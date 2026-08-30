@@ -11590,6 +11590,9 @@ class JIT {
                     break;
                 case OpCode::TYPE_ECHO:
                 case OpCode::TYPE_PRINT:
+                    // Standalone `new DateTime(Immutable)` leaves pendingDateTimePropertyInstant
+                    // for the next expression — do not stamp unrelated typed property stores (#35802).
+                    $this->context->pendingDateTimePropertyInstant = null;
                     JIT\JitNativeString::ensureInsertBlock($this->context);
                     $this->context->intrinsic->builder = $this->context->builder;
                     $this->context->callSiteLine = OpCode::TYPE_ECHO === $op->type
@@ -18165,31 +18168,39 @@ class JIT {
                 if (Variable::TYPE_OBJECT === $prior->type) {
                     // Legacy path: void __construct on an unboxed TYPE_OBJECT `new` temp.
                     if ($this->isVoidJitConstructCall($this->context->scope->toCall)) {
-                        $this->markNewObjectConstructedAfterCall(
-                            $this->context->scope->toCall,
-                            $this->context->scope->args
-                        );
-                        if ($this->context->scope->toCall instanceof JIT\Call\BcMathNumberConstruct) {
-                            $thisArg = $this->context->scope->args[0] ?? null;
-                            $ct = ($thisArg instanceof Variable)
-                                ? $thisArg->compileTimeBcmathNumber
-                                : null;
-                            if (null !== $ct) {
-                                $prior->compileTimeBcmathNumber = $ct;
-                                $name = JIT\OperandName::resolve($result);
-                                if (null !== $name && '' !== $name) {
-                                    $resolved = $this->context->resolveRefAliasName($name);
-                                    if (isset($this->context->namedVariableBindings[$resolved])) {
-                                        $this->context->namedVariableBindings[$resolved]
-                                            ->compileTimeBcmathNumber = $ct;
-                                    }
-                                    $this->context->bindVariableByName($resolved, $prior);
+                        if (
+                            $this->context->scope->toCall instanceof JIT\Call\DateTimeConstruct
+                            || $this->context->scope->toCall instanceof JIT\Call\DateTimeImmutableConstruct
+                        ) {
+                            // JitDateTimeConstruct returns an initialized __value__* box (#35752).
+                            // Drop the empty New_ shell and assign the box below (#35802).
+                        } else {
+                            $this->markNewObjectConstructedAfterCall(
+                                $this->context->scope->toCall,
+                                $this->context->scope->args
+                            );
+                            if ($this->context->scope->toCall instanceof JIT\Call\BcMathNumberConstruct) {
+                                $thisArg = $this->context->scope->args[0] ?? null;
+                                $ct = ($thisArg instanceof Variable)
+                                    ? $thisArg->compileTimeBcmathNumber
+                                    : null;
+                                if (null !== $ct) {
                                     $prior->compileTimeBcmathNumber = $ct;
+                                    $name = JIT\OperandName::resolve($result);
+                                    if (null !== $name && '' !== $name) {
+                                        $resolved = $this->context->resolveRefAliasName($name);
+                                        if (isset($this->context->namedVariableBindings[$resolved])) {
+                                            $this->context->namedVariableBindings[$resolved]
+                                                ->compileTimeBcmathNumber = $ct;
+                                        }
+                                        $this->context->bindVariableByName($resolved, $prior);
+                                        $prior->compileTimeBcmathNumber = $ct;
+                                    }
                                 }
                             }
-                        }
 
-                        return;
+                            return;
+                        }
                     }
                     // Inline f(); g() must not inherit object-typed operand slots (#18052).
                     $prior->free();
@@ -21267,14 +21278,34 @@ class JIT {
             JIT\ReadonlyClassGuard::emitStoreUnlessPending(
                 $this->context,
                 function () use ($result, $value): void {
+                    $constraint = strtolower(ltrim((string) ($result->objectPropertyClassConstraint ?? ''), '\\'));
+                    if (\in_array($constraint, ['datetime', 'datetimeimmutable'], true)) {
+                        $valueClass = strtolower(ltrim((string) (
+                            $value->compileTimeDateTimeClassName ?? $value->classUserType ?? ''
+                        ), '\\'));
+                        // Reused New_ temps keep the prior DateTime(Immutable) class hint and block
+                        // pending instant copy — typed property stores get an empty shell (#35802).
+                        if ('' !== $valueClass && $valueClass !== $constraint) {
+                            $value->compileTimeDateTimeTimestamp = null;
+                            $value->compileTimeDateTimeMicrosecond = null;
+                            $value->compileTimeTimezoneName = null;
+                            $value->compileTimeDateTimeClassName = null;
+                            if (\in_array($valueClass, ['datetime', 'datetimeimmutable'], true)) {
+                                $value->classUserType = null;
+                            }
+                        }
+                    }
                     $pending = $this->context->pendingDateTimePropertyInstant;
                     if (
                         is_array($pending)
                         && isset($pending['timestamp'])
                         && null === $value->compileTimeDateTimeTimestamp
                     ) {
-                        $constraint = strtolower(ltrim((string) ($result->objectPropertyClassConstraint ?? ''), '\\'));
-                        if (\in_array($constraint, ['datetime', 'datetimeimmutable'], true)) {
+                        $pendingClass = strtolower(ltrim((string) ($pending['className'] ?? 'datetime'), '\\'));
+                        if (
+                            \in_array($constraint, ['datetime', 'datetimeimmutable'], true)
+                            && $pendingClass === $constraint
+                        ) {
                             $value->compileTimeDateTimeTimestamp = (int) $pending['timestamp'];
                             $value->compileTimeDateTimeMicrosecond = (int) ($pending['microsecond'] ?? 0);
                             $value->compileTimeTimezoneName = $pending['timezone'] ?? null;
@@ -22948,6 +22979,7 @@ class JIT {
             'timestamp' => (int) $value->compileTimeDateTimeTimestamp,
             'timezone' => $value->compileTimeTimezoneName,
             'microsecond' => (int) ($value->compileTimeDateTimeMicrosecond ?? 0),
+            'className' => $value->compileTimeDateTimeClassName ?? $value->classUserType ?? 'DateTime',
         ];
         $this->context->bindVariableByName($resolved, $value);
     }
@@ -23473,21 +23505,32 @@ class JIT {
             $bound->compileTimeDateTimeMicrosecond = $first->compileTimeDateTimeMicrosecond;
             $bound->compileTimeTimezoneName = $first->compileTimeTimezoneName;
             $bound->classUserType = $first->classUserType ?? $className;
+            $bound->compileTimeDateTimeClassName = $first->compileTimeDateTimeClassName ?? $className;
         };
         $instant = [
             'timestamp' => (int) $first->compileTimeDateTimeTimestamp,
             'timezone' => $first->compileTimeTimezoneName,
             'microsecond' => (int) ($first->compileTimeDateTimeMicrosecond ?? 0),
+            'className' => $className,
         ];
         $stamp($first);
         $resultVar = $this->context->lastDateTimeNewResultVar;
-        if ($resultVar instanceof JIT\Variable) {
+        $resultOp = $this->context->lastDateTimeNewResultOp;
+        if ($resultOp instanceof \PHPCfg\Operand && $this->context->hasVariableOp($resultOp)) {
+            // EXEC_RETURN may replace the New_ shell with JitDateTimeConstruct's __value__* box
+            // (#35752). Never revert scope[$resultOp] to construct $this (#35802).
+            $live = $this->context->getVariableFromOp($resultOp);
+            $stamp($live);
+            $this->context->scope->variables[$resultOp] = $live;
+            $resultVar = $live;
+        } elseif ($resultVar instanceof JIT\Variable) {
             $stamp($resultVar);
         }
-        $resultOp = $this->context->lastDateTimeNewResultOp;
         $publishName = null;
         if ($resultOp instanceof \PHPCfg\Operand) {
-            $this->context->scope->variables[$resultOp] = $first;
+            if (!$this->context->hasVariableOp($resultOp)) {
+                $this->context->scope->variables[$resultOp] = $first;
+            }
             $publishName = JIT\OperandName::resolve($resultOp);
         }
         // Temporary New_ results often have no Operand name (#32691 / re-#27309). Prefer a
@@ -23767,25 +23810,34 @@ class JIT {
     /** Copy compile-time instant onto `$dt->format()` / getTimestamp receivers (#32691). */
     private function applyDateTimeLocalInstantToReceiver(Operand $receiverOp, JIT\Variable $receiverVar): void
     {
+        // Typed property fetch temps reuse operand names across statements. An earlier
+        // `new DateTime(Immutable)` must not stamp a later `(new Sub)->dt->format()` receiver
+        // (#35802 peer #35752 — cross-class chained format SIGABRT).
+        if (
+            null !== $receiverVar->objectPropertyClassConstraint
+            || null !== $receiverVar->objectPropertySlot
+        ) {
+            return;
+        }
         $recvName = JIT\OperandName::resolve($receiverOp);
         if (null === $recvName || '' === $recvName) {
             return;
         }
         $resolved = $this->context->resolveRefAliasName($recvName);
+        $bound = $this->context->namedVariableBindings[$resolved] ?? null;
+        if (!$bound instanceof JIT\Variable || $bound !== $receiverVar) {
+            return;
+        }
         $instant = $this->context->dateTimeLocalInstants[$resolved] ?? null;
-        if (null === $instant) {
-            // Fall back to the named binding — dateTimeLocalInstants can stay empty when
-            // New_/construct sync misses the local, while the binding still carries the
-            // dedicated #32691 stamp (re-#27309 DateTime::diff).
-            $bound = $this->context->namedVariableBindings[$resolved] ?? null;
-            if ($bound instanceof JIT\Variable && null !== $bound->compileTimeDateTimeTimestamp) {
-                $instant = [
-                    'timestamp' => (int) $bound->compileTimeDateTimeTimestamp,
-                    'timezone' => $bound->compileTimeTimezoneName,
-                    'microsecond' => (int) ($bound->compileTimeDateTimeMicrosecond ?? 0),
-                ];
-                $this->context->dateTimeLocalInstants[$resolved] = $instant;
-            }
+        if (null === $instant && null !== $bound->compileTimeDateTimeTimestamp) {
+            // New_/construct sync missed dateTimeLocalInstants but the binding still carries
+            // the dedicated #32691 stamp (re-#27309 DateTime::diff).
+            $instant = [
+                'timestamp' => (int) $bound->compileTimeDateTimeTimestamp,
+                'timezone' => $bound->compileTimeTimezoneName,
+                'microsecond' => (int) ($bound->compileTimeDateTimeMicrosecond ?? 0),
+                'className' => $bound->compileTimeDateTimeClassName ?? $bound->classUserType ?? 'DateTime',
+            ];
         }
         if (null === $instant) {
             return;
@@ -23793,9 +23845,18 @@ class JIT {
         $receiverVar->compileTimeDateTimeTimestamp = $instant['timestamp'];
         $receiverVar->compileTimeDateTimeMicrosecond = (int) ($instant['microsecond'] ?? 0);
         $receiverVar->compileTimeTimezoneName = $instant['timezone'];
+        $instantClass = $instant['className'] ?? 'DateTime';
         if (null === $receiverVar->classUserType || '' === $receiverVar->classUserType) {
-            $receiverVar->classUserType = 'DateTime';
+            $receiverVar->classUserType = \is_string($instantClass) && '' !== $instantClass
+                ? $instantClass
+                : 'DateTime';
         }
+        if (null === $receiverVar->compileTimeDateTimeClassName || '' === $receiverVar->compileTimeDateTimeClassName) {
+            $receiverVar->compileTimeDateTimeClassName = $receiverVar->classUserType;
+        }
+        // Operand names are reused across statements — consume so a later unrelated
+        // `(new Sub)->dt->format()` temp does not inherit this construct instant (#35802).
+        unset($this->context->dateTimeLocalInstants[$resolved]);
     }
 
     /** Copy construct stamp onto `$i->format()` receivers (#32699). */
@@ -30760,6 +30821,13 @@ class JIT {
             $boxed->compileTimeDateTimeMicrosecond = $fetched->compileTimeDateTimeMicrosecond;
             $boxed->compileTimeTimezoneName = $fetched->compileTimeTimezoneName;
             $boxed->compileTimeDateTimeClassName = $fetched->compileTimeDateTimeClassName;
+        } elseif (null !== $constraintUserType) {
+            $dateLc = strtolower(ltrim($constraintUserType, '\\'));
+            if (\in_array($dateLc, ['datetime', 'datetimeimmutable'], true)) {
+                $boxed->compileTimeDateTimeClassName = 'datetimeimmutable' === $dateLc
+                    ? 'DateTimeImmutable'
+                    : 'DateTime';
+            }
         }
 
         return $boxed;

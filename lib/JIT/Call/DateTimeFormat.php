@@ -40,6 +40,7 @@ final class DateTimeFormat implements Call
 
         // Unserialize sync stamps named bindings / dateTimeLocalInstants; method $this may
         // be a divergent scope Variable (#34614). Restore before format fold.
+        $context->pendingDateTimePropertyInstant = null;
         self::restoreDateTimeInstantStamps($context, $args[0]);
 
         return DateTimeFormatJitHelper::compileFormat($context, $args[0], $args[1]);

@@ -8942,20 +8942,36 @@ class Object_ extends Type {
                 && \is_array($pending)
                 && isset($pending['timestamp'])
             ) {
-                $value->compileTimeDateTimeTimestamp = (int) $pending['timestamp'];
-                $value->compileTimeDateTimeMicrosecond = (int) ($pending['microsecond'] ?? 0);
-                $value->compileTimeTimezoneName = $pending['timezone'] ?? null;
-                if (null === $value->compileTimeDateTimeClassName || '' === $value->compileTimeDateTimeClassName) {
-                    $hint = strtolower(ltrim((string) ($value->classUserType ?? ''), '\\'));
-                    $value->compileTimeDateTimeClassName = 'datetimeimmutable' === $hint
-                        ? 'DateTimeImmutable'
-                        : 'DateTime';
+                $pendingClass = strtolower(ltrim((string) ($pending['className'] ?? 'datetime'), '\\'));
+                $hint = strtolower(ltrim((string) ($value->classUserType ?? ''), '\\'));
+                if (
+                    '' !== $hint
+                    && $hint !== $pendingClass
+                    && \in_array($hint, ['datetime', 'datetimeimmutable'], true)
+                ) {
+                    // Operand reuse: prior DateTime(Immutable) hint must not block pending (#35802).
+                    $value->classUserType = null;
+                    $value->compileTimeDateTimeClassName = null;
+                    $value->compileTimeDateTimeTimestamp = null;
+                    $hint = '';
+                }
+                if ('' === $hint || $hint === $pendingClass) {
+                    $value->compileTimeDateTimeTimestamp = (int) $pending['timestamp'];
+                    $value->compileTimeDateTimeMicrosecond = (int) ($pending['microsecond'] ?? 0);
+                    $value->compileTimeTimezoneName = $pending['timezone'] ?? null;
+                    $useClass = '' !== $hint ? $hint : $pendingClass;
+                    if (null === $value->compileTimeDateTimeClassName || '' === $value->compileTimeDateTimeClassName) {
+                        $value->compileTimeDateTimeClassName = 'datetimeimmutable' === $useClass
+                            ? 'DateTimeImmutable'
+                            : 'DateTime';
+                    }
                 }
             }
             if (null !== $value->compileTimeDateTimeTimestamp) {
+                $layoutClass = $value->compileTimeDateTimeClassName ?? $value->classUserType ?? 'DateTime';
+                $layoutLc = strtolower(ltrim((string) $layoutClass, '\\'));
                 if (null === $value->compileTimeDateTimeClassName || '' === $value->compileTimeDateTimeClassName) {
-                    $hint = strtolower(ltrim((string) ($value->classUserType ?? ''), '\\'));
-                    $value->compileTimeDateTimeClassName = 'datetimeimmutable' === $hint
+                    $value->compileTimeDateTimeClassName = 'datetimeimmutable' === $layoutLc
                         ? 'DateTimeImmutable'
                         : 'DateTime';
                 }

@@ -97,6 +97,7 @@ final class JitDateTimeConstruct
         $args[0]->compileTimeDateTimeClassName = $className;
         $args[0]->compileTimeDateTimeMicrosecond = $parsed['microsecond'];
         $args[0]->compileTimeTimezoneName = $parsed['timezone'];
+        $args[0]->classUserType = $className;
 
         // Return the initialized object box so `$prop = new DateTime(...)` EXEC_RETURN
         // does not wipe the `new` temp with null (#35752; peer Exception #23641).
