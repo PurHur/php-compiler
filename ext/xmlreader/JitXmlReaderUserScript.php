@@ -10,19 +10,28 @@ use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\UserScriptAotEnv;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\ext\dom\JitDomCreateCDATASection;
+use PHPCompiler\ext\dom\JitDomCreateComment;
+use PHPCompiler\ext\dom\JitDomCreateElement;
+use PHPCompiler\ext\dom\JitDomCreateTextNode;
+use PHPCompiler\ext\dom\JitDomDocumentElement;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
  * User-script AOT: XMLReader::XML / open / fromString + read() + nodeType/name/value
- * (#27299, #28670, #35907).
+ * + readInnerXml / readOuterXml / expand (#27299, #28670, #35907, #35908, #35911).
  *
  * Thin standalone previously lowered factories to ExternalMethod NULL and then failed
  * `while ($r->read())` with `object::read()` once PHPCfg widened the receiver. Compile-time
  * tokenize via {@see VmXmlReader::tokenize} and emit a position switch that updates real
  * object slots so property fetches match Zend without NestedJIT of the full pull parser.
  *
- * php-src: ext/xmlreader/php_xmlreader.c — XML / open / fromString / read / xmlreader props
+ * Subtree serialize / expand APIs precompute per event index and switch on `__xr_pos`.
+ * Expand materializes DOM via outer XML (peer importNode / loadXML child sync).
+ *
+ * php-src: ext/xmlreader/php_xmlreader.c — XML / open / fromString / read /
+ * zim_XMLReader_readInnerXml / zim_XMLReader_readOuterXml / zim_XMLReader_expand
  */
 final class JitXmlReaderUserScript
 {
@@ -38,6 +47,13 @@ final class JitXmlReaderUserScript
 
     /** @var list<string>|null Precomputed readOuterXml() per event index (#35908). */
     private static ?array $lastOuterXml = null;
+
+    /**
+     * Precomputed expand() materialize specs per event index (#35911).
+     *
+     * @var list<array{kind: string, name: string, text: string, outer: string, inner: string}>|null
+     */
+    private static ?array $lastExpand = null;
 
     /** Set when the last XML()/open lowering was the instance form (#35106 / #35907). */
     public static bool $lastCallWasInstance = false;
@@ -223,18 +239,76 @@ final class JitXmlReaderUserScript
         self::$lastEvents = $events;
         $inner = [];
         $outer = [];
+        $expand = [];
         foreach ($rawEvents as $i => $_) {
-            $inner[] = XmlReaderSubtreeXmlHelper::innerXml($rawEvents, $i);
-            $outer[] = XmlReaderSubtreeXmlHelper::outerXml($rawEvents, $i);
+            $innerXml = XmlReaderSubtreeXmlHelper::innerXml($rawEvents, $i);
+            $outerXml = XmlReaderSubtreeXmlHelper::outerXml($rawEvents, $i);
+            $inner[] = $innerXml;
+            $outer[] = $outerXml;
+            $expand[] = self::expandSpecForEvent($rawEvents[$i], $innerXml, $outerXml, $rawEvents, $i);
         }
         self::$lastInnerXml = $inner;
         self::$lastOuterXml = $outer;
+        self::$lastExpand = $expand;
 
         if (null !== $instanceReceiver) {
             return self::resetReceiverForParse($context, $instanceReceiver);
         }
 
         return self::materializeReader($context);
+    }
+
+    /**
+     * @param list<XmlReaderEvent> $rawEvents
+     * @return array{kind: string, name: string, text: string, outer: string, inner: string}
+     */
+    private static function expandSpecForEvent(
+        XmlReaderEvent $event,
+        string $innerXml,
+        string $outerXml,
+        array $rawEvents,
+        int $index
+    ): array {
+        return match ($event->nodeType) {
+            XmlReaderConstants::ELEMENT,
+            XmlReaderConstants::END_ELEMENT => [
+                'kind' => 'element',
+                'name' => $event->name,
+                'text' => XmlReaderSubtreeXmlHelper::readString($rawEvents, $index),
+                'outer' => $outerXml,
+                'inner' => $innerXml,
+            ],
+            XmlReaderConstants::TEXT,
+            XmlReaderConstants::WHITESPACE,
+            XmlReaderConstants::SIGNIFICANT_WHITESPACE => [
+                'kind' => 'text',
+                'name' => '#text',
+                'text' => $event->value,
+                'outer' => '',
+                'inner' => '',
+            ],
+            XmlReaderConstants::CDATA => [
+                'kind' => 'cdata',
+                'name' => '#cdata-section',
+                'text' => $event->value,
+                'outer' => '',
+                'inner' => '',
+            ],
+            XmlReaderConstants::COMMENT => [
+                'kind' => 'comment',
+                'name' => '#comment',
+                'text' => $event->value,
+                'outer' => '',
+                'inner' => '',
+            ],
+            default => [
+                'kind' => 'false',
+                'name' => '',
+                'text' => '',
+                'outer' => '',
+                'inner' => '',
+            ],
+        };
     }
 
     /**
@@ -377,6 +451,167 @@ final class JitXmlReaderUserScript
     public static function tryReadOuterXml(Context $context, JITVariable ...$args): ?Value
     {
         return self::trySubtreeXml($context, self::$lastOuterXml, 'readOuterXml', ...$args);
+    }
+
+    /**
+     * XMLReader::expand() leftover of fromString/open (#35911 / #27299 / #19394).
+     * php-src: zim_XMLReader_expand / xmlTextReaderExpand.
+     */
+    public static function tryExpand(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot() || null === self::$lastExpand || null === self::$lastEvents) {
+            return null;
+        }
+        if (\count($args) < 1) {
+            throw new \LogicException('XMLReader::expand() called without $this');
+        }
+        // Optional DOMNode $baseNode is unsupported on the thin path (null owner).
+        if (\count($args) > 1) {
+            return null;
+        }
+
+        return self::emitExpandSwitch($context, $args[0], self::$lastExpand);
+    }
+
+    /**
+     * @param list<array{kind: string, name: string, text: string, outer: string, inner: string}> $byPos
+     */
+    private static function emitExpandSwitch(
+        Context $context,
+        JITVariable $receiver,
+        array $byPos
+    ): Value {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'xmlreader_expand_cont');
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup(self::CLASS_NAME);
+        self::ensureLayout($objectType, $classId);
+
+        $obj = self::loadObject($context, $receiver);
+        $i64 = $context->getTypeFromString('int64');
+        $posVal = $context->helper->loadValue(
+            $objectType->propertyFetch($obj, self::CLASS_NAME, self::PROP_POS)
+        );
+
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__*'));
+        $merge = BasicBlockHelper::append($context, 'xmlreader_expand_merge');
+        $miss = BasicBlockHelper::append($context, 'xmlreader_expand_miss');
+
+        $n = \count($byPos);
+        /** @var list<\PHPLLVM\BasicBlock> */
+        $caseBlocks = [];
+        for ($i = 0; $i < $n; ++$i) {
+            $caseBlocks[$i] = BasicBlockHelper::append($context, 'xmlreader_expand_case_'.$i);
+        }
+        $inRange = $context->builder->icmp(
+            Builder::INT_SLT,
+            $posVal,
+            $i64->constInt($n, true)
+        );
+        $nonNeg = $context->builder->icmp(
+            Builder::INT_SGE,
+            $posVal,
+            $i64->constInt(0, true)
+        );
+        $ok = $context->builder->and($inRange, $nonNeg);
+        $context->builder->branchIf(
+            $ok,
+            $n > 0 ? $caseBlocks[0] : $miss,
+            $miss
+        );
+
+        $context->builder->positionAtEnd($miss);
+        $context->builder->store(self::boolFalseValueBox($context), $resultSlot);
+        $context->builder->branch($merge);
+
+        for ($i = 0; $i < $n; ++$i) {
+            $context->builder->positionAtEnd($caseBlocks[$i]);
+            $isThis = $context->builder->icmp(
+                Builder::INT_EQ,
+                $posVal,
+                $i64->constInt($i, true)
+            );
+            $apply = BasicBlockHelper::append($context, 'xmlreader_expand_apply_'.$i);
+            $next = ($i + 1 < $n) ? $caseBlocks[$i + 1] : $miss;
+            $context->builder->branchIf($isThis, $apply, $next);
+
+            $context->builder->positionAtEnd($apply);
+            $context->builder->store(self::materializeExpandSpec($context, $byPos[$i]), $resultSlot);
+            $context->builder->branch($merge);
+        }
+
+        $context->builder->positionAtEnd($merge);
+
+        return $context->builder->load($resultSlot);
+    }
+
+    /**
+     * @param array{kind: string, name: string, text: string, outer: string, inner: string} $spec
+     */
+    private static function materializeExpandSpec(Context $context, array $spec): Value
+    {
+        return match ($spec['kind']) {
+            'element' => self::materializeExpandElement($context, $spec),
+            'text' => self::objectValueBox(
+                $context,
+                JitDomCreateTextNode::materialize($context, $spec['text'])
+            ),
+            'cdata' => self::objectValueBox(
+                $context,
+                JitDomCreateCDATASection::materialize($context, $spec['text'])
+            ),
+            'comment' => self::objectValueBox(
+                $context,
+                JitDomCreateComment::materialize($context, $spec['text'])
+            ),
+            default => self::boolFalseValueBox($context),
+        };
+    }
+
+    /**
+     * @param array{kind: string, name: string, text: string, outer: string, inner: string} $spec
+     */
+    private static function materializeExpandElement(Context $context, array $spec): Value
+    {
+        if ('' === $spec['name']) {
+            return self::boolFalseValueBox($context);
+        }
+        $element = JitDomCreateElement::materializeElementWithTextContent(
+            $context,
+            $spec['name'],
+            $spec['text']
+        );
+        if ('' !== $spec['inner']) {
+            JitDomCreateElement::storeUserScriptInnerXml($context, $element, $spec['inner']);
+        }
+        if ('' !== $spec['outer']) {
+            JitDomDocumentElement::syncChildrenFromXmlPublic($context, $element, $spec['outer']);
+        }
+
+        return self::objectValueBox($context, $element);
+    }
+
+    private static function objectValueBox(Context $context, Value $object): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            JitValueBox::pointer($context, $slot),
+            $object
+        );
+
+        return JitValueBox::normalizeValuePtr($context, $slot);
+    }
+
+    private static function boolFalseValueBox(Context $context): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeBool(
+            $context,
+            $slot,
+            $context->getTypeFromString('int1')->constInt(0, false)
+        );
+
+        return JitValueBox::normalizeValuePtr($context, $slot);
     }
 
     /**
