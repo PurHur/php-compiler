@@ -9,16 +9,16 @@ use PHPUnit\Framework\TestCase;
 require_once __DIR__.'/../LlvmToolchain.php';
 
 /**
- * AOT: iterator_to_array(SimpleXMLElement) host fold (#35852 leftover of #35844).
+ * AOT: iterator_to_array(SimpleXMLElement) leftover of Iterator host folds (#35852 / #35844).
  *
- * php-src: ext/spl/iterator.c + ext/simplexml/sxe.c Iterator handlers
+ * php-src: ext/spl/iterator.c + ext/simplexml/sxe.c
  *
  * @group llvm
  * @group aot
  */
 final class SimpleXmlIteratorToArrayAotTest extends TestCase
 {
-    private const EXPECTED = "{\"a\":{\"0\":\"1\"},\"b\":{\"0\":\"2\"}}\n[{\"0\":\"1\"},{\"0\":\"2\"}]\n";
+    private const EXPECTED = "a=1\nb=2\n0=1\n1=2\n{\"a\":{\"0\":\"1\"},\"b\":{\"0\":\"2\"}}\n[{\"0\":\"1\"},{\"0\":\"2\"}]\n";
 
     public function testVmIteratorToArrayMatchesZendShape(): void
     {
@@ -55,14 +55,14 @@ final class SimpleXmlIteratorToArrayAotTest extends TestCase
         }
     }
 
-    public function testNoNewRuntimeC(): void
+    public function testFoldHookAndNoNewRuntimeC(): void
     {
         $root = dirname(__DIR__, 2);
         $this->assertFileDoesNotExist($root.'/runtime/simplexml_iterator_to_array.c');
         $us = (string) file_get_contents($root.'/ext/simplexml/JitSimpleXmlUserScript.php');
-        $this->assertStringContainsString('tryMaterializeHostIteratorToArrayHashtable', $us);
+        $this->assertStringContainsString('tryFoldIteratorToArrayHashtable', $us);
         $this->assertStringContainsString('#35852', $us);
         $ita = (string) file_get_contents($root.'/ext/standard/JitIteratorToArray.php');
-        $this->assertStringContainsString('tryMaterializeHostIteratorToArrayHashtable', $ita);
+        $this->assertStringContainsString('tryFoldIteratorToArrayHashtable', $ita);
     }
 }

@@ -31,14 +31,6 @@ final class JitIteratorToArray
     public static function invoke(Context $context, Variable $iterator, bool $preserveKeys): Value
     {
         ExceptionBridge::ensureLinked($context);
-        $sxeFold = JitSimpleXmlUserScript::tryMaterializeHostIteratorToArrayHashtable(
-            $context,
-            $iterator,
-            $preserveKeys
-        );
-        if (null !== $sxeFold) {
-            return self::wrapHashTable($context, $sxeFold);
-        }
 
         return self::wrapHashTable($context, self::materializeHashtable($context, $iterator, $preserveKeys));
     }
@@ -81,13 +73,14 @@ final class JitIteratorToArray
         bool $preserveKeys,
         ?string $containerUserType = null
     ): Value {
-        $sxeFold = JitSimpleXmlUserScript::tryMaterializeHostIteratorToArrayHashtable(
+        // Before value-box unwrap — SXE host tokens live on the operand Variable (#35852).
+        $sxeHt = JitSimpleXmlUserScript::tryFoldIteratorToArrayHashtable(
             $context,
             $iterator,
             $preserveKeys
         );
-        if (null !== $sxeFold) {
-            return $sxeFold;
+        if (null !== $sxeHt) {
+            return $sxeHt;
         }
         if (Variable::TYPE_NULL === $iterator->type || ($iterator->isNullConstant ?? false)) {
             JitIterableArg::emitIterableTypeErrorAndAbort(
@@ -234,6 +227,15 @@ final class JitIteratorToArray
             ?? (Variable::TYPE_OBJECT === $iterator->type
                 ? ($iterator->compileTimeString ?? $iterator->objectPropertyClassName)
                 : null);
+        // SimpleXMLElement Iterator host folds must not enter the runtime protocol loop (#35852).
+        $sxeHt = JitSimpleXmlUserScript::tryFoldIteratorToArrayHashtable(
+            $context,
+            $iterator,
+            $preserveKeys
+        );
+        if (null !== $sxeHt) {
+            return $sxeHt;
+        }
         if (\PHPCompiler\VM\SplOuterIteratorHt::isHtBacked($userType)) {
             return self::materializeFromSplHt($context, $iterator, $preserveKeys);
         }

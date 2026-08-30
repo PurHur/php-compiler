@@ -2061,12 +2061,9 @@ final class JitSimpleXmlUserScript
      */
     public static function tryFoldJsonEncode(Context $context, JITVariable $arg, int $flags): ?Value
     {
+        // Exact match only — lastTree would json_encode() a sibling HT as the last SXE (#35850 / #35852).
         $tree = self::lookupExact($arg);
-        if (null === $tree && JITVariable::TYPE_OBJECT === $arg->type) {
-            // Chained (new SimpleXMLElement(...))->… binds lastTree, not the temp (#35844).
-            $tree = self::$lastTree;
-        }
-        if (null === $tree) {
+        if (null === $tree || !UserScriptAotEnv::isActive()) {
             return null;
         }
         try {
@@ -2082,84 +2079,88 @@ final class JitSimpleXmlUserScript
     }
 
     /**
-     * iterator_to_array($sxe) — host spl iterator_to_array + sxe Iterator (#35852 leftover of #35844).
+     * iterator_to_array($sxe) — host fold leftover of Iterator method folds (#35852 / #35844).
      *
-     * Host-folded rewind/valid/next are compile-time no-ops; the runtime Iterator loop never
-     * terminates. Materialize on the host when the compile-time tree is known (peer #35850).
+     * Host-folded rewind/valid/next are compile-time constants/no-ops. Emitting them inside
+     * JitIteratorToArray's runtime Iterator loop never terminates (timeout/OOM). Drain the
+     * host tree once at compile time (php-src ext/spl/iterator.c + ext/simplexml/sxe.c).
      *
-     * @return Value|null __hashtable__* for {@see \PHPCompiler\ext\standard\JitIteratorToArray}
+     * @return Value|null `__hashtable__*` or null when no compile-time tree
      */
-    public static function tryMaterializeHostIteratorToArrayHashtable(
+    public static function tryFoldIteratorToArrayHashtable(
         Context $context,
-        JITVariable $arg,
+        JITVariable $iterator,
         bool $preserveKeys
     ): ?Value {
-        if (!UserScriptAotEnv::isActive() || !\extension_loaded('simplexml')) {
+        if (!UserScriptAotEnv::isActive()) {
             return null;
         }
-        $tree = self::compileTimeTree($arg);
+        // Exact match only — lastTree after baking children would drain the last child (#35852).
+        $tree = self::lookupExact($iterator);
         if (null === $tree) {
             return null;
         }
         try {
-            $arr = \iterator_to_array($tree, $preserveKeys);
+            // Isolate — host Iterator mutates the shared compile-time tree (#35844 rewind/next).
+            $isolated = self::isolateHostElement($tree);
+            $hostArr = \iterator_to_array($isolated, $preserveKeys);
         } catch (\Throwable) {
             return null;
         }
-        if (!\is_array($arr)) {
+        if (!\is_array($hostArr)) {
             return null;
         }
-        self::$pendingIteratorToArrayHostArray = $arr;
-        $ht = self::materializeHostIteratorToArrayHashtable($context, $arr);
-        if (null === $ht) {
-            self::$pendingIteratorToArrayHostArray = null;
+        self::$pendingIteratorToArrayHostArray = $hostArr;
+        $out = new JITVariable(
+            $context,
+            JITVariable::TYPE_HASHTABLE,
+            JITVariable::KIND_VALUE,
+            HashTableHelper::alloc($context)
+        );
+        if (!$preserveKeys) {
+            $out->nextFreeElement = 0;
         }
-
-        return $ht;
-    }
-
-    /**
-     * @param array<int|string, mixed> $arr
-     */
-    private static function materializeHostIteratorToArrayHashtable(Context $context, array $arr): ?Value
-    {
-        $ht = HashTableHelper::alloc($context);
         $i64 = $context->getTypeFromString('int64');
-        $classId = $context->type->object->lookup('SimpleXMLElement');
-        try {
-            foreach ($arr as $key => $value) {
-                if (!($value instanceof \SimpleXMLElement)) {
-                    return null;
-                }
-                $obj = $context->type->object->allocate($classId);
-                $context->type->object->markObjectConstructed($obj);
-                $receiver = new JITVariable(
-                    $context,
-                    JITVariable::TYPE_OBJECT,
-                    JITVariable::KIND_VALUE,
-                    $obj
-                );
-                self::bindHostTreeForSnapshot($context, $receiver, $value);
+        foreach ($hostArr as $key => $child) {
+            if (!($child instanceof \SimpleXMLElement)) {
+                self::$pendingIteratorToArrayHostArray = null;
+
+                return null;
+            }
+            $classId = $context->type->object->lookup('SimpleXMLElement');
+            $obj = $context->type->object->allocate($classId);
+            $context->type->object->markObjectConstructed($obj);
+            $elem = new JITVariable(
+                $context,
+                JITVariable::TYPE_OBJECT,
+                JITVariable::KIND_VALUE,
+                $obj
+            );
+            $isolatedChild = self::isolateHostElement($child);
+            self::store($elem, $isolatedChild);
+            self::bakeElementScalars($context, $elem, $isolatedChild);
+            $keyVar = null;
+            if ($preserveKeys) {
                 if (\is_int($key)) {
-                    HashTableHelper::setAtIndex(
+                    $keyVar = new JITVariable(
                         $context,
-                        $ht,
-                        $i64->constInt($key, false),
-                        $receiver
+                        JITVariable::TYPE_NATIVE_LONG,
+                        JITVariable::KIND_VALUE,
+                        $i64->constInt($key, false)
                     );
                 } else {
-                    $keyStr = $context->builder->load(
-                        $context->constantStringFromString((string) $key)
+                    $keyVar = new JITVariable(
+                        $context,
+                        JITVariable::TYPE_STRING,
+                        JITVariable::KIND_VALUE,
+                        $context->builder->load($context->constantStringFromString((string) $key))
                     );
-                    HashTableHelper::setAtStringKey($context, $ht, $keyStr, $receiver);
                 }
             }
-        } catch (\Throwable) {
-            return null;
+            HashTableHelper::addElement($context, $out, $elem, $keyVar);
         }
-        $context->refcount->addref($ht);
 
-        return $ht;
+        return $context->helper->loadValue($out);
     }
 
     /**
