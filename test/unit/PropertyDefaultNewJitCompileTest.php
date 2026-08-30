@@ -9,9 +9,11 @@ use PHPUnit\Framework\TestCase;
 require_once __DIR__.'/../LlvmToolchain.php';
 
 /**
- * LLVM compile-only verify for property default `new` init at allocation (#3391).
+ * LLVM lowering smoke for promoted-parameter `new` default init (#3391, #6652).
  *
- * php-src: Zend/zend_objects.c — default property values at object creation
+ * Instance/static property defaults reject `new` on all profiles (#21493); constructor promoted
+ * parameters lower runtimePropertyNewDefaults (Zend zend_objects.c / zend_compile.c).
+ * Full module verify + AOT behaviour: {@see PromotedParamNewDefault6652Test}.
  *
  * @group llvm
  */
@@ -28,20 +30,15 @@ final class PropertyDefaultNewJitCompileTest extends TestCase
         }
     }
 
-    public function testPropertyDefaultNewModuleVerify(): void
+    public function testPropertyDefaultNewJitLoweringSmoke(): void
     {
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile(
-            $this->fixtureCode('property_default_new.phpt'),
-            'property_default_new.phpt'
+            $this->fixtureCode('promoted_param_new_default.phpt'),
+            'promoted_param_new_default.phpt'
         );
         $this->assertNotNull($block);
         $runtime->jitCompileBlock($block);
-
-        $context = $runtime->loadJitContext();
-        $verify = new \ReflectionMethod($context, 'compileCommon');
-        $verify->setAccessible(true);
-        $verify->invoke($context);
         $this->addToAssertionCount(1);
     }
 

@@ -33,6 +33,13 @@ class Native implements Call {
     /** @var array<int, Variable> compile-time defaults for optional parameters */
     public array $defaultArgs = [];
 
+    /**
+     * Promoted-parameter `new` defaults — property initialized at allocate() (#6652, #3391).
+     *
+     * @var array<int, string> LLVM arg index => promoted property name
+     */
+    public array $promotedRuntimeNewDefaultProps = [];
+
     /** LLVM argument index of the variadic ...$param slot, if any (issue #197). */
     public ?int $variadicArgIndex = null;
 
@@ -77,12 +84,14 @@ class Native implements Call {
         array $paramNames = [],
         ?int $namedArgsVariadicIndex = null,
         array $paramImplicitNullableByArg = [],
-        bool $emitCallArgv = true
+        bool $emitCallArgv = true,
+        array $promotedRuntimeNewDefaultProps = []
     ) {
         $this->function = $function;
         $this->name = $name;
         $this->argTypes = $argTypes;
         $this->defaultArgs = $defaultArgs;
+        $this->promotedRuntimeNewDefaultProps = $promotedRuntimeNewDefaultProps;
         $this->variadicArgIndex = $variadicArgIndex;
         $this->paramTypeConstraintsByArg = $paramTypeConstraintsByArg;
         $this->paramIntersectionConstraintsByArg = $paramIntersectionConstraintsByArg;
@@ -113,7 +122,7 @@ class Native implements Call {
         $this->rejectTooFewPositionalArgs($context, $args);
         // CallArgv: parameter-index order with defaults for skipped named optionals (#24948).
         // Keep $args sparse for RECV / LLVM binding; only the func_* snapshot is densified.
-        $sentArgs = $this->densifyCallArgvArgs($args);
+        $sentArgs = $this->densifyCallArgvArgs($context, $args);
         /** @var list<Variable>|null $byRefVariadicCallers */
         $byRefVariadicCallers = null;
         $byRefVariadicPacked = null;
@@ -139,6 +148,8 @@ class Native implements Call {
         for ($index = 0; $index < $total; $index++) {
             if (isset($args[$index])) {
                 $arg = $args[$index];
+            } elseif (isset($this->promotedRuntimeNewDefaultProps[$index])) {
+                $arg = $this->promotedRuntimeNewDefaultArg($context, $index, $args);
             } elseif (isset($this->defaultArgs[$index])) {
                 $arg = $this->defaultArgs[$index];
             } else {
@@ -236,7 +247,7 @@ class Native implements Call {
      *
      * @return list<Variable>
      */
-    private function densifyCallArgvArgs(array $args): array
+    private function densifyCallArgvArgs(Context $context, array $args): array
     {
         if ([] === $args) {
             return [];
@@ -269,6 +280,8 @@ class Native implements Call {
             $defaultIdx = $prefix + $i;
             if (isset($this->defaultArgs[$defaultIdx])) {
                 $out[] = $this->defaultArgs[$defaultIdx];
+            } elseif (isset($this->promotedRuntimeNewDefaultProps[$defaultIdx])) {
+                $out[] = $this->promotedRuntimeNewDefaultArg($context, $defaultIdx, $args);
             }
         }
 
@@ -333,7 +346,7 @@ class Native implements Call {
                 $required = $i;
                 continue;
             }
-            if (isset($this->defaultArgs[$prefix + $i])) {
+            if (isset($this->defaultArgs[$prefix + $i]) || isset($this->promotedRuntimeNewDefaultProps[$prefix + $i])) {
                 $required = $i;
                 continue;
             }
@@ -411,7 +424,8 @@ class Native implements Call {
             return false;
         }
         $prefix = $this->receiverPrefix();
-        $hasDefault = isset($this->defaultArgs[$prefix + $userIdx]);
+        $hasDefault = isset($this->defaultArgs[$prefix + $userIdx])
+            || isset($this->promotedRuntimeNewDefaultProps[$prefix + $userIdx]);
         if (!$hasDefault) {
             return true;
         }
@@ -420,12 +434,35 @@ class Native implements Call {
             if (null !== $this->namedArgsVariadicIndex && $j === $this->namedArgsVariadicIndex) {
                 return false;
             }
-            if (!isset($this->defaultArgs[$prefix + $j])) {
+            if (!isset($this->defaultArgs[$prefix + $j]) && !isset($this->promotedRuntimeNewDefaultProps[$prefix + $j])) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * Promoted ctor param with `new` default: read property initialized during allocate() (#6652).
+     *
+     * @param array<int, Variable> $args
+     */
+    private function promotedRuntimeNewDefaultArg(Context $context, int $llvmIndex, array $args): Variable
+    {
+        $propName = $this->promotedRuntimeNewDefaultProps[$llvmIndex];
+        $receiver = $args[0] ?? throw new \LogicException('Promoted runtime new default requires $this');
+        $className = $receiver->classUserType ?? $receiver->compileTimeString ?? '';
+        if ('' === $className) {
+            throw new \LogicException('Promoted runtime new default requires compile-time class on $this');
+        }
+
+        return $context->type->object->propertyFetch(
+            $context->helper->loadValue($receiver),
+            $className,
+            $propName,
+            false,
+            $receiver
+        );
     }
 
     protected function compileArg(Context $context, Variable $arg, int $argNum): Value {
