@@ -341,9 +341,13 @@ final class JitDomSaveXMLUserScript
         // Skip when loadXML supplies the root tag from the compile-time literal (#23251).
         // cloneNode of a non-root child keeps compileTimeDomTagName ≠ root — dump from
         // object slots (tagName + INNER_XML + xmlns/attrs), not the document literal.
-        $cloneTag = $nodeVar->compileTimeDomTagName
-            ?? JitDomCloneNode::$lastResultTagName;
+        $nodeTag = $nodeVar->compileTimeDomTagName;
+        if (JitDomCreateDocumentFragment::TAG_KIND === $nodeTag) {
+            return self::serializeUserScriptNode($context, $objectType, $node, $elementClassId);
+        }
+        $cloneTag = $nodeTag ?? JitDomCloneNode::$lastResultTagName;
         if (null !== $cloneTag && null !== $xmlLit
+            && JitDomCreateDocumentFragment::TAG_KIND !== $cloneTag
             && $cloneTag !== DomParseSimpleXmlJitHelper::rootTagArgv($xmlLit)
         ) {
             return self::serializeElementNode(

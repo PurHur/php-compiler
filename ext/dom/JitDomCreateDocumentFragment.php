@@ -9,6 +9,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
+use PHPCompiler\ext\dom\JitDomCloneNode;
 
 /**
  * User-script AOT materialization for DOMDocument::createDocumentFragment() (#20203, #35168).
@@ -87,6 +88,32 @@ final class JitDomCreateDocumentFragment
     }
 
 
+    /**
+     * Refresh compile-time inner on an element already recorded in lastChildren (#35997).
+     *
+     * When a fragment child element gains text/nodes after appendChild onto the fragment,
+     * importNode deep-copy must see the updated inner snapshot.
+     */
+    public static function refreshRecordedElementInner(JITVariable $element, string $inner): void
+    {
+        if (!self::$lastMaterialized || '' === $inner) {
+            return;
+        }
+        $tag = $element->compileTimeDomTagName ?? null;
+        if (null === $tag || '' === $tag || str_starts_with($tag, '#')) {
+            return;
+        }
+        $count = \count(self::$lastChildren);
+        for ($i = $count - 1; $i >= 0; --$i) {
+            $node = self::$lastChildren[$i];
+            if ('element' === ($node['kind'] ?? '') && $tag === ($node['data'] ?? '')) {
+                self::$lastChildren[$i]['inner'] = $inner;
+
+                return;
+            }
+        }
+    }
+
     /** Record one appendChild onto the open createDocumentFragment (#35881). */
     public static function rememberAppendedChild(JITVariable $child): void
     {
@@ -138,10 +165,13 @@ final class JitDomCreateDocumentFragment
             return;
         }
         if (null !== $tag && '' !== $tag && !str_starts_with($tag, '#')) {
+            $inner = $child->compileTimeDomInnerXml
+                ?? JitDomCloneNode::$lastResultInnerXml
+                ?? '';
             self::$lastChildren[] = [
                 'kind' => 'element',
                 'data' => $tag,
-                'inner' => $child->compileTimeDomInnerXml ?? '',
+                'inner' => $inner,
             ];
         }
     }
