@@ -32,4 +32,29 @@ final class JitSimpleXmlOffsetGet
             'SimpleXMLElement::offsetUnset() user-script AOT requires a compile-time offset (#35817 leftover of #35810)'
         );
     }
+
+    public static function invokeSet(Context $context, JITVariable ...$args): Value
+    {
+        $us = JitSimpleXmlUserScript::tryOffsetSet($context, ...$args);
+        if (null !== $us) {
+            return $us;
+        }
+        throw new \LogicException(
+            'SimpleXMLElement::offsetSet() user-script AOT requires compile-time offset and value (#35810 leftover)'
+        );
+    }
+
+    public static function invokeExists(Context $context, JITVariable ...$args): Value
+    {
+        if (\count($args) < 2) {
+            throw new \LogicException('SimpleXMLElement::offsetExists() expects receiver and offset');
+        }
+        $us = JitSimpleXmlUserScript::tryFoldDimIsset($context, $args[0], $args[1]);
+        if (null !== $us) {
+            return $us;
+        }
+        throw new \LogicException(
+            'SimpleXMLElement::offsetExists() user-script AOT requires a compile-time offset (#35810 leftover)'
+        );
+    }
 }
