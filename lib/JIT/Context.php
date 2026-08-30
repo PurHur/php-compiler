@@ -2296,10 +2296,10 @@ class Context {
                 $zipMethod
             );
         }
-        // SQLite3 construct/exec/querySingle/lastInsertRowID/changes — NestedJIT leftover of advertise-only AOT (#35931 / #35914 / #20565).
+        // SQLite3 construct/exec/querySingle/lastInsertRowID/changes/lastError* — NestedJIT leftover of advertise-only AOT (#35931 / #35966 / #20565).
         if (CompilerVersion::supportsSqlite3()) {
             $this->type->object->lookup('SQLite3');
-            foreach (['__construct', 'exec', 'querySingle', 'close', 'lastInsertRowID', 'changes'] as $sqliteMethod) {
+            foreach (['__construct', 'exec', 'querySingle', 'close', 'lastInsertRowID', 'changes', 'lastErrorCode', 'lastErrorMsg'] as $sqliteMethod) {
                 $this->functionProxies['sqlite3::'.strtolower($sqliteMethod)] = new Call\Sqlite3Method(
                     $sqliteMethod
                 );

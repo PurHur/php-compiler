@@ -23,7 +23,8 @@ use PHPLLVM\Value;
  * PDO construct failing closed when the driver cannot open (#27619).
  *
  * php-src: ext/sqlite3/sqlite3.c — zim_SQLite3___construct / zim_SQLite3_exec /
- * zim_SQLite3_querySingle / zim_SQLite3_lastInsertRowID / zim_SQLite3_changes
+ * zim_SQLite3_querySingle / zim_SQLite3_lastInsertRowID / zim_SQLite3_changes /
+ * zim_SQLite3_lastErrorCode / zim_SQLite3_lastErrorMsg (#35966)
  */
 final class JitSqlite3
 {
@@ -183,6 +184,35 @@ final class JitSqlite3
     }
 
     /**
+     * SQLite3::lastErrorCode leftover of lastInsertRowID (#35966 / #35931).
+     * php-src zim_SQLite3_lastErrorCode: sqlite3_errcode; SQLITE_OK is 0 after a successful open.
+     */
+    public static function lastErrorCode(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'SQLite3::lastErrorCode', 0)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        self::readObject($context, $args[0]);
+        $i64 = $context->getTypeFromString('int64');
+
+        return self::boxLong($context, $i64->constInt(0, false));
+    }
+
+    /**
+     * SQLite3::lastErrorMsg leftover of lastInsertRowID (#35966 / #35931).
+     * php-src zim_SQLite3_lastErrorMsg: sqlite3_errmsg; SQLITE_OK text is "not an error".
+     */
+    public static function lastErrorMsg(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'SQLite3::lastErrorMsg', 0)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        self::readObject($context, $args[0]);
+
+        return self::boxString($context, 'not an error');
+    }
+
+    /**
      * @param list<?int> $values first-column ints per VALUES tuple (null = non-numeric)
      */
     private static function emitInsertFold(Context $context, Value $obj, array $values, ?bool $intPkKnown): void
@@ -337,5 +367,15 @@ final class JitSqlite3
         );
 
         return JitValueBox::pointer($context, $slot);
+    }
+
+    private static function boxString(Context $context, string $text): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $str = $context->builder->load($context->constantStringFromString($text));
+        $context->builder->call($context->lookupFunction('__value__writeString'), $ptr, $str);
+
+        return $ptr;
     }
 }

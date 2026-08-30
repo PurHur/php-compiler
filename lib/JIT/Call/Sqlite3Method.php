@@ -12,7 +12,8 @@ use PHPLLVM\Value;
 
 /**
  * SQLite3 thin-AOT methods — __construct / exec / querySingle / close /
- * lastInsertRowID / changes (#35931 leftover of #35914 / #20565 / #19821).
+ * lastInsertRowID / changes / lastErrorCode / lastErrorMsg
+ * (#35931 leftover of #35914; lastError leftover #35966).
  *
  * php-src: ext/sqlite3/sqlite3.c
  */
@@ -36,7 +37,8 @@ final class Sqlite3Method implements Call
             $this->paramNames = ['query'];
         } elseif ('querysingle' === $lc) {
             $this->paramNames = ['query', 'entireRow='];
-        } elseif ('lastinsertrowid' === $lc || 'changes' === $lc) {
+        } elseif ('lastinsertrowid' === $lc || 'changes' === $lc
+            || 'lasterrorcode' === $lc || 'lasterrormsg' === $lc) {
             $this->paramNames = [];
         }
     }
@@ -55,8 +57,10 @@ final class Sqlite3Method implements Call
             'close' => JitSqlite3::close($context, ...$args),
             'lastinsertrowid' => JitSqlite3::lastInsertRowID($context, ...$args),
             'changes' => JitSqlite3::changes($context, ...$args),
+            'lasterrorcode' => JitSqlite3::lastErrorCode($context, ...$args),
+            'lasterrormsg' => JitSqlite3::lastErrorMsg($context, ...$args),
             default => throw new \LogicException(
-                'SQLite3::'.$this->method.'() JIT dispatch missing (#35931 / #35914)'
+                'SQLite3::'.$this->method.'() JIT dispatch missing (#35931 / #35966)'
             ),
         };
     }
