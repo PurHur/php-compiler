@@ -14262,6 +14262,10 @@ class JIT {
                         $block->getOperand($op->arg1),
                         $this->context->scope->toCall
                     );
+                    $this->propagateIteratorToArrayCompileTime(
+                        $block->getOperand($op->arg1),
+                        $this->context->scope->toCall
+                    );
                     $this->propagateDomImportSimpleXmlCompileTime(
                         $block->getOperand($op->arg1),
                         $this->context->scope->toCall
@@ -18082,6 +18086,20 @@ class JIT {
             return;
         }
         $this->stampSimpleXmlElementUserType($result, $var);
+    }
+
+    private function propagateIteratorToArrayCompileTime(Operand $result, mixed $toCall): void
+    {
+        if (!$this->context->hasVariableOp($result)) {
+            return;
+        }
+        if (!$toCall instanceof CoreFunc\Internal
+            || 'iterator_to_array' !== strtolower($toCall->getName())
+        ) {
+            return;
+        }
+        $var = $this->context->getVariableFromOp($result);
+        \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::applyPendingIteratorToArrayHostArray($var);
     }
 
     /**

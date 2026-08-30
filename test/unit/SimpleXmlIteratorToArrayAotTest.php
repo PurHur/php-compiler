@@ -18,7 +18,7 @@ require_once __DIR__.'/../LlvmToolchain.php';
  */
 final class SimpleXmlIteratorToArrayAotTest extends TestCase
 {
-    private const EXPECTED = "a=1\nb=2\n0=1\n1=2\n";
+    private const EXPECTED = "a=1\nb=2\n0=1\n1=2\n{\"a\":{\"0\":\"1\"},\"b\":{\"0\":\"2\"}}\n[{\"0\":\"1\"},{\"0\":\"2\"}]\n";
 
     public function testVmIteratorToArrayMatchesZendShape(): void
     {
