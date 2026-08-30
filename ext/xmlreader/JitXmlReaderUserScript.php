@@ -33,6 +33,12 @@ final class JitXmlReaderUserScript
     /** @var list<array{nodeType: int, name: string, value: string}>|null */
     private static ?array $lastEvents = null;
 
+    /** @var list<string>|null Precomputed readInnerXml() per event index (#35908). */
+    private static ?array $lastInnerXml = null;
+
+    /** @var list<string>|null Precomputed readOuterXml() per event index (#35908). */
+    private static ?array $lastOuterXml = null;
+
     /** Set when the last XML()/open lowering was the instance form (#35106 / #35907). */
     public static bool $lastCallWasInstance = false;
 
@@ -202,10 +208,12 @@ final class JitXmlReaderUserScript
         }
 
         $events = [];
+        $rawEvents = [];
         foreach ($raw as $ev) {
             if (!$ev instanceof XmlReaderEvent) {
                 continue;
             }
+            $rawEvents[] = $ev;
             $events[] = [
                 'nodeType' => $ev->nodeType,
                 'name' => $ev->name,
@@ -213,6 +221,14 @@ final class JitXmlReaderUserScript
             ];
         }
         self::$lastEvents = $events;
+        $inner = [];
+        $outer = [];
+        foreach ($rawEvents as $i => $_) {
+            $inner[] = XmlReaderSubtreeXmlHelper::innerXml($rawEvents, $i);
+            $outer[] = XmlReaderSubtreeXmlHelper::outerXml($rawEvents, $i);
+        }
+        self::$lastInnerXml = $inner;
+        self::$lastOuterXml = $outer;
 
         if (null !== $instanceReceiver) {
             return self::resetReceiverForParse($context, $instanceReceiver);
@@ -343,6 +359,135 @@ final class JitXmlReaderUserScript
         }
 
         return self::emitReadSwitch($context, $args[0], $events);
+    }
+
+    /**
+     * XMLReader::readInnerXml() leftover of fromString read (#35908 / #27299 / #19411).
+     * php-src: zim_XMLReader_readInnerXml
+     */
+    public static function tryReadInnerXml(Context $context, JITVariable ...$args): ?Value
+    {
+        return self::trySubtreeXml($context, self::$lastInnerXml, 'readInnerXml', ...$args);
+    }
+
+    /**
+     * XMLReader::readOuterXml() leftover of fromString read (#35908 / #27299 / #19411).
+     * php-src: zim_XMLReader_readOuterXml
+     */
+    public static function tryReadOuterXml(Context $context, JITVariable ...$args): ?Value
+    {
+        return self::trySubtreeXml($context, self::$lastOuterXml, 'readOuterXml', ...$args);
+    }
+
+    /**
+     * @param list<string>|null $byPos
+     */
+    private static function trySubtreeXml(
+        Context $context,
+        ?array $byPos,
+        string $label,
+        JITVariable ...$args
+    ): ?Value {
+        if (!self::isUserScriptAot() || null === $byPos || null === self::$lastEvents) {
+            return null;
+        }
+        if (\count($args) < 1) {
+            throw new \LogicException('XMLReader::'.$label.'() called without $this');
+        }
+
+        return self::emitPosStringSwitch($context, $args[0], $byPos, $label);
+    }
+
+    /**
+     * Return precomputed string for the current __xr_pos (after a successful read).
+     *
+     * @param list<string> $byPos
+     */
+    private static function emitPosStringSwitch(
+        Context $context,
+        JITVariable $receiver,
+        array $byPos,
+        string $label
+    ): Value {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'xmlreader_'.$label.'_cont');
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup(self::CLASS_NAME);
+        self::ensureLayout($objectType, $classId);
+
+        $obj = self::loadObject($context, $receiver);
+        $i64 = $context->getTypeFromString('int64');
+        $posVal = $context->helper->loadValue(
+            $objectType->propertyFetch($obj, self::CLASS_NAME, self::PROP_POS)
+        );
+
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__*'));
+        $merge = BasicBlockHelper::append($context, 'xmlreader_'.$label.'_merge');
+        $miss = BasicBlockHelper::append($context, 'xmlreader_'.$label.'_miss');
+
+        $n = \count($byPos);
+        /** @var list<\PHPLLVM\BasicBlock> */
+        $caseBlocks = [];
+        for ($i = 0; $i < $n; ++$i) {
+            $caseBlocks[$i] = BasicBlockHelper::append($context, 'xmlreader_'.$label.'_case_'.$i);
+        }
+        $inRange = $context->builder->icmp(
+            Builder::INT_SLT,
+            $posVal,
+            $i64->constInt($n, true)
+        );
+        $nonNeg = $context->builder->icmp(
+            Builder::INT_SGE,
+            $posVal,
+            $i64->constInt(0, true)
+        );
+        $ok = $context->builder->and($inRange, $nonNeg);
+        $context->builder->branchIf(
+            $ok,
+            $n > 0 ? $caseBlocks[0] : $miss,
+            $miss
+        );
+
+        $context->builder->positionAtEnd($miss);
+        $context->builder->store(self::stringValueBox($context, ''), $resultSlot);
+        $context->builder->branch($merge);
+
+        for ($i = 0; $i < $n; ++$i) {
+            $context->builder->positionAtEnd($caseBlocks[$i]);
+            $isThis = $context->builder->icmp(
+                Builder::INT_EQ,
+                $posVal,
+                $i64->constInt($i, true)
+            );
+            $apply = BasicBlockHelper::append($context, 'xmlreader_'.$label.'_apply_'.$i);
+            $next = ($i + 1 < $n) ? $caseBlocks[$i + 1] : $miss;
+            $context->builder->branchIf($isThis, $apply, $next);
+
+            $context->builder->positionAtEnd($apply);
+            $context->builder->store(self::stringValueBox($context, $byPos[$i]), $resultSlot);
+            $context->builder->branch($merge);
+        }
+
+        $context->builder->positionAtEnd($merge);
+
+        return $context->builder->load($resultSlot);
+    }
+
+    /** Boxed __value__* string constant for call results. */
+    private static function stringValueBox(Context $context, string $xml): Value
+    {
+        $str = $context->builder->load($context->constantStringFromString($xml));
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $str
+        );
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            JitValueBox::pointer($context, $slot),
+            $owned
+        );
+
+        return JitValueBox::normalizeValuePtr($context, $slot);
     }
 
     /**
