@@ -166,6 +166,10 @@ final class JitDomChildNodesProperty
             if (null !== $valueLit) {
                 $result->compileTimeDomNodeListLength = '' !== $valueLit ? 1 : 0;
             }
+        } elseif (null !== ($receiverVar?->compileTimeDomNodeListLength ?? null)) {
+            // DocumentFragment stand-in: LiveSlots length read SIGSEGVs when GLOBAL_COUNT
+            // is live — stamp from appendChild rememberAppendedChild (#35881).
+            $result->compileTimeDomNodeListLength = $receiverVar->compileTimeDomNodeListLength;
         }
 
         return $result;

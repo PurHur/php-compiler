@@ -17360,6 +17360,11 @@ class JIT {
         } elseif (null !== $src->compileTimeDomAttributes) {
             $resultVar->compileTimeDomAttributes = $src->compileTimeDomAttributes;
         }
+        if (\PHPCompiler\ext\dom\JitDomCreateDocumentFragment::TAG_KIND === $tag) {
+            $resultVar->compileTimeDomNodeListLength = $deep
+                ? (int) ($src->compileTimeDomNodeListLength ?? 0)
+                : 0;
+        }
     }
 
     /**
@@ -17922,6 +17927,7 @@ class JIT {
         $var = $this->context->getVariableFromOp($result);
         $var->compileTimeDomTagName = \PHPCompiler\ext\dom\JitDomCreateDocumentFragment::TAG_KIND;
         $var->compileTimeDomInnerXml = $var->compileTimeDomInnerXml ?? '';
+        $var->compileTimeDomNodeListLength = 0;
         $name = JIT\OperandName::resolve($result);
         if (null !== $name && '' !== $name) {
             $resolved = $this->context->resolveRefAliasName($name);
@@ -17929,6 +17935,7 @@ class JIT {
                 $bound = $this->context->namedVariableBindings[$resolved];
                 $bound->compileTimeDomTagName = \PHPCompiler\ext\dom\JitDomCreateDocumentFragment::TAG_KIND;
                 $bound->compileTimeDomInnerXml = $bound->compileTimeDomInnerXml ?? '';
+                $bound->compileTimeDomNodeListLength = 0;
             }
             $this->context->bindVariableByName($resolved, $var);
         }

@@ -375,6 +375,9 @@ final class DomNodeLiveMutationRuntime
                     foreach ($extraArgs as $arg) {
                         JitDomCreateDocumentFragment::rememberAppendedChild($arg);
                     }
+                    $receiver->compileTimeDomNodeListLength = \count(
+                        JitDomCreateDocumentFragment::$lastChildren
+                    );
                     $fragInner = self::fragmentInnerXmlFromLastChildren();
                     $receiver->compileTimeDomInnerXml = $fragInner;
                     // saveXML($fragment) reads INNER_XML, not live child walk (#35997).
