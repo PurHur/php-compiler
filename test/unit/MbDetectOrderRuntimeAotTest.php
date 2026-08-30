@@ -33,6 +33,10 @@ final class MbDetectOrderRuntimeAotTest extends TestCase
         $this->assertStringContainsString('parseHelper', $runtime);
         $this->assertStringContainsString('G_ORDER_CSV', $runtime);
         $this->assertStringContainsString('MbDetectOrderJitHelper::parseOrderArgv', $runtime);
+        $this->assertStringContainsString('phpc_mb_detect_order_parse', $runtime);
+        $this->assertStringContainsString('ensureBridge', $runtime);
+        $this->assertStringContainsString('\\strlen(', $helper);
+        $this->assertStringNotContainsString('byteLen', $helper);
         $jit = (string) file_get_contents($root.'/ext/mbstring/JitMbDetectOrder.php');
         $this->assertStringContainsString('MbDetectOrderRuntime', $jit);
         $src = (string) file_get_contents($root.'/ext/mbstring/mb_detect_order.php');

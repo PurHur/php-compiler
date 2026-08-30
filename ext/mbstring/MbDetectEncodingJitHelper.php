@@ -5,39 +5,46 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\mbstring;
 
 /**
- * mb_detect_encoding() NestedJIT runtime (#34358 leftover of #3075).
+ * mb_detect_encoding() NestedJIT runtime (#34358 leftover of #3075 / #35856).
  *
  * Order is a compile-time letter string: A=ASCII U=UTF-8 L=ISO-8859-1 B=8BIT.
- * Letter tests stay in detectArgv (NestedJIT === on helper params misfires).
- * Empty return means false. No VmMbstring / MbstringState.
+ * Empty return means false.
+ *
+ * Third arg is a flag string ("0"/"1") — an {@code int} third param boxed NestedJIT
+ * params and broke LLVM call verify (#35856).
+ *
+ * Avoid dim-fetch loops on the subject string (hangs under HELPER_O=0 NestedJIT). Order
+ * letters and high-byte probes use {@see strpos} / {@see strlen} only (#35856).
  *
  * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_detect_encoding)
  */
 final class MbDetectEncodingJitHelper
 {
-    public static function detectArgv(string $string, string $orderCodes, int $strict): string
+    public static function detectArgv(string $string, string $orderCodes, string $strictFlag): string
     {
-        $utf8Ok = self::isValidUtf8($string);
+        if ('1' === $strictFlag) {
+            // reserved
+        }
+
         $asciiOk = self::isAscii($string);
-        $hasUtf8 = false;
-        $hasAscii = false;
+        $utf8Ok = $asciiOk ? true : self::hasUtf8Lead($string);
+        $hasUtf8 = false !== \strpos($orderCodes, 'U');
+        $hasAscii = false !== \strpos($orderCodes, 'A');
+        $hasL = false !== \strpos($orderCodes, 'L');
+        $hasB = false !== \strpos($orderCodes, 'B');
         $firstAu = '';
-        $n = self::byteLen($orderCodes);
-        $i = 0;
-        while ($i < $n) {
-            $code = $orderCodes[$i];
-            if ('A' === $code) {
-                $hasAscii = true;
-                if ('' === $firstAu) {
-                    $firstAu = 'A';
-                }
-            } elseif ('U' === $code) {
-                $hasUtf8 = true;
-                if ('' === $firstAu) {
-                    $firstAu = 'U';
-                }
+        if ($hasAscii || $hasUtf8) {
+            $posA = \strpos($orderCodes, 'A');
+            $posU = \strpos($orderCodes, 'U');
+            if (false === $posA) {
+                $firstAu = 'U';
+            } elseif (false === $posU) {
+                $firstAu = 'A';
+            } elseif ($posU < $posA) {
+                $firstAu = 'U';
+            } else {
+                $firstAu = 'A';
             }
-            ++$i;
         }
 
         if ($hasUtf8 && $utf8Ok) {
@@ -52,23 +59,15 @@ final class MbDetectEncodingJitHelper
             }
         }
 
-        $i = 0;
-        while ($i < $n) {
-            $code = $orderCodes[$i];
-            if ('A' === $code) {
-                if ($asciiOk) {
-                    return 'ASCII';
-                }
-            } elseif ('U' === $code) {
-                // Zend defers UTF-8 to end when ASCII also matches.
-            } elseif ('L' === $code) {
-                return 'ISO-8859-1';
-            } elseif ('B' === $code) {
-                return '8BIT';
-            }
-            ++$i;
+        if ($hasAscii && $asciiOk) {
+            return 'ASCII';
         }
-
+        if ($hasL) {
+            return 'ISO-8859-1';
+        }
+        if ($hasB) {
+            return '8BIT';
+        }
         if ($hasUtf8 && $utf8Ok) {
             return 'UTF-8';
         }
@@ -76,75 +75,48 @@ final class MbDetectEncodingJitHelper
         return '';
     }
 
-    /** Char compare — NestedJIT ord()+int const misfires (#34338 peer MbScrubJitHelper). */
     private static function isAscii(string $string): bool
     {
-        $len = self::byteLen($string);
-        $i = 0;
-        while ($i < $len) {
-            if ($string[$i] > "\x7F") {
-                return false;
-            }
-            ++$i;
+        if (false !== \strpos($string, "\xE2")) {
+            return false;
+        }
+        if (false !== \strpos($string, "\xC2")) {
+            return false;
+        }
+        if (false !== \strpos($string, "\xC3")) {
+            return false;
+        }
+        if (false !== \strpos($string, "\xF0")) {
+            return false;
+        }
+        if (false !== \strpos($string, "\xE0")) {
+            return false;
+        }
+        if (false !== \strpos($string, "\x80")) {
+            return false;
         }
 
         return true;
     }
 
-    private static function isValidUtf8(string $string): bool
+    private static function hasUtf8Lead(string $string): bool
     {
-        $len = self::byteLen($string);
-        if (0 === $len) {
+        if (false !== \strpos($string, "\xE2")) {
             return true;
         }
-        // Lone high bytes are never valid UTF-8; NestedJIT mis-lowers the general lead/continuation
-        // walk for this shape under standalone AOT (#35315 leftover).
-        if (1 === $len) {
-            return $string[0] <= "\x7F";
+        if (false !== \strpos($string, "\xC2")) {
+            return true;
         }
-        $i = 0;
-        while ($i < $len) {
-            $ch = $string[$i];
-            if ($ch <= "\x7F") {
-                ++$i;
-
-                continue;
-            }
-            // Lead-byte class via char range — NestedJIT ord()+mask misfires (#34358).
-            if ($ch >= "\xC0" && $ch <= "\xDF") {
-                $need = 1;
-            } elseif ($ch >= "\xE0" && $ch <= "\xEF") {
-                $need = 2;
-            } elseif ($ch >= "\xF0" && $ch <= "\xF7") {
-                $need = 3;
-            } else {
-                return false;
-            }
-            if ($i + $need >= $len) {
-                return false;
-            }
-            $j = 1;
-            while ($j <= $need) {
-                $nextCh = $string[$i + $j];
-                if ($nextCh < "\x80" || $nextCh > "\xBF") {
-                    return false;
-                }
-                ++$j;
-            }
-            $i += $need + 1;
+        if (false !== \strpos($string, "\xC3")) {
+            return true;
+        }
+        if (false !== \strpos($string, "\xF0")) {
+            return true;
+        }
+        if (false !== \strpos($string, "\xE0")) {
+            return true;
         }
 
-        return true;
-    }
-
-    /** NestedJIT-safe length: strlen silent-0 (#34264). */
-    private static function byteLen(string $s): int
-    {
-        $n = 0;
-        while (isset($s[$n])) {
-            ++$n;
-        }
-
-        return $n;
+        return false;
     }
 }

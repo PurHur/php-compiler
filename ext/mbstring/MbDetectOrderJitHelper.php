@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\mbstring;
 
 /**
- * mb_detect_order() NestedJIT CSV parse (#35280 leftover of #13100/#29920/#35278).
+ * mb_detect_order() NestedJIT CSV parse (#35280 / #35856).
  *
  * Returns canonical comma-joined encodings (exploded in {@see JitMbDetectOrder}).
  * Mutable order lives in module global {@see MbDetectOrderRuntime}.
+ * Iteration mirrors {@see MbDetectEncodingJitHelper} (strlen + for) — isset length loops
+ * hang under thin AOT NestedJIT HELPER_O=0 (#35856).
  *
  * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_detect_order)
  */
@@ -38,9 +40,8 @@ final class MbDetectOrderJitHelper
     {
         $order = [];
         $part = '';
-        $len = self::byteLen($csv);
-        $i = 0;
-        while ($i <= $len) {
+        $len = \strlen($csv);
+        for ($i = 0; $i <= $len; ++$i) {
             $atEnd = ($i === $len);
             $ch = $atEnd ? ',' : $csv[$i];
             if (',' === $ch) {
@@ -58,7 +59,6 @@ final class MbDetectOrderJitHelper
             } else {
                 $part .= $ch;
             }
-            ++$i;
         }
 
         return $order;
@@ -82,7 +82,7 @@ final class MbDetectOrderJitHelper
 
     private static function trimAscii(string $s): string
     {
-        $len = self::byteLen($s);
+        $len = \strlen($s);
         $start = 0;
         while ($start < $len && (' ' === $s[$start] || "\t" === $s[$start])) {
             ++$start;
@@ -99,10 +99,8 @@ final class MbDetectOrderJitHelper
             return '';
         }
         $out = '';
-        $i = $start;
-        while ($i < $end) {
+        for ($i = $start; $i < $end; ++$i) {
             $out .= $s[$i];
-            ++$i;
         }
 
         return $out;
@@ -150,15 +148,5 @@ final class MbDetectOrderJitHelper
         }
 
         return null;
-    }
-
-    private static function byteLen(string $s): int
-    {
-        $n = 0;
-        while (isset($s[$n])) {
-            ++$n;
-        }
-
-        return $n;
     }
 }

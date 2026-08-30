@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT: mb_detect_encoding() NestedJIT runtime (#34358 leftover of #3075).
+ * AOT: mb_detect_encoding() NestedJIT runtime (#34358 / #35856 leftover of #3075).
  *
  * @see php-src ext/mbstring/mbstring.c PHP_FUNCTION(mb_detect_encoding)
  *
@@ -33,7 +33,15 @@ final class MbDetectEncodingRuntimeAotTest extends TestCase
         $runtime = (string) file_get_contents($root.'/lib/JIT/Builtin/MbDetectEncodingRuntime.php');
         $this->assertStringContainsString('detectHelper', $runtime);
         $this->assertStringContainsString('phpc_mb_detect_encoding_detect', $runtime);
+        $this->assertStringContainsString('ensureBridge', $runtime);
         $this->assertStringContainsString('MbDetectEncodingJitHelper::detectArgv', $runtime);
+        $helper = (string) file_get_contents($root.'/ext/mbstring/MbDetectEncodingJitHelper.php');
+        $this->assertStringContainsString('string $strictFlag', $helper);
+        $this->assertStringNotContainsString('int $strict', $helper);
+        $this->assertStringContainsString('strpos', $helper);
+        $jit = (string) file_get_contents($root.'/ext/mbstring/JitMbDetectEncoding.php');
+        $this->assertStringContainsString('Link NestedJIT helpers before lowering args', $jit);
+        $this->assertStringContainsString('strictFlagString', $jit);
         $src = (string) file_get_contents($root.'/ext/mbstring/mb_detect_encoding.php');
         $this->assertStringContainsString('JitMbDetectEncoding::invoke', $src);
         $this->assertStringNotContainsString(

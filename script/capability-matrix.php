@@ -11,15 +11,37 @@ declare(strict_types=1);
  * Usage:
  *   php script/capability-matrix.php          # write docs/capabilities.md
  *   php script/capability-matrix.php --check  # exit 1 if committed file is stale
+ *
+ * Doc generation enables optional in-tree surfaces that are host-gated at runtime
+ * (e.g. PHP_COMPILER_ENABLE_CURL) so --check matches the committed matrix on CI images
+ * without php-curl. Otherwise release-readiness --full falsely fails (#8739 / #23953).
  */
 
 $root = dirname(__DIR__);
 require $root . '/vendor/autoload.php';
 require __DIR__ . '/capability-syntax-lib.php';
 
+/**
+ * Opt in to host-gated extension surfaces for the capability matrix only.
+ *
+ * Runtime advertisement still follows CurlExtensionPolicy (host module or explicit env).
+ * Matrix docs describe the in-tree enabled surface; unset ENABLE leaves curl_* rows empty
+ * on images without php-curl and breaks --check / release-readiness --full.
+ */
+function enableOptionalExtsForCapabilityDocs(): void
+{
+    $raw = getenv('PHP_COMPILER_ENABLE_CURL');
+    if (!\is_string($raw) || '' === trim($raw)) {
+        putenv('PHP_COMPILER_ENABLE_CURL=1');
+        $_ENV['PHP_COMPILER_ENABLE_CURL'] = '1';
+    }
+}
+
 /** @return array<string, array{vm: bool, jit: bool, aot: bool, notes: list<string>, module: string}> */
 function collectCapabilities(string $root): array
 {
+    enableOptionalExtsForCapabilityDocs();
+
     $modules = [
         'types' => new PHPCompiler\ext\types\Module(),
         'bcmath' => new PHPCompiler\ext\bcmath\Module(),
