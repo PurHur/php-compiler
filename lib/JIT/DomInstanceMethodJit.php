@@ -472,7 +472,11 @@ final class DomInstanceMethodJit
 
                 return;
             }
-            if ('domdocument::getelementbyid' === $lc) {
+            if ('domdocument::getelementbyid' === $lc
+                || 'dom\\htmldocument::getelementbyid' === $lc
+            ) {
+                // Living HTMLDocument CFS trees are main-module objects — GenericMethod
+                // NestedJIT GEPs the classic DOMDocument layout and SIGABRTs (#35792).
                 $context->functionProxies[$lc] = new Call\DomDocumentGetElementById();
 
                 return;
@@ -1197,7 +1201,6 @@ final class DomInstanceMethodJit
                 || 'dom\\document::queryselectorall' === $lc
                 || 'dom\\xmldocument::queryselector' === $lc
                 || 'dom\\xmldocument::queryselectorall' === $lc
-                || 'dom\\htmldocument::getelementbyid' === $lc
                 || 'dom\\element::rename' === $lc
                 || 'dom\\htmlelement::rename' === $lc
                 || 'dom\\element::hasattributens' === $lc

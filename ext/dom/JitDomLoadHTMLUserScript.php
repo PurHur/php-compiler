@@ -49,6 +49,24 @@ final class JitDomLoadHTMLUserScript
         return self::$lastCompileTimeHtml;
     }
 
+    /**
+     * Remember a Dom\HTMLDocument::createFromString literal for getElementById fold (#35792).
+     *
+     * CFS user-script docs are not loadHTML receivers, so {@see receiverOwnsGlobalCompileTimeParsed}
+     * stays false; the HTML string is enough for {@see DomParseSimpleHtmlJitHelper::parseIdElementArgv}.
+     */
+    public static function rememberCreateFromStringHtml(string $html): void
+    {
+        if ('' === trim($html)) {
+            return;
+        }
+        self::$lastCompileTimeHtml = $html;
+        $parsed = DomParseSimpleHtmlJitHelper::parseArgv($html);
+        if (null !== $parsed) {
+            self::$lastCompileTimeParsed = $parsed;
+        }
+    }
+
     public static function lastCompileTimeOptions(): ?int
     {
         return self::$lastCompileTimeOptions;

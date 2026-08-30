@@ -73,9 +73,10 @@ final class JitDomHtmlDocumentCreateFromString
             $optionsLit = (int) $opt;
         }
 
-        // Remember CFS source for Dom\HTMLDocument::saveHtml AOT fold (#31324).
+        // Remember CFS source for saveHtml (#31324) and getElementById (#35792) AOT folds.
         if (null !== $sourceLit && '' !== $sourceLit) {
             JitDomHtmlDocumentSaveHtml::rememberCreateFromString($sourceLit, $optionsLit);
+            JitDomLoadHTMLUserScript::rememberCreateFromStringHtml($sourceLit);
         }
 
         // LIBXML_NOERROR-only options still match options=0 tree — allow US materialize
@@ -148,6 +149,7 @@ final class JitDomHtmlDocumentCreateFromString
 
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_html_cfs_us_materialize');
         JitDomHtmlDocumentSaveHtml::rememberCreateFromString($source, 0);
+        JitDomLoadHTMLUserScript::rememberCreateFromStringHtml($source);
         // textContent fetch reads property slots when last load was pure user-script (#24121 / #27300).
         JitDomLoadXMLUserScript::markLastLoadPureUserScript();
         JitDomLoadXMLUserScript::rememberLivingDocumentClass(self::CLASS_DOCUMENT);

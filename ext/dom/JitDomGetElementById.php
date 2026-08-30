@@ -57,7 +57,9 @@ final class JitDomGetElementById
         // After a compile-time getElementById hit (typical: source loadHTML), further lookups
         // must use the runtime id map so importNode materialize on a *different* document is
         // visible (HTML→XML; #20830). Pairing again would fabricate an element on the wrong doc.
-        $alreadyPaired = null !== JitDomLoadHTMLUserScript::lastGetElementByIdHit();
+        // Living CFS HTML documents have no NestedJIT id-map — keep scanning the literal (#35792).
+        $cfsLiving = self::isLivingHtmlCreateFromStringFold();
+        $alreadyPaired = !$cfsLiving && null !== JitDomLoadHTMLUserScript::lastGetElementByIdHit();
 
         if (!$alreadyPaired && JitDomDocumentMethodKernel::shouldUse($context)) {
             $compileTime = self::tryUserScriptCompileTimeLookup($context, $args[0], $args[1]);
@@ -393,7 +395,9 @@ final class JitDomGetElementById
         JITVariable $receiver,
         JITVariable $idArg
     ): ?Value {
-        if (!JitDomLoadHTMLUserScript::receiverOwnsGlobalCompileTimeParsed($receiver)) {
+        $owned = JitDomLoadHTMLUserScript::receiverOwnsGlobalCompileTimeParsed($receiver);
+        $cfsLiving = self::isLivingHtmlCreateFromStringFold();
+        if (!$owned && !$cfsLiving) {
             return null;
         }
 
@@ -408,7 +412,11 @@ final class JitDomGetElementById
         $parsed = JitDomLoadHTMLUserScript::lastCompileTimeParsed();
         if (null === $parsed || $parsed['id'] !== $idLit) {
             // Full html/body documents may remember a different "first" id; re-scan (#32996).
+            // CFS literals are remembered the same way for living HTMLDocument (#35792).
             $htmlLit = JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml();
+            if ((null === $htmlLit || '' === trim($htmlLit)) && $cfsLiving) {
+                $htmlLit = JitDomHtmlDocumentSaveHtml::lastCreateFromStringSource();
+            }
             if (null !== $htmlLit && '' !== trim($htmlLit)) {
                 $byId = DomParseSimpleHtmlJitHelper::parseIdElementArgv($htmlLit, $idLit);
                 if (null !== $byId) {
@@ -418,14 +426,14 @@ final class JitDomGetElementById
             }
         }
         if (null === $parsed) {
-            if ('missing' === $idLit) {
+            if ($cfsLiving || 'missing' === $idLit) {
                 return self::boxNullResult($context);
             }
 
             return null;
         }
         if ($parsed['id'] !== $idLit) {
-            if ('missing' === $idLit) {
+            if ($cfsLiving || 'missing' === $idLit) {
                 return self::boxNullResult($context);
             }
 
@@ -437,8 +445,22 @@ final class JitDomGetElementById
         // Must return a boxed %__value__* — raw __object__* breaks the call convention (#25119).
         return self::boxObjectResult(
             $context,
-            self::materializeParsedElement($context, $receiver, $parsed)
+            self::materializeParsedElement($context, $receiver, $parsed, $cfsLiving && !$owned)
         );
+    }
+
+    /**
+     * Thin AOT createFromString HTML lives in the main module (no NestedJIT id-map; #35792).
+     */
+    private static function isLivingHtmlCreateFromStringFold(): bool
+    {
+        $src = JitDomHtmlDocumentSaveHtml::lastCreateFromStringSource();
+        if (null === $src || '' === trim($src)) {
+            return false;
+        }
+        $cls = JitDomLoadXMLUserScript::lastDocumentClass();
+
+        return null !== $cls && 0 === strcasecmp($cls, 'Dom\\HTMLDocument');
     }
 
     /**
@@ -452,8 +474,20 @@ final class JitDomGetElementById
     private static function materializeParsedElement(
         Context $context,
         JITVariable $receiver,
-        array $parsed
+        array $parsed,
+        bool $livingHtml = false
     ): Value {
+        if ($livingHtml) {
+            // php-src living HTML tagName is uppercase. Materialize as DOMElement so
+            // textContent fetch uses the classic slot layout (HTMLElement GEP mismatch).
+            return JitDomCreateElement::materializeForUserScriptDocument(
+                $context,
+                $receiver,
+                strtoupper($parsed['tag']),
+                $parsed['text']
+            );
+        }
+
         return JitDomCreateElement::materializeForUserScriptDocument(
             $context,
             $receiver,
