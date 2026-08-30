@@ -856,7 +856,39 @@ final class JitXmlReaderUserScript
             $hits[] = ['name' => $name, 'value' => $attrs[$name]];
         }
 
-        return self::emitMoveToAttributeSwitch($context, $args[0], $hits);
+        return self::emitMoveToAttributeSwitch($context, $args[0], $hits, 'movetoattribute');
+    }
+
+    /**
+     * XMLReader::moveToFirstAttribute() leftover of moveToAttribute (#35948 / #35941 / #27299 / #19395).
+     * php-src: zim_XMLReader_moveToFirstAttribute / xmlTextReaderMoveToFirstAttribute
+     */
+    public static function tryMoveToFirstAttribute(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot()
+            || null === self::$lastAttributes
+            || null === self::$lastAttrNodeTypes
+            || null === self::$lastEvents
+        ) {
+            return null;
+        }
+        if (\count($args) < 1) {
+            throw new \LogicException('XMLReader::moveToFirstAttribute() called without $this');
+        }
+        $hits = [];
+        foreach (self::$lastAttributes as $i => $attrs) {
+            if (!isset(self::$lastAttrNodeTypes[$i])
+                || XmlReaderConstants::ELEMENT !== self::$lastAttrNodeTypes[$i]
+                || [] === $attrs
+            ) {
+                $hits[] = null;
+                continue;
+            }
+            $name = (string) array_key_first($attrs);
+            $hits[] = ['name' => $name, 'value' => $attrs[$name]];
+        }
+
+        return self::emitMoveToAttributeSwitch($context, $args[0], $hits, 'movetofirstattribute');
     }
 
     /**
@@ -900,7 +932,7 @@ final class JitXmlReaderUserScript
             $hits[] = ['name' => $name, 'value' => $attrs[$name]];
         }
 
-        return self::emitMoveToAttributeSwitch($context, $args[0], $hits);
+        return self::emitMoveToAttributeSwitch($context, $args[0], $hits, 'movetoattributeno');
     }
 
     /**
@@ -911,9 +943,10 @@ final class JitXmlReaderUserScript
     private static function emitMoveToAttributeSwitch(
         Context $context,
         JITVariable $receiver,
-        array $hits
+        array $hits,
+        string $label = 'movetoattribute'
     ): Value {
-        BasicBlockHelper::ensureOpenInsertBlock($context, 'xmlreader_movetoattribute_cont');
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'xmlreader_'.$label.'_cont');
         $objectType = $context->type->object;
         $classId = $objectType->lookup(self::CLASS_NAME);
         self::ensureLayout($objectType, $classId);
@@ -926,14 +959,14 @@ final class JitXmlReaderUserScript
         );
 
         $resultSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__*'));
-        $merge = BasicBlockHelper::append($context, 'xmlreader_movetoattribute_merge');
-        $miss = BasicBlockHelper::append($context, 'xmlreader_movetoattribute_miss');
+        $merge = BasicBlockHelper::append($context, 'xmlreader_'.$label.'_merge');
+        $miss = BasicBlockHelper::append($context, 'xmlreader_'.$label.'_miss');
 
         $n = \count($hits);
         /** @var list<\PHPLLVM\BasicBlock> */
         $caseBlocks = [];
         for ($i = 0; $i < $n; ++$i) {
-            $caseBlocks[$i] = BasicBlockHelper::append($context, 'xmlreader_movetoattribute_case_'.$i);
+            $caseBlocks[$i] = BasicBlockHelper::append($context, 'xmlreader_'.$label.'_case_'.$i);
         }
         $inRange = $context->builder->icmp(
             Builder::INT_SLT,
@@ -965,7 +998,7 @@ final class JitXmlReaderUserScript
                 $posVal,
                 $i64->constInt($i, true)
             );
-            $apply = BasicBlockHelper::append($context, 'xmlreader_movetoattribute_apply_'.$i);
+            $apply = BasicBlockHelper::append($context, 'xmlreader_'.$label.'_apply_'.$i);
             $next = ($i + 1 < $n) ? $caseBlocks[$i + 1] : $miss;
             $context->builder->branchIf($isThis, $apply, $next);
 

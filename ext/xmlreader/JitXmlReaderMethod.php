@@ -46,6 +46,8 @@ final class JitXmlReaderMethod
             'movetoattribute' => JitXmlReaderUserScript::tryMoveToAttribute($context, ...$args),
             // leftover of moveToAttribute (#35946 / #35941 / #27299) — php-src zim_XMLReader_moveToAttributeNo
             'movetoattributeno' => JitXmlReaderUserScript::tryMoveToAttributeNo($context, ...$args),
+            // leftover of moveToAttribute (#35948 / #35941 / #27299) — php-src zim_XMLReader_moveToFirstAttribute
+            'movetofirstattribute' => JitXmlReaderUserScript::tryMoveToFirstAttribute($context, ...$args),
             // leftover of moveToAttribute (#35940 / #27299) — php-src zim_XMLReader_moveToElement
             'movetoelement' => JitXmlReaderUserScript::tryMoveToElement($context, ...$args),
             default => null,
