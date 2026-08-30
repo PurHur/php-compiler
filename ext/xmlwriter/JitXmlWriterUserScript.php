@@ -106,6 +106,35 @@ final class JitXmlWriterUserScript
     }
 
     /**
+     * XMLWriter::toStream() leftover of toMemory/toUri (#35895 / #19606).
+     * php-src: zim_XMLWriter_toStream — static factory = new + xmlNewTextWriterMemory on stream.
+     * Host PHP 8.2 has no toStream(); fold via new XMLWriter + openUri when fopen stamped a path.
+     */
+    public static function tryToStream(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot()
+            || !\extension_loaded('xmlwriter')
+            || !\class_exists(\XMLWriter::class, false)
+            || !isset($args[0])
+        ) {
+            return null;
+        }
+        $path = JitStringBuiltinArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString;
+        if (null === $path || str_starts_with($path, '__phpc_xw_')) {
+            return null;
+        }
+        if ('' === $path) {
+            throw new \Error('XMLWriter::toStream(): Unable to open stream');
+        }
+        $writer = new \XMLWriter();
+        if (!@$writer->openUri($path)) {
+            throw new \Error('XMLWriter::toStream(): Unable to open stream');
+        }
+
+        return self::materializeFactoryObject($context, $writer);
+    }
+
+    /**
      * XMLWriter::openUri() leftover of openMemory (#35872 / #19551).
      * php-src: zim_XMLWriter_openUri / xmlTextWriterStartDocument (after open)
      */

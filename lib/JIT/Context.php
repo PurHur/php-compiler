@@ -132,6 +132,11 @@ class Context {
     /** Compile-time str_repeat() result for json_decode($s, …, JSON_THROW_ON_ERROR) depth fold (#10611). */
     public ?string $jitStrRepeatFoldedString = null;
 
+    /**
+     * Compile-time fopen() path for assignCallResultOperand — XMLWriter::toStream host openUri (#35895).
+     */
+    public ?string $jitFopenLiteralPath = null;
+
     /** Operand for iterator_to_array() iterator arg — CFG userType for HT-backed SPL (#26825). */
     public ?Operand $jitIteratorToArrayIteratorOperand = null;
 
@@ -2444,10 +2449,11 @@ class Context {
         if (CompilerVersion::supportsXmlReaderFactories()) {
             XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::fromstring');
         }
-        // XMLWriter::toMemory / toUri — leftover of openMemory/openUri (#19606 / #35872).
+        // XMLWriter::toMemory / toUri / toStream — leftover of openMemory/openUri (#19606 / #35872 / #35895).
         if (CompilerVersion::supportsXmlWriterFactories()) {
             XmlWriterInstanceMethodJit::ensureProxy($this, 'xmlwriter::tomemory');
             XmlWriterInstanceMethodJit::ensureProxy($this, 'xmlwriter::touri');
+            XmlWriterInstanceMethodJit::ensureProxy($this, 'xmlwriter::tostream');
         }
         if (CompilerVersion::supportsDomTokenList()) {
             DomInstanceMethodJit::registerKnownProxies($this);

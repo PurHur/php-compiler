@@ -14307,6 +14307,10 @@ class JIT {
                         $block->getOperand($op->arg1),
                         $this->context->scope->toCall
                     );
+                    $this->propagateFopenLiteralPath(
+                        $block->getOperand($op->arg1),
+                        $this->context->scope->toCall
+                    );
                     break;
                     } finally {
                         // Peer VM clearOutgoingCallState + restorePendingOutboundCall (#15217 / #27242).
@@ -17714,6 +17718,33 @@ class JIT {
     }
 
     /**
+     * Stamp compile-time fopen() path on the stream CV so XMLWriter::toStream can host-fold (#35895).
+     *
+     * @param CoreFunc\Internal|JIT\Call\Native|JIT\Call\ExternalMethod|JIT\Call\NestedClosureInvoke|null $toCall
+     */
+    private function propagateFopenLiteralPath(Operand $result, $toCall): void
+    {
+        if (!$toCall instanceof CoreFunc\Internal || 'fopen' !== strtolower($toCall->getName())) {
+            return;
+        }
+        $path = $this->context->jitFopenLiteralPath;
+        $this->context->jitFopenLiteralPath = null;
+        if (null === $path || '' === $path || !$this->context->hasVariableOp($result)) {
+            return;
+        }
+        $resultVar = $this->context->getVariableFromOp($result);
+        $resultVar->compileTimeString = $path;
+        $name = JIT\OperandName::resolve($result);
+        if (null === $name || '' === $name) {
+            return;
+        }
+        $resolved = $this->context->resolveRefAliasName($name);
+        if (isset($this->context->namedVariableBindings[$resolved])) {
+            $this->context->namedVariableBindings[$resolved]->compileTimeString = $path;
+        }
+    }
+
+    /**
      * Remember cloneNode() tag on the result Variable for saveXML of non-root clones.
      */
     private function propagateDomCloneNodeCompileTimeTag(Operand $result): void
@@ -17977,13 +18008,14 @@ class JIT {
     }
 
     /**
-     * XMLWriter::toMemory()/toUri() — static factories return XMLWriter (#19606 leftover of #35872).
+     * XMLWriter::toMemory()/toUri()/toStream() — static factories return XMLWriter (#19606 / #35895).
      */
     private function propagateXmlWriterFactoryResultType(Operand $result, mixed $toCall): void
     {
         if (
             !($toCall instanceof JIT\Call\XmlWriterToMemory)
             && !($toCall instanceof JIT\Call\XmlWriterToUri)
+            && !($toCall instanceof JIT\Call\XmlWriterToStream)
         ) {
             return;
         }
@@ -18645,6 +18677,7 @@ class JIT {
             if (
                 $this->context->scope->toCall instanceof JIT\Call\XmlWriterToMemory
                 || $this->context->scope->toCall instanceof JIT\Call\XmlWriterToUri
+                || $this->context->scope->toCall instanceof JIT\Call\XmlWriterToStream
             ) {
                 $ptr = JIT\JitValueBox::coerceToValuePtrForStore($this->context, $llvmResult);
                 if ($this->context->hasVariableOp($result)) {

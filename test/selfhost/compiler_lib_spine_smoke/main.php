@@ -6598,6 +6598,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/WeakReferenceCreate.php';
 require_once __DIR__.'/../../../lib/JIT/Call/WeakReferenceGet.php';
 require_once __DIR__.'/../../../lib/JIT/Call/XmlWriterMethod.php';
 require_once __DIR__.'/../../../lib/JIT/Call/XmlWriterToMemory.php';
+require_once __DIR__.'/../../../lib/JIT/Call/XmlWriterToStream.php';
 require_once __DIR__.'/../../../lib/JIT/Call/XmlWriterToUri.php';
 require_once __DIR__.'/../../../lib/JIT/Call/XmlReaderFromString.php';
 require_once __DIR__.'/../../../lib/JIT/Call/XmlReaderXML.php';

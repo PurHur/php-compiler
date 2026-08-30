@@ -82,6 +82,10 @@ final class fopen extends Internal
             );
         }
 
+        // Stamp literal path onto the stream CV so XMLWriter::toStream can host-fold via openUri (#35895).
+        $pathLit = JitStringBuiltinArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString;
+        $context->jitFopenLiteralPath = (null !== $pathLit && '' !== $pathLit) ? $pathLit : null;
+
         return JitFopen::invoke(
             $context,
             JitStreamPath::lowerNonEmptyPath($context, $args[0], 'fopen', 0, 'filename'),

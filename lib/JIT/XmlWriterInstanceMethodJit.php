@@ -18,6 +18,8 @@ final class XmlWriterInstanceMethodJit
         'xmlwriter::tomemory' => true,
         // leftover of openUri AOT (#19606 / #35872) — php-src zim_XMLWriter_toUri
         'xmlwriter::touri' => true,
+        // leftover of toMemory/toUri AOT (#35895 / #19606) — php-src zim_XMLWriter_toStream
+        'xmlwriter::tostream' => true,
         'xmlwriter::startdocument' => true,
         'xmlwriter::startelement' => true,
         'xmlwriter::startelementns' => true,
@@ -96,6 +98,14 @@ final class XmlWriterInstanceMethodJit
                 return;
             }
             $context->functionProxies[$lc] = new Call\XmlWriterToUri();
+
+            return;
+        }
+        if ('xmlwriter::tostream' === $lc) {
+            if (!\PHPCompiler\CompilerVersion::supportsXmlWriterFactories()) {
+                return;
+            }
+            $context->functionProxies[$lc] = new Call\XmlWriterToStream();
 
             return;
         }
