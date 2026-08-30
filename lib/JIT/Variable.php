@@ -1487,7 +1487,12 @@ final class Variable {
                     return $this->dimFetchValueBoxRead($dim, $expectedType);
                 }
                 // Value-boxed arrays share HTs after by-value assign — separate first (#34508).
-                HashTableWriteLlvm::separateContainerForWrite($this->context, $this);
+                // Property-backed boxes already alias the live object slot: COW here detaches
+                // earlier `&$o->p[$k]` refs when a second fetch runs (#35980 / leftover #34673).
+                $propertyBackedValue = null !== $this->objectPropertySlot;
+                if (!$propertyBackedValue) {
+                    HashTableWriteLlvm::separateContainerForWrite($this->context, $this);
+                }
                 $childHt = HashTableHelper::loadHashtablePointer($this->context, $this);
                 $htVar = new Variable(
                     $this->context,
@@ -1496,6 +1501,13 @@ final class Variable {
                     $childHt
                 );
                 $htVar->borrowedHashtable = true;
+                if ($propertyBackedValue) {
+                    $htVar->objectPropertySlot = $this->objectPropertySlot;
+                    $htVar->objectPropertyType = $this->objectPropertyType ?? self::TYPE_VALUE;
+                    $htVar->objectPropertyReceiver = $this->objectPropertyReceiver;
+                    $htVar->objectPropertyName = $this->objectPropertyName;
+                    $htVar->objectPropertyClassName = $this->objectPropertyClassName;
+                }
 
                 return $htVar->dimFetch($dim, $expectedType, $forWrite, $emitFloatKeyDeprecation, $warnUndefinedKeyForIncDec);
             default:
