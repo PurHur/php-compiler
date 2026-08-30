@@ -17949,12 +17949,20 @@ class JIT {
             && !($toCall instanceof JIT\Call\XmlReaderFromString)
             && !($toCall instanceof JIT\Call\XmlReaderFromUri)
             && !($toCall instanceof JIT\Call\XmlReaderFromStream)
+            && !($toCall instanceof JIT\Call\XmlReaderOpen)
         ) {
             return;
         }
-        // Instance XML() returns bool after resetting $this (#35106) — do not retag as object.
-        if ($toCall instanceof JIT\Call\XmlReaderXML
-            && \PHPCompiler\ext\xmlreader\JitXmlReaderUserScript::$lastCallWasInstance
+        // Instance XML()/open() returns bool after resetting $this (#35106 / #35907).
+        if (
+            (
+                $toCall instanceof JIT\Call\XmlReaderXML
+                || $toCall instanceof JIT\Call\XmlReaderOpen
+            )
+            && (
+                \PHPCompiler\ext\xmlreader\JitXmlReaderUserScript::$lastCallWasInstance
+                || !\PHPCompiler\ext\xmlreader\JitXmlReaderUserScript::$lastResultIsObject
+            )
         ) {
             return;
         }
@@ -18621,10 +18629,17 @@ class JIT {
                     || $this->context->scope->toCall instanceof JIT\Call\XmlReaderFromString
                     || $this->context->scope->toCall instanceof JIT\Call\XmlReaderFromUri
                     || $this->context->scope->toCall instanceof JIT\Call\XmlReaderFromStream
+                    || $this->context->scope->toCall instanceof JIT\Call\XmlReaderOpen
                 )
                 && !(
-                    $this->context->scope->toCall instanceof JIT\Call\XmlReaderXML
-                    && \PHPCompiler\ext\xmlreader\JitXmlReaderUserScript::$lastCallWasInstance
+                    (
+                        $this->context->scope->toCall instanceof JIT\Call\XmlReaderXML
+                        || $this->context->scope->toCall instanceof JIT\Call\XmlReaderOpen
+                    )
+                    && (
+                        \PHPCompiler\ext\xmlreader\JitXmlReaderUserScript::$lastCallWasInstance
+                        || !\PHPCompiler\ext\xmlreader\JitXmlReaderUserScript::$lastResultIsObject
+                    )
                 )
             ) {
                 $ptr = JIT\JitValueBox::coerceToValuePtrForStore($this->context, $llvmResult);

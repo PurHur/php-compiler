@@ -2440,6 +2440,7 @@ class Context {
         // XMLReader::XML / fromString / read — avoid ExternalMethod silent NULL on thin AOT (#27299, #28670).
         // XML() exists on all profiles; fromString is PROFILE≥8.4 only.
         XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::xml');
+        XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::open');
         XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::read');
         if (CompilerVersion::supportsXmlReaderFactories()) {
             XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::fromstring');

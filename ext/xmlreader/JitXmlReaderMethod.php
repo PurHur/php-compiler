@@ -15,6 +15,8 @@ final class JitXmlReaderMethod
     {
         $result = match ($methodLc) {
             'fromstring', 'xml' => JitXmlReaderUserScript::tryFromString($context, ...$args),
+            // leftover of fromUri/fromString (#35907 / #27299) — php-src zim_xmlreader_open
+            'open' => JitXmlReaderUserScript::tryOpen($context, ...$args),
             // leftover of fromString (#35900 / #27299) — php-src zim_xmlreader_fromUri
             'fromuri' => JitXmlReaderUserScript::tryFromUri($context, ...$args),
             // leftover of fromString (#35900 / #27299) — php-src zim_xmlreader_fromStream
