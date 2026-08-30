@@ -93,6 +93,16 @@ final class Variable {
 
     public bool $isArrayAccessWritableOffset = false;
 
+    /**
+     * FETCH_OBJ_W lvalue for a compile-time SimpleXMLElement tree (#35823 leftover of #35814).
+     *
+     * Thin AOT has no declared SXE slots; ZEND_ASSIGN_OBJ abort()s. Host-fold at ASSIGN
+     * via {@see \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryPropSet}.
+     */
+    public ?Variable $writableSxePropReceiver = null;
+
+    public ?string $writableSxePropName = null;
+
     /** String literal value when this variable represents a constant string operand. */
     public ?string $compileTimeString = null;
 

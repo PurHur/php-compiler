@@ -15131,6 +15131,28 @@ class JIT {
                     $propFetchForWrite = $forWrite
                         || $this->varFetchDestUsedAsPlainAssignStore($block, $i, (int) $op->arg1);
                     if ($name instanceof Operand\Literal) {
+                        // User-script AOT: SimpleXMLElement property write via host tree
+                        // (sxe_property_write). Thin AOT has no declared slots — ZEND_ASSIGN_OBJ
+                        // abort()s (#35823 leftover of #35814 / #35810).
+                        if (
+                            $forWrite
+                            && JIT\UserScriptAotEnv::isActive()
+                            && $this->context->hasVariableOp($obj)
+                        ) {
+                            $sxePropWrite = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryPreparePropWrite(
+                                $this->context,
+                                $this->context->getVariableFromOp($obj),
+                                (string) $name->value
+                            );
+                            if (null !== $sxePropWrite) {
+                                if ($forceBranchMerge) {
+                                    $this->assignOperand($result, $sxePropWrite, true);
+                                } else {
+                                    $this->context->scope->variables[$result] = $sxePropWrite;
+                                }
+                                break;
+                            }
+                        }
                         // PHPCfg types `new static()` receivers as static — skip declaring-class
                         // guards that target a bogus "static" ClassEntry (#31937).
                         // Also: unserialize() runtime O: results lack classUserType — use
@@ -21154,6 +21176,22 @@ class JIT {
         )) {
             return;
         }
+        // SimpleXMLElement property write — before temp→stack promotion drops markers (#35823).
+        if (
+            JIT\UserScriptAotEnv::isActive()
+            && null !== $result->writableSxePropReceiver
+            && null !== $result->writableSxePropName
+        ) {
+            $sxePropSet = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryPropSet(
+                $this->context,
+                $result->writableSxePropReceiver,
+                $result->writableSxePropName,
+                $value
+            );
+            if (null !== $sxePropSet) {
+                return;
+            }
+        }
         // __set / ARRAY_AS_PROPS lvalues are KIND_VALUE Temporary placeholders — must dispatch
         // before temp→stack promotion, which allocates a fresh Variable and drops the markers
         // (AOT silent no-op; Zend/zend_object_handlers.c zend_std_write_property).
@@ -21193,6 +21231,7 @@ class JIT {
             && !$result->functionStaticGlobal
             && null === $result->magicSetReceiver
             && null === $result->arrayAsPropsReceiver
+            && null === $result->writableSxePropReceiver
         ) {
             // ?? left branch fetch binds a superglobal lvalue; force-assign needs a stack slot (#866).
             // Property lvalues keep objectPropertySlot so ReadonlyClassGuard runs on inc/dec (#3149).
@@ -21216,6 +21255,7 @@ class JIT {
             && null === $result->staticPropertyGlobal
             && null === $result->magicSetReceiver
             && null === $result->arrayAsPropsReceiver
+            && null === $result->writableSxePropReceiver
             && (
                 Variable::TYPE_STRING !== $result->type
                 || !JIT\StringOffsetHelper::isWritableCharOffsetLvalue($result, $this->context)

@@ -781,6 +781,73 @@ final class JitSimpleXmlUserScript
     }
 
     /**
+     * FETCH_OBJ_W lvalue for a compile-time SXE tree (#35823 leftover of #35814 / #35810).
+     *
+     * Thin AOT has no declared SimpleXMLElement slots; ZEND_ASSIGN_OBJ abort()s (exit 134).
+     * Mark a property-writable slot so ASSIGN host-folds via {@see tryPropSet}.
+     */
+    public static function tryPreparePropWrite(
+        Context $context,
+        JITVariable $container,
+        string $propName
+    ): ?JITVariable {
+        if (!UserScriptAotEnv::isActive() || !\extension_loaded('simplexml') || '' === $propName) {
+            return null;
+        }
+        $token = $container->compileTimeString;
+        if (null !== $token && isset(self::$xpathListsByToken[$token])) {
+            return null;
+        }
+        if (JITVariable::TYPE_HASHTABLE === $container->type
+            || 0 !== ($container->type & JITVariable::IS_NATIVE_ARRAY)
+        ) {
+            return null;
+        }
+        if (null === self::lookup($container)) {
+            return null;
+        }
+        $slot = JitValueBox::alloc($context);
+        $var = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VARIABLE, $slot);
+        $var->writableSxePropReceiver = $container;
+        $var->writableSxePropName = $propName;
+
+        return $var;
+    }
+
+    /**
+     * SimpleXMLElement property write — host sxe_property_write (#35823 / php-src sxe.c).
+     *
+     * Mutates the compile-time tree so a later asXML()/__get fold sees the text.
+     */
+    public static function tryPropSet(
+        Context $context,
+        JITVariable $container,
+        string $propName,
+        JITVariable $value
+    ): ?Value {
+        if (!UserScriptAotEnv::isActive() || !\extension_loaded('simplexml') || '' === $propName) {
+            return null;
+        }
+        $tree = self::lookup($container);
+        if (null === $tree) {
+            return null;
+        }
+        $text = self::compileTimeOffsetSetValue($context, $value);
+        if (null === $text) {
+            throw new \LogicException(
+                'SimpleXMLElement property write user-script AOT requires a compile-time value (#35823 leftover of #35814)'
+            );
+        }
+        try {
+            $tree->{$propName} = $text;
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return self::nullValue($context);
+    }
+
+    /**
      * isset($sxe->prop) — host property existence (php-src sxe.c / __isset; #35814).
      *
      * Thin AOT boxes SXE as TYPE_VALUE so value-box propertyIsSet looks at declared slots
