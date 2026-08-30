@@ -20,6 +20,7 @@ final class SimpleXmlInstanceMethodJit
         'simplexmlelement::registerxpathnamespace' => true,
         'simplexmlelement::__get' => true,
         'simplexmlelement::offsetget' => true,
+        'simplexmlelement::offsetunset' => true,
         'simplexmlelement::count' => true,
         'simplexmlelement::__tostring' => true,
         'simplexmlelement::children' => true,
@@ -87,6 +88,11 @@ final class SimpleXmlInstanceMethodJit
         }
         if ('simplexmlelement::offsetget' === $lc) {
             $context->functionProxies[$lc] = new Call\SimpleXMLElementOffsetGet();
+
+            return;
+        }
+        if ('simplexmlelement::offsetunset' === $lc) {
+            $context->functionProxies[$lc] = new Call\SimpleXMLElementOffsetGet('offsetUnset');
 
             return;
         }
