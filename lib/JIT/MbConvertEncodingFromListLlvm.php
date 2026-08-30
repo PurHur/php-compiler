@@ -35,7 +35,9 @@ final class MbConvertEncodingFromListLlvm
         MbConvertVariablesRuntime::ensureLinked($context);
         BasicBlockHelper::ensureOpenInsertBlock($context, 'mb_convert_encoding_from_list');
 
-        $ht = HashTableReadLlvm::loadHashtablePointer($context, $fromArg);
+        $ht = ArrayBuiltinHelper::isNativeArray($fromArg->type)
+            ? ArrayBuiltinHelper::nativeListToHashTable($context, $fromArg)
+            : ArrayBuiltinHelper::loadHashTable($context, $fromArg);
         $htMap = $context->structFieldMap['__hashtable__'];
         $sizeT = $context->getTypeFromString('size_t');
         $zero = $sizeT->constInt(0, false);
