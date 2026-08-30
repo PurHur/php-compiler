@@ -26276,54 +26276,6 @@ class JIT {
         return $native;
     }
 
-    /**
-     * DOMNodeList::$length and other native scalar property reads stay __value__-boxed
-     * for identical/echo — ordered `<` needs native i64 like `(int)$len` (#36018).
-     */
-    private function materializeDomNodeListLengthCompareOperand(Variable $var): Variable
-    {
-        if (Variable::TYPE_NATIVE_LONG === $var->type
-            && Variable::KIND_VARIABLE === $var->kind
-            && null === $var->objectPropertySlot
-        ) {
-            return $var;
-        }
-        if (null !== $var->objectPropertySlot) {
-            $propType = $var->objectPropertyType ?? $var->type;
-            if (\in_array($propType, [
-                Variable::TYPE_NATIVE_LONG,
-                Variable::TYPE_NATIVE_BOOL,
-                Variable::TYPE_NATIVE_DOUBLE,
-            ], true)) {
-                return $this->snapshotNativeScalarPropertyRead($var, $propType);
-            }
-
-            return $var;
-        }
-        if (Variable::TYPE_VALUE !== $var->type || !JIT\JitValueBox::isValueOperand($var)) {
-            return $var;
-        }
-        $isNativeLongProp = Variable::TYPE_NATIVE_LONG === ($var->objectPropertyType ?? null);
-        $isDomNodeListLen = null !== ($var->compileTimeDomNodeListLength ?? null);
-        if (!$isNativeLongProp && !$isDomNodeListLen) {
-            return $var;
-        }
-        $long = ext\standard\JitZendScalarCast::emitIntCast($this->context, $var);
-        $i64 = $this->context->getTypeFromString('int64');
-        $slot = JIT\BasicBlockHelper::entryAlloca($this->context, $i64);
-        $this->context->builder->store($long, $slot);
-        $native = new Variable(
-            $this->context,
-            Variable::TYPE_NATIVE_LONG,
-            Variable::KIND_VARIABLE,
-            $slot
-        );
-        $native->addref();
-        $native->compileTimeLong = null;
-
-        return $native;
-    }
-
     private function jitVariableArrayClassConstant(string $constName): ?Variable
     {
         switch (strtolower($constName)) {
