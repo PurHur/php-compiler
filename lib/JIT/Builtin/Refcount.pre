@@ -57,12 +57,21 @@ class Refcount extends Builtin {
     }
 
     public function implement(): void {
-        \PHPCompiler\JIT\Builtin\WeakRefRuntime::ensureLinked($this->context);
-        \PHPCompiler\JIT\Builtin\WeakRefNative::registerDeclarations($this->context);
+        // WeakRef / GC delref always-on ensureLinked removed (#35802): only
+        // implementDelref emits phpc_weakref_clear_object_typed / phpc_gc_unregister /
+        // phpc_destruct_* — call ensureDelrefHelperAbis there (peer #35751).
         $this->implementInit();
         $this->implementAddref();
         $this->implementDelref();
         $this->implementSeparate();
+    }
+
+    /** WeakReference clear + GC unregister + deferred-destruct probes — delref only (#35802). */
+    private function ensureDelrefHelperAbis(): void
+    {
+        \PHPCompiler\JIT\Builtin\WeakRefRuntime::ensureLinked($this->context);
+        \PHPCompiler\JIT\Builtin\WeakRefNative::registerDeclarations($this->context);
+        \PHPCompiler\JIT\Builtin\GcCollectCyclesRuntime::ensureDeclarations($this->context);
     }
 
     private function implementInit(): void {
@@ -101,6 +110,7 @@ class Refcount extends Builtin {
     }
 
     private function implementDelref(): void {
+        $this->ensureDelrefHelperAbis();
         compile {
             function __ref__delref($refVirtual) {
                 $isNull = $refVirtual == null;
