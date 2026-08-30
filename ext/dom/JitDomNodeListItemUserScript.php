@@ -294,10 +294,23 @@ final class JitDomNodeListItemUserScript
             return $context->builder->select($preferRemat, $compileTime, $live);
         }
 
-        // Legacy XPath evaluate/query cache hit (item(0) only).
+        // Legacy XPath evaluate/query cache hit (item(0) only) — predicate //tag[@a=v]
+        // lists only; host-folded axis node-sets rematerialize via PROP_XPATH_AXIS_ID
+        // (#32003 follow-up: compile-time lastCacheKey is unit-global).
         if (0 === $index) {
             $cacheKey = JitDomXPathQueryUserScript::lastCacheKey();
-            if (null !== $cacheKey) {
+            if (null !== $cacheKey && !str_starts_with($cacheKey, 'xpath-axis-')) {
+                if (null !== $xpathAxisIdVal && null !== $xpathAxisBlock) {
+                    $i64 = $context->getTypeFromString('int64');
+                    $noAxisOnList = $context->builder->icmp(
+                        Builder::INT_EQ,
+                        $xpathAxisIdVal,
+                        $i64->constInt(0, false)
+                    );
+                    $legacyCacheBlock = BasicBlockHelper::append($context, 'dom_nli_xpath_legacy_cache');
+                    $context->builder->branchIf($noAxisOnList, $legacyCacheBlock, $xpathAxisBlock);
+                    $context->builder->positionAtEnd($legacyCacheBlock);
+                }
                 $keyStr = $context->builder->load($context->constantStringFromString($cacheKey));
                 $found = DomUserScriptElementCacheLlvm::lookupObject($context, $keyStr);
 

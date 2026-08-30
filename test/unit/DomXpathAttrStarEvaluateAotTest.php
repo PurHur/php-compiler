@@ -40,6 +40,17 @@ final class DomXpathAttrStarEvaluateAotTest extends TestCase
         $this->assertAotMatchesZend(__DIR__.'/../repro/maintainer_gap_dom_xpath_attr_star.php');
     }
 
+    /** item(0)->nodeName after length / repeated query() must not use unit-global cache (#32003). */
+    public function testAttrStarItemZeroNodeNameMatchesZend(): void
+    {
+        $this->assertAotMatchesZend(__DIR__.'/../repro/aot_dom_xpath_attr_star_32003.php');
+    }
+
+    public function testAttrStarHeldListLengthThenItemZeroMatchesZend(): void
+    {
+        $this->assertAotMatchesZend(__DIR__.'/../repro/aot_dom_xpath_attr_star_held_list.php');
+    }
+
     private function assertAotMatchesZend(string $src): void
     {
         $zend = $this->runPhp($src);
