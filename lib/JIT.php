@@ -17938,15 +17938,17 @@ class JIT {
     }
 
     /**
-     * XMLReader::XML()/fromString() — InternalArgInfo types XML()/open() as boolean (instance
+     * XMLReader::XML()/fromString()/fromUri()/fromStream() — InternalArgInfo types XML()/open() as boolean (instance
      * form). Static factory results are objects; retag the CFG operand so `$r->nodeType`
-     * does not take the non-object property path (#28670, re-#27299).
+     * does not take the non-object property path (#28670, re-#27299, #35900).
      */
     private function propagateXmlReaderFactoryResultType(Operand $result, mixed $toCall): void
     {
         if (
             !($toCall instanceof JIT\Call\XmlReaderXML)
             && !($toCall instanceof JIT\Call\XmlReaderFromString)
+            && !($toCall instanceof JIT\Call\XmlReaderFromUri)
+            && !($toCall instanceof JIT\Call\XmlReaderFromStream)
         ) {
             return;
         }
@@ -18617,6 +18619,8 @@ class JIT {
                 (
                     $this->context->scope->toCall instanceof JIT\Call\XmlReaderXML
                     || $this->context->scope->toCall instanceof JIT\Call\XmlReaderFromString
+                    || $this->context->scope->toCall instanceof JIT\Call\XmlReaderFromUri
+                    || $this->context->scope->toCall instanceof JIT\Call\XmlReaderFromStream
                 )
                 && !(
                     $this->context->scope->toCall instanceof JIT\Call\XmlReaderXML

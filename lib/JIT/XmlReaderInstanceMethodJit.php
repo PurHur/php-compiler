@@ -12,6 +12,10 @@ final class XmlReaderInstanceMethodJit
     /** @var array<string, true> */
     private const METHODS = [
         'xmlreader::fromstring' => true,
+        // leftover of fromString AOT (#27299 / #35900) — php-src zim_xmlreader_fromUri
+        'xmlreader::fromuri' => true,
+        // leftover of fromString AOT (#27299 / #35900) — php-src zim_xmlreader_fromStream
+        'xmlreader::fromstream' => true,
         'xmlreader::xml' => true,
         'xmlreader::read' => true,
     ];
@@ -40,6 +44,22 @@ final class XmlReaderInstanceMethodJit
         }
         if ('xmlreader::fromstring' === $lc) {
             $context->functionProxies[$lc] = new Call\XmlReaderFromString();
+
+            return;
+        }
+        if ('xmlreader::fromuri' === $lc) {
+            if (!\PHPCompiler\CompilerVersion::supportsXmlReaderFactories()) {
+                return;
+            }
+            $context->functionProxies[$lc] = new Call\XmlReaderFromUri();
+
+            return;
+        }
+        if ('xmlreader::fromstream' === $lc) {
+            if (!\PHPCompiler\CompilerVersion::supportsXmlReaderFactories()) {
+                return;
+            }
+            $context->functionProxies[$lc] = new Call\XmlReaderFromStream();
 
             return;
         }

@@ -84,8 +84,9 @@ final class fopen extends Internal
 
         $pathLit = JitStringBuiltinArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString;
         if (null !== $pathLit && '' !== $pathLit) {
-            // Recover URI for XMLWriter::toStream host fold (#35895).
+            // Recover URI for XMLWriter::toStream / XMLReader::fromStream host fold (#35895 / #35900).
             \PHPCompiler\ext\xmlwriter\JitXmlWriterUserScript::noteFopenPath($pathLit);
+            \PHPCompiler\ext\xmlreader\JitXmlReaderUserScript::noteFopenPath($pathLit);
         }
 
         return JitFopen::invoke(

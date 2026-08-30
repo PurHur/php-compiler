@@ -14,14 +14,16 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * User-script AOT: XMLReader::XML / fromString + read() + nodeType/name/value (#27299, #28670).
+ * User-script AOT: XMLReader::XML / fromString / fromUri / fromStream + read()
+ * + nodeType/name/value (#27299, #28670, #35900).
  *
  * Thin standalone previously lowered factories to ExternalMethod NULL and then failed
  * `while ($r->read())` with `object::read()` once PHPCfg widened the receiver. Compile-time
  * tokenize via {@see VmXmlReader::tokenize} and emit a position switch that updates real
  * object slots so property fetches match Zend without NestedJIT of the full pull parser.
  *
- * php-src: ext/xmlreader/php_xmlreader.c — XML / fromString / read / xmlreader props
+ * php-src: ext/xmlreader/php_xmlreader.c — XML / fromString / fromUri / fromStream /
+ * read / xmlreader props
  */
 final class JitXmlReaderUserScript
 {
@@ -34,6 +36,14 @@ final class JitXmlReaderUserScript
 
     /** Set when the last XML()/fromString lowering was the instance form (#35106). */
     public static bool $lastCallWasInstance = false;
+
+    /** Last compile-time fopen() path — recovers URI for fromStream fold (#35900 / #35895). */
+    private static ?string $lastFopenPath = null;
+
+    /** @var array<string, string> stream compileTimeString token → fopen path */
+    private static array $fopenPathsByToken = [];
+
+    private static int $fopenTokenSeq = 0;
 
     public static function isUserScriptAot(): bool
     {
@@ -79,10 +89,132 @@ final class JitXmlReaderUserScript
             return null;
         }
 
-        try {
-            $raw = VmXmlReader::tokenize($lit);
-        } catch (\Throwable) {
+        if (!self::tokenizeIntoLastEvents($lit)) {
             return null;
+        }
+
+        if (null !== $instanceReceiver) {
+            return self::resetReceiverForParse($context, $instanceReceiver);
+        }
+
+        return self::materializeReader($context);
+    }
+
+    /**
+     * Record a compile-time fopen() path so XMLReader::fromStream can tokenize (#35900).
+     * Peer of XMLWriter::toStream stamp (#35895).
+     */
+    public static function noteFopenPath(string $path, ?JITVariable $streamResult = null): void
+    {
+        if ('' === $path || str_starts_with($path, '__phpc_')) {
+            return;
+        }
+        self::$lastFopenPath = $path;
+        if (null !== $streamResult) {
+            $token = $streamResult->compileTimeString;
+            if (null === $token || str_starts_with($token, '__phpc_xw_') || str_starts_with($token, '__phpc_fopen_')) {
+                $token = '__phpc_fopen_xr_'.(++self::$fopenTokenSeq);
+                $streamResult->compileTimeString = $token;
+            }
+            self::$fopenPathsByToken[$token] = $path;
+        }
+    }
+
+    /**
+     * XMLReader::fromUri() leftover of fromString (#27299 / #35900).
+     * Host PHP 8.2 has no fromUri; fold via compile-time URI + {@see VmXmlReader::tokenize}
+     * (php-src zim_xmlreader_fromUri = xmlReaderForFile / open).
+     */
+    public static function tryFromUri(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot() || !isset($args[0])) {
+            return null;
+        }
+        self::$lastCallWasInstance = false;
+        $uri = JitStringBuiltinArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString;
+        if (null === $uri || str_starts_with($uri, '__phpc_')) {
+            return null;
+        }
+        if ('' === $uri) {
+            throw new \ValueError('XMLReader::fromUri(): Argument #1 ($uri) cannot be empty');
+        }
+        $xml = self::readUriAtCompileTime($uri);
+        if (null === $xml) {
+            throw new \Error('XMLReader::fromUri(): Unable to open source data');
+        }
+        if (!self::tokenizeIntoLastEvents($xml)) {
+            return null;
+        }
+
+        return self::materializeReader($context);
+    }
+
+    /**
+     * XMLReader::fromStream() leftover of fromString (#27299 / #35900).
+     * Host has no fromStream; fold as fromUri when the stream was opened from a
+     * compile-time fopen() path (php-src zim_xmlreader_fromStream).
+     */
+    public static function tryFromStream(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot() || !isset($args[0])) {
+            return null;
+        }
+        self::$lastCallWasInstance = false;
+        $uri = self::resolveStreamUri($args[0]);
+        if (null === $uri) {
+            return null;
+        }
+        if ('' === $uri) {
+            throw new \ValueError(
+                'XMLReader::fromStream(): Argument #1 ($stream) is not an open stream resource'
+            );
+        }
+        $xml = self::readUriAtCompileTime($uri);
+        if (null === $xml) {
+            throw new \Error('XMLReader::fromStream(): Unable to read source data');
+        }
+        if (!self::tokenizeIntoLastEvents($xml)) {
+            return null;
+        }
+
+        return self::materializeReader($context);
+    }
+
+    /** Resolve fopen literal path from stream arg token or lastFopenPath (#35895). */
+    private static function resolveStreamUri(JITVariable $stream): ?string
+    {
+        $token = $stream->compileTimeString;
+        if (null !== $token && isset(self::$fopenPathsByToken[$token])) {
+            return self::$fopenPathsByToken[$token];
+        }
+        if (null !== $token && '' !== $token && !str_starts_with($token, '__phpc_')) {
+            return $token;
+        }
+        $lit = JitStringBuiltinArg::compileTimeLiteral($stream);
+        if (null !== $lit && '' !== $lit && !str_starts_with($lit, '__phpc_')) {
+            return $lit;
+        }
+
+        return self::$lastFopenPath;
+    }
+
+    private static function readUriAtCompileTime(string $uri): ?string
+    {
+        $path = $uri;
+        if (str_starts_with($path, 'file://')) {
+            $path = substr($path, 7);
+        }
+        $xml = @file_get_contents($path);
+
+        return false === $xml ? null : $xml;
+    }
+
+    private static function tokenizeIntoLastEvents(string $xml): bool
+    {
+        try {
+            $raw = VmXmlReader::tokenize($xml);
+        } catch (\Throwable) {
+            return false;
         }
 
         $events = [];
@@ -98,11 +230,7 @@ final class JitXmlReaderUserScript
         }
         self::$lastEvents = $events;
 
-        if (null !== $instanceReceiver) {
-            return self::resetReceiverForParse($context, $instanceReceiver);
-        }
-
-        return self::materializeReader($context);
+        return true;
     }
 
     /**
