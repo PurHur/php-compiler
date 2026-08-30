@@ -9,7 +9,6 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\MbDetectOrderRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
-use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -119,6 +118,7 @@ final class JitMbDetectOrder
 
     private static function lowerSetRuntime(Context $context, JITVariable $arg): Value
     {
+        // Link NestedJIT helpers before lowering args — NestedJIT can invalidate prior IR (#34270 / #35856).
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         MbDetectOrderRuntime::ensureLinked($context);
         if (null !== $savedInsert) {
@@ -133,12 +133,10 @@ final class JitMbDetectOrder
             0,
             'encoding'
         );
-        $raw = JitNestedHelperCoerce::callHelper(
-            $context,
+        $csv = $context->builder->call(
             MbDetectOrderRuntime::parseHelper($context),
-            [$csvArg]
+            $csvArg
         );
-        $csv = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
         self::storeOrderCsv($context, $csv);
 
         return $context->constantFromBool(true);
