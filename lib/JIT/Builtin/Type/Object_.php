@@ -4188,6 +4188,15 @@ class Object_ extends Type {
             $this->defineProperty($id, '__hcKey', Variable::TYPE_STRING);
             $this->defineProperty($id, '__hcHmac', Variable::TYPE_NATIVE_LONG);
         }
+        // DeflateContext / InflateContext thin-AOT buffer slots (#35885 leftover of #4656).
+        if ('deflatecontext' === $lcname || 'inflatecontext' === $lcname) {
+            $this->defineProperty($id, \PHPCompiler\ext\standard\ZlibIncrementalJitSupport::PROP_ENC, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\ext\standard\ZlibIncrementalJitSupport::PROP_LEVEL, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\ext\standard\ZlibIncrementalJitSupport::PROP_BUF, Variable::TYPE_STRING);
+            $this->defineProperty($id, \PHPCompiler\ext\standard\ZlibIncrementalJitSupport::PROP_STATUS, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\ext\standard\ZlibIncrementalJitSupport::PROP_READ_LEN, Variable::TYPE_NATIVE_LONG);
+            $this->markFinalClass($lcname);
+        }
         // ZipArchive stub props — late defineProperty after new SIGSEGVs (#35002 leftover of #20584).
         // TYPE_VALUE for filename/comment: emitSetStringPropertyFromCstr stores heap __value__* boxes.
         if ('ziparchive' === $lcname) {
@@ -5706,6 +5715,20 @@ class Object_ extends Type {
         // HashContext JIT handle (ext/hash/JitHashContext.php, #3357 / #27264).
         if ('hashcontext' === $lcClass && ('__hcid' === $lcName || '__hchmac' === $lcName)) {
             return Variable::TYPE_NATIVE_LONG;
+        }
+        if (
+            ('deflatecontext' === $lcClass || 'inflatecontext' === $lcClass)
+            && (
+                '__zenc' === $lcName
+                || '__zlevel' === $lcName
+                || '__zstatus' === $lcName
+                || '__zreadlen' === $lcName
+            )
+        ) {
+            return Variable::TYPE_NATIVE_LONG;
+        }
+        if (('deflatecontext' === $lcClass || 'inflatecontext' === $lcClass) && '__zbuf' === $lcName) {
+            return Variable::TYPE_STRING;
         }
         if (
             'hashcontext' === $lcClass
