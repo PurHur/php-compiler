@@ -16,6 +16,7 @@ use PHPCompiler\JIT\Builtin\StringTriggerError;
 use PHPCompiler\JIT\Builtin\Type;
 use PHPCompiler\JIT\JitStringCompare;
 use PHPCompiler\JIT\LibcExtern;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM;
 use PHPLLVM\Builder;
@@ -141,7 +142,8 @@ class HashTable extends Type
         // SORT_STRING|SORT_FLAG_CASE — length-aware ASCII strcasecmp (#34702).
         $this->registerFn('__hashtable__sortPackedStringCase', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__sortPackedReverseStringCase', 'void', ['__hashtable__*']);
-        // locale / packed-natural / packed-multisort decls deferred to ensureSortAbi (#35904).
+        // locale / packed-natural decls deferred to ensureSortAbi (#35904).
+        // __multisort__packed deferred to ensureMultisortPacked (#35904).
         $this->pointer = $this->context->getTypeFromString('__hashtable__*');
     }
 
@@ -174,6 +176,11 @@ class HashTable extends Type
      */
     public function ensureSortAbi(string $name): void
     {
+        if ('__multisort__packed' === $name) {
+            $this->ensureMultisortPacked();
+
+            return;
+        }
         $probe = $this->context->module->getNamedFunction($name);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $this->context->registerFunction($name, $probe);
@@ -181,59 +188,39 @@ class HashTable extends Type
             return;
         }
 
-        $savedBlock = null;
+        $restore = BasicBlockHelper::tryGetInsertBlock($this->context);
         try {
-            $savedBlock = $this->context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
-
-        if (null === $probe) {
-            if ('__multisort__packed' === $name) {
-                $this->registerFn($name, 'void', ['__hashtable__*', 'int1'], false);
-            } else {
-                $this->registerFn($name, 'void', ['__hashtable__*'], false);
-            }
-        } else {
-            $this->context->registerFunction($name, $probe);
-        }
-
-        // Drop the caller insert before NestedJIT of strcoll/strnatcmp so those
-        // helpers cannot plant ret void into user main (#35904 empty stdout after natsort).
-        $this->context->builder->clearInsertionPosition();
-
-        $fn = $this->context->lookupFunction($name);
-        BasicBlockHelper::scopeLoweringToFunction($this->context, $fn, $name, function () use ($name): void {
-            switch ($name) {
-                case '__hashtable__sortStringKeysLocale':
-                    $this->implementSortStringKeysLocale();
-                    break;
-                case '__hashtable__sortStringKeyValuesLocale':
-                    $this->implementSortStringKeyValuesLocale();
-                    break;
-                case '__hashtable__sortStringKeyValuesNatural':
-                    $this->implementSortStringKeyValuesNatural();
-                    break;
-                case '__hashtable__sortStringKeyValuesNaturalCase':
-                    $this->implementSortStringKeyValuesNaturalCase();
-                    break;
-                case '__hashtable__sortPackedNatural':
-                    $this->implementSortPackedNatural(false);
-                    break;
-                case '__hashtable__sortPackedNaturalCase':
-                    $this->implementSortPackedNatural(true);
-                    break;
-                case '__multisort__packed':
-                    $this->implementMultisortPacked();
-                    break;
-                default:
-                    throw new \LogicException('unknown lazy HashTable sort ABI '.$name.' (#35904)');
-            }
-        });
-
-        if (null !== $savedBlock) {
-            $this->context->builder->positionAtEnd($savedBlock);
-        } else {
-            $this->context->builder->clearInsertionPosition();
+            NestedJitCompileScope::run($this->context, function () use ($name, $probe): void {
+                if (null === $probe) {
+                    $this->registerFn($name, 'void', ['__hashtable__*'], false);
+                } else {
+                    $this->context->registerFunction($name, $probe);
+                }
+                switch ($name) {
+                    case '__hashtable__sortStringKeysLocale':
+                        $this->implementSortStringKeysLocale();
+                        break;
+                    case '__hashtable__sortStringKeyValuesLocale':
+                        $this->implementSortStringKeyValuesLocale();
+                        break;
+                    case '__hashtable__sortStringKeyValuesNatural':
+                        $this->implementSortStringKeyValuesNatural();
+                        break;
+                    case '__hashtable__sortStringKeyValuesNaturalCase':
+                        $this->implementSortStringKeyValuesNaturalCase();
+                        break;
+                    case '__hashtable__sortPackedNatural':
+                        $this->implementSortPackedNatural(false);
+                        break;
+                    case '__hashtable__sortPackedNaturalCase':
+                        $this->implementSortPackedNatural(true);
+                        break;
+                    default:
+                        throw new \LogicException('unknown lazy HashTable sort ABI '.$name.' (#35904)');
+                }
+            });
+        } finally {
+            BasicBlockHelper::restoreInsertBlock($this->context, $restore);
         }
     }
 
@@ -305,10 +292,40 @@ class HashTable extends Type
         $this->implementSortPacked(true, false);
         $this->implementSortPacked(false, true);
         $this->implementSortPacked(true, true);
-        // locale / packed-natural / packed-multisort: ensureSortAbi on first lookup (#35904).
+        // locale / packed-natural: ensureSortAbi on first lookup (#35904).
         // strKey natsort stays eager so valueToString/strnatcmp first-link cannot plant
         // ret void into user main (empty stdout after natsort).
+        // implementMultisortPacked deferred to ensureMultisortPacked (#35904).
         $this->context->builder->clearInsertionPosition();
+    }
+
+    /**
+     * Coupled array_multisort() LLVM — first use only (#35904 / peer #26908).
+     *
+     * Restores the caller insert block; implementMultisortPacked positionAtEnd the new fn.
+     */
+    public function ensureMultisortPacked(): void
+    {
+        $name = '__multisort__packed';
+        $existing = $this->context->module->getNamedFunction($name);
+        if (null !== $existing && $existing->countBasicBlocks() > 0) {
+            $this->context->registerFunction($name, $existing);
+
+            return;
+        }
+        $restore = BasicBlockHelper::tryGetInsertBlock($this->context);
+        try {
+            NestedJitCompileScope::run($this->context, function () use ($name, $existing): void {
+                if (null === $existing) {
+                    $this->registerFn($name, 'void', ['__hashtable__*', 'int1']);
+                } else {
+                    $this->context->registerFunction($name, $existing);
+                }
+                $this->implementMultisortPacked();
+            });
+        } finally {
+            BasicBlockHelper::restoreInsertBlock($this->context, $restore);
+        }
     }
 
     private function ensureLibcStrtol(): void

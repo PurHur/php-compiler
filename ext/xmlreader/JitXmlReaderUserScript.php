@@ -14,14 +14,15 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * User-script AOT: XMLReader::XML / fromString + read() + nodeType/name/value (#27299, #28670).
+ * User-script AOT: XMLReader::XML / open / fromString + read() + nodeType/name/value
+ * (#27299, #28670, #35907).
  *
  * Thin standalone previously lowered factories to ExternalMethod NULL and then failed
  * `while ($r->read())` with `object::read()` once PHPCfg widened the receiver. Compile-time
  * tokenize via {@see VmXmlReader::tokenize} and emit a position switch that updates real
  * object slots so property fetches match Zend without NestedJIT of the full pull parser.
  *
- * php-src: ext/xmlreader/php_xmlreader.c — XML / fromString / read / xmlreader props
+ * php-src: ext/xmlreader/php_xmlreader.c — XML / open / fromString / read / xmlreader props
  */
 final class JitXmlReaderUserScript
 {
@@ -32,8 +33,17 @@ final class JitXmlReaderUserScript
     /** @var list<array{nodeType: int, name: string, value: string}>|null */
     private static ?array $lastEvents = null;
 
-    /** Set when the last XML()/fromString lowering was the instance form (#35106). */
+    /** @var list<string>|null Precomputed readInnerXml() per event index (#35908). */
+    private static ?array $lastInnerXml = null;
+
+    /** @var list<string>|null Precomputed readOuterXml() per event index (#35908). */
+    private static ?array $lastOuterXml = null;
+
+    /** Set when the last XML()/open lowering was the instance form (#35106 / #35907). */
     public static bool $lastCallWasInstance = false;
+
+    /** Static open() may return false; skip object retag then (#35907). */
+    public static bool $lastResultIsObject = true;
 
     public static function isUserScriptAot(): bool
     {
@@ -54,6 +64,7 @@ final class JitXmlReaderUserScript
             return null;
         }
         self::$lastCallWasInstance = false;
+        self::$lastResultIsObject = true;
         // Static factory: source is $args[0]. Instance XML() keeps EX(This) as $args[0]
         // with source in $args[1] (#22630 / #28670 / #35106).
         // Do NOT read compileTimeString from the object receiver — ARG_SEND may stamp the
@@ -83,6 +94,61 @@ final class JitXmlReaderUserScript
     }
 
     /**
+     * XMLReader::open() leftover of fromUri/fromString (#35907 / #35900 / #27299).
+     * php-src: zim_xmlreader_open — static returns XMLReader|false; instance returns bool.
+     */
+    public static function tryOpen(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot() || \count($args) < 1) {
+            return null;
+        }
+        self::$lastCallWasInstance = false;
+        self::$lastResultIsObject = true;
+        $instanceReceiver = null;
+        $uri = null;
+        if (isset($args[1])
+            && (JITVariable::TYPE_OBJECT === $args[0]->type
+                || JITVariable::TYPE_VALUE === $args[0]->type)
+        ) {
+            $uri = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+            if (null !== $uri && '' !== $uri && !str_starts_with($uri, '__phpc_')) {
+                $instanceReceiver = $args[0];
+                self::$lastCallWasInstance = true;
+                self::$lastResultIsObject = false;
+            }
+        }
+        if (null === $uri || '' === $uri || str_starts_with((string) $uri, '__phpc_')) {
+            $uri = JitStringBuiltinArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString;
+            $instanceReceiver = null;
+            self::$lastCallWasInstance = false;
+            self::$lastResultIsObject = true;
+        }
+        if (null === $uri || str_starts_with($uri, '__phpc_')) {
+            return null;
+        }
+        if ('' === $uri) {
+            throw new \ValueError('XMLReader::open(): Argument #1 ($uri) cannot be empty');
+        }
+        $xml = @file_get_contents($uri);
+        if (false === $xml) {
+            self::$lastResultIsObject = false;
+            if (self::$lastCallWasInstance) {
+                return $context->getTypeFromString('int1')->constInt(0, false);
+            }
+            $slot = JitValueBox::alloc($context);
+            JitValueBox::writeBool(
+                $context,
+                $slot,
+                $context->getTypeFromString('int1')->constInt(0, false)
+            );
+
+            return JitValueBox::normalizeValuePtr($context, $slot);
+        }
+
+        return self::foldTokenizedSource($context, $xml, $instanceReceiver);
+    }
+
+    /**
      * XMLReader::fromUri() leftover of fromString (#35900 / #27299).
      * php-src: zim_xmlreader_fromUri — host PHP 8.2 has no factory; read URI + tokenize.
      */
@@ -92,6 +158,7 @@ final class JitXmlReaderUserScript
             return null;
         }
         self::$lastCallWasInstance = false;
+        self::$lastResultIsObject = true;
         $uri = JitStringBuiltinArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString;
         if (null === $uri || '' === $uri || str_starts_with($uri, '__phpc_')) {
             return null;
@@ -114,6 +181,7 @@ final class JitXmlReaderUserScript
             return null;
         }
         self::$lastCallWasInstance = false;
+        self::$lastResultIsObject = true;
         $path = \PHPCompiler\ext\xmlwriter\JitXmlWriterUserScript::resolveFopenPath($args[0]);
         if (null === $path || '' === $path || str_starts_with($path, '__phpc_')) {
             return null;
@@ -140,10 +208,12 @@ final class JitXmlReaderUserScript
         }
 
         $events = [];
+        $rawEvents = [];
         foreach ($raw as $ev) {
             if (!$ev instanceof XmlReaderEvent) {
                 continue;
             }
+            $rawEvents[] = $ev;
             $events[] = [
                 'nodeType' => $ev->nodeType,
                 'name' => $ev->name,
@@ -151,6 +221,14 @@ final class JitXmlReaderUserScript
             ];
         }
         self::$lastEvents = $events;
+        $inner = [];
+        $outer = [];
+        foreach ($rawEvents as $i => $_) {
+            $inner[] = XmlReaderSubtreeXmlHelper::innerXml($rawEvents, $i);
+            $outer[] = XmlReaderSubtreeXmlHelper::outerXml($rawEvents, $i);
+        }
+        self::$lastInnerXml = $inner;
+        self::$lastOuterXml = $outer;
 
         if (null !== $instanceReceiver) {
             return self::resetReceiverForParse($context, $instanceReceiver);
@@ -281,6 +359,135 @@ final class JitXmlReaderUserScript
         }
 
         return self::emitReadSwitch($context, $args[0], $events);
+    }
+
+    /**
+     * XMLReader::readInnerXml() leftover of fromString read (#35908 / #27299 / #19411).
+     * php-src: zim_XMLReader_readInnerXml
+     */
+    public static function tryReadInnerXml(Context $context, JITVariable ...$args): ?Value
+    {
+        return self::trySubtreeXml($context, self::$lastInnerXml, 'readInnerXml', ...$args);
+    }
+
+    /**
+     * XMLReader::readOuterXml() leftover of fromString read (#35908 / #27299 / #19411).
+     * php-src: zim_XMLReader_readOuterXml
+     */
+    public static function tryReadOuterXml(Context $context, JITVariable ...$args): ?Value
+    {
+        return self::trySubtreeXml($context, self::$lastOuterXml, 'readOuterXml', ...$args);
+    }
+
+    /**
+     * @param list<string>|null $byPos
+     */
+    private static function trySubtreeXml(
+        Context $context,
+        ?array $byPos,
+        string $label,
+        JITVariable ...$args
+    ): ?Value {
+        if (!self::isUserScriptAot() || null === $byPos || null === self::$lastEvents) {
+            return null;
+        }
+        if (\count($args) < 1) {
+            throw new \LogicException('XMLReader::'.$label.'() called without $this');
+        }
+
+        return self::emitPosStringSwitch($context, $args[0], $byPos, $label);
+    }
+
+    /**
+     * Return precomputed string for the current __xr_pos (after a successful read).
+     *
+     * @param list<string> $byPos
+     */
+    private static function emitPosStringSwitch(
+        Context $context,
+        JITVariable $receiver,
+        array $byPos,
+        string $label
+    ): Value {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'xmlreader_'.$label.'_cont');
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup(self::CLASS_NAME);
+        self::ensureLayout($objectType, $classId);
+
+        $obj = self::loadObject($context, $receiver);
+        $i64 = $context->getTypeFromString('int64');
+        $posVal = $context->helper->loadValue(
+            $objectType->propertyFetch($obj, self::CLASS_NAME, self::PROP_POS)
+        );
+
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__*'));
+        $merge = BasicBlockHelper::append($context, 'xmlreader_'.$label.'_merge');
+        $miss = BasicBlockHelper::append($context, 'xmlreader_'.$label.'_miss');
+
+        $n = \count($byPos);
+        /** @var list<\PHPLLVM\BasicBlock> */
+        $caseBlocks = [];
+        for ($i = 0; $i < $n; ++$i) {
+            $caseBlocks[$i] = BasicBlockHelper::append($context, 'xmlreader_'.$label.'_case_'.$i);
+        }
+        $inRange = $context->builder->icmp(
+            Builder::INT_SLT,
+            $posVal,
+            $i64->constInt($n, true)
+        );
+        $nonNeg = $context->builder->icmp(
+            Builder::INT_SGE,
+            $posVal,
+            $i64->constInt(0, true)
+        );
+        $ok = $context->builder->and($inRange, $nonNeg);
+        $context->builder->branchIf(
+            $ok,
+            $n > 0 ? $caseBlocks[0] : $miss,
+            $miss
+        );
+
+        $context->builder->positionAtEnd($miss);
+        $context->builder->store(self::stringValueBox($context, ''), $resultSlot);
+        $context->builder->branch($merge);
+
+        for ($i = 0; $i < $n; ++$i) {
+            $context->builder->positionAtEnd($caseBlocks[$i]);
+            $isThis = $context->builder->icmp(
+                Builder::INT_EQ,
+                $posVal,
+                $i64->constInt($i, true)
+            );
+            $apply = BasicBlockHelper::append($context, 'xmlreader_'.$label.'_apply_'.$i);
+            $next = ($i + 1 < $n) ? $caseBlocks[$i + 1] : $miss;
+            $context->builder->branchIf($isThis, $apply, $next);
+
+            $context->builder->positionAtEnd($apply);
+            $context->builder->store(self::stringValueBox($context, $byPos[$i]), $resultSlot);
+            $context->builder->branch($merge);
+        }
+
+        $context->builder->positionAtEnd($merge);
+
+        return $context->builder->load($resultSlot);
+    }
+
+    /** Boxed __value__* string constant for call results. */
+    private static function stringValueBox(Context $context, string $xml): Value
+    {
+        $str = $context->builder->load($context->constantStringFromString($xml));
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $str
+        );
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            JitValueBox::pointer($context, $slot),
+            $owned
+        );
+
+        return JitValueBox::normalizeValuePtr($context, $slot);
     }
 
     /**

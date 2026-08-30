@@ -27,7 +27,6 @@ final class HashTableLazySortAbi35904RuntimeShrinkTest extends TestCase
             'sortStringKeysLocale',
             'sortStringKeyValuesLocale',
             'sortPackedNatural',
-            '__multisort__packed',
         ] as $forbidden) {
             $this->assertStringNotContainsString(
                 $forbidden,
@@ -35,6 +34,7 @@ final class HashTableLazySortAbi35904RuntimeShrinkTest extends TestCase
                 'HashTable::register must not declare '.$forbidden.' (#35904)'
             );
         }
+        $this->assertStringNotContainsString("registerFn('__multisort__packed'", $body);
         $this->assertStringContainsString('ensureSortAbi', $body);
         $this->assertStringContainsString('sortStringKeyValuesNatural', $body);
     }
@@ -58,8 +58,7 @@ final class HashTableLazySortAbi35904RuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ensureSortAbi(self::ABI_STRKEY_NATURAL_CASE)', $natural);
 
         $multi = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MultisortRuntime.php');
-        $this->assertStringContainsString('ensureSortAbi(self::ABI_MULTISORT_PACKED)', $multi);
-        $this->assertStringNotContainsString('missing after HashTable type init', $multi);
+        $this->assertStringContainsString('ensureMultisortPacked', $multi);
     }
 
     public function testNoNewRuntimeC(): void

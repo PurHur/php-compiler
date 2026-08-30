@@ -59,7 +59,7 @@ final class MultisortRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        $context->type->hashtable->ensureSortAbi(self::ABI_MULTISORT_PACKED);
+        $context->type->hashtable->ensureMultisortPacked();
     }
 
     public static function ensureStandaloneBodies(Context $context): void
