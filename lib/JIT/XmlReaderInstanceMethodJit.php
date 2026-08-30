@@ -28,6 +28,8 @@ final class XmlReaderInstanceMethodJit
         'xmlreader::readstring' => true,
         // leftover of fromString/open (#35911 / #27299) — php-src zim_XMLReader_expand
         'xmlreader::expand' => true,
+        // leftover of fromString/read (#35918 / #27299) — php-src zim_XMLReader_getAttribute
+        'xmlreader::getattribute' => true,
     ];
 
     public static function isXmlReaderInstanceMethodProxy(string $proxyName): bool

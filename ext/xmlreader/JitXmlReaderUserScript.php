@@ -56,6 +56,13 @@ final class JitXmlReaderUserScript
      */
     private static ?array $lastExpandSpec = null;
 
+    /**
+     * Per-event attribute maps for getAttribute() (#35918 leftover of #27299).
+     *
+     * @var list<array<string, string>>|null
+     */
+    private static ?array $lastAttributes = null;
+
     /** Set when the last XML()/open lowering was the instance form (#35106 / #35907). */
     public static bool $lastCallWasInstance = false;
 
@@ -242,17 +249,20 @@ final class JitXmlReaderUserScript
         $outer = [];
         $readString = [];
         $expand = [];
+        $attributes = [];
         foreach ($rawEvents as $i => $ev) {
             $inner[] = XmlReaderSubtreeXmlHelper::innerXml($rawEvents, $i);
             $outerXml = XmlReaderSubtreeXmlHelper::outerXml($rawEvents, $i);
             $outer[] = $outerXml;
             $readString[] = XmlReaderSubtreeXmlHelper::readString($rawEvents, $i);
             $expand[] = self::expandSpecForEvent($ev, $outerXml);
+            $attributes[] = $ev->attributes;
         }
         self::$lastInnerXml = $inner;
         self::$lastOuterXml = $outer;
         self::$lastReadString = $readString;
         self::$lastExpandSpec = $expand;
+        self::$lastAttributes = $attributes;
 
         if (null !== $instanceReceiver) {
             return self::resetReceiverForParse($context, $instanceReceiver);
@@ -449,6 +459,30 @@ final class JitXmlReaderUserScript
         }
 
         return self::emitExpandSwitch($context, $args[0], self::$lastExpandSpec);
+    }
+
+    /**
+     * XMLReader::getAttribute() leftover of fromString/read (#35918 / #27299 / #6135).
+     * php-src: zim_XMLReader_getAttribute — compile-time name + __xr_pos attr map.
+     */
+    public static function tryGetAttribute(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot() || null === self::$lastAttributes || null === self::$lastEvents) {
+            return null;
+        }
+        if (\count($args) < 2) {
+            throw new \LogicException('XMLReader::getAttribute() expects $this and $name');
+        }
+        $name = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        if (null === $name) {
+            return null;
+        }
+        $byPos = [];
+        foreach (self::$lastAttributes as $attrs) {
+            $byPos[] = \array_key_exists($name, $attrs) ? $attrs[$name] : null;
+        }
+
+        return self::emitPosNullableStringSwitch($context, $args[0], $byPos, 'getAttribute');
     }
 
     /**
@@ -693,6 +727,96 @@ final class JitXmlReaderUserScript
         $context->builder->positionAtEnd($merge);
 
         return $context->builder->load($resultSlot);
+    }
+
+    /**
+     * Return precomputed ?string for the current __xr_pos (getAttribute; #35918).
+     *
+     * @param list<?string> $byPos
+     */
+    private static function emitPosNullableStringSwitch(
+        Context $context,
+        JITVariable $receiver,
+        array $byPos,
+        string $label
+    ): Value {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'xmlreader_'.$label.'_cont');
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup(self::CLASS_NAME);
+        self::ensureLayout($objectType, $classId);
+
+        $obj = self::loadObject($context, $receiver);
+        $i64 = $context->getTypeFromString('int64');
+        $posVal = $context->helper->loadValue(
+            $objectType->propertyFetch($obj, self::CLASS_NAME, self::PROP_POS)
+        );
+
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__*'));
+        $merge = BasicBlockHelper::append($context, 'xmlreader_'.$label.'_merge');
+        $miss = BasicBlockHelper::append($context, 'xmlreader_'.$label.'_miss');
+
+        $n = \count($byPos);
+        /** @var list<\PHPLLVM\BasicBlock> */
+        $caseBlocks = [];
+        for ($i = 0; $i < $n; ++$i) {
+            $caseBlocks[$i] = BasicBlockHelper::append($context, 'xmlreader_'.$label.'_case_'.$i);
+        }
+        $inRange = $context->builder->icmp(
+            Builder::INT_SLT,
+            $posVal,
+            $i64->constInt($n, true)
+        );
+        $nonNeg = $context->builder->icmp(
+            Builder::INT_SGE,
+            $posVal,
+            $i64->constInt(0, true)
+        );
+        $ok = $context->builder->and($inRange, $nonNeg);
+        $context->builder->branchIf(
+            $ok,
+            $n > 0 ? $caseBlocks[0] : $miss,
+            $miss
+        );
+
+        $context->builder->positionAtEnd($miss);
+        $context->builder->store(self::nullValueBox($context), $resultSlot);
+        $context->builder->branch($merge);
+
+        for ($i = 0; $i < $n; ++$i) {
+            $context->builder->positionAtEnd($caseBlocks[$i]);
+            $isThis = $context->builder->icmp(
+                Builder::INT_EQ,
+                $posVal,
+                $i64->constInt($i, true)
+            );
+            $apply = BasicBlockHelper::append($context, 'xmlreader_'.$label.'_apply_'.$i);
+            $next = ($i + 1 < $n) ? $caseBlocks[$i + 1] : $miss;
+            $context->builder->branchIf($isThis, $apply, $next);
+
+            $context->builder->positionAtEnd($apply);
+            $val = $byPos[$i];
+            if (null === $val) {
+                $context->builder->store(self::nullValueBox($context), $resultSlot);
+            } else {
+                $context->builder->store(self::stringValueBox($context, $val), $resultSlot);
+            }
+            $context->builder->branch($merge);
+        }
+
+        $context->builder->positionAtEnd($merge);
+
+        return $context->builder->load($resultSlot);
+    }
+
+    private static function nullValueBox(Context $context): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $slot)
+        );
+
+        return JitValueBox::normalizeValuePtr($context, $slot);
     }
 
     /** Boxed __value__* string constant for call results. */
