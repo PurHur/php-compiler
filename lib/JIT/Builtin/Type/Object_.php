@@ -200,6 +200,13 @@ class Object_ extends Type {
 
     /** @var array<int, array<int, int>> class id => property slot => instantiated class id (#3391) */
     private array $runtimePropertyNewDefaults = [];
+
+    /**
+     * Full `new Class(...)` init fragments for property defaults (#3391, #6652).
+     *
+     * @var array<int, array<int, array{0: \PHPCompiler\Block, 1: int}>>
+     */
+    private array $runtimePropertyNewInitFragments = [];
     /**
      * @var array<int, array<string, array{type: int, global: \PHPLLVM\Value}>>
      *     class id => property lc => typed LLVM global
@@ -1185,13 +1192,19 @@ class Object_ extends Type {
         if (!isset($this->runtimePropertyNewDefaults[$classId])) {
             return;
         }
-        $restore = $this->context->builder->getInsertBlock();
         $propertyTypes = [];
         foreach ($this->properties[$classId] ?? [] as $propset) {
             $propertyTypes[$propset[3]] = $propset[2];
         }
         foreach ($this->runtimePropertyNewDefaults[$classId] as $slotIndex => $newClassId) {
             $slot = $this->propertySlotPtr($obj, $slotIndex);
+            if (isset($this->runtimePropertyNewInitFragments[$classId][$slotIndex])) {
+                [$initBlock, $resultSlot] = $this->runtimePropertyNewInitFragments[$classId][$slotIndex];
+                $jit = $this->context->activeJitCompiler ?? $this->context->runtime->loadJit();
+                $jitVar = $jit->jitVariableFromRuntimeNewInitFragment($initBlock, $resultSlot);
+                $this->propertyStore($slot, $jitVar, $propertyTypes[$slotIndex] ?? Variable::TYPE_OBJECT);
+                continue;
+            }
             $child = $this->allocate($newClassId);
             if (!$this->hasConstructor($newClassId)) {
                 $this->markObjectConstructed($child);
@@ -1203,7 +1216,6 @@ class Object_ extends Type {
                 $child
             );
             $this->propertyStore($slot, $jitVar, $propertyTypes[$slotIndex] ?? Variable::TYPE_OBJECT);
-            $this->context->builder->positionAtEnd($restore);
         }
     }
 
@@ -6757,6 +6769,23 @@ class Object_ extends Type {
                 continue;
             }
             $this->runtimePropertyNewDefaults[$classId][$propset[3]] = $newClassId;
+
+            return;
+        }
+        throw new \LogicException("Property {$name} not defined for class {$classId}");
+    }
+
+    public function definePropertyRuntimeNewInitFragment(
+        int $classId,
+        string $name,
+        \PHPCompiler\Block $initBlock,
+        int $resultSlot
+    ): void {
+        foreach ($this->properties[$classId] as $propset) {
+            if ($propset[1] !== $name) {
+                continue;
+            }
+            $this->runtimePropertyNewInitFragments[$classId][$propset[3]] = [$initBlock, $resultSlot];
 
             return;
         }

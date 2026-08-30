@@ -575,6 +575,9 @@ class Context {
     private array $exports = [];
     public Runtime $runtime;
 
+    /** Active {@see \PHPCompiler\JIT} during module lowering — avoids re-entrant loadJit() at call sites (#6652). */
+    public ?\PHPCompiler\JIT $activeJitCompiler = null;
+
     public int $mode;
     public Analyzer $analyzer;
 

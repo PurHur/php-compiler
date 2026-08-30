@@ -76,6 +76,7 @@ class JIT {
 
     public function __construct(Context $context) {
         $this->context = $context;
+        $context->activeJitCompiler = $this;
         $this->registeredGlobalConstDeclareOpcodes = new \SplObjectStorage();
     }
 
@@ -3067,7 +3068,8 @@ class JIT {
                     $block->paramNames,
                     $block->variadicParamIndex,
                     $this->paramImplicitNullableForNativeCall($block),
-                    Block::usesFuncArgsIntrospection($block)
+                    Block::usesFuncArgsIntrospection($block),
+                    $this->collectPromotedRuntimeNewDefaultProps($block)
                 );
                 JIT\NoDiscardCallGuard::registerCallee($this->context, $funcName, $block);
                 JIT\DeprecatedCallGuard::registerCallee($this->context, $funcName, $block);
@@ -8665,11 +8667,13 @@ class JIT {
             $this->context->implicitThisArgument = null;
         }
         // Handle hoisted variables
-        foreach ($block->orig->hoistedOperands as $operand) {
-            if ($this->context->coalesceAssignTargets->contains($operand)) {
-                continue;
+        if (null !== $block->orig) {
+            foreach ($block->orig->hoistedOperands as $operand) {
+                if ($this->context->coalesceAssignTargets->contains($operand)) {
+                    continue;
+                }
+                $this->context->makeVariableFromOp($func, $basicBlock, $block, $operand);
             }
-            $this->context->makeVariableFromOp($func, $basicBlock, $block, $operand);
         }
         $blockKey = spl_object_id($block);
         if (isset($this->context->listUnpackMergeNullInitTargets[$blockKey])) {
@@ -31348,7 +31352,10 @@ class JIT {
     private function collectParamDefaults(Block $block): array {
         $defaults = [];
         foreach ($block->opCodes as $op) {
-            if ($op->type !== OpCode::TYPE_ARG_RECV || null === $op->arg3) {
+            if ($op->type !== OpCode::TYPE_ARG_RECV) {
+                continue;
+            }
+            if (null === $op->arg3) {
                 continue;
             }
             if (null !== $block->variadicParamIndex && $block->variadicParamIndex === (int) $op->arg2) {
@@ -31364,6 +31371,92 @@ class JIT {
             $defaults[$defaultIdx] = $this->jitVariableFromVmConstant($block->constants[$op->arg3]);
         }
         return $defaults;
+    }
+
+    /**
+     * Promoted ctor params with `new` defaults — property initialized at allocate() (#6652).
+     *
+     * @return array<int, string> LLVM arg index => property name
+     */
+    private function collectPromotedRuntimeNewDefaultProps(Block $block): array
+    {
+        if (!$this->instanceMethodUsesThis($block)) {
+            return [];
+        }
+        $classId = $this->context->scope->classId;
+        $thisParamOffset = $this->llvmThisParamOffset($block);
+        $defaults = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ARG_RECV !== $op->type) {
+                continue;
+            }
+            $paramIdx = (int) $op->arg2;
+            if (null !== $block->variadicParamIndex && $block->variadicParamIndex === $paramIdx) {
+                continue;
+            }
+            if (!isset($block->paramRuntimeDefaultInitBlocks[$paramIdx])) {
+                continue;
+            }
+            $propName = $block->paramNames[$paramIdx] ?? null;
+            if (!is_string($propName) || '' === $propName) {
+                continue;
+            }
+            if ($classId >= 0) {
+                $initBlock = $block->paramRuntimeDefaultInitBlocks[$paramIdx];
+                $newClass = $this->jitPropertyNewClassNameFromOps($initBlock, $initBlock->opCodes);
+                if (null !== $newClass) {
+                    $this->context->type->object->definePropertyRuntimeNewDefault(
+                        $classId,
+                        $propName,
+                        $newClass
+                    );
+                    $this->context->type->object->definePropertyRuntimeNewInitFragment(
+                        $classId,
+                        $propName,
+                        $initBlock,
+                        $block->paramRuntimeDefaultResultSlots[$paramIdx]
+                            ?? throw new \LogicException('Missing runtime parameter default result slot')
+                    );
+                }
+            }
+            $defaults[$paramIdx + $thisParamOffset] = $propName;
+        }
+
+        return $defaults;
+    }
+
+    /**
+     * Lower a property/param `new` init fragment at the current insert point (#3391, #6652).
+     */
+    public function jitVariableFromRuntimeNewInitFragment(Block $initBlock, int $resultSlot): Variable
+    {
+        JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'runtime_new_init');
+        $func = JIT\BasicBlockHelper::parentFunction($this->context);
+        $entry = $func->appendBasicBlock('runtime_new_init_entry');
+        $cont = $func->appendBasicBlock('runtime_new_init_cont');
+        $this->context->builder->branch($entry);
+        $savedToCall = $this->context->scope->toCall;
+        $savedArgs = $this->context->scope->args;
+        $savedArgOperands = $this->context->scope->argOperands;
+        $savedPreserveNew = $this->context->scope->preserveNewResultOnNullCall;
+        $saved = $initBlock->syntheticCfgBranch ?? false;
+        $initBlock->syntheticCfgBranch = true;
+        try {
+            $tail = $this->compileSubBlockAtEntry($func, $initBlock, $entry);
+        } finally {
+            $initBlock->syntheticCfgBranch = $saved;
+            $this->context->scope->toCall = $savedToCall;
+            $this->context->scope->args = $savedArgs;
+            $this->context->scope->argOperands = $savedArgOperands;
+            $this->context->scope->preserveNewResultOnNullCall = $savedPreserveNew;
+        }
+        JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'runtime_new_init_done');
+        $this->context->builder->positionAtEnd($tail);
+        $var = $this->variableFromBlockSlot($initBlock, $resultSlot);
+        $this->context->builder->branch($cont);
+        $this->context->builder->positionAtEnd($cont);
+
+        return $var;
     }
 
     /**
