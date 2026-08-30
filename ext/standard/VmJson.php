@@ -10,6 +10,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\MethodVisibility;
 use PHPCompiler\VM;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\DateIntervalSupport;
 use PHPCompiler\VM\DatePeriodSupport;
 use PHPCompiler\VM\DateTimeSupport;
 use PHPCompiler\VM\EnumCaseEntry;
@@ -355,6 +356,9 @@ final class VmJson
                     }
                     if (DatePeriodSupport::CLASS_DATEPERIOD === $lcClass) {
                         return DatePeriodSupport::exportZendJsonWireDatePeriod($object);
+                    }
+                    if (DateIntervalSupport::CLASS_DATEINTERVAL === $lcClass) {
+                        return DateIntervalSupport::exportZendJsonWireDateInterval($object);
                     }
                     if (VmDom::CLASS_DOCUMENT === $lcClass) {
                         // Zend ext/dom/php_dom.c + ext/json/php_json.c — public DOM props are
