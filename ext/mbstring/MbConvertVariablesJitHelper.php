@@ -30,7 +30,7 @@ final class MbConvertVariablesJitHelper
             $detected = MbDetectEncodingJitHelper::detectArgv(
                 $str,
                 self::orderCodesFromList($fromList),
-                0
+                '0'
             );
             if ('' === $detected || !self::leafPairSupported($toEncoding, $detected, $packedSubst)) {
                 return '';
@@ -60,7 +60,7 @@ final class MbConvertVariablesJitHelper
             $detected = MbDetectEncodingJitHelper::detectArgv(
                 $str,
                 self::orderCodesFromList($fromList),
-                0
+                '0'
             );
             if ('' === $detected || !self::leafPairSupported($toEncoding, $detected)) {
                 return '';

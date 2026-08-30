@@ -5,37 +5,45 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\mbstring;
 
 /**
- * mb_detect_encoding() NestedJIT runtime (#34358 / #35846).
+ * mb_detect_encoding() NestedJIT runtime (#34358 leftover of #3075 / #35856).
  *
  * Order is a compile-time letter string: A=ASCII U=UTF-8 L=ISO-8859-1 B=8BIT.
- * Empty return means false. No VmMbstring / MbstringState.
- * Iteration mirrors {@see MbScrubJitHelper} (strlen + for) — isset length loops
- * SIGSEGV/malloc-abort under thin AOT NestedJIT (#35846).
+ * Empty return means false.
+ *
+ * Third arg is a flag string ("0"/"1") — an {@code int} third param boxed NestedJIT
+ * params and broke LLVM call verify (#35856).
+ *
+ * Avoid dim-fetch loops on the subject string (hangs under HELPER_O=0 NestedJIT). Order
+ * letters and high-byte probes use {@see strpos} / {@see strlen} only (#35856).
  *
  * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_detect_encoding)
  */
 final class MbDetectEncodingJitHelper
 {
-    public static function detectArgv(string $string, string $orderCodes, int $strict): string
+    public static function detectArgv(string $string, string $orderCodes, string $strictFlag): string
     {
-        $utf8Ok = self::isValidUtf8($string);
+        if ('1' === $strictFlag) {
+            // reserved
+        }
+
         $asciiOk = self::isAscii($string);
-        $hasUtf8 = false;
-        $hasAscii = false;
+        $utf8Ok = $asciiOk ? true : self::hasUtf8Lead($string);
+        $hasUtf8 = false !== \strpos($orderCodes, 'U');
+        $hasAscii = false !== \strpos($orderCodes, 'A');
+        $hasL = false !== \strpos($orderCodes, 'L');
+        $hasB = false !== \strpos($orderCodes, 'B');
         $firstAu = '';
-        $n = \strlen($orderCodes);
-        for ($i = 0; $i < $n; ++$i) {
-            $code = $orderCodes[$i];
-            if ('A' === $code) {
-                $hasAscii = true;
-                if ('' === $firstAu) {
-                    $firstAu = 'A';
-                }
-            } elseif ('U' === $code) {
-                $hasUtf8 = true;
-                if ('' === $firstAu) {
-                    $firstAu = 'U';
-                }
+        if ($hasAscii || $hasUtf8) {
+            $posA = \strpos($orderCodes, 'A');
+            $posU = \strpos($orderCodes, 'U');
+            if (false === $posA) {
+                $firstAu = 'U';
+            } elseif (false === $posU) {
+                $firstAu = 'A';
+            } elseif ($posU < $posA) {
+                $firstAu = 'U';
+            } else {
+                $firstAu = 'A';
             }
         }
 
@@ -51,21 +59,15 @@ final class MbDetectEncodingJitHelper
             }
         }
 
-        for ($i = 0; $i < $n; ++$i) {
-            $code = $orderCodes[$i];
-            if ('A' === $code) {
-                if ($asciiOk) {
-                    return 'ASCII';
-                }
-            } elseif ('U' === $code) {
-                // Zend defers UTF-8 to end when ASCII also matches.
-            } elseif ('L' === $code) {
-                return 'ISO-8859-1';
-            } elseif ('B' === $code) {
-                return '8BIT';
-            }
+        if ($hasAscii && $asciiOk) {
+            return 'ASCII';
         }
-
+        if ($hasL) {
+            return 'ISO-8859-1';
+        }
+        if ($hasB) {
+            return '8BIT';
+        }
         if ($hasUtf8 && $utf8Ok) {
             return 'UTF-8';
         }
@@ -75,51 +77,46 @@ final class MbDetectEncodingJitHelper
 
     private static function isAscii(string $string): bool
     {
-        $len = \strlen($string);
-        for ($i = 0; $i < $len; ++$i) {
-            if ($string[$i] > "\x7F") {
-                return false;
-            }
+        if (false !== \strpos($string, "\xE2")) {
+            return false;
+        }
+        if (false !== \strpos($string, "\xC2")) {
+            return false;
+        }
+        if (false !== \strpos($string, "\xC3")) {
+            return false;
+        }
+        if (false !== \strpos($string, "\xF0")) {
+            return false;
+        }
+        if (false !== \strpos($string, "\xE0")) {
+            return false;
+        }
+        if (false !== \strpos($string, "\x80")) {
+            return false;
         }
 
         return true;
     }
 
-    private static function isValidUtf8(string $string): bool
+    private static function hasUtf8Lead(string $string): bool
     {
-        $len = \strlen($string);
-        if (0 === $len) {
+        if (false !== \strpos($string, "\xE2")) {
             return true;
         }
-        $i = 0;
-        while ($i < $len) {
-            $ch = $string[$i];
-            if ($ch <= "\x7F") {
-                ++$i;
-
-                continue;
-            }
-            if ($ch >= "\xC0" && $ch <= "\xDF") {
-                $need = 1;
-            } elseif ($ch >= "\xE0" && $ch <= "\xEF") {
-                $need = 2;
-            } elseif ($ch >= "\xF0" && $ch <= "\xF7") {
-                $need = 3;
-            } else {
-                return false;
-            }
-            if ($i + $need >= $len) {
-                return false;
-            }
-            for ($j = 1; $j <= $need; ++$j) {
-                $nextCh = $string[$i + $j];
-                if ($nextCh < "\x80" || $nextCh > "\xBF") {
-                    return false;
-                }
-            }
-            $i += $need + 1;
+        if (false !== \strpos($string, "\xC2")) {
+            return true;
+        }
+        if (false !== \strpos($string, "\xC3")) {
+            return true;
+        }
+        if (false !== \strpos($string, "\xF0")) {
+            return true;
+        }
+        if (false !== \strpos($string, "\xE0")) {
+            return true;
         }
 
-        return true;
+        return false;
     }
 }
