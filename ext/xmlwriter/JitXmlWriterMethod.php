@@ -24,6 +24,12 @@ final class JitXmlWriterMethod
             'startattributens' => JitXmlWriterUserScript::tryStartAttributeNS($context, ...$args),
             'endattribute' => JitXmlWriterUserScript::tryEndAttribute($context, ...$args),
             'writeelementns' => JitXmlWriterUserScript::tryWriteElementNS($context, ...$args),
+            // leftover of writeElementNS (#19371 / #35865) — php-src zim_XMLWriter_writeElement
+            'writeelement' => JitXmlWriterUserScript::tryWriteElement($context, ...$args),
+            'writecdata' => JitXmlWriterUserScript::tryWriteCData($context, ...$args),
+            'writecomment' => JitXmlWriterUserScript::tryWriteComment($context, ...$args),
+            'setindent' => JitXmlWriterUserScript::trySetIndent($context, ...$args),
+            'setindentstring' => JitXmlWriterUserScript::trySetIndentString($context, ...$args),
             'text' => JitXmlWriterUserScript::tryText($context, ...$args),
             'startcdata' => JitXmlWriterUserScript::tryStartCData($context, ...$args),
             'endcdata' => JitXmlWriterUserScript::tryEndCData($context, ...$args),

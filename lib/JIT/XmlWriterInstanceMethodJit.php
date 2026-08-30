@@ -42,6 +42,12 @@ final class XmlWriterInstanceMethodJit
         'xmlwriter::writepi' => true,
         'xmlwriter::writeraw' => true,
         'xmlwriter::writeelementns' => true,
+        // leftover of writeElementNS AOT (#19371 / #35865) — php-src zim_XMLWriter_writeElement
+        'xmlwriter::writeelement' => true,
+        'xmlwriter::writecdata' => true,
+        'xmlwriter::writecomment' => true,
+        'xmlwriter::setindent' => true,
+        'xmlwriter::setindentstring' => true,
         'xmlwriter::fullendelement' => true,
         'xmlwriter::endelement' => true,
         'xmlwriter::enddocument' => true,
