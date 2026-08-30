@@ -1418,18 +1418,21 @@ final class DomNodeLiveMutationRuntime
                 Variable::TYPE_STRING
             );
         }
+        if ($skipInnerXmlSlotMerge) {
+            // LiveSlots rebuild already wrote PROP_USER_SCRIPT_INNER_XML from the child chain.
+            // Do not refresh lastCompileTimeXml from another document's loadXML — cross-document
+            // importNode + appendChild used the source literal as SSOT and doubled inner markup
+            // (#34302 / #34405 leftover).
+            DomUserScriptLiveTagListLlvm::clearPending($context);
+
+            return;
+        }
         if (null === $xml || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
             return;
         }
         $oldInner = DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml);
         $newInner = 'prepend' === $kind ? $delta.$oldInner : $oldInner.$delta;
         JitDomLoadXMLUserScript::refreshCompileTimeXmlWithRootInner($newInner, $receiver);
-        if ($skipInnerXmlSlotMerge) {
-            // LiveSlots rebuild + C14N refresh already baked $delta into compile-time XML.
-            // incrementForChildArg may have queued the same subtree on GLOBAL_PENDING before
-            // the first getElementsByTagName — initCount would add base+pending twice (#33918).
-            DomUserScriptLiveTagListLlvm::clearPending($context);
-        }
     }
 
     private static function ensureStringMutationBridge(Context $context, string $kind): void
