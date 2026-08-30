@@ -18,7 +18,8 @@ use PHPLLVM\Value;
  *
  * Reflection / named-arg param is Zend stub `options` (not InternalArgInfo `configargs`; #24491).
  *
- * JIT/AOT: argc/TypeError paths (#33530); happy-path NestedJIT + OpenSSLAsymmetricKey (#34015).
+ * JIT/AOT: argc/TypeError paths (#33530); happy-path NestedJIT + OpenSSLAsymmetricKey (#34015);
+ * runtime options arrays via hashtable string-key reads (#35866 leftover of #34015).
  */
 final class openssl_pkey_new extends Internal
 {
@@ -78,15 +79,18 @@ final class openssl_pkey_new extends Internal
 
         $options = 1 === $argc ? $args[0] : null;
         $folded = JitOpensslPkeyNew::foldCompileTimeOptions($options);
-        if (null === $folded) {
-            // Runtime/non-foldable options arrays still need full Hashtable lowering (#34015 follow-up).
+        if (null !== $folded) {
+            return JitOpensslPkeyNew::generate($context, $folded[0], $folded[1], $folded[2]);
+        }
+
+        // Runtime/?array options: dimFetch private_key_bits/type/curve_name (#35866 leftover of #34015).
+        if (null === $options) {
             throw new \LogicException(
-                'openssl_pkey_new() options must be compile-time null/?array for JIT/AOT in this '
-                .'compiler build (issue #34015)'
+                'openssl_pkey_new() options fold failed without an options argument (issue #35866)'
             );
         }
 
-        return JitOpensslPkeyNew::generate($context, $folded[0], $folded[1], $folded[2]);
+        return JitOpensslPkeyNew::generateFromRuntimeOptions($context, $options);
     }
 
     /**
