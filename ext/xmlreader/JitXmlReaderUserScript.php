@@ -92,6 +92,14 @@ final class JitXmlReaderUserScript
      */
     private static ?bool $lastValid = null;
 
+    /**
+     * Parser props for setParserProperty leftover (#35965 / #27299).
+     * Mirrors {@see XmlReaderState::$parserProps} after bindParsedSource.
+     *
+     * @var array<int, bool>|null
+     */
+    private static ?array $lastParserProps = null;
+
     /** Set when the last XML()/open lowering was the instance form (#35106 / #35907). */
     public static bool $lastCallWasInstance = false;
 
@@ -276,6 +284,12 @@ final class JitXmlReaderUserScript
         self::$lastEvents = $events;
         // Same validity gate as VmXmlReader::bindParsedSource (#35959).
         self::$lastValid = [] === VmXml::validationErrorRecords($lit);
+        self::$lastParserProps = [
+            XmlReaderConstants::LOADDTD => false,
+            XmlReaderConstants::DEFAULTATTRS => false,
+            XmlReaderConstants::VALIDATE => false,
+            XmlReaderConstants::SUBST_ENTITIES => false,
+        ];
         $inner = [];
         $outer = [];
         $readString = [];
@@ -704,6 +718,30 @@ final class JitXmlReaderUserScript
         return null;
     }
 
+    private static function compileTimeBoolArg(Context $context, JITVariable $var): ?bool
+    {
+        if (null !== $var->compileTimeLong) {
+            return 0 !== (int) $var->compileTimeLong;
+        }
+        if (null !== $var->compileTimeConstantName) {
+            $cn = strtolower($var->compileTimeConstantName);
+            if ('true' === $cn) {
+                return true;
+            }
+            if ('false' === $cn) {
+                return false;
+            }
+        }
+        if (JITVariable::TYPE_NATIVE_BOOL === $var->type && JITVariable::KIND_VALUE === $var->kind && null !== $var->value) {
+            $lib = $context->llvm->lib;
+            if (null !== $lib->LLVMIsAConstantInt($var->value->value)) {
+                return 0 !== (int) $lib->LLVMConstIntGetSExtValue($var->value->value);
+            }
+        }
+
+        return null;
+    }
+
     /**
      * XMLReader::lookupNamespace() leftover of fromString/getAttribute (#35930 / #27299 / #19396).
      * php-src: zim_XMLReader_lookupNamespace — compile-time prefix + __xr_pos nsScope.
@@ -796,6 +834,38 @@ final class JitXmlReaderUserScript
             $box,
             $i1->constInt(self::$lastValid ? 1 : 0, false)
         );
+
+        return JitValueBox::normalizeValuePtr($context, $box);
+    }
+
+    /**
+     * XMLReader::setParserProperty() leftover of fromString/read (#35965 / #27299 / #6135).
+     * php-src: zim_XMLReader_setParserProperty / xmlTextReaderSetParserProp.
+     * Compile-time property+value: stamp parserProps and return true (php-src always succeeds
+     * for LOADDTD/DEFAULTATTRS/VALIDATE/SUBST_ENTITIES).
+     */
+    public static function trySetParserProperty(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot() || null === self::$lastEvents || null === self::$lastParserProps) {
+            return null;
+        }
+        if (\count($args) < 3) {
+            throw new \LogicException('XMLReader::setParserProperty() expects $this, $property, $value');
+        }
+        $property = self::compileTimeIntArg($context, $args[1]);
+        $value = self::compileTimeBoolArg($context, $args[2]);
+        if (null === $property || null === $value) {
+            return null;
+        }
+        if (!isset(self::$lastParserProps[$property])) {
+            throw new \ValueError('XMLReader::setParserProperty(): Argument #1 ($property) must be a valid parser property');
+        }
+        self::$lastParserProps[$property] = $value;
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'xmlreader_setparserproperty_cont');
+        self::loadObject($context, $args[0]);
+        $i1 = $context->getTypeFromString('int1');
+        $box = JitValueBox::alloc($context);
+        JitValueBox::writeBool($context, $box, $i1->constInt(1, false));
 
         return JitValueBox::normalizeValuePtr($context, $box);
     }

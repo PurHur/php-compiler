@@ -40,6 +40,8 @@ final class XmlReaderInstanceMethodJit
         'xmlreader::next' => true,
         // leftover of fromString/read (#35959 / #27299) — php-src zim_XMLReader_isValid
         'xmlreader::isvalid' => true,
+        // leftover of fromString/read (#35965 / #27299) — php-src zim_XMLReader_setParserProperty
+        'xmlreader::setparserproperty' => true,
         // leftover of fromString/open (#35935 / #27299) — php-src zim_XMLReader_close
         'xmlreader::close' => true,
         // leftover of getAttribute (#35941 / #35918 / #27299) — php-src zim_XMLReader_moveToAttribute
