@@ -2927,6 +2927,10 @@ class Compiler {
                     ) {
                         /** @var Op\Expr\BinaryOp\Coalesce $coalesce */
                         [$coalesce, $coalesceIndex] = $coalesceMatch;
+                        // Nested ??= stmts may sit between hoisted fetch and outer ?? (#33760).
+                        if ($coalesceIndex !== $i + 1) {
+                            break;
+                        }
                         $resultOverride = null;
                         if (
                             $coalesceIndex + 1 < $opCount
@@ -2958,6 +2962,9 @@ class Compiler {
                         // fetch so uninitialized typed statics stay BP_VAR_IS (#31146).
                         /** @var Op\Expr\BinaryOp\Coalesce $coalesce */
                         [$coalesce, $coalesceIndex] = $coalesceMatch;
+                        if ($coalesceIndex !== $i + 1) {
+                            break;
+                        }
                         $resultOverride = null;
                         if (
                             $coalesceIndex + 1 < $opCount
@@ -3885,17 +3892,15 @@ class Compiler {
         for ($j = $index + 1; $j < $count; ++$j) {
             $next = $ops[$j];
             if ($next instanceof Op\Expr\BinaryOp\Coalesce) {
-                if (!$this->isStaticPropertyFetchOnlyCoalesceLeft($fetch, $next)) {
-                    return null;
+                if ($this->isStaticPropertyFetchOnlyCoalesceLeft($fetch, $next)) {
+                    return [$next, $j];
                 }
-
-                return [$next, $j];
+                continue;
             }
             if ($this->isLoweredByFollowingCoalesce($next, $ops, $j)) {
                 continue;
             }
-
-            return null;
+            continue;
         }
 
         return null;
@@ -3917,17 +3922,17 @@ class Compiler {
         for ($j = $index + 1; $j < $count; ++$j) {
             $next = $ops[$j];
             if ($next instanceof Op\Expr\BinaryOp\Coalesce) {
-                if (!$this->isPropertyFetchOnlyCoalesceLeft($fetch, $next)) {
-                    return null;
+                if ($this->isPropertyFetchOnlyCoalesceLeft($fetch, $next)) {
+                    return [$next, $j];
                 }
-
-                return [$next, $j];
+                // Nested ??= before outer ??= (e.g. $a->p ??= $b->q ??= 9) — keep scanning (#33760).
+                continue;
             }
             if ($this->isLoweredByFollowingCoalesce($next, $ops, $j)) {
                 continue;
             }
-
-            return null;
+            // php-cfg hoists inner PropertyFetch / ??= stmts between outer fetch and ?? (#33760).
+            continue;
         }
 
         return null;
