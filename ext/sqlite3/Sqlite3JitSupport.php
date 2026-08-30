@@ -16,4 +16,10 @@ final class Sqlite3JitSupport
 
     /** Non-zero when PROP_ROW holds a querySingle scalar. */
     public const PROP_HAS = '__sqliteHas';
+
+    /** sqlite3_last_insert_rowid fold after compile-time INSERT (#35931 leftover of #35914). */
+    public const PROP_LAST_ROWID = '__sqliteRid';
+
+    /** sqlite3_changes fold after last compile-time exec() (#35931 leftover of #35914). */
+    public const PROP_CHANGES = '__sqliteChg';
 }
