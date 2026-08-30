@@ -14252,6 +14252,18 @@ class JIT {
                     $this->propagateDomCreateTextNodeCompileTimeData(
                         $block->getOperand($op->arg1)
                     );
+                    $this->propagateDomCreateCommentCompileTimeData(
+                        $block->getOperand($op->arg1)
+                    );
+                    $this->propagateDomCreateCDATASectionCompileTimeData(
+                        $block->getOperand($op->arg1)
+                    );
+                    $this->propagateDomCreateProcessingInstructionCompileTimeData(
+                        $block->getOperand($op->arg1)
+                    );
+                    $this->propagateDomCreateDocumentFragmentCompileTime(
+                        $block->getOperand($op->arg1)
+                    );
                     $this->propagateDomTextSplitTextCompileTimeData(
                         $block->getOperand($op->arg1)
                     );
@@ -17401,7 +17413,10 @@ class JIT {
             $parent = $callArgs[0] ?? null;
             if ($parent instanceof Variable) {
                 $priorInner = $parent->compileTimeDomInnerXml ?? '';
-                if ('' === $priorInner) {
+                $isFrag = '#document-fragment' === ($parent->compileTimeDomTagName ?? null);
+                // DocumentFragment: LiveMutation leaves Variable inner empty (#35461) — always
+                // concat each child. Elements: only seed when empty (LiveMutation owns refresh).
+                if ($isFrag || '' === $priorInner) {
                     $this->appendCompileTimeDomInnerXmlChild($parent, $child);
                 }
             }
@@ -17719,7 +17734,108 @@ class JIT {
         if (null === $data || !$this->context->hasVariableOp($result)) {
             return;
         }
-        $this->bindCompileTimeDomTextData($result, $data);
+        $this->bindCompileTimeDomLeaf($result, '#text', $data);
+    }
+
+    /** Stamp createComment() result for importNode (#35871 leftover of #35098). */
+    private function propagateDomCreateCommentCompileTimeData(Operand $result): void
+    {
+        if (!($this->context->scope->toCall instanceof JIT\Call\DomDocumentCreateComment)) {
+            return;
+        }
+        $data = \PHPCompiler\ext\dom\JitDomCreateComment::$lastMaterializedData;
+        if (null === $data || !$this->context->hasVariableOp($result)) {
+            return;
+        }
+        $this->bindCompileTimeDomLeaf($result, '#comment', $data);
+    }
+
+    /** Stamp createCDATASection() result for importNode (#35871 leftover of #35098). */
+    private function propagateDomCreateCDATASectionCompileTimeData(Operand $result): void
+    {
+        if (!($this->context->scope->toCall instanceof JIT\Call\DomDocumentCreateCDATASection)) {
+            return;
+        }
+        $data = \PHPCompiler\ext\dom\JitDomCreateCDATASection::$lastMaterializedData;
+        if (null === $data || !$this->context->hasVariableOp($result)) {
+            return;
+        }
+        $this->bindCompileTimeDomLeaf($result, '#cdata-section', $data);
+    }
+
+    /** Stamp createProcessingInstruction() result for importNode (#35871 leftover of #35098). */
+    private function propagateDomCreateProcessingInstructionCompileTimeData(Operand $result): void
+    {
+        if (!($this->context->scope->toCall instanceof JIT\Call\DomDocumentCreateProcessingInstruction)) {
+            return;
+        }
+        $target = \PHPCompiler\ext\dom\JitDomCreateProcessingInstruction::$lastMaterializedTarget;
+        if (null === $target || !$this->context->hasVariableOp($result)) {
+            return;
+        }
+        $data = \PHPCompiler\ext\dom\JitDomCreateProcessingInstruction::$lastMaterializedData ?? '';
+        $this->bindCompileTimeDomLeaf(
+            $result,
+            \PHPCompiler\ext\dom\JitDomCreateProcessingInstruction::TAG_KIND,
+            $data,
+            ['target' => $target]
+        );
+    }
+
+    /** Stamp createDocumentFragment() result for importNode (#35871 leftover of #35098). */
+    private function propagateDomCreateDocumentFragmentCompileTime(Operand $result): void
+    {
+        if (!($this->context->scope->toCall instanceof JIT\Call\DomDocumentCreateDocumentFragment)) {
+            return;
+        }
+        if (!\PHPCompiler\ext\dom\JitDomCreateDocumentFragment::$lastMaterialized
+            || !$this->context->hasVariableOp($result)
+        ) {
+            return;
+        }
+        $var = $this->context->getVariableFromOp($result);
+        $var->compileTimeDomTagName = '#document-fragment';
+        $var->compileTimeDomInnerXml = $var->compileTimeDomInnerXml ?? '';
+        $name = JIT\OperandName::resolve($result);
+        if (null !== $name && '' !== $name) {
+            $resolved = $this->context->resolveRefAliasName($name);
+            if (isset($this->context->namedVariableBindings[$resolved])) {
+                $bound = $this->context->namedVariableBindings[$resolved];
+                $bound->compileTimeDomTagName = '#document-fragment';
+                $bound->compileTimeDomInnerXml = $bound->compileTimeDomInnerXml ?? '';
+            }
+            $this->context->bindVariableByName($resolved, $var);
+        }
+    }
+
+    /**
+     * @param array<string, string>|null $attrs
+     */
+    private function bindCompileTimeDomLeaf(
+        Operand $result,
+        string $tag,
+        string $data,
+        ?array $attrs = null
+    ): void {
+        $var = $this->context->getVariableFromOp($result);
+        $var->compileTimeDomTagName = $tag;
+        $var->compileTimeDomTextData = $data;
+        if (null !== $attrs) {
+            $var->compileTimeDomAttributes = $attrs;
+        }
+        $name = JIT\OperandName::resolve($result);
+        if (null !== $name && '' !== $name) {
+            $resolved = $this->context->resolveRefAliasName($name);
+            if (isset($this->context->namedVariableBindings[$resolved])) {
+                $bound = $this->context->namedVariableBindings[$resolved];
+                $bound->compileTimeDomTagName = $tag;
+                $bound->compileTimeDomTextData = $data;
+                if (null !== $attrs) {
+                    $bound->compileTimeDomAttributes = $attrs;
+                }
+            }
+            $this->context->bindVariableByName($resolved, $var);
+        }
     }
 
     /** Remember splitText() tail data on the result Variable (#32362). */
@@ -17737,16 +17853,7 @@ class JIT {
 
     private function bindCompileTimeDomTextData(Operand $result, string $data): void
     {
-        $var = $this->context->getVariableFromOp($result);
-        $var->compileTimeDomTextData = $data;
-        $name = JIT\OperandName::resolve($result);
-        if (null !== $name && '' !== $name) {
-            $resolved = $this->context->resolveRefAliasName($name);
-            if (isset($this->context->namedVariableBindings[$resolved])) {
-                $this->context->namedVariableBindings[$resolved]->compileTimeDomTextData = $data;
-            }
-            $this->context->bindVariableByName($resolved, $var);
-        }
+        $this->bindCompileTimeDomLeaf($result, '#text', $data);
     }
 
     /** Folded BcMath\Number::{add,mul} result metadata for (string) cast / further ops (#26803). */

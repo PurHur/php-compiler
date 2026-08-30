@@ -26,6 +26,12 @@ final class JitDomCreateProcessingInstruction
     /** Internal saveXML discriminator; not a Zend PI nodeName. */
     public const TAG_KIND = '#pi';
 
+    /** Last createProcessingInstruction target (#35871 / #35098). */
+    public static ?string $lastMaterializedTarget = null;
+
+    /** Last createProcessingInstruction data (#35871 / #35098). */
+    public static ?string $lastMaterializedData = null;
+
     private const PROP_NODE_NAME = 'nodeName';
 
     private const PROP_TAG_NAME = 'tagName';
@@ -82,8 +88,19 @@ final class JitDomCreateProcessingInstruction
         return self::materializeFromRuntime($context, $targetStr, $dataStr);
     }
 
+    public static function clearLastMaterialized(): void
+    {
+        self::$lastMaterializedTarget = null;
+        self::$lastMaterializedData = null;
+    }
+
     public static function materialize(Context $context, string $target, string $data): Value
     {
+        self::$lastMaterializedTarget = $target;
+        self::$lastMaterializedData = $data;
+        JitDomCreateTextNode::$lastMaterializedData = null;
+        JitDomCreateComment::$lastMaterializedData = null;
+        JitDomCreateCDATASection::$lastMaterializedData = null;
         $objectType = $context->type->object;
         $classId = $objectType->lookup(self::CLASS_STANDIN);
         self::ensurePropertyLayout($objectType, $classId);
@@ -110,6 +127,7 @@ final class JitDomCreateProcessingInstruction
 
     private static function materializeFromRuntime(Context $context, Value $targetStr, Value $dataStr): Value
     {
+        self::clearLastMaterialized();
         $objectType = $context->type->object;
         $classId = $objectType->lookup(self::CLASS_STANDIN);
         self::ensurePropertyLayout($objectType, $classId);

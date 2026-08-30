@@ -567,9 +567,23 @@ final class JitDomImportNode
         // and no element child-fetch stamp (peer splitText #32362).
         if (null === $sourceNode->compileTimeDomNodePath
             && null === JitDomNodeChildProperty::$lastFetchedTagName
-            && null !== JitDomCreateTextNode::$lastMaterializedData
         ) {
-            return ['kind' => 'text', 'data' => JitDomCreateTextNode::$lastMaterializedData];
+            if (null !== JitDomCreateComment::$lastMaterializedData) {
+                return ['kind' => 'comment', 'data' => JitDomCreateComment::$lastMaterializedData];
+            }
+            if (null !== JitDomCreateCDATASection::$lastMaterializedData) {
+                return ['kind' => 'cdata', 'data' => JitDomCreateCDATASection::$lastMaterializedData];
+            }
+            if (null !== JitDomCreateProcessingInstruction::$lastMaterializedTarget) {
+                return [
+                    'kind' => 'pi',
+                    'data' => JitDomCreateProcessingInstruction::$lastMaterializedTarget,
+                    'content' => JitDomCreateProcessingInstruction::$lastMaterializedData ?? '',
+                ];
+            }
+            if (null !== JitDomCreateTextNode::$lastMaterializedData) {
+                return ['kind' => 'text', 'data' => JitDomCreateTextNode::$lastMaterializedData];
+            }
         }
 
         return null;
