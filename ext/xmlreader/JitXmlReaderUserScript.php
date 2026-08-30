@@ -860,6 +860,50 @@ final class JitXmlReaderUserScript
     }
 
     /**
+     * XMLReader::moveToAttributeNo() leftover of moveToAttribute (#35946 / #35941 / #27299 / #19939).
+     * php-src: zim_XMLReader_moveToAttributeNo / xmlTextReaderMoveToAttributeNo
+     */
+    public static function tryMoveToAttributeNo(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot()
+            || null === self::$lastAttributes
+            || null === self::$lastAttrNodeTypes
+            || null === self::$lastEvents
+        ) {
+            return null;
+        }
+        if (\count($args) < 2) {
+            throw new \LogicException('XMLReader::moveToAttributeNo() expects $this and $index');
+        }
+        $index = self::compileTimeIntArg($context, $args[1]);
+        if (null === $index) {
+            return null;
+        }
+        // Negative indexes behave like 0 under libxml xmlTextReaderMoveToAttributeNo.
+        if ($index < 0) {
+            $index = 0;
+        }
+        $hits = [];
+        foreach (self::$lastAttributes as $i => $attrs) {
+            if (!isset(self::$lastAttrNodeTypes[$i])
+                || XmlReaderConstants::ELEMENT !== self::$lastAttrNodeTypes[$i]
+            ) {
+                $hits[] = null;
+                continue;
+            }
+            $keys = array_keys($attrs);
+            if (!isset($keys[$index])) {
+                $hits[] = null;
+                continue;
+            }
+            $name = $keys[$index];
+            $hits[] = ['name' => $name, 'value' => $attrs[$name]];
+        }
+
+        return self::emitMoveToAttributeSwitch($context, $args[0], $hits);
+    }
+
+    /**
      * Move the AOT cursor onto an attribute node (or leave it unchanged on miss) (#35941).
      *
      * @param list<?array{name: string, value: string}> $hits
