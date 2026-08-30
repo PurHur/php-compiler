@@ -9245,6 +9245,25 @@ class JIT {
                         // ClosureWithCaptures on `$f` or AOT invoke drops use() snapshots (#24106).
                         $this->preserveClosureInvokeMetadata($aliasOp, $aliasVar, $value);
                         $this->recordListUnpackAssignSlot($aliasOp, $aliasVar);
+                        if (null !== $destOp) {
+                            $destUsed = [] !== $destOp->usages;
+                            // `$o->p ??= $x = n` reads Assign.result, not `$x` (#35998 / #29747).
+                            $resultConsumedLater = null !== $op->arg1
+                                && $op->arg1 !== $op->arg2
+                                && $op->arg1 !== $rhsSlot
+                                && !$block->assignTempSlotIsDead((int) $op->arg1);
+                            if ($destUsed || $forceAssign || $resultConsumedLater) {
+                                $this->emitAssignOperandWithByRefFormalFastPath(
+                                    $block,
+                                    $destOp,
+                                    $rhsOperand,
+                                    $value,
+                                    $args,
+                                    $thisParamOffset,
+                                    $destUsed || $forceAssign || $resultConsumedLater
+                                );
+                            }
+                        }
                     } else {
                         if (null !== $aliasOp) {
                             $this->emitAssignOperandWithByRefFormalFastPath(
