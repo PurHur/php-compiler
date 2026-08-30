@@ -48,6 +48,14 @@ final class JitMbDetectEncoding
             throw new \LogicException('mb_detect_encoding() expects 1 to 3 arguments in this compiler build');
         }
 
+        // Bridge/NestedJIT setup before haystack lowering — first call site must not emit
+        // $str SSA then run ensureLinked (bridge entry IR breaks non-ASCII runtime haystack).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        MbDetectEncodingRuntime::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+
         $folded = self::tryCompileTimeFold($context, $args);
         if (null !== $folded) {
             return $folded;
@@ -67,12 +75,6 @@ final class JitMbDetectEncoding
             }
         }
 
-        // Link NestedJIT helpers before lowering args — NestedJIT can invalidate prior IR (#34270 / #35856).
-        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        MbDetectEncodingRuntime::ensureLinked($context);
-        if (null !== $savedInsert) {
-            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-        }
         BasicBlockHelper::ensureOpenInsertBlock($context, 'mb_detect_encoding_runtime');
 
         $str = JitStringBuiltinArg::lowerTrimFamilyString(
@@ -138,7 +140,17 @@ final class JitMbDetectEncoding
     private static function compileTimeOrder(Context $context, array $args, int $argc): ?array
     {
         if ($argc < 2 || JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)) {
-            return MbstringAotFoldState::detectOrder($context) ?? MbstringState::detectOrder();
+            $order = MbstringAotFoldState::detectOrder($context) ?? MbstringState::detectOrder();
+            if (!\is_array($order) || [] === $order) {
+                return null;
+            }
+            // Re-parse default detect_order — do not reuse MbstringState's static list reference
+            // across multiple invoke() lowers (#35846 / leftover #34358 multi-call haystack).
+            return MbstringEncodingRegistry::parseOrderList(
+                'mb_detect_encoding',
+                1,
+                implode(',', $order)
+            );
         }
         $lit = JitStringArg::compileTimeLiteral($args[1]);
         if (null !== $lit) {
