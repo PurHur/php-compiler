@@ -11,7 +11,10 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable as VmVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
@@ -53,7 +56,11 @@ final class JitSettype
                 BasicBlockHelper::ensureOpenInsertBlock($context, 'settype_after_is_resource');
             }
         }
-        JitValueBox::promoteNativeLvalueToValueBox($context, $var);
+        // Thin-AOT named locals live in script-global __value__** — boxing into a stack
+        // snapshot leaves settype mutating a temp while var_export reads the heap (#8787).
+        if (!$var->functionStaticGlobal || JITVariable::KIND_VALUE !== $var->kind) {
+            JitValueBox::promoteNativeLvalueToValueBox($context, $var);
+        }
         $destPtr = JitValueBox::normalizeValuePtr(
             $context,
             JitValueBox::valuePtrFromVariable($context, $var)
@@ -62,10 +69,19 @@ final class JitSettype
         // Compile-time subject + type: fold via VmSettype into the shared value box. NestedJIT
         // SettypeJitHelper does not observe thin-AOT named-local promotions (#27090).
         if (self::tryFoldCompileTime($context, $var, $destPtr, $canonical)) {
+            self::finalizeInPlaceSettype($context, $var, $destPtr);
+
+            return $context->constantFromBool(true);
+        }
+
+        if (self::tryEmitInPlaceEnumSettype($context, $destPtr, $canonical)) {
+            self::finalizeInPlaceSettype($context, $var, $destPtr);
+
             return $context->constantFromBool(true);
         }
 
         SettypeRuntime::applyInPlace($context, $destPtr, $canonical);
+        self::finalizeInPlaceSettype($context, $var, $destPtr);
 
         return $context->constantFromBool(true);
     }
@@ -79,7 +95,7 @@ final class JitSettype
         Value $destPtr,
         string $canonical
     ): bool {
-        $vm = self::compileTimeVmSubject($var);
+        $vm = self::compileTimeVmSubject($context, $var);
         if (null === $vm) {
             return false;
         }
@@ -91,6 +107,7 @@ final class JitSettype
         if (!self::storeVmResult($context, $destPtr, $vm)) {
             return false;
         }
+        $var->compileTimeEnumCase = null;
         $var->compileTimeString = null;
         $var->compileTimeLong = null;
         $resolved = $vm->resolveIndirect();
@@ -103,8 +120,11 @@ final class JitSettype
         return true;
     }
 
-    private static function compileTimeVmSubject(JITVariable $var): ?VmVariable
+    private static function compileTimeVmSubject(Context $context, JITVariable $var): ?VmVariable
     {
+        if (null !== $var->compileTimeEnumCase) {
+            return self::compileTimeEnumCaseVm($context, $var);
+        }
         if (null !== $var->compileTimeString) {
             $vm = new VmVariable();
             $vm->string($var->compileTimeString);
@@ -125,6 +145,152 @@ final class JitSettype
         }
 
         return null;
+    }
+
+    /**
+     * Materialize a compile-time enum case for VmSettype folding (#8787 / maintainer_gap_settype).
+     */
+    private static function compileTimeEnumCaseVm(Context $context, JITVariable $var): VmVariable
+    {
+        $meta = $var->compileTimeEnumCase;
+        if (null === $meta) {
+            throw new \LogicException('compileTimeEnumCaseVm requires compileTimeEnumCase metadata');
+        }
+        $classId = (int) $meta['classId'];
+        $caseKey = (string) $meta['caseKey'];
+        $jitObject = $context->type->object;
+        $enum = new ClassEntry($jitObject->classNameForId($classId));
+        $enum->isEnum = true;
+        $backedType = $jitObject->enumBackedTypeFor($classId);
+        if (null !== $backedType) {
+            $enum->backedType = $backedType;
+        }
+        $backing = new VmVariable();
+        if ($jitObject->enumHasBacking($classId)) {
+            $backingScalar = $jitObject->enumCaseBackingScalarForCase($classId, $caseKey);
+            if (\is_int($backingScalar)) {
+                $backing->int($backingScalar);
+            } elseif (\is_float($backingScalar)) {
+                $backing->float($backingScalar);
+            } elseif (\is_string($backingScalar)) {
+                $backing->string($backingScalar);
+            } elseif (\is_bool($backingScalar)) {
+                $backing->bool($backingScalar);
+            } else {
+                $backing->null();
+            }
+        } else {
+            $backing->null();
+        }
+        $caseName = $jitObject->enumCaseCanonicalName($classId, $caseKey);
+
+        return EnumCaseSupport::createCase($enum, $caseName, $backing);
+    }
+
+    /**
+     * Thin AOT: enum case in a {@see __value__*} box — inline legacy scalar coercion (#8787).
+     *
+     * NestedJIT SettypeJitHelper misses some script-global lvalue shapes; intval's enum path is SSOT.
+     */
+    /**
+     * Thin AOT: enum case in a {@see __value__*} box — inline legacy scalar coercion (#8787).
+     *
+     * @return bool true when enum fast-path IR was emitted (caller skips NestedJIT helper)
+     */
+    private static function tryEmitInPlaceEnumSettype(
+        Context $context,
+        Value $destPtr,
+        string $canonical
+    ): bool {
+        if ('integer' !== $canonical) {
+            return false;
+        }
+
+        $map = $context->structFieldMap['__value__'];
+        $i8 = $context->getTypeFromString('int8');
+        $typeByte = $context->builder->load($context->builder->structGep($destPtr, $map['type']));
+        $isObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $context->builder->and($typeByte, $i8->constInt(0x7f, false)),
+            $i8->constInt(JITVariable::TYPE_OBJECT, false)
+        );
+        $objectBlock = BasicBlockHelper::append($context, 'settype_enum_obj');
+        $scalarBlock = BasicBlockHelper::append($context, 'settype_enum_scalar');
+        $doneBlock = BasicBlockHelper::append($context, 'settype_enum_done');
+        $context->builder->branchIf($isObject, $objectBlock, $scalarBlock);
+        $context->builder->positionAtEnd($scalarBlock);
+        SettypeRuntime::applyInPlace($context, $destPtr, 'integer');
+        $scalarEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+        $context->builder->positionAtEnd($objectBlock);
+        $objPtr = $context->builder->call($context->lookupFunction('__value__readObject'), $destPtr);
+        $plainObjectBlock = BasicBlockHelper::append($context, 'settype_enum_plain_object');
+        $enumLong = JitScalarEnumCoerce::tryEmitObjectEnumCaseLegacyCastToLong(
+            $context,
+            $objPtr,
+            'settype',
+            $plainObjectBlock
+        );
+        if (null === $enumLong) {
+            $context->builder->positionAtEnd($scalarBlock);
+
+            return false;
+        }
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            $destPtr,
+            $enumLong
+        );
+        $enumEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+        $context->builder->positionAtEnd($plainObjectBlock);
+        SettypeRuntime::applyInPlace($context, $destPtr, 'integer');
+        $plainEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+        $context->builder->positionAtEnd($doneBlock);
+
+        return true;
+    }
+
+    private static function emitEnumCaseLegacyCastToBool(
+        Context $context,
+        Value $objPtr,
+        \PHPLLVM\BasicBlock $nonEnumTarget
+    ): ?Value {
+        $long = JitScalarEnumCoerce::tryEmitObjectEnumCaseLegacyCastToLong(
+            $context,
+            $objPtr,
+            'settype',
+            $nonEnumTarget
+        );
+        if (null === $long) {
+            return null;
+        }
+
+        return $context->builder->icmp(
+            Builder::INT_NE,
+            $long,
+            $context->constantFromInteger(0)
+        );
+    }
+
+    /**
+     * After in-place settype, drop stale enum/const hints and publish script-global writes (#8787).
+     */
+    private static function finalizeInPlaceSettype(Context $context, JITVariable $var, Value $destPtr): void
+    {
+        if ($var->functionStaticGlobal && JITVariable::KIND_VALUE === $var->kind) {
+            $savedAlias = $var->valueBoxAliasPtr;
+            $var->valueBoxAliasPtr = null;
+            $livePtr = JitValueBox::valuePtrFromVariable($context, $var);
+            $var->valueBoxAliasPtr = $savedAlias;
+            if ($livePtr !== $destPtr) {
+                JitValueBox::copyIntoPointer($context, $livePtr, $destPtr);
+            }
+            JitValueBox::publishAfterWrite($context, $livePtr);
+        }
+        $var->compileTimeEnumCase = null;
+        $var->compileTimeConstantName = null;
     }
 
     private static function storeVmResult(Context $context, Value $destPtr, VmVariable $vm): bool
