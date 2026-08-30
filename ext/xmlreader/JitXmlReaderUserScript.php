@@ -63,6 +63,20 @@ final class JitXmlReaderUserScript
      */
     private static ?array $lastAttributes = null;
 
+    /**
+     * Per-event nsScope for getAttributeNs() (#35924 leftover of #35918).
+     *
+     * @var list<array<string, string>>|null
+     */
+    private static ?array $lastNsScopes = null;
+
+    /**
+     * Per-event nodeType for ELEMENT-only attr lookups (#35924).
+     *
+     * @var list<int>|null
+     */
+    private static ?array $lastAttrNodeTypes = null;
+
     /** Set when the last XML()/open lowering was the instance form (#35106 / #35907). */
     public static bool $lastCallWasInstance = false;
 
@@ -250,6 +264,8 @@ final class JitXmlReaderUserScript
         $readString = [];
         $expand = [];
         $attributes = [];
+        $nsScopes = [];
+        $attrNodeTypes = [];
         foreach ($rawEvents as $i => $ev) {
             $inner[] = XmlReaderSubtreeXmlHelper::innerXml($rawEvents, $i);
             $outerXml = XmlReaderSubtreeXmlHelper::outerXml($rawEvents, $i);
@@ -257,12 +273,16 @@ final class JitXmlReaderUserScript
             $readString[] = XmlReaderSubtreeXmlHelper::readString($rawEvents, $i);
             $expand[] = self::expandSpecForEvent($ev, $outerXml);
             $attributes[] = $ev->attributes;
+            $nsScopes[] = $ev->nsScope;
+            $attrNodeTypes[] = $ev->nodeType;
         }
         self::$lastInnerXml = $inner;
         self::$lastOuterXml = $outer;
         self::$lastReadString = $readString;
         self::$lastExpandSpec = $expand;
         self::$lastAttributes = $attributes;
+        self::$lastNsScopes = $nsScopes;
+        self::$lastAttrNodeTypes = $attrNodeTypes;
 
         if (null !== $instanceReceiver) {
             return self::resetReceiverForParse($context, $instanceReceiver);
@@ -478,11 +498,158 @@ final class JitXmlReaderUserScript
             return null;
         }
         $byPos = [];
-        foreach (self::$lastAttributes as $attrs) {
-            $byPos[] = \array_key_exists($name, $attrs) ? $attrs[$name] : null;
+        foreach (self::$lastAttributes as $i => $attrs) {
+            $byPos[] = self::lookupAttributeAtPos($i, $name);
         }
 
         return self::emitPosNullableStringSwitch($context, $args[0], $byPos, 'getAttribute');
+    }
+
+    /**
+     * XMLReader::getAttributeNs() leftover of getAttribute (#35924 / #35918 / #27299 / #19412).
+     * php-src: zim_XMLReader_getAttributeNs / xmlTextReaderGetAttributeNs
+     */
+    public static function tryGetAttributeNs(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot()
+            || null === self::$lastAttributes
+            || null === self::$lastNsScopes
+            || null === self::$lastAttrNodeTypes
+            || null === self::$lastEvents
+        ) {
+            return null;
+        }
+        if (\count($args) < 3) {
+            throw new \LogicException('XMLReader::getAttributeNs() expects $this, $name, $namespace');
+        }
+        $local = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        $ns = JitStringBuiltinArg::compileTimeLiteral($args[2]) ?? $args[2]->compileTimeString;
+        if (null === $local || null === $ns) {
+            return null;
+        }
+        if ('' === $local) {
+            throw new \ValueError('XMLReader::getAttributeNs(): Argument #1 ($name) cannot be empty');
+        }
+        if ('' === $ns) {
+            throw new \ValueError('XMLReader::getAttributeNs(): Argument #2 ($namespace) cannot be empty');
+        }
+        $byPos = [];
+        foreach (self::$lastAttributes as $i => $attrs) {
+            $byPos[] = self::lookupAttributeNsAtPos($i, $local, $ns);
+        }
+
+        return self::emitPosNullableStringSwitch($context, $args[0], $byPos, 'getAttributeNs');
+    }
+
+    /**
+     * XMLReader::getAttributeNo() leftover of getAttribute (#35924 / #35918 / #27299 / #19412).
+     * php-src: zim_XMLReader_getAttributeNo / xmlTextReaderGetAttributeNo
+     */
+    public static function tryGetAttributeNo(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot()
+            || null === self::$lastAttributes
+            || null === self::$lastAttrNodeTypes
+            || null === self::$lastEvents
+        ) {
+            return null;
+        }
+        if (\count($args) < 2) {
+            throw new \LogicException('XMLReader::getAttributeNo() expects $this and $index');
+        }
+        $index = self::compileTimeIntArg($context, $args[1]);
+        if (null === $index) {
+            return null;
+        }
+        // Negative indexes behave like 0 under libxml xmlTextReaderGetAttributeNo.
+        if ($index < 0) {
+            $index = 0;
+        }
+        $byPos = [];
+        foreach (self::$lastAttributes as $i => $attrs) {
+            $byPos[] = self::lookupAttributeNoAtPos($i, $index);
+        }
+
+        return self::emitPosNullableStringSwitch($context, $args[0], $byPos, 'getAttributeNo');
+    }
+
+    /** @return ?string Attribute value at pos for exact name, or null (ELEMENT-only). */
+    private static function lookupAttributeAtPos(int $pos, string $name): ?string
+    {
+        if (null === self::$lastAttrNodeTypes
+            || !isset(self::$lastAttrNodeTypes[$pos])
+            || XmlReaderConstants::ELEMENT !== self::$lastAttrNodeTypes[$pos]
+        ) {
+            // Pre-#35924 getAttribute stored attrs on every event; still honor ELEMENT-only php-src.
+            if (null === self::$lastAttrNodeTypes && isset(self::$lastAttributes[$pos])) {
+                $attrs = self::$lastAttributes[$pos];
+
+                return \array_key_exists($name, $attrs) ? $attrs[$name] : null;
+            }
+
+            return null;
+        }
+        $attrs = self::$lastAttributes[$pos] ?? [];
+
+        return \array_key_exists($name, $attrs) ? $attrs[$name] : null;
+    }
+
+    /** @return ?string Namespaced attribute value at pos, or null. */
+    private static function lookupAttributeNsAtPos(int $pos, string $localName, string $namespaceUri): ?string
+    {
+        if (null === self::$lastAttrNodeTypes
+            || !isset(self::$lastAttrNodeTypes[$pos])
+            || XmlReaderConstants::ELEMENT !== self::$lastAttrNodeTypes[$pos]
+        ) {
+            return null;
+        }
+        $attrs = self::$lastAttributes[$pos] ?? [];
+        $nsScope = self::$lastNsScopes[$pos] ?? [];
+        foreach ($attrs as $attrName => $value) {
+            if (VmXmlReader::attributeLocalNamePublic($attrName) !== $localName) {
+                continue;
+            }
+            if (VmXmlReader::attributeNamespaceUriPublic($attrName, $nsScope) !== $namespaceUri) {
+                continue;
+            }
+
+            return $value;
+        }
+
+        return null;
+    }
+
+    /** @return ?string Attribute value by document-order index at pos, or null. */
+    private static function lookupAttributeNoAtPos(int $pos, int $index): ?string
+    {
+        if (null === self::$lastAttrNodeTypes
+            || !isset(self::$lastAttrNodeTypes[$pos])
+            || XmlReaderConstants::ELEMENT !== self::$lastAttrNodeTypes[$pos]
+        ) {
+            return null;
+        }
+        $attrs = self::$lastAttributes[$pos] ?? [];
+        $keys = array_keys($attrs);
+        if (!isset($keys[$index])) {
+            return null;
+        }
+
+        return $attrs[$keys[$index]];
+    }
+
+    private static function compileTimeIntArg(Context $context, JITVariable $var): ?int
+    {
+        if (null !== ($var->compileTimeLong ?? null)) {
+            return (int) $var->compileTimeLong;
+        }
+        if (JITVariable::TYPE_NATIVE_LONG === $var->type && null !== $var->value) {
+            $lib = $context->llvm->lib;
+            if (null !== $lib->LLVMIsAConstantInt($var->value->value)) {
+                return (int) $lib->LLVMConstIntGetZExtValue($var->value->value);
+            }
+        }
+
+        return null;
     }
 
     /**
