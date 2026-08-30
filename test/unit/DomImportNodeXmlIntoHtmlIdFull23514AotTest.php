@@ -17,8 +17,8 @@ final class DomImportNodeXmlIntoHtmlIdFull23514AotTest extends TestCase
         $zend = $this->runPhp($src);
         $aot = $this->runAot($src);
         foreach ([
-            'xml2html isId=false',
-            'rewrite isId=false',
+            'xml2html isId=false gebi=null',
+            'rewrite isId=false gebi=null',
             'remove+set isId=true gebi=div',
             'html2html isId=true gebi=div',
             'html-create isId=true gebi=div',
@@ -27,6 +27,7 @@ final class DomImportNodeXmlIntoHtmlIdFull23514AotTest extends TestCase
             $this->assertStringContainsString($needle, $zend, 'Zend: '.$needle);
             $this->assertStringContainsString($needle, $aot, 'AOT: '.$needle);
         }
+        $this->assertSame($zend, $aot);
     }
 
     private function runPhp(string $src): string

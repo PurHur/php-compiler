@@ -9147,11 +9147,13 @@ class JIT {
                         && null !== $coalesceTarget
                         && null !== $aliasOp
                         && $op->arg1 !== $op->arg2
-                        && ($coalesceTarget === $destOp || $coalesceTarget === $aliasOp)
                     ) {
                         // php-cfg ?: arms use ASSIGN(resultTemp, phiAlias, rhs). Null arms hit
                         // forceCoalesce+isNullSource above; non-null else arms (e.g. `['x']`)
                         // must write the stack phi at phiAlias, not only the dead result temp (#34956).
+                        // JUMPIF arms reuse slot numbers with distinct Operand instances — resolve
+                        // via coalesceMergeSlotOperands so `$x = ($o ? $o->p : 'null')` false arm
+                        // does not assign into a stale fetch-arm objectPropertySlot (#23514).
                         $ternaryEchoPhiDest = $coalesceTarget;
                     }
                     $aliasName = null !== $aliasOp ? JIT\OperandName::resolve($aliasOp) : null;
@@ -9211,6 +9213,13 @@ class JIT {
                                     $value
                                 );
                             }
+                        }
+                        if (null !== $op->arg2) {
+                            $this->bindCoalesceMergeSlotVariable(
+                                $block,
+                                (int) $op->arg2,
+                                $this->context->getVariableFromOp($ternaryEchoPhiDest)
+                            );
                         }
                         $this->recordTernaryEchoPhiByAliasSlot($block, $op, $destOp, $aliasOp, $rhsSlot);
                         break;
@@ -20968,6 +20977,24 @@ class JIT {
             $value = $this->detachScalarObjectPropertyAliasForAssign($value);
         }
         $branchMergeTarget = $force && $this->context->coalesceAssignTargets->contains($resultOp);
+        // ?: false arm (`'null'`) after the true arm fetched `$o->tagName`: bindPropertyFetchResult
+        // can leave objectPropertySlot on a TYPE_VALUE phi temp, so a later scalar assign skips
+        // assignToPointer and echo/`$x =` reads empty DOMElement::$tagName (#23514 / #33849).
+        if (
+            null === $value->objectPropertySlot
+            && !$this->context->retainCoalesceInstancePropertyLvalue
+            && $this->context->hasVariableOp($resultOp)
+        ) {
+            $mergeDest = $this->context->getVariableFromOp($resultOp);
+            if (
+                null !== $mergeDest->objectPropertySlot
+                && Variable::TYPE_VALUE === $mergeDest->type
+                && null === $mergeDest->staticPropertyGlobal
+                && !$mergeDest->functionStaticGlobal
+            ) {
+                $this->reseatCoalesceResultAfterPropertyArms($resultOp);
+            }
+        }
         $resolvedName = JIT\OperandName::resolve($resultOp);
         // Propagate empty-array markers onto the assign destination before DateTime New_
         // sync can mistake `$out = []` for a pending object local (#34461).
