@@ -17511,20 +17511,15 @@ class JIT {
             $parent = $callArgs[0] ?? null;
             if ($parent instanceof Variable) {
                 $priorInner = $parent->compileTimeDomInnerXml ?? '';
+                // Tag on the parent Variable only — not $lastMaterialized (#35997).
                 $isFrag = \PHPCompiler\ext\dom\JitDomCreateDocumentFragment::TAG_KIND
                     === ($parent->compileTimeDomTagName ?? null);
                 if ($isFrag) {
                     // LiveMutation records lastChildren + sets InnerXml (#35881). Do not
                     // concat here — that doubled fragment markup for importNode.
-                } elseif (
-                    '' === $priorInner
-                    && !($toCall instanceof JIT\Call\DomNodeAppendChild
-                        || $toCall instanceof JIT\Call\DomDocumentAppendChild)
-                ) {
+                } elseif ('' === $priorInner) {
                     $this->appendCompileTimeDomInnerXmlChild($parent, $child);
                 }
-                // appendChild on elements/documents: DomNodeLiveMutationRuntime::
-                // syncUserScriptInnerXmlFromArgs owns compile-time inner (#35997).
             }
         }
         // Parent compileTimeDomInnerXml is stamped by DomNodeLiveMutationRuntime::
@@ -17830,8 +17825,20 @@ class JIT {
         $var = $this->context->getVariableFromOp($result);
         $var->compileTimeDomTagName = $tag;
         $inner = \PHPCompiler\ext\dom\JitDomCloneNode::$lastResultInnerXml;
-        if (null !== $inner && '' !== $inner) {
+        if (null !== $inner) {
             $var->compileTimeDomInnerXml = $inner;
+        }
+        $name = JIT\OperandName::resolve($result);
+        if (null !== $name && '' !== $name) {
+            $resolved = $this->context->resolveRefAliasName($name);
+            if (isset($this->context->namedVariableBindings[$resolved])) {
+                $bound = $this->context->namedVariableBindings[$resolved];
+                $bound->compileTimeDomTagName = $tag;
+                if (null !== $inner) {
+                    $bound->compileTimeDomInnerXml = $inner;
+                }
+            }
+            $this->context->bindVariableByName($resolved, $var);
         }
     }
 
