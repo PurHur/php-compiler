@@ -39,7 +39,19 @@ final class JitXmlReaderUserScript
 
     public const CLASS_NAME = 'XMLReader';
 
-    /** @var list<array{nodeType: int, name: string, value: string}>|null */
+    /** @var list<array{
+     *     nodeType: int,
+     *     name: string,
+     *     value: string,
+     *     depth: int,
+     *     isEmptyElement: bool,
+     *     hasValue: bool,
+     *     hasAttributes: bool,
+     *     attributeCount: int,
+     *     localName: string,
+     *     prefix: string,
+     *     namespaceUri: string
+     * }>|null */
     private static ?array $lastEvents = null;
 
     /** @var list<string>|null Precomputed readInnerXml() per event index (#35908). */
@@ -112,7 +124,19 @@ final class JitXmlReaderUserScript
     }
 
     /**
-     * @return list<array{nodeType: int, name: string, value: string}>|null
+     * @return list<array{
+     *     nodeType: int,
+     *     name: string,
+     *     value: string,
+     *     depth: int,
+     *     isEmptyElement: bool,
+     *     hasValue: bool,
+     *     hasAttributes: bool,
+     *     attributeCount: int,
+     *     localName: string,
+     *     prefix: string,
+     *     namespaceUri: string
+     * }>|null
      */
     public static function lastEvents(): ?array
     {
@@ -279,6 +303,14 @@ final class JitXmlReaderUserScript
                 'nodeType' => $ev->nodeType,
                 'name' => $ev->name,
                 'value' => $ev->value,
+                'depth' => $ev->depth,
+                'isEmptyElement' => $ev->isEmptyElement,
+                'hasValue' => $ev->hasValue,
+                'hasAttributes' => $ev->hasAttributes,
+                'attributeCount' => $ev->attributeCount,
+                'localName' => $ev->localName,
+                'prefix' => $ev->prefix,
+                'namespaceUri' => $ev->namespaceUri,
             ];
         }
         self::$lastEvents = $events;
@@ -402,27 +434,7 @@ final class JitXmlReaderUserScript
             $posVar,
             JITVariable::TYPE_NATIVE_LONG
         );
-        $zero = new JITVariable(
-            $context,
-            JITVariable::TYPE_NATIVE_LONG,
-            JITVariable::KIND_VALUE,
-            $i64->constInt(0, true)
-        );
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($reader, self::CLASS_NAME, VmXmlReader::PROP_NODE_TYPE),
-            $zero,
-            JITVariable::TYPE_NATIVE_LONG
-        );
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($reader, self::CLASS_NAME, VmXmlReader::PROP_NAME),
-            self::stringLlvm($context, ''),
-            JITVariable::TYPE_STRING
-        );
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($reader, self::CLASS_NAME, VmXmlReader::PROP_VALUE),
-            self::stringLlvm($context, ''),
-            JITVariable::TYPE_STRING
-        );
+        self::storeIdleReaderProps($context, $objectType, $reader);
 
         // Return raw i1 so assignCallResultOperand keeps NATIVE_BOOL (not object box) (#35106).
         return $context->getTypeFromString('int1')->constInt(1, false);
@@ -450,29 +462,7 @@ final class JitXmlReaderUserScript
             $posVar,
             JITVariable::TYPE_NATIVE_LONG
         );
-
-        $empty = self::stringLlvm($context, '');
-        $zero = new JITVariable(
-            $context,
-            JITVariable::TYPE_NATIVE_LONG,
-            JITVariable::KIND_VALUE,
-            $i64->constInt(0, true)
-        );
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($reader, self::CLASS_NAME, VmXmlReader::PROP_NODE_TYPE),
-            $zero,
-            JITVariable::TYPE_NATIVE_LONG
-        );
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($reader, self::CLASS_NAME, VmXmlReader::PROP_NAME),
-            $empty,
-            JITVariable::TYPE_STRING
-        );
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($reader, self::CLASS_NAME, VmXmlReader::PROP_VALUE),
-            self::stringLlvm($context, ''),
-            JITVariable::TYPE_STRING
-        );
+        self::storeIdleReaderProps($context, $objectType, $reader);
 
         $slot = JitValueBox::alloc($context);
         $context->builder->call(
@@ -993,26 +983,7 @@ final class JitXmlReaderUserScript
             ),
             JITVariable::TYPE_NATIVE_LONG
         );
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($obj, self::CLASS_NAME, VmXmlReader::PROP_NODE_TYPE),
-            new JITVariable(
-                $context,
-                JITVariable::TYPE_NATIVE_LONG,
-                JITVariable::KIND_VALUE,
-                $i64->constInt(0, true)
-            ),
-            JITVariable::TYPE_NATIVE_LONG
-        );
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($obj, self::CLASS_NAME, VmXmlReader::PROP_NAME),
-            self::stringLlvm($context, ''),
-            JITVariable::TYPE_STRING
-        );
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($obj, self::CLASS_NAME, VmXmlReader::PROP_VALUE),
-            self::stringLlvm($context, ''),
-            JITVariable::TYPE_STRING
-        );
+        self::storeIdleReaderProps($context, $objectType, $obj);
         $trueBox = JitValueBox::alloc($context);
         JitValueBox::writeBool($context, $trueBox, $i1->constInt(1, false));
 
@@ -1311,27 +1282,8 @@ final class JitXmlReaderUserScript
                 JitValueBox::writeBool($context, $missBox, $i1->constInt(0, false));
                 $context->builder->store(JitValueBox::normalizeValuePtr($context, $missBox), $resultSlot);
             } else {
-                $nodeTypeVar = new JITVariable(
-                    $context,
-                    JITVariable::TYPE_NATIVE_LONG,
-                    JITVariable::KIND_VALUE,
-                    $i64->constInt(XmlReaderConstants::ATTRIBUTE, true)
-                );
-                $objectType->propertyStore(
-                    $objectType->propertySlotFor($obj, self::CLASS_NAME, VmXmlReader::PROP_NODE_TYPE),
-                    $nodeTypeVar,
-                    JITVariable::TYPE_NATIVE_LONG
-                );
-                $objectType->propertyStore(
-                    $objectType->propertySlotFor($obj, self::CLASS_NAME, VmXmlReader::PROP_NAME),
-                    self::stringLlvm($context, $hit['name']),
-                    JITVariable::TYPE_STRING
-                );
-                $objectType->propertyStore(
-                    $objectType->propertySlotFor($obj, self::CLASS_NAME, VmXmlReader::PROP_VALUE),
-                    self::stringLlvm($context, $hit['value']),
-                    JITVariable::TYPE_STRING
-                );
+                $depth = self::$lastEvents[$i]['depth'] ?? 0;
+                self::storeAttributeCursorHit($context, $objectType, $obj, $hit, $i64, $depth + 1);
                 $trueBox = JitValueBox::alloc($context);
                 JitValueBox::writeBool($context, $trueBox, $i1->constInt(1, false));
                 $context->builder->store(JitValueBox::normalizeValuePtr($context, $trueBox), $resultSlot);
@@ -1473,7 +1425,14 @@ final class JitXmlReaderUserScript
 
             // Not on attribute → first attribute (php-src moveToNextAttribute).
             $context->builder->positionAtEnd($fromElem);
-            self::storeAttributeCursorHit($context, $objectType, $obj, $attrs[0], $i64);
+            self::storeAttributeCursorHit(
+                $context,
+                $objectType,
+                $obj,
+                $attrs[0],
+                $i64,
+                (self::$lastEvents[$i]['depth'] ?? 0) + 1
+            );
             $tb = JitValueBox::alloc($context);
             JitValueBox::writeBool($context, $tb, $i1->constInt(1, false));
             $context->builder->store(JitValueBox::normalizeValuePtr($context, $tb), $resultSlot);
@@ -1502,7 +1461,14 @@ final class JitXmlReaderUserScript
 
                 $context->builder->positionAtEnd($matched);
                 if ($j + 1 < $attrCount) {
-                    self::storeAttributeCursorHit($context, $objectType, $obj, $attrs[$j + 1], $i64);
+                    self::storeAttributeCursorHit(
+                        $context,
+                        $objectType,
+                        $obj,
+                        $attrs[$j + 1],
+                        $i64,
+                        (self::$lastEvents[$i]['depth'] ?? 0) + 1
+                    );
                     $okBox = JitValueBox::alloc($context);
                     JitValueBox::writeBool($context, $okBox, $i1->constInt(1, false));
                     $context->builder->store(JitValueBox::normalizeValuePtr($context, $okBox), $resultSlot);
@@ -1535,29 +1501,23 @@ final class JitXmlReaderUserScript
         \PHPCompiler\JIT\Builtin\Type\Object_ $objectType,
         Value $obj,
         array $hit,
-        $i64
+        $i64,
+        int $depth
     ): void {
-        $nodeTypeVar = new JITVariable(
-            $context,
-            JITVariable::TYPE_NATIVE_LONG,
-            JITVariable::KIND_VALUE,
-            $i64->constInt(XmlReaderConstants::ATTRIBUTE, true)
-        );
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($obj, self::CLASS_NAME, VmXmlReader::PROP_NODE_TYPE),
-            $nodeTypeVar,
-            JITVariable::TYPE_NATIVE_LONG
-        );
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($obj, self::CLASS_NAME, VmXmlReader::PROP_NAME),
-            self::stringLlvm($context, $hit['name']),
-            JITVariable::TYPE_STRING
-        );
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($obj, self::CLASS_NAME, VmXmlReader::PROP_VALUE),
-            self::stringLlvm($context, $hit['value']),
-            JITVariable::TYPE_STRING
-        );
+        $parts = self::attributeQNameParts($hit['name']);
+        self::storeReaderProps($context, $objectType, $obj, [
+            'nodeType' => XmlReaderConstants::ATTRIBUTE,
+            'name' => $hit['name'],
+            'value' => $hit['value'],
+            'depth' => $depth,
+            'isEmptyElement' => false,
+            'hasValue' => '' !== $hit['value'],
+            'hasAttributes' => false,
+            'attributeCount' => 0,
+            'localName' => $parts['local'],
+            'prefix' => $parts['prefix'],
+            'namespaceUri' => '',
+        ]);
     }
 
     /**
@@ -2223,16 +2183,45 @@ final class JitXmlReaderUserScript
         Value $obj,
         array $ev
     ): void {
+        self::storeReaderProps($context, $objectType, $obj, $ev);
+    }
+
+    private static function storeIdleReaderProps(
+        Context $context,
+        \PHPCompiler\JIT\Builtin\Type\Object_ $objectType,
+        Value $obj
+    ): void {
+        self::storeReaderProps($context, $objectType, $obj, [
+            'nodeType' => 0,
+            'name' => '',
+            'value' => '',
+            'depth' => 0,
+            'isEmptyElement' => false,
+            'hasValue' => false,
+            'hasAttributes' => false,
+            'attributeCount' => 0,
+            'localName' => '',
+            'prefix' => '',
+            'namespaceUri' => '',
+        ]);
+    }
+
+    private static function storeReaderProps(
+        Context $context,
+        \PHPCompiler\JIT\Builtin\Type\Object_ $objectType,
+        Value $obj,
+        array $ev
+    ): void {
         $i64 = $context->getTypeFromString('int64');
-        $nodeTypeVar = new JITVariable(
+        $long = static fn (int $n): JITVariable => new JITVariable(
             $context,
             JITVariable::TYPE_NATIVE_LONG,
             JITVariable::KIND_VALUE,
-            $i64->constInt($ev['nodeType'], true)
+            $i64->constInt($n, true)
         );
         $objectType->propertyStore(
             $objectType->propertySlotFor($obj, self::CLASS_NAME, VmXmlReader::PROP_NODE_TYPE),
-            $nodeTypeVar,
+            $long($ev['nodeType']),
             JITVariable::TYPE_NATIVE_LONG
         );
         $objectType->propertyStore(
@@ -2244,6 +2233,93 @@ final class JitXmlReaderUserScript
             $objectType->propertySlotFor($obj, self::CLASS_NAME, VmXmlReader::PROP_VALUE),
             self::stringLlvm($context, $ev['value']),
             JITVariable::TYPE_STRING
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, self::CLASS_NAME, VmXmlReader::PROP_DEPTH),
+            $long($ev['depth']),
+            JITVariable::TYPE_NATIVE_LONG
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, self::CLASS_NAME, VmXmlReader::PROP_LOCAL_NAME),
+            self::stringLlvm($context, $ev['localName']),
+            JITVariable::TYPE_STRING
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, self::CLASS_NAME, VmXmlReader::PROP_PREFIX),
+            self::stringLlvm($context, $ev['prefix']),
+            JITVariable::TYPE_STRING
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, self::CLASS_NAME, VmXmlReader::PROP_NAMESPACE_URI),
+            self::stringLlvm($context, $ev['namespaceUri']),
+            JITVariable::TYPE_STRING
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, self::CLASS_NAME, VmXmlReader::PROP_ATTRIBUTE_COUNT),
+            $long($ev['attributeCount']),
+            JITVariable::TYPE_NATIVE_LONG
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, self::CLASS_NAME, VmXmlReader::PROP_HAS_ATTRIBUTES),
+            self::boolLlvm($context, $ev['hasAttributes']),
+            JITVariable::TYPE_NATIVE_BOOL
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, self::CLASS_NAME, VmXmlReader::PROP_HAS_VALUE),
+            self::boolLlvm($context, $ev['hasValue']),
+            JITVariable::TYPE_NATIVE_BOOL
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, self::CLASS_NAME, VmXmlReader::PROP_IS_EMPTY_ELEMENT),
+            self::boolLlvm($context, $ev['isEmptyElement']),
+            JITVariable::TYPE_NATIVE_BOOL
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, self::CLASS_NAME, VmXmlReader::PROP_IS_DEFAULT),
+            self::boolLlvm($context, false),
+            JITVariable::TYPE_NATIVE_BOOL
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, self::CLASS_NAME, VmXmlReader::PROP_BASE_URI),
+            self::stringLlvm($context, ''),
+            JITVariable::TYPE_STRING
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, self::CLASS_NAME, VmXmlReader::PROP_XML_LANG),
+            self::stringLlvm($context, ''),
+            JITVariable::TYPE_STRING
+        );
+    }
+
+    /** @return array{local: string, prefix: string} */
+    private static function attributeQNameParts(string $attrName): array
+    {
+        if ('xmlns' === $attrName) {
+            return ['local' => 'xmlns', 'prefix' => ''];
+        }
+        if (str_starts_with($attrName, 'xmlns:')) {
+            return ['local' => substr($attrName, 6), 'prefix' => 'xmlns'];
+        }
+        $colon = strpos($attrName, ':');
+        if (false === $colon) {
+            return ['local' => $attrName, 'prefix' => ''];
+        }
+
+        return [
+            'local' => substr($attrName, $colon + 1),
+            'prefix' => substr($attrName, 0, $colon),
+        ];
+    }
+
+    private static function boolLlvm(Context $context, bool $value): JITVariable
+    {
+        $i1 = $context->getTypeFromString('int1');
+
+        return new JITVariable(
+            $context,
+            JITVariable::TYPE_NATIVE_BOOL,
+            JITVariable::KIND_VALUE,
+            $i1->constInt($value ? 1 : 0, false)
         );
     }
 
@@ -2286,6 +2362,39 @@ final class JitXmlReaderUserScript
         }
         if (!$objectType->hasProperty($classId, VmXmlReader::PROP_VALUE)) {
             $objectType->defineProperty($classId, VmXmlReader::PROP_VALUE, JITVariable::TYPE_STRING);
+        }
+        if (!$objectType->hasProperty($classId, VmXmlReader::PROP_DEPTH)) {
+            $objectType->defineProperty($classId, VmXmlReader::PROP_DEPTH, JITVariable::TYPE_NATIVE_LONG);
+        }
+        if (!$objectType->hasProperty($classId, VmXmlReader::PROP_LOCAL_NAME)) {
+            $objectType->defineProperty($classId, VmXmlReader::PROP_LOCAL_NAME, JITVariable::TYPE_STRING);
+        }
+        if (!$objectType->hasProperty($classId, VmXmlReader::PROP_PREFIX)) {
+            $objectType->defineProperty($classId, VmXmlReader::PROP_PREFIX, JITVariable::TYPE_STRING);
+        }
+        if (!$objectType->hasProperty($classId, VmXmlReader::PROP_NAMESPACE_URI)) {
+            $objectType->defineProperty($classId, VmXmlReader::PROP_NAMESPACE_URI, JITVariable::TYPE_STRING);
+        }
+        if (!$objectType->hasProperty($classId, VmXmlReader::PROP_ATTRIBUTE_COUNT)) {
+            $objectType->defineProperty($classId, VmXmlReader::PROP_ATTRIBUTE_COUNT, JITVariable::TYPE_NATIVE_LONG);
+        }
+        if (!$objectType->hasProperty($classId, VmXmlReader::PROP_HAS_ATTRIBUTES)) {
+            $objectType->defineProperty($classId, VmXmlReader::PROP_HAS_ATTRIBUTES, JITVariable::TYPE_NATIVE_BOOL);
+        }
+        if (!$objectType->hasProperty($classId, VmXmlReader::PROP_HAS_VALUE)) {
+            $objectType->defineProperty($classId, VmXmlReader::PROP_HAS_VALUE, JITVariable::TYPE_NATIVE_BOOL);
+        }
+        if (!$objectType->hasProperty($classId, VmXmlReader::PROP_IS_EMPTY_ELEMENT)) {
+            $objectType->defineProperty($classId, VmXmlReader::PROP_IS_EMPTY_ELEMENT, JITVariable::TYPE_NATIVE_BOOL);
+        }
+        if (!$objectType->hasProperty($classId, VmXmlReader::PROP_IS_DEFAULT)) {
+            $objectType->defineProperty($classId, VmXmlReader::PROP_IS_DEFAULT, JITVariable::TYPE_NATIVE_BOOL);
+        }
+        if (!$objectType->hasProperty($classId, VmXmlReader::PROP_BASE_URI)) {
+            $objectType->defineProperty($classId, VmXmlReader::PROP_BASE_URI, JITVariable::TYPE_STRING);
+        }
+        if (!$objectType->hasProperty($classId, VmXmlReader::PROP_XML_LANG)) {
+            $objectType->defineProperty($classId, VmXmlReader::PROP_XML_LANG, JITVariable::TYPE_STRING);
         }
     }
 }
