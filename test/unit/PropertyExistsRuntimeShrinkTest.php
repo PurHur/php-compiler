@@ -16,10 +16,16 @@ final class PropertyExistsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('propertyExistsLiteral', $source);
         $this->assertStringContainsString('#31966', $source);
         $this->assertStringContainsString('#32688', $source);
+        $this->assertStringContainsString('#35788', $source);
+        $this->assertStringContainsString('existsForRuntimeClassNameLiteralProperty', $source);
         $this->assertStringContainsString('0x7f', $source);
         $this->assertStringNotContainsString("lookupFunction('strcasecmp')", $source);
         $this->assertStringNotContainsString('existsForClassIdRuntimeProperty', $source);
         $this->assertStringNotContainsString('forClassLiteralRuntimeProperty', $source);
+        $this->assertStringNotContainsString(
+            'requires a string literal class name in this compiler build',
+            $source
+        );
         // Object/value-box routing grew past the original 270-line thin-delegate cap;
         // same-unit static props fold via ReflectionBuiltinHelper (#31966), not more LLVM.
         $this->assertLessThan(450, \substr_count($source, "\n") + 1);

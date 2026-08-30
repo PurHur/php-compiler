@@ -16,6 +16,86 @@ use PHPLLVM\Value;
 /** Object / class-id literal arms for property_exists() JIT (#31966, #32688, #33068). */
 final class JitPropertyExistsObject
 {
+    private static int $blockSeq = 0;
+
+    /**
+     * Runtime class-string + literal property: walk LLVM object table then autoload (#35788 / #32701).
+     *
+     * NestedJIT VmReflection misses AOT user classes (#31966).
+     */
+    public static function existsForRuntimeClassNameLiteralProperty(
+        Context $context,
+        Value $classStr,
+        JITVariable $classArg,
+        JITVariable $propertyArg,
+        string $property
+    ): Value {
+        \PHPCompiler\JIT\Builtin\StringCaseCompare::ensureStrcasecmpLinked($context);
+        $i1 = $context->getTypeFromString('int1');
+        $matched = $i1->constInt(0, false);
+        $exists = $i1->constInt(0, false);
+        $object = $context->type->object;
+        $classData = self::stringDataPtr($context, $classStr);
+        foreach ($object->allClassNamesById() as $id => $className) {
+            $lit = $context->builder->load($context->constantStringFromString((string) $className));
+            $cmp = $context->builder->call(
+                $context->lookupFunction(\PHPCompiler\JIT\Builtin\StringCaseCompare::ABI_STRCASECMP),
+                $classData,
+                self::stringDataPtr($context, $lit)
+            );
+            $isMatch = $context->builder->icmp(
+                Builder::INT_EQ,
+                $cmp,
+                $context->constantFromInteger(0, 'int32')
+            );
+            $matched = $context->builder->or($matched, $isMatch);
+            $classExists = $object->propertyExistsFromScope($id, $property)
+                ? $i1->constInt(1, false)
+                : $i1->constInt(0, false);
+            if ('name' === $property || 'value' === $property) {
+                $enumExists = $i1->constInt(0, false);
+                if ($object->isEnumClassId($id)) {
+                    if ('name' === $property) {
+                        $enumExists = $i1->constInt(1, false);
+                    } elseif ($object->enumHasBacking($id)) {
+                        $enumExists = $i1->constInt(1, false);
+                    }
+                }
+                $classExists = $context->builder->or($classExists, $enumExists);
+            }
+            $exists = $context->builder->select($isMatch, $classExists, $exists);
+        }
+        $tag = 'r'.(string) self::$blockSeq++;
+        $knownBlock = BasicBlockHelper::append($context, 'prop_exists_runtime_known_'.$tag);
+        $autoloadBlock = BasicBlockHelper::append($context, 'prop_exists_runtime_autoload_'.$tag);
+        $mergeBlock = BasicBlockHelper::append($context, 'prop_exists_runtime_merge_'.$tag);
+        $context->builder->branchIf($matched, $knownBlock, $autoloadBlock);
+
+        $context->builder->positionAtEnd($knownBlock);
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($autoloadBlock);
+        $helperResult = JitPropertyExists::routeThroughPhpHelper($context, $classArg, $propertyArg);
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($mergeBlock);
+        $phi = $context->builder->phi($i1);
+        $phi->addIncoming($exists, $knownBlock);
+        $phi->addIncoming($helperResult, $autoloadBlock);
+
+        return $phi;
+    }
+
+    private static function stringDataPtr(Context $context, Value $strPtr): Value
+    {
+        $map = $context->structFieldMap['__string__'];
+
+        return $context->builder->pointerCast(
+            $context->builder->structGep($strPtr, $map['value']),
+            $context->getTypeFromString('int8*')
+        );
+    }
+
     public static function forCompleteObject(
         Context $context,
         JITVariable $objectArg,
