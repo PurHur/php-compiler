@@ -8,6 +8,9 @@ use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\JsonEncodeQuoteStringRuntime;
 use PHPCompiler\JIT\Builtin\StringJsonEncode;
+use PHPCompiler\JIT\Call;
+use PHPCompiler\JIT\Call\RuntimeIndirectInstanceMethodCall;
+use PHPCompiler\JIT\ClosureHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectBuiltin;
 use PHPCompiler\JIT\Builtin\Type\ObjectEnumCasePropertyLlvm;
@@ -29,6 +32,7 @@ use PHPLLVM\Value;
  * Boxed `__value__*` arrays (get_object_vars AOT) must use the hashtable ABI —
  * NestedJIT encodeValue resolveIndirect on those boxes SIGSEGVs (#27020).
  * Objects: NestedJIT encodeValue quotes class names — route via get_object_vars (#28638).
+ * JsonSerializable: call jsonSerialize() then encode the wire (php_json_encode_serializable_object).
  * DateTime/DateTimeImmutable/DateTimeZone: Zend wire, not empty get_object_vars (#33752 / #14143).
  * Enum cases: VmJson export wire (JsonSerializable + backing scalar), not get_object_vars (#6880).
  */
@@ -346,16 +350,203 @@ final class JitJsonEncode
         );
         $flagsObj = $context->builder->or($flags, $overlay);
 
+        $objVar = self::resolveObjectReceiver($context, $arg);
+        if (null !== $objVar) {
+            if (null === $objVar->classUserType && null !== $arg->classUserType) {
+                $objVar->classUserType = $arg->classUserType;
+            }
+            $candidates = self::jsonSerializeMethodCandidates($context);
+            if ([] !== $candidates) {
+                return self::encodeJsonSerializableOrFallback(
+                    $context,
+                    $arg,
+                    $objVar,
+                    $flags,
+                    $flagsObj,
+                    $candidates
+                );
+            }
+        }
+
+        return self::encodeObjectPublicPropsFallback($context, $arg, $objVar, $flags, $flagsObj);
+    }
+
+    /**
+     * php-src ext/json/json_encoder.c — php_json_encode_serializable_object before
+     * zend_get_properties_for. Thin AOT previously used get_object_vars only, so
+     * user JsonSerializable types encoded as {}.
+     *
+     * SplFixedArray / ArrayObject keep dedicated `__spl_ht` lowering (#33723 / #33619).
+     *
+     * @param array<int, Call> $candidates
+     */
+    private static function encodeJsonSerializableOrFallback(
+        Context $context,
+        JITVariable $arg,
+        JITVariable $objVar,
+        Value $flags,
+        Value $flagsObj,
+        array $candidates
+    ): Value {
+        $id = (string) (++self::$blockSerial);
+        $objPtr = $context->helper->loadValue($objVar);
+        $classId = ClosureHelper::loadClassId($context, $objPtr);
+        $i64 = $context->getTypeFromString('int64');
+        $isJs = $context->getTypeFromString('int1')->constInt(0, false);
+        foreach (array_keys($candidates) as $cid) {
+            $match = $context->builder->icmp(
+                Builder::INT_EQ,
+                $classId,
+                $i64->constInt((int) $cid, false)
+            );
+            $isJs = $context->builder->or($isJs, $match);
+        }
+
+        $jsBlock = BasicBlockHelper::append($context, 'json_encode_js_'.$id);
+        $plainBlock = BasicBlockHelper::append($context, 'json_encode_js_plain_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'json_encode_js_done_'.$id);
+        $context->builder->branchIf($isJs, $jsBlock, $plainBlock);
+
+        $context->builder->positionAtEnd($jsBlock);
+        $dispatch = new RuntimeIndirectInstanceMethodCall($objVar, 'jsonserialize', $candidates);
+        $raw = $dispatch->call($context, $objVar);
+        $valuePtr = JitValueBox::coerceToValuePtrForStore($context, $raw);
+        $jsResult = self::encodeJsonSerializeWire($context, $objPtr, $valuePtr, $flags);
+        $jsEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($plainBlock);
+        $plainResult = self::encodeObjectPublicPropsFallback($context, $arg, $objVar, $flags, $flagsObj);
+        $plainEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $strPtr = $context->getTypeFromString('__string__*');
+        $phi = $context->builder->phi($strPtr, 'json_encode_js_phi_'.$id);
+        $phi->addIncoming($jsResult, $jsEnd);
+        $phi->addIncoming($plainResult, $plainEnd);
+
+        return $phi;
+    }
+
+    /**
+     * Encode jsonSerialize() return value. Self-return is {} (php_json_encoder.c).
+     */
+    private static function encodeJsonSerializeWire(
+        Context $context,
+        Value $receiverObj,
+        Value $valuePtr,
+        Value $flags
+    ): Value {
+        $id = (string) (++self::$blockSerial);
+        $valuePtr = JitValueBox::normalizeValuePtr($context, $valuePtr);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isObj = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(JITVariable::TYPE_OBJECT & 0x7f, false)
+        );
+
+        $objCheck = BasicBlockHelper::append($context, 'json_encode_js_selfchk_'.$id);
+        $selfBlock = BasicBlockHelper::append($context, 'json_encode_js_self_'.$id);
+        $encBlock = BasicBlockHelper::append($context, 'json_encode_js_enc_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'json_encode_js_wire_done_'.$id);
+        $context->builder->branchIf($isObj, $objCheck, $encBlock);
+
+        $context->builder->positionAtEnd($objCheck);
+        $resultObj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $valuePtr
+        );
+        $same = $context->builder->icmp(Builder::INT_EQ, $resultObj, $receiverObj);
+        $context->builder->branchIf($same, $selfBlock, $encBlock);
+
+        $context->builder->positionAtEnd($selfBlock);
+        $selfResult = $context->builder->load($context->constantStringFromString('{}'));
+        $selfEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($encBlock);
+        // Do not re-enter JsonSerializable dispatch (compile-time IR recursion).
+        $encResult = self::encodeBoxedValue($context, $valuePtr, $flags, false);
+        $encEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $strPtr = $context->getTypeFromString('__string__*');
+        $phi = $context->builder->phi($strPtr, 'json_encode_js_wire_phi_'.$id);
+        $phi->addIncoming($selfResult, $selfEnd);
+        $phi->addIncoming($encResult, $encEnd);
+
+        return $phi;
+    }
+
+    /**
+     * @return array<int, Call>
+     */
+    private static function jsonSerializeMethodCandidates(Context $context): array
+    {
+        $objectType = $context->type->object;
+        if (!$objectType instanceof ObjectBuiltin) {
+            return [];
+        }
+        $skip = [
+            'splfixedarray' => true,
+            'arrayobject' => true,
+            'arrayiterator' => true,
+            'recursivearrayiterator' => true,
+        ];
+        $candidates = [];
+        foreach ($objectType->allClassNamesById() as $classId => $className) {
+            $classLc = strtolower(ltrim((string) $className, '\\'));
+            if (isset($skip[$classLc])) {
+                continue;
+            }
+            if (!\in_array('jsonserializable', $objectType->allInterfacesForClassLc($classLc), true)) {
+                continue;
+            }
+            $current = $classLc;
+            $visited = [];
+            while (!isset($visited[$current])) {
+                $visited[$current] = true;
+                $proxyName = $current.'::jsonserialize';
+                if ($context->functionIsRegistered($proxyName)) {
+                    $candidates[(int) $classId] = $context->resolveFunctionProxy($proxyName);
+                    break;
+                }
+                $parent = $objectType->parentClassLc($current);
+                if (null === $parent) {
+                    break;
+                }
+                $current = $parent;
+            }
+        }
+
+        return $candidates;
+    }
+
+    private static function encodeObjectPublicPropsFallback(
+        Context $context,
+        JITVariable $arg,
+        ?JITVariable $objVar,
+        Value $flags,
+        Value $flagsObj
+    ): Value {
         $objectType = $context->type->object;
         if ($objectType instanceof ObjectBuiltin) {
             $enumIds = $objectType->registeredEnumClassIds();
             if ([] !== $enumIds) {
-                $objVar = self::resolveObjectReceiver($context, $arg);
-                if (null !== $objVar) {
+                $recv = $objVar ?? self::resolveObjectReceiver($context, $arg);
+                if (null !== $recv) {
                     return self::encodeEnumObjectOrPublicProps(
                         $context,
                         $arg,
-                        $objVar,
+                        $recv,
                         $flags,
                         $flagsObj,
                         $enumIds
@@ -374,7 +565,6 @@ final class JitJsonEncode
             $context->lookupFunction('__value__readHashtable'),
             $boxed
         );
-        // Skip unconditional overlay — see encode() (#31101). CONTAINER_AS_OBJECT still applied.
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_json_encode_array'),
@@ -652,8 +842,15 @@ final class JitJsonEncode
     /**
      * Route boxed hashtables / objects — NestedJIT encodeValue quotes class names (#27020 / #28638).
      * Also used from {@see JsonEncodeArrayLlvm} pair values (#26367).
+     *
+     * @param bool $jsonSerializeObjects false when encoding a jsonSerialize() return (avoid IR recursion)
      */
-    public static function encodeBoxedValue(Context $context, Value $valuePtr, Value $flags): Value
+    public static function encodeBoxedValue(
+        Context $context,
+        Value $valuePtr,
+        Value $flags,
+        bool $jsonSerializeObjects = true
+    ): Value
     {
         $valuePtr = JitValueBox::normalizeValuePtr($context, $valuePtr);
         $map = $context->structFieldMap['__value__'];
@@ -776,7 +973,16 @@ final class JitJsonEncode
 
         $context->builder->positionAtEnd($objBlock);
         $objVar = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VALUE, $valuePtr);
-        $objResult = self::encodeObjectPublicProps($context, $objVar, $flags);
+        if ($jsonSerializeObjects) {
+            $objResult = self::encodeObjectPublicProps($context, $objVar, $flags);
+        } else {
+            $overlay = $context->getTypeFromString('int64')->constInt(
+                VmJsonFlags::CONTAINER_AS_OBJECT,
+                false
+            );
+            $flagsObj = $context->builder->or($flags, $overlay);
+            $objResult = self::encodeObjectPublicPropsFallback($context, $objVar, null, $flags, $flagsObj);
+        }
         $objEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
