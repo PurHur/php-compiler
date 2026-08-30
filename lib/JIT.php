@@ -31309,6 +31309,10 @@ class JIT {
     /**
      * After ??= arms persist the store, drop fetch-arm property SSA so the merge
      * block (and nested outer ??) load the stack box (#33760 / #32988).
+     *
+     * ASSIGN_REF aliases (`$r =& $obj->prop; $r ??= …`) already have a dominating
+     * GEP from the ref bind — stripping here makes the right-arm store a local-box
+     * no-op (leftover of #35898 / #33748).
      */
     private function reseatCoalesceResultAfterPropertyArms(Operand $coalesceResult): void
     {
@@ -31317,6 +31321,12 @@ class JIT {
             return;
         }
         $mergeSeat = $this->context->getVariableFromOp($coalesceResult);
+        $namedRefAlias = $mergeSeat->assignRefLvalueAlias
+            && null !== JIT\OperandName::resolve($coalesceResult)
+            && '' !== (string) JIT\OperandName::resolve($coalesceResult);
+        if ($namedRefAlias) {
+            return;
+        }
         $mergeSeat->objectPropertySlot = null;
         $mergeSeat->objectPropertyType = null;
         $mergeSeat->objectPropertyReceiver = null;
@@ -31573,11 +31583,21 @@ class JIT {
                 // Property-backed slots carry a fetch-arm-only SSA pointer (objectPropertySlot).
                 // Keep the alloca (already written by the fetch/null arm) but drop the backing so
                 // nullsafe_merge reads the stack box — otherwise Module verify fails (#32988).
+                // `$r =& $obj->prop` GEP dominates both ??= arms; dropping it here leaves
+                // `$r ??= n` as a local-box write (#35987 leftover of #35898).
+                // Only named CVs: FETCH_OBJ_W temps for `$a->p ??= $b->q ??=` must still
+                // drop arm-local GEPs (#33760 / #32988).
+                $namedRefAlias = $var->assignRefLvalueAlias
+                    && null !== JIT\OperandName::resolve($mergeOp)
+                    && '' !== (string) JIT\OperandName::resolve($mergeOp);
                 if (
-                    null !== $var->objectPropertySlot
-                    || null !== $var->staticPropertyGlobal
-                    || null !== $var->valueBoxAliasPtr
-                    || $var->functionStaticGlobal
+                    !$namedRefAlias
+                    && (
+                        null !== $var->objectPropertySlot
+                        || null !== $var->staticPropertyGlobal
+                        || null !== $var->valueBoxAliasPtr
+                        || $var->functionStaticGlobal
+                    )
                 ) {
                     $var->objectPropertySlot = null;
                     $var->objectPropertyType = null;
