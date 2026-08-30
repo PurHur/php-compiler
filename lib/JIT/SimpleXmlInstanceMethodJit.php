@@ -13,6 +13,8 @@ final class SimpleXmlInstanceMethodJit
     private const METHODS = [
         'simplexmlelement::__construct' => true,
         'simplexmlelement::addchild' => true,
+        // leftover of addChild AOT (#19306 / #35806) — php-src sxe.c zim_simplexmlelement_addAttribute
+        'simplexmlelement::addattribute' => true,
         'simplexmlelement::asxml' => true,
         'simplexmlelement::savexml' => true,
         'simplexmlelement::xpath' => true,
@@ -53,6 +55,11 @@ final class SimpleXmlInstanceMethodJit
         }
         if ('simplexmlelement::addchild' === $lc) {
             $context->functionProxies[$lc] = new Call\SimpleXMLElementAddChild();
+
+            return;
+        }
+        if ('simplexmlelement::addattribute' === $lc) {
+            $context->functionProxies[$lc] = new Call\SimpleXMLElementAddAttribute();
 
             return;
         }

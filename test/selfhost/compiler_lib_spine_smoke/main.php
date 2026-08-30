@@ -2012,6 +2012,7 @@ require_once __DIR__.'/../../../ext/session/session_unset.php';
 require_once __DIR__.'/../../../ext/session/session_write_close.php';
 require_once __DIR__.'/../../../ext/simplexml/BuiltinClasses.php';
 require_once __DIR__.'/../../../ext/simplexml/JitSimpleXmlAddChild.php';
+require_once __DIR__.'/../../../ext/simplexml/JitSimpleXmlAddAttribute.php';
 require_once __DIR__.'/../../../ext/simplexml/JitSimpleXmlAttributes.php';
 require_once __DIR__.'/../../../ext/simplexml/JitSimpleXmlAsXml.php';
 require_once __DIR__.'/../../../ext/simplexml/JitSimpleXmlChildren.php';
@@ -6558,6 +6559,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/RuntimeVariableStaticMethodCall.php
 require_once __DIR__.'/../../../lib/JIT/Call/SensitiveParameterValueConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/SensitiveParameterValueGetValue.php';
 require_once __DIR__.'/../../../lib/JIT/Call/SimpleXMLElementAddChild.php';
+require_once __DIR__.'/../../../lib/JIT/Call/SimpleXMLElementAddAttribute.php';
 require_once __DIR__.'/../../../lib/JIT/Call/SimpleXMLElementAttributes.php';
 require_once __DIR__.'/../../../lib/JIT/Call/SimpleXMLElementAsXml.php';
 require_once __DIR__.'/../../../lib/JIT/Call/SimpleXMLElementChildren.php';
