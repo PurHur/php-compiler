@@ -159,6 +159,13 @@ class Context {
     public array $dateTimeLocalInstants = [];
 
     /**
+     * Next typed DateTime property store after DateTime::__construct (#35752).
+     *
+     * @var array{timestamp: int, timezone: ?string, microsecond?: int}|null
+     */
+    public ?array $pendingDateTimePropertyInstant = null;
+
+    /**
      * New DateInterval result — construct stamps parsed duration onto the local (#32699).
      */
     public ?Operand $lastDateIntervalNewResultOp = null;

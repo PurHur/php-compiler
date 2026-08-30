@@ -16434,6 +16434,21 @@ class JIT {
     /** PHPCfg operand names for inventory argv Runtime spine (#11809). */
     private function resolveInstanceMethodReceiverClass(Operand $receiverOp): ?string
     {
+        if ($this->context->hasVariableOp($receiverOp)) {
+            $fromConstraint = $this->typedPropertyClassConstraintUserType(
+                $this->context->getVariableFromOp($receiverOp)
+            );
+            if (null !== $fromConstraint) {
+                return $fromConstraint;
+            }
+            $tagged = $this->context->getVariableFromOp($receiverOp)->classUserType ?? null;
+            if (is_string($tagged) && '' !== ltrim($tagged, '\\')) {
+                $tagLc = strtolower(ltrim($tagged, '\\'));
+                if (!\in_array($tagLc, ['object', 'stdclass', 'mixed'], true)) {
+                    return ltrim($tagged, '\\');
+                }
+            }
+        }
         $userType = $receiverOp->type?->userType;
         if (is_string($userType) && '' !== ltrim($userType, '\\')) {
             return ltrim($userType, '\\');
@@ -18098,6 +18113,47 @@ class JIT {
             return;
         }
         if (!$returnsByRef) {
+            // Void JIT __construct proxies return null __value__*; never materialize that onto
+            // the EXEC_RETURN operand — it shares the `new` temp (#23641). When assignOperand
+            // boxed the temp to TYPE_VALUE, the old TYPE_OBJECT-only guard missed it and typed
+            // property stores kept an empty object shell (#35752).
+            if ($this->isVoidJitConstructCallThatDiscardsExecReturn($this->context->scope->toCall)) {
+                if ($this->context->hasVariableOp($result)) {
+                    $prior = $this->context->getVariableFromOp($result);
+                    if (
+                        Variable::TYPE_OBJECT === $prior->type
+                        || Variable::TYPE_VALUE === $prior->type
+                    ) {
+                        $this->markNewObjectConstructedAfterCall(
+                            $this->context->scope->toCall,
+                            $this->context->scope->args
+                        );
+                        if ($this->context->scope->toCall instanceof JIT\Call\BcMathNumberConstruct) {
+                            $thisArg = $this->context->scope->args[0] ?? null;
+                            $ct = ($thisArg instanceof Variable)
+                                ? $thisArg->compileTimeBcmathNumber
+                                : null;
+                            if (null !== $ct) {
+                                $prior->compileTimeBcmathNumber = $ct;
+                                $name = JIT\OperandName::resolve($result);
+                                if (null !== $name && '' !== $name) {
+                                    $resolved = $this->context->resolveRefAliasName($name);
+                                    if (isset($this->context->namedVariableBindings[$resolved])) {
+                                        $this->context->namedVariableBindings[$resolved]
+                                            ->compileTimeBcmathNumber = $ct;
+                                    }
+                                    $this->context->bindVariableByName($resolved, $prior);
+                                    $prior->compileTimeBcmathNumber = $ct;
+                                }
+                            }
+                        }
+
+                        return;
+                    }
+                }
+
+                return;
+            }
             // FUNCCALL_EXEC_RETURN must materialize even when php-cfg dropped result usages
             // (nested f(g()) arg temps — strlen(trim($s)), #8561).
             $llvmTy = $this->context->getStringFromType($llvmResult->typeOf());
@@ -18107,9 +18163,7 @@ class JIT {
             ) {
                 $prior = $this->context->getVariableFromOp($result);
                 if (Variable::TYPE_OBJECT === $prior->type) {
-                    // Void __construct EXEC_RETURN shares the `new` result operand — keep the
-                    // object (VM #4540). Wiping here made `throw new LogicException` see a
-                    // non-Throwable / wrong temp (#23641).
+                    // Legacy path: void __construct on an unboxed TYPE_OBJECT `new` temp.
                     if ($this->isVoidJitConstructCall($this->context->scope->toCall)) {
                         $this->markNewObjectConstructedAfterCall(
                             $this->context->scope->toCall,
@@ -21213,6 +21267,28 @@ class JIT {
             JIT\ReadonlyClassGuard::emitStoreUnlessPending(
                 $this->context,
                 function () use ($result, $value): void {
+                    $pending = $this->context->pendingDateTimePropertyInstant;
+                    if (
+                        is_array($pending)
+                        && isset($pending['timestamp'])
+                        && null === $value->compileTimeDateTimeTimestamp
+                    ) {
+                        $constraint = strtolower(ltrim((string) ($result->objectPropertyClassConstraint ?? ''), '\\'));
+                        if (\in_array($constraint, ['datetime', 'datetimeimmutable'], true)) {
+                            $value->compileTimeDateTimeTimestamp = (int) $pending['timestamp'];
+                            $value->compileTimeDateTimeMicrosecond = (int) ($pending['microsecond'] ?? 0);
+                            $value->compileTimeTimezoneName = $pending['timezone'] ?? null;
+                            if (null === $value->classUserType || '' === $value->classUserType) {
+                                $value->classUserType = 'datetimeimmutable' === $constraint
+                                    ? 'DateTimeImmutable'
+                                    : 'DateTime';
+                            }
+                            if (null === $value->compileTimeDateTimeClassName || '' === $value->compileTimeDateTimeClassName) {
+                                $value->compileTimeDateTimeClassName = $value->classUserType;
+                            }
+                        }
+                    }
+                    $this->context->pendingDateTimePropertyInstant = null;
                     $this->context->type->object->propertyStore(
                         $result->objectPropertySlot,
                         $value,
@@ -23203,6 +23279,24 @@ class JIT {
     }
 
     /**
+     * Like {@see isVoidJitConstructCall} but DateTime ctors return the initialized object box (#35752).
+     */
+    private function isVoidJitConstructCallThatDiscardsExecReturn(?JIT\Call $toCall): bool
+    {
+        if (!$this->isVoidJitConstructCall($toCall)) {
+            return false;
+        }
+        if (
+            $toCall instanceof JIT\Call\DateTimeConstruct
+            || $toCall instanceof JIT\Call\DateTimeImmutableConstruct
+        ) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
      * @param list<JIT\Variable|array{unpack: JIT\Variable}> $callArgs
      * @param list<\PHPCfg\Operand|null>|null $callOperands
      */
@@ -23462,6 +23556,7 @@ class JIT {
                 $this->context->dateTimeLocalInstants[$boundName] = $instant;
             }
         }
+        $this->context->pendingDateTimePropertyInstant = $instant;
         $this->context->lastDateTimeNewResultOp = null;
         $this->context->lastDateTimeNewResultVar = null;
     }
@@ -25792,7 +25887,10 @@ class JIT {
         $this->applyDateIntervalStateToReceiver($receiverOp, $receiverVar);
         $this->applyDateTimeZoneLocalToReceiver($receiverOp, $receiverVar);
         $recvHintLc = strtolower(ltrim(
-            (string) ($receiverVar->classUserType ?? $receiverOp->type?->userType ?? ''),
+            (string) ($receiverVar->classUserType
+                ?? $this->typedPropertyClassConstraintUserType($receiverVar)
+                ?? $receiverOp->type?->userType
+                ?? ''),
             '\\'
         ));
         // unserialize() runtime O: result — prefer RuntimeIndirect before object::format throw (#34602).
@@ -26099,7 +26197,9 @@ class JIT {
             ? $userType
             : (null !== $externalReceiverClass
                 ? $externalReceiverClass
-                : ('' !== $scopeClassName ? $scopeClassName : 'object'));
+                : (null !== ($constraintClass = $this->typedPropertyClassConstraintUserType($receiverVar))
+                    ? $constraintClass
+                    : ('' !== $scopeClassName ? $scopeClassName : 'object')));
         $declaringClassLc = strtolower(ltrim($className, '\\'));
         // php-types InternalArgInfo typo: simplexml_load_* → simplemxml_element (#25338, #26863, #26911).
         // userType wins over resolveInstanceMethodReceiverClass(), so remap here too.
@@ -30601,9 +30701,14 @@ class JIT {
      */
     private function bindPropertyFetchResult(Operand $result, Variable $fetched, bool $forWrite): void
     {
-        $this->context->scope->variables[$result] = $forWrite
-            ? $fetched
-            : $this->reseatPropertyFetchReadIntoValueBox($fetched);
+        if ($forWrite) {
+            $this->context->scope->variables[$result] = $fetched;
+
+            return;
+        }
+        $boxed = $this->reseatPropertyFetchReadIntoValueBox($fetched);
+        $this->context->scope->variables[$result] = $boxed;
+        $this->applyTypedPropertyFetchResultType($result, $boxed);
     }
 
     private function reseatPropertyFetchReadIntoValueBox(Variable $fetched): Variable
@@ -30646,8 +30751,49 @@ class JIT {
             $boxed->compileTimeDomAttrLocalName = $fetched->compileTimeDomAttrLocalName;
             $boxed->compileTimeDomAttrNamespace = $fetched->compileTimeDomAttrNamespace ?? '';
         }
+        $constraintUserType = $this->typedPropertyClassConstraintUserType($fetched);
+        if (null !== $constraintUserType) {
+            $boxed->classUserType = $constraintUserType;
+        }
+        if (null !== $fetched->compileTimeDateTimeTimestamp) {
+            $boxed->compileTimeDateTimeTimestamp = $fetched->compileTimeDateTimeTimestamp;
+            $boxed->compileTimeDateTimeMicrosecond = $fetched->compileTimeDateTimeMicrosecond;
+            $boxed->compileTimeTimezoneName = $fetched->compileTimeTimezoneName;
+            $boxed->compileTimeDateTimeClassName = $fetched->compileTimeDateTimeClassName;
+        }
 
         return $boxed;
+    }
+
+    /**
+     * Typed property fetch results carry objectPropertyClassConstraint, not CFG userType.
+     * Without this, `$sub->dt->format()` in global scope resolves Sub::format (#35752).
+     */
+    private function typedPropertyClassConstraintUserType(JIT\Variable $var): ?string
+    {
+        $constraint = $var->objectPropertyClassConstraint ?? null;
+        if (!\is_string($constraint) || '' === $constraint) {
+            return null;
+        }
+        $lc = strtolower(ltrim($constraint, '\\'));
+        if (\in_array($lc, [
+            'int', 'float', 'string', 'bool', 'array', 'object', 'mixed', 'null',
+            'callable', 'iterable', 'resource', 'void', 'never', 'false', 'true', 'null',
+        ], true)) {
+            return null;
+        }
+
+        return ltrim($constraint, '\\');
+    }
+
+    private function applyTypedPropertyFetchResultType(Operand $result, JIT\Variable $var): void
+    {
+        $userType = $this->typedPropertyClassConstraintUserType($var);
+        if (null === $userType) {
+            return;
+        }
+        $var->classUserType = $userType;
+        $result->type = Type::object($userType);
     }
 
     /**

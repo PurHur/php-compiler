@@ -3013,10 +3013,69 @@ class Object_ extends Type {
      */
     public function instancePropertyDeclaringClassName(int $classId, string $propName): string
     {
-        $lc = strtolower($propName);
-        $declId = $this->instancePropertyDeclaringClassId[$classId][$lc] ?? $classId;
+        return $this->classNameForId($this->instancePropertyDeclaringClassIdFor($classId, $propName));
+    }
 
-        return $this->classNameForId($declId);
+    public function instancePropertyDeclaringClassIdFor(int $classId, string $propName): int
+    {
+        $lc = strtolower($propName);
+
+        return $this->instancePropertyDeclaringClassId[$classId][$lc] ?? $classId;
+    }
+
+    public function instancePropertySlotDeclaringClassIdFor(int $classId, int $slotIndex): int
+    {
+        if (isset($this->instancePropertySlotDeclaringClassId[$classId][$slotIndex])) {
+            return $this->instancePropertySlotDeclaringClassId[$classId][$slotIndex];
+        }
+        foreach ($this->properties[$classId] ?? [] as $propset) {
+            if ($propset[3] !== $slotIndex) {
+                continue;
+            }
+
+            return $this->instancePropertyDeclaringClassId[$classId][strtolower($propset[1])] ?? $classId;
+        }
+
+        return $classId;
+    }
+
+    /**
+     * Class id whose object layout slot holds the value for inherited FETCH_OBJ_R (#35752).
+     */
+    public function instancePropertyStorageClassIdForFetch(int $classId, string $propName): int
+    {
+        $lc = strtolower($propName);
+        if (isset($this->instancePropertyDeclaringClassId[$classId][$lc])) {
+            $declFromMeta = $this->instancePropertyDeclaringClassId[$classId][$lc];
+            if ($declFromMeta !== $classId) {
+                return $declFromMeta;
+            }
+        }
+        $propset = $this->findInstancePropertySet($classId, $propName, false);
+        if (null !== $propset) {
+            $slotDecl = $this->instancePropertySlotDeclaringClassIdFor($classId, $propset[3]);
+            if ($slotDecl !== $classId) {
+                return $slotDecl;
+            }
+        }
+        $nameDecl = $this->instancePropertyDeclaringClassIdFor($classId, $propName);
+        if ($nameDecl !== $classId) {
+            return $nameDecl;
+        }
+        $parentLc = $this->parentClassLc($this->classNameForId($classId));
+        if (null === $parentLc || !isset($this->classes[$parentLc])) {
+            return $classId;
+        }
+        $parentId = $this->classes[$parentLc];
+        if (!$this->hasProperty($classId, $propName) || !$this->hasProperty($parentId, $propName)) {
+            return $classId;
+        }
+        $vis = $this->propertyVisibility($parentId, $propName);
+        if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
+            return $classId;
+        }
+
+        return $this->instancePropertyStorageClassIdForFetch($parentId, $propName);
     }
 
     /** @return array<int, string> */
@@ -8877,7 +8936,35 @@ class Object_ extends Type {
 
         if (Variable::TYPE_OBJECT === $propertyType) {
             $objectPtr = null;
-            if (Variable::TYPE_OBJECT === $value->type) {
+            $pending = $this->context->pendingDateTimePropertyInstant;
+            if (
+                null === $value->compileTimeDateTimeTimestamp
+                && \is_array($pending)
+                && isset($pending['timestamp'])
+            ) {
+                $value->compileTimeDateTimeTimestamp = (int) $pending['timestamp'];
+                $value->compileTimeDateTimeMicrosecond = (int) ($pending['microsecond'] ?? 0);
+                $value->compileTimeTimezoneName = $pending['timezone'] ?? null;
+                if (null === $value->compileTimeDateTimeClassName || '' === $value->compileTimeDateTimeClassName) {
+                    $hint = strtolower(ltrim((string) ($value->classUserType ?? ''), '\\'));
+                    $value->compileTimeDateTimeClassName = 'datetimeimmutable' === $hint
+                        ? 'DateTimeImmutable'
+                        : 'DateTime';
+                }
+            }
+            if (null !== $value->compileTimeDateTimeTimestamp) {
+                if (null === $value->compileTimeDateTimeClassName || '' === $value->compileTimeDateTimeClassName) {
+                    $hint = strtolower(ltrim((string) ($value->classUserType ?? ''), '\\'));
+                    $value->compileTimeDateTimeClassName = 'datetimeimmutable' === $hint
+                        ? 'DateTimeImmutable'
+                        : 'DateTime';
+                }
+                // Ctor temps lose backing storage when only the property slot retains them (#35752).
+                $objectPtr = \PHPCompiler\ext\standard\JitDateTimeConstruct::materializeOwnedFromArg(
+                    $this->context,
+                    $value
+                );
+            } elseif (Variable::TYPE_OBJECT === $value->type) {
                 $objectPtr = $this->context->helper->loadValue($value);
             } elseif (Variable::TYPE_VALUE === $value->type) {
                 // Locals from `new` / assigns are boxed __value__; native object slots need
