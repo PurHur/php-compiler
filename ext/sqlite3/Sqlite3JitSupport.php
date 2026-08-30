@@ -31,4 +31,7 @@ final class Sqlite3JitSupport
 
     /** Non-zero when CREATE TABLE used INTEGER PRIMARY KEY (#35956). */
     public const PROP_INT_PK = '__sqlitePk';
+
+    /** Non-zero when enableExceptions(true) is in effect (#35975 leftover of #35972). */
+    public const PROP_EXCEPTIONS = '__sqliteEx';
 }
