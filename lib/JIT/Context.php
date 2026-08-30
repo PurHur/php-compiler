@@ -2468,6 +2468,8 @@ class Context {
         XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::movetoattributeno');
         // leftover of moveToAttribute (#35948 / #35941 / #27299)
         XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::movetofirstattribute');
+        // leftover of moveToAttribute (#35951 / #35941 / #27299)
+        XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::movetoattributens');
         // leftover of moveToAttribute (#35940 / #27299)
         XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::movetoelement');
         // leftover of moveToAttribute (#35952 / #35941 / #27299)
