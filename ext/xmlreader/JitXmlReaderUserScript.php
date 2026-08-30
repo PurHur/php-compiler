@@ -46,6 +46,9 @@ final class JitXmlReaderUserScript
     /** @var list<string>|null Precomputed readOuterXml() per event index (#35908). */
     private static ?array $lastOuterXml = null;
 
+    /** @var list<string>|null Precomputed readString() per event index (#35917 leftover of #35908). */
+    private static ?array $lastReadString = null;
+
     /**
      * Precomputed expand() materialize plan per event index (#35911 / #19394).
      *
@@ -237,15 +240,18 @@ final class JitXmlReaderUserScript
         self::$lastEvents = $events;
         $inner = [];
         $outer = [];
+        $readString = [];
         $expand = [];
         foreach ($rawEvents as $i => $ev) {
             $inner[] = XmlReaderSubtreeXmlHelper::innerXml($rawEvents, $i);
             $outerXml = XmlReaderSubtreeXmlHelper::outerXml($rawEvents, $i);
             $outer[] = $outerXml;
+            $readString[] = XmlReaderSubtreeXmlHelper::readString($rawEvents, $i);
             $expand[] = self::expandSpecForEvent($ev, $outerXml);
         }
         self::$lastInnerXml = $inner;
         self::$lastOuterXml = $outer;
+        self::$lastReadString = $readString;
         self::$lastExpandSpec = $expand;
 
         if (null !== $instanceReceiver) {
@@ -414,6 +420,15 @@ final class JitXmlReaderUserScript
     public static function tryReadOuterXml(Context $context, JITVariable ...$args): ?Value
     {
         return self::trySubtreeXml($context, self::$lastOuterXml, 'readOuterXml', ...$args);
+    }
+
+    /**
+     * XMLReader::readString() leftover of fromString/readInnerXml (#35917 / #35908 / #27299 / #19411).
+     * php-src: zim_XMLReader_readString
+     */
+    public static function tryReadString(Context $context, JITVariable ...$args): ?Value
+    {
+        return self::trySubtreeXml($context, self::$lastReadString, 'readString', ...$args);
     }
 
     /**
