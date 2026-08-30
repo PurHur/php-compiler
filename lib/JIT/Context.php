@@ -2451,6 +2451,8 @@ class Context {
         XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::xml');
         XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::open');
         XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::read');
+        // leftover of fromString/read (#35926 / #27299) — php-src zim_XMLReader_next
+        XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::next');
         // leftover of fromString read (#35908 / #27299) — php-src readInnerXml / readOuterXml
         XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::readinnerxml');
         XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::readouterxml');

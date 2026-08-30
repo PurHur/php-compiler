@@ -27427,6 +27427,26 @@ class JIT {
                         return;
                     }
                 }
+                // $r->next() on :object temps after fromString/read (#35926 / #27299).
+                // Extra $name is sent via later ARG_SEND (same as getAttribute).
+                if (
+                    'next' === $methodLc
+                    && JIT\XmlReaderInstanceMethodJit::isUserScriptAot()
+                ) {
+                    $recvHintLcNext = strtolower(ltrim(
+                        (string) ($receiverVar->classUserType ?? ''),
+                        '\\'
+                    ));
+                    if ('xmlreader' === $recvHintLcNext) {
+                        JIT\XmlReaderInstanceMethodJit::ensureProxy($this->context, 'xmlreader::next');
+                        if ($this->context->functionIsRegistered('xmlreader::next')) {
+                            $this->context->scope->toCall = $this->context->resolveFunctionProxy('xmlreader::next');
+                            $this->context->scope->args = [$receiverVar];
+
+                            return;
+                        }
+                    }
+                }
                 if ('getnameditem' === $methodLc || 'getnameditemns' === $methodLc) {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnamednodemap::'.$methodLc);
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\namednodemap::'.$methodLc);
