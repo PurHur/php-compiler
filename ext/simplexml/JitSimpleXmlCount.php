@@ -42,4 +42,106 @@ final class JitSimpleXmlCount
             'SimpleXMLElement::hasChildren() user-script AOT requires a compile-time tree (#35827 leftover of #26863)'
         );
     }
+
+    /**
+     * SimpleXMLElement::rewind() — leftover of hasChildren AOT (#35844 / php-src sxe.c).
+     */
+    public static function invokeRewind(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'SimpleXMLElement::rewind', 0)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        $us = JitSimpleXmlUserScript::tryRewind($context, ...$args);
+        if (null !== $us) {
+            return $us;
+        }
+        throw new \LogicException(
+            'SimpleXMLElement::rewind() user-script AOT requires a compile-time tree (#35844 leftover of #35827)'
+        );
+    }
+
+    /**
+     * SimpleXMLElement::valid() — leftover of hasChildren AOT (#35844 / php-src sxe.c).
+     */
+    public static function invokeValid(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'SimpleXMLElement::valid', 0)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        $us = JitSimpleXmlUserScript::tryValid($context, ...$args);
+        if (null !== $us) {
+            return $us;
+        }
+        throw new \LogicException(
+            'SimpleXMLElement::valid() user-script AOT requires a compile-time tree (#35844 leftover of #35827)'
+        );
+    }
+
+    /**
+     * SimpleXMLElement::current() — leftover of hasChildren AOT (#35844 / php-src sxe.c).
+     */
+    public static function invokeCurrent(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'SimpleXMLElement::current', 0)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        $us = JitSimpleXmlUserScript::tryCurrent($context, ...$args);
+        if (null !== $us) {
+            return $us;
+        }
+        throw new \LogicException(
+            'SimpleXMLElement::current() user-script AOT requires a compile-time tree (#35844 leftover of #35827)'
+        );
+    }
+
+    /**
+     * SimpleXMLElement::key() — leftover of hasChildren AOT (#35844 / php-src sxe.c).
+     */
+    public static function invokeKey(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'SimpleXMLElement::key', 0)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        $us = JitSimpleXmlUserScript::tryKey($context, ...$args);
+        if (null !== $us) {
+            return $us;
+        }
+        throw new \LogicException(
+            'SimpleXMLElement::key() user-script AOT requires a compile-time tree (#35844 leftover of #35827)'
+        );
+    }
+
+    /**
+     * SimpleXMLElement::next() — leftover of hasChildren AOT (#35844 / php-src sxe.c).
+     */
+    public static function invokeNext(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'SimpleXMLElement::next', 0)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        $us = JitSimpleXmlUserScript::tryNext($context, ...$args);
+        if (null !== $us) {
+            return $us;
+        }
+        throw new \LogicException(
+            'SimpleXMLElement::next() user-script AOT requires a compile-time tree (#35844 leftover of #35827)'
+        );
+    }
+
+    /**
+     * SimpleXMLElement::getChildren() — leftover of hasChildren AOT (#35844 / php-src sxe.c).
+     */
+    public static function invokeGetChildren(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'SimpleXMLElement::getChildren', 0)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        $us = JitSimpleXmlUserScript::tryGetChildren($context, ...$args);
+        if (null !== $us) {
+            return $us;
+        }
+        throw new \LogicException(
+            'SimpleXMLElement::getChildren() user-script AOT requires a compile-time tree (#35844 leftover of #35827)'
+        );
+    }
 }

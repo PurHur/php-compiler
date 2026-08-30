@@ -1179,6 +1179,153 @@ final class JitSimpleXmlUserScript
     }
 
     /**
+     * SimpleXMLElement::rewind — host Iterator (php-src sxe.c; #35844 leftover of #35827).
+     *
+     * Mutates the compile-time tree so later hasChildren/valid/key/getChildren folds
+     * see SXE_ITER_CHILD at index 0 (Zend UNDEF iter.data is false until rewind).
+     */
+    public static function tryRewind(Context $context, JITVariable ...$args): ?Value
+    {
+        if ([] === $args || !\extension_loaded('simplexml')) {
+            return null;
+        }
+        $tree = self::lookup($args[0]);
+        if (null === $tree) {
+            return null;
+        }
+        try {
+            $tree->rewind();
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return self::nullValue($context);
+    }
+
+    /**
+     * SimpleXMLElement::valid — host Iterator (php-src sxe.c; #35844 leftover of #35827).
+     */
+    public static function tryValid(Context $context, JITVariable ...$args): ?Value
+    {
+        if ([] === $args || !\extension_loaded('simplexml')) {
+            return null;
+        }
+        $tree = self::lookup($args[0]);
+        if (null === $tree) {
+            return null;
+        }
+        try {
+            $ok = $tree->valid();
+        } catch (\Throwable) {
+            return null;
+        }
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeBool(
+            $context,
+            $slot,
+            $context->getTypeFromString('int1')->constInt($ok ? 1 : 0, false)
+        );
+
+        return JitValueBox::normalizeValuePtr($context, $slot);
+    }
+
+    /**
+     * SimpleXMLElement::key — host Iterator local name (php-src sxe.c; #35844 leftover of #35827).
+     */
+    public static function tryKey(Context $context, JITVariable ...$args): ?Value
+    {
+        if ([] === $args || !\extension_loaded('simplexml')) {
+            return null;
+        }
+        $tree = self::lookup($args[0]);
+        if (null === $tree) {
+            return null;
+        }
+        try {
+            $key = $tree->key();
+        } catch (\Throwable) {
+            return null;
+        }
+        if (null === $key) {
+            return self::nullValue($context);
+        }
+
+        return self::boxConstantString($context, (string) $key);
+    }
+
+    /**
+     * SimpleXMLElement::current — host Iterator child (php-src sxe.c; #35844 leftover of #35827).
+     */
+    public static function tryCurrent(Context $context, JITVariable ...$args): ?Value
+    {
+        if ([] === $args || !\extension_loaded('simplexml')) {
+            return null;
+        }
+        $tree = self::lookup($args[0]);
+        if (null === $tree) {
+            return null;
+        }
+        try {
+            $cur = $tree->current();
+        } catch (\Throwable) {
+            return null;
+        }
+        if (!($cur instanceof \SimpleXMLElement)) {
+            return self::nullValue($context);
+        }
+
+        return self::materializeElement($context, $cur);
+    }
+
+    /**
+     * SimpleXMLElement::next — host Iterator (php-src sxe.c; #35844 leftover of #35827).
+     */
+    public static function tryNext(Context $context, JITVariable ...$args): ?Value
+    {
+        if ([] === $args || !\extension_loaded('simplexml')) {
+            return null;
+        }
+        $tree = self::lookup($args[0]);
+        if (null === $tree) {
+            return null;
+        }
+        try {
+            $tree->next();
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return self::nullValue($context);
+    }
+
+    /**
+     * SimpleXMLElement::getChildren — host RecursiveIterator (php-src sxe.c; #35844 leftover of #35827).
+     *
+     * Null before rewind (UNDEF iter.data). After rewind, materialize the current
+     * child so chained getName() folds (#27535).
+     */
+    public static function tryGetChildren(Context $context, JITVariable ...$args): ?Value
+    {
+        if ([] === $args || !\extension_loaded('simplexml')) {
+            return null;
+        }
+        $tree = self::lookup($args[0]);
+        if (null === $tree) {
+            return null;
+        }
+        try {
+            $child = $tree->getChildren();
+        } catch (\Throwable) {
+            return null;
+        }
+        if (!($child instanceof \SimpleXMLElement)) {
+            return self::nullValue($context);
+        }
+
+        return self::materializeElement($context, $child);
+    }
+
+    /**
      * Fold count($sxe) when a host tree is known (#26863).
      * XPath node-set Variables must count the list, not fall back to lastTree (#26911, #27413).
      */
