@@ -8157,7 +8157,11 @@ unset($__spineMimeEnc, $__spineMimeDec);
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
 require_once __DIR__.'/../../../ext/sqlite3/JitSqlite3.php';
+require_once __DIR__.'/../../../ext/sqlite3/JitSqlite3Stmt.php';
+require_once __DIR__.'/../../../ext/sqlite3/JitSqlite3Result.php';
 require_once __DIR__.'/../../../ext/sqlite3/Sqlite3JitSupport.php';
 require_once __DIR__.'/../../../ext/standard/ZlibIncrementalJitSupport.php';
 require_once __DIR__.'/../../../lib/JIT/Call/Sqlite3Method.php';
+require_once __DIR__.'/../../../lib/JIT/Call/Sqlite3StmtMethod.php';
+require_once __DIR__.'/../../../lib/JIT/Call/Sqlite3ResultMethod.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
