@@ -17984,6 +17984,7 @@ class JIT {
         if (
             !($toCall instanceof JIT\Call\XmlWriterToMemory)
             && !($toCall instanceof JIT\Call\XmlWriterToUri)
+            && !($toCall instanceof JIT\Call\XmlWriterToStream)
         ) {
             return;
         }
@@ -18645,6 +18646,7 @@ class JIT {
             if (
                 $this->context->scope->toCall instanceof JIT\Call\XmlWriterToMemory
                 || $this->context->scope->toCall instanceof JIT\Call\XmlWriterToUri
+                || $this->context->scope->toCall instanceof JIT\Call\XmlWriterToStream
             ) {
                 $ptr = JIT\JitValueBox::coerceToValuePtrForStore($this->context, $llvmResult);
                 if ($this->context->hasVariableOp($result)) {
@@ -28970,6 +28972,12 @@ class JIT {
             '__construct' === $methodLc
         );
         $proxyName = $this->resolveJitStaticMethodProxyName($declaringClassLc, $methodLc);
+        // Register XMLWriter static factory proxies before functionIsRegistered (#35890 / #35895).
+        if (JIT\XmlWriterInstanceMethodJit::isXmlWriterInstanceMethodProxy($proxyName)
+            && JIT\XmlWriterInstanceMethodJit::isUserScriptAot()
+        ) {
+            JIT\XmlWriterInstanceMethodJit::ensureProxy($this->context, $proxyName);
+        }
         // Static generator methods register a resume creator under class::method, not an
         // ordinary callable proxy — mirror METHODCALL_INIT (#35147) for Class::g() (#35153 /
         // Zend zend_generators.c; re-#4938 false fatal removed so this path is reachable).

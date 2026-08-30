@@ -29,9 +29,34 @@ final class JitXmlWriterUserScript
 
     private static int $tokenSeq = 0;
 
+    /** Last compile-time fopen() path — recovers URI for toStream fold (#35895). */
+    private static ?string $lastFopenPath = null;
+
+    /** @var array<string, string> stream compileTimeString token → fopen path */
+    private static array $fopenPathsByToken = [];
+
     public static function isUserScriptAot(): bool
     {
         return \PHPCompiler\JIT\UserScriptAotEnv::isActive();
+    }
+
+    /**
+     * Record a compile-time fopen() path so XMLWriter::toStream can openUri (#35895).
+     */
+    public static function noteFopenPath(string $path, ?JITVariable $streamResult = null): void
+    {
+        if ('' === $path || str_starts_with($path, '__phpc_')) {
+            return;
+        }
+        self::$lastFopenPath = $path;
+        if (null !== $streamResult) {
+            $token = $streamResult->compileTimeString;
+            if (null === $token || str_starts_with($token, '__phpc_xw_')) {
+                $token = '__phpc_fopen_'.(++self::$tokenSeq);
+                $streamResult->compileTimeString = $token;
+            }
+            self::$fopenPathsByToken[$token] = $path;
+        }
     }
 
     public static function tryInit(Context $context, JITVariable $receiver): ?Value
@@ -103,6 +128,56 @@ final class JitXmlWriterUserScript
         }
 
         return self::materializeFactoryObject($context, $writer);
+    }
+
+    /**
+     * XMLWriter::toStream() leftover of toMemory/toUri (#35895 / #19606).
+     * Host has no toStream; fold as new XMLWriter + openUri when the stream
+     * was opened from a compile-time fopen() path (php-src zim_XMLWriter_toStream).
+     */
+    public static function tryToStream(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot()
+            || !\extension_loaded('xmlwriter')
+            || !\class_exists(\XMLWriter::class, false)
+            || !isset($args[0])
+        ) {
+            return null;
+        }
+        $uri = self::resolveStreamUri($args[0]);
+        if (null === $uri) {
+            return null;
+        }
+        if ('' === $uri) {
+            throw new \ValueError(
+                'XMLWriter::toStream(): Argument #1 ($stream) is not an open stream resource'
+            );
+        }
+        $writer = new \XMLWriter();
+        if (!@$writer->openUri($uri)) {
+            throw new \Error('XMLWriter::toStream(): Unable to open stream');
+        }
+
+        return self::materializeFactoryObject($context, $writer);
+    }
+
+    /** Resolve fopen literal path from stream arg token or lastFopenPath. */
+    private static function resolveStreamUri(JITVariable $stream): ?string
+    {
+        $token = $stream->compileTimeString;
+        if (null !== $token && isset(self::$fopenPathsByToken[$token])) {
+            return self::$fopenPathsByToken[$token];
+        }
+        // Direct path stamp (ASSIGN after fopen may copy compileTimeString = path).
+        if (null !== $token && '' !== $token && !str_starts_with($token, '__phpc_')) {
+            return $token;
+        }
+        $lit = JitStringBuiltinArg::compileTimeLiteral($stream);
+        if (null !== $lit && '' !== $lit && !str_starts_with($lit, '__phpc_')) {
+            return $lit;
+        }
+
+        return self::$lastFopenPath;
     }
 
     /**
