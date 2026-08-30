@@ -764,6 +764,64 @@ final class JitXmlReaderUserScript
     }
 
     /**
+     * XMLReader::close() leftover of fromString/open (#35935 / #27299 / #6135).
+     * php-src: zim_XMLReader_close / xmlTextReaderClose — return true; cursor past last event.
+     * Subsequent read() is Zend Error / VM LogicException (not folded here).
+     */
+    public static function tryClose(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot() || null === self::$lastEvents) {
+            return null;
+        }
+        if (\count($args) < 1) {
+            throw new \LogicException('XMLReader::close() called without $this');
+        }
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'xmlreader_close_cont');
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup(self::CLASS_NAME);
+        self::ensureLayout($objectType, $classId);
+
+        $obj = self::loadObject($context, $args[0]);
+        $i64 = $context->getTypeFromString('int64');
+        $i1 = $context->getTypeFromString('int1');
+        $end = $i64->constInt(\count(self::$lastEvents), true);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, self::CLASS_NAME, self::PROP_POS),
+            new JITVariable(
+                $context,
+                JITVariable::TYPE_NATIVE_LONG,
+                JITVariable::KIND_VALUE,
+                $end
+            ),
+            JITVariable::TYPE_NATIVE_LONG
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, self::CLASS_NAME, VmXmlReader::PROP_NODE_TYPE),
+            new JITVariable(
+                $context,
+                JITVariable::TYPE_NATIVE_LONG,
+                JITVariable::KIND_VALUE,
+                $i64->constInt(0, true)
+            ),
+            JITVariable::TYPE_NATIVE_LONG
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, self::CLASS_NAME, VmXmlReader::PROP_NAME),
+            self::stringLlvm($context, ''),
+            JITVariable::TYPE_STRING
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, self::CLASS_NAME, VmXmlReader::PROP_VALUE),
+            self::stringLlvm($context, ''),
+            JITVariable::TYPE_STRING
+        );
+        $trueBox = JitValueBox::alloc($context);
+        JitValueBox::writeBool($context, $trueBox, $i1->constInt(1, false));
+
+        return JitValueBox::normalizeValuePtr($context, $trueBox);
+    }
+
+    /**
      * Materialize DOMNode|false for the current __xr_pos (after a successful read).
      *
      * @param list<array{kind: string, xml?: string, data?: string}> $byPos
