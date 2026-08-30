@@ -30,6 +30,21 @@ final class JitPropertyExists
             return self::forObject($context, $objectOrClass, $propertyArg, $propLiteral);
         }
         if (JITVariable::TYPE_VALUE === $objectOrClass->type) {
+            // Boxed locals (`$n = 'C'`) carry compileTimeString; fold like method_exists (#32701).
+            $classLit = JitStringArg::compileTimeLiteral($objectOrClass)
+                ?? $objectOrClass->compileTimeString;
+            if (\is_string($classLit) && '' !== $classLit && null !== $propLiteral) {
+                if ($context->type->object->hasUserDeclaredClass($classLit)) {
+                    return ReflectionBuiltinHelper::propertyExistsLiteral(
+                        $context,
+                        $classLit,
+                        $propLiteral
+                    );
+                }
+
+                return self::routeThroughPhpHelper($context, $objectOrClass, $propertyArg);
+            }
+
             return self::invokeFromValueBox($context, $objectOrClass, $propertyArg, $propLiteral);
         }
         if (JITVariable::TYPE_STRING !== $objectOrClass->type) {
@@ -38,8 +53,9 @@ final class JitPropertyExists
 
             return $i1->constInt(0, false);
         }
-        $classLiteral = JitStringArg::compileTimeLiteral($objectOrClass);
-        if (null !== $classLiteral) {
+        $classLiteral = JitStringArg::compileTimeLiteral($objectOrClass)
+            ?? $objectOrClass->compileTimeString;
+        if (null !== $classLiteral && '' !== $classLiteral) {
             $propLiteral = JitStringArg::compileTimeLiteral($propertyArg);
             if (
                 null !== $propLiteral
@@ -58,8 +74,36 @@ final class JitPropertyExists
             // fold would skip registered autoloaders for not-yet-loaded class strings.
             return self::routeThroughPhpHelper($context, $objectOrClass, $propertyArg);
         }
+        // Typed `string $n`: NestedJIT misses AOT classes (#31966). Walk the LLVM object
+        // table like method_exists (#32701 leftover) when the property name is a literal.
+        $propLiteral = JitStringArg::compileTimeLiteral($propertyArg);
+        if (null !== $propLiteral) {
+            $classStr = $context->callerStrictTypes
+                ? JitStringBuiltinArg::lowerStrictOrCoercible(
+                    $context,
+                    $objectOrClass,
+                    'property_exists',
+                    0,
+                    'object_or_class'
+                )
+                : JitStringBuiltinArg::lowerZparamStr(
+                    $context,
+                    $objectOrClass,
+                    'property_exists',
+                    0,
+                    'object_or_class'
+                );
 
-        throw new \LogicException('property_exists() requires a string literal class name in this compiler build');
+            return JitPropertyExistsObject::existsForRuntimeClassNameLiteralProperty(
+                $context,
+                $classStr,
+                $objectOrClass,
+                $propertyArg,
+                $propLiteral
+            );
+        }
+
+        return self::routeThroughPhpHelper($context, $objectOrClass, $propertyArg);
     }
 
     private static function invokeFromValueBox(
@@ -135,8 +179,22 @@ final class JitPropertyExists
         $context->builder->branchIf($isString, $stringBlock, $errBlock);
 
         $context->builder->positionAtEnd($stringBlock);
-        // Runtime class string in a value box — autoload like zend_lookup_class (#26407).
-        $strResult = self::routeThroughPhpHelper($context, $objectOrClass, $propertyArg);
+        // Runtime class string in a value box — table walk when property is a literal (#35788).
+        if (null !== $propLiteral) {
+            $classStr = $context->builder->call(
+                $context->lookupFunction('__value__readString'),
+                $valuePtr
+            );
+            $strResult = JitPropertyExistsObject::existsForRuntimeClassNameLiteralProperty(
+                $context,
+                $classStr,
+                $objectOrClass,
+                $propertyArg,
+                $propLiteral
+            );
+        } else {
+            $strResult = self::routeThroughPhpHelper($context, $objectOrClass, $propertyArg);
+        }
         $context->builder->store($strResult, $resultSlot);
         $context->builder->branch($mergeBlock);
 
@@ -193,7 +251,7 @@ final class JitPropertyExists
         self::emitTypeErrorAndAbort($context, \sprintf(self::TYPE_ERROR, 'mixed'));
     }
 
-    private static function routeThroughPhpHelper(
+    public static function routeThroughPhpHelper(
         Context $context,
         JITVariable $objectOrClass,
         JITVariable $propertyArg
