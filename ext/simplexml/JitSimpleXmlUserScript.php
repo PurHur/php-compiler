@@ -767,6 +767,56 @@ final class JitSimpleXmlUserScript
     }
 
     /**
+     * isset($sxe->prop) — host property existence (php-src sxe.c / __isset; #35814).
+     *
+     * Thin AOT boxes SXE as TYPE_VALUE so value-box propertyIsSet looks at declared slots
+     * (none for child elements) and always returns false; fold when the host tree + name
+     * are known (peer tryFoldDimIsset #34555 / tryGet #26863).
+     */
+    public static function tryFoldPropIsset(Context $context, JITVariable $container, string $propName): ?Value
+    {
+        if (!UserScriptAotEnv::isActive() || !\extension_loaded('simplexml') || '' === $propName) {
+            return null;
+        }
+        $tree = self::lookup($container);
+        if (null === $tree) {
+            return null;
+        }
+        try {
+            $exists = isset($tree->{$propName});
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return $context->getTypeFromString('int1')->constInt($exists ? 1 : 0, false);
+    }
+
+    /**
+     * unset($sxe->prop) — host property unset (php-src sxe.c / __unset; #35814).
+     *
+     * Mutates the compile-time tree so a later asXML() fold omits the child (peer tryOffsetSet).
+     *
+     * @return bool true when the unset was folded (including no-op on missing props)
+     */
+    public static function tryPropUnset(Context $context, JITVariable $container, string $propName): bool
+    {
+        if (!UserScriptAotEnv::isActive() || !\extension_loaded('simplexml') || '' === $propName) {
+            return false;
+        }
+        $tree = self::lookup($container);
+        if (null === $tree) {
+            return false;
+        }
+        try {
+            unset($tree->{$propName});
+        } catch (\Throwable) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
      * isset($sxe[$dim]) — host has_dimension (php-src sxe_object_has_dimension; #34555).
      *
      * Thin AOT boxes SXE as TYPE_VALUE so ArrayAccess isset is skipped and HT probe

@@ -505,6 +505,17 @@ final class UnsetHelperLlvm
         if (self::shouldNoopDateIntervalUnset($declaringClass, $dimOp)) {
             return;
         }
+        // Thin-AOT SXE: host-fold unset($sxe->prop) before magic/declared-slot path (#35814).
+        if ($dimOp instanceof Literal && \is_string($dimOp->value) && $context->hasVariableOp($containerOp)) {
+            $containerVar = $context->getVariableFromOp($containerOp);
+            if (\PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryPropUnset(
+                $context,
+                $containerVar,
+                (string) $dimOp->value
+            )) {
+                return;
+            }
+        }
         $receiver = self::loadPropertyReceiver($context, $containerOp);
         if ($dimOp instanceof Literal) {
             if (PropertyHookDispatch::emitVirtualHookUnsetGuard(
