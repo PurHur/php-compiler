@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -64,7 +65,7 @@ final class dirname extends Internal
         // peer settype #30506 / count #27446 / getprotobynumber #30283).
         if ($context->callerStrictTypes
             && (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false))) {
-            JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[1], 'dirname', 2, 'levels');
+            JitInternalStrictArg::rejectNullInt($context, $args[1], 'dirname', 'levels', 2);
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dirname_null_levels_te_cont');
 
             return $context->getTypeFromString('__string__*')->constNull();

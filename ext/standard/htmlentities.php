@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -91,7 +92,7 @@ final class htmlentities extends Internal
         if ($argc >= 2
             && $context->callerStrictTypes
             && (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false))) {
-            JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[1], 'htmlentities', 2, 'flags');
+            JitInternalStrictArg::rejectNullInt($context, $args[1], 'htmlentities', 'flags', 2);
             BasicBlockHelper::ensureOpenInsertBlock($context, 'htmlentities_null_flags_te_cont');
 
             return $context->getTypeFromString('__string__*')->constNull();
