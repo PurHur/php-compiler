@@ -253,8 +253,8 @@ final class JitMbConvertVariables
                 $fromCsvPtr
             );
         } elseif ($fromUseCsvString) {
-            $converted = $context->builder->call(
-                MbConvertVariablesRuntime::convertStringHelper($context),
+            $converted = MbConvertVariablesRuntime::callConvertString(
+                $context,
                 $str,
                 $toPtr,
                 $fromPtr
@@ -267,8 +267,8 @@ final class JitMbConvertVariables
             );
         } else {
             // Single leaf $from_encoding — peer JitMbConvertEncoding::convertHelper (#35351).
-            $converted = $context->builder->call(
-                MbConvertEncodingRuntime::convertHelper($context),
+            $converted = MbConvertEncodingRuntime::callConvert(
+                $context,
                 $str,
                 $toPtr,
                 $fromPtr

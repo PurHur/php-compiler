@@ -417,8 +417,8 @@ final class MbConvertVariablesLlvm
             $valuePtr
         );
         // Peer JitMbConvertVariables::lowerStringVar — convertStringHelper NestedJIT mis-returns (#35315).
-        $converted = $context->builder->call(
-            MbConvertEncodingRuntime::convertHelper($context),
+        $converted = MbConvertEncodingRuntime::callConvert(
+            $context,
             $str,
             $toPtr,
             $fromPtr

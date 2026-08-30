@@ -133,8 +133,8 @@ final class JitMbConvertEncoding
             }
         }
 
-        $resultStr = $context->builder->call(
-            MbConvertEncodingRuntime::convertHelper($context),
+        $resultStr = MbConvertEncodingRuntime::callConvert(
+            $context,
             $str,
             $toPtr,
             $fromPtr

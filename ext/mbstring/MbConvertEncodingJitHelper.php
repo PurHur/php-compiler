@@ -12,6 +12,9 @@ namespace PHPCompiler\ext\mbstring;
  * encoding resolved at compile time — NestedJIT MbstringState aborts).
  * Runtime encodings via {@see assertToEncodingArgv} / {@see assertFromEncodingArgv}
  * (#35165 leftover of #34309 / peer #35161).
+ *
+ * Illegal-byte substitution honors {@see MbSubstituteCharacterRuntime::G_SUBST_CODE} (#25207).
+ *
  * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_convert_encoding)
  */
 final class MbConvertEncodingJitHelper
@@ -64,22 +67,26 @@ final class MbConvertEncodingJitHelper
         return 0;
     }
 
-    public static function convertArgv(string $string, string $toEncoding, string $fromEncoding): string
-    {
+    public static function convertArgv(
+        string $string,
+        string $toEncoding,
+        string $fromEncoding,
+        int $packedSubst = 63
+    ): string {
         // Encodings must already be validated via assert*EncodingArgv when runtime (#35165).
         $from = self::canon($fromEncoding);
         $to = self::canon($toEncoding);
         if ($from === $to) {
-            return $string;
+            return MbConvertSubstJitHelper::scrubSameCharsetArgv($string, $from, $packedSubst);
         }
         if ('UTF-8' === $from && 'ISO-8859-1' === $to) {
-            return self::utf8ToLatin1($string);
+            return self::utf8ToLatin1($string, $packedSubst);
         }
         if ('ISO-8859-1' === $from && 'UTF-8' === $to) {
             return self::latin1ToUtf8($string);
         }
         if ('UTF-8' === $from && 'ASCII' === $to) {
-            return self::utf8ToAscii($string);
+            return self::utf8ToAscii($string, $packedSubst);
         }
         if ('ASCII' === $from && 'UTF-8' === $to) {
             return $string;
@@ -120,7 +127,7 @@ final class MbConvertEncodingJitHelper
         return $out;
     }
 
-    private static function utf8ToLatin1(string $input): string
+    private static function utf8ToLatin1(string $input, int $packedSubst): string
     {
         $out = '';
         $len = \strlen($input);
@@ -135,10 +142,12 @@ final class MbConvertEncodingJitHelper
             } elseif ($c < 0xE0 && $i + 1 < $len) {
                 $c2 = \ord($input[$i + 1]);
                 $cp = (($c & 0x1F) << 6) | ($c2 & 0x3F);
-                $out .= $cp <= 0xFF ? \chr($cp) : '?';
+                $out .= $cp <= 0xFF
+                    ? \chr($cp)
+                    : MbConvertSubstJitHelper::substitutionOutputArgv($packedSubst, 'ISO-8859-1', $cp);
                 $i += 2;
             } else {
-                $out .= '?';
+                $out .= MbConvertSubstJitHelper::substitutionOutputArgv($packedSubst, 'ISO-8859-1', null);
                 if ($c < 0xF0) {
                     $i += 3;
                 } elseif ($c < 0xF8) {
@@ -152,7 +161,7 @@ final class MbConvertEncodingJitHelper
         return $out;
     }
 
-    private static function utf8ToAscii(string $input): string
+    private static function utf8ToAscii(string $input, int $packedSubst): string
     {
         $out = '';
         $len = \strlen($input);
@@ -163,13 +172,13 @@ final class MbConvertEncodingJitHelper
                 $out .= $input[$i];
                 ++$i;
             } elseif ($c < 0xE0) {
-                $out .= '?';
+                $out .= MbConvertSubstJitHelper::substitutionOutputArgv($packedSubst, 'ASCII', null);
                 $i += 2;
             } elseif ($c < 0xF0) {
-                $out .= '?';
+                $out .= MbConvertSubstJitHelper::substitutionOutputArgv($packedSubst, 'ASCII', null);
                 $i += 3;
             } else {
-                $out .= '?';
+                $out .= MbConvertSubstJitHelper::substitutionOutputArgv($packedSubst, 'ASCII', null);
                 $i += 4;
             }
         }

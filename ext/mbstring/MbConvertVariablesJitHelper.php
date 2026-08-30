@@ -16,8 +16,12 @@ final class MbConvertVariablesJitHelper
     /**
      * Convert one string; returns converted bytes (leaf encodings only).
      */
-    public static function convertStringArgv(string $str, string $toEncoding, string $fromCsv): string
-    {
+    public static function convertStringArgv(
+        string $str,
+        string $toEncoding,
+        string $fromCsv,
+        int $packedSubst = 63
+    ): string {
         $fromList = self::parseFromCsv($fromCsv);
         if ([] === $fromList) {
             return '';
@@ -28,19 +32,19 @@ final class MbConvertVariablesJitHelper
                 self::orderCodesFromList($fromList),
                 0
             );
-            if ('' === $detected || !self::leafPairSupported($toEncoding, $detected)) {
+            if ('' === $detected || !self::leafPairSupported($toEncoding, $detected, $packedSubst)) {
                 return '';
             }
 
-            return MbConvertEncodingJitHelper::convertArgv($str, $toEncoding, $detected);
+            return MbConvertEncodingJitHelper::convertArgv($str, $toEncoding, $detected, $packedSubst);
         }
 
         $from = $fromList[0];
-        if (!self::leafPairSupported($toEncoding, $from)) {
+        if (!self::leafPairSupported($toEncoding, $from, $packedSubst)) {
             return '';
         }
 
-        return MbConvertEncodingJitHelper::convertArgv($str, $toEncoding, $from);
+        return MbConvertEncodingJitHelper::convertArgv($str, $toEncoding, $from, $packedSubst);
     }
 
     /**
@@ -91,9 +95,9 @@ final class MbConvertVariablesJitHelper
         return $out;
     }
 
-    private static function leafPairSupported(string $to, string $from): bool
+    private static function leafPairSupported(string $to, string $from, int $packedSubst = 63): bool
     {
-        return '' !== MbConvertEncodingJitHelper::convertArgv('a', $to, $from);
+        return '' !== MbConvertEncodingJitHelper::convertArgv('a', $to, $from, $packedSubst);
     }
 
     /**

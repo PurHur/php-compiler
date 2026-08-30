@@ -67,7 +67,7 @@ final class MbConvertVariables35315AotTest extends TestCase
         $this->assertStringContainsString('convertStringHelper', $runtime);
         $this->assertStringContainsString('HELPER_BUNDLE', $runtime);
         $jit = (string) file_get_contents($root.'/ext/mbstring/JitMbConvertVariables.php');
-        $this->assertStringContainsString('MbConvertVariablesRuntime::convertStringHelper', $jit);
+        $this->assertStringContainsString('MbConvertVariablesRuntime::callConvertString', $jit);
         $this->assertStringContainsString('MbConvertVariablesRuntime::detectHelper', $jit);
         $this->assertStringContainsString('MbConvertEncodingFromListLlvm::convert', $jit);
         $this->assertStringContainsString('MbConvertVariablesLlvm::convertArrayInPlace', $jit);
