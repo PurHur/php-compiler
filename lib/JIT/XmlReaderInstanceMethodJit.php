@@ -36,6 +36,8 @@ final class XmlReaderInstanceMethodJit
         'xmlreader::getattributeno' => true,
         // leftover of fromString/getAttribute (#35930 / #27299) — php-src zim_XMLReader_lookupNamespace
         'xmlreader::lookupnamespace' => true,
+        // leftover of fromString/read (#35926 / #27299) — php-src zim_XMLReader_next
+        'xmlreader::next' => true,
     ];
 
     public static function isXmlReaderInstanceMethodProxy(string $proxyName): bool
