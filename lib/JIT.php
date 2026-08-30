@@ -10800,6 +10800,19 @@ class JIT {
                             $this->maybeRefreshIncludeBindingsBeforeUse();
                             break;
                         }
+                        // In-place `$r .= …` after `$r =& $obj->prop`: php-cfg marks the CV dead
+                        // even though the property slot is live. Ephemeral concat never
+                        // propertyStore's (leftover of #35898 / ZEND_ASSIGN_OP).
+                        if (
+                            (int) $op->arg1 === (int) $op->arg2
+                            && null !== $left->objectPropertySlot
+                            && null !== $left->objectPropertyType
+                        ) {
+                            $this->context->setVariableOp($destOp, $left);
+                            $this->compileObjectPropertyConcatOp($left, $left, $right);
+                            $this->maybeRefreshIncludeBindingsBeforeUse();
+                            break;
+                        }
                         // Always use entry-alloca for dead-operand concat results.
                         // assignOperand creates KIND_VALUE variables whose free() is a
                         // no-op, leaking the allocated string and corrupting the heap on
