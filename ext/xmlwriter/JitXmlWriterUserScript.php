@@ -697,8 +697,8 @@ final class JitXmlWriterUserScript
         return match ($fn) {
             'xmlwriter_open_memory' => self::tryProceduralOpenMemory($context),
             'xmlwriter_open_uri' => self::tryProceduralOpenUri($context, ...$args),
-            'xmlwriter_set_indent' => self::tryProceduralSetIndent($context, ...$args),
-            'xmlwriter_set_indent_string' => self::tryProceduralSetIndentString($context, ...$args),
+            'xmlwriter_set_indent' => self::trySetIndent($context, ...$args),
+            'xmlwriter_set_indent_string' => self::trySetIndentString($context, ...$args),
             'xmlwriter_start_document' => self::tryStartDocument($context, ...$args),
             'xmlwriter_end_document' => self::tryEndDocument($context, ...$args),
             'xmlwriter_start_element' => self::tryStartElement($context, ...$args),
@@ -710,12 +710,12 @@ final class JitXmlWriterUserScript
             'xmlwriter_start_attribute' => self::tryStartAttribute($context, ...$args),
             'xmlwriter_start_attribute_ns' => self::tryStartAttributeNS($context, ...$args),
             'xmlwriter_end_attribute' => self::tryEndAttribute($context, ...$args),
-            'xmlwriter_write_element' => self::tryProceduralWriteElement($context, ...$args),
+            'xmlwriter_write_element' => self::tryWriteElement($context, ...$args),
             'xmlwriter_write_element_ns' => self::tryWriteElementNS($context, ...$args),
-            'xmlwriter_write_cdata' => self::tryProceduralWriteCData($context, ...$args),
+            'xmlwriter_write_cdata' => self::tryWriteCData($context, ...$args),
             'xmlwriter_start_cdata' => self::tryStartCData($context, ...$args),
             'xmlwriter_end_cdata' => self::tryEndCData($context, ...$args),
-            'xmlwriter_write_comment' => self::tryProceduralWriteComment($context, ...$args),
+            'xmlwriter_write_comment' => self::tryWriteComment($context, ...$args),
             'xmlwriter_start_comment' => self::tryStartComment($context, ...$args),
             'xmlwriter_end_comment' => self::tryEndComment($context, ...$args),
             'xmlwriter_write_raw' => self::tryWriteRaw($context, ...$args),
@@ -773,7 +773,8 @@ final class JitXmlWriterUserScript
         return self::nullValue($context);
     }
 
-    private static function tryProceduralSetIndent(Context $context, JITVariable ...$args): ?Value
+    /** XMLWriter::setIndent() / xmlwriter_set_indent() — leftover of writeElementNS (#35865). */
+    public static function trySetIndent(Context $context, JITVariable ...$args): ?Value
     {
         $writer = self::requireWriter($args[0] ?? null);
         if (null === $writer || !isset($args[1])) {
@@ -788,7 +789,8 @@ final class JitXmlWriterUserScript
         return self::boolValue($context, (bool) $ok);
     }
 
-    private static function tryProceduralSetIndentString(Context $context, JITVariable ...$args): ?Value
+    /** XMLWriter::setIndentString() / xmlwriter_set_indent_string() — leftover of writeElementNS (#35865). */
+    public static function trySetIndentString(Context $context, JITVariable ...$args): ?Value
     {
         $writer = self::requireWriter($args[0] ?? null);
         if (null === $writer || !isset($args[1])) {
@@ -803,7 +805,11 @@ final class JitXmlWriterUserScript
         return self::boolValue($context, (bool) $ok);
     }
 
-    private static function tryProceduralWriteElement(Context $context, JITVariable ...$args): ?Value
+    /**
+     * XMLWriter::writeElement() / xmlwriter_write_element() leftover of writeElementNS (#35865).
+     * php-src: zim_XMLWriter_writeElement / xmlTextWriterWriteElement
+     */
+    public static function tryWriteElement(Context $context, JITVariable ...$args): ?Value
     {
         $writer = self::requireWriter($args[0] ?? null);
         if (null === $writer || !isset($args[1])) {
@@ -831,7 +837,8 @@ final class JitXmlWriterUserScript
         return self::boolValue($context, (bool) $ok);
     }
 
-    private static function tryProceduralWriteCData(Context $context, JITVariable ...$args): ?Value
+    /** XMLWriter::writeCdata() / xmlwriter_write_cdata() leftover of writeElementNS (#35865). */
+    public static function tryWriteCData(Context $context, JITVariable ...$args): ?Value
     {
         $writer = self::requireWriter($args[0] ?? null);
         if (null === $writer || !isset($args[1])) {
@@ -846,7 +853,8 @@ final class JitXmlWriterUserScript
         return self::boolValue($context, (bool) $ok);
     }
 
-    private static function tryProceduralWriteComment(Context $context, JITVariable ...$args): ?Value
+    /** XMLWriter::writeComment() / xmlwriter_write_comment() leftover of writeElementNS (#35865). */
+    public static function tryWriteComment(Context $context, JITVariable ...$args): ?Value
     {
         $writer = self::requireWriter($args[0] ?? null);
         if (null === $writer || !isset($args[1])) {
