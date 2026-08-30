@@ -23826,20 +23826,17 @@ class JIT {
             return;
         }
         $resolved = $this->context->resolveRefAliasName($recvName);
-        $bound = $this->context->namedVariableBindings[$resolved] ?? null;
-        if (!$bound instanceof JIT\Variable || $bound !== $receiverVar) {
-            return;
-        }
         $instant = $this->context->dateTimeLocalInstants[$resolved] ?? null;
-        if (null === $instant && null !== $bound->compileTimeDateTimeTimestamp) {
-            // New_/construct sync missed dateTimeLocalInstants but the binding still carries
-            // the dedicated #32691 stamp (re-#27309 DateTime::diff).
-            $instant = [
-                'timestamp' => (int) $bound->compileTimeDateTimeTimestamp,
-                'timezone' => $bound->compileTimeTimezoneName,
-                'microsecond' => (int) ($bound->compileTimeDateTimeMicrosecond ?? 0),
-                'className' => $bound->compileTimeDateTimeClassName ?? $bound->classUserType ?? 'DateTime',
-            ];
+        if (null === $instant) {
+            $bound = $this->context->namedVariableBindings[$resolved] ?? null;
+            if ($bound instanceof JIT\Variable && null !== $bound->compileTimeDateTimeTimestamp) {
+                $instant = [
+                    'timestamp' => (int) $bound->compileTimeDateTimeTimestamp,
+                    'timezone' => $bound->compileTimeTimezoneName,
+                    'microsecond' => (int) ($bound->compileTimeDateTimeMicrosecond ?? 0),
+                    'className' => $bound->compileTimeDateTimeClassName ?? $bound->classUserType ?? 'DateTime',
+                ];
+            }
         }
         if (null === $instant) {
             return;
