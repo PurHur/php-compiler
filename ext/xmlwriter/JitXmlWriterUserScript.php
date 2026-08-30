@@ -55,6 +55,25 @@ final class JitXmlWriterUserScript
         return self::boolValue($context, $ok);
     }
 
+    /**
+     * XMLWriter::openUri() leftover of openMemory (#35872 / #19551).
+     * php-src: zim_XMLWriter_openUri / xmlTextWriterStartDocument (after open)
+     */
+    public static function tryOpenUri(Context $context, JITVariable ...$args): ?Value
+    {
+        $writer = self::requireWriter($args[0] ?? null);
+        if (null === $writer || !isset($args[1])) {
+            return null;
+        }
+        $uri = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        if (null === $uri || str_starts_with($uri, '__phpc_xw_')) {
+            return null;
+        }
+        $ok = @$writer->openUri($uri);
+
+        return self::boolValue($context, (bool) $ok);
+    }
+
     public static function tryStartDocument(Context $context, JITVariable ...$args): ?Value
     {
         $writer = self::requireWriter($args[0] ?? null);

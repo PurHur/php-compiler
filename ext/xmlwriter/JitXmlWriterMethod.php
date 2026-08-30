@@ -15,6 +15,8 @@ final class JitXmlWriterMethod
     {
         $result = match ($methodLc) {
             'openmemory' => JitXmlWriterUserScript::tryOpenMemory($context, ...$args),
+            // leftover of openMemory (#19551 / #35872) — php-src zim_XMLWriter_openUri
+            'openuri' => JitXmlWriterUserScript::tryOpenUri($context, ...$args),
             'startdocument' => JitXmlWriterUserScript::tryStartDocument($context, ...$args),
             'startelement' => JitXmlWriterUserScript::tryStartElement($context, ...$args),
             'startelementns' => JitXmlWriterUserScript::tryStartElementNS($context, ...$args),
