@@ -172,13 +172,26 @@ class Refcount extends Builtin {
     }
 
     public function implement(): void {
-        \PHPCompiler\JIT\Builtin\WeakRefRuntime::ensureLinked($this->context);
-        \PHPCompiler\JIT\Builtin\WeakRefNative::registerDeclarations($this->context);
-        \PHPCompiler\JIT\Builtin\GcCollectCyclesRuntime::ensureDeclarations($this->context);
+        // WeakRef / GC delref always-on ensureLinked removed (#35802): only
+        // implementDelref lookupFunction phpc_weakref_clear_object_typed /
+        // phpc_gc_unregister / phpc_destruct_* — call ensureDelrefHelperAbis there
+        // (peer #35751 HashTable lazy strtol, #35626 strcoll). Thin hello-world must
+        // not NestedJIT weakref/gc ABIs during Refcount init — leftover NestedJIT vs
+        // Runtime ABI drift mints phpc_weakref_*.1 / phpc_gc_*.1 (#31894 / #32122).
         $this->implementInit();
         $this->implementAddref();
         $this->implementDelref();
         $this->implementSeparate();
+    }
+
+    /**
+     * WeakReference clear + GC unregister + deferred-destruct probes — delref only (#35802).
+     */
+    private function ensureDelrefHelperAbis(): void
+    {
+        \PHPCompiler\JIT\Builtin\WeakRefRuntime::ensureLinked($this->context);
+        \PHPCompiler\JIT\Builtin\WeakRefNative::registerDeclarations($this->context);
+        \PHPCompiler\JIT\Builtin\GcCollectCyclesRuntime::ensureDeclarations($this->context);
     }
 
     private function implementInit(): void {
@@ -254,6 +267,7 @@ class Refcount extends Builtin {
     }
 
     private function implementDelref(): void {
+        $this->ensureDelrefHelperAbis();
         $fn___8f14e45fceea167a5a36dedd4bea2543 = $this->context->lookupFunction('__ref__delref');
     $block___8f14e45fceea167a5a36dedd4bea2543 = $fn___8f14e45fceea167a5a36dedd4bea2543->appendBasicBlock('main');
     $this->context->builder->positionAtEnd($block___8f14e45fceea167a5a36dedd4bea2543);
