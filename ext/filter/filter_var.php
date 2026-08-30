@@ -10,8 +10,10 @@ use PHPCompiler\ext\standard\VmNullNumberParamDeprecation;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\FilterVarRequireArrayLlvm;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -386,7 +388,7 @@ final class filter_var extends Internal
     }
 
     /**
-     * Fold filter_var() when value + filter + options[] are compile-time constants (#29046).
+     * Fold filter_var() when value + filter + options are compile-time constants (#29046, #29047).
      */
     private static function tryFoldConstOptionsFilter(
         Context $context,
@@ -394,36 +396,76 @@ final class filter_var extends Internal
         JITVariable $filterArg,
         ?JITVariable $optionsArg
     ): ?Value {
-        if (null === $optionsArg || !\is_array($optionsArg->compileTimeAssoc)) {
-            return null;
-        }
         $filterId = self::tryConstFilterId($context, $filterArg);
         if (null === $filterId) {
             return null;
         }
-        $lit = $value->compileTimeString ?? JitStringArg::compileTimeLiteral($value);
-        $valueVar = new Variable();
-        if (null !== $lit) {
-            $valueVar->string($lit);
-        } elseif (null !== $value->compileTimeLong
-            && (JITVariable::TYPE_NATIVE_LONG === $value->type || JITVariable::TYPE_VALUE === $value->type)) {
-            $valueVar->int($value->compileTimeLong);
-        } elseif (null !== $value->compileTimeFloat
-            && (JITVariable::TYPE_NATIVE_DOUBLE === $value->type || JITVariable::TYPE_VALUE === $value->type)) {
-            $valueVar->float($value->compileTimeFloat);
-        } elseif (JITVariable::TYPE_NULL === $value->type) {
-            $valueVar->null();
-        } else {
+        $valueVar = self::tryCompileTimeValueVariable($value);
+        if (null === $valueVar) {
             return null;
         }
-        $optionsVar = self::phpArrayToVariable($optionsArg->compileTimeAssoc);
-        $result = VmFilter::filterVar($valueVar, $filterId, $optionsVar);
-        if (Variable::TYPE_ARRAY === $result->resolveIndirect()->type) {
-            // Thin AOT array materialization is limited; leave FORCE_ARRAY to runtime paths.
-            return null;
+        $optionsVar = self::tryCompileTimeOptionsVariable($optionsArg);
+
+        return self::boxVmFilterResult($context, VmFilter::filterVar($valueVar, $filterId, $optionsVar));
+    }
+
+    /** @return Variable|null VM variable for a compile-time filter_var() value operand */
+    private static function tryCompileTimeValueVariable(JITVariable $value): ?Variable
+    {
+        if (\is_array($value->compileTimeAssoc)) {
+            return self::phpArrayToVariable($value->compileTimeAssoc);
+        }
+        $lit = $value->compileTimeString ?? JitStringArg::compileTimeLiteral($value);
+        if (null !== $lit) {
+            $valueVar = new Variable();
+            $valueVar->string($lit);
+
+            return $valueVar;
+        }
+        if (null !== $value->compileTimeLong
+            && (JITVariable::TYPE_NATIVE_LONG === $value->type || JITVariable::TYPE_VALUE === $value->type)) {
+            $valueVar = new Variable();
+            $valueVar->int($value->compileTimeLong);
+
+            return $valueVar;
+        }
+        if (null !== $value->compileTimeFloat
+            && (JITVariable::TYPE_NATIVE_DOUBLE === $value->type || JITVariable::TYPE_VALUE === $value->type)) {
+            $valueVar = new Variable();
+            $valueVar->float($value->compileTimeFloat);
+
+            return $valueVar;
+        }
+        if (JITVariable::TYPE_NULL === $value->type) {
+            $valueVar = new Variable();
+            $valueVar->null();
+
+            return $valueVar;
         }
 
-        return self::boxVmFilterResult($context, $result);
+        return null;
+    }
+
+    /** @return Variable|null int-bitmask or assoc options[] for VmFilter::filterVar */
+    private static function tryCompileTimeOptionsVariable(?JITVariable $optionsArg): ?Variable
+    {
+        if (null === $optionsArg || JITVariable::TYPE_NULL === $optionsArg->type) {
+            return null;
+        }
+        if (null !== $optionsArg->compileTimeLong
+            && (JITVariable::TYPE_NATIVE_LONG === $optionsArg->type
+                || JITVariable::TYPE_VALUE === $optionsArg->type
+                || JITVariable::TYPE_NATIVE_BOOL === $optionsArg->type)) {
+            $optionsVar = new Variable();
+            $optionsVar->int((int) $optionsArg->compileTimeLong);
+
+            return $optionsVar;
+        }
+        if (\is_array($optionsArg->compileTimeAssoc)) {
+            return self::phpArrayToVariable($optionsArg->compileTimeAssoc);
+        }
+
+        return null;
     }
 
     /** @param array<string|int, mixed> $php */
@@ -499,6 +541,15 @@ final class filter_var extends Internal
                     $owned
                 );
                 break;
+            case Variable::TYPE_ARRAY:
+                $htVar = HashTableHelper::variableFromVmHashTable($context, $resolved->toArray());
+                $htPtr = HashTableHelper::loadHashtablePointer($context, $htVar);
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeHashtable'),
+                    $ptr,
+                    $htPtr
+                );
+                break;
             default:
                 throw new \LogicException('filter_var() const-fold returned unexpected type');
         }
@@ -551,6 +602,9 @@ final class filter_var extends Internal
         JitFilter::assertThrowNullExclusiveConst($context, $optionsArg);
         $throwOnFailure = JitFilter::loadThrowOnFailureFlag($context, $optionsArg);
         $flags = JitFilter::loadFilterFlags($context, $optionsArg);
+        if (self::flagsIncludeRequireArray($context, $flags)) {
+            return FilterVarRequireArrayLlvm::filter($context, $value, $filterId, $optionsArg);
+        }
         $applyNull = null !== $optionsArg && JITVariable::TYPE_NULL !== $optionsArg->type;
         $filterName = VmFilter::nameForFilterId($filterId);
 
@@ -629,5 +683,15 @@ final class filter_var extends Internal
                     $filterName
                 );
         }
+    }
+
+    private static function flagsIncludeRequireArray(Context $context, Value $flags): bool
+    {
+        $lib = $context->llvm->lib;
+        if (null === $lib->LLVMIsAConstantInt($flags->value)) {
+            return false;
+        }
+
+        return 0 !== ((int) $lib->LLVMConstIntGetZExtValue($flags->value) & VmFilter::FILTER_REQUIRE_ARRAY);
     }
 }
