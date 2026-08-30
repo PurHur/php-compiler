@@ -18,6 +18,10 @@ final class PendingHeaders
         if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
             return;
         }
+        // Lazy bodies — full standalone {main} prologue must not lookup before declare
+        // (#35804 / peer #35803 HttpResponseRuntime). Type::register no longer declares
+        // pending_header_* (#33891); implement() restores insert block (#20930).
+        PendingHeadersRuntime::ensureLinked($context);
         $context->builder->call($context->lookupFunction('__phpc_pending_header_reset'));
     }
 

@@ -34,6 +34,7 @@ final class PendingHeadersRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('PendingHeadersRuntime::ensureLinked', $header);
         $pending = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/PendingHeaders.php');
         $this->assertStringContainsString('PendingHeadersRuntime::ensureLinked', $pending);
+        $this->assertStringContainsString('#35804', $pending);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString('new JIT(', $source);
@@ -51,6 +52,23 @@ final class PendingHeadersRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('PendingHeadersJitHelper.php', $spine);
         $this->assertStringContainsString('PendingHeadersJitBridge.php', $spine);
         $this->assertStringContainsString('PendingHeadersRuntime.php', $spine);
+    }
+
+    /** #35804: emitReset self-ensures like emitFlush / HttpResponseRuntime (#35803). */
+    public function testEmitResetForStandaloneMainSelfEnsures(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/PendingHeaders.php');
+        $pos = strpos($source, 'public static function emitResetForStandaloneMain');
+        $this->assertNotFalse($pos);
+        $next = strpos($source, 'public static function emitFlushForStandalone', $pos);
+        $this->assertNotFalse($next);
+        $body = substr($source, $pos, $next - $pos);
+        $this->assertStringContainsString('PendingHeadersRuntime::ensureLinked($context)', $body);
+        $ensurePos = strpos($body, 'PendingHeadersRuntime::ensureLinked($context)');
+        $lookupPos = strpos($body, '__phpc_pending_header_reset');
+        $this->assertNotFalse($ensurePos);
+        $this->assertNotFalse($lookupPos);
+        $this->assertLessThan($lookupPos, $ensurePos);
     }
 
     public function testHelperUsesHostGetenvNotKernel(): void
