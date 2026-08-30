@@ -1148,6 +1148,37 @@ final class JitSimpleXmlUserScript
     }
 
     /**
+     * SimpleXMLElement::hasChildren — host RecursiveIterator fold (#35827 leftover of #26863).
+     * php-src: ext/simplexml/sxe.c — PHP_METHOD(SimpleXMLElement, hasChildren)
+     *
+     * Fresh trees have UNDEF iter.data → false (php-src RETURN_FALSE before rewind).
+     * Exact host match only — lastTree would mis-fold foreach/child views.
+     */
+    public static function tryHasChildren(Context $context, JITVariable ...$args): ?Value
+    {
+        if ([] === $args || !\extension_loaded('simplexml')) {
+            return null;
+        }
+        $tree = self::lookupExact($args[0]);
+        if (null === $tree) {
+            return null;
+        }
+        try {
+            $has = $tree->hasChildren();
+        } catch (\Throwable) {
+            return null;
+        }
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeBool(
+            $context,
+            $slot,
+            $context->getTypeFromString('int1')->constInt($has ? 1 : 0, false)
+        );
+
+        return JitValueBox::normalizeValuePtr($context, $slot);
+    }
+
+    /**
      * Fold count($sxe) when a host tree is known (#26863).
      * XPath node-set Variables must count the list, not fall back to lastTree (#26911, #27413).
      */
