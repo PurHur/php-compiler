@@ -735,6 +735,38 @@ final class JitSimpleXmlUserScript
     }
 
     /**
+     * SimpleXMLElement::offsetUnset — host sxe_prop_dim_delete (#35815 leftover of #35810).
+     *
+     * Thin AOT boxes SXE as TYPE_VALUE; ArrayAccess offsetUnset has no SXE proxy and
+     * emits a terminator then `br` in `%unset_dim_vb_object_*` (module verify fail).
+     *
+     * @param JITVariable $args receiver, dim
+     */
+    public static function tryOffsetUnset(Context $context, JITVariable ...$args): ?Value
+    {
+        if (\count($args) < 2 || !\extension_loaded('simplexml')) {
+            return null;
+        }
+        $tree = self::lookup($args[0]);
+        if (null === $tree) {
+            return null;
+        }
+        $dim = self::compileTimeDim($context, $args[1]);
+        if (null === $dim) {
+            throw new \LogicException(
+                'SimpleXMLElement::offsetUnset() user-script AOT requires a compile-time offset (#35815)'
+            );
+        }
+        try {
+            unset($tree[$dim]);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return self::nullValue($context);
+    }
+
+    /**
      * isset($sxe[$dim]) — host has_dimension (php-src sxe_object_has_dimension; #34555).
      *
      * Thin AOT boxes SXE as TYPE_VALUE so ArrayAccess isset is skipped and HT probe

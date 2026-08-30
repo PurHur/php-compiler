@@ -30,6 +30,19 @@ final class UnsetHelperLlvm
         $dimOp = $block->getOperand($op->arg3);
         $container = $context->getVariableFromOp($containerOp);
         $dim = $context->getVariableFromOp($dimOp);
+        // SimpleXMLElement dim unset: host sxe_prop_dim_delete (#35815 leftover of #35810).
+        // Skip the TYPE_VALUE diamond — ArrayAccess offsetUnset has no SXE proxy and
+        // leaves a terminator in %unset_dim_vb_object_* then another br (module verify).
+        if (!$op->unsetOnProperty && UserScriptAotEnv::isActive()) {
+            $sxeUnset = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryOffsetUnset(
+                $context,
+                $container,
+                $dim
+            );
+            if (null !== $sxeUnset) {
+                return;
+            }
+        }
         // php-src DateInterval living unset is a no-op — skip value-box diamond entirely (#26180).
         if ($op->unsetOnProperty && self::shouldNoopDateIntervalUnsetFromOps($containerOp, $dimOp, $block, $context)) {
             return;
