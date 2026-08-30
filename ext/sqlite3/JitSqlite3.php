@@ -14,12 +14,12 @@ use PHPLLVM\Value;
 
 /**
  * LLVM lowering for SQLite3::__construct / exec / querySingle / close /
- * lastInsertRowID / changes (#35931 leftover of #35914 / #20565).
+ * lastInsertRowID / changes (#35931 leftover of #35914 / #20565; multi-row #35956).
  *
  * Thin standalone AOT has no PHP FFI, so libsqlite3 cannot be NestedJIT'd (FFI::cdef is a
  * null ExternalMethod; int+string helper pairs SIGSEGV — peer HashContext update #3357).
  * Compile-time SQL literals are folded in the compiler process (CREATE/INSERT/SELECT
- * first-column integer) onto {@see Sqlite3JitSupport::PROP_ROW} — same honesty class as
+ * COUNT|SUM|first-column) onto {@see Sqlite3JitSupport} props — same honesty class as
  * PDO construct failing closed when the driver cannot open (#27619).
  *
  * php-src: ext/sqlite3/sqlite3.c — zim_SQLite3___construct / zim_SQLite3_exec /
@@ -39,6 +39,9 @@ final class JitSqlite3
         self::storeLong($context, $obj, Sqlite3JitSupport::PROP_HAS, $i64->constInt(0, false));
         self::storeLong($context, $obj, Sqlite3JitSupport::PROP_LAST_ROWID, $i64->constInt(0, false));
         self::storeLong($context, $obj, Sqlite3JitSupport::PROP_CHANGES, $i64->constInt(0, false));
+        self::storeLong($context, $obj, Sqlite3JitSupport::PROP_ROW_COUNT, $i64->constInt(0, false));
+        self::storeLong($context, $obj, Sqlite3JitSupport::PROP_SUM, $i64->constInt(0, false));
+        self::storeLong($context, $obj, Sqlite3JitSupport::PROP_INT_PK, $i64->constInt(0, false));
         $context->type->object->markObjectConstructed($obj);
 
         $slot = JitValueBox::alloc($context);
@@ -59,16 +62,18 @@ final class JitSqlite3
         $sqlLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
         $i64 = $context->getTypeFromString('int64');
         if (null !== $sqlLit) {
-            $parsed = self::parseLastInsertInt($sqlLit);
-            if (null !== $parsed) {
-                self::storeLong($context, $obj, Sqlite3JitSupport::PROP_ROW, $i64->constInt($parsed, true));
-                self::storeLong($context, $obj, Sqlite3JitSupport::PROP_HAS, $i64->constInt(1, false));
-                $rid = self::loadLong($context, $obj, Sqlite3JitSupport::PROP_LAST_ROWID);
-                $newRid = $context->builder->add($rid, $i64->constInt(1, false));
-                self::storeLong($context, $obj, Sqlite3JitSupport::PROP_LAST_ROWID, $newRid);
-                self::storeLong($context, $obj, Sqlite3JitSupport::PROP_CHANGES, $i64->constInt(1, false));
+            $info = self::analyzeExecSql($sqlLit);
+            if (null !== $info['int_pk']) {
+                self::storeLong(
+                    $context,
+                    $obj,
+                    Sqlite3JitSupport::PROP_INT_PK,
+                    $i64->constInt($info['int_pk'] ? 1 : 0, false)
+                );
+            }
+            if (null !== $info['values']) {
+                self::emitInsertFold($context, $obj, $info['values'], $info['int_pk']);
             } else {
-                self::storeLong($context, $obj, Sqlite3JitSupport::PROP_HAS, $i64->constInt(0, false));
                 self::storeLong($context, $obj, Sqlite3JitSupport::PROP_CHANGES, $i64->constInt(0, false));
             }
 
@@ -84,8 +89,40 @@ final class JitSqlite3
             return VmClassMethod::jitArgcDummyReturn($context);
         }
         $obj = self::readObject($context, $args[0]);
-        $has = self::loadLong($context, $obj, Sqlite3JitSupport::PROP_HAS);
+        $sqlLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
         $i64 = $context->getTypeFromString('int64');
+
+        if (null !== $sqlLit && 1 === preg_match('/^\s*SELECT\s+COUNT\s*\(\s*\*\s*\)/i', $sqlLit)) {
+            return self::boxLong($context, self::loadLong($context, $obj, Sqlite3JitSupport::PROP_ROW_COUNT));
+        }
+
+        if (null !== $sqlLit && 1 === preg_match('/^\s*SELECT\s+SUM\s*\(\s*[A-Za-z_][A-Za-z0-9_]*\s*\)/i', $sqlLit)) {
+            $count = self::loadLong($context, $obj, Sqlite3JitSupport::PROP_ROW_COUNT);
+            $isEmpty = $context->builder->icmp(
+                \PHPLLVM\Builder::INT_EQ,
+                $count,
+                $i64->constInt(0, false)
+            );
+            $sumSlot = JitValueBox::alloc($context);
+            $nullSlot = JitValueBox::alloc($context);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeLong'),
+                JitValueBox::pointer($context, $sumSlot),
+                self::loadLong($context, $obj, Sqlite3JitSupport::PROP_SUM)
+            );
+            $context->builder->call(
+                $context->lookupFunction('__value__writeNull'),
+                JitValueBox::pointer($context, $nullSlot)
+            );
+
+            return $context->builder->select(
+                $isEmpty,
+                JitValueBox::pointer($context, $nullSlot),
+                JitValueBox::pointer($context, $sumSlot)
+            );
+        }
+
+        $has = self::loadLong($context, $obj, Sqlite3JitSupport::PROP_HAS);
         $isHas = $context->builder->icmp(
             \PHPLLVM\Builder::INT_NE,
             $has,
@@ -145,19 +182,105 @@ final class JitSqlite3
         return self::boxLong($context, self::loadLong($context, $obj, Sqlite3JitSupport::PROP_CHANGES));
     }
 
-    private static function parseLastInsertInt(string $sql): ?int
+    /**
+     * @param list<?int> $values first-column ints per VALUES tuple (null = non-numeric)
+     */
+    private static function emitInsertFold(Context $context, Value $obj, array $values, ?bool $intPkKnown): void
     {
-        $lp = strrpos($sql, '(');
-        $rp = strrpos($sql, ')');
-        if (false === $lp || false === $rp || $rp <= $lp) {
-            return null;
-        }
-        $inner = trim(substr($sql, $lp + 1, $rp - $lp - 1));
-        if ('' === $inner || !is_numeric($inner)) {
-            return null;
+        $i64 = $context->getTypeFromString('int64');
+        $n = count($values);
+        $first = null;
+        $last = null;
+        $sum = 0;
+        foreach ($values as $v) {
+            if (null === $v) {
+                continue;
+            }
+            if (null === $first) {
+                $first = $v;
+            }
+            $last = $v;
+            $sum += $v;
         }
 
-        return (int) $inner;
+        self::storeLong($context, $obj, Sqlite3JitSupport::PROP_CHANGES, $i64->constInt($n, false));
+
+        $count = self::loadLong($context, $obj, Sqlite3JitSupport::PROP_ROW_COUNT);
+        $isEmpty = $context->builder->icmp(
+            \PHPLLVM\Builder::INT_EQ,
+            $count,
+            $i64->constInt(0, false)
+        );
+        $newCount = $context->builder->add($count, $i64->constInt($n, false));
+        self::storeLong($context, $obj, Sqlite3JitSupport::PROP_ROW_COUNT, $newCount);
+
+        $oldSum = self::loadLong($context, $obj, Sqlite3JitSupport::PROP_SUM);
+        self::storeLong(
+            $context,
+            $obj,
+            Sqlite3JitSupport::PROP_SUM,
+            $context->builder->add($oldSum, $i64->constInt($sum, true))
+        );
+
+        if (null !== $first) {
+            $oldRow = self::loadLong($context, $obj, Sqlite3JitSupport::PROP_ROW);
+            $firstVal = $i64->constInt($first, true);
+            $rowVal = $context->builder->select($isEmpty, $firstVal, $oldRow);
+            self::storeLong($context, $obj, Sqlite3JitSupport::PROP_ROW, $rowVal);
+            self::storeLong($context, $obj, Sqlite3JitSupport::PROP_HAS, $i64->constInt(1, false));
+        }
+
+        $rid = self::loadLong($context, $obj, Sqlite3JitSupport::PROP_LAST_ROWID);
+        $autoRid = $context->builder->add($rid, $i64->constInt($n, false));
+        if (true === $intPkKnown && null !== $last) {
+            self::storeLong($context, $obj, Sqlite3JitSupport::PROP_LAST_ROWID, $i64->constInt($last, true));
+        } elseif (false === $intPkKnown) {
+            self::storeLong($context, $obj, Sqlite3JitSupport::PROP_LAST_ROWID, $autoRid);
+        } else {
+            $pkFlag = self::loadLong($context, $obj, Sqlite3JitSupport::PROP_INT_PK);
+            $isPk = $context->builder->icmp(
+                \PHPLLVM\Builder::INT_NE,
+                $pkFlag,
+                $i64->constInt(0, false)
+            );
+            $pkRid = null !== $last ? $i64->constInt($last, true) : $autoRid;
+            $newRid = $context->builder->select($isPk, $pkRid, $autoRid);
+            self::storeLong($context, $obj, Sqlite3JitSupport::PROP_LAST_ROWID, $newRid);
+        }
+    }
+
+    /**
+     * @return array{int_pk: ?bool, values: ?list<?int>}
+     */
+    private static function analyzeExecSql(string $sql): array
+    {
+        $intPk = null;
+        if (1 === preg_match('/CREATE\s+TABLE\b/i', $sql)) {
+            $intPk = 1 === preg_match('/INTEGER\s+PRIMARY\s+KEY/i', $sql);
+        }
+
+        $values = null;
+        if (1 === preg_match('/INSERT\s+INTO\b.*?VALUES\s*(.+)$/is', $sql, $m)) {
+            $part = rtrim($m[1], " \t\n\r;");
+            if (preg_match_all('/\(([^)]*)\)/', $part, $tuples) > 0 && [] !== $tuples[1]) {
+                $values = [];
+                foreach ($tuples[1] as $inner) {
+                    $inner = trim((string) $inner);
+                    if ('' === $inner) {
+                        $values[] = null;
+                        continue;
+                    }
+                    $first = trim(explode(',', $inner, 2)[0]);
+                    if (is_numeric($first)) {
+                        $values[] = (int) $first;
+                    } else {
+                        $values[] = null;
+                    }
+                }
+            }
+        }
+
+        return ['int_pk' => $intPk, 'values' => $values];
     }
 
     private static function readObject(Context $context, JITVariable $arg): Value

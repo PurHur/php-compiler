@@ -3949,6 +3949,12 @@ class Object_ extends Type {
             $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::PROP_ID, Variable::TYPE_NATIVE_LONG);
             $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::PROP_ROW, Variable::TYPE_NATIVE_LONG);
             $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::PROP_HAS, Variable::TYPE_NATIVE_LONG);
+            // lastInsertRowID/changes + multi-row COUNT/SUM/INTPK (#35931 / #35956).
+            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::PROP_LAST_ROWID, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::PROP_CHANGES, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::PROP_ROW_COUNT, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::PROP_SUM, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::PROP_INT_PK, Variable::TYPE_NATIVE_LONG);
             $this->markHasConstructor($id);
         }
         if ('sqlite3stmt' === $lcname && CompilerVersion::supportsSqlite3()) {
@@ -5721,7 +5727,16 @@ class Object_ extends Type {
         if ('hashcontext' === $lcClass && ('__hcid' === $lcName || '__hchmac' === $lcName)) {
             return Variable::TYPE_NATIVE_LONG;
         }
-        if ('sqlite3' === $lcClass && ('__sqliteid' === $lcName || '__sqliterow' === $lcName || '__sqlitehas' === $lcName || '__sqliterid' === $lcName || '__sqlitechg' === $lcName)) {
+        if ('sqlite3' === $lcClass && (
+            '__sqliteid' === $lcName
+            || '__sqliterow' === $lcName
+            || '__sqlitehas' === $lcName
+            || '__sqliterid' === $lcName
+            || '__sqlitechg' === $lcName
+            || '__sqliten' === $lcName
+            || '__sqlitesum' === $lcName
+            || '__sqlitepk' === $lcName
+        )) {
             return Variable::TYPE_NATIVE_LONG;
         }
         if (
