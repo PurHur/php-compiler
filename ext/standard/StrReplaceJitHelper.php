@@ -13,6 +13,8 @@ namespace PHPCompiler\ext\standard;
  * NestedJIT user-script AOT (#23912 / peer #23871 / #27079 / #32621):
  * - Match via {@see findAt()} + {@see slice()} like {@see ExplodeJitHelper} / VmString::findSubstring
  *   — the inline subject walk sticky-reads `$subject[$hi]` when `$hi > $i` under NestedJIT.
+ * - Inner `while` + `$str[$i]` miscompares under NestedJIT; {@see matchAt()} / {@see matchAtI()}
+ *   recurse on the needle index instead (#36002 / differential c10_builtin).
  * - No int `$count++` in the match arm (NestedJIT segfault/abort).
  * - No `\strlen`/`\strpos`/`\substr` / explode+implode lowering for this helper.
  * - No `VmString::*` calls from NestedJIT path (#27079 — empty AOT for ireplace).
@@ -93,24 +95,36 @@ final class StrReplaceJitHelper
         }
         $i = $offset;
         while ($i < $hayLen) {
-            $matched = true;
-            $j = 0;
-            $hi = $i;
-            while ($j < $needleLen) {
-                if ($hi >= $hayLen || $haystack[$hi] !== $needle[$j]) {
-                    $matched = false;
-                    break;
-                }
-                ++$j;
-                ++$hi;
-            }
-            if ($matched) {
+            if (self::matchAt($haystack, $needle, $i, $hayLen, $needleLen, 0)) {
                 return $i;
             }
             ++$i;
         }
 
         return -1;
+    }
+
+    /** Recurse on needle index — NestedJIT inner `while` + `$str[$i]` miscompares (c10_builtin / #36002). */
+    private static function matchAt(
+        string $haystack,
+        string $needle,
+        int $start,
+        int $hayLen,
+        int $needleLen,
+        int $j
+    ): bool {
+        if ($j >= $needleLen) {
+            return true;
+        }
+        $hi = $start + $j;
+        if ($hi >= $hayLen) {
+            return false;
+        }
+        if ($haystack[$hi] !== $needle[$j]) {
+            return false;
+        }
+
+        return self::matchAt($haystack, $needle, $start, $hayLen, $needleLen, $j + 1);
     }
 
     private static function findAtI(string $haystack, string $needle, int $offset): int
@@ -122,24 +136,36 @@ final class StrReplaceJitHelper
         }
         $i = $offset;
         while ($i < $hayLen) {
-            $matched = true;
-            $j = 0;
-            $hi = $i;
-            while ($j < $needleLen) {
-                if ($hi >= $hayLen || !self::asciiFoldEq($haystack[$hi], $needle[$j])) {
-                    $matched = false;
-                    break;
-                }
-                ++$j;
-                ++$hi;
-            }
-            if ($matched) {
+            if (self::matchAtI($haystack, $needle, $i, $hayLen, $needleLen, 0)) {
                 return $i;
             }
             ++$i;
         }
 
         return -1;
+    }
+
+    /** Case-insensitive peer of {@see matchAt} (NestedJIT inner-while string dim). */
+    private static function matchAtI(
+        string $haystack,
+        string $needle,
+        int $start,
+        int $hayLen,
+        int $needleLen,
+        int $j
+    ): bool {
+        if ($j >= $needleLen) {
+            return true;
+        }
+        $hi = $start + $j;
+        if ($hi >= $hayLen) {
+            return false;
+        }
+        if (!self::asciiFoldEq($haystack[$hi], $needle[$j])) {
+            return false;
+        }
+
+        return self::matchAtI($haystack, $needle, $start, $hayLen, $needleLen, $j + 1);
     }
 
     /** Build a byte slice via concat (no \substr). */
