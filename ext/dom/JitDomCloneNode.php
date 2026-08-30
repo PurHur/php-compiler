@@ -53,6 +53,40 @@ final class JitDomCloneNode
         self::$lastDetachedChildMarkup = '' === $markup ? null : $markup;
     }
 
+    /**
+     * insertBefore return temps often inherit documentElement root tag — reuse the
+     * newChild hint captured during invoke (#35425).
+     *
+     * @param-out string|null $tagHint
+     * @param-out int|null    $index
+     */
+    private static function applyInsertBeforeReturnCompileTimeHint(
+        JITVariable $receiver,
+        ?string &$tagHint,
+        ?int &$index
+    ): void {
+        $hintTag = JitDomInsertBefore::$lastNewChildCompileTimeTag;
+        if (null === $hintTag || '' === $hintTag) {
+            return;
+        }
+        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        $rootTag = null !== $xml ? DomParseSimpleXmlJitHelper::rootTagArgv($xml) : null;
+        if (
+            null !== $tagHint
+            && '' !== $tagHint
+            && (null === $rootTag || strtolower($tagHint) !== strtolower($rootTag))
+        ) {
+            return;
+        }
+        $receiver->compileTimeDomTagName = $hintTag;
+        $tagHint = $hintTag;
+        $hintIndex = JitDomInsertBefore::$lastNewChildCompileTimeChildIndex;
+        if (null !== $hintIndex) {
+            $receiver->compileTimeDomChildIndex = $hintIndex;
+            $index = $hintIndex;
+        }
+    }
+
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
         self::$lastResultTagName = null;
@@ -99,6 +133,9 @@ final class JitDomCloneNode
 
         $index = $receiver->compileTimeDomChildIndex;
         $tagHint = $receiver->compileTimeDomTagName;
+        self::applyInsertBeforeReturnCompileTimeHint($receiver, $tagHint, $index);
+        $tagHint = $receiver->compileTimeDomTagName;
+        $index = $receiver->compileTimeDomChildIndex;
         // firstChild temps often drop Variable metadata — lastFetched* recovers them.
         // documentElement stamps compileTimeDomNodePath without a child index; do NOT
         // borrow lastFetchedChildIndex from a prior firstChild walk (#32949).
@@ -141,6 +178,17 @@ final class JitDomCloneNode
                 null !== $expectTag
                 && null !== $parsedAt
                 && strtolower($parsedAt['tag']) === strtolower($expectTag)
+            ) {
+                return self::specFromMarkup($chunks[$index], $deep);
+            }
+            // insertBefore return can inherit documentElement root tag from lastFetched
+            // recovery while childIndex still names the moved node (#35425).
+            if (
+                null !== $expectTag
+                && null !== $rootTag
+                && null !== $receiver->compileTimeDomChildIndex
+                && strtolower($expectTag) === strtolower((string) $rootTag)
+                && null !== $parsedAt
             ) {
                 return self::specFromMarkup($chunks[$index], $deep);
             }

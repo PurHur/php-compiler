@@ -349,6 +349,7 @@ final class DomNodeLiveMutationRuntime
                         $parentObj,
                         $childObj
                     );
+                    self::clearFragmentCompileTimeAfterExpand($arg);
                     DomUserScriptLiveTagListLlvm::incrementForChildArg($context, $arg);
                 }
                 self::syncTextContentSlotFromLiteralArgs($context, $receiver, $extraArgs);
@@ -463,10 +464,12 @@ final class DomNodeLiveMutationRuntime
                     $context->builder->branch($bbDone);
                     $context->builder->positionAtEnd($bbDoInsert);
                     JitDomInsertBeforeLiveSlots::sync($context, $parentObj, $childObj, $first);
+                    self::clearFragmentCompileTimeAfterExpand($arg);
                     $context->builder->branch($bbDone);
 
                     $context->builder->positionAtEnd($bbAppend);
                     JitDomAppendChildLiveSlots::sync($context, $parentObj, $childObj);
+                    self::clearFragmentCompileTimeAfterExpand($arg);
                     $context->builder->branch($bbDone);
 
                     $context->builder->positionAtEnd($bbDone);
@@ -1238,6 +1241,19 @@ final class DomNodeLiveMutationRuntime
             ?? null;
     }
 
+
+    /**
+     * Fragment expand empties live childNodes at runtime — clear compile-time length
+     * too or childNodes->length reads the pre-expand stamp (#35518 re-#35461).
+     */
+    private static function clearFragmentCompileTimeAfterExpand(Variable $child): void
+    {
+        if (JitDomCreateDocumentFragment::TAG_KIND !== ($child->compileTimeDomTagName ?? null)) {
+            return;
+        }
+        $child->compileTimeDomNodeListLength = 0;
+        $child->compileTimeDomInnerXml = '';
+    }
 
     /**
      * Rebuild fragment compile-time InnerXml from rememberAppendedChild (#35881).
