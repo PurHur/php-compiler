@@ -18031,14 +18031,22 @@ class JIT {
         if (!\PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::applyPendingElementAssign($var)) {
             return;
         }
+        // children()/attributes()/__get/dim results are TYPE_VALUE boxes; without a class
+        // stamp FETCH_OBJ skips tryGet and child props become null (#35828 leftover of #27535).
+        $var->classUserType = 'SimpleXMLElement';
+        $var->magicGetOverloadedClass = 'SimpleXMLElement';
+        $result->type = new Type(Type::TYPE_OBJECT, [], 'SimpleXMLElement');
         $name = JIT\OperandName::resolve($result);
         if (null !== $name && '' !== $name) {
             $resolved = $this->context->resolveRefAliasName($name);
             if (isset($this->context->namedVariableBindings[$resolved])
                 && $this->context->namedVariableBindings[$resolved] !== $var
-                && null !== $var->compileTimeString
             ) {
-                $this->context->namedVariableBindings[$resolved]->compileTimeString = $var->compileTimeString;
+                if (null !== $var->compileTimeString) {
+                    $this->context->namedVariableBindings[$resolved]->compileTimeString = $var->compileTimeString;
+                }
+                $this->context->namedVariableBindings[$resolved]->classUserType = 'SimpleXMLElement';
+                $this->context->namedVariableBindings[$resolved]->magicGetOverloadedClass = 'SimpleXMLElement';
             }
             $this->context->bindVariableByName($resolved, $var);
         }
