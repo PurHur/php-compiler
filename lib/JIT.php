@@ -9245,6 +9245,27 @@ class JIT {
                         // ClosureWithCaptures on `$f` or AOT invoke drops use() snapshots (#24106).
                         $this->preserveClosureInvokeMetadata($aliasOp, $aliasVar, $value);
                         $this->recordListUnpackAssignSlot($aliasOp, $aliasVar);
+                        // `$o->p ??= $x = n`: php-cfg feeds Assign.result (unnamed temp) into the
+                        // ??= store, not the named $x. Writing only $x left the property as 0 /
+                        // garbage (#35998 leftover of #33748 / ZEND_ASSIGN expression value).
+                        if (null !== $destOp && $destOp !== $aliasOp) {
+                            $destUsed = [] !== $destOp->usages;
+                            $resultConsumedLater = null !== $op->arg1
+                                && $op->arg1 !== $op->arg2
+                                && $op->arg1 !== $rhsSlot
+                                && !$block->assignTempSlotIsDead((int) $op->arg1);
+                            if ($destUsed || $resultConsumedLater) {
+                                $this->emitAssignOperandWithByRefFormalFastPath(
+                                    $block,
+                                    $destOp,
+                                    $rhsOperand,
+                                    $value,
+                                    $args,
+                                    $thisParamOffset,
+                                    true
+                                );
+                            }
+                        }
                     } else {
                         if (null !== $aliasOp) {
                             $this->emitAssignOperandWithByRefFormalFastPath(
