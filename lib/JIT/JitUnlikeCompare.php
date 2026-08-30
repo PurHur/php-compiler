@@ -20,6 +20,7 @@ use PHPLLVM\Value;
  * Object vs string without {@code __toString} is object-greater (#32514);
  * {@code null} literals are TYPE_VALUE + isNullConstant, not TYPE_NULL.
  * Object vs string == / != uses the same spaceship (#32515 leftover of #32503).
+ * Assigned object/array vs native int == / != uses boxedUnlikeVsNative (#35807 leftover of #35799).
  * Object vs non-object === / !== is never identical ({@code zend_is_identical}, #32523).
  * VM SSOT: {@see \PHPCompiler\VM\CompareUnlikeHelper::zendUnlikeValueSpaceship}
  */
@@ -63,6 +64,14 @@ final class JitUnlikeCompare
         // `$e = []` boxes as TYPE_VALUE; literal `[]` stays native (#32528 leftover of #32520).
         if ($ordered && (JitValueBox::isValueOperand($left) || JitValueBox::isValueOperand($right))) {
             return self::valueBoxOrdered($context, $opType, $left, $right);
+        }
+        // Assigned `$o = new C` is TYPE_VALUE; == / != vs native int skipped the
+        // ordered-only path and compared as 0==n (#35807 leftover of #35799).
+        if ($equal && (JitValueBox::isValueOperand($left) || JitValueBox::isValueOperand($right))) {
+            $loose = self::valueBoxLooseEqualNative($context, $opType, $left, $right);
+            if (null !== $loose) {
+                return $loose;
+            }
         }
 
         return null;
@@ -659,6 +668,31 @@ final class JitUnlikeCompare
         return Variable::TYPE_NATIVE_LONG === $var->type
             || Variable::TYPE_NATIVE_DOUBLE === $var->type
             || Variable::TYPE_STRING === $var->type;
+    }
+
+    /**
+     * Assigned `$o = new C` / `$a = []` vs native long/double/string == / != (#35807).
+     *
+     * php-src zend_operators.c compare_function: same spaceship as ordered compare;
+     * {@code ==} is cmp==0. Do not reuse the bool/null hashtable shortcut (that is
+     * array vs zend_is_true only).
+     */
+    private static function valueBoxLooseEqualNative(
+        Context $context,
+        int $opType,
+        Variable $left,
+        Variable $right
+    ): ?Variable {
+        $leftBox = JitValueBox::isValueOperand($left);
+        $rightBox = JitValueBox::isValueOperand($right);
+        if ($leftBox && self::isNativeNumberOrString($right)) {
+            return self::boxedUnlikeVsNative($context, $opType, $left, $right, true);
+        }
+        if ($rightBox && self::isNativeNumberOrString($left)) {
+            return self::boxedUnlikeVsNative($context, $opType, $right, $left, false);
+        }
+
+        return null;
     }
 
     /**
