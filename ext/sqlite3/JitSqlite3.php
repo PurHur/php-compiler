@@ -27,7 +27,8 @@ use PHPLLVM\Value;
  * php-src: ext/sqlite3/sqlite3.c — zim_SQLite3___construct / zim_SQLite3_exec /
  * zim_SQLite3_querySingle / zim_SQLite3_lastInsertRowID / zim_SQLite3_changes /
  * zim_SQLite3_lastErrorCode / zim_SQLite3_lastErrorMsg (#35966) /
- * zim_SQLite3_busyTimeout (#35972) / zim_SQLite3_enableExceptions (#35975)
+ * zim_SQLite3_busyTimeout (#35972) / zim_SQLite3_enableExceptions (#35975) /
+ * zim_SQLite3_escapeString (#35977)
  */
 final class JitSqlite3
 {
@@ -265,6 +266,45 @@ final class JitSqlite3
         JitValueBox::writeBool($context, $slot, $priorBool);
 
         return JitValueBox::pointer($context, $slot);
+    }
+
+    /**
+     * SQLite3::escapeString leftover of busyTimeout (#35977 / #35972).
+     * php-src zim_SQLite3_escapeString / sqlite3_mprintf("%q") — fold compile-time strings in
+     * the compiler process (thin AOT has no libsqlite3 FFI at runtime).
+     */
+    public static function escapeString(Context $context, JITVariable ...$args): Value
+    {
+        $offset = 0;
+        if (\count($args) >= 1 && JITVariable::TYPE_OBJECT === $args[0]->type) {
+            self::readObject($context, $args[0]);
+            $offset = 1;
+        }
+        $given = \count($args) - $offset;
+        if (1 !== $given) {
+            \PHPCompiler\JIT\ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                'SQLite3::escapeString() expects exactly 1 argument, '.$given.' given'
+            );
+            \PHPCompiler\JIT\BasicBlockHelper::ensureOpenInsertBlock($context, 'SQLite3::escapeString_argc_cont');
+
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        $lit = JitStringBuiltinArg::compileTimeLiteral($args[$offset])
+            ?? $args[$offset]->compileTimeString;
+        if (null === $lit) {
+            throw new \LogicException(
+                'SQLite3::escapeString() user-script AOT requires a compile-time string (#35977)'
+            );
+        }
+        try {
+            $escaped = VmSqlite3Native::escapeString($lit);
+        } catch (\Throwable $e) {
+            // sqlite3_mprintf("%q") doubles single quotes when FFI is unavailable in the host.
+            $escaped = str_replace("'", "''", $lit);
+        }
+
+        return self::boxString($context, $escaped);
     }
 
     /**
