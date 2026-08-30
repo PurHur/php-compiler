@@ -110,28 +110,78 @@ fi
 echo "==> spine-sync 3/6: recount and rewrite footnotes"
 read -r NEW_SPINE NEW_INV < <("$PHP_BIN" script/bootstrap-spine-count.php --json \
   | "$PHP_BIN" -r '$j = json_decode(stream_get_contents(STDIN), true); echo $j["spine"], " ", $j["inventory"], "\n";')
-OLD_PAIR="$(grep -oE 'self-host spine \*\*[0-9]+\*\* / \*\*[0-9]+\*\*' README.md | head -1 \
-  | grep -oE '[0-9]+\*\* / \*\*[0-9]+' | sed 's/\*\*//g')"
-OLD_SPINE="${OLD_PAIR%% /*}"
-OLD_INV="${OLD_PAIR##*/ }"
-OLD_SPINE="$(echo "$OLD_SPINE" | xargs)"
-OLD_INV="$(echo "$OLD_INV" | xargs)"
-echo "    ${OLD_SPINE}/${OLD_INV} -> ${NEW_SPINE}/${NEW_INV}"
-if [[ "$OLD_SPINE" != "$NEW_SPINE" || "$OLD_INV" != "$NEW_INV" ]]; then
-  FOOTNOTE_FILES=(README.md docs/pages/development-status.md docs/self-host-target.md
-    docs/bootstrap-selfhost.md docs/roadmap-wave3.md docs/pages/index.html
-    docs/bootstrap-generations.md docs/pages/missing-implementation.html)
+FOOTNOTE_FILES=(README.md docs/pages/development-status.md docs/self-host-target.md
+  docs/bootstrap-selfhost.md docs/roadmap-wave3.md docs/pages/index.html
+  docs/bootstrap-generations.md docs/pages/missing-implementation.html)
+# Scan footnote files for stale spine/inventory pairs (#35784).
+# README may already be N/N (both stale) while other docs still carry N/M.
+# Only rewrite pairs near the canonical spine counts — never vendor 7410/7412
+# or Wave-3 language/stdlib trackers.
+STALE_PAIRS=$("$PHP_BIN" -r '
+$newSpine = (int) $argv[1];
+$newInv = (int) $argv[2];
+$files = array_slice($argv, 3);
+$pairs = [];
+$near = static function (int $a, int $b): bool {
+    return abs($a - $b) <= 50;
+};
+foreach ($files as $path) {
+    if (!is_readable($path)) {
+        continue;
+    }
+    $doc = file_get_contents($path);
+    foreach ([
+        "/\*\*(\d{3,5})\*\*\s*\/\s*\*\*(\d{3,5})\*\*/",
+        "/\*\*(\d{3,5})\/(\d{3,5})\*\*/",
+        "/(?<![0-9])(\d{3,5})\/(\d{3,5})(?![0-9])/",
+    ] as $pattern) {
+        if (!preg_match_all($pattern, $doc, $m, PREG_SET_ORDER)) {
+            continue;
+        }
+        foreach ($m as $match) {
+            $s = (int) $match[1];
+            $i = (int) $match[2];
+            if ($s === $newSpine && $i === $newInv) {
+                continue;
+            }
+            $staleDenom = ($i === $newInv);
+            $staleNear = $near($s, $newSpine) && $near($i, $newInv);
+            if ($staleDenom || $staleNear) {
+                $pairs["{$s}/{$i}"] = [$s, $i];
+            }
+        }
+    }
+}
+foreach ($pairs as [$s, $i]) {
+    echo "{$s} {$i}\n";
+}
+' "$NEW_SPINE" "$NEW_INV" "${FOOTNOTE_FILES[@]}")
+replace_spine_footnote_pair() {
+  local old_spine=$1 old_inv=$2
   sed -i \
-    -e "s/\*\*${OLD_SPINE}\*\* \/ \*\*${OLD_INV}\*\*/**${NEW_SPINE}** \/ **${NEW_INV}**/g" \
-    -e "s/\*\*${OLD_SPINE}\/${OLD_INV}\*\*/**${NEW_SPINE}\/${NEW_INV}**/g" \
-    -e "s/${OLD_SPINE} of ${OLD_INV}/${NEW_SPINE} of ${NEW_INV}/g" \
-    -e "s/${OLD_SPINE} \/ ${OLD_INV}/${NEW_SPINE} \/ ${NEW_INV}/g" \
-    -e "s/${OLD_SPINE}\/${OLD_INV}/${NEW_SPINE}\/${NEW_INV}/g" \
+    -e "s/\*\*${old_spine}\*\* \/ \*\*${old_inv}\*\*/**${NEW_SPINE}** \/ **${NEW_INV}**/g" \
+    -e "s/\*\*${old_spine}\/${old_inv}\*\*/**${NEW_SPINE}\/${NEW_INV}**/g" \
+    -e "s/${old_spine} of ${old_inv}/${NEW_SPINE} of ${NEW_INV}/g" \
+    -e "s/${old_spine} \/ ${old_inv}/${NEW_SPINE} \/ ${NEW_INV}/g" \
+    -e "s/${old_spine}\/${old_inv}/${NEW_SPINE}\/${NEW_INV}/g" \
     "${FOOTNOTE_FILES[@]}"
   sed -i \
-    -e "s/assertSame(${OLD_SPINE}, \$count/assertSame(${NEW_SPINE}, \$count/" \
-    -e "s|Spine ratio ${OLD_SPINE}/${OLD_INV}|Spine ratio ${NEW_SPINE}/${NEW_INV}|" \
+    -e "s/assertSame(${old_spine}, \$count/assertSame(${NEW_SPINE}, \$count/" \
+    -e "s|Spine ratio ${old_spine}/${old_inv}|Spine ratio ${NEW_SPINE}/${NEW_INV}|" \
     test/unit/BootstrapSelfhostBundleTest.php
+}
+replaced=0
+while read -r OLD_SPINE OLD_INV; do
+  [[ -z "${OLD_SPINE:-}" ]] && continue
+  if [[ "$OLD_SPINE" == "$NEW_SPINE" && "$OLD_INV" == "$NEW_INV" ]]; then
+    continue
+  fi
+  echo "    ${OLD_SPINE}/${OLD_INV} -> ${NEW_SPINE}/${NEW_INV}"
+  replace_spine_footnote_pair "$OLD_SPINE" "$OLD_INV"
+  ((replaced++)) || true
+done <<< "${STALE_PAIRS}"
+if [[ "$replaced" -eq 0 ]]; then
+  echo "    footnotes already ${NEW_SPINE}/${NEW_INV}"
 fi
 
 echo "==> spine-sync 4/6: verify counts + coverage + deferred + roadmap"

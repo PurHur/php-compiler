@@ -564,7 +564,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $contents = (string) file_get_contents($entry);
         $count = bootstrap_spine_counts(self::$root)['spine'];
         // Spine ratio 8017/8002 — Phase A inventory in compiler_lib_spine_smoke (#2202, #31835 typed parent assign).
-        $this->assertSame(8003, $count, 'M2 spine require_once units track Phase A inventory (#8559, #9234, #11629, #18550); coverage sync defers PregJitHelperThinAot (#24115) + NetworkServicesNameLookupThinAot (#27103)');
+        $this->assertSame(8006, $count, 'M2 spine require_once units track Phase A inventory (#8559, #9234, #11629, #18550); coverage sync defers PregJitHelperThinAot (#24115) + NetworkServicesNameLookupThinAot (#27103)');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",
