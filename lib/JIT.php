@@ -15202,8 +15202,13 @@ class JIT {
                     $forWrite = $opcodeIsPropertyWrite
                         || $this->varFetchDestUsedAsAssignLvalue($block, $i, (int) $op->arg1);
                     $forDimWrite = $this->varFetchDestUsedAsDimWriteContainer($block, $i, (int) $op->arg1);
+                    // `$o->p[$k]` / `$r =& $o->p[$k]`: keep the live property HT (FETCH_OBJ_W),
+                    // do not reseat into a value-box copy — a second fetch would COW-separate and
+                    // detach earlier refs (#35980 / leftover #34673; zend_std_get_property_ptr_ptr).
                     $propFetchForWrite = $forWrite
+                        || $forDimWrite
                         || $this->varFetchDestUsedAsPlainAssignStore($block, $i, (int) $op->arg1);
+                    $bindPropAsWrite = $forWrite || $forDimWrite;
                     if ($name instanceof Operand\Literal) {
                         // PHPCfg types `new static()` receivers as static — skip declaring-class
                         // guards that target a bogus "static" ClassEntry (#31937).
@@ -15247,7 +15252,7 @@ class JIT {
                             if ($forceBranchMerge) {
                                 $this->assignOperand($result, $fetched, true);
                             } else {
-                                $this->bindPropertyFetchResult($result, $fetched, $forWrite);
+                                $this->bindPropertyFetchResult($result, $fetched, $bindPropAsWrite);
                             }
                             break;
                         }
@@ -15698,7 +15703,7 @@ class JIT {
                                 $this->context->retainCoalesceInstancePropertyLvalue = $savedRetain;
                             }
                         } else {
-                            $this->bindPropertyFetchResult($result, $fetched, $forWrite);
+                            $this->bindPropertyFetchResult($result, $fetched, $bindPropAsWrite);
                         }
                         if ($op->nullsafeFetchPropertyRead && $this->context->hasVariableOp($result)) {
                             $bound = $this->context->getVariableFromOp($result);
@@ -15728,7 +15733,7 @@ class JIT {
                         if ($forceBranchMerge) {
                             $this->assignOperand($result, $fetched, true);
                         } else {
-                            $this->bindPropertyFetchResult($result, $fetched, $forWrite);
+                            $this->bindPropertyFetchResult($result, $fetched, $bindPropAsWrite);
                         }
                     }
                     break;
@@ -31362,6 +31367,12 @@ class JIT {
     /**
      * Read fetches keep objectPropertySlot on branch-local SSA; ARG_SEND / var_dump load it later
      * from a block where the GEP does not dominate (#33760, peer #32988).
+     */
+    /**
+     * Bind a property fetch result. Write / dim-write keep the live slot (no value-box reseat)
+     * so `$r =& $o->p[$k]; $s =& $o->p[$k]` share one HT (#35980).
+     *
+     * @see php-src Zend/zend_object_handlers.c zend_std_get_property_ptr_ptr
      */
     private function bindPropertyFetchResult(Operand $result, Variable $fetched, bool $forWrite): void
     {
