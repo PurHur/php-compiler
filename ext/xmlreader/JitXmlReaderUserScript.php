@@ -13,6 +13,7 @@ use PHPCompiler\ext\dom\JitDomDocumentElement;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitStringCompare;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\UserScriptAotEnv;
@@ -1007,6 +1008,222 @@ final class JitXmlReaderUserScript
         $context->builder->positionAtEnd($merge);
 
         return $context->builder->load($resultSlot);
+    }
+
+    /**
+     * XMLReader::moveToNextAttribute() leftover of moveToAttribute (#35952 / #35941 / #27299 / #19395).
+     * php-src: zim_XMLReader_moveToNextAttribute / xmlTextReaderMoveToNextAttribute
+     *
+     * When not on an attribute node, behaves like moveToFirstAttribute. When on an attribute,
+     * advances by matching the current name against document-order keys at __xr_pos.
+     */
+    public static function tryMoveToNextAttribute(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot()
+            || null === self::$lastAttributes
+            || null === self::$lastAttrNodeTypes
+            || null === self::$lastEvents
+        ) {
+            return null;
+        }
+        if (\count($args) < 1) {
+            throw new \LogicException('XMLReader::moveToNextAttribute() called without $this');
+        }
+        /** @var list<list<array{name: string, value: string}>> $byPos */
+        $byPos = [];
+        foreach (self::$lastAttributes as $i => $attrs) {
+            if (!isset(self::$lastAttrNodeTypes[$i])
+                || XmlReaderConstants::ELEMENT !== self::$lastAttrNodeTypes[$i]
+            ) {
+                $byPos[] = [];
+                continue;
+            }
+            $list = [];
+            foreach ($attrs as $name => $value) {
+                $list[] = ['name' => (string) $name, 'value' => (string) $value];
+            }
+            $byPos[] = $list;
+        }
+
+        return self::emitMoveToNextAttribute($context, $args[0], $byPos);
+    }
+
+    /**
+     * @param list<list<array{name: string, value: string}>> $byPos
+     */
+    private static function emitMoveToNextAttribute(
+        Context $context,
+        JITVariable $receiver,
+        array $byPos
+    ): Value {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'xmlreader_mtna_cont');
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup(self::CLASS_NAME);
+        self::ensureLayout($objectType, $classId);
+
+        $obj = self::loadObject($context, $receiver);
+        $i64 = $context->getTypeFromString('int64');
+        $i1 = $context->getTypeFromString('int1');
+        $posVal = $context->helper->loadValue(
+            $objectType->propertyFetch($obj, self::CLASS_NAME, self::PROP_POS)
+        );
+        $nodeTypeVal = $context->helper->loadValue(
+            $objectType->propertyFetch($obj, self::CLASS_NAME, VmXmlReader::PROP_NODE_TYPE)
+        );
+        $nameStr = $context->helper->loadValue(
+            $objectType->propertyFetch($obj, self::CLASS_NAME, VmXmlReader::PROP_NAME)
+        );
+
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__*'));
+        $merge = BasicBlockHelper::append($context, 'xmlreader_mtna_merge');
+        $miss = BasicBlockHelper::append($context, 'xmlreader_mtna_miss');
+
+        $n = \count($byPos);
+        /** @var list<\PHPLLVM\BasicBlock> */
+        $caseBlocks = [];
+        for ($i = 0; $i < $n; ++$i) {
+            $caseBlocks[$i] = BasicBlockHelper::append($context, 'xmlreader_mtna_case_'.$i);
+        }
+        $inRange = $context->builder->icmp(
+            Builder::INT_SLT,
+            $posVal,
+            $i64->constInt($n, true)
+        );
+        $nonNeg = $context->builder->icmp(
+            Builder::INT_SGE,
+            $posVal,
+            $i64->constInt(0, true)
+        );
+        $ok = $context->builder->and($inRange, $nonNeg);
+        $context->builder->branchIf(
+            $ok,
+            $n > 0 ? $caseBlocks[0] : $miss,
+            $miss
+        );
+
+        $context->builder->positionAtEnd($miss);
+        $falseBox = JitValueBox::alloc($context);
+        JitValueBox::writeBool($context, $falseBox, $i1->constInt(0, false));
+        $context->builder->store(JitValueBox::normalizeValuePtr($context, $falseBox), $resultSlot);
+        $context->builder->branch($merge);
+
+        for ($i = 0; $i < $n; ++$i) {
+            $context->builder->positionAtEnd($caseBlocks[$i]);
+            $isThis = $context->builder->icmp(
+                Builder::INT_EQ,
+                $posVal,
+                $i64->constInt($i, true)
+            );
+            $applyPos = BasicBlockHelper::append($context, 'xmlreader_mtna_pos_'.$i);
+            $nextPos = ($i + 1 < $n) ? $caseBlocks[$i + 1] : $miss;
+            $context->builder->branchIf($isThis, $applyPos, $nextPos);
+
+            $context->builder->positionAtEnd($applyPos);
+            $attrs = $byPos[$i];
+            if ([] === $attrs) {
+                $emptyBox = JitValueBox::alloc($context);
+                JitValueBox::writeBool($context, $emptyBox, $i1->constInt(0, false));
+                $context->builder->store(JitValueBox::normalizeValuePtr($context, $emptyBox), $resultSlot);
+                $context->builder->branch($merge);
+                continue;
+            }
+
+            $onAttr = BasicBlockHelper::append($context, 'xmlreader_mtna_onattr_'.$i);
+            $fromElem = BasicBlockHelper::append($context, 'xmlreader_mtna_fromelem_'.$i);
+            $isOnAttr = $context->builder->icmp(
+                Builder::INT_EQ,
+                $nodeTypeVal,
+                $i64->constInt(XmlReaderConstants::ATTRIBUTE, true)
+            );
+            $context->builder->branchIf($isOnAttr, $onAttr, $fromElem);
+
+            // Not on attribute → first attribute (php-src moveToNextAttribute).
+            $context->builder->positionAtEnd($fromElem);
+            self::storeAttributeCursorHit($context, $objectType, $obj, $attrs[0], $i64);
+            $tb = JitValueBox::alloc($context);
+            JitValueBox::writeBool($context, $tb, $i1->constInt(1, false));
+            $context->builder->store(JitValueBox::normalizeValuePtr($context, $tb), $resultSlot);
+            $context->builder->branch($merge);
+
+            // On attribute → match current name, advance to next key.
+            $context->builder->positionAtEnd($onAttr);
+            $attrCount = \count($attrs);
+            /** @var list<\PHPLLVM\BasicBlock> */
+            $attrBlocks = [];
+            for ($j = 0; $j < $attrCount; ++$j) {
+                $attrBlocks[$j] = BasicBlockHelper::append($context, 'xmlreader_mtna_attr_'.$i.'_'.$j);
+            }
+            $attrMiss = BasicBlockHelper::append($context, 'xmlreader_mtna_attrmiss_'.$i);
+            $context->builder->branch($attrBlocks[0]);
+
+            for ($j = 0; $j < $attrCount; ++$j) {
+                $context->builder->positionAtEnd($attrBlocks[$j]);
+                $lit = $context->builder->load(
+                    $context->constantStringFromString($attrs[$j]['name'])
+                );
+                $match = JitStringCompare::identical($context, $nameStr, $lit);
+                $matched = BasicBlockHelper::append($context, 'xmlreader_mtna_matched_'.$i.'_'.$j);
+                $tryNext = ($j + 1 < $attrCount) ? $attrBlocks[$j + 1] : $attrMiss;
+                $context->builder->branchIf($match, $matched, $tryNext);
+
+                $context->builder->positionAtEnd($matched);
+                if ($j + 1 < $attrCount) {
+                    self::storeAttributeCursorHit($context, $objectType, $obj, $attrs[$j + 1], $i64);
+                    $okBox = JitValueBox::alloc($context);
+                    JitValueBox::writeBool($context, $okBox, $i1->constInt(1, false));
+                    $context->builder->store(JitValueBox::normalizeValuePtr($context, $okBox), $resultSlot);
+                } else {
+                    $endBox = JitValueBox::alloc($context);
+                    JitValueBox::writeBool($context, $endBox, $i1->constInt(0, false));
+                    $context->builder->store(JitValueBox::normalizeValuePtr($context, $endBox), $resultSlot);
+                }
+                $context->builder->branch($merge);
+            }
+
+            $context->builder->positionAtEnd($attrMiss);
+            $noMatch = JitValueBox::alloc($context);
+            JitValueBox::writeBool($context, $noMatch, $i1->constInt(0, false));
+            $context->builder->store(JitValueBox::normalizeValuePtr($context, $noMatch), $resultSlot);
+            $context->builder->branch($merge);
+        }
+
+        $context->builder->positionAtEnd($merge);
+
+        return $context->builder->load($resultSlot);
+    }
+
+    /**
+     * @param array{name: string, value: string} $hit
+     * @param mixed $i64 int64 LLVM type from getTypeFromString
+     */
+    private static function storeAttributeCursorHit(
+        Context $context,
+        \PHPCompiler\JIT\Builtin\Type\Object_ $objectType,
+        Value $obj,
+        array $hit,
+        $i64
+    ): void {
+        $nodeTypeVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_NATIVE_LONG,
+            JITVariable::KIND_VALUE,
+            $i64->constInt(XmlReaderConstants::ATTRIBUTE, true)
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, self::CLASS_NAME, VmXmlReader::PROP_NODE_TYPE),
+            $nodeTypeVar,
+            JITVariable::TYPE_NATIVE_LONG
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, self::CLASS_NAME, VmXmlReader::PROP_NAME),
+            self::stringLlvm($context, $hit['name']),
+            JITVariable::TYPE_STRING
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, self::CLASS_NAME, VmXmlReader::PROP_VALUE),
+            self::stringLlvm($context, $hit['value']),
+            JITVariable::TYPE_STRING
+        );
     }
 
     /**
