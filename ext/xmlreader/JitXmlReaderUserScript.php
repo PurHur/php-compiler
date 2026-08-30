@@ -573,6 +573,36 @@ final class JitXmlReaderUserScript
         return self::emitPosNullableStringSwitch($context, $args[0], $byPos, 'getAttributeNo');
     }
 
+    /**
+     * XMLReader::lookupNamespace() leftover of getAttributeNs (#35929 / #35924 / #27299 / #19396).
+     * php-src: zim_XMLReader_lookupNamespace / xmlTextReaderLookupNamespace
+     */
+    public static function tryLookupNamespace(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot()
+            || null === self::$lastNsScopes
+            || null === self::$lastEvents
+        ) {
+            return null;
+        }
+        if (\count($args) < 2) {
+            throw new \LogicException('XMLReader::lookupNamespace() expects $this and $prefix');
+        }
+        $prefix = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        if (null === $prefix) {
+            return null;
+        }
+        if ('' === $prefix) {
+            throw new \ValueError('XMLReader::lookupNamespace(): Argument #1 ($prefix) cannot be empty');
+        }
+        $byPos = [];
+        foreach (self::$lastNsScopes as $nsScope) {
+            $byPos[] = \array_key_exists($prefix, $nsScope) ? $nsScope[$prefix] : null;
+        }
+
+        return self::emitPosNullableStringSwitch($context, $args[0], $byPos, 'lookupNamespace');
+    }
+
     /** @return ?string Attribute value at pos for exact name, or null (ELEMENT-only). */
     private static function lookupAttributeAtPos(int $pos, string $name): ?string
     {

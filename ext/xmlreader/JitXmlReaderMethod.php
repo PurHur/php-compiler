@@ -36,6 +36,8 @@ final class JitXmlReaderMethod
             'getattributens' => JitXmlReaderUserScript::tryGetAttributeNs($context, ...$args),
             // leftover of getAttribute (#35924 / #35918 / #27299) — php-src zim_XMLReader_getAttributeNo
             'getattributeno' => JitXmlReaderUserScript::tryGetAttributeNo($context, ...$args),
+            // leftover of getAttributeNs (#35929 / #35924) — php-src zim_XMLReader_lookupNamespace
+            'lookupnamespace' => JitXmlReaderUserScript::tryLookupNamespace($context, ...$args),
             default => null,
         };
         if (null === $result) {
