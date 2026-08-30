@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\xmlwriter;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -53,6 +54,88 @@ final class JitXmlWriterUserScript
         $ok = $writer->openMemory();
 
         return self::boolValue($context, $ok);
+    }
+
+    /**
+     * XMLWriter::toMemory() — PHP 8.4 static factory leftover of openMemory (#35890 / #19606).
+     * Host has no toMemory; fold as new XMLWriter + openMemory.
+     * php-src: zim_XMLWriter_toMemory
+     */
+    public static function tryToMemory(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot()
+            || !\extension_loaded('xmlwriter')
+            || !\class_exists(\XMLWriter::class, false)
+        ) {
+            return null;
+        }
+        $writer = new \XMLWriter();
+        if (!$writer->openMemory()) {
+            return null;
+        }
+
+        return self::materializeFactoryWriter($context, $writer);
+    }
+
+    /**
+     * XMLWriter::toUri() — PHP 8.4 static factory leftover of openUri (#35890 / #19606).
+     * Host has no toUri; fold as new XMLWriter + openUri (URI written at compile time).
+     * php-src: zim_XMLWriter_toUri
+     */
+    public static function tryToUri(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot()
+            || !\extension_loaded('xmlwriter')
+            || !\class_exists(\XMLWriter::class, false)
+            || !isset($args[0])
+        ) {
+            return null;
+        }
+        $uri = JitStringBuiltinArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString;
+        if (null === $uri || '' === $uri || str_starts_with($uri, '__phpc_xw_')) {
+            return null;
+        }
+        $writer = new \XMLWriter();
+        $ok = @$writer->openUri($uri);
+        if (!$ok) {
+            return null;
+        }
+
+        return self::materializeFactoryWriter($context, $writer);
+    }
+
+    /**
+     * Attach the host writer from the last factory call onto the ASSIGN result slot (#35890).
+     */
+    public static function attachLastWriterTo(JITVariable $receiver): void
+    {
+        if (null === self::$lastWriter) {
+            return;
+        }
+        self::store($receiver, self::$lastWriter);
+    }
+
+    /**
+     * Allocate a thin XMLWriter object box and track $writer via lastWriter for later methods.
+     */
+    private static function materializeFactoryWriter(Context $context, \XMLWriter $writer): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'xmlwriter_factory_cont');
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup('XMLWriter');
+        $obj = $objectType->allocate($classId);
+        $objectType->markObjectConstructed($obj);
+
+        self::$lastWriter = $writer;
+
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            JitValueBox::pointer($context, $slot),
+            $obj
+        );
+
+        return JitValueBox::normalizeValuePtr($context, $slot);
     }
 
     /**

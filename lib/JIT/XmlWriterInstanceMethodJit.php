@@ -11,6 +11,9 @@ final class XmlWriterInstanceMethodJit
 {
     /** @var array<string, true> */
     private const METHODS = [
+        // PHP 8.4 static factories leftover of openMemory/openUri (#35890 / #19606)
+        'xmlwriter::tomemory' => true,
+        'xmlwriter::touri' => true,
         'xmlwriter::openmemory' => true,
         // leftover of openMemory AOT (#19551 / #35872) — php-src zim_XMLWriter_openUri
         'xmlwriter::openuri' => true,
@@ -77,6 +80,16 @@ final class XmlWriterInstanceMethodJit
         }
         if (isset($context->functionProxies[$lc])
             && !($context->functionProxies[$lc] instanceof Call\ExternalMethod)) {
+            return;
+        }
+        if ('xmlwriter::tomemory' === $lc) {
+            $context->functionProxies[$lc] = new Call\XmlWriterToMemory();
+
+            return;
+        }
+        if ('xmlwriter::touri' === $lc) {
+            $context->functionProxies[$lc] = new Call\XmlWriterToUri();
+
             return;
         }
         $methodLc = substr($lc, \strlen('xmlwriter::'));

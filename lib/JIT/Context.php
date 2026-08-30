@@ -1160,6 +1160,15 @@ class Context {
                 return $this->functionProxies[$lc];
             }
         }
+        if (XmlWriterInstanceMethodJit::isXmlWriterInstanceMethodProxy($lc)
+            && XmlWriterInstanceMethodJit::isUserScriptAot()
+        ) {
+            XmlWriterInstanceMethodJit::ensureProxy($this, $lc);
+            if (isset($this->functionProxies[$lc])
+                && !($this->functionProxies[$lc] instanceof Call\ExternalMethod)) {
+                return $this->functionProxies[$lc];
+            }
+        }
 
         return null;
     }
@@ -1427,6 +1436,11 @@ class Context {
             && XmlReaderInstanceMethodJit::isUserScriptAot()
         ) {
             XmlReaderInstanceMethodJit::ensureProxy($this, $lc);
+        }
+        if (XmlWriterInstanceMethodJit::isXmlWriterInstanceMethodProxy($lc)
+            && XmlWriterInstanceMethodJit::isUserScriptAot()
+        ) {
+            XmlWriterInstanceMethodJit::ensureProxy($this, $lc);
         }
         if ($this->functionProxyIsCallable($lc)) {
             return true;
@@ -2438,6 +2452,11 @@ class Context {
         XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::read');
         if (CompilerVersion::supportsXmlReaderFactories()) {
             XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::fromstring');
+        }
+        // XMLWriter::toMemory / toUri — avoid ExternalMethod silent NULL on thin AOT (#35890 / #19606).
+        if (CompilerVersion::supportsXmlWriterFactories()) {
+            XmlWriterInstanceMethodJit::ensureProxy($this, 'xmlwriter::tomemory');
+            XmlWriterInstanceMethodJit::ensureProxy($this, 'xmlwriter::touri');
         }
         if (CompilerVersion::supportsDomTokenList()) {
             DomInstanceMethodJit::registerKnownProxies($this);
