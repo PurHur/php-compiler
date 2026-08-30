@@ -2425,10 +2425,12 @@ class Context {
         $this->functionProxies['pdo::__construct'] = new Call\PdoConstruct();
         $this->functionProxies['pdo::getavailabledrivers'] = new Call\PdoGetAvailableDrivers();
         $this->functionProxies['pdo::quote'] = new Call\PdoQuote();
-        // Dom\XMLDocument / Dom\HTMLDocument::createFromString — avoid ExternalMethod silent NULL (#27108, #27300).
+        // Dom\XMLDocument / Dom\HTMLDocument::createFromString / createFromFile — avoid ExternalMethod silent NULL (#27108, #27300, #35804).
         if (CompilerVersion::supportsDomLivingStandardNamespace()) {
             $this->functionProxies['dom\\xmldocument::createfromstring'] = new Call\DomXmlDocumentCreateFromString();
             $this->functionProxies['dom\\htmldocument::createfromstring'] = new Call\DomHtmlDocumentCreateFromString();
+            $this->functionProxies['dom\\xmldocument::createfromfile'] = new Call\DomXmlDocumentCreateFromFile();
+            $this->functionProxies['dom\\htmldocument::createfromfile'] = new Call\DomHtmlDocumentCreateFromFile();
         }
         // XMLReader::XML / fromString / read — avoid ExternalMethod silent NULL on thin AOT (#27299, #28670).
         // XML() exists on all profiles; fromString is PROFILE≥8.4 only.

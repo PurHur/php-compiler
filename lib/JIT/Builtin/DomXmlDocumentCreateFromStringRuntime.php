@@ -17,6 +17,8 @@ final class DomXmlDocumentCreateFromStringRuntime
 {
     public const ABI_NAME = '__phpc_dom_xml_document_create_from_string';
 
+    public const ABI_FILE = '__phpc_dom_xml_document_create_from_file';
+
     private const HELPER_PATH = '/ext/dom/DomXmlDocumentCreateFromStringJitHelper.php';
 
     private const HELPER = 'PHPCompiler\\ext\\dom\\DomXmlDocumentCreateFromStringJitHelper::createFromStringArgv';
@@ -47,6 +49,17 @@ final class DomXmlDocumentCreateFromStringRuntime
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
             '#27108'
+        );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI_FILE,
+            'dom_xml_document_create_from_file_bridge',
+            [$strPtr, $i64],
+            $objPtr,
+            'PHPCompiler\\ext\\dom\\DomXmlDocumentCreateFromStringJitHelper::createFromFileArgv',
+            self::HELPER_PATH,
+            ['PHPCompiler\\ext\\dom\\DomXmlDocumentCreateFromStringJitHelper::createFromFileArgv'],
+            '#35804'
         );
     }
 }

@@ -307,6 +307,40 @@ final class JitDomDocumentMethodKernel
         );
     }
 
+    /** Dom\XMLDocument::createFromFile() — thin AOT (#35804). */
+    public static function ensureXmlDocumentCreateFromFileBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomXmlDocumentCreateFromStringRuntime::ABI_FILE,
+            'dom_xml_document_create_from_file_user_script',
+            [
+                $context->getTypeFromString('__string__*'),
+                $context->getTypeFromString('int64'),
+            ],
+            $context->getTypeFromString('__object__*'),
+            'PHPCompiler\\ext\\dom\\DomXmlDocumentCreateFromStringJitHelper::createFromFileArgv',
+            '/ext/dom/DomXmlDocumentCreateFromStringJitHelper.php'
+        );
+    }
+
+    /** Dom\HTMLDocument::createFromFile() — thin AOT (#35804). */
+    public static function ensureHtmlDocumentCreateFromFileBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomHtmlDocumentCreateFromStringRuntime::ABI_FILE,
+            'dom_html_document_create_from_file_user_script',
+            [
+                $context->getTypeFromString('__string__*'),
+                $context->getTypeFromString('int64'),
+            ],
+            $context->getTypeFromString('__object__*'),
+            'PHPCompiler\\ext\\dom\\DomHtmlDocumentCreateFromStringJitHelper::createFromFileArgv',
+            '/ext/dom/DomHtmlDocumentCreateFromStringJitHelper.php'
+        );
+    }
+
     /** Dom\HTMLDocument::createFromString() — thin AOT (#27300). */
     public static function ensureHtmlDocumentCreateFromStringBridge(Context $context): void
     {

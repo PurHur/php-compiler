@@ -33,4 +33,21 @@ final class DomHtmlDocumentCreateFromStringJitHelper
 
         return $var->toObject();
     }
+
+    /** Dom\HTMLDocument::createFromFile() NestedJIT (#35804). */
+    public static function createFromFileArgv(
+        Context $ctx,
+        string $path,
+        int $options = 0
+    ): ObjectEntry {
+        $var = VmDomLiving::createFromFile($ctx, $path, $options);
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            throw new \DOMException(
+                'Invalid State Error',
+                DomExceptionConstants::INVALID_STATE_ERR
+            );
+        }
+
+        return $var->toObject();
+    }
 }
