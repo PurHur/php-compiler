@@ -154,6 +154,11 @@ final class json_encode extends Internal
             throw new \LogicException('json_encode() flags not supported at runtime in this compiler build');
         }
 
+        // DatePeriod before DateTime — leaked start instant on $this must not win (#34591 / #14144).
+        $datePeriodFold = JitJsonEncode::tryFoldDatePeriod($context, $args[0], $knownFlags ?? 0);
+        if (null !== $datePeriodFold) {
+            return $datePeriodFold;
+        }
         $dateFold = JitJsonEncode::tryFoldDateTimeFamily($context, $args[0], $knownFlags ?? 0);
         if (null !== $dateFold) {
             return $dateFold;
