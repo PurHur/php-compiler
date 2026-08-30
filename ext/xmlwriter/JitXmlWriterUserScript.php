@@ -144,7 +144,7 @@ final class JitXmlWriterUserScript
         ) {
             return null;
         }
-        $uri = self::resolveStreamUri($args[0]);
+        $uri = self::resolveFopenPath($args[0]);
         if (null === $uri) {
             return null;
         }
@@ -161,8 +161,8 @@ final class JitXmlWriterUserScript
         return self::materializeFactoryObject($context, $writer);
     }
 
-    /** Resolve fopen literal path from stream arg token or lastFopenPath. */
-    private static function resolveStreamUri(JITVariable $stream): ?string
+    /** Resolve fopen literal path from stream arg token or lastFopenPath (#35895 / #35900). */
+    public static function resolveFopenPath(JITVariable $stream): ?string
     {
         $token = $stream->compileTimeString;
         if (null !== $token && isset(self::$fopenPathsByToken[$token])) {
