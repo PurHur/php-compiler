@@ -4621,7 +4621,9 @@ class Object_ extends Type {
             }
         }
         if ('xmlreader' === $lcname) {
-            // Thin AOT: pull-parser cursor + virtual props as real slots (#27299).
+            // Thin AOT: pull-parser cursor + virtual props as real slots (#27299 / #35983).
+            // Layout must be complete before `new XMLReader()` allocates — ensureLayout alone
+            // after construction overflows the object and corrupts __xr_pos (read() → false).
             $this->defineProperty(
                 $id,
                 \PHPCompiler\ext\xmlreader\JitXmlReaderUserScript::PROP_POS,
@@ -4630,6 +4632,17 @@ class Object_ extends Type {
             $this->defineProperty($id, 'nodeType', Variable::TYPE_NATIVE_LONG);
             $this->defineProperty($id, 'name', Variable::TYPE_STRING);
             $this->defineProperty($id, 'value', Variable::TYPE_STRING);
+            $this->defineProperty($id, 'depth', Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, 'localName', Variable::TYPE_STRING);
+            $this->defineProperty($id, 'prefix', Variable::TYPE_STRING);
+            $this->defineProperty($id, 'namespaceURI', Variable::TYPE_STRING);
+            $this->defineProperty($id, 'attributeCount', Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, 'hasAttributes', Variable::TYPE_NATIVE_BOOL);
+            $this->defineProperty($id, 'hasValue', Variable::TYPE_NATIVE_BOOL);
+            $this->defineProperty($id, 'isEmptyElement', Variable::TYPE_NATIVE_BOOL);
+            $this->defineProperty($id, 'isDefault', Variable::TYPE_NATIVE_BOOL);
+            $this->defineProperty($id, 'xmlLang', Variable::TYPE_STRING);
+            $this->defineProperty($id, 'baseURI', Variable::TYPE_STRING);
             $pub = \PHPCfg\Func::FLAG_PUBLIC;
             $pubStatic = $pub | \PHPCfg\Func::FLAG_STATIC;
             foreach (['read', 'close', 'next'] as $method) {
