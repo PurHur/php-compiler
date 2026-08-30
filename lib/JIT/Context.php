@@ -2368,6 +2368,9 @@ class Context {
         $this->functionProxies['datetimeimmutable::add'] = new Call\DateTimeAdd(true);
         $this->functionProxies['datetime::sub'] = new Call\DateTimeSub(false);
         $this->functionProxies['datetimeimmutable::sub'] = new Call\DateTimeSub(true);
+        // Procedural date_add/date_sub — Call proxy avoids Internal FUNCCALL prep SIGSEGV (#33781).
+        $this->functionProxies['date_add'] = new Call\ProceduralDateAdd();
+        $this->functionProxies['date_sub'] = new Call\ProceduralDateSub();
         // DateTime::diff — compile-time DateInterval materialize (#27309).
         $this->functionProxies['datetime::diff'] = new Call\DateTimeDiff();
         $this->functionProxies['datetimeimmutable::diff'] = new Call\DateTimeDiff();

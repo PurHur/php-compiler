@@ -87,3 +87,38 @@ final class DateTimeSub implements Call
         return JitDateMutation::invokeObjectSub($context, $this->immutable, ...$args);
     }
 }
+
+/**
+ * date_add() — JIT via Call proxy so FUNCCALL skips Internal densify/adapt (#33781).
+ *
+ * SSOT: {@see JitDateMutation::invokeAdd}
+ * php-src: ext/date/php_date.c — php_date_add
+ */
+final class ProceduralDateAdd implements Call
+{
+    /** @var list<string> php-src ext/date/php_date.stub.php */
+    public array $paramNames = ['object', 'interval'];
+
+    public function call(Context $context, Variable ...$args): Value
+    {
+        // Same lowering as DateTime::add — isProcedural=false IR is AOT-safe (#33781).
+        return JitDateMutation::invokeObjectAdd($context, false, ...$args);
+    }
+}
+
+/**
+ * date_sub() — JIT via Call proxy so FUNCCALL skips Internal densify/adapt (#33781).
+ *
+ * SSOT: {@see JitDateMutation::invokeSub}
+ * php-src: ext/date/php_date.c — php_date_sub
+ */
+final class ProceduralDateSub implements Call
+{
+    /** @var list<string> php-src ext/date/php_date.stub.php */
+    public array $paramNames = ['object', 'interval'];
+
+    public function call(Context $context, Variable ...$args): Value
+    {
+        return JitDateMutation::invokeObjectSub($context, false, ...$args);
+    }
+}
