@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin\Type;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\Refcount;
 use PHPCompiler\JIT\Builtin\StringNaturalCompare;
 use PHPCompiler\JIT\Builtin\StringStrcoll;
@@ -15,6 +16,7 @@ use PHPCompiler\JIT\Builtin\StringTriggerError;
 use PHPCompiler\JIT\Builtin\Type;
 use PHPCompiler\JIT\JitStringCompare;
 use PHPCompiler\JIT\LibcExtern;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM;
 use PHPLLVM\Builder;
@@ -143,8 +145,8 @@ class HashTable extends Type
         // Packed natsort()/natcasesort() — NestedJIT NaturalSortJitHelper aborts under thin AOT (#26975).
         $this->registerFn('__hashtable__sortPackedNatural', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__sortPackedNaturalCase', 'void', ['__hashtable__*']);
-        // Coupled array_multisort() — NestedJIT MultisortJitHelper aborts under thin AOT (#26908).
-        $this->registerFn('__multisort__packed', 'void', ['__hashtable__*', 'int1']);
+        // __multisort__packed registerFn deferred to ensureMultisortPacked (#35904) —
+        // hello-world must not emit coupled-multisort LLVM at HashTable init.
         $this->pointer = $this->context->getTypeFromString('__hashtable__*');
     }
 
@@ -235,7 +237,37 @@ class HashTable extends Type
         $this->implementSortPacked(true, true);
         $this->implementSortPackedNatural(false);
         $this->implementSortPackedNatural(true);
-        $this->implementMultisortPacked();
+        // implementMultisortPacked deferred to ensureMultisortPacked (#35904).
+        $this->context->builder->clearInsertionPosition();
+    }
+
+    /**
+     * Coupled array_multisort() LLVM — first use only (#35904 / peer #26908).
+     *
+     * Restores the caller insert block; implementMultisortPacked positionAtEnd the new fn.
+     */
+    public function ensureMultisortPacked(): void
+    {
+        $name = '__multisort__packed';
+        $existing = $this->context->module->getNamedFunction($name);
+        if (null !== $existing && $existing->countBasicBlocks() > 0) {
+            $this->context->registerFunction($name, $existing);
+
+            return;
+        }
+        $restore = BasicBlockHelper::tryGetInsertBlock($this->context);
+        try {
+            NestedJitCompileScope::run($this->context, function () use ($name, $existing): void {
+                if (null === $existing) {
+                    $this->registerFn($name, 'void', ['__hashtable__*', 'int1']);
+                } else {
+                    $this->context->registerFunction($name, $existing);
+                }
+                $this->implementMultisortPacked();
+            });
+        } finally {
+            BasicBlockHelper::restoreInsertBlock($this->context, $restore);
+        }
     }
 
     private function ensureLibcStrtol(): void
