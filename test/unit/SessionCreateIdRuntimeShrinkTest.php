@@ -22,7 +22,7 @@ final class SessionCreateIdRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('HEX_TABLE', $source);
         $this->assertStringNotContainsString('emitRandomIdString', $source);
         $this->assertStringNotContainsString('hexTableGlobal', $source);
-        $this->assertStringNotContainsString('__compiler_random_bytes', $source);
+        $this->assertStringContainsString('SessionCreateIdJitHelper::randomIdString', $source);
     }
 
     /** Thin STANDALONE AOT must lazy-link create-id ABI (#27258; peer JitSessionStart). */
@@ -44,7 +44,7 @@ final class SessionCreateIdRuntimeShrinkTest extends TestCase
         $prefixed = SessionCreateIdJitHelper::createIdNullable('app-');
         $this->assertIsString($prefixed);
         $this->assertStringStartsWith('app-', $prefixed);
-        $this->assertSame('app-'.SessionCreateIdJitHelper::randomIdString(), $prefixed);
+        $this->assertSame(30, \strlen($prefixed));
 
         $withPrefix = SessionCreateIdJitHelper::createIdWithPrefix('app-');
         $this->assertStringStartsWith('app-', $withPrefix);

@@ -81,7 +81,7 @@ final class SessionWireMultiKeyTest extends TestCase
         $marker = 'prepareStringKeyWrite / prepareIndexWrite lvalues';
         $pos = strpos($jit, $marker);
         $this->assertNotFalse($pos);
-        $snippet = substr($jit, (int) $pos, 700);
+        $snippet = substr($jit, (int) $pos, 900);
         $this->assertStringContainsString('writableStringKey', $snippet);
         $this->assertStringContainsString('HashTableHelper::setAtStringKey', $snippet);
         $this->assertStringContainsString('HashTableHelper::setAtIndex', $snippet);

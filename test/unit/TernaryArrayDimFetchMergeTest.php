@@ -6,12 +6,34 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 use PHPCompiler\Web\Superglobals;
+use PHPCompiler\ext\standard\VmSession;
 
 /**
  * ?: true arm must not reuse isset() dim-key slots (issue #1887, 005-SessionsWeb).
  */
 final class TernaryArrayDimFetchMergeTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        VM\OutputBuffer::reset();
+        VM\SapiOutput::reset();
+        Web\ResponseContext::reset();
+        VmSession::reset();
+    }
+
+    protected function tearDown(): void
+    {
+        VM\OutputBuffer::reset();
+        VM\SapiOutput::reset();
+        Web\ResponseContext::reset();
+        VmSession::reset();
+        putenv('PHP_COMPILER_SESSION_DIR');
+        putenv('REQUEST_METHOD');
+        putenv('REQUEST_BODY');
+        putenv('HTTP_CONTENT_TYPE');
+        parent::tearDown();
+    }
+
     private function runWithPostBody(string $source): string
     {
         putenv('REQUEST_METHOD=POST');

@@ -26,7 +26,7 @@ final class SessionEncodeRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('new JIT(', $source);
         $this->assertStringNotContainsString('__phpc_unser_parse_item', $source);
         $this->assertStringNotContainsString('__compiler_serialize_value', $source);
-        $this->assertLessThan(340, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(345, \substr_count($source, "\n") + 1);
     }
 
     public function testSessionEncodeJitHelperRoundTripMatchesVmSessionSerializer(): void

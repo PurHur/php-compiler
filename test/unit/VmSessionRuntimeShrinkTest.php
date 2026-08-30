@@ -7,6 +7,9 @@ namespace PHPCompiler;
 use PHPCompiler\ext\session\SessionFileStorage;
 use PHPCompiler\ext\standard\VmIni;
 use PHPCompiler\ext\standard\VmSession;
+use PHPCompiler\VM\OutputBuffer;
+use PHPCompiler\VM\SapiOutput;
+use PHPCompiler\Web\ResponseContext;
 use PHPUnit\Framework\TestCase;
 
 /** VmSession GC + file I/O without host Zend delegation (#8072, #6006, #8514). */
@@ -18,11 +21,17 @@ final class VmSessionRuntimeShrinkTest extends TestCase
     {
         $dir = getenv('PHP_COMPILER_SESSION_DIR');
         $this->savedSessionDir = false !== $dir ? $dir : null;
+        OutputBuffer::reset();
+        SapiOutput::reset();
+        ResponseContext::reset();
         VmSession::reset();
     }
 
     protected function tearDown(): void
     {
+        OutputBuffer::reset();
+        SapiOutput::reset();
+        ResponseContext::reset();
         VmSession::reset();
         $runtime = new Runtime();
         VmIni::restore($runtime->vmContext, 'session.gc_maxlifetime');
@@ -36,10 +45,14 @@ final class VmSessionRuntimeShrinkTest extends TestCase
 
     public function testLoadSessionDoesNotReferenceHostUnserialize(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmSession.php');
-        $this->assertStringContainsString('VmUnserializeFormat::decodePayload', $source);
-        $this->assertDoesNotMatchRegularExpression('/@\\\\unserialize\\s*\\(/', $source);
-        $this->assertDoesNotMatchRegularExpression('/(?<!\\\\)unserialize\\s*\\(/', $source);
+        $sessionSource = (string) file_get_contents(__DIR__.'/../../ext/standard/VmSession.php');
+        $serializerSource = (string) file_get_contents(__DIR__.'/../../ext/standard/VmSessionSerializer.php');
+        $this->assertStringContainsString('VmSessionSerializer::decode', $sessionSource);
+        $this->assertStringContainsString('VmSerialize::unserializePayload', $serializerSource);
+        $this->assertStringContainsString('VmUnserializeFormat::decodePayload', $serializerSource);
+        $this->assertDoesNotMatchRegularExpression('/@\\\\unserialize\\s*\\(/', $sessionSource);
+        $this->assertDoesNotMatchRegularExpression('/@\\\\unserialize\\s*\\(/', $serializerSource);
+        $this->assertDoesNotMatchRegularExpression('/(?<!\\\\|::)unserialize\\s*\\(/', $sessionSource);
     }
 
     public function testSessionFileIoDoesNotReferenceHostDelegation(): void
