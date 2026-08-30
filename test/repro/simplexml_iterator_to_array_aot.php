@@ -7,3 +7,5 @@ foreach (iterator_to_array($x) as $k => $v) {
 foreach (iterator_to_array($x, false) as $k => $v) {
     echo $k.'='.(string) $v."\n";
 }
+echo json_encode(iterator_to_array(new SimpleXMLElement('<r><a>1</a><b>2</b></r>')))."\n";
+echo json_encode(iterator_to_array(new SimpleXMLElement('<r><a>1</a><b>2</b></r>'), false))."\n";

@@ -63,6 +63,9 @@ final class JitSimpleXmlUserScript
     /** @var array<string, list<JITVariable>> */
     private static array $xpathListsByToken = [];
 
+    /** @var array<int|string, mixed>|null */
+    private static ?array $pendingIteratorToArrayHostArray = null;
+
     public static function lastConstructParseFailed(): bool
     {
         return self::$lastConstructParseFailed;
@@ -1733,6 +1736,23 @@ final class JitSimpleXmlUserScript
         return true;
     }
 
+    /**
+     * Attach host iterator_to_array wire after Call result assign (#35852 json_encode peer).
+     *
+     * @return bool true when pending host array was applied
+     */
+    public static function applyPendingIteratorToArrayHostArray(JITVariable $result): bool
+    {
+        $pending = self::$pendingIteratorToArrayHostArray;
+        self::$pendingIteratorToArrayHostArray = null;
+        if (null === $pending) {
+            return false;
+        }
+        $result->compileTimeIteratorToArrayHostArray = $pending;
+
+        return true;
+    }
+
     private static function store(JITVariable $receiver, \SimpleXMLElement $tree, bool $asRoot = false): void
     {
         if (null === self::$trees) {
@@ -2090,6 +2110,7 @@ final class JitSimpleXmlUserScript
         if (!\is_array($hostArr)) {
             return null;
         }
+        self::$pendingIteratorToArrayHostArray = $hostArr;
         $out = new JITVariable(
             $context,
             JITVariable::TYPE_HASHTABLE,
@@ -2102,7 +2123,9 @@ final class JitSimpleXmlUserScript
         $i64 = $context->getTypeFromString('int64');
         foreach ($hostArr as $key => $child) {
             if (!($child instanceof \SimpleXMLElement)) {
-                continue;
+                self::$pendingIteratorToArrayHostArray = null;
+
+                return null;
             }
             $classId = $context->type->object->lookup('SimpleXMLElement');
             $obj = $context->type->object->allocate($classId);
@@ -2138,6 +2161,24 @@ final class JitSimpleXmlUserScript
         }
 
         return $context->helper->loadValue($out);
+    }
+
+    /**
+     * json_encode(iterator_to_array($sxe)) — host wire when the array was materialized at compile time (#35852).
+     */
+    public static function tryFoldJsonEncodeIteratorToArrayHost(JITVariable $arg, int $flags): ?string
+    {
+        $arr = $arg->compileTimeIteratorToArrayHostArray ?? null;
+        if (!\is_array($arr)) {
+            return null;
+        }
+        try {
+            $encoded = \json_encode($arr, $flags);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return \is_string($encoded) ? $encoded : null;
     }
 
     /**
