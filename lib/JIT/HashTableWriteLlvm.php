@@ -2392,7 +2392,8 @@ final class HashTableWriteLlvm
             $tmp = HashTableReadLlvm::readStringKeyToValueBox(
                 $context,
                 $lvalue->writableHt,
-                $lvalue->writableStringKey
+                $lvalue->writableStringKey,
+                false
             );
             JitValueBox::copyFromPointer(
                 $context,

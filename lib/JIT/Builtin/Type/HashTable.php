@@ -1745,10 +1745,19 @@ class HashTable extends Type
         );
         $keyBytes = $this->stringDataPtr($key);
         $keyCStr = $this->context->builder->pointerCast($keyBytes, $i8p);
+        $i32 = $this->context->getTypeFromString('int32');
+        $path = $this->context->jitAotEntryScriptPath;
+        $file = $this->context->builder->pointerCast(
+            $this->context->constantFromString('' !== $path ? $path : 'Standard input code'),
+            $i8p
+        );
+        $line = $i32->constInt(0, false);
         $this->context->builder->call(
             $this->context->lookupFunction('__compiler_undefined_array_key_warning_cstr'),
             $keyCStr,
-            $keyLen
+            $keyLen,
+            $file,
+            $line
         );
         $this->context->builder->branch($merge);
         $this->context->builder->positionAtEnd($hasValue);

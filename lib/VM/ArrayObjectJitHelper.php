@@ -612,10 +612,14 @@ final class ArrayObjectJitHelper
         $keyBytes = $context->builder->structGep($keyStr, $strMap['value']);
         $i8p = $context->getTypeFromString('int8*');
         $keyCStr = $context->builder->pointerCast($keyBytes, $i8p);
+        $file = HashTableReadLlvm::undefinedArrayKeyWarningFilePtr($context);
+        $line = HashTableReadLlvm::undefinedArrayKeyWarningLineVal($context);
         $context->builder->call(
             $context->lookupFunction('__compiler_undefined_array_key_warning_cstr'),
             $keyCStr,
-            $keyLen
+            $keyLen,
+            $file,
+            $line
         );
         $context->builder->branch($doneBb);
         $context->builder->positionAtEnd($afterStr);
@@ -632,7 +636,9 @@ final class ArrayObjectJitHelper
         $longKey = $context->builder->call($context->lookupFunction('__value__readLong'), $valPtr);
         $context->builder->call(
             $context->lookupFunction('__compiler_undefined_array_key_warning_long'),
-            $longKey
+            $longKey,
+            $file,
+            $line
         );
         $context->builder->branch($doneBb);
         $context->builder->positionAtEnd($doneBb);

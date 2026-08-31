@@ -83,13 +83,20 @@ final class HashTableReadLlvm
      * Lvalue marker for $arr['key'] = … without reading the old value first (#107).
      */
 
-    public static function readStringKeyToValueBox(Context $context, Value $ht, Value $keyStr): Variable
-    {
+    public static function readStringKeyToValueBox(
+        Context $context,
+        Value $ht,
+        Value $keyStr,
+        bool $warnOnMissing = true
+    ): Variable {
         $tag = 'sk'.(string) self::nextSeq();
         $slot = JitValueBox::alloc($context);
         $destPtr = JitValueBox::pointer($context, $slot);
+        $lookupFn = $warnOnMissing
+            ? '__hashtable__readStringKeyValue'
+            : '__hashtable__peekStringKeyValue';
         $valPtr = $context->builder->call(
-            $context->lookupFunction('__hashtable__readStringKeyValue'),
+            $context->lookupFunction($lookupFn),
             $ht,
             $keyStr
         );
@@ -704,11 +711,15 @@ final class HashTableReadLlvm
         } else {
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dim_inc_ukey_warn_setup');
         }
+        $file = self::undefinedArrayKeyWarningFilePtr($context);
+        $line = self::undefinedArrayKeyWarningLineVal($context);
 
         if (Variable::TYPE_NATIVE_LONG === $dim->type) {
             $context->builder->call(
                 $context->lookupFunction('__compiler_undefined_array_key_warning_long'),
-                $context->helper->loadValue($dim)
+                $context->helper->loadValue($dim),
+                $file,
+                $line
             );
 
             return;
@@ -723,7 +734,9 @@ final class HashTableReadLlvm
             $context->builder->call(
                 $context->lookupFunction('__compiler_undefined_array_key_warning_cstr'),
                 $keyCStr,
-                $keyLen
+                $keyLen,
+                $file,
+                $line
             );
 
             return;
@@ -759,7 +772,9 @@ final class HashTableReadLlvm
             $context->builder->call(
                 $context->lookupFunction('__compiler_undefined_array_key_warning_cstr'),
                 $keyCStr,
-                $keyLen
+                $keyLen,
+                $file,
+                $line
             );
             $context->builder->branch($doneBb);
             $context->builder->positionAtEnd($afterStr);
@@ -776,7 +791,9 @@ final class HashTableReadLlvm
             $longKey = $context->builder->call($context->lookupFunction('__value__readLong'), $valPtr);
             $context->builder->call(
                 $context->lookupFunction('__compiler_undefined_array_key_warning_long'),
-                $longKey
+                $longKey,
+                $file,
+                $line
             );
             $context->builder->branch($doneBb);
             $context->builder->positionAtEnd($doneBb);
@@ -794,9 +811,29 @@ final class HashTableReadLlvm
             $context->builder->call(
                 $context->lookupFunction('__compiler_undefined_array_key_warning_cstr'),
                 $keyCStr,
-                $keyLen
+                $keyLen,
+                $file,
+                $line
             );
         }
+    }
+
+    public static function undefinedArrayKeyWarningFilePtr(Context $context): Value
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        $path = $context->jitAotEntryScriptPath;
+
+        return $context->builder->pointerCast(
+            $context->constantFromString('' !== $path ? $path : 'Standard input code'),
+            $i8p
+        );
+    }
+
+    public static function undefinedArrayKeyWarningLineVal(Context $context): Value
+    {
+        $i32 = $context->getTypeFromString('int32');
+
+        return $i32->constInt(max(0, $context->callSiteLine), false);
     }
 
     /**

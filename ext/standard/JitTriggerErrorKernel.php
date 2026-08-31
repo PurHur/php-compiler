@@ -11,6 +11,9 @@ use PHPCompiler\JIT\Builtin\SilenceRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\LibcExtern;
+use PHPCompiler\VM\ErrorReporter;
+use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -23,7 +26,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  *
  * Standalone AOT (#21300): drop dishonest no-op thin ABI. trigger_error records via
  * {@see LastErrorRuntime} and prints via thin libc fprintf (user-script AOT has no
- * honest PHP fwrite(STDERR)). Undefined-array-key NestedJITs {@see TriggerErrorJitHelper}.
+ * honest PHP fwrite(STDERR)). Undefined-array-key warnings record via {@see LastErrorRuntime}
+ * and gate stderr on {@see SilenceRuntime} (peer trigger_error / #35563).
  *
  * Do not re-add Type always-on empty decls — leftover mint trigger_error.1 /
  * undefined_array_key_warning_*.1 (#31894 / #32122 / #33234 / #33249).
@@ -40,6 +44,10 @@ final class JitTriggerErrorKernel
     private const UNDEF_KEY_LONG_HELPER = 'PHPCompiler\\ext\\standard\\TriggerErrorJitHelper::undefinedArrayKeyLong';
 
     private const E_USER_ERROR = 256;
+
+    private const E_WARNING = ErrorReporter::E_WARNING;
+
+    private const UNDEF_KEY_MSG_BUF = 256;
 
     /** @var list<string> */
     private const UNDEF_HELPERS = [
@@ -138,8 +146,9 @@ final class JitTriggerErrorKernel
         }
         $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
+        $i32 = $context->getTypeFromString('int32');
         $voidTy = $context->getTypeFromString('void');
-        $ft = $context->context->functionType($voidTy, false, $i8p, $sizeT);
+        $ft = $context->context->functionType($voidTy, false, $i8p, $sizeT, $i8p, $i32);
         $fn = $context->module->addFunction($abiName, $ft);
         $context->registerFunction($abiName, $fn);
     }
@@ -154,8 +163,10 @@ final class JitTriggerErrorKernel
             return;
         }
         $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
         $voidTy = $context->getTypeFromString('void');
-        $ft = $context->context->functionType($voidTy, false, $i64);
+        $ft = $context->context->functionType($voidTy, false, $i64, $i8p, $i32);
         $fn = $context->module->addFunction($abiName, $ft);
         $context->registerFunction($abiName, $fn);
     }
@@ -320,16 +331,15 @@ final class JitTriggerErrorKernel
         $context->builder->positionAtEnd($entry);
         $key = $fn->getParam(0);
         $len = $fn->getParam(1);
+        $file = $fn->getParam(2);
+        $line = $fn->getParam(3);
         $i8p = $context->getTypeFromString('int8*');
         $nullKey = $context->builder->icmp(Builder::INT_EQ, $key, $i8p->constNull());
         $retBb = $fn->appendBasicBlock('undef_key_cstr_ret');
         $bodyBb = $fn->appendBasicBlock('undef_key_cstr_body');
         $context->builder->branchIf($nullKey, $retBb, $bodyBb);
         $context->builder->positionAtEnd($bodyBb);
-        $i64 = $context->getTypeFromString('int64');
-        $keyStr = self::cstrToStringWithLength($context, $key, $context->builder->zExt($len, $i64));
-        $context->builder->call(self::helperFunction($context, self::UNDEF_KEY_HELPER), $keyStr);
-        $context->builder->branch($retBb);
+        self::emitUndefinedArrayKeyWarningCstr($context, $fn, $key, $len, $file, $line, $retBb);
         $context->builder->positionAtEnd($retBb);
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
@@ -348,13 +358,143 @@ final class JitTriggerErrorKernel
 
         $fn = $probe;
         $entry = $fn->appendBasicBlock('undef_key_long_bridge_entry');
+        $retBb = $fn->appendBasicBlock('undef_key_long_ret');
         $context->builder->positionAtEnd($entry);
-        $context->builder->call(
-            self::helperFunction($context, self::UNDEF_KEY_LONG_HELPER),
-            $fn->getParam(0)
-        );
+        self::emitUndefinedArrayKeyWarningLong($context, $fn, $fn->getParam(0), $fn->getParam(1), $fn->getParam(2), $retBb);
+        $context->builder->positionAtEnd($retBb);
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
+    }
+
+    private static function emitUndefinedArrayKeyWarningCstr(
+        Context $context,
+        LlvmFunction $fn,
+        Value $key,
+        Value $keyLen,
+        Value $file,
+        Value $line,
+        BasicBlock $mergeBb
+    ): void {
+        LibcExtern::ensureSnprintf($context);
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $charPtr = $context->getTypeFromString('char*');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $bufSize = $sizeT->constInt(self::UNDEF_KEY_MSG_BUF, false);
+        $msgBuf = BasicBlockHelper::entryAllocaForFunction($context, $fn, $i8->arrayType(self::UNDEF_KEY_MSG_BUF));
+        $msgChar = $context->builder->pointerCast($msgBuf, $charPtr);
+        $fmt = $context->builder->pointerCast(
+            $context->constantFromString('Undefined array key "%.*s"'),
+            $charPtr
+        );
+        $written = $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $msgChar,
+            $bufSize,
+            $fmt,
+            $context->builder->trunc($keyLen, $i32),
+            $context->builder->pointerCast($key, $charPtr)
+        );
+        self::emitRecordedCliWarning(
+            $context,
+            $fn,
+            $context->builder->pointerCast($msgChar, $i8p),
+            $context->builder->zExt($written, $sizeT),
+            $file,
+            $line,
+            $mergeBb
+        );
+    }
+
+    private static function emitUndefinedArrayKeyWarningLong(
+        Context $context,
+        LlvmFunction $fn,
+        Value $key,
+        Value $file,
+        Value $line,
+        BasicBlock $mergeBb
+    ): void {
+        LibcExtern::ensureSnprintf($context);
+        $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
+        $charPtr = $context->getTypeFromString('char*');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $bufSize = $sizeT->constInt(self::UNDEF_KEY_MSG_BUF, false);
+        $msgBuf = BasicBlockHelper::entryAllocaForFunction($context, $fn, $i8->arrayType(self::UNDEF_KEY_MSG_BUF));
+        $msgChar = $context->builder->pointerCast($msgBuf, $charPtr);
+        $fmt = $context->builder->pointerCast(
+            $context->constantFromString('Undefined array key %lld'),
+            $charPtr
+        );
+        $written = $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $msgChar,
+            $bufSize,
+            $fmt,
+            $key
+        );
+        self::emitRecordedCliWarning(
+            $context,
+            $fn,
+            $context->builder->pointerCast($msgChar, $i8p),
+            $context->builder->zExt($written, $sizeT),
+            $file,
+            $line,
+            $mergeBb
+        );
+    }
+
+    /**
+     * Record E_WARNING and maybe print to stderr — gates on phpc_aot_error_reporting (#35563).
+     */
+    private static function emitRecordedCliWarning(
+        Context $context,
+        LlvmFunction $fn,
+        Value $message,
+        Value $messageLen,
+        Value $file,
+        Value $line,
+        BasicBlock $mergeBb
+    ): void {
+        $i32 = $context->getTypeFromString('int32');
+        $level = $i32->constInt(self::E_WARNING, false);
+        $afterRecordBb = $fn->appendBasicBlock('undef_key_warn_after_record');
+
+        $context->builder->call(
+            $context->lookupFunction('__phpc_last_error_record'),
+            $level,
+            $message,
+            $messageLen,
+            $file,
+            $line
+        );
+        $context->builder->branch($afterRecordBb);
+
+        $context->builder->positionAtEnd($afterRecordBb);
+        $stderrBb = $fn->appendBasicBlock('undef_key_warn_stderr');
+        $enabled = $context->builder->call(
+            $context->lookupFunction('__compiler_phpc_error_level_enabled'),
+            $level
+        );
+        $shouldPrint = $context->builder->icmp(
+            Builder::INT_NE,
+            $enabled,
+            $i32->constInt(0, false)
+        );
+        $context->builder->branchIf($shouldPrint, $stderrBb, $mergeBb);
+
+        $context->builder->positionAtEnd($stderrBb);
+        $context->builder->call(
+            $context->lookupFunction('__phpc_stderr_print_cli_error'),
+            $level,
+            $message,
+            $file,
+            $line
+        );
+        $context->builder->branch($mergeBb);
     }
 
     private static function implementTriggerErrorBridge(Context $context): void

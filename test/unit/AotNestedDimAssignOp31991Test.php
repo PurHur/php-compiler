@@ -40,6 +40,8 @@ final class AotNestedDimAssignOp31991Test extends TestCase
         $root = dirname(__DIR__, 2);
         $src = $root.'/test/differential/cases/i31991_nested_dim_assign_op_undef.php';
         $bin = sys_get_temp_dir().'/phpc_aot_nested_dim_31991_'.getmypid().'.bin';
+        $outFile = sys_get_temp_dir().'/phpc_aot_nested_dim_31991_'.getmypid().'.out';
+        $errFile = sys_get_temp_dir().'/phpc_aot_nested_dim_31991_'.getmypid().'.err';
         $compile = 'env PHP_COMPILER_HELPER_RUNTIME_O=0 '.escapeshellarg(PHP_BINARY).' '
             .escapeshellarg($root.'/bin/compile.php')
             .' -o '.escapeshellarg($bin).' '.escapeshellarg($src).' 2>&1';
@@ -47,12 +49,22 @@ final class AotNestedDimAssignOp31991Test extends TestCase
         $this->assertSame(0, $compileRc, implode("\n", $compileOut));
         $this->assertFileExists($bin);
         try {
-            $runOut = [];
-            exec(escapeshellarg($bin).' 2>&1', $runOut, $runRc);
-            $this->assertSame(0, $runRc, implode("\n", $runOut));
-            $this->assertSame(self::EXPECT, implode("\n", $runOut)."\n");
+            exec(
+                escapeshellarg($bin)
+                    .' >'.escapeshellarg($outFile)
+                    .' 2>'.escapeshellarg($errFile),
+                $ignored,
+                $runRc
+            );
+            $stdout = (string) file_get_contents($outFile);
+            $stderr = (string) file_get_contents($errFile);
+            $this->assertSame(0, $runRc, $stderr.$stdout);
+            $this->assertSame(self::EXPECT, $stdout);
+            $this->assertGreaterThanOrEqual(4, substr_count($stderr, 'Undefined array key'));
         } finally {
             @unlink($bin);
+            @unlink($outFile);
+            @unlink($errFile);
         }
     }
 }
