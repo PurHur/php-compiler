@@ -364,7 +364,7 @@ final class JitDomImportNode
         }
         if ([] !== $attrInfo['pairs']) {
             JitDomCreateElement::storeAttributesPresence($context, $element, $attrInfo['pairs']);
-            if (self::importedAttrsStampHtmlIdBearing($sourceNode, $attrInfo['pairs'], $fromXml)) {
+            if (self::importedAttrsStampHtmlIdBearing($sourceNode, $attrInfo['pairs'], $fromXml, $documentVar, $tag)) {
                 DomUserScriptAttributeCacheLlvm::markIdBearingLiteral('', 'id', true);
                 DomUserScriptAttributeCacheLlvm::storeIdBearingGlobal($context, true);
             }
@@ -384,6 +384,12 @@ final class JitDomImportNode
         } else {
             foreach ($attrInfo['pairs'] as $pair) {
                 if ('id' === $pair['qname'] && '' !== $pair['value']) {
+                    // Plain non-ID id on an HTML destination must not index until remove+set (#23514).
+                    if (self::destinationHasCompileTimeHtmlLoad($documentVar)
+                        && !DomUserScriptAttributeCacheLlvm::isIdBearingLiteral('', 'id')
+                    ) {
+                        break;
+                    }
                     self::storeElementInIdMap($context, $documentVar, $pair['value'], $element);
                     break;
                 }
@@ -1126,7 +1132,9 @@ final class JitDomImportNode
     private static function importedAttrsStampHtmlIdBearing(
         JITVariable $sourceNode,
         array $pairs,
-        bool $fromXml
+        bool $fromXml,
+        JITVariable $destinationDocument,
+        string $tag
     ): bool {
         $hasId = false;
         foreach ($pairs as $pair) {
@@ -1138,13 +1146,25 @@ final class JitDomImportNode
         if (!$hasId) {
             return false;
         }
-        if (!$fromXml) {
+        $sourceIsXml = $fromXml
+            || null !== $sourceNode->compileTimeDomLoadXml
+            || null !== JitDomLoadXMLUserScript::compileTimeXmlFor($sourceNode)
+            || null !== JitDomGetNodePath::$lastDocumentElementXml;
+        if ($sourceIsXml && self::destinationHasCompileTimeHtmlLoad($destinationDocument)) {
+            // DTD ATTLIST ID / xml:id still promote; plain id does not (#23514).
+            foreach ($pairs as $pair) {
+                if ('xml:id' === $pair['qname'] && '' !== $pair['value']) {
+                    return true;
+                }
+            }
+
+            return null !== self::compileTimeXmlIdLiteralForImport($sourceNode, $tag, $pairs);
+        }
+        if (!$fromXml && !$sourceIsXml) {
             return true;
         }
         // Plain XML id into HTML must not promote until remove+set (#23514).
-        if (null !== $sourceNode->compileTimeDomLoadXml
-            || null !== JitDomLoadXMLUserScript::compileTimeXmlFor($sourceNode)
-        ) {
+        if ($sourceIsXml) {
             return false;
         }
 

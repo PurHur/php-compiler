@@ -1274,52 +1274,57 @@ final class JitDomAttributeNodeNS
             JitDomNamedNodeMap::appendAttrPin($context, $element, $attr);
             if ('id' === $nameLit) {
                 $document = self::loadOwnerDocumentObject($context, $element);
-                if (null !== $oldIdLit && '' !== $oldIdLit && $oldIdLit !== $valueLit) {
-                    JitDomLoadXMLUserScript::removeElementFromIdMap($context, $document, $oldIdLit);
+                // HTML htmlSetProp: creating a *new* id attr stamps ID-bearing (#23514).
+                $stampNewHtmlId = null !== JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml()
+                    && !$hadIdAttr;
+                if ($stampNewHtmlId) {
+                    DomUserScriptAttributeCacheLlvm::markIdBearingLiteral('', 'id', true);
+                    DomUserScriptAttributeCacheLlvm::storeIdBearingGlobal($context, true);
                 }
-                if ('' !== $valueLit) {
-                    $idStr = $context->builder->load($context->constantStringFromString($valueLit));
-                    // Rebind on the same element (a→b) may overwrite after remove above (#19870).
-                    // First id on a node, or stale cache oldId===newId, must stay first-wins (#29694).
+                $idBearing = DomUserScriptAttributeCacheLlvm::isIdBearingLiteral('', 'id');
+                if ($idBearing) {
                     if (null !== $oldIdLit && '' !== $oldIdLit && $oldIdLit !== $valueLit) {
-                        JitDomLoadXMLUserScript::storeElementInIdMap(
-                            $context,
-                            $document,
-                            $valueLit,
-                            $element
-                        );
-                    } else {
-                        JitDomLoadXMLUserScript::storeElementInIdMapFromValueFirstWins(
-                            $context,
-                            $document,
-                            $idStr,
-                            $element
-                        );
+                        JitDomLoadXMLUserScript::removeElementFromIdMap($context, $document, $oldIdLit);
+                    }
+                    if ('' !== $valueLit) {
+                        $idStr = $context->builder->load($context->constantStringFromString($valueLit));
+                        // Rebind on the same element (a→b) may overwrite after remove above (#19870).
+                        // First id on a node, or stale cache oldId===newId, must stay first-wins (#29694).
+                        if (null !== $oldIdLit && '' !== $oldIdLit && $oldIdLit !== $valueLit) {
+                            JitDomLoadXMLUserScript::storeElementInIdMap(
+                                $context,
+                                $document,
+                                $valueLit,
+                                $element
+                            );
+                        } else {
+                            JitDomLoadXMLUserScript::storeElementInIdMapFromValueFirstWins(
+                                $context,
+                                $document,
+                                $idStr,
+                                $element
+                            );
+                        }
                     }
                 }
                 // Retarget single-slot cache when receiver matches, or oldId matches cached
                 // id (loadHTML getElementById pointer mismatch; #35329 / re-#19870).
-                DomUserScriptElementCacheLlvm::rebindIdIfElement(
-                    $context,
-                    $element,
-                    $valueLit,
-                    $oldIdLit
-                );
+                if ($idBearing) {
+                    DomUserScriptElementCacheLlvm::rebindIdIfElement(
+                        $context,
+                        $element,
+                        $valueLit,
+                        $oldIdLit
+                    );
+                }
                 JitDomSetIdAttribute::rememberSetAttributeIdValue($valueLit);
                 if (null !== $args[0]->compileTimeDomAttributes) {
                     $args[0]->compileTimeDomAttributes['id'] = $valueLit;
                 }
-                // HTML htmlSetProp: creating a *new* id attr stamps ID-bearing (#23514).
-                if (null !== JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml()
-                    && !$hadIdAttr
-                ) {
-                    DomUserScriptAttributeCacheLlvm::markIdBearingLiteral('', 'id', true);
-                    DomUserScriptAttributeCacheLlvm::storeIdBearingGlobal($context, true);
-                }
                 // Keep setIdAttribute cache in sync when setAttribute runs after a prior
                 // setIdAttribute in the same script (multi-document #29257).
                 $parsed = JitDomLoadHTMLUserScript::lastCompileTimeParsed();
-                if (null !== $parsed) {
+                if (null !== $parsed && $idBearing) {
                     $parsed['id'] = $valueLit;
                     JitDomLoadHTMLUserScript::rememberCompileTimeParsed($parsed);
                 }
