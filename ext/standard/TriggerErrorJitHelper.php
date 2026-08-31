@@ -25,14 +25,24 @@ final class TriggerErrorJitHelper
         );
     }
 
+    public static function undefinedArrayKeyMessage(string $key): string
+    {
+        return 'Undefined array key "'.$key.'"';
+    }
+
+    public static function undefinedArrayKeyLongMessage(int $key): string
+    {
+        return "Undefined array key {$key}";
+    }
+
     public static function undefinedArrayKey(string $key): void
     {
-        self::recordAndMaybePrint(ErrorReporter::E_WARNING, 'Undefined array key "'.$key.'"');
+        self::recordAndMaybePrint(ErrorReporter::E_WARNING, self::undefinedArrayKeyMessage($key));
     }
 
     public static function undefinedArrayKeyLong(int $key): void
     {
-        self::recordAndMaybePrint(ErrorReporter::E_WARNING, "Undefined array key {$key}");
+        self::recordAndMaybePrint(ErrorReporter::E_WARNING, self::undefinedArrayKeyLongMessage($key));
     }
 
     public static function warning(string $message): void

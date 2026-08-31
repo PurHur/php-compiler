@@ -42,6 +42,10 @@ final class JitTriggerErrorKernel
 
     private const UNDEF_KEY_LONG_HELPER = 'PHPCompiler\\ext\\standard\\TriggerErrorJitHelper::undefinedArrayKeyLong';
 
+    private const UNDEF_KEY_MESSAGE_HELPER = 'PHPCompiler\\ext\\standard\\TriggerErrorJitHelper::undefinedArrayKeyMessage';
+
+    private const UNDEF_KEY_LONG_MESSAGE_HELPER = 'PHPCompiler\\ext\\standard\\TriggerErrorJitHelper::undefinedArrayKeyLongMessage';
+
     private const E_USER_ERROR = 256;
 
     private const E_WARNING = ErrorReporter::E_WARNING;
@@ -56,6 +60,8 @@ final class JitTriggerErrorKernel
     private const UNDEF_HELPERS = [
         self::UNDEF_KEY_HELPER,
         self::UNDEF_KEY_LONG_HELPER,
+        self::UNDEF_KEY_MESSAGE_HELPER,
+        self::UNDEF_KEY_LONG_MESSAGE_HELPER,
     ];
 
     /** @var list<string> */
@@ -401,6 +407,7 @@ final class JitTriggerErrorKernel
 
         $fn = $probe;
         $entry = $fn->appendBasicBlock('undef_key_long_bridge_entry');
+        $retBb = $fn->appendBasicBlock('undef_key_long_ret');
         $context->builder->positionAtEnd($entry);
         LibcExtern::ensureSnprintf($context);
         $i8p = $context->getTypeFromString('int8*');
@@ -423,13 +430,73 @@ final class JitTriggerErrorKernel
             $fmt,
             $keyI64
         );
-        $retBb = $fn->appendBasicBlock('undef_key_long_ret');
         $msgCstr = $context->builder->pointerCast($bufChar, $i8p);
         $msgLen = $context->builder->zExt($written, $sizeT);
         self::emitGlobalGatedCliWarning($context, $fn, $retBb, $msgCstr, $msgLen);
         $context->builder->positionAtEnd($retBb);
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
+    }
+
+    /**
+     * Record + stderr-print a Zend warning using SilenceRuntime globals (#35563 / #31991).
+     *
+     * {@see TriggerErrorJitHelper::recordAndMaybePrint} gates on PHP statics that do not
+     * persist under AOT; match {@see implementTriggerErrorBridge} instead.
+     */
+    private static function emitCliWarningForMessageString(
+        Context $context,
+        LlvmFunction $fn,
+        Value $messageStr,
+        BasicBlock $doneBb,
+        int $level
+    ): void {
+        SilenceRuntime::ensureLinked($context);
+        LastErrorRuntime::ensureLinked($context);
+        self::implementStderrPrintBridge($context);
+
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $strMap = $context->structFieldMap['__string__'];
+        $levelVal = $i32->constInt($level, false);
+        $zeroLine = $i32->constInt(0, false);
+        $nullFile = $i8p->constNull();
+        $msgLen = $context->builder->load(
+            $context->builder->structGep($messageStr, $strMap['length'])
+        );
+        $msgBytes = $context->builder->structGep($messageStr, $strMap['value']);
+        $msgCStr = $context->builder->pointerCast($msgBytes, $i8p);
+
+        $context->builder->call(
+            $context->lookupFunction('__phpc_last_error_record'),
+            $levelVal,
+            $msgCStr,
+            $msgLen,
+            $nullFile,
+            $zeroLine
+        );
+
+        $stderrBb = $fn->appendBasicBlock('undef_key_warn_stderr');
+        $enabled = $context->builder->call(
+            $context->lookupFunction('__compiler_phpc_error_level_enabled'),
+            $levelVal
+        );
+        $shouldPrint = $context->builder->icmp(
+            Builder::INT_NE,
+            $enabled,
+            $i32->constInt(0, false)
+        );
+        $context->builder->branchIf($shouldPrint, $stderrBb, $doneBb);
+
+        $context->builder->positionAtEnd($stderrBb);
+        $context->builder->call(
+            $context->lookupFunction('__phpc_stderr_print_cli_error'),
+            $levelVal,
+            $msgCStr,
+            $nullFile,
+            $zeroLine
+        );
+        $context->builder->branch($doneBb);
     }
 
     private static function implementTriggerErrorBridge(Context $context): void

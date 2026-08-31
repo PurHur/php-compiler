@@ -74,6 +74,7 @@ final class Variable {
     /** @var \PHPLLVM\Value|null */
     public ?\PHPLLVM\Value $writableStringKey = null;
 
+    /** FETCH_DIM_W ++/-- / += orphan: warn on hydrate when key was absent (#30078 / #31991). */
     /** @var \PHPLLVM\Value|null */
     public ?\PHPLLVM\Value $writableObjectKey = null;
 
@@ -1365,11 +1366,9 @@ final class Variable {
                 $ht = HashTableHelper::loadHashtablePointer($this->context, $container);
                 if (self::TYPE_VALUE === $dim->type) {
                     if ($forWrite) {
-                        if ($warnUndefinedKeyForIncDec) {
-                            HashTableHelper::emitUndefinedArrayKeyWarningIfMissing($this->context, $ht, $dim);
-                        }
+                        $lvalue = HashTableHelper::prepareValueBoxKeyWrite($this->context, $ht, $dim);
 
-                        return HashTableHelper::prepareValueBoxKeyWrite($this->context, $ht, $dim);
+                        return $lvalue;
                     }
 
                     return HashTableHelper::readDimToValueBox(
@@ -1396,11 +1395,9 @@ final class Variable {
                 if (self::TYPE_STRING === $dim->type) {
                     $key = $this->context->helper->loadValue($dim);
                     if ($forWrite && (null === $expectedType || Type::TYPE_ARRAY !== $expectedType->type)) {
-                        if ($warnUndefinedKeyForIncDec) {
-                            HashTableHelper::emitUndefinedArrayKeyWarningIfMissing($this->context, $ht, $dim);
-                        }
+                        $lvalue = HashTableHelper::prepareStringKeyWrite($this->context, $ht, $key);
 
-                        return HashTableHelper::prepareStringKeyWrite($this->context, $ht, $key);
+                        return $lvalue;
                     }
                     if ('_FILES' === $container->superglobalName && !$forWrite) {
                         $childHt = $this->context->builder->call(
@@ -1416,9 +1413,6 @@ final class Variable {
                         );
                     }
                     if (null !== $expectedType && Type::TYPE_ARRAY === $expectedType->type) {
-                        if ($warnUndefinedKeyForIncDec) {
-                            HashTableHelper::emitUndefinedArrayKeyWarningIfMissing($this->context, $ht, $dim);
-                        }
                         $childHt = HashTableHelper::readStringKeyHashtableForNestedWrite(
                             $this->context,
                             $ht,
@@ -1453,16 +1447,11 @@ final class Variable {
                 // must return the live child HT so the inner write persists (#24011; string keys
                 // already branch on TYPE_ARRAY above — zend_execute.c ZEND_FETCH_DIM_W).
                 if ($forWrite && (null === $expectedType || Type::TYPE_ARRAY !== $expectedType->type)) {
-                    if ($warnUndefinedKeyForIncDec) {
-                        HashTableHelper::emitUndefinedArrayKeyWarningIfMissing($this->context, $ht, $dim);
-                    }
+                    $lvalue = HashTableHelper::prepareIndexWrite($this->context, $ht, $index);
 
-                    return HashTableHelper::prepareIndexWrite($this->context, $ht, $index);
+                    return $lvalue;
                 }
                 if ($forWrite && null !== $expectedType && Type::TYPE_ARRAY === $expectedType->type) {
-                    if ($warnUndefinedKeyForIncDec) {
-                        HashTableHelper::emitUndefinedArrayKeyWarningIfMissing($this->context, $ht, $dim);
-                    }
                     $childHt = HashTableHelper::readIndexedHashtableForNestedWrite(
                         $this->context,
                         $ht,

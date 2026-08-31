@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
-use PHPCompiler\ext\standard\JitTriggerErrorKernel;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
-use PHPCompiler\JIT\Builtin\StringTriggerErrorJit;
+use PHPCompiler\JIT\Builtin\StringTriggerError;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
+use PHPCompiler\VM\ErrorReporter;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -106,6 +106,7 @@ final class HashTableReadLlvm
 
         // Missing key → null (Zend undefined-index softens to null under @ / in some contexts).
         $context->builder->positionAtEnd($nullBlock);
+        self::emitUndefinedArrayKeyWarningForStringKeyValue($context, $keyStr);
         $context->builder->call(
             $context->lookupFunction('__value__writeNull'),
             $destPtr
@@ -695,37 +696,177 @@ final class HashTableReadLlvm
         $context->builder->positionAtEnd($done);
     }
 
-    /** Emit {@see __compiler_undefined_array_key_warning_*} for a dim operand (#30078). */
-    private static function emitUndefinedArrayKeyWarningForDim(Context $context, Variable $dim): void
+    /**
+     * Warn when a string-key FETCH_DIM_W orphan hydrates a missing slot (#31991 / prepareStringKeyWrite).
+     *
+     * @param Value $keyStr {@see __string__}* from {@see HashTableWriteLlvm::prepareStringKeyWrite}
+     */
+    public static function emitUndefinedArrayKeyWarningIfMissingStringKey(
+        Context $context,
+        Value $ht,
+        Value $keyStr
+    ): void {
+        $exists = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
+            $ht,
+            $keyStr
+        );
+        $tag = 'diuwsk'.(string) self::nextSeq();
+        $hasKey = BasicBlockHelper::append($context, 'dim_inc_ukey_sk_has_'.$tag);
+        $missKey = BasicBlockHelper::append($context, 'dim_inc_ukey_sk_miss_'.$tag);
+        $done = BasicBlockHelper::append($context, 'dim_inc_ukey_sk_done_'.$tag);
+        $context->builder->branchIf($exists, $hasKey, $missKey);
+        $context->builder->positionAtEnd($missKey);
+        self::emitUndefinedArrayKeyWarningForStringKeyValue($context, $keyStr);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($hasKey);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
+    }
+
+    /**
+     * Warn when a packed-index FETCH_DIM_W orphan hydrates a missing slot (#31991 / prepareIndexWrite).
+     */
+    public static function emitUndefinedArrayKeyWarningIfMissingIndex(
+        Context $context,
+        Value $ht,
+        Value $index
+    ): void {
+        $exists = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $ht,
+            $index
+        );
+        $tag = 'diuwix'.(string) self::nextSeq();
+        $hasKey = BasicBlockHelper::append($context, 'dim_inc_ukey_ix_has_'.$tag);
+        $missKey = BasicBlockHelper::append($context, 'dim_inc_ukey_ix_miss_'.$tag);
+        $done = BasicBlockHelper::append($context, 'dim_inc_ukey_ix_done_'.$tag);
+        $context->builder->branchIf($exists, $hasKey, $missKey);
+        $context->builder->positionAtEnd($missKey);
+        self::emitUndefinedArrayKeyWarningForIndexValue($context, $index);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($hasKey);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
+    }
+
+    /** Emit E_WARNING with script path + opline for a materialized string key (#31991). */
+    public static function emitUndefinedArrayKeyWarningForStringKeyValue(Context $context, Value $keyStr): void
     {
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        StringTriggerErrorJit::implement($context);
+        StringTriggerError::ensureLinked($context);
         if (null !== $savedInsert) {
             BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         } else {
-            BasicBlockHelper::ensureOpenInsertBlock($context, 'dim_inc_ukey_warn_setup');
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'dim_inc_ukey_sk_warn_setup');
         }
-        JitTriggerErrorKernel::emitDiagSiteStore($context);
+        $strMap = $context->structFieldMap['__string__'];
+        $i8p = $context->getTypeFromString('int8*');
+        $charPtr = $context->getTypeFromString('char*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $i32 = $context->getTypeFromString('int32');
+        $keyLen = $context->builder->load($context->builder->structGep($keyStr, $strMap['length']));
+        $keyBytes = $context->builder->structGep($keyStr, $strMap['value']);
+        $keyCStr = $context->builder->pointerCast($keyBytes, $charPtr);
+        $msgBufSize = 256;
+        $msgBuf = $context->builder->alloca($i8p->arrayType($msgBufSize), 1, 'undef_key_sk_msg');
+        $msgBufPtr = $context->builder->pointerCast($msgBuf, $i8p);
+        $fmtPtr = $context->builder->pointerCast(
+            $context->constantFromString('Undefined array key "%.*s"'),
+            $charPtr
+        );
+        LibcExtern::ensureSnprintf($context);
+        $written = $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $msgBufPtr,
+            $sizeT->constInt($msgBufSize, false),
+            $fmtPtr,
+            $keyLen,
+            $keyCStr
+        );
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msgBufPtr,
+            $context->builder->zExt($written, $sizeT),
+            $i32->constInt(ErrorReporter::E_WARNING, false),
+            self::errorTriggerFilePtr($context),
+            self::errorTriggerLineVal($context)
+        );
+    }
 
+    /** Emit E_WARNING with script path + opline for a packed index (#31991). */
+    private static function emitUndefinedArrayKeyWarningForIndexValue(Context $context, Value $index): void
+    {
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        StringTriggerError::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'dim_inc_ukey_ix_warn_setup');
+        }
+        $i8p = $context->getTypeFromString('int8*');
+        $charPtr = $context->getTypeFromString('char*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $msgBufSize = 256;
+        $msgBuf = $context->builder->alloca($i8p->arrayType($msgBufSize), 1, 'undef_key_ix_msg');
+        $msgBufPtr = $context->builder->pointerCast($msgBuf, $i8p);
+        $fmtPtr = $context->builder->pointerCast(
+            $context->constantFromString('Undefined array key %lld'),
+            $charPtr
+        );
+        LibcExtern::ensureSnprintf($context);
+        $written = $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $msgBufPtr,
+            $sizeT->constInt($msgBufSize, false),
+            $fmtPtr,
+            $context->builder->zExt($index, $i64)
+        );
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msgBufPtr,
+            $context->builder->zExt($written, $sizeT),
+            $i32->constInt(ErrorReporter::E_WARNING, false),
+            self::errorTriggerFilePtr($context),
+            self::errorTriggerLineVal($context)
+        );
+    }
+
+    private static function errorTriggerFilePtr(Context $context): Value
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        $path = $context->jitAotEntryScriptPath;
+
+        return $context->builder->pointerCast(
+            $context->constantFromString('' !== $path ? $path : 'Standard input code'),
+            $i8p
+        );
+    }
+
+    private static function errorTriggerLineVal(Context $context): Value
+    {
+        $i32 = $context->getTypeFromString('int32');
+
+        return $i32->constInt(max(0, $context->callSiteLine), false);
+    }
+
+    /** Emit E_WARNING with script path + opline for a dim operand (#30078, #31991). */
+    private static function emitUndefinedArrayKeyWarningForDim(Context $context, Variable $dim): void
+    {
         if (Variable::TYPE_NATIVE_LONG === $dim->type) {
-            $context->builder->call(
-                $context->lookupFunction('__compiler_undefined_array_key_warning_long'),
+            self::emitUndefinedArrayKeyWarningForIndexValue(
+                $context,
                 $context->helper->loadValue($dim)
             );
 
             return;
         }
         if (Variable::TYPE_STRING === $dim->type) {
-            $keyStr = $context->helper->loadValue($dim);
-            $strMap = $context->structFieldMap['__string__'];
-            $i8p = $context->getTypeFromString('int8*');
-            $keyLen = $context->builder->load($context->builder->structGep($keyStr, $strMap['length']));
-            $keyBytes = $context->builder->structGep($keyStr, $strMap['value']);
-            $keyCStr = $context->builder->pointerCast($keyBytes, $i8p);
-            $context->builder->call(
-                $context->lookupFunction('__compiler_undefined_array_key_warning_cstr'),
-                $keyCStr,
-                $keyLen
+            self::emitUndefinedArrayKeyWarningForStringKeyValue(
+                $context,
+                $context->helper->loadValue($dim)
             );
 
             return;
@@ -753,16 +894,7 @@ final class HashTableReadLlvm
             );
             $context->builder->positionAtEnd($strBb);
             $keyStr = $context->builder->call($context->lookupFunction('__value__readString'), $valPtr);
-            $strMap = $context->structFieldMap['__string__'];
-            $keyLen = $context->builder->load($context->builder->structGep($keyStr, $strMap['length']));
-            $keyBytes = $context->builder->structGep($keyStr, $strMap['value']);
-            $i8p = $context->getTypeFromString('int8*');
-            $keyCStr = $context->builder->pointerCast($keyBytes, $i8p);
-            $context->builder->call(
-                $context->lookupFunction('__compiler_undefined_array_key_warning_cstr'),
-                $keyCStr,
-                $keyLen
-            );
+            self::emitUndefinedArrayKeyWarningForStringKeyValue($context, $keyStr);
             $context->builder->branch($doneBb);
             $context->builder->positionAtEnd($afterStr);
             $context->builder->branchIf(
@@ -776,10 +908,7 @@ final class HashTableReadLlvm
             );
             $context->builder->positionAtEnd($longBb);
             $longKey = $context->builder->call($context->lookupFunction('__value__readLong'), $valPtr);
-            $context->builder->call(
-                $context->lookupFunction('__compiler_undefined_array_key_warning_long'),
-                $longKey
-            );
+            self::emitUndefinedArrayKeyWarningForIndexValue($context, $longKey);
             $context->builder->branch($doneBb);
             $context->builder->positionAtEnd($doneBb);
 
@@ -788,16 +917,7 @@ final class HashTableReadLlvm
         if (Variable::TYPE_NULL === $dim->type) {
             DynamicPropertyDeprecationGuard::emitNullArrayOffset($context);
             $emptyKey = $context->builder->load($context->constantStringFromString(''));
-            $strMap = $context->structFieldMap['__string__'];
-            $i8p = $context->getTypeFromString('int8*');
-            $keyLen = $context->builder->load($context->builder->structGep($emptyKey, $strMap['length']));
-            $keyBytes = $context->builder->structGep($emptyKey, $strMap['value']);
-            $keyCStr = $context->builder->pointerCast($keyBytes, $i8p);
-            $context->builder->call(
-                $context->lookupFunction('__compiler_undefined_array_key_warning_cstr'),
-                $keyCStr,
-                $keyLen
-            );
+            self::emitUndefinedArrayKeyWarningForStringKeyValue($context, $emptyKey);
         }
     }
 
@@ -1254,6 +1374,7 @@ final class HashTableReadLlvm
         $context->builder->branchIf($isSet, $read, $create);
 
         $context->builder->positionAtEnd($create);
+        self::emitUndefinedArrayKeyWarningForStringKeyValue($context, $keyStr);
         $childHt = HashTableWriteLlvm::alloc($context);
         $context->builder->call(
             $context->lookupFunction('__hashtable__setStringKeyHashtable'),
@@ -1316,6 +1437,7 @@ final class HashTableReadLlvm
         $context->builder->branchIf($isUndef, $create, $read);
 
         $context->builder->positionAtEnd($create);
+        self::emitUndefinedArrayKeyWarningForIndexValue($context, $index);
         $childHt = HashTableWriteLlvm::alloc($context);
         $context->builder->call(
             $context->lookupFunction('__hashtable__setHashtableAt'),
