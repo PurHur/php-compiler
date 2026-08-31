@@ -9,6 +9,7 @@ use PHPCompiler\JIT\Builtin\DomGetElementByIdRuntime;
 use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitStringCompare;
 use PHPCompiler\JIT\JitValueBox;
@@ -167,7 +168,7 @@ final class JitDomGetElementById
                 $context->lookupFunction('__value__readObject'),
                 $mapValPtr
             );
-            $mapBoxed = self::boxObjectIfConnectedAndIdBearing($context, $mapObj);
+            $mapBoxed = self::boxObjectIfConnectedAndIdBearing($context, $document, $mapObj);
             $context->builder->store(JitValueBox::normalizeValuePtr($context, $mapBoxed), $resultSlot);
             $context->builder->branch($doneBlock);
 
@@ -521,9 +522,9 @@ final class JitDomGetElementById
         return $context->builder->load($resultSlot);
     }
 
-    private static function boxObjectIfConnectedAndIdBearing(Context $context, Value $element): Value
+    private static function boxObjectIfConnectedAndIdBearing(Context $context, Value $document, Value $element): Value
     {
-        $connected = self::boxObjectIfConnected($context, $element);
+        $connected = self::boxObjectIfConnected($context, $document, $element);
         $i1 = $context->getTypeFromString('int1');
         $idBearing = DomUserScriptAttributeCacheLlvm::loadIdBearingGlobal($context);
         $isBearing = $context->builder->icmp(
@@ -615,10 +616,12 @@ final class JitDomGetElementById
     /**
      * php-src ext/dom/document.c — php_dom_is_node_connected on id-map hits (#23999 / #29694).
      */
-    private static function boxObjectIfConnected(Context $context, Value $obj): Value
+    private static function boxObjectIfConnected(Context $context, Value $document, Value $obj): Value
     {
         $objectType = $context->type->object;
-        $connected = JitDomNodeIsConnected::isConnectedFlag($objectType, $obj);
+        $viaParent = JitDomNodeIsConnected::isConnectedFlag($objectType, $obj);
+        $viaOwner = self::isConnectedViaOwnerDocumentAndParent($context, $document, $obj);
+        $connected = $context->builder->or($viaParent, $viaOwner);
         $yesBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_conn_yes');
         $noBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_conn_no');
         $doneBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_conn_done');
@@ -645,5 +648,57 @@ final class JitDomGetElementById
         $context->builder->positionAtEnd($doneBlock);
 
         return $context->builder->load($resultSlot);
+    }
+
+    /**
+     * Thin-AOT importNode trees: parentNode is set by appendChild but documentElement may
+     * lack a parent link, so {@see JitDomNodeIsConnected::isConnectedFlag} stops early
+     * while ownerDocument + non-null parent still denote an attached node (#21102).
+     *
+     * @return Value int1
+     */
+    private static function isConnectedViaOwnerDocumentAndParent(
+        Context $context,
+        Value $document,
+        Value $obj
+    ): Value {
+        $objectType = $context->type->object;
+        $elementClassId = $objectType->lookup('DOMElement');
+        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_PARENT_NODE)) {
+            $objectType->defineProperty($elementClassId, VmDom::PROP_PARENT_NODE, JITVariable::TYPE_VALUE);
+        }
+        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_OWNER_DOCUMENT)) {
+            $objectType->defineProperty($elementClassId, VmDom::PROP_OWNER_DOCUMENT, JITVariable::TYPE_VALUE);
+        }
+        $parentVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $obj,
+            'DOMElement',
+            VmDom::PROP_PARENT_NODE,
+            $elementClassId
+        );
+        $parentRaw = JitValueBox::valuePtrFromVariable($context, $parentVar);
+        $parentIsNull = JitNestedHelperCoerce::isHelperResultNull($context, $parentRaw);
+        $ownerVar = $objectType->propertyFetch($obj, 'DOMElement', VmDom::PROP_OWNER_DOCUMENT);
+        $ownerObj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            JitValueBox::valuePtrFromVariable($context, $ownerVar)
+        );
+        $objPtr = $context->getTypeFromString('__object__*');
+        $ownerNonNull = $context->builder->icmp(
+            \PHPLLVM\Builder::INT_NE,
+            $ownerObj,
+            $objPtr->constNull()
+        );
+        $ownerMatches = $context->builder->icmp(
+            \PHPLLVM\Builder::INT_EQ,
+            $ownerObj,
+            $document
+        );
+
+        return $context->builder->and(
+            $context->builder->not($parentIsNull),
+            $context->builder->and($ownerNonNull, $ownerMatches)
+        );
     }
 }
