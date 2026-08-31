@@ -1542,6 +1542,30 @@ class Block {
         return null;
     }
 
+    /**
+     * Nested literal includes: the immediate caller TU may not declare a name that an
+     * inner partial reads — walk suspended include frames on the run stack (#764, #878).
+     *
+     * @see php-src Zend/zend_execute.c execute_data->prev_execute_data include scope
+     */
+    public static function findVariableInIncludeRunStackByName(Context $context, string $name): ?Variable
+    {
+        foreach ($context->runStackFrames() as $stackFrame) {
+            if (null === $stackFrame->block) {
+                continue;
+            }
+            $idx = $stackFrame->block->slotIndexForVariableName($name);
+            if (null !== $idx && isset($stackFrame->scope[$idx])) {
+                return $stackFrame->scope[$idx];
+            }
+            if (isset($stackFrame->dynamicLocals[$name])) {
+                return $stackFrame->dynamicLocals[$name];
+            }
+        }
+
+        return null;
+    }
+
     public function getFrame(Context $context, ?Frame $frame = null): Frame {
         // Back-edge to the same block (goto label) must reuse the frame; otherwise each
         // jump chains a new parent Frame and getFrame never finishes (issue #1228).
@@ -1650,6 +1674,16 @@ class Block {
                             $scope[$pos] = $inherited;
                             continue;
                         }
+                        if ($this->isMainScript()) {
+                            $name = self::resolveVariableName($op);
+                            if (null !== $name && '' !== $name) {
+                                $fromStack = self::findVariableInIncludeRunStackByName($context, $name);
+                                if (null !== $fromStack) {
+                                    $scope[$pos] = $fromStack;
+                                    continue;
+                                }
+                            }
+                        }
                     }
                 }
                 if (!$found) {
@@ -1693,6 +1727,13 @@ class Block {
                     if (null !== $inherited) {
                         $scope[$pos] = $inherited;
                         continue;
+                    }
+                    if ($this->isMainScript() && null !== $name && '' !== $name) {
+                        $fromStack = self::findVariableInIncludeRunStackByName($context, $name);
+                        if (null !== $fromStack) {
+                            $scope[$pos] = $fromStack;
+                            continue;
+                        }
                     }
                     if ($cfgMerge) {
                         $fromJump = $this->findSlot($op, $frame);
