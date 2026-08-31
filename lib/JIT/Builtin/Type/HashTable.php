@@ -10,6 +10,7 @@ namespace PHPCompiler\JIT\Builtin\Type;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\Refcount;
+use PHPCompiler\JIT\Builtin\SpaceshipRuntime;
 use PHPCompiler\JIT\Builtin\StringNaturalCompare;
 use PHPCompiler\JIT\Builtin\StringStrcoll;
 use PHPCompiler\JIT\Builtin\StringTriggerError;
@@ -3407,14 +3408,14 @@ class HashTable extends Type
 
 
     /**
-     * Bubble-sort packed list values in place (sort / rsort SORT_REGULAR / STRING|CASE) (#24010, #34702).
+     * Bubble-sort packed list values in place (sort / rsort SORT_REGULAR / STRING|CASE) (#24010, #34702, #7466).
      *
-     * NestedJIT {@see \PHPCompiler\ext\standard\SortJitHelper} currently lowers to a no-op
-     * stub; this LLVM path matches the asort string-key bubble sort but walks `values[]`.
-     * `$caseInsensitive` → SORT_STRING|SORT_FLAG_CASE via {@see JitStringCompare::strcasecmp}.
+     * String/int elements use readString/readLong; object/enum/mixed use {@see __value__spaceship}
+     * (php-src zend_compare on zvals). `$caseInsensitive` → SORT_STRING|SORT_FLAG_CASE.
      */
     private function implementSortPacked(bool $reverse, bool $caseInsensitive = false): void
     {
+        SpaceshipRuntime::ensureLinked($this->context);
         if ($caseInsensitive) {
             $abi = $reverse
                 ? '__hashtable__sortPackedReverseStringCase'
@@ -3436,6 +3437,8 @@ class HashTable extends Type
         $zero = $sizeT->constInt(0, false);
         $one = $sizeT->constInt(1, false);
         $stringTag = $i8->constInt(Variable::TYPE_STRING, false);
+        $integerTag = $i8->constInt(\PHPCompiler\VM\Variable::TYPE_INTEGER, false);
+        $objectTag = $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false);
         $valueType = $this->context->getTypeFromString('__value__');
 
         $n = $this->context->builder->load($this->context->builder->structGep($ht, $htMap['nextFreeElement']));
@@ -3479,12 +3482,16 @@ class HashTable extends Type
         $valCur = $this->listEntryAt($ht, $htMap, $i);
         $valNext = $this->listEntryAt($ht, $htMap, $j);
         $typeCur = $this->context->builder->load($this->context->builder->structGep($valCur, $valueMap['type']));
-        $isString = $this->context->builder->icmp(Builder::INT_EQ, $typeCur, $stringTag);
+        $typeKind = $this->context->builder->and($typeCur, $i8->constInt(0x7f, false));
+        $isString = $this->context->builder->icmp(Builder::INT_EQ, $typeKind, $i8->constInt(Variable::TYPE_STRING & 0x7f, false));
         $cmpStr = $fn->appendBasicBlock($tag.'_cmp_str');
         $cmpLong = $fn->appendBasicBlock($tag.'_cmp_long');
+        $cmpValue = $fn->appendBasicBlock($tag.'_cmp_value');
+        $cmpObject = $fn->appendBasicBlock($tag.'_cmp_object');
+        $typeDispatch = $fn->appendBasicBlock($tag.'_type_dispatch');
         $cmpDone = $fn->appendBasicBlock($tag.'_cmp_done');
         $needsSwapSlot = $this->context->builder->alloca($i1, 1, $tag.'_needs_swap');
-        $this->context->builder->branchIf($isString, $cmpStr, $cmpLong);
+        $this->context->builder->branchIf($isString, $cmpStr, $typeDispatch);
 
         $this->context->builder->positionAtEnd($cmpStr);
         $strCur = $this->context->builder->call($this->context->lookupFunction('__value__readString'), $valCur);
@@ -3493,11 +3500,21 @@ class HashTable extends Type
             ? JitStringCompare::strcasecmp($this->context, $strCur, $strNext)
             : JitStringCompare::strcmp($this->context, $strCur, $strNext);
         $i64 = $this->context->getTypeFromString('int64');
+        $zeroI64 = $i64->constInt(0, false);
         $strOutOfOrder = $reverse
-            ? $this->context->builder->icmp(Builder::INT_SLT, $cmp, $i64->constInt(0, false))
-            : $this->context->builder->icmp(Builder::INT_SGT, $cmp, $i64->constInt(0, false));
+            ? $this->context->builder->icmp(Builder::INT_SLT, $cmp, $zeroI64)
+            : $this->context->builder->icmp(Builder::INT_SGT, $cmp, $zeroI64);
         $this->context->builder->store($strOutOfOrder, $needsSwapSlot);
         $this->context->builder->branch($cmpDone);
+
+        $this->context->builder->positionAtEnd($typeDispatch);
+        $isInteger = $this->context->builder->icmp(Builder::INT_EQ, $typeKind, $integerTag);
+        $checkObject = $fn->appendBasicBlock($tag.'_check_object');
+        $this->context->builder->branchIf($isInteger, $cmpLong, $checkObject);
+
+        $this->context->builder->positionAtEnd($checkObject);
+        $isObject = $this->context->builder->icmp(Builder::INT_EQ, $typeKind, $objectTag);
+        $this->context->builder->branchIf($isObject, $cmpObject, $cmpValue);
 
         $this->context->builder->positionAtEnd($cmpLong);
         $longCur = $this->context->builder->call($this->context->lookupFunction('__value__readLong'), $valCur);
@@ -3506,6 +3523,24 @@ class HashTable extends Type
             ? $this->context->builder->icmp(Builder::INT_SLT, $longCur, $longNext)
             : $this->context->builder->icmp(Builder::INT_SGT, $longCur, $longNext);
         $this->context->builder->store($longOutOfOrder, $needsSwapSlot);
+        $this->context->builder->branch($cmpDone);
+
+        $this->context->builder->positionAtEnd($cmpObject);
+        $objCur = $this->context->builder->call($this->context->lookupFunction('__value__readObject'), $valCur);
+        $objNext = $this->context->builder->call($this->context->lookupFunction('__value__readObject'), $valNext);
+        $objectCmp = SpaceshipRuntime::callObjectCompareSpaceship($this->context, $objCur, $objNext);
+        $objectOutOfOrder = $reverse
+            ? $this->context->builder->icmp(Builder::INT_SLT, $objectCmp, $zeroI64)
+            : $this->context->builder->icmp(Builder::INT_SGT, $objectCmp, $zeroI64);
+        $this->context->builder->store($objectOutOfOrder, $needsSwapSlot);
+        $this->context->builder->branch($cmpDone);
+
+        $this->context->builder->positionAtEnd($cmpValue);
+        $valueCmp = SpaceshipRuntime::callValueSpaceship($this->context, $valCur, $valNext);
+        $valueOutOfOrder = $reverse
+            ? $this->context->builder->icmp(Builder::INT_SLT, $valueCmp, $zeroI64)
+            : $this->context->builder->icmp(Builder::INT_SGT, $valueCmp, $zeroI64);
+        $this->context->builder->store($valueOutOfOrder, $needsSwapSlot);
         $this->context->builder->branch($cmpDone);
 
         $this->context->builder->positionAtEnd($cmpDone);

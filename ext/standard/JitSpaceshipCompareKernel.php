@@ -645,7 +645,7 @@ final class JitSpaceshipCompareKernel
             $left
         );
         $slotSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('int32'));
-        $context->builder->store($propCount, $slotSlot);
+        $context->builder->store($context->getTypeFromString('int32')->constInt(0, false), $slotSlot);
         $headerSize = self::objectHeaderSize($context);
 
         $loopHead = $fn->appendBasicBlock('ss_obj_prop_head');
@@ -930,6 +930,9 @@ final class JitSpaceshipCompareKernel
         $nullBlock = BasicBlockHelper::append($context, self::blockName('ss_slot_null'));
         $checkObj = BasicBlockHelper::append($context, self::blockName('ss_slot_check_obj'));
         $objBlock = BasicBlockHelper::append($context, self::blockName('ss_slot_obj'));
+        $checkString = BasicBlockHelper::append($context, self::blockName('ss_slot_check_str'));
+        $strBlock = BasicBlockHelper::append($context, self::blockName('ss_slot_str'));
+        $nativeLongBlock = BasicBlockHelper::append($context, self::blockName('ss_slot_native_long'));
         $loadBlock = BasicBlockHelper::append($context, self::blockName('ss_slot_load'));
         $done = BasicBlockHelper::append($context, self::blockName('ss_slot_done'));
         $context->builder->branchIf($isNull, $nullBlock, $checkObj);
@@ -940,11 +943,17 @@ final class JitSpaceshipCompareKernel
 
         $context->builder->positionAtEnd($checkObj);
         $isObject = self::slotIsObject($context, $content);
-        $context->builder->branchIf($isObject, $objBlock, $loadBlock);
+        $context->builder->branchIf($isObject, $objBlock, $checkString);
 
-        $context->builder->positionAtEnd($objBlock);
+        $context->builder->positionAtEnd($checkString);
+        $isString = self::slotPointsToString($context, $content);
+        $context->builder->branchIf($isString, $strBlock, $nativeLongBlock);
+
         $valueMap = $context->structFieldMap['__value__'];
         $objPtr = $context->getTypeFromString('__object__*');
+        $strPtr = $context->getTypeFromString('__string__*');
+
+        $context->builder->positionAtEnd($objBlock);
         $context->builder->store(
             $context->getTypeFromString('int8')->constInt(Variable::TYPE_OBJECT, false),
             $context->builder->structGep($dest, $valueMap['type'])
@@ -956,6 +965,30 @@ final class JitSpaceshipCompareKernel
         $context->builder->store(
             $context->builder->pointerCast($content, $objPtr),
             $objSlot
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($strBlock);
+        $context->builder->store(
+            $context->getTypeFromString('int8')->constInt(Variable::TYPE_STRING, false),
+            $context->builder->structGep($dest, $valueMap['type'])
+        );
+        $strSlot = $context->builder->pointerCast(
+            $context->builder->structGep($dest, $valueMap['value']),
+            $strPtr->pointerType(0)
+        );
+        $context->builder->store(
+            $context->builder->pointerCast($content, $strPtr),
+            $strSlot
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($nativeLongBlock);
+        $longPtr = $context->builder->pointerCast($content, $context->getTypeFromString('int64*'));
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            $dest,
+            $context->builder->load($longPtr)
         );
         $context->builder->branch($done);
 
