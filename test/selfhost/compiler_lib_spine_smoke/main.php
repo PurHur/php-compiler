@@ -8171,5 +8171,4 @@ require_once __DIR__.'/../../../ext/standard/ZlibIncrementalJitSupport.php';
 require_once __DIR__.'/../../../lib/JIT/Call/Sqlite3Method.php';
 require_once __DIR__.'/../../../lib/JIT/Call/Sqlite3StmtMethod.php';
 require_once __DIR__.'/../../../lib/JIT/Call/Sqlite3ResultMethod.php';
-require_once __DIR__.'/../../../ext/standard/JitHashPbkdf2.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
