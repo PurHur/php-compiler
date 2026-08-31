@@ -37,6 +37,15 @@ final class JitDomSubstringData
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_substringdata_cont');
+        $argcDummy = DomCharacterDataJitArgc::rejectUnlessExactUserArgCount(
+            $context,
+            'DOMCharacterData::substringData',
+            2,
+            ...$args
+        );
+        if (null !== $argcDummy) {
+            return $argcDummy;
+        }
         if (!VmClassMethod::requireExactJitUserArgCount(
             $context,
             $args,

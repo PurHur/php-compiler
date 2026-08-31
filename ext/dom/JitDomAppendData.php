@@ -27,6 +27,15 @@ final class JitDomAppendData
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_appenddata_cont');
+        $argcDummy = DomCharacterDataJitArgc::rejectUnlessExactUserArgCount(
+            $context,
+            'DOMCharacterData::appendData',
+            1,
+            ...$args
+        );
+        if (null !== $argcDummy) {
+            return $argcDummy;
+        }
         if (!VmClassMethod::requireExactJitUserArgCount(
             $context,
             $args,

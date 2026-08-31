@@ -29,6 +29,15 @@ final class JitDomReplaceData
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_replacedata_cont');
+        $argcDummy = DomCharacterDataJitArgc::rejectUnlessExactUserArgCount(
+            $context,
+            'DOMCharacterData::replaceData',
+            3,
+            ...$args
+        );
+        if (null !== $argcDummy) {
+            return $argcDummy;
+        }
         if (!VmClassMethod::requireExactJitUserArgCount(
             $context,
             $args,

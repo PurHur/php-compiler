@@ -27182,6 +27182,22 @@ class JIT {
                     }
                 }
             }
+            // firstChild/documentElement temps lose TYPE_OBJECT — CharacterData mutators
+            // via RuntimeIndirect drop surplus args silently (#31091).
+            if (
+                \in_array($methodLcEarly, ['substringdata', 'appenddata', 'replacedata', 'deletedata', 'insertdata'], true)
+                && \PHPCompiler\ext\dom\JitDomDocumentMethodKernel::shouldUse($this->context)
+            ) {
+                $proxy = 'domtext::'.$methodLcEarly;
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, $proxy);
+                if ($this->context->functionIsRegistered($proxy)) {
+                    $receiverVar = $this->context->getVariableFromOp($receiverOp);
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxy);
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+            }
             // ?-> fetch blocks compile against a null-typed receiver slot; at runtime the
             // branch is only taken when the receiver is a real object (zend_compile.c).
             $runtimeCandidates = $this->buildRuntimeInstanceMethodCandidatesByClassId($methodLcEarly);
@@ -27591,6 +27607,16 @@ class JIT {
                 }
             }
         }
+        if (
+            \in_array($methodLc, ['substringdata', 'appenddata', 'replacedata', 'deletedata', 'insertdata'], true)
+            && \PHPCompiler\ext\dom\JitDomDocumentMethodKernel::shouldUse($this->context)
+        ) {
+            $cdProxy = 'domtext::'.$methodLc;
+            JIT\DomInstanceMethodJit::ensureProxy($this->context, $cdProxy);
+            if ($this->context->functionIsRegistered($cdProxy)) {
+                $proxyName = $cdProxy;
+            }
+        }
         // Register SimpleXML user-script AOT proxies before functionIsRegistered (#19306).
         if (str_starts_with(strtolower($proxyName), 'simplexmlelement::')
             && ('1' === getenv('PHP_COMPILER_AOT_USER_SCRIPT')
@@ -27960,24 +27986,60 @@ class JIT {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcomment::substringdata');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcdatasection::substringdata');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcharacterdata::substringdata');
+                    if ($this->context->functionIsRegistered('domtext::substringdata')) {
+                        $this->context->scope->toCall = $this->context->resolveFunctionProxy('domtext::substringdata');
+                        $this->context->scope->args = [$receiverVar];
+
+                        return;
+                    }
+                }
+                if ('appenddata' === $methodLc) {
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domtext::appenddata');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcomment::appenddata');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcdatasection::appenddata');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcharacterdata::appenddata');
+                    if ($this->context->functionIsRegistered('domtext::appenddata')) {
+                        $this->context->scope->toCall = $this->context->resolveFunctionProxy('domtext::appenddata');
+                        $this->context->scope->args = [$receiverVar];
+
+                        return;
+                    }
                 }
                 if ('replacedata' === $methodLc) {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domtext::replacedata');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcomment::replacedata');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcdatasection::replacedata');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcharacterdata::replacedata');
+                    if ($this->context->functionIsRegistered('domtext::replacedata')) {
+                        $this->context->scope->toCall = $this->context->resolveFunctionProxy('domtext::replacedata');
+                        $this->context->scope->args = [$receiverVar];
+
+                        return;
+                    }
                 }
                 if ('deletedata' === $methodLc) {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domtext::deletedata');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcomment::deletedata');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcdatasection::deletedata');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcharacterdata::deletedata');
+                    if ($this->context->functionIsRegistered('domtext::deletedata')) {
+                        $this->context->scope->toCall = $this->context->resolveFunctionProxy('domtext::deletedata');
+                        $this->context->scope->args = [$receiverVar];
+
+                        return;
+                    }
                 }
                 if ('insertdata' === $methodLc) {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domtext::insertdata');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcomment::insertdata');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcdatasection::insertdata');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcharacterdata::insertdata');
+                    if ($this->context->functionIsRegistered('domtext::insertdata')) {
+                        $this->context->scope->toCall = $this->context->resolveFunctionProxy('domtext::insertdata');
+                        $this->context->scope->args = [$receiverVar];
+
+                        return;
+                    }
                 }
                 if ('splittext' === $methodLc) {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domtext::splittext');
@@ -28243,6 +28305,19 @@ class JIT {
             }
             // firstChild temps stamped DOMElement (#34375) resolve domelement::splittext as
             // ExternalMethod no-op; force DOMText fold (#34475 / re-#34314).
+            if (
+                \in_array($methodLc, ['substringdata', 'appenddata', 'replacedata', 'deletedata', 'insertdata'], true)
+                && \PHPCompiler\ext\dom\JitDomDocumentMethodKernel::shouldUse($this->context)
+            ) {
+                $cdProxy = 'domtext::'.$methodLc;
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, $cdProxy);
+                if ($this->context->functionIsRegistered($cdProxy)) {
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy($cdProxy);
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+            }
             if ('splittext' === $methodLc) {
                 JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domtext::splittext');
                 if ($this->context->functionIsRegistered('domtext::splittext')) {
@@ -28370,6 +28445,19 @@ class JIT {
         $receiverUserType = $receiverOp->type?->userType;
         $normalizedReceiverUserType = is_string($receiverUserType) ? ltrim($receiverUserType, '\\') : null;
         $staticProxy = $this->context->resolveFunctionProxy($proxyName);
+        if (
+            \in_array($methodLc, ['substringdata', 'appenddata', 'replacedata', 'deletedata', 'insertdata'], true)
+            && \PHPCompiler\ext\dom\JitDomDocumentMethodKernel::shouldUse($this->context)
+        ) {
+            $cdProxy = 'domtext::'.$methodLc;
+            JIT\DomInstanceMethodJit::ensureProxy($this->context, $cdProxy);
+            if ($this->context->functionIsRegistered($cdProxy)) {
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy($cdProxy);
+                $this->context->scope->args = [$receiverVar];
+
+                return;
+            }
+        }
         // :object receivers use RuntimeIndirectInstanceMethodCall; MCJIT segfaults on
         // ReflectionAttribute::newInstance() through that path (#4598).
         if ('reflectionattribute::newinstance' === strtolower($proxyName)) {
@@ -28546,6 +28634,15 @@ class JIT {
             JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domtext::insertdata');
             if ($this->context->functionIsRegistered('domtext::insertdata')) {
                 $this->context->scope->toCall = $this->context->resolveFunctionProxy('domtext::insertdata');
+                $this->context->scope->args = [$receiverVar];
+
+                return;
+            }
+        }
+        if ('appenddata' === $methodLc) {
+            JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domtext::appenddata');
+            if ($this->context->functionIsRegistered('domtext::appenddata')) {
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy('domtext::appenddata');
                 $this->context->scope->args = [$receiverVar];
 
                 return;
@@ -29932,6 +30029,9 @@ class JIT {
      */
     private function resolveJitOutgoingCall(JIT\Call $toCall, array $argEntries, array $argOperands): array
     {
+        $prefixLen = $this->jitNamedCallArgPrefixLength($toCall, $argEntries);
+        $this->context->callSiteOutgoingUserArgCount = max(0, \count($argEntries) - $prefixLen);
+
         if (null !== $this->context->scope->magicCallMethodName) {
             $methodName = $this->context->scope->magicCallMethodName;
             $this->context->scope->magicCallMethodName = null;

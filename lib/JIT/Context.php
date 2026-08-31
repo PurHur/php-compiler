@@ -385,6 +385,9 @@ class Context {
     /** Call-site line for the pending FUNCCALL_EXEC (issue #4381). */
     public int $callSiteLine = 0;
 
+    /** Outgoing user argc at the current call site (includes surplus args dropped from $args) (#31091). */
+    public ?int $callSiteOutgoingUserArgCount = null;
+
     /** When true, pow() lowering returns a boxed {@see __value__*} (power operator **). */
     public bool $powReturnValueBox = false;
 
