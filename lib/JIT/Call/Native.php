@@ -36,7 +36,7 @@ class Native implements Call {
     /**
      * Promoted-parameter `new` defaults — property initialized at allocate() (#6652, #3391).
      *
-     * @var array<int, string> LLVM arg index => promoted property name
+     * @var array<int, array{prop: string, declClass: string}|string> LLVM arg index => promoted property meta
      */
     public array $promotedRuntimeNewDefaultProps = [];
 
@@ -445,18 +445,57 @@ class Native implements Call {
     /**
      * Promoted ctor param with `new` default: read property initialized during allocate() (#6652).
      *
+     * When a subclass ctor defers inherited promoted defaults, parent::__construct() must
+     * evaluate the `new` init fragment — not read an uninitialized slot (zend_objects.c).
+     *
      * @param array<int, Variable> $args
      */
     private function promotedRuntimeNewDefaultArg(Context $context, int $llvmIndex, array $args): Variable
     {
-        $propName = $this->promotedRuntimeNewDefaultProps[$llvmIndex];
+        $entry = $this->promotedRuntimeNewDefaultProps[$llvmIndex];
+        if (is_string($entry)) {
+            $propName = $entry;
+            $declClass = '';
+        } else {
+            $propName = $entry['prop'];
+            $declClass = $entry['declClass'] ?? '';
+        }
         $receiver = $args[0] ?? throw new \LogicException('Promoted runtime new default requires $this');
-        $className = $receiver->classUserType ?? $receiver->compileTimeString ?? '';
-        if ('' === $className) {
-            throw new \LogicException('Promoted runtime new default requires compile-time class on $this');
+        $object = $context->type->object;
+
+        $receiverClass = $receiver->classUserType ?? $receiver->compileTimeString ?? '';
+        if ('' === $receiverClass && '' !== $context->scope->className) {
+            $receiverClass = ltrim($context->scope->className, '\\');
         }
 
-        return $context->type->object->propertyFetch(
+        if ('' !== $declClass) {
+            $declId = $object->lookup($declClass);
+            if ('' !== $receiverClass) {
+                $recvId = $object->lookup(ltrim($receiverClass, '\\'));
+                if ($object->shouldDeferInheritedPromotedDefaultForNamedProperty($recvId, $declId, $propName)) {
+                    return $object->variableFromRuntimeNewInitFragmentForProperty($declId, $propName);
+                }
+            }
+
+            return $object->propertyFetch(
+                $context->helper->loadValue($receiver),
+                $declClass,
+                $propName,
+                false,
+                $receiver
+            );
+        }
+
+        $className = $receiverClass;
+        if ('' === $className) {
+            return $object->propertyFetchByRuntimeReceiverClass(
+                $context->helper->loadValue($receiver),
+                $propName,
+                false
+            );
+        }
+
+        return $object->propertyFetch(
             $context->helper->loadValue($receiver),
             $className,
             $propName,

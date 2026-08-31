@@ -6326,6 +6326,43 @@ class Object_ extends Type {
         return isset($this->propertyFromConstructorPromotion[$allocateClassId][$slotIndex]);
     }
 
+    /**
+     * Whether allocate() skipped a promoted `new` default for this receiver (#6652 / #36104).
+     */
+    public function shouldDeferInheritedPromotedDefaultForNamedProperty(
+        int $allocateClassId,
+        int $declaringClassId,
+        string $propName
+    ): bool {
+        $propset = $this->findInstancePropertySet($declaringClassId, $propName, false);
+        if (null === $propset) {
+            return false;
+        }
+
+        return $this->shouldDeferInheritedPromotedDefaultAtAllocate($allocateClassId, $propset[3]);
+    }
+
+    /**
+     * Evaluate a promoted ctor `new` default init fragment at the current insert point (#6652).
+     */
+    public function variableFromRuntimeNewInitFragmentForProperty(
+        int $declaringClassId,
+        string $propName
+    ): Variable {
+        $propset = $this->findInstancePropertySet($declaringClassId, $propName, false);
+        if (null === $propset) {
+            throw new \LogicException("Property {$propName} not defined for class id {$declaringClassId}");
+        }
+        $slotIndex = $propset[3];
+        if (!isset($this->runtimePropertyNewInitFragments[$declaringClassId][$slotIndex])) {
+            throw new \LogicException("No runtime new init fragment for property {$propName}");
+        }
+        [$initBlock, $resultSlot] = $this->runtimePropertyNewInitFragments[$declaringClassId][$slotIndex];
+        $jit = $this->context->activeJitCompiler ?? $this->context->runtime->loadJit();
+
+        return $jit->jitVariableFromRuntimeNewInitFragment($initBlock, $resultSlot);
+    }
+
     public function markHasConstructor(int $classId): void
     {
         $this->hasConstructor[$classId] = true;
