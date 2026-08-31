@@ -38,6 +38,13 @@ final class HashCryptoJitHelper
         int $length,
         bool $raw
     ): string {
+        if ($iterations < 1) {
+            throw new \ValueError('hash_pbkdf2(): Argument #4 ($iterations) must be greater than 0');
+        }
+        if ($length < 0) {
+            throw new \ValueError('hash_pbkdf2(): Argument #5 ($length) must be greater than or equal to 0');
+        }
+
         return \phpc_hash_crypto_pbkdf2($algo, $password, $salt, $iterations, $length, $raw);
     }
 
