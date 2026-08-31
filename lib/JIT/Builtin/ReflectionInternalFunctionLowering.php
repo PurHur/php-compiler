@@ -19,6 +19,9 @@ final class ReflectionInternalFunctionLowering
     /** @var array<string, true> */
     private static array $functions = [];
 
+    /** Embed full internal metadata when ReflectionFunction::getParameters() uses runtime names (#23593). */
+    private static bool $runtimeInternalParameterLookup = false;
+
     public static function recordFunction(string $funcLc): void
     {
         $lc = strtolower(trim($funcLc));
@@ -57,13 +60,24 @@ final class ReflectionInternalFunctionLowering
         self::$functions = [];
     }
 
+    public static function consumeRuntimeInternalParameterLookup(): bool
+    {
+        $needed = self::$runtimeInternalParameterLookup;
+        self::$runtimeInternalParameterLookup = false;
+
+        return $needed;
+    }
+
+    public static function noteRuntimeInternalParameterLookup(): void
+    {
+        self::$runtimeInternalParameterLookup = true;
+    }
+
     public static function implementLookupFunctions(Context $context): void
     {
         $recorded = self::$functions;
+        $embedAllInternal = self::$runtimeInternalParameterLookup;
         self::resetAccumulated();
-        if ([] === $recorded) {
-            return;
-        }
 
         $metadata = [];
         foreach (array_keys($recorded) as $funcLc) {
@@ -91,8 +105,10 @@ final class ReflectionInternalFunctionLowering
             ];
         }
 
-        if ([] === $metadata) {
-            return;
+        if ($embedAllInternal) {
+            foreach (self::buildAllInternalMetadata() as $funcLc => $entry) {
+                $metadata[$funcLc] = $entry;
+            }
         }
 
         foreach ($metadata as $entry) {
@@ -115,6 +131,57 @@ final class ReflectionInternalFunctionLowering
             ReflectionTypeJitHelper::knownLabels()
         );
         $context->builder->clearInsertionPosition();
+    }
+
+    /**
+     * @return array<string, array{params: array<int, array{name: string, type: ?string, hasDefault: bool}>, return: ?string}>
+     */
+    public static function buildAllInternalMetadata(): array
+    {
+        $metadata = [];
+        $funcNames = array_keys(BuiltinInternalArgInfo::functionArityTables());
+        foreach (BuiltinParamNames::variadicInternalFunctionNames() as $funcLc) {
+            if (!\in_array($funcLc, $funcNames, true)) {
+                $funcNames[] = $funcLc;
+            }
+        }
+        foreach ($funcNames as $funcLc) {
+            $names = BuiltinParamNames::paramNamesForInternalFunction($funcLc);
+            if (null === $names) {
+                continue;
+            }
+            $params = [];
+            foreach (array_keys($names) as $index) {
+                $info = BuiltinInternalArgInfo::paramInfoForFunction($funcLc, (int) $index);
+                $type = null !== $info ? trim((string) ($info['type'] ?? '')) : '';
+                $params[(int) $index] = [
+                    'name' => self::displayParamName((string) $names[$index]),
+                    'type' => '' !== $type ? $type : null,
+                    'hasDefault' => self::internalParamHasDefault($funcLc, (int) $index),
+                ];
+            }
+            $ret = BuiltinInternalArgInfo::returnTypeLabelForFunction($funcLc);
+            $metadata[$funcLc] = [
+                'params' => $params,
+                'return' => null !== $ret && '' !== trim($ret) ? trim($ret) : null,
+            ];
+        }
+
+        return $metadata;
+    }
+
+    /** @return array<string, int> */
+    public static function buildAllInternalParamCounts(): array
+    {
+        $counts = [];
+        foreach (array_keys(self::buildAllInternalMetadata()) as $funcLc) {
+            $count = BuiltinParamNames::paramCountForInternalFunction($funcLc);
+            if (null !== $count) {
+                $counts[$funcLc] = $count;
+            }
+        }
+
+        return $counts;
     }
 
     private static function displayParamName(string $raw): string

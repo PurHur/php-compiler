@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Call;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\ReflectionInternalFunctionLowering;
 use PHPCompiler\JIT\Builtin\ReflectionNative;
 use PHPCompiler\JIT\Builtin\ReflectionParameterJitHelper;
 use PHPCompiler\JIT\Builtin\ReflectionRuntime;
@@ -34,6 +35,7 @@ final class ReflectionFunctionGetParameters implements Call
 
         ReflectionRuntime::ensureLinked($context);
         ReflectionNative::registerDeclarations($context);
+        ReflectionInternalFunctionLowering::noteRuntimeInternalParameterLookup();
         $obj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
         [$funcCstr] = ReflectionSetup::stringPropertyAsCstr(
             $context,
