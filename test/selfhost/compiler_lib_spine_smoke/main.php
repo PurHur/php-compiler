@@ -2958,6 +2958,7 @@ require_once __DIR__.'/../../../ext/standard/JitGzwrite.php';
 require_once __DIR__.'/../../../ext/standard/JitHash.php';
 require_once __DIR__.'/../../../ext/standard/JitHashFile.php';
 require_once __DIR__.'/../../../ext/standard/JitHashHmacAlgos.php';
+require_once __DIR__.'/../../../ext/standard/JitHashPbkdf2.php';
 require_once __DIR__.'/../../../ext/standard/JitHeader.php';
 require_once __DIR__.'/../../../ext/standard/JitHeaderRegisterCallback.php';
 require_once __DIR__.'/../../../ext/standard/JitHeadersSent.php';
