@@ -722,6 +722,11 @@ final class JitUnlikeCompare
             $kind,
             $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false)
         );
+        $isStr = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_STRING & 0x7f, false)
+        );
         $scalarIsNumber = Variable::TYPE_NATIVE_LONG === $scalar->type
             || Variable::TYPE_NATIVE_DOUBLE === $scalar->type;
         $tag = 'box_nat_'.spl_object_id($context).'_'.spl_object_id($boxed);
@@ -730,6 +735,7 @@ final class JitUnlikeCompare
         $genBlock = BasicBlockHelper::append($context, $tag.'_gen');
         $doneBlock = BasicBlockHelper::append($context, $tag.'_done');
         $objBlock = $scalarIsNumber ? BasicBlockHelper::append($context, $tag.'_obj') : null;
+        $strBlock = $scalarIsNumber ? BasicBlockHelper::append($context, $tag.'_str') : null;
         $context->builder->branchIf($isHt, $htBlock, $notHt);
 
         $context->builder->positionAtEnd($htBlock);
@@ -739,7 +745,16 @@ final class JitUnlikeCompare
 
         $context->builder->positionAtEnd($notHt);
         if ($scalarIsNumber && null !== $objBlock) {
-            $context->builder->branchIf($isObj, $objBlock, $genBlock);
+            $postObjBb = null !== $strBlock
+                ? BasicBlockHelper::append($context, $tag.'_post_obj')
+                : $genBlock;
+            $context->builder->branchIf($isObj, $objBlock, $postObjBb);
+            if (null !== $strBlock) {
+                $context->builder->positionAtEnd($postObjBb);
+                $context->builder->branchIf($isStr, $strBlock, $genBlock);
+            }
+        } elseif (null !== $strBlock) {
+            $context->builder->branchIf($isStr, $strBlock, $genBlock);
         } else {
             $context->builder->branch($genBlock);
         }
@@ -773,6 +788,20 @@ final class JitUnlikeCompare
             $context->builder->branch($doneBlock);
         }
 
+        $strCmp = null;
+        $strEnd = null;
+        if ($scalarIsNumber && null !== $strBlock) {
+            $context->builder->positionAtEnd($strBlock);
+            // Boxed numeric-string vs native long/double must not use __value__spaceship
+            // (readLong on IS_STRING → wrong cmp); peer tryLowerBoxedPair #35317 / #35320.
+            $scalarVal = $context->helper->loadValue($scalar);
+            $strCmp = $boxOnLeft
+                ? \PHPCompiler\VM\VmValueCompare::spaceshipValueToNativeLong($context, $boxed, $scalarVal)
+                : \PHPCompiler\VM\VmValueCompare::spaceshipNativeLongToValue($context, $scalarVal, $boxed);
+            $strEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($doneBlock);
+        }
+
         $context->builder->positionAtEnd($genBlock);
         \PHPCompiler\JIT\Builtin\SpaceshipRuntime::ensureLinked($context);
         $slot = JitValueBox::alloc($context);
@@ -789,6 +818,9 @@ final class JitUnlikeCompare
         $phi->addIncoming($htCmp, $htEnd);
         if (null !== $objCmp && null !== $objEnd) {
             $phi->addIncoming($objCmp, $objEnd);
+        }
+        if (null !== $strCmp && null !== $strEnd) {
+            $phi->addIncoming($strCmp, $strEnd);
         }
         $phi->addIncoming($genCmp, $genEnd);
 
