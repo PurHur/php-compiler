@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\ext\standard\JitTriggerErrorKernel;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\StringTriggerErrorJit;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
@@ -704,6 +705,7 @@ final class HashTableReadLlvm
         } else {
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dim_inc_ukey_warn_setup');
         }
+        JitTriggerErrorKernel::emitDiagSiteStore($context);
 
         if (Variable::TYPE_NATIVE_LONG === $dim->type) {
             $context->builder->call(

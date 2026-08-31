@@ -18,8 +18,6 @@ require_once __DIR__.'/../LlvmToolchain.php';
  */
 final class AotNestedDimAssignOp31991Test extends TestCase
 {
-    private const EXPECT = "nest=1\nidx=1\n";
-
     public function testVmNestedDimAssignOpUndefKeys(): void
     {
         $runtime = new Runtime();
@@ -50,7 +48,13 @@ final class AotNestedDimAssignOp31991Test extends TestCase
             $runOut = [];
             exec(escapeshellarg($bin).' 2>&1', $runOut, $runRc);
             $this->assertSame(0, $runRc, implode("\n", $runOut));
-            $this->assertSame(self::EXPECT, implode("\n", $runOut)."\n");
+            $merged = implode("\n", $runOut)."\n";
+            $this->assertStringContainsString('Undefined array key "x"', $merged);
+            $this->assertStringContainsString('Undefined array key "y"', $merged);
+            $this->assertStringContainsString('Undefined array key 0', $merged);
+            $this->assertStringContainsString('Undefined array key 1', $merged);
+            $this->assertStringContainsString("nest=1\n", $merged);
+            $this->assertStringContainsString("idx=1\n", $merged);
         } finally {
             @unlink($bin);
         }
