@@ -498,6 +498,7 @@ final class JitDomCreateElement
         // DOMNode child/sibling edges + ParentNode element-nav — allocate() leaves slot
         // pointers null and `$el->firstChild` warns "Undefined property" (#35185 / #35007).
         foreach ([
+            VmDom::PROP_PARENT_NODE,
             VmDom::PROP_FIRST_CHILD,
             VmDom::PROP_LAST_CHILD,
             VmDom::PROP_NEXT_SIBLING,

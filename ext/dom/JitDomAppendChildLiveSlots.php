@@ -600,6 +600,16 @@ final class JitDomAppendChildLiveSlots
     ): void {
         $tag = self::tag('dom_rc_rebuild_inner');
         BasicBlockHelper::ensureOpenInsertBlock($context, $tag);
+        // Document / DocumentFragment lack Element INNER_XML layout (#33404 / peer upward walk).
+        $isDoc = JitDomParentChildLinkLayout::isDocumentObject($context, $parent, self::tag('dom_rb_doc'));
+        $isFrag = self::isDocumentFragmentNode($context, $parent);
+        $skip = $context->builder->or($isDoc, $isFrag);
+        $bbSkip = BasicBlockHelper::append($context, self::tag('dom_rb_skip'));
+        $bbDo = BasicBlockHelper::append($context, self::tag('dom_rb_do'));
+        $context->builder->branchIf($skip, $bbSkip, $bbDo);
+        $context->builder->positionAtEnd($bbSkip);
+
+        $context->builder->positionAtEnd($bbDo);
         self::ensureLayout($context);
         $objectType = $context->type->object;
         $elementClassId = $objectType->lookup('DOMElement');

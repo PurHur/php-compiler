@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\dom;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
@@ -145,11 +146,36 @@ final class JitDomRemoveChildLiveSlots
     private static function rejectIfNotChildOfParent(Context $context, Value $parent, Value $child): void
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_rm_parent_guard');
-        $objPtrTy = $context->getTypeFromString('__object__*');
-        $curParent = JitDomParentChildLinkLayout::loadSibling($context, $child, VmDom::PROP_PARENT_NODE, 'dom_rm_chk_parent');
-        $isChild = $context->builder->icmp(Builder::INT_EQ, $curParent, $parent);
+        $objectType = $context->type->object;
+        $elementClassId = $objectType->lookup('DOMElement');
+        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_PARENT_NODE)) {
+            $objectType->defineProperty($elementClassId, VmDom::PROP_PARENT_NODE, JITVariable::TYPE_VALUE);
+        }
+        // Match isConnected slot read — loadLinkFlat missed invokeDocumentAppend parentNode (#29375).
+        $parentVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $child,
+            'DOMElement',
+            VmDom::PROP_PARENT_NODE,
+            $elementClassId
+        );
+        $parentRaw = JitValueBox::valuePtrFromVariable($context, $parentVar);
+        $parentIsNull = JitNestedHelperCoerce::isHelperResultNull($context, $parentRaw);
         $bbBad = BasicBlockHelper::append($context, 'dom_rm_not_child');
+        $bbRead = BasicBlockHelper::append($context, 'dom_rm_read_parent');
+        $bbCheck = BasicBlockHelper::append($context, 'dom_rm_check_parent');
         $bbOk = BasicBlockHelper::append($context, 'dom_rm_is_child');
+        $context->builder->branchIf($parentIsNull, $bbBad, $bbRead);
+
+        $context->builder->positionAtEnd($bbRead);
+        $curParent = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            JitValueBox::normalizeValuePtr($context, $parentRaw)
+        );
+        $context->builder->branch($bbCheck);
+
+        $context->builder->positionAtEnd($bbCheck);
+        $isChild = $context->builder->icmp(Builder::INT_EQ, $curParent, $parent);
         $context->builder->branchIf($isChild, $bbOk, $bbBad);
 
         $context->builder->positionAtEnd($bbBad);
