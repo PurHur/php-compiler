@@ -13682,9 +13682,19 @@ class JIT {
                         );
                     } else {
                         $sendLocalName = JIT\OperandName::resolve($sendOperand);
+                        $outgoingArgIndex = \count($this->context->scope->args);
+                        $skipUndefGuardForByRefSend = $this->isOutgoingByRefArgIndex(
+                            $this->context->scope->toCall,
+                            $outgoingArgIndex
+                        );
                         // {main} script globals: scope slots can retain stale NATIVE_LONG after
                         // the heap box was updated (echo path #23842; substr_compare $length #4297).
-                        $sendValue = $this->resolveScriptGlobalForRuntimeRead($sendOperand, $block);
+                        $sendValue = $this->resolveScriptGlobalForRuntimeRead(
+                            $sendOperand,
+                            $block,
+                            null,
+                            $skipUndefGuardForByRefSend
+                        );
                         if (null === $sendValue) {
                             $sendValue = $this->context->getVariableFromOp($sendOperand);
                             if (null !== $sendLocalName && '' !== $sendLocalName) {
@@ -13858,6 +13868,11 @@ class JIT {
                         $callOperands
                     );
                     $this->invokeJitCall($this->context->scope->toCall, $callArgs);
+                    $this->markByRefOutParamsAssignedAfterCall(
+                        $this->context->scope->toCall,
+                        $callOperands,
+                        $block
+                    );
                     $this->context->jitJsonDecodeFlagsOperand = $savedJsonDecodeFlagsOperandNoreturn;
                     JIT\NoDiscardCallGuard::emitAfterDiscardedReturn($this->context, $this->context->scope->toCall);
                     $this->markNewObjectConstructedAfterCall($this->context->scope->toCall, $callArgs);
@@ -14259,6 +14274,11 @@ class JIT {
                         $callOperands
                     );
                     $result = $this->invokeJitCall($this->context->scope->toCall, $callArgs);
+                    $this->markByRefOutParamsAssignedAfterCall(
+                        $this->context->scope->toCall,
+                        $callOperands,
+                        $block
+                    );
                     $this->context->jitUnserializeOptionsOperand = $savedUnserializeOptionsOperand;
                     $this->context->jitJsonEncodeValueOperand = $savedJsonEncodeValueOperand;
                     $this->context->jitJsonEncodeFlagsOperand = $savedJsonEncodeFlagsOperand;
@@ -20341,7 +20361,8 @@ class JIT {
     private function resolveScriptGlobalForRuntimeRead(
         Operand $op,
         ?Block $block = null,
-        ?string $nameOverride = null
+        ?string $nameOverride = null,
+        bool $skipUndefGuard = false
     ): ?JIT\Variable {
         $name = $nameOverride ?? JIT\OperandName::resolve($op);
         if (null === $name || '' === $name || \PHPCompiler\Web\Superglobals::isSuperglobalName($name)) {
@@ -20356,10 +20377,10 @@ class JIT {
                 return null;
             }
 
-            return $this->ensureScriptGlobalForRuntimeRead($op, $name);
+            return $this->ensureScriptGlobalForRuntimeRead($op, $name, $skipUndefGuard);
         }
         if ($block->declaresGlobalName($name) || isset($this->context->jitImportedGlobalNames[$name])) {
-            return $this->ensureScriptGlobalForRuntimeRead($op, $name);
+            return $this->ensureScriptGlobalForRuntimeRead($op, $name, $skipUndefGuard);
         }
         $resolved = $this->context->resolveRefAliasName($name);
         if (
@@ -20380,10 +20401,15 @@ class JIT {
      * {main} locals and `global $name` imports share ensureScriptGlobal() heap boxes; reads
      * previously skipped UndefinedVariableHelper when echoScriptGlobalName was set (#23842).
      */
-    private function ensureScriptGlobalForRuntimeRead(Operand $op, string $name): JIT\Variable
-    {
+    private function ensureScriptGlobalForRuntimeRead(
+        Operand $op,
+        string $name,
+        bool $skipUndefGuard = false
+    ): JIT\Variable {
         $global = $this->context->ensureScriptGlobal($name);
-        JIT\UndefinedVariableHelper::guardBeforeScriptGlobalName($this->context, $name);
+        if (!$skipUndefGuard) {
+            JIT\UndefinedVariableHelper::guardBeforeScriptGlobalName($this->context, $name);
+        }
 
         return $global;
     }
@@ -24973,6 +24999,117 @@ class JIT {
         ) {
             $receiverVar->compileTimeString = $zoneId;
         }
+    }
+
+    /**
+     * After a call with by-ref out parameters, mark those CVs assigned so later
+     * ZEND_CHECK_UNDEFINED_VAR stays quiet (#36081 regression on j08_preg / preg_match $matches).
+     *
+     * php-src: zend_execute.c — callee write through ZEND_SEND_REF defines the CV.
+     *
+     * @param list<Operand> $callOperands
+     */
+    private function markByRefOutParamsAssignedAfterCall(
+        ?JIT\Call $toCall,
+        array $callOperands,
+        Block $block
+    ): void {
+        if (null === $toCall) {
+            return;
+        }
+        $byRefIndices = [];
+        if ($toCall instanceof CoreFunc\Internal) {
+            $name = $toCall->getName();
+            $byRefIndices = BuiltinByRefParams::forFunction($name);
+            $variadicFrom = BuiltinByRefParams::variadicByRefFromIndex($name);
+            if (null !== $variadicFrom) {
+                for ($idx = $variadicFrom, $n = \count($callOperands); $idx < $n; ++$idx) {
+                    $byRefIndices[] = $idx;
+                }
+            }
+        } elseif ($toCall instanceof JIT\Call\Native) {
+            foreach ($toCall->paramByRefByArg as $idx => $_) {
+                if (null !== $toCall->variadicArgIndex && $idx === $toCall->variadicArgIndex) {
+                    continue;
+                }
+                $byRefIndices[] = $idx;
+            }
+            if (
+                null !== $toCall->variadicArgIndex
+                && isset($toCall->paramByRefByArg[$toCall->variadicArgIndex])
+            ) {
+                $start = $toCall->variadicArgIndex;
+                $end = \count($callOperands) - 1;
+                if (null !== $toCall->namedArgsVariadicIndex) {
+                    $trailing = \count($toCall->paramNames) - $toCall->namedArgsVariadicIndex - 1;
+                    if ($trailing > 0) {
+                        $end = \count($callOperands) - $trailing - 1;
+                    }
+                }
+                for ($idx = $start; $idx <= $end; ++$idx) {
+                    $byRefIndices[] = $idx;
+                }
+            }
+        } else {
+            return;
+        }
+        $seen = [];
+        foreach ($byRefIndices as $idx) {
+            if (isset($seen[$idx])) {
+                continue;
+            }
+            $seen[$idx] = true;
+            $operand = $callOperands[$idx] ?? null;
+            if (null === $operand) {
+                continue;
+            }
+            $this->markByRefOutParamOperandAssigned($block, $operand);
+        }
+    }
+
+    private function markByRefOutParamOperandAssigned(Block $block, Operand $operand): void
+    {
+        if (!$this->context->hasVariableOp($operand)) {
+            $this->context->aliasVariableOpFromSlot($block, $operand);
+        }
+        if (!$this->context->hasVariableOp($operand)) {
+            return;
+        }
+        $var = $this->context->getVariableFromOp($operand);
+        JIT\UndefinedVariableHelper::markAssigned($this->context, $operand, $var);
+    }
+
+    /** True when the pending outgoing call passes argument $argIndex by reference (ZEND_SEND_REF). */
+    private function isOutgoingByRefArgIndex(?JIT\Call $toCall, int $argIndex): bool
+    {
+        if (null === $toCall) {
+            return false;
+        }
+        if ($toCall instanceof CoreFunc\Internal) {
+            return BuiltinByRefParams::isByRefArg($toCall->getName(), $argIndex);
+        }
+        if ($toCall instanceof JIT\Call\Native) {
+            if (isset($toCall->paramByRefByArg[$argIndex])) {
+                return true;
+            }
+            if (
+                null !== $toCall->variadicArgIndex
+                && isset($toCall->paramByRefByArg[$toCall->variadicArgIndex])
+                && $argIndex >= $toCall->variadicArgIndex
+            ) {
+                $end = $toCall->variadicArgIndex;
+                if (null !== $toCall->namedArgsVariadicIndex) {
+                    $trailing = \count($toCall->paramNames) - $toCall->namedArgsVariadicIndex - 1;
+                    if ($trailing > 0) {
+                        return $argIndex <= $end;
+                    }
+                }
+
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
