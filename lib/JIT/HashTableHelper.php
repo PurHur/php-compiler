@@ -176,6 +176,18 @@ final class HashTableHelper
         return HashTableReadLlvm::readIndexedHashtable($context, $ht, $index);
     }
 
+    /** Nested dim write: autovivify [] at missing string key (#31991 / #24011). */
+    public static function readStringKeyHashtableForNestedWrite(Context $context, Value $ht, Value $keyStr): Value
+    {
+        return HashTableReadLlvm::readStringKeyHashtableForNestedWrite($context, $ht, $keyStr);
+    }
+
+    /** Nested dim write: autovivify [] at undefined packed index (#31991 / #24011). */
+    public static function readIndexedHashtableForNestedWrite(Context $context, Value $ht, Value $index): Value
+    {
+        return HashTableReadLlvm::readIndexedHashtableForNestedWrite($context, $ht, $index);
+    }
+
     /**
      * Lvalue marker for $arr['key'] = … without reading the old value first (#107).
      */

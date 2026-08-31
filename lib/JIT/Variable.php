@@ -1416,8 +1416,11 @@ final class Variable {
                         );
                     }
                     if (null !== $expectedType && Type::TYPE_ARRAY === $expectedType->type) {
-                        $childHt = $this->context->builder->call(
-                            $this->context->lookupFunction('__hashtable__readStringKeyHashtable'),
+                        if ($warnUndefinedKeyForIncDec) {
+                            HashTableHelper::emitUndefinedArrayKeyWarningIfMissing($this->context, $ht, $dim);
+                        }
+                        $childHt = HashTableHelper::readStringKeyHashtableForNestedWrite(
+                            $this->context,
                             $ht,
                             $key
                         );
@@ -1457,7 +1460,14 @@ final class Variable {
                     return HashTableHelper::prepareIndexWrite($this->context, $ht, $index);
                 }
                 if ($forWrite && null !== $expectedType && Type::TYPE_ARRAY === $expectedType->type) {
-                    $childHt = HashTableHelper::readIndexedHashtable($this->context, $ht, $index);
+                    if ($warnUndefinedKeyForIncDec) {
+                        HashTableHelper::emitUndefinedArrayKeyWarningIfMissing($this->context, $ht, $dim);
+                    }
+                    $childHt = HashTableHelper::readIndexedHashtableForNestedWrite(
+                        $this->context,
+                        $ht,
+                        $index
+                    );
 
                     return new Variable(
                         $this->context,
