@@ -256,10 +256,29 @@ final class JitOpensslPkeyNew
         $i64 = $context->getTypeFromString('int64');
         $i8 = $context->getTypeFromString('int8');
         $keyStr = $context->builder->load($context->constantStringFromString($key));
-        $box = HashTableReadLlvm::readStringKeyToValueBox($context, $ht, $keyStr);
-        $ptr = $box->value;
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
+            $ht,
+            $keyStr
+        );
+        $id = (string) (++self::$blockSerial);
+        $defaultBlock = BasicBlockHelper::append($context, 'ossl_opt_int_def_'.$id);
+        $readBlock = BasicBlockHelper::append($context, 'ossl_opt_int_read_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'ossl_opt_int_done_'.$id);
+        $context->builder->branchIf($isSet, $readBlock, $defaultBlock);
+
+        $context->builder->positionAtEnd($defaultBlock);
+        $defaultEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($readBlock);
+        $valPtr = $context->builder->call(
+            $context->lookupFunction('__hashtable__readStringKeyValue'),
+            $ht,
+            $keyStr
+        );
         $typeByte = $context->builder->load(
-            $context->builder->structGep($ptr, $context->structFieldMap['__value__']['type'])
+            $context->builder->structGep($valPtr, $context->structFieldMap['__value__']['type'])
         );
         $isInt = $context->builder->icmp(
             Builder::INT_EQ,
@@ -268,21 +287,49 @@ final class JitOpensslPkeyNew
         );
         $read = $context->builder->call(
             $context->lookupFunction('__value__readLong'),
-            $ptr
+            $valPtr
         );
         $fallback = $i64->constInt($default, false);
+        $readVal = $context->builder->select($isInt, $read, $fallback);
+        $readEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
 
-        return $context->builder->select($isInt, $read, $fallback);
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($i64, 'ossl_opt_int_phi_'.$id);
+        $phi->addIncoming($i64->constInt($default, false), $defaultEnd);
+        $phi->addIncoming($readVal, $readEnd);
+
+        return $phi;
     }
 
     private static function optionStringOrEmpty(Context $context, Value $ht, string $key): Value
     {
         $i8 = $context->getTypeFromString('int8');
         $keyStr = $context->builder->load($context->constantStringFromString($key));
-        $box = HashTableReadLlvm::readStringKeyToValueBox($context, $ht, $keyStr);
-        $ptr = $box->value;
+        $empty = $context->builder->load($context->constantStringFromString(''));
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
+            $ht,
+            $keyStr
+        );
+        $id = (string) (++self::$blockSerial);
+        $emptyBlock = BasicBlockHelper::append($context, 'ossl_opt_str_empty_'.$id);
+        $readBlock = BasicBlockHelper::append($context, 'ossl_opt_str_read_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'ossl_opt_str_done_'.$id);
+        $context->builder->branchIf($isSet, $readBlock, $emptyBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $emptyEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($readBlock);
+        $valPtr = $context->builder->call(
+            $context->lookupFunction('__hashtable__readStringKeyValue'),
+            $ht,
+            $keyStr
+        );
         $typeByte = $context->builder->load(
-            $context->builder->structGep($ptr, $context->structFieldMap['__value__']['type'])
+            $context->builder->structGep($valPtr, $context->structFieldMap['__value__']['type'])
         );
         $isStr = $context->builder->icmp(
             Builder::INT_EQ,
@@ -291,11 +338,19 @@ final class JitOpensslPkeyNew
         );
         $read = $context->builder->call(
             $context->lookupFunction('__value__readString'),
-            $ptr
+            $valPtr
         );
-        $empty = $context->builder->load($context->constantStringFromString(''));
+        $readVal = $context->builder->select($isStr, $read, $empty);
+        $readEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
 
-        return $context->builder->select($isStr, $read, $empty);
+        $context->builder->positionAtEnd($doneBlock);
+        $strTy = $empty->typeOf();
+        $phi = $context->builder->phi($strTy, 'ossl_opt_str_phi_'.$id);
+        $phi->addIncoming($empty, $emptyEnd);
+        $phi->addIncoming($readVal, $readEnd);
+
+        return $phi;
     }
 
     /**
