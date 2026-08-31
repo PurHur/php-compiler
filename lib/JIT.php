@@ -31784,7 +31784,7 @@ class JIT {
     /**
      * Promoted ctor params with `new` defaults — property initialized at allocate() (#6652).
      *
-     * @return array<int, string> LLVM arg index => property name
+     * @return array<int, array{prop: string, declClass: string}> LLVM arg index => promoted property meta
      */
     private function collectPromotedRuntimeNewDefaultProps(Block $block): array
     {
@@ -31792,6 +31792,7 @@ class JIT {
             return [];
         }
         $classId = $this->context->scope->classId;
+        $declClass = ltrim($this->context->scope->className, '\\');
         $thisParamOffset = $this->llvmThisParamOffset($block);
         $defaults = [];
         foreach ($block->opCodes as $op) {
@@ -31827,7 +31828,7 @@ class JIT {
                     );
                 }
             }
-            $defaults[$paramIdx + $thisParamOffset] = $propName;
+            $defaults[$paramIdx + $thisParamOffset] = ['prop' => $propName, 'declClass' => $declClass];
         }
 
         return $defaults;
