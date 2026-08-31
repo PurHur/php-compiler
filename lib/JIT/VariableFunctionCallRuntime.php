@@ -86,13 +86,10 @@ final class VariableFunctionCallRuntime
             $context->builder->branchIf($isCase, $onMatch, $onMiss);
 
             $context->builder->positionAtEnd($onMatch);
-            $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
             $raw = $proxy->call($context, ...$args);
-            if (null !== $savedInsert) {
-                BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-            } else {
-                $context->builder->positionAtEnd($onMatch);
-            }
+            // Boxed null args seal $onMatch with the first Z_PARAM_NUMBER branch; restoring
+            // the sealed block parks store/branch in an unreachable BB (foreach $fn(null)).
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'var_fn_cand_cont_'.$tag.'_'.$i);
             if ($nativeLong) {
                 $context->builder->store($raw, $resultSlot);
             } else {
@@ -174,14 +171,8 @@ final class VariableFunctionCallRuntime
             $context->builder->branchIf($isCase, $onMatch, $onMiss);
 
             $context->builder->positionAtEnd($onMatch);
-            // Candidate proxies (abs/round ensureBridge) must not steal the insert block (#35075).
-            $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
             $raw = $proxy->call($context, ...$args);
-            if (null !== $savedInsert) {
-                BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-            } else {
-                $context->builder->positionAtEnd($onMatch);
-            }
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'var_fn_idx_cont_'.$tag.'_'.$i);
             if ($nativeLong) {
                 $context->builder->store($raw, $resultSlot);
             } else {
