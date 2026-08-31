@@ -207,6 +207,10 @@ class Object_ extends Type {
      * @var array<int, array<int, array{0: \PHPCompiler\Block, 1: int}>>
      */
     private array $runtimePropertyNewInitFragments = [];
+
+    /** @var array<int, array<int, true>> class id => slot => ctor-promoted property (#6652 defer) */
+    private array $propertyFromConstructorPromotion = [];
+
     /**
      * @var array<int, array<string, array{type: int, global: \PHPLLVM\Value}>>
      *     class id => property lc => typed LLVM global
@@ -1166,6 +1170,9 @@ class Object_ extends Type {
             return;
         }
         foreach ($this->propertyDefaults[$classId] as $slotIndex => $entry) {
+            if ($this->shouldDeferInheritedPromotedDefaultAtAllocate($classId, $slotIndex)) {
+                continue;
+            }
             $slot = $this->propertySlotPtr($obj, $slotIndex);
             if (!empty($entry['emptyArray'])) {
                 $ht = HashTableHelper::alloc($this->context);
@@ -1197,6 +1204,9 @@ class Object_ extends Type {
             $propertyTypes[$propset[3]] = $propset[2];
         }
         foreach ($this->runtimePropertyNewDefaults[$classId] as $slotIndex => $newClassId) {
+            if ($this->shouldDeferInheritedPromotedDefaultAtAllocate($classId, $slotIndex)) {
+                continue;
+            }
             $slot = $this->propertySlotPtr($obj, $slotIndex);
             if (isset($this->runtimePropertyNewInitFragments[$classId][$slotIndex])) {
                 [$initBlock, $resultSlot] = $this->runtimePropertyNewInitFragments[$classId][$slotIndex];
@@ -6283,6 +6293,37 @@ class Object_ extends Type {
             $this->runtimePropertyNewInitFragments[$childId][$childSlot]
                 = $this->runtimePropertyNewInitFragments[$parentId][$parentSlot];
         }
+        if (isset($this->propertyFromConstructorPromotion[$parentId][$parentSlot])) {
+            $this->propertyFromConstructorPromotion[$childId][$childSlot] = true;
+        }
+    }
+
+    public function markPropertyFromConstructorPromotion(int $classId, string $name): void
+    {
+        $propset = $this->findInstancePropertySet($classId, $name);
+        if (null === $propset) {
+            throw new \LogicException("Property {$name} not defined for class {$classId}");
+        }
+        $this->propertyFromConstructorPromotion[$classId][$propset[3]] = true;
+    }
+
+    /**
+     * Parent ctor-promoted defaults apply at allocate only when the subclass has no __construct
+     * (#6652 / #31895). With a child ctor that skips parent::__construct, Zend leaves ancestor
+     * promoted slots uninitialized (zend_objects.c).
+     */
+    private function shouldDeferInheritedPromotedDefaultAtAllocate(int $allocateClassId, int $slotIndex): bool
+    {
+        if (!$this->hasConstructor($allocateClassId)) {
+            return false;
+        }
+        $declaringId = $this->instancePropertySlotDeclaringClassId[$allocateClassId][$slotIndex]
+            ?? $allocateClassId;
+        if ($declaringId === $allocateClassId) {
+            return false;
+        }
+
+        return isset($this->propertyFromConstructorPromotion[$allocateClassId][$slotIndex]);
     }
 
     public function markHasConstructor(int $classId): void
@@ -6355,6 +6396,7 @@ class Object_ extends Type {
             // Drop trait/parent default so a class body without an initializer stays unset.
             unset($this->propertyDefaults[$classId][$existing[3]]);
             unset($this->runtimePropertyNewDefaults[$classId][$existing[3]]);
+            unset($this->propertyFromConstructorPromotion[$classId][$existing[3]]);
 
             return;
         }
