@@ -143,6 +143,11 @@ final class JitDomSetIdAttribute
         $localLlvm = JitStringArg::lower($context, $args[2], 'DOMElement::setIdAttributeNS() localName');
         $element = self::loadObjectArg($context, $args[0]);
         $isIdTrue = self::resolveIsIdTrue($context, $args[3]);
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+            // Peer non-NS setIdAttribute('id', …) — getElementById cache hits require the
+            // module-global id-bearing flag (#29884 / re-#35303).
+            DomUserScriptAttributeCacheLlvm::storeIdBearingGlobal($context, $isIdTrue);
+        }
         if ($isIdTrue) {
             DomSetIdAttributeRuntime::ensureNsTrueLinked($context);
             $abi = DomSetIdAttributeRuntime::ABI_NS_TRUE;
@@ -163,6 +168,9 @@ final class JitDomSetIdAttribute
             // loadXML open-tag stamp first; createElement+setAttributeNS stores under ns\0local
             // (#35303). Bare getAttribute(localName) is empty for x:id and skipped the id-map.
             $elemAttrVal = self::compileTimeReceiverAttrValue($args[0], $localLit);
+            if (null === $elemAttrVal || '' === $elemAttrVal) {
+                $elemAttrVal = self::compileTimeReceiverNsLocalAttrValue($args[0], $localLit);
+            }
             if (null === $elemAttrVal || '' === $elemAttrVal) {
                 $elemAttrVal = DomUserScriptAttributeCacheLlvm::literalValue(
                     (string) $nsLit,
@@ -829,6 +837,34 @@ final class JitDomSetIdAttribute
             $local = substr($nameLit, $pos + 1);
             if (isset($attrs[$local]) && '' !== $attrs[$local]) {
                 return $attrs[$local];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * createElement+setAttributeNS stamps qName keys (x:id) while setIdAttributeNS uses localName (#35303).
+     *
+     * @return string|null
+     */
+    private static function compileTimeReceiverNsLocalAttrValue(JITVariable $receiver, ?string $localLit): ?string
+    {
+        if (null === $localLit || '' === $localLit) {
+            return null;
+        }
+        $attrs = $receiver->compileTimeDomAttributes;
+        if (null === $attrs || [] === $attrs) {
+            return null;
+        }
+        foreach ($attrs as $qname => $value) {
+            if ('' === $value) {
+                continue;
+            }
+            $pos = strpos((string) $qname, ':');
+            $local = false === $pos ? (string) $qname : substr((string) $qname, $pos + 1);
+            if ($local === $localLit) {
+                return (string) $value;
             }
         }
 
