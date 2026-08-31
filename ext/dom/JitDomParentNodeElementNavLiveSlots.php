@@ -59,9 +59,15 @@ final class JitDomParentNodeElementNavLiveSlots
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, self::tag('dom_pn_rm'));
         self::ensureProps($context);
+        $bbDone = BasicBlockHelper::append($context, self::tag('dom_pn_rm_done'));
+        // Document ParentNode is computed from documentElement (#34910) — peer appendChild #35007.
+        $isDoc = JitDomParentChildLinkLayout::isDocumentObject($context, $parent, self::tag('dom_pn_rm_doc'));
+        $bbAfterDoc = BasicBlockHelper::append($context, self::tag('dom_pn_rm_after_doc'));
+        $context->builder->branchIf($isDoc, $bbDone, $bbAfterDoc);
+
+        $context->builder->positionAtEnd($bbAfterDoc);
         $bbSkip = BasicBlockHelper::append($context, self::tag('dom_pn_rm_skip'));
         $bbDo = BasicBlockHelper::append($context, self::tag('dom_pn_rm_do'));
-        $bbDone = BasicBlockHelper::append($context, self::tag('dom_pn_rm_done'));
         $context->builder->branchIf(self::isElementObject($context, $child), $bbDo, $bbSkip);
 
         $context->builder->positionAtEnd($bbSkip);

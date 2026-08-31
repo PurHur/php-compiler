@@ -43,10 +43,31 @@ final class JitDomRemoveChild
             // php-src: Attr is not a content child — Not Found before LiveSlots (#33596).
             // Must not walk Element sibling slots on a DOMAttr allocation (SIGSEGV).
             self::rejectAttrAsChildBeforeLiveSlots($context, $child);
+
+            $isDoc = JitDomParentChildLinkLayout::isDocumentObject($context, $parent, 'dom_rm_doc_path');
+            $bbDocBridge = BasicBlockHelper::append($context, 'dom_rm_doc_bridge');
+            $bbLiveSlots = BasicBlockHelper::append($context, 'dom_rm_live_slots_path');
+            $bbAfterRemove = BasicBlockHelper::append($context, 'dom_rm_after_remove_path');
+            $context->builder->branchIf($isDoc, $bbDocBridge, $bbLiveSlots);
+
+            $context->builder->positionAtEnd($bbDocBridge);
+            DomNodeTreeMutationRuntime::ensureRemoveChildLinked($context);
+            $context->builder->call(
+                $context->lookupFunction(DomNodeTreeMutationRuntime::ABI_REMOVE_CHILD),
+                $parent,
+                $child
+            );
+            self::clearDetachedLinkSlots($context, $child);
+            $context->builder->branch($bbAfterRemove);
+
+            $context->builder->positionAtEnd($bbLiveSlots);
             // Snapshot before LiveSlots — sync re-stamps sticky/lastFetched onto the
             // remaining firstChild and would make cloneNode pick the wrong sibling (#35421).
             self::rememberDetachedChildBeforeLiveSlots($args[0], $args[1]);
             JitDomRemoveChildLiveSlots::sync($context, $parent, $child);
+            $context->builder->branch($bbAfterRemove);
+
+            $context->builder->positionAtEnd($bbAfterRemove);
             DomUserScriptElementCacheLlvm::invalidateIfElement($context, $child);
             self::syncUserScriptInnerXmlAfterRemove($context, $args[0], $args[1]);
             // #33659 bumped live tag pending/count on append; remove must undo (#33679).
