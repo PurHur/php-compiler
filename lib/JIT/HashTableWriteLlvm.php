@@ -2350,6 +2350,7 @@ final class HashTableWriteLlvm
         $fill = BasicBlockHelper::append($context, 'ht_idx_hyd_fill_'.$tag);
         $context->builder->branchIf($isSet, $fill, $miss);
         $context->builder->positionAtEnd($miss);
+        HashTableReadLlvm::emitUndefinedArrayKeyWarningIfMissingIndex($context, $ht, $index);
         $context->builder->call(
             $context->lookupFunction('__hashtable__setNullAt'),
             $ht,

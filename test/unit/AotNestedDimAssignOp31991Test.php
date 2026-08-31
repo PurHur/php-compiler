@@ -50,7 +50,21 @@ final class AotNestedDimAssignOp31991Test extends TestCase
             $runOut = [];
             exec(escapeshellarg($bin).' 2>&1', $runOut, $runRc);
             $this->assertSame(0, $runRc, implode("\n", $runOut));
-            $this->assertSame(self::EXPECT, implode("\n", $runOut)."\n");
+            $stdout = array_values(array_filter(
+                $runOut,
+                static fn (string $line): bool => !str_starts_with($line, 'PHP Warning:')
+                    && !str_starts_with($line, 'PHP Notice:')
+                    && !str_starts_with($line, 'PHP Deprecated:')
+            ));
+            $this->assertSame(self::EXPECT, implode("\n", $stdout)."\n");
+            $warnings = array_filter(
+                $runOut,
+                static fn (string $line): bool => str_contains($line, 'Undefined array key')
+            );
+            $this->assertCount(4, $warnings, implode("\n", $runOut));
+            $combined = implode("\n", $runOut);
+            $this->assertStringContainsString('i31991_nested_dim_assign_op_undef.php on line 5', $combined);
+            $this->assertStringContainsString('i31991_nested_dim_assign_op_undef.php on line 8', $combined);
         } finally {
             @unlink($bin);
         }
