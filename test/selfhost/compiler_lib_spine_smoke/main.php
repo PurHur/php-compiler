@@ -6105,6 +6105,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringUnitEnumExists.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/UnlinkLibcRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUnlink.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUnpack.php';
+require_once __DIR__.'/../../../lib/JIT/UnserializeObjectDecodeLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUnserialize.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUrldecode.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUrlencode.php';

@@ -12,9 +12,9 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\NestedVmHashTableMethodLlvm;
 use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
+use PHPCompiler\JIT\UnserializeObjectDecodeLlvm;
 use PHPCompiler\JIT\VmActiveContextInitLlvm;
 use PHPCompiler\JIT\VmActiveContextLlvm;
-use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -26,36 +26,16 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * {@see implementUnserializeBridge}. Do not re-add empty always-on shells in {@see Type} —
  * leftover decls mint unserialize.1 (#31894 / #32122 / #33213).
  *
- * Embed + thin standalone AOT: {@see UnserializeJitHelper} NestedJIT
- * (Serialize #20773 shape — no thin null/empty stubs).
- * Helper NestedJIT-decodes `i:N;` as int; bridge boxes to `__value__*` (#20785).
- * Simple `O:` public-prop objects: {@see UnserializeObjectNestedJitHelper}::propsInto HT
- * + copy into declared slots (#35107; NestedJIT `$x++` miscompile fixed in helper).
- * SPL ArrayObject family: bag restore into `__spl_ht` (#33636) — not firstIntProp→slot0.
- * SplFixedArray: integer-keyed elements into `__spl_ht` (#33640) — same slot-0 trap.
- * SplObjectStorage: object-key pairs (#33876); SplDoublyLinkedList/Queue/Stack bag (#33966).
- * DateTime / DateTimeImmutable / DateTimeZone: Zend date wire via NestedJIT (#34599 / #34601).
- * DateInterval: compileTimeString fold (#34599) + NestedJIT member-wire restore (#34602).
- * DatePeriod: compileTimeString fold + foreach snapshot (#34608); NestedJIT bag TBD.
+ * O: wire materialize lives in {@see UnserializeObjectDecodeLlvm} (#20785 thin bridge).
  * php-src: ext/standard/var_unserializer.c
  */
 final class StringUnserialize
 {
     private const HELPER_PATH = '/ext/standard/UnserializeJitHelper.php';
 
-    private const OBJECT_HELPER_PATH = '/ext/standard/UnserializeObjectNestedJitHelper.php';
-
     private const DECODE_HELPER = 'PHPCompiler\\ext\\standard\\UnserializeJitHelper::decode';
 
     private const DECODE_SESSION_HELPER = 'PHPCompiler\\ext\\standard\\UnserializeJitHelper::decodeSession';
-
-    private const IS_OBJECT_WIRE_HELPER = 'PHPCompiler\\ext\\standard\\UnserializeObjectNestedJitHelper::isObjectWire';
-
-    private const CLASS_NAME_HELPER = 'PHPCompiler\\ext\\standard\\UnserializeObjectNestedJitHelper::className';
-
-    private const PROPS_INTO_HELPER = 'PHPCompiler\\ext\\standard\\UnserializeObjectNestedJitHelper::propsInto';
-
-    private const FIRST_INT_PROP_HELPER = 'PHPCompiler\\ext\\standard\\UnserializeObjectNestedJitHelper::firstIntProp';
 
     private const UNSER_BRIDGE_ENTRY = 'unser_bridge_entry';
 
@@ -65,14 +45,6 @@ final class StringUnserialize
     private const COMPILED_HELPERS = [
         self::DECODE_HELPER,
         self::DECODE_SESSION_HELPER,
-    ];
-
-    /** @var list<string> */
-    private const OBJECT_COMPILED_HELPERS = [
-        self::IS_OBJECT_WIRE_HELPER,
-        self::CLASS_NAME_HELPER,
-        self::PROPS_INTO_HELPER,
-        self::FIRST_INT_PROP_HELPER,
     ];
 
     /** @var list<string> */
@@ -97,23 +69,19 @@ final class StringUnserialize
             return;
         }
 
-        // Save before active-context / NestedJIT work — those can detach the builder
-        // ("Current basic block has no parent function", peer StrRepeat #19998).
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
 
-        // Thin + embed: publish sg_vm_context before NestedJIT of UnserializeJitHelper (#17391).
         VmActiveContextInitLlvm::requestThinStandaloneInit($context);
         VmActiveContextLlvm::ensureAbi($context);
         NestedVmActiveContextLlvm::ensureMethod($context);
         DomInstanceMethodRuntime::ensureActiveContextProxy($context);
-        // Variable / HashTable mutators used by UnserializeJitHelper NestedJIT (#12910 / #20785).
         foreach (['null', 'bool', 'int', 'string', 'float', 'array', 'copyfrom', 'resolveindirect'] as $varMethod) {
             NestedVmVariableMethodLlvm::ensureMethod($context, $varMethod);
         }
         foreach (['add', 'updateindex', 'append'] as $htMethod) {
             NestedVmHashTableMethodLlvm::ensureMethod($context, $htMethod);
         }
-        self::ensureNativeHtInternalProxies($context);
+        UnserializeObjectDecodeLlvm::ensureNativeHtInternalProxies($context);
 
         $unserProbe = $context->module->getNamedFunction('__compiler_unserialize');
         $sessionProbe = $context->module->getNamedFunction('phpc_session_decode_payload');
@@ -151,36 +119,7 @@ final class StringUnserialize
 
     public static function ensureObjectHelpersCompiled(Context $context): void
     {
-        self::ensureNativeHtInternalProxies($context);
-        JitVmHelperLink::ensureCompiled(
-            $context,
-            self::OBJECT_HELPER_PATH,
-            self::OBJECT_COMPILED_HELPERS,
-            '#27030'
-        );
-    }
-
-    /** Register phpc_native_ht_* Internal JIT handlers before NestedJIT (#27030 / #24137 / #33636). */
-    private static function ensureNativeHtInternalProxies(Context $context): void
-    {
-        $internals = [
-            new \PHPCompiler\ext\standard\phpc_native_ht_alloc(),
-            new \PHPCompiler\ext\standard\phpc_native_ht_set_string_key(),
-            new \PHPCompiler\ext\standard\phpc_native_ht_set_string_key_long(),
-            new \PHPCompiler\ext\standard\phpc_native_ht_set_string_key_double(),
-            new \PHPCompiler\ext\standard\phpc_native_ht_set_string_key_bool(),
-            new \PHPCompiler\ext\standard\phpc_native_ht_set_string_key_null(),
-            new \PHPCompiler\ext\standard\phpc_native_ht_set_string_at(),
-            new \PHPCompiler\ext\standard\phpc_native_ht_set_long_at(),
-            new \PHPCompiler\ext\standard\phpc_native_ht_set_null_at(),
-        ];
-        foreach ($internals as $internal) {
-            $lc = strtolower($internal->getName());
-            $existing = $context->functionProxies[$lc] ?? null;
-            if (null === $existing || $existing instanceof \PHPCompiler\JIT\Call\ExternalMethod) {
-                $context->functionProxies[$lc] = $internal;
-            }
-        }
+        UnserializeObjectDecodeLlvm::ensureObjectHelpersCompiled($context);
     }
 
     public static function helperFunction(Context $context, string $logical): LlvmFunction
@@ -195,400 +134,11 @@ final class StringUnserialize
         return $fn;
     }
 
-    public static function objectHelperFunction(Context $context, string $logical): LlvmFunction
-    {
-        self::ensureObjectHelpersCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after UnserializeObjectNestedJitHelper compile (#27030)');
-        }
-
-        return $fn;
-    }
-
-    /**
-     * Emit runtime O: decode into the current insert block (call-site class table) (#27030).
-     *
-     * Returns `__value__*` — object on success, false on parse/class miss (php-src-ish).
-     * Class name is matched via LLVM prefix compare against known classes (NestedJIT string
-     * returns are unreliable under thin AOT — peer str_contains #24161).
-     */
     public static function emitObjectDecodeRuntime(Context $context, Value $payloadString): Value
     {
-        self::ensureLinked($context);
-        self::ensureObjectHelpersCompiled($context);
-        self::ensureRuntimeHelpers($context);
-        StringStrContains::ensureLinked($context);
-        $htPtrTy = $context->getTypeFromString('__hashtable__*');
-        $strPtrTy = $context->getTypeFromString('__string__*');
-        $valuePtrTy = $context->getTypeFromString('__value__*');
-        $i1Ty = $context->getTypeFromString('int1');
-        try {
-            $context->lookupFunction('__hashtable__readStringKeyValue');
-        } catch (\Throwable) {
-            $fn = $context->module->addFunction(
-                '__hashtable__readStringKeyValue',
-                $context->context->functionType($valuePtrTy, false, $htPtrTy, $strPtrTy)
-            );
-            $context->registerFunction('__hashtable__readStringKeyValue', $fn);
-        }
-        try {
-            $context->lookupFunction('__hashtable__offsetIsSetStringKey');
-        } catch (\Throwable) {
-            $fn = $context->module->addFunction(
-                '__hashtable__offsetIsSetStringKey',
-                $context->context->functionType($i1Ty, false, $htPtrTy, $strPtrTy)
-            );
-            $context->registerFunction('__hashtable__offsetIsSetStringKey', $fn);
-        }
-
-        $fn = BasicBlockHelper::parentFunction($context);
-        $i64 = $context->getTypeFromString('int64');
-        $i32 = $context->getTypeFromString('int32');
-        $valuePtr = $context->getTypeFromString('__value__*');
-        $objPtr = $context->getTypeFromString('__object__*');
-
-        $bbObj = $fn->appendBasicBlock('unser_obj_decode');
-        $bbFail = $fn->appendBasicBlock('unser_obj_fail');
-        $bbDone = $fn->appendBasicBlock('unser_obj_done');
-        $resultSlot = BasicBlockHelper::entryAlloca($context, $valuePtr);
-
-        $payloadArg = JitNestedHelperCoerce::coerceArgForHelper(
-            $context,
-            $payloadString,
-            self::objectHelperFunction($context, self::IS_OBJECT_WIRE_HELPER)->getParam(0)->typeOf()
-        );
-        $isObj = $context->builder->call(
-            self::objectHelperFunction($context, self::IS_OBJECT_WIRE_HELPER),
-            $payloadArg
-        );
-        $isObjI64 = JitNestedHelperCoerce::coerceBridgeResult($context, $isObj, $i64);
-        $isObject = $context->builder->icmp(
-            \PHPLLVM\Builder::INT_NE,
-            $isObjI64,
-            $i64->constInt(0, false)
-        );
-        $context->builder->branchIf($isObject, $bbObj, $bbFail);
-
-        $context->builder->positionAtEnd($bbFail);
-        self::emitParseFailureWarning($context, $payloadString);
-        $failSlot = \PHPCompiler\JIT\JitValueBox::alloc($context);
-        $failPtr = \PHPCompiler\JIT\JitValueBox::pointer($context, $failSlot);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeBool'),
-            $failPtr,
-            $i32->constInt(0, false)
-        );
-        $context->builder->store($failPtr, $resultSlot);
-        $context->builder->branch($bbDone);
-
-        $context->builder->positionAtEnd($bbObj);
-        // Skip HT propsInto — NestedJIT int return of firstIntProp is reliable (#27030).
-        $bbPropsOk = $fn->appendBasicBlock('unser_obj_props_ok');
-        $context->builder->branch($bbPropsOk);
-
-        $context->builder->positionAtEnd($bbPropsOk);
-        /** @var \PHPCompiler\JIT\Builtin\Type\Object_ $object */
-        $object = $context->type->object;
-        // User-script AOT only declares classes seen so far in this TU. `unserialize(load())`
-        // can run before `new DateInterval` is compiled — seed date layouts so NestedJIT
-        // restore cases exist (#34602 residual / peer DOMNodeList #24422).
-        foreach (['DateInterval', 'DateTime', 'DateTimeImmutable', 'DateTimeZone'] as $dateClass) {
-            $object->lookup($dateClass);
-        }
-        $bbMatchFail = $fn->appendBasicBlock('unser_obj_class_miss');
-        $bbMatched = $fn->appendBasicBlock('unser_obj_matched');
-        $objSlot = BasicBlockHelper::entryAlloca($context, $objPtr);
-        $context->builder->store($objPtr->constNull(), $objSlot);
-        $firstIntHelper = self::objectHelperFunction($context, self::FIRST_INT_PROP_HELPER);
-        $firstIntRaw = $context->builder->call(
-            $firstIntHelper,
-            JitNestedHelperCoerce::coerceArgForHelper(
-                $context,
-                $payloadString,
-                $firstIntHelper->getParam(0)->typeOf()
-            )
-        );
-        $firstInt = JitNestedHelperCoerce::coerceBridgeResult($context, $firstIntRaw, $i64);
-        $check = $context->builder->getInsertBlock();
-        $hasCase = false;
-        foreach ($object->allClassNamesById() as $id => $className) {
-            if ('__PHP_Incomplete_Class' === $className) {
-                continue;
-            }
-            $hasCase = true;
-            $case = $fn->appendBasicBlock('unser_obj_case_'.$id);
-            $next = $fn->appendBasicBlock('unser_obj_try_'.$id);
-            $context->builder->positionAtEnd($check);
-            $header = 'O:'.\strlen($className).':"'.$className.'":';
-            $headerStr = $context->builder->load($context->constantStringFromString($header));
-            $isMatch = \PHPCompiler\VM\VmStringCompare::prefixIdentical(
-                $context,
-                $payloadString,
-                $headerStr
-            );
-            $context->builder->branchIf($isMatch, $case, $next);
-            $context->builder->positionAtEnd($case);
-            $classLcEarly = strtolower(ltrim($className, '\\'));
-            if ('stdclass' === $classLcEarly) {
-                foreach (\range('a', 'z') as $ch) {
-                    $object->defineProperty($id, (string) $ch, \PHPCompiler\JIT\Variable::TYPE_VALUE);
-                }
-                foreach (\range('A', 'Z') as $ch) {
-                    $object->defineProperty($id, (string) $ch, \PHPCompiler\JIT\Variable::TYPE_VALUE);
-                }
-                for ($d = 0; $d <= 9; ++$d) {
-                    $object->defineProperty($id, (string) $d, \PHPCompiler\JIT\Variable::TYPE_VALUE);
-                }
-            }
-            $objVal = $object->allocate($id);
-            BasicBlockHelper::ensureOpenInsertBlock($context, 'unser_obj_after_alloc_'.$id);
-            $object->markObjectConstructed($objVal);
-            $classLc = strtolower(ltrim($className, '\\'));
-            if (\PHPCompiler\VM\ArrayObjectJitHelper::isArrayAsPropsClass($className)) {
-                // Bag restore into `__spl_ht` — do not write firstIntProp into slot 0 (#33636).
-                $splName = match ($classLc) {
-                    'arrayobject' => 'ArrayObject',
-                    'arrayiterator' => 'ArrayIterator',
-                    'recursivearrayiterator' => 'RecursiveArrayIterator',
-                    default => $className,
-                };
-                \PHPCompiler\VM\ArrayObjectJitHelper::compileUnserializeRestore(
-                    $context,
-                    $objVal,
-                    $payloadString,
-                    $splName
-                );
-            } elseif ('splfixedarray' === $classLc) {
-                // Integer-keyed elements into `__spl_ht` — not firstIntProp→slot0 (#33640).
-                \PHPCompiler\VM\SplFixedArrayJitHelper::compileUnserializeRestore(
-                    $context,
-                    $objVal,
-                    $payloadString
-                );
-            } elseif ('splobjectstorage' === $classLc) {
-                // Object-key pairs into `__spl_ht` — not firstIntProp→slot0 (#33876).
-                \PHPCompiler\VM\SplObjectStorageJitHelper::compileUnserializeRestore(
-                    $context,
-                    $objVal,
-                    $payloadString
-                );
-            } elseif (
-                'spldoublylinkedlist' === $classLc
-                || 'splqueue' === $classLc
-                || 'splstack' === $classLc
-            ) {
-                // flags+dllist bag into `__spl_ht` — not firstIntProp→slot0 (#33966).
-                \PHPCompiler\VM\SplDllistJitHelper::compileUnserializeRestore(
-                    $context,
-                    $objVal,
-                    $payloadString
-                );
-            } elseif ('datetime' === $classLc || 'datetimeimmutable' === $classLc) {
-                // Zend date/timezone wire into __dt_* — not firstIntProp→slot0 (#34599 / #34594).
-                \PHPCompiler\VM\DateUnserializeJitHelper::compileDateTimeLikeRestore(
-                    $context,
-                    $objVal,
-                    $payloadString,
-                    $className
-                );
-            } elseif ('datetimezone' === $classLc) {
-                \PHPCompiler\VM\DateUnserializeJitHelper::compileDateTimeZoneRestore(
-                    $context,
-                    $objVal,
-                    $payloadString
-                );
-            } elseif ('dateinterval' === $classLc) {
-                // Zend member wire → y..days — not firstIntProp→slot0 / empty alloc (#34602).
-                \PHPCompiler\VM\DateUnserializeJitHelper::compileDateIntervalRestore(
-                    $context,
-                    $objVal,
-                    $payloadString
-                );
-                // True runtime payloads (file_get_contents) need classUserType or `$u->y`
-                // resolves as stdClass and format() SIGSEGVs (#34602 residual of #34604).
-                $context->lastUnserializeObjectClassUserType = 'DateInterval';
-            } elseif ('dateperiod' === $classLc) {
-                // Fold path covers assigned serialize→unserialize (#34608). NestedJIT bag TBD —
-                // skip firstIntProp (empty alloc still SIGSEGVs on foreach without timestamps).
-            } else {
-                // User / stdClass public props: propsInto → declared slots (#35107).
-                self::ensureObjectHelpersCompiled($context);
-                $htI64 = ParseStrNativeOpsJit::alloc($context);
-                $propsInto = self::objectHelperFunction($context, self::PROPS_INTO_HELPER);
-                $context->builder->call(
-                    $propsInto,
-                    JitNestedHelperCoerce::coerceArgForHelper(
-                        $context,
-                        $htI64,
-                        $propsInto->getParam(0)->typeOf()
-                    ),
-                    JitNestedHelperCoerce::coerceArgForHelper(
-                        $context,
-                        $payloadString,
-                        $propsInto->getParam(1)->typeOf()
-                    )
-                );
-                $htVar = new \PHPCompiler\JIT\Variable(
-                    $context,
-                    \PHPCompiler\JIT\Variable::TYPE_NATIVE_LONG,
-                    \PHPCompiler\JIT\Variable::KIND_VALUE,
-                    $htI64
-                );
-                $propsHt = ParseStrNativeOpsJit::htPointerFromI64Arg($context, $htVar);
-                $voidPtr = $context->getTypeFromString('void*');
-                $i1 = $context->getTypeFromString('int1');
-                $serial = 0;
-                foreach ($object->instancePropertySets($id) as $propset) {
-                    $propName = $propset[1];
-                    if ('' === $propName || "\0" === $propName[0] || str_starts_with($propName, '__')) {
-                        continue;
-                    }
-                    ++$serial;
-                    $keyStr = $context->builder->load($context->constantStringFromString($propName));
-                    $isset = $context->builder->call(
-                        $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
-                        $propsHt,
-                        $keyStr
-                    );
-                    $yes = BasicBlockHelper::append($context, 'unser_prop_yes_'.$id.'_'.$serial);
-                    $no = BasicBlockHelper::append($context, 'unser_prop_no_'.$id.'_'.$serial);
-                    $context->builder->branchIf(
-                        $context->builder->icmp(
-                            \PHPLLVM\Builder::INT_NE,
-                            $isset,
-                            $i1->constInt(0, false)
-                        ),
-                        $yes,
-                        $no
-                    );
-                    $context->builder->positionAtEnd($yes);
-                    $valEntry = $context->builder->call(
-                        $context->lookupFunction('__hashtable__readStringKeyValue'),
-                        $propsHt,
-                        $keyStr
-                    );
-                    $slot = $object->propertySlotFor($objVal, $className, $propName);
-                    $context->builder->store(
-                        $context->builder->pointerCast($valEntry, $voidPtr),
-                        $slot
-                    );
-                    $context->builder->branch($no);
-                    $context->builder->positionAtEnd($no);
-                }
-            }
-            BasicBlockHelper::ensureOpenInsertBlock($context, 'unser_obj_after_props_'.$id);
-            $context->builder->store($objVal, $objSlot);
-            $context->builder->branch($bbMatched);
-            $check = $next;
-        }
-        if (!$hasCase) {
-            $context->builder->branch($bbMatchFail);
-        } else {
-            $context->builder->positionAtEnd($check);
-            $context->builder->branch($bbMatchFail);
-        }
-
-        $context->builder->positionAtEnd($bbMatchFail);
-        $context->builder->branch($bbFail);
-
-        $context->builder->positionAtEnd($bbMatched);
-        $objLoaded = $context->builder->load($objSlot);
-        $outSlot = \PHPCompiler\JIT\JitValueBox::alloc($context);
-        $outPtr = \PHPCompiler\JIT\JitValueBox::pointer($context, $outSlot);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeObject'),
-            $outPtr,
-            $objLoaded
-        );
-        $context->builder->store($outPtr, $resultSlot);
-        $context->builder->branch($bbDone);
-
-        $context->builder->positionAtEnd($bbDone);
-
-        return $context->builder->load($resultSlot);
+        return UnserializeObjectDecodeLlvm::emitObjectDecodeRuntime($context, $payloadString);
     }
 
-    /**
-     * php-src var_unserializer — "Error at offset N of M bytes" on O: decode failure (#29204).
-     *
-     * Truncated object wire typically fails at EOF (offset == length).
-     */
-    private static function emitParseFailureWarning(Context $context, Value $payloadString): void
-    {
-        StringTriggerError::ensureLinked($context);
-        TypeErrorRaise::ensureDeclInScope($context, 'snprintf', $context->context->functionType(
-            $context->getTypeFromString('int32'),
-            true,
-            $context->getTypeFromString('char*'),
-            $context->getTypeFromString('size_t'),
-            $context->getTypeFromString('char*')
-        ));
-        try {
-            $context->lookupFunction('__mm__malloc');
-        } catch (\Throwable) {
-            $context->type->memorymanager->register();
-        }
-        $strMap = $context->structFieldMap['__string__'];
-        $i32 = $context->getTypeFromString('int32');
-        $i8p = $context->getTypeFromString('int8*');
-        $sizeT = $context->getTypeFromString('size_t');
-        $charPtr = $context->getTypeFromString('char*');
-        $lenI64 = $context->builder->load(
-            $context->builder->structGep($payloadString, $strMap['length'])
-        );
-        // php-src var.c — empty buffer has no Error-at-offset warning (#29483).
-        $fn = BasicBlockHelper::parentFunction($context);
-        $bbWarn = $fn->appendBasicBlock('unser_fail_warn');
-        $bbSkip = $fn->appendBasicBlock('unser_fail_skip');
-        $isEmpty = $context->builder->icmp(
-            Builder::INT_EQ,
-            $lenI64,
-            $context->getTypeFromString('int64')->constInt(0, false)
-        );
-        $context->builder->branchIf($isEmpty, $bbSkip, $bbWarn);
-        $context->builder->positionAtEnd($bbWarn);
-        $lenI32 = $context->builder->trunc($lenI64, $i32);
-        $bufSize = $sizeT->constInt(128, false);
-        $buf = $context->builder->call($context->lookupFunction('__mm__malloc'), $bufSize);
-        $bufChar = $context->builder->pointerCast($buf, $charPtr);
-        $fmt = $context->builder->pointerCast(
-            $context->constantFromString('unserialize(): Error at offset %d of %d bytes'),
-            $charPtr
-        );
-        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
-        LibcExtern::ensureSnprintf($context);
-        $written = $context->builder->call(
-            $context->lookupFunction('snprintf'),
-            $bufChar,
-            $bufSize,
-            $fmt,
-            $lenI32,
-            $lenI32
-        );
-        $level = \PHPCompiler\CompilerVersion::supportsUnserializeErrorAtOffsetWarning()
-            ? \PHPCompiler\VM\ErrorReporter::E_WARNING
-            : \PHPCompiler\VM\ErrorReporter::E_NOTICE;
-        $msgPtr = $context->builder->pointerCast($bufChar, $i8p);
-        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
-        $context->builder->call(
-            $context->lookupFunction('__compiler_trigger_error'),
-            $msgPtr,
-            $context->builder->zExt($written, $sizeT),
-            $i32->constInt($level, false),
-            $emptyFile,
-            $i32->constInt(0, false)
-        );
-        $context->builder->call($context->lookupFunction('__mm__free'), $buf);
-        $context->builder->branch($bbSkip);
-        $context->builder->positionAtEnd($bbSkip);
-    }
-
-    /**
-     * NestedJIT decode(): int → box as `__value__*` (#20785).
-     * (Variable / mixed NestedJIT returns are not yet thin-AOT safe.)
-     */
     private static function implementUnserializeBridge(Context $context): void
     {
         $abiName = '__compiler_unserialize';

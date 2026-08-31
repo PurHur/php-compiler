@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8041 |
-| Phase A inventory files (M2 ratio SSOT) | 8041 |
+| PHP files on vm.php path | 8042 |
+| Phase A inventory files (M2 ratio SSOT) | 8042 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 25618 |
+| Source constructs flagged (warnings) | 25619 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7154,6 +7154,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/UnboundThisGuard.php` | 0 | 1 |
 | `lib/JIT/UndefinedPropertyFetchHelper.php` | 0 | 1 |
 | `lib/JIT/UndefinedVariableHelper.php` | 0 | 1 |
+| `lib/JIT/UnserializeObjectDecodeLlvm.php` | 0 | 1 |
 | `lib/JIT/UnsetHelper.php` | 0 | 1 |
 | `lib/JIT/UnsetHelperLlvm.php` | 0 | 4 |
 | `lib/JIT/UserScriptAotEnv.php` | 0 | 1 |
@@ -11048,9 +11049,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 42)
-- new JITVariable (line 186)
-- new JITVariable (line 192)
-- new JITVariable (line 251)
+- new JITVariable (line 189)
+- new JITVariable (line 195)
+- new JITVariable (line 254)
 - 6 class method(s)
 
 ### `ext/dom/JitDomHtmlDocumentSaveHtml.php`
@@ -48349,20 +48350,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 829)
 - new Variable (line 1458)
 - new Variable (line 1464)
-- new Variable (line 1590)
-- new Variable (line 1597)
+- new Variable (line 1614)
 - new Variable (line 1621)
-- new Variable (line 1662)
-- new Variable (line 1672)
-- new Variable (line 1676)
-- new Variable (line 1680)
-- new Variable (line 1713)
-- new Variable (line 1720)
-- new Frame (line 1731)
-- new Variable (line 1832)
-- new Variable (line 1858)
-- new Variable (line 1898)
-- 132 class method(s)
+- new Variable (line 1645)
+- new Variable (line 1696)
+- new Variable (line 1706)
+- new Variable (line 1710)
+- new Variable (line 1714)
+- new Variable (line 1754)
+- new Variable (line 1761)
+- new Frame (line 1772)
+- new Variable (line 1873)
+- new Variable (line 1899)
+- new Variable (line 1939)
+- 133 class method(s)
 
 ### `lib/BuiltinByRefParams.php`
 
@@ -54338,7 +54339,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringUnserialize.php`
 
 **Warnings** (review for bootstrap subset):
-- 14 class method(s)
+- 11 class method(s)
 
 ### `lib/JIT/Builtin/StringUrldecode.php`
 
@@ -59095,6 +59096,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `lib/JIT/UndefinedVariableHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
+
+### `lib/JIT/UnserializeObjectDecodeLlvm.php`
 
 **Warnings** (review for bootstrap subset):
 - 6 class method(s)
