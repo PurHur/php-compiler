@@ -14,6 +14,7 @@ namespace PHPCompiler\JIT;
  * drop (#32287) — StreamGlobalsJit / JitStreamLibcHandleKernel still implement the body.
  * {@see ensureSyscall} owns syscall(2) for EMBED write trampoline; MCJIT echo uses
  * {@see McjitEmbedHostEcho} function-pointer globals (#21124), not __phpc_host_* decls.
+ * {@see ensureSetlocaleDecl} owns setlocale(3) for LocaleStartupRuntime (#36074 / #30789).
  */
 final class LibcExtern
 {
@@ -1005,6 +1006,30 @@ final class LibcExtern
             );
         }
         $context->registerFunction('strtol', $fn);
+    }
+
+    /**
+     * Module-local setlocale(3) — LocaleStartupRuntime only (#30789 / #36074).
+     *
+     * php-src Zend/zend_operators.c zend_reset_lc_ctype_locale; user-script setlocale()
+     * Must not call lookupFunction (re-entrancy when Context lazy-ensures). Peer:
+     * ensureExitAbort (#35428).
+     */
+    public static function ensureSetlocaleDecl(Context $context): void
+    {
+        if (null !== $context->tryGetRegisteredFunction('setlocale')) {
+            return;
+        }
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $fn = $context->module->getNamedFunction('setlocale');
+        if (null === $fn) {
+            $fn = $context->module->addFunction(
+                'setlocale',
+                $context->context->functionType($i8p, false, $i32, $i8p)
+            );
+        }
+        $context->registerFunction('setlocale', $fn);
     }
 
     /**

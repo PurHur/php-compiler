@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 
 /**
@@ -18,6 +19,7 @@ use PHPLLVM\Builder;
  *   }
  * Called from php_module_startup so idle {@see nl_langinfo}(CODESET) returns UTF-8
  * (not ANSI_X3.4-1968 from classic C). Thin libc trampoline only — no NestedJIT.
+ * setlocale(3) decl is {@see LibcExtern::ensureSetlocaleDecl} (#36074).
  *
  * Emits a separate void function then a single call from {@code standalone_main}
  * (Context::emitInStandaloneMain always repositions to that block).
@@ -45,7 +47,7 @@ final class LocaleStartupRuntime
             return;
         }
 
-        self::ensureSetlocaleDecl($context);
+        LibcExtern::ensureSetlocaleDecl($context);
 
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         $void = $context->getTypeFromString('void');
@@ -91,18 +93,4 @@ final class LocaleStartupRuntime
         return \defined('LC_CTYPE') ? (int) \constant('LC_CTYPE') : 0;
     }
 
-    private static function ensureSetlocaleDecl(Context $context): void
-    {
-        try {
-            $context->lookupFunction('setlocale');
-        } catch (\Throwable) {
-            $i8p = $context->getTypeFromString('int8*');
-            $i32 = $context->getTypeFromString('int32');
-            $fn = $context->module->addFunction(
-                'setlocale',
-                $context->context->functionType($i8p, false, $i32, $i8p)
-            );
-            $context->registerFunction('setlocale', $fn);
-        }
-    }
 }
