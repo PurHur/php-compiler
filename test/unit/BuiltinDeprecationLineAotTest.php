@@ -42,9 +42,25 @@ final class BuiltinDeprecationLineAotTest extends TestCase
             $this->assertNotSame([], $aotDep, 'AOT must emit at least one deprecation');
             $this->assertSame($zendDep[0], $aotDep[0]);
             $this->assertStringNotContainsString(' on line 0', $aotDep[0]);
+            $this->assertCount(4, $aotDep, 'foreach $fn(null) must emit all four deprecations');
+            $aotStdout = $this->stdoutLines($aotOut);
+            $this->assertCount(4, $aotStdout, 'foreach $fn(null) must print all four results');
+            $this->assertSame('round(null)=0.0', $aotStdout[1]);
+            $this->assertSame('ceil(null)=0.0', $aotStdout[2]);
+            $this->assertSame('floor(null)=0.0', $aotStdout[3]);
+            $this->assertMatchesRegularExpression('/^abs\(null\)=(0|0\.0)$/', $aotStdout[0]);
         } finally {
             @unlink($bin);
         }
+    }
+
+    /** @param list<string> $lines */
+    private function stdoutLines(array $lines): array
+    {
+        return array_values(array_filter(
+            $lines,
+            static fn (string $line): bool => !str_contains($line, 'Deprecated:')
+        ));
     }
 
     /** @param list<string> $lines */
