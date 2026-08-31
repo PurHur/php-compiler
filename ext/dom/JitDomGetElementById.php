@@ -291,7 +291,8 @@ final class JitDomGetElementById
         $context->builder->branchIf($isMatch, $hitBlock, $missBlock);
 
         $context->builder->positionAtEnd($hitBlock);
-        if (!DomUserScriptAttributeCacheLlvm::isIdBearingLiteral('', 'id')) {
+        $htmlFromCfs = JitDomHtmlDocumentSaveHtml::lastCreateFromStringSource();
+        if (null === $htmlFromCfs && !DomUserScriptAttributeCacheLlvm::isIdBearingLiteral('', 'id')) {
             $boxedNull = self::boxNullResult($context);
             $context->builder->store(JitValueBox::normalizeValuePtr($context, $boxedNull), $resultSlot);
             $context->builder->branch($doneBlock);
@@ -446,7 +447,8 @@ final class JitDomGetElementById
         }
 
         // Plain XML id imported into HTML is not ID-bearing until remove+set (#23514).
-        if (!DomUserScriptAttributeCacheLlvm::isIdBearingLiteral('', 'id')) {
+        // Dom\HTMLDocument::createFromString HTML literals always treat id= as ID-bearing (#35792).
+        if (null === $htmlFromCfs && !DomUserScriptAttributeCacheLlvm::isIdBearingLiteral('', 'id')) {
             return self::boxNullResult($context);
         }
 
