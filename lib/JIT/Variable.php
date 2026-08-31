@@ -149,6 +149,16 @@ final class Variable {
      */
     public ?string $compileTimeDomLoadXml = null;
 
+    /** Receiver took compile-time DOMDocument::loadHTML() (#29487). */
+    public bool $compileTimeDomHtmlLoaded = false;
+
+    /**
+     * Immutable loadHTML getElementById() hit bound to this node for importNode (#29487 / #20830).
+     *
+     * @var null|array{tag: string, id: string, text: string}
+     */
+    public ?array $compileTimeDomGeiHtmlHit = null;
+
     /**
      * Document-wide saveXML must dump pinned slots — never another doc's lastCompileTimeXml (#33697).
      *
