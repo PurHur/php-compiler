@@ -47,16 +47,19 @@ final class MbScrubJitHelper
 
     public static function scrubArgv(string $value, string $encoding): string
     {
+        // Copy params before byte walks — NestedJIT may zero param slots after locals run (#34881 peer).
+        $payload = $value.'';
+        $enc = $encoding.'';
         // Encoding must already be validated via {@see assertEncodingArgv} (#35161).
-        $canonical = self::canonical($encoding);
+        $canonical = self::canonical($enc);
         if ('8BIT' === $canonical) {
-            return $value;
+            return $payload;
         }
         if ('ASCII' === $canonical) {
-            return self::scrubAscii($value);
+            return self::scrubAscii($payload);
         }
 
-        return self::scrubUtf8($value);
+        return self::scrubUtf8($payload);
     }
 
     private static function canonical(string $encoding): string
@@ -74,16 +77,20 @@ final class MbScrubJitHelper
 
     private static function scrubAscii(string $value): string
     {
-        // Char compare — NestedJIT of ord()+int const misfires on high bytes (#34338).
+        // ord()+const compare — NestedJIT string `$ch <= "\x7F"` mis-fires on high bytes (#34881 peer).
         $out = '';
         $len = \strlen($value);
-        for ($i = 0; $i < $len; ++$i) {
-            $ch = $value[$i];
-            if ($ch <= "\x7F") {
-                $out .= $ch;
+        $i = 0;
+        $guard = $len + 1;
+        while ($i < $len && $guard > 0) {
+            $guard = $guard - 1;
+            $byte = \ord($value[$i]);
+            if ($byte < 0x80) {
+                $out .= $value[$i];
             } else {
                 $out .= '?';
             }
+            $i = $i + 1;
         }
 
         return $out;
