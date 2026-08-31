@@ -12,6 +12,7 @@ demo
 .php_cs.cache
 .env
 .php-compiler-ci.lock
+.phpc/
 .libs
 # Local bisect / spine debug artifacts (not committed)
 build/selfhost-lib-spine-smoke
