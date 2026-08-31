@@ -75,25 +75,19 @@ final class MbDetectEncodingJitHelper
         return '';
     }
 
+    /**
+     * NestedJIT-safe: strpos high-byte probes only (#35856), not subject dim-fetch or strspn
+     * (strspn mis-lowers under HELPER_O=0; strpos lead-byte probes miss Latin-1 e.g. \\xE9 — #35315).
+     */
     private static function isAscii(string $string): bool
     {
-        if (false !== \strpos($string, "\xE2")) {
-            return false;
+        if ('' === $string) {
+            return true;
         }
-        if (false !== \strpos($string, "\xC2")) {
-            return false;
-        }
-        if (false !== \strpos($string, "\xC3")) {
-            return false;
-        }
-        if (false !== \strpos($string, "\xF0")) {
-            return false;
-        }
-        if (false !== \strpos($string, "\xE0")) {
-            return false;
-        }
-        if (false !== \strpos($string, "\x80")) {
-            return false;
+        for ($b = 0x80; $b <= 0xFF; ++$b) {
+            if (false !== \strpos($string, \chr($b))) {
+                return false;
+            }
         }
 
         return true;
