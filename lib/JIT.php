@@ -19387,6 +19387,12 @@ class JIT {
                     if ($op->propertyFinal ?? false) {
                         $this->context->type->object->markPropertyFinal($classId, $name->value);
                     }
+                    if ($op->propertyFromConstructorPromotion ?? false) {
+                        $this->context->type->object->markPropertyFromConstructorPromotion(
+                            $classId,
+                            $name->value
+                        );
+                    }
                     $this->markJitPropertyVirtualFromHookRegistry($className, $classId, $name->value);
                     if (
                         null !== $op->arg2
