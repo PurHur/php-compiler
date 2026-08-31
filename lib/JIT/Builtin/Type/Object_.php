@@ -6403,9 +6403,9 @@ class Object_ extends Type {
         if ($this->instancePropertySnapshotsCompatible($pending, $currentSnap)) {
             return;
         }
-        // Parent property override: different defaults are OK; visibility/type still must match.
+        // Parent property override: defaults may differ; visibility may widen (#25661, #33439).
         if (!$this->isTraitClass($originLc)
-            && $this->instancePropertySnapshotsCompatibleIgnoringDefaults($pending, $currentSnap)) {
+            && $this->instancePropertyParentOverrideCompatible($pending, $currentSnap)) {
             return;
         }
         throw new \LogicException(TraitCompositionConflictMessage::incompatibleClassTraitProperty(
@@ -6483,6 +6483,56 @@ class Object_ extends Type {
      * @param array<string, mixed> $left
      * @param array<string, mixed> $right
      */
+    /**
+     * Parent (non-trait) property redeclare: defaults may differ; child may widen visibility.
+     *
+     * @param array<string, mixed> $parentSnap
+     * @param array<string, mixed> $childSnap
+     */
+    private function instancePropertyParentOverrideCompatible(array $parentSnap, array $childSnap): bool
+    {
+        if (!$this->propertyVisibilityAllowsParentOverride(
+            (int) $parentSnap['visibility'],
+            (int) $childSnap['visibility']
+        )) {
+            return false;
+        }
+        if ((bool) $parentSnap['readonly'] !== (bool) $childSnap['readonly']) {
+            return false;
+        }
+        if ((int) $parentSnap['setVisibility'] !== (int) $childSnap['setVisibility']
+            || (int) $parentSnap['getVisibility'] !== (int) $childSnap['getVisibility']) {
+            return false;
+        }
+        if ((bool) $parentSnap['typedGuard'] !== (bool) $childSnap['typedGuard']) {
+            return false;
+        }
+        if ($parentSnap['dnf'] != $childSnap['dnf']) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /** Child may widen (more accessible) or keep the same; narrowing is fatal (#25661). */
+    private function propertyVisibilityAllowsParentOverride(int $parentVis, int $childVis): bool
+    {
+        return $this->propertyVisibilityRank($childVis) <= $this->propertyVisibilityRank($parentVis);
+    }
+
+    private function propertyVisibilityRank(int $visibilityFlags): int
+    {
+        $vis = MethodVisibility::mask($visibilityFlags);
+        if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
+            return 3;
+        }
+        if (($vis & \PHPCfg\Func::FLAG_PROTECTED) !== 0) {
+            return 2;
+        }
+
+        return 1;
+    }
+
     private function instancePropertySnapshotsCompatibleIgnoringDefaults(array $left, array $right): bool
     {
         if (MethodVisibility::mask((int) $left['visibility']) !== MethodVisibility::mask((int) $right['visibility'])) {
