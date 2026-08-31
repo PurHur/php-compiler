@@ -2225,13 +2225,29 @@ final class HashTableWriteLlvm
         }
         BasicBlockHelper::ensureOpenInsertBlock($context, 'ht_dim_live_entry');
         if (null !== $lvalue->writableIndex) {
-            self::hydrateIndexWriteLvalue($context, $lvalue);
-
-            return HashTableReadLlvm::listEntryPointer(
-                $context,
-                $lvalue->writableHt,
-                $lvalue->writableIndex
+            // ASSIGN_REF / RETURN_BY_REF write: grow the packed slot without FETCH_DIM_W read
+            // warnings — Zend materialises on assign, not on the orphan box hydrate (#34689).
+            $ht = $lvalue->writableHt;
+            $index = $lvalue->writableIndex;
+            $tag = (string) self::nextSeq();
+            $isSet = $context->builder->call(
+                $context->lookupFunction('__hashtable__offsetIsSet'),
+                $ht,
+                $index
             );
+            $create = BasicBlockHelper::append($context, 'ht_dim_live_idx_create_'.$tag);
+            $ready = BasicBlockHelper::append($context, 'ht_dim_live_idx_ready_'.$tag);
+            $context->builder->branchIf($isSet, $ready, $create);
+            $context->builder->positionAtEnd($create);
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setNullAt'),
+                $ht,
+                $index
+            );
+            $context->builder->branch($ready);
+            $context->builder->positionAtEnd($ready);
+
+            return HashTableReadLlvm::listEntryPointer($context, $ht, $index);
         }
         if (null !== $lvalue->writableStringKey) {
             $ht = $lvalue->writableHt;
