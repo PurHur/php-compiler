@@ -778,7 +778,68 @@ final class VmIteratorForeach
         return $phi;
     }
 
+    private static function packedPrefixEndUnset(Context $context): \PHPLLVM\Value
+    {
+        return $context->getTypeFromString('size_t')->constInt(\PHP_INT_MAX, false);
+    }
+
+    private static function usesInsertionOrderForeach(Context $context, \PHPLLVM\Value $ht, array $map): \PHPLLVM\Value
+    {
+        $i1 = $context->getTypeFromString('int1');
+        $head = $context->builder->load($context->builder->structGep($ht, $map['strKeys']));
+        $headNull = $context->builder->icmp(Builder::INT_EQ, $head, $head->typeOf()->constNull());
+        $prefixEnd = $context->builder->load($context->builder->structGep($ht, $map['packedPrefixEnd']));
+        $prefixUnset = $context->builder->icmp(
+            Builder::INT_EQ,
+            $prefixEnd,
+            self::packedPrefixEndUnset($context)
+        );
+
+        return $context->builder->and(
+            $context->builder->not($headNull),
+            $context->builder->not($prefixUnset)
+        );
+    }
+
+    private static function foreachStringKeyCount(Context $context, \PHPLLVM\Value $ht, array $map): \PHPLLVM\Value
+    {
+        $numElements = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
+        $nextFree = $context->builder->load($context->builder->structGep($ht, $map['nextFreeElement']));
+
+        return $context->builder->sub($numElements, $nextFree);
+    }
+
     private static function compileValidHashtableForward(Context $context, JitVariable $array, JitVariable $slotKey): \PHPLLVM\Value
+    {
+        $ht = $context->helper->loadValue($array);
+        $map = $context->structFieldMap['__hashtable__'];
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $legacy = $fn->appendBasicBlock('foreach_valid_legacy');
+        $insertion = $fn->appendBasicBlock('foreach_valid_insertion');
+        $merge = $fn->appendBasicBlock('foreach_valid_mode_merge');
+        $entry = $context->builder->getInsertBlock();
+        $context->builder->branchIf(self::usesInsertionOrderForeach($context, $ht, $map), $insertion, $legacy);
+
+        $context->builder->positionAtEnd($legacy);
+        $legacyResult = self::compileValidHashtableForwardLegacy($context, $array, $slotKey);
+        $legacyEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($insertion);
+        $insertionResult = self::compileValidHashtableForwardInsertionOrder($context, $array, $slotKey);
+        $insertionEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($merge);
+        $i1 = $context->getTypeFromString('int1');
+        $phi = $context->builder->phi($i1);
+        $phi->addIncoming($legacyResult, $legacyEnd);
+        $phi->addIncoming($insertionResult, $insertionEnd);
+
+        return $phi;
+    }
+
+    private static function compileValidHashtableForwardLegacy(Context $context, JitVariable $array, JitVariable $slotKey): \PHPLLVM\Value
     {
         $ht = $context->helper->loadValue($array);
         $map = $context->structFieldMap['__hashtable__'];
@@ -847,6 +908,121 @@ final class VmIteratorForeach
         $nextNode = $context->builder->load($context->builder->structGep($node, $nodeMap['next']));
         $nextNull = $context->builder->icmp(Builder::INT_EQ, $nextNode, $nextNode->typeOf()->constNull());
         $strAdvance = $fn->appendBasicBlock('foreach_str_advance');
+        $context->builder->branchIf($nextNull, $empty, $strAdvance);
+        $context->builder->positionAtEnd($strAdvance);
+        $node->addIncoming($nextNode, $strAdvance);
+        $remaining->addIncoming($context->builder->sub($remaining, $one), $strAdvance);
+        $context->builder->branch($strWalk);
+
+        $context->builder->positionAtEnd($found);
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($empty);
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($merge);
+        $result = $context->builder->phi($i1);
+        $result->addIncoming($i1->constInt(1, false), $found);
+        $result->addIncoming($i1->constInt(0, false), $empty);
+
+        return $result;
+    }
+
+    /**
+     * Zend insertion-order foreach: packed prefix, string keys, then late appends (#34977).
+     */
+    private static function compileValidHashtableForwardInsertionOrder(
+        Context $context,
+        JitVariable $array,
+        JitVariable $slotKey
+    ): \PHPLLVM\Value {
+        $ht = $context->helper->loadValue($array);
+        $map = $context->structFieldMap['__hashtable__'];
+        $nodeMap = $context->structFieldMap['__strkey_node__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $i1 = $context->getTypeFromString('int1');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $slot = self::indexSlot($context, $slotKey);
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $head = $fn->appendBasicBlock('foreach_ins_head');
+        $prefixBody = $fn->appendBasicBlock('foreach_ins_prefix');
+        $strBody = $fn->appendBasicBlock('foreach_ins_str');
+        $lateBody = $fn->appendBasicBlock('foreach_ins_late');
+        $found = $fn->appendBasicBlock('foreach_ins_found');
+        $empty = $fn->appendBasicBlock('foreach_ins_empty');
+        $merge = $fn->appendBasicBlock('foreach_ins_merge');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($slot);
+        $linearPos = $context->builder->addNoSignedWrap($idx, $one);
+        $context->builder->store($linearPos, $slot);
+        $prefixEnd = $context->builder->load($context->builder->structGep($ht, $map['packedPrefixEnd']));
+        $nextFree = $context->builder->load($context->builder->structGep($ht, $map['nextFreeElement']));
+        $strCount = self::foreachStringKeyCount($context, $ht, $map);
+        $totalPos = $context->builder->addNoSignedWrap($nextFree, $strCount);
+        $pastEnd = $context->builder->icmp(Builder::INT_UGE, $linearPos, $totalPos);
+        $inPrefix = self::icmpUltSizeT($context, $linearPos, $prefixEnd);
+        $strEnd = $context->builder->addNoSignedWrap($prefixEnd, $strCount);
+        $inStr = self::icmpUltSizeT($context, $linearPos, $strEnd);
+        $routeStr = $fn->appendBasicBlock('foreach_ins_route_str');
+        $routeLate = $fn->appendBasicBlock('foreach_ins_route_late');
+        $context->builder->branchIf($pastEnd, $empty, $routeStr);
+        $context->builder->positionAtEnd($routeStr);
+        $context->builder->branchIf($inPrefix, $prefixBody, $routeLate);
+        $context->builder->positionAtEnd($routeLate);
+        $context->builder->branchIf($inStr, $strBody, $lateBody);
+
+        $context->builder->positionAtEnd($prefixBody);
+        $entry = HashTableHelper::listEntryPointer($context, $ht, $linearPos);
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($entry, $context->structFieldMap['__value__']['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $isDefined = $context->builder->icmp(
+            Builder::INT_NE,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_UNDEFINED & 0xff, false)
+        );
+        $context->builder->branchIf($isDefined, $found, $head);
+
+        $context->builder->positionAtEnd($lateBody);
+        $lateOffset = $context->builder->sub(
+            $context->builder->sub($linearPos, $prefixEnd),
+            $strCount
+        );
+        $lateIdx = $context->builder->addNoSignedWrap($prefixEnd, $lateOffset);
+        $lateEntry = HashTableHelper::listEntryPointer($context, $ht, $lateIdx);
+        $lateType = $context->builder->load(
+            $context->builder->structGep($lateEntry, $context->structFieldMap['__value__']['type'])
+        );
+        $lateDefined = $context->builder->icmp(
+            Builder::INT_NE,
+            $lateType,
+            $i8->constInt(Variable::TYPE_UNDEFINED & 0xff, false)
+        );
+        $context->builder->branchIf($lateDefined, $found, $head);
+
+        $context->builder->positionAtEnd($strBody);
+        $strEntry = $fn->appendBasicBlock('foreach_ins_str_entry');
+        $strWalk = $fn->appendBasicBlock('foreach_ins_str_walk');
+        $context->builder->branch($strEntry);
+        $context->builder->positionAtEnd($strEntry);
+        $ord = $context->builder->sub($linearPos, $prefixEnd);
+        $strHead = $context->builder->load($context->builder->structGep($ht, $map['strKeys']));
+        $headNull = $context->builder->icmp(Builder::INT_EQ, $strHead, $strHead->typeOf()->constNull());
+        $context->builder->branchIf($headNull, $empty, $strWalk);
+        $context->builder->positionAtEnd($strWalk);
+        $node = $context->builder->phi($strHead->typeOf());
+        $node->addIncoming($strHead, $strEntry);
+        $remaining = $context->builder->phi($sizeT);
+        $remaining->addIncoming($ord, $strEntry);
+        $atTarget = $context->builder->icmp(Builder::INT_EQ, $remaining, $zero);
+        $strStep = $fn->appendBasicBlock('foreach_ins_str_step');
+        $context->builder->branchIf($atTarget, $found, $strStep);
+        $context->builder->positionAtEnd($strStep);
+        $nextNode = $context->builder->load($context->builder->structGep($node, $nodeMap['next']));
+        $nextNull = $context->builder->icmp(Builder::INT_EQ, $nextNode, $nextNode->typeOf()->constNull());
+        $strAdvance = $fn->appendBasicBlock('foreach_ins_str_advance');
         $context->builder->branchIf($nextNull, $empty, $strAdvance);
         $context->builder->positionAtEnd($strAdvance);
         $node->addIncoming($nextNode, $strAdvance);
@@ -1053,8 +1229,34 @@ final class VmIteratorForeach
         $destPtr = JitValueBox::pointer($context, $slot);
         $ht = $context->helper->loadValue($array);
         $map = $context->structFieldMap['__hashtable__'];
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $legacy = $fn->appendBasicBlock('foreach_key_mode_legacy');
+        $insertion = $fn->appendBasicBlock('foreach_key_mode_insertion');
+        $done = $fn->appendBasicBlock('foreach_key_mode_done');
+        $context->builder->branchIf(self::usesInsertionOrderForeach($context, $ht, $map), $insertion, $legacy);
+
+        $context->builder->positionAtEnd($legacy);
+        self::compileKeyHashtableLegacyBody($context, $array, $slotKey, $destPtr);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($insertion);
+        self::compileKeyHashtableInsertionBody($context, $array, $slotKey, $destPtr);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+
+        return new JitVariable($context, JitVariable::TYPE_VALUE, JitVariable::KIND_VARIABLE, $slot);
+    }
+
+    private static function compileKeyHashtableLegacyBody(
+        Context $context,
+        JitVariable $array,
+        JitVariable $slotKey,
+        \PHPLLVM\Value $destPtr
+    ): void {
+        $ht = $context->helper->loadValue($array);
+        $map = $context->structFieldMap['__hashtable__'];
         $nodeMap = $context->structFieldMap['__strkey_node__'];
-        $sizeT = $context->getTypeFromString('size_t');
         $idx = $context->builder->load(self::indexSlot($context, $slotKey));
         $nextFree = $context->builder->load($context->builder->structGep($ht, $map['nextFreeElement']));
         $inPacked = self::icmpUltSizeT($context, $idx, $nextFree);
@@ -1073,7 +1275,6 @@ final class VmIteratorForeach
         $context->builder->positionAtEnd($str);
         $node = self::stringKeyNodeAt($context, $ht, $map, $nodeMap, $slotKey);
         $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
-        // Own a copy — writeString delrefs the previous $k; borrowing the HT key UAF's the bag (#34635).
         $ownedKey = $context->builder->call(
             $context->lookupFunction('__string__separate'),
             $keyStr
@@ -1085,8 +1286,67 @@ final class VmIteratorForeach
         );
         $context->builder->branch($done);
         $context->builder->positionAtEnd($done);
+    }
 
-        return new JitVariable($context, JitVariable::TYPE_VALUE, JitVariable::KIND_VARIABLE, $slot);
+    private static function compileKeyHashtableInsertionBody(
+        Context $context,
+        JitVariable $array,
+        JitVariable $slotKey,
+        \PHPLLVM\Value $destPtr
+    ): void {
+        $ht = $context->helper->loadValue($array);
+        $map = $context->structFieldMap['__hashtable__'];
+        $nodeMap = $context->structFieldMap['__strkey_node__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $linearPos = $context->builder->load(self::indexSlot($context, $slotKey));
+        $prefixEnd = $context->builder->load($context->builder->structGep($ht, $map['packedPrefixEnd']));
+        $strCount = self::foreachStringKeyCount($context, $ht, $map);
+        $strEnd = $context->builder->addNoSignedWrap($prefixEnd, $strCount);
+        $inPrefix = self::icmpUltSizeT($context, $linearPos, $prefixEnd);
+        $inStr = self::icmpUltSizeT($context, $linearPos, $strEnd);
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $prefix = $fn->appendBasicBlock('foreach_key_ins_prefix');
+        $str = $fn->appendBasicBlock('foreach_key_ins_str');
+        $late = $fn->appendBasicBlock('foreach_key_ins_late');
+        $done = $fn->appendBasicBlock('foreach_key_ins_done');
+        $routeLate = $fn->appendBasicBlock('foreach_key_ins_route_late');
+        $context->builder->branchIf($inPrefix, $prefix, $routeLate);
+        $context->builder->positionAtEnd($routeLate);
+        $context->builder->branchIf($inStr, $str, $late);
+        $context->builder->positionAtEnd($prefix);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            $destPtr,
+            $context->builder->truncOrBitCast($linearPos, $context->getTypeFromString('int64'))
+        );
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($late);
+        $lateOffset = $context->builder->sub(
+            $context->builder->sub($linearPos, $prefixEnd),
+            $strCount
+        );
+        $lateIdx = $context->builder->addNoSignedWrap($prefixEnd, $lateOffset);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            $destPtr,
+            $context->builder->truncOrBitCast($lateIdx, $context->getTypeFromString('int64'))
+        );
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($str);
+        $ord = $context->builder->sub($linearPos, $prefixEnd);
+        $node = self::stringKeyNodeAtOrdinal($context, $ht, $map, $nodeMap, $ord);
+        $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
+        $ownedKey = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $keyStr
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $destPtr,
+            $ownedKey
+        );
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
     }
 
     private static function compileKeyWeakMap(Context $context, JitVariable $array, JitVariable $slotKey): JitVariable
@@ -1338,6 +1598,33 @@ final class VmIteratorForeach
         $destPtr = JitValueBox::pointer($context, $slot);
         $ht = $context->helper->loadValue($array);
         $map = $context->structFieldMap['__hashtable__'];
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $legacy = $fn->appendBasicBlock('foreach_val_mode_legacy');
+        $insertion = $fn->appendBasicBlock('foreach_val_mode_insertion');
+        $done = $fn->appendBasicBlock('foreach_val_mode_done');
+        $context->builder->branchIf(self::usesInsertionOrderForeach($context, $ht, $map), $insertion, $legacy);
+
+        $context->builder->positionAtEnd($legacy);
+        self::compileValueHashtableLegacyBody($context, $array, $slotKey, $destPtr);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($insertion);
+        self::compileValueHashtableInsertionBody($context, $array, $slotKey, $destPtr);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+
+        return new JitVariable($context, JitVariable::TYPE_VALUE, JitVariable::KIND_VARIABLE, $slot);
+    }
+
+    private static function compileValueHashtableLegacyBody(
+        Context $context,
+        JitVariable $array,
+        JitVariable $slotKey,
+        \PHPLLVM\Value $destPtr
+    ): void {
+        $ht = $context->helper->loadValue($array);
+        $map = $context->structFieldMap['__hashtable__'];
         $nodeMap = $context->structFieldMap['__strkey_node__'];
         $valueMap = $context->structFieldMap['__value__'];
         $idx = $context->builder->load(self::indexSlot($context, $slotKey));
@@ -1359,8 +1646,53 @@ final class VmIteratorForeach
         self::copyValueEntryToBox($context, $destPtr, $valField, $valueMap, $fn);
         $context->builder->branch($done);
         $context->builder->positionAtEnd($done);
+    }
 
-        return new JitVariable($context, JitVariable::TYPE_VALUE, JitVariable::KIND_VARIABLE, $slot);
+    private static function compileValueHashtableInsertionBody(
+        Context $context,
+        JitVariable $array,
+        JitVariable $slotKey,
+        \PHPLLVM\Value $destPtr
+    ): void {
+        $ht = $context->helper->loadValue($array);
+        $map = $context->structFieldMap['__hashtable__'];
+        $nodeMap = $context->structFieldMap['__strkey_node__'];
+        $valueMap = $context->structFieldMap['__value__'];
+        $linearPos = $context->builder->load(self::indexSlot($context, $slotKey));
+        $prefixEnd = $context->builder->load($context->builder->structGep($ht, $map['packedPrefixEnd']));
+        $strCount = self::foreachStringKeyCount($context, $ht, $map);
+        $strEnd = $context->builder->addNoSignedWrap($prefixEnd, $strCount);
+        $inPrefix = self::icmpUltSizeT($context, $linearPos, $prefixEnd);
+        $inStr = self::icmpUltSizeT($context, $linearPos, $strEnd);
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $prefix = $fn->appendBasicBlock('foreach_val_ins_prefix');
+        $str = $fn->appendBasicBlock('foreach_val_ins_str');
+        $late = $fn->appendBasicBlock('foreach_val_ins_late');
+        $done = $fn->appendBasicBlock('foreach_val_ins_done');
+        $routeLate = $fn->appendBasicBlock('foreach_val_ins_route_late');
+        $context->builder->branchIf($inPrefix, $prefix, $routeLate);
+        $context->builder->positionAtEnd($routeLate);
+        $context->builder->branchIf($inStr, $str, $late);
+        $context->builder->positionAtEnd($prefix);
+        $entry = HashTableHelper::listEntryPointer($context, $ht, $linearPos);
+        self::copyValueEntryToBox($context, $destPtr, $entry, $valueMap, $fn);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($late);
+        $lateOffset = $context->builder->sub(
+            $context->builder->sub($linearPos, $prefixEnd),
+            $strCount
+        );
+        $lateIdx = $context->builder->addNoSignedWrap($prefixEnd, $lateOffset);
+        $lateEntry = HashTableHelper::listEntryPointer($context, $ht, $lateIdx);
+        self::copyValueEntryToBox($context, $destPtr, $lateEntry, $valueMap, $fn);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($str);
+        $ord = $context->builder->sub($linearPos, $prefixEnd);
+        $node = self::stringKeyNodeAtOrdinal($context, $ht, $map, $nodeMap, $ord);
+        $valField = $context->builder->structGep($node, $nodeMap['value']);
+        self::copyValueEntryToBox($context, $destPtr, $valField, $valueMap, $fn);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
     }
 
     /**
@@ -1374,13 +1706,27 @@ final class VmIteratorForeach
         array $nodeMap,
         JitVariable $slotKey
     ): \PHPLLVM\Value {
-        $sizeT = $context->getTypeFromString('size_t');
-        $zero = $sizeT->constInt(0, false);
-        $one = $sizeT->constInt(1, false);
-        // Index is packed-nextFree + string ordinal (#34977 / Zend FE_FETCH_R).
         $idx = $context->builder->load(self::indexSlot($context, $slotKey));
         $nextFree = $context->builder->load($context->builder->structGep($ht, $map['nextFreeElement']));
         $ord = $context->builder->sub($idx, $nextFree);
+
+        return self::stringKeyNodeAtOrdinal($context, $ht, $map, $nodeMap, $ord);
+    }
+
+    /**
+     * @param array<string, int> $map
+     * @param array<string, int> $nodeMap
+     */
+    private static function stringKeyNodeAtOrdinal(
+        Context $context,
+        \PHPLLVM\Value $ht,
+        array $map,
+        array $nodeMap,
+        \PHPLLVM\Value $ord
+    ): \PHPLLVM\Value {
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
         $head = $context->builder->load($context->builder->structGep($ht, $map['strKeys']));
         $block = $context->builder->getInsertBlock();
         $fn = $block->getParent();

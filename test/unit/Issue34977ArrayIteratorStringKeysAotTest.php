@@ -22,8 +22,8 @@ final class Issue34977ArrayIteratorStringKeysAotTest extends TestCase
         $src = (string) file_get_contents(
             dirname(__DIR__, 2).'/lib/VM/VmIteratorForeach.php'
         );
-        $this->assertStringContainsString('#34977', $src);
-        $this->assertStringContainsString('sub($context->builder->load($slot), $nextFree)', $src);
+        $this->assertStringContainsString('packedPrefixEnd', $src);
+        $this->assertStringContainsString('stringKeyNodeAtOrdinal', $src);
     }
 
     public function testAotArrayIteratorAndMixedArrayForeach(): void
@@ -45,10 +45,8 @@ final class Issue34977ArrayIteratorStringKeysAotTest extends TestCase
             $runOut = [];
             exec(escapeshellarg($bin).' 2>&1', $runOut, $runRc);
             $this->assertSame(0, $runRc, implode("\n", $runOut));
-            // String keys present (were dropped). Append-after-string sorts after packed
-            // indices under dual-HT walk — order debt vs Zend insertion order.
             $this->assertSame(
-                "4|0=1;1=2;2=4;x=3;null\n3|0=1;1=2;y=5;\n",
+                "4|0=1;1=2;x=3;2=4;null\n3|0=1;1=2;y=5;\n",
                 implode("\n", $runOut)."\n"
             );
         } finally {
