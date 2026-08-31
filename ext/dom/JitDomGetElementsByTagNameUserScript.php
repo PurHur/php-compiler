@@ -348,6 +348,9 @@ final class JitDomGetElementsByTagNameUserScript
         if (!$objectType->hasProperty($classId, VmDom::PROP_CHILD_NODES_OWNER)) {
             $objectType->defineProperty($classId, VmDom::PROP_CHILD_NODES_OWNER, JITVariable::TYPE_VALUE);
         }
+        if (!$objectType->hasProperty($classId, VmDom::PROP_XPATH_SNAPSHOT)) {
+            $objectType->defineProperty($classId, VmDom::PROP_XPATH_SNAPSHOT, JITVariable::TYPE_NATIVE_LONG);
+        }
         if (!$objectType->hasProperty($classId, 'length')) {
             $objectType->defineProperty($classId, 'length', JITVariable::TYPE_NATIVE_LONG);
         }
@@ -363,6 +366,33 @@ final class JitDomGetElementsByTagNameUserScript
             $objectType->propertySlotFor($list, self::CLASS_NODELIST, 'length'),
             $lengthVar,
             JITVariable::TYPE_NATIVE_LONG
+        );
+        // Tag lists: empty owner box + snapshot=0 so JitDomNodeListLength reads GLOBAL_COUNT
+        // (#28605) — uninitialized owner/snapshot slots segfault or skip the live path.
+        $snapshotVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_NATIVE_LONG,
+            JITVariable::KIND_VALUE,
+            $context->getTypeFromString('int64')->constInt(0, false)
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($list, self::CLASS_NODELIST, VmDom::PROP_XPATH_SNAPSHOT),
+            $snapshotVar,
+            JITVariable::TYPE_NATIVE_LONG
+        );
+        $ownerBox = JitValueBox::alloc($context);
+        $ownerPtr = JitValueBox::pointer($context, $ownerBox);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $ownerPtr);
+        $ownerJit = new JITVariable(
+            $context,
+            JITVariable::TYPE_VALUE,
+            JITVariable::KIND_VALUE,
+            JitValueBox::normalizeValuePtr($context, $ownerPtr)
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($list, self::CLASS_NODELIST, VmDom::PROP_CHILD_NODES_OWNER),
+            $ownerJit,
+            JITVariable::TYPE_VALUE
         );
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
