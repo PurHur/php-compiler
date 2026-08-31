@@ -441,9 +441,16 @@ class Object_ extends Type {
     private function implementLoadValueSlot(): void
     {
         $fn = $this->context->lookupFunction('__object__load_value_slot');
+        if ($fn->countBasicBlocks() > 0) {
+            return;
+        }
         $entry = $fn->appendBasicBlock('entry');
         $nullBlock = $fn->appendBasicBlock('null');
-        $loadBlock = $fn->appendBasicBlock('load');
+        $classify = $fn->appendBasicBlock('classify');
+        $writeObj = $fn->appendBasicBlock('write_obj');
+        $writeStr = $fn->appendBasicBlock('write_str');
+        $nativeLongBlock = $fn->appendBasicBlock('native_long');
+        $valueBoxBlock = $fn->appendBasicBlock('value_box');
         $done = $fn->appendBasicBlock('done');
         $this->context->builder->positionAtEnd($entry);
 
@@ -459,7 +466,7 @@ class Object_ extends Type {
             $loaded,
             $voidPtr->constNull()
         );
-        $this->context->builder->branchIf($isNull, $nullBlock, $loadBlock);
+        $this->context->builder->branchIf($isNull, $nullBlock, $classify);
 
         $this->context->builder->positionAtEnd($nullBlock);
         $this->context->builder->call(
@@ -468,7 +475,62 @@ class Object_ extends Type {
         );
         $this->context->builder->branch($done);
 
-        $this->context->builder->positionAtEnd($loadBlock);
+        $this->context->builder->positionAtEnd($classify);
+        $isObjectRef = $this->slotContentHasObjectRefHeader($loaded);
+        $checkString = $fn->appendBasicBlock('check_string');
+        $this->context->builder->branchIf($isObjectRef, $writeObj, $checkString);
+
+        $this->context->builder->positionAtEnd($checkString);
+        $isStringRef = $this->slotContentHasStringRefHeader($loaded);
+        $this->context->builder->branchIf($isStringRef, $writeStr, $nativeLongBlock);
+
+        $valueMap = $this->context->structFieldMap['__value__'];
+        $objPtr = $this->context->getTypeFromString('__object__*');
+        $strPtr = $this->context->getTypeFromString('__string__*');
+
+        $this->context->builder->positionAtEnd($writeObj);
+        $this->context->builder->store(
+            $this->context->getTypeFromString('int8')->constInt(Variable::TYPE_OBJECT, false),
+            $this->context->builder->structGep($dest, $valueMap['type'])
+        );
+        $objSlot = $this->context->builder->pointerCast(
+            $this->context->builder->structGep($dest, $valueMap['value']),
+            $objPtr->pointerType(0)
+        );
+        $this->context->builder->store(
+            $this->context->builder->pointerCast($loaded, $objPtr),
+            $objSlot
+        );
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($writeStr);
+        $this->context->builder->store(
+            $this->context->getTypeFromString('int8')->constInt(Variable::TYPE_STRING, false),
+            $this->context->builder->structGep($dest, $valueMap['type'])
+        );
+        $strSlot = $this->context->builder->pointerCast(
+            $this->context->builder->structGep($dest, $valueMap['value']),
+            $strPtr->pointerType(0)
+        );
+        $this->context->builder->store(
+            $this->context->builder->pointerCast($loaded, $strPtr),
+            $strSlot
+        );
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($nativeLongBlock);
+        $longPtr = $this->context->builder->pointerCast(
+            $loaded,
+            $this->context->getTypeFromString('int64*')
+        );
+        \PHPCompiler\JIT\JitValueBox::writeLong(
+            $this->context,
+            $dest,
+            $this->context->builder->load($longPtr)
+        );
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($valueBoxBlock);
         $valPtr = $this->context->builder->pointerCast(
             $loaded,
             $this->context->getTypeFromString('__value__*')
@@ -482,6 +544,36 @@ class Object_ extends Type {
         $this->context->builder->positionAtEnd($done);
         $this->context->builder->returnVoid();
         $this->context->builder->clearInsertionPosition();
+    }
+
+    private function slotContentHasObjectRefHeader(PHPLLVM\Value $content): PHPLLVM\Value
+    {
+        $refMap = $this->context->structFieldMap['__ref__'];
+        $i32 = $this->context->getTypeFromString('int32');
+        $head = $this->context->builder->pointerCast($content, $this->context->getTypeFromString('__ref__*'));
+        $typeinfo = $this->context->builder->load($this->context->builder->structGep($head, $refMap['typeinfo']));
+        $masked = $this->context->builder->and($typeinfo, $i32->constInt(0xFFFFFFFC, false));
+
+        return $this->context->builder->icmp(
+            PHPLLVM\Builder::INT_EQ,
+            $masked,
+            $i32->constInt(8, false)
+        );
+    }
+
+    private function slotContentHasStringRefHeader(PHPLLVM\Value $content): PHPLLVM\Value
+    {
+        $refMap = $this->context->structFieldMap['__ref__'];
+        $i32 = $this->context->getTypeFromString('int32');
+        $head = $this->context->builder->pointerCast($content, $this->context->getTypeFromString('__ref__*'));
+        $typeinfo = $this->context->builder->load($this->context->builder->structGep($head, $refMap['typeinfo']));
+        $masked = $this->context->builder->and($typeinfo, $i32->constInt(0xFFFFFFFC, false));
+
+        return $this->context->builder->icmp(
+            PHPLLVM\Builder::INT_EQ,
+            $masked,
+            $i32->constInt(4, false)
+        );
     }
 
     private function implementValueReadObject(): void
