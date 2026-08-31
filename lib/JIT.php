@@ -24275,6 +24275,11 @@ class JIT {
                 break;
             }
         }
+        // After #35752 the authoritative local is the EXEC_RETURN __value__* box ($resultVar),
+        // not construct $this ($first). Binding $first let a later `new DateTime` reclaim the
+        // first local lacking a stamp and overwrite dateTimeLocalInstants — DatePeriod ctor
+        // then materialized the wrong start/end (#27572 regression re-#35752).
+        $publishVar = $resultVar instanceof JIT\Variable ? $resultVar : $first;
         if (null !== $publishName && '' !== $publishName) {
             $resolved = $this->context->resolveRefAliasName($publishName);
             $existing = $this->context->namedVariableBindings[$resolved] ?? null;
@@ -24284,13 +24289,13 @@ class JIT {
                 || !empty($existing->compileTimeEmptyArrayLiteral)
                 || !empty($existing->valueBoxHashtable)
             );
-            if (!$existingIsArray || $existing === $first || $existing === $resultVar) {
-                $this->context->bindVariableByName($resolved, $first);
+            if (!$existingIsArray || $existing === $first || $existing === $publishVar) {
+                $this->context->bindVariableByName($resolved, $publishVar);
                 $this->context->dateTimeLocalInstants[$resolved] = $instant;
             }
         }
         foreach ($this->context->namedVariableBindings as $boundName => $bound) {
-            if ($bound === $first || $bound === $resultVar) {
+            if ($bound === $first || $bound === $publishVar) {
                 $stamp($bound);
                 $this->context->dateTimeLocalInstants[$boundName] = $instant;
             }
@@ -24364,6 +24369,10 @@ class JIT {
         array $callOperands,
         ?JIT\Call $toCall = null
     ): void {
+        // DatePeriod::__construct restores start/end/interval via applyDateMetaToDatePeriodConstructArgs.
+        if ($toCall instanceof JIT\Call\DatePeriodConstruct) {
+            return;
+        }
         $mutationCall = $this->isDateTimeMutationJitCall($toCall);
         $opOffset = \count($callArgs) - \count($callOperands);
         if ($opOffset < 0) {
@@ -24446,7 +24455,12 @@ class JIT {
         // Without it, callOperands[0] (start) is applied onto $this → DatePeriod inherits a
         // DateTime timestamp and serialize folds as O:8:"DateTime" instead of DatePeriod.
         $opOffset = \count($callArgs) - \count($callOperands);
+        // Do not let the last standalone DateTime construct stamp DatePeriod::$start/$end (#35802).
+        $this->context->pendingDateTimePropertyInstant = null;
         foreach ($callArgs as $i => $arg) {
+            if (0 === $i) {
+                continue;
+            }
             if (is_array($arg)) {
                 $arg = $arg['value'] ?? $arg['unpack'] ?? null;
             }
@@ -24457,8 +24471,55 @@ class JIT {
             if (!$operand instanceof \PHPCfg\Operand) {
                 continue;
             }
-            $this->applyDateTimeLocalInstantToReceiver($operand, $arg);
-            $this->applyDateIntervalStateToReceiver($operand, $arg);
+            $this->copyDateConstructMetaFromLocalName($operand, $arg);
+        }
+    }
+
+    /** Restore DateTime/DateInterval compile-time stamps for DatePeriod ctor args by local name. */
+    private function copyDateConstructMetaFromLocalName(\PHPCfg\Operand $operand, JIT\Variable $arg): void
+    {
+        $recvName = JIT\OperandName::resolve($operand);
+        if (null === $recvName || '' === $recvName) {
+            return;
+        }
+        $resolved = $this->context->resolveRefAliasName($recvName);
+        $bound = $this->context->namedVariableBindings[$resolved] ?? null;
+        if ($bound instanceof JIT\Variable) {
+            if (null !== $bound->compileTimeDateTimeTimestamp) {
+                $arg->compileTimeDateTimeTimestamp = $bound->compileTimeDateTimeTimestamp;
+                $arg->compileTimeDateTimeMicrosecond = $bound->compileTimeDateTimeMicrosecond;
+                $arg->compileTimeTimezoneName = $bound->compileTimeTimezoneName;
+                $arg->compileTimeDateTimeClassName = $bound->compileTimeDateTimeClassName;
+                if (null === $arg->classUserType || '' === $arg->classUserType) {
+                    $arg->classUserType = $bound->classUserType
+                        ?? $bound->compileTimeDateTimeClassName
+                        ?? 'DateTime';
+                }
+            }
+            if (\is_array($bound->compileTimeDateInterval)) {
+                $arg->compileTimeDateInterval = $bound->compileTimeDateInterval;
+                if (null === $arg->classUserType || '' === $arg->classUserType) {
+                    $arg->classUserType = 'DateInterval';
+                }
+            }
+        }
+        $instant = $this->context->dateTimeLocalInstants[$resolved] ?? null;
+        if (\is_array($instant) && null === $arg->compileTimeDateTimeTimestamp) {
+            $arg->compileTimeDateTimeTimestamp = (int) $instant['timestamp'];
+            $arg->compileTimeDateTimeMicrosecond = (int) ($instant['microsecond'] ?? 0);
+            $arg->compileTimeTimezoneName = $instant['timezone'] ?? null;
+            $class = $instant['className'] ?? 'DateTime';
+            $arg->compileTimeDateTimeClassName = \is_string($class) && '' !== $class ? $class : 'DateTime';
+            if (null === $arg->classUserType || '' === $arg->classUserType) {
+                $arg->classUserType = $arg->compileTimeDateTimeClassName;
+            }
+        }
+        $interval = $this->context->dateIntervalLocalStates[$resolved] ?? null;
+        if (\is_array($interval) && !\is_array($arg->compileTimeDateInterval)) {
+            $arg->compileTimeDateInterval = $interval;
+            if (null === $arg->classUserType || '' === $arg->classUserType) {
+                $arg->classUserType = 'DateInterval';
+            }
         }
     }
 
