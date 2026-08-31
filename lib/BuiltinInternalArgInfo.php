@@ -587,8 +587,8 @@ final class BuiltinInternalArgInfo
             'version_compare' => 'int|bool',
             // ext/standard/basic_functions.stub.php — InternalArgInfo return string (missing |false) (#27906)
             'php_sapi_name' => 'string|false',
-            // ext/standard/info.stub.php — InternalArgInfo empty return; Zend : bool (#24508)
-            'phpcredits' => 'bool',
+            // ext/standard/info.stub.php — InternalArgInfo empty return; Zend : true (#24508, re-#27728)
+            'phpcredits' => 'true',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits return; Zend : true (#27728, re-#24550)
             'phpinfo' => 'true',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits return; Zend array|float (#27906)

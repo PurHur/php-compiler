@@ -45,6 +45,9 @@ final class ReflectionFunctionParamCountLowering
                 $internalArity[strtolower($builtin)] = \count($names);
             }
         }
+        if (ReflectionInternalFunctionLowering::consumeRuntimeInternalParameterLookup()) {
+            $internalArity = ReflectionInternalFunctionLowering::buildAllInternalParamCounts() + $internalArity;
+        }
 
         ReflectionFunctionParamCountLookupRuntime::implement(
             $context,

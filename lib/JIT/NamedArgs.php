@@ -393,6 +393,9 @@ final class NamedArgs
             if (false === $unknownName || null === $unknownName) {
                 BuiltinParamNames::throwUnknownNamedParameterError($functionName);
             }
+            if (null !== $variadicParamIndex) {
+                BuiltinParamNames::throwUnknownNamedParameterError($functionName);
+            }
             throw new \Error("Unknown named parameter \${$unknownName}");
         }
 
