@@ -1230,4 +1230,130 @@ final class HashTableReadLlvm
         );
     }
 
+    /**
+     * Nested FETCH_DIM_W intermediate: autovivify an empty array when the string key is missing.
+     *
+     * {@see readStringKeyHashtable} returns null for absent keys; inner dim writes then SIGSEGV.
+     *
+     * @see php-src Zend/zend_execute.c ZEND_FETCH_DIM_W (write / nested dimension)
+     */
+    public static function readStringKeyHashtableForNestedWrite(Context $context, Value $ht, Value $keyStr): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'ht_nested_sk');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
+            $ht,
+            $keyStr
+        );
+        $create = BasicBlockHelper::append($context, 'ht_nested_sk_create');
+        $read = BasicBlockHelper::append($context, 'ht_nested_sk_read');
+        $merge = BasicBlockHelper::append($context, 'ht_nested_sk_merge');
+        $context->builder->branchIf($isSet, $read, $create);
+
+        $context->builder->positionAtEnd($create);
+        $childHt = HashTableWriteLlvm::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyHashtable'),
+            $ht,
+            $keyStr,
+            $childHt
+        );
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($read);
+        $existing = $context->builder->call(
+            $context->lookupFunction('__hashtable__readStringKeyHashtable'),
+            $ht,
+            $keyStr
+        );
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $existing,
+            $htPtr->constNull()
+        );
+        $fixup = BasicBlockHelper::append($context, 'ht_nested_sk_fixup');
+        $ok = BasicBlockHelper::append($context, 'ht_nested_sk_ok');
+        $context->builder->branchIf($isNull, $fixup, $ok);
+
+        $context->builder->positionAtEnd($fixup);
+        $fixupHt = HashTableWriteLlvm::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyHashtable'),
+            $ht,
+            $keyStr,
+            $fixupHt
+        );
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($ok);
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($merge);
+        $result = $context->builder->phi($htPtr);
+        $result->addIncoming($childHt, $create);
+        $result->addIncoming($fixupHt, $fixup);
+        $result->addIncoming($existing, $ok);
+
+        return $result;
+    }
+
+    /**
+     * Nested FETCH_DIM_W intermediate: autovivify an empty array when the packed index is undefined.
+     *
+     * @see php-src Zend/zend_execute.c ZEND_FETCH_DIM_W (write / nested dimension)
+     */
+    public static function readIndexedHashtableForNestedWrite(Context $context, Value $ht, Value $index): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'ht_nested_idx');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $isUndef = self::packedIndexIsUndefined($context, $ht, $index);
+        $create = BasicBlockHelper::append($context, 'ht_nested_idx_create');
+        $read = BasicBlockHelper::append($context, 'ht_nested_idx_read');
+        $merge = BasicBlockHelper::append($context, 'ht_nested_idx_merge');
+        $context->builder->branchIf($isUndef, $create, $read);
+
+        $context->builder->positionAtEnd($create);
+        $childHt = HashTableWriteLlvm::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setHashtableAt'),
+            $ht,
+            $index,
+            $childHt
+        );
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($read);
+        $existing = self::readIndexedHashtable($context, $ht, $index);
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $existing,
+            $htPtr->constNull()
+        );
+        $fixup = BasicBlockHelper::append($context, 'ht_nested_idx_fixup');
+        $ok = BasicBlockHelper::append($context, 'ht_nested_idx_ok');
+        $context->builder->branchIf($isNull, $fixup, $ok);
+
+        $context->builder->positionAtEnd($fixup);
+        $fixupHt = HashTableWriteLlvm::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setHashtableAt'),
+            $ht,
+            $index,
+            $fixupHt
+        );
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($ok);
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($merge);
+        $result = $context->builder->phi($htPtr);
+        $result->addIncoming($childHt, $create);
+        $result->addIncoming($fixupHt, $fixup);
+        $result->addIncoming($existing, $ok);
+
+        return $result;
+    }
+
 }
