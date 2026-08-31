@@ -31,6 +31,11 @@ final class Issue33711HttpBuildQueryRuntimeAotTest extends TestCase
         }
     }
 
+    public function testNumericPrefixMatchesZend(): void
+    {
+        $this->assertAotMatchesZend(__DIR__.'/../repro/aot_http_build_query_numeric_prefix.php');
+    }
+
     private function assertAotMatchesZend(string $src): void
     {
         $zend = $this->runPhp($src);

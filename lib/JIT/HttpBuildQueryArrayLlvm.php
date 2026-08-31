@@ -26,7 +26,8 @@ final class HttpBuildQueryArrayLlvm
     public static function build(
         Context $context,
         Value $ht,
-        Value $prefix,
+        Value $numericPrefix,
+        Value $keyPrefix,
         Value $separator,
         Value $encoding
     ): Value {
@@ -51,6 +52,7 @@ final class HttpBuildQueryArrayLlvm
         $eq = $context->builder->load($context->constantStringFromString('='));
         $openBracket = $context->builder->load($context->constantStringFromString('%5B'));
         $closeBracket = $context->builder->load($context->constantStringFromString('%5D'));
+        $nestedOpen = $context->builder->load($context->constantStringFromString('%5D%5B'));
 
         $accSlot = BasicBlockHelper::entryAlloca($context, $strPtr);
         $idxSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
@@ -137,36 +139,86 @@ final class HttpBuildQueryArrayLlvm
         $keyStr->addIncoming($rawKey, $keyStrEnd);
         $keyStr->addIncoming($keyDigits, $keyLongEnd);
 
-        $prefixLen = $context->builder->load(
-            $context->builder->structGep($prefix, $context->structFieldMap['__string__']['length'])
+        // php-src ext/standard/http.c — numeric_prefix vs key_prefix (VmHttpBuildQuery).
+        $keyPrefixLen = $context->builder->load(
+            $context->builder->structGep($keyPrefix, $context->structFieldMap['__string__']['length'])
         );
-        $hasPrefix = $context->builder->icmp(Builder::INT_NE, $prefixLen, $i64->constInt(0, false));
-        $pfxBb = BasicBlockHelper::append($context, 'hbq_pfx_'.$tag);
-        $nopfxBb = BasicBlockHelper::append($context, 'hbq_nopfx_'.$tag);
-        $ekDone = BasicBlockHelper::append($context, 'hbq_ek_'.$tag);
-        $context->builder->branchIf($hasPrefix, $pfxBb, $nopfxBb);
+        $hasKeyPrefix = $context->builder->icmp(Builder::INT_NE, $keyPrefixLen, $i64->constInt(0, false));
+        $numPrefixLen = $context->builder->load(
+            $context->builder->structGep($numericPrefix, $context->structFieldMap['__string__']['length'])
+        );
+        $hasNumPrefix = $context->builder->icmp(Builder::INT_NE, $numPrefixLen, $i64->constInt(0, false));
 
-        $context->builder->positionAtEnd($pfxBb);
-        $nestedKey = JitStringConcat::concat(
+        $kpModeBb = BasicBlockHelper::append($context, 'hbq_kpmode_'.$tag);
+        $rootModeBb = BasicBlockHelper::append($context, 'hbq_rootmode_'.$tag);
+        $ekChildDone = BasicBlockHelper::append($context, 'hbq_ekchild_'.$tag);
+        $context->builder->branchIf($hasKeyPrefix, $kpModeBb, $rootModeBb);
+
+        $context->builder->positionAtEnd($kpModeBb);
+        $ekKp = JitStringConcat::concat(
             $context,
-            JitStringConcat::concat(
-                $context,
-                JitStringConcat::concat($context, $prefix, $openBracket),
-                $keyStr
-            ),
+            JitStringConcat::concat($context, $keyPrefix, $keyStr),
             $closeBracket
         );
-        $pfxEnd = $context->builder->getInsertBlock();
-        $context->builder->branch($ekDone);
+        $childKp = JitStringConcat::concat(
+            $context,
+            JitStringConcat::concat($context, $keyPrefix, $keyStr),
+            $nestedOpen
+        );
+        $kpEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($ekChildDone);
 
-        $context->builder->positionAtEnd($nopfxBb);
-        $nopfxEnd = $context->builder->getInsertBlock();
-        $context->builder->branch($ekDone);
+        $context->builder->positionAtEnd($rootModeBb);
+        $intRootBb = BasicBlockHelper::append($context, 'hbq_introot_'.$tag);
+        $strRootBb = BasicBlockHelper::append($context, 'hbq_strroot_'.$tag);
+        $context->builder->branchIf($isLongKey, $intRootBb, $strRootBb);
 
-        $context->builder->positionAtEnd($ekDone);
+        $context->builder->positionAtEnd($intRootBb);
+        $intPfxBb = BasicBlockHelper::append($context, 'hbq_intpfx_'.$tag);
+        $intNoPfxBb = BasicBlockHelper::append($context, 'hbq_intnopfx_'.$tag);
+        $intRootDone = BasicBlockHelper::append($context, 'hbq_introot_done_'.$tag);
+        $context->builder->branchIf($hasNumPrefix, $intPfxBb, $intNoPfxBb);
+
+        $context->builder->positionAtEnd($intPfxBb);
+        $ekIntPfx = JitStringConcat::concat($context, $numericPrefix, $keyStr);
+        $childIntPfx = JitStringConcat::concat(
+            $context,
+            JitStringConcat::concat($context, $numericPrefix, $keyStr),
+            $openBracket
+        );
+        $intPfxEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($intRootDone);
+
+        $context->builder->positionAtEnd($intNoPfxBb);
+        $childIntNo = JitStringConcat::concat($context, $keyStr, $openBracket);
+        $intNoPfxEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($intRootDone);
+
+        $context->builder->positionAtEnd($intRootDone);
+        $ekIntRoot = $context->builder->phi($strPtr);
+        $ekIntRoot->addIncoming($ekIntPfx, $intPfxEnd);
+        $ekIntRoot->addIncoming($keyStr, $intNoPfxEnd);
+        $childIntRoot = $context->builder->phi($strPtr);
+        $childIntRoot->addIncoming($childIntPfx, $intPfxEnd);
+        $childIntRoot->addIncoming($childIntNo, $intNoPfxEnd);
+        $intRootEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($ekChildDone);
+
+        $context->builder->positionAtEnd($strRootBb);
+        $ekStrRoot = $keyStr;
+        $childStrRoot = JitStringConcat::concat($context, $keyStr, $openBracket);
+        $strRootEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($ekChildDone);
+
+        $context->builder->positionAtEnd($ekChildDone);
         $ek = $context->builder->phi($strPtr);
-        $ek->addIncoming($nestedKey, $pfxEnd);
-        $ek->addIncoming($keyStr, $nopfxEnd);
+        $ek->addIncoming($ekKp, $kpEnd);
+        $ek->addIncoming($ekIntRoot, $intRootEnd);
+        $ek->addIncoming($ekStrRoot, $strRootEnd);
+        $childPrefix = $context->builder->phi($strPtr);
+        $childPrefix->addIncoming($childKp, $kpEnd);
+        $childPrefix->addIncoming($childIntRoot, $intRootEnd);
+        $childPrefix->addIncoming($childStrRoot, $strRootEnd);
 
         $isHt = $context->builder->or(
             $context->builder->icmp(
@@ -193,7 +245,8 @@ final class HttpBuildQueryArrayLlvm
         $nestedStr = $context->builder->call(
             $context->lookupFunction('__compiler_http_build_query_llvm'),
             $childHt,
-            $ek,
+            $empty,
+            $childPrefix,
             $separator,
             $encoding
         );
@@ -257,7 +310,7 @@ final class HttpBuildQueryArrayLlvm
         $isString = $context->builder->icmp(
             Builder::INT_EQ,
             $valKind,
-            $i8->constInt(Variable::TYPE_STRING, false)
+            $i8->constInt(Variable::TYPE_STRING & 0x7f, false)
         );
         $strBb = BasicBlockHelper::append($context, 'hbq_vstr_'.$tag);
         $dblCheck = BasicBlockHelper::append($context, 'hbq_vdblchk_'.$tag);

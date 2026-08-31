@@ -52,10 +52,13 @@ final class JitHttpBuildQuery
         $ht = self::loadData($context, $data);
 
         // LLVM ABI (#33711) — NestedJIT __compiler_http_build_query SEGVs on runtime HTs.
+        $emptyPrefix = $context->builder->load($context->constantStringFromString(''));
+
         return $context->builder->call(
             $context->lookupFunction('__compiler_http_build_query_llvm'),
             $ht,
             $prefix,
+            $emptyPrefix,
             $separator,
             $encoding
         );
