@@ -517,6 +517,23 @@ final class InternalStrictArg
             $failBlock
         );
         $context->builder->positionAtEnd($failBlock);
+        $nullTy = $i8->constInt(VmVariable::TYPE_NULL, false);
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $typeByte, $nullTy);
+        $nullFail = BasicBlockHelper::append($context, 'internal_strict_null_fail');
+        $mixedFail = BasicBlockHelper::append($context, 'internal_strict_mixed_fail');
+        $context->builder->branchIf($isNull, $nullFail, $mixedFail);
+        $context->builder->positionAtEnd($nullFail);
+        ExceptionBridge::emitTypeErrorAndAbort(
+            $context,
+            sprintf(
+                '%s(): Argument #%d ($%s) must be of type %s, null given',
+                $function,
+                $argNumber,
+                $paramName,
+                $expectedLabel
+            )
+        );
+        $context->builder->positionAtEnd($mixedFail);
         ExceptionBridge::emitTypeErrorAndAbort(
             $context,
             sprintf(
