@@ -2903,6 +2903,14 @@ class Object_ extends Type {
             }
             if (isset($this->runtimePropertyNewDefaults[$id][$slotIndex])) {
                 $newClassId = $this->runtimePropertyNewDefaults[$id][$slotIndex];
+                if (isset($this->runtimePropertyNewInitFragments[$id][$slotIndex])) {
+                    [$initBlock, $resultSlot] = $this->runtimePropertyNewInitFragments[$id][$slotIndex];
+                    $jit = $this->context->activeJitCompiler ?? $this->context->runtime->loadJit();
+                    $jitVar = $jit->jitVariableFromRuntimeNewInitFragment($initBlock, $resultSlot);
+                    $this->propertyStore($slot, $jitVar, $propertyType ?? Variable::TYPE_OBJECT);
+
+                    return;
+                }
                 $child = $this->allocate($newClassId);
                 if (!$this->hasConstructor($newClassId)) {
                     $this->markObjectConstructed($child);
@@ -6271,6 +6279,10 @@ class Object_ extends Type {
             $this->runtimePropertyNewDefaults[$childId][$childSlot]
                 = $this->runtimePropertyNewDefaults[$parentId][$parentSlot];
         }
+        if (isset($this->runtimePropertyNewInitFragments[$parentId][$parentSlot])) {
+            $this->runtimePropertyNewInitFragments[$childId][$childSlot]
+                = $this->runtimePropertyNewInitFragments[$parentId][$parentSlot];
+        }
     }
 
     public function markHasConstructor(int $classId): void
@@ -7549,6 +7561,15 @@ class Object_ extends Type {
                         continue;
                     }
                     $this->runtimePropertyNewDefaults[$classId][$classSlot] = $newClassId;
+                    break;
+                }
+            }
+            if (isset($this->runtimePropertyNewInitFragments[$traitId])) {
+                foreach ($this->runtimePropertyNewInitFragments[$traitId] as $slotIndex => $fragment) {
+                    if (($this->properties[$traitId][$slotIndex][1] ?? '') !== $name) {
+                        continue;
+                    }
+                    $this->runtimePropertyNewInitFragments[$classId][$classSlot] = $fragment;
                     break;
                 }
             }
