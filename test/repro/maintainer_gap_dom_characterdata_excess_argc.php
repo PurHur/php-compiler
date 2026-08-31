@@ -6,37 +6,51 @@
  * php-src: ext/dom/characterdata.c / php_dom.stub.php
  */
 error_reporting(E_ALL);
-function msg(callable $fn): void
-{
-    try {
-        $fn();
-        echo "NOERR\n";
-    } catch (ArgumentCountError $e) {
-        echo $e->getMessage(), "\n";
-    } catch (Throwable $e) {
-        echo get_class($e), ':', $e->getMessage(), "\n";
-    }
-}
 
 $dom = new DOMDocument();
 $dom->loadXML('<r>hello</r>');
 $t = $dom->documentElement->firstChild;
 
-msg(static function () use ($t) {
+try {
     $t->substringData(0, 1, 1);
-});
-msg(static function () use ($t) {
+    echo "NOERR\n";
+} catch (ArgumentCountError $e) {
+    echo $e->getMessage(), "\n";
+} catch (Throwable $e) {
+    echo get_class($e), ':', $e->getMessage(), "\n";
+}
+try {
     $t->appendData('x', 1);
-});
-msg(static function () use ($t) {
+    echo "NOERR\n";
+} catch (ArgumentCountError $e) {
+    echo $e->getMessage(), "\n";
+} catch (Throwable $e) {
+    echo get_class($e), ':', $e->getMessage(), "\n";
+}
+try {
     $t->deleteData(0, 1, 1);
-});
-msg(static function () use ($t) {
+    echo "NOERR\n";
+} catch (ArgumentCountError $e) {
+    echo $e->getMessage(), "\n";
+} catch (Throwable $e) {
+    echo get_class($e), ':', $e->getMessage(), "\n";
+}
+try {
     $t->insertData(0, '!', 1);
-});
-msg(static function () use ($t) {
+    echo "NOERR\n";
+} catch (ArgumentCountError $e) {
+    echo $e->getMessage(), "\n";
+} catch (Throwable $e) {
+    echo get_class($e), ':', $e->getMessage(), "\n";
+}
+try {
     $t->replaceData(0, 1, '!', 1);
-});
+    echo "NOERR\n";
+} catch (ArgumentCountError $e) {
+    echo $e->getMessage(), "\n";
+} catch (Throwable $e) {
+    echo get_class($e), ':', $e->getMessage(), "\n";
+}
 
 // Surplus args must not mutate; legal arities still work.
 echo $t->data, "\n";

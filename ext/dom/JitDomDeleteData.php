@@ -28,6 +28,15 @@ final class JitDomDeleteData
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_deletedata_cont');
+        $argcDummy = DomCharacterDataJitArgc::rejectUnlessExactUserArgCount(
+            $context,
+            'DOMCharacterData::deleteData',
+            2,
+            ...$args
+        );
+        if (null !== $argcDummy) {
+            return $argcDummy;
+        }
         if (!VmClassMethod::requireExactJitUserArgCount(
             $context,
             $args,
