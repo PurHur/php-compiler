@@ -90,7 +90,7 @@ final class JitHash
             $length,
             $info,
             $salt
-        ));
+        ), 'hash_hkdf');
     }
 
     public static function equals(Context $context, Value $known, Value $user): Value
