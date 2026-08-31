@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
@@ -144,6 +145,7 @@ final class JitDomNodeListItemUserScript
                     $indexVal = null;
                 }
                 if (null !== $indexVal) {
+                    $snapXml = JitDomXPathQueryUserScript::snapshotXmlForAxisId(0);
                     $pinned = DomUserScriptPinnedRootLlvm::load($context);
                     $live = JitDomLiveElementsByTagWalk::itemAt(
                         $context,
@@ -154,7 +156,7 @@ final class JitDomNodeListItemUserScript
                     );
                     $compileTime = self::materializeDynamicIndexQueryMatch(
                         $context,
-                        $xml,
+                        $snapXml ?? $xml,
                         $queryTag,
                         $arg
                     );
@@ -170,11 +172,19 @@ final class JitDomNodeListItemUserScript
                     );
                     $liveNull = $context->builder->icmp(Builder::INT_EQ, $liveObj, $objPtrTy->constNull());
                     $preferRemat = $context->builder->or($pinNull, $liveNull);
+                    $liveOrRemat = $context->builder->select($preferRemat, $compileTime, $live);
+                    if (null !== $snapXml) {
+                        $isSnapshot = self::receiverHasXPathSnapshot($context, $args[0]);
 
-                    return $context->builder->select($preferRemat, $compileTime, $live);
+                        return $context->builder->select($isSnapshot, $compileTime, $liveOrRemat);
+                    }
+
+                    return $liveOrRemat;
                 }
 
-                return self::materializeDynamicIndexQueryMatch($context, $xml, $queryTag, $arg);
+                $snapXml = JitDomXPathQueryUserScript::snapshotXmlForAxisId(0);
+
+                return self::materializeDynamicIndexQueryMatch($context, $snapXml ?? $xml, $queryTag, $arg);
             }
             if (null !== $tagQuery && null !== $itemMarkup) {
                 $tagResult = self::materializeDynamicIndexQueryMatch($context, $itemMarkup, $tagQuery, $arg);
@@ -225,10 +235,10 @@ final class JitDomNodeListItemUserScript
         }
 
         // XPath //tag lists: prefer live pinned-root walk so item() keeps
-        // ownerDocument for setIdAttribute (#35447). Always rematerializing
-        // (#27275) returned a detached clone — getAttribute worked via Attr
-        // presence, but NestedJIT setIdAttribute SIGSEGV'd.
+        // ownerDocument for setIdAttribute (#35447). XPath snapshot NodeLists
+        // (PROP_XPATH_SNAPSHOT) must not live-walk after DOM mutations (#36065).
         if (null !== $xml && null !== $queryTag && '' !== $queryTag) {
+            $snapXml = JitDomXPathQueryUserScript::snapshotXmlForAxisId(0);
             $pinned = DomUserScriptPinnedRootLlvm::load($context);
             $i64 = $context->getTypeFromString('int64');
             $live = JitDomLiveElementsByTagWalk::itemAt(
@@ -238,7 +248,12 @@ final class JitDomNodeListItemUserScript
                 $i64->constInt($index, false),
                 false
             );
-            $compileTime = self::materializeNthQueryMatch($context, $xml, $queryTag, $index);
+            $compileTime = self::materializeNthQueryMatch(
+                $context,
+                $snapXml ?? $xml,
+                $queryTag,
+                $index
+            );
             $objPtrTy = $context->getTypeFromString('__object__*');
             $pinNull = $context->builder->icmp(
                 Builder::INT_EQ,
@@ -251,8 +266,14 @@ final class JitDomNodeListItemUserScript
             );
             $liveNull = $context->builder->icmp(Builder::INT_EQ, $liveObj, $objPtrTy->constNull());
             $preferRemat = $context->builder->or($pinNull, $liveNull);
+            $liveOrRemat = $context->builder->select($preferRemat, $compileTime, $live);
+            if (null !== $snapXml) {
+                $isSnapshot = self::receiverHasXPathSnapshot($context, $args[0]);
 
-            return $context->builder->select($preferRemat, $compileTime, $live);
+                return $context->builder->select($isSnapshot, $compileTime, $liveOrRemat);
+            }
+
+            return $liveOrRemat;
         }
 
         // getElementsByTagNameNS live list — prefer pinned-root walk (#34995 / re-#34983).
@@ -560,6 +581,33 @@ final class JitDomNodeListItemUserScript
         return $context->helper->loadValue($fetched);
     }
 
+    /** XPath query() NodeLists carry {@see VmDom::PROP_XPATH_SNAPSHOT} (#36065). */
+    private static function receiverHasXPathSnapshot(Context $context, JITVariable $listVar): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_nli_xpath_snapshot');
+        $objectType = $context->type->object;
+        $listClassId = $objectType->lookup('DOMNodeList');
+        if (!$objectType->hasProperty($listClassId, VmDom::PROP_XPATH_SNAPSHOT)) {
+            $objectType->defineProperty($listClassId, VmDom::PROP_XPATH_SNAPSHOT, JITVariable::TYPE_NATIVE_LONG);
+        }
+        $list = JitDomNodeListItem::loadObjectArgForUserScript($context, $listVar);
+        $fetched = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $list,
+            'DOMNodeList',
+            VmDom::PROP_XPATH_SNAPSHOT,
+            $listClassId
+        );
+        $val = $context->helper->loadValue($fetched);
+        $i64 = $context->getTypeFromString('int64');
+
+        return $context->builder->icmp(
+            Builder::INT_NE,
+            $val,
+            $i64->constInt(0, false)
+        );
+    }
+
     private static function materializeDynamicIndexXPathAxisMatchByAxisId(
         Context $context,
         string $xml,
@@ -575,7 +623,8 @@ final class JitDomNodeListItemUserScript
                 $axisIdVal,
                 $i64->constInt($id, false)
             );
-            $cand = self::materializeDynamicIndexXPathAxisMatch($context, $xml, $expr, $indexArg);
+            $snapXml = JitDomXPathQueryUserScript::snapshotXmlForAxisId($id) ?? $xml;
+            $cand = self::materializeDynamicIndexXPathAxisMatch($context, $snapXml, $expr, $indexArg);
             $out = $context->builder->select($isId, $cand, $out);
         }
 
@@ -597,7 +646,8 @@ final class JitDomNodeListItemUserScript
                 $axisIdVal,
                 $i64->constInt($id, false)
             );
-            $cand = self::materializeNthXPathAxisMatch($context, $xml, $expr, $index);
+            $snapXml = JitDomXPathQueryUserScript::snapshotXmlForAxisId($id) ?? $xml;
+            $cand = self::materializeNthXPathAxisMatch($context, $snapXml, $expr, $index);
             $out = $context->builder->select($isId, $cand, $out);
         }
 
