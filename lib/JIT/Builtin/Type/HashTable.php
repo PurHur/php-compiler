@@ -74,6 +74,8 @@ class HashTable extends Type
             $this->context->getTypeFromString('__strkey_node__*'),
             $this->context->getTypeFromString('__objkey_node__*'),
             $this->context->getTypeFromString('int64'),
+            /** nextFree when the first string key was inserted — foreach insertion order (#34977). */
+            $this->context->getTypeFromString('size_t'),
         );
         $this->context->structFieldMap['__hashtable__'] = [
             'ref' => 0,
@@ -85,6 +87,7 @@ class HashTable extends Type
             'objKeys' => 6,
             /** Zend HT internal pointer for key/current/next (#4967, #5504). */
             'internalPointer' => 7,
+            'packedPrefixEnd' => 8,
         ];
 
         $this->registerFn('__hashtable__alloc', '__hashtable__*', []);
@@ -402,6 +405,10 @@ class HashTable extends Type
         $this->context->builder->store(
             $invalidPtr,
             $this->context->builder->structGep($ht, $map['internalPointer'])
+        );
+        $this->context->builder->store(
+            $sizeT->constInt(\PHP_INT_MAX, false),
+            $this->context->builder->structGep($ht, $map['packedPrefixEnd'])
         );
         $typeinfo = $this->context->getTypeFromString('int32')->constInt(
             Refcount::TYPE_INFO_TYPE_MASKED_ARRAY | Refcount::TYPE_INFO_REFCOUNTED,
@@ -919,6 +926,26 @@ class HashTable extends Type
         $this->context->builder->returnValue($result);
     }
 
+    /**
+     * Record nextFree at first string-key insert so foreach can interleave late appends (#34977).
+     */
+    private function stampPackedPrefixEndIfUnset(\PHPLLVM\Value $ht): void
+    {
+        $map = $this->context->structFieldMap['__hashtable__'];
+        $sizeT = $this->context->getTypeFromString('size_t');
+        $sentinel = $sizeT->constInt(\PHP_INT_MAX, false);
+        $slot = $this->context->builder->structGep($ht, $map['packedPrefixEnd']);
+        $cur = $this->context->builder->load($slot);
+        $isUnset = $this->context->builder->icmp(Builder::INT_EQ, $cur, $sentinel);
+        $nextFree = $this->context->builder->load(
+            $this->context->builder->structGep($ht, $map['nextFreeElement'])
+        );
+        $this->context->builder->store(
+            $this->context->builder->select($isUnset, $nextFree, $cur),
+            $slot
+        );
+    }
+
     private function implementSetStringKeyString(): void
     {
         $fn = $this->context->lookupFunction('__hashtable__setStringKeyString');
@@ -1017,6 +1044,7 @@ class HashTable extends Type
         $this->context->builder->branch($done);
 
         $this->context->builder->positionAtEnd($emptyHead);
+        $this->stampPackedPrefixEndIfUnset($ht);
         $this->context->builder->store($newNode, $headSlot);
         $this->incrementNumElements($ht);
         $this->context->builder->branch($done);
@@ -1123,6 +1151,7 @@ class HashTable extends Type
         $this->context->builder->branch($done);
 
         $this->context->builder->positionAtEnd($emptyHead);
+        $this->stampPackedPrefixEndIfUnset($ht);
         $this->context->builder->store($newNode, $headSlot);
         $this->incrementNumElements($ht);
         $this->context->builder->branch($done);
@@ -1229,6 +1258,7 @@ class HashTable extends Type
         $this->context->builder->branch($done);
 
         $this->context->builder->positionAtEnd($emptyHead);
+        $this->stampPackedPrefixEndIfUnset($ht);
         $this->context->builder->store($newNode, $headSlot);
         $this->incrementNumElements($ht);
         $this->context->builder->branch($done);
@@ -1335,6 +1365,7 @@ class HashTable extends Type
         $this->context->builder->branch($done);
 
         $this->context->builder->positionAtEnd($emptyHead);
+        $this->stampPackedPrefixEndIfUnset($ht);
         $this->context->builder->store($newNode, $headSlot);
         $this->incrementNumElements($ht);
         $this->context->builder->branch($done);
@@ -1441,6 +1472,7 @@ class HashTable extends Type
         $this->context->builder->branch($done);
 
         $this->context->builder->positionAtEnd($emptyHead);
+        $this->stampPackedPrefixEndIfUnset($ht);
         $this->context->builder->store($newNode, $headSlot);
         $this->incrementNumElements($ht);
         $this->context->builder->branch($done);
@@ -1543,6 +1575,7 @@ class HashTable extends Type
         $this->context->builder->branch($done);
 
         $this->context->builder->positionAtEnd($emptyHead);
+        $this->stampPackedPrefixEndIfUnset($ht);
         $this->context->builder->store($newNode, $headSlot);
         $this->incrementNumElements($ht);
         $this->context->builder->branch($done);
@@ -1646,6 +1679,7 @@ class HashTable extends Type
         $this->context->builder->branch($done);
 
         $this->context->builder->positionAtEnd($emptyHead);
+        $this->stampPackedPrefixEndIfUnset($ht);
         $this->context->builder->store($newNode, $headSlot);
         $this->incrementNumElements($ht);
         $this->context->builder->branch($done);

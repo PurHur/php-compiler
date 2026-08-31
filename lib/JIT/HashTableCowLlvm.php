@@ -31,6 +31,11 @@ final class HashTableCowLlvm
         $dest = HashTableHelper::alloc($context);
         self::copyPackedPreservingIndex($context, $dest, $srcHt);
         self::copyStringKeys($context, $dest, $srcHt);
+        $map = $context->structFieldMap['__hashtable__'];
+        $context->builder->store(
+            $context->builder->load($context->builder->structGep($srcHt, $map['packedPrefixEnd'])),
+            $context->builder->structGep($dest, $map['packedPrefixEnd'])
+        );
 
         return $dest;
     }
