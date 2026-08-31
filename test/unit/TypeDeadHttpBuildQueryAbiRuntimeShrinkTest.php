@@ -51,10 +51,22 @@ final class TypeDeadHttpBuildQueryAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('__compiler_http_build_query_llvm', $jit);
     }
 
-    public function testStringBuiltinStillImplementsHttpBuildQueryOnFullLoad(): void
+  public function testHttpBuildQueryLazyLinkedAtCallSiteNotEagerInStringImplement(): void
     {
         $string = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type/String_.php');
-        $this->assertStringContainsString('StringHttpBuildQuery::implement($this->context)', $string);
+        $pos = strpos($string, 'public function implement(): void');
+        $this->assertNotFalse($pos);
+        $next = strpos($string, 'private function implementStrlen', $pos);
+        $this->assertNotFalse($next);
+        $body = substr($string, $pos, $next - $pos);
+        $this->assertStringNotContainsString(
+            'StringHttpBuildQuery::implement',
+            $body,
+            'Type\\String_::implement must not eagerly link http_build_query (#35613)'
+        );
+
+        $callSite = (string) file_get_contents(__DIR__.'/../../ext/standard/http_build_query.php');
+        $this->assertStringContainsString('StringHttpBuildQuery::ensureLinked', $callSite);
     }
 
     public function testNoNewRuntimeCForHttpBuildQueryAbi(): void
