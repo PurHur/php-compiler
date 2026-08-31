@@ -257,6 +257,14 @@ final class VmDom
     public const PROP_XPATH_AXIS_ID = '__phpcXPathAxisId';
 
     /**
+     * XPath query()/evaluate() NodeList — snapshot length, not live GLOBAL_COUNT (#36065).
+     *
+     * php-src ext/dom/nodelist.c: XPath node-sets are fixed at query time; DOM
+     * mutations do not shrink {@see DOMNodeList::$length}.
+     */
+    public const PROP_XPATH_SNAPSHOT = '__phpcXPathSnapshot';
+
+    /**
      * php-src stub property for Reflection (XMLReader #31639 pattern; #31753).
      *
      * Runtime reads for computed node props stay virtual via {@see DomNodePropertySupport}.

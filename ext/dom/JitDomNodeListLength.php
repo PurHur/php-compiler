@@ -98,8 +98,8 @@ final class JitDomNodeListLength
                 $voidPtr->constNull()
             );
             $bbCheckOwnerObj = BasicBlockHelper::append($context, 'dom_nll_chk_owner_obj');
-            $bbGlobal = BasicBlockHelper::append($context, 'dom_nll_global');
-            $context->builder->branchIf($slotNull, $bbGlobal, $bbCheckOwnerObj);
+            $bbCheckSnapshot = BasicBlockHelper::append($context, 'dom_nll_chk_snapshot');
+            $context->builder->branchIf($slotNull, $bbCheckSnapshot, $bbCheckOwnerObj);
 
             $context->builder->positionAtEnd($bbCheckOwnerObj);
             $ownerObj = $context->builder->call(
@@ -113,7 +113,41 @@ final class JitDomNodeListLength
             );
             $bbInstance = BasicBlockHelper::append($context, 'dom_nll_instance');
             $bbMerge = BasicBlockHelper::append($context, 'dom_nll_merge');
-            $context->builder->branchIf($hasOwner, $bbInstance, $bbGlobal);
+            $context->builder->branchIf($hasOwner, $bbInstance, $bbCheckSnapshot);
+
+            $context->builder->positionAtEnd($bbCheckSnapshot);
+            $i64 = $context->getTypeFromString('int64');
+            if (!$objectType->hasProperty($classId, VmDom::PROP_XPATH_SNAPSHOT)) {
+                $objectType->defineProperty($classId, VmDom::PROP_XPATH_SNAPSHOT, JITVariable::TYPE_NATIVE_LONG);
+            }
+            $snapshotLen = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+                $objectType,
+                $obj,
+                self::CLASS_NODELIST,
+                VmDom::PROP_XPATH_SNAPSHOT,
+                $classId
+            );
+            $snapshotVal = $context->helper->loadValue($snapshotLen);
+            $isSnapshot = $context->builder->icmp(
+                Builder::INT_NE,
+                $snapshotVal,
+                $i64->constInt(0, false)
+            );
+            $bbSnapshot = BasicBlockHelper::append($context, 'dom_nll_snapshot');
+            $bbGlobal = BasicBlockHelper::append($context, 'dom_nll_global');
+            $context->builder->branchIf($isSnapshot, $bbSnapshot, $bbGlobal);
+
+            $context->builder->positionAtEnd($bbSnapshot);
+            $snapshotInstanceLen = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+                $objectType,
+                $obj,
+                self::CLASS_NODELIST,
+                self::PROP_LENGTH,
+                $classId
+            );
+            $snapshotInstanceVal = $context->helper->loadValue($snapshotInstanceLen);
+            $snapshotEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($bbMerge);
 
             $context->builder->positionAtEnd($bbInstance);
             $instanceLen = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
@@ -133,9 +167,9 @@ final class JitDomNodeListLength
             $context->builder->branch($bbMerge);
 
             $context->builder->positionAtEnd($bbMerge);
-            $i64 = $context->getTypeFromString('int64');
             $phi = $context->builder->phi($i64);
             $phi->addIncoming($instanceVal, $instanceEnd);
+            $phi->addIncoming($snapshotInstanceVal, $snapshotEnd);
             $phi->addIncoming($globalVal, $globalEnd);
             // Keep native-long fetch shape aligned with propertyFetchDeclaredSlot(): callers
             // expect TYPE_NATIVE_LONG KIND_VALUE to carry an int64* storage pointer.

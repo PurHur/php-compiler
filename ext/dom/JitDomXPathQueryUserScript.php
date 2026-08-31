@@ -31,6 +31,20 @@ final class JitDomXPathQueryUserScript
     /** @var array<int, string> */
     private static array $xpathAxisExprById = [];
 
+    /** @var array<int, string> compile-time XML captured at each XPath query() (#36065). */
+    private static array $xpathSnapshotXmlByAxisId = [];
+
+    /** @return array<int, string> */
+    public static function xpathSnapshotXmlByAxisId(): array
+    {
+        return self::$xpathSnapshotXmlByAxisId;
+    }
+
+    public static function snapshotXmlForAxisId(int $axisId): ?string
+    {
+        return self::$xpathSnapshotXmlByAxisId[$axisId] ?? null;
+    }
+
     public static function lastCacheKey(): ?string
     {
         return self::$lastCacheKey;
@@ -236,6 +250,9 @@ final class JitDomXPathQueryUserScript
         if (!$objectType->hasProperty($classId, VmDom::PROP_XPATH_AXIS_ID)) {
             $objectType->defineProperty($classId, VmDom::PROP_XPATH_AXIS_ID, JITVariable::TYPE_NATIVE_LONG);
         }
+        if (!$objectType->hasProperty($classId, VmDom::PROP_XPATH_SNAPSHOT)) {
+            $objectType->defineProperty($classId, VmDom::PROP_XPATH_SNAPSHOT, JITVariable::TYPE_NATIVE_LONG);
+        }
         if (!$objectType->hasProperty($classId, 'length')) {
             $objectType->defineProperty($classId, 'length', JITVariable::TYPE_NATIVE_LONG);
         }
@@ -263,6 +280,21 @@ final class JitDomXPathQueryUserScript
             $axisIdVar,
             JITVariable::TYPE_NATIVE_LONG
         );
+        $snapshotVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_NATIVE_LONG,
+            JITVariable::KIND_VALUE,
+            $context->getTypeFromString('int64')->constInt(1, false)
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($list, self::CLASS_NODELIST, VmDom::PROP_XPATH_SNAPSHOT),
+            $snapshotVar,
+            JITVariable::TYPE_NATIVE_LONG
+        );
+        $snapXml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        if (null !== $snapXml) {
+            self::$xpathSnapshotXmlByAxisId[$axisId] = $snapXml;
+        }
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         $context->builder->call(
