@@ -1248,7 +1248,7 @@ final class JitDomLoadXMLUserScript
             $classId
         );
         $ht = HashTableHelper::readHashtableFromValueBox($context, $mapVar);
-        $foundVar = HashTableHelper::readStringKeyToValueBox($context, $ht, $idStr);
+        $foundVar = HashTableHelper::peekStringKeyToValueBox($context, $ht, $idStr);
         $valPtr = JitValueBox::valuePtrFromVariable($context, $foundVar);
         $valueMap = $context->structFieldMap['__value__'];
         $i8 = $context->getTypeFromString('int8');

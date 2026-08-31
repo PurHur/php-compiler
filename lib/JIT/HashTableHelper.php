@@ -264,6 +264,12 @@ final class HashTableHelper
         return HashTableReadLlvm::readSuperglobalStringKeyToValueBox($context, $ht, $keyStr);
     }
 
+    /** Missing-key read without Zend undefined-index warning (#35648 / getElementById id map). */
+    public static function peekStringKeyToValueBox(Context $context, Value $ht, Value $keyStr): Variable
+    {
+        return HashTableReadLlvm::readSuperglobalStringKeyToValueBox($context, $ht, $keyStr);
+    }
+
     public static function readStringKeyToValueBox(Context $context, Value $ht, Value $keyStr): Variable
     {
         return HashTableReadLlvm::readStringKeyToValueBox($context, $ht, $keyStr);
