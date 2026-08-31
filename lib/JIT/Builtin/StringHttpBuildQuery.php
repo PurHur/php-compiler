@@ -91,7 +91,7 @@ final class StringHttpBuildQuery
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');
-        $ft = $context->context->functionType($strPtr, false, $htPtr, $strPtr, $strPtr, $i64);
+        $ft = $context->context->functionType($strPtr, false, $htPtr, $strPtr, $strPtr, $strPtr, $i64);
         $fn = null !== $probe
             ? $probe
             : $context->module->addFunction($abiName, $ft);
@@ -108,7 +108,8 @@ final class StringHttpBuildQuery
                     $fn->getParam(0),
                     $fn->getParam(1),
                     $fn->getParam(2),
-                    $fn->getParam(3)
+                    $fn->getParam(3),
+                    $fn->getParam(4)
                 )
             );
         });
