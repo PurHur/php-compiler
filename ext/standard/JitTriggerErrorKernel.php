@@ -11,9 +11,10 @@ use PHPCompiler\JIT\Builtin\SilenceRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\VM\ErrorReporter;
-use PHPLLVM\Builder;
 use PHPLLVM\BasicBlock;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
@@ -46,6 +47,14 @@ final class JitTriggerErrorKernel
     private const UNDEF_KEY_LONG_MESSAGE_HELPER = 'PHPCompiler\\ext\\standard\\TriggerErrorJitHelper::undefinedArrayKeyLongMessage';
 
     private const E_USER_ERROR = 256;
+
+    private const E_WARNING = ErrorReporter::E_WARNING;
+
+    private const G_DIAG_FILE = 'phpc_aot_diag_file_cstr';
+
+    private const G_DIAG_LINE = 'phpc_aot_diag_line';
+
+    private const UNDEF_KEY_MSG_BUF = 256;
 
     /** @var list<string> */
     private const UNDEF_HELPERS = [
@@ -166,6 +175,29 @@ final class JitTriggerErrorKernel
         $ft = $context->context->functionType($voidTy, false, $i64);
         $fn = $context->module->addFunction($abiName, $ft);
         $context->registerFunction($abiName, $fn);
+    }
+
+    /**
+     * Store compile-time call site for the next undef-key warning (#31991 / #31994).
+     *
+     * Thin AOT cannot pass file/line through the 2-arg undef-key ABI without relinking
+     * prelinked helper units — module globals match {@see SilenceRuntime} (#35563).
+     */
+    public static function emitDiagSiteStore(Context $context): void
+    {
+        self::ensureDiagGlobals($context);
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $path = $context->jitAotEntryScriptPath;
+        $filePtr = $context->builder->pointerCast(
+            $context->constantFromString('' !== $path ? $path : ''),
+            $i8p
+        );
+        $context->builder->store($filePtr, self::diagGlobalPtr($context, self::G_DIAG_FILE, $i8p));
+        $context->builder->store(
+            $i32->constInt(max(0, $context->callSiteLine), false),
+            self::diagGlobalPtr($context, self::G_DIAG_LINE, $i32)
+        );
     }
 
     /** Load libc stderr FILE* (external global), matching StreamGlobalsJit. */
@@ -334,19 +366,29 @@ final class JitTriggerErrorKernel
         $bodyBb = $fn->appendBasicBlock('undef_key_cstr_body');
         $context->builder->branchIf($nullKey, $retBb, $bodyBb);
         $context->builder->positionAtEnd($bodyBb);
-        $i64 = $context->getTypeFromString('int64');
-        $keyStr = self::cstrToStringWithLength($context, $key, $context->builder->zExt($len, $i64));
-        $messageStr = $context->builder->call(
-            self::helperFunction($context, self::UNDEF_KEY_MESSAGE_HELPER),
-            $keyStr
+        LibcExtern::ensureSnprintf($context);
+        $i32 = $context->getTypeFromString('int32');
+        $sizeT = $context->getTypeFromString('size_t');
+        $charPtr = $context->getTypeFromString('char*');
+        $bufSize = $sizeT->constInt(self::UNDEF_KEY_MSG_BUF, false);
+        $buf = $context->builder->alloca($i8p->arrayType(self::UNDEF_KEY_MSG_BUF), 1, 'undef_key_msg');
+        $bufChar = $context->builder->pointerCast($buf, $charPtr);
+        $fmt = $context->builder->pointerCast(
+            $context->constantFromString('Undefined array key "%.*s"'),
+            $charPtr
         );
-        self::emitCliWarningForMessageString(
-            $context,
-            $fn,
-            $messageStr,
-            $retBb,
-            ErrorReporter::E_WARNING
+        $lenI32 = $context->builder->trunc($len, $i32);
+        $written = $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $bufChar,
+            $bufSize,
+            $fmt,
+            $lenI32,
+            $key
         );
+        $msgCstr = $context->builder->pointerCast($bufChar, $i8p);
+        $msgLen = $context->builder->zExt($written, $sizeT);
+        self::emitGlobalGatedCliWarning($context, $fn, $retBb, $msgCstr, $msgLen);
         $context->builder->positionAtEnd($retBb);
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
@@ -367,17 +409,30 @@ final class JitTriggerErrorKernel
         $entry = $fn->appendBasicBlock('undef_key_long_bridge_entry');
         $retBb = $fn->appendBasicBlock('undef_key_long_ret');
         $context->builder->positionAtEnd($entry);
-        $messageStr = $context->builder->call(
-            self::helperFunction($context, self::UNDEF_KEY_LONG_MESSAGE_HELPER),
-            $fn->getParam(0)
+        LibcExtern::ensureSnprintf($context);
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $charPtr = $context->getTypeFromString('char*');
+        $bufSize = $sizeT->constInt(self::UNDEF_KEY_MSG_BUF, false);
+        $buf = $context->builder->alloca($i8p->arrayType(self::UNDEF_KEY_MSG_BUF), 1, 'undef_key_long_msg');
+        $bufChar = $context->builder->pointerCast($buf, $charPtr);
+        $fmt = $context->builder->pointerCast(
+            $context->constantFromString('Undefined array key %lld'),
+            $charPtr
         );
-        self::emitCliWarningForMessageString(
-            $context,
-            $fn,
-            $messageStr,
-            $retBb,
-            ErrorReporter::E_WARNING
+        $keyI64 = $context->builder->sext($fn->getParam(0), $i64);
+        $written = $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $bufChar,
+            $bufSize,
+            $fmt,
+            $keyI64
         );
+        $msgCstr = $context->builder->pointerCast($bufChar, $i8p);
+        $msgLen = $context->builder->zExt($written, $sizeT);
+        self::emitGlobalGatedCliWarning($context, $fn, $retBb, $msgCstr, $msgLen);
         $context->builder->positionAtEnd($retBb);
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
@@ -601,5 +656,82 @@ final class JitTriggerErrorKernel
             }
             $context->registerFunction($name, $fn);
         }
+    }
+
+    /**
+     * Record + stderr-print via module-global error_reporting (#35563), not NestedJIT statics.
+     */
+    private static function emitGlobalGatedCliWarning(
+        Context $context,
+        LlvmFunction $fn,
+        BasicBlock $retBb,
+        Value $msgCstr,
+        Value $msgLen
+    ): void {
+        LastErrorRuntime::ensureLinked($context);
+        SilenceRuntime::ensureLinked($context);
+        self::ensureDiagGlobals($context);
+        self::implementStderrPrintBridge($context);
+
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $eWarning = $i32->constInt(self::E_WARNING, false);
+        $filePtr = $context->builder->load(self::diagGlobalPtr($context, self::G_DIAG_FILE, $i8p));
+        $lineVal = $context->builder->load(self::diagGlobalPtr($context, self::G_DIAG_LINE, $i32));
+
+        $context->builder->call(
+            $context->lookupFunction('__phpc_last_error_record'),
+            $eWarning,
+            $msgCstr,
+            $msgLen,
+            $filePtr,
+            $lineVal
+        );
+
+        $stderrBb = $fn->appendBasicBlock('undef_key_warn_stderr');
+        $enabled = $context->builder->call(
+            $context->lookupFunction('__compiler_phpc_error_level_enabled'),
+            $eWarning
+        );
+        $shouldPrint = $context->builder->icmp(
+            Builder::INT_NE,
+            $enabled,
+            $i32->constInt(0, false)
+        );
+        $context->builder->branchIf($shouldPrint, $stderrBb, $retBb);
+
+        $context->builder->positionAtEnd($stderrBb);
+        $context->builder->call(
+            $context->lookupFunction('__phpc_stderr_print_cli_error'),
+            $eWarning,
+            $msgCstr,
+            $filePtr,
+            $lineVal
+        );
+        $context->builder->branch($retBb);
+    }
+
+    private static function ensureDiagGlobals(Context $context): void
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        if (null === $context->module->getNamedGlobal(self::G_DIAG_FILE)) {
+            $g = $context->module->addGlobal($i8p, self::G_DIAG_FILE);
+            $g->setInitializer($i8p->constNull());
+        }
+        if (null === $context->module->getNamedGlobal(self::G_DIAG_LINE)) {
+            $g = $context->module->addGlobal($i32, self::G_DIAG_LINE);
+            $g->setInitializer($i32->constInt(0, false));
+        }
+    }
+
+    private static function diagGlobalPtr(Context $context, string $name, $llvmType): Value
+    {
+        $global = $context->module->getNamedGlobal($name);
+        if (null === $global) {
+            throw new \LogicException('JitTriggerErrorKernel global missing: '.$name);
+        }
+
+        return $context->builder->pointerCast($global, $llvmType->pointerType(0));
     }
 }

@@ -57,14 +57,18 @@ final class AotNestedDimAssignOp31991Test extends TestCase
                     && !str_starts_with($line, 'PHP Deprecated:')
             ));
             $this->assertSame(self::EXPECT, implode("\n", $stdout)."\n");
+            $merged = implode("\n", $runOut)."\n";
+            $this->assertStringContainsString('Undefined array key "x"', $merged);
+            $this->assertStringContainsString('Undefined array key "y"', $merged);
+            $this->assertStringContainsString('Undefined array key 0', $merged);
+            $this->assertStringContainsString('Undefined array key 1', $merged);
             $warnings = array_filter(
                 $runOut,
                 static fn (string $line): bool => str_contains($line, 'Undefined array key')
             );
             $this->assertCount(4, $warnings, implode("\n", $runOut));
-            $combined = implode("\n", $runOut);
-            $this->assertStringContainsString('i31991_nested_dim_assign_op_undef.php on line 5', $combined);
-            $this->assertStringContainsString('i31991_nested_dim_assign_op_undef.php on line 8', $combined);
+            $this->assertStringContainsString('i31991_nested_dim_assign_op_undef.php on line 5', $merged);
+            $this->assertStringContainsString('i31991_nested_dim_assign_op_undef.php on line 8', $merged);
         } finally {
             @unlink($bin);
         }

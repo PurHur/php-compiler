@@ -2362,6 +2362,45 @@ final class HashTableWriteLlvm
         JitValueBox::copyFromPointer($context, $lvalue->value, $entry);
     }
 
+    /**
+     * Copy the string-key slot into a FETCH_DIM_W lvalue box so assign-op reads null without
+     * a second Undefined array key Warning — Zend warns once at FETCH_DIM_W (#31991).
+     *
+     * @see self::hydrateIndexWriteLvalue
+     */
+    public static function hydrateStringKeyWriteLvalue(Context $context, Variable $lvalue): void
+    {
+        if (null === $lvalue->writableHt || null === $lvalue->writableStringKey) {
+            return;
+        }
+        $ht = $lvalue->writableHt;
+        $keyStr = $lvalue->writableStringKey;
+        $tag = 'skhyd'.(string) self::nextSeq();
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
+            $ht,
+            $keyStr
+        );
+        $miss = BasicBlockHelper::append($context, 'ht_sk_hyd_miss_'.$tag);
+        $fill = BasicBlockHelper::append($context, 'ht_sk_hyd_fill_'.$tag);
+        $context->builder->branchIf($isSet, $fill, $miss);
+        $context->builder->positionAtEnd($miss);
+        HashTableReadLlvm::emitUndefinedArrayKeyWarningForStringKeyValue($context, $keyStr);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyNull'),
+            $ht,
+            $keyStr
+        );
+        $context->builder->branch($fill);
+        $context->builder->positionAtEnd($fill);
+        $entry = $context->builder->call(
+            $context->lookupFunction('__hashtable__readStringKeyValue'),
+            $ht,
+            $keyStr
+        );
+        JitValueBox::copyFromPointer($context, $lvalue->value, $entry);
+    }
+
     /** Store a FETCH_DIM_W ++/-- box back into the packed hashtable (#32305). */
     public static function commitIndexWriteLvalue(Context $context, Variable $lvalue): void
     {
@@ -2390,16 +2429,7 @@ final class HashTableWriteLlvm
             return;
         }
         if (null !== $lvalue->writableStringKey) {
-            $tmp = HashTableReadLlvm::readStringKeyToValueBox(
-                $context,
-                $lvalue->writableHt,
-                $lvalue->writableStringKey
-            );
-            JitValueBox::copyFromPointer(
-                $context,
-                $lvalue->value,
-                JitValueBox::pointer($context, $tmp->value)
-            );
+            self::hydrateStringKeyWriteLvalue($context, $lvalue);
 
             return;
         }

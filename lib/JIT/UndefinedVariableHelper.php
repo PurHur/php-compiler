@@ -118,6 +118,18 @@ final class UndefinedVariableHelper
         self::emitAssignedFlagGuard($context, $name);
     }
 
+    /** Script-global heap box read by resolved CV name ({main} / global import, #36081). */
+    public static function guardBeforeScriptGlobalName(Context $context, string $name): void
+    {
+        if (self::shouldSkipGuards()) {
+            return;
+        }
+        if ('' === $name || 'this' === $name || \PHPCompiler\Web\Superglobals::isSuperglobalName($name)) {
+            return;
+        }
+        self::emitAssignedFlagGuard($context, $name);
+    }
+
     private static function emitAssignedFlagGuard(Context $context, string $name): void
     {
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);

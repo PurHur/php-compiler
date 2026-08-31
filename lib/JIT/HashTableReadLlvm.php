@@ -751,7 +751,7 @@ final class HashTableReadLlvm
     }
 
     /** Emit E_WARNING with script path + opline for a materialized string key (#31991). */
-    private static function emitUndefinedArrayKeyWarningForStringKeyValue(Context $context, Value $keyStr): void
+    public static function emitUndefinedArrayKeyWarningForStringKeyValue(Context $context, Value $keyStr): void
     {
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         StringTriggerError::ensureLinked($context);
