@@ -376,27 +376,29 @@ final class JitDomImportNode
                     self::storeElementInIdMap($context, $documentVar, $xmlIdLit, $element);
                 }
             }
+            foreach ($attrInfo['pairs'] as $pair) {
+                if ('id' !== $pair['qname'] || '' === $pair['value']) {
+                    continue;
+                }
+                if (self::destinationHasCompileTimeHtmlLoad($documentVar)
+                    && !DomUserScriptAttributeCacheLlvm::isIdBearingLiteral('', 'id')
+                ) {
+                    break;
+                }
+                self::storeElementInIdMap($context, $documentVar, $pair['value'], $element);
+                break;
+            }
+        } elseif ('' !== $attrInfo['attrs']
+            && 1 === preg_match('/\bid=(["\'])([^"\']*)\1/', $attrInfo['attrs'], $idMatch)
+        ) {
+            DomUserScriptAttributeCacheLlvm::markIdBearingLiteral('', 'id', true);
+            DomUserScriptAttributeCacheLlvm::storeIdBearingGlobal($context, true);
+            self::storeElementInIdMap($context, $documentVar, $idMatch[2], $element);
         }
         $htmlHit = self::resolveImportSourceHtmlHit($sourceNode);
         $htmlId = (string) ($htmlHit['id'] ?? '');
         if ('' !== $htmlId) {
             self::storeElementInIdMap($context, $documentVar, $htmlId, $element);
-        } else {
-            foreach ($attrInfo['pairs'] as $pair) {
-                if ('id' === $pair['qname'] && '' !== $pair['value']) {
-                    // Plain non-ID id on an HTML destination must not index until remove+set (#23514).
-                    if (self::destinationHasCompileTimeHtmlLoad($documentVar)
-                        && !DomUserScriptAttributeCacheLlvm::isIdBearingLiteral('', 'id')
-                    ) {
-                        break;
-                    }
-                    self::storeElementInIdMap($context, $documentVar, $pair['value'], $element);
-                    break;
-                }
-            }
-            if (!$fromXml && '' !== $id) {
-                self::storeElementInIdMap($context, $documentVar, $id, $element);
-            }
         }
 
         return self::boxObjectResult($context, $element);
