@@ -7,11 +7,14 @@ namespace PHPCompiler\ext\openssl;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\ext\standard\JitBuiltinWarning;
 use PHPLLVM\Value;
 
 /** LLVM lowering for openssl_cipher_iv_length() (#7331 phase 2, ext/openssl/openssl.c). */
 final class JitOpensslCipherIvLength
 {
+    private const UNKNOWN_CIPHER_WARNING = 'openssl_cipher_iv_length(): Unknown cipher algorithm';
+
     public static function invoke(Context $context, JITVariable $cipherArg): Value
     {
         $literal = $cipherArg->compileTimeString ?? null;
@@ -26,6 +29,7 @@ final class JitOpensslCipherIvLength
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         if (false === $length) {
+            JitBuiltinWarning::emit($context, self::UNKNOWN_CIPHER_WARNING);
             JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
 
             return $ptr;
