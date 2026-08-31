@@ -17,7 +17,9 @@ namespace PHPCompiler\ext\mbstring;
  * - Prefer `$found == 0` and nested range ifs (no elseif / ternaries).
  * - Do not branch on `$encoding` before the UTF-8 walk (NestedJIT mis-slice).
  * - Never reassign `$start` / `$length` / `$from` params — NestedJIT then treats them as 0
- *   (#34256 / #34881). Plain `$startAt = $start` is also zeroed; copy via `$startAt = $start + 0`.
+ *   (#34256 / #34881). Plain `$startAt = $start` is also zeroed; copy via `$startAt = $start + 0`
+ *   before any loop. mb_substr slice walk uses skip/take counters — `$charIndex == $startAt`
+ *   mis-lowers after an earlier charLen loop (#34881 re-open).
  *
  * Runtime encoding validation (#34875) — int-returning assert (string-returning NestedJIT throws SIGSEGV).
  */
@@ -58,13 +60,13 @@ final class MbStrcutJitHelper
     public static function strcutArgv(string $string, int $from, int $length, string $encoding): string
     {
         // Encoding must already be validated via {@see assertEncodingArgv} (#34875).
-        // Never reassign $from — NestedJIT zeros reassigned params (#34881 / #34256).
-        // Plain `$fromAt = $from` is also zeroed under NestedJIT — use `+ 0`.
+        // Copy params before any loop — NestedJIT zeros param slots after locals run (#34881).
+        $fromAt = $from + 0;
+        $lenAt = $length + 0;
         // UTF-8 char-boundary snap inlined (php-src mb_strcut; no helper calls in this unit).
         $byteLen = \strlen($string);
-        $fromAt = $from + 0;
-        if ($from < 0) {
-            $fromAt = $byteLen + $from;
+        if ($fromAt < 0) {
+            $fromAt = $byteLen + $fromAt;
             if ($fromAt < 0) {
                 $fromAt = 0;
             }
@@ -94,14 +96,13 @@ final class MbStrcutJitHelper
                 }
             }
         }
-        if ($length < 0) {
+        if ($lenAt < 0) {
             return \substr($string, $fromAt);
         }
-        if ($length <= 0) {
+        if ($lenAt <= 0) {
             return '';
         }
-        $end = $fromAt + $length;
-        $lenAt = $length + 0;
+        $end = $fromAt + $lenAt;
         if ($end >= $byteLen) {
             $lenAt = $byteLen - $fromAt;
         }
@@ -143,6 +144,9 @@ final class MbSubstrJitHelper
         int $length,
         string $encoding
     ): string {
+        // Copy params before any loop — NestedJIT zeros param slots after locals run (#34881 re-open).
+        $startAt = $start + 0;
+        $lenAt = $length + 0;
         $byteLen = \strlen($string);
         $charLen = 0;
         $bytePos = 0;
@@ -175,10 +179,8 @@ final class MbSubstrJitHelper
             $bytePos = $bytePos + $w;
             $charLen = $charLen + 1;
         }
-        // NestedJIT zeros plain `$startAt = $start` — use `+ 0` (#34881 leftover of #34883).
-        $startAt = $start + 0;
-        if ($start < 0) {
-            $startAt = $charLen + $start;
+        if ($startAt < 0) {
+            $startAt = $charLen + $startAt;
         }
         if ($startAt < 0) {
             $startAt = 0;
@@ -186,76 +188,85 @@ final class MbSubstrJitHelper
         if ($startAt >= $charLen) {
             return '';
         }
-        // -1 = omitted length sentinel from JitMbSubstr (#34256). Never reassign $length.
-        $lenAt = $length + 0;
-        if (-1 == $length) {
+        if (-1 === $lenAt) {
             $lenAt = $charLen - $startAt;
-        }
-        if ($length < 0) {
-            if (-1 != $length) {
-                $lenAt = $charLen - $startAt + $length;
-                if ($lenAt < 0) {
-                    return '';
-                }
+        } elseif ($lenAt < 0) {
+            $lenAt = $charLen - $startAt + $lenAt;
+            if ($lenAt < 0) {
+                return '';
             }
         }
         if ($lenAt <= 0) {
             return '';
         }
-        $endAt = $startAt + $lenAt;
-        $charIndex = 0;
-        $bytePos = 0;
-        $sliceStart = $byteLen;
-        $sliceEnd = $byteLen;
-        $foundStart = 0;
-        $foundEnd = 0;
-        $g = $byteLen + 1;
-        while ($bytePos < $byteLen && $g > 0) {
-            $g = $g - 1;
-            if ($foundStart == 0) {
-                if ($charIndex == $startAt) {
-                    $sliceStart = $bytePos;
-                    $foundStart = 1;
-                }
-            }
-            if ($foundEnd == 0) {
-                if ($charIndex == $endAt) {
-                    $sliceEnd = $bytePos;
-                    $foundEnd = 1;
-                }
-            }
-            $b = \ord(\substr($string, $bytePos, 1));
-            $w = 1;
-            if ($b >= 192) {
-                if ($b < 224) {
-                    if ($bytePos + 1 < $byteLen) {
-                        $w = 2;
+        // Skip/take char walk — NestedJIT mis-lowers `$charIndex == $startAt` after an earlier loop (#34881).
+        $skip = $startAt + 0;
+        $take = $lenAt + 0;
+        $walkPos = 0;
+        $walkGuard = $byteLen + 1;
+        while ($walkPos < $byteLen && $walkGuard > 0 && $skip > 0) {
+            $walkGuard = $walkGuard - 1;
+            $bb = \ord(\substr($string, $walkPos, 1));
+            $ww = 1;
+            if ($bb >= 192) {
+                if ($bb < 224) {
+                    if ($walkPos + 1 < $byteLen) {
+                        $ww = 2;
                     }
                 }
             }
-            if ($b >= 224) {
-                if ($b < 240) {
-                    if ($bytePos + 2 < $byteLen) {
-                        $w = 3;
+            if ($bb >= 224) {
+                if ($bb < 240) {
+                    if ($walkPos + 2 < $byteLen) {
+                        $ww = 3;
                     }
                 }
             }
-            if ($b >= 240) {
-                if ($b < 248) {
-                    if ($bytePos + 3 < $byteLen) {
-                        $w = 4;
+            if ($bb >= 240) {
+                if ($bb < 248) {
+                    if ($walkPos + 3 < $byteLen) {
+                        $ww = 4;
                     }
                 }
             }
-            $bytePos = $bytePos + $w;
-            $charIndex = $charIndex + 1;
+            $walkPos = $walkPos + $ww;
+            $skip = $skip - 1;
         }
-        if ($foundStart == 0) {
+        if ($skip > 0) {
             return '';
         }
-        if ($foundEnd == 0) {
-            $sliceEnd = $byteLen;
+        $sliceStart = $walkPos;
+        $sliceEnd = $byteLen;
+        $walkGuard = $byteLen + 1;
+        while ($walkPos < $byteLen && $walkGuard > 0 && $take > 0) {
+            $walkGuard = $walkGuard - 1;
+            $bb = \ord(\substr($string, $walkPos, 1));
+            $ww = 1;
+            if ($bb >= 192) {
+                if ($bb < 224) {
+                    if ($walkPos + 1 < $byteLen) {
+                        $ww = 2;
+                    }
+                }
+            }
+            if ($bb >= 224) {
+                if ($bb < 240) {
+                    if ($walkPos + 2 < $byteLen) {
+                        $ww = 3;
+                    }
+                }
+            }
+            if ($bb >= 240) {
+                if ($bb < 248) {
+                    if ($walkPos + 3 < $byteLen) {
+                        $ww = 4;
+                    }
+                }
+            }
+            $walkPos = $walkPos + $ww;
+            $take = $take - 1;
         }
+        $sliceEnd = $walkPos;
         $n = $sliceEnd - $sliceStart;
 
         return \substr($string, $sliceStart, $n);
