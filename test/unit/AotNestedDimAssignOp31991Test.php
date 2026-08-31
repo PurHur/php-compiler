@@ -18,6 +18,8 @@ require_once __DIR__.'/../LlvmToolchain.php';
  */
 final class AotNestedDimAssignOp31991Test extends TestCase
 {
+    private const EXPECT = "nest=1\nidx=1\n";
+
     public function testVmNestedDimAssignOpUndefKeys(): void
     {
         $runtime = new Runtime();
@@ -48,13 +50,25 @@ final class AotNestedDimAssignOp31991Test extends TestCase
             $runOut = [];
             exec(escapeshellarg($bin).' 2>&1', $runOut, $runRc);
             $this->assertSame(0, $runRc, implode("\n", $runOut));
-            $merged = implode("\n", $runOut)."\n";
-            $this->assertStringContainsString('Undefined array key "x"', $merged);
-            $this->assertStringContainsString('Undefined array key "y"', $merged);
-            $this->assertStringContainsString('Undefined array key 0', $merged);
-            $this->assertStringContainsString('Undefined array key 1', $merged);
-            $this->assertStringContainsString("nest=1\n", $merged);
-            $this->assertStringContainsString("idx=1\n", $merged);
+            $stdout = array_values(array_filter(
+                $runOut,
+                static fn (string $line): bool => !str_starts_with($line, 'PHP Warning:')
+                    && !str_starts_with($line, 'PHP Notice:')
+                    && !str_starts_with($line, 'PHP Deprecated:')
+            ));
+            $this->assertSame(self::EXPECT, implode("\n", $stdout)."\n");
+            $warnings = array_filter(
+                $runOut,
+                static fn (string $line): bool => str_contains($line, 'Undefined array key')
+            );
+            $this->assertCount(4, $warnings, implode("\n", $runOut));
+            $combined = implode("\n", $runOut);
+            $this->assertStringContainsString('Undefined array key "x"', $combined);
+            $this->assertStringContainsString('Undefined array key "y"', $combined);
+            $this->assertStringContainsString('Undefined array key 0', $combined);
+            $this->assertStringContainsString('Undefined array key 1', $combined);
+            $this->assertStringContainsString('i31991_nested_dim_assign_op_undef.php on line 5', $combined);
+            $this->assertStringContainsString('i31991_nested_dim_assign_op_undef.php on line 8', $combined);
         } finally {
             @unlink($bin);
         }
