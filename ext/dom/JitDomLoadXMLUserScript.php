@@ -1151,6 +1151,9 @@ final class JitDomLoadXMLUserScript
         // not DomRegistry — stamp when DTD / xml:id actually registers (#34821).
         if (null !== $idAttrName) {
             DomUserScriptAttributeCacheLlvm::markIdBearingLiteral('', $idAttrName, true);
+            if ('id' === $idAttrName || 'xml:id' === $idAttrName) {
+                DomUserScriptAttributeCacheLlvm::storeIdBearingGlobal($context, true);
+            }
         }
         self::storeElementInIdMap($context, $document, $idVal, $element);
         $idStr = $context->builder->load($context->constantStringFromString($idVal));
