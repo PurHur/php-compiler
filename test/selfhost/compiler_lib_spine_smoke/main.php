@@ -373,6 +373,7 @@ require_once __DIR__.'/../../../ext/dom/DocumentValidate.php';
 require_once __DIR__.'/../../../ext/dom/DocumentXInclude.php';
 require_once __DIR__.'/../../../ext/dom/DomAdjacentPositionEnum.php';
 require_once __DIR__.'/../../../ext/dom/DomC14NJitHelper.php';
+require_once __DIR__.'/../../../ext/dom/DomCharacterDataJitArgc.php';
 require_once __DIR__.'/../../../ext/dom/DomClassConstants.php';
 require_once __DIR__.'/../../../ext/dom/DomConstants.php';
 require_once __DIR__.'/../../../ext/dom/DomContainsJitHelper.php';
