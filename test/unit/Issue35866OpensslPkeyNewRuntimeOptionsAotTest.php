@@ -56,7 +56,7 @@ final class Issue35866OpensslPkeyNewRuntimeOptionsAotTest extends TestCase
         $this->assertFileExists($bin);
         try {
             $runOut = [];
-            exec(escapeshellarg($bin).' 2>/dev/null', $runOut, $runRc);
+            exec(escapeshellarg($bin).' 2>&1', $runOut, $runRc);
             $this->assertSame(0, $runRc, implode("\n", $runOut));
             $this->assertSame($vmOut, implode("\n", $runOut)."\n");
         } finally {
