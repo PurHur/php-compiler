@@ -119,7 +119,7 @@ final class JitDomGetElementById
 
             $context->builder->positionAtEnd($cacheHit);
             // Single-slot cache is invalidated on detach; temps may lack parent slots (#19870).
-            $hitBoxed = self::boxObjectResult($context, $cached);
+            $hitBoxed = self::boxObjectResultIfIdBearing($context, $cached);
             $context->builder->store(JitValueBox::normalizeValuePtr($context, $hitBoxed), $resultSlot);
             $context->builder->branch($doneBlock);
 
@@ -167,7 +167,7 @@ final class JitDomGetElementById
                 $context->lookupFunction('__value__readObject'),
                 $mapValPtr
             );
-            $mapBoxed = self::boxObjectIfConnected($context, $mapObj);
+            $mapBoxed = self::boxObjectIfConnectedAndIdBearing($context, $mapObj);
             $context->builder->store(JitValueBox::normalizeValuePtr($context, $mapBoxed), $resultSlot);
             $context->builder->branch($doneBlock);
 
@@ -291,11 +291,17 @@ final class JitDomGetElementById
         $context->builder->branchIf($isMatch, $hitBlock, $missBlock);
 
         $context->builder->positionAtEnd($hitBlock);
-        $element = self::materializeParsedElement($context, $receiver, $parsed);
-        JitDomLoadHTMLUserScript::rememberLastGetElementByIdHit($parsed);
-        $boxed = self::boxObjectResult($context, $element);
-        $context->builder->store(JitValueBox::normalizeValuePtr($context, $boxed), $resultSlot);
-        $context->builder->branch($doneBlock);
+        if (!DomUserScriptAttributeCacheLlvm::isIdBearingLiteral('', 'id')) {
+            $boxedNull = self::boxNullResult($context);
+            $context->builder->store(JitValueBox::normalizeValuePtr($context, $boxedNull), $resultSlot);
+            $context->builder->branch($doneBlock);
+        } else {
+            $element = self::materializeParsedElement($context, $receiver, $parsed);
+            JitDomLoadHTMLUserScript::rememberLastGetElementByIdHit($parsed);
+            $boxed = self::boxObjectResult($context, $element);
+            $context->builder->store(JitValueBox::normalizeValuePtr($context, $boxed), $resultSlot);
+            $context->builder->branch($doneBlock);
+        }
 
         $context->builder->positionAtEnd($missBlock);
         $boxedNull = self::boxNullResult($context);
@@ -439,6 +445,11 @@ final class JitDomGetElementById
             return null;
         }
 
+        // Plain XML id imported into HTML is not ID-bearing until remove+set (#23514).
+        if (!DomUserScriptAttributeCacheLlvm::isIdBearingLiteral('', 'id')) {
+            return self::boxNullResult($context);
+        }
+
         // php-src html5 parser: HTML element nodeName/tagName are uppercase (#19580).
         if (null !== $htmlFromCfs && !$ownsLoadHtml) {
             $parsed['tag'] = strtoupper($parsed['tag']);
@@ -472,6 +483,72 @@ final class JitDomGetElementById
             $parsed['tag'],
             $parsed['text']
         );
+    }
+
+    private static function boxObjectResultIfIdBearing(Context $context, Value $element): Value
+    {
+        $i1 = $context->getTypeFromString('int1');
+        $idBearing = DomUserScriptAttributeCacheLlvm::loadIdBearingGlobal($context);
+        $isBearing = $context->builder->icmp(
+            \PHPLLVM\Builder::INT_EQ,
+            $idBearing,
+            $i1->constInt(1, false)
+        );
+        $okBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_idbearing_ok');
+        $nullBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_idbearing_null');
+        $doneBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_idbearing_done');
+        $resultSlot = \PHPCompiler\JIT\BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__*'));
+        $context->builder->branchIf($isBearing, $okBlock, $nullBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $context->builder->store(
+            JitValueBox::normalizeValuePtr($context, self::boxObjectResult($context, $element)),
+            $resultSlot
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($nullBlock);
+        $context->builder->store(
+            JitValueBox::normalizeValuePtr($context, self::boxNullResult($context)),
+            $resultSlot
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $context->builder->load($resultSlot);
+    }
+
+    private static function boxObjectIfConnectedAndIdBearing(Context $context, Value $element): Value
+    {
+        $connected = self::boxObjectIfConnected($context, $element);
+        $i1 = $context->getTypeFromString('int1');
+        $idBearing = DomUserScriptAttributeCacheLlvm::loadIdBearingGlobal($context);
+        $isBearing = $context->builder->icmp(
+            \PHPLLVM\Builder::INT_EQ,
+            $idBearing,
+            $i1->constInt(1, false)
+        );
+        $okBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_map_idbearing_ok');
+        $nullBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_map_idbearing_null');
+        $doneBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_map_idbearing_done');
+        $resultSlot = \PHPCompiler\JIT\BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__*'));
+        $context->builder->branchIf($isBearing, $okBlock, $nullBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $context->builder->store(JitValueBox::normalizeValuePtr($context, $connected), $resultSlot);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($nullBlock);
+        $context->builder->store(
+            JitValueBox::normalizeValuePtr($context, self::boxNullResult($context)),
+            $resultSlot
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $context->builder->load($resultSlot);
     }
 
     private static function boxObjectResult(Context $context, Value $element): Value
