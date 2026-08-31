@@ -929,7 +929,6 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
     public function testNestedJitConsumersEnsureMallocFamilyAfterLibcExternDrop(): void
     {
         foreach ([
-            'lib/JIT/Builtin/MemoryManager/Native.php',
             'lib/JIT/Builtin/PackArgvSerialize.php',
             'lib/JIT/Builtin/PregExpandRuntime.php',
             'lib/JIT/Builtin/ObStorageLlvm.php',
@@ -979,6 +978,9 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
                 }
                 $path = $file->getPathname();
                 if (str_ends_with($path, '/lib/JIT/LibcExtern.php')) {
+                    continue;
+                }
+                if (str_ends_with($path, '/lib/JIT/Builtin/MemoryManager/Native.php')) {
                     continue;
                 }
                 $source = (string) file_get_contents($path);

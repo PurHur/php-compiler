@@ -15,6 +15,8 @@ namespace PHPCompiler\JIT;
  * {@see ensureSyscall} owns syscall(2) for EMBED write trampoline; MCJIT echo uses
  * {@see McjitEmbedHostEcho} function-pointer globals (#21124), not __phpc_host_* decls.
  * {@see ensureSetlocaleDecl} owns setlocale(3) for LocaleStartupRuntime (#36074 / #30789).
+ * {@see ensureMallocFamily} owns malloc/realloc/free; Context::lookupFunction lazy-links
+ * (#36100 / peer #36074) so thin hello-world skips libc alloc decls during type register.
  */
 final class LibcExtern
 {
@@ -492,11 +494,8 @@ final class LibcExtern
             ['realloc', $i8p, [$i8p, $sizeT]],
             ['free', $void, [$i8p]],
         ] as [$name, $ret, $params]) {
-            try {
-                $context->lookupFunction($name);
-
+            if (null !== $context->tryGetRegisteredFunction($name)) {
                 continue;
-            } catch (\LogicException $e) {
             }
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn) {

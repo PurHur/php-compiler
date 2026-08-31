@@ -3309,6 +3309,8 @@ class Context {
         // Lazy libc exit(3)/abort(3) — Type::register no longer always-on ensures (#35428 /
         // leftover #33267 / peer #35392). ~292 call sites lookup without a nearby ensure.
         // Lazy setlocale(3) — LocaleStartupRuntime ensures before use (#36074 / #30789).
+        // Lazy malloc/realloc/free — MemoryManager\Native::implement + NestedJIT leaves
+        // (#36100 / peer #32273); register() no longer eager-ensures the family.
         if ('exit' === $name || 'abort' === $name) {
             LibcExtern::ensureExitAbort($this);
             if (isset($this->functionScope[$name])) {
@@ -3317,6 +3319,12 @@ class Context {
         }
         if ('setlocale' === $name) {
             LibcExtern::ensureSetlocaleDecl($this);
+            if (isset($this->functionScope[$name])) {
+                return $this->functionScope[$name];
+            }
+        }
+        if ('malloc' === $name || 'realloc' === $name || 'free' === $name) {
+            LibcExtern::ensureMallocFamily($this);
             if (isset($this->functionScope[$name])) {
                 return $this->functionScope[$name];
             }
