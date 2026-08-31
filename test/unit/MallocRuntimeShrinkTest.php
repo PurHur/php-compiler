@@ -15,12 +15,14 @@ final class MallocRuntimeShrinkTest extends TestCase
     public function testMemoryManagerNativeDeclaresMallocFamilyModuleLocally(): void
     {
         $native = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MemoryManager/Native.php');
-        $this->assertStringContainsString('LibcExtern::ensureMallocFamily', $native);
+        $this->assertStringContainsString('#36100', $native);
         $this->assertStringContainsString('#32273', $native);
         $this->assertStringContainsString("lookupFunction('malloc')", $native);
+        $this->assertStringNotContainsString('ensureMallocFamily', $native);
         $pre = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MemoryManager/Native.pre');
-        $this->assertStringContainsString('LibcExtern::ensureMallocFamily', $pre);
+        $this->assertStringContainsString('#36100', $pre);
         $this->assertStringContainsString('#32273', $pre);
+        $this->assertStringNotContainsString('ensureMallocFamily', $pre);
     }
 
     public function testLibcExternDropsAlwaysOnMallocFamily(): void
