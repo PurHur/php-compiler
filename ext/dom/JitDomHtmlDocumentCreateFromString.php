@@ -150,6 +150,9 @@ final class JitDomHtmlDocumentCreateFromString
         JitDomHtmlDocumentSaveHtml::rememberCreateFromString($source, 0);
         // Pair getElementById with this CFS literal — loadHTML's id-map path is cold (#35792).
         JitDomLoadHTMLUserScript::rememberCompileTimeHtml($source);
+        // HTML id= is ID-bearing (peer loadHTML materialize; #23514 applies to XML import only).
+        DomUserScriptAttributeCacheLlvm::markIdBearingLiteral('', 'id', true);
+        DomUserScriptAttributeCacheLlvm::storeIdBearingGlobal($context, true);
         // textContent fetch reads property slots when last load was pure user-script (#24121 / #27300).
         JitDomLoadXMLUserScript::markLastLoadPureUserScript();
         JitDomLoadXMLUserScript::rememberLivingDocumentClass(self::CLASS_DOCUMENT);
