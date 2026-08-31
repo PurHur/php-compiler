@@ -12,8 +12,8 @@ namespace PHPCompiler\ext\mbstring;
  * SIGSEGV under thin AOT when several leaves share a module).
  *
  * Byte access via $value[$i] — NestedJIT substr() mis-fires under thin AOT (#34338).
- * Rtrim NBSP uses a C2-hold deferral — `$last = $i - 1` / `$last === $n - 1` miscompile
- * under thin AOT (#34396 leftover).
+ * Copy `$payload = $value.''` before any loop — NestedJIT zeros param slots (#34881 peer).
+ * Rtrim walks backward with `$keep` / `$pos - 1` — forward `$last = $i` miscompiles (#34396).
  *
  * Runtime encoding via {@see assertEncodingArgv} (#35199 leftover of #34379 / peer #35161).
  *
@@ -59,40 +59,44 @@ final class MbTrimJitHelper
         // php-src mb_trim uses single-byte trim for ASCII/8BIT (VmMbstring::trimString).
         unset($encoding);
 
-        return self::trimRightBody(self::trimLeftBody($value));
+        $payload = $value.'';
+
+        return self::trimRightBody(self::trimLeftBody($payload));
     }
 
     public static function ltrimDefault(string $value, string $encoding): string
     {
         unset($encoding);
 
-        return self::trimLeftBody($value);
+        return self::trimLeftBody($value.'');
     }
 
     public static function rtrimDefault(string $value, string $encoding): string
     {
         unset($encoding);
 
-        return self::trimRightBody($value);
+        return self::trimRightBody($value.'');
     }
 
     public static function trimChars(string $value, string $what): string
     {
-        if ('' === $what) {
-            return $value;
+        $payload = $value.'';
+        $chars = $what.'';
+        if ('' === $chars) {
+            return $payload;
         }
 
-        return self::trimCharsRightBody(self::trimCharsLeftBody($value, $what), $what);
+        return self::trimCharsRightBody(self::trimCharsLeftBody($payload, $chars), $chars);
     }
 
-    private static function trimLeftBody(string $value): string
+    private static function trimLeftBody(string $payload): string
     {
-        $n = \strlen($value);
+        $n = \strlen($payload);
         $out = '';
         $started = 0;
         $prev = '';
         for ($i = 0; $i < $n; ++$i) {
-            $c = $value[$i];
+            $c = $payload[$i];
             $ws = 0;
             if (' ' === $c || "\t" === $c || "\n" === $c || "\r" === $c
                 || "\0" === $c || "\x0B" === $c) {
@@ -130,37 +134,31 @@ final class MbTrimJitHelper
         return $out;
     }
 
-    private static function trimRightBody(string $value): string
+    private static function trimRightBody(string $payload): string
     {
-        $n = \strlen($value);
-        $last = -1;
-        $pendingC2 = -1;
-        for ($i = 0; $i < $n; ++$i) {
-            $c = $value[$i];
-            if ($pendingC2 >= 0) {
-                if ("\xA0" === $c) {
-                    $pendingC2 = -1;
-                } else {
-                    $last = $pendingC2;
-                    $pendingC2 = -1;
-                    if (0 === self::defaultWsFlag($c)) {
-                        $last = $i;
-                    }
-                }
-            } elseif ("\xC2" === $c) {
-                $pendingC2 = $i;
-            } elseif (0 === self::defaultWsFlag($c)) {
-                $last = $i;
-            }
-        }
-        if ($pendingC2 >= 0) {
-            $last = $pendingC2;
-        }
-        if ($last < 0) {
+        $n = \strlen($payload);
+        if ($n <= 0) {
             return '';
         }
+        $keep = $n + 0;
+        $pos = $n - 1;
+        $done = 0;
+        $guard = $n + 1;
+        while ($pos >= 0 && $guard > 0 && 0 === $done) {
+            $guard = $guard - 1;
+            $c = $payload[$pos];
+            if ("\xA0" === $c && $pos > 0 && "\xC2" === $payload[$pos - 1]) {
+                $keep = $pos - 1;
+                $pos = $pos - 2;
+            } elseif (1 === self::defaultWsFlag($c)) {
+                $keep = $pos + 0;
+                $pos = $pos - 1;
+            } else {
+                $done = 1;
+            }
+        }
 
-        return self::copyPrefix($value, $last + 1);
+        return self::copyPrefix($payload, $keep);
     }
 
     private static function defaultWsFlag(string $c): int
@@ -173,14 +171,14 @@ final class MbTrimJitHelper
         return 0;
     }
 
-    private static function trimCharsLeftBody(string $value, string $what): string
+    private static function trimCharsLeftBody(string $payload, string $what): string
     {
-        $n = \strlen($value);
+        $n = \strlen($payload);
         $wlen = \strlen($what);
         $out = '';
         $started = 0;
         for ($i = 0; $i < $n; ++$i) {
-            $c = $value[$i];
+            $c = $payload[$i];
             if (0 === $started) {
                 $hit = 0;
                 for ($k = 0; $k < $wlen; ++$k) {
@@ -200,13 +198,20 @@ final class MbTrimJitHelper
         return $out;
     }
 
-    private static function trimCharsRightBody(string $value, string $what): string
+    private static function trimCharsRightBody(string $payload, string $what): string
     {
-        $n = \strlen($value);
+        $n = \strlen($payload);
         $wlen = \strlen($what);
-        $last = -1;
-        for ($i = 0; $i < $n; ++$i) {
-            $c = $value[$i];
+        if ($n <= 0) {
+            return '';
+        }
+        $keep = $n + 0;
+        $pos = $n - 1;
+        $done = 0;
+        $guard = $n + 1;
+        while ($pos >= 0 && $guard > 0 && 0 === $done) {
+            $guard = $guard - 1;
+            $c = $payload[$pos];
             $hit = 0;
             for ($k = 0; $k < $wlen; ++$k) {
                 if ($what[$k] === $c) {
@@ -214,21 +219,22 @@ final class MbTrimJitHelper
                 }
             }
             if (0 === $hit) {
-                $last = $i;
+                $done = 1;
+            } else {
+                $keep = $pos + 0;
+                $pos = $pos - 1;
             }
         }
-        if ($last < 0) {
-            return '';
-        }
 
-        return self::copyPrefix($value, $last + 1);
+        return self::copyPrefix($payload, $keep);
     }
 
-    private static function copyPrefix(string $value, int $len): string
+    private static function copyPrefix(string $payload, int $len): string
     {
+        $want = $len + 0;
         $out = '';
-        for ($i = 0; $i < $len; ++$i) {
-            $out .= $value[$i];
+        for ($i = 0; $i < $want; ++$i) {
+            $out .= $payload[$i];
         }
 
         return $out;
