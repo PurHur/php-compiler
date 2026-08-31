@@ -344,11 +344,7 @@ final class DomNodeLiveMutationRuntime
                 foreach ($extraArgs as $arg) {
                     $childObj = self::mutationArgObject($context, $arg);
                     self::assertTreeMutationChildBeforeLiveSlots($context, $parentObj, $childObj);
-                    JitDomAppendChildLiveSlots::sync(
-                        $context,
-                        $parentObj,
-                        $childObj
-                    );
+                    self::syncAppendOrExpandFragment($context, $parentObj, $arg, $childObj);
                     self::clearFragmentCompileTimeAfterExpand($arg);
                     DomUserScriptLiveTagListLlvm::incrementForChildArg($context, $arg);
                 }
@@ -379,6 +375,7 @@ final class DomNodeLiveMutationRuntime
                     $receiver->compileTimeDomNodeListLength = \count(
                         JitDomCreateDocumentFragment::$lastChildren
                     );
+                    $receiver->compileTimeDomFragmentChildren = JitDomCreateDocumentFragment::$lastChildren;
                     $fragInner = self::fragmentInnerXmlFromLastChildren();
                     $receiver->compileTimeDomInnerXml = $fragInner;
                     // saveXML($fragment) reads INNER_XML, not live child walk (#35997).
@@ -463,12 +460,12 @@ final class DomNodeLiveMutationRuntime
                     $context->builder->positionAtEnd($bbAlreadyFirst);
                     $context->builder->branch($bbDone);
                     $context->builder->positionAtEnd($bbDoInsert);
-                    JitDomInsertBeforeLiveSlots::sync($context, $parentObj, $childObj, $first);
+                    self::syncAppendOrExpandFragment($context, $parentObj, $arg, $childObj, $first);
                     self::clearFragmentCompileTimeAfterExpand($arg);
                     $context->builder->branch($bbDone);
 
                     $context->builder->positionAtEnd($bbAppend);
-                    JitDomAppendChildLiveSlots::sync($context, $parentObj, $childObj);
+                    self::syncAppendOrExpandFragment($context, $parentObj, $arg, $childObj);
                     self::clearFragmentCompileTimeAfterExpand($arg);
                     $context->builder->branch($bbDone);
 
@@ -1253,6 +1250,7 @@ final class DomNodeLiveMutationRuntime
         }
         $child->compileTimeDomNodeListLength = 0;
         $child->compileTimeDomInnerXml = '';
+        $child->compileTimeDomFragmentChildren = [];
     }
 
     /**
@@ -1475,6 +1473,42 @@ final class DomNodeLiveMutationRuntime
         }
 
         throw new \LogicException('DOM object live-mutation arg must be object or value box');
+    }
+
+    /**
+     * User-script DocumentFragment expand: prefer compile-time child specs over LLVM
+     * firstChild walk (#35518 re-#35461 / #33312).
+     */
+    private static function syncAppendOrExpandFragment(
+        Context $context,
+        Value $parentObj,
+        Variable $arg,
+        Value $childObj,
+        ?Value $refChild = null
+    ): void {
+        $specs = $arg->compileTimeDomFragmentChildren ?? null;
+        if (
+            JitDomCreateDocumentFragment::TAG_KIND === ($arg->compileTimeDomTagName ?? null)
+            && null !== $specs
+            && [] !== $specs
+        ) {
+            JitDomAppendChildLiveSlots::expandFragmentFromCompileTimeSpecs(
+                $context,
+                $parentObj,
+                $childObj,
+                $specs,
+                null !== $refChild ? 'insertBefore' : 'append',
+                $refChild
+            );
+            $arg->compileTimeDomFragmentChildren = [];
+
+            return;
+        }
+        if (null !== $refChild) {
+            JitDomInsertBeforeLiveSlots::sync($context, $parentObj, $childObj, $refChild);
+        } else {
+            JitDomAppendChildLiveSlots::sync($context, $parentObj, $childObj);
+        }
     }
 
     private static int $treeMutAssertSeq = 0;

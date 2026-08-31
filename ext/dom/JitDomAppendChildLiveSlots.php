@@ -487,6 +487,47 @@ final class JitDomAppendChildLiveSlots
     }
 
     /**
+     * Expand a user-script DocumentFragment from compile-time child specs (#35518 / #33312).
+     *
+     * appendChild onto a fragment records children in {@see JITVariable::$compileTimeDomFragmentChildren}
+     * but LLVM firstChild may stay null — {@see expandFragmentChildrenAppend} then no-ops or
+     * SIGSEGVs on stale boxes. Materialize each spec and link via syncNonFragment instead.
+     *
+     * @param list<array{kind: string, data: string, content?: string, inner?: string}> $childSpecs
+     */
+    public static function expandFragmentFromCompileTimeSpecs(
+        Context $context,
+        Value $parent,
+        Value $fragment,
+        array $childSpecs,
+        string $mode = 'append',
+        ?Value $refChild = null
+    ): void {
+        BasicBlockHelper::ensureOpenInsertBlock($context, self::tag('dom_acls_frag_ct'));
+        self::ensureLayout($context);
+
+        $nullBox = self::nullValueVar($context);
+        self::storeChildEdge($context, $fragment, VmDom::PROP_FIRST_CHILD, $nullBox);
+        self::storeChildEdge($context, $fragment, VmDom::PROP_LAST_CHILD, $nullBox);
+        self::zeroChildNodesLengthInPlace($context, $fragment);
+        JitDomCreateElement::storeUserScriptInnerXml($context, $fragment, '');
+
+        foreach ($childSpecs as $node) {
+            $child = JitDomCreateDocumentFragment::materializeChildFromSpec($context, $node);
+            if (null === $child) {
+                continue;
+            }
+            if ('insertBefore' === $mode && null !== $refChild) {
+                JitDomInsertBeforeLiveSlots::syncNonFragment($context, $parent, $child, $refChild);
+            } else {
+                self::syncNonFragment($context, $parent, $child);
+            }
+        }
+
+        self::rebuildUserScriptInnerXmlFromElementChildren($context, $parent);
+    }
+
+    /**
      * Move fragment children before $refChild (php-src insertFragmentChildrenBefore) (#33312 / #33327).
      *
      * Prepend/append-only INNER_XML updates were wrong for middle refs (#33327):
@@ -606,8 +647,11 @@ final class JitDomAppendChildLiveSlots
         $skip = $context->builder->or($isDoc, $isFrag);
         $bbSkip = BasicBlockHelper::append($context, self::tag('dom_rb_skip'));
         $bbDo = BasicBlockHelper::append($context, self::tag('dom_rb_do'));
+        $bbDone = BasicBlockHelper::append($context, self::tag('dom_rc_rb_done'));
         $context->builder->branchIf($skip, $bbSkip, $bbDo);
+
         $context->builder->positionAtEnd($bbSkip);
+        $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbDo);
         self::ensureLayout($context);
@@ -647,7 +691,6 @@ final class JitDomAppendChildLiveSlots
         $context->builder->store($first, $curAlloca);
         $bbLoop = BasicBlockHelper::append($context, self::tag('dom_rc_rb_loop'));
         $bbBody = BasicBlockHelper::append($context, self::tag('dom_rc_rb_body'));
-        $bbDone = BasicBlockHelper::append($context, self::tag('dom_rc_rb_done'));
         $context->builder->branch($bbLoop);
 
         $context->builder->positionAtEnd($bbLoop);

@@ -176,6 +176,45 @@ final class JitDomCreateDocumentFragment
         }
     }
 
+    /**
+     * Materialize one compile-time fragment child for expand/import (#35881 / #35518).
+     *
+     * @param array{kind: string, data: string, content?: string, inner?: string} $node
+     */
+    public static function materializeChildFromSpec(Context $context, array $node): ?Value
+    {
+        $kind = $node['kind'] ?? '';
+        if ('comment' === $kind) {
+            return JitDomCreateComment::materialize($context, $node['data']);
+        }
+        if ('cdata' === $kind) {
+            return JitDomCreateCDATASection::materialize($context, $node['data']);
+        }
+        if ('pi' === $kind) {
+            return JitDomCreateProcessingInstruction::materialize(
+                $context,
+                $node['data'],
+                $node['content'] ?? ''
+            );
+        }
+        if ('text' === $kind) {
+            return JitDomCreateTextNode::materialize($context, $node['data'] ?? '');
+        }
+        if ('element' === $kind) {
+            $tag = $node['data'] ?? '';
+            $childInner = $node['inner'] ?? '';
+            $text = '' === $childInner
+                ? ''
+                : DomParseSimpleXmlJitHelper::rootTextContentArgv(
+                    '<'.$tag.'>'.$childInner.'</'.$tag.'>'
+                );
+
+            return JitDomCreateElement::materializeElementWithTextContent($context, $tag, $text);
+        }
+
+        return null;
+    }
+
     /** Fresh DocumentFragment stand-in for importNode deep-copy (#35881). */
     public static function materialize(Context $context, JITVariable $documentVar): Value
     {
