@@ -14,7 +14,8 @@ final class JitXmlReaderMethod
     public static function invoke(Context $context, string $methodLc, JITVariable ...$args): Value
     {
         $result = match ($methodLc) {
-            'fromstring', 'xml' => JitXmlReaderUserScript::tryFromString($context, ...$args),
+            'fromstring' => JitXmlReaderUserScript::tryFromString($context, 'fromString', ...$args),
+            'xml' => JitXmlReaderUserScript::tryFromString($context, 'XML', ...$args),
             // leftover of fromUri/fromString (#35907 / #27299) — php-src zim_xmlreader_open
             'open' => JitXmlReaderUserScript::tryOpen($context, ...$args),
             // leftover of fromString (#35900 / #27299) — php-src zim_xmlreader_fromUri

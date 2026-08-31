@@ -75,8 +75,52 @@ final class XmlReaderOpenAotTest extends TestCase
         $this->assertStringContainsString('tryOpen', $method);
         $user = (string) file_get_contents(dirname(__DIR__, 2).'/ext/xmlreader/JitXmlReaderUserScript.php');
         $this->assertStringContainsString('function tryOpen', $user);
+        $this->assertStringContainsString('emitEmptyUriValueError', $user);
         $this->assertFileExists(dirname(__DIR__, 2).'/lib/JIT/Call/XmlReaderOpen.php');
         $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/lib/AOT/runtime/xmlreader_open.c');
         $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/runtime/xmlreader_open.c');
+    }
+
+    /**
+     * @group llvm
+     * @group aot
+     */
+    public function testAotEmptyUriMessageParity(): void
+    {
+        if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $root = dirname(__DIR__, 2);
+        $src = $root.'/test/repro/xmlreader_open_empty_uri_message_parity.php';
+
+        $vm = [];
+        exec(
+            escapeshellarg(PHP_BINARY).' '.escapeshellarg($root.'/bin/vm.php').' '
+            .escapeshellarg($src).' 2>&1',
+            $vm,
+            $vmRc
+        );
+        $this->assertSame(0, $vmRc, implode("\n", $vm));
+        $vmOut = implode("\n", $vm)."\n";
+        $expected = "ValueError:XMLReader::open(): Argument #1 (\$uri) cannot be empty\n"
+            ."ValueError:XMLReader::XML(): Argument #1 (\$source) cannot be empty\n"
+            ."ValueError:XMLReader::open(): Argument #1 (\$uri) cannot be empty\n";
+        $this->assertSame($expected, $vmOut);
+
+        $bin = sys_get_temp_dir().'/phpc_xr_empty_uri_'.getmypid().'.bin';
+        $compile = 'env PHP_COMPILER_HELPER_RUNTIME_O=0 '
+            .escapeshellarg(PHP_BINARY).' '.escapeshellarg($root.'/bin/compile.php')
+            .' -o '.escapeshellarg($bin).' '.escapeshellarg($src).' 2>&1';
+        exec($compile, $compileOut, $compileRc);
+        $this->assertSame(0, $compileRc, implode("\n", $compileOut));
+        $this->assertFileExists($bin);
+        try {
+            $runOut = [];
+            exec(escapeshellarg($bin).' 2>&1', $runOut, $runRc);
+            $this->assertSame(0, $runRc, implode("\n", $runOut));
+            $this->assertSame($vmOut, implode("\n", $runOut)."\n");
+        } finally {
+            @unlink($bin);
+        }
     }
 }

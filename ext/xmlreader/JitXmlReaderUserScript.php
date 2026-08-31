@@ -13,6 +13,7 @@ use PHPCompiler\ext\dom\JitDomDocumentElement;
 use PHPCompiler\ext\xml\VmXml;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitStringCompare;
 use PHPCompiler\JIT\JitValueBox;
@@ -154,7 +155,7 @@ final class JitXmlReaderUserScript
         return self::$lastEvents;
     }
 
-    public static function tryFromString(Context $context, JITVariable ...$args): ?Value
+    public static function tryFromString(Context $context, string $factoryMethod, JITVariable ...$args): ?Value
     {
         if (!self::isUserScriptAot() || \count($args) < 1) {
             return null;
@@ -172,17 +173,20 @@ final class JitXmlReaderUserScript
                 || JITVariable::TYPE_VALUE === $args[0]->type)
         ) {
             $lit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
-            if (null !== $lit && '' !== $lit) {
+            if (null !== $lit) {
                 $instanceReceiver = $args[0];
                 self::$lastCallWasInstance = true;
             }
         }
-        if (null === $lit || '' === $lit) {
+        if (null === $lit) {
             $lit = JitStringBuiltinArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString;
             $instanceReceiver = null;
             self::$lastCallWasInstance = false;
         }
-        if (null === $lit || '' === $lit) {
+        if ('' === $lit) {
+            return self::emitEmptySourceValueError($context, $factoryMethod);
+        }
+        if (null === $lit) {
             return null;
         }
 
@@ -207,13 +211,13 @@ final class JitXmlReaderUserScript
                 || JITVariable::TYPE_VALUE === $args[0]->type)
         ) {
             $uri = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
-            if (null !== $uri && '' !== $uri && !str_starts_with($uri, '__phpc_')) {
+            if (null !== $uri && !str_starts_with($uri, '__phpc_')) {
                 $instanceReceiver = $args[0];
                 self::$lastCallWasInstance = true;
                 self::$lastResultIsObject = false;
             }
         }
-        if (null === $uri || '' === $uri || str_starts_with((string) $uri, '__phpc_')) {
+        if (null === $uri || str_starts_with((string) $uri, '__phpc_')) {
             $uri = JitStringBuiltinArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString;
             $instanceReceiver = null;
             self::$lastCallWasInstance = false;
@@ -223,7 +227,7 @@ final class JitXmlReaderUserScript
             return null;
         }
         if ('' === $uri) {
-            throw new \ValueError('XMLReader::open(): Argument #1 ($uri) cannot be empty');
+            return self::emitEmptyUriValueError($context);
         }
         $xml = @file_get_contents($uri);
         if (false === $xml) {
@@ -2025,6 +2029,32 @@ final class JitXmlReaderUserScript
         );
 
         return JitValueBox::normalizeValuePtr($context, $slot);
+    }
+
+    /** Catchable ValueError for compile-time empty open('') — #24810 / php_xmlreader.c. */
+    private static function emitEmptyUriValueError(Context $context): Value
+    {
+        ExceptionBridge::ensureLinked($context);
+        ExceptionBridge::emitValueErrorAndAbort(
+            $context,
+            'XMLReader::open(): Argument #1 ($uri) cannot be empty'
+        );
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'xmlreader_open_empty_uri_err');
+
+        return self::nullValueBox($context);
+    }
+
+    /** Catchable ValueError for compile-time empty XML()/fromString('') — #24810. */
+    private static function emitEmptySourceValueError(Context $context, string $factoryMethod): Value
+    {
+        ExceptionBridge::ensureLinked($context);
+        ExceptionBridge::emitValueErrorAndAbort(
+            $context,
+            'XMLReader::'.$factoryMethod.'(): Argument #1 ($source) cannot be empty'
+        );
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'xmlreader_empty_source_err');
+
+        return self::nullValueBox($context);
     }
 
     /** Boxed __value__* string constant for call results. */
