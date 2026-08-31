@@ -51,6 +51,7 @@ class Value extends Type {
         $this->implementValueWriteString();
         $this->implementValueWriteNull();
         $this->implementValueDelref();
+        // __value__writeBool deferred — Context::lookupFunction ensureLinked (#36108).
     }
 
     public function initialize(): void {

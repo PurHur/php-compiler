@@ -26,7 +26,11 @@ final class VmValueBoxWriteBool
             return;
         }
 
-        $fn = $context->lookupFunction('__value__writeBool');
+        $fn = $context->tryGetRegisteredFunction('__value__writeBool')
+            ?? $context->module->getNamedFunction('__value__writeBool');
+        if (null === $fn) {
+            throw new \LogicException('__value__writeBool shell missing before implement (#36108)');
+        }
         self::emitWriteBool($context, $fn);
         $context->registerFunction('__value__writeBool', $fn);
         $context->builder->clearInsertionPosition();

@@ -3303,6 +3303,11 @@ class Context {
     }
 
     public function lookupFunction(string $name): PHPLLVM\Value\Function_ {
+        // Lazy __value__writeBool — Value::implement no longer eager-implements (#36108 /
+        // peer #36100 malloc). Thin hello-world must not emit bool-box LLVM during init.
+        if ('__value__writeBool' === $name) {
+            Builtin\ValueBoxWriteBoolJit::ensureLinked($this);
+        }
         if (isset($this->functionScope[$name])) {
             return $this->functionScope[$name];
         }
