@@ -1,13 +1,13 @@
 {
-    "version": 1,
-    "generated_at": "2026-08-31T10:07:37+00:00",
-    "arch": "x86_64-linux",
-    "role": "committed per-arch split-compilation helper units (#15889) \u2014 consumed via PHP_COMPILER_HELPER_RUNTIME_O=1; stale units are skipped per fingerprint and recompiled locally",
-    "core_fingerprint": "3f2bbab566b4a543aea9",
-    "llvm_identity_token": "lib:df0be984ee08e28d74ef02207ab33225a55ab237986747d6fe995028e2ec67b4",
-    "unit_count": 446,
-    "published_fresh": 31,
-    "kept_live_unpublished": 0,
-    "total_bytes": 828772266,
-    "refresh": "php script/publish-helper-units-prelink.php (targeted dom refresh #32122)"
+  "version": 1,
+  "generated_at": "2026-08-31T16:00:12+00:00",
+  "arch": "x86_64-linux",
+  "role": "committed per-arch split-compilation helper units (#15889) — consumed via PHP_COMPILER_HELPER_RUNTIME_O=1; stale units are skipped per fingerprint and recompiled locally",
+  "core_fingerprint": "3f2bbab566b4a543aea9",
+  "llvm_identity_token": "lib:df0be984ee08e28d74ef02207ab33225a55ab237986747d6fe995028e2ec67b4",
+  "unit_count": 446,
+  "published_fresh": 12,
+  "kept_live_unpublished": 0,
+  "total_bytes": 827064410,
+  "refresh": "php script/publish-helper-units-prelink.php (targeted dom refresh #32122)"
 }
