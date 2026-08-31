@@ -9,4 +9,4 @@ echo "ok\n";
 --EXPECT_EXIT--
 255
 --EXPECTF--
-Fatal error: static::class cannot be used for compile-time class name resolution in %s on line %d
+PHP Fatal error:  static::class cannot be used for compile-time class name resolution in %s on line %d
