@@ -25,7 +25,8 @@ final class LocaleStartupRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('C.UTF-8', $runtime);
         $this->assertStringContainsString('zend_reset_lc_ctype_locale', $runtime);
         $this->assertStringContainsString('__phpc_zend_reset_lc_ctype', $runtime);
-        $this->assertStringContainsString("lookupFunction('setlocale')", $runtime);
+        $this->assertStringContainsString('LibcExtern::ensureSetlocaleDecl', $runtime);
+        $this->assertStringContainsString('#36074', $runtime);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $runtime);
     }
 
