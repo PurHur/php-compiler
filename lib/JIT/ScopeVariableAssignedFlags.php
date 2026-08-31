@@ -14,7 +14,15 @@ final class ScopeVariableAssignedFlags
 
     public static function flagKey(Context $context, string $name): string
     {
-        return $context->activeFunction."\0".$context->resolveRefAliasName($name);
+        $resolved = $context->resolveRefAliasName($name);
+        $block = $context->jitEnclosingBlock ?? $context->jitFunctionRootBlock;
+        if (null !== $block && $block->isMainScript()) {
+            // {main} CV flags must not key off activeFunction — nested class/method
+            // lowering can leave it stale while still emitting main-body guards (#31835 / #36081).
+            return '{main}'."\0".$resolved;
+        }
+
+        return $context->activeFunction."\0".$resolved;
     }
 
     public static function ensureFlag(Context $context, string $key): Value
