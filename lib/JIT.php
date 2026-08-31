@@ -14332,6 +14332,10 @@ class JIT {
                         $block->getOperand($op->arg1),
                         $callArgs
                     );
+                    $this->propagateDomGetElementByIdCompileTimeAttrs(
+                        $block->getOperand($op->arg1),
+                        $callArgs
+                    );
                     $this->propagateDomAttrNodeCompileTimeKey(
                         $block->getOperand($op->arg1),
                         $callArgs
@@ -17357,6 +17361,9 @@ class JIT {
         if (null !== $src->compileTimeDomNodePath) {
             $resultVar->compileTimeDomNodePath = $src->compileTimeDomNodePath;
         }
+        if (null !== $src->compileTimeDomGeiHtmlHit) {
+            $resultVar->compileTimeDomGeiHtmlHit = $src->compileTimeDomGeiHtmlHit;
+        }
         // Stamp attrs for appendChild INNER_XML sync (compileTimeChildElementMarkup; #33362).
         $attrs = \PHPCompiler\ext\dom\JitDomImportNode::compileTimeAttributesFor($src, $tag);
         if (null !== $attrs && [] !== $attrs) {
@@ -17401,6 +17408,55 @@ class JIT {
             $inner = htmlspecialchars($valueArg->compileTimeString, ENT_QUOTES | ENT_XML1, 'UTF-8');
         }
         $resultVar->compileTimeDomInnerXml = $inner;
+    }
+
+    /**
+     * Bind immutable loadHTML getElementById() parse to the result for importNode (#29487 / #20830).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private function propagateDomGetElementByIdCompileTimeAttrs(Operand $result, array $callArgs): void
+    {
+        if (!($this->context->scope->toCall instanceof JIT\Call\DomDocumentGetElementById)) {
+            return;
+        }
+        $idArg = $callArgs[1] ?? null;
+        if (!$idArg instanceof Variable) {
+            return;
+        }
+        $idLit = $idArg->compileTimeString
+            ?? JIT\JitStringBuiltinArg::compileTimeLiteral($idArg);
+        if (null === $idLit || '' === $idLit) {
+            return;
+        }
+        if (!$this->context->hasVariableOp($result)) {
+            return;
+        }
+        $resultVar = $this->context->getVariableFromOp($result);
+        $hit = \PHPCompiler\ext\dom\JitDomLoadHTMLUserScript::lastGetElementByIdHit();
+        if (null === $hit || ($hit['id'] ?? '') !== $idLit) {
+            $html = \PHPCompiler\ext\dom\JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml();
+            if (null !== $html) {
+                $hit = \PHPCompiler\ext\dom\DomParseSimpleHtmlJitHelper::parseIdElementArgv($html, $idLit);
+            }
+        }
+        if (null === $hit || '' === ($hit['id'] ?? '')) {
+            return;
+        }
+        $snapshot = [
+            'tag' => (string) ($hit['tag'] ?? 'div'),
+            'id' => (string) $hit['id'],
+            'text' => (string) ($hit['text'] ?? ''),
+        ];
+        $resultVar->compileTimeDomGeiHtmlHit = $snapshot;
+        $name = JIT\OperandName::resolve($result);
+        if (null === $name || '' === $name) {
+            return;
+        }
+        $resolved = $this->context->resolveRefAliasName($name);
+        if (isset($this->context->namedVariableBindings[$resolved])) {
+            $this->context->namedVariableBindings[$resolved]->compileTimeDomGeiHtmlHit = $snapshot;
+        }
     }
 
     /**
@@ -32241,11 +32297,17 @@ class JIT {
         if (null !== $source->compileTimeDomAttributes && null === $dest->compileTimeDomAttributes) {
             $dest->compileTimeDomAttributes = $source->compileTimeDomAttributes;
         }
+        if (null !== $source->compileTimeDomGeiHtmlHit && null === $dest->compileTimeDomGeiHtmlHit) {
+            $dest->compileTimeDomGeiHtmlHit = $source->compileTimeDomGeiHtmlHit;
+        }
         if (null !== $source->compileTimeDomElementId && null === $dest->compileTimeDomElementId) {
             $dest->compileTimeDomElementId = $source->compileTimeDomElementId;
         }
         if (null !== $source->compileTimeDomLoadXml && null === $dest->compileTimeDomLoadXml) {
             $dest->compileTimeDomLoadXml = $source->compileTimeDomLoadXml;
+        }
+        if ($source->compileTimeDomHtmlLoaded && !$dest->compileTimeDomHtmlLoaded) {
+            $dest->compileTimeDomHtmlLoaded = true;
         }
         if (null !== $source->compileTimeDomImportHostSxeToken && null === $dest->compileTimeDomImportHostSxeToken) {
             $dest->compileTimeDomImportHostSxeToken = $source->compileTimeDomImportHostSxeToken;

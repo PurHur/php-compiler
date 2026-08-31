@@ -102,6 +102,7 @@ final class JitDomLoadHTMLUserScript
 
     public static function markReceiverHtmlLoaded(JITVariable $receiver): void
     {
+        $receiver->compileTimeDomHtmlLoaded = true;
         if (null === self::$htmlByReceiver) {
             self::$htmlByReceiver = new \SplObjectStorage();
         }
@@ -112,6 +113,9 @@ final class JitDomLoadHTMLUserScript
     {
         if (null === $receiver) {
             return false;
+        }
+        if ($receiver->compileTimeDomHtmlLoaded) {
+            return true;
         }
 
         return null !== self::$htmlByReceiver && isset(self::$htmlByReceiver[$receiver]);

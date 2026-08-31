@@ -223,8 +223,7 @@ final class JitDomImportNode
             return self::materializeImportedAttr($context, $attrSpec);
         }
 
-        $html = JitDomLoadHTMLUserScript::lastGetElementByIdHit()
-            ?? JitDomLoadHTMLUserScript::lastCompileTimeParsed();
+        $html = self::resolveImportSourceHtmlHit($sourceNode);
         $tag = 'div';
         $text = '';
         $inner = '';
@@ -268,7 +267,7 @@ final class JitDomImportNode
             if (null !== $srcInner) {
                 $inner = $srcInner;
                 $fromXml = true;
-            } else {
+            } elseif (null === self::resolveImportSourceHtmlHit($sourceNode)) {
                 $dstXml = JitDomLoadXMLUserScript::compileTimeXmlFor($documentVar)
                     ?? $documentVar->compileTimeDomLoadXml
                     ?? null;
@@ -277,9 +276,9 @@ final class JitDomImportNode
                     $parsed = DomParseSimpleXmlJitHelper::parseElementMarkupArgv($markup);
                     if (null !== $parsed) {
                         $inner = $parsed['inner'];
+                        $fromXml = true;
                     }
                 }
-                $fromXml = true;
             }
         }
         if (!$fromXml) {
@@ -288,17 +287,19 @@ final class JitDomImportNode
             $dstXml = JitDomLoadXMLUserScript::compileTimeXmlFor($documentVar)
                 ?? $documentVar->compileTimeDomLoadXml
                 ?? null;
-            $markup = self::resolveSourceElementMarkup($sourceNode, '', $dstXml);
-            if (null !== $markup) {
-                $parsed = DomParseSimpleXmlJitHelper::parseElementMarkupArgv($markup);
-                if (null !== $parsed) {
-                    $tag = $parsed['tag'];
-                    $inner = $parsed['inner'];
-                    $fromXml = true;
+            if (null === self::resolveImportSourceHtmlHit($sourceNode)) {
+                $markup = self::resolveSourceElementMarkup($sourceNode, '', $dstXml);
+                if (null !== $markup) {
+                    $parsed = DomParseSimpleXmlJitHelper::parseElementMarkupArgv($markup);
+                    if (null !== $parsed) {
+                        $tag = $parsed['tag'];
+                        $inner = $parsed['inner'];
+                        $fromXml = true;
+                    }
                 }
             }
         }
-        if (!$fromXml) {
+        if (!$fromXml && null === self::resolveImportSourceHtmlHit($sourceNode)) {
             $dstXml = JitDomLoadXMLUserScript::compileTimeXmlFor($documentVar)
                 ?? $documentVar->compileTimeDomLoadXml
                 ?? JitDomLoadXMLUserScript::lastCompileTimeXml();
@@ -317,9 +318,11 @@ final class JitDomImportNode
                 }
             }
         }
-        if (!$fromXml && null !== $html) {
+        if (null !== $html) {
             $tag = $html['tag'] ?? $tag;
-            $text = $html['text'] ?? '';
+            if ('' !== ($html['text'] ?? '')) {
+                $text = $html['text'];
+            }
             $id = $html['id'] ?? $id;
         }
 
@@ -374,8 +377,20 @@ final class JitDomImportNode
                 }
             }
         }
-        if (!$fromXml) {
-            self::storeElementInIdMap($context, $documentVar, $id, $element);
+        $htmlHit = self::resolveImportSourceHtmlHit($sourceNode);
+        $htmlId = (string) ($htmlHit['id'] ?? '');
+        if ('' !== $htmlId) {
+            self::storeElementInIdMap($context, $documentVar, $htmlId, $element);
+        } else {
+            foreach ($attrInfo['pairs'] as $pair) {
+                if ('id' === $pair['qname'] && '' !== $pair['value']) {
+                    self::storeElementInIdMap($context, $documentVar, $pair['value'], $element);
+                    break;
+                }
+            }
+            if (!$fromXml && '' !== $id) {
+                self::storeElementInIdMap($context, $documentVar, $id, $element);
+            }
         }
 
         return self::boxObjectResult($context, $element);
@@ -804,15 +819,15 @@ final class JitDomImportNode
         }
         $markup = self::resolveSourceElementMarkup($sourceNode, $tag, $dstXml);
         if (null === $markup) {
-            return self::resolveSourceAttrInfoFromHtmlHit($tag) ?? $empty;
+            return self::resolveSourceAttrInfoFromHtmlHit($tag, $sourceNode) ?? $empty;
         }
         $parsed = DomParseSimpleXmlJitHelper::parseElementMarkupArgv($markup);
         if (null === $parsed) {
-            return self::resolveSourceAttrInfoFromHtmlHit($tag) ?? $empty;
+            return self::resolveSourceAttrInfoFromHtmlHit($tag, $sourceNode) ?? $empty;
         }
         $attrs = $parsed['attrs'];
         if ('' === trim($attrs)) {
-            return self::resolveSourceAttrInfoFromHtmlHit($tag) ?? $empty;
+            return self::resolveSourceAttrInfoFromHtmlHit($tag, $sourceNode) ?? $empty;
         }
         $open = '<'.$parsed['tag'].$attrs.'>';
 
@@ -828,10 +843,14 @@ final class JitDomImportNode
      *
      * @return null|array{attrs: string, pairs: list<array{qname: string, value: string}>}
      */
-    private static function resolveSourceAttrInfoFromHtmlHit(string $tag): ?array
-    {
-        $html = JitDomLoadHTMLUserScript::lastGetElementByIdHit()
-            ?? JitDomLoadHTMLUserScript::lastCompileTimeParsed();
+    private static function resolveSourceAttrInfoFromHtmlHit(
+        string $tag,
+        ?JITVariable $sourceNode = null
+    ): ?array {
+        $html = null !== $sourceNode
+            ? self::resolveImportSourceHtmlHit($sourceNode)
+            : (JitDomLoadHTMLUserScript::lastGetElementByIdHit()
+                ?? JitDomLoadHTMLUserScript::lastCompileTimeParsed());
         if (null === $html) {
             return null;
         }
@@ -849,6 +868,60 @@ final class JitDomImportNode
             'attrs' => ' id="'.$escaped.'"',
             'pairs' => [['qname' => 'id', 'value' => $id]],
         ];
+    }
+
+    /**
+     * Source-bound loadHTML parse for importNode — never the destination's last hit (#29487).
+     *
+     * @return array{tag: string, id: string, text: string}|null
+     */
+    private static function resolveImportSourceHtmlHit(JITVariable $sourceNode): ?array
+    {
+        if (null !== $sourceNode->compileTimeDomGeiHtmlHit) {
+            return $sourceNode->compileTimeDomGeiHtmlHit;
+        }
+        // XML sources must not reuse a prior HTML getElementById hit (#20830 part 2).
+        if (null !== $sourceNode->compileTimeDomLoadXml
+            || null !== JitDomLoadXMLUserScript::compileTimeXmlFor($sourceNode)
+        ) {
+            return null;
+        }
+        $srcTag = $sourceNode->compileTimeDomTagName;
+        $hit = JitDomLoadHTMLUserScript::lastGetElementByIdHit();
+        if (null !== $hit && '' !== ($hit['id'] ?? '')) {
+            $hitTag = (string) ($hit['tag'] ?? '');
+            if (null === $srcTag || '' === $srcTag || '' === $hitTag || $hitTag === $srcTag) {
+                return $hit;
+            }
+        }
+        if (null !== $sourceNode->compileTimeDomAttributes && [] !== $sourceNode->compileTimeDomAttributes) {
+            $id = (string) ($sourceNode->compileTimeDomAttributes['id'] ?? '');
+            if ('' !== $id) {
+                $text = '';
+                if (null !== $hit && ($hit['id'] ?? '') === $id) {
+                    $text = (string) ($hit['text'] ?? '');
+                }
+
+                return [
+                    'tag' => (string) ($srcTag ?? 'div'),
+                    'id' => $id,
+                    'text' => $text,
+                ];
+            }
+        }
+        $candidate = JitDomLoadHTMLUserScript::lastGetElementByIdHit()
+            ?? JitDomLoadHTMLUserScript::lastCompileTimeParsed();
+        if (null === $candidate) {
+            return null;
+        }
+        if (null !== $srcTag && '' !== $srcTag) {
+            $hitTag = (string) ($candidate['tag'] ?? '');
+            if ('' !== $hitTag && $hitTag !== $srcTag) {
+                return null;
+            }
+        }
+
+        return $candidate;
     }
 
     /**

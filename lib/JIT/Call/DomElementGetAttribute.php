@@ -71,16 +71,19 @@ final class DomElementGetAttribute implements Call
             }
         }
 
+        // Per-element NamedNodeMap pins — correct after importNode / lastChild /
+        // getElementById and for Attr::$value writes on attached attributes (#34863 / #19281).
+        // Must run before the process-global Attr cache: a second loadHTML on another
+        // document overwrites cache keys so importNode getAttribute('id') read 'other'
+        // instead of the imported node's pinned id (#29487 / re-#19212).
+        if (isset($args[0], $args[1])) {
+            return JitDomNamedNodeMap::invokeElementGetAttribute($context, $args[0], $args[1]);
+        }
+
         // User-script cache from createFromString / getAttributeNode — NamedNodeMap may
         // lack pins until appendChild/setAttribute; read live Attr::$value (#21083).
         if (null !== $nameLit && isset($args[0]) && self::cacheHasPresentLiteralName($nameLit)) {
             return JitDomAttributeNodeNS::invokeGetAttributeLive($context, ...$args);
-        }
-
-        // Per-element NamedNodeMap pins — correct after lastChild / getElementById
-        // and for Attr::$value writes on attached attributes (#34863 / #19281).
-        if (isset($args[0], $args[1])) {
-            return JitDomNamedNodeMap::invokeElementGetAttribute($context, $args[0], $args[1]);
         }
 
         // Otherwise fall back to importNode/getElementById HTML-id stub (#19212).
