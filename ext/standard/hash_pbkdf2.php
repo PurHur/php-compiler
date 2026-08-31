@@ -110,12 +110,16 @@ final class hash_pbkdf2 extends Internal
             JitArrayElem::requireArrayParam($context, $args[6], 'hash_pbkdf2', 7, 'options');
         }
 
+        $iterations = JitLongArg::lower($context, $args[3], 'hash_pbkdf2() iterations');
+        JitHashPbkdf2::emitRuntimeIterationsGuard($context, $iterations);
+        JitHashPbkdf2::emitRuntimeLengthGuard($context, $length);
+
         return JitHash::hashPbkdf2(
             $context,
             self::jitZparamStrArg($context, $args[0], 0, 'algo'),
             self::jitZparamStrArg($context, $args[1], 1, 'password'),
             self::jitZparamStrArg($context, $args[2], 2, 'salt'),
-            JitLongArg::lower($context, $args[3], 'hash_pbkdf2() iterations'),
+            $iterations,
             $length,
             $raw
         );
