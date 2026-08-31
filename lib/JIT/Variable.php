@@ -195,6 +195,13 @@ final class Variable {
     public ?int $compileTimeDomNodeListLength = null;
 
     /**
+     * createDocumentFragment() child specs from appendChild onto the fragment (#35881 / #35518).
+     *
+     * @var list<array{kind: string, data: string, content?: string, inner?: string}>|null
+     */
+    public ?array $compileTimeDomFragmentChildren = null;
+
+    /**
      * DatePeriod end-date form — ordered Unix timestamps for foreach snapshot (#26772).
      *
      * @var list<int>|null
