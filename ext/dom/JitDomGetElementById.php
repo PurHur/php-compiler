@@ -204,7 +204,7 @@ final class JitDomGetElementById
             $classId
         );
         $ht = HashTableHelper::readHashtableFromValueBox($context, $mapVar);
-        $foundVar = HashTableHelper::readStringKeyToValueBox($context, $ht, $idStr);
+        $foundVar = HashTableHelper::peekStringKeyToValueBox($context, $ht, $idStr);
 
         return JitValueBox::valuePtrFromVariable($context, $foundVar);
     }
@@ -235,7 +235,7 @@ final class JitDomGetElementById
             $classId
         );
         $ht = HashTableHelper::readHashtableFromValueBox($context, $mapVar);
-        $foundVar = HashTableHelper::readStringKeyToValueBox($context, $ht, $idStr);
+        $foundVar = HashTableHelper::peekStringKeyToValueBox($context, $ht, $idStr);
 
         return JitValueBox::valuePtrFromVariable($context, $foundVar);
     }

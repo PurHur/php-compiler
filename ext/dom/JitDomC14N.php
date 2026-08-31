@@ -92,6 +92,7 @@ final class JitDomC14N
         $xml = JitDomLoadXMLUserScript::compileTimeXmlFor($receiver)
             ?? $receiver->compileTimeDomLoadXml
             ?? JitDomLoadXMLUserScript::unambiguousCompileTimeXml();
+        $xml = self::compileTimeXmlWithReceiverInner($receiver, $xml);
         if (null === $xml
             || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
             || JitDomLoadXMLUserScript::treeMutatedSinceLoad()
@@ -285,6 +286,33 @@ final class JitDomC14N
         }
 
         return $cur;
+    }
+
+    /**
+     * Rebuild loadXML literal from stamped inner after appendChild mutations (#32972 / #34862).
+     *
+     * {@see foldAnnotatedPath} reads the full document literal; LiveSlots refresh may
+     * update {@see JITVariable::$compileTimeDomInnerXml} without rewriting loadXml first.
+     */
+    private static function compileTimeXmlWithReceiverInner(JITVariable $receiver, ?string $xml): ?string
+    {
+        if (null === $xml || '' === trim($xml)) {
+            return $xml;
+        }
+        $inner = $receiver->compileTimeDomInnerXml ?? null;
+        if (null === $inner || '' === $inner) {
+            return $xml;
+        }
+        $currentInner = DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml);
+        if ($inner === $currentInner) {
+            return $xml;
+        }
+        $parsed = DomParseSimpleXmlJitHelper::parseElementMarkupArgv($xml);
+        if (null === $parsed) {
+            return $xml;
+        }
+
+        return '<'.$parsed['tag'].$parsed['attrs'].'>'.$inner.'</'.$parsed['tag'].'>';
     }
 
     /** True when exclusive is non-default / non-constant — skip inclusive loadXML fold. */

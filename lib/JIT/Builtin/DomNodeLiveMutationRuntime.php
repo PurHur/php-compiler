@@ -1112,40 +1112,41 @@ final class DomNodeLiveMutationRuntime
             return false;
         }
         // createTextNode / character-data stand-ins are never same-parent moves (#33000).
-        // Sticky lastFetchedChildIndex from firstChild would steal the index and rewrite
-        // INNER_XML to the root child markup (saveXML → <a><a>1</a></a>).
         if (null !== self::compileTimeChildTextData($childArg)) {
             return false;
         }
-        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        $markup = self::compileTimeChildElementMarkup($childArg);
+        if (null === $markup || '' === $markup) {
+            return false;
+        }
+        $xml = $receiver->compileTimeDomLoadXml
+            ?? JitDomLoadXMLUserScript::compileTimeXmlFor($receiver)
+            ?? JitDomLoadXMLUserScript::lastCompileTimeXml();
         if (null === $xml || '' === trim($xml)) {
             return false;
         }
-        $nodes = DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
-        $index = $childArg->compileTimeDomChildIndex
-            ?? JitDomNodeListItem::$lastFetchedChildIndex
-            ?? JitDomNodeChildProperty::$lastFetchedChildIndex
-            ?? null;
-        if (null === $index) {
-            $tag = $childArg->compileTimeDomTagName
-                ?? JitDomNodeListItem::$lastFetchedTagName
-                ?? JitDomNodeChildProperty::$lastFetchedTagName
-                ?? null;
-            if (null === $tag || '' === $tag) {
-                return false;
-            }
-            foreach ($nodes as $i => $node) {
-                if ('element' === $node['kind'] && strtolower($tag) === strtolower($node['data'])) {
-                    $index = $i;
-                    break;
-                }
-            }
-        }
-        if (null === $index) {
+        $parentInner = $receiver->compileTimeDomInnerXml
+            ?? DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml);
+        if ('' === $parentInner) {
             return false;
         }
-        $inner = DomParseSimpleXmlJitHelper::rootInnerXmlMoveChildToEnd($xml, $index);
-        if (null === $inner) {
+        $chunks = DomParseSimpleXmlJitHelper::directChildMarkupChunks($parentInner);
+        $chunkIndex = null;
+        foreach ($chunks as $i => $chunk) {
+            if ($chunk === $markup) {
+                $chunkIndex = $i;
+                break;
+            }
+        }
+        if (null === $chunkIndex) {
+            return false;
+        }
+        // appendChild(already-last) and repeat compile-time sync are no-ops (#34862).
+        if ($chunkIndex === \count($chunks) - 1) {
+            return true;
+        }
+        $inner = DomParseSimpleXmlJitHelper::moveChildMarkupToEnd($parentInner, $chunkIndex);
+        if (null === $inner || $inner === $parentInner) {
             return false;
         }
         $receiverObj = self::receiverObject($context, $receiver);
@@ -1302,6 +1303,24 @@ final class DomNodeLiveMutationRuntime
         if ([] === $extraArgs) {
             return;
         }
+        $receiverObj = self::receiverObject($context, $receiver);
+        $xml = $receiver->compileTimeDomLoadXml
+            ?? JitDomLoadXMLUserScript::compileTimeXmlFor($receiver)
+            ?? JitDomLoadXMLUserScript::lastCompileTimeXml();
+        // Same-parent move must run before metadata concat — appendChild(firstChild)
+        // would duplicate markup and leave C14N fold stale (#34862 / re-#32972).
+        if (
+            $skipInnerXmlSlotMerge
+            && 1 === \count($extraArgs)
+            && null !== $xml
+            && '' !== trim($xml)
+            && JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
+            && self::trySyncUserScriptInnerXmlMoveToEnd($context, $receiver, $extraArgs[0])
+        ) {
+            DomUserScriptLiveTagListLlvm::clearPending($context);
+
+            return;
+        }
         $pieces = [];
         $rawTexts = [];
         foreach ($extraArgs as $arg) {
@@ -1335,11 +1354,7 @@ final class DomNodeLiveMutationRuntime
         if (!$objectType->hasProperty($classId, VmDom::PROP_USER_SCRIPT_INNER_XML)) {
             $objectType->defineProperty($classId, VmDom::PROP_USER_SCRIPT_INNER_XML, Variable::TYPE_STRING);
         }
-        $receiverObj = self::receiverObject($context, $receiver);
         // Refresh C14N fold from the *receiver* document's loadXML (#32972 / #32987 / #33000).
-        $xml = $receiver->compileTimeDomLoadXml
-            ?? JitDomLoadXMLUserScript::compileTimeXmlFor($receiver)
-            ?? JitDomLoadXMLUserScript::lastCompileTimeXml();
         $childIndex = $receiver->compileTimeDomChildIndex
             ?? JitDomNodeChildProperty::$lastFetchedChildIndex
             ?? null;
@@ -1422,6 +1437,16 @@ final class DomNodeLiveMutationRuntime
             // importNode + appendChild used the source literal as SSOT and doubled inner markup
             // (#34302 / #34405 leftover).
             DomUserScriptLiveTagListLlvm::clearPending($context);
+            // Refresh C14N fold from stamped inner after createElement append (#32972).
+            $inner = $receiver->compileTimeDomInnerXml ?? null;
+            if (
+                null !== $inner
+                && '' !== $inner
+                && null !== $xml
+                && JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
+            ) {
+                JitDomLoadXMLUserScript::refreshCompileTimeXmlWithRootInner($inner, $receiver);
+            }
 
             return;
         }
