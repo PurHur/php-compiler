@@ -251,7 +251,7 @@ class Value extends Type {
         $this->implementValueWriteString();
         $this->implementValueWriteNull();
         $this->implementValueDelref();
-        \PHPCompiler\JIT\Builtin\ValueBoxWriteBoolJit::implement($this->context);
+        // __value__writeBool deferred — Context::lookupFunction ensureLinked (#36108).
     }
 
     public function initialize(): void {
