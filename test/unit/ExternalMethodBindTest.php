@@ -122,4 +122,19 @@ final class ExternalMethodBindTest extends TestCase
         $this->assertInstanceOf(\PHPLLVM\Type::class, $bound->argTypes[0]);
         $this->assertSame('int64', $ctx->getStringFromType($bound->argTypes[0]));
     }
+
+    /**
+     * Chunk TU compiles without registerModule() — stdlib Internal leaves must resolve from
+     * Runtime modules under SPINE_CHUNK, not ExternalMethod-null (#36147).
+     */
+    public function testSpineChunkResolvesRuntimeInternalBuiltin(): void
+    {
+        putenv(ExternalMethodBind::ENV_SPINE_CHUNK.'=1');
+        $_ENV[ExternalMethodBind::ENV_SPINE_CHUNK] = '1';
+        $runtime = new Runtime(Runtime::MODE_AOT);
+        $ctx = new JIT\Context($runtime, JIT\Builtin::LOAD_TYPE_STANDALONE);
+        $proxy = $ctx->resolveFunctionProxy('count');
+        $this->assertNotInstanceOf(ExternalMethod::class, $proxy);
+        $this->assertInstanceOf(JIT\Call::class, $proxy);
+    }
 }
