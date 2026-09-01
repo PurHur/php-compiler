@@ -29,7 +29,8 @@ patch_already_applied() {
       grep -q 'array \$implements, Block \$stmts, ?Operand \$extends = null' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Class_.php" 2>/dev/null
       ;;
     php-llvm-structgep-assert.patch)
-      grep -q 'PHP_COMPILER_LLVM_ASSERT' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php" 2>/dev/null
+      grep -q 'PHP_COMPILER_LLVM_ASSERT' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php" 2>/dev/null \
+        && patch_is_fully_applied "$ROOT/patches/php-llvm-structgep-assert.patch"
       ;;
     php-llvm-icmp-assert.patch)
       grep -q 'iCmp: operands are not of the same type' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php" 2>/dev/null
@@ -5411,7 +5412,7 @@ old_d = """        $cond = $this->readVariable($this->parseExprNode($node->cond)
         $this->block = $loopEnd;
     }
 
-    protected function parseStmt_Enum(Stmt\\Enum_ $node)"""
+    protected function parseStmt_Echo(Stmt\\Echo_ $node)"""
 new_d = """        $cond = $this->readVariable($this->parseExprNode($node->cond));
         // Zend emits ZEND_TICKS after the do-while statement (on loop exit) (#25621).
         $jumpIf = new JumpIf($cond, $loopBody, $loopEnd, $this->mapAttributes($node));
@@ -5425,7 +5426,7 @@ new_d = """        $cond = $this->readVariable($this->parseExprNode($node->cond)
         $this->block = $loopEnd;
     }
 
-    protected function parseStmt_Enum(Stmt\\Enum_ $node)"""
+    protected function parseStmt_Echo(Stmt\\Echo_ $node)"""
 old_d = old_d.replace("\\\\", "\\")
 new_d = new_d.replace("\\\\", "\\")
 if old_d not in text:
@@ -6571,6 +6572,76 @@ print('Repaired php-types-static-var Terminal_StaticVar array type (#32806)')
 PY
 }
 
+# True when the patch is genuinely present (reverse-apply succeeds), not just a grep marker.
+patch_is_fully_applied() {
+  local patch="$1"
+  if git -C "$ROOT" apply --check -p0 -R "$patch" >/dev/null 2>&1; then
+    return 0
+  fi
+  if git -C "$ROOT" apply --check -p1 -R "$patch" >/dev/null 2>&1; then
+    return 0
+  fi
+  if command -v patch >/dev/null 2>&1; then
+    if patch -p0 --reverse --dry-run -s -f < "$patch" >/dev/null 2>&1; then
+      return 0
+    fi
+    if patch -p1 --reverse --dry-run -s -f < "$patch" >/dev/null 2>&1; then
+      return 0
+    fi
+  fi
+  return 1
+}
+
+# Verify a single patch applies to a pristine snapshot (vendor *.orig or patches/pristine/).
+verify_pristine_patch_on_orig() {
+  local patch="$1" orig_rel="$2"
+  local orig="$ROOT/$orig_rel" dest_rel scratch
+  if [[ ! -f "$patch" ]]; then
+    return 0
+  fi
+  if [[ ! -f "$orig" ]]; then
+    local snap_rel="${orig_rel#vendor/}"
+    snap_rel="${snap_rel%.orig}"
+    orig="$ROOT/patches/pristine-snapshots/$snap_rel"
+  fi
+  if [[ ! -f "$orig" ]]; then
+    echo "verify-pristine: skip $(basename "$patch") (no pristine snapshot for ${orig_rel})"
+    return 0
+  fi
+  dest_rel="${orig_rel%.orig}"
+  dest_rel="${dest_rel#vendor/}"
+  scratch="$(mktemp -d "${TMPDIR:-/tmp}/phpc-pristine-one.XXXXXX")"
+  mkdir -p "$scratch/vendor/$(dirname "$dest_rel")"
+  cp "$orig" "$scratch/vendor/$dest_rel"
+  if (cd "$scratch" && git apply --check -p0 "$patch") >/dev/null 2>&1; then
+    rm -rf "$scratch"
+    echo "verify-pristine: OK   $(basename "$patch")"
+    return 0
+  fi
+  if (cd "$scratch" && git apply --check -p1 "$patch") >/dev/null 2>&1; then
+    rm -rf "$scratch"
+    echo "verify-pristine: OK   $(basename "$patch") (-p1)"
+    return 0
+  fi
+  rm -rf "$scratch"
+  echo "verify-pristine: FAIL $(basename "$patch") (does not apply to pristine ${orig_rel})" >&2
+  return 1
+}
+
+# Fast gate: llvm git patches must apply to pristine vendor snapshots (*.orig).
+verify_pristine_patches() {
+  local failed=0
+  local llvm_builder_orig="vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php.orig"
+  verify_pristine_patch_on_orig "$PATCH_DIR/php-llvm-structgep-assert.patch" "$llvm_builder_orig" || failed=1
+  verify_pristine_patch_on_orig "$PATCH_DIR/php-llvm-icmp-assert.patch" "$llvm_builder_orig" || failed=1
+  if [[ "$failed" -ne 0 ]]; then
+    echo "verify-pristine: patch drift detected — re-diff against pristine vendor (#36209)" >&2
+    return 1
+  fi
+  echo "verify-pristine: llvm patches apply to pristine vendor snapshots"
+  return 0
+}
+
 # Apply a patch file with git/patch(1) only — no overlay dispatch (avoids recursion).
 apply_patch_file_direct() {
   local patch="$1"
@@ -7044,6 +7115,17 @@ PY
       ;;
   esac
 }
+
+case "${1:-}" in
+  --verify-pristine)
+    verify_pristine_patches
+    exit $?
+    ;;
+  --help|-h)
+    echo "Usage: $0 [--verify-only | --verify-pristine]" >&2
+    exit 0
+    ;;
+esac
 
 if [[ "${1:-}" != "--verify-only" ]]; then
 apply_patch "$PATCH_DIR/php-parser-final-property.patch"

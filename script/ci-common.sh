@@ -56,7 +56,7 @@ ci_install_deps() {
     python3 -c "import urllib.request; urllib.request.urlretrieve('https://getcomposer.org/download/latest-stable/composer.phar','/tmp/composer.phar')"
     COMPOSER=("$PHP_BIN" -d "extension=$ext_dir/phar.so" -d "extension=$ext_dir/mbstring.so" /tmp/composer.phar)
   fi
-  "${COMPOSER[@]}" install --no-interaction --ignore-platform-reqs 2>/dev/null || true
+  "${COMPOSER[@]}" install --no-interaction --ignore-platform-reqs
 
   chmod +x script/install-llvm9.sh script/apply-patches.sh 2>/dev/null || true
   if [[ -z "${PHP_COMPILER_LLVM_PATH:-}" || ! -f "${PHP_COMPILER_LLVM_PATH}/libLLVM-9.so.1" ]]; then

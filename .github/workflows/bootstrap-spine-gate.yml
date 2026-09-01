@@ -84,6 +84,7 @@ jobs:
             php-compiler:22.04-dev bash -lc '
               set -euo pipefail
               composer install --no-interaction --ignore-platform-reqs -q
+              script/apply-patches.sh --verify-pristine
               script/apply-patches.sh
 
               echo "=== bootstrap-inventory --check-spine ==="
@@ -134,6 +135,7 @@ jobs:
             php-compiler:22.04-dev bash -lc "
               set -euo pipefail
               composer install --no-interaction --ignore-platform-reqs -q
+              script/apply-patches.sh --verify-pristine
               script/apply-patches.sh
               ./script/bootstrap-loop-probe.sh ${HONEST_ARGS}
             "

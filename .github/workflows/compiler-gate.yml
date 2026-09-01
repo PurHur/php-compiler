@@ -95,6 +95,7 @@ jobs:
             php-compiler:22.04-dev bash -lc '
               set -euo pipefail
               composer install --no-interaction --ignore-platform-reqs -q
+              script/apply-patches.sh --verify-pristine
               script/apply-patches.sh
 
               # Tier 0 — syntax. Seconds. A parse error in a spine file has killed multi-hour
@@ -144,6 +145,7 @@ jobs:
             php-compiler:22.04-dev bash -lc '
               set -uo pipefail
               composer install --no-interaction --ignore-platform-reqs -q
+              script/apply-patches.sh --verify-pristine
               script/apply-patches.sh
               script/differential-sweep.sh --aot --repeat 3 || true
               echo

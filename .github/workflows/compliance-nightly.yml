@@ -80,6 +80,7 @@ jobs:
             php-compiler:22.04-dev bash -lc '
               set -uo pipefail
               composer install --no-interaction --ignore-platform-reqs -q
+              script/apply-patches.sh --verify-pristine
               script/apply-patches.sh
               script/shard-compliance.sh --suite="$SUITE" --shards=24 --shard=${{ matrix.shard }}
             '

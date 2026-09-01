@@ -1,9 +1,9 @@
 --- vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php
 +++ vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php
-@@ -313,6 +313,27 @@
-         if (null === $struct->value) {
-             throw new \LogicException('LLVM struct value is null in structGep()');
-         }
+@@ -303,6 +303,27 @@
+     }
+ 
+     public function structGep(CoreValue $struct, int $index): CoreValue {
 +        if ('1' === \getenv('PHP_COMPILER_LLVM_ASSERT')) {
 +            // LLVM 9 release builds do not bounds-check StructGEP: a non-struct
 +            // receiver or out-of-range field index reads a garbage Type* and
@@ -28,7 +28,7 @@
          return $this->llvm->factory->value($this->context, $this->llvm->lib->LLVMBuildStructGEP($this->builder, $struct->value, $index, ''));
      }
  
-@@ -329,6 +350,12 @@
+@@ -319,6 +340,12 @@
      }
  
      public function zExt(CoreValue $value, CoreType $type): CoreValue {
