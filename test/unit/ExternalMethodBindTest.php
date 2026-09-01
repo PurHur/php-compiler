@@ -21,6 +21,8 @@ final class ExternalMethodBindTest extends TestCase
         unset($_ENV[ExternalMethodBind::ENV_SPINE_CHUNK], $_SERVER[ExternalMethodBind::ENV_SPINE_CHUNK]);
         putenv(ExternalMethodBind::ENV_MANIFEST);
         unset($_ENV[ExternalMethodBind::ENV_MANIFEST], $_SERVER[ExternalMethodBind::ENV_MANIFEST]);
+        putenv('PHP_COMPILER_HELPER_RUNTIME_O');
+        unset($_ENV['PHP_COMPILER_HELPER_RUNTIME_O'], $_SERVER['PHP_COMPILER_HELPER_RUNTIME_O']);
         ExternalMethodBind::resetManifestForTests();
         parent::tearDown();
     }
@@ -136,5 +138,40 @@ final class ExternalMethodBindTest extends TestCase
         $proxy = $ctx->resolveFunctionProxy('count');
         $this->assertNotInstanceOf(ExternalMethod::class, $proxy);
         $this->assertInstanceOf(JIT\Call::class, $proxy);
+    }
+
+    /**
+     * Consumer chunk binds a producer symbol via manifest + bitcode (#36155 Phase C).
+     */
+    public function testTryBindFromChunkManifestBitcode(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $unitDir = $root.'/prelinked/helper-runtime/x86_64-linux/units/ext_standard_ErrorSilenceJitHelper_php';
+        $bitcode = $unitDir.'/unit.bc';
+        if (!is_file($bitcode)) {
+            $this->markTestSkipped('helper-runtime ErrorSilenceJitHelper unit.bc not present');
+        }
+        $logical = 'phpcompiler\\ext\\standard\\errorsilencejithelper::seterrorreporting';
+        $symbol = 'PHPCompiler_ext_standard_ErrorSilenceJitHelper__seterrorreporting';
+        $manifestPath = sys_get_temp_dir().'/phpc_chunk_manifest_'.uniqid('', true).'.json';
+        file_put_contents($manifestPath, json_encode([
+            'bitcode' => $bitcode,
+            'methods' => [
+                $logical => ['symbol' => $symbol],
+            ],
+        ], JSON_UNESCAPED_SLASHES));
+        putenv(ExternalMethodBind::ENV_SPINE_CHUNK.'=1');
+        $_ENV[ExternalMethodBind::ENV_SPINE_CHUNK] = '1';
+        putenv('PHP_COMPILER_HELPER_RUNTIME_O=0');
+        $_ENV['PHP_COMPILER_HELPER_RUNTIME_O'] = '0';
+        putenv(ExternalMethodBind::ENV_MANIFEST.'='.$manifestPath);
+        $_ENV[ExternalMethodBind::ENV_MANIFEST] = $manifestPath;
+        $runtime = new Runtime(Runtime::MODE_AOT);
+        $ctx = new JIT\Context($runtime, JIT\Builtin::LOAD_TYPE_STANDALONE);
+        $bound = ExternalMethodBind::tryBind($ctx, $logical);
+        @unlink($manifestPath);
+        $this->assertInstanceOf(JIT\Call\Native::class, $bound);
+        $this->assertCount(1, $bound->argTypes);
+        $this->assertInstanceOf(\PHPLLVM\Type::class, $bound->argTypes[0]);
     }
 }
