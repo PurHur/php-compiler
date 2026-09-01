@@ -3317,6 +3317,11 @@ class Context {
     }
 
     public function lookupFunction(string $name): PHPLLVM\Value\Function_ {
+        // Lazy __value__writeLong — Value::implement no longer eager-implements (#36135 /
+        // peer #36124 writeNull). Thin hello-world must not emit long-box LLVM during init.
+        if ('__value__writeLong' === $name) {
+            Builtin\ValueBoxWriteLongJit::ensureLinked($this);
+        }
         // Lazy __value__writeNull — Value::implement no longer eager-implements (#36124 /
         // peer #36108 writeBool). Thin hello-world must not emit null-box LLVM during init.
         if ('__value__writeNull' === $name) {
