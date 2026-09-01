@@ -10,13 +10,17 @@ try {
     echo (false === $r || is_string($r)) ? "hash:soft\n" : "hash:other\n";
 } catch (TypeError $e) {
     echo "hash:TE\n";
+} catch (ValueError $e) {
+    echo "hash:VE\n";
 }
 try {
     $r = hash_hmac($a, 'x', 'k');
     echo (false === $r || is_string($r)) ? "hmac:soft\n" : "hmac:other\n";
 } catch (TypeError $e) {
     echo "hmac:TE\n";
+} catch (ValueError $e) {
+    echo "hmac:VE\n";
 }
 --EXPECT--
-hash:soft
-hmac:soft
+hash:VE
+hmac:VE

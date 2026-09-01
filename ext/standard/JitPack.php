@@ -103,10 +103,24 @@ final class JitPack
     private static function writeArg(Context $context, Value $slot, JITVariable $arg): void
     {
         $ptr = JitValueBox::pointer($context, $slot);
-        switch ($arg->type) {
-            case JITVariable::TYPE_NULL:
+        if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
+            if ($context->callerStrictTypes) {
                 $context->builder->call($context->lookupFunction('__value__writeNull'), $ptr);
+
                 return;
+            }
+            // pack() value operands: Zend quiet null→'' (#21209); writeNull in argv
+            // mis-lowers under thin AOT and SIGSEGVs compile (peer hash PROFILE=8.4).
+            $empty = $context->builder->load($context->constantStringFromString(''));
+            $context->builder->call(
+                $context->lookupFunction('__value__writeString'),
+                $ptr,
+                $empty
+            );
+
+            return;
+        }
+        switch ($arg->type) {
             case JITVariable::TYPE_NATIVE_LONG:
                 JitValueBox::writeLong($context, $slot, $context->helper->loadValue($arg));
                 return;

@@ -30,6 +30,9 @@ class AotTest extends BaseTest
         'CONTENT_LENGTH',
         'CONTENT_TYPE',
         'REQUEST_BODY',
+        // PROFILE gates compile-time NestedJIT helper ABI (8.4.0-dev unset ≠ explicit 8.4);
+        // runtime PROFILE=8.4 still applies for executed getenv/ErrorReporter paths (#21557).
+        'PHP_COMPILER_PROFILE',
     ];
 
     private static ?bool $llvmReady = null;
