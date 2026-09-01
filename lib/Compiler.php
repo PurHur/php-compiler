@@ -5765,16 +5765,21 @@ class Compiler {
             return false;
         }
         $concat = $ops[$index + 1] ?? null;
-        if (
-            !$concat instanceof Op\Expr\BinaryOp\Concat
-            || !(
+        $concatAtNext = $concat instanceof Op\Expr\BinaryOp\Concat
+            && (
                 $this->operandsChainEqual($concat->left, $call->result)
                 || $this->operandsReferToSameVariable($concat->left, $call->result)
                 || $this->operandsChainEqual($concat->right, $call->result)
                 || $this->operandsReferToSameVariable($concat->right, $call->result)
-            )
-        ) {
-            return false;
+            );
+        if (!$concatAtNext) {
+            // set_error_handler() may sit between hoisted soft-null producer and echo (#21223).
+            $name = strtolower($this->resolveCfgFuncCallName($call) ?? '');
+            if (!$this->funcCallNameMaySoftNullDeprecateOnProfile84($name)) {
+                return false;
+            }
+
+            return $this->hoistedSoftNullProducerHasFollowingEcho($ops, $index + 1);
         }
         for ($j = $index + 2; $j < \count($ops); ++$j) {
             $next = $ops[$j];
@@ -5818,6 +5823,37 @@ class Compiler {
         }
 
         return false;
+    }
+
+    /**
+     * PROFILE≥8.4 soft-null hoisted producer — later echo must run set_error_handler first (#21223).
+     *
+     * @param Op[] $ops
+     */
+    private function hoistedSoftNullProducerHasFollowingEcho(array $ops, int $startIndex): bool
+    {
+        for ($j = $startIndex, $opCount = \count($ops); $j < $opCount; ++$j) {
+            $next = $ops[$j];
+            if ($next instanceof Op\Terminal\Echo_) {
+                return true;
+            }
+            if ($next instanceof Op\Terminal\Return) {
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    /** set_error_handler()/restore_error_handler() between hoisted producers and echo (#21223). */
+    private function isErrorHandlerRegistrationStmt(Op $op): bool
+    {
+        if (!$op instanceof Op\Expr\FuncCall && !$op instanceof Op\Expr\NsFuncCall) {
+            return false;
+        }
+        $name = strtolower($this->resolveCfgFuncCallName($op) ?? '');
+
+        return \in_array($name, ['set_error_handler', 'restore_error_handler'], true);
     }
 
     /**
@@ -31887,6 +31923,15 @@ class Compiler {
      */
     private function isDeferredSiblingInlineCallArgProducer(Op $op, array $ops, int $producerIndex): bool
     {
+        // Soft-null E_DEPRECATED on null literals must run at the consumer call site — hoisted
+        // producers that compile early skip intervening set_error_handler() (#21223).
+        if (
+            ($op instanceof Op\Expr\FuncCall || $op instanceof Op\Expr\NsFuncCall)
+            && null !== $this->deferredSiblingInlineCallArgConsumerIndex($op, $ops, $producerIndex)
+            && $this->funcCallSoftNullDeprecationOnNullMustDeferAtConsumer($op)
+        ) {
+            return true;
+        }
         // chmod(); substr(sprintf('%o', fileperms($path)), -N) — side effects must run in stmt order (#16480).
         if (
             ($op instanceof Op\Expr\FuncCall || $op instanceof Op\Expr\NsFuncCall)
@@ -41516,6 +41561,67 @@ class Compiler {
             ],
             true
         );
+    }
+
+    /**
+     * Hoisted call-arg producers with PROFILE≥8.4 soft-null deprecation on a null literal.
+     *
+     * php-cfg may hoist json_decode(null) ahead of set_error_handler(); defer to the consumer
+     * so user handlers observe E_DEPRECATED (Zend stmt order, #21223).
+     */
+    private function funcCallSoftNullDeprecationOnNullMustDeferAtConsumer(Op\Expr $call): bool
+    {
+        if (!$call instanceof Op\Expr\FuncCall && !$call instanceof Op\Expr\NsFuncCall) {
+            return false;
+        }
+        if (!version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=')) {
+            return false;
+        }
+        $first = $call->args[0] ?? null;
+        if (!$this->callArgIsNullLiteral($first)) {
+            return false;
+        }
+        $name = strtolower($this->resolveCfgFuncCallName($call) ?? '');
+        if ('' === $name || !$this->funcCallNameMaySoftNullDeprecateOnProfile84($name)) {
+            return false;
+        }
+        $first = $call->args[0] ?? null;
+        if (!$this->callArgIsNullLiteral($first)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /** PROFILE≥8.4 builtins that emit E_DEPRECATED on null → '' coercion (VmString trim-family). */
+    private function funcCallNameMaySoftNullDeprecateOnProfile84(string $name): bool
+    {
+        if (!version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=')) {
+            return false;
+        }
+
+        return \in_array($name, [
+            'json_decode',
+            'json_validate',
+            'unserialize',
+            'trim',
+            'ltrim',
+            'rtrim',
+            'chop',
+            'strlen',
+            'strtolower',
+            'strtoupper',
+            'strrev',
+            'md5',
+            'sha1',
+            'hash',
+            'hash_hmac',
+            'base64_encode',
+            'base64_decode',
+            'parse_url',
+            'htmlspecialchars',
+            'htmlentities',
+        ], true);
     }
 
     /**
