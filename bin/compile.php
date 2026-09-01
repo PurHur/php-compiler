@@ -415,6 +415,7 @@ function run(string $filename, string $code, array $options): void
     );
     $prevUserScriptAot = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
     $prevHelperRuntimeO = getenv('PHP_COMPILER_HELPER_RUNTIME_O');
+    $prevLanguageProfile = getenv('PHP_COMPILER_PROFILE');
     $setUserScriptAot = phpc_compile_is_user_script_aot($normalized);
     // Skip-bundle inventory compile_driver needs helper-runtime .o for ABIs like
     // phpc_str_replace — NestedJIT includes hit those calls while NestedJitCompileScope
@@ -435,6 +436,15 @@ function run(string $filename, string $code, array $options): void
             $_ENV['PHP_COMPILER_HELPER_RUNTIME_O'] = '1';
             $_SERVER['PHP_COMPILER_HELPER_RUNTIME_O'] = '1';
         }
+    }
+    // Explicit PROFILE during user-script AOT compile breaks hash crypto helper ABI
+    // (unset 8.4.0-dev default is fine). Runtime PROFILE still applies when the
+    // binary runs (#21557 / peer AotTest COMPILE_EXCLUDED_ENV).
+    $clearedLanguageProfile = false;
+    if ($setUserScriptAot && false !== $prevLanguageProfile && '' !== (string) $prevLanguageProfile && \function_exists('putenv')) {
+        putenv('PHP_COMPILER_PROFILE=');
+        unset($_ENV['PHP_COMPILER_PROFILE'], $_SERVER['PHP_COMPILER_PROFILE']);
+        $clearedLanguageProfile = true;
     }
     // Warm helper-unit cache once per core fingerprint so subsequent builds skip nested helper lowering (#15889).
     \PHPCompiler\AOT\HelperRuntimeCache::warmForUserAotBuild();
@@ -593,6 +603,11 @@ function run(string $filename, string $code, array $options): void
             putenv('PHP_COMPILER_HELPER_RUNTIME_O='.$prevHelperRuntimeO);
             $_ENV['PHP_COMPILER_HELPER_RUNTIME_O'] = $prevHelperRuntimeO;
             $_SERVER['PHP_COMPILER_HELPER_RUNTIME_O'] = $prevHelperRuntimeO;
+        }
+        if ($clearedLanguageProfile) {
+            putenv('PHP_COMPILER_PROFILE='.$prevLanguageProfile);
+            $_ENV['PHP_COMPILER_PROFILE'] = $prevLanguageProfile;
+            $_SERVER['PHP_COMPILER_PROFILE'] = $prevLanguageProfile;
         }
     }
 }
