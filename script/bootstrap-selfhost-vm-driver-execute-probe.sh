@@ -6,6 +6,8 @@
 # BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_FULL_LINK=1 (north-star5 / post-spine-entry edits).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=bootstrap-gen0-install-prelinked-driver.sh
+source "$(dirname "$0")/bootstrap-gen0-install-prelinked-driver.sh"
 ENTRY="${ROOT}/test/selfhost/compiler_lib_spine_smoke/main.php"
 OUT="${ROOT}/build/selfhost-lib-spine-smoke"
 LINK="${ROOT}/script/bootstrap-selfhost-lib-spine-smoke-link.sh"
@@ -91,9 +93,6 @@ if [[ -x "${OUT}" ]]; then
   fi
   fast_probe_failed=1
 fi
-
-# shellcheck source=bootstrap-gen0-install-prelinked-driver.sh
-source "$(dirname "$0")/bootstrap-gen0-install-prelinked-driver.sh"
 
 full_link="${BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_FULL_LINK:-0}"
 if [[ "${full_link}" != "1" && "${want_sha}" != "${have_sha}" ]]; then

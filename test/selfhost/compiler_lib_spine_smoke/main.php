@@ -5373,6 +5373,7 @@ require_once __DIR__.'/../../../lib/HexFloat.php';
 require_once __DIR__.'/../../../lib/JIT.php';
 require_once __DIR__.'/../../../lib/JIT/Analyzer.php';
 require_once __DIR__.'/../../../lib/JIT/AotDebugSymbols.php';
+require_once __DIR__.'/../../../lib/JIT/AotGcSections.php';
 require_once __DIR__.'/../../../lib/JIT/ArrayAccessHelper.php';
 require_once __DIR__.'/../../../lib/JIT/ArrayBuiltinHelper.php';
 require_once __DIR__.'/../../../lib/JIT/ArrayFilterCallbackPolicy.php';

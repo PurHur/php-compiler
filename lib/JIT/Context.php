@@ -3099,6 +3099,7 @@ class Context {
             || $vendorObjectOnly;
         // M5 vendor argv uses -o path ending in .o; do not append a second .o (#3054).
         $objectFile = $keepingObjectOnly && str_ends_with($file, '.o') ? $file : $file.'.o';
+        AotGcSections::applyFunctionSections($this->llvm, $this->module);
         Progress::noteFunction('jit_context_emit_object_begin');
         $machine->emitToFile($this->module, $objectFile, $machine::CODEGEN_FILE_TYPE_OBJECT);
         Progress::noteFunction('jit_context_emit_object_done');
