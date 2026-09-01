@@ -161,9 +161,11 @@ abstract class BaseTest extends TestCase {
             }
         }
         $cmd[] = '-d';
-        $cmd[] = 'display_errors=0';
+        $cmd[] = 'display_errors=stderr';
         $cmd[] = '-d';
-        $cmd[] = 'error_reporting=0';
+        $cmd[] = 'error_reporting=1';
+        $cmd[] = '-d';
+        $cmd[] = 'log_errors=1';
         $memoryLimit = getenv('PHP_COMPILER_MEMORY_LIMIT') ?: '1536M';
         if ('-1' !== $memoryLimit) {
             $cmd[] = '-d';

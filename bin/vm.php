@@ -50,8 +50,10 @@ function run(string $filename, string $code, array $options): void
     try {
         $block = $runtime->parseAndCompile($code, $filename);
     } catch (\CompileError $e) {
+        // Runtime::parseAndCompile already logged via emitParseCompileFailureStderr (#5354, #36208).
         exit(255);
     } catch (\LogicException $e) {
+        // Runtime::parseAndCompile already logged Zend-shaped fatal (#36208).
         exit(255);
     }
     if (! isset($options['-l'])) {
@@ -60,8 +62,7 @@ function run(string $filename, string $code, array $options): void
         } catch (PHPCompiler\VM\ScriptExit $e) {
             exit($e->status);
         } catch (\LogicException $e) {
-            echo $e->getMessage(), "\n";
-            exit(255);
+            php_compiler_cli_fatal_exit($e);
         }
     }
 }

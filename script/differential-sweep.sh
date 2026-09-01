@@ -147,7 +147,7 @@ for f in "$DIR"/*.php; do
         if [ "$BACKEND" = aot ]; then
             got="$(timeout 120 "$bin" 2>&1)"
         else
-            got="$(timeout 120 php bin/vm.php "$f" 2>&1)"
+            got="$(timeout 120 php -d error_reporting=1 -d log_errors=1 -d display_errors=stderr bin/vm.php "$f" 2>&1)"
         fi
         if [ "$zend" = "$got" ]; then
             matched=$((matched + 1))
