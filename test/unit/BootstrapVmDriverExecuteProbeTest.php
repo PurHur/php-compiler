@@ -44,6 +44,13 @@ final class BootstrapVmDriverExecuteProbeTest extends TestCase
         $this->assertStringContainsString('BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_ATTEMPTS', $script);
         $this->assertStringContainsString('VM driver execute transient failure', $script);
         $this->assertMatchesRegularExpression('/BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_ATTEMPTS:-5/', $script);
+        // Fast path calls sidecar stamp refresh — helpers must be sourced first (#36186).
+        $this->assertStringContainsString('bootstrap_refresh_compiler_lib_sidecar_stamp_if_byte_matched_prelinked', $script);
+        $sourcePos = strpos($script, 'bootstrap-gen0-install-prelinked-driver.sh');
+        $stampPos = strpos($script, 'bootstrap_refresh_compiler_lib_sidecar_stamp_if_byte_matched_prelinked');
+        $this->assertNotFalse($sourcePos);
+        $this->assertNotFalse($stampPos);
+        $this->assertLessThan($stampPos, $sourcePos, 'sidecar stamp helper must be sourced before first call');
     }
 
     public function testSpineEntryDocumentsVmDriverExecutePath(): void

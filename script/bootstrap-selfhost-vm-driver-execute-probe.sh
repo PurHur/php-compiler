@@ -39,6 +39,10 @@ if [[ -f "${stamp}" ]]; then
   have_sha="$(tr -d '\n' <"${stamp}")"
 fi
 
+# Sidecar stamp refresh helpers live here; fast path must source before calling them (#36186).
+# shellcheck source=bootstrap-gen0-install-prelinked-driver.sh
+source "$(dirname "$0")/bootstrap-gen0-install-prelinked-driver.sh"
+
 bootstrap_vm_driver_execute_probe_run() {
   env PHP_COMPILER_VM_DRIVER_EXECUTE=1 "${OUT}" 2>&1
 }
@@ -91,9 +95,6 @@ if [[ -x "${OUT}" ]]; then
   fi
   fast_probe_failed=1
 fi
-
-# shellcheck source=bootstrap-gen0-install-prelinked-driver.sh
-source "$(dirname "$0")/bootstrap-gen0-install-prelinked-driver.sh"
 
 full_link="${BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_FULL_LINK:-0}"
 if [[ "${full_link}" != "1" && "${want_sha}" != "${have_sha}" ]]; then
