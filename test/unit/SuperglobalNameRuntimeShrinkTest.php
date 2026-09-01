@@ -32,10 +32,11 @@ final class SuperglobalNameRuntimeShrinkTest extends TestCase
         $this->assertLessThan(160, \substr_count($source, "\n") + 1);
     }
 
-    public function testSuperglobalNameJitHelperDelegatesToSuperglobalNames(): void
+    public function testSuperglobalNameJitHelperUsesCompileTimeSwitch(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/SuperglobalNameJitHelper.php');
-        $this->assertStringContainsString('SuperglobalNames::isSuperglobalName', $source);
+        $this->assertStringContainsString("case '_GET':", $source);
+        $this->assertStringNotContainsString('return SuperglobalNames::isSuperglobalName', $source);
     }
 
     public function testSuperglobalNameJitHelperSemanticsMatchSuperglobalNames(): void
