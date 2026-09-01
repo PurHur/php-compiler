@@ -477,6 +477,10 @@ final class BootstrapCompileSmokeM3Emit
         if ('1' === $inventoryEmit || 'true' === strtolower((string) $inventoryEmit)) {
             return true;
         }
+        $inventoryEmitDriver = getenv('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER');
+        if ('1' === $inventoryEmitDriver || 'true' === strtolower((string) $inventoryEmitDriver)) {
+            return true;
+        }
         // Full M5 argv / gen-0 seed drivers must bake RuntimeEmitTuInit + real parseAndCompile
         // even though PHP_COMPILER_M3_COMPILE_DRIVER=1 (that flag alone selects stub spine for
         // helloworld inventory argv — #12036). Without this, functional smoke dies at
