@@ -22,22 +22,66 @@ final class SimplifierUseChainOpcodeEquivalenceTest extends TestCase
         putenv('PHPCFG_SIMPLIFIER_LEGACY');
     }
 
-    /** @return list<array{0: string}> */
-    public static function corpusProvider(): array
+    /** @return list<string> */
+    private static function discoverCorpusPaths(): array
     {
         $root = \dirname(__DIR__, 2);
-        $rels = [
+        $dirs = [
+            $root.'/lib',
+            $root.'/ext/standard',
+            $root.'/examples',
+            $root.'/bin',
+        ];
+        $files = [];
+        foreach ($dirs as $dir) {
+            if (! is_dir($dir)) {
+                continue;
+            }
+            $it = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS)
+            );
+            foreach ($it as $file) {
+                if (! $file->isFile() || 'php' !== $file->getExtension()) {
+                    continue;
+                }
+                $path = $file->getPathname();
+                if (str_contains($path, '/vendor/') || str_contains($path, '/build/')) {
+                    continue;
+                }
+                $files[] = substr($path, \strlen($root) + 1);
+            }
+        }
+        $spine = $root.'/test/selfhost/compiler_lib_spine_smoke/main.php';
+        if (is_readable($spine)) {
+            $files[] = 'test/selfhost/compiler_lib_spine_smoke/main.php';
+        }
+        $files = array_values(array_unique($files));
+        sort($files, SORT_STRING);
+
+        return $files;
+    }
+
+    /** @return list<string> */
+    private static function representativeSample(): array
+    {
+        $want = [
             'examples/000-HelloWorld/example.php',
             'lib/Printer.php',
+            'lib/Block.php',
+            'lib/Compiler.php',
+            'lib/VM.php',
+            'lib/JIT/Context.php',
             'ext/standard/Module.php',
+            'ext/standard/PackJitHelper.php',
             'bin/print.php',
             'bin/vm.php',
+            'test/selfhost/compiler_lib_spine_smoke/main.php',
         ];
+        $root = \dirname(__DIR__, 2);
         $out = [];
-        foreach ($rels as $rel) {
-            $abs = $root.'/'.$rel;
-            if (is_readable($abs)) {
-                $out[$rel] = [$abs];
+        foreach ($want as $rel) {
+            if (is_readable($root.'/'.$rel)) {
+                $out[] = $rel;
             }
         }
 
@@ -50,7 +94,7 @@ final class SimplifierUseChainOpcodeEquivalenceTest extends TestCase
             putenv('PHPCFG_SIMPLIFIER_USECHAIN=0');
             putenv('PHPCFG_SIMPLIFIER_LEGACY=1');
         } else {
-            putenv('PHPCFG_SIMPLIFIER_USECHAIN');
+            putenv('PHPCFG_SIMPLIFIER_USECHAIN=1');
             putenv('PHPCFG_SIMPLIFIER_LEGACY');
         }
         $runtime = new Runtime();
@@ -60,23 +104,49 @@ final class SimplifierUseChainOpcodeEquivalenceTest extends TestCase
         return (new OpCodePrinter())->print($block);
     }
 
-    /**
-     * @dataProvider corpusProvider
-     */
-    public function testDefaultUseChainMatchesLegacyOpcodes(string $file): void
+    public function testCorpusHasMinimumFileCount(): void
     {
-        $legacy = $this->opcodes($file, true);
-        $usechain = $this->opcodes($file, false);
-        $this->assertSame(
-            $legacy,
-            $usechain,
-            basename($file).': use-chain opcodes diverged from legacy CFG walk'
-        );
+        $this->assertGreaterThanOrEqual(100, \count(self::discoverCorpusPaths()));
+    }
+
+    public function testDefaultUseChainMatchesLegacyOpcodesOnRepresentativeSample(): void
+    {
+        $root = \dirname(__DIR__, 2);
+        foreach (self::representativeSample() as $rel) {
+            $abs = $root.'/'.$rel;
+            $legacy = $this->opcodes($abs, true);
+            $usechain = $this->opcodes($abs, false);
+            $this->assertSame(
+                $legacy,
+                $usechain,
+                $rel.': use-chain opcodes diverged from legacy CFG walk'
+            );
+        }
+    }
+
+    /**
+     * @group slow
+     */
+    public function testDefaultUseChainMatchesLegacyOpcodesOnFullCorpus(): void
+    {
+        $root = \dirname(__DIR__, 2);
+        foreach (self::discoverCorpusPaths() as $rel) {
+            $abs = $root.'/'.$rel;
+            if (! is_readable($abs)) {
+                continue;
+            }
+            $legacy = $this->opcodes($abs, true);
+            $usechain = $this->opcodes($abs, false);
+            $this->assertSame(
+                $legacy,
+                $usechain,
+                $rel.': use-chain opcodes diverged from legacy CFG walk'
+            );
+        }
     }
 
     public function testLegacyEnvForcesCfgWalkPath(): void
     {
-        // Smoke: both opt-out knobs are accepted without throwing on a tiny script.
         $root = \dirname(__DIR__, 2);
         $file = $root.'/examples/000-HelloWorld/example.php';
         putenv('PHPCFG_SIMPLIFIER_USECHAIN=0');
