@@ -330,6 +330,81 @@ class Block {
         return $value;
     }
 
+    /**
+     * Zend include/require: included file shares caller locals by name (issue #471).
+     */
+    private static function findVariableInParentFrames(Operand $op, Frame $frame): ?Variable
+    {
+        $name = self::resolveVariableName($op);
+        // php-cfg merge temporaries use empty Var names; do not match other "" slots (#3790).
+        if (null === $name || '' === $name) {
+            return null;
+        }
+
+        return self::findVariableInParentFramesByName($name, $frame);
+    }
+
+    /** Bound $this from auto-bound / bindTo closure invoke (issue #5325, Zend zend_closures.c). */
+    private static function resolveBoundClosureThis(Frame $frame): ?Variable
+    {
+        if (null !== $frame->pendingClosureInvoke && null !== $frame->pendingClosureInvoke->boundThis) {
+            return $frame->pendingClosureInvoke->boundThis;
+        }
+        if (null !== $frame->closureCall && null !== $frame->closureCall->boundThis) {
+            return $frame->closureCall->boundThis;
+        }
+
+        return null;
+    }
+
+    public static function findVariableInParentFramesByName(string $name, Frame $frame): ?Variable
+    {
+        // Limit the walk to the function that owns $frame. Foreach/merge blocks set
+        // inheritUndefinedLocals (so blocksScriptGlobalInheritance() is false) and must
+        // still share locals across CFG edges — but must not alias caller CVs of the same
+        // name. That alias made foreach-by-ref over &...$args bind the loop var to itself
+        // via the packed indirect (#21932; Zend/zend_execute.c FE_FETCH_RW).
+        $startFunc = null !== $frame->block ? $frame->block->func : null;
+        $blockScriptGlobals = null !== $frame->block && $frame->block->blocksScriptGlobalInheritance();
+        for ($f = $frame; null !== $f; $f = $f->parent) {
+            if (
+                null !== $startFunc
+                && null !== $f->block
+                && (null === $f->block->func || $f->block->func !== $startFunc)
+            ) {
+                break;
+            }
+            if (
+                $blockScriptGlobals
+                && null !== $f->block
+                && $f->block->isMainScript()
+            ) {
+                break;
+            }
+            if ('this' === $name) {
+                $boundThis = self::resolveBoundClosureThis($f);
+                if (null !== $boundThis) {
+                    return $boundThis;
+                }
+            }
+            if ('this' === $name && !empty($f->calledArgs)) {
+                return $f->calledArgs[0];
+            }
+            if (null === $f->block) {
+                continue;
+            }
+            $idx = $f->block->slotIndexForVariableName($name);
+            if (null !== $idx && isset($f->scope[$idx])) {
+                return $f->scope[$idx];
+            }
+            if (isset($f->dynamicLocals[$name])) {
+                return $f->dynamicLocals[$name];
+            }
+        }
+
+        return null;
+    }
+
     public function registerNamedAssignDest(Operand $varRoot, int $slot): void
     {
         $this->namedAssignDestSlots[$varRoot] = $slot;
@@ -1528,81 +1603,6 @@ class Block {
         }
 
         return $frame->dynamicLocals[$name];
-    }
-
-    /**
-     * Zend include/require: included file shares caller locals by name (issue #471).
-     */
-    private static function findVariableInParentFrames(Operand $op, Frame $frame): ?Variable
-    {
-        $name = self::resolveVariableName($op);
-        // php-cfg merge temporaries use empty Var names; do not match other "" slots (#3790).
-        if (null === $name || '' === $name) {
-            return null;
-        }
-
-        return self::findVariableInParentFramesByName($name, $frame);
-    }
-
-    /** Bound $this from auto-bound / bindTo closure invoke (issue #5325, Zend zend_closures.c). */
-    private static function resolveBoundClosureThis(Frame $frame): ?Variable
-    {
-        if (null !== $frame->pendingClosureInvoke && null !== $frame->pendingClosureInvoke->boundThis) {
-            return $frame->pendingClosureInvoke->boundThis;
-        }
-        if (null !== $frame->closureCall && null !== $frame->closureCall->boundThis) {
-            return $frame->closureCall->boundThis;
-        }
-
-        return null;
-    }
-
-    public static function findVariableInParentFramesByName(string $name, Frame $frame): ?Variable
-    {
-        // Limit the walk to the function that owns $frame. Foreach/merge blocks set
-        // inheritUndefinedLocals (so blocksScriptGlobalInheritance() is false) and must
-        // still share locals across CFG edges — but must not alias caller CVs of the same
-        // name. That alias made foreach-by-ref over &...$args bind the loop var to itself
-        // via the packed indirect (#21932; Zend/zend_execute.c FE_FETCH_RW).
-        $startFunc = null !== $frame->block ? $frame->block->func : null;
-        $blockScriptGlobals = null !== $frame->block && $frame->block->blocksScriptGlobalInheritance();
-        for ($f = $frame; null !== $f; $f = $f->parent) {
-            if (
-                null !== $startFunc
-                && null !== $f->block
-                && (null === $f->block->func || $f->block->func !== $startFunc)
-            ) {
-                break;
-            }
-            if (
-                $blockScriptGlobals
-                && null !== $f->block
-                && $f->block->isMainScript()
-            ) {
-                break;
-            }
-            if ('this' === $name) {
-                $boundThis = self::resolveBoundClosureThis($f);
-                if (null !== $boundThis) {
-                    return $boundThis;
-                }
-            }
-            if ('this' === $name && !empty($f->calledArgs)) {
-                return $f->calledArgs[0];
-            }
-            if (null === $f->block) {
-                continue;
-            }
-            $idx = $f->block->slotIndexForVariableName($name);
-            if (null !== $idx && isset($f->scope[$idx])) {
-                return $f->scope[$idx];
-            }
-            if (isset($f->dynamicLocals[$name])) {
-                return $f->dynamicLocals[$name];
-            }
-        }
-
-        return null;
     }
 
     /**
