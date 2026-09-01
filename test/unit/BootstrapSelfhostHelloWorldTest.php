@@ -199,6 +199,8 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $resolve = (string) file_get_contents(self::$root.'/script/bootstrap-resolve-compile-invoke.sh');
         $this->assertStringContainsString('BOOTSTRAP_INVENTORY_DRIVER_USE_PRELINKED', $resolve);
         $this->assertStringContainsString('PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1', $resolve);
+        $this->assertStringContainsString('PHP_COMPILER_M5_DRIVER_HOST=1', $resolve);
+        $this->assertStringContainsString('PHP_COMPILER_HELPER_RUNTIME_O=1', $resolve);
         $this->assertStringContainsString('bootstrap_inventory_argv_link', $resolve);
         $this->assertStringContainsString('BOOTSTRAP_ALLOW_SIDECAR_EMIT_FALLBACK', $resolve);
         $this->assertStringContainsString('emit_path=${BOOTSTRAP_COMPILE_DRIVER_MODE:-native}', $resolve);
@@ -516,6 +518,8 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('compile_driver.php', $compile);
         $this->assertStringContainsString('#23970', $compile);
         $this->assertStringContainsString('PHP_COMPILER_HELPER_RUNTIME_O=1', $compile);
+        $this->assertStringContainsString('inventoryArgvSeed', $compile);
+        $this->assertStringContainsString('#36144', $compile);
         $this->assertMatchesRegularExpression(
             '/function phpc_compile_skip_aot_bundle.*?compile_driver\.php/s',
             $compile

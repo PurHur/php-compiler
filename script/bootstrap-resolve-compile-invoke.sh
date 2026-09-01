@@ -381,10 +381,12 @@ bootstrap_inventory_argv_driver_accepts() {
   if ! bootstrap_inventory_argv_driver_smoke "${driver}"; then
     return 1
   fi
-  if ! bootstrap_inventory_argv_driver_minimal_smoke "${driver}"; then
+  # M4 bin/compile.php emit before compiler_minimal — minimal smoke seeds M3 sidecars
+  # that make the next bin/compile.php compile byte-match stale prelinked (#8710, #36144).
+  if ! bootstrap_inventory_argv_driver_m4_smoke "${driver}"; then
     return 1
   fi
-  bootstrap_inventory_argv_driver_m4_smoke "${driver}"
+  bootstrap_inventory_argv_driver_minimal_smoke "${driver}"
 }
 
 # Gen-0 prelinked argv drivers may lack bin/compile.php path-keyed LLVM sidecar; recover from blob (#1492).
@@ -422,8 +424,8 @@ bootstrap_inventory_argv_driver_m4_smoke() {
     # shellcheck source=bootstrap-gen0-install-prelinked-driver.sh
     source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/bootstrap-gen0-install-prelinked-driver.sh"
   fi
-  bootstrap_gen0_seed_prelinked_m3_sidecars 2>/dev/null || true
-  bootstrap_ensure_prelinked_sidecar_path_symlink 2>/dev/null || true
+  # Do not seed prelinked M3 sidecars before the primary native emit — that routes
+  # bin/compile.php through sidecar COPY and false-fails stale prelinked cmp (#8710, #36144).
   local lint_log=""
   local lint_code=0
   set +e
@@ -471,6 +473,8 @@ bootstrap_inventory_argv_driver_m4_smoke() {
   if [[ "${compile_code}" -ne 0 ]] \
     || ! bootstrap_native_compile_output_ok "${compile_log}" \
     || ! bootstrap_inventory_argv_emit_output_ok "${compile_out}"; then
+    bootstrap_gen0_seed_prelinked_m3_sidecars 2>/dev/null || true
+    bootstrap_ensure_prelinked_sidecar_path_symlink 2>/dev/null || true
     if bootstrap_inventory_bin_compile_m4_sidecar_recover "${compile_out}" "${bin_compile}" \
       && bootstrap_inventory_argv_emit_output_ok "${compile_out}" \
       && bootstrap_inventory_argv_driver_size_ok "${compile_out}"; then
@@ -603,6 +607,8 @@ bootstrap_inventory_argv_link() {
     PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1 \
     PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1 \
     BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1 \
+    PHP_COMPILER_M5_DRIVER_HOST=1 \
+    PHP_COMPILER_HELPER_RUNTIME_O=1 \
     PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke \
     PHP_COMPILER_M3_INVENTORY_MINIMAL_SIDECARS="${_inventory_minimal}" \
     PHP_COMPILER_M3_REUSE_STALE_COMPILER_LIB_SIDECAR="${_inventory_minimal}"; then
@@ -630,6 +636,8 @@ bootstrap_inventory_argv_link() {
         putenv('PHP_COMPILER_M3_COMPILE_DRIVER=1');
         putenv('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1');
         putenv('PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1');
+        putenv('PHP_COMPILER_M5_DRIVER_HOST=1');
+        putenv('PHP_COMPILER_HELPER_RUNTIME_O=1');
         putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke');
         putenv('PHP_COMPILER_M3_INVENTORY_MINIMAL_SIDECARS=${_inventory_minimal}');
         putenv('PHP_COMPILER_M3_REUSE_STALE_COMPILER_LIB_SIDECAR=${_inventory_minimal}');

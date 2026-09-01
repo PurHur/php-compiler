@@ -420,8 +420,17 @@ function run(string $filename, string $code, array $options): void
     // Skip-bundle inventory compile_driver needs helper-runtime .o for ABIs like
     // phpc_str_replace — NestedJIT includes hit those calls while NestedJitCompileScope
     // is active and StringStrReplace::ensureLinked no-ops (#23970 / peer #8559).
+    // Inventory argv seed (Zend compile of bin/compile.php itself) hits the same ABIs (#36144).
+    $inventoryArgvSeed = (str_ends_with($normalized, '/bin/compile.php') || 'bin/compile.php' === $normalized)
+        && (('1' === (string) (getenv('PHP_COMPILER_M4_BIN_COMPILE_DRIVER') ?: ''))
+            || 'true' === strtolower((string) (getenv('PHP_COMPILER_M4_BIN_COMPILE_DRIVER') ?: ''))
+            || '1' === (string) (getenv('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER') ?: '')
+            || 'true' === strtolower((string) (getenv('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER') ?: ''))
+            || '1' === (string) (getenv('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER') ?: '')
+            || 'true' === strtolower((string) (getenv('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER') ?: '')));
     $needHelperRuntimeO = $setUserScriptAot
-        || ($skipBundle && str_contains($normalized, 'compile_driver.php'));
+        || ($skipBundle && str_contains($normalized, 'compile_driver.php'))
+        || $inventoryArgvSeed;
     if ($setUserScriptAot && \function_exists('putenv')) {
         putenv('PHP_COMPILER_AOT_USER_SCRIPT=1');
         $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
