@@ -121,6 +121,9 @@ final class ObjectInstancePropertyLlvm
         if (\PHPCompiler\ext\dom\JitDomDocumentDoctype::isDomDocumentDoctype($classLc, strtolower($name))) {
             return \PHPCompiler\ext\dom\JitDomDocumentDoctype::fetch($object, $obj, $class);
         }
+        if (\PHPCompiler\ext\dom\JitDomNodeBaseUri::isDomNodeBaseUriProperty($classLc, strtolower($name))) {
+            return \PHPCompiler\ext\dom\JitDomNodeBaseUri::fetch($object, $obj, $class);
+        }
         if (\PHPCompiler\ext\dom\JitDomDocumentMetaProps::isDomDocumentMetaProp($classLc, strtolower($name))) {
             return \PHPCompiler\ext\dom\JitDomDocumentMetaProps::fetch($object, $obj, $class, $name);
         }

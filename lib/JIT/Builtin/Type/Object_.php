@@ -2204,6 +2204,15 @@ class Object_ extends Type {
         $this->setClassInterfaces('DOMText', ['domchildnode']);
         $this->setClassInterfaces('DOMComment', ['domchildnode']);
         $this->setClassInterfaces('DOMCdataSection', ['domchildnode']);
+        // property_exists() walks parentClassLc — DOMNode declares baseURI (#34904).
+        $this->setClassParentName('DOMElement', 'DOMNode');
+        $this->setClassParentName('DOMAttr', 'DOMNode');
+        $this->setClassParentName('DOMDocument', 'DOMNode');
+        $this->setClassParentName('DOMDocumentFragment', 'DOMNode');
+        $this->setClassParentName('DOMCharacterData', 'DOMNode');
+        $this->setClassParentName('DOMText', 'DOMCharacterData');
+        $this->setClassParentName('DOMComment', 'DOMCharacterData');
+        $this->setClassParentName('DOMCdataSection', 'DOMCharacterData');
         $this->ensureDomLivingParentChildInterfaces();
         // php-src session.stub.php — SessionId / UpdateTimestamp do not extend Handler (#22262).
         $this->markInterfaceClass('SessionHandlerInterface');
@@ -4642,6 +4651,12 @@ class Object_ extends Type {
             }
             // Thin user-script AOT must call __construct (not allocate-only) (#26772).
             $this->markHasConstructor($id);
+        }
+        if ('domnode' === $lcname) {
+            // Stub for property_exists() + inheritance — computed read via JitDomNodeBaseUri (#34904).
+            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_BASE_URI, Variable::TYPE_VALUE);
+            $this->markPropertyWriteReject($id, \PHPCompiler\ext\dom\VmDom::PROP_BASE_URI);
+            $this->propagateInstancePropertyToSubclasses($id, \PHPCompiler\ext\dom\VmDom::PROP_BASE_URI);
         }
         if ('domelement' === $lcname) {
             $this->defineProperty($id, 'nodeName', Variable::TYPE_STRING);
