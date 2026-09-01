@@ -10874,8 +10874,25 @@ restart:
 
         // Cross-block loop back-edges must reuse the header frame — otherwise every iteration
         // chains a new parent Frame and getFrame walks grow without bound (#1228, #15906, #36148).
+        // Recursive re-entry shares Block objects across activations — only reuse frames within
+        // the current call (#23472 g06_nested_recursion OOM).
         $targetFunc = $target->func;
+        $activationEntry = $this->activationEntryFrame($frame, $targetFunc);
+
+        if (
+            null !== $frame->parent
+            && $frame->parent->block === $target
+            && (null === $activationEntry || $this->frameInActivation($activationEntry, $frame->parent))
+        ) {
+            $frame->parent->pos = 0;
+
+            return $frame->parent;
+        }
+
         for ($ancestor = $frame->parent; null !== $ancestor; $ancestor = $ancestor->parent) {
+            if (null !== $activationEntry && !$this->frameInActivation($activationEntry, $ancestor)) {
+                break;
+            }
             if ($ancestor->block === $target) {
                 $ancestor->pos = 0;
 
@@ -10892,6 +10909,36 @@ restart:
         }
 
         return $target->getFrame($this->context, $frame);
+    }
+
+    /** Innermost entry-block frame for the active call of $func, if any. */
+    private function activationEntryFrame(Frame $frame, ?\PHPCfg\Func $func): ?Frame
+    {
+        if (null === $func || null === $func->cfg) {
+            return null;
+        }
+        for ($f = $frame; null !== $f; $f = $f->parent) {
+            if (null === $f->block || $f->block->func !== $func) {
+                break;
+            }
+            if (null !== $f->block->orig && $f->block->orig === $func->cfg) {
+                return $f;
+            }
+        }
+
+        return null;
+    }
+
+    /** True when $candidate is $activationEntry or a descendant frame in the same activation. */
+    private function frameInActivation(Frame $activationEntry, Frame $candidate): bool
+    {
+        for ($f = $candidate; null !== $f; $f = $f->parent) {
+            if ($f === $activationEntry) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** Zend compile-time fatal if $this is written; runtime guard when compile missed (#4865). */
