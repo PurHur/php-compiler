@@ -190,6 +190,40 @@ bootstrap_copy_prelinked_compiler_lib_spine_blob() {
   return 0
 }
 
+# When spine entry edits are require_once-only and the linked binary is still byte-identical
+# to committed prelinked/compiler_lib_aot_blob, refresh the sidecar stamp after a passing VM
+# driver probe — same policy as bootstrap-selfhost-lib-spine-smoke-link.sh (#8559, #8703).
+bootstrap_refresh_compiler_lib_sidecar_stamp_if_byte_matched_prelinked() {
+  local out=$1
+  local root="${ROOT:-}"
+  if [[ -z "${root}" || -z "${out}" || ! -x "${out}" ]]; then
+    return 1
+  fi
+  local want_sha have_sha
+  want_sha="$(bootstrap_compiler_lib_spine_entry_sha)" || return 1
+  local prelinked_lib="${root}/prelinked/bootstrap-gen0/compiler_lib_aot_blob"
+  local prelinked_stamp="${root}/prelinked/bootstrap-gen0/.m3_compiler_lib_sidecar.sha"
+  local build_stamp="${root}/build/.m3_compiler_lib_sidecar.sha"
+  if [[ ! -f "${prelinked_lib}" || ! -s "${prelinked_lib}" ]]; then
+    return 1
+  fi
+  if ! cmp -s "${out}" "${prelinked_lib}"; then
+    return 1
+  fi
+  have_sha=""
+  if [[ -f "${prelinked_stamp}" ]]; then
+    have_sha="$(tr -d '\n' <"${prelinked_stamp}")"
+  fi
+  if [[ "${want_sha}" == "${have_sha}" ]]; then
+    return 0
+  fi
+  mkdir -p "${root}/build" "$(dirname "${prelinked_stamp}")"
+  printf '%s' "${want_sha}" >"${build_stamp}"
+  printf '%s' "${want_sha}" >"${prelinked_stamp}"
+  echo "bootstrap-refresh-sidecar-stamp: byte-matched prelinked + VM probe OK — stamp ${have_sha:-<none>} -> ${want_sha} (#8703)" >&2
+  return 0
+}
+
 # SHA-1 of M2 compiler_lib_spine_smoke entry (sidecar + inventory argv driver must match).
 bootstrap_compiler_lib_spine_entry_sha() {
   local root="${ROOT:-}"
