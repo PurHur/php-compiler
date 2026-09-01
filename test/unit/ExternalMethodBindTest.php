@@ -143,6 +143,23 @@ final class ExternalMethodBindTest extends TestCase
     }
 
     /**
+     * SPINE_CHUNK registers static proxies in source order — helpers used by findSlot must
+     * precede it (#36155, same constraint as cfgVarRoot/resolveVariableName in #36166).
+     */
+    public function testBlockFindVariableHelpersPrecedeFindSlot(): void
+    {
+        $source = (string) file_get_contents(dirname(__DIR__, 2).'/lib/Block.php');
+        $findSlot = strpos($source, 'public function findSlot(');
+        $findVar = strpos($source, 'function findVariableInParentFrames(');
+        $findByName = strpos($source, 'function findVariableInParentFramesByName(');
+        $this->assertNotFalse($findSlot);
+        $this->assertNotFalse($findVar);
+        $this->assertNotFalse($findByName);
+        $this->assertLessThan($findSlot, $findVar);
+        $this->assertLessThan($findSlot, $findByName);
+    }
+
+    /**
      * Consumer chunk binds a producer symbol via manifest + bitcode (#36155 Phase C).
      */
     public function testTryBindFromChunkManifestBitcode(): void
