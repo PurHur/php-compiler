@@ -38,9 +38,7 @@ final class JitDomDocumentMetaProps
         return 'implementation' === $propLc
             || 'xmlencoding' === $propLc
             || 'actualencoding' === $propLc
-            || 'config' === $propLc
-            // DOMNode::$baseURI — read-only alias of documentURI (#34925 / #34904).
-            || 'baseuri' === $propLc;
+            || 'config' === $propLc;
     }
 
     public static function fetch(Object_ $objectType, Value $obj, string $className, string $propName): JITVariable
@@ -67,20 +65,6 @@ final class JitDomDocumentMetaProps
                 false
             );
         }
-        // Read-only alias of $documentURI (php-src node.c base_uri_read; #34925).
-        if ('baseuri' === $propLc) {
-            $classId = $objectType->lookup('DOMDocument');
-
-            return \PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
-                $objectType,
-                $obj,
-                'DOMDocument',
-                VmDom::PROP_DOCUMENT_URI,
-                $classId,
-                false
-            );
-        }
-
         return self::boxNull($context);
     }
 
