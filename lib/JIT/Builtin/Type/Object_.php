@@ -1540,7 +1540,21 @@ class Object_ extends Type {
 
     public function propNameIdAfterDefine(string $name): int
     {
-        return $this->propNameMap[$name];
+        if (isset($this->propNameMap[$name])) {
+            return $this->propNameMap[$name];
+        }
+        $nameLc = strtolower($name);
+        foreach ($this->properties as $props) {
+            foreach ($props as $existing) {
+                if (strtolower($existing[1]) === $nameLc) {
+                    $this->propNameMap[$name] = $existing[0];
+
+                    return $existing[0];
+                }
+            }
+        }
+
+        throw new \LogicException('propNameIdAfterDefine: property not registered: '.$name);
     }
 
     /**
@@ -6598,6 +6612,10 @@ class Object_ extends Type {
             $traitSourceId = $this->instancePropertyTraitSourceId[$classId][$nameLc] ?? null;
             if ($declaringId === $classId && null === $traitSourceId) {
                 // Same class already declared this property — keep the first slot.
+                if (!isset($this->propNameMap[$name])) {
+                    $this->propNameMap[$name] = $existing[0];
+                }
+
                 return;
             }
             // Parent private slots coexist with same-name child privates (zend_inheritance.c / #22521 / #33439).
@@ -6626,6 +6644,9 @@ class Object_ extends Type {
             unset($this->propertyDefaults[$classId][$existing[3]]);
             unset($this->runtimePropertyNewDefaults[$classId][$existing[3]]);
             unset($this->propertyFromConstructorPromotion[$classId][$existing[3]]);
+            if (!isset($this->propNameMap[$name])) {
+                $this->propNameMap[$name] = $existing[0];
+            }
 
             return;
         }
