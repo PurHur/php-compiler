@@ -174,9 +174,13 @@ final class JitDomNodeListItemUserScript
                     $preferRemat = $context->builder->or($pinNull, $liveNull);
                     $liveOrRemat = $context->builder->select($preferRemat, $compileTime, $live);
                     if (null !== $snapXml) {
-                        $isSnapshot = self::receiverHasXPathSnapshot($context, $args[0]);
-
-                        return $context->builder->select($isSnapshot, $compileTime, $liveOrRemat);
+                        return self::selectXPathSnapshotOrLiveItem(
+                            $context,
+                            $args[0],
+                            $compileTime,
+                            $liveOrRemat,
+                            $snapXml
+                        );
                     }
 
                     return $liveOrRemat;
@@ -235,8 +239,8 @@ final class JitDomNodeListItemUserScript
         }
 
         // XPath //tag lists: prefer live pinned-root walk so item() keeps
-        // ownerDocument for setIdAttribute (#35447). XPath snapshot NodeLists
-        // (PROP_XPATH_SNAPSHOT) must not live-walk after DOM mutations (#36065).
+        // ownerDocument for setIdAttribute (#35447). After DOM mutations,
+        // snapshot NodeLists rematerialize from query-time XML (#36065).
         if (null !== $xml && null !== $queryTag && '' !== $queryTag) {
             $snapXml = JitDomXPathQueryUserScript::snapshotXmlForAxisId(0);
             $pinned = DomUserScriptPinnedRootLlvm::load($context);
@@ -268,9 +272,13 @@ final class JitDomNodeListItemUserScript
             $preferRemat = $context->builder->or($pinNull, $liveNull);
             $liveOrRemat = $context->builder->select($preferRemat, $compileTime, $live);
             if (null !== $snapXml) {
-                $isSnapshot = self::receiverHasXPathSnapshot($context, $args[0]);
-
-                return $context->builder->select($isSnapshot, $compileTime, $liveOrRemat);
+                return self::selectXPathSnapshotOrLiveItem(
+                    $context,
+                    $args[0],
+                    $compileTime,
+                    $liveOrRemat,
+                    $snapXml
+                );
             }
 
             return $liveOrRemat;
@@ -579,6 +587,27 @@ final class JitDomNodeListItemUserScript
         );
 
         return $context->helper->loadValue($fetched);
+    }
+
+    /**
+     * XPath snapshot lists rematerialize only when query-time XML differs from the
+     * current compile-time tree (#36065). On an unchanged tree, live-walk item()
+     * so setIdAttribute keeps ownerDocument and DomRegistry (#35447).
+     */
+    private static function selectXPathSnapshotOrLiveItem(
+        Context $context,
+        JITVariable $listVar,
+        Value $compileTime,
+        Value $liveOrRemat,
+        ?string $snapXml
+    ): Value {
+        $currentXml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        if (null !== $snapXml && null !== $currentXml && $snapXml === $currentXml) {
+            return $liveOrRemat;
+        }
+        $isSnapshot = self::receiverHasXPathSnapshot($context, $listVar);
+
+        return $context->builder->select($isSnapshot, $compileTime, $liveOrRemat);
     }
 
     /** XPath query() NodeLists carry {@see VmDom::PROP_XPATH_SNAPSHOT} (#36065). */
