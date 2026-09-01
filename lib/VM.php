@@ -21180,10 +21180,11 @@ restart:
             if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
                 continue;
             }
-            if (isset($entry->methods[$name])) {
+            if (isset($entry->methods[$name]) || isset($entry->abstractMethods[$name])) {
                 // Child (or trait) redeclared a non-private parent final method (#24884).
                 // Same-script compile is covered by FinalMethodOverrideCheck; cross-eval needs
                 // this runtime path (see final class const #22329 / final property #22988).
+                // Abstract-only overrides live in abstractMethods, not methods (#25660).
                 $this->rejectChildOverrideOfFinalMethod($entry, $parent, $name);
                 // Cross-file / eval LSP: same-script InheritanceVariance never sees the parent (#25384).
                 $this->rejectIncompatibleChildMethodSignature($entry, $parent, $name);
