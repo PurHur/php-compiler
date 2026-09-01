@@ -7,10 +7,20 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringSerialize;
+use PHPCompiler\JIT\Builtin\StringTriggerError;
+use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectBuiltin;
+use PHPCompiler\JIT\Call;
+use PHPCompiler\JIT\Call\RuntimeIndirectInstanceMethodCall;
+use PHPCompiler\JIT\ClosureHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\ReflectionBuiltinHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\JIT\VmActiveContextInitLlvm;
+use PHPCompiler\VM\Variable as VmVariable;
 use PHPCompiler\VM\ArrayObjectJitHelper;
 use PHPCompiler\VM\DatePeriodSupport;
 use PHPCompiler\VM\DateTimeSupport;
@@ -33,9 +43,20 @@ use PHPLLVM\Value;
  * DateInterval / DateTimeZone: same empty-bag failure when stamps are present but
  * {@see serialize::compileTimeSerialize} did not fire (#34584 / re-#10692).
  * DatePeriod: same empty-bag failure for period storage (#34585).
+ *
+ * User __sleep(): indirect call + LLVM prop filter (#13378, ext/standard/var.c).
  */
 final class JitSerialize
 {
+    private const SLEEP_HELPER_PATH = '/ext/standard/SerializeSleepNestedJitHelper.php';
+
+    private const SLEEP_WARN_HELPER = 'PHPCompiler\\ext\\standard\\SerializeSleepNestedJitHelper::warnNonArraySleep';
+
+    /** @var list<string> */
+    private const SLEEP_COMPILED_HELPERS = [
+        self::SLEEP_WARN_HELPER,
+    ];
+
     private static int $blockSerial = 0;
 
     public static function encode(Context $context, JITVariable $arg): Value
@@ -376,18 +397,12 @@ final class JitSerialize
      */
     private static function encodePublicObjectProps(Context $context, JITVariable $objectOperand): Value
     {
-        $className = ReflectionBuiltinHelper::getClassName($context, $objectOperand);
-        $varsBoxed = JitGetObjectVars::invoke($context, $objectOperand, false);
-        $ht = $context->builder->call(
-            $context->lookupFunction('__value__readHashtable'),
-            JitValueBox::normalizeValuePtr($context, $varsBoxed)
-        );
+        $sleepEncoded = self::tryEncodeSleepViaCall($context, $objectOperand);
+        if (null !== $sleepEncoded) {
+            return $sleepEncoded;
+        }
 
-        return $context->builder->call(
-            $context->lookupFunction('__compiler_serialize_object'),
-            $className,
-            $ht
-        );
+        return self::encodePublicObjectPropsWithoutSleep($context, $objectOperand);
     }
 
     /**
@@ -557,5 +572,217 @@ final class JitSerialize
         $objVar = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VALUE, $valuePtr);
 
         return self::encodeObjectOperand($context, $objVar);
+    }
+
+    /**
+     * @return array<int, Call> class id => lowered __sleep proxy
+     */
+    private static function sleepMethodCandidates(Context $context): array
+    {
+        $objectType = $context->type->object;
+        if (!$objectType instanceof ObjectBuiltin) {
+            return [];
+        }
+        $candidates = [];
+        foreach ($objectType->allClassNamesById() as $classId => $className) {
+            $classLc = strtolower(ltrim((string) $className, '\\'));
+            $current = $classLc;
+            $visited = [];
+            while (!isset($visited[$current])) {
+                $visited[$current] = true;
+                $proxyName = $current.'::__sleep';
+                if ($context->functionIsRegistered($proxyName)) {
+                    $candidates[(int) $classId] = $context->resolveFunctionProxy($proxyName);
+                    break;
+                }
+                $parent = $objectType->parentClassLc($current);
+                if (null === $parent) {
+                    break;
+                }
+                $current = $parent;
+            }
+        }
+
+        return $candidates;
+    }
+
+    private static function ensureSleepHelperCompiled(Context $context): void
+    {
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::SLEEP_HELPER_PATH,
+            self::SLEEP_COMPILED_HELPERS,
+            '#13378'
+        );
+        VmActiveContextInitLlvm::requestThinStandaloneInit($context);
+        NestedVmActiveContextLlvm::ensureMethod($context);
+    }
+
+    /** null when no class in the unit declares __sleep. */
+    private static function tryEncodeSleepViaCall(
+        Context $context,
+        JITVariable $objectOperand
+    ): ?Value {
+        $candidates = self::sleepMethodCandidates($context);
+        if ([] === $candidates) {
+            return null;
+        }
+
+        self::ensureSleepHelperCompiled($context);
+        StringSerialize::ensureLinked($context);
+        StringTriggerError::ensureLinked($context);
+
+        $objVar = self::objectVariableForSleep($context, $objectOperand);
+        $objPtr = $context->helper->loadValue($objVar);
+        $classId = ClosureHelper::loadClassId($context, $objPtr);
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $id = (string) (++self::$blockSerial);
+
+        $isSleep = $context->getTypeFromString('int1')->constInt(0, false);
+        foreach (array_keys($candidates) as $cid) {
+            $isSleep = $context->builder->or(
+                $isSleep,
+                $context->builder->icmp(
+                    Builder::INT_EQ,
+                    $classId,
+                    $i64->constInt((int) $cid, false)
+                )
+            );
+        }
+
+        $sleepBlock = BasicBlockHelper::append($context, 'serialize_sleep_call_'.$id);
+        $plainBlock = BasicBlockHelper::append($context, 'serialize_sleep_plain_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'serialize_sleep_done_'.$id);
+        $context->builder->branchIf($isSleep, $sleepBlock, $plainBlock);
+
+        $context->builder->positionAtEnd($sleepBlock);
+        $sleepResult = self::encodeSleepCallResult($context, $objVar, $candidates);
+        $sleepEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($plainBlock);
+        $plainResult = self::encodePublicObjectPropsWithoutSleep($context, $objectOperand);
+        $plainEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($strPtr, 'serialize_sleep_phi_'.$id);
+        $phi->addIncoming($sleepResult, $sleepEnd);
+        $phi->addIncoming($plainResult, $plainEnd);
+
+        return $phi;
+    }
+
+    private static function objectVariableForSleep(
+        Context $context,
+        JITVariable $objectOperand
+    ): JITVariable {
+        if (JITVariable::TYPE_OBJECT === $objectOperand->type) {
+            return $objectOperand;
+        }
+        $objPtr = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            JitValueBox::valuePtrFromVariable($context, $objectOperand)
+        );
+
+        return new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $objPtr);
+    }
+
+    /**
+     * @param array<int, Call> $candidates
+     */
+    private static function encodeSleepCallResult(
+        Context $context,
+        JITVariable $objVar,
+        array $candidates
+    ): Value {
+        $dispatch = new RuntimeIndirectInstanceMethodCall($objVar, '__sleep', $candidates);
+        $sleepReturn = $dispatch->call($context, $objVar);
+        $sleepPtr = JitValueBox::coerceToValuePtrForStore($context, $sleepReturn);
+
+        $id = (string) (++self::$blockSerial);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($sleepPtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isVmArray = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(VmVariable::TYPE_ARRAY & 0x7f, false)
+        );
+        $isJitHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(JITVariable::TYPE_HASHTABLE & 0x7f, false)
+        );
+        $isArray = $context->builder->or($isVmArray, $isJitHt);
+
+        $arrayBlock = BasicBlockHelper::append($context, 'serialize_sleep_arr_'.$id);
+        $badBlock = BasicBlockHelper::append($context, 'serialize_sleep_bad_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'serialize_sleep_wire_'.$id);
+        $strPtr = $context->getTypeFromString('__string__*');
+        $context->builder->branchIf($isArray, $arrayBlock, $badBlock);
+
+        $context->builder->positionAtEnd($badBlock);
+        $className = ReflectionBuiltinHelper::getClassName($context, $objVar);
+        $warnFn = JitVmHelperLink::lookupCompiled($context, self::SLEEP_WARN_HELPER, '#13378');
+        $classArg = JitNestedHelperCoerce::coerceArgForHelper(
+            $context,
+            $className,
+            $warnFn->getParam(0)->typeOf()
+        );
+        $context->builder->call($warnFn, $classArg);
+        $badResult = $context->builder->load($context->constantStringFromString('N;'));
+        $badEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($arrayBlock);
+        $sleepHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            JitValueBox::normalizeValuePtr($context, $sleepPtr)
+        );
+        $varsBoxed = JitGetObjectVars::invoke($context, $objVar, false);
+        $allHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            JitValueBox::normalizeValuePtr($context, $varsBoxed)
+        );
+        $filteredHt = SerializeSleepFilterLlvm::filterProps($context, $allHt, $sleepHt);
+        $classNameWire = ReflectionBuiltinHelper::getClassName($context, $objVar);
+        $arrayResult = $context->builder->call(
+            $context->lookupFunction('__compiler_serialize_object'),
+            $classNameWire,
+            $filteredHt
+        );
+        $arrayEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($strPtr, 'serialize_sleep_out_'.$id);
+        $phi->addIncoming($badResult, $badEnd);
+        $phi->addIncoming($arrayResult, $arrayEnd);
+
+        return $phi;
+    }
+
+    /** get_object_vars wire without re-entering the __sleep VmSerialize path. */
+    private static function encodePublicObjectPropsWithoutSleep(
+        Context $context,
+        JITVariable $objectOperand
+    ): Value {
+        $className = ReflectionBuiltinHelper::getClassName($context, $objectOperand);
+        $varsBoxed = JitGetObjectVars::invoke($context, $objectOperand, false);
+        $ht = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            JitValueBox::normalizeValuePtr($context, $varsBoxed)
+        );
+
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_serialize_object'),
+            $className,
+            $ht
+        );
     }
 }
