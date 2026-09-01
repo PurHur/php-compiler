@@ -103,6 +103,9 @@ final class NestedJitCompileScope
         // stateParam must not land in void helper fns (#35144).
         $savedCompilingGeneratorResume = $context->compilingGeneratorResume;
         $savedGeneratorStateParam = $context->generatorStateParam;
+        // Outer include bindings must not refresh while lowering a NestedJIT helper —
+        // refresh stores into caller alloca slots at the current insert BB (#36253).
+        $savedInlineIncludeDepth = $context->inlineIncludeDepth;
         $context->scope->blockStorage = new \SplObjectStorage();
         $context->scope->blockEntryStorage = new \SplObjectStorage();
         $context->scope->variables = new \SplObjectStorage();
@@ -125,6 +128,7 @@ final class NestedJitCompileScope
         $context->ternaryEchoPhiByAliasSlot = [];
         $context->compilingGeneratorResume = false;
         $context->generatorStateParam = null;
+        $context->inlineIncludeDepth = 0;
         // Drop outer activeFunction while insert is cleared — otherwise parentFunction() /
         // entryAlloca pin allocas into the outer fn and NestedJIT bodies load them (#28053).
         $context->activeFunction = '';
@@ -164,6 +168,7 @@ final class NestedJitCompileScope
             $context->ternaryEchoPhiByAliasSlot = $savedTernaryEchoPhiByAliasSlot;
             $context->compilingGeneratorResume = $savedCompilingGeneratorResume;
             $context->generatorStateParam = $savedGeneratorStateParam;
+            $context->inlineIncludeDepth = $savedInlineIncludeDepth;
             self::resyncNamedBindings($context);
             $context->builder = $savedBuilder;
             $context->syncIntrinsicBuilder();
