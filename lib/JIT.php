@@ -238,6 +238,7 @@ class JIT {
         JIT\Progress::noteFunction('jit_compile_finalize_m3_emit_tu_spine_done');
 
         JIT\Progress::noteFunction('jit_compile_done');
+        JIT\Progress::noteFunction('jit_compile_return_begin');
         return $return;
     }
 
@@ -5201,6 +5202,31 @@ class JIT {
         $saved = $this->context->builder;
         $this->context->builder = $this->context->context->builderCreate();
         $this->context->builder->positionAtEnd($bb);
+        JIT\Builtin\CliArgvRuntime::ensureLinked($this->context);
+        $diagStubBlock = $this->m3EmitTuMainBlock ?? $this->m3CompileDriverMainBlock ?? $block;
+        $constructLogical = 'PHPCompiler\\Runtime::__construct';
+        $constructLc = strtolower($constructLogical);
+        if (!isset($this->context->functions[$constructLc])) {
+            $this->emitM3EmitTuRuntimeConstructNativeFunction(
+                $this->llvmInternalName($constructLogical),
+                $constructLogical,
+                $diagStubBlock
+            );
+        }
+        if ($this->shouldRealLowerInventoryArgvParseSpine()) {
+            $peekLogical = 'PHPCompiler\\Runtime::peeklastparsefailure';
+            $peekLc = strtolower($peekLogical);
+            unset(
+                $this->context->functions[$peekLc],
+                $this->context->functionReturnType[$peekLc],
+                $this->context->functionProxies[$peekLc]
+            );
+            $this->emitM3EmitTuCompilerNullStringGetterStub(
+                $this->llvmInternalName($peekLogical),
+                $peekLogical,
+                $diagStubBlock
+            );
+        }
         $logPrefix = getenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX');
         if (!is_string($logPrefix) || '' === $logPrefix) {
             $logPrefix = 'compile_smoke_m3_emit';
@@ -5311,6 +5337,32 @@ class JIT {
             $this->context->builder = $this->context->context->builderCreate();
             $this->context->builder->positionAtEnd($bb);
             JIT\Builtin\CliArgvRuntime::ensureLinked($this->context);
+            $diagStubBlock = $this->m3CompileDriverMainBlock ?? $this->m3EmitTuMainBlock;
+            if (null !== $diagStubBlock) {
+                $constructLogical = 'PHPCompiler\\Runtime::__construct';
+                $constructLc = strtolower($constructLogical);
+                if (!isset($this->context->functions[$constructLc])) {
+                    $this->emitM3EmitTuRuntimeConstructNativeFunction(
+                        $this->llvmInternalName($constructLogical),
+                        $constructLogical,
+                        $diagStubBlock
+                    );
+                }
+                if ($this->shouldRealLowerInventoryArgvParseSpine()) {
+                    $peekLogical = 'PHPCompiler\\Runtime::peeklastparsefailure';
+                    $peekLc = strtolower($peekLogical);
+                    unset(
+                        $this->context->functions[$peekLc],
+                        $this->context->functionReturnType[$peekLc],
+                        $this->context->functionProxies[$peekLc]
+                    );
+                    $this->emitM3EmitTuCompilerNullStringGetterStub(
+                        $this->llvmInternalName($peekLogical),
+                        $peekLogical,
+                        $diagStubBlock
+                    );
+                }
+            }
             \PHPCompiler\JIT\BootstrapCompileSmokeM3Emit::emitMainEntry($this->context, $logPrefix);
         } else {
             $this->context->builder = $this->context->context->builderCreate();
@@ -5398,6 +5450,13 @@ class JIT {
             if (null !== $stubBlock && ($emitTu || $compileDriver)) {
                 $this->ensureM3EmitTuRuntimeInitSpineSymbols($stubBlock);
                 $this->ensureM3EmitTuEmitBridgeSpineSymbols();
+                if ($compileDriver) {
+                    $this->emitM3EmitTuRuntimeConstructNativeFunction(
+                        $this->llvmInternalName('PHPCompiler\\Runtime::__construct'),
+                        'PHPCompiler\\Runtime::__construct',
+                        $stubBlock
+                    );
+                }
             }
             $this->compileM3EmitTuRuntimeParseAndCompileNativeDecl([
                 'parseandcompile' => true,
@@ -5649,6 +5708,11 @@ class JIT {
                 'preprocesssourceforparse',
                 'rewritesourcebeforeparser',
                 'compileemitsmoke',
+                // Native __string__* stubs — real PHP lowering returns boxed __value__* and
+                // BootstrapCompileSmokeM3Emit::echoLastParseFailureSuffix structGeps __string__
+                // fields (#36144).
+                'noteparsecompilenullforscript',
+                'peeklastparsefailure',
             ];
             if ($this->shouldUseM5DriverHostCompile()) {
                 // C-floor initParsePipeline via compileRuntimeInitParsePipelineM3Native (#26756).
@@ -5657,8 +5721,6 @@ class JIT {
                 $emitHelperStubMethods = array_merge($emitHelperStubMethods, [
                     'parse',
                     'initparsepipeline',
-                    'noteparsecompilenullforscript',
-                    'peeklastparsefailure',
                 ]);
             }
         }
@@ -7714,6 +7776,20 @@ class JIT {
         // M4 bin/compile.php + M5_DRIVER_HOST can have shouldRealLower true while
         // shouldUseM3InventoryEmitDriver() is false — still need the Runtime.php path.
         if ($this->shouldUseM3InventoryEmitDriver() || $this->shouldRealLowerInventoryArgvParseSpine()) {
+            if ('__construct' === $methodLc) {
+                if (!isset($this->context->functions[$lc])) {
+                    $stubBlock = $this->m3CompileDriverMainBlock ?? $this->m3EmitTuMainBlock;
+                    if (null !== $stubBlock) {
+                        $this->emitM3EmitTuRuntimeConstructNativeFunction(
+                            $this->llvmInternalName($logical),
+                            $logical,
+                            $stubBlock
+                        );
+                    }
+                }
+
+                return;
+            }
             // Never scan O(modules×funcs) on inventory argv links (#2967). parse/compileEmitSmoke from
             // Runtime.php; ctor/init* use native M3 via compileBlock / ensureM3EmitTuRuntimeInitSpineSymbols.
             if (in_array($methodLc, [
@@ -7727,16 +7803,39 @@ class JIT {
             ], true)) {
                 // Inventory argv / compile_driver: compileEmitSmoke must stay stubbed — full CFG
                 // hits Object_::optimize() under NestedJIT and SEGV (#26756, #36144).
-                if ('compileemitsmoke' === $methodLc && $this->shouldRealLowerInventoryArgvParseSpine()) {
+                // peekLastParseFailure / noteParseCompileNullForScript must stay stubbed too —
+                // real lowering returns __value__* but BootstrapCompileSmokeM3Emit::echoLastParseFailureSuffix
+                // structGeps __string__ fields on the call result (#36144).
+                if ($this->shouldRealLowerInventoryArgvParseSpine()
+                    && in_array($methodLc, [
+                        'compileemitsmoke',
+                        'peeklastparsefailure',
+                        'noteparsecompilenullforscript',
+                    ], true)
+                ) {
                     $stubBlock = $this->m3CompileDriverMainBlock ?? $this->m3EmitTuMainBlock;
                     if (null === $stubBlock) {
                         return;
                     }
-                    $this->emitM3EmitTuRuntimeCompileEmitSmokeNative(
-                        $this->llvmInternalName($logical),
-                        $logical,
-                        $stubBlock
-                    );
+                    if ('compileemitsmoke' === $methodLc) {
+                        $this->emitM3EmitTuRuntimeCompileEmitSmokeNative(
+                            $this->llvmInternalName($logical),
+                            $logical,
+                            $stubBlock
+                        );
+                    } elseif ('noteparsecompilenullforscript' === $methodLc) {
+                        $this->emitM3EmitTuRuntimeTwoObjectVoidStub(
+                            $this->llvmInternalName($logical),
+                            $logical,
+                            $stubBlock
+                        );
+                    } else {
+                        $this->emitM3EmitTuCompilerNullStringGetterStub(
+                            $this->llvmInternalName($logical),
+                            $logical,
+                            $stubBlock
+                        );
+                    }
 
                     return;
                 }
@@ -7745,15 +7844,11 @@ class JIT {
 
                     return;
                 }
-                // M5 argv seed: keep diagnostics on void/null stubs — host CFG is unnecessary
-                // and noteParseCompileNullForScript had no spine-stub handler (#26756).
-                if ($this->shouldUseM5DriverHostCompile()
-                    && in_array($methodLc, [
-                        'noteparsecompilenullforscript',
-                        'peeklastparsefailure',
-                        'preprocesssourceforparse',
-                        'rewritesourcebeforeparser',
-                    ], true)
+                // Inventory argv / M5 argv: diagnostic helpers must return native __string__* (not
+                // boxed __value__*) — BootstrapCompileSmokeM3Emit::echoLastParseFailureSuffix
+                // structGeps __string__ fields (#26756, #36144).
+                if (in_array($methodLc, ['noteparsecompilenullforscript', 'peeklastparsefailure'], true)
+                    && ($this->shouldUseM5DriverHostCompile() || $this->shouldRealLowerInventoryArgvParseSpine())
                 ) {
                     $stubBlock = $this->m3CompileDriverMainBlock ?? $this->m3EmitTuMainBlock;
                     if (null === $stubBlock) {
@@ -7765,20 +7860,29 @@ class JIT {
                             $logical,
                             $stubBlock
                         );
-                    } elseif ('peeklastparsefailure' === $methodLc) {
+                    } else {
                         $this->emitM3EmitTuCompilerNullStringGetterStub(
                             $this->llvmInternalName($logical),
                             $logical,
                             $stubBlock
                         );
-                    } else {
-                        // Identity preprocess/rewrite CFG stubs (#11809 / #26756).
-                        $this->compileSkippedCompilerSplitCfgStub(
-                            $this->llvmInternalName($logical),
-                            $stubBlock,
-                            $logical
-                        );
                     }
+
+                    return;
+                }
+                // M5 argv seed: identity preprocess/rewrite CFG stubs (#11809 / #26756).
+                if ($this->shouldUseM5DriverHostCompile()
+                    && in_array($methodLc, ['preprocesssourceforparse', 'rewritesourcebeforeparser'], true)
+                ) {
+                    $stubBlock = $this->m3CompileDriverMainBlock ?? $this->m3EmitTuMainBlock;
+                    if (null === $stubBlock) {
+                        return;
+                    }
+                    $this->compileSkippedCompilerSplitCfgStub(
+                        $this->llvmInternalName($logical),
+                        $stubBlock,
+                        $logical
+                    );
 
                     return;
                 }
@@ -7796,9 +7900,9 @@ class JIT {
                 if (!isset($this->context->functions[$lc])) {
                     $this->compileM3EmitTuRuntimeMethodFromDeclareClassBlocks([$methodLc]);
                 }
-            }
 
-            return;
+                return;
+            }
         }
         if (isset($this->context->functions[$lc])) {
             return;
