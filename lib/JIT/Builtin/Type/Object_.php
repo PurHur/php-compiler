@@ -1540,7 +1540,35 @@ class Object_ extends Type {
 
     public function propNameIdAfterDefine(string $name): int
     {
-        return $this->propNameMap[$name];
+        $id = $this->propNameIdFor($name);
+        if (null !== $id) {
+            return $id;
+        }
+        // defineProperty can return early when a slot already exists (same-class redeclare,
+        // trait/parent override) while propNameMap was never keyed by this spelling — e.g.
+        // spine core hub chunk emit on Block::$opCodes (#36147 / #36155).
+        $nameLc = strtolower($name);
+        foreach ($this->properties as $sets) {
+            foreach ($sets as $propset) {
+                if (strtolower($propset[1]) === $nameLc) {
+                    $this->rememberPropNameId($propset[1], $propset[0]);
+                    $this->rememberPropNameId($name, $propset[0]);
+
+                    return $propset[0];
+                }
+            }
+        }
+
+        throw new \LogicException(
+            \sprintf('Property %s missing from propNameMap after defineProperty', $name)
+        );
+    }
+
+    private function rememberPropNameId(string $name, int $nameId): void
+    {
+        if (!isset($this->propNameMap[$name])) {
+            $this->propNameMap[$name] = $nameId;
+        }
     }
 
     /**
@@ -6598,6 +6626,9 @@ class Object_ extends Type {
             $traitSourceId = $this->instancePropertyTraitSourceId[$classId][$nameLc] ?? null;
             if ($declaringId === $classId && null === $traitSourceId) {
                 // Same class already declared this property — keep the first slot.
+                $this->rememberPropNameId($name, $existing[0]);
+                $this->rememberPropNameId($existing[1], $existing[0]);
+
                 return;
             }
             // Parent private slots coexist with same-name child privates (zend_inheritance.c / #22521 / #33439).
@@ -6626,6 +6657,8 @@ class Object_ extends Type {
             unset($this->propertyDefaults[$classId][$existing[3]]);
             unset($this->runtimePropertyNewDefaults[$classId][$existing[3]]);
             unset($this->propertyFromConstructorPromotion[$classId][$existing[3]]);
+            $this->rememberPropNameId($name, $existing[0]);
+            $this->rememberPropNameId($existing[1], $existing[0]);
 
             return;
         }
