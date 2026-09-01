@@ -11029,6 +11029,7 @@ class JIT {
                         if (null !== ($newVal->compileTimeString ?? null)) {
                             $result->compileTimeString = $newVal->compileTimeString;
                         }
+                        $this->markScopeVariableAssignedIfTracked($destOp, $result);
                     } else {
                         // Fresh and in-place native concat: JitStringConcat + store. Avoid
                         // string->concat __string__realloc on entry allocas (AOT strlen→0, #15642).
@@ -11103,6 +11104,7 @@ class JIT {
                             $result->compileTimeString = $leftResolved.$rightResolved;
                         }
                     }
+                    $this->markScopeVariableAssignedIfTracked($destOp, $result);
                     $this->maybeRefreshIncludeBindingsBeforeUse();
                     break;
                 case OpCode::TYPE_CONST_FETCH:
@@ -33431,6 +33433,15 @@ class JIT {
         }
         foreach ($names as $name => $_) {
             $this->context->bindVariableByName((string) $name, $promoted);
+        }
+        $this->markScopeVariableAssignedIfTracked($destOp, $promoted);
+        if (null !== $slot) {
+            foreach ($block->scopedOperands() as $scopeOp) {
+                if ($block->slotForOperand($scopeOp) !== $slot) {
+                    continue;
+                }
+                $this->markScopeVariableAssignedIfTracked($scopeOp, $promoted);
+            }
         }
     }
 
