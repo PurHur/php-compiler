@@ -1033,8 +1033,9 @@ final class DirectoryIteratorJitHelper
         $zero = $i64->constInt(0, false);
         $one = $i64->constInt(1, false);
 
-        // Alloca — JitStringConcat ends in its own blocks; PHI preds would not match (#33263).
-        $outSlot = $context->builder->alloca($strPtrTy);
+        // Entry alloca: emitJoinedPathname runs from stringable-class match arms inside
+        // NestedJIT helpers (htmlspecialchars, PendingHeaders) — mid-block alloca fails verify (#36253).
+        $outSlot = BasicBlockHelper::entryAlloca($context, $strPtrTy);
 
         $dirLen = $context->builder->call($context->lookupFunction('__string__strlen'), $dirPtr);
         $dirEmpty = $context->builder->icmp(Builder::INT_EQ, $dirLen, $zero);

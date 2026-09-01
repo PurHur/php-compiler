@@ -63,6 +63,7 @@ CASES=(
 'loop@@@<?php $t = 0; for ($i = 1; $i <= 10; $i++) { $t += $i; } echo $t, "\n";@@@55'
 'array@@@<?php $a = [1, 2, 3]; $t = 0; foreach ($a as $v) { $t += $v; } echo $t, "|", count($a), "\n";@@@6|3'
 'class@@@<?php class P { public function __construct(private int $x) {} public function get(): int { return $this->x; } } echo (new P(42))->get(), "\n";@@@42'
+'htmlspecialchars@@@<?php echo htmlspecialchars("Home"), " — ", htmlspecialchars("MiniWebApp"), "\n";@@@Home — MiniWebApp'
 )
 
 pass=0

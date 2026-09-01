@@ -292,7 +292,7 @@ final class JitVmHelperLink
         $context->registerFunction($abiName, $fn);
 
         if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
+            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
         } else {
             $fallback = null;
             if ('' !== $context->activeFunction && isset($context->functions[$context->activeFunction])) {
@@ -383,7 +383,7 @@ final class JitVmHelperLink
         $context->registerFunction($abiName, $fn);
 
         if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
+            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
         } else {
             $fallback = null;
             if ('' !== $context->activeFunction && isset($context->functions[$context->activeFunction])) {

@@ -420,6 +420,13 @@ final class BasicBlockHelper
         }
         $func = $block->getParent();
         if ($func instanceof Function_) {
+            $open = self::lastOpenBasicBlock($func);
+            if (null !== $open) {
+                $context->builder->positionAtEnd($open);
+                $context->syncIntrinsicBuilder();
+
+                return;
+            }
             $next = $func->appendBasicBlock('restore_insert_cont');
             $context->builder->positionAtEnd($next);
             $context->syncIntrinsicBuilder();
@@ -495,20 +502,11 @@ final class BasicBlockHelper
             ? $fn->getEntryBasicBlock()
             : $fn->appendBasicBlock('entry');
         $restore = self::tryGetInsertBlock($context);
-        try {
-            $first = $entry->getFirstInstruction();
-            $context->builder->position($entry, $first);
-        } catch (\Throwable) {
-            $context->builder->positionAtEnd($entry);
-        }
+        // Append after the entry alloca group, before the first non-alloca / terminator —
+        // never prepend after a branch to include_entry already exists (#36253).
+        self::positionAfterEntryAllocas($context, $fn);
         $slot = $context->builder->alloca($type);
-        if (null !== $restore) {
-            // Never positionBefore(terminator) / never clear when a restore BB exists —
-            // callers keep emitting (fromLiteral string init, value-box writes). Sealed
-            // restore → append open cont via restoreInsertBlock (Runtime::parse M5 — #26756).
-            self::restoreInsertBlock($context, $restore);
-        }
-        // restore === null: leave insert after the alloca in entry so callers can emit.
+        self::restoreInsertBlock($context, $restore);
 
         return $slot;
     }

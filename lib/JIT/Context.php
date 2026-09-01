@@ -3155,7 +3155,7 @@ class Context {
         }
         McjitEmbedRuntime::prepareModule($this);
         $message = '';
-        $this->module->verify($this->module::VERIFY_ACTION_THROW, $message);
+        $this->verifyModuleOrThrow($message);
         $engine = $this->module->createJITCompiler(0);
         McjitEmbedHostEcho::bindEngine($engine);
         $this->result = new Result(
@@ -3324,8 +3324,45 @@ class Context {
         if ('1' === $dumpIr || 'true' === strtolower((string) $dumpIr)) {
             $this->module->printToFile('/tmp/phpc-last.ll');
         }
-        $this->module->verify($this->module::VERIFY_ACTION_THROW, $message);   
+        $message = '';
+        $this->verifyModuleOrThrow($message);
         Progress::noteFunction('jit_context_verify_done');
+    }
+
+    /**
+     * LLVM verify with a bounded error — raw messages repeat thousands of dominance lines (#36253).
+     */
+    private function verifyModuleOrThrow(string &$message): void
+    {
+        try {
+            $this->module->verify($this->module::VERIFY_ACTION_THROW, $message);
+        } catch (\RuntimeException $e) {
+            $raw = $e->getMessage();
+            if (!str_contains($raw, 'Module verification failed')) {
+                throw $e;
+            }
+            $detail = str_starts_with($raw, 'Module verification failed due to ')
+                ? substr($raw, \strlen('Module verification failed due to '))
+                : $raw;
+            $lines = preg_split("/\r\n|\n|\r/", $detail) ?: [];
+            $head = [];
+            foreach ($lines as $line) {
+                if ('' === trim($line)) {
+                    continue;
+                }
+                $head[] = $line;
+                if (\count($head) >= 20) {
+                    break;
+                }
+            }
+            $fn = $this->loweringLlvmFunction instanceof PHPLLVM\Value\Function_
+                ? $this->loweringLlvmFunction->getName()
+                : ($this->activeFunction !== '' ? $this->activeFunction : '{unknown}');
+            throw new \RuntimeException(
+                'Module verification failed in '.$fn." (first ".min(20, \count($head))." lines):\n"
+                .implode("\n", $head)
+            );
+        }
     }
 
     /**
