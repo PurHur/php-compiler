@@ -2969,6 +2969,183 @@ apply_php_types_magic_script_const_overlay() {
   echo "Applied php-types-magic-script-const.patch (overlay)"
 }
 
+apply_php_types_resolver_worklist_overlay_to_target() {
+  local target="$1"
+  if [[ ! -f "$target" ]]; then
+    return 0
+  fi
+  if grep -q 'PHPTYPES_RESOLVER_LEGACY' "$target" 2>/dev/null; then
+    return 0
+  fi
+  if ! python3 - "$target" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+
+if "PHPTYPES_RESOLVER_LEGACY" in text:
+    raise SystemExit(0)
+
+legacy_header = """        // Worklist is the default (#16077 / #36225): dependency-driven instead of
+        // O(rounds × vars) rescans. Opcode dumps match legacy on a 10-file corpus.
+        // Opt out with PHPTYPES_RESOLVER_WORKLIST=0 or PHPTYPES_RESOLVER_LEGACY=1.
+        $worklistFlag = getenv('PHPTYPES_RESOLVER_WORKLIST');
+        $legacyResolver = ('0' === $worklistFlag)
+            || ('1' === getenv('PHPTYPES_RESOLVER_LEGACY'))
+            || ('false' === strtolower((string) $worklistFlag));
+        if ($legacyResolver) {"""
+
+old_optin = "        if ('1' !== getenv('PHPTYPES_RESOLVER_WORKLIST')) {"
+old_optin_else_comment = """            // Dependency-driven worklist: the round-based loop rescanned every
+            // unresolved variable per round — O(rounds × vars), minutes on
+            // 30k-line files (#16077). Resolution ORDER differs from the round
+            // loop and the fixpoint is order-sensitive for codegen, so this is
+            // opt-in for lint workloads only (bin/lint.php sets the flag);
+            // default stays on the legacy round loop."""
+new_worklist_comment = """            // Dependency-driven worklist: the round-based loop rescanned every
+            // unresolved variable per round — O(rounds × vars), minutes on
+            // 30k-line files (#16077)."""
+
+worklist_else = """        } else {
+            // Dependency-driven worklist: the round-based loop rescanned every
+            // unresolved variable per round — O(rounds × vars), minutes on
+            // 30k-line files (#16077).
+            $dependents = new SplObjectStorage();
+            foreach ($unresolved as $var) {
+                foreach ($var->ops as $op) {
+                    foreach ($op->getVariableNames() as $name) {
+                        if ($op->isWriteVariable($name)) {
+                            continue;
+                        }
+                        $inputs = $op->{$name};
+                        if (! is_array($inputs)) {
+                            $inputs = [$inputs];
+                        }
+                        foreach ($inputs as $input) {
+                            if (! $input instanceof Operand || $input === $var) {
+                                continue;
+                            }
+                            if (! isset($dependents[$input])) {
+                                $dependents[$input] = [];
+                            }
+                            $deps = $dependents[$input];
+                            $deps[] = $var;
+                            $dependents[$input] = $deps;
+                        }
+                    }
+                }
+            }
+            $queue = [];
+            foreach ($unresolved as $var) {
+                $queue[] = $var;
+            }
+            $queued = new SplObjectStorage();
+            foreach ($queue as $var) {
+                $queued->attach($var);
+            }
+            // Head-index pop: array_shift() reindexes (O(n) per pop, quadratic
+            // on large queues); appends keep integer keys sequential.
+            $head = 0;
+            while (isset($queue[$head])) {
+                $var = $queue[$head];
+                unset($queue[$head]);
+                ++$head;
+                $queued->detach($var);
+                if (! $unresolved->contains($var)) {
+                    continue;
+                }
+                $type = $this->resolveVar($var, $resolved);
+                if (! $type) {
+                    continue;
+                }
+                $resolved[$var] = $type;
+                $unresolved->detach($var);
+                if (isset($dependents[$var])) {
+                    foreach ($dependents[$var] as $dep) {
+                        if ($unresolved->contains($dep) && ! $queued->contains($dep)) {
+                            $queue[] = $dep;
+                            $queued->attach($dep);
+                        }
+                    }
+                }
+            }
+        }"""
+
+round_loop = """        $round = 1;
+        do {
+            $start = count($resolved);
+            $toRemove = [];
+            foreach ($unresolved as $k => $var) {
+                $type = $this->resolveVar($var, $resolved);
+                if ($type) {
+                    $toRemove[] = $var;
+                    $resolved[$var] = $type;
+                }
+            }
+            foreach ($toRemove as $remove) {
+                $unresolved->detach($remove);
+            }
+        } while (count($unresolved) > 0 && $start < count($resolved));"""
+
+if old_optin in text:
+    text = text.replace(old_optin, legacy_header, 1)
+    text = text.replace(old_optin_else_comment, new_worklist_comment, 1)
+elif "$dependents = new SplObjectStorage()" not in text:
+    if round_loop not in text:
+        sys.stderr.write("php-types-resolver-worklist: round-loop anchor not found\n")
+        raise SystemExit(1)
+    legacy_round = round_loop.replace(
+        "        $round = 1;",
+        legacy_header + "\n            $round = 1;",
+        1,
+    )
+    text = text.replace(round_loop, legacy_round + worklist_else, 1)
+else:
+    sys.stderr.write("php-types-resolver-worklist: unknown TypeReconstructor state\n")
+    raise SystemExit(1)
+
+if "PHPTYPES_RESOLVER_LEGACY" not in text:
+    sys.stderr.write("php-types-resolver-worklist: flip did not apply\n")
+    raise SystemExit(1)
+
+path.write_text(text)
+PY
+  then
+    return 1
+  fi
+  return 0
+}
+
+apply_php_types_resolver_worklist_overlay() {
+  local rc=0
+  local vendor="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  local prelinked="$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  local applied=0
+
+  if [[ -f "$vendor" ]] && ! grep -q 'PHPTYPES_RESOLVER_LEGACY' "$vendor" 2>/dev/null; then
+    if grep -q "PHPTYPES_RESOLVER_WORKLIST" "$vendor" 2>/dev/null \
+      || ! grep -q '\$dependents = new SplObjectStorage' "$vendor" 2>/dev/null; then
+      apply_php_types_resolver_worklist_overlay_to_target "$vendor" || rc=1
+      applied=1
+    fi
+  fi
+  if [[ -f "$prelinked" ]] && ! grep -q 'PHPTYPES_RESOLVER_LEGACY' "$prelinked" 2>/dev/null; then
+    if ! grep -q '\$dependents = new SplObjectStorage' "$prelinked" 2>/dev/null \
+      || grep -q "PHPTYPES_RESOLVER_WORKLIST" "$prelinked" 2>/dev/null; then
+      apply_php_types_resolver_worklist_overlay_to_target "$prelinked" || rc=1
+      applied=1
+    fi
+  fi
+  if [[ "$applied" -eq 0 ]]; then
+    echo "Skip php-types-resolver-worklist.patch (already applied)"
+  else
+    echo "Applied php-types-resolver-worklist.patch (overlay)"
+  fi
+  return "$rc"
+}
+
 apply_php_cfg_class_const_flags_overlay() {
   local const_file="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/Const_.php"
   local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
@@ -7103,6 +7280,10 @@ PY
   fi
   if [[ "$(basename "$patch")" == "php-types-union-type.patch" ]]; then
     apply_php_types_union_type_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-types-resolver-worklist.patch" ]]; then
+    apply_php_types_resolver_worklist_overlay
     return $?
   fi
   if [[ "$(basename "$patch")" == "php-cfg-list-spread.patch" ]]; then
