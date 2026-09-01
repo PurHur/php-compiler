@@ -1993,6 +1993,62 @@ class JIT {
     }
 
     /**
+     * C-floor Runtime::parse (+ PHPCfg peers) — inventory argv compile_driver host link
+     * segfaults on NestedJIT PHP CFG (#26756, #36144); same path as M5 argv seed.
+     */
+    private function shouldUseM5ParseSpineCFloor(): bool
+    {
+        return $this->shouldUseM5DriverHostCompile() || $this->shouldRealLowerInventoryArgvParseSpine();
+    }
+
+    /** Register PHPCfg peers + RuntimeParseM5Native before inventory argv parse spine (#27426). */
+    private function ensureM5ParseSpineCFloorSymbols(): void
+    {
+        if (!$this->shouldUseM5ParseSpineCFloor()) {
+            return;
+        }
+        $m5ForceParserCbs = [
+            $this->context,
+            fn (string $n): string => $this->llvmInternalName($n),
+            function (callable $body): void {
+                JIT\NestedJitCompileScope::run($this->context, $body);
+            },
+            function ($block, string $logical): void {
+                $this->compileBlock($block, $logical);
+            },
+            function (string $logical, $cfgFunc) {
+                return $this->context->runtime->compileFunc($logical, $cfgFunc);
+            },
+            function (string $code, string $path) {
+                return $this->context->runtime->parse($code, $path);
+            },
+        ];
+        JIT\RuntimeParseM5AstPeer::ensureMethods(...$m5ForceParserCbs);
+        JIT\RuntimeParseM5PhpCfgParser::ensureParse(...$m5ForceParserCbs);
+        if ($this->shouldUseM5DriverHostCompile()) {
+            $m5TrivialNested = getenv('PHP_COMPILER_M5_TRIVIAL_ECHO_NESTEDJIT');
+            if ('1' === $m5TrivialNested || 'true' === strtolower((string) $m5TrivialNested)) {
+                $this->ensureM5TrivialEchoScriptParseAndCompileLowered();
+            } else {
+                JIT\M5TrivialEchoNative::ensureParseAndCompile(
+                    $this->context,
+                    fn (string $n): string => $this->llvmInternalName($n)
+                );
+            }
+        }
+        $parseLogical = 'PHPCompiler\\Runtime::parse';
+        $parseLc = strtolower($parseLogical);
+        if (!isset($this->context->functions[$parseLc])) {
+            JIT\RuntimeParseM5Native::emitFunction(
+                $this->context,
+                $this->llvmInternalName($parseLogical),
+                $parseLogical,
+                fn (string $n): string => $this->llvmInternalName($n)
+            );
+        }
+    }
+
+    /**
      * NestedJIT of PHPCfg\Parser::parse under M5 argv host-compile (#27426 / #26756).
      *
      * Vendor parse() has no PHP type hints; CFG defaults to __value__ params/return while
@@ -2672,8 +2728,10 @@ class JIT {
                 return $this->compileRuntimeParseAndCompileM3Native($internalName, $block, $logicalName);
             }
             if (str_ends_with($m3Spine, '\\runtime::parse')) {
-                // M5 argv: C-floor parse (skip prepare list-unpack SEGV; no NestedJIT mid-BB) (#26756).
-                if ($this->shouldUseM5DriverHostCompile()) {
+                // M5 argv / inventory argv: C-floor parse (skip prepare list-unpack SEGV) (#26756, #36144).
+                if ($this->shouldUseM5ParseSpineCFloor()) {
+                    $this->ensureM5ParseSpineCFloorSymbols();
+
                     return JIT\RuntimeParseM5Native::emitFunction(
                         $this->context,
                         $internalName,
@@ -3596,9 +3654,9 @@ class JIT {
         string $logicalName
     ): PHPLLVM\Value {
         $lcname = strtolower($logicalName);
-        // M5 argv / gen-0 seed: C-floor BEFORE void-stub checks — inventory emit otherwise
-        // registers a 1-byte `ret` and leaves $parser null (#26756 / re-#23468).
-        if ($this->shouldUseM5DriverHostCompile()) {
+        // M5 argv / inventory argv: C-floor BEFORE void-stub checks — inventory emit otherwise
+        // registers a 1-byte `ret` and leaves $parser null (#26756 / re-#23468, #36144).
+        if ($this->shouldUseM5ParseSpineCFloor()) {
             if (isset($this->context->functions[$lcname])) {
                 return $this->context->functions[$lcname];
             }
@@ -5252,6 +5310,7 @@ class JIT {
             }
             $this->context->builder = $this->context->context->builderCreate();
             $this->context->builder->positionAtEnd($bb);
+            JIT\Builtin\CliArgvRuntime::ensureLinked($this->context);
             \PHPCompiler\JIT\BootstrapCompileSmokeM3Emit::emitMainEntry($this->context, $logPrefix);
         } else {
             $this->context->builder = $this->context->context->builderCreate();
@@ -5624,50 +5683,10 @@ class JIT {
             }
             $this->compileM3EmitTuRuntimeMethodFromModules($methodLc);
         }
-        // M5: NestedJIT peer methods then PHPCfg\Parser::parse so C-floor Runtime::parse
-        // can call astParser->parse (#26756 / #27426).
-        if ($this->shouldUseM5DriverHostCompile()) {
-            $m5ForceParserCbs = [
-                $this->context,
-                fn (string $n): string => $this->llvmInternalName($n),
-                function (callable $body): void {
-                    JIT\NestedJitCompileScope::run($this->context, $body);
-                },
-                function ($block, string $logical): void {
-                    $this->compileBlock($block, $logical);
-                },
-                function (string $logical, $cfgFunc) {
-                    return $this->context->runtime->compileFunc($logical, $cfgFunc);
-                },
-                function (string $code, string $path) {
-                    return $this->context->runtime->parse($code, $path);
-                },
-            ];
-            // Peer parse/traverse/beginCompilationUnit before Parser::parse (#27426).
-            JIT\RuntimeParseM5AstPeer::ensureMethods(...$m5ForceParserCbs);
-            JIT\RuntimeParseM5PhpCfgParser::ensureParse(...$m5ForceParserCbs);
-            // Pure C-floor M5TrivialEchoScript::parseAndCompile — NestedJIT of the PHP helper
-            // hangs at runtime in the argv driver (#26756). Opt-in NestedJIT still available for
-            // experiments via PHP_COMPILER_M5_TRIVIAL_ECHO_NESTEDJIT=1 (overrides C-floor).
-            $m5TrivialNested = getenv('PHP_COMPILER_M5_TRIVIAL_ECHO_NESTEDJIT');
-            if ('1' === $m5TrivialNested || 'true' === strtolower((string) $m5TrivialNested)) {
-                $this->ensureM5TrivialEchoScriptParseAndCompileLowered();
-            } else {
-                JIT\M5TrivialEchoNative::ensureParseAndCompile(
-                    $this->context,
-                    fn (string $n): string => $this->llvmInternalName($n)
-                );
-            }
-            $parseLogical = 'PHPCompiler\\Runtime::parse';
-            $parseLc = strtolower($parseLogical);
-            if (!isset($this->context->functions[$parseLc])) {
-                JIT\RuntimeParseM5Native::emitFunction(
-                    $this->context,
-                    $this->llvmInternalName($parseLogical),
-                    $parseLogical,
-                    fn (string $n): string => $this->llvmInternalName($n)
-                );
-            }
+        // M5 / inventory argv: NestedJIT peer methods then PHPCfg\Parser::parse so C-floor
+        // Runtime::parse can call astParser->parse (#26756 / #27426, #36144).
+        if ($this->shouldUseM5ParseSpineCFloor()) {
+            $this->ensureM5ParseSpineCFloorSymbols();
         }
         // M5 argv seed host-lowers Runtime::parse first; emitting the sidecar standalone
         // stub here runQueues mid-parse and fatals on a null LLVM insert block (#26756).
@@ -7706,13 +7725,32 @@ class JIT {
                 'peeklastparsefailure',
                 'noteparsecompilenullforscript',
             ], true)) {
+                // Inventory argv / compile_driver: compileEmitSmoke must stay stubbed — full CFG
+                // hits Object_::optimize() under NestedJIT and SEGV (#26756, #36144).
+                if ('compileemitsmoke' === $methodLc && $this->shouldRealLowerInventoryArgvParseSpine()) {
+                    $stubBlock = $this->m3CompileDriverMainBlock ?? $this->m3EmitTuMainBlock;
+                    if (null === $stubBlock) {
+                        return;
+                    }
+                    $this->emitM3EmitTuRuntimeCompileEmitSmokeNative(
+                        $this->llvmInternalName($logical),
+                        $logical,
+                        $stubBlock
+                    );
+
+                    return;
+                }
+                if ('parse' === $methodLc && $this->shouldUseM5ParseSpineCFloor()) {
+                    $this->ensureM5ParseSpineCFloorSymbols();
+
+                    return;
+                }
                 // M5 argv seed: keep diagnostics on void/null stubs — host CFG is unnecessary
                 // and noteParseCompileNullForScript had no spine-stub handler (#26756).
                 if ($this->shouldUseM5DriverHostCompile()
                     && in_array($methodLc, [
                         'noteparsecompilenullforscript',
                         'peeklastparsefailure',
-                        'compileemitsmoke',
                         'preprocesssourceforparse',
                         'rewritesourcebeforeparser',
                     ], true)
@@ -7729,12 +7767,6 @@ class JIT {
                         );
                     } elseif ('peeklastparsefailure' === $methodLc) {
                         $this->emitM3EmitTuCompilerNullStringGetterStub(
-                            $this->llvmInternalName($logical),
-                            $logical,
-                            $stubBlock
-                        );
-                    } elseif ('compileemitsmoke' === $methodLc) {
-                        $this->emitM3EmitTuRuntimeCompileEmitSmokeNative(
                             $this->llvmInternalName($logical),
                             $logical,
                             $stubBlock
