@@ -22,6 +22,8 @@ final class ExternalMethodBind
     /** @var array<string, array{symbol: string}>|null logical lc → entry */
     private static ?array $manifestIndex = null;
 
+    private static ?string $manifestBitcodePath = null;
+
     private static bool $manifestLoaded = false;
 
     public static function spineChunkMode(): bool
@@ -90,6 +92,7 @@ final class ExternalMethodBind
     public static function resetManifestForTests(): void
     {
         self::$manifestIndex = null;
+        self::$manifestBitcodePath = null;
         self::$manifestLoaded = false;
     }
 
@@ -113,6 +116,7 @@ final class ExternalMethodBind
         }
         self::$manifestLoaded = true;
         self::$manifestIndex = [];
+        self::$manifestBitcodePath = null;
         $path = getenv(self::ENV_MANIFEST);
         if (!is_string($path) || '' === $path || !is_file($path)) {
             return self::$manifestIndex;
@@ -120,6 +124,15 @@ final class ExternalMethodBind
         $raw = json_decode((string) file_get_contents($path), true);
         if (!is_array($raw)) {
             return self::$manifestIndex;
+        }
+        if (isset($raw['bitcode']) && is_string($raw['bitcode']) && '' !== $raw['bitcode']) {
+            $bc = $raw['bitcode'];
+            if (!str_starts_with($bc, '/')) {
+                $bc = dirname($path).'/'.$bc;
+            }
+            if (is_file($bc)) {
+                self::$manifestBitcodePath = $bc;
+            }
         }
         $methods = $raw['methods'] ?? $raw;
         if (!is_array($methods)) {
@@ -152,9 +165,15 @@ final class ExternalMethodBind
 
             return $existing;
         }
-        // Signature unknown until a producer chunk emits typed manifests — declare a
-        // nullary void stub only when the caller already has a matching LLVM type via
-        // helper-runtime. Without a type, keep the ExternalMethod null path.
-        return null;
+        $bitcode = self::$manifestBitcodePath;
+        if (null === $bitcode || '' === $bitcode) {
+            return null;
+        }
+        $fn = HelperRuntimeCache::declareExternFromBitcode($context, $symbol, $bitcode);
+        if (null !== $fn) {
+            $context->functions[$logicalLc] = $fn;
+        }
+
+        return $fn;
     }
 }

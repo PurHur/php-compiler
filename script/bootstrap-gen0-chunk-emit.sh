@@ -46,6 +46,8 @@ BIN="${OUT_DIR}/${CHUNK_ID}.bin"
 LOG="${OUT_DIR}/${CHUNK_ID}.log"
 RECEIPT="${OUT_DIR}/${CHUNK_ID}.receipt.json"
 STUBS="${OUT_DIR}/${CHUNK_ID}.stubs.json"
+BITCODE="${OUT_DIR}/${CHUNK_ID}.bc"
+MANIFEST="${OUT_DIR}/${CHUNK_ID}.manifest.json"
 
 want_fp="$(bootstrap_lowering_source_fingerprint)"
 have_fp=""
@@ -69,6 +71,8 @@ set +e
 env PHP_COMPILER_SPINE_CHUNK="${PHP_COMPILER_SPINE_CHUNK:-1}" \
   PHP_COMPILER_REPORT_EXTERNAL_STUBS=1 \
   PHP_COMPILER_EXTERNAL_STUBS_JSON="${STUBS}" \
+  PHP_COMPILER_EMIT_BITCODE="${BITCODE}" \
+  PHP_COMPILER_EXTERNAL_METHOD_MANIFEST_EXPORT="${MANIFEST}" \
   php bin/compile.php -o "${BIN}" "${CHUNK_ENTRY}" >"${LOG}" 2>&1
 rc=$?
 set -e

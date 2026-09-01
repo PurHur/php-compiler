@@ -52,6 +52,9 @@ final class HelperRuntimeCache
     /** @var array<string, object> unit dir → parsed bitcode module (kept alive: types are shared) */
     private static array $parsedUnits = [];
 
+    /** @var array<string, object> bitcode path → parsed module (chunk manifest bind, #36155) */
+    private static array $parsedBitcodeFiles = [];
+
     /** @var array<string, true> unit dir → merged at link time */
     private static array $usedUnits = [];
 
@@ -1075,10 +1078,39 @@ final class HelperRuntimeCache
     }
 
     /**
-     * Function type rebuilt from the local context's named structs, or null
-     * when any component type is unknown locally (caller falls back to the
-     * parsed type verbatim).
+     * Declare an extern from a producer chunk's bitcode (#36155 Phase C).
+     *
+     * Mirrors {@see tryProvide} but reads an explicit bitcode file instead of the
+     * helper-runtime index — used when a consumer chunk binds cross-TU via manifest.
      */
+    public static function declareExternFromBitcode(Context $context, string $symbol, string $bitcodePath): ?object
+    {
+        if ('' === $symbol || '' === $bitcodePath || !is_file($bitcodePath)) {
+            return null;
+        }
+        $existing = $context->module->getNamedFunction($symbol);
+        if (null !== $existing) {
+            return $existing;
+        }
+        $parsed = self::parsedBitcodeFile($context, $bitcodePath);
+        if (null === $parsed) {
+            return null;
+        }
+        $source = $parsed->getNamedFunction($symbol);
+        if (null === $source) {
+            return null;
+        }
+        $lib = $context->llvm->lib;
+        $fnType = $lib->LLVMGetElementType($lib->LLVMTypeOf($source->value));
+        if (null === $fnType) {
+            return null;
+        }
+        $type = self::localizedFunctionType($context, $source, $fnType)
+            ?? $context->llvm->factory->type($context->context, $fnType);
+
+        return $context->module->addFunction($symbol, $type);
+    }
+
     /**
      * Function type rebuilt from the local context's named structs, or null
      * when any component type is unknown locally (caller falls back to the
@@ -1191,20 +1223,32 @@ final class HelperRuntimeCache
         if (isset(self::$parsedUnits[$unitDir])) {
             return self::$parsedUnits[$unitDir];
         }
-        $path = $unitDir.'/unit.bc';
+        $parsed = self::parsedBitcodeFile($context, $unitDir.'/unit.bc');
+        if (null !== $parsed) {
+            self::$parsedUnits[$unitDir] = $parsed;
+        }
+
+        return $parsed;
+    }
+
+    private static function parsedBitcodeFile(Context $context, string $path): ?object
+    {
+        if (isset(self::$parsedBitcodeFiles[$path])) {
+            return self::$parsedBitcodeFiles[$path];
+        }
         $data = is_file($path) ? (string) file_get_contents($path) : '';
         if ('' === $data) {
             return null;
         }
         // createMemoryBufferWithString instead of ...WithFile: the vendored
         // ...WithFile references an unimported FFI class (latent php-llvm bug).
-        $buffer = $context->llvm->createMemoryBufferWithString($data, basename($unitDir).'.bc');
+        $buffer = $context->llvm->createMemoryBufferWithString($data, basename($path));
 
         try {
             // Kept referenced for the process lifetime — declaration types
             // point into the shared LLVMContext.
-            return self::$parsedUnits[$unitDir] = $buffer->parseBitcode($context->context);
-        } catch (\Throwable $e) {
+            return self::$parsedBitcodeFiles[$path] = $buffer->parseBitcode($context->context);
+        } catch (\Throwable) {
             return null;
         }
     }

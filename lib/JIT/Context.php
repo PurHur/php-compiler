@@ -1489,6 +1489,60 @@ class Context {
     }
 
     /**
+     * Producer chunk: write logical→symbol manifest for cross-TU bind (#36155 Phase C).
+     *
+     * PHP_COMPILER_EXTERNAL_METHOD_MANIFEST_EXPORT=/path/to/manifest.json
+     * PHP_COMPILER_EMIT_BITCODE=/path/to/chunk.bc  (optional; recorded as relative path)
+     */
+    private function exportChunkMethodManifestIfRequested(): void
+    {
+        $exportPath = getenv('PHP_COMPILER_EXTERNAL_METHOD_MANIFEST_EXPORT');
+        if (!is_string($exportPath) || '' === $exportPath) {
+            return;
+        }
+        $methods = [];
+        foreach ($this->functions as $logical => $fn) {
+            if (!is_object($fn) || !method_exists($fn, 'getName')) {
+                continue;
+            }
+            $symbol = $fn->getName();
+            if (!is_string($symbol) || '' === $symbol) {
+                continue;
+            }
+            $methods[strtolower($logical)] = ['symbol' => $symbol];
+        }
+        ksort($methods, SORT_STRING);
+        $bitcodeEnv = getenv('PHP_COMPILER_EMIT_BITCODE');
+        $bitcodeRel = null;
+        if (is_string($bitcodeEnv) && '' !== $bitcodeEnv) {
+            $manifestDir = dirname($exportPath);
+            $bitcodeAbs = $bitcodeEnv;
+            if (!str_starts_with($bitcodeAbs, '/')) {
+                $bitcodeAbs = getcwd().'/'.$bitcodeAbs;
+            }
+            if (str_starts_with($bitcodeAbs, $manifestDir.'/')) {
+                $bitcodeRel = substr($bitcodeAbs, \strlen($manifestDir) + 1);
+            } else {
+                $bitcodeRel = basename($bitcodeAbs);
+            }
+        }
+        $payload = [
+            'bitcode' => $bitcodeRel,
+            'method_count' => count($methods),
+            'methods' => $methods,
+            'generated_at' => gmdate('c'),
+        ];
+        $dir = dirname($exportPath);
+        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+            throw new \RuntimeException('cannot create directory for chunk method manifest: '.$dir);
+        }
+        file_put_contents(
+            $exportPath,
+            json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n"
+        );
+    }
+
+    /**
      * Whether a function name resolves to a builtin or user function in this compile unit (issue #1216).
      */
     public function functionIsRegistered(string $name): bool
@@ -2999,6 +3053,16 @@ class Context {
         Progress::noteFunction('jit_context_compile_common_done');
 
         $this->runModuleOptimizationPasses();
+
+        $bitcodePath = getenv('PHP_COMPILER_EMIT_BITCODE');
+        if (is_string($bitcodePath) && '' !== $bitcodePath) {
+            $bcDir = dirname($bitcodePath);
+            if (!is_dir($bcDir) && !mkdir($bcDir, 0775, true) && !is_dir($bcDir)) {
+                throw new \RuntimeException('cannot create directory for chunk bitcode: '.$bcDir);
+            }
+            $this->module->writeBitcodeToFile($bitcodePath);
+        }
+        $this->exportChunkMethodManifestIfRequested();
 
         Progress::noteFunction('jit_context_create_execution_engine');
         $engine = $this->module->createExecutionEngine();
