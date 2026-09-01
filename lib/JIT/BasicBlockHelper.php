@@ -408,11 +408,13 @@ final class BasicBlockHelper
     {
         if (null === $block) {
             $context->builder->clearInsertionPosition();
+            $context->syncIntrinsicBuilder();
 
             return;
         }
         if (null === $block->getTerminator()) {
             $context->builder->positionAtEnd($block);
+            $context->syncIntrinsicBuilder();
 
             return;
         }
@@ -420,6 +422,7 @@ final class BasicBlockHelper
         if ($func instanceof Function_) {
             $next = $func->appendBasicBlock('restore_insert_cont');
             $context->builder->positionAtEnd($next);
+            $context->syncIntrinsicBuilder();
 
             return;
         }
