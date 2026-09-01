@@ -9,6 +9,7 @@ use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\HashTableReadLlvm;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Builder;
@@ -34,6 +35,157 @@ final class HashTableExportKeyValuePairs implements Call
     public static function exportPairsForSlice(Context $context, Value $ht): Value
     {
         return self::exportPairs($context, $ht);
+    }
+
+    /**
+     * Foreach insertion-order export for keyed array_splice (#13573 / #34977).
+     */
+    public static function exportPairsInForeachOrder(Context $context, Value $ht): Value
+    {
+        $result = HashTableHelper::alloc($context);
+        $outIdxSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('size_t'));
+        $context->builder->store($context->getTypeFromString('size_t')->constInt(0, false), $outIdxSlot);
+
+        $htMap = $context->structFieldMap['__hashtable__'];
+        $nodeMap = $context->structFieldMap['__strkey_node__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $nodePtrTy = $context->getTypeFromString('__strkey_node__*');
+
+        $prefixEnd = $context->builder->load($context->builder->structGep($ht, $htMap['packedPrefixEnd']));
+        $nextFree = $context->builder->load($context->builder->structGep($ht, $htMap['nextFreeElement']));
+        $numElements = $context->builder->load($context->builder->structGep($ht, $htMap['numElements']));
+        $strCount = $context->builder->sub($numElements, $nextFree);
+        $totalPos = $context->builder->add($nextFree, $strCount);
+
+        $posSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $context->builder->store($zero, $posSlot);
+        $tag = (string) spl_object_id($context);
+
+        $head = BasicBlockHelper::append($context, 'ht_expins_head_'.$tag);
+        $body = BasicBlockHelper::append($context, 'ht_expins_body_'.$tag);
+        $done = BasicBlockHelper::append($context, 'ht_expins_done_'.$tag);
+        $skip = BasicBlockHelper::append($context, 'ht_expins_skip_'.$tag);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $linearPos = $context->builder->load($posSlot);
+        $pastEnd = $context->builder->icmp(Builder::INT_SGE, $linearPos, $totalPos);
+        $context->builder->branchIf($pastEnd, $done, $body);
+
+        $context->builder->positionAtEnd($body);
+        $inPrefix = $context->builder->icmp(Builder::INT_ULT, $linearPos, $prefixEnd);
+        $strEnd = $context->builder->add($prefixEnd, $strCount);
+        $inStr = $context->builder->icmp(Builder::INT_ULT, $linearPos, $strEnd);
+
+        $prefixBb = BasicBlockHelper::append($context, 'ht_expins_prefix_'.$tag);
+        $routeLate = BasicBlockHelper::append($context, 'ht_expins_route_late_'.$tag);
+        $strBb = BasicBlockHelper::append($context, 'ht_expins_str_'.$tag);
+        $lateBb = BasicBlockHelper::append($context, 'ht_expins_late_'.$tag);
+        $context->builder->branchIf($inPrefix, $prefixBb, $routeLate);
+
+        $context->builder->positionAtEnd($routeLate);
+        $context->builder->branchIf($inStr, $strBb, $lateBb);
+
+        $context->builder->positionAtEnd($prefixBb);
+        $isUndef = HashTableReadLlvm::packedIndexIsUndefined($context, $ht, $linearPos);
+        $prefixTake = BasicBlockHelper::append($context, 'ht_expins_ptake_'.$tag);
+        $context->builder->branchIf($isUndef, $skip, $prefixTake);
+        $context->builder->positionAtEnd($prefixTake);
+        $keyVar = self::longValueBox($context, JitNestedHelperCoerce::scalarToI64($context, $linearPos, $sizeT));
+        $valVar = HashTableReadLlvm::readIndexedToValueBox($context, $ht, $linearPos);
+        self::appendPair($context, $result, $outIdxSlot, $keyVar, $valVar);
+        $context->builder->branch($skip);
+
+        $context->builder->positionAtEnd($strBb);
+        self::appendStringKeyPairAtOrd(
+            $context,
+            $ht,
+            $result,
+            $outIdxSlot,
+            $context->builder->sub($linearPos, $prefixEnd),
+            $htMap,
+            $nodeMap,
+            $nodePtrTy,
+            $skip,
+            $tag
+        );
+
+        $context->builder->positionAtEnd($lateBb);
+        $lateOffset = $context->builder->sub($context->builder->sub($linearPos, $prefixEnd), $strCount);
+        $lateIdx = $context->builder->add($prefixEnd, $lateOffset);
+        $lateUndef = HashTableReadLlvm::packedIndexIsUndefined($context, $ht, $lateIdx);
+        $lateTake = BasicBlockHelper::append($context, 'ht_expins_ltake_'.$tag);
+        $context->builder->branchIf($lateUndef, $skip, $lateTake);
+        $context->builder->positionAtEnd($lateTake);
+        $keyVar = self::longValueBox($context, JitNestedHelperCoerce::scalarToI64($context, $lateIdx, $sizeT));
+        $valVar = HashTableReadLlvm::readIndexedToValueBox($context, $ht, $lateIdx);
+        self::appendPair($context, $result, $outIdxSlot, $keyVar, $valVar);
+        $context->builder->branch($skip);
+
+        $context->builder->positionAtEnd($skip);
+        $context->builder->store($context->builder->addNoSignedWrap($linearPos, $one), $posSlot);
+        $context->builder->branch($head);
+        $context->builder->positionAtEnd($done);
+
+        return $result;
+    }
+
+    private static function appendStringKeyPairAtOrd(
+        Context $context,
+        Value $ht,
+        Value $result,
+        Value $outIdxSlot,
+        Value $ord,
+        array $htMap,
+        array $nodeMap,
+        $nodePtrTy,
+        $skipBb,
+        string $tag
+    ): void {
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+
+        $nodeSlot = BasicBlockHelper::entryAlloca($context, $nodePtrTy);
+        $remSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $context->builder->store(
+            $context->builder->load($context->builder->structGep($ht, $htMap['strKeys'])),
+            $nodeSlot
+        );
+        $context->builder->store($ord, $remSlot);
+
+        $wh = BasicBlockHelper::append($context, 'ht_expins_swh_'.$tag);
+        $wb = BasicBlockHelper::append($context, 'ht_expins_swb_'.$tag);
+        $wtake = BasicBlockHelper::append($context, 'ht_expins_swtake_'.$tag);
+        $wadv = BasicBlockHelper::append($context, 'ht_expins_swadv_'.$tag);
+        $context->builder->branch($wh);
+
+        $context->builder->positionAtEnd($wh);
+        $node = $context->builder->load($nodeSlot);
+        $remaining = $context->builder->load($remSlot);
+        $nodeNull = $context->builder->icmp(Builder::INT_EQ, $node, $nodePtrTy->constNull());
+        $atTarget = $context->builder->icmp(Builder::INT_EQ, $remaining, $zero);
+        $context->builder->branchIf($nodeNull, $skipBb, $wb);
+
+        $context->builder->positionAtEnd($wb);
+        $context->builder->branchIf($atTarget, $wtake, $wadv);
+
+        $context->builder->positionAtEnd($wtake);
+        $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
+        $keyVar = self::stringPtrValueBox($context, $keyStr);
+        $valField = $context->builder->structGep($node, $nodeMap['value']);
+        $valVar = self::valueBoxFromEntry($context, $valField);
+        self::appendPair($context, $result, $outIdxSlot, $keyVar, $valVar);
+        $context->builder->branch($skipBb);
+
+        $context->builder->positionAtEnd($wadv);
+        $nextNode = $context->builder->load($context->builder->structGep($node, $nodeMap['next']));
+        $context->builder->store($nextNode, $nodeSlot);
+        $context->builder->store($context->builder->sub($remaining, $one), $remSlot);
+        $context->builder->branch($wh);
     }
 
     private static function exportPairs(Context $context, Value $ht): Value
@@ -145,6 +297,16 @@ final class HashTableExportKeyValuePairs implements Call
         $context->builder->store($next, $nodeSlot);
         $context->builder->branch($head);
         $context->builder->positionAtEnd($done);
+    }
+
+    public static function appendPairToList(
+        Context $context,
+        Value $pairList,
+        Value $outIdxSlot,
+        Variable $keyVar,
+        Variable $valVar
+    ): void {
+        self::appendPair($context, $pairList, $outIdxSlot, $keyVar, $valVar);
     }
 
     private static function appendPair(
