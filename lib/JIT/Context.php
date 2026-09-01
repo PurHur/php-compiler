@@ -1250,16 +1250,25 @@ class Context {
      * Internal builtins safe to resolve from Runtime modules during SPINE_CHUNK chunk emits.
      *
      * Opening the full stdlib surface pulls in helpers that fail module verify in isolation
-     * (e.g. strncasecmp #36147) — same constraint as NestedJIT pre-register whitelist (#15417).
+     * (e.g. strncasecmp LLVM verify — Instruction referencing instruction not embedded in a basic
+     * block; #36147). Same constraint as NestedJIT pre-register whitelist (#15417).
      */
     private static function isSpineChunkRuntimeInternalKernel(string $lc): bool
     {
         return match ($lc) {
             'count',
+            'in_array',
+            'intdiv',
+            'intval',
             'is_float',
             'is_nan',
             'sprintf',
             'strlen',
+            'strpbrk',
+            'strpos',
+            'strtolower',
+            'substr',
+            'trim',
             => true,
             default => false,
         };
