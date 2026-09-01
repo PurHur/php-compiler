@@ -221,13 +221,19 @@ echo "==> M4 gen-1 link + gen-2 compile attempt (script defaults native emit whe
 set +e
 (
   cd "${ROOT}"
-  bash "${GEN1_LINK}"
+  env BOOTSTRAP_M4_REQUIRE_NATIVE_EMIT="${BOOTSTRAP_M4_REQUIRE_NATIVE_EMIT:-0}" \
+    bash "${GEN1_LINK}"
 ) >"${GEN1_LOG}" 2>&1
 GEN1_CODE=$?
 set -e
 
 if [[ "${GEN1_CODE}" -ne 0 ]]; then
-  echo "bootstrap-loop-probe: M4 gen-1 link failed (exit 1)" >&2
+  if [[ "${BOOTSTRAP_M4_REQUIRE_NATIVE_EMIT:-0}" == "1" ]] \
+    && grep -qE 'BOOTSTRAP_M4_REQUIRE_NATIVE_EMIT=1 — refusing prelinked sidecar' "${GEN1_LOG}"; then
+    echo "bootstrap-loop-probe: BOOTSTRAP_M4_REQUIRE_NATIVE_EMIT=1 — gen-1 refused sidecar COPY (#21860 / #36146)" >&2
+  else
+    echo "bootstrap-loop-probe: M4 gen-1 link failed (exit 1)" >&2
+  fi
   m4_probe_tail "${GEN1_LOG}"
   exit 1
 fi
@@ -235,6 +241,11 @@ fi
 grep -E 'bootstrap-loop-gen1-link: OK' "${GEN1_LOG}" || tail -n 5 "${GEN1_LOG}"
 if m4_gen1_log_emit_path_sidecar "${GEN1_LOG}"; then
   echo "bootstrap-loop-probe: gen-2 emit_path=native-prelinked-sidecar (native emit failed — not M4 green; #21860)" >&2
+  if [[ "${BOOTSTRAP_M4_REQUIRE_NATIVE_EMIT:-0}" == "1" ]]; then
+    echo "bootstrap-loop-probe: BOOTSTRAP_M4_REQUIRE_NATIVE_EMIT=1 — sidecar COPY must not count as success (#36146)" >&2
+    m4_probe_tail "${GEN1_LOG}" 20
+    exit 1
+  fi
   m4_probe_tail "${GEN1_LOG}" 20
   exit 2
 elif m4_gen1_log_emit_path_native "${GEN1_LOG}"; then

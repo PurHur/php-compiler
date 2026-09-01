@@ -40,6 +40,7 @@ Usage: script/north-star5-verify.sh [--fast] [--require-llvm] [--strict] [--with
 
 M5 ladder presenter (#1416, #1492):
 
+  3t. bootstrap-trust-preflight after vendor check (warn on --fast; strict on --strict — #36145)
   1. php script/bootstrap-inventory.php --check
   2. php script/bootstrap-spine-count.php + check-selfhost-spine-coverage-sync.php (live N/N)
   3. php script/bootstrap-vendor-objects.php --check
