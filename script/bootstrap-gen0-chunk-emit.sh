@@ -68,6 +68,7 @@ start=$(date +%s)
 set +e
 env PHP_COMPILER_SPINE_CHUNK="${PHP_COMPILER_SPINE_CHUNK:-1}" \
   PHP_COMPILER_REPORT_EXTERNAL_STUBS=1 \
+  PHP_COMPILER_EXTERNAL_STUBS_JSON="${STUBS}" \
   php bin/compile.php -o "${BIN}" "${CHUNK_ENTRY}" >"${LOG}" 2>&1
 rc=$?
 set -e
@@ -77,7 +78,9 @@ size=0
 [[ -f "${BIN}" ]] && size=$(wc -c <"${BIN}")
 
 stub_count=0
-if grep -q 'external method stubs' "${LOG}" 2>/dev/null; then
+if [ -f "${STUBS}" ]; then
+  stub_count="$(php -r 'echo (int)(json_decode(file_get_contents($argv[1]), true)["stub_count"] ?? 0);' "${STUBS}" 2>/dev/null || echo 0)"
+elif grep -q 'external method stubs' "${LOG}" 2>/dev/null; then
   php "${ROOT}/script/spine-chunk-stub-export.php" --write "${STUBS}" "${LOG}" >/dev/null || true
   stub_count="$(php -r 'echo (int)(json_decode(file_get_contents($argv[1]), true)["stub_count"] ?? 0);' "${STUBS}" 2>/dev/null || echo 0)"
 fi

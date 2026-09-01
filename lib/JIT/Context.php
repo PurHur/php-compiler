@@ -1458,6 +1458,22 @@ class Context {
 
         $names = array_keys($this->externalMethodStubs);
         sort($names, SORT_STRING);
+        $jsonPath = getenv('PHP_COMPILER_EXTERNAL_STUBS_JSON');
+        if (is_string($jsonPath) && '' !== $jsonPath) {
+            $payload = [
+                'stub_count' => count($names),
+                'stubs' => $names,
+                'generated_at' => gmdate('c'),
+            ];
+            $dir = dirname($jsonPath);
+            if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+                throw new \RuntimeException('cannot create directory for external stubs JSON: '.$dir);
+            }
+            file_put_contents(
+                $jsonPath,
+                json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n"
+            );
+        }
         $summary = sprintf(
             '%d method call(s) lowered to a silent null — class not in this module (#579): %s',
             count($names),

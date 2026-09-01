@@ -133,6 +133,7 @@ for ext in "${EXTS[@]}"; do
     timeout "$CHUNK_TIMEOUT" env \
         PHP_COMPILER_SPINE_CHUNK=1 \
         PHP_COMPILER_REPORT_EXTERNAL_STUBS=1 \
+        PHP_COMPILER_EXTERNAL_STUBS_JSON="${OUT_DIR}/${ext}.stubs.json" \
         "$PHP_BIN" bin/compile.php -o "$bin" "$tu" > "$log" 2>&1
     rc=$?
     t1=$(date +%s)
@@ -153,7 +154,9 @@ for ext in "${EXTS[@]}"; do
     # build is a false clean, and has been reported as one before.
     stub_line=$(grep -m1 'external method stubs' "$log" 2>/dev/null)
     stubs=0
-    if [ -n "$stub_line" ]; then
+    if [ -f "${OUT_DIR}/${ext}.stubs.json" ]; then
+        stubs=$(php -r 'echo (int)(json_decode(file_get_contents($argv[1]), true)["stub_count"] ?? 0);' "${OUT_DIR}/${ext}.stubs.json" 2>/dev/null || echo 0)
+    elif [ -n "$stub_line" ]; then
         stubs=$(printf '%s' "$stub_line" | sed -E 's/.*— ([0-9]+) method call\(s\).*/\1/')
         [ -n "$stubs" ] || stubs=0
         php "${REPO_ROOT}/script/spine-chunk-stub-export.php" --write "${OUT_DIR}/${ext}.stubs.json" "$log" >/dev/null 2>&1 || true
