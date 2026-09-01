@@ -52,6 +52,19 @@ final class StreamIoRuntimeStandaloneTest extends TestCase
         }
     }
 
+    /**
+     * SPINE_CHUNK standard hub lowers fread before StreamIo::ensureLinked (#36155).
+     */
+    public function testLookupFunctionLazyEnsuresStreamIoAbi(): void
+    {
+        $this->assertTrue(StreamIoRuntime::isLazyLookupRuntimeFunction('__compiler_fread'));
+        $this->assertTrue(StreamIoRuntime::isLazyLookupRuntimeFunction('__compiler_fwrite'));
+        $this->assertFalse(StreamIoRuntime::isLazyLookupRuntimeFunction('__compiler_sprintf'));
+        $source = (string) file_get_contents(dirname(__DIR__, 3).'/lib/JIT/Context.php');
+        $this->assertStringContainsString('StreamIoRuntime::isLazyLookupRuntimeFunction', $source);
+        $this->assertStringContainsString('StreamIoRuntime::ensureLinkedForUserScriptLowering', $source);
+    }
+
     public function testUserScriptLoweringUsesLibcKernelBridges(): void
     {
         $prev = getenv('PHP_COMPILER_AOT_USER_SCRIPT');

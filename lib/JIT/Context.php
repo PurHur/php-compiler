@@ -3504,6 +3504,15 @@ class Context {
                 return $this->functionScope[$name];
             }
         }
+        // Lazy stream I/O ABI — Type::register no longer always-on ensures (#33055).
+        // SPINE_CHUNK standard hub (VmFs slice) lowers fread before StreamIo::ensureLinked
+        // (#36155 Phase B/C); JitFread::invoke lookupFunction must self-ensure.
+        if (Builtin\StreamIoRuntime::isLazyLookupRuntimeFunction($name)) {
+            Builtin\StreamIoRuntime::ensureLinkedForUserScriptLowering($this);
+            if (isset($this->functionScope[$name])) {
+                return $this->functionScope[$name];
+            }
+        }
         throw new \LogicException('Unable to lookup non-existing function ' . $name);
     }
 
