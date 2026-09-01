@@ -5398,6 +5398,13 @@ class JIT {
             if (null !== $stubBlock && ($emitTu || $compileDriver)) {
                 $this->ensureM3EmitTuRuntimeInitSpineSymbols($stubBlock);
                 $this->ensureM3EmitTuEmitBridgeSpineSymbols();
+                if ($compileDriver) {
+                    $this->emitM3EmitTuRuntimeConstructNativeFunction(
+                        $this->llvmInternalName('PHPCompiler\\Runtime::__construct'),
+                        'PHPCompiler\\Runtime::__construct',
+                        $stubBlock
+                    );
+                }
             }
             $this->compileM3EmitTuRuntimeParseAndCompileNativeDecl([
                 'parseandcompile' => true,
@@ -7727,16 +7734,39 @@ class JIT {
             ], true)) {
                 // Inventory argv / compile_driver: compileEmitSmoke must stay stubbed — full CFG
                 // hits Object_::optimize() under NestedJIT and SEGV (#26756, #36144).
-                if ('compileemitsmoke' === $methodLc && $this->shouldRealLowerInventoryArgvParseSpine()) {
+                // peekLastParseFailure / noteParseCompileNullForScript must stay stubbed too —
+                // real lowering returns __value__* but BootstrapCompileSmokeM3Emit::echoLastParseFailureSuffix
+                // structGeps __string__ fields on the call result (#36144).
+                if ($this->shouldRealLowerInventoryArgvParseSpine()
+                    && in_array($methodLc, [
+                        'compileemitsmoke',
+                        'peeklastparsefailure',
+                        'noteparsecompilenullforscript',
+                    ], true)
+                ) {
                     $stubBlock = $this->m3CompileDriverMainBlock ?? $this->m3EmitTuMainBlock;
                     if (null === $stubBlock) {
                         return;
                     }
-                    $this->emitM3EmitTuRuntimeCompileEmitSmokeNative(
-                        $this->llvmInternalName($logical),
-                        $logical,
-                        $stubBlock
-                    );
+                    if ('compileemitsmoke' === $methodLc) {
+                        $this->emitM3EmitTuRuntimeCompileEmitSmokeNative(
+                            $this->llvmInternalName($logical),
+                            $logical,
+                            $stubBlock
+                        );
+                    } elseif ('noteparsecompilenullforscript' === $methodLc) {
+                        $this->emitM3EmitTuRuntimeTwoObjectVoidStub(
+                            $this->llvmInternalName($logical),
+                            $logical,
+                            $stubBlock
+                        );
+                    } else {
+                        $this->emitM3EmitTuCompilerNullStringGetterStub(
+                            $this->llvmInternalName($logical),
+                            $logical,
+                            $stubBlock
+                        );
+                    }
 
                     return;
                 }

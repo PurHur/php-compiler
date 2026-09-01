@@ -513,6 +513,11 @@ final class BootstrapCompileSmokeM3Emit
     /** Append ` — {detail}` from Runtime::getLastParseFailure when native parse+compile returns null (#3037). */
     private static function echoLastParseFailureSuffix(Context $context): void
     {
+        $peekLc = strtolower('PHPCompiler\\Runtime::peeklastparsefailure');
+        // Real-lowering returns ?string as __value__*; structGep __string__ fields only when typed __string__* (#36144).
+        if (isset($context->functionReturnType[$peekLc]) && '__string__*' !== $context->functionReturnType[$peekLc]) {
+            return;
+        }
         $tag = 'lpf'.(string) ++self::$seq;
         $strPtr = $context->getTypeFromString('__string__*');
         $sizeT = $context->getTypeFromString('size_t');
