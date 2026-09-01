@@ -47,6 +47,17 @@ foreach ($inputs as $path) {
         exit(2);
     }
     $text = (string) file_get_contents($path);
+    if (str_ends_with($path, '.json')) {
+        $decoded = json_decode($text, true);
+        if (is_array($decoded) && isset($decoded['stubs']) && is_array($decoded['stubs'])) {
+            foreach ($decoded['stubs'] as $name) {
+                if (is_string($name) && '' !== $name) {
+                    $stubs[strtolower($name)] = true;
+                }
+            }
+            continue;
+        }
+    }
     foreach (preg_split('/\R/', $text) ?: [] as $line) {
         if (!str_contains($line, 'external method stubs')) {
             continue;

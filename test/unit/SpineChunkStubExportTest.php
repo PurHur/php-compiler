@@ -28,4 +28,24 @@ final class SpineChunkStubExportTest extends TestCase
         $this->assertContains('object::int', $payload['stubs']);
         $this->assertContains('count', $payload['stubs']);
     }
+
+    public function testReadsFullStubListFromCompilerJson(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $in = $root.'/build/micro/chunk/_stub_export_compiler.json';
+        $out = $root.'/build/micro/chunk/_stub_export_compiler_out.json';
+        @mkdir(dirname($in), 0775, true);
+        $names = [];
+        for ($i = 0; $i < 50; ++$i) {
+            $names[] = 'stub_'.$i;
+        }
+        file_put_contents($in, json_encode(['stub_count' => 50, 'stubs' => $names], JSON_PRETTY_PRINT)."\n");
+
+        $cmd = escapeshellarg(PHP_BINARY).' '.escapeshellarg($root.'/script/spine-chunk-stub-export.php')
+            .' --write '.escapeshellarg($out).' '.escapeshellarg($in).' 2>&1';
+        exec($cmd, $lines, $code);
+        $this->assertSame(0, $code, implode("\n", $lines));
+        $payload = json_decode((string) file_get_contents($out), true);
+        $this->assertSame(50, $payload['stub_count']);
+    }
 }

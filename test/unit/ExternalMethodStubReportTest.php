@@ -38,6 +38,10 @@ final class ExternalMethodStubReportTest extends TestCase
             'PHP_COMPILER_FAIL_ON_EXTERNAL_STUBS',
             $source
         );
+        $this->assertStringContainsString(
+            'PHP_COMPILER_EXTERNAL_STUBS_JSON',
+            $source
+        );
     }
 
     /** compileToFile() is the finalisation point, so the report must fire before object emit. */
