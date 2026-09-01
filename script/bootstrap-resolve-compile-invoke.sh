@@ -992,7 +992,16 @@ bootstrap_compile_invoke() {
     set -e
     printf '%s\n' "${invoke_out}"
     if [[ "${last_code}" -eq 0 ]] && bootstrap_inventory_argv_emit_output_ok "${out}"; then
-      if bootstrap_is_inventory_bin_compile_argv_driver "${BOOTSTRAP_COMPILE_DRIVER}"; then
+      local accept_ok=1
+      # Gen-0 helloworld re-link of bin/compile.php can link a driver that prints compile OK
+      # but fails argv emit silently — exercise inventory smoke before accepting (#36144).
+      if [[ "${entry}" == *"/bin/compile.php" ]] && ! bootstrap_inventory_argv_driver_accepts "${out}"; then
+        echo "bootstrap-compile-invoke: ${out} failed inventory argv functional smoke (gen-0 compiled — reject #36144)" >&2
+        accept_ok=0
+        last_code=1
+        rm -f "${out}"
+      fi
+      if [[ "${accept_ok}" -eq 1 ]] && bootstrap_is_inventory_bin_compile_argv_driver "${BOOTSTRAP_COMPILE_DRIVER}"; then
         if ! bootstrap_native_compile_output_ok "${invoke_out}"; then
           echo "bootstrap-compile-invoke: inventory driver exited 0 but missing compile OK line (#3046)" >&2
           last_code=1
@@ -1005,7 +1014,7 @@ bootstrap_compile_invoke() {
           BOOTSTRAP_COMPILE_DRIVER_MODE=native
           return 0
         fi
-      else
+      elif [[ "${accept_ok}" -eq 1 ]]; then
         BOOTSTRAP_COMPILE_DRIVER_MODE=native
         return 0
       fi
