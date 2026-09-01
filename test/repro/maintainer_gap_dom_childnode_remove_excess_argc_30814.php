@@ -5,17 +5,6 @@
  * Zend names: DOMElement::remove / DOMCharacterData::remove (user args exclude $this).
  */
 error_reporting(E_ALL);
-function msg(callable $fn): void
-{
-    try {
-        $fn();
-        echo "NOERR\n";
-    } catch (ArgumentCountError $e) {
-        echo $e->getMessage(), "\n";
-    } catch (Throwable $e) {
-        echo get_class($e), ':', $e->getMessage(), "\n";
-    }
-}
 
 $d = new DOMDocument();
 $d->loadXML('<r><a/></r>');
@@ -27,18 +16,30 @@ $d->documentElement->appendChild($comment);
 $cdata = $d->createCDATASection('x');
 $d->documentElement->appendChild($cdata);
 
-msg(static function () use ($el) {
+try {
     $el->remove(1);
-});
-msg(static function () use ($text) {
+    echo "NOERR\n";
+} catch (ArgumentCountError $e) {
+    echo $e->getMessage(), "\n";
+}
+try {
     $text->remove(1);
-});
-msg(static function () use ($comment) {
+    echo "NOERR\n";
+} catch (ArgumentCountError $e) {
+    echo $e->getMessage(), "\n";
+}
+try {
     $comment->remove(1);
-});
-msg(static function () use ($cdata) {
+    echo "NOERR\n";
+} catch (ArgumentCountError $e) {
+    echo $e->getMessage(), "\n";
+}
+try {
     $cdata->remove(1);
-});
+    echo "NOERR\n";
+} catch (ArgumentCountError $e) {
+    echo $e->getMessage(), "\n";
+}
 
 // Zero-arg still detaches.
 $d2 = new DOMDocument();

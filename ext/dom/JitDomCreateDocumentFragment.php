@@ -47,6 +47,15 @@ final class JitDomCreateDocumentFragment
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_cdf_materialize_cont');
+        $argcDummy = DomJitArgc::rejectUnlessExactUserArgCount(
+            $context,
+            $args,
+            'DOMDocument::createDocumentFragment',
+            0
+        );
+        if (null !== $argcDummy) {
+            return $argcDummy;
+        }
         if ([] === $args) {
             throw new \LogicException('DOMDocument::createDocumentFragment() called without $this');
         }

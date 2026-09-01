@@ -5,25 +5,28 @@
  * php-src: ext/dom/implementation.c / php_dom.stub.php
  */
 error_reporting(E_ALL);
-function msg(callable $fn): void
-{
-    try {
-        $fn();
-        echo "NOERR\n";
-    } catch (ArgumentCountError $e) {
-        echo $e->getMessage(), "\n";
-    } catch (Throwable $e) {
-        echo get_class($e), ':', $e->getMessage(), "\n";
-    }
-}
 
 $di = new DOMImplementation();
-msg(static function () use ($di) {
-    $di->createDocument(null, 'r', null, 1);
-});
-msg(static function () use ($di) {
-    $di->hasFeature('XML', '2.0', 1);
-});
+try {
+    (static function () use ($di) {
+        $di->createDocument(null, 'r', null, 1);
+    })();
+    echo "NOERR\n";
+} catch (ArgumentCountError $e) {
+    echo $e->getMessage(), "\n";
+} catch (Throwable $e) {
+    echo get_class($e), ':', $e->getMessage(), "\n";
+}
+try {
+    (static function () use ($di) {
+        $di->hasFeature('XML', '2.0', 1);
+    })();
+    echo "NOERR\n";
+} catch (ArgumentCountError $e) {
+    echo $e->getMessage(), "\n";
+} catch (Throwable $e) {
+    echo get_class($e), ':', $e->getMessage(), "\n";
+}
 
 // Legal arities still work.
 $doc = $di->createDocument(null, 'r');

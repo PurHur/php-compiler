@@ -34,6 +34,15 @@ final class JitDomCreateEntityReference
 
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
+        $argcDummy = DomJitArgc::rejectUnlessExactUserArgCount(
+            $context,
+            $args,
+            'DOMDocument::createEntityReference',
+            1
+        );
+        if (null !== $argcDummy) {
+            return $argcDummy;
+        }
         if (\count($args) < 2) {
             throw new \LogicException('DOMDocument::createEntityReference() expects receiver and name');
         }

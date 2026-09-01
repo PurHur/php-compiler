@@ -24,7 +24,7 @@ final class DomCharacterDataJitArgc
         int $expected,
         JITVariable ...$args
     ): ?Value {
-        $given = $context->callSiteOutgoingUserArgCount ?? max(0, \count($args) - 1);
+        $given = VmClassMethod::jitUserArgCount($context, $args);
         if ($given === $expected) {
             return null;
         }

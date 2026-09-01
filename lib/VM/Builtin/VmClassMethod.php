@@ -101,6 +101,19 @@ abstract class VmClassMethod extends Internal
     }
 
     /**
+     * Outgoing user argc for instance-method JIT — $args[0] is $this.
+     *
+     * Compile-time call lowering may drop surplus operands from $args; the call
+     * site count is preserved on the context (#31091 / #30814 / #31251).
+     *
+     * @param JITVariable[] $args
+     */
+    public static function jitUserArgCount(Context $context, array $args): int
+    {
+        return $context->callSiteOutgoingUserArgCount ?? max(0, \count($args) - 1);
+    }
+
+    /**
      * Instance-method JIT argc — $args[0] is $this (php-src ZEND_NUM_ARGS; #30828).
      *
      * @param JITVariable[] $args
@@ -112,11 +125,13 @@ abstract class VmClassMethod extends Internal
         int $minimum,
         int $maximum
     ): bool {
-        $given = max(0, \count($args) - 1);
+        $given = self::jitUserArgCount($context, $args);
         if ($given < $minimum) {
             ExceptionBridge::emitArgumentCountErrorAndAbort(
                 $context,
-                self::atLeastUserArgCountMessage($function, $minimum, $given)
+                $minimum === $maximum
+                    ? self::exactUserArgCountMessage($function, $minimum, $given)
+                    : self::atLeastUserArgCountMessage($function, $minimum, $given)
             );
             BasicBlockHelper::ensureOpenInsertBlock($context, $function.'_argc_cont');
 
@@ -125,7 +140,9 @@ abstract class VmClassMethod extends Internal
         if ($given > $maximum) {
             ExceptionBridge::emitArgumentCountErrorAndAbort(
                 $context,
-                self::atMostUserArgCountMessage($function, $maximum, $given)
+                $minimum === $maximum
+                    ? self::exactUserArgCountMessage($function, $maximum, $given)
+                    : self::atMostUserArgCountMessage($function, $maximum, $given)
             );
             BasicBlockHelper::ensureOpenInsertBlock($context, $function.'_argc_cont');
 

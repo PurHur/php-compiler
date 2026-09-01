@@ -129,6 +129,10 @@ final class ExceptionBridge
 
     /**
      * Builtin ArgumentCountError — catchable in active try/catch, fatal when uncaught (#23875).
+     *
+     * When the throw site is a non-{main} closure with no local try, pend + return so the
+     * caller's {@see TryCatchHelper::emitCheckPendingThrowAfterCall} can land in an outer
+     * catch — same shape as {@see emitTypeErrorAndAbort} (#33971 / DOM excess argc #30814).
      */
     public static function emitArgumentCountErrorAndAbort(Context $context, string $message): void
     {
@@ -143,6 +147,16 @@ final class ExceptionBridge
 
         TypeErrorRaise::emitArgumentCountError($context, $message);
         if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            if (self::shouldPendTypeErrorForCaller($context)) {
+                TypeErrorRaise::ensureStandaloneBodies($context);
+                TryCatchHelper::emitPendArgumentCountErrorForCaller($context, $message);
+                $fn = $context->builder->getInsertBlock()?->getParent();
+                if ($fn instanceof \PHPLLVM\Value\Function_) {
+                    TryCatchHelper::emitPropagateReturnAfterPendingThrow($context, $fn);
+
+                    return;
+                }
+            }
             $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_type_error'));
         } else {
             $context->builder->call($context->lookupFunction('abort'));
