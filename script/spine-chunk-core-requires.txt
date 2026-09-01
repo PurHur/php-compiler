@@ -1,7 +1,8 @@
 # Minimal spine core for chunk TU probes (#36147).
 # Prepended before ext/<name> requires so Zend + compiler see ModuleAbstract, Func\Internal, VM.
+# lib/Block.php is intentionally omitted — it does not compile as an isolated AOT TU
+# (self::cfgVarRoot forward refs; #36155). Phase C uses manifest bind, not same-TU prepend.
 lib/OpCode.php
-lib/Block.php
 lib/Frame.php
 lib/Func.php
 lib/Func/PHP.php

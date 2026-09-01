@@ -122,15 +122,11 @@ for ext in "${EXTS[@]}"; do
         echo '// rejects cannot be used to judge the compiler.'
         echo
         printf "require_once __DIR__ . '/../../../vendor/autoload.php';\n"
-        # Phase B same-TU core prepend is superseded by Phase C manifest bind when
-        # --with-core emitted core.manifest.json above (#36155).
-        if [ "$WITH_CORE" -eq 1 ] && [ -z "$CORE_MANIFEST" ]; then
-            while IFS= read -r core_rel || [ -n "$core_rel" ]; do
-                core_rel="${core_rel%%#*}"
-                core_rel="$(echo "$core_rel" | tr -d '\r' | xargs)"
-                [ -z "$core_rel" ] && continue
-                printf "require_once __DIR__ . '/../../../%s';\n" "$core_rel"
-            done < "${REPO_ROOT}/script/spine-chunk-core-requires.txt"
+        # Phase C manifest bind only — do not same-TU prepend when core emit failed (#36155).
+        if [ -n "$CORE_MANIFEST" ]; then
+            : # consumer uses PHP_COMPILER_EXTERNAL_METHOD_MANIFEST below
+        elif [ "$WITH_CORE" -eq 1 ]; then
+            echo "spine-chunk-probe: --with-core but no core.manifest.json — manifest bind skipped" >&2
         fi
         find "$src_dir" -name '*.php' -type f | LC_ALL=C sort | while read -r f; do
             printf "require_once __DIR__ . '/../../../%s';\n" "$f"
