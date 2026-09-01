@@ -595,7 +595,10 @@ bootstrap_inventory_argv_link() {
     fi
     return 1
   fi
-  bootstrap_inventory_argv_link_sidecar_prep
+  # Compiled-first: gen-0 seed only — seeding .m3_* sidecars routes through COPY (#36144).
+  bootstrap_ensure_gen0_seed_driver 2>/dev/null || true
+  export PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1
+  export BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1
   local _inventory_minimal
   _inventory_minimal="$(bootstrap_inventory_argv_link_minimal_flags)"
   rm -f "${out}"
@@ -621,6 +624,7 @@ bootstrap_inventory_argv_link() {
     return 0
   fi
   echo "bootstrap-inventory-argv-link: compiled-first inventory emit failed; trying Zend helloworld (#2930, #3046)" >&2
+  bootstrap_inventory_argv_link_sidecar_prep
   if [[ "${BOOTSTRAP_M5_NO_ZEND:-0}" != "1" && "${BOOTSTRAP_NO_ZEND_FALLBACK:-0}" != "1" ]] \
     && command -v php >/dev/null 2>&1; then
     local zend_log=""
@@ -927,6 +931,20 @@ bootstrap_compile_invoke_zend() {
   return "${rc}"
 }
 
+# Skip M3 sidecar seed before inventory argv native emit (sidecar COPY — #8710, #36144).
+bootstrap_compile_invoke_skip_m3_sidecar_seed() {
+  local entry=$1
+  local norm="${entry//\\//}"
+  if [[ "${norm}" == */bin/compile.php ]]; then
+    return 0
+  fi
+  if [[ "${PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER:-0}" == "1" \
+    || "${BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER:-0}" == "1" ]]; then
+    return 0
+  fi
+  return 1
+}
+
 # Link OUT from ENTRY. Optional prefix: env VAR=val … (same as `env … php bin/compile.php`).
 bootstrap_compile_invoke() {
   local out=$1
@@ -950,7 +968,9 @@ bootstrap_compile_invoke() {
   local root="${ROOT:-}"
   if [[ -n "${root}" ]]; then
     export PHP_COMPILER_REPO_ROOT="${PHP_COMPILER_REPO_ROOT:-${root}}"
-    bootstrap_gen0_seed_prelinked_m3_sidecars 2>/dev/null || true
+    if ! bootstrap_compile_invoke_skip_m3_sidecar_seed "${entry}"; then
+      bootstrap_gen0_seed_prelinked_m3_sidecars 2>/dev/null || true
+    fi
   fi
 
   local no_zend_fallback=0

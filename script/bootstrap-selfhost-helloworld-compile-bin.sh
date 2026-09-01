@@ -82,6 +82,8 @@ fi
 export PHP_COMPILER_JIT_PROGRESS_FILE="${ROOT}/build/.last-jit-func-helloworld-compile-bin"
 rm -f "${OUT}" "${AOT_OUT}" "${PHP_COMPILER_JIT_PROGRESS_FILE}"
 
+export PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1
+export BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1
 bootstrap_inventory_argv_link_sidecar_prep 2>/dev/null || true
 if ! bootstrap_compile_invoke "${OUT}" "${ENTRY}" env \
   PHP_COMPILER_SELFHOST_AOT=1 \
