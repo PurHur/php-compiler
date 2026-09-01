@@ -746,6 +746,15 @@ class Runtime {
         if ($e instanceof CompileFatal) {
             $line = $e->zendStderrLine();
             $this->recordLastParseFailure(sprintf('%s: %s', $e->sourceFile, $primary));
+        } elseif ($e instanceof \LogicException) {
+            $this->recordLastParseFailure(sprintf('%s: %s', $sourcePath, $primary));
+            $line = sprintf(
+                "PHP Fatal error:  Uncaught %s: %s in %s:%d\n",
+                $e::class,
+                $primary,
+                $e->getFile(),
+                max(1, $e->getLine())
+            );
         } else {
             $this->recordLastParseFailure(sprintf('%s: %s', $sourcePath, $primary));
             $line = sprintf("parseAndCompile failure: target=%s: %s\n", $sourcePath, $primary);

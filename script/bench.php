@@ -111,7 +111,9 @@ function bench(string $file, array $runtimes, string $harnessPhp, string $llvmEn
             die("Failure for Zend {$name}: \"{$got}\" != \"{$expected}\"\n");
         }
     }
-    $vmCmd = escapeshellcmd($harnessPhp).' '.escapeshellarg($root.'/bin/vm.php').' '.escapeshellarg($file);
+    $vmCmd = escapeshellcmd($harnessPhp)
+        .' -d error_reporting=1 -d log_errors=1 -d display_errors=stderr'
+        .' '.escapeshellarg($root.'/bin/vm.php').' '.escapeshellarg($file);
     $vmOk = trim(capture($vmCmd, $vmRc)) === $expected;
     if (!$vmOk) {
         echo capture_timed_out($vmRc)

@@ -340,6 +340,60 @@ if (!function_exists('php_compiler_cli_usage_error')) {
     }
 }
 
+if (!function_exists('php_compiler_cli_write_fatal_stderr')) {
+    /**
+     * Zend-shaped CLI fatal on stderr — never stdout (#36208, lib/VM/ErrorReporter.php).
+     */
+    function php_compiler_cli_write_fatal_stderr(\Throwable $e): void
+    {
+        if ($e instanceof \PHPCompiler\Compiler\CompileFatal) {
+            fwrite(STDERR, $e->zendStderrLine());
+
+            return;
+        }
+        $message = $e->getMessage();
+        if (
+            str_starts_with($message, 'PHP Fatal error:')
+            || str_starts_with($message, 'PHP Parse error:')
+        ) {
+            fwrite(STDERR, str_ends_with($message, "\n") ? $message : $message."\n");
+
+            return;
+        }
+        if ($e instanceof \CompileError) {
+            fwrite(
+                STDERR,
+                \PHPCompiler\Compiler\CompileFatal::formatZendStderrLine(
+                    $message,
+                    $e->getFile(),
+                    $e->getLine()
+                )
+            );
+
+            return;
+        }
+        fwrite(
+            STDERR,
+            sprintf(
+                "PHP Fatal error:  Uncaught %s: %s in %s:%d\n",
+                $e::class,
+                $message,
+                $e->getFile(),
+                max(1, $e->getLine())
+            )
+        );
+    }
+}
+
+if (!function_exists('php_compiler_cli_fatal_exit')) {
+    /** Write Zend-shaped fatal to stderr and mirror Zend CLI exit 255 (#36208). */
+    function php_compiler_cli_fatal_exit(\Throwable $e): never
+    {
+        php_compiler_cli_write_fatal_stderr($e);
+        exit(255);
+    }
+}
+
 if (!function_exists('php_compiler_cli_print_version')) {
     /** Minimal -v/--version banner for bin/* entrypoints (issue #18691, sapi/cli/php_cli.c). */
     function php_compiler_cli_print_version(): void
