@@ -108,6 +108,7 @@ final class ReadonlyRaise
         // Body emission / NestedJIT may clear the insert block; restore so readonly
         // store guards do not hit Factory::basicBlock(null) mid-user AOT (#26826).
         $restore = BasicBlockHelper::tryGetInsertBlock($context);
+        $savedIntrinsic = $context->intrinsic;
         try {
             self::ensureJitHelperCompiled($context);
             self::implementRaiseBridge($context);
@@ -117,6 +118,7 @@ final class ReadonlyRaise
             self::implementAbortIfPending($context);
             self::registerLinkedRuntime($context);
         } finally {
+            $context->intrinsic = $savedIntrinsic;
             BasicBlockHelper::restoreInsertBlock($context, $restore);
             self::$implementing = false;
         }
@@ -201,8 +203,13 @@ final class ReadonlyRaise
             ? $probe
             : $context->module->addFunction($abiName, $ft);
 
+        // NestedJIT helper calls may clear insert position; restore after bridge emit (#33403).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        $savedIntrinsic = $context->intrinsic;
+
         $entry = $fn->appendBasicBlock('readonly_copy_entry');
         $context->builder->positionAtEnd($entry);
+        $context->intrinsic = $context->module->intrinsic($context->builder);
         $dest = $fn->getParam(0);
         $bufsize = $fn->getParam(1);
 
@@ -229,6 +236,8 @@ final class ReadonlyRaise
             []
         );
         $msgStr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $msgRaw);
+        $context->builder->positionAtEnd($copyBlock);
+        $context->intrinsic = $context->module->intrinsic($context->builder);
         $strMap = $context->structFieldMap['__string__'];
         $msgLen = $context->builder->load(
             $context->builder->structGep($msgStr, $strMap['length'])
@@ -256,6 +265,7 @@ final class ReadonlyRaise
         $copyLenPhi = $context->builder->phi($sizeT);
         $copyLenPhi->addIncoming($msgLenSized, $bufOk);
         $copyLenPhi->addIncoming($useLenPhi, $msgLenClamp);
+        $context->intrinsic = $context->module->intrinsic($context->builder);
         $context->intrinsic->memcpy(
             $dest,
             $context->builder->pointerCast($msgData, $i8p),
@@ -269,6 +279,8 @@ final class ReadonlyRaise
         $context->builder->positionAtEnd($done);
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
+        $context->intrinsic = $savedIntrinsic;
+        BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
     }
 
     private static function implementAbortIfPending(Context $context): void
