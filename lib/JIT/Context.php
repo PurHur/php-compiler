@@ -49,6 +49,10 @@ class Context {
 
     public array $constants = [];
     public array $functions = [];
+
+    /** Logical callee lc => LLVM symbol for chunk manifest export (#36155). */
+    public array $functionLlvmSymbols = [];
+
     public array $functionProxies = [];
 
     /**
@@ -1509,12 +1513,8 @@ class Context {
             return;
         }
         $methods = [];
-        foreach ($this->functions as $logical => $fn) {
-            if (!is_object($fn) || !method_exists($fn, 'getName')) {
-                continue;
-            }
-            $symbol = $fn->getName();
-            if (!is_string($symbol) || '' === $symbol) {
+        foreach ($this->functionLlvmSymbols as $logical => $symbol) {
+            if (!is_string($logical) || '' === $logical || !is_string($symbol) || '' === $symbol) {
                 continue;
             }
             $methods[strtolower($logical)] = ['symbol' => $symbol];

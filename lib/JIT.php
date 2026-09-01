@@ -3097,11 +3097,13 @@ class JIT {
 
         $lcname = strtolower($logicalName ?? $internalName);
         $this->context->functions[$lcname] = $func;
+        $this->context->functionLlvmSymbols[$lcname] = $internalName;
         $this->context->activeFunction = $lcname;
         if (!is_null($funcName)) {
             $lcname = strtolower($funcName);
             $this->context->activeFunction = $lcname;
             $this->context->functions[$lcname] = $func;
+            $this->context->functionLlvmSymbols[$lcname] = $internalName;
             if ($isVarArgs) {
                 $this->context->functionProxies[$lcname] = new JIT\Call\Vararg($func, $funcName, count($args));
             } else {
