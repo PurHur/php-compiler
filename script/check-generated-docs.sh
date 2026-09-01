@@ -39,6 +39,9 @@ step "bootstrap-sdk-platform --check" "$PHP_BIN" script/check-bootstrap-sdk-plat
 # 5. composer.lock content-hash vs composer.json — #15620 class of drift
 step "composer.lock content-hash" "$PHP_BIN" script/check-composer-lock-hash.php
 
+# 6. Vendor patches apply to pristine *.orig snapshots — #36209
+step "apply-patches --verify-pristine" script/apply-patches.sh --verify-pristine
+
 if [[ "$fail" -ne 0 ]]; then
   echo "check-generated-docs: drift detected — regenerate in the pinned env (see CONTRIBUTING 'Generated docs')" >&2
   exit 1
