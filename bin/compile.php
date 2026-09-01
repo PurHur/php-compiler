@@ -442,6 +442,9 @@ function run(string $filename, string $code, array $options): void
     // binary runs (#21557 / peer AotTest COMPILE_EXCLUDED_ENV).
     $clearedLanguageProfile = false;
     if ($setUserScriptAot && false !== $prevLanguageProfile && '' !== (string) $prevLanguageProfile && \function_exists('putenv')) {
+        putenv('PHP_COMPILER_AOT_COMPILE_PROFILE='.$prevLanguageProfile);
+        $_ENV['PHP_COMPILER_AOT_COMPILE_PROFILE'] = $prevLanguageProfile;
+        $_SERVER['PHP_COMPILER_AOT_COMPILE_PROFILE'] = $prevLanguageProfile;
         putenv('PHP_COMPILER_PROFILE=');
         unset($_ENV['PHP_COMPILER_PROFILE'], $_SERVER['PHP_COMPILER_PROFILE']);
         $clearedLanguageProfile = true;
@@ -608,6 +611,8 @@ function run(string $filename, string $code, array $options): void
             putenv('PHP_COMPILER_PROFILE='.$prevLanguageProfile);
             $_ENV['PHP_COMPILER_PROFILE'] = $prevLanguageProfile;
             $_SERVER['PHP_COMPILER_PROFILE'] = $prevLanguageProfile;
+            putenv('PHP_COMPILER_AOT_COMPILE_PROFILE=');
+            unset($_ENV['PHP_COMPILER_AOT_COMPILE_PROFILE'], $_SERVER['PHP_COMPILER_AOT_COMPILE_PROFILE']);
         }
     }
 }

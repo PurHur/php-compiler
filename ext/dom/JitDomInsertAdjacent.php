@@ -6,10 +6,12 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\DomInsertAdjacentRuntime;
+use PHPCompiler\JIT\Call\DomNodeAppendChild;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -19,6 +21,10 @@ use PHPLLVM\Value;
  *
  * php-src: ext/dom/php_dom.c php_dom_insert_adjacent
  *          ext/dom/element.c PHP_METHOD(DOMElement, insertAdjacentText)
+ *
+ * Thin standalone AOT materializes createElement nodes without DomRegistry
+ * ({@see JitDomInsertBefore}) — the VM bridge leaves firstChild/parentNode stale.
+ * Use LiveSlots (appendChild / insertBefore / ChildNode sibling insert) instead.
  *
  * Null $element is legal (?DOMElement) and returns null — variable null is
  * TYPE_VALUE without isNullConstant; readObject on that box SIGSEGVs (#33763,
@@ -79,6 +85,14 @@ final class JitDomInsertAdjacent
                 $context,
                 'DOMElement::insertAdjacentText(): Argument #1 ($where) must be a valid adjacency insertion position'
             );
+
+            return self::boxNull($context);
+        }
+
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+            $textObj = JitDomCreateTextNode::materialize($context, $data);
+            $textVar = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $textObj);
+            self::invokeInsertAdjacentLiveSlots($context, $args[0], strtolower($where), $textVar);
 
             return self::boxNull($context);
         }
@@ -157,6 +171,14 @@ final class JitDomInsertAdjacent
         string $where,
         JITVariable $nodeArg
     ): Value {
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+            // Pin object identity before LiveSlots mutate slots (#27480).
+            $childObj = self::loadObjectArg($context, $nodeArg, 'DOMElement::insertAdjacentElement()');
+            self::invokeInsertAdjacentLiveSlots($context, $receiver, strtolower($where), $nodeArg);
+
+            return self::boxObject($context, $childObj);
+        }
+
         DomInsertAdjacentRuntime::ensureLinked($context);
         $element = self::loadObjectArg($context, $receiver, 'DOMElement::insertAdjacentElement()');
         $node = self::loadObjectArg($context, $nodeArg, 'DOMElement::insertAdjacentElement()');
@@ -167,42 +189,114 @@ final class JitDomInsertAdjacent
             $whereStr,
             $node
         );
-        if ('afterbegin' === $where || 'beforeend' === $where) {
-            self::syncEmptyParentChildSlots($context, $element, $node);
-        }
 
         return self::boxObject($context, $node);
     }
 
-    private static function syncEmptyParentChildSlots(
+    /**
+     * LiveSlots insertAdjacent* — peer {@see JitDomInsertBefore} / {@see JitDomChildNodeSiblingInsert}.
+     */
+    private static function invokeInsertAdjacentLiveSlots(
         Context $context,
-        Value $receiverObj,
-        Value $child
+        JITVariable $receiver,
+        string $where,
+        JITVariable $newChildVar
     ): void {
-        $objectType = $context->type->object;
-        $elementClassId = $objectType->lookup('DOMElement');
-        foreach ([VmDom::PROP_FIRST_CHILD, VmDom::PROP_LAST_CHILD, VmDom::PROP_PARENT_NODE] as $prop) {
-            if (!$objectType->hasProperty($elementClassId, $prop)) {
-                $objectType->defineProperty($elementClassId, $prop, JITVariable::TYPE_VALUE);
-            }
-        }
-        $childJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $child);
-        $parentJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $receiverObj);
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($receiverObj, 'DOMElement', VmDom::PROP_FIRST_CHILD),
-            $childJit,
-            JITVariable::TYPE_VALUE
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_iae_live_'.$where);
+        match ($where) {
+            'beforebegin' => self::liveBeforeBegin($context, $receiver, $newChildVar),
+            'afterbegin' => self::liveAfterBegin($context, $receiver, $newChildVar),
+            'beforeend' => (new DomNodeAppendChild())->call($context, $receiver, $newChildVar),
+            'afterend' => self::liveAfterEnd($context, $receiver, $newChildVar),
+            default => throw new \LogicException('invalid insertAdjacent position: '.$where),
+        };
+    }
+
+    private static function liveBeforeBegin(
+        Context $context,
+        JITVariable $elementVar,
+        JITVariable $newChildVar
+    ): void {
+        $parentVar = self::requireParentVar($context, $elementVar);
+        JitDomChildNodeSiblingInsert::invokeBefore($context, $parentVar, $newChildVar, $elementVar);
+    }
+
+    private static function liveAfterEnd(
+        Context $context,
+        JITVariable $elementVar,
+        JITVariable $newChildVar
+    ): void {
+        $parentVar = self::requireParentVar($context, $elementVar);
+        JitDomChildNodeSiblingInsert::invokeAfter($context, $parentVar, $newChildVar, $elementVar);
+    }
+
+    private static function liveAfterBegin(
+        Context $context,
+        JITVariable $elementVar,
+        JITVariable $newChildVar
+    ): void {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_iae_afterbegin');
+        JitDomParentChildLinkLayout::ensureChildEdgeProperties($context);
+        $element = JitDomParentChildLinkLayout::loadObjectArg($context, $elementVar);
+        $first = JitDomParentChildLinkLayout::loadSibling(
+            $context,
+            $element,
+            VmDom::PROP_FIRST_CHILD,
+            'dom_iae_afterbegin_fc'
         );
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($receiverObj, 'DOMElement', VmDom::PROP_LAST_CHILD),
-            $childJit,
-            JITVariable::TYPE_VALUE
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $firstNull = $context->builder->icmp(Builder::INT_EQ, $first, $objPtrTy->constNull());
+        $bbAppend = BasicBlockHelper::append($context, 'dom_iae_afterbegin_append');
+        $bbInsert = BasicBlockHelper::append($context, 'dom_iae_afterbegin_insert');
+        $bbDone = BasicBlockHelper::append($context, 'dom_iae_afterbegin_done');
+        $context->builder->branchIf($firstNull, $bbAppend, $bbInsert);
+
+        $context->builder->positionAtEnd($bbAppend);
+        (new DomNodeAppendChild())->call($context, $elementVar, $newChildVar);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbInsert);
+        $firstJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $first);
+        JitDomInsertBefore::syncUserScriptInsertBeforeSlotsPublic(
+            $context,
+            $elementVar,
+            $newChildVar,
+            $firstJit
         );
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($child, 'DOMElement', VmDom::PROP_PARENT_NODE),
-            $parentJit,
-            JITVariable::TYPE_VALUE
+        DomUserScriptLiveTagListLlvm::incrementForChildArg($context, $newChildVar);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDone);
+    }
+
+    /** @return JITVariable parent JITVariable or abort with DOMException */
+    private static function requireParentVar(Context $context, JITVariable $elementVar): JITVariable
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_iae_req_parent');
+        JitDomParentChildLinkLayout::ensureChildEdgeProperties($context);
+        $element = JitDomParentChildLinkLayout::loadObjectArg($context, $elementVar);
+        $parent = JitDomParentChildLinkLayout::loadSibling(
+            $context,
+            $element,
+            VmDom::PROP_PARENT_NODE,
+            'dom_iae_req_parent_load'
         );
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $parentNull = $context->builder->icmp(Builder::INT_EQ, $parent, $objPtrTy->constNull());
+        $bbThrow = BasicBlockHelper::append($context, 'dom_iae_req_parent_throw');
+        $bbOk = BasicBlockHelper::append($context, 'dom_iae_req_parent_ok');
+        $context->builder->branchIf($parentNull, $bbThrow, $bbOk);
+
+        $context->builder->positionAtEnd($bbThrow);
+        TryCatchHelper::emitCatchableClassError(
+            $context,
+            'DOMException',
+            'Hierarchy request error'
+        );
+
+        $context->builder->positionAtEnd($bbOk);
+
+        return new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $parent);
     }
 
     private static function loadObjectArg(Context $context, JITVariable $arg, string $label): Value

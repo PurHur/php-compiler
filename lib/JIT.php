@@ -27843,6 +27843,20 @@ class JIT {
 
         $proxyName = $this->resolveJitInstanceMethodProxyName($declaringClassLc, $methodLc);
         $proxyName = $this->resolveDomSubclassInstanceMethodProxy($declaringClassLc, $methodLc, $proxyName);
+        if (
+            \in_array($methodLc, ['insertadjacentelement', 'insertadjacenttext', 'insertadjacenthtml'], true)
+        ) {
+            if (
+                ('insertadjacentelement' === $methodLc
+                    && !\PHPCompiler\CompilerVersion::supportsDomElementInsertAdjacentElement())
+                || ('insertadjacenttext' === $methodLc
+                    && !\PHPCompiler\CompilerVersion::supportsDomElementInsertAdjacentText())
+                || ('insertadjacenthtml' === $methodLc
+                    && !\PHPCompiler\CompilerVersion::supportsDomElementInsertAdjacentHtml())
+            ) {
+                throw new \LogicException("Call to undefined method {$className}::{$methodLc}()");
+            }
+        }
         // Thin AOT: Element/Node appendChild → DomNodeAppendChild (live NodeList + return
         // child) (#19208, #27044, #27480). Never remap to ParentNode::append alone — that
         // returns null and makes `$a = $el->appendChild(...)` NULL under AOT (#27480).
