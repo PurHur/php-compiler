@@ -6647,6 +6647,7 @@ require_once __DIR__.'/../../../lib/JIT/Context.php';
 require_once __DIR__.'/../../../lib/JIT/DatePeriodForeachSnapshot.php';
 require_once __DIR__.'/../../../lib/JIT/SimpleXmlForeachSnapshot.php';
 require_once __DIR__.'/../../../lib/JIT/DnfParamCheck.php';
+require_once __DIR__.'/../../../lib/JIT/DiscardedPureCallElision.php';
 require_once __DIR__.'/../../../lib/JIT/DomInstanceMethodJit.php';
 require_once __DIR__.'/../../../lib/JIT/DynamicObjectReadonlyGuard.php';
 require_once __DIR__.'/../../../lib/JIT/DynamicPropertyDeprecationGuard.php';
