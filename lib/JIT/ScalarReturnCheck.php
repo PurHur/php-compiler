@@ -41,7 +41,9 @@ final class ScalarReturnCheck
         if (null === $expectedJit) {
             return true;
         }
-        if ($return->type === $expectedJit) {
+        if ($return->type === $expectedJit
+            || (Variable::TYPE_HASHTABLE === $expectedJit && 0 !== ($return->type & Variable::IS_NATIVE_ARRAY))
+        ) {
             return true;
         }
         $callableName = self::callableName($block);
@@ -345,6 +347,10 @@ final class ScalarReturnCheck
                 // GH-8385 — true/false returned on PROFILE≥8.4 (#29097 / #31160).
                 return 0 !== (int) $value->getConstantValue() ? 'true' : 'false';
             }
+        }
+
+        if (0 !== ($return->type & Variable::IS_NATIVE_ARRAY)) {
+            return 'array';
         }
 
         return match ($return->type) {

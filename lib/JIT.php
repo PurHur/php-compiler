@@ -16258,6 +16258,17 @@ class JIT {
 
                 return $this->context->builder->load($slot);
             }
+            if (0 !== ($return->type & Variable::IS_NATIVE_ARRAY)) {
+                $slot = JIT\JitValueBox::alloc($this->context);
+                $ht = JIT\HashTableHelper::materializeNativeArrayForCall($this->context, $return);
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeHashtable'),
+                    JIT\JitValueBox::pointer($this->context, $slot),
+                    $ht
+                );
+
+                return $this->context->builder->load($slot);
+            }
 
             return $this->loadNullValueStruct();
         }
