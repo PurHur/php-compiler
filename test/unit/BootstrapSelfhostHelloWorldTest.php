@@ -201,6 +201,7 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1', $resolve);
         $this->assertStringContainsString('PHP_COMPILER_M5_DRIVER_HOST=1', $resolve);
         $this->assertStringContainsString('PHP_COMPILER_HELPER_RUNTIME_O=1', $resolve);
+        $this->assertStringContainsString('failed inventory argv functional smoke (gen-0 compiled — reject #36144)', $resolve);
         $this->assertStringContainsString('bootstrap_inventory_argv_link', $resolve);
         $this->assertStringContainsString('BOOTSTRAP_ALLOW_SIDECAR_EMIT_FALLBACK', $resolve);
         $this->assertStringContainsString('emit_path=${BOOTSTRAP_COMPILE_DRIVER_MODE:-native}', $resolve);
