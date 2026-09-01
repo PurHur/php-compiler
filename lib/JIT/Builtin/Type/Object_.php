@@ -449,7 +449,6 @@ class Object_ extends Type {
         $classify = $fn->appendBasicBlock('classify');
         $writeObj = $fn->appendBasicBlock('write_obj');
         $writeStr = $fn->appendBasicBlock('write_str');
-        $nativeLongBlock = $fn->appendBasicBlock('native_long');
         $valueBoxBlock = $fn->appendBasicBlock('value_box');
         $done = $fn->appendBasicBlock('done');
         $this->context->builder->positionAtEnd($entry);
@@ -482,7 +481,9 @@ class Object_ extends Type {
 
         $this->context->builder->positionAtEnd($checkString);
         $isStringRef = $this->slotContentHasStringRefHeader($loaded);
-        $this->context->builder->branchIf($isStringRef, $writeStr, $nativeLongBlock);
+        // TYPE_VALUE slots store __value__* — not native int64* (#24008). #36113 routed
+        // the fallback to native_long and broke untyped property reads (**=, echo).
+        $this->context->builder->branchIf($isStringRef, $writeStr, $valueBoxBlock);
 
         $valueMap = $this->context->structFieldMap['__value__'];
         $objPtr = $this->context->getTypeFromString('__object__*');
@@ -515,18 +516,6 @@ class Object_ extends Type {
         $this->context->builder->store(
             $this->context->builder->pointerCast($loaded, $strPtr),
             $strSlot
-        );
-        $this->context->builder->branch($done);
-
-        $this->context->builder->positionAtEnd($nativeLongBlock);
-        $longPtr = $this->context->builder->pointerCast(
-            $loaded,
-            $this->context->getTypeFromString('int64*')
-        );
-        \PHPCompiler\JIT\JitValueBox::writeLong(
-            $this->context,
-            $dest,
-            $this->context->builder->load($longPtr)
         );
         $this->context->builder->branch($done);
 
