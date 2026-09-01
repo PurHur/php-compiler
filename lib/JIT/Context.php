@@ -1251,6 +1251,8 @@ class Context {
             'count',
             'is_float',
             'is_nan',
+            'sprintf',
+            'strlen',
             => true,
             default => false,
         };

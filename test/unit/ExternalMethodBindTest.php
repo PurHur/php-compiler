@@ -138,6 +138,8 @@ final class ExternalMethodBindTest extends TestCase
         $proxy = $ctx->resolveFunctionProxy('count');
         $this->assertNotInstanceOf(ExternalMethod::class, $proxy);
         $this->assertInstanceOf(JIT\Call::class, $proxy);
+        $strlen = $ctx->resolveFunctionProxy('strlen');
+        $this->assertNotInstanceOf(ExternalMethod::class, $strlen);
     }
 
     /**

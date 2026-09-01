@@ -9465,6 +9465,19 @@ class Object_ extends Type {
 
                 return;
             }
+            // HashTable extends Object in VM — same refcounted layout; bitcast matches
+            // retval coercion in JIT::coerceReturnValue (#36155 core hub chunk emit).
+            if (Variable::TYPE_OBJECT === $value->type) {
+                $htPtr = $this->context->builder->bitcast(
+                    $this->context->helper->loadValue($value),
+                    $this->context->getTypeFromString('__hashtable__*')
+                );
+                $stored = $this->context->builder->pointerCast($htPtr, $voidPtr);
+                $this->context->builder->store($stored, $slot);
+                $value->addref();
+
+                return;
+            }
         }
 
         if (Variable::TYPE_OBJECT === $propertyType) {
