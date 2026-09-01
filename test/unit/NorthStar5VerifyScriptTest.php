@@ -61,6 +61,9 @@ final class NorthStar5VerifyScriptTest extends TestCase
         // 4f2 retries live in the probe script (same class as 4f3) — #33501.
         $this->assertStringContainsString('bootstrap-selfhost-vm-driver-execute-probe', $body);
         $this->assertStringContainsString('Retries for gen-0 free(): invalid pointer flake live in the probe script (#33501)', $body);
+        $this->assertStringContainsString('ns5_gen0_trust_preflight', $body);
+        $this->assertStringContainsString('bootstrap-trust-preflight.sh', $body);
+        $this->assertStringContainsString('#36145', $body);
     }
 
     public function testMakefileDeclaresNorthStar5VerifyTarget(): void
