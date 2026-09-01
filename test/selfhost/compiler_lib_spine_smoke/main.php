@@ -6753,6 +6753,7 @@ require_once __DIR__.'/../../../lib/JIT/NestedVmObjectMethodLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/NestedVmVariableMethodLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/NoDiscardCallGuard.php';
 require_once __DIR__.'/../../../lib/JIT/DeprecatedCallGuard.php';
+require_once __DIR__.'/../../../lib/JIT/DiscardedPureCallElision.php';
 require_once __DIR__.'/../../../lib/JIT/NonObjectPropertyFetchHelper.php';
 require_once __DIR__.'/../../../lib/JIT/NullsafeHelper.php';
 require_once __DIR__.'/../../../lib/JIT/ObjectPropertyForeachHelper.php';
