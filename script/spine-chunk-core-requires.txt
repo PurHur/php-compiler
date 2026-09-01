@@ -1,0 +1,32 @@
+# Minimal spine core for chunk TU probes (#36147).
+# Prepended before ext/<name> requires so Zend + compiler see ModuleAbstract, Func\Internal, VM.
+lib/OpCode.php
+lib/Block.php
+lib/Frame.php
+lib/Func.php
+lib/Func/PHP.php
+lib/VM/ClassProperty.php
+lib/VM/ScriptExit.php
+lib/JIT/OperandName.php
+lib/Printer.php
+lib/Runtime.php
+lib/OpCodeNames.php
+lib/VM/Variable.php
+lib/Module.php
+lib/ModuleAbstract.php
+lib/VM/Refcount.php
+lib/VM/ErrorReporter.php
+lib/VM/ScriptStack.php
+lib/VM/HashTable.php
+lib/VM/ClassEntry.php
+lib/VM/ObjectEntry.php
+lib/VM/TypeCheck.php
+lib/VM/Context.php
+lib/Handler.php
+lib/JIT/Call.php
+lib/JIT/Builtin.php
+lib/JIT/Result.php
+lib/Func/Internal.php
+lib/Func/JIT.php
+lib/JIT/Variable.php
+lib/VM/Builtin/VmClassMethod.php

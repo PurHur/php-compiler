@@ -111,7 +111,7 @@ test-docker-fast-jit-preflight: docker-build-22
 	JIT_PREFLIGHT_GATE=1 ./script/docker-ci-local.sh fast
 
 # VM smoke: examples/001-SimpleWeb with ?name=Test
-.PHONY: web-smoke miniwebapp-gates miniwebapp-aot-bisect north-star1-verify north-star2-verify north-star3-verify north-star4-verify north-star5-verify north-star5-verify-fast dev-verify-fast bootstrap-trust-preflight release-readiness bootstrap-gen0-staleness bootstrap-gen0-driver-functional-smoke bootstrap-gen0-refresh-argv-driver bootstrap-vendor-native-rebuild-audit
+.PHONY: web-smoke miniwebapp-gates miniwebapp-aot-bisect north-star1-verify north-star2-verify north-star3-verify north-star4-verify north-star5-verify north-star5-verify-fast dev-verify-fast bootstrap-trust-preflight release-readiness bootstrap-gen0-staleness bootstrap-gen0-driver-functional-smoke bootstrap-gen0-refresh-argv-driver bootstrap-vendor-native-rebuild-audit spine-chunk-probe bootstrap-gen0-chunk-emit
 web-smoke:
 	./script/web-smoke.sh
 
@@ -140,6 +140,12 @@ dev-verify-fast:
 
 bootstrap-trust-preflight:
 	./script/bootstrap-trust-preflight.sh
+
+spine-chunk-probe:
+	./script/spine-chunk-probe.sh $(ARGS)
+
+bootstrap-gen0-chunk-emit:
+	./script/bootstrap-gen0-chunk-emit.sh
 release-readiness:
 	./script/release-readiness.sh $(ARGS)
 # Git-derived gen-0 seed age — a manifest stamp cannot satisfy it (#22642).

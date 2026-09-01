@@ -32,6 +32,7 @@
 # USAGE
 #   script/spine-chunk-probe.sh                       # default probe set
 #   script/spine-chunk-probe.sh --ext=sockets --ext=spl
+#   script/spine-chunk-probe.sh --with-core --ext=ds
 #   script/spine-chunk-probe.sh --timeout=1800
 #
 # EXIT: 0 only if every probed chunk compiled, bound every call, and matched Zend. 1 otherwise.
@@ -44,11 +45,13 @@ cd "$REPO_ROOT" || exit 1
 : "${CHUNK_TIMEOUT:=1800}"
 : "${PHP_BIN:=php}"
 EXTS=()
+WITH_CORE=0
 
 for arg in "$@"; do
     case "$arg" in
         --ext=*)     EXTS+=("${arg#*=}") ;;
         --timeout=*) CHUNK_TIMEOUT="${arg#*=}" ;;
+        --with-core) WITH_CORE=1 ;;
         *) echo "unknown argument: $arg" >&2; exit 2 ;;
     esac
 done
@@ -87,6 +90,14 @@ for ext in "${EXTS[@]}"; do
         echo '// rejects cannot be used to judge the compiler.'
         echo
         printf "require_once __DIR__ . '/../../../vendor/autoload.php';\n"
+        if [ "$WITH_CORE" -eq 1 ]; then
+            while IFS= read -r core_rel || [ -n "$core_rel" ]; do
+                core_rel="${core_rel%%#*}"
+                core_rel="$(echo "$core_rel" | xargs)"
+                [ -z "$core_rel" ] && continue
+                printf "require_once __DIR__ . '/../../../%s';\n" "$core_rel"
+            done < "${REPO_ROOT}/script/spine-chunk-core-requires.txt"
+        fi
         find "$src_dir" -name '*.php' -type f | LC_ALL=C sort | while read -r f; do
             printf "require_once __DIR__ . '/../../../%s';\n" "$f"
         done
@@ -145,6 +156,7 @@ for ext in "${EXTS[@]}"; do
     if [ -n "$stub_line" ]; then
         stubs=$(printf '%s' "$stub_line" | sed -E 's/.*— ([0-9]+) method call\(s\).*/\1/')
         [ -n "$stubs" ] || stubs=0
+        php "${REPO_ROOT}/script/spine-chunk-stub-export.php" --write "${OUT_DIR}/${ext}.stubs.json" "$log" >/dev/null 2>&1 || true
     fi
 
     # --- does the artifact behave like Zend? ---------------------------------------------------
