@@ -5,7 +5,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ENTRY="${ROOT}/test/selfhost/compiler_helloworld_smoke/compile_driver.php"
 OUT="${ROOT}/build/selfhost-helloworld-compile"
-SOURCE="${PHP_COMPILER_M3_SOURCE:-${ROOT}/examples/000-HelloWorld/example.php}"
+SOURCE="${PHP_COMPILER_M3_SOURCE:-${ROOT}/test/bootstrap-aot/compiler_smoke_standalone.php}"
 AOT_OUT="${PHP_COMPILER_M3_OUT:-${ROOT}/build/helloworld-compile-bin-aot}"
 if [[ "${AOT_OUT}" != /* ]]; then
   AOT_OUT="${ROOT}/${AOT_OUT#./}"
