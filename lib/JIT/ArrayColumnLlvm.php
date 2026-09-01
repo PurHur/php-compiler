@@ -782,7 +782,7 @@ final class ArrayColumnLlvm
         $cellSlot = JitValueBox::alloc($context);
         $cellPtr = JitValueBox::pointer($context, $cellSlot);
         $context->builder->call(
-            $context->lookupFunction('__object__load_value_slot'),
+            $context->lookupFunction('__object__load_boxed_value_slot'),
             $slot,
             $cellPtr
         );
