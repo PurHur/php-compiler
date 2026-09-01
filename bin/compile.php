@@ -587,7 +587,10 @@ function run(string $filename, string $code, array $options): void
         // `free(): invalid pointer` (exit 134) or spins after a successful link
         // (#21925, #31726). Prefer Runtime::standalone() fast-exit (before $context
         // dtor); this is belt-and-suspenders if that return is reached.
-        if ($aotEmitOk && '' !== $normalized && str_contains($normalized, 'test/selfhost/')) {
+        if ($aotEmitOk && '' !== $normalized && (
+            str_contains($normalized, 'test/selfhost/')
+            || \PHPCompiler\AOT\ExternalMethodBind::spineChunkMode()
+        )) {
             \PHPCompiler\AOT\AotEmitFastExit::exitAfterSuccessfulSelfhostEmit($filename, (string) $options['-o']);
         }
     }

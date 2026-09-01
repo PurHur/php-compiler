@@ -68,8 +68,13 @@ final class AotEmitFastExit
         $selfhostEnv = getenv('PHP_COMPILER_SELFHOST_AOT');
         $isSelfhostPath = '' !== $normalized && str_contains($normalized, 'test/selfhost/');
         $isSelfhostEnv = '1' === $selfhostEnv || 'true' === strtolower((string) $selfhostEnv);
+        $spineChunkEnv = getenv(ExternalMethodBind::ENV_SPINE_CHUNK);
+        $isSpineChunk = '1' === $spineChunkEnv || 'true' === strtolower((string) $spineChunkEnv);
         // Match #31741: selfhost path or explicit SELFHOST_AOT (compile_driver argv).
-        if (!$isSelfhostPath && !$isSelfhostEnv) {
+        // Spine split-TU hub/consumer chunks compile under SPINE_CHUNK=1 but are not
+        // test/selfhost paths; bin/compile.php treats them as user-script AOT and clears
+        // SELFHOST_AOT — same post-emit LLVM teardown hang (#31726, #36155 Phase B).
+        if (!$isSelfhostPath && !$isSelfhostEnv && !$isSpineChunk) {
             return;
         }
         if (null !== $outfile && '' !== $outfile) {
