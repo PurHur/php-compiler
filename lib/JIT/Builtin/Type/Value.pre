@@ -44,12 +44,12 @@ class Value extends Type {
     public function implement(): void {
         $this->implementValueToNumeric();
         $this->implementValueReadLong();
-        $this->implementValueWriteLong();
         $this->implementValueReadDouble();
         $this->implementValueWriteDouble();
         $this->implementValueReadString();
         $this->implementValueWriteString();
         $this->implementValueDelref();
+        // __value__writeLong deferred — Context::lookupFunction ensureLinked (#36135).
         // __value__writeNull deferred — Context::lookupFunction ensureLinked (#36124).
         // __value__writeBool deferred — Context::lookupFunction ensureLinked (#36108).
     }
@@ -145,21 +145,6 @@ class Value extends Type {
                 }
                 $result = (int64) 0;
                 return $result;
-            }
-        }
-    }
-
-    public function implementValueWriteLong(): void {
-        compile {
-            function __value__writeLong($value, $long) {
-                __value__valueDelref($value);
-                $type = (int8) Variable::TYPE_NATIVE_LONG;
-                $value->type = $type;
-                $ptr = &$value->value;
-                $resultPtr = (int64*) $ptr;
-                $offset = (int32) 0;
-                $resultPtr[$offset] = $long;
-                return;
             }
         }
     }
