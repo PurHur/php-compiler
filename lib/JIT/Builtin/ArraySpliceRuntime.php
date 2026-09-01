@@ -51,9 +51,9 @@ final class ArraySpliceRuntime
             $hasLength,
             $length,
             $hasReplFlag,
-            $replHt
+            $replHt,
+            $array
         );
-        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
 
         return $removed;
     }

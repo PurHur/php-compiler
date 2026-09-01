@@ -42,9 +42,73 @@ final class HashTableSpliceLlvm
         Value $hasLength,
         Value $length,
         Value $hasReplacement,
-        Value $replacementHt
+        Value $replacementHt,
+        ?Variable $array = null
     ): Value {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'ht_splice_cont');
+        if (null !== $array) {
+            $packed = self::isPackedListI1($context, $srcHt);
+            $packedBb = BasicBlockHelper::append($context, 'ht_splice_packed_'.self::nextSeq());
+            $keyedBb = BasicBlockHelper::append($context, 'ht_splice_keyed_'.self::nextSeq());
+            $joinBb = BasicBlockHelper::append($context, 'ht_splice_join_'.self::nextSeq());
+            $context->builder->branchIf($packed, $packedBb, $keyedBb);
+
+            $context->builder->positionAtEnd($keyedBb);
+            $keyedRemoved = HashTableSpliceKeyedLlvm::spliceInPlace(
+                $context,
+                $array,
+                $srcHt,
+                $offset,
+                $hasLength,
+                $length,
+                $hasReplacement,
+                $replacementHt
+            );
+            $keyedTail = $context->builder->getInsertBlock();
+            $context->builder->branch($joinBb);
+
+            $context->builder->positionAtEnd($packedBb);
+            $packedRemoved = self::splicePackedInPlace(
+                $context,
+                $srcHt,
+                $offset,
+                $hasLength,
+                $length,
+                $hasReplacement,
+                $replacementHt
+            );
+            HashTableHelper::storeHashtableInArrayVariable($context, $array, $srcHt);
+            $packedTail = $context->builder->getInsertBlock();
+            $context->builder->branch($joinBb);
+
+            $context->builder->positionAtEnd($joinBb);
+            $phi = $context->builder->phi($packedRemoved->typeOf());
+            $phi->addIncoming($packedRemoved, $packedTail);
+            $phi->addIncoming($keyedRemoved, $keyedTail);
+
+            return $phi;
+        }
+
+        return self::splicePackedInPlace(
+            $context,
+            $srcHt,
+            $offset,
+            $hasLength,
+            $length,
+            $hasReplacement,
+            $replacementHt
+        );
+    }
+
+    private static function splicePackedInPlace(
+        Context $context,
+        Value $srcHt,
+        Value $offset,
+        Value $hasLength,
+        Value $length,
+        Value $hasReplacement,
+        Value $replacementHt
+    ): Value {
         $map = $context->structFieldMap['__hashtable__'];
         $sizeT = $context->getTypeFromString('size_t');
         $i64 = $context->getTypeFromString('int64');
@@ -57,9 +121,9 @@ final class HashTableSpliceLlvm
             $srcHt
         );
         $numI64 = JitNestedHelperCoerce::scalarToI64($context, $num, $sizeT);
-        $normOffI64 = self::normalizeOffset($context, $offset, $numI64);
+        $normOffI64 = self::normalizeOffsetForSplice($context, $offset, $numI64);
         $normOff = JitNestedHelperCoerce::i64ToScalar($context, $normOffI64, $sizeT);
-        $removeLen = self::computeRemoveLen($context, $num, $normOff, $hasLength, $length);
+        $removeLen = self::computeRemoveLenForSplice($context, $num, $normOff, $hasLength, $length);
 
         $removed = HashTableHelper::alloc($context);
         self::copyPackedRange($context, $snapshot, $normOff, $removeLen, $removed, null);
@@ -115,6 +179,41 @@ final class HashTableSpliceLlvm
         self::copyTempOnto($context, $temp, $srcHt, $newNum);
 
         return $removed;
+    }
+
+    public static function isPackedListI1(Context $context, Value $ht): Value
+    {
+        $map = $context->structFieldMap['__hashtable__'];
+        $nodePtrTy = $context->getTypeFromString('__strkey_node__*');
+
+        $numElements = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
+        $nextFree = $context->builder->load($context->builder->structGep($ht, $map['nextFreeElement']));
+        $strKeys = $context->builder->load($context->builder->structGep($ht, $map['strKeys']));
+
+        $zero = $context->getTypeFromString('size_t')->constInt(0, false);
+        $empty = $context->builder->icmp(Builder::INT_EQ, $numElements, $zero);
+        $noStrKeys = $context->builder->icmp(Builder::INT_EQ, $strKeys, $nodePtrTy->constNull());
+        $dense = $context->builder->icmp(Builder::INT_EQ, $numElements, $nextFree);
+
+        return $context->builder->or(
+            $empty,
+            $context->builder->and($noStrKeys, $dense)
+        );
+    }
+
+    public static function normalizeOffsetForSplice(Context $context, Value $offset, Value $numI64): Value
+    {
+        return self::normalizeOffset($context, $offset, $numI64);
+    }
+
+    public static function computeRemoveLenForSplice(
+        Context $context,
+        Value $num,
+        Value $normOffset,
+        Value $hasLength,
+        Value $length
+    ): Value {
+        return self::computeRemoveLen($context, $num, $normOffset, $hasLength, $length);
     }
 
     private static function normalizeOffset(Context $context, Value $offset, Value $numI64): Value

@@ -102,6 +102,118 @@ final class HashTableMutateNestedLlvm
         $context->builder->store($count, $context->builder->structGep($ht, $map['numElements']));
     }
 
+    /**
+     * Replace contents from an ordered pair list preserving foreach insertion order (#13573).
+     *
+     * Unlike {@see reorderKeyedPairs}, integer keys written after the first string key
+     * land in the late-packed region (values[packedPrefixEnd+…]) so json_encode / foreach
+     * interleave string keys before trailing ints (peer {@see VmIteratorForeach} #34977).
+     *
+     * @param Value $ht      receiver {@see __hashtable__*}
+     * @param Value $pairsHt packed list of pair hashtables (index 0=key, 1=value)
+     */
+    public static function assignPairsInForeachOrder(Context $context, Value $ht, Value $pairsHt): void
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'ht_mut_fo_cont');
+        self::clearInPlace($context, $ht);
+
+        $map = $context->structFieldMap['__hashtable__'];
+        $valueMap = $context->structFieldMap['__value__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $i8 = $context->getTypeFromString('int8');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $prefixUnset = $sizeT->constInt(\PHP_INT_MAX, false);
+        $context->builder->store(
+            $prefixUnset,
+            $context->builder->structGep($ht, $map['packedPrefixEnd'])
+        );
+
+        $count = $context->builder->load($context->builder->structGep($pairsHt, $map['nextFreeElement']));
+        $idxSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $lateCountSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $context->builder->store($zero, $idxSlot);
+        $context->builder->store($zero, $lateCountSlot);
+        $tag = (string) self::nextSeq();
+        $head = BasicBlockHelper::append($context, 'ht_mut_fo_head_'.$tag);
+        $body = BasicBlockHelper::append($context, 'ht_mut_fo_body_'.$tag);
+        $done = BasicBlockHelper::append($context, 'ht_mut_fo_done_'.$tag);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $count);
+        $context->builder->branchIf($atEnd, $done, $body);
+
+        $context->builder->positionAtEnd($body);
+        $pairBox = HashTableReadLlvm::readIndexedToValueBox($context, $pairsHt, $idx);
+        $pairHt = HashTableHelper::loadHashtablePointer($context, $pairBox);
+        $keyVar = HashTableReadLlvm::readIndexedToValueBox($context, $pairHt, $zero);
+        $valVar = HashTableReadLlvm::readIndexedToValueBox($context, $pairHt, $one);
+        $keyPtr = JitValueBox::valuePtrFromVariable($context, $keyVar);
+        $kind = $context->builder->and(
+            $context->builder->load($context->builder->structGep($keyPtr, $valueMap['type'])),
+            $i8->constInt(0x7f, false)
+        );
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_STRING & 0x7f, false)
+        );
+        $isLong = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG & 0x7f, false)
+        );
+
+        $strBb = BasicBlockHelper::append($context, 'ht_mut_fo_str_'.$tag);
+        $checkLong = BasicBlockHelper::append($context, 'ht_mut_fo_cl_'.$tag);
+        $longBb = BasicBlockHelper::append($context, 'ht_mut_fo_long_'.$tag);
+        $fallbackBb = BasicBlockHelper::append($context, 'ht_mut_fo_fb_'.$tag);
+        $writeJoin = BasicBlockHelper::append($context, 'ht_mut_fo_wjoin_'.$tag);
+        $context->builder->branchIf($isString, $strBb, $checkLong);
+
+        $context->builder->positionAtEnd($checkLong);
+        $context->builder->branchIf($isLong, $longBb, $fallbackBb);
+
+        $context->builder->positionAtEnd($strBb);
+        HashTableHelper::setValueBoxKey($context, $ht, $keyVar, $valVar);
+        $context->builder->branch($writeJoin);
+
+        $context->builder->positionAtEnd($longBb);
+        $prefixEnd = $context->builder->load($context->builder->structGep($ht, $map['packedPrefixEnd']));
+        $hasStrPrefix = $context->builder->icmp(Builder::INT_NE, $prefixEnd, $prefixUnset);
+        $earlyLong = BasicBlockHelper::append($context, 'ht_mut_fo_early_'.$tag);
+        $lateLong = BasicBlockHelper::append($context, 'ht_mut_fo_late_'.$tag);
+        $context->builder->branchIf($hasStrPrefix, $lateLong, $earlyLong);
+
+        $context->builder->positionAtEnd($earlyLong);
+        $intKey = $context->builder->truncOrBitCast(
+            $context->builder->call($context->lookupFunction('__value__readLong'), $keyPtr),
+            $sizeT
+        );
+        HashTableHelper::setAtIndex($context, $ht, $intKey, $valVar);
+        $context->builder->branch($writeJoin);
+
+        $context->builder->positionAtEnd($lateLong);
+        $lateCount = $context->builder->load($lateCountSlot);
+        $storageIdx = $context->builder->addNoSignedWrap($prefixEnd, $lateCount);
+        HashTableHelper::setAtIndex($context, $ht, $storageIdx, $valVar);
+        $context->builder->store($context->builder->addNoSignedWrap($lateCount, $one), $lateCountSlot);
+        $context->builder->branch($writeJoin);
+
+        $context->builder->positionAtEnd($fallbackBb);
+        HashTableHelper::setValueBoxKey($context, $ht, $keyVar, $valVar);
+        $context->builder->branch($writeJoin);
+
+        $context->builder->positionAtEnd($writeJoin);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($done);
+        $context->builder->store($count, $context->builder->structGep($ht, $map['numElements']));
+    }
+
     /** Drop packed + string/object keys; keep capacity/values buffer for reuse. */
     private static function clearInPlace(Context $context, Value $ht): void
     {

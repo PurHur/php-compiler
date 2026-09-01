@@ -74,7 +74,7 @@ final class JsonEncodeArrayLlvm
             $context->builder->icmp(Builder::INT_EQ, $forceObject, $i1->constInt(0, false))
         );
 
-        $pairs = HashTableExportKeyValuePairs::exportPairsForSlice($context, $ht);
+        $pairs = HashTableExportKeyValuePairs::exportPairsInForeachOrder($context, $ht);
         $num = $context->builder->call(
             $context->lookupFunction('__hashtable__getNumElements'),
             $pairs
