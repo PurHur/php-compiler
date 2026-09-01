@@ -1,0 +1,1 @@
+../cases/g07_inc_resource.php

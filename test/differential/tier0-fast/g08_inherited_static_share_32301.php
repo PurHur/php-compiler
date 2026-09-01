@@ -1,0 +1,1 @@
+../cases/g08_inherited_static_share_32301.php

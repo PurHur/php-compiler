@@ -1,0 +1,1 @@
+../cases/g09_callable_static_array_param_13686.php
