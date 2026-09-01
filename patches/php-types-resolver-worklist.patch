@@ -1,6 +1,6 @@
 --- vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
 +++ vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
-@@ -48,21 +48,89 @@
+@@ -48,21 +48,93 @@
              return;
          }
  
@@ -13,7 +13,14 @@
 -                if ($type) {
 -                    $toRemove[] = $var;
 -                    $resolved[$var] = $type;
-+        if ('1' !== getenv('PHPTYPES_RESOLVER_WORKLIST')) {
++        // Worklist is the default (#16077 / #36225): dependency-driven instead of
++        // O(rounds × vars) rescans. Opcode dumps match legacy on a 10-file corpus.
++        // Opt out with PHPTYPES_RESOLVER_WORKLIST=0 or PHPTYPES_RESOLVER_LEGACY=1.
++        $worklistFlag = getenv('PHPTYPES_RESOLVER_WORKLIST');
++        $legacyResolver = ('0' === $worklistFlag)
++            || ('1' === getenv('PHPTYPES_RESOLVER_LEGACY'))
++            || ('false' === strtolower((string) $worklistFlag));
++        if ($legacyResolver) {
 +            $round = 1;
 +            do {
 +                $start = count($resolved);
@@ -32,10 +39,7 @@
 +        } else {
 +            // Dependency-driven worklist: the round-based loop rescanned every
 +            // unresolved variable per round — O(rounds × vars), minutes on
-+            // 30k-line files (#16077). Resolution ORDER differs from the round
-+            // loop and the fixpoint is order-sensitive for codegen, so this is
-+            // opt-in for lint workloads only (bin/lint.php sets the flag);
-+            // default stays on the legacy round loop.
++            // 30k-line files (#16077).
 +            $dependents = new SplObjectStorage();
 +            foreach ($unresolved as $var) {
 +                foreach ($var->ops as $op) {

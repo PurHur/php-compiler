@@ -565,7 +565,7 @@ patch_already_applied() {
       grep -q 'usageIds' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Operand.php" 2>/dev/null
       ;;
     php-types-resolver-worklist.patch)
-      grep -q 'PHPTYPES_RESOLVER_WORKLIST' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
+      grep -q 'PHPTYPES_RESOLVER_LEGACY' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
       ;;
     php-types-never-type.patch)
       grep -q 'function never(): self' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null \
