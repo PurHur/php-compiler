@@ -57,7 +57,11 @@ final class HashTableExportKeyValuePairs implements Call
         $prefixEnd = $context->builder->load($context->builder->structGep($ht, $htMap['packedPrefixEnd']));
         $nextFree = $context->builder->load($context->builder->structGep($ht, $htMap['nextFreeElement']));
         $numElements = $context->builder->load($context->builder->structGep($ht, $htMap['numElements']));
-        $strCount = $context->builder->sub($numElements, $nextFree);
+        // Sparse int-key arrays (array_diff filter, array_splice holes) may have
+        // numElements < nextFreeElement — raw sub wraps and json_encode drops tail keys (#23593).
+        $strCountRaw = $context->builder->sub($numElements, $nextFree);
+        $hasStrRegion = $context->builder->icmp(Builder::INT_UGE, $numElements, $nextFree);
+        $strCount = $context->builder->select($hasStrRegion, $strCountRaw, $zero);
         $totalPos = $context->builder->add($nextFree, $strCount);
 
         $posSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
