@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\JIT\Builtin\DomLoadRuntime;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Intdiv as JitIntdiv;
 use PHPCompiler\JIT\JitValueBox;
@@ -17,6 +18,17 @@ final class JitDomLoad
 {
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_load_cont');
+        $argcDummy = DomJitArgc::rejectUnlessUserArgCountRange(
+            $context,
+            $args,
+            'DOMDocument::load',
+            1,
+            2
+        );
+        if (null !== $argcDummy) {
+            return $argcDummy;
+        }
         if (\count($args) < 2) {
             throw new \LogicException('DOMDocument::load() expects receiver and filename');
         }

@@ -187,6 +187,15 @@ final class JitDomAttributeNodeNS
      */
     public static function invokeSetAttributeNode(Context $context, JITVariable ...$args): Value
     {
+        $argcDummy = DomJitArgc::rejectUnlessExactUserArgCount(
+            $context,
+            $args,
+            'DOMElement::setAttributeNode',
+            1
+        );
+        if (null !== $argcDummy) {
+            return $argcDummy;
+        }
         if (\count($args) < 2) {
             throw new \LogicException('DOMElement::setAttributeNode() expects receiver and attr');
         }

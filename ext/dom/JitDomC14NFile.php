@@ -27,6 +27,17 @@ final class JitDomC14NFile
 {
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_c14nfile_cont');
+        $argcDummy = DomJitArgc::rejectUnlessUserArgCountRange(
+            $context,
+            $args,
+            'DOMNode::C14NFile',
+            1,
+            5
+        );
+        if (null !== $argcDummy) {
+            return $argcDummy;
+        }
         if (\count($args) < 2) {
             throw new \LogicException('DOMNode::C14NFile() expects receiver and uri');
         }

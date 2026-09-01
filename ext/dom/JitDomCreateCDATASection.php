@@ -40,6 +40,15 @@ final class JitDomCreateCDATASection
 
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
+        $argcDummy = DomJitArgc::rejectUnlessExactUserArgCount(
+            $context,
+            $args,
+            'DOMDocument::createCDATASection',
+            1
+        );
+        if (null !== $argcDummy) {
+            return $argcDummy;
+        }
         if (\count($args) < 2) {
             throw new \LogicException('DOMDocument::createCDATASection() expects receiver and data');
         }

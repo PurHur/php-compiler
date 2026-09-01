@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
+use PHPCompiler\ext\dom\DomJitArgc;
 use PHPCompiler\ext\dom\JitDomXPathRegisterUserScript;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\DomInstanceMethodRuntime;
@@ -20,6 +21,16 @@ final class DomXPathRegisterPhpFunctions implements Call
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_xpath_register_php_functions_cont');
         if ([] === $args) {
             throw new \LogicException('DOMXPath::registerPhpFunctions() called without $this');
+        }
+        $argcDummy = DomJitArgc::rejectUnlessUserArgCountRange(
+            $context,
+            $args,
+            'DOMXPath::registerPhpFunctions',
+            0,
+            1
+        );
+        if (null !== $argcDummy) {
+            return $argcDummy;
         }
         if (JitDomXPathRegisterUserScript::shouldUse($context)) {
             $us = JitDomXPathRegisterUserScript::tryRegisterPhpFunctions($context, ...$args);

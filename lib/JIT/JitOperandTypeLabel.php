@@ -142,7 +142,8 @@ final class JitOperandTypeLabel
         return $jitObject->classNameForId($classId);
     }
 
-    private static function compileTimeObjectClassName(Context $context, Variable $arg): ?string
+    /** Compile-time {@see __object__} class display name, or null when unknown (#30814). */
+    public static function compileTimeObjectClassName(Context $context, Variable $arg): ?string
     {
         $classId = self::constantObjectClassId($context, $arg);
         if (null === $classId) {

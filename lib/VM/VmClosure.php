@@ -163,6 +163,12 @@ final class VmClosure
         JitValueBox::copyIntoPointer($context, JitValueBox::pointer($context, $slot), $srcPtr);
         $dest = new JitVariable($context, JitVariable::TYPE_VALUE, JitVariable::KIND_VARIABLE, $slot);
         $dest->addref();
+        if (null !== $src->classUserType) {
+            $dest->classUserType = $src->classUserType;
+        }
+        if (null !== $src->compileTimeDomTagName) {
+            $dest->compileTimeDomTagName = $src->compileTimeDomTagName;
+        }
 
         return $dest;
     }

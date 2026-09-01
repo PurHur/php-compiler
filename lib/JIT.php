@@ -27461,6 +27461,16 @@ class JIT {
                     return;
                 }
             }
+            // Closure use() / :object temps — RuntimeIndirect drops surplus argc (#31251 / #30814).
+            $receiverVar = $this->context->getVariableFromOp($receiverOp);
+            if (\PHPCompiler\ext\dom\DomExcessArgcJitRoute::tryRouteNonObjectReceiver(
+                $this->context,
+                $methodLcEarly,
+                $receiverVar,
+                $this->context->scope
+            )) {
+                return;
+            }
             // ?-> fetch blocks compile against a null-typed receiver slot; at runtime the
             // branch is only taken when the receiver is a real object (zend_compile.c).
             $runtimeCandidates = $this->buildRuntimeInstanceMethodCandidatesByClassId($methodLcEarly);
@@ -28879,6 +28889,14 @@ class JIT {
 
                 return;
             }
+        }
+        if (\PHPCompiler\ext\dom\DomExcessArgcJitRoute::tryRouteNonObjectReceiver(
+            $this->context,
+            $methodLc,
+            $receiverVar,
+            $this->context->scope
+        )) {
+            return;
         }
         if ('substringdata' === $methodLc) {
             JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domtext::substringdata');

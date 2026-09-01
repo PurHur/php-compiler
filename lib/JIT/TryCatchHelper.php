@@ -812,6 +812,37 @@ final class TryCatchHelper
     }
 
     /**
+     * Pend an ArgumentCountError object for the caller's after-call check (no local try).
+     *
+     * Same shape as {@see emitPendTypeErrorForCaller} — DOM excess argc inside a closure
+     * invoked from outer try/catch must propagate, not abort in-place (#30814 / #33971).
+     */
+    public static function emitPendArgumentCountErrorForCaller(Context $context, string $message): void
+    {
+        JitThrow::registerDeclarations($context);
+        JitThrow::ensureLinked($context);
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            JitThrow::ensureStandaloneBodies($context);
+        }
+
+        $object = $context->type->object;
+        GetClassRuntime::ensureLinked($context);
+        $object->lookup('ArgumentCountError');
+        $classId = $object->lookup('ArgumentCountError');
+        $obj = $object->allocate($classId);
+        $object->markObjectConstructed($obj);
+        $msgStr = $context->builder->load($context->constantStringFromString($message));
+        $msgVar = new Variable(
+            $context,
+            Variable::TYPE_STRING,
+            Variable::KIND_VALUE,
+            $msgStr
+        );
+        $object->storeInstanceProperty($obj, 'Error', ExceptionSupport::PROP_MESSAGE, $msgVar);
+        $context->builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $obj);
+    }
+
+    /**
      * Public wrapper for {@see emitPropagateReturn} after cross-function pending throw (#26486).
      */
     public static function emitPropagateReturnAfterPendingThrow(Context $context, Function_ $func): void

@@ -46,6 +46,16 @@ final class JitDomCreateProcessingInstruction
 
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
+        $argcDummy = DomJitArgc::rejectUnlessUserArgCountRange(
+            $context,
+            $args,
+            'DOMDocument::createProcessingInstruction',
+            1,
+            2
+        );
+        if (null !== $argcDummy) {
+            return $argcDummy;
+        }
         if (\count($args) < 2) {
             throw new \LogicException('DOMDocument::createProcessingInstruction() expects receiver and target');
         }
