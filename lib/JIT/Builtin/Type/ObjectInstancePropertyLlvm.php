@@ -243,7 +243,7 @@ final class ObjectInstancePropertyLlvm
                         $context->builder->structGep($storage, $valueMap['type'])
                     );
                     $context->builder->call(
-                        $context->lookupFunction('__object__load_value_slot'),
+                        $context->lookupFunction('__object__load_boxed_value_slot'),
                         $slot,
                         $storage
                     );
@@ -599,7 +599,7 @@ final class ObjectInstancePropertyLlvm
                 );
             }
             $context->builder->call(
-                $context->lookupFunction('__object__load_value_slot'),
+                $context->lookupFunction('__object__load_boxed_value_slot'),
                 $fetched->objectPropertySlot,
                 $destSlot
             );

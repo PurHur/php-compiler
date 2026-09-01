@@ -166,7 +166,7 @@ final class JitValueBox
         ) {
             $storage = self::alloc($context);
             $context->builder->call(
-                $context->lookupFunction('__object__load_value_slot'),
+                $context->lookupFunction('__object__load_boxed_value_slot'),
                 ObjectInstancePropertyLlvm::dominatingSlotPtr($context->type->object, $var),
                 $storage
             );
