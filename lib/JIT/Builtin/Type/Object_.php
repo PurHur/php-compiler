@@ -482,7 +482,12 @@ class Object_ extends Type {
 
         $this->context->builder->positionAtEnd($checkString);
         $isStringRef = $this->slotContentHasStringRefHeader($loaded);
-        $this->context->builder->branchIf($isStringRef, $writeStr, $nativeLongBlock);
+        $checkNative = $fn->appendBasicBlock('check_native');
+        $this->context->builder->branchIf($isStringRef, $writeStr, $checkNative);
+
+        $this->context->builder->positionAtEnd($checkNative);
+        $isNativeLong = $this->slotContentIsNativeLongStorage($loaded);
+        $this->context->builder->branchIf($isNativeLong, $nativeLongBlock, $valueBoxBlock);
 
         $valueMap = $this->context->structFieldMap['__value__'];
         $objPtr = $this->context->getTypeFromString('__object__*');
@@ -573,6 +578,28 @@ class Object_ extends Type {
             PHPLLVM\Builder::INT_EQ,
             $masked,
             $i32->constInt(4, false)
+        );
+    }
+
+    /**
+     * Typed native int slots store int64*; boxed TYPE_VALUE slots store __value__* (#24008 / #36113).
+     * Refcounted __value__ tags (e.g. TYPE_HASHTABLE 135) must not take the native-long path.
+     */
+    private function slotContentIsNativeLongStorage(PHPLLVM\Value $content): PHPLLVM\Value
+    {
+        $i8 = $this->context->getTypeFromString('int8');
+        $head = $this->context->builder->pointerCast($content, $i8->pointerType(0));
+        $tag = $this->context->builder->load($head);
+        $hasRefcountTag = $this->context->builder->icmp(
+            PHPLLVM\Builder::INT_NE,
+            $this->context->builder->and($tag, $i8->constInt(0x80, false)),
+            $i8->constInt(0, false)
+        );
+
+        return $this->context->builder->icmp(
+            PHPLLVM\Builder::INT_EQ,
+            $hasRefcountTag,
+            $this->context->getTypeFromString('int1')->constInt(0, false)
         );
     }
 

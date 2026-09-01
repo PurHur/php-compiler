@@ -945,9 +945,14 @@ final class JitSpaceshipCompareKernel
         $isObject = self::slotIsObject($context, $content);
         $context->builder->branchIf($isObject, $objBlock, $checkString);
 
+        $checkNative = BasicBlockHelper::append($context, self::blockName('ss_slot_check_native'));
         $context->builder->positionAtEnd($checkString);
         $isString = self::slotPointsToString($context, $content);
-        $context->builder->branchIf($isString, $strBlock, $nativeLongBlock);
+        $context->builder->branchIf($isString, $strBlock, $checkNative);
+
+        $context->builder->positionAtEnd($checkNative);
+        $isNativeLong = self::slotIsNativeLongStorage($context, $content);
+        $context->builder->branchIf($isNativeLong, $nativeLongBlock, $loadBlock);
 
         $valueMap = $context->structFieldMap['__value__'];
         $objPtr = $context->getTypeFromString('__object__*');
@@ -1012,6 +1017,25 @@ final class JitSpaceshipCompareKernel
         $isObject = $context->builder->icmp(Builder::INT_EQ, $masked, $i32->constInt(self::TYPEINFO_TYPE_OBJECT, false));
 
         return $context->builder->select($isNull, $context->getTypeFromString('int1')->constInt(0, false), $isObject);
+    }
+
+    /** Native typed int slots store int64*; boxed properties store __value__* (#24008 / #36113). */
+    private static function slotIsNativeLongStorage(Context $context, Value $content): Value
+    {
+        $i8 = $context->getTypeFromString('int8');
+        $head = $context->builder->pointerCast($content, $i8->pointerType(0));
+        $tag = $context->builder->load($head);
+        $hasRefcountTag = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->and($tag, $i8->constInt(0x80, false)),
+            $i8->constInt(0, false)
+        );
+
+        return $context->builder->icmp(
+            Builder::INT_EQ,
+            $hasRefcountTag,
+            $context->getTypeFromString('int1')->constInt(0, false)
+        );
     }
 
     private static function valueKind(Context $context, Value $valuePtr): Value
