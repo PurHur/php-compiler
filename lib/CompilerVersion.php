@@ -462,11 +462,6 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
         return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
     }
 
@@ -3652,11 +3647,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
+        // Honor PHP_COMPILER_AOT_COMPILE_PROFILE when user-script AOT clears PROFILE for helper warmup (#21557 / #36123).
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
@@ -3675,11 +3666,6 @@ final class CompilerVersion
 
         if (version_compare(self::VERSION, '8.4.0', '>=')) {
             return true;
-        }
-
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
         }
 
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
