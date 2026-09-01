@@ -1192,13 +1192,9 @@ class Context {
     private function resolveRegisteredInternalBuiltin(string $lc): ?FuncInternal
     {
         foreach ($this->modules as $module) {
-            foreach ($module->getFunctions() as $func) {
-                if (!$func instanceof FuncInternal) {
-                    continue;
-                }
-                if (strtolower($func->getName()) === $lc) {
-                    return $func;
-                }
+            $found = self::findInternalBuiltinInModule($module, $lc);
+            if (null !== $found) {
+                return $found;
             }
         }
 
@@ -1211,14 +1207,57 @@ class Context {
             && [] !== $this->runtime->modules
         ) {
             foreach ($this->runtime->modules as $module) {
-                foreach ($module->getFunctions() as $func) {
-                    if (!$func instanceof FuncInternal) {
-                        continue;
-                    }
-                    if (strtolower($func->getName()) === $lc) {
-                        return $func;
-                    }
+                $found = self::findInternalBuiltinInModule($module, $lc);
+                if (null !== $found) {
+                    return $found;
                 }
+            }
+        }
+
+        // Spine split-TU: chunk entry is bare require_once lines — registerModule() never
+        // runs, so a few stdlib Internal leaves would ExternalMethod-null (#36147). Whitelist
+        // only type-check/count kernels safe to emit without the full stdlib surface (#15417).
+        if ([] === $this->modules
+            && \PHPCompiler\AOT\ExternalMethodBind::spineChunkMode()
+            && self::isSpineChunkRuntimeInternalKernel($lc)
+            && [] !== $this->runtime->modules
+        ) {
+            foreach ($this->runtime->modules as $module) {
+                $found = self::findInternalBuiltinInModule($module, $lc);
+                if (null !== $found) {
+                    return $found;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Internal builtins safe to resolve from Runtime modules during SPINE_CHUNK chunk emits.
+     *
+     * Opening the full stdlib surface pulls in helpers that fail module verify in isolation
+     * (e.g. strncasecmp #36147) — same constraint as NestedJIT pre-register whitelist (#15417).
+     */
+    private static function isSpineChunkRuntimeInternalKernel(string $lc): bool
+    {
+        return match ($lc) {
+            'count',
+            'is_float',
+            'is_nan',
+            => true,
+            default => false,
+        };
+    }
+
+    private static function findInternalBuiltinInModule(Module $module, string $lc): ?FuncInternal
+    {
+        foreach ($module->getFunctions() as $func) {
+            if (!$func instanceof FuncInternal) {
+                continue;
+            }
+            if (strtolower($func->getName()) === $lc) {
+                return $func;
             }
         }
 

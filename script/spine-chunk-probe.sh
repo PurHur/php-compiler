@@ -93,7 +93,7 @@ for ext in "${EXTS[@]}"; do
         if [ "$WITH_CORE" -eq 1 ]; then
             while IFS= read -r core_rel || [ -n "$core_rel" ]; do
                 core_rel="${core_rel%%#*}"
-                core_rel="$(echo "$core_rel" | xargs)"
+                core_rel="$(echo "$core_rel" | tr -d '\r' | xargs)"
                 [ -z "$core_rel" ] && continue
                 printf "require_once __DIR__ . '/../../../%s';\n" "$core_rel"
             done < "${REPO_ROOT}/script/spine-chunk-core-requires.txt"
