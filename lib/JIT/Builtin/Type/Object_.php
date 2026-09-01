@@ -2231,7 +2231,7 @@ class Object_ extends Type {
      */
     private function ensureDomLivingParentChildInterfaces(): void
     {
-        if (!CompilerVersion::supportsDomLivingStandardNamespace()) {
+        if (!CompilerVersion::supportsDomLivingStandardNamespaceJitLowering()) {
             return;
         }
         $this->markInterfaceClass('Dom\\ParentNode');

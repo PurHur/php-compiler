@@ -4483,6 +4483,27 @@ final class CompilerVersion
     }
 
     /**
+     * Dom\ living API LLVM lowering during user-script AOT compile (#35804, #21557).
+     *
+     * {@see supportsDomLivingStandardNamespace()} is false when compile.php clears
+     * PHP_COMPILER_PROFILE during emit (hash crypto ABI; #21557). Factory Call proxies
+     * and CFS materialize must still lower — runtime PROFILE applies when the binary runs.
+     */
+    public static function supportsDomLivingStandardNamespaceJitLowering(): bool
+    {
+        if (self::supportsDomLivingStandardNamespace()) {
+            return true;
+        }
+        $userScript = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+        if ('1' !== $userScript && 'true' !== strtolower((string) $userScript)) {
+            return false;
+        }
+
+        return self::MAJOR_VERSION > 8
+            || (self::MAJOR_VERSION === 8 && self::MINOR_VERSION >= 4);
+    }
+
+    /**
      * PHP 8.5+ Dom\ ParentNode::$children live HTMLCollection
      * (php-src PHP-8.5+ ext/dom/php_dom.stub.php; #21559, re-#21033).
      *

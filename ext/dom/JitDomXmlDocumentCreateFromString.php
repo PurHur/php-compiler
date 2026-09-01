@@ -75,7 +75,7 @@ final class JitDomXmlDocumentCreateFromString
 
         if (0 === $optionsLit && null !== $sourceLit && '' !== $sourceLit
             && JitDomDocumentMethodKernel::shouldUse($context)
-            && CompilerVersion::supportsDomLivingStandardNamespace()
+            && CompilerVersion::supportsDomLivingStandardNamespaceJitLowering()
         ) {
             $us = self::tryMaterializeUserScript($context, $sourceLit);
             if (null !== $us) {

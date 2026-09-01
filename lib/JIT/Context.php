@@ -1166,8 +1166,27 @@ class Context {
                 return $this->functionProxies[$lc];
             }
         }
+        $this->ensureDomLivingDocumentFactoryProxies();
+        if (isset($this->functionProxies[$lc])
+            && !($this->functionProxies[$lc] instanceof Call\ExternalMethod)) {
+            return $this->functionProxies[$lc];
+        }
 
         return null;
+    }
+
+    /** Dom\HTMLDocument/XMLDocument factory Call proxies — thin user-script AOT (#27108, #27300, #35804). */
+    private function ensureDomLivingDocumentFactoryProxies(): void
+    {
+        if (!CompilerVersion::supportsDomLivingStandardNamespaceJitLowering()) {
+            return;
+        }
+        if (!isset($this->functionProxies['dom\\htmldocument::createfromstring'])) {
+            $this->functionProxies['dom\\xmldocument::createfromstring'] = new Call\DomXmlDocumentCreateFromString();
+            $this->functionProxies['dom\\htmldocument::createfromstring'] = new Call\DomHtmlDocumentCreateFromString();
+            $this->functionProxies['dom\\xmldocument::createfromfile'] = new Call\DomXmlDocumentCreateFromFile();
+            $this->functionProxies['dom\\htmldocument::createfromfile'] = new Call\DomHtmlDocumentCreateFromFile();
+        }
     }
 
     private function resolveRegisteredInternalBuiltin(string $lc): ?FuncInternal
@@ -2458,12 +2477,7 @@ class Context {
         $this->functionProxies['pdo::getavailabledrivers'] = new Call\PdoGetAvailableDrivers();
         $this->functionProxies['pdo::quote'] = new Call\PdoQuote();
         // Dom\XMLDocument / Dom\HTMLDocument::createFromString / createFromFile — avoid ExternalMethod silent NULL (#27108, #27300).
-        if (CompilerVersion::supportsDomLivingStandardNamespace()) {
-            $this->functionProxies['dom\\xmldocument::createfromstring'] = new Call\DomXmlDocumentCreateFromString();
-            $this->functionProxies['dom\\htmldocument::createfromstring'] = new Call\DomHtmlDocumentCreateFromString();
-            $this->functionProxies['dom\\xmldocument::createfromfile'] = new Call\DomXmlDocumentCreateFromFile();
-            $this->functionProxies['dom\\htmldocument::createfromfile'] = new Call\DomHtmlDocumentCreateFromFile();
-        }
+        $this->ensureDomLivingDocumentFactoryProxies();
         // XMLReader::XML / fromString / read — avoid ExternalMethod silent NULL on thin AOT (#27299, #28670).
         // XML() exists on all profiles; fromString is PROFILE≥8.4 only.
         XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::xml');
