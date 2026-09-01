@@ -40,7 +40,8 @@ final class IncludeBindingEmitHelper
         Context $context,
         BasicBlock $materializeBb,
         Variable $callerVar,
-        ?string $name = null
+        ?string $name = null,
+        ?\PHPLLVM\Value $preallocatedSlot = null
     ): Variable {
         if (
             null !== $name
@@ -87,7 +88,11 @@ final class IncludeBindingEmitHelper
             }
             $saved = $context->builder->getInsertBlock();
             $context->builder->positionAtEnd($materializeBb);
-            $slot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__string__*'));
+            $slot = $preallocatedSlot ?? BasicBlockHelper::entryAllocaForFunction(
+                $context,
+                $materializeBb->getParent(),
+                $context->getTypeFromString('__string__*')
+            );
             $stringVar = new Variable(
                 $context,
                 Variable::TYPE_STRING,
@@ -114,7 +119,11 @@ final class IncludeBindingEmitHelper
         }
         $saved = $context->builder->getInsertBlock();
         $context->builder->positionAtEnd($materializeBb);
-        $slot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__string__*'));
+        $slot = $preallocatedSlot ?? BasicBlockHelper::entryAllocaForFunction(
+            $context,
+            $materializeBb->getParent(),
+            $context->getTypeFromString('__string__*')
+        );
         $stringVar = new Variable(
             $context,
             Variable::TYPE_STRING,

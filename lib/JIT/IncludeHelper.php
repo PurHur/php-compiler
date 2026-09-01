@@ -204,6 +204,32 @@ final class IncludeHelper
         $bindingRefreshIndex = \count($context->inlineIncludeBindingRefreshStack) - 1;
         $returnHolderOp = new Temporary();
         $entryBb = $func->appendBasicBlock('include_entry_'.(++self::$includeEntrySerial));
+        $stringPtrTy = $context->getTypeFromString('__string__*');
+        // Pre-allocate include-binding slots in function entry while preIncludeBb is still
+        // open — late entryAlloca after the branch seals the caller block (#36253).
+        $preparedBindingSlots = new \SplObjectStorage();
+        $calleeBindingSlots = new \SplObjectStorage();
+        $returnHolderSlot = BasicBlockHelper::entryAllocaValueBox($context);
+        foreach ($localBindings as $operand) {
+            $bindingName = OperandName::resolve($operand);
+            $resolvedCaller = IncludeBindingJitHelper::resolveIncludeCallerVar(
+                $context,
+                $bindingName,
+                $localBindings[$operand],
+                $bindingCaller
+            );
+            $localBindings[$operand] = $resolvedCaller;
+            $preparedBindingSlots[$operand] = BasicBlockHelper::entryAllocaForFunction(
+                $context,
+                $func,
+                $stringPtrTy
+            );
+            $calleeBindingSlots[$operand] = BasicBlockHelper::entryAllocaForFunction(
+                $context,
+                $func,
+                $stringPtrTy
+            );
+        }
         if (null !== $preIncludeBb && null === $preIncludeBb->getTerminator()) {
             $context->builder->positionAtEnd($preIncludeBb);
             $context->builder->branch($entryBb);
@@ -213,7 +239,7 @@ final class IncludeHelper
             $context,
             Variable::TYPE_VALUE,
             Variable::KIND_VARIABLE,
-            JitValueBox::alloc($context)
+            $returnHolderSlot
         );
         if ($captureEvalReturn) {
             $context->builder->call(
@@ -231,18 +257,13 @@ final class IncludeHelper
         IncludeBindingJitHelper::syncLocalBindingsFromScope($context, $localBindings, $bindingCaller);
         foreach ($localBindings as $operand) {
             $bindingName = OperandName::resolve($operand);
-            $resolvedCaller = IncludeBindingJitHelper::resolveIncludeCallerVar(
-                $context,
-                $bindingName,
-                $localBindings[$operand],
-                $bindingCaller
-            );
-            $localBindings[$operand] = $resolvedCaller;
+            $resolvedCaller = $localBindings[$operand];
             $preparedBindings[$operand] = IncludeBindingEmitHelper::prepareCallerBinding(
                 $context,
                 $entryBb,
                 $resolvedCaller,
-                $bindingName
+                $bindingName,
+                $preparedBindingSlots[$operand]
             );
         }
 
@@ -263,7 +284,7 @@ final class IncludeHelper
                     $context,
                     Variable::TYPE_STRING,
                     Variable::KIND_VARIABLE,
-                    BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__string__*'))
+                    $calleeBindingSlots[$operand]
                 );
                 $calleeVar->initialize();
                 $context->setVariableOp($operand, $calleeVar);
