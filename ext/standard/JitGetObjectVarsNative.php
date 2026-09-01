@@ -604,11 +604,12 @@ final class JitGetObjectVarsNative
 
                 return;
             }
-            $context->builder->call(
-                $context->lookupFunction('__object__load_value_slot'),
-                $fetched->objectPropertySlot,
-                $dest->value
-            );
+            // Heap __value__* property slots must use load_boxed_value_slot (#26797 / #36115).
+            $object = $context->type->object;
+            if (!$object instanceof ObjectBuiltin) {
+                throw new \LogicException('get_object_vars() requires object type metadata in this compiler build');
+            }
+            $object->boxFetchedPropertyIntoValueBox($dest->value, $fetched);
 
             return;
         }
@@ -626,7 +627,14 @@ final class JitGetObjectVarsNative
 
             return;
         }
-        HashTableHelper::setAtStringKey($context, $ht, $keyStr, $fetched);
+        // Native scalar slots are int64*/double*/int1* pointers — setAtStringKeyLong passed
+        // the slot address as the value (#24008 / #26797 regression on get_mangled_object_vars).
+        $object = $context->type->object;
+        if (!$object instanceof ObjectBuiltin) {
+            throw new \LogicException('get_object_vars() requires object type metadata in this compiler build');
+        }
+        $dest = HashTableHelper::writableStringKeyValueBox($context, $ht, $keyStr);
+        $object->boxFetchedPropertyIntoValueBox($dest->value, $fetched);
     }
 
     private static function manglePropertyKey(string $propName, int $visibility, string $declaringClassName): string
