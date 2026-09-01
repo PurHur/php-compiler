@@ -337,6 +337,7 @@ class Object_ extends Type {
         // (#31894 / #32122). JitThrow linked on demand when compiling try/catch (#1056).
 
         $this->registerFn('__object__load_value_slot', 'void', ['void**', '__value__*']);
+        $this->registerFn('__object__load_boxed_value_slot', 'void', ['void**', '__value__*']);
         $this->registerFn('__object__prop_count', 'int32', ['__object__*']);
         $this->registerFn('__value__readObject', '__object__*', ['__value__*']);
         $this->registerFn('__value__writeObject', 'void', ['__value__*', '__object__*']);
@@ -364,6 +365,7 @@ class Object_ extends Type {
     public function implement(): void
     {
         $this->implementLoadValueSlot();
+        $this->implementLoadBoxedValueSlot();
         $this->implementObjectPropCount();
         $this->implementValueReadObject();
         $this->implementValueWriteObject();
@@ -536,6 +538,62 @@ class Object_ extends Type {
         $this->context->builder->branch($done);
 
         $this->context->builder->positionAtEnd($valueBoxBlock);
+        $valPtr = $this->context->builder->pointerCast(
+            $loaded,
+            $this->context->getTypeFromString('__value__*')
+        );
+        $this->context->builder->store(
+            $this->context->builder->load($valPtr),
+            $dest
+        );
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($done);
+        $this->context->builder->returnVoid();
+        $this->context->builder->clearInsertionPosition();
+    }
+
+    /**
+     * Copy a boxed {@see __value__} heap slot into a stack destination.
+     *
+     * User string/array/untyped properties use TYPE_VALUE slots that always store
+     * {@code __value__*} — {@see implementLoadValueSlot} mis-classifies those as native
+     * {@code int64*} and echoes the pointer (#31895 / #24086 AOT leftovers).
+     */
+    private function implementLoadBoxedValueSlot(): void
+    {
+        $fn = $this->context->lookupFunction('__object__load_boxed_value_slot');
+        if ($fn->countBasicBlocks() > 0) {
+            return;
+        }
+        $entry = $fn->appendBasicBlock('entry');
+        $nullBlock = $fn->appendBasicBlock('null');
+        $copyBlock = $fn->appendBasicBlock('copy');
+        $done = $fn->appendBasicBlock('done');
+        $this->context->builder->positionAtEnd($entry);
+
+        $slot = $fn->getParam(0);
+        $dest = $fn->getParam(1);
+        $voidPtr = $this->context->getTypeFromString('void*');
+        $loaded = $this->context->builder->pointerCast(
+            $this->context->builder->load($slot),
+            $voidPtr
+        );
+        $isNull = $this->context->builder->icmp(
+            PHPLLVM\Builder::INT_EQ,
+            $loaded,
+            $voidPtr->constNull()
+        );
+        $this->context->builder->branchIf($isNull, $nullBlock, $copyBlock);
+
+        $this->context->builder->positionAtEnd($nullBlock);
+        $this->context->builder->call(
+            $this->context->lookupFunction('__value__writeNull'),
+            $dest
+        );
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($copyBlock);
         $valPtr = $this->context->builder->pointerCast(
             $loaded,
             $this->context->getTypeFromString('__value__*')
@@ -9140,7 +9198,7 @@ class Object_ extends Type {
                     $this->context->builder->structGep($storage, $valueMap['type'])
                 );
                 $this->context->builder->call(
-                    $this->context->lookupFunction('__object__load_value_slot'),
+                    $this->context->lookupFunction('__object__load_boxed_value_slot'),
                     $slot,
                     $storage
                 );
