@@ -35,11 +35,10 @@ final class BootstrapLoweringFreshnessTest extends TestCase
     }
 
     /**
-     * Committed prelinked stamp may lag live lib/ext until the next verified-fresh
-     * gen-0 refresh (#21905; full rebuild blocked on #21886). The --check gate must
-     * still detect drift (exit 1) or confirm match (exit 0).
+     * Committed prelinked stamp must match live lib/ext fingerprint on a clean checkout.
+     * Drift means a refresh stamped a stale env-cached fingerprint (#36145).
      */
-    public function testPrelinkedLoweringStampCheckDetectsMatchOrDrift(): void
+    public function testPrelinkedLoweringStampMatchesLiveFingerprint(): void
     {
         $stamp = self::$root.'/prelinked/bootstrap-gen0/.bootstrap_lowering_source.sha';
         $this->assertFileExists($stamp);
@@ -47,12 +46,21 @@ final class BootstrapLoweringFreshnessTest extends TestCase
             .' --check '.escapeshellarg($stamp).' 2>&1';
         exec($cmd, $out, $code);
         $joined = implode("\n", $out);
-        $this->assertContains($code, [0, 1], $joined);
-        if (0 === $code) {
-            $this->assertStringContainsString('OK', $joined);
-        } else {
-            $this->assertStringContainsString('FAILED', $joined);
-        }
+        $this->assertSame(0, $code, $joined);
+        $this->assertStringContainsString('OK', $joined);
+    }
+
+    public function testLoweringFingerprintResetCacheClearsEnvOverride(): void
+    {
+        $fresh = trim((string) shell_exec('php '.escapeshellarg(self::$root.'/script/bootstrap-lowering-source-fingerprint.php')));
+        $script = self::$root.'/script/bootstrap-lowering-freshness.sh';
+        $cmd = 'BOOTSTRAP_LOWERING_SOURCE_FINGERPRINT=deadbeef'
+            .' ROOT='.escapeshellarg(self::$root)
+            .' bash -lc "source '.escapeshellarg($script)
+            .' && bootstrap_lowering_source_fingerprint_reset_cache'
+            .' && bootstrap_lowering_source_fingerprint"';
+        $after = trim((string) shell_exec($cmd));
+        $this->assertSame($fresh, $after);
     }
 
     public function testResolveScriptEnforcesLoweringFreshness(): void

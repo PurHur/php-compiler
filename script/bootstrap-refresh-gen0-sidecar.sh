@@ -72,6 +72,7 @@ source "$(dirname "$0")/bootstrap-gen0-install-prelinked-driver.sh"
 source "$(dirname "$0")/bootstrap-lowering-freshness.sh"
 
 ci_apply_llvm_memory_env
+bootstrap_lowering_source_fingerprint_reset_cache
 
 PRELINKED="${ROOT}/prelinked/bootstrap-gen0"
 SPINE_ENTRY="${ROOT}/test/selfhost/compiler_lib_spine_smoke/main.php"
@@ -153,6 +154,7 @@ if [[ "${SKIP_LINK}" -eq 0 ]]; then
       bash "${ROOT}/script/bootstrap-selfhost-lib-spine-smoke-link.sh"
     unset BOOTSTRAP_ALLOW_STALE_COMPILED_DRIVER BOOTSTRAP_ALLOW_STALE_SIDECAR
   fi
+  bootstrap_lowering_source_fingerprint_reset_cache
   bootstrap_lowering_source_write_build_stamp
   # Receipt over the artifacts this link produced; the later stamp verifies against it (#22642).
   echo "==> record gen-0 build receipt (build/.gen0-build-receipt.json)"

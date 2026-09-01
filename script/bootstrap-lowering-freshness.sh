@@ -22,6 +22,13 @@ bootstrap_lowering_source_prelinked_stamp() {
   echo "${root}/prelinked/bootstrap-gen0/$(bootstrap_lowering_source_stamp_basename)"
 }
 
+# Drop cached fingerprint so the next call hashes live lib/ext/patches (#36145).
+# Refresh scripts must call this before write_build_stamp / manifest stamp — a stale
+# BOOTSTRAP_LOWERING_SOURCE_FINGERPRINT env from an earlier gate poisons provenance.
+bootstrap_lowering_source_fingerprint_reset_cache() {
+  unset BOOTSTRAP_LOWERING_SOURCE_FINGERPRINT
+}
+
 bootstrap_lowering_source_fingerprint() {
   local root="${ROOT:-}"
   if [[ -z "${root}" ]]; then

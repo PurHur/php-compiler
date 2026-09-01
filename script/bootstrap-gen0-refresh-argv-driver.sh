@@ -78,6 +78,7 @@ export PHP_COMPILER_M3_EMIT_LOG_PREFIX="${PHP_COMPILER_M3_EMIT_LOG_PREFIX:-hello
 unset PHP_COMPILER_M3_EMIT_TU
 
 mkdir -p "${ROOT}/build" "${PRELINKED}"
+bootstrap_lowering_source_fingerprint_reset_cache
 rm -f "${OUT}"
 export PHP_COMPILER_JIT_PROGRESS_FILE="${ROOT}/build/.last-jit-gen0-argv-driver"
 export PHP_COMPILER_JIT_ENTRY_FILE="${ROOT}/build/.last-jit-gen0-argv-driver-entry"
@@ -116,6 +117,7 @@ chmod +x "${PRELINKED}/bin-compile-aot" "${PRELINKED}/.m3_bin_compile_aot_blob"
 cp -f "${OUT}" "${ROOT}/build/.m3_bin_compile_aot_blob"
 chmod +x "${ROOT}/build/.m3_bin_compile_aot_blob"
 
+bootstrap_lowering_source_fingerprint_reset_cache
 bootstrap_lowering_source_write_build_stamp
 echo "==> record gen-0 build receipt for argv driver artifacts"
 # Argv-only refresh: functional smoke on build/bin-compile-aot is the evidence (#26756).
