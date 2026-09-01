@@ -193,4 +193,49 @@ final class ExternalMethodBindTest extends TestCase
         $this->assertCount(1, $bound->argTypes);
         $this->assertInstanceOf(\PHPLLVM\Type::class, $bound->argTypes[0]);
     }
+
+    /**
+     * Consumer chunk may bind symbols from multiple producer manifests (#36155 Phase C).
+     */
+    public function testTryBindFromMultipleChunkManifests(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $unitDir = $root.'/prelinked/helper-runtime/x86_64-linux/units/ext_standard_ErrorSilenceJitHelper_php';
+        $bitcode = $unitDir.'/unit.bc';
+        if (!is_file($bitcode)) {
+            $this->markTestSkipped('helper-runtime ErrorSilenceJitHelper unit.bc not present');
+        }
+        $logicalA = 'phpcompiler\\ext\\standard\\errorsilencejithelper::seterrorreporting';
+        $logicalB = 'phpcompiler\\ext\\standard\\errorsilencejithelper::beginsilence';
+        $symbolA = 'PHPCompiler_ext_standard_ErrorSilenceJitHelper__seterrorreporting';
+        $symbolB = 'PHPCompiler_ext_standard_ErrorSilenceJitHelper__beginsilence';
+        $manifestA = sys_get_temp_dir().'/phpc_chunk_manifest_a_'.uniqid('', true).'.json';
+        $manifestB = sys_get_temp_dir().'/phpc_chunk_manifest_b_'.uniqid('', true).'.json';
+        file_put_contents($manifestA, json_encode([
+            'bitcode' => $bitcode,
+            'methods' => [
+                $logicalA => ['symbol' => $symbolA],
+            ],
+        ], JSON_UNESCAPED_SLASHES));
+        file_put_contents($manifestB, json_encode([
+            'bitcode' => $bitcode,
+            'methods' => [
+                $logicalB => ['symbol' => $symbolB],
+            ],
+        ], JSON_UNESCAPED_SLASHES));
+        putenv(ExternalMethodBind::ENV_SPINE_CHUNK.'=1');
+        $_ENV[ExternalMethodBind::ENV_SPINE_CHUNK] = '1';
+        putenv('PHP_COMPILER_HELPER_RUNTIME_O=0');
+        $_ENV['PHP_COMPILER_HELPER_RUNTIME_O'] = '0';
+        putenv(ExternalMethodBind::ENV_MANIFEST.'='.$manifestA.':'.$manifestB);
+        $_ENV[ExternalMethodBind::ENV_MANIFEST] = $manifestA.':'.$manifestB;
+        $runtime = new Runtime(Runtime::MODE_AOT);
+        $ctx = new JIT\Context($runtime, JIT\Builtin::LOAD_TYPE_STANDALONE);
+        $boundA = ExternalMethodBind::tryBind($ctx, $logicalA);
+        $boundB = ExternalMethodBind::tryBind($ctx, $logicalB);
+        @unlink($manifestA);
+        @unlink($manifestB);
+        $this->assertInstanceOf(JIT\Call\Native::class, $boundA);
+        $this->assertInstanceOf(JIT\Call\Native::class, $boundB);
+    }
 }
