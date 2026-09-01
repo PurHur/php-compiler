@@ -166,6 +166,7 @@ final class NestedJitCompileScope
             $context->generatorStateParam = $savedGeneratorStateParam;
             self::resyncNamedBindings($context);
             $context->builder = $savedBuilder;
+            $context->syncIntrinsicBuilder();
             self::restoreInsertBlock($context, $restoreBlock);
             $context->activeFunction = $savedActive;
             $context->loweringLlvmFunction = $savedLoweringLlvm;

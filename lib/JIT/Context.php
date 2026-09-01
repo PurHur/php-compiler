@@ -1033,6 +1033,12 @@ class Context {
         $this->main = $func;
     }
 
+    /** Keep intrinsic memcpy/memset on the live builder after save/restore swaps (#36144). */
+    public function syncIntrinsicBuilder(): void
+    {
+        $this->intrinsic->builder = $this->builder;
+    }
+
     public function addExport(string $name, string $signature, Block $block): void {
         $this->exports[] = [$name, $signature, $block];
         CompileCache::recordExport($name, $signature, $block);
