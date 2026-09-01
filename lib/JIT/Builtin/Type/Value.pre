@@ -49,8 +49,8 @@ class Value extends Type {
         $this->implementValueWriteDouble();
         $this->implementValueReadString();
         $this->implementValueWriteString();
-        $this->implementValueWriteNull();
         $this->implementValueDelref();
+        // __value__writeNull deferred — Context::lookupFunction ensureLinked (#36124).
         // __value__writeBool deferred — Context::lookupFunction ensureLinked (#36108).
     }
 
@@ -248,17 +248,6 @@ class Value extends Type {
                 $resultPtr = (__string__**) $ptr;
                 $offset = (int32) 0;
                 $resultPtr[$offset] = $string;
-                return;
-            }
-        }
-    }
-
-    public function implementValueWriteNull(): void {
-        compile {
-            function __value__writeNull($value) {
-                __value__valueDelref($value);
-                $type = (int8) Variable::TYPE_NULL;
-                $value->type = $type;
                 return;
             }
         }
