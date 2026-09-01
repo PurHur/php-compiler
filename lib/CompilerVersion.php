@@ -2772,7 +2772,14 @@ final class CompilerVersion
 
         $raw = getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
+            // User-script AOT clears PROFILE during compile (#21557) — honor CLI profile
+            // from PHP_COMPILER_AOT_COMPILE_PROFILE for mb_str_pad registration (#35187).
+            if (\PHPCompiler\JIT\UserScriptAotEnv::isActive()) {
+                $raw = getenv('PHP_COMPILER_AOT_COMPILE_PROFILE');
+            }
+            if (!\is_string($raw) || '' === trim($raw)) {
+                return false;
+            }
         }
 
         return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
@@ -2786,6 +2793,26 @@ final class CompilerVersion
     public static function advertisesMbStrPad(): bool
     {
         return self::supportsMbStrPad();
+    }
+
+    /**
+     * Runtime module registration for mb_str_pad() — includes user-script AOT compile (#35187).
+     *
+     * {@see supportsMbStrPad()} is false when compile.php clears PHP_COMPILER_PROFILE (#21557),
+     * but mb_str_pad must still register for JIT lowering during emit. At AOT binary runtime
+     * {@see UserScriptAotEnv} is inactive, so phantom/function_exists gates stay on PROFILE.
+     */
+    public static function supportsMbStrPadRegistration(): bool
+    {
+        if (self::supportsMbStrPad()) {
+            return true;
+        }
+        if (!\PHPCompiler\JIT\UserScriptAotEnv::isActive()) {
+            return false;
+        }
+
+        return self::MAJOR_VERSION > 8
+            || (self::MAJOR_VERSION === 8 && self::MINOR_VERSION >= 4);
     }
 
     /**

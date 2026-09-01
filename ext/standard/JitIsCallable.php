@@ -547,7 +547,11 @@ final class JitIsCallable
         }
         $valid = (bool) preg_match('/^[a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*$/', $name);
         if ($valid && !$syntaxOnly) {
-            $valid = $context->functionIsRegistered(strtolower($name));
+            $normalized = VmReflection::normalizeGlobalIntrospectionName($name);
+            $lc = strtolower($normalized);
+            $valid = VmReflection::isVisibleToFunctionExists($lc)
+                && $context->functionIsRegistered($lc)
+                && BuiltinIntrospectionPolicy::functionIsAdvertised($lc);
         }
 
         return $context->constantFromInteger($valid ? 1 : 0, 'int1');
