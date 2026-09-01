@@ -83,7 +83,7 @@ final class JitDomHtmlDocumentCreateFromString
         if (JitDomHtmlDocumentSaveHtml::optionsAllowUserScriptMaterialize($optionsLit)
             && null !== $sourceLit && '' !== $sourceLit
             && JitDomDocumentMethodKernel::shouldUse($context)
-            && CompilerVersion::supportsDomLivingStandardNamespace()
+            && CompilerVersion::supportsDomLivingStandardNamespaceJitLowering()
         ) {
             $us = self::tryMaterializeUserScript($context, $sourceLit);
             if (null !== $us) {
