@@ -77,4 +77,13 @@ final class BootstrapInventoryEmitTest extends TestCase
         $this->assertStringContainsString('bootstrap-inventory-argv-emit: missing -o output file', $script);
         $this->assertStringContainsString('#8709', $script);
     }
+
+    public function testInventoryArgvCompiledFirstSkipsM3SidecarSeedBeforeNativeEmit(): void
+    {
+        $resolve = (string) file_get_contents(self::$root.'/script/bootstrap-resolve-compile-invoke.sh');
+        $this->assertStringContainsString('bootstrap_compile_invoke_skip_m3_sidecar_seed', $resolve);
+        $this->assertStringContainsString('#36144', $resolve);
+        $helloworld = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-helloworld-compile-bin.sh');
+        $this->assertStringContainsString('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1', $helloworld);
+    }
 }
