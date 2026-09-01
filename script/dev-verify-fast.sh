@@ -11,6 +11,9 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 start=$(date +%s)
+echo "dev-verify-fast: tier 0 — bootstrap trust preflight (non-blocking)..."
+./script/bootstrap-trust-preflight.sh
+
 echo "dev-verify-fast: tier 1 — aot-smoke (8 programs)..."
 ./script/aot-smoke.sh
 
