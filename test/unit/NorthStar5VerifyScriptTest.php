@@ -63,6 +63,7 @@ final class NorthStar5VerifyScriptTest extends TestCase
         $this->assertStringContainsString('Retries for gen-0 free(): invalid pointer flake live in the probe script (#33501)', $body);
         $this->assertStringContainsString('ns5_gen0_trust_preflight', $body);
         $this->assertStringContainsString('bootstrap-trust-preflight.sh', $body);
+        $this->assertStringContainsString('step 3t: gen-0 trust preflight', $body);
         $this->assertStringContainsString('#36145', $body);
     }
 

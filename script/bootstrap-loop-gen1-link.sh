@@ -230,6 +230,10 @@ fi
 if [[ "${M4_NATIVE_COMPILE}" -eq 1 ]]; then
   echo "bootstrap-loop-gen1-link: OK emit_path=native gen-1=${ROOT}/${GEN1} gen-2=${ROOT}/${GEN2_OUT}"
 elif [[ "${M4_GEN2_SIDECAR}" -eq 1 ]]; then
+  if [[ "${BOOTSTRAP_M4_REQUIRE_NATIVE_EMIT:-0}" == "1" ]]; then
+    echo "bootstrap-loop-gen1-link: BOOTSTRAP_M4_REQUIRE_NATIVE_EMIT=1 — refusing emit_path=native-prelinked-sidecar (#21860 / #36146)" >&2
+    exit 1
+  fi
   echo "bootstrap-loop-gen1-link: OK emit_path=native-prelinked-sidecar gen-1=${ROOT}/${GEN1} gen-2=${ROOT}/${GEN2_OUT} (native emit failed — #21860)"
 else
   echo "bootstrap-loop-gen1-link: OK emit_path=zend partial gen-1=${ROOT}/${GEN1} gen-2=${ROOT}/${GEN2_OUT} (gen-1 native compile blocked)"

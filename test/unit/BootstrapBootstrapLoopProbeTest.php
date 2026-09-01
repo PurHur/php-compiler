@@ -125,6 +125,8 @@ final class BootstrapBootstrapLoopProbeTest extends TestCase
         $this->assertStringContainsString('m4_gen1_log_emit_path_sidecar', $probe);
         $this->assertStringContainsString('#21860', $probe);
         $this->assertStringContainsString('native-prelinked-sidecar (native emit failed', $probe);
+        $this->assertStringContainsString('BOOTSTRAP_M4_REQUIRE_NATIVE_EMIT', $probe);
+        $this->assertStringContainsString('#36146', $probe);
         $gen1 = (string) file_get_contents(self::$root.'/script/bootstrap-loop-gen1-link.sh');
         $this->assertStringContainsString('M4_GEN2_SIDECAR', $gen1);
         $this->assertStringContainsString('native emit failed — gen-2 recovered via prelinked sidecar', $gen1);
