@@ -31,6 +31,7 @@ final class BootstrapCompileSmokeM3Emit
     /** M3 emit TU {main}: argv `-o OUT SOURCE` (preferred) or env PHP_COMPILER_M3_* (#1937, #2697, #2866). */
     public static function emitMainEntry(Context $context, string $logPrefix): void
     {
+        Builtin\CliArgvRuntime::ensureLinked($context);
         self::emitEnsureRepoRootEnvIfUnset($context);
         $i64 = $context->getTypeFromString('int64');
         $strPtr = $context->getTypeFromString('__string__*');
@@ -488,6 +489,14 @@ final class BootstrapCompileSmokeM3Emit
         $m5Host = getenv('PHP_COMPILER_M5_DRIVER_HOST');
         if ('1' === $m5Host || 'true' === strtolower((string) $m5Host)) {
             return true;
+        }
+        foreach (['PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER', 'BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER'] as $envKey) {
+            $inventoryArgv = getenv($envKey);
+            if ('1' === $inventoryArgv || 'true' === strtolower((string) $inventoryArgv)) {
+                // Inventory argv compile_driver must bake RuntimeEmitTuInit + real parse spine
+                // at runtime — thin __construct-only ctor leaves parseAndCompile null (#36144).
+                return true;
+            }
         }
         $m3Driver = getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
         if ('1' === $m3Driver || 'true' === strtolower((string) $m3Driver)) {
