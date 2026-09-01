@@ -1,0 +1,19 @@
+# Minimal ext/standard slice for spine-chunk ds probe cross-chunk bind (#36155).
+# Covers the ext/standard stubs reported by `script/spine-chunk-probe.sh --ext=ds`.
+ext/standard/ErrorSilenceJitHelper.php
+ext/standard/ExecutionLimitsJitHelper.php
+ext/standard/IncludePathJitHelper.php
+ext/standard/in_array.php
+ext/standard/intdiv.php
+ext/standard/intval.php
+ext/standard/SetcookieLine.php
+ext/standard/VmAssertState.php
+ext/standard/VmDate.php
+ext/standard/VmFs.php
+ext/standard/VmIni.php
+ext/standard/VmIniIntrospection.php
+ext/standard/VmOpenBasedir.php
+ext/standard/VmSerializeFormat.php
+ext/standard/VmSession.php
+ext/standard/VmString.php
+ext/standard/VmUrlRewriterOb.php

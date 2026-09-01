@@ -22,7 +22,8 @@ final class ExternalMethodBind
     /** @var array<string, array{symbol: string}>|null logical lc → entry */
     private static ?array $manifestIndex = null;
 
-    private static ?string $manifestBitcodePath = null;
+    /** @var array<string, string> logical lc → producer bitcode path */
+    private static array $manifestBitcodeByLogical = [];
 
     private static bool $manifestLoaded = false;
 
@@ -92,7 +93,7 @@ final class ExternalMethodBind
     public static function resetManifestForTests(): void
     {
         self::$manifestIndex = null;
-        self::$manifestBitcodePath = null;
+        self::$manifestBitcodeByLogical = [];
         self::$manifestLoaded = false;
     }
 
@@ -109,34 +110,63 @@ final class ExternalMethodBind
     /**
      * @return array<string, array{symbol: string}>
      */
-    private static function manifestIndex(): array
+  private static function manifestIndex(): array
     {
         if (self::$manifestLoaded) {
             return self::$manifestIndex ?? [];
         }
         self::$manifestLoaded = true;
         self::$manifestIndex = [];
-        self::$manifestBitcodePath = null;
-        $path = getenv(self::ENV_MANIFEST);
-        if (!is_string($path) || '' === $path || !is_file($path)) {
+        self::$manifestBitcodeByLogical = [];
+        $pathEnv = getenv(self::ENV_MANIFEST);
+        if (!is_string($pathEnv) || '' === $pathEnv) {
             return self::$manifestIndex;
         }
+        foreach (self::manifestPaths($pathEnv) as $path) {
+            self::mergeManifestFile($path);
+        }
+
+        return self::$manifestIndex;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function manifestPaths(string $pathEnv): array
+    {
+        $paths = [];
+        foreach (preg_split('/[:;]/', $pathEnv) ?: [] as $candidate) {
+            if (!is_string($candidate) || '' === $candidate) {
+                continue;
+            }
+            if (!is_file($candidate)) {
+                continue;
+            }
+            $paths[] = $candidate;
+        }
+
+        return $paths;
+    }
+
+    private static function mergeManifestFile(string $path): void
+    {
         $raw = json_decode((string) file_get_contents($path), true);
         if (!is_array($raw)) {
-            return self::$manifestIndex;
+            return;
         }
+        $bitcodePath = null;
         if (isset($raw['bitcode']) && is_string($raw['bitcode']) && '' !== $raw['bitcode']) {
             $bc = $raw['bitcode'];
             if (!str_starts_with($bc, '/')) {
                 $bc = dirname($path).'/'.$bc;
             }
             if (is_file($bc)) {
-                self::$manifestBitcodePath = $bc;
+                $bitcodePath = $bc;
             }
         }
         $methods = $raw['methods'] ?? $raw;
         if (!is_array($methods)) {
-            return self::$manifestIndex;
+            return;
         }
         foreach ($methods as $logical => $entry) {
             if (!is_string($logical) || '' === $logical) {
@@ -151,10 +181,12 @@ final class ExternalMethodBind
             if (null === $symbol || '' === $symbol) {
                 continue;
             }
-            self::$manifestIndex[strtolower($logical)] = ['symbol' => $symbol];
+            $logicalLc = strtolower($logical);
+            self::$manifestIndex[$logicalLc] = ['symbol' => $symbol];
+            if (null !== $bitcodePath) {
+                self::$manifestBitcodeByLogical[$logicalLc] = $bitcodePath;
+            }
         }
-
-        return self::$manifestIndex;
     }
 
     private static function declareExternFromManifest(Context $context, string $logicalLc, string $symbol): ?object
@@ -165,7 +197,7 @@ final class ExternalMethodBind
 
             return $existing;
         }
-        $bitcode = self::$manifestBitcodePath;
+        $bitcode = self::$manifestBitcodeByLogical[$logicalLc] ?? null;
         if (null === $bitcode || '' === $bitcode) {
             return null;
         }
