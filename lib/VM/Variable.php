@@ -3055,9 +3055,7 @@ restart:
         ?\PHPCompiler\Frame $frame = null
     ): void {
         if ($this->type === self::TYPE_INDIRECT) {
-            $result = new self();
-            $result->incDecOp($opCode, $left, $right, $vm, $frame);
-            $this->indirect->copyFrom($result);
+            $this->indirect->incDecOp($opCode, $left, $right, $vm, $frame);
 
             return;
         }
@@ -3346,10 +3344,7 @@ restart:
     public function applyIncrement(?\PHPCompiler\VM $vm = null, ?\PHPCompiler\Frame $frame = null): void
     {
         if ($this->type === self::TYPE_INDIRECT) {
-            $copy = new self();
-            $copy->copyFrom($this->indirect);
-            $copy->applyIncrement($vm, $frame);
-            $this->indirect->copyFrom($copy);
+            $this->indirect->applyIncrement($vm, $frame);
 
             return;
         }
@@ -3420,10 +3415,7 @@ restart:
     public function applyDecrement(?\PHPCompiler\VM $vm = null, ?\PHPCompiler\Frame $frame = null): void
     {
         if ($this->type === self::TYPE_INDIRECT) {
-            $copy = new self();
-            $copy->copyFrom($this->indirect);
-            $copy->applyDecrement($vm, $frame);
-            $this->indirect->copyFrom($copy);
+            $this->indirect->applyDecrement($vm, $frame);
 
             return;
         }

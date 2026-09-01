@@ -75,6 +75,11 @@ class VM {
     /** Active builtin handler while {@see executeInternalHandler} bridges a throw (#11677). */
     private ?Frame $builtinHandlerFrameForTrace = null;
 
+    /** Reused ++/-- scratch slots — avoid per-iteration Variable alloc in hot loops (#15906, #36148). */
+    private ?Variable $incDecScratchWorking = null;
+
+    private ?Variable $incDecScratchBefore = null;
+
     /** @internal Active VM during runFrames (#3429 typed property errors). */
     public static function running(): ?self
     {
@@ -10867,6 +10872,25 @@ restart:
             return $frame;
         }
 
+        // Cross-block loop back-edges must reuse the header frame — otherwise every iteration
+        // chains a new parent Frame and getFrame walks grow without bound (#1228, #15906, #36148).
+        $targetFunc = $target->func;
+        for ($ancestor = $frame->parent; null !== $ancestor; $ancestor = $ancestor->parent) {
+            if ($ancestor->block === $target) {
+                $ancestor->pos = 0;
+
+                return $ancestor;
+            }
+            if (
+                null !== $targetFunc
+                && null !== $ancestor->block
+                && null !== $ancestor->block->func
+                && $ancestor->block->func !== $targetFunc
+            ) {
+                break;
+            }
+        }
+
         return $target->getFrame($this->context, $frame);
     }
 
@@ -11269,11 +11293,14 @@ restart:
         if (Variable::TYPE_STRING_OFFSET === $write->resolveIndirect()->type) {
             return $this->dispatchVmError(Variable::STRING_OFFSET_INCDEC_ERROR, $frame);
         }
-        $working = new Variable();
+        if ($this->tryExecuteIncDecFastPath($frame, $read, $write, $result, $increment, $prefix, (int) $op->arg3)) {
+            return null;
+        }
+        $working = $this->incDecScratch(0);
         $working->copyFrom($read->resolveIndirect());
         try {
             if ($prefix) {
-                $before = new Variable();
+                $before = $this->incDecScratch(1);
                 $before->copyFrom($working);
                 if ($increment) {
                     $working->applyIncrement($this, $frame);
@@ -11285,7 +11312,7 @@ restart:
                 $write->copyFrom($working);
                 $result->copyFrom($working);
             } else {
-                $old = new Variable();
+                $old = $this->incDecScratch(1);
                 $old->copyFrom($working);
                 if ($increment) {
                     $working->applyIncrement($this, $frame);
@@ -11305,6 +11332,74 @@ restart:
         $this->markScopeSlotInitialized($frame, (int) $op->arg3);
 
         return null;
+    }
+
+    private function incDecScratch(int $which): Variable
+    {
+        if (0 === $which) {
+            if (null === $this->incDecScratchWorking) {
+                $this->incDecScratchWorking = new Variable();
+            }
+
+            return $this->incDecScratchWorking;
+        }
+        if (null === $this->incDecScratchBefore) {
+            $this->incDecScratchBefore = new Variable();
+        }
+
+        return $this->incDecScratchBefore;
+    }
+
+    /**
+     * In-place ++/-- for plain locals/refs — no per-op Variable heap churn (#15906, #36148).
+     */
+    private function tryExecuteIncDecFastPath(
+        Frame $frame,
+        Variable $read,
+        Variable $write,
+        Variable $result,
+        bool $increment,
+        bool $prefix,
+        int $writeSlot
+    ): bool {
+        $resolvedWrite = $write->resolveIndirect();
+        if (Variable::TYPE_STRING_OFFSET === $resolvedWrite->type) {
+            return false;
+        }
+        if ($resolvedWrite->isArrayAccessOffset()) {
+            return false;
+        }
+        if (
+            Variable::TYPE_INTEGER === $resolvedWrite->type
+            && VmIncDec::typedSlotRejectsOverflowDouble($resolvedWrite)
+        ) {
+            return false;
+        }
+        $target = $resolvedWrite;
+        try {
+            if ($prefix) {
+                if ($increment) {
+                    $target->applyIncrement($this, $frame);
+                } else {
+                    $target->applyDecrement($this, $frame);
+                }
+                $write->copyFrom($target);
+                $result->copyFrom($target);
+            } else {
+                $result->copyFrom($target);
+                if ($increment) {
+                    $target->applyIncrement($this, $frame);
+                } else {
+                    $target->applyDecrement($this, $frame);
+                }
+                $write->copyFrom($target);
+            }
+        } catch (\TypeError|\Error) {
+            return false;
+        }
+        $this->markScopeSlotInitialized($frame, $writeSlot);
+
+        return true;
     }
 
     /**
