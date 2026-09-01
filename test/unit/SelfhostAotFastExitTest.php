@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\test\unit;
 
+use PHPCompiler\AOT\ExternalMethodBind;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -87,5 +88,21 @@ final class SelfhostAotFastExitTest extends TestCase
         $this->assertStringContainsString('BOOTSTRAP_SELFHOST_POST_EMIT_GRACE_SEC', $script);
         $this->assertStringContainsString('runtime_standalone_compiletofile_done', $script);
         $this->assertStringContainsString('#31726', $script);
+    }
+
+    /** Spine split-TU hub chunks hit the same post-emit hang without fast-exit (#36155). */
+    public function testAotEmitFastExitIncludesSpineChunkMode(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $helper = (string) file_get_contents($root.'/lib/AOT/AotEmitFastExit.php');
+        $this->assertStringContainsString('ExternalMethodBind::ENV_SPINE_CHUNK', $helper);
+        $this->assertStringContainsString('isSpineChunk', $helper);
+    }
+
+    public function testCompilePhpFastExitsAfterSpineChunkEmit(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $compile = (string) file_get_contents($root.'/bin/compile.php');
+        $this->assertStringContainsString('ExternalMethodBind::spineChunkMode()', $compile);
     }
 }
