@@ -293,6 +293,43 @@ class Block {
         $this->namedAssignDestSlots = new \SplObjectStorage;
     }
 
+    /**
+     * php-cfg may wrap the same Var in distinct Operand objects (e.g. call result vs return expr).
+     */
+    public static function cfgVarRoot(Operand $op): ?VarOperand
+    {
+        while ($op instanceof Temporary) {
+            if (null === $op->original) {
+                return null;
+            }
+            $op = $op->original;
+        }
+
+        return $op instanceof VarOperand ? $op : null;
+    }
+
+    public static function resolveVariableName(Operand $op): ?string
+    {
+        $root = self::cfgVarRoot($op);
+        if (null === $root) {
+            return null;
+        }
+        $nameOp = $root->name;
+        if (!$nameOp instanceof Literal) {
+            return null;
+        }
+        $value = $nameOp->value;
+        // php-cfg: Expr_Variable name Scalar_LNumber → int Literal for ${1} (Zend CV "$1", #22776).
+        if (\is_int($value) || \is_float($value)) {
+            return (string) $value;
+        }
+        if (!\is_string($value)) {
+            return null;
+        }
+
+        return $value;
+    }
+
     public function registerNamedAssignDest(Operand $varRoot, int $slot): void
     {
         $this->namedAssignDestSlots[$varRoot] = $slot;
@@ -2122,21 +2159,6 @@ class Block {
         return false;
     }
 
-    /**
-     * php-cfg may wrap the same Var in distinct Operand objects (e.g. call result vs return expr).
-     */
-    public static function cfgVarRoot(Operand $op): ?VarOperand
-    {
-        while ($op instanceof Temporary) {
-            if (null === $op->original) {
-                return null;
-            }
-            $op = $op->original;
-        }
-
-        return $op instanceof VarOperand ? $op : null;
-    }
-
     /** Scope slot receiving TYPE_ARG_RECV (function parameter, not caller local). */
     private function isArgRecvParameterSlot(int $slot): bool
     {
@@ -2164,28 +2186,6 @@ class Block {
                 && !isset($this->paramDnfConstraints[$slot])
                 && !isset($this->paramIntersectionConstraints[$slot])
             );
-    }
-
-    public static function resolveVariableName(Operand $op): ?string
-    {
-        $root = self::cfgVarRoot($op);
-        if (null === $root) {
-            return null;
-        }
-        $nameOp = $root->name;
-        if (!$nameOp instanceof Literal) {
-            return null;
-        }
-        $value = $nameOp->value;
-        // php-cfg: Expr_Variable name Scalar_LNumber → int Literal for ${1} (Zend CV "$1", #22776).
-        if (\is_int($value) || \is_float($value)) {
-            return (string) $value;
-        }
-        if (!\is_string($value)) {
-            return null;
-        }
-
-        return $value;
     }
 
     /**
