@@ -239,6 +239,20 @@ class Block {
     public array $deferredArrayLiteralKeepSlots = [];
 
     /**
+     * Cached {@see scopeSlotReadInJumpTargets()} — CFG-stable; hot loops hit JUMPIF every iteration (#36148).
+     *
+     * @var array<int, bool>
+     */
+    private array $scopeSlotReadInJumpTargetsCache = [];
+
+    /**
+     * Cached {@see scopeSlotReadInDirectJumpTargets()} (#36148).
+     *
+     * @var array<int, bool>
+     */
+    private array $scopeSlotReadInDirectJumpTargetsCache = [];
+
+    /**
      * PHP 8.4+ Zend closure display name {@code {closure:…:line}} for this body (#30076).
      *
      * Set at compile time on anonymous/arrow Func blocks; used by TypeError / Reflection / debugInfo.
@@ -1245,6 +1259,10 @@ class Block {
      */
     public function scopeSlotReadInJumpTargets(int $slot): bool
     {
+        if (\array_key_exists($slot, $this->scopeSlotReadInJumpTargetsCache)) {
+            return $this->scopeSlotReadInJumpTargetsCache[$slot];
+        }
+        $live = false;
         foreach ($this->opCodes as $op) {
             foreach ($this->controlFlowBranchTargets($op) as $target) {
                 if (!$target instanceof self) {
@@ -1252,12 +1270,14 @@ class Block {
                 }
                 $seen = [];
                 if ($target->blockReadsScopeSlotTree($slot, $seen)) {
-                    return true;
+                    $live = true;
+                    break 2;
                 }
             }
         }
+        $this->scopeSlotReadInJumpTargetsCache[$slot] = $live;
 
-        return false;
+        return $live;
     }
 
     /**
@@ -1283,6 +1303,10 @@ class Block {
      */
     public function scopeSlotReadInDirectJumpTargets(int $slot): bool
     {
+        if (\array_key_exists($slot, $this->scopeSlotReadInDirectJumpTargetsCache)) {
+            return $this->scopeSlotReadInDirectJumpTargetsCache[$slot];
+        }
+        $live = false;
         foreach ($this->opCodes as $op) {
             foreach ($this->controlFlowBranchTargets($op) as $target) {
                 if (!$target instanceof self) {
@@ -1290,12 +1314,14 @@ class Block {
                 }
                 $seen = [];
                 if ($this->branchOrJumpMergeReadsScopeSlot($target, $slot, $seen)) {
-                    return true;
+                    $live = true;
+                    break 2;
                 }
             }
         }
+        $this->scopeSlotReadInDirectJumpTargetsCache[$slot] = $live;
 
-        return false;
+        return $live;
     }
 
     /**
