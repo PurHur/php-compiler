@@ -14520,8 +14520,10 @@ class JIT {
                     );
                     break;
                 case OpCode::TYPE_DECLARE_INTERFACE:
-                    $nameOp = $block->getOperand($op->arg1);
-                    assert($nameOp instanceof Operand\Literal);
+                    $nameOp = $this->jitResolveClassLikeDeclareNameOperand($block, $op);
+                    if (null === $nameOp) {
+                        break;
+                    }
                     if ($this->emitDuplicateClassLikeDeclareFatalIfNeeded($op, $block, 'interface', $nameOp->value)) {
                         break;
                     }
@@ -14557,8 +14559,10 @@ class JIT {
                     $this->context->popScope();
                     break;
                 case OpCode::TYPE_DECLARE_TRAIT:
-                    $nameOp = $block->getOperand($op->arg1);
-                    assert($nameOp instanceof Operand\Literal);
+                    $nameOp = $this->jitResolveClassLikeDeclareNameOperand($block, $op);
+                    if (null === $nameOp) {
+                        break;
+                    }
                     if ($this->emitDuplicateClassLikeDeclareFatalIfNeeded($op, $block, 'trait', $nameOp->value)) {
                         break;
                     }
@@ -14585,16 +14589,20 @@ class JIT {
                     $this->context->popScope();
                     break;
                 case OpCode::TYPE_DECLARE_ENUM:
-                    $nameOp = $block->getOperand($op->arg1);
-                    assert($nameOp instanceof Operand\Literal);
+                    $nameOp = $this->jitResolveClassLikeDeclareNameOperand($block, $op);
+                    if (null === $nameOp) {
+                        break;
+                    }
                     if ($this->context->type->object->isRegisteredEnumLc(strtolower($nameOp->value))) {
                         break;
                     }
                     $this->jitCompileDeclareEnum($block, $op);
                     break;
                 case OpCode::TYPE_DECLARE_CLASS:
-                    $nameOp = $block->getOperand($op->arg1);
-                    assert($nameOp instanceof Operand\Literal);
+                    $nameOp = $this->jitResolveClassLikeDeclareNameOperand($block, $op);
+                    if (null === $nameOp) {
+                        break;
+                    }
                     if ($this->emitDuplicateClassLikeDeclareFatalIfNeeded($op, $block, 'class', $nameOp->value)) {
                         break;
                     }
@@ -19138,6 +19146,25 @@ class JIT {
         $name = strtolower($this->context->scope->className ?? '');
 
         return 'phpcompiler\\web\\superglobals' === $name || 'superglobals' === $name;
+    }
+
+    /**
+     * DECLARE_* name slot may be a Temporary with the string in $block->constants (#22642).
+     */
+    private function jitResolveClassLikeDeclareNameOperand(Block $block, OpCode $op): ?Operand\Literal
+    {
+        $nameOp = $block->getOperand($op->arg1);
+        if ($nameOp instanceof Operand\Literal && is_string($nameOp->value)) {
+            return $nameOp;
+        }
+        if (isset($block->constants[$op->arg1])) {
+            $const = $block->constants[$op->arg1];
+            if (VM\Variable::TYPE_STRING === $const->type) {
+                return new Operand\Literal($const->toString());
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -31973,8 +32000,10 @@ class JIT {
 
     private function jitCompileDeclareEnum(Block $block, OpCode $op): void
     {
-        $nameOp = $block->getOperand($op->arg1);
-        assert($nameOp instanceof Operand\Literal);
+        $nameOp = $this->jitResolveClassLikeDeclareNameOperand($block, $op);
+        if (null === $nameOp) {
+            return;
+        }
         if ($this->emitDuplicateClassLikeDeclareFatalIfNeeded($op, $block, 'enum', $nameOp->value)) {
             return;
         }

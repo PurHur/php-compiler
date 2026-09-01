@@ -31267,7 +31267,8 @@ class Compiler {
                 continue;
             }
             if (
-                null !== $op->var
+                $op instanceof Op\Expr\MethodCall
+                && null !== $op->var
                 && $this->operandsReferToSameVariable($fetch->result, $op->var)
             ) {
                 return true;
