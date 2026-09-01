@@ -44,6 +44,13 @@ final class JitDomGetElementsByTagNameUserScript
     private static ?string $liveItemTagQuery = null;
 
     /**
+     * XML markup for the document that created the held tag NodeList — survives
+     * {@see clearTagQueryState()} so item() does not steal lastCompileTimeXml from
+     * a later loadXML on another document (#34630 / re-#20284).
+     */
+    private static ?string $liveItemMarkup = null;
+
+    /**
      * Last tag query was DOMElement::getElementsByTagName — descendants only,
      * exclude the context element (#34780 / php-src element.c).
      */
@@ -61,6 +68,12 @@ final class JitDomGetElementsByTagNameUserScript
     public static function liveItemTagQuery(): ?string
     {
         return self::$liveItemTagQuery;
+    }
+
+    /** Markup paired with {@see liveItemTagQuery()} for held NodeList::item(). */
+    public static function liveItemMarkup(): ?string
+    {
+        return self::$liveItemMarkup;
     }
 
     /** True when the active tag list is Element::getElementsByTagName (#34780). */
@@ -119,6 +132,7 @@ final class JitDomGetElementsByTagNameUserScript
         self::$liveItemNsFromElement = false;
         self::$lastTagQuery = null;
         self::$liveItemTagQuery = null;
+        self::$liveItemMarkup = null;
         self::$lastTagQueryFromElement = false;
         JitDomNodeListForeachSnapshot::clearChildNodesFetch();
         JitDomNodeListForeachSnapshot::clearAttributesFetch();
@@ -141,7 +155,7 @@ final class JitDomGetElementsByTagNameUserScript
         // Prefer this document's loadXML binding — never steal lastCompileTimeXml from
         // another document (importNode destination counted the source tree; #34630 /
         // peer saveXML #33697).
-        $markup = JitDomLoadXMLUserScript::compileTimeXmlFor($args[0]);
+        $markup = JitDomLoadXMLUserScript::compileTimeXmlForBoundReceiver($context, $args[0]);
         // Do NOT fall back to lastCompileTimeXml() — that steals the source document
         // after importNode into a createElement destination (regression of #34630,
         // reintroduced by #34936). Single-doc prefixed loadXML keeps working via
@@ -151,16 +165,24 @@ final class JitDomGetElementsByTagNameUserScript
             $markup = JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml();
         }
         if (null === $markup) {
+            // Multi-document scripts: pick the sole loadXML literal that contains $tagLit.
+            if (JitDomLoadXMLUserScript::compileTimeXmlBindingCount() >= 2) {
+                $markup = JitDomLoadXMLUserScript::soleCompileTimeMarkupContainingTag($tagLit);
+            }
+        }
+        if (null === $markup) {
             // Receiver never loadXML'd (createElement / importNode dest). Seed length
             // from the live pinned tree so pending+source-count cannot double (#34630).
             self::$lastTagQuery = $tagLit;
             self::$liveItemTagQuery = $tagLit;
+            self::$liveItemMarkup = null;
             DomUserScriptLiveTagListLlvm::resyncCountFromLiveTree($context, $tagLit);
 
             return self::boxNodeList($context, 0);
         }
         self::$lastTagQuery = $tagLit;
         self::$liveItemTagQuery = $tagLit;
+        self::$liveItemMarkup = $markup;
         // LiveSlots mutations after loadXML leave compile-time markup stale (#33918).
         if (JitDomLoadXMLUserScript::treeMutatedSinceLoad()) {
             DomUserScriptLiveTagListLlvm::resyncCountFromLiveTree($context, $tagLit);
@@ -235,6 +257,7 @@ final class JitDomGetElementsByTagNameUserScript
         // to pinned-root firstChild (#34780).
         self::$lastTagQuery = null;
         self::$liveItemTagQuery = null;
+        self::$liveItemMarkup = null;
         self::$lastTagQueryFromElement = false;
         JitDomNodeListForeachSnapshot::clearChildNodesFetch();
         JitDomNodeListForeachSnapshot::clearAttributesFetch();
@@ -259,6 +282,7 @@ final class JitDomGetElementsByTagNameUserScript
             // DOMNode-typed receivers ExternalMethod-null SIGSEGV'd (#35277).
             self::$lastTagQuery = $tagLit;
             self::$liveItemTagQuery = $tagLit;
+            self::$liveItemMarkup = null;
             self::$lastTagQueryFromElement = true;
             DomUserScriptLiveTagListLlvm::resyncCountFromLiveTree($context, $tagLit);
 
@@ -268,6 +292,7 @@ final class JitDomGetElementsByTagNameUserScript
         if (JitDomLoadXMLUserScript::treeMutatedSinceLoad()) {
             self::$lastTagQuery = $tagLit;
             self::$liveItemTagQuery = $tagLit;
+            self::$liveItemMarkup = $xml;
             self::$lastTagQueryFromElement = true;
             DomUserScriptLiveTagListLlvm::resyncCountFromLiveTree($context, $tagLit);
 
@@ -277,6 +302,7 @@ final class JitDomGetElementsByTagNameUserScript
         $count = DomParseSimpleXmlJitHelper::countDescendantTagArgv($inner, $tagLit);
         self::$lastTagQuery = $tagLit;
         self::$liveItemTagQuery = $tagLit;
+        self::$liveItemMarkup = $xml;
         self::$lastTagQueryFromElement = true;
         DomUserScriptLiveTagListLlvm::initCount($context, $tagLit, $count);
 

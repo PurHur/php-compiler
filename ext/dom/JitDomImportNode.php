@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dom;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\JIT\Builtin\DomImportNodeRuntime;
@@ -92,43 +93,49 @@ final class JitDomImportNode
                 $nameLit = $args[1]->compileTimeString
                     ?? \PHPCompiler\JIT\JitStringBuiltinArg::compileTimeLiteral($args[1]);
             }
-            $valueLit = '';
-            if (null !== $nameLit) {
-                $cached = DomUserScriptAttributeCacheLlvm::literalValue('', $nameLit);
-                if (null !== $cached) {
-                    $valueLit = $cached;
-                } else {
-                    $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
-                    if (null !== $xml) {
-                        foreach (DomParseSimpleXmlJitHelper::rootAttributesArgv($xml) as $pair) {
-                            $qname = $pair['qname'];
-                            $pos = strpos($qname, ':');
-                            $local = false === $pos ? $qname : substr($qname, $pos + 1);
-                            if ($nameLit === $qname || $nameLit === $local) {
-                                $valueLit = $pair['value'];
-                                break;
-                            }
-                        }
+            // classList mutates class at runtime — compile-time literal is stale (#16876).
+            $classListRuntime = null !== $nameLit
+                && 'class' === $nameLit
+                && CompilerVersion::supportsDomTokenList();
+            if (!$classListRuntime) {
+                $valueLit = '';
+                if (null !== $nameLit) {
+                    $cached = DomUserScriptAttributeCacheLlvm::literalValue('', $nameLit);
+                    if (null !== $cached) {
+                        $valueLit = $cached;
                     } else {
-                        $parsed = JitDomLoadHTMLUserScript::lastGetElementByIdHit()
-                            ?? JitDomLoadHTMLUserScript::lastCompileTimeParsed();
-                        // Only the id attribute itself may use the HTML id stub (#19212).
-                        if (null !== $parsed && ('id' === $nameLit)) {
-                            $valueLit = $parsed['id'] ?? 'target';
+                        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+                        if (null !== $xml) {
+                            foreach (DomParseSimpleXmlJitHelper::rootAttributesArgv($xml) as $pair) {
+                                $qname = $pair['qname'];
+                                $pos = strpos($qname, ':');
+                                $local = false === $pos ? $qname : substr($qname, $pos + 1);
+                                if ($nameLit === $qname || $nameLit === $local) {
+                                    $valueLit = $pair['value'];
+                                    break;
+                                }
+                            }
+                        } else {
+                            $parsed = JitDomLoadHTMLUserScript::lastGetElementByIdHit()
+                                ?? JitDomLoadHTMLUserScript::lastCompileTimeParsed();
+                            // Only the id attribute itself may use the HTML id stub (#19212).
+                            if (null !== $parsed && ('id' === $nameLit)) {
+                                $valueLit = $parsed['id'] ?? 'target';
+                            }
                         }
                     }
                 }
-            }
-            $str = $context->builder->load($context->constantStringFromString($valueLit));
-            $slot = JitValueBox::alloc($context);
-            $ptr = JitValueBox::pointer($context, $slot);
-            $context->builder->call(
-                $context->lookupFunction('__value__writeString'),
-                $ptr,
-                $str
-            );
+                $str = $context->builder->load($context->constantStringFromString($valueLit));
+                $slot = JitValueBox::alloc($context);
+                $ptr = JitValueBox::pointer($context, $slot);
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeString'),
+                    $ptr,
+                    $str
+                );
 
-            return JitValueBox::normalizeValuePtr($context, $ptr);
+                return JitValueBox::normalizeValuePtr($context, $ptr);
+            }
         }
 
         DomImportNodeRuntime::ensureGetAttributeLinked($context);
@@ -237,9 +244,14 @@ final class JitDomImportNode
         // 2) documentElement: annotateDocumentElement clears lastFetched* but leaves
         //    GetNodePath::$lastPath as a single-segment path ('/x') + $lastInner.
         if ((null === $srcTag || '' === $srcTag) && null === $sourceNode->compileTimeDomNodePath) {
+            $fetchedTag = JitDomNodeChildProperty::$lastFetchedTagName
+                ?? JitDomNodeListItem::$lastFetchedTagName;
             $srcIndex = $srcIndex ?? JitDomNodeChildProperty::$lastFetchedChildIndex;
-            if (null !== $srcIndex) {
-                $srcTag = JitDomNodeChildProperty::$lastFetchedTagName;
+            if (null !== $fetchedTag && '' !== $fetchedTag) {
+                $srcTag = $fetchedTag;
+                $srcInner = $srcInner ?? JitDomGetNodePath::$lastInner;
+            } elseif (null !== $srcIndex) {
+                $srcTag = $fetchedTag;
                 $srcInner = $srcInner ?? JitDomGetNodePath::$lastInner;
             } elseif (null !== JitDomGetNodePath::$lastPath
                 && 1 === preg_match('#^/([^/\[\]]+)$#', JitDomGetNodePath::$lastPath, $pathMatch)
@@ -942,6 +954,10 @@ final class JitDomImportNode
     ): ?string {
         $index = $sourceNode->compileTimeDomChildIndex;
         $candidates = [];
+        $liveMarkup = JitDomGetElementsByTagNameUserScript::liveItemMarkup();
+        if (null !== $liveMarkup && '' !== $liveMarkup) {
+            $candidates[] = $liveMarkup;
+        }
         $bound = $sourceNode->compileTimeDomLoadXml
             ?? JitDomLoadXMLUserScript::compileTimeXmlFor($sourceNode);
         if (null !== $bound) {
@@ -967,6 +983,20 @@ final class JitDomImportNode
             }
             $seen[$xml] = true;
             $stripped = preg_replace('/^\s*<\?xml[^?]*\?>\s*/i', '', trim($xml)) ?? trim($xml);
+            if (null === $index && '' !== $tag) {
+                $position = 1;
+                $openTag = DomParseSimpleXmlJitHelper::nthTagOpenTagArgv($xml, $tag, $position);
+                if (null !== $openTag) {
+                    $offset = DomParseSimpleXmlJitHelper::nthTagOpenTagOffsetArgv($xml, $tag, $position);
+                    if ($offset >= 0) {
+                        $outer = self::elementOuterMarkupFromOffsetArgv($xml, $offset, $openTag);
+                        if (null !== $outer) {
+                            return $outer;
+                        }
+                    }
+                }
+                continue;
+            }
             if (null !== $index) {
                 $chunks = DomParseSimpleXmlJitHelper::directChildMarkupChunks(
                     DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml)
@@ -1010,6 +1040,82 @@ final class JitDomImportNode
         }
 
         return false;
+    }
+
+    /**
+     * Slice one element's outer markup from a compile-time XML literal (#20284).
+     */
+    private static function elementOuterMarkupFromOffsetArgv(
+        string $xml,
+        int $offset,
+        string $openTag
+    ): ?string {
+        if (str_ends_with(trim($openTag), '/>')) {
+            return $openTag;
+        }
+        $tagName = DomParseSimpleXmlJitHelper::tagNameFromOpenTagArgv($openTag);
+        if (null === $tagName || '' === $tagName) {
+            return null;
+        }
+        $gt = strpos($xml, '>', $offset);
+        if (false === $gt) {
+            return null;
+        }
+        $pos = $gt + 1;
+        $len = \strlen($xml);
+        $depth = 1;
+        while ($pos < $len && $depth > 0) {
+            $lt = strpos($xml, '<', $pos);
+            if (false === $lt) {
+                break;
+            }
+            $next = $xml[$lt + 1] ?? '';
+            if ('/' === $next) {
+                $closeEnd = strpos($xml, '>', $lt);
+                if (false === $closeEnd) {
+                    break;
+                }
+                $closeName = strtolower(trim(substr($xml, $lt + 2, $closeEnd - $lt - 2)));
+                $colon = strrpos($closeName, ':');
+                $local = false === $colon ? $closeName : substr($closeName, $colon + 1);
+                if ($local === strtolower($tagName)) {
+                    --$depth;
+                    if (0 === $depth) {
+                        return substr($xml, $offset, $closeEnd - $offset + 1);
+                    }
+                }
+                $pos = $closeEnd + 1;
+                continue;
+            }
+            if ('!' === $next || '?' === $next) {
+                $end = strpos($xml, '>', $lt);
+                $pos = false === $end ? $len : $end + 1;
+                continue;
+            }
+            $nameEnd = $lt + 1;
+            while ($nameEnd < $len) {
+                $ch = $xml[$nameEnd];
+                if ('>' === $ch || '/' === $ch || ' ' === $ch || "\t" === $ch || "\n" === $ch || "\r" === $ch) {
+                    break;
+                }
+                ++$nameEnd;
+            }
+            $qname = strtolower(substr($xml, $lt + 1, $nameEnd - $lt - 1));
+            $colon = strrpos($qname, ':');
+            $local = false === $colon ? $qname : substr($qname, $colon + 1);
+            $tagEnd = strpos($xml, '>', $lt);
+            if (false === $tagEnd) {
+                break;
+            }
+            if ($local === strtolower($tagName)) {
+                if ('/' !== ($xml[$tagEnd - 1] ?? '')) {
+                    ++$depth;
+                }
+            }
+            $pos = $tagEnd + 1;
+        }
+
+        return null;
     }
 
     /**

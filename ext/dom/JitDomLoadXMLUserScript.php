@@ -194,6 +194,120 @@ final class JitDomLoadXMLUserScript
     }
 
     /**
+     * Recover {@see compileTimeDomLoadXml} on method-call temps from the named CV (#32978).
+     */
+    public static function mergeCompileTimeDomLoadXmlFromNamedBindings(Context $context, JITVariable $receiver): void
+    {
+        if (null !== ($receiver->compileTimeDomLoadXml ?? null) && '' !== $receiver->compileTimeDomLoadXml) {
+            return;
+        }
+        if (null !== self::$xmlByReceiver) {
+            $recvVal = $receiver->value ?? null;
+            if (null !== $recvVal) {
+                foreach (self::$xmlByReceiver as $bound) {
+                    if (!$bound instanceof JITVariable) {
+                        continue;
+                    }
+                    if ($bound === $receiver || $bound->value === $recvVal) {
+                        $receiver->compileTimeDomLoadXml = self::$xmlByReceiver[$bound];
+
+                        return;
+                    }
+                }
+            }
+        }
+        if (!isset($context->namedVariableBindings) || !\is_array($context->namedVariableBindings)) {
+            return;
+        }
+        $recvVal = $receiver->value ?? null;
+        foreach ($context->namedVariableBindings as $bound) {
+            if (!$bound instanceof JITVariable) {
+                continue;
+            }
+            if ($bound === $receiver) {
+                if (null !== ($bound->compileTimeDomLoadXml ?? null) && '' !== $bound->compileTimeDomLoadXml) {
+                    $receiver->compileTimeDomLoadXml = $bound->compileTimeDomLoadXml;
+                }
+
+                return;
+            }
+            if (null !== $recvVal && $bound->value === $recvVal
+                && null !== ($bound->compileTimeDomLoadXml ?? null) && '' !== $bound->compileTimeDomLoadXml
+            ) {
+                $receiver->compileTimeDomLoadXml = $bound->compileTimeDomLoadXml;
+
+                return;
+            }
+        }
+    }
+
+    public static function compileTimeXmlForBoundReceiver(Context $context, JITVariable $document): ?string
+    {
+        self::mergeCompileTimeDomLoadXmlFromNamedBindings($context, $document);
+
+        return self::compileTimeXmlFor($document);
+    }
+
+    /**
+     * True when the receiver is a document that had loadXML() but compile-time markup
+     * could not be recovered (multi-document scripts) — defer to runtime (#20284).
+     */
+    public static function receiverLooksLoadXmlBound(Context $context, JITVariable $receiver): bool
+    {
+        self::mergeCompileTimeDomLoadXmlFromNamedBindings($context, $receiver);
+        if (null !== ($receiver->compileTimeDomLoadXml ?? null) && '' !== $receiver->compileTimeDomLoadXml) {
+            return true;
+        }
+        if (!isset($context->namedVariableBindings) || !\is_array($context->namedVariableBindings)) {
+            return false;
+        }
+        $recvVal = $receiver->value ?? null;
+        foreach ($context->namedVariableBindings as $bound) {
+            if (!$bound instanceof JITVariable) {
+                continue;
+            }
+            if (($bound === $receiver || (null !== $recvVal && $bound->value === $recvVal))
+                && null !== ($bound->compileTimeDomLoadXml ?? null) && '' !== $bound->compileTimeDomLoadXml
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** Distinct loadXML literals remembered at compile time (multi-document probe). */
+    public static function compileTimeXmlBindingCount(): int
+    {
+        return \count(self::$xmlByToken);
+    }
+
+    /**
+     * When multiple loadXML literals exist, return the only one containing $tag.
+     *
+     * @return null|string null when zero or ambiguous matches (#20284 / re-#34630)
+     */
+    public static function soleCompileTimeMarkupContainingTag(string $tag): ?string
+    {
+        $seen = [];
+        $hits = [];
+        foreach (self::$xmlByToken as $xml) {
+            if (isset($seen[$xml])) {
+                continue;
+            }
+            $seen[$xml] = true;
+            if (DomParseSimpleXmlJitHelper::countTagArgv($xml, $tag) > 0) {
+                $hits[] = $xml;
+            }
+        }
+        if (1 !== \count($hits)) {
+            return null;
+        }
+
+        return $hits[0];
+    }
+
+    /**
      * Pick a remembered loadXML() literal that is not the imported stylesheet (#27392).
      *
      * Method args often rematerialize as TYPE_VALUE boxes, so SplObjectStorage identity

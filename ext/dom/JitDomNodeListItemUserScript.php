@@ -57,7 +57,8 @@ final class JitDomNodeListItemUserScript
             : null;
         $tagQuery = $activeTagQuery ?? $recoveredTagQuery;
         $fromElement = JitDomGetElementsByTagNameUserScript::lastTagQueryFromElement();
-        $markup = JitDomLoadXMLUserScript::lastCompileTimeXml()
+        $markup = JitDomGetElementsByTagNameUserScript::liveItemMarkup()
+            ?? JitDomLoadXMLUserScript::lastCompileTimeXml()
             ?? JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml();
         // Element::getElementsByTagName is descendants-only — compile-time nth must
         // skip the document element (#34780 / php-src element.c).
