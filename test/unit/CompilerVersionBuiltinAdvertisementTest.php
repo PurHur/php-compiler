@@ -235,6 +235,52 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::advertisesMbStrPad());
     }
 
+    public function testMbStrPadHonorsAotCompileProfileWhenRuntimeProfileCleared(): void
+    {
+        $prevProfile = getenv('PHP_COMPILER_PROFILE');
+        $prevAotCompileProfile = getenv('PHP_COMPILER_AOT_COMPILE_PROFILE');
+        $prevUserScript = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+        putenv('PHP_COMPILER_PROFILE=');
+        putenv('PHP_COMPILER_AOT_COMPILE_PROFILE=8.4');
+        putenv('PHP_COMPILER_AOT_USER_SCRIPT=1');
+        try {
+            $this->assertTrue(CompilerVersion::supportsMbStrPad());
+            $this->assertTrue(CompilerVersion::advertisesMbStrPad());
+        } finally {
+            if (false === $prevProfile) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prevProfile);
+            }
+            if (false === $prevAotCompileProfile) {
+                putenv('PHP_COMPILER_AOT_COMPILE_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_AOT_COMPILE_PROFILE='.$prevAotCompileProfile);
+            }
+            if (false === $prevUserScript) {
+                putenv('PHP_COMPILER_AOT_USER_SCRIPT');
+            } else {
+                putenv('PHP_COMPILER_AOT_USER_SCRIPT='.$prevUserScript);
+            }
+        }
+    }
+
+    public function testMbStrPadRegistrationDuringUserScriptAotCompile(): void
+    {
+        $prevUserScript = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+        putenv('PHP_COMPILER_AOT_USER_SCRIPT=1');
+        try {
+            $this->assertTrue(CompilerVersion::supportsMbStrPadRegistration());
+            $this->assertFalse(CompilerVersion::supportsMbStrPad());
+        } finally {
+            if (false === $prevUserScript) {
+                putenv('PHP_COMPILER_AOT_USER_SCRIPT');
+            } else {
+                putenv('PHP_COMPILER_AOT_USER_SCRIPT='.$prevUserScript);
+            }
+        }
+    }
+
     public function testMbStrPadWithheldOn82Profile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
