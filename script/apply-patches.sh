@@ -5353,7 +5353,8 @@ if "getenv('PHPCFG_SIMPLIFIER_LEGACY')" not in text:
     if not repl_pat.search(text):
         sys.stderr.write('php-cfg-simplifier-use-chain: replaceVariables anchor not found\n')
         raise SystemExit(1)
-    text = repl_pat.sub(new_replace_variables, text, count=1)
+    # Lambda replacement: new_replace_variables contains Op\Phi — re.sub treats \P as an escape.
+    text = repl_pat.sub(lambda _: new_replace_variables, text, count=1)
 
 if len(list(cfgwalk_pat.finditer(text))) != 1:
     sys.stderr.write('php-cfg-simplifier-use-chain: expected exactly one replaceVariablesByCfgWalk\n')
