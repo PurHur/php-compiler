@@ -159,4 +159,15 @@ final class BootstrapSelfhostDriverSmokeTest extends TestCase
             $jit
         );
     }
+
+    /** Issue #31714 / #36144: docker-exec must bump cgroup to 16g for driver-smoke (Zend gen-0 fallback). */
+    public function testDockerExecBumpsMemForBootstrapDriverSmoke(): void
+    {
+        $dockerExec = (string) file_get_contents(self::$root.'/script/docker-exec.sh');
+        $ciDockerRun = (string) file_get_contents(self::$root.'/script/ci-docker-run.sh');
+        $this->assertStringContainsString('ci_docker_maybe_bump_mem_for_command', $dockerExec);
+        $this->assertStringContainsString('bootstrap-selfhost-driver-smoke', $ciDockerRun);
+        $this->assertStringContainsString('north-star5-verify*--strict*', $ciDockerRun);
+        $this->assertStringContainsString('PHP_COMPILER_DOCKER_MEM=16g', $ciDockerRun);
+    }
 }
