@@ -12,6 +12,10 @@ ENTRY="${ROOT}/test/selfhost/compiler_lib_spine_smoke/main.php"
 OUT="${ROOT}/build/selfhost-lib-spine-smoke"
 LINK="${ROOT}/script/bootstrap-selfhost-lib-spine-smoke-link.sh"
 
+# Fast path calls bootstrap_refresh_compiler_lib_sidecar_stamp_if_byte_matched_prelinked (#8703).
+# shellcheck source=bootstrap-gen0-install-prelinked-driver.sh
+source "$(dirname "$0")/bootstrap-gen0-install-prelinked-driver.sh"
+
 bootstrap_vm_driver_execute_probe_llvm_env() {
   local llvm=""
   if [[ -n "${PHP_COMPILER_LLVM_PATH:-}" && -f "${PHP_COMPILER_LLVM_PATH}/libLLVM-9.so.1" ]]; then
