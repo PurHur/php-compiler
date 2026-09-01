@@ -153,8 +153,44 @@ final class EvalRuntime
             throw $e;
         }
 
+        // Cross-eval inheritFromParent on the compile Runtime — isolated parse cannot see
+        // prior eval-declared parents; AOT emitFalse would otherwise skip the fatal (#25660).
+        try {
+            self::probeOuterUnitDeclEvalRuntime($jit, $literal, $evalFile, $evalClassScope);
+        } catch (CompileFatal $e) {
+            if (\defined('STDERR') && \is_resource(STDERR)) {
+                fwrite(STDERR, $e->zendStderrLine());
+            }
+            throw $e;
+        }
+
         // Decl succeeded but cannot MCJIT-inline into the outer unit (#25535).
         self::emitFalse($jit, $resultOp);
+    }
+
+    /**
+     * Run decl eval on the outer compile {@see Runtime} so inheritFromParent sees prior
+     * eval units in the same AOT compile (#25660, peer #28437 final-property probe).
+     */
+    private static function probeOuterUnitDeclEvalRuntime(
+        JIT $jit,
+        string $literal,
+        string $evalFile,
+        ?string $evalClassScope
+    ): void {
+        $runtime = $jit->context->runtime;
+        $vm = $runtime->vm();
+        $probeMain = $runtime->parseAndCompile('<?php;', 'probe_main.php');
+        if (null === $probeMain) {
+            return;
+        }
+        $caller = $probeMain->getFrame($vm->context, null);
+        $caller->scriptPath = $evalFile;
+        try {
+            VmEval::evalCodeInFrame($vm, $caller, $literal);
+        } catch (\CompileError $e) {
+            throw new CompileFatal($evalFile, 1, $e->getMessage());
+        }
     }
 
     /**
