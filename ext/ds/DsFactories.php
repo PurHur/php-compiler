@@ -20,6 +20,13 @@ use PHPLLVM\Value;
  */
 abstract class DsFactoryFunction extends Internal
 {
+    public function __construct(string $name)
+    {
+        // SPINE_CHUNK: Internal::__construct is only parent::__construct($name) when $name is
+        // set — inline so ds_* parent calls bind in-chunk (#36155, not ExternalMethod-null).
+        $this->name = $name;
+    }
+
     public function call(Context $context, JITVariable ...$args): Value
     {
         throw new \LogicException(
