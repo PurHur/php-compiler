@@ -6,6 +6,7 @@
 # BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_FULL_LINK=1 (north-star5 / post-spine-entry edits).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# Sidecar stamp refresh helpers — source before fast path (#36210, #8703).
 # shellcheck source=bootstrap-gen0-install-prelinked-driver.sh
 source "$(dirname "$0")/bootstrap-gen0-install-prelinked-driver.sh"
 ENTRY="${ROOT}/test/selfhost/compiler_lib_spine_smoke/main.php"
