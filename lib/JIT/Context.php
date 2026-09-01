@@ -2801,6 +2801,7 @@ class Context {
     }
 
     public function compileToFile(string $file) {
+        Progress::noteFunction('jit_context_compile_to_file_begin');
         // `-o` is a file path, not a directory. When a directory slips through, LLVM/ld
         // errors are confusing and (in some environments) can be misinterpreted as success.
         if (is_dir($file)) {
