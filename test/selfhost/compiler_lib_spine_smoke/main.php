@@ -3399,6 +3399,8 @@ require_once __DIR__.'/../../../ext/standard/ScopeBuiltinJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/SerializeJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/SerializeNestedJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/SerializeObjectNestedJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/SerializeSleepFilterLlvm.php';
+require_once __DIR__.'/../../../ext/standard/SerializeSleepNestedJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/SessionCookieParams.php';
 require_once __DIR__.'/../../../ext/standard/SessionCreateIdJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/SessionEncodeJitHelper.php';
