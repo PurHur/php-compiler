@@ -125,8 +125,10 @@ final class ObjectEnumCasePropertyLlvm
             $context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),
             $context->builder->structGep($storage, $valueMap['type'])
         );
+        // Backing is stored via propertyStore(TYPE_VALUE) as heap __value__* — load_boxed_value_slot
+        // avoids mis-classifying the box header as __string__* / int64* (#31895 peer / m03 flake).
         $context->builder->call(
-            $context->lookupFunction('__object__load_value_slot'),
+            $context->lookupFunction('__object__load_boxed_value_slot'),
             $slot,
             $storage
         );
@@ -227,7 +229,7 @@ final class ObjectEnumCasePropertyLlvm
             $context->builder->structGep($storage, $valueMap['type'])
         );
         $context->builder->call(
-            $context->lookupFunction('__object__load_value_slot'),
+            $context->lookupFunction('__object__load_boxed_value_slot'),
             $slot,
             $storage
         );

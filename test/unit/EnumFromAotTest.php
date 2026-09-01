@@ -45,6 +45,34 @@ PHP);
     }
 
     /**
+     * String-backed enum ->value must be stable across runs (m03_enum_from differential flake).
+     */
+    public function testAotStringBackedEnumValueFetchIsStable(): void
+    {
+        if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $root = dirname(__DIR__, 2);
+        $src = $root.'/test/differential/cases/m03_enum_from.php';
+        $bin = sys_get_temp_dir().'/phpc_enum_value_flake_'.getmypid().'.bin';
+        $compile = escapeshellarg(PHP_BINARY).' '.escapeshellarg($root.'/bin/compile.php')
+            .' -o '.escapeshellarg($bin).' '.escapeshellarg($src).' 2>&1';
+        exec($compile, $compileOut, $compileRc);
+        $this->assertSame(0, $compileRc, implode("\n", $compileOut));
+        $this->assertFileExists($bin);
+        try {
+            for ($i = 0; $i < 20; ++$i) {
+                $runOut = [];
+                exec(escapeshellarg($bin).' 2>&1', $runOut, $runRc);
+                $this->assertSame(0, $runRc, 'run '.($i + 1).': '.implode("\n", $runOut));
+                $this->assertStringContainsString('S', implode("\n", $runOut), 'run '.($i + 1));
+            }
+        } finally {
+            @unlink($bin);
+        }
+    }
+
+    /**
      * Issue repro: tryFrom + var_export(..., true) must survive thin AOT (≥5 runs) (#26855).
      * Root cause was NestedJIT var_export under thin AOT (peer print_r #24266).
      */
