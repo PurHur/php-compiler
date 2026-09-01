@@ -559,7 +559,9 @@ patch_already_applied() {
         || grep -q 'isset($assertionFunctions[$lname]) && isset($args[0])' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
     php-cfg-simplifier-use-chain.patch)
-      grep -q 'replaceVariablesByCfgWalk' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/Simplifier.php" 2>/dev/null
+      # July 5 partial apply added replaceVariablesByCfgWalk but kept legacy default;
+      # the #23070 flip (2026-07-25) rewrites replaceVariables — guard on the new opt-out.
+      grep -q "getenv('PHPCFG_SIMPLIFIER_LEGACY')" "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/Simplifier.php" 2>/dev/null
       ;;
     php-cfg-operand-usage-dedup.patch)
       grep -q 'usageIds' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Operand.php" 2>/dev/null
@@ -5066,6 +5068,128 @@ PY
   echo "Applied php-cfg-call-arg-site-clone.patch (overlay)"
 }
 
+apply_php_cfg_simplifier_use_chain_overlay() {
+  local simplifier="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/Simplifier.php"
+  if [[ ! -f "$simplifier" ]]; then
+    return 0
+  fi
+  local cfgwalk_count
+  cfgwalk_count="$(grep -c 'private function replaceVariablesByCfgWalk' "$simplifier" 2>/dev/null || true)"
+  if patch_already_applied "$PATCH_DIR/php-cfg-simplifier-use-chain.patch"; then
+    if [[ "${cfgwalk_count:-0}" -le 1 ]]; then
+      echo "Skip php-cfg-simplifier-use-chain.patch (already applied)"
+      return 0
+    fi
+    echo "Repair php-cfg-simplifier-use-chain.patch (duplicate replaceVariablesByCfgWalk; #36250)"
+  fi
+  python3 - "$simplifier" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+
+new_replace_variables = """    private function replaceVariables(Operand $from, Operand $to, Block $block)
+    {
+        // Use-chain is the default (#23056): O(uses) instead of O(phis×blocks).
+        // Opcode dumps match legacy on a 193-file corpus; CFG type pretty-print
+        // can still differ. Opt out with PHPCFG_SIMPLIFIER_USECHAIN=0 or
+        // PHPCFG_SIMPLIFIER_LEGACY=1 for bisect (#16077).
+        $usechain = getenv('PHPCFG_SIMPLIFIER_USECHAIN');
+        $legacy = ('0' === $usechain)
+            || ('1' === getenv('PHPCFG_SIMPLIFIER_LEGACY'))
+            || ('false' === strtolower((string) $usechain));
+        if ($legacy) {
+            $this->replaceVariablesByCfgWalk($from, $to, $block);
+
+            return;
+        }
+        // Use-chain replacement: visit only the ops that actually reference
+        // $from (Operand tracks usages/write-ops) instead of re-walking the
+        // whole CFG per removed phi. The CFG walk was O(phis × blocks) and
+        // took 121 s on a 32k-line file; this is O(uses) (#16077 / #23056).
+        $ops = array_merge($from->usages, $from->ops);
+        foreach ($ops as $op) {
+            if ($op instanceof Op\\Phi) {
+                if ($op->hasOperand($from)) {
+                    // Since we're removing from the phi, it may become trivial.
+                    // The stored block is only carried through to
+                    // tryRemoveTrivialPhi, which no longer depends on it.
+                    $this->trivialPhiCandidates[$op] = $block;
+                    $op->removeOperand($from);
+                    $op->addOperand($to);
+                }
+
+                continue;
+            }
+            $this->replaceOpVariable($from, $to, $op);
+        }
+        $from->usages = [];
+        $from->ops = [];
+    }"""
+
+cfgwalk_pat = re.compile(
+    r'(?P<hdr>/\*\* Legacy whole-CFG replacement.*?\*/\s*)?'
+    r'private function replaceVariablesByCfgWalk\(Operand \$from, Operand \$to, Block \$block\)\s*\{',
+    re.DOTALL,
+)
+matches = list(cfgwalk_pat.finditer(text))
+if len(matches) > 1:
+    keep_idx = None
+    for i, m in enumerate(matches):
+        start = m.end()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+        body = text[start:end]
+        if '$toReplace = new \\SplObjectStorage()' in body:
+            keep_idx = i
+            break
+    if keep_idx is None:
+        sys.stderr.write('php-cfg-simplifier-use-chain: no canonical replaceVariablesByCfgWalk found\n')
+        raise SystemExit(1)
+    for i in reversed(range(len(matches))):
+        if i == keep_idx:
+            continue
+        m = matches[i]
+        start = m.start()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+        # Drop through closing brace of this duplicate method.
+        depth = 0
+        j = m.end() - 1
+        while j < len(text):
+            if text[j] == '{':
+                depth += 1
+            elif text[j] == '}':
+                depth -= 1
+                if depth == 0:
+                    end = j + 1
+                    break
+            j += 1
+        text = text[:start] + text[end:]
+    matches = list(cfgwalk_pat.finditer(text))
+
+if "getenv('PHPCFG_SIMPLIFIER_LEGACY')" not in text:
+    repl_pat = re.compile(
+        r'    private function replaceVariables\(Operand \$from, Operand \$to, Block \$block\)\s*\{.*?\n    \}',
+        re.DOTALL,
+    )
+    if not repl_pat.search(text):
+        sys.stderr.write('php-cfg-simplifier-use-chain: replaceVariables anchor not found\n')
+        raise SystemExit(1)
+    text = repl_pat.sub(new_replace_variables, text, count=1)
+
+if len(list(cfgwalk_pat.finditer(text))) != 1:
+    sys.stderr.write('php-cfg-simplifier-use-chain: expected exactly one replaceVariablesByCfgWalk\n')
+    raise SystemExit(1)
+if "getenv('PHPCFG_SIMPLIFIER_LEGACY')" not in text:
+    sys.stderr.write('php-cfg-simplifier-use-chain: flip did not apply\n')
+    raise SystemExit(1)
+
+path.write_text(text)
+PY
+  echo "Applied php-cfg-simplifier-use-chain.patch (overlay)"
+}
+
 apply_php_cfg_simplifier_call_unpack_overlay() {
   local simplifier="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/Simplifier.php"
   if grep -q 'preserveCallSiteOperandMetadata' "$simplifier" 2>/dev/null; then
@@ -7268,7 +7392,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-is-resource-no-assertion.patch"
   apply_patch "$PATCH_DIR/php-cfg-assertion-fn-arity.patch"
   # Perf patches last: their hunks are diffed against the fully-patched files (#16077).
-  apply_patch "$PATCH_DIR/php-cfg-simplifier-use-chain.patch"
+  apply_php_cfg_simplifier_use_chain_overlay
   apply_patch "$PATCH_DIR/php-cfg-operand-usage-dedup.patch"
 fi
 
