@@ -69,6 +69,9 @@ class Context {
      */
     public array $noDiscardCalleeMessages = [];
 
+    /** @var array<string, true> void Native callees elidable when discarded (#23483) */
+    public array $discardedCallElisionVoidNatives = [];
+
     /**
      * Lowercase logical callee => #[\Deprecated] metadata for AOT/JIT call sites (#27331).
      *

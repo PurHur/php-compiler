@@ -3512,6 +3512,43 @@ class Block {
         return false;
     }
 
+    /**
+     * True when a void user function body cannot observe call-site args (#23483).
+     *
+     * php-src: zend_compile.c still emits RECV for formals; an empty `: void` body is only
+     * ARG_RECV + RETURN_VOID.
+     */
+    public static function isEffectFreeVoidCalleeBody(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (
+                    OpCode::TYPE_ARG_RECV !== $op->type
+                    && OpCode::TYPE_RETURN_VOID !== $op->type
+                ) {
+                    return false;
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return true;
+    }
+
     public static function containsReflectionAttributeNewInstanceOpcodes(?self $root): bool
     {
         if (null === $root) {
