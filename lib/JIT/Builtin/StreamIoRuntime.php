@@ -112,6 +112,12 @@ final class StreamIoRuntime
         '__compiler_stream_supports',
     ];
 
+    /** Symbols {@see Context::lookupFunction} may lazy-ensure via user-script lowering (#36155). */
+    public static function isLazyLookupRuntimeFunction(string $name): bool
+    {
+        return '__compiler_fgets' === $name || in_array($name, self::RUNTIME_FUNCTIONS, true);
+    }
+
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
