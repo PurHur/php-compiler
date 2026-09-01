@@ -14005,7 +14005,9 @@ class JIT {
                         $callArgs,
                         $callOperands
                     );
-                    $this->invokeJitCall($this->context->scope->toCall, $callArgs);
+                    if (!JIT\DiscardedPureCallElision::tryElide($this->context->scope->toCall, $callArgs)) {
+                        $this->invokeJitCall($this->context->scope->toCall, $callArgs);
+                    }
                     $this->markByRefOutParamsAssignedAfterCall(
                         $this->context->scope->toCall,
                         $callOperands,
