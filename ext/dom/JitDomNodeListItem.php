@@ -87,7 +87,8 @@ final class JitDomNodeListItem
             return;
         }
 
-        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        $xml = JitDomGetElementsByTagNameUserScript::liveItemMarkup()
+            ?? JitDomLoadXMLUserScript::lastCompileTimeXml();
         if (
             null === $xml
             || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()

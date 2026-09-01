@@ -120,7 +120,8 @@ final class JitDomGetElementById
 
             $context->builder->positionAtEnd($cacheHit);
             // Single-slot cache is invalidated on detach; temps may lack parent slots (#19870).
-            $hitBoxed = self::boxObjectResultIfIdBearing($context, $cached);
+            // Detached setIdAttribute must not resolve via getElementById (#23999).
+            $hitBoxed = self::boxObjectIfConnectedAndIdBearing($context, $document, $cached);
             $context->builder->store(JitValueBox::normalizeValuePtr($context, $hitBoxed), $resultSlot);
             $context->builder->branch($doneBlock);
 
