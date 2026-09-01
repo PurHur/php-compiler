@@ -1543,7 +1543,7 @@ final class SplFileObjectJitHelper
         $strPtr = $context->getTypeFromString('__string__*');
         $fn = $context->builder->getInsertBlock()->getParent();
         $owned = $context->builder->call($context->lookupFunction('__string__separate'), $line);
-        $outSlot = $context->builder->alloca($strPtr);
+        $outSlot = BasicBlockHelper::entryAllocaForFunction($context, $fn, $strPtr);
         $context->builder->store($owned, $outSlot);
 
         $crlf = $context->builder->load($context->constantStringFromString("\r\n"));
@@ -1711,7 +1711,7 @@ final class SplFileObjectJitHelper
         $fn = $context->builder->getInsertBlock()->getParent();
         $needBb = $fn->appendBasicBlock('splfo_dnl_need');
         $doneBb = $fn->appendBasicBlock('splfo_dnl_done');
-        $outSlot = $context->builder->alloca($strPtr);
+        $outSlot = BasicBlockHelper::entryAllocaForFunction($context, $fn, $strPtr);
         $context->builder->store($line, $outSlot);
 
         $masked = $context->builder->and($flags, $i64->constInt(self::FLAG_DROP_NEW_LINE, false));
