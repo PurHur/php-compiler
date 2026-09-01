@@ -3134,6 +3134,15 @@ class JIT {
                 );
                 JIT\NoDiscardCallGuard::registerCallee($this->context, $funcName, $block);
                 JIT\DeprecatedCallGuard::registerCallee($this->context, $funcName, $block);
+                if (
+                    'void' === $callbackType
+                    && Block::isEffectFreeVoidCalleeBody($block)
+                    && !$block->noDiscard
+                    && null === $block->deprecated
+                    && !Block::usesFuncArgsIntrospection($block)
+                ) {
+                    $this->context->discardedCallElisionVoidNatives[$lcname] = true;
+                }
             }
             if ($returnsByRef) {
                 $this->markFunctionReturnsByRef($lcname, $funcName ?? '');
@@ -14007,7 +14016,7 @@ class JIT {
                         $callArgs,
                         $callOperands
                     );
-                    if (!JIT\DiscardedPureCallElision::tryElide($this->context->scope->toCall, $callArgs)) {
+                    if (!JIT\DiscardedPureCallElision::tryElide($this->context, $this->context->scope->toCall, $callArgs)) {
                         $this->invokeJitCall($this->context->scope->toCall, $callArgs);
                     }
                     $this->markByRefOutParamsAssignedAfterCall(
