@@ -24,8 +24,12 @@ source "$(dirname "$0")/ci-docker-preflight.sh"
 ci_docker_preflight
 ci_docker_acquire_single_ci_lock
 
+# shellcheck source=ci-defaults.env
+source "$(dirname "$0")/ci-defaults.env"
 # shellcheck source=ci-docker-run.sh
 source "$(dirname "$0")/ci-docker-run.sh"
+ci_docker_maybe_bump_mem_for_command "$@"
+ci_docker_rebuild_common_args
 
 if [[ "${1:-}" == "--" ]]; then
   shift
