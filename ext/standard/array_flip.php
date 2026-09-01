@@ -17,6 +17,7 @@ use PHPCompiler\JIT\Builtin\ArrayFlipRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -54,14 +55,21 @@ final class array_flip extends Internal
             return HashTableHelper::emptyVariable($context)->value;
         }
         JitArrayElem::requireArrayParam($context, $args[0], 'array_flip', 1, 'array');
-
-        foreach ($args as $i => $arg) {
-            if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
-                $this->jitString($context, $arg, 'array_flip() argument #'.((int) $i + 1));
+        if (JITVariable::TYPE_HASHTABLE === $args[0]->type
+            || ($args[0]->type & JITVariable::IS_NATIVE_ARRAY)
+            || JITVariable::TYPE_VALUE === $args[0]->type
+            || JitValueBox::isValueOperand($args[0])
+        ) {
+            foreach ($args as $i => $arg) {
+                if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
+                    $this->jitString($context, $arg, 'array_flip() argument #'.((int) $i + 1));
+                }
             }
-        }
-        TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::ensureLinked($context);
 
-        return ArrayFlipRuntime::flip($context, $args[0]);
+            return ArrayFlipRuntime::flip($context, $args[0]);
+        }
+
+        return HashTableHelper::emptyVariable($context)->value;
     }
 }

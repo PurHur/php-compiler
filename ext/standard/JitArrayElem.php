@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ArrayElemRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Builtin\Type\Object_ as JitObjectType;
 use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -109,6 +110,12 @@ final class JitArrayElem
             return;
         }
         $okBlock = BasicBlockHelper::append($context, 'array_req_ok');
+        if (JITVariable::TYPE_OBJECT === $array->type) {
+            self::emitRuntimeObjectParamReject($context, $array, $fn, $argNum, $paramName, $expectedType);
+            $context->builder->positionAtEnd($okBlock);
+
+            return;
+        }
         $errBlock = BasicBlockHelper::append($context, 'array_req_err');
         $context->builder->branch($errBlock);
         $context->builder->positionAtEnd($errBlock);
@@ -120,7 +127,7 @@ final class JitArrayElem
                 $argNum,
                 $paramName,
                 $expectedType,
-                self::jitTypeLabel($array->type)
+                \PHPCompiler\JIT\JitOperandTypeLabel::givenLabel($context, $array)
             )
         );
         $context->builder->positionAtEnd($okBlock);
@@ -344,6 +351,86 @@ final class JitArrayElem
         // Catchable in try/catch; uncaught AOT uses abort_if_pending (not raw abort) (#27447 / #27448).
         ExceptionBridge::emitTypeErrorAndAbort($context, $message);
         BasicBlockHelper::ensureOpenInsertBlock($context, 'array_elem_te_cont');
+    }
+
+    private static function emitRuntimeObjectParamReject(
+        Context $context,
+        JITVariable $array,
+        string $fn,
+        int $argNum,
+        string $paramName,
+        string $expectedType
+    ): void {
+        $objMap = $context->structFieldMap['__object__'] ?? null;
+        if (null === $objMap || !isset($objMap['class_id'])) {
+            self::emitErrorAndAbort(
+                $context,
+                \sprintf(self::TYPE_ERROR_N, $fn, $argNum, $paramName, $expectedType, 'object')
+            );
+
+            return;
+        }
+        $objPtr = JITVariable::KIND_VALUE === $array->kind
+            ? $array->value
+            : $context->builder->load($array->value);
+        $classId = $context->builder->load(
+            $context->builder->structGep($objPtr, $objMap['class_id'])
+        );
+        $jitObject = $context->type->object;
+        if (!$jitObject instanceof JitObjectType) {
+            self::emitErrorAndAbort(
+                $context,
+                \sprintf(self::TYPE_ERROR_N, $fn, $argNum, $paramName, $expectedType, 'object')
+            );
+
+            return;
+        }
+        $ids = [];
+        foreach ($jitObject->allDeclaredClassLowerNames() as $lc) {
+            $declaredId = $jitObject->lookup($lc);
+            $ids[] = [$declaredId, $jitObject->classNameForId($declaredId)];
+        }
+        if ([] === $ids) {
+            self::emitErrorAndAbort(
+                $context,
+                \sprintf(self::TYPE_ERROR_N, $fn, $argNum, $paramName, $expectedType, 'object')
+            );
+
+            return;
+        }
+        $i64 = $context->getTypeFromString('int64');
+        $fnLlvm = BasicBlockHelper::parentFunction($context);
+        $checkBlock = $context->builder->getInsertBlock();
+        $okBlock = BasicBlockHelper::append($context, 'array_obj_class_ok');
+        $lastIdx = \count($ids) - 1;
+        foreach ($ids as $idx => [$declaredId, $className]) {
+            $context->builder->positionAtEnd($checkBlock);
+            $match = $context->builder->icmp(
+                Builder::INT_EQ,
+                $classId,
+                $i64->constInt($declaredId, false)
+            );
+            $rejectBlock = $fnLlvm->appendBasicBlock('array_obj_reject_'.$declaredId);
+            $nextBlock = $idx === $lastIdx
+                ? $okBlock
+                : $fnLlvm->appendBasicBlock('array_obj_try_'.($idx + 1));
+            $context->builder->branchIf($match, $rejectBlock, $nextBlock);
+            $context->builder->positionAtEnd($rejectBlock);
+            self::emitErrorAndAbort(
+                $context,
+                \sprintf(self::TYPE_ERROR_N, $fn, $argNum, $paramName, $expectedType, $className)
+            );
+            $checkBlock = $nextBlock;
+        }
+        if ($checkBlock !== $okBlock) {
+            $context->builder->positionAtEnd($checkBlock);
+            self::emitErrorAndAbort(
+                $context,
+                \sprintf(self::TYPE_ERROR_N, $fn, $argNum, $paramName, $expectedType, 'object')
+            );
+            $context->builder->branch($okBlock);
+        }
+        $context->builder->positionAtEnd($okBlock);
     }
 
     private static function jitTypeLabel(int $type): string
