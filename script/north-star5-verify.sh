@@ -65,6 +65,7 @@ Options:
 Env:
   NORTH_STAR5_VERIFY_FAST=1   same as --fast
   BOOTSTRAP_VENDOR_REBUILD_AUDIT=1   opt-in native vendor .o drift audit (#8718)
+  BOOTSTRAP_TRUST_PREFLIGHT_STRICT=1   set automatically with --strict (#36145)
 
 Docker:
   ./script/docker-exec.sh -- bash -lc './script/north-star5-verify.sh --fast'
@@ -74,6 +75,16 @@ EOF
     *) echo "north-star5-verify: unknown argument: $1" >&2; exit 1 ;;
   esac
 done
+
+# Git-derived gen-0 seed age + lowering fingerprint drift (#36145, #22642).
+# Fast path: warn and continue. --strict: fail when behaviorally stale.
+ns5_gen0_trust_preflight() {
+  if [[ "${STRICT_M5}" -eq 1 ]]; then
+    BOOTSTRAP_TRUST_PREFLIGHT_STRICT=1 "${_CI_SCRIPT_DIR}/bootstrap-trust-preflight.sh"
+  else
+    "${_CI_SCRIPT_DIR}/bootstrap-trust-preflight.sh"
+  fi
+}
 
 ns5_hint() {
   local step="$1"
@@ -211,6 +222,14 @@ if ! "${PHP_BIN}" "${PHP_OPTS[@]}" "${_CI_REPO_ROOT}/script/bootstrap-vendor-obj
   "${PHP_BIN}" "${PHP_OPTS[@]}" "${_CI_REPO_ROOT}/script/bootstrap-vendor-objects.php" --check
 fi
 echo "north-star5-verify: step 3 ok"
+
+echo
+echo "=== north-star5-verify step 3t: gen-0 trust preflight (#36145) ==="
+if ! ns5_gen0_trust_preflight; then
+  echo "north-star5-verify: step 3t FAILED (gen-0 seed behaviorally stale — refresh sidecar or use --fast without --strict for warn-only)" >&2
+  exit 1
+fi
+echo "north-star5-verify: step 3t ok"
 
 if [[ "${FAST_M5}" -eq 1 ]]; then
   echo

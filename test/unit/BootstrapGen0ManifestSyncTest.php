@@ -33,6 +33,8 @@ final class BootstrapGen0ManifestSyncTest extends TestCase
         $root = dirname(__DIR__, 2);
         $script = (string) file_get_contents($root.'/script/north-star5-verify.sh');
         $this->assertStringContainsString('check-bootstrap-gen0-manifest-sync.php', $script);
+        $this->assertStringContainsString('ns5_gen0_trust_preflight', $script);
+        $this->assertStringContainsString('bootstrap-trust-preflight.sh', $script);
     }
 
     public function testRefreshScriptRefusesStaleBuildAndStampsFingerprint(): void
