@@ -3847,6 +3847,55 @@ apply_php_types_callable_return_strip_overlay() {
   echo "Applied php-types-callable-return-strip.patch (overlay)"
 }
 
+apply_php_types_resolver_worklist_default_to_target() {
+  local target=$1
+  [[ -f "$target" ]] || return 0
+  python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+if 'PHPTYPES_RESOLVER_LEGACY' in text:
+    raise SystemExit(0)
+old = "        if ('1' !== getenv('PHPTYPES_RESOLVER_WORKLIST')) {"
+new = """        // Worklist is the default (#36225): O(deps) instead of O(rounds × vars).
+        // Opcode dumps match legacy on corpus; opt out with PHPTYPES_RESOLVER_WORKLIST=0
+        // or PHPTYPES_RESOLVER_LEGACY=1 for bisect (#16077).
+        $worklist = getenv('PHPTYPES_RESOLVER_WORKLIST');
+        $legacy = ('0' === $worklist)
+            || ('1' === getenv('PHPTYPES_RESOLVER_LEGACY'))
+            || ('false' === strtolower((string) $worklist));
+        if ($legacy) {"""
+if old not in text:
+    raise SystemExit(0)
+text = text.replace(old, new, 1)
+old_comment = (
+    "            // loop and the fixpoint is order-sensitive for codegen, so this is\n"
+    "            // opt-in for lint workloads only (bin/lint.php sets the flag);\n"
+    "            // default stays on the legacy round loop."
+)
+new_comment = (
+    "            // loop; opcode corpus matches legacy (#36225)."
+)
+if old_comment in text:
+    text = text.replace(old_comment, new_comment, 1)
+path.write_text(text)
+PY
+}
+
+apply_php_types_resolver_worklist_default_overlay() {
+  local vendor="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  local prelinked="$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  if grep -q 'PHPTYPES_RESOLVER_LEGACY' "$vendor" 2>/dev/null; then
+    echo "Skip php-types-resolver-worklist default flip (already applied)"
+    return 0
+  fi
+  apply_php_types_resolver_worklist_default_to_target "$vendor"
+  apply_php_types_resolver_worklist_default_to_target "$prelinked"
+  echo "Applied php-types-resolver-worklist default flip (#36225)"
+}
+
 apply_php_types_docblock_full_type_overlay() {
   local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
   if patch_already_applied "$PATCH_DIR/php-types-docblock-first-token.patch"; then
@@ -7363,6 +7412,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_php_types_compiler_halt_offset_overlay
   # Perf patch last: diffed against the fully-patched TypeReconstructor.php (#16077).
   apply_patch "$PATCH_DIR/php-types-resolver-worklist.patch"
+  apply_php_types_resolver_worklist_default_overlay
 fi
 
 if [[ -d "$ROOT/vendor/pre/plugin" ]]; then

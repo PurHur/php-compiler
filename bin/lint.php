@@ -22,10 +22,10 @@ require __DIR__.'/../src/yay-php8-compat.php';
 require __DIR__.'/../vendor/autoload.php';
 require __DIR__.'/../script/bootstrap-lib.php';
 
-// Fast frontend paths: use-chain Simplifier is now the compile default (#23056);
-// still force it here so lint stays fast even if PHPCFG_SIMPLIFIER_LEGACY=1 is
-// set in the environment. Worklist type resolver remains lint-only (#16077) —
-// resolution ORDER can affect AOT. PHP_COMPILER_LINT_FRONTEND_FAST=0 opts out.
+// Fast frontend paths: use-chain Simplifier and worklist type resolver are compile
+// defaults (#23056, #36225). bin/lint.php still forces them so lint stays fast when
+// PHPCFG_SIMPLIFIER_LEGACY=1 or PHPTYPES_RESOLVER_LEGACY=1 is set in the environment.
+// PHP_COMPILER_LINT_FRONTEND_FAST=0 opts out.
 if ('0' !== getenv('PHP_COMPILER_LINT_FRONTEND_FAST')) {
     putenv('PHPCFG_SIMPLIFIER_USECHAIN=1');
     putenv('PHPCFG_SIMPLIFIER_LEGACY');
