@@ -85,6 +85,7 @@ bootstrap_vm_driver_execute_probe_run_with_retries() {
 fast_probe_failed=0
 if [[ -x "${OUT}" ]]; then
   if bootstrap_vm_driver_execute_probe_run_with_retries; then
+    bootstrap_refresh_compiler_lib_sidecar_stamp_if_byte_matched_prelinked "${OUT}" || true
     echo "bootstrap-selfhost-vm-driver-execute-probe: OK ${OUT}"
     exit 0
   fi
@@ -117,6 +118,7 @@ if [[ "${relink}" == "1" ]]; then
     && bootstrap_copy_prelinked_compiler_lib_spine_blob "${OUT}"; then
     echo "bootstrap-selfhost-vm-driver-execute-probe: seeded ${OUT} from prelinked/bootstrap-gen0 (fast)" >&2
     if bootstrap_vm_driver_execute_probe_run_with_retries; then
+      bootstrap_refresh_compiler_lib_sidecar_stamp_if_byte_matched_prelinked "${OUT}" || true
       echo "bootstrap-selfhost-vm-driver-execute-probe: OK ${OUT}"
       exit 0
     fi
@@ -147,6 +149,7 @@ if [[ -f "${stamp}" ]]; then
   have_sha="$(tr -d '\n' <"${stamp}")"
 fi
 if bootstrap_vm_driver_execute_probe_run_with_retries; then
+  bootstrap_refresh_compiler_lib_sidecar_stamp_if_byte_matched_prelinked "${OUT}" || true
   echo "bootstrap-selfhost-vm-driver-execute-probe: OK ${OUT}"
   exit 0
 fi
