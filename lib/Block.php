@@ -282,6 +282,9 @@ class Block {
     /** @var array<int, true> */
     private array $namedAssignDestSlotIndexes = [];
 
+    /** @var array<int, Operand|null> lazy {@see getOperand} results — cleared when scope slots change (#36226). */
+    private array $operandBySlotCache = [];
+
     /** assign.result temp => CV lvalue slot for reads after in-place mutation (#15125). */
     private array $assignResultToLvalueSlot = [];
 
@@ -409,6 +412,7 @@ class Block {
     {
         $this->namedAssignDestSlots[$varRoot] = $slot;
         $this->namedAssignDestSlotIndexes[$slot] = true;
+        $this->invalidateOperandSlotCache($slot);
     }
 
     /** True when $slot is a registered `$local = …` assign destination (#16040, #24017). */
@@ -506,7 +510,44 @@ class Block {
             && !$this->inheritUndefinedLocals;
     }
 
-    public function getOperand(int $offset): ?Operand {
+    public function getOperand(int $offset): ?Operand
+    {
+        if (\array_key_exists($offset, $this->operandBySlotCache)) {
+            return $this->operandBySlotCache[$offset];
+        }
+        $operand = $this->resolveOperandForSlot($offset);
+        $this->operandBySlotCache[$offset] = $operand;
+
+        return $operand;
+    }
+
+    private function invalidateOperandSlotCache(?int $slot = null): void
+    {
+        if (null === $slot) {
+            $this->operandBySlotCache = [];
+
+            return;
+        }
+        unset($this->operandBySlotCache[$slot]);
+    }
+
+    private function bindScopeOperandSlot(Operand $operand, int $slot): void
+    {
+        $this->scope[$operand] = $slot;
+        $this->invalidateOperandSlotCache($slot);
+    }
+
+    private function detachScopeOperandAtSlot(int $slot, Operand $operand): void
+    {
+        if (!$this->scope->contains($operand) || $this->scope[$operand] !== $slot) {
+            return;
+        }
+        $this->scope->detach($operand);
+        $this->invalidateOperandSlotCache($slot);
+    }
+
+    private function resolveOperandForSlot(int $offset): ?Operand
+    {
         foreach ($this->namedAssignDestSlots as $root => $slot) {
             if ($slot === $offset) {
                 return $root;
@@ -644,7 +685,7 @@ class Block {
             if (null !== $name && '' !== $name) {
                 $paramSlot = $this->paramSlotForName($name);
                 if (null !== $paramSlot) {
-                    $this->scope[$operand] = $paramSlot;
+                    $this->bindScopeOperandSlot($operand, $paramSlot);
                     if ($this->shouldRegisterInheritedArg($operand)) {
                         $this->args[$operand] = $paramSlot;
                     }
@@ -656,7 +697,7 @@ class Block {
             // may leave Temporary/$local mappings on fresh slots before the CV is registered.
             $namedDest = $this->slotForNamedAssignDest($operand);
             if (null !== $namedDest) {
-                $this->scope[$operand] = $namedDest;
+                $this->bindScopeOperandSlot($operand, $namedDest);
                 if ($this->shouldRegisterInheritedArg($operand)) {
                     $this->args[$operand] = $namedDest;
                 }
@@ -674,7 +715,7 @@ class Block {
             if (null !== $name && '' !== $name) {
                 $namedDest = $this->slotIndexForVariableName($name);
                 if (null !== $namedDest) {
-                    $this->scope[$operand] = $namedDest;
+                    $this->bindScopeOperandSlot($operand, $namedDest);
                     if ($this->shouldRegisterInheritedArg($operand)) {
                         $this->args[$operand] = $namedDest;
                     }
@@ -704,7 +745,7 @@ class Block {
             if (null !== $name) {
                 $existing = $this->slotIndexForVariableName($name);
                 if (null !== $existing && ($isRead || $this->closureCaptureSlotWritableForOperand($existing, $operand))) {
-                    $this->scope[$operand] = $existing;
+                    $this->bindScopeOperandSlot($operand, $existing);
                     if ($isRead && $this->shouldRegisterInheritedArg($operand)) {
                         $this->args[$operand] = $existing;
                     }
@@ -720,7 +761,7 @@ class Block {
         if ($operand instanceof Temporary && null !== $operand->original && $this->scope->contains($operand->original)) {
             $existing = $this->scope[$operand->original];
             if ($isRead || $this->closureCaptureSlotWritableForOperand($existing, $operand)) {
-                $this->scope[$operand] = $existing;
+                $this->bindScopeOperandSlot($operand, $existing);
                 if ($isRead && $this->shouldRegisterInheritedArg($operand)) {
                     $this->args[$operand] = $existing;
                 }
@@ -735,7 +776,7 @@ class Block {
         if (null !== $name) {
             $existing = $this->slotIndexForVariableName($name);
             if (null !== $existing && ($isRead || $this->closureCaptureSlotWritableForOperand($existing, $operand))) {
-                $this->scope[$operand] = $existing;
+                $this->bindScopeOperandSlot($operand, $existing);
                 if ($isRead && $this->shouldRegisterInheritedArg($operand)) {
                     $this->args[$operand] = $existing;
                 }
@@ -754,7 +795,7 @@ class Block {
                     if (!$isRead && !$this->closureCaptureSlotWritableForOperand($existing, $operand)) {
                         continue;
                     }
-                    $this->scope[$operand] = $existing;
+                    $this->bindScopeOperandSlot($operand, $existing);
                     if ($isRead && $this->shouldRegisterInheritedArg($operand)) {
                         $this->args[$operand] = $existing;
                     }
@@ -767,7 +808,7 @@ class Block {
             }
         }
         $next = $this->nextScopeSlot();
-            $this->scope[$operand] = $next;
+            $this->bindScopeOperandSlot($operand, $next);
             if ($isRead && $this->shouldRegisterInheritedArg($operand)) {
                 $this->args[$operand] = $next;
             }
@@ -829,7 +870,7 @@ class Block {
                     continue;
                 }
                 if ($scopedOp instanceof Operand\Literal && $scopedOp !== $operand) {
-                    $this->scope->detach($scopedOp);
+                    $this->detachScopeOperandAtSlot($slot, $scopedOp);
                 }
             }
         }
@@ -866,7 +907,7 @@ class Block {
                 continue;
             }
             if ($scopedOp instanceof Operand\Literal) {
-                $this->scope->detach($scopedOp);
+                $this->detachScopeOperandAtSlot($slot, $scopedOp);
             }
         }
     }
@@ -901,7 +942,7 @@ class Block {
         if (null !== $excludeSlot && $slot <= $excludeSlot) {
             $slot = $excludeSlot + 1;
         }
-        $this->scope[$operand] = $slot;
+        $this->bindScopeOperandSlot($operand, $slot);
 
         return $slot;
     }
@@ -975,7 +1016,7 @@ class Block {
             if ($this->namedAssignDestSlots->contains($root)) {
                 continue;
             }
-            $this->scope[$root] = $slot;
+            $this->bindScopeOperandSlot($root, $slot);
             if ($sibling->args->contains($root) || $sibling->isArgSlot($slot)) {
                 $this->args[$root] = $slot;
             }
@@ -1018,7 +1059,7 @@ class Block {
         }
         $this->displaceLiteralsAtSlotForPhi($slot);
         if (!$this->scope->contains($root)) {
-            $this->scope[$root] = $slot;
+            $this->bindScopeOperandSlot($root, $slot);
         }
     }
 
@@ -1039,7 +1080,7 @@ class Block {
             $this->displaceLiteralsAtSlotForPhi($slot);
         }
         if (!$this->scope->contains($operand)) {
-            $this->scope[$operand] = $slot;
+            $this->bindScopeOperandSlot($operand, $slot);
         }
     }
 
@@ -1048,6 +1089,7 @@ class Block {
      */
     private function displaceLiteralsAtSlotForPhi(int $slot): void
     {
+        $this->invalidateOperandSlotCache($slot);
         $toMove = [];
         foreach ($this->scope as $scopedOp) {
             if ($this->scope[$scopedOp] !== $slot) {
@@ -1086,7 +1128,7 @@ class Block {
     /** Error-suppress exit may need to override an inherited empty slot (#10336). */
     public function forceBindScopeSlot(Operand $operand, int $slot): void
     {
-        $this->scope[$operand] = $slot;
+        $this->bindScopeOperandSlot($operand, $slot);
     }
 
     private function isArgSlot(int $slot): bool
@@ -1130,7 +1172,7 @@ class Block {
                     $slot = $this->nextScopeSlot();
                 }
             }
-            $this->scope[$operand] = $slot;
+            $this->bindScopeOperandSlot($operand, $slot);
             if ($parent->args->contains($operand)) {
                 $this->args[$operand] = $slot;
             }
@@ -1143,7 +1185,9 @@ class Block {
         }
         foreach ($parent->namedAssignDestSlots as $root) {
             if (!$this->namedAssignDestSlots->contains($root)) {
-                $this->namedAssignDestSlots[$root] = $parent->namedAssignDestSlots[$root];
+                $destSlot = $parent->namedAssignDestSlots[$root];
+                $this->namedAssignDestSlots[$root] = $destSlot;
+                $this->invalidateOperandSlotCache($destSlot);
             }
         }
         foreach ($parent->assignResultToLvalueSlot as $resultSlot => $lvalueSlot) {
@@ -1549,7 +1593,7 @@ class Block {
     /** Rebind hoisted producer/consumer temps after opcode emission (#14467, trim($obj->prop)). */
     public function bindOperandScopeSlot(Operand $operand, int $slot): void
     {
-        $this->scope[$operand] = $slot;
+        $this->bindScopeOperandSlot($operand, $slot);
     }
 
     public function operandForScopeSlot(int $slot): ?Operand
