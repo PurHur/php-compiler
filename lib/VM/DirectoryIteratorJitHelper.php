@@ -316,7 +316,7 @@ final class DirectoryIteratorJitHelper
         $context->builder->branchIf($keepStrip, $stripBody, $afterStrip);
 
         $context->builder->positionAtEnd($afterStrip);
-        $fileNameSlot = $context->builder->alloca($strPtrTy);
+        $fileNameSlot = BasicBlockHelper::entryAlloca($context, $strPtrTy);
         $trimmedLen = $context->builder->load($pathLenSlot);
         $wasTrimmed = $context->builder->icmp(Builder::INT_SLT, $trimmedLen, $origLen);
         $mkFile = BasicBlockHelper::append($context, 'sfi_mk_file_'.$id);
@@ -371,7 +371,7 @@ final class DirectoryIteratorJitHelper
 
         $context->builder->positionAtEnd($afterDirLen);
         $dirLen = $context->builder->load($pathLenSlot);
-        $dirSlot = $context->builder->alloca($strPtrTy);
+        $dirSlot = BasicBlockHelper::entryAlloca($context, $strPtrTy);
         $dirEmpty = $context->builder->icmp(Builder::INT_EQ, $dirLen, $zero);
         $mkDir = BasicBlockHelper::append($context, 'sfi_mk_dir_'.$id);
         $emptyDir = BasicBlockHelper::append($context, 'sfi_empty_dir_'.$id);
@@ -399,7 +399,7 @@ final class DirectoryIteratorJitHelper
         $hasDir = $context->builder->icmp(Builder::INT_NE, $dirLen2, $zero);
         $dirShorter = $context->builder->icmp(Builder::INT_SLT, $dirLen2, $fileLen);
         $takeSuffix = $context->builder->and($hasDir, $dirShorter);
-        $fnSlot = $context->builder->alloca($strPtrTy);
+        $fnSlot = BasicBlockHelper::entryAlloca($context, $strPtrTy);
         $suffixBb = BasicBlockHelper::append($context, 'sfi_fn_suffix_'.$id);
         $fullBb = BasicBlockHelper::append($context, 'sfi_fn_full_'.$id);
         $doneBb = BasicBlockHelper::append($context, 'sfi_fn_done_'.$id);
@@ -1033,8 +1033,8 @@ final class DirectoryIteratorJitHelper
         $zero = $i64->constInt(0, false);
         $one = $i64->constInt(1, false);
 
-        // Alloca — JitStringConcat ends in its own blocks; PHI preds would not match (#33263).
-        $outSlot = $context->builder->alloca($strPtrTy);
+        // Entry alloca — multi-branch join stores; current-block alloca fails LLVM dominate (#36253).
+        $outSlot = BasicBlockHelper::entryAlloca($context, $strPtrTy);
 
         $dirLen = $context->builder->call($context->lookupFunction('__string__strlen'), $dirPtr);
         $dirEmpty = $context->builder->icmp(Builder::INT_EQ, $dirLen, $zero);

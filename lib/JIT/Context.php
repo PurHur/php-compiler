@@ -3154,8 +3154,7 @@ class Context {
             return;
         }
         McjitEmbedRuntime::prepareModule($this);
-        $message = '';
-        $this->module->verify($this->module::VERIFY_ACTION_THROW, $message);
+        $this->verifyModuleOrThrow();
         $engine = $this->module->createJITCompiler(0);
         McjitEmbedHostEcho::bindEngine($engine);
         $this->result = new Result(
@@ -3324,8 +3323,44 @@ class Context {
         if ('1' === $dumpIr || 'true' === strtolower((string) $dumpIr)) {
             $this->module->printToFile('/tmp/phpc-last.ll');
         }
-        $this->module->verify($this->module::VERIFY_ACTION_THROW, $message);   
+        $this->verifyModuleOrThrow();
         Progress::noteFunction('jit_context_verify_done');
+    }
+
+    /**
+     * LLVM verify failures on large modules repeat the same line thousands of times (#36253).
+     * Surface the first distinct lines and a best-effort function name instead of megabytes of IR.
+     */
+    private function verifyModuleOrThrow(): void
+    {
+        $message = '';
+        if ($this->module->verify($this->module::VERIFY_ACTION_RETURN, $message)) {
+            return;
+        }
+        $funcName = 'unknown';
+        if (preg_match('/@([A-Za-z0-9_.$]+)/', $message, $match)) {
+            $funcName = $match[1];
+        }
+        $uniqueLines = [];
+        $seen = [];
+        foreach (explode("\n", $message) as $line) {
+            if ('' === $line || isset($seen[$line])) {
+                continue;
+            }
+            $seen[$line] = true;
+            $uniqueLines[] = $line;
+            if (\count($uniqueLines) >= 20) {
+                break;
+            }
+        }
+        $head = implode("\n", $uniqueLines);
+        $totalLines = substr_count($message, "\n") + ('' !== $message && !str_ends_with($message, "\n") ? 1 : 0);
+        $suffix = $totalLines > \count($uniqueLines)
+            ? "\n… (".($totalLines - \count($uniqueLines)).' more lines truncated)'
+            : '';
+        throw new \RuntimeException(
+            "Module verification failed in function {$funcName}:\n{$head}{$suffix}"
+        );
     }
 
     /**

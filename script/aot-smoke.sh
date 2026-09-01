@@ -107,6 +107,47 @@ for entry in "${CASES[@]}"; do
     pass=$((pass + 1))
 done
 
+# Multi-file reference app — must link under AOT (#36253). ~30s compile; not inline PHP.
+mini_name='miniwebapp'
+mini_bin="$WORK/$mini_name.bin"
+mini_timeout="${AOT_SMOKE_MINIWEBAPP_TIMEOUT:-180}"
+printf 'compile %-9s ' "$mini_name"
+timeout "$mini_timeout" "$PHP_BIN" bin/compile.php -o "$mini_bin" \
+    --include examples/003-MiniWebApp/config.php \
+    --include examples/003-MiniWebApp/src/Router.php \
+    examples/003-MiniWebApp/public/index.php \
+    > "$WORK/$mini_name.compile.log" 2>&1
+mini_compile_rc=$?
+if [ "$mini_compile_rc" -ne 0 ]; then
+    printf 'FAIL compile failed (rc=%s)\n' "$mini_compile_rc"
+    tail -5 "$WORK/$mini_name.compile.log" | sed 's/^/        /'
+    fail=$((fail + 1)); failed_names+=("$mini_name")
+elif [ ! -x "$mini_bin" ]; then
+    printf 'FAIL compile reported success but emitted no binary\n'
+    fail=$((fail + 1)); failed_names+=("$mini_name")
+else
+    mini_public="$REPO_ROOT/examples/003-MiniWebApp/public"
+    mini_actual="$(
+        env SCRIPT_FILENAME="$mini_public/index.php" \
+            SCRIPT_NAME='/index.php' \
+            DOCUMENT_ROOT="$mini_public" \
+            REQUEST_METHOD='GET' \
+            QUERY_STRING='route=home' \
+            timeout "$AOT_SMOKE_RUN_TIMEOUT" "$mini_bin" 2>&1
+    )"
+    mini_rc=$?
+    if [ "$mini_rc" -ne 0 ]; then
+        printf 'FAIL binary exited %s\n' "$mini_rc"
+        fail=$((fail + 1)); failed_names+=("$mini_name")
+    elif ! printf '%s' "$mini_actual" | grep -q 'MiniWebApp'; then
+        printf 'FAIL home route missing MiniWebApp marker\n'
+        fail=$((fail + 1)); failed_names+=("$mini_name")
+    else
+        printf 'ok    %-9s home route\n' "$mini_name"
+        pass=$((pass + 1))
+    fi
+fi
+
 echo
 echo "aot-smoke: ${pass} passed, ${fail} failed"
 if [ "$fail" -ne 0 ]; then
