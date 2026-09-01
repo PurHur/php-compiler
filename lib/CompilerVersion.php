@@ -395,7 +395,14 @@ final class CompilerVersion
     {
         $raw = getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === $raw) {
-            return self::VERSION;
+            // User-script AOT clears PROFILE during compile (#21557) — honor CLI profile
+            // from PHP_COMPILER_AOT_COMPILE_PROFILE for version-gated builtins/DOM APIs.
+            if (\PHPCompiler\JIT\UserScriptAotEnv::isActive()) {
+                $raw = getenv('PHP_COMPILER_AOT_COMPILE_PROFILE');
+            }
+            if (!\is_string($raw) || '' === $raw) {
+                return self::VERSION;
+            }
         }
         $raw = trim($raw);
         if (preg_match('/^\d+\.\d+$/', $raw)) {
@@ -4304,7 +4311,14 @@ final class CompilerVersion
 
         $raw = getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
+            // User-script AOT clears PROFILE during compile (#21557) — honor CLI profile
+            // for DOM 8.4+ proxy registration via PHP_COMPILER_AOT_COMPILE_PROFILE.
+            if (\PHPCompiler\JIT\UserScriptAotEnv::isActive()) {
+                $raw = getenv('PHP_COMPILER_AOT_COMPILE_PROFILE');
+            }
+            if (!\is_string($raw) || '' === trim($raw)) {
+                return false;
+            }
         }
 
         return version_compare(self::languageProfileVersion(), $since, '>=');
