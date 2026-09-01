@@ -32,6 +32,7 @@ class AotTest extends BaseTest
         'REQUEST_BODY',
         // PROFILE gates compile-time NestedJIT helper ABI (8.4.0-dev unset ≠ explicit 8.4);
         // runtime PROFILE=8.4 still applies for executed getenv/ErrorReporter paths (#21557).
+        // compile.php snapshots CLI PROFILE into PHP_COMPILER_AOT_COMPILE_PROFILE for version gates (#36123).
         'PHP_COMPILER_PROFILE',
     ];
 
