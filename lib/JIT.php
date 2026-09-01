@@ -2350,7 +2350,13 @@ class JIT {
             || str_ends_with($lower, '\\runtime::resetparsernameresolverstate')
             || str_ends_with($lower, '\\runtime::recordlastparsefailure')
             || str_ends_with($lower, '\\runtime::formatparseandcompilenulldetail')) {
-            return $this->shouldRealLowerInventoryArgvParseSpine();
+            // Inventory argv: ensureM3EmitTuRuntimeParseSpineDeps registers link stubs —
+            // real-lowering formatParseAndCompileNullDetail hits detached memcpy/GEP (#36144).
+            if ($this->shouldRealLowerInventoryArgvParseSpine()) {
+                return false;
+            }
+
+            return true;
         }
         if (str_ends_with($lower, '\\runtime::compileemitsmoke')) {
             if ($this->shouldRealLowerInventoryArgvParseSpine()) {
