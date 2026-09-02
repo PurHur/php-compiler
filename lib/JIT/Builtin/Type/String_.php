@@ -330,19 +330,12 @@ class String_ extends Type {
     $size = $fn___eccbc87e4b5ce2fe28308fd9f2a7baf3->getParam(0);
     
     $__right = $size->typeOf()->constInt(1, false);
-                            
-                        
-
-                        
-
-                        
-
-                        
-
-                        
-                            $allocSize = $this->context->builder->addNoSignedWrap($size, $__right);
+    $minCap = $size->typeOf()->constInt(32, false);
+    $needsMin = $this->context->builder->icmp(\PHPLLVM\Builder::INT_SLT, $size, $minCap);
+    $capacity = $this->context->builder->select($needsMin, $minCap, $size);
+    $allocSize = $this->context->builder->addNoSignedWrap($capacity, $__right);
     $type = $this->context->getTypeFromString('__string__');
-                    $struct = $this->context->memory->mallocWithExtra($type, $size);
+                    $struct = $this->context->memory->mallocWithExtra($type, $capacity);
     $offset = $this->context->structFieldMap[$this->context->structNameForValue($struct)]['length'];
                 $this->context->builder->store(
                     $size,
@@ -661,7 +654,13 @@ class String_ extends Type {
                     $oldSize = $this->context->builder->load(
                         $this->context->builder->structGep($destVar, $offset)
                     );
-    $destValue = $this->context->memory->realloc($destVar, $newSize);
+    $two = $newSize->typeOf()->constInt(2, false);
+    $half = $this->context->builder->unsignedDiv($newSize, $two);
+    $grown = $this->context->builder->addNoSignedWrap($newSize, $half);
+    $minCap = $newSize->typeOf()->constInt(32, false);
+    $needsMin = $this->context->builder->icmp(\PHPLLVM\Builder::INT_SLT, $grown, $minCap);
+    $targetCap = $this->context->builder->select($needsMin, $minCap, $grown);
+    $destValue = $this->context->memory->realloc($destVar, $targetCap);
     $offset = $this->context->structFieldMap[$this->context->structNameForValue($destValue)]['length'];
                 $this->context->builder->store(
                     $newSize,

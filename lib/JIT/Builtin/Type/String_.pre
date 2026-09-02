@@ -68,8 +68,13 @@ class String_ extends Type {
     private function implementAlloc(): void {
         compile {
             function __string__alloc($size) {
-                $allocSize = $size + 1;
-                $struct = malloc __string__ $size;
+                $capacity = $size;
+                $minCap = (int64) 32;
+                if ($capacity < $minCap) {
+                    $capacity = $minCap;
+                }
+                $allocSize = $capacity + 1;
+                $struct = malloc __string__ $capacity;
                 $struct->length = $size;
                 $char = &$struct->value;
                 memset $char 0 $allocSize;
@@ -106,7 +111,13 @@ class String_ extends Type {
                 }
                 $oldSize = $destVar->length;
 
-                $destValue = realloc $destVar $newSize;
+                $targetCap = $newSize + ($newSize / 2);
+                $minCap = (int64) 32;
+                if ($targetCap < $minCap) {
+                    $targetCap = $minCap;
+                }
+
+                $destValue = realloc $destVar $targetCap;
                 $destValue->length = $newSize;
                 $char = &$destValue->value;
 
