@@ -100,6 +100,7 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
+
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
@@ -6807,7 +6808,6 @@ require_once __DIR__.'/../../../lib/JIT/SelfHostBuiltinPolicy.php';
 require_once __DIR__.'/../../../lib/JIT/SensitiveParamHelper.php';
 require_once __DIR__.'/../../../lib/JIT/ShutdownCallbackPolicy.php';
 require_once __DIR__.'/../../../lib/JIT/SidecarPathRemap.php';
-require_once __DIR__.'/../../../lib/JIT/SpineChunkNestedVmBind.php';
 require_once __DIR__.'/../../../lib/JIT/SimpleXmlInstanceMethodJit.php';
 require_once __DIR__.'/../../../lib/JIT/SplAutoloadCallbackPolicy.php';
 require_once __DIR__.'/../../../lib/JIT/StaticPropertyVisibilityJitGuard.php';
@@ -8176,6 +8176,8 @@ require_once __DIR__.'/../../../lib/AOT/HelperRuntimeCommon.php';
 require_once __DIR__.'/../../../lib/Cli/ProcPipeReader.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ValueBoxWriteDoubleJit.php';
 require_once __DIR__.'/../../../lib/VM/VmValueBoxWriteDouble.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/Type/HashTableDtorLlvm.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/Type/ObjectDtorLlvm.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 
