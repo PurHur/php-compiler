@@ -190,7 +190,9 @@ the fallback so no feature depends on the guess.
 
 ## Before you open a PR
 
-1. Run the smallest sufficient gate — `.cursor/rules/phpc-verify` guidance and `local-ci-only.mdc`.
+1. Run the smallest sufficient gate — default iteration loop: `make check` (~90s: trust preflight,
+   gen-0 driver smoke, aot-smoke, VM differential tier-0). Before merge: `make north-star5-verify-fast`.
+   See `.cursor/rules/phpc-verify` and `local-ci-only.mdc` for diff-class tiers.
 2. Differential sweep for any lowering change.
 3. State in the PR **what you ran and what you did not cover**. Partial is fine; overstated is not.
 4. Vendor fixes go in `patches/` with an idempotency guard in `script/apply-patches.sh` — never edit
