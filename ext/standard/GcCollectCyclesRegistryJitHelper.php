@@ -33,6 +33,12 @@ final class GcCollectCyclesRegistryJitHelper
         self::$destructInvoked = [];
     }
 
+    /** @internal Standalone user-script AOT {main} — drop helper .o static-init pollution (#36245). */
+    public static function resetUserScriptRegistry(): void
+    {
+        self::resetForTest();
+    }
+
     public static function count(): int
     {
         return self::$count;

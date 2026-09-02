@@ -83,68 +83,33 @@ final class JitGcCollectCyclesStandaloneKernel
         if ($fn->countBasicBlocks() > 0) {
             return;
         }
-        $i32 = $context->getTypeFromString('int32');
-        $i8 = $context->getTypeFromString('int8');
-        $i8p = $context->getTypeFromString('int8*');
-        $objPtr = $context->getTypeFromString('__object__*');
-        $valuePtr = $context->getTypeFromString('__value__*');
         $voidpp = $context->getTypeFromString('void**');
+        $objPtr = $context->getTypeFromString('__object__*');
+        $valueTy = $context->getTypeFromString('__value__');
         $entry = $fn->appendBasicBlock('slot_read_entry');
         $nullRet = $fn->appendBasicBlock('slot_read_null');
-        $boxed = $fn->appendBasicBlock('slot_read_boxed');
-        $direct = $fn->appendBasicBlock('slot_read_direct');
-        $done = $fn->appendBasicBlock('slot_read_done');
+        $work = $fn->appendBasicBlock('slot_read_work');
         $context->builder->positionAtEnd($entry);
 
         $slotPtr = $fn->getParam(0);
-        $null = $voidpp->constNull();
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $slotPtr, $null);
-        $context->builder->branchIf($isNull, $nullRet, $boxed);
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $slotPtr, $voidpp->constNull());
+        $context->builder->branchIf($isNull, $nullRet, $work);
 
-        $context->builder->positionAtEnd($boxed);
-        $slotVal = $context->builder->load($slotPtr);
-        $slotI8 = $context->builder->pointerCast($slotVal, $i8p);
-        $boxedVal = $context->builder->pointerCast($slotI8, $valuePtr);
-        $typePtr = $context->builder->pointerCast($boxedVal, $i8p);
-        $typeByte = $context->builder->load($typePtr);
-        $typeMasked = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
-        $isObjBox = $context->builder->icmp(Builder::INT_EQ, $typeMasked, $i8->constInt(self::TYPE_OBJECT, false));
-        $readBoxed = $fn->appendBasicBlock('slot_read_boxed_obj');
-        $context->builder->branchIf($isObjBox, $readBoxed, $direct);
-
-        $context->builder->positionAtEnd($readBoxed);
-        $objFromBox = $context->builder->call($context->lookupFunction('__value__readObject'), $boxedVal);
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($direct);
-        $headTypeinfoPtr = $context->builder->pointerCast(
-            $context->builder->inBoundsGEP($slotI8, $i32->constInt(4, false)),
-            $i32->pointerType(0)
+        $context->builder->positionAtEnd($work);
+        $tmp = $context->builder->alloca($valueTy, 1, 'gc_slot_value');
+        $context->builder->call(
+            $context->lookupFunction('__object__load_boxed_value_slot'),
+            $slotPtr,
+            $tmp
         );
-        $typeinfo = $context->builder->load($headTypeinfoPtr);
-        $mask = $i32->constInt(self::TYPEINFO_TYPEMASK, false);
-        $objType = $i32->constInt(self::TYPEINFO_TYPE_OBJECT, false);
-        $isDirectObj = $context->builder->icmp(
-            Builder::INT_EQ,
-            $context->builder->and($typeinfo, $mask),
-            $objType
+        $obj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $tmp
         );
-        $directObj = $fn->appendBasicBlock('slot_read_direct_obj');
-        $context->builder->branchIf($isDirectObj, $directObj, $nullRet);
-
-        $context->builder->positionAtEnd($directObj);
-        $objDirect = $context->builder->pointerCast($slotI8, $objPtr);
-        $context->builder->branch($done);
+        $context->builder->returnValue($obj);
 
         $context->builder->positionAtEnd($nullRet);
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($done);
-        $phi = $context->builder->phi($objPtr);
-        $phi->addIncoming($objPtr->constNull(), $nullRet);
-        $phi->addIncoming($objFromBox, $readBoxed);
-        $phi->addIncoming($objDirect, $directObj);
-        $context->builder->returnValue($phi);
+        $context->builder->returnValue($objPtr->constNull());
         $context->builder->clearInsertionPosition();
     }
     private static function implementVisitObject(Context $context): void

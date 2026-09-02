@@ -8806,6 +8806,9 @@ class JIT {
             $this->context->jitFunctionRootBlock = $block;
             $this->prescanFunctionImportedGlobals($block->func);
             $this->emitJitDestructAllowDelref($block);
+            if ($block->isMainScript() || '{main}' === $block->func->name) {
+                \PHPCompiler\JIT\Builtin\GcCollectCyclesRuntime::emitUserScriptStandaloneRegistryReset($this->context);
+            }
         }
         $thisParamOffset = 0;
         if ($this->instanceMethodUsesThis($block) || $this->closureBodyUsesThis($block)) {

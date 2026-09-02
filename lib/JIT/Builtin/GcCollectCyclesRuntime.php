@@ -8,6 +8,7 @@ use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\UserScriptAotEnv;
 use PHPCompiler\VM\CycleCollector;
 use PHPCompiler\ext\standard\JitGcCollectCyclesStandaloneKernel;
 use PHPLLVM\Builder;
@@ -204,8 +205,10 @@ final class GcCollectCyclesRuntime
             return;
         }
 
-        $probe = $context->module->getNamedFunction('phpc_destruct_delref_allowed');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        $probeDestruct = $context->module->getNamedFunction('phpc_destruct_delref_allowed');
+        $probeImpl = $context->module->getNamedFunction('phpc_gc_collect_cycles_impl');
+        if (null !== $probeDestruct && $probeDestruct->countBasicBlocks() > 0
+            && null !== $probeImpl && $probeImpl->countBasicBlocks() > 0) {
             self::ensurePhpRegistryUserScriptBodies($context);
             self::registerLinkedRuntime($context);
 
@@ -1008,6 +1011,55 @@ final class GcCollectCyclesRuntime
     private static function usesPhpRegistry(Context $context): bool
     {
         return Builtin::LOAD_TYPE_STANDALONE !== $context->loadType;
+    }
+
+    /**
+     * User-script {main}: helper .o static init pollutes the GC registry before user code (#36245).
+     */
+    public static function emitUserScriptStandaloneRegistryReset(Context $context): void
+    {
+        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType || !UserScriptAotEnv::isActive()) {
+            return;
+        }
+        if (self::usesPhpRegistry($context)) {
+            return;
+        }
+        self::ensureLinked($context);
+        $fn = $context->module->getNamedFunction('phpc_gc_reset_standalone_registry');
+        $saved = self::captureInsertBlock($context);
+        try {
+            if (null === $fn || 0 === $fn->countBasicBlocks()) {
+                self::implementResetStandaloneRegistry($context);
+                $fn = $context->lookupFunction('phpc_gc_reset_standalone_registry');
+            }
+        } finally {
+            self::restoreInsertBlock($context, $saved);
+        }
+        $context->builder->call($fn);
+    }
+
+    private static function implementResetStandaloneRegistry(Context $context): void
+    {
+        $name = 'phpc_gc_reset_standalone_registry';
+        $probe = $context->module->getNamedFunction($name);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($name, $probe);
+
+            return;
+        }
+        $voidTy = $context->getTypeFromString('void');
+        $i32 = $context->getTypeFromString('int32');
+        $ft = $context->context->functionType($voidTy, false);
+        $fn = null !== $probe ? $probe : $context->module->addFunction($name, $ft);
+        $entry = $fn->appendBasicBlock('gc_reset_standalone_entry');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->store(
+            $i32->constInt(0, false),
+            self::globalPtr($context, self::G_COUNT, $i32)
+        );
+        $context->builder->returnVoid();
+        $context->builder->clearInsertionPosition();
+        $context->registerFunction($name, $fn);
     }
 
     /**
