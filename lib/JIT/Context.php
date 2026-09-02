@@ -1111,6 +1111,14 @@ class Context {
         if (null !== $bound) {
             return $bound;
         }
+        if ($this->isUserScriptAot() && str_contains($lc, '::')) {
+            $vmOnly = self::findInternalClassMethodInVmRegistry($this, $lc);
+            if (null !== $vmOnly && !self::internalBuiltinHasJitLowering($vmOnly)) {
+                throw new \LogicException(
+                    \sprintf('%s is registered in the VM but has no JIT lowering (#36202)', $proxyName)
+                );
+            }
+        }
         $this->functionProxies[$lc] = new Call\ExternalMethod($proxyName);
 
         return $this->functionProxies[$lc];
@@ -1243,7 +1251,63 @@ class Context {
             }
         }
 
+        // Registered builtin class methods with JIT lowering — one table for VM and JIT (#36202).
+        // VM-only handlers stay on ExternalMethod until call() is implemented (helper infra).
+        if (!\PHPCompiler\AOT\ExternalMethodBind::spineChunkMode()) {
+            $vmMethod = self::findInternalClassMethodInVmRegistry($this, $lc);
+            if (null !== $vmMethod && self::internalBuiltinHasJitLowering($vmMethod)) {
+                return $vmMethod;
+            }
+        }
+
         return null;
+    }
+
+    /**
+     * VM registry lookup for `Class::method` — one table for VM and JIT (#36202).
+     */
+    private static function findInternalClassMethodInVmRegistry(self $context, string $lc): ?FuncInternal
+    {
+        if (!str_contains($lc, '::')) {
+            return null;
+        }
+        [$classLc, $methodLc] = explode('::', $lc, 2);
+        $classLc = strtolower(ltrim($classLc, '\\'));
+        $methodLc = strtolower($methodLc);
+        if ('' === $classLc || '' === $methodLc) {
+            return null;
+        }
+
+        $vm = $context->runtime->vmContext;
+        while (isset($vm->classAliases[$classLc])) {
+            $classLc = $vm->classAliases[$classLc];
+        }
+        if (!isset($vm->classes[$classLc])) {
+            return null;
+        }
+
+        $entry = $vm->classes[$classLc];
+        if (!isset($entry->methods[$methodLc])) {
+            return null;
+        }
+
+        $method = $entry->methods[$methodLc];
+        if (!$method instanceof FuncInternal) {
+            return null;
+        }
+
+        return $method;
+    }
+
+    /** True when an Internal / VmClassMethod overrides {@see VmClassMethod::call()} for JIT. */
+    private static function internalBuiltinHasJitLowering(FuncInternal $method): bool
+    {
+        if (!$method instanceof \PHPCompiler\VM\Builtin\VmClassMethod) {
+            return true;
+        }
+        $ref = new \ReflectionMethod($method, 'call');
+
+        return \PHPCompiler\VM\Builtin\VmClassMethod::class !== $ref->getDeclaringClass()->getName();
     }
 
     /**
