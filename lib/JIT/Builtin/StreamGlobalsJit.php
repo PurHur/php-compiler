@@ -29,6 +29,7 @@ final class StreamGlobalsJit
 
     public const GLOBAL_READ_BUFFER = 'phpc_stream_read_buffer';
 
+    /** Reserved name — byte storage is heap-allocated on first fwrite, not a 2 MiB .bss table (#36195). */
     public const GLOBAL_WRITE_BUFFER_STORAGE = 'phpc_stream_write_buffer_storage';
 
     public static function implement(Context $context): void
@@ -51,7 +52,6 @@ final class StreamGlobalsJit
         $ptrTableTy = $i8p->arrayType(self::MAX_HANDLES);
         $i32TableTy = $i32->arrayType(self::MAX_HANDLES);
         $wasUsedTy = $i8->arrayType(self::MAX_HANDLES);
-        $storageTy = $i8->arrayType(8192)->arrayType(self::MAX_HANDLES);
 
         $isPopenTy = $i8->arrayType(self::MAX_HANDLES);
         $isGzTy = $i8->arrayType(self::MAX_HANDLES);
@@ -62,7 +62,6 @@ final class StreamGlobalsJit
             self::GLOBAL_WRITE_BUFFER => $i32TableTy,
             self::GLOBAL_READ_BUFFER => $i32TableTy,
             self::GLOBAL_WAS_USED => $wasUsedTy,
-            self::GLOBAL_WRITE_BUFFER_STORAGE => $storageTy,
             'phpc_stream_is_popen' => $isPopenTy,
             'phpc_stream_is_gz' => $isGzTy,
         ] as $name => $ty) {
