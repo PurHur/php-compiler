@@ -3130,6 +3130,7 @@ class Context {
         if (is_null($this->result)) {
             McjitEmbedRuntime::prepareModule($this);
             $this->compileCommon();
+            $this->runModuleOptimizationPasses();
             $engine = $this->module->createJITCompiler(0);
             if (!is_null($this->debugFile)) {
                 $machine = $engine->getTargetMachine();
@@ -3375,17 +3376,100 @@ class Context {
      * survived into the binary. That is the shape behind an untyped `++$a` loop running ~12x slower
      * than Zend.
      *
-     * Opt-in while it is measured: PHP_COMPILER_OPT_LEVEL=0 (default) keeps the previous behaviour,
-     * 1-3 selects the pipeline. Set PHP_COMPILER_OPT_SIZE_LEVEL to bias for size.
+     * Default (unset or 0): cheap function-scoped passes (SROA, EarlyCSE, InstCombine, CFG simplify,
+     * AlwaysInliner) over user-emitted functions so `alwaysinline` helpers fold without the 13–25×
+     * whole-module O2 cost. PHP_COMPILER_OPT_LEVEL=1–3 selects the full PassManagerBuilder pipeline;
+     * `none`/`off` disables IR optimisation entirely. Set PHP_COMPILER_OPT_SIZE_LEVEL to bias for size.
      */
     private function runModuleOptimizationPasses(): void
     {
-        $level = getenv('PHP_COMPILER_OPT_LEVEL');
-        $level = is_string($level) && ctype_digit($level) ? (int) $level : 0;
-        if ($level <= 0) {
+        $raw = getenv('PHP_COMPILER_OPT_LEVEL');
+        if (is_string($raw)) {
+            $normalized = strtolower(trim($raw));
+            if (in_array($normalized, ['none', 'off', 'false'], true)) {
+                return;
+            }
+        }
+        $level = is_string($raw) && ctype_digit($raw) ? (int) $raw : 0;
+        if ($level >= 1) {
+            $this->runHeavyModuleOptimizationPasses(min($level, 3));
+
             return;
         }
-        $level = min($level, 3);
+        $this->runLightModuleOptimizationPasses();
+    }
+
+    /**
+     * Cheap IR cleanup at the default opt level (#36213): SROA + EarlyCSE + InstCombine +
+     * CFGSimplify over user-emitted functions only. Legacy LLVM 9 function pass managers
+     * segfault if AlwaysInliner/FunctionInlining passes are registered (module passes on an FPM).
+     */
+    private function runLightModuleOptimizationPasses(): void
+    {
+        $targets = $this->lightOptimizationFunctionTargets();
+        if ([] === $targets) {
+            return;
+        }
+
+        Progress::noteFunction('jit_context_opt_passes_begin');
+        $functionPasses = $this->module->createFunctionPassManager();
+        if (!$functionPasses instanceof PHPLLVM\LLVMAbstract\PassManager) {
+            throw new \RuntimeException('expected LLVMAbstract PassManager for light opt passes');
+        }
+        $pm = $functionPasses->passManager;
+        $lib = $this->llvm->lib;
+        $lib->LLVMAddScalarReplAggregatesPassSSA($pm);
+        $lib->LLVMAddEarlyCSEPass($pm);
+        $lib->LLVMAddInstructionCombiningPass($pm);
+        $lib->LLVMAddCFGSimplificationPass($pm);
+        $functionPasses->initializeFunctionPassManager();
+        foreach ($targets as $function) {
+            $functionPasses->runFunctionPassManager($function);
+        }
+        $functionPasses->finalizeFunctionPassManager();
+        $functionPasses->dispose();
+        Progress::noteFunction('jit_context_opt_passes_done');
+    }
+
+    /**
+     * LLVM functions lowered in this compile (not the prelinked helper corpus).
+     *
+     * @return list<PHPLLVM\Value\Function_>
+     */
+    private function lightOptimizationFunctionTargets(): array
+    {
+        $seen = [];
+        $targets = [];
+        $add = function (?PHPLLVM\Value $function) use (&$seen, &$targets): void {
+            if (!$function instanceof PHPLLVM\Value\Function_) {
+                return;
+            }
+            $key = spl_object_id($function);
+            if (isset($seen[$key])) {
+                return;
+            }
+            $seen[$key] = true;
+            $targets[] = $function;
+        };
+
+        $add($this->main);
+        $add($this->initFunc);
+        $add($this->shutdownFunc);
+        $add($this->headerPreFlushFunc);
+
+        foreach ($this->functionLlvmSymbols as $symbol) {
+            if (!is_string($symbol) || '' === $symbol) {
+                continue;
+            }
+            $named = $this->module->getNamedFunction($symbol);
+            $add($named);
+        }
+
+        return $targets;
+    }
+
+    private function runHeavyModuleOptimizationPasses(int $level): void
+    {
         $sizeLevel = getenv('PHP_COMPILER_OPT_SIZE_LEVEL');
         $sizeLevel = is_string($sizeLevel) && ctype_digit($sizeLevel) ? min((int) $sizeLevel, 2) : 0;
 

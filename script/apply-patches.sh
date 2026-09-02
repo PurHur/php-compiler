@@ -46,7 +46,7 @@ patch_already_applied() {
       grep -q 'CorePassManagerIface' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/PassManagerBuilder.php" 2>/dev/null
       ;;
     php-llvm-module-createfunctionpassmanager.patch)
-      grep -q 'this->llvm->lib->LLVMCreatePassManagerForModule' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Module.php" 2>/dev/null
+      grep -q 'LLVMCreateFunctionPassManagerForModule' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Module.php" 2>/dev/null
       ;;
     php-llvm-mcjit-libc-mem.patch)
       grep -q 'Emit libc memset' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Intrinsic.php" 2>/dev/null
@@ -7467,6 +7467,7 @@ apply_patch "$PATCH_DIR/php-llvm-pass-registry-interface.patch"
 apply_patch "$PATCH_DIR/php-llvm-pass-manager-builder-semicolon.patch"
 apply_patch "$PATCH_DIR/php-llvm-pass-manager-builder-typed-prop.patch"
 apply_patch "$PATCH_DIR/php-llvm-pass-manager-builder-populate.patch"
+apply_patch "$PATCH_DIR/php-llvm-module-createfunctionpassmanager.patch"
 apply_patch "$PATCH_DIR/php-llvm-memory-buffer-bitcode.patch"
 apply_patch "$PATCH_DIR/php-llvm-vector-get-address-space.patch"
 apply_patch "$PATCH_DIR/php-llvm-token-type-kind-typo.patch"
