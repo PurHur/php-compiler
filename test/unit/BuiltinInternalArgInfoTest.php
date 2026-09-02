@@ -2965,4 +2965,28 @@ final class BuiltinInternalArgInfoTest extends TestCase
             ), $fn);
         }
     }
+
+    /** Native method return types lowered without boxing (#36205). */
+    public function testNativeMethodReturnArginfo36205(): void
+    {
+        $rt = (new \ReflectionMethod('Generator', 'valid'))->getReturnType();
+        $this->assertNotNull($rt);
+        $this->assertSame('bool', $rt->getName());
+
+        $rt = (new \ReflectionMethod('Exception', 'getLine'))->getReturnType();
+        $this->assertNotNull($rt);
+        $this->assertSame('int', $rt->getName());
+
+        foreach (['DateTime', 'DateTimeImmutable'] as $class) {
+            $this->assertSame(
+                'int',
+                BuiltinInternalArgInfo::tentativeReturnTypeForClassMethod($class, 'getTimestamp'),
+                "$class::getTimestamp"
+            );
+        }
+        $this->assertSame(
+            'int',
+            BuiltinInternalArgInfo::tentativeReturnTypeForClassMethod('DateTime', 'getOffset')
+        );
+    }
 }

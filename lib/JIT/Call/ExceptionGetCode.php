@@ -9,7 +9,7 @@ use PHPCompiler\JIT\Builtin\ReflectionSetup;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
-use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\JitNativeMethodReturn;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\ExceptionSupport;
 use PHPLLVM\Value;
@@ -44,10 +44,8 @@ final class ExceptionGetCode implements Call
                 )
             );
             BasicBlockHelper::ensureOpenInsertBlock($context, 'exc_getcode_argc_cont');
-            $slot = JitValueBox::alloc($context);
-            JitValueBox::writeLong($context, $slot, $context->constantFromInteger(0, 'int64'));
 
-            return $slot;
+            return JitNativeMethodReturn::longZero($context);
         }
         $obj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
         $code = ReflectionSetup::integerPropertyAsI64(
@@ -56,9 +54,6 @@ final class ExceptionGetCode implements Call
             $this->declaringRoot,
             ExceptionSupport::PROP_CODE
         );
-        $slot = JitValueBox::alloc($context);
-        JitValueBox::writeLong($context, $slot, $code);
-
-        return $slot;
+        return JitNativeMethodReturn::long($context, $code);
     }
 }
