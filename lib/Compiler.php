@@ -156,6 +156,9 @@ class Compiler {
     /** Set from the first compile-time abort (#2642, self-host diagnostics). */
     private ?string $compileAbortDetail = null;
 
+    /** CFG op being lowered — fallback file/line for throwCompileError/Logic (#36227). */
+    private ?Op $compileErrorContextOp = null;
+
     /** While compiling an arrow function CFG for implicit outer captures (#10304). */
     private bool $compilingArrowAutoCapture = false;
 
@@ -579,6 +582,11 @@ class Compiler {
             $this->compileAbortDetail = $detail;
         }
 
+        [$sourceFile, $sourceLine] = $this->resolveCompileErrorLocation(null, null);
+        if (null !== $sourceFile) {
+            throw new CompileFatal($sourceFile, max(1, $sourceLine ?? 1), $detail);
+        }
+
         throw new \LogicException($detail);
     }
 
@@ -608,6 +616,7 @@ class Compiler {
             $this->compileAbortDetail = $detail;
         }
 
+        [$sourceFile, $sourceLine] = $this->resolveCompileErrorLocation($sourceFile, $sourceLine);
         if (null !== $sourceFile) {
             throw new CompileFatal($sourceFile, max(1, $sourceLine ?? 1), $detail);
         }
@@ -615,8 +624,29 @@ class Compiler {
         throw new \CompileError($detail);
     }
 
+    /**
+     * @return array{0: ?string, 1: ?int}
+     */
+    private function resolveCompileErrorLocation(?string $sourceFile, ?int $sourceLine): array
+    {
+        if (null !== $sourceFile && '' !== $sourceFile) {
+            return [$sourceFile, $sourceLine];
+        }
+        $op = $this->compileErrorContextOp;
+        if (null === $op) {
+            return [null, null];
+        }
+        $file = $op->getFile();
+        if ('' === $file) {
+            return [null, null];
+        }
+
+        return [$file, $op->getLine()];
+    }
+
     public function compile(Script $script): ?Block {
         $this->resetCompileAbortDetail();
+        $this->compileErrorContextOp = null;
         $this->coalesceResultSlots = [];
         $this->coalesceMergeBlocks = [];
         $this->nullsafeResultSlots = [];
@@ -2810,6 +2840,8 @@ class Compiler {
                 continue;
             }
             $child = $ops[$i];
+            $prevCompileErrorContextOp = $this->compileErrorContextOp;
+            $this->compileErrorContextOp = $child;
             if ($child instanceof Op\Expr\ArrayDimFetch) {
                 $this->rejectArrayEmptyOffsetRead($child, $block);
             }
@@ -3226,6 +3258,7 @@ class Compiler {
                         $this->assignRefBindRefFlags = $savedAssignRefFlags;
                     }
             }
+            $this->compileErrorContextOp = $prevCompileErrorContextOp;
         }
     }
 
