@@ -12,6 +12,7 @@
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin;
 use PHPLLVM;
 
@@ -432,7 +433,10 @@ class Refcount extends Builtin {
                 
                 $endBlock[] = $tmp = $ifBlock->insertBasicBlock('endBlock');
                     $this->context->builder->branchIf($bool, $ifBlock, $tmp);
-                
+
+                $this->context->builder->positionAtEnd($tmp);
+                self::emitPossibleGcRootOnDelref($this->context, $refVirtual, $typeinfo, $current);
+
                 $this->context->builder->positionAtEnd($ifBlock);
                 { $parentFn = $ifBlock->getParent();
                     assert($parentFn instanceof PHPLLVM\Value\Function_);
@@ -547,6 +551,49 @@ class Refcount extends Builtin {
     $this->context->builder->returnVoid();
     
     $this->context->builder->clearInsertionPosition();
+    }
+
+    /** Zend gc_possible_root when object refcount drops to 1 (#36195). */
+    private static function emitPossibleGcRootOnDelref(
+        \PHPCompiler\JIT\Context $context,
+        PHPLLVM\Value $refVirtual,
+        PHPLLVM\Value $typeinfo,
+        PHPLLVM\Value $current
+    ): void {
+        $parentFn = BasicBlockHelper::parentFunction($context);
+        $i32 = $context->getTypeFromString('int32');
+        $objMask = $i32->constInt(self::TYPE_INFO_TYPE_OBJECT, false);
+        $isObject = $context->builder->icmp(
+            PHPLLVM\Builder::INT_NE,
+            $context->builder->bitwiseAnd($typeinfo, $objMask),
+            $i32->constInt(0, false)
+        );
+        $isOne = $context->builder->icmp(
+            PHPLLVM\Builder::INT_EQ,
+            $current,
+            $current->typeOf()->constInt(1, false)
+        );
+        $shouldRegister = $context->builder->bitwiseAnd($isObject, $isOne);
+        $registerBb = $parentFn->appendBasicBlock('delref_gc_possible_root');
+        $afterBb = $parentFn->appendBasicBlock('delref_after_gc_possible_root');
+        $context->builder->branchIf($shouldRegister, $registerBb, $afterBb);
+        $context->builder->positionAtEnd($registerBb);
+        GcCollectCyclesRuntime::ensureLinked($context);
+        $objPtr = $context->builder->pointerCast(
+            $refVirtual,
+            $context->getTypeFromString('__object__*')
+        );
+        $propCount = $context->builder->call(
+            $context->lookupFunction('__object__prop_count'),
+            $objPtr
+        );
+        $context->builder->call(
+            $context->lookupFunction('phpc_gc_register'),
+            $context->builder->pointerCast($refVirtual, $context->getTypeFromString('int8*')),
+            $propCount
+        );
+        $context->builder->branch($afterBb);
+        $context->builder->positionAtEnd($afterBb);
     }
 
     private function implementSeparate(): void {

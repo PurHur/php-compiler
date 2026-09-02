@@ -24,4 +24,10 @@ final class GcRegistryGrow36195Test extends TestCase
         $helper = (string) file_get_contents(dirname(__DIR__, 2).'/ext/standard/GcCollectCyclesRegistryJitHelper.php');
         $this->assertStringNotContainsString('self::$count >= self::MAX_OBJECTS', $helper);
     }
+
+    public function testRegistryRegisterCapMatchesZendBuffer(): void
+    {
+        $runtime = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Builtin/GcCollectCyclesRuntime.php');
+        $this->assertStringContainsString('CycleCollector::ROOT_THRESHOLD - 3', $runtime);
+    }
 }
