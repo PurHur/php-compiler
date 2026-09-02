@@ -58,7 +58,23 @@ final class JitGcCollectCyclesStandaloneKernel
 
     public static function ensureSlotReadObject(Context $context): void
     {
+        $objPtr = $context->getTypeFromString('__object__*');
+        $voidpp = $context->getTypeFromString('void**');
+        $fn = $context->module->getNamedFunction('phpc_gc_slot_read_object');
+        if (null === $fn) {
+            $fn = $context->module->addFunction(
+                'phpc_gc_slot_read_object',
+                $context->context->functionType($objPtr, false, $voidpp)
+            );
+            $context->registerFunction('phpc_gc_slot_read_object', $fn);
+        }
         self::implementSlotReadObject($context);
+    }
+
+    /** @alias ensureSlotReadObject — NativeOps call sites (#36245) */
+    public static function ensureSlotReadObjectDecl(Context $context): void
+    {
+        self::ensureSlotReadObject($context);
     }
 
     private static function implementSlotReadObject(Context $context): void

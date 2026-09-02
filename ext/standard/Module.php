@@ -656,6 +656,7 @@ class Module extends ModuleAbstract
             new phpc_gc_native_child_at(),
             new phpc_gc_native_clear_slot_at(),
             new phpc_gc_native_object_refcount(),
+            new phpc_gc_native_clear_slot_at(),
             new phpc_gc_native_free_object(),
             new phpc_object_is_constructed_native(),
             new phpc_object_invoke_destructor_native(),

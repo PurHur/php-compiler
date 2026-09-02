@@ -802,7 +802,6 @@ final class GcCollectCyclesRuntime
         JitGcCollectCyclesStandaloneKernel::implementCollectCyclesImpl($context);
     }
 
-
     private static function loadObjectConstructed(Context $context, Value $objI8): Value
     {
         // Byte-offset load — avoid structGep load typing as [8 x i8] (#21109).

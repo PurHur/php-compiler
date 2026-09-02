@@ -71,7 +71,7 @@ final class GcCollectCyclesNativeScanJitHelper
             }
         }
         foreach ($toFree as $objPtr) {
-            phpc_gc_native_free_object($objPtr);
+            GcCollectCyclesNativeFreeJitHelper::freeRegistryObject($objPtr);
             ++$collected;
         }
 
