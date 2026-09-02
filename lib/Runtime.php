@@ -200,7 +200,7 @@ class Runtime {
      */
     private function isBootstrapVendorPrelinkMode(): bool
     {
-        $flag = getenv('PHP_COMPILER_VENDOR_PRELINK');
+        $flag = Config::getenv('PHP_COMPILER_VENDOR_PRELINK');
 
         return '1' === $flag || 'true' === strtolower((string) $flag);
     }
@@ -599,7 +599,7 @@ class Runtime {
             $this->confusableBuiltinTypeHintCheck->clearPending();
         }
         $this->preprocessor->traverse($script);
-        $vendorPrelink = getenv('PHP_COMPILER_VENDOR_PRELINK');
+        $vendorPrelink = Config::getenv('PHP_COMPILER_VENDOR_PRELINK');
         if ('1' !== $vendorPrelink && 'true' !== strtolower((string) $vendorPrelink)) {
             $state = new State($script);
             $this->typeReconstructor->resolve($state);
@@ -849,7 +849,7 @@ class Runtime {
         }
 
         $this->assignOpResolver->optimize($block);
-        if ('1' === getenv('PHP_COMPILER_RELEASE_CFG_AFTER_COMPILE')) {
+        if ('1' === Config::getenv('PHP_COMPILER_RELEASE_CFG_AFTER_COMPILE')) {
             Block::detachCfgTree($block, true);
         }
 

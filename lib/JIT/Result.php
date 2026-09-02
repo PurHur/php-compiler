@@ -14,6 +14,7 @@ use PHPCompiler\Handler;
 
 use PHPLLVM;
 use FFI;
+use PHPCompiler\Config;
 
 class Result {
     private PHPLLVM\ExecutionEngine $engine;
@@ -107,7 +108,7 @@ class Result {
     /** Self-host AOT bundles skip FFI pointer casts; use no-op handlers (#816, #557). */
     private static function selfHostAotStubEnabled(): bool
     {
-        $flag = getenv('PHP_COMPILER_SELFHOST_AOT');
+        $flag = Config::getenv('PHP_COMPILER_SELFHOST_AOT');
 
         return '1' === $flag || 'true' === strtolower((string) $flag);
     }

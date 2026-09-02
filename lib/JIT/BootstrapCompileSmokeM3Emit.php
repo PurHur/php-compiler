@@ -13,6 +13,7 @@ use PHPCompiler\JIT\Builtin\StringFileGetContents;
 use PHPCompiler\JIT\Builtin\StringGetenv;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
+use PHPCompiler\Config;
 
 /**
  * Thin native LLVM bridge for BootstrapAot\compile_smoke_m3_emit (#1983, approach 3).
@@ -470,15 +471,15 @@ final class BootstrapCompileSmokeM3Emit
     private static function shouldUseEmitTuRealLowering(Context $context): bool
     {
         unset($context);
-        $emitTu = getenv('PHP_COMPILER_M3_EMIT_TU');
+        $emitTu = Config::getenv('PHP_COMPILER_M3_EMIT_TU');
         if ('1' === $emitTu || 'true' === strtolower((string) $emitTu)) {
             return true;
         }
-        $inventoryEmit = getenv('PHP_COMPILER_M3_INVENTORY_EMIT');
+        $inventoryEmit = Config::getenv('PHP_COMPILER_M3_INVENTORY_EMIT');
         if ('1' === $inventoryEmit || 'true' === strtolower((string) $inventoryEmit)) {
             return true;
         }
-        $inventoryEmitDriver = getenv('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER');
+        $inventoryEmitDriver = Config::getenv('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER');
         if ('1' === $inventoryEmitDriver || 'true' === strtolower((string) $inventoryEmitDriver)) {
             return true;
         }
@@ -486,7 +487,7 @@ final class BootstrapCompileSmokeM3Emit
         // even though PHP_COMPILER_M3_COMPILE_DRIVER=1 (that flag alone selects stub spine for
         // helloworld inventory argv — #12036). Without this, functional smoke dies at
         // parseAndCompile null after source read succeeds (#26756 / re-#23468).
-        $m5Host = getenv('PHP_COMPILER_M5_DRIVER_HOST');
+        $m5Host = Config::getenv('PHP_COMPILER_M5_DRIVER_HOST');
         if ('1' === $m5Host || 'true' === strtolower((string) $m5Host)) {
             return true;
         }
@@ -498,7 +499,7 @@ final class BootstrapCompileSmokeM3Emit
                 return true;
             }
         }
-        $m3Driver = getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+        $m3Driver = Config::getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
         if ('1' === $m3Driver || 'true' === strtolower((string) $m3Driver)) {
             // Zend helloworld bin/compile.php inventory argv: thin ctor, stub spine (#12036).
             return false;
@@ -772,7 +773,7 @@ final class BootstrapCompileSmokeM3Emit
         $filename = $func->getParam(2);
         // M5 argv / gen-0: compileEmitSmoke is a 3-byte null stub (`xor eax,eax; ret`).
         // Prefer real Runtime::compile when present so parseAndCompile can succeed (#26756).
-        $m5Host = getenv('PHP_COMPILER_M5_DRIVER_HOST');
+        $m5Host = Config::getenv('PHP_COMPILER_M5_DRIVER_HOST');
         $preferCompile = '1' === $m5Host || 'true' === strtolower((string) $m5Host);
         if ($preferCompile) {
             $context->builder->returnValue(

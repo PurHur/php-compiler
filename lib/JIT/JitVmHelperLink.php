@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT;
 
 use PHPLLVM\Type;
 use PHPLLVM\Value\Function_ as LlvmFunction;
+use PHPCompiler\Config;
 
 /**
  * Compile lib/VM/*JitHelper.php into the active JIT module (#10311).
@@ -182,8 +183,8 @@ final class JitVmHelperLink
         // User-script standalone: clear env so nested *JitHelper compile is full NestedJIT (#15407, #20246).
         $clearUserScriptEnv = $context->shouldClearUserScriptEnvForNestedHelperCompile();
         NestedJitCompileScope::run($context, static function () use ($compile, $clearUserScriptEnv): void {
-            $prevUser = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
-            $prevSelf = getenv('PHP_COMPILER_SELFHOST_AOT');
+            $prevUser = Config::getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+            $prevSelf = Config::getenv('PHP_COMPILER_SELFHOST_AOT');
             if ($clearUserScriptEnv && \function_exists('putenv')) {
                 putenv('PHP_COMPILER_AOT_USER_SCRIPT=');
                 unset($_ENV['PHP_COMPILER_AOT_USER_SCRIPT'], $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT']);

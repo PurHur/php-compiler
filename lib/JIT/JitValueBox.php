@@ -12,6 +12,7 @@ use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
 use PHPLLVM\Builder;
 use PHPLLVM\Type as LlvmType;
 use PHPLLVM\Value;
+use PHPCompiler\Config;
 
 final class JitValueBox
 {
@@ -312,7 +313,7 @@ final class JitValueBox
     public static function writeLong(Context $context, Value $slot, Value $long): void
     {
         // Surface TYPE_VALUE/NATIVE_LONG confusion at emit time (#22642 module verify).
-        $assert = getenv('PHP_COMPILER_LLVM_ASSERT');
+        $assert = Config::getenv('PHP_COMPILER_LLVM_ASSERT');
         if ('1' === $assert || 'true' === strtolower((string) $assert)) {
             $longTy = $context->getStringFromType($long->typeOf());
             if ('int64' !== $longTy && 'long long' !== $longTy) {

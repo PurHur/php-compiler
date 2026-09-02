@@ -11,6 +11,7 @@ use PHPTypes\Type;
 use PHPCompiler\JIT\OperandName;
 use PHPCompiler\JIT\Variable as JitVariable;
 use PHPCompiler\Web\Superglobals;
+use PHPCompiler\Config;
 
 /**
  * Shared isset()/empty() semantic guards for VM + JIT lowering (#10170).
@@ -100,7 +101,7 @@ final class VmIsset
 
     public static function isSelfHostAot(): bool
     {
-        $flag = getenv('PHP_COMPILER_SELFHOST_AOT');
+        $flag = Config::getenv('PHP_COMPILER_SELFHOST_AOT');
 
         return '1' === $flag || 'true' === strtolower((string) $flag);
     }

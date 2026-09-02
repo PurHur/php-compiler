@@ -20,6 +20,7 @@ use PHPCompiler\VM\VmInclude;
 use PHPCompiler\ext\standard\IncludeBindingJitHelper;
 use PHPCompiler\ext\standard\IncludeJitHelper;
 use PHPCompiler\Web\DeployRoot;
+use PHPCompiler\Config;
 
 /**
  * Compile-time literal include/require for JIT/AOT (issue #54, #475, #485).
@@ -178,7 +179,7 @@ final class IncludeHelper
         // Zend full-spine may opt out via PHP_COMPILER_INCLUDE_SCOPE_REMAP=0: always-on
         // remapping made honest gen-0 refresh ~25× slower (r14 vs r13 @ gmp, #22642).
         $remapCollidingSlots = true;
-        $remapFlag = getenv('PHP_COMPILER_INCLUDE_SCOPE_REMAP');
+        $remapFlag = Config::getenv('PHP_COMPILER_INCLUDE_SCOPE_REMAP');
         if (is_string($remapFlag)) {
             $remapLc = strtolower($remapFlag);
             if ('0' === $remapFlag || 'false' === $remapLc || 'off' === $remapLc) {

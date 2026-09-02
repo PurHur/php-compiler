@@ -46,7 +46,7 @@ final class ReleaseUnsupportedExtensions
     public static function explicitEnableRequested(string $extension): bool
     {
         $ext = strtoupper($extension);
-        $raw = getenv('PHP_COMPILER_ENABLE_'.$ext);
+        $raw = Config::getenv('PHP_COMPILER_ENABLE_'.$ext);
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }

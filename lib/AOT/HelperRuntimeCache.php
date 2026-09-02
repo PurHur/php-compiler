@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\AOT;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\Config;
 
 /**
  * Incremental split-compilation cache for php-in-PHP JIT helpers (#15889).
@@ -341,7 +342,7 @@ final class HelperRuntimeCache
             return;
         }
         // Only for user-script AOT builds; bootstrap/self-host pipelines own their own emit ladders.
-        $user = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+        $user = Config::getenv('PHP_COMPILER_AOT_USER_SCRIPT');
         if ('1' !== $user && 'true' !== strtolower((string) $user)) {
             return;
         }
@@ -495,7 +496,7 @@ final class HelperRuntimeCache
             return $legacy;
         }
         $root = \dirname(__DIR__, 2);
-        $parts = [(string) getenv('PHP_COMPILER_LLVM_PATH')];
+        $parts = [(string) Config::getenv('PHP_COMPILER_LLVM_PATH')];
         foreach ([
             $root.'/composer.lock',
             $root.'/lib/JIT.php',
@@ -529,7 +530,7 @@ final class HelperRuntimeCache
         if (null !== $token) {
             return $token;
         }
-        $env = (string) getenv('PHP_COMPILER_LLVM_PATH');
+        $env = (string) Config::getenv('PHP_COMPILER_LLVM_PATH');
         if ('' !== $env) {
             $so = rtrim($env, '/').'/libLLVM-9.so.1';
             if (is_file($so)) {
@@ -583,7 +584,7 @@ final class HelperRuntimeCache
         }
         $root = \dirname(__DIR__, 2);
         foreach (array_unique(array_filter([
-            (string) getenv('PHP_COMPILER_LLVM_PATH'),
+            (string) Config::getenv('PHP_COMPILER_LLVM_PATH'),
             $root.'/.llvm',
             '/opt/llvm9',
         ])) as $dir) {
@@ -1121,7 +1122,7 @@ final class HelperRuntimeCache
         }
 
         if ($bound > 0 && !self::$loggedHit) {
-            $user = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+            $user = Config::getenv('PHP_COMPILER_AOT_USER_SCRIPT');
             if ('1' === $user || 'true' === strtolower((string) $user)) {
                 if (\defined('STDERR') && \is_resource(STDERR)) {
                     fwrite(STDERR, sprintf(
@@ -1264,7 +1265,7 @@ final class HelperRuntimeCache
         // Legacy units without global ctors: user-script AOT must skip emitInInit
         // wiring — calling unit inits from script __init__ aliases muldefs-merged
         // globals (#17069).
-        $userAot = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+        $userAot = Config::getenv('PHP_COMPILER_AOT_USER_SCRIPT');
         $skipInit = '1' === $userAot || 'true' === strtolower((string) $userAot);
         if (!$skipInit && null !== $entry['init'] && '' !== $entry['init']) {
             $initFn = $voidFn($entry['init']);
@@ -1359,7 +1360,7 @@ final class HelperRuntimeCache
         if (!isset(self::USER_SCRIPT_INLINE_ONLY_LOGICALS[$logicalLc])) {
             return false;
         }
-        $user = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+        $user = Config::getenv('PHP_COMPILER_AOT_USER_SCRIPT');
 
         return '1' === $user || 'true' === strtolower((string) $user);
     }

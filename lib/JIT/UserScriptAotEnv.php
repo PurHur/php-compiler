@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+
+use PHPCompiler\Config;
+
 /**
  * SSOT for PHP_COMPILER_AOT_USER_SCRIPT (#20246, #20256).
  *
@@ -28,7 +31,7 @@ final class UserScriptAotEnv
 
     public static function isActive(): bool
     {
-        $userScript = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+        $userScript = Config::getenv('PHP_COMPILER_AOT_USER_SCRIPT');
 
         return '1' === $userScript || 'true' === strtolower((string) $userScript);
     }

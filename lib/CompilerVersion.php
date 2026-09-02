@@ -151,7 +151,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -176,7 +176,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -202,7 +202,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -227,7 +227,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -258,7 +258,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -276,7 +276,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -313,7 +313,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -339,7 +339,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -393,12 +393,12 @@ final class CompilerVersion
      */
     public static function languageProfileVersion(): string
     {
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === $raw) {
             // User-script AOT clears PROFILE during compile (#21557) — honor CLI profile
             // from PHP_COMPILER_AOT_COMPILE_PROFILE for version-gated builtins/DOM APIs.
             if (\PHPCompiler\JIT\UserScriptAotEnv::isActive()) {
-                $raw = getenv('PHP_COMPILER_AOT_COMPILE_PROFILE');
+                $raw = Config::getenv('PHP_COMPILER_AOT_COMPILE_PROFILE');
             }
             if (!\is_string($raw) || '' === $raw) {
                 return self::VERSION;
@@ -431,7 +431,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (\is_string($raw) && '' !== trim($raw)) {
             return false;
         }
@@ -551,7 +551,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -583,7 +583,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -676,7 +676,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -816,7 +816,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -894,7 +894,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -922,7 +922,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -1027,7 +1027,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -1054,7 +1054,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -1074,7 +1074,7 @@ final class CompilerVersion
         if (version_compare(self::VERSION, '8.3', '<')) {
             return false;
         }
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -1095,7 +1095,7 @@ final class CompilerVersion
         if (version_compare(self::VERSION, '8.3', '<')) {
             return false;
         }
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -1115,7 +1115,7 @@ final class CompilerVersion
         if (version_compare(self::VERSION, '8.3', '<')) {
             return false;
         }
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -1245,7 +1245,7 @@ final class CompilerVersion
         if (version_compare(self::VERSION, '8.3', '<')) {
             return false;
         }
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -1263,7 +1263,7 @@ final class CompilerVersion
         if (version_compare(self::VERSION, '8.3', '<')) {
             return false;
         }
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -1312,7 +1312,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -1405,7 +1405,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -1426,7 +1426,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -1836,7 +1836,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -2058,7 +2058,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -2366,7 +2366,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -2405,7 +2405,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -2727,7 +2727,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -2765,12 +2765,12 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             // User-script AOT clears PROFILE during compile (#21557) — honor CLI profile
             // from PHP_COMPILER_AOT_COMPILE_PROFILE for mb_str_pad registration (#35187).
             if (\PHPCompiler\JIT\UserScriptAotEnv::isActive()) {
-                $raw = getenv('PHP_COMPILER_AOT_COMPILE_PROFILE');
+                $raw = Config::getenv('PHP_COMPILER_AOT_COMPILE_PROFILE');
             }
             if (!\is_string($raw) || '' === trim($raw)) {
                 return false;
@@ -2827,7 +2827,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -2854,7 +2854,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -2887,7 +2887,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -2971,7 +2971,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -3009,7 +3009,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -3043,7 +3043,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -3078,7 +3078,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -3124,7 +3124,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -3160,7 +3160,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -3197,7 +3197,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -3221,7 +3221,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -3245,7 +3245,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -3276,7 +3276,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -3302,7 +3302,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -3366,7 +3366,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -3386,7 +3386,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -3483,7 +3483,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -3711,7 +3711,7 @@ final class CompilerVersion
             return false;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -3748,7 +3748,7 @@ final class CompilerVersion
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -3770,7 +3770,7 @@ final class CompilerVersion
         if (version_compare(self::VERSION, '8.4.0', '>=')) {
             return true;
         }
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
@@ -4322,12 +4322,12 @@ final class CompilerVersion
             return version_compare(self::VERSION, $since, '>=');
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             // User-script AOT clears PROFILE during compile (#21557) — honor CLI profile
             // for DOM 8.4+ proxy registration via PHP_COMPILER_AOT_COMPILE_PROFILE.
             if (\PHPCompiler\JIT\UserScriptAotEnv::isActive()) {
-                $raw = getenv('PHP_COMPILER_AOT_COMPILE_PROFILE');
+                $raw = Config::getenv('PHP_COMPILER_AOT_COMPILE_PROFILE');
             }
             if (!\is_string($raw) || '' === trim($raw)) {
                 return false;
@@ -4521,7 +4521,7 @@ final class CompilerVersion
         if (self::supportsDomLivingStandardNamespace()) {
             return true;
         }
-        $userScript = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+        $userScript = Config::getenv('PHP_COMPILER_AOT_USER_SCRIPT');
         if ('1' !== $userScript && 'true' !== strtolower((string) $userScript)) {
             return false;
         }

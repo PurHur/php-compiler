@@ -7,9 +7,10 @@ namespace PHPCompiler;
 /**
  * Central registry for PHP_COMPILER_* (and related) environment knobs (#36201).
  *
- * Call sites in lib/ and bin/ must use Config::getenv() / Config::get() / Config::isTruthy()
+ * Call sites in lib/ and bin/ use Config::getenv() / Config::get() / Config::isTruthy()
  * instead of raw getenv() for PHP_COMPILER_* names so unknown knobs can be warned and
- * `phpc doctor --env` can report origin + effective value.
+ * `phpc doctor --env` can report origin + effective value. On the self-host spine via
+ * `compiler_lib_spine_smoke/main.php` (required before Doctor.php).
  */
 final class Config
 {

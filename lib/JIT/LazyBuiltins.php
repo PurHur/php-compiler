@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Builtin;
+use PHPCompiler\Config;
 
 /**
  * On-demand JIT lowering of ext/* module functions (issue #94).
@@ -22,10 +23,10 @@ final class LazyBuiltins
         if (EmitTuMode::isMinimalRuntime()) {
             return false;
         }
-        if (getenv('PHP_COMPILER_SELFHOST_AOT') === '1') {
+        if (Config::getenv('PHP_COMPILER_SELFHOST_AOT') === '1') {
             return false;
         }
-        $flag = getenv('PHP_COMPILER_JIT_LAZY_BUILTINS');
+        $flag = Config::getenv('PHP_COMPILER_JIT_LAZY_BUILTINS');
         if (false !== $flag) {
             return !('0' === $flag || 'false' === strtolower($flag));
         }
@@ -36,7 +37,7 @@ final class LazyBuiltins
     /** Cache fingerprint segment when enabled state affects bitcode shape (#153). */
     public static function fingerprintSegment(): string
     {
-        $flag = getenv('PHP_COMPILER_JIT_LAZY_BUILTINS');
+        $flag = Config::getenv('PHP_COMPILER_JIT_LAZY_BUILTINS');
         if (false === $flag || '' === $flag) {
             return 'default-lazy';
         }

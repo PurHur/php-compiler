@@ -238,7 +238,7 @@ class JIT {
         JIT\Progress::noteFunction('jit_compile_finalize_m3_emit_tu_spine_done');
 
         JIT\Progress::noteFunction('jit_compile_done');
-        if ('1' === getenv('PHP_COMPILER_DETACH_CFG_AFTER_JIT')) {
+        if ('1' === Config::getenv('PHP_COMPILER_DETACH_CFG_AFTER_JIT')) {
             Block::detachCfgTree($block, false);
         }
         JIT\Progress::noteFunction('jit_compile_return_begin');
@@ -1610,7 +1610,7 @@ class JIT {
     /** Self-host AOT sets PHP_COMPILER_SELFHOST_AOT=1 (#816, #557). */
     private function shouldUseSelfHostJitStubs(): bool
     {
-        $flag = getenv('PHP_COMPILER_SELFHOST_AOT');
+        $flag = Config::getenv('PHP_COMPILER_SELFHOST_AOT');
 
         return '1' === $flag || 'true' === strtolower((string) $flag);
     }
@@ -1618,7 +1618,7 @@ class JIT {
     /** User script AOT via bin/compile.php: real closure lowering (#3725). */
     private function shouldStubClosureLowering(): bool
     {
-        $userScript = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+        $userScript = Config::getenv('PHP_COMPILER_AOT_USER_SCRIPT');
         if ('1' === $userScript || 'true' === strtolower((string) $userScript)) {
             return false;
         }
@@ -1670,7 +1670,7 @@ class JIT {
      */
     private function shouldUseEmitHelperLinkStubs(): bool
     {
-        $flag = getenv('PHP_COMPILER_EMIT_HELPER_LINK');
+        $flag = Config::getenv('PHP_COMPILER_EMIT_HELPER_LINK');
 
         return '1' === $flag || 'true' === strtolower((string) $flag);
     }
@@ -1714,7 +1714,7 @@ class JIT {
      */
     private function shouldUseVendorPrelinkJitStubs(): bool
     {
-        $flag = getenv('PHP_COMPILER_VENDOR_PRELINK');
+        $flag = Config::getenv('PHP_COMPILER_VENDOR_PRELINK');
 
         return '1' === $flag || 'true' === strtolower((string) $flag);
     }
@@ -1729,10 +1729,10 @@ class JIT {
             return false;
         }
         // Sidecar host-compiles (bin/compile.php blob, vendor bundles) must keep standalone stubbed.
-        if ('1' === (string) getenv('PHP_COMPILER_M3_EMIT_SIDECAR_RECURSION_GUARD')) {
+        if ('1' === (string) Config::getenv('PHP_COMPILER_M3_EMIT_SIDECAR_RECURSION_GUARD')) {
             return false;
         }
-        if ('1' === (string) getenv('PHP_COMPILER_M3_EMIT_TU')) {
+        if ('1' === (string) Config::getenv('PHP_COMPILER_M3_EMIT_TU')) {
             return false;
         }
 
@@ -1747,7 +1747,7 @@ class JIT {
         if (!$this->shouldUseVendorPrelinkJitStubs()) {
             return false;
         }
-        $keep = getenv('PHP_COMPILER_KEEP_OBJECT_FILE');
+        $keep = Config::getenv('PHP_COMPILER_KEEP_OBJECT_FILE');
 
         return '1' === $keep || 'true' === strtolower((string) $keep);
     }
@@ -1761,7 +1761,7 @@ class JIT {
         if ($this->shouldUseVendorPrelinkObjectEmit()) {
             return true;
         }
-        $selfhost = getenv('PHP_COMPILER_SELFHOST_AOT');
+        $selfhost = Config::getenv('PHP_COMPILER_SELFHOST_AOT');
 
         return '1' === $selfhost || 'true' === strtolower((string) $selfhost);
     }
@@ -1772,7 +1772,7 @@ class JIT {
         if ($this->shouldUseVendorPrelinkJitStubs()) {
             return false;
         }
-        $selfhost = getenv('PHP_COMPILER_SELFHOST_AOT');
+        $selfhost = Config::getenv('PHP_COMPILER_SELFHOST_AOT');
 
         return '1' === $selfhost || 'true' === strtolower((string) $selfhost);
     }
@@ -1836,7 +1836,7 @@ class JIT {
         if ($this->shouldUseM4BinCompileArgvMainNative()) {
             return true;
         }
-        $flag = getenv('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN');
+        $flag = Config::getenv('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN');
 
         return '1' === $flag || 'true' === strtolower((string) $flag);
     }
@@ -1945,7 +1945,7 @@ class JIT {
         if ($this->shouldRealLowerInventoryArgvParseSpine()) {
             return true;
         }
-        $m3Driver = getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+        $m3Driver = Config::getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
         if ('1' !== $m3Driver && 'true' !== strtolower((string) $m3Driver)) {
             return false;
         }
@@ -1997,7 +1997,7 @@ class JIT {
      */
     private function shouldUseM5DriverHostCompile(): bool
     {
-        $flag = getenv('PHP_COMPILER_M5_DRIVER_HOST');
+        $flag = Config::getenv('PHP_COMPILER_M5_DRIVER_HOST');
 
         return '1' === $flag || 'true' === strtolower((string) $flag);
     }
@@ -2036,7 +2036,7 @@ class JIT {
         JIT\RuntimeParseM5AstPeer::ensureMethods(...$m5ForceParserCbs);
         JIT\RuntimeParseM5PhpCfgParser::ensureParse(...$m5ForceParserCbs);
         if ($this->shouldUseM5DriverHostCompile()) {
-            $m5TrivialNested = getenv('PHP_COMPILER_M5_TRIVIAL_ECHO_NESTEDJIT');
+            $m5TrivialNested = Config::getenv('PHP_COMPILER_M5_TRIVIAL_ECHO_NESTEDJIT');
             if ('1' === $m5TrivialNested || 'true' === strtolower((string) $m5TrivialNested)) {
                 $this->ensureM5TrivialEchoScriptParseAndCompileLowered();
             } else {
@@ -2157,7 +2157,7 @@ class JIT {
         if ($this->shouldUseM5DriverHostCompile()) {
             return true;
         }
-        $flag = getenv('PHP_COMPILER_M4_BIN_COMPILE_DRIVER');
+        $flag = Config::getenv('PHP_COMPILER_M4_BIN_COMPILE_DRIVER');
 
         return '1' === $flag || 'true' === strtolower((string) $flag);
     }
@@ -2253,7 +2253,7 @@ class JIT {
     /** Opt-in when linking test/selfhost/compiler_helloworld_smoke/compile_driver.php (#1056). */
     private function shouldUseM3CompileDriverRealLowering(): bool
     {
-        $flag = getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+        $flag = Config::getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
         if ('1' !== $flag && 'true' !== strtolower((string) $flag)) {
             return false;
         }
@@ -2273,7 +2273,7 @@ class JIT {
         if ($this->shouldUseM3InventoryEmitDriver() && $this->shouldUseEmitHelperLinkStubs()) {
             return true;
         }
-        $flag = getenv('PHP_COMPILER_M3_EMIT_TU');
+        $flag = Config::getenv('PHP_COMPILER_M3_EMIT_TU');
 
         return '1' === $flag || 'true' === strtolower((string) $flag);
     }
@@ -3533,7 +3533,7 @@ class JIT {
         if ($this->shouldUseM3CompileDriverRealLowering()) {
             return false;
         }
-        $flag = getenv('PHP_COMPILER_M3_EMIT_HELPER_SPINE');
+        $flag = Config::getenv('PHP_COMPILER_M3_EMIT_HELPER_SPINE');
 
         return '1' === $flag || 'true' === strtolower((string) $flag);
     }
@@ -5172,7 +5172,7 @@ class JIT {
         $saved = $this->context->builder;
         $this->context->builder = $this->context->context->builderCreate();
         $this->context->builder->positionAtEnd($bb);
-        $logPrefix = getenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX');
+        $logPrefix = Config::getenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX');
         if (!is_string($logPrefix) || '' === $logPrefix) {
             $logPrefix = str_contains($lcname, 'runtime_compile_smoke_m3_emit')
                 ? 'runtime_compile_smoke_m3_emit'
@@ -5253,7 +5253,7 @@ class JIT {
                 $diagStubBlock
             );
         }
-        $logPrefix = getenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX');
+        $logPrefix = Config::getenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX');
         if (!is_string($logPrefix) || '' === $logPrefix) {
             $logPrefix = 'compile_smoke_m3_emit';
         }
@@ -5297,7 +5297,7 @@ class JIT {
         $saved = $this->context->builder;
         $m4BinCompileArgv = $this->isM4BinCompileScriptMain($block) && $this->shouldUseM4BinCompileArgvMainNative();
         $m4NativeRebuild = $m4BinCompileArgv && $this->shouldUseM4InventoryArgvNativeEmitRebuild($block);
-        $logPrefix = getenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX');
+        $logPrefix = Config::getenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX');
         if (!is_string($logPrefix) || '' === $logPrefix) {
             $logPrefix = 'helloworld_compile_smoke';
         }
@@ -6352,7 +6352,7 @@ class JIT {
         if (is_string($resolved) && '' !== $resolved) {
             return $resolved;
         }
-        $fromEnv = getenv('PHP_COMPILER_REPO_ROOT');
+        $fromEnv = Config::getenv('PHP_COMPILER_REPO_ROOT');
         if (is_string($fromEnv) && '' !== $fromEnv) {
             $real = realpath($fromEnv);
             if (false !== $real && is_readable($real.'/bin/compile.php') && is_readable($real.'/lib/JIT.php')) {
@@ -6407,7 +6407,7 @@ class JIT {
         if (!$this->shouldUseM3InventoryEmitDriver() || $this->shouldUseEmitHelperLinkStubs()) {
             return false;
         }
-        $flag = getenv('PHP_COMPILER_M3_INVENTORY_NO_EMIT_HELPER_SIDECAR');
+        $flag = Config::getenv('PHP_COMPILER_M3_INVENTORY_NO_EMIT_HELPER_SIDECAR');
 
         return '1' === $flag || 'true' === strtolower((string) $flag);
     }
@@ -6592,7 +6592,7 @@ class JIT {
         }
         $this->m3EmitTuSidecarsCached = true;
         $repoRoot = $this->m3EmitTuRuntimeRepoRoot();
-        $logPrefix = getenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX');
+        $logPrefix = Config::getenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX');
         if ('helloworld_compile_smoke' === $logPrefix) {
             $minimalSidecars = $this->shouldUseM3InventoryMinimalSidecars();
             $this->registerM3EmitTuSidecarFromPath(
@@ -6813,7 +6813,7 @@ class JIT {
         if (!is_array($base)) {
             $base = is_array($_ENV) ? $_ENV : [];
         }
-        $memLimit = getenv('PHP_COMPILER_MEMORY_LIMIT');
+        $memLimit = Config::getenv('PHP_COMPILER_MEMORY_LIMIT');
         if (is_string($memLimit) && '' !== $memLimit && '-1' !== $memLimit) {
             $base['PHP_COMPILER_MEMORY_LIMIT'] = $memLimit;
         }
@@ -6828,9 +6828,9 @@ class JIT {
         string $sentinelLogical,
         bool $sidecarHostStubNonLiteralIncludes = false
     ): void {
-        $maxDepthRaw = getenv('PHP_COMPILER_M3_EMIT_SIDECAR_MAX_DEPTH');
+        $maxDepthRaw = Config::getenv('PHP_COMPILER_M3_EMIT_SIDECAR_MAX_DEPTH');
         $maxDepth = is_string($maxDepthRaw) && '' !== $maxDepthRaw ? (int) $maxDepthRaw : 4;
-        $depthRaw = getenv('PHP_COMPILER_M3_EMIT_SIDECAR_DEPTH');
+        $depthRaw = Config::getenv('PHP_COMPILER_M3_EMIT_SIDECAR_DEPTH');
         $depth = is_string($depthRaw) && '' !== $depthRaw ? (int) $depthRaw : 0;
         if ($depth >= $maxDepth) {
             throw new \LogicException(
@@ -6839,7 +6839,7 @@ class JIT {
         }
         // Prevent unbounded sidecar recursion: a sidecar host-compile runs bin/compile.php, which would
         // otherwise register/host-compile additional sidecars again (hang in bootstrap-selfhost-helloworld).
-        $guard = getenv('PHP_COMPILER_M3_EMIT_SIDECAR_RECURSION_GUARD');
+        $guard = Config::getenv('PHP_COMPILER_M3_EMIT_SIDECAR_RECURSION_GUARD');
         if ('1' === $guard || 'true' === strtolower((string) $guard)) {
             return;
         }
@@ -7051,7 +7051,7 @@ class JIT {
         $tmpOut = sys_get_temp_dir().'/m3_emit_sidecar_aot_'.getmypid().'_'.substr(md5($sidecarRel), 0, 8);
         @unlink($tmpOut);
         $compileCmd = 'php';
-        $memLimit = getenv('PHP_COMPILER_MEMORY_LIMIT');
+        $memLimit = Config::getenv('PHP_COMPILER_MEMORY_LIMIT');
         // ci_apply_llvm_memory_env pins 4096M; full-spine sidecar host-compile OOMs below 8GB (#8559).
         if (\PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_LIB_SIDECAR_REL === $sidecarRel) {
             $memLimit = '8192M';
@@ -7276,7 +7276,7 @@ class JIT {
         $tmpOut = sys_get_temp_dir().'/m3_bin_vm_sidecar_stub_'.getmypid();
         @unlink($tmpOut);
         $compileCmd = 'php';
-        $memLimit = getenv('PHP_COMPILER_MEMORY_LIMIT');
+        $memLimit = Config::getenv('PHP_COMPILER_MEMORY_LIMIT');
         if (is_string($memLimit) && '' !== $memLimit && '-1' !== $memLimit) {
             $compileCmd .= ' -d memory_limit='.escapeshellarg($memLimit);
         }
@@ -15042,8 +15042,8 @@ class JIT {
                                 $this->context->scope->args = [$this->context->getVariableFromOp($resultOp)];
                             } elseif ($classOp instanceof Operand\Literal
                                 && 0 === strcasecmp(ltrim($classOp->value, '\\'), 'SimpleXMLElement')
-                                && ('1' === getenv('PHP_COMPILER_AOT_USER_SCRIPT')
-                                    || 'true' === strtolower((string) getenv('PHP_COMPILER_AOT_USER_SCRIPT')))
+                                && ('1' === Config::getenv('PHP_COMPILER_AOT_USER_SCRIPT')
+                                    || 'true' === strtolower((string) Config::getenv('PHP_COMPILER_AOT_USER_SCRIPT')))
                             ) {
                                 JIT\SimpleXmlInstanceMethodJit::ensureProxy(
                                     $this->context,
@@ -28172,8 +28172,8 @@ class JIT {
         }
         // Register SimpleXML user-script AOT proxies before functionIsRegistered (#19306).
         if (str_starts_with(strtolower($proxyName), 'simplexmlelement::')
-            && ('1' === getenv('PHP_COMPILER_AOT_USER_SCRIPT')
-                || 'true' === strtolower((string) getenv('PHP_COMPILER_AOT_USER_SCRIPT')))
+            && ('1' === Config::getenv('PHP_COMPILER_AOT_USER_SCRIPT')
+                || 'true' === strtolower((string) Config::getenv('PHP_COMPILER_AOT_USER_SCRIPT')))
         ) {
             JIT\SimpleXmlInstanceMethodJit::ensureProxy($this->context, $proxyName);
         }
@@ -28212,8 +28212,8 @@ class JIT {
         $dispatchReceiver = $this->jitInstanceMethodReceiverVariable($receiverVar);
         $splObjectStorageMethod = str_starts_with(strtolower($proxyName), 'splobjectstorage::');
         $simpleXmlUserScript = str_starts_with(strtolower($proxyName), 'simplexmlelement::')
-            && ('1' === getenv('PHP_COMPILER_AOT_USER_SCRIPT')
-                || 'true' === strtolower((string) getenv('PHP_COMPILER_AOT_USER_SCRIPT')));
+            && ('1' === Config::getenv('PHP_COMPILER_AOT_USER_SCRIPT')
+                || 'true' === strtolower((string) Config::getenv('PHP_COMPILER_AOT_USER_SCRIPT')));
         $xmlWriterUserScript = JIT\XmlWriterInstanceMethodJit::isXmlWriterInstanceMethodProxy($proxyName)
             && JIT\XmlWriterInstanceMethodJit::isUserScriptAot();
         $xmlReaderUserScript = JIT\XmlReaderInstanceMethodJit::isXmlReaderInstanceMethodProxy($proxyName)

@@ -32,7 +32,7 @@ final class LanguageProfileScope
         if (null === $profile) {
             return $scope;
         }
-        $previous = getenv('PHP_COMPILER_PROFILE');
+        $previous = Config::getenv('PHP_COMPILER_PROFILE');
         $scope->previous = false === $previous ? null : $previous;
         $scope->applied = true;
         putenv('PHP_COMPILER_PROFILE='.$profile);
@@ -60,7 +60,7 @@ final class LanguageProfileScope
 
     private static function profileEnvIsSet(): bool
     {
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
 
         return \is_string($raw) && '' !== trim($raw);
     }

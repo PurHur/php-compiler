@@ -61,7 +61,7 @@ function phpc_compile_skip_aot_bundle_for_lint(string $normalized): bool
  */
 function phpc_bundle_lint_cache_path(string $filename, string $normalized): ?string
 {
-    $root = getenv('PHP_COMPILER_REPO_ROOT');
+    $root = \PHPCompiler\Config::getenv('PHP_COMPILER_REPO_ROOT');
     if (!is_string($root) || '' === $root || !is_dir($root.'/lib')) {
         $root = dirname(__DIR__);
     }
@@ -131,7 +131,7 @@ function phpc_compile_is_user_script_aot(string $normalized): bool
         return false;
     }
     // M5 argv / gen-0 seed rebuild must keep self-host compile-driver real-lowering (#26756).
-    $m5Host = getenv('PHP_COMPILER_M5_DRIVER_HOST');
+    $m5Host = \PHPCompiler\Config::getenv('PHP_COMPILER_M5_DRIVER_HOST');
     if ('1' === $m5Host || 'true' === strtolower((string) $m5Host)) {
         return false;
     }
@@ -141,7 +141,7 @@ function phpc_compile_is_user_script_aot(string $normalized): bool
 
 function phpc_compile_ensure_repo_root_env(): void
 {
-    $existing = getenv('PHP_COMPILER_REPO_ROOT');
+    $existing = \PHPCompiler\Config::getenv('PHP_COMPILER_REPO_ROOT');
     if (is_string($existing) && '' !== $existing && is_readable($existing.'/bin/compile.php')) {
         return;
     }
@@ -209,21 +209,21 @@ function run(string $filename, string $code, array $options): void
     // alone is fragile in early bootstrap contexts, and the native driver is only used for the
     // self-host ladder.
     if (\function_exists('php_compiler_cli_should_skip_entry_driver')) {
-        $selfhostAot = getenv('PHP_COMPILER_SELFHOST_AOT');
+        $selfhostAot = \PHPCompiler\Config::getenv('PHP_COMPILER_SELFHOST_AOT');
         if (false === $selfhostAot || '' === $selfhostAot) {
             putenv('PHP_COMPILER_SELFHOST_AOT=1');
         }
         // Compiled argv drivers must enable the M3 compile-driver lowering allowlist; otherwise
         // key Runtime entrypoints can be stubbed and compilation returns null (#3004).
-        $m3CompileDriver = getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+        $m3CompileDriver = \PHPCompiler\Config::getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
         if (false === $m3CompileDriver || '' === $m3CompileDriver) {
             putenv('PHP_COMPILER_M3_COMPILE_DRIVER=1');
         }
-        $m3CompileDriverMain = getenv('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN');
+        $m3CompileDriverMain = \PHPCompiler\Config::getenv('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN');
         if (false === $m3CompileDriverMain || '' === $m3CompileDriverMain) {
             putenv('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1');
         }
-        $m4BinCompile = getenv('PHP_COMPILER_M4_BIN_COMPILE_DRIVER');
+        $m4BinCompile = \PHPCompiler\Config::getenv('PHP_COMPILER_M4_BIN_COMPILE_DRIVER');
         if (false === $m4BinCompile || '' === $m4BinCompile) {
             putenv('PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1');
         }
@@ -244,7 +244,7 @@ function run(string $filename, string $code, array $options): void
         // Use a runtime-native marker instead of getenv(): self-host AOT execution stubs and
         // env access can be unreliable precisely in the scenarios we're trying to debug.
         if (!\function_exists('php_compiler_cli_should_skip_entry_driver')) {
-            $bootstrapAotLink = getenv('PHP_COMPILER_BOOTSTRAP_AOT_LINK');
+            $bootstrapAotLink = \PHPCompiler\Config::getenv('PHP_COMPILER_BOOTSTRAP_AOT_LINK');
             $isBootstrapAotLink = '1' === $bootstrapAotLink || 'true' === strtolower((string) $bootstrapAotLink);
             if ($isBootstrapAotLink) {
                 // bootstrap-aot-link: Runtime spine via self-host stubs; user FUNCDEF bodies stay real (#1492).
@@ -259,14 +259,14 @@ function run(string $filename, string $code, array $options): void
         }
     }
     if ('-' !== $filename && str_contains($normalized, 'test/selfhost/')) {
-        $selfhostAot = getenv('PHP_COMPILER_SELFHOST_AOT');
+        $selfhostAot = \PHPCompiler\Config::getenv('PHP_COMPILER_SELFHOST_AOT');
         if (false === $selfhostAot || '' === $selfhostAot) {
             putenv('PHP_COMPILER_SELFHOST_AOT=1');
         }
     }
     $bundleLintCacheFile = null;
     if (isset($options['-l']) && '' !== $normalized && str_contains($normalized, 'test/selfhost/')
-        && '0' !== getenv('PHP_COMPILER_BUNDLE_LINT_CACHE')) {
+        && '0' !== \PHPCompiler\Config::getenv('PHP_COMPILER_BUNDLE_LINT_CACHE')) {
         // Self-host bundle lints compile hundreds-to-thousands of units as one
         // Script (21m+ for compiler_minimal; the spine bundle never finished a
         // measured run) but are re-run verbatim by ci-fast on every invocation
@@ -290,7 +290,7 @@ function run(string $filename, string $code, array $options): void
         if (\class_exists(\PHPCompiler\AOT\AotEmitFastExit::class, true)) {
             \PHPCompiler\AOT\AotEmitFastExit::warmup();
         }
-        $bundleLimit = getenv('PHP_COMPILER_MEMORY_LIMIT');
+        $bundleLimit = \PHPCompiler\Config::getenv('PHP_COMPILER_MEMORY_LIMIT');
         $isCompileDriver = str_contains($normalized, 'compile_driver.php');
         $limitMib = static function ($limit): int {
             if (false === $limit || '' === $limit || !is_string($limit)) {
@@ -327,7 +327,7 @@ function run(string $filename, string $code, array $options): void
         putenv('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1');
         // Skip-bundle compile_driver needs split helper objects or ABIs like
         // phpc_str_replace fail lookup during IncludeHelper lowering (#23970).
-        if (false === getenv('PHP_COMPILER_HELPER_RUNTIME_O') || '' === (string) getenv('PHP_COMPILER_HELPER_RUNTIME_O')) {
+        if (false === \PHPCompiler\Config::getenv('PHP_COMPILER_HELPER_RUNTIME_O') || '' === (string) \PHPCompiler\Config::getenv('PHP_COMPILER_HELPER_RUNTIME_O')) {
             putenv('PHP_COMPILER_HELPER_RUNTIME_O=1');
             $_ENV['PHP_COMPILER_HELPER_RUNTIME_O'] = '1';
             $_SERVER['PHP_COMPILER_HELPER_RUNTIME_O'] = '1';
@@ -343,7 +343,7 @@ function run(string $filename, string $code, array $options): void
         } elseif (str_contains($normalized, 'compile_driver.php')) {
             putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=compile_smoke_m3_emit');
         }
-        $inventoryEmit = getenv('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER') ?: getenv('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER');
+        $inventoryEmit = getenv('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER') ?: \PHPCompiler\Config::getenv('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER');
         if ('1' === $inventoryEmit || 'true' === strtolower((string) $inventoryEmit)) {
             putenv('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1');
             // Runtime: do not force emit-helper TU/minimal mode here.
@@ -355,7 +355,7 @@ function run(string $filename, string $code, array $options): void
         putenv('PHP_COMPILER_SELFHOST_AOT=1');
     }
     if ('' !== $normalized && str_contains($normalized, 'bootstrap-vendor-prelink/generated/')) {
-        $vendorPrelink = getenv('PHP_COMPILER_VENDOR_PRELINK');
+        $vendorPrelink = \PHPCompiler\Config::getenv('PHP_COMPILER_VENDOR_PRELINK');
         if ('1' === $vendorPrelink || 'true' === strtolower((string) $vendorPrelink)) {
             // Real-lower parse/compile for vendor bundles; avoid M3 emit-TU sidecar host-compile (#3028, #3036).
             putenv('PHP_COMPILER_M3_EMIT_HELPER_SPINE=1');
@@ -413,19 +413,19 @@ function run(string $filename, string $code, array $options): void
         $scriptFilename,
         $scriptName
     );
-    $prevUserScriptAot = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
-    $prevHelperRuntimeO = getenv('PHP_COMPILER_HELPER_RUNTIME_O');
-    $prevLanguageProfile = getenv('PHP_COMPILER_PROFILE');
+    $prevUserScriptAot = \PHPCompiler\Config::getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+    $prevHelperRuntimeO = \PHPCompiler\Config::getenv('PHP_COMPILER_HELPER_RUNTIME_O');
+    $prevLanguageProfile = \PHPCompiler\Config::getenv('PHP_COMPILER_PROFILE');
     $setUserScriptAot = phpc_compile_is_user_script_aot($normalized);
     // Skip-bundle inventory compile_driver needs helper-runtime .o for ABIs like
     // phpc_str_replace — NestedJIT includes hit those calls while NestedJitCompileScope
     // is active and StringStrReplace::ensureLinked no-ops (#23970 / peer #8559).
     // Inventory argv seed (Zend compile of bin/compile.php itself) hits the same ABIs (#36144).
     $inventoryArgvSeed = (str_ends_with($normalized, '/bin/compile.php') || 'bin/compile.php' === $normalized)
-        && (('1' === (string) (getenv('PHP_COMPILER_M4_BIN_COMPILE_DRIVER') ?: ''))
-            || 'true' === strtolower((string) (getenv('PHP_COMPILER_M4_BIN_COMPILE_DRIVER') ?: ''))
-            || '1' === (string) (getenv('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER') ?: '')
-            || 'true' === strtolower((string) (getenv('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER') ?: ''))
+        && (('1' === (string) (\PHPCompiler\Config::getenv('PHP_COMPILER_M4_BIN_COMPILE_DRIVER') ?: ''))
+            || 'true' === strtolower((string) (\PHPCompiler\Config::getenv('PHP_COMPILER_M4_BIN_COMPILE_DRIVER') ?: ''))
+            || '1' === (string) (\PHPCompiler\Config::getenv('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER') ?: '')
+            || 'true' === strtolower((string) (\PHPCompiler\Config::getenv('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER') ?: ''))
             || '1' === (string) (getenv('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER') ?: '')
             || 'true' === strtolower((string) (getenv('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER') ?: '')));
     $needHelperRuntimeO = $setUserScriptAot
@@ -440,7 +440,7 @@ function run(string $filename, string $code, array $options): void
     if ($needHelperRuntimeO && \function_exists('putenv')) {
         // Default-on helper-runtime split compilation for user scripts (#15889)
         // and skip-bundle selfhost compile_driver (#23970).
-        $helperCache = getenv('PHP_COMPILER_HELPER_RUNTIME_O');
+        $helperCache = \PHPCompiler\Config::getenv('PHP_COMPILER_HELPER_RUNTIME_O');
         if (false === $helperCache || '' === (string) $helperCache) {
             putenv('PHP_COMPILER_HELPER_RUNTIME_O=1');
             $_ENV['PHP_COMPILER_HELPER_RUNTIME_O'] = '1';
@@ -499,9 +499,9 @@ function run(string $filename, string $code, array $options): void
                 return \PHPCompiler\AOT\LinkerProcessPolyfill::run($command, $env);
             }
         }
-        $prevSelfHostAot = getenv('PHP_COMPILER_SELFHOST_AOT');
+        $prevSelfHostAot = \PHPCompiler\Config::getenv('PHP_COMPILER_SELFHOST_AOT');
         $bootstrapAotFixture = '' !== $normalized && str_contains($normalized, 'bootstrap-aot/');
-        $bootstrapAotLink = getenv('PHP_COMPILER_BOOTSTRAP_AOT_LINK');
+        $bootstrapAotLink = \PHPCompiler\Config::getenv('PHP_COMPILER_BOOTSTRAP_AOT_LINK');
         $isBootstrapAotLink = '1' === $bootstrapAotLink || 'true' === strtolower((string) $bootstrapAotLink);
         // parseAndCompile uses real lowering (SELFHOST_AOT=0) for bootstrap-aot fixtures (#1086); standalone
         // LLVM emit still needs self-host Runtime stubs when the env is explicitly `0` (#1492 bootstrap gate).
@@ -524,7 +524,7 @@ function run(string $filename, string $code, array $options): void
             $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
             // Real CGI refresh helpers (multipart $_FILES) must not use self-host stubs (#15624).
             // Never clear SELFHOST_AOT under M5 argv / gen-0 seed rebuild (#26756).
-            $m5DriverHost = getenv('PHP_COMPILER_M5_DRIVER_HOST');
+            $m5DriverHost = \PHPCompiler\Config::getenv('PHP_COMPILER_M5_DRIVER_HOST');
             $keepSelfHostForM5 = '1' === $m5DriverHost || 'true' === strtolower((string) $m5DriverHost);
             if (!$keepSelfHostForM5) {
                 putenv('PHP_COMPILER_SELFHOST_AOT=0');
@@ -533,7 +533,7 @@ function run(string $filename, string $code, array $options): void
             }
             // MCJIT bitcode cache is keyed on source + helper-runtime digest (#36199, #15624).
         }
-        $prevBootstrapAotLink = getenv('PHP_COMPILER_BOOTSTRAP_AOT_LINK');
+        $prevBootstrapAotLink = \PHPCompiler\Config::getenv('PHP_COMPILER_BOOTSTRAP_AOT_LINK');
         $setBootstrapAotLink = $bootstrapAotFixture && !$isBootstrapAotLink && \function_exists('putenv');
         if ($setBootstrapAotLink) {
             putenv('PHP_COMPILER_BOOTSTRAP_AOT_LINK=1');

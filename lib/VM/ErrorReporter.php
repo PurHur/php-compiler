@@ -7,6 +7,7 @@ namespace PHPCompiler\VM;
 use PHPCompiler\Frame;
 use PHPCompiler\ext\standard\NativeLastError;
 use PHPCompiler\ext\standard\VmErrorHandler;
+use PHPCompiler\Config;
 
 /**
  * Zend-style warnings for compiled VM code (issue #273).
@@ -72,7 +73,7 @@ final class ErrorReporter
      */
     public static function defaultStartupReporting(): int
     {
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (\is_string($raw) && '' !== trim($raw)) {
             return self::eAll();
         }

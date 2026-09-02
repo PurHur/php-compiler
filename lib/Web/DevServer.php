@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Web;
 
+
+use PHPCompiler\Config;
+
 /**
  * Shared HTTP/1.1 dev-server helpers for bin/serve.php, bin/serve-jit.php, and bin/serve-aot.php.
  */
@@ -28,7 +31,7 @@ final class DevServer
      */
     public static function maxRequestBody(): int
     {
-        $raw = getenv('PHP_COMPILER_MAX_BODY');
+        $raw = Config::getenv('PHP_COMPILER_MAX_BODY');
         if (false === $raw || '' === $raw) {
             return self::MAX_REQUEST_BODY;
         }
@@ -633,7 +636,7 @@ final class DevServer
 
     public static function isServeDebug(): bool
     {
-        $v = getenv('PHP_COMPILER_DEBUG');
+        $v = Config::getenv('PHP_COMPILER_DEBUG');
 
         return false !== $v && '' !== $v && '0' !== $v;
     }

@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT;
 
 use PHPCompiler\AOT\HelperRuntimeCache;
 use PHPCompiler\Block;
+use PHPCompiler\Config;
 
 /**
  * On-disk MCJIT bitcode cache (issue #153).
@@ -26,11 +27,11 @@ final class CompileCache
 
     public static function isEnabled(): bool
     {
-        $flag = getenv('PHP_COMPILER_CACHE');
+        $flag = Config::getenv('PHP_COMPILER_CACHE');
         if (false !== $flag && ('0' === $flag || 'false' === strtolower($flag))) {
             return false;
         }
-        if (getenv('PHP_COMPILER_SELFHOST_AOT') === '1') {
+        if (Config::getenv('PHP_COMPILER_SELFHOST_AOT') === '1') {
             return false;
         }
         if (EmitTuMode::isMinimalRuntime()) {
@@ -47,7 +48,7 @@ final class CompileCache
 
     public static function cacheRoot(): string
     {
-        $override = getenv('PHP_COMPILER_CACHE_DIR');
+        $override = Config::getenv('PHP_COMPILER_CACHE_DIR');
         if (is_string($override) && '' !== $override) {
             return rtrim($override, '/');
         }

@@ -7,6 +7,7 @@ namespace PHPCompiler\SourcePreprocessor;
 use PHPCompiler\Compiler\CompileFatal;
 use PHPCompiler\Compiler\InheritanceVariance;
 use PHPCompiler\CompilerVersion;
+use PHPCompiler\Config;
 
 /**
  * Strip PHP 8.4 property-hook blocks for nikic/php-parser v4 and inject hook methods.
@@ -835,7 +836,7 @@ final class PropertyHooks
         // hotspot on lib/VM.php (#16077). Scan once per body, then binary
         // search. The interval builder replicates the legacy state machine's
         // exact boundary semantics (loop ran strictly below $offset).
-        if ('1' === getenv('PHP_COMPILER_COMMENT_SCAN_LEGACY')) {
+        if ('1' === Config::getenv('PHP_COMPILER_COMMENT_SCAN_LEGACY')) {
             return $this->isOffsetInCommentScan($body, $offset);
         }
         if ($body !== $this->commentScanBody) {
@@ -1124,7 +1125,7 @@ final class PropertyHooks
         // back to byte 0 per probe AND took substr($body, 0, $i) — O(vars x body) with an O(body)
         // copy each time. It was 32% of the gen-0 rebuild profile once the php-cfg simplifier
         // hotspot was removed (#23056). Same remedy as isOffsetInComment: scan once, binary search.
-        if ('1' === getenv('PHP_COMPILER_FUNCTION_BODY_SCAN_LEGACY')) {
+        if ('1' === Config::getenv('PHP_COMPILER_FUNCTION_BODY_SCAN_LEGACY')) {
             return $this->isInsideFunctionBodyScan($body, $offset);
         }
         if ($body !== $this->functionBodyScanBody) {

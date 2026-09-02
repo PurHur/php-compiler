@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+
+use PHPCompiler\Config;
+
 final class SelfHostBuiltinPolicy
 {
     /** Self-host / JIT: array_map() lowers null, string builtins, and closure callbacks (#142, #1154). */
@@ -330,7 +333,7 @@ final class SelfHostBuiltinPolicy
 
     public static function isSelfHostAot(): bool
     {
-        $flag = getenv('PHP_COMPILER_SELFHOST_AOT');
+        $flag = Config::getenv('PHP_COMPILER_SELFHOST_AOT');
 
         return '1' === $flag || 'true' === strtolower((string) $flag);
     }
@@ -417,7 +420,7 @@ final class SelfHostBuiltinPolicy
 
     private static function isAotUserScriptRealOutput(string $name): bool
     {
-        $userScript = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+        $userScript = Config::getenv('PHP_COMPILER_AOT_USER_SCRIPT');
         if ('1' !== $userScript && 'true' !== strtolower((string) $userScript)) {
             return false;
         }

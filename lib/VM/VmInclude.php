@@ -6,6 +6,7 @@ namespace PHPCompiler\VM;
 
 use PHPCompiler\Compiler\CompileFatal;
 use PHPCompiler\OpCode;
+use PHPCompiler\Config;
 
 /**
  * Include/require semantics SSOT for VM and compiled JIT/AOT (#10063, php-in-PHP).
@@ -175,9 +176,9 @@ final class VmInclude
 
     public static function shouldSkipSelfHostSpineCliInclude(string $path): bool
     {
-        $selfhost = getenv('PHP_COMPILER_SELFHOST_AOT');
-        $cliSpine = getenv('PHP_COMPILER_CLI_SPINE_BUNDLE');
-        $vmSpine = getenv('PHP_COMPILER_VM_SPINE_SMOKE');
+        $selfhost = Config::getenv('PHP_COMPILER_SELFHOST_AOT');
+        $cliSpine = Config::getenv('PHP_COMPILER_CLI_SPINE_BUNDLE');
+        $vmSpine = Config::getenv('PHP_COMPILER_VM_SPINE_SMOKE');
         if (
             ('1' !== $selfhost && 'true' !== strtolower((string) $selfhost))
             && ('1' !== $cliSpine && 'true' !== strtolower((string) $cliSpine))
@@ -219,17 +220,17 @@ final class VmInclude
         $isSpineSmokeEntry = self::callerIsSelfHostSpineSmokeEntry($callerPath);
         $isSpineSmokeTree = self::callerIsSelfHostSpineSmokeTree($callerPath);
 
-        $sidecarHost = getenv('PHP_COMPILER_M3_SIDECAR_HOST');
+        $sidecarHost = Config::getenv('PHP_COMPILER_M3_SIDECAR_HOST');
         if ('1' === $sidecarHost || 'true' === strtolower((string) $sidecarHost)) {
             return self::callerIsCliEntry($callerPath) || $isSpineSmokeEntry;
         }
 
-        $libSpineBundle = getenv('PHP_COMPILER_LIB_SPINE_BUNDLE');
+        $libSpineBundle = Config::getenv('PHP_COMPILER_LIB_SPINE_BUNDLE');
         if ('1' === $libSpineBundle || 'true' === strtolower((string) $libSpineBundle)) {
             return true;
         }
 
-        $selfhost = getenv('PHP_COMPILER_SELFHOST_AOT');
+        $selfhost = Config::getenv('PHP_COMPILER_SELFHOST_AOT');
         if ('1' === $selfhost || 'true' === strtolower((string) $selfhost)) {
             return $isSpineSmokeEntry
                 || $isSpineSmokeTree

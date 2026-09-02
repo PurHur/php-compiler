@@ -14,6 +14,7 @@ use PHPCfg\Op\Stmt\Trait_;
 use PHPCfg\Op\Stmt\TraitUse;
 use PHPCfg\Operand;
 use PHPCfg\Script;
+use PHPCompiler\Config;
 
 /**
  * Compile-time parameter contravariance / return covariance, staticness,
@@ -64,7 +65,7 @@ final class InheritanceVariance
      */
     public static function validateScript(Script $script, callable $report): void
     {
-        if ('1' === (string) getenv('PHP_COMPILER_VENDOR_PRELINK')) {
+        if ('1' === (string) Config::getenv('PHP_COMPILER_VENDOR_PRELINK')) {
             return;
         }
 
