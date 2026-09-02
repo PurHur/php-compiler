@@ -6,6 +6,7 @@ namespace PHPCompiler;
 
 use PHPCompiler\AOT\ExternalMethodBind;
 use PHPCompiler\JIT\Call\ExternalMethod;
+use PHPCompiler\JIT\UserScriptAotEnv;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -23,6 +24,9 @@ final class ExternalMethodBindTest extends TestCase
         unset($_ENV[ExternalMethodBind::ENV_MANIFEST], $_SERVER[ExternalMethodBind::ENV_MANIFEST]);
         putenv('PHP_COMPILER_HELPER_RUNTIME_O');
         unset($_ENV['PHP_COMPILER_HELPER_RUNTIME_O'], $_SERVER['PHP_COMPILER_HELPER_RUNTIME_O']);
+        putenv('PHP_COMPILER_AOT_USER_SCRIPT');
+        unset($_ENV['PHP_COMPILER_AOT_USER_SCRIPT'], $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT']);
+        UserScriptAotEnv::resetLatchForTest();
         ExternalMethodBind::resetManifestForTests();
         parent::tearDown();
     }
@@ -196,6 +200,44 @@ final class ExternalMethodBindTest extends TestCase
         $this->assertInstanceOf(JIT\Call\Native::class, $bound);
         $this->assertCount(1, $bound->argTypes);
         $this->assertInstanceOf(\PHPLLVM\Type::class, $bound->argTypes[0]);
+    }
+
+    /**
+     * User-script AOT must not silently null a registered-but-unlowered builtin method (#36202).
+     */
+    public function testUserScriptAotRejectsUnloweredVmClassMethod(): void
+    {
+        putenv('PHP_COMPILER_AOT_USER_SCRIPT=1');
+        $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
+        $runtime = new Runtime(Runtime::MODE_AOT);
+        $ctx = new JIT\Context($runtime, JIT\Builtin::LOAD_TYPE_STANDALONE);
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('datetime::__serialize');
+        $ctx->resolveFunctionProxy('datetime::__serialize');
+    }
+
+    /**
+     * VM-only class methods keep ExternalMethod stubs outside user-script AOT (#36202).
+     */
+    public function testVmOnlyClassMethodStaysExternalMethodOutsideUserScript(): void
+    {
+        $runtime = new Runtime(Runtime::MODE_AOT);
+        $ctx = new JIT\Context($runtime, JIT\Builtin::LOAD_TYPE_STANDALONE);
+        $proxy = $ctx->resolveFunctionProxy('datetime::__serialize');
+        $this->assertInstanceOf(ExternalMethod::class, $proxy);
+    }
+
+    /**
+     * Spine chunk keeps cross-TU class methods on ExternalMethod until manifest bind (#24429).
+     */
+    public function testSpineChunkSkipsVmRegistryClassMethodLookup(): void
+    {
+        putenv(ExternalMethodBind::ENV_SPINE_CHUNK.'=1');
+        $_ENV[ExternalMethodBind::ENV_SPINE_CHUNK] = '1';
+        $runtime = new Runtime(Runtime::MODE_AOT);
+        $ctx = new JIT\Context($runtime, JIT\Builtin::LOAD_TYPE_STANDALONE);
+        $proxy = $ctx->resolveFunctionProxy('datetime::__serialize');
+        $this->assertInstanceOf(ExternalMethod::class, $proxy);
     }
 
     /**
