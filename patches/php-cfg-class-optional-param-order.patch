@@ -1,8 +1,0 @@
-# PHP 8.0+ deprecates optional parameters declared before required parameters.
-# Class_::__construct has `$extends = null` before required `$implements` and `$stmts`.
-# This produces a Deprecated notice on every class compilation, leaking into VM output.
-#
-# Fix: reorder so $extends comes after $stmts (all required params first).
-# Idempotency: patch_already_applied greps Class_.php for the reordered signature.
-#
-# Applied via overlay function in apply-patches.sh (line numbers drift with other patches).

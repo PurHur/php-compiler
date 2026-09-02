@@ -4945,15 +4945,27 @@ from pathlib import Path
 
 parser_path = Path(sys.argv[1])
 text = parser_path.read_text()
-if 'isEmptyListExpr' in text:
+if 'isEmptyListExpr' in text and "Cannot use empty list" in text:
     raise SystemExit(0)
-old = """    /**
+# Prefer the post-listAssignment-attr shape (#22646); fall back to the older body.
+candidates = [
+    """    /**
      * @param Expr\\List_|Expr\\Array_ $expr
      */
     protected function parseListAssignment($expr, Operand $rhs)
     {
         $attributes = $this->mapAttributes($expr);
-        $logicalIndex = 0;"""
+        // Marker for Compiler list-destruct detection — Runtime lexer omits startFilePos (#22646).
+        $attributes['listAssignment'] = true;
+        $logicalIndex = 0;""",
+    """    /**
+     * @param Expr\\List_|Expr\\Array_ $expr
+     */
+    protected function parseListAssignment($expr, Operand $rhs)
+    {
+        $attributes = $this->mapAttributes($expr);
+        $logicalIndex = 0;""",
+]
 new = """    /**
      * @param Expr\\List_|Expr\\Array_ $expr
      */
@@ -4978,13 +4990,27 @@ new = """    /**
         }
 
         $attributes = $this->mapAttributes($expr);
+        // Marker for Compiler list-destruct detection — Runtime lexer omits startFilePos (#22646).
+        $attributes['listAssignment'] = true;
         $logicalIndex = 0;"""
-if old not in text:
-    sys.stderr.write("php-cfg-empty-list-assignment: Parser.php anchor not found\n")
-    raise SystemExit(1)
-parser_path.write_text(text.replace(old, new, 1))
+for old in candidates:
+    if old in text:
+        # Keep listAssignment marker only when the matched anchor already had it.
+        if "listAssignment" not in old:
+            new = new.replace(
+                "        $attributes = $this->mapAttributes($expr);\n"
+                "        // Marker for Compiler list-destruct detection — Runtime lexer omits startFilePos (#22646).\n"
+                "        $attributes['listAssignment'] = true;\n"
+                "        $logicalIndex = 0;",
+                "        $attributes = $this->mapAttributes($expr);\n"
+                "        $logicalIndex = 0;",
+            )
+        parser_path.write_text(text.replace(old, new, 1))
+        print("Applied php-cfg-empty-list-assignment.patch (overlay)")
+        raise SystemExit(0)
+sys.stderr.write("php-cfg-empty-list-assignment: Parser.php anchor not found\n")
+raise SystemExit(1)
 PY
-  echo "Applied php-cfg-empty-list-assignment.patch (overlay)"
 }
 
 apply_php_cfg_list_mix_keyed_unkeyed_overlay() {
@@ -6812,6 +6838,26 @@ record_patch_failure() {
   echo "  Hint: git -C \"${ROOT}\" apply --check -p0 \"${PATCH_DIR}/${patch_name}\"" >&2
 }
 
+# Zero-fuzz patch(1): never silently apply with drifted context (#36229).
+# Callers pass the same flags as before (e.g. -p0 -s --dry-run); -F0 is injected.
+run_patch() {
+  patch -F0 "$@"
+}
+
+# Hunkless .patch stubs are forbidden — overlays must be called by name, not via empty files (#36229).
+reject_hunkless_patches() {
+  local f bad=0
+  shopt -s nullglob
+  for f in "$PATCH_DIR"/*.patch; do
+    if ! grep -qE '^@@' "$f"; then
+      echo "apply-patches: hunkless stub forbidden: $(basename "$f") (#36229 — delete stub; call overlay by name)" >&2
+      bad=1
+    fi
+  done
+  shopt -u nullglob
+  return "$bad"
+}
+
 # When git apply / patch(1) cannot run (stale hunk lines, corrupt diff), detect prior apply
 # from the first added line or new-file target in the patch file.
 patch_marker_present() {
@@ -6900,10 +6946,11 @@ patch_is_fully_applied() {
     return 0
   fi
   if command -v patch >/dev/null 2>&1; then
-    if patch -p0 --reverse --dry-run -s -f < "$patch" >/dev/null 2>&1; then
+    # -F0: refuse fuzz; no -f: refuse partial reverse as "already applied" (#36229).
+    if run_patch -p0 --reverse --dry-run -s < "$patch" >/dev/null 2>&1; then
       return 0
     fi
-    if patch -p1 --reverse --dry-run -s -f < "$patch" >/dev/null 2>&1; then
+    if run_patch -p1 --reverse --dry-run -s < "$patch" >/dev/null 2>&1; then
       return 0
     fi
   fi
@@ -6947,23 +6994,27 @@ verify_pristine_patch_on_orig() {
 }
 
 # Fast gate: llvm git patches must apply to pristine vendor snapshots (*.orig).
+# Also rejects hunkless stub .patch files (#36229 interim).
 verify_pristine_patches() {
   local failed=0
   local llvm_builder_orig="vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php.orig"
+  reject_hunkless_patches || failed=1
   verify_pristine_patch_on_orig "$PATCH_DIR/php-llvm-structgep-assert.patch" "$llvm_builder_orig" || failed=1
   verify_pristine_patch_on_orig "$PATCH_DIR/php-llvm-icmp-assert.patch" "$llvm_builder_orig" || failed=1
   if [[ "$failed" -ne 0 ]]; then
-    echo "verify-pristine: patch drift detected — re-diff against pristine vendor (#36209)" >&2
+    echo "verify-pristine: patch drift detected — re-diff against pristine vendor (#36209/#36229)" >&2
     return 1
   fi
-  echo "verify-pristine: llvm patches apply to pristine vendor snapshots"
+  echo "verify-pristine: llvm patches apply to pristine vendor snapshots; no hunkless stubs"
   return 0
 }
 
 # Apply a patch file with git/patch(1) only — no overlay dispatch (avoids recursion).
+# patch(1) path uses -F0 and refuses partial applies (#36229).
 apply_patch_file_direct() {
   local patch="$1"
   local patch_name
+  local patch_rc
   patch_name="$(basename "$patch")"
   if [[ ! -f "$patch" ]]; then
     return 0
@@ -6983,21 +7034,35 @@ apply_patch_file_direct() {
     return 0
   fi
   if command -v patch >/dev/null 2>&1; then
-    if patch -p0 --dry-run -s -f < "$patch" >/dev/null 2>&1; then
-      patch -p0 -s -f < "$patch" >/dev/null 2>&1
-      echo "Applied ${patch_name} (patch(1))"
-      return 0
+    if run_patch -p0 --dry-run -s < "$patch" >/dev/null 2>&1; then
+      set +e
+      run_patch -p0 -s < "$patch" >/dev/null 2>&1
+      patch_rc=$?
+      set -e
+      if [[ "$patch_rc" -eq 0 ]]; then
+        echo "Applied ${patch_name} (patch(1) -F0)"
+        return 0
+      fi
+      record_patch_failure "${patch_name}" "patch(1) -p0 partial or failed (rc=${patch_rc}; -F0)"
+      return 1
     fi
-    if patch -p1 --dry-run -s -f < "$patch" >/dev/null 2>&1; then
-      patch -p1 -s -f < "$patch" >/dev/null 2>&1
-      echo "Applied ${patch_name} (patch(1), -p1)"
-      return 0
+    if run_patch -p1 --dry-run -s < "$patch" >/dev/null 2>&1; then
+      set +e
+      run_patch -p1 -s < "$patch" >/dev/null 2>&1
+      patch_rc=$?
+      set -e
+      if [[ "$patch_rc" -eq 0 ]]; then
+        echo "Applied ${patch_name} (patch(1) -F0, -p1)"
+        return 0
+      fi
+      record_patch_failure "${patch_name}" "patch(1) -p1 partial or failed (rc=${patch_rc}; -F0)"
+      return 1
     fi
-    if patch -p0 --reverse --dry-run -s -f < "$patch" >/dev/null 2>&1; then
+    if run_patch -p0 --reverse --dry-run -s < "$patch" >/dev/null 2>&1; then
       echo "Skip ${patch_name} (already applied)"
       return 0
     fi
-    if patch -p1 --reverse --dry-run -s -f < "$patch" >/dev/null 2>&1; then
+    if run_patch -p1 --reverse --dry-run -s < "$patch" >/dev/null 2>&1; then
       echo "Skip ${patch_name} (already applied, -p1)"
       return 0
     fi
@@ -7063,9 +7128,8 @@ apply_patch() {
   local patch="$1"
   local patch_name
   patch_name="$(basename "$patch")"
-  if [[ ! -f "$patch" ]]; then
-    return 0
-  fi
+  # Overlay-only names (deleted hunkless stubs #36229) dispatch before the file check.
+  # Missing optional/real patches fall through to apply_patch_file_direct (returns 0).
   if [[ "$patch_name" == "php-cfg-new-ctor-parens.patch" ]]; then
     # Optional, known-stale diff (#6549). Keep it non-fatal (do not record failure).
     echo "Skip ${patch_name} (optional — stale hunk #6549; does not block throw-expr #6746)"
@@ -7166,8 +7230,12 @@ apply_patch() {
       echo "Skip php-types-generics-fallback.patch (already applied)"
       return 0
     fi
-    if patch -p0 --forward --dry-run < "$PATCH_DIR/php-types-generics-fallback.patch" >/dev/null 2>&1; then
-      patch -p0 --forward < "$PATCH_DIR/php-types-generics-fallback.patch"
+    if [[ -f "$PATCH_DIR/php-types-generics-fallback.patch" ]] \
+      && run_patch -p0 --forward --dry-run < "$PATCH_DIR/php-types-generics-fallback.patch" >/dev/null 2>&1; then
+      if ! run_patch -p0 --forward < "$PATCH_DIR/php-types-generics-fallback.patch"; then
+        record_patch_failure "php-types-generics-fallback.patch" "patch(1) -F0 partial or failed"
+        return 1
+      fi
       echo "Applied php-types-generics-fallback.patch"
       return 0
     fi
@@ -7450,6 +7518,7 @@ case "${1:-}" in
 esac
 
 if [[ "${1:-}" != "--verify-only" ]]; then
+reject_hunkless_patches
 apply_patch "$PATCH_DIR/php-parser-final-property.patch"
 apply_patch "$PATCH_DIR/php-llvm-chooser.patch"
 apply_patch "$PATCH_DIR/php-llvm-mcjit-libc-mem.patch"
@@ -7552,8 +7621,8 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-assignop-coalesce.patch"
   apply_patch "$PATCH_DIR/php-cfg-list-destruct-byref.patch"
   apply_patch "$PATCH_DIR/php-cfg-list-assignment-attr.patch"
-  apply_patch "$PATCH_DIR/php-cfg-empty-list-assignment.patch" || true
-  apply_patch "$PATCH_DIR/php-cfg-list-mix-keyed-unkeyed.patch" || true
+  apply_patch "$PATCH_DIR/php-cfg-empty-list-assignment.patch"
+  apply_patch "$PATCH_DIR/php-cfg-list-mix-keyed-unkeyed.patch"
   apply_patch "$PATCH_DIR/php-cfg-list-skip-slot.patch" || true
   apply_patch "$PATCH_DIR/php-cfg-list-spread.patch"
   apply_patch "$PATCH_DIR/php-cfg-first-class-callable.patch"
