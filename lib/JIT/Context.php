@@ -3662,6 +3662,10 @@ class Context {
         if ('__value__writeBool' === $name) {
             Builtin\ValueBoxWriteBoolJit::ensureLinked($this);
         }
+        // Lazy __value__copy — one outlined type-switch per module (#36193).
+        if ('__value__copy' === $name) {
+            Builtin\ValueBoxCopyJit::ensureLinked($this);
+        }
         if (isset($this->functionScope[$name])) {
             return $this->functionScope[$name];
         }

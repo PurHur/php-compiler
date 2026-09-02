@@ -238,6 +238,23 @@ class Value extends Type {
         
 
         
+    $fntype___cfcd208495d565ef66e7dff9f98764da = $this->context->context->functionType(
+                $this->context->getTypeFromString('void'),
+                false , 
+                $this->context->getTypeFromString('__value__*')
+                , $this->context->getTypeFromString('__value__*')
+                
+            );
+            $fn___cfcd208495d565ef66e7dff9f98764da = $this->context->module->addFunction('__value__copy', $fntype___cfcd208495d565ef66e7dff9f98764da);
+            
+            
+            
+            $this->context->registerFunction('__value__copy', $fn___cfcd208495d565ef66e7dff9f98764da);
+        
+
+        
+
+        
     
     }
 
@@ -252,6 +269,7 @@ class Value extends Type {
         // __value__writeLong deferred — Context::lookupFunction ensureLinked (#36135).
         // __value__writeNull deferred — Context::lookupFunction ensureLinked (#36124).
         // __value__writeBool deferred — Context::lookupFunction ensureLinked (#36108).
+        // __value__copy deferred — Context::lookupFunction ensureLinked (#36193).
     }
 
     public function initialize(): void {
