@@ -11914,6 +11914,14 @@ class JIT {
                     if (null === $arg && null !== $scriptGlobalEchoName) {
                         if ($this->shouldDeferScriptGlobalForInlineIncludeBinding($scriptGlobalEchoName, $echoOp, $block)) {
                             $scriptGlobalEchoName = null;
+                        } elseif (
+                            null !== $argOffset
+                            && $this->context->hasVariableOp($echoOp)
+                            && $this->jitBlockHasInBlockConcatToSlot($block, (int) $argOffset)
+                        ) {
+                            // Fused `$out = 'a' . "b"; echo $out` — CONCAT wrote the CV slot (#36366).
+                            $arg = $this->context->getVariableFromOp($echoOp);
+                            $scriptGlobalEchoName = null;
                         } else {
                             $arg = $this->ensureScriptGlobalForRuntimeRead($echoOp, $scriptGlobalEchoName);
                         }
@@ -20682,6 +20690,21 @@ class JIT {
      * {main} locals and `global $name` imports share ensureScriptGlobal() heap boxes; reads
      * previously skipped UndefinedVariableHelper when echoScriptGlobalName was set (#23842).
      */
+    /**
+     * AssignOp peephole fuses CONCAT+ASSIGN in-place (#16281); echo must read that CV slot,
+     * not the {main} script-global sidecar the echo opcode names (#36366 / p16).
+     */
+    private function jitBlockHasInBlockConcatToSlot(Block $block, int $slot): bool
+    {
+        foreach ($block->opCodes as $prior) {
+            if (OpCode::TYPE_CONCAT === $prior->type && null !== $prior->arg1 && (int) $prior->arg1 === $slot) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function ensureScriptGlobalForRuntimeRead(
         Operand $op,
         string $name,
