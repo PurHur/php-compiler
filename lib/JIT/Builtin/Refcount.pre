@@ -152,6 +152,15 @@ class Refcount extends Builtin {
                             __object__dtor((__object__*) $refVirtual);
                         }
                         free $refVirtual;
+                    } else {
+                        // Zend gc_possible_root — buffer object when refcount hits 1 (#36195).
+                        $objMask = (int32) self::TYPE_INFO_TYPE_OBJECT;
+                        $one = (int32) 1;
+                        if (($typeinfo & $objMask) != 0 && $current == $one) {
+                            $obj = (__object__*) $refVirtual;
+                            $props = __object__prop_count($obj);
+                            phpc_gc_register((int8*) $refVirtual, $props);
+                        }
                     }
                 }
                 return;

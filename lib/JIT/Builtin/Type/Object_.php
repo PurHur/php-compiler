@@ -828,21 +828,6 @@ class Object_ extends Type {
         }
 
         $propCount = \count($this->properties[$classId] ?? []);
-        $savedInsert = null;
-        try {
-            $savedInsert = $this->context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
-        \PHPCompiler\JIT\Builtin\GcCollectCyclesRuntime::ensureLinked($this->context);
-        if (null !== $savedInsert) {
-            $this->context->builder->positionAtEnd($savedInsert);
-        }
-        $this->context->builder->call(
-            $this->context->lookupFunction('phpc_gc_register'),
-            $this->context->builder->pointerCast($obj, $this->context->getTypeFromString('int8*')),
-            $this->context->constantFromInteger($propCount, 'int32')
-        );
-
         ObjectHandleRuntime::emitAssignHandle($this->context, $obj);
 
         return $obj;
@@ -2577,12 +2562,7 @@ class Object_ extends Type {
                 Variable::TYPE_VALUE
             );
         }
-        \PHPCompiler\JIT\Builtin\GcCollectCyclesRuntime::ensureLinked($this->context);
-        $this->context->builder->call(
-            $this->context->lookupFunction('phpc_gc_register'),
-            $this->context->builder->pointerCast($obj, $this->context->getTypeFromString('int8*')),
-            $this->context->constantFromInteger($enumPropCount, 'int32')
-        );
+        ObjectHandleRuntime::emitAssignHandle($this->context, $obj);
 
         return new Variable(
             $this->context,

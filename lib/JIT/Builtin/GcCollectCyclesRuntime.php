@@ -360,7 +360,8 @@ final class GcCollectCyclesRuntime
         $null = $i8p->constNull();
         $countPtr = self::globalPtr($context, self::G_COUNT, $i32);
         $count = $context->builder->load($countPtr);
-        $max = $i32->constInt(self::MAX_OBJECTS, false);
+        // Zend root buffer reports at most threshold-3 roots on saturation (#36195).
+        $max = $i32->constInt(CycleCollector::ROOT_THRESHOLD - 3, false);
 
         $objNull = $context->builder->icmp(Builder::INT_EQ, $obj, $null);
         $atMax = $context->builder->icmp(Builder::INT_SGE, $count, $max);
