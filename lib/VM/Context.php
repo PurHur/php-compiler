@@ -79,6 +79,12 @@ class Context {
     /** @var array<string, Variable> function-local static storage keyed by compile-time key (#2286) */
     private array $functionStaticVars = [];
 
+    /** @var array<int, string> spl_object_id(Variable) => global name (#36207) */
+    private array $globalStorageIndex = [];
+
+    /** @var array<int, string> spl_object_id(Variable) => function-static key (#36207) */
+    private array $functionStaticStorageIndex = [];
+
     /** @var array<string, true> */
     private array $functionStaticInitialized = [];
 
@@ -831,7 +837,9 @@ class Context {
     public function ensureGlobal(string $name): Variable
     {
         if (!isset($this->globalVars[$name])) {
-            $this->globalVars[$name] = new Variable(Variable::TYPE_NULL);
+            $global = new Variable(Variable::TYPE_NULL);
+            $this->globalVars[$name] = $global;
+            $this->indexGlobalStorage($global, $name);
         }
         $this->ensureGlobalsTable();
         $this->syncGlobalEntryInGlobalsTable($name, $this->globalVars[$name]);
@@ -850,13 +858,7 @@ class Context {
     /** True when $var is the canonical storage cell for a script global (#5089). */
     public function isGlobalStorage(Variable $var): bool
     {
-        foreach ($this->globalVars as $global) {
-            if ($global === $var) {
-                return true;
-            }
-        }
-
-        return false;
+        return isset($this->globalStorageIndex[\spl_object_id($var)]);
     }
 
     public function markGlobalEverAssigned(string $name): void
@@ -876,11 +878,13 @@ class Context {
 
     public function globalNameForStorage(Variable $var): ?string
     {
+        $name = $this->lookupIndexedGlobalName($var);
+        if (null !== $name) {
+            return $name;
+        }
         $resolved = $var->resolveIndirect();
-        foreach ($this->globalVars as $name => $global) {
-            if ($global === $var || $global === $resolved) {
-                return $name;
-            }
+        if ($resolved !== $var) {
+            return $this->lookupIndexedGlobalName($resolved);
         }
 
         return null;
@@ -888,11 +892,13 @@ class Context {
 
     public function functionStaticKeyForStorage(Variable $var): ?string
     {
+        $key = $this->lookupIndexedFunctionStaticKey($var);
+        if (null !== $key) {
+            return $key;
+        }
         $resolved = $var->resolveIndirect();
-        foreach ($this->functionStaticVars as $key => $storage) {
-            if ($storage === $var || $storage === $resolved) {
-                return $key;
-            }
+        if ($resolved !== $var) {
+            return $this->lookupIndexedFunctionStaticKey($resolved);
         }
 
         return null;
@@ -923,6 +929,7 @@ class Context {
             $global = $this->globalVars[$name];
             // Same last-strong-ref rule as clearGlobalByName / Variable::reset (#24784).
             $global->reset();
+            $this->unindexGlobalStorage($global);
             unset($this->globalVars[$name]);
         }
         if (null === $this->globalsSuperglobal) {
@@ -1054,12 +1061,39 @@ class Context {
     public function ensureFunctionStatic(string $storageKey): Variable
     {
         if (!isset($this->functionStaticVars[$storageKey])) {
-            $this->functionStaticVars[$storageKey] = new Variable(Variable::TYPE_NULL);
+            $storage = new Variable(Variable::TYPE_NULL);
+            $this->functionStaticVars[$storageKey] = $storage;
+            $this->indexFunctionStaticStorage($storage, $storageKey);
         }
         // Persist across calls: frame teardown must not releaseRef through CV aliases (#28039).
         $this->functionStaticVars[$storageKey]->functionStaticStorage = true;
 
         return $this->functionStaticVars[$storageKey];
+    }
+
+    private function indexGlobalStorage(Variable $global, string $name): void
+    {
+        $this->globalStorageIndex[\spl_object_id($global)] = $name;
+    }
+
+    private function unindexGlobalStorage(Variable $global): void
+    {
+        unset($this->globalStorageIndex[\spl_object_id($global)]);
+    }
+
+    private function lookupIndexedGlobalName(Variable $var): ?string
+    {
+        return $this->globalStorageIndex[\spl_object_id($var)] ?? null;
+    }
+
+    private function indexFunctionStaticStorage(Variable $storage, string $key): void
+    {
+        $this->functionStaticStorageIndex[\spl_object_id($storage)] = $key;
+    }
+
+    private function lookupIndexedFunctionStaticKey(Variable $var): ?string
+    {
+        return $this->functionStaticStorageIndex[\spl_object_id($var)] ?? null;
     }
 
     public function peekFunctionStatic(string $storageKey): ?Variable

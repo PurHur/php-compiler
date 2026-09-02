@@ -30,6 +30,9 @@ final class MemoryAccounting
 
     private static bool $hasPeakQueryEmalloc = false;
 
+    /** Cached getenv('PHPC_DEBUG_EMALLOC') — hot in noteBytes (#36207). */
+    private static ?bool $debugEmalloc = null;
+
     /** Interpreter overhead between consecutive memory_get_* calls (enum/string temps). */
     public static function currentBytes(): int
     {
@@ -50,7 +53,7 @@ final class MemoryAccounting
         if (0 === $delta) {
             return;
         }
-        if (getenv('PHPC_DEBUG_EMALLOC') && $delta > 0 && $delta <= 16) {
+        if (self::debugEmallocEnabled() && $delta > 0 && $delta <= 16) {
             error_log('noteBytes +'.$delta.' cur='.(self::$currentEmalloc + $delta));
         }
         self::$currentEmalloc = max(0, self::$currentEmalloc + $delta);
@@ -119,6 +122,16 @@ final class MemoryAccounting
         self::$mmCacheRemaining = self::initialMmCache();
         self::resetPeakToCurrent();
         self::$hasPeakQueryEmalloc = false;
+        self::$debugEmalloc = null;
+    }
+
+    private static function debugEmallocEnabled(): bool
+    {
+        if (null === self::$debugEmalloc) {
+            self::$debugEmalloc = (bool) getenv('PHPC_DEBUG_EMALLOC');
+        }
+
+        return self::$debugEmalloc;
     }
 
     /** Host-aligned first-call bucket (php_gc.c gc_mem_caches / zend_mm_gc, #12921). */

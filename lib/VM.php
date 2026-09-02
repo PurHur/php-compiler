@@ -7854,10 +7854,7 @@ restart:
                             ) {
                                 $thisArgOffset = 1;
                             }
-                            foreach ($calleeBlock->opCodes as $recv) {
-                                if (OpCode::TYPE_ARG_RECV !== $recv->type) {
-                                    continue;
-                                }
+                            foreach ($calleeBlock->argRecvOpcodes() as $recv) {
                                 $paramIdx = (int) $recv->arg2;
                                 $argIndex = $paramIdx + $thisArgOffset;
                                 if (!array_key_exists($argIndex, $calledArgs)) {

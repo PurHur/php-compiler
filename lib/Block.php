@@ -291,6 +291,9 @@ class Block {
     /** Cached {@see operandForScopeSlot()} — scope-stable at runtime (#36207). */
     private array $operandForScopeSlotCache = [];
 
+    /** Cached {@see argRecvOpcodes()} — CFG-stable (#36207). */
+    private ?array $argRecvOpcodesCache = null;
+
     /** assign.result temp => CV lvalue slot for reads after in-place mutation (#15125). */
     private array $assignResultToLvalueSlot = [];
 
@@ -653,13 +656,33 @@ class Block {
      */
     public function paramSlotForIndex(int $paramIdx): ?int
     {
-        foreach ($this->opCodes as $op) {
-            if (OpCode::TYPE_ARG_RECV === $op->type && (int) $op->arg2 === $paramIdx) {
+        foreach ($this->argRecvOpcodes() as $op) {
+            if ((int) $op->arg2 === $paramIdx) {
                 return (int) $op->arg1;
             }
         }
 
         return null;
+    }
+
+    /**
+     * TYPE_ARG_RECV opcodes in block order — avoids scanning the full opcode list per call (#36207).
+     *
+     * @return list<OpCode>
+     */
+    public function argRecvOpcodes(): array
+    {
+        if (null === $this->argRecvOpcodesCache) {
+            $recv = [];
+            foreach ($this->opCodes as $op) {
+                if (OpCode::TYPE_ARG_RECV === $op->type) {
+                    $recv[] = $op;
+                }
+            }
+            $this->argRecvOpcodesCache = $recv;
+        }
+
+        return $this->argRecvOpcodesCache;
     }
 
     /**
