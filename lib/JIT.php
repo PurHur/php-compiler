@@ -11257,6 +11257,18 @@ class JIT {
                             $result->compileTimeString = $leftResolved.$rightResolved;
                         }
                     }
+                    $scopeName = JIT\OperandName::resolve($destOp);
+                    if (
+                        null !== $scopeName
+                        && '' !== $scopeName
+                        && null !== ($result->compileTimeString ?? null)
+                    ) {
+                        $resolvedName = $this->context->resolveRefAliasName($scopeName);
+                        if (isset($this->context->namedVariableBindings[$resolvedName])) {
+                            $this->context->namedVariableBindings[$resolvedName]->compileTimeString
+                                = $result->compileTimeString;
+                        }
+                    }
                     $this->markScopeVariableAssignedIfTracked($destOp, $result);
                     $this->maybeRefreshIncludeBindingsBeforeUse();
                     break;
@@ -32992,10 +33004,22 @@ class JIT {
                     if ($this->jitNamedLocalHasDivergentBranchCompileTimeStrings($block, $scopeName)) {
                         $arg->compileTimeString = null;
                     } else {
-                        $arg->compileTimeString = $this->jitEffectiveNamedLocalCompileTimeString(
+                        $effective = $this->jitEffectiveNamedLocalCompileTimeString(
                             $block,
                             $scopeName
                         );
+                        if (null !== $effective) {
+                            if (
+                                null !== $arg->compileTimeString
+                                && $arg->compileTimeString !== $effective
+                            ) {
+                                // `.=` / loop back-edges stamp a longer runtime string on the
+                                // JIT Variable than init-literal back-walk finds (#36244).
+                                $arg->compileTimeString = null;
+                            } else {
+                                $arg->compileTimeString = $effective;
+                            }
+                        }
                     }
 
                     continue;
@@ -33168,12 +33192,14 @@ class JIT {
 
         if (\count($block->parents) > 1) {
             $agreed = null;
+            $sawNull = false;
             foreach ($block->parents as $parent) {
                 if (!$parent instanceof Block) {
                     return true;
                 }
                 $resolved = $this->jitEffectiveNamedLocalCompileTimeString($parent, $name);
                 if (null === $resolved) {
+                    $sawNull = true;
                     continue;
                 }
                 if (null === $agreed) {
@@ -33181,6 +33207,10 @@ class JIT {
                 } elseif ($agreed !== $resolved) {
                     return true;
                 }
+            }
+            // Loop header: entry literal vs null back-edge must not fold (#36244).
+            if ($sawNull && null !== $agreed) {
+                return true;
             }
 
             return false;
@@ -33198,6 +33228,38 @@ class JIT {
         }
 
         return false;
+    }
+
+    /**
+     * Last in-block CONCAT on a named CV wins over earlier init ASSIGN (#36244).
+     */
+    private function jitNamedLocalCompileTimeStringInBlock(Block $block, int $slot): ?string
+    {
+        foreach (array_reverse($block->opCodes) as $prior) {
+            if (OpCode::TYPE_CONCAT !== $prior->type || $prior->arg1 !== $slot) {
+                continue;
+            }
+            $leftOp = $block->getOperand((int) $prior->arg2);
+            $rightOp = $block->getOperand((int) $prior->arg3);
+            if (
+                !$this->context->hasVariableOp($leftOp)
+                || !$this->context->hasVariableOp($rightOp)
+            ) {
+                return null;
+            }
+            $left = $this->context->getVariableFromOp($leftOp);
+            $right = $this->context->getVariableFromOp($rightOp);
+            if (
+                null !== ($left->compileTimeString ?? null)
+                && null !== ($right->compileTimeString ?? null)
+            ) {
+                return $left->compileTimeString.$right->compileTimeString;
+            }
+
+            return null;
+        }
+
+        return null;
     }
 
     private function jitEffectiveNamedLocalCompileTimeString(
@@ -33218,6 +33280,10 @@ class JIT {
             }
         }
         if (null !== $slot) {
+            $inBlock = $this->jitNamedLocalCompileTimeStringInBlock($block, $slot);
+            if (null !== $inBlock) {
+                return $inBlock;
+            }
             foreach ($block->opCodes as $prior) {
                 if (OpCode::TYPE_ASSIGN !== $prior->type) {
                     continue;
