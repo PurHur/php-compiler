@@ -16,8 +16,8 @@
 -        $error = new string_ptr(FFI::addr(FFI::new('char*')));
 +        $error = new string_ptr(\FFI::addr(\FFI::new('char*')));
          $target = new LLVMTargetRef($this->lib->getFFI()->new('LLVMTargetRef'));
-         if (!$this->fromBool($this->lib->LLVMGetTargetFromTriple($triple, $target->addr(), $error))) {
-             $errorMessage = $error->deref(0);
+         $result = $this->lib->LLVMGetTargetFromTriple($triple, $target->addr(), $error);
+         if (!$this->fromBool($result)) {
 @@ -160,7 +160,7 @@ abstract class LLVM implements CoreLLVM {
      }
  
