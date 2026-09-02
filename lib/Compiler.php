@@ -130,6 +130,9 @@ class Compiler {
     /** Identity of the $seen storage the index was built against; rebuilt when $seen is replaced. */
     private ?SplObjectStorage $cfgProducerIndexSeenSource = null;
 
+    /** Fingerprint of $seen block count + child counts when producer index last synced (#36224). */
+    private int $cfgProducerIndexLastSyncFingerprint = -1;
+
     /** spl_object_id(callOp) => preceding inline producers (#36224). */
     private array $precedingInlineCallArgProducersCache = [];
 
@@ -682,6 +685,7 @@ class Compiler {
         $this->precedingInlineCallArgProducersCache = [];
         $this->cfgCallOpIndexCache = [];
         $this->cfgChildrenOpIndexBuiltCount = [];
+        $this->cfgProducerIndexLastSyncFingerprint = -1;
         $this->debugWriteLastPhase('Compiler::compile enter');
 
         Compiler\InheritanceVariance::validateScript(
@@ -44320,6 +44324,21 @@ class Compiler {
      * Bring the producer index up to date with $this->seen: index newly seen
      * blocks, re-index blocks whose child list grew or shrank since indexing.
      */
+    private function cfgProducerIndexFingerprint(): int
+    {
+        if (null === $this->seen) {
+            return 0;
+        }
+        $fp = $this->seen->count();
+        foreach ($this->seen as $cfgBlock) {
+            if ($cfgBlock instanceof CfgBlock) {
+                $fp = (int) (($fp * 31) + \count($cfgBlock->children));
+            }
+        }
+
+        return $fp;
+    }
+
     private function syncCfgProducerExprIndex(): void
     {
         if ($this->cfgProducerIndexSeenSource !== $this->seen || null === $this->cfgProducerExprIndex) {
@@ -44327,7 +44346,13 @@ class Compiler {
             $this->cfgProducerIndexedBlocks = new SplObjectStorage();
             $this->cfgProducerRootsWithCandidates = [];
             $this->cfgProducerIndexSeenSource = $this->seen;
+            $this->cfgProducerIndexLastSyncFingerprint = -1;
         }
+        $fp = $this->cfgProducerIndexFingerprint();
+        if ($fp === $this->cfgProducerIndexLastSyncFingerprint) {
+            return;
+        }
+        $this->cfgProducerIndexLastSyncFingerprint = $fp;
         foreach ($this->seen as $cfgBlock) {
             if ($cfgBlock instanceof CfgBlock) {
                 $this->indexCfgProducerBlockTree($cfgBlock);
