@@ -12,6 +12,7 @@ declare(strict_types=1);
 use PHPCompiler\Runtime;
 use PHPCompiler\Block;
 use PHPCompiler\JitMcjitEmbed;
+use PHPCompiler\JitVmLoweringPolicy;
 use PHPCompiler\Web\Superglobals;
 
 function php_compiler_jit_prepare_embed_code(string $filename, string $code): string
@@ -84,11 +85,7 @@ function run(string $filename, string $code, array $options): void
             $block->haltCompilerOffset = $runtime->compiler->getHaltCompilerOffset();
         }
     }
-    if (null !== $block && Block::requiresVmLowering($block)) {
-        // Generators, readonly, fibers, typed returns in script scope, etc. still VM-fallback (#2114).
-        // Script-scope try/catch/throw uses MCJIT via TryCatchHelper (#4246, #4137).
-        // finally in script scope still VM-fallback until #2114 phase B.
-    } else {
+    if (null === $block || !JitVmLoweringPolicy::announceWholeScriptVmFallback($block)) {
         $runtime->jit($block, $code, $filename);
     }
 

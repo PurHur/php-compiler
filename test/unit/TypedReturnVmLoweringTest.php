@@ -49,6 +49,7 @@ PHP,
         $this->assertNotNull($block);
         $this->assertTrue(Block::containsTypedNonVoidReturnOpcodes($block));
         $this->assertTrue(Block::requiresVmLowering($block));
+        $this->assertContains('typed non-void return (#2114)', Block::requiresVmLoweringReasons($block));
     }
 
     public function testVoidReturnDoesNotRequireVmLowering(): void

@@ -6839,6 +6839,7 @@ require_once __DIR__.'/../../../lib/JIT/XmlWriterInstanceMethodJit.php';
 require_once __DIR__.'/../../../lib/JIT/XmlReaderInstanceMethodJit.php';
 require_once __DIR__.'/../../../lib/JIT/XsltInstanceMethodJit.php';
 require_once __DIR__.'/../../../lib/JitMcjitEmbed.php';
+require_once __DIR__.'/../../../lib/JitVmLoweringPolicy.php';
 require_once __DIR__.'/../../../lib/LanguageProfileScope.php';
 require_once __DIR__.'/../../../lib/LazyPropertyRejector.php';
 require_once __DIR__.'/../../../lib/Lint/Issue.php';
