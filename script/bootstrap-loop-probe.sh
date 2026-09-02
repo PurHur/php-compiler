@@ -76,6 +76,10 @@ if [[ "${HONEST_COMPILE}" == "1" ]]; then
   echo "bootstrap-loop-probe: honest compile gate ON (BOOTSTRAP_HONEST_COMPILE_GATE=1, #15603)"
 fi
 
+if [[ "${BOOTSTRAP_M4_REQUIRE_NATIVE_EMIT:-0}" == "1" ]]; then
+  export BOOTSTRAP_M3_REQUIRE_NATIVE_EMIT="${BOOTSTRAP_M3_REQUIRE_NATIVE_EMIT:-1}"
+fi
+
 m4_probe_tail() {
   local file=$1
   local n=${2:-8}
