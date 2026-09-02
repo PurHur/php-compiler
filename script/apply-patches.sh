@@ -5374,16 +5374,59 @@ if len(matches) > 1:
         text = text[:start] + text[end:]
     matches = list(cfgwalk_pat.finditer(text))
 
+repl_sig = re.compile(
+    r'    private function replaceVariables\(Operand \$from, Operand \$to, Block \$block\)\s*\{',
+)
+
+def method_extent(src: str, sig_start: int):
+    brace = src.find('{', sig_start)
+    if brace < 0:
+        return None
+    depth = 0
+    j = brace
+    while j < len(src):
+        if src[j] == '{':
+            depth += 1
+        elif src[j] == '}':
+            depth -= 1
+            if depth == 0:
+                return sig_start, j + 1
+        j += 1
+    return None
+
 if "getenv('PHPCFG_SIMPLIFIER_LEGACY')" not in text:
-    repl_pat = re.compile(
-        r'    private function replaceVariables\(Operand \$from, Operand \$to, Block \$block\)\s*\{.*?\n    \}',
-        re.DOTALL,
-    )
-    if not repl_pat.search(text):
+    if not repl_sig.search(text):
         sys.stderr.write('php-cfg-simplifier-use-chain: replaceVariables anchor not found\n')
         raise SystemExit(1)
-    # Lambda replacement: new_replace_variables contains Op\Phi — re.sub treats \P as an escape.
-    text = repl_pat.sub(lambda _: new_replace_variables, text, count=1)
+    if not list(cfgwalk_pat.finditer(text)):
+        # Pristine vendor: the CFG walk lives inside replaceVariables — rename, do not delete (#36377).
+        m = repl_sig.search(text)
+        extent = method_extent(text, m.start())
+        if extent is None:
+            sys.stderr.write('php-cfg-simplifier-use-chain: could not parse replaceVariables body\n')
+            raise SystemExit(1)
+        start, end = extent
+        old_method = text[start:end]
+        cfgwalk_method = (
+            '    /** Legacy whole-CFG replacement (PHPCFG_SIMPLIFIER_LEGACY=1 or USECHAIN=0). */\n'
+            + old_method.replace(
+                'private function replaceVariables',
+                'private function replaceVariablesByCfgWalk',
+                1,
+            )
+        )
+        text = text[:start] + new_replace_variables + '\n\n' + cfgwalk_method + text[end:]
+    else:
+        # July-5 partial: cfgwalk exists; flip replaceVariables only.
+        repl_pat = re.compile(
+            r'    private function replaceVariables\(Operand \$from, Operand \$to, Block \$block\)\s*\{.*?\n    \}',
+            re.DOTALL,
+        )
+        if not repl_pat.search(text):
+            sys.stderr.write('php-cfg-simplifier-use-chain: replaceVariables anchor not found\n')
+            raise SystemExit(1)
+        # Lambda replacement: new_replace_variables contains Op\Phi — re.sub treats \P as an escape.
+        text = repl_pat.sub(lambda _: new_replace_variables, text, count=1)
 
 if len(list(cfgwalk_pat.finditer(text))) != 1:
     sys.stderr.write('php-cfg-simplifier-use-chain: expected exactly one replaceVariablesByCfgWalk\n')
