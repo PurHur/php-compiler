@@ -260,6 +260,23 @@ final class ExternalMethodBindTest extends TestCase
     }
 
     /**
+     * SPINE_CHUNK on-demand NestedJIT binds ext/standard helper leaves (#36155 Phase C).
+     */
+    public function testSpineChunkBindsStandardHelperOnDemand(): void
+    {
+        putenv(ExternalMethodBind::ENV_SPINE_CHUNK.'=1');
+        $_ENV[ExternalMethodBind::ENV_SPINE_CHUNK] = '1';
+        putenv('PHP_COMPILER_HELPER_RUNTIME_O=0');
+        $_ENV['PHP_COMPILER_HELPER_RUNTIME_O'] = '0';
+        $runtime = new Runtime(Runtime::MODE_AOT);
+        $ctx = new JIT\Context($runtime, JIT\Builtin::LOAD_TYPE_STANDALONE);
+        $proxy = $ctx->resolveFunctionProxy('phpcompiler\\ext\\standard\\errorsilencejithelper::getdisplayerrors');
+        $this->assertNotInstanceOf(ExternalMethod::class, $proxy);
+        $apply = $ctx->resolveFunctionProxy('phpcompiler\\ext\\standard\\executionlimitsjithelper::applymaxexecutiontime');
+        $this->assertNotInstanceOf(ExternalMethod::class, $apply);
+    }
+
+    /**
      * SPINE_CHUNK vm registry whitelist does not bind VM-only static helpers (no JIT call()).
      */
     public function testSpineChunkVmRegistryLeavesVmOnlyStaticExternal(): void

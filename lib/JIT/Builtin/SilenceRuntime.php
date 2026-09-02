@@ -42,6 +42,12 @@ final class SilenceRuntime
 
     private const INI_RESTORE_ER_HELPER = 'PHPCompiler\\ext\\standard\\ErrorSilenceJitHelper::iniRestoreErrorReporting';
 
+    private const GET_DISPLAY_ERRORS_HELPER = 'PHPCompiler\\ext\\standard\\ErrorSilenceJitHelper::getDisplayErrors';
+
+    private const SET_DISPLAY_ERRORS_HELPER = 'PHPCompiler\\ext\\standard\\ErrorSilenceJitHelper::setDisplayErrors';
+
+    private const SHOULD_DISPLAY_CLI_HELPER = 'PHPCompiler\\ext\\standard\\ErrorSilenceJitHelper::shouldDisplayCliError';
+
     private const G_ERROR_REPORTING = 'phpc_aot_error_reporting';
 
     private const G_SAVED_ERROR_REPORTING = 'phpc_aot_saved_error_reporting';
@@ -65,6 +71,9 @@ final class SilenceRuntime
         self::INI_GET_ER_HELPER,
         self::SET_ER_HELPER,
         self::INI_RESTORE_ER_HELPER,
+        self::GET_DISPLAY_ERRORS_HELPER,
+        self::SET_DISPLAY_ERRORS_HELPER,
+        self::SHOULD_DISPLAY_CLI_HELPER,
     ];
 
     /** @var list<string> */

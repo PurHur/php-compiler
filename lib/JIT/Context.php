@@ -1146,6 +1146,10 @@ class Context {
         if (null !== $bound) {
             return $bound;
         }
+        $standard = SpineChunkStandardHelperBind::tryBind($this, $proxyName);
+        if (null !== $standard) {
+            return $standard;
+        }
         $nestedObject = SpineChunkNestedVmBind::tryBindObjectStaticProxy($this, $lc);
         if (null !== $nestedObject) {
             return $nestedObject;
@@ -1178,6 +1182,12 @@ class Context {
                 $bound = \PHPCompiler\AOT\ExternalMethodBind::tryBind($this, $proxyName);
                 if (null !== $bound && !($bound instanceof Call\ExternalMethod)) {
                     return $bound;
+                }
+                $standard = SpineChunkStandardHelperBind::tryBind($this, $proxyName);
+                if (null !== $standard && !($standard instanceof Call\ExternalMethod)) {
+                    $this->functionProxies[$lc] = $standard;
+
+                    return $standard;
                 }
                 $nestedObject = SpineChunkNestedVmBind::tryBindObjectStaticProxy($this, $lc);
                 if (null !== $nestedObject) {
