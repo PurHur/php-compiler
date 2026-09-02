@@ -445,6 +445,16 @@ final class Variable {
     /** Live {@see __value__*} for closure use (&$var) capture slots (issue #72). */
     public ?\PHPLLVM\Value $valueBoxAliasPtr = null;
 
+    /**
+     * i1 alloca: native long + / − / * took the overflow→double cold path (#36189).
+     *
+     * @var \PHPLLVM\Value|null
+     */
+    public ?\PHPLLVM\Value $longArithOverflowFlag = null;
+
+    /** Cold-path double box when {@see $longArithOverflowFlag} is set (#36189). */
+    public ?Variable $longArithOverflowPromoted = null;
+
     /** Module-global {@see __value__*} slot for function-local static storage (#3778, #2286). */
     public bool $functionStaticGlobal = false;
 
