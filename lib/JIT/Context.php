@@ -495,16 +495,6 @@ class Context {
      */
     public array $scopeSlotObjectMirrorLlvmBySlot = [];
 
-    /** Active alias slot while lowering named-storage dest mirror assign (#36245). */
-    public ?int $pendingNamedStorageAssignMirrorAliasSlot = null;
-
-    /**
-     * Named-storage ASSIGN alias slot => LLVM {@see __object__**} mirror allocas (#36245 loop_unset).
-     *
-     * @var array<int, list<\PHPLLVM\Value>>
-     */
-    public array $assignResultObjectMirrorLlvmByLocalSlot = [];
-
     /** `return $c ? $a : $b` shared merge operand — emit direct returns per arm (#8555 AOT). */
     public ?Operand $ternarySharedReturnOperand = null;
 
