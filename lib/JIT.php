@@ -12209,7 +12209,7 @@ class JIT {
                             JIT\ValueEchoHelper::echoLiteral($this->context, 'Array');
                             break;
                         case Variable::TYPE_OBJECT:
-                            $classHint = $block->getOperand($argOffset)->type?->userType ?? null;
+                            $classHint = $this->opCodeArgSlotType($block, $op, $argOffset)?->userType ?? null;
                             JIT\ValueEchoHelper::echoObjectVariable(
                                 $this->context,
                                 $arg,
@@ -16650,6 +16650,51 @@ class JIT {
         return $block->getOperand($slot);
     }
 
+    /**
+     * php-types fact for a value-scope arg index (see Block::opCodeValueScopeArgs) (#36249).
+     */
+    private function opCodeValueArgType(OpCode $op, int $valueArgIndex): ?\PHPTypes\Type
+    {
+        return $op->argTypes[$valueArgIndex] ?? null;
+    }
+
+    /**
+     * Primary result type for an opcode; falls back to the dest operand when unstamped (#36249).
+     */
+    private function opCodeResultType(Block $block, OpCode $op): ?\PHPTypes\Type
+    {
+        if ($op->resultType instanceof \PHPTypes\Type) {
+            return $op->resultType;
+        }
+        if (null === $op->arg1) {
+            return null;
+        }
+        $dest = $block->getOperand((int) $op->arg1);
+
+        return ($dest?->type instanceof \PHPTypes\Type) ? $dest->type : null;
+    }
+
+    /**
+     * Type for a specific opcode arg slot (arg1/arg2/arg3), via stamped value-scope index (#36249).
+     */
+    private function opCodeArgSlotType(Block $block, OpCode $op, int $argSlot): ?\PHPTypes\Type
+    {
+        $scopeArgs = $block->opCodeValueScopeArgs($op);
+        foreach ($scopeArgs as $index => $slot) {
+            if (null !== $slot && (int) $slot === $argSlot) {
+                $typed = $this->opCodeValueArgType($op, (int) $index);
+                if ($typed instanceof \PHPTypes\Type) {
+                    return $typed;
+                }
+                $operand = $block->getOperand($argSlot);
+
+                return ($operand?->type instanceof \PHPTypes\Type) ? $operand->type : null;
+            }
+        }
+
+        return null;
+    }
+
     /** Match/phi merge may leave TYPE_ASSIGN arg3 null; rhs lives in arg1 (#13092). */
     /** AssignOp peephole may leave arg2 null; lvalue lives in arg1 (#13062, #6438). */
     /** Resolve `$v` RHS from a callee formal CV before Temporary null-box fallback (#32654). */
@@ -19433,7 +19478,9 @@ class JIT {
                     $name = $block->getOperand($op->arg1);
                     assert($name instanceof Operand\Literal);
                     $className = $this->context->scope->className ?? '';
-                    $declaredJitType = Variable::getTypeFromType($block->getOperand($op->arg3)->type);
+                    $declaredJitType = Variable::getTypeFromType(
+                        $this->opCodeArgSlotType($block, $op, (int) $op->arg3)
+                    );
                     if (
                         Variable::TYPE_NATIVE_LONG !== $declaredJitType
                         && Variable::TYPE_STRING !== $declaredJitType
@@ -19494,7 +19541,9 @@ class JIT {
                     $name = $block->getOperand($op->arg1);
                     assert($name instanceof Operand\Literal);
                     $className = $this->context->scope->className ?? '';
-                    $declaredJitType = Variable::getTypeFromType($block->getOperand($op->arg3)->type);
+                    $declaredJitType = Variable::getTypeFromType(
+                        $this->opCodeArgSlotType($block, $op, (int) $op->arg3)
+                    );
                     if (Variable::TYPE_HASHTABLE === $declaredJitType || Variable::TYPE_STRING === $declaredJitType) {
                         $jitType = $declaredJitType;
                         $lcClass = strtolower(str_replace('/', '\\', ltrim($className, '\\')));
@@ -19518,7 +19567,7 @@ class JIT {
                         ) {
                             // User classes: native slots for declared scalars (VALUE-box fetch segfaults MCJIT, #5111).
                             $jitType = $declaredJitType;
-                            $propType = $block->getOperand($op->arg3)->type;
+                            $propType = $this->opCodeArgSlotType($block, $op, (int) $op->arg3);
                             $userType = is_object($propType) ? ($propType->userType ?? null) : null;
                             if (is_string($userType) && 0 === strcasecmp($userType, 'SplObjectStorage')) {
                                 // Boxed object slots: native TYPE_OBJECT property fetch breaks method calls (#8422).

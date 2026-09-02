@@ -433,6 +433,19 @@ class OpCode {
     public int $includeKind = self::INCLUDE_KIND_INCLUDE_ONCE;
     /** Docblock + source file/line for reflection (#7358). */
     public ?\PHPCompiler\Compiler\SourceLocation $sourceLocation = null;
+    /**
+     * php-types inferred result for this opcode's primary value slot (#36249).
+     *
+     * Populated at compile time from the dest operand so JIT/AOT can read facts without
+     * retaining php-cfg Operand graphs (#36231).
+     */
+    public ?\PHPTypes\Type $resultType = null;
+    /**
+     * Operand types for {@see Block::opCodeValueScopeArgs()} slots, in order (#36249).
+     *
+     * @var list<?\PHPTypes\Type>
+     */
+    public array $argTypes = [];
 
     public function __construct(int $type, ?int $arg1 = null, ?int $arg2 = null, ?int $arg3 = null) {
         $this->type = $type;

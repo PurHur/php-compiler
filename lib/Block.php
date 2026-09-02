@@ -1272,8 +1272,34 @@ class Block {
 
     public function addOpCode(OpCode ...$ops): void {
         foreach ($ops as $op) {
+            $this->stampOpCodeTypeFacts($op);
             $this->nOpCodes++;
             $this->opCodes[] = $op;
+        }
+    }
+
+    /**
+     * Copy php-types facts from scope operands onto the opcode (#36249).
+     *
+     * Value-scope arg order matches {@see opCodeValueScopeArgs()}.
+     */
+    public function stampOpCodeTypeFacts(OpCode $op): void
+    {
+        $argTypes = [];
+        foreach ($this->opCodeValueScopeArgs($op) as $slot) {
+            if (null === $slot) {
+                $argTypes[] = null;
+                continue;
+            }
+            $operand = $this->getOperand((int) $slot);
+            $argTypes[] = ($operand?->type instanceof \PHPTypes\Type) ? $operand->type : null;
+        }
+        $op->argTypes = $argTypes;
+        if (null !== $op->arg1) {
+            $dest = $this->getOperand((int) $op->arg1);
+            if ($dest?->type instanceof \PHPTypes\Type) {
+                $op->resultType = $dest->type;
+            }
         }
     }
 
