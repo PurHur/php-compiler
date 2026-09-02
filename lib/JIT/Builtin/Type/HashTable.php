@@ -424,13 +424,9 @@ class HashTable extends Type
             $typeinfo,
             $ref
         );
-        // __ref__init stores refcount 0; the allocator is the first owner (#32538).
-        // Without this, writeHashtable addref + delref of the INIT_ARRAY temp
-        // drops to 0 and frees the table before `$m['c']=3` / <=> run.
-        $this->context->builder->call(
-            $this->context->lookupFunction('__ref__addref'),
-            $ref
-        );
+        // Leave refcount at 0 — the next owner (direct store addref or __value__writeHashtable)
+        // establishes the sole reference. Eager addref here plus writeHashtable's retain left
+        // value-boxed script locals at rc=2 and O(n²) append COW (#36252).
         $this->context->builder->call(
             $this->context->lookupFunction('__hashtable__grow'),
             $ht,
@@ -2184,7 +2180,8 @@ class HashTable extends Type
         $ptrField = $this->context->builder->structGep($value, $map['value']);
         $htSlot = $this->context->builder->pointerCast($ptrField, $htPtr->pointerType(0));
         $this->context->builder->store($hashtable, $htSlot);
-        // Match writeObject: retain the HT for the value-box owner (#24226 e08_spread).
+        // Sole owner claim for the value box (Zend zval array assignment). Callers that
+        // store a shared HT must addref before writeHashtable (#24226 / #36252).
         $this->context->builder->call(
             $this->context->lookupFunction('__ref__addref'),
             $this->context->builder->pointerCast(
