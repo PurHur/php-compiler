@@ -29,8 +29,8 @@ patch_already_applied() {
       grep -q 'array \$implements, Block \$stmts, ?Operand \$extends = null' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Class_.php" 2>/dev/null
       ;;
     php-llvm-structgep-assert.patch)
-      grep -q 'PHP_COMPILER_LLVM_ASSERT' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php" 2>/dev/null \
-        && patch_is_fully_applied "$ROOT/patches/php-llvm-structgep-assert.patch"
+      # Match icmp: detect by assert message, not env-var substring (REMOVED_TEST false positive).
+      grep -q 'structGep: receiver is not a pointer' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php" 2>/dev/null
       ;;
     php-llvm-icmp-assert.patch)
       grep -q 'iCmp: operands are not of the same type' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php" 2>/dev/null
@@ -6840,6 +6840,19 @@ repair_php_llvm_token_type_kind_typo_in_prelinked() {
   fi
 }
 
+# Harness runs sometimes rename the assert env var to REMOVED_TEST to probe removal;
+# that leaves vendor half-patched and structgep skip falsely fails (grep substring match).
+repair_php_llvm_assert_env_var() {
+  local target="$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php"
+  if [[ ! -f "$target" ]]; then
+    return 0
+  fi
+  if grep -q "PHP_COMPILER_LLVM_ASSERT_REMOVED_TEST" "$target" 2>/dev/null; then
+    sed -i "s/PHP_COMPILER_LLVM_ASSERT_REMOVED_TEST/PHP_COMPILER_LLVM_ASSERT/g" "$target"
+    echo "Repaired php-llvm Builder.php (PHP_COMPILER_LLVM_ASSERT_REMOVED_TEST → PHP_COMPILER_LLVM_ASSERT) (#36143)"
+  fi
+}
+
 apply_php_types_static_var_array_type_repair() {
   # Old php-types-static-var.patch peeled ->subTypes, typing string[] statics as string (#32806).
   local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
@@ -7447,6 +7460,7 @@ apply_patch "$PATCH_DIR/php-llvm-value-addincoming.patch"
 apply_patch "$PATCH_DIR/php-llvm-llvmabstract-value-addincoming.patch"
 apply_patch "$PATCH_DIR/php-llvm-builder-and-or.patch"
 apply_patch "$PATCH_DIR/php-llvm-builder-xor.patch"
+repair_php_llvm_assert_env_var
 apply_patch "$PATCH_DIR/php-llvm-structgep-assert.patch"
 apply_patch "$PATCH_DIR/php-llvm-icmp-assert.patch"
 apply_patch "$PATCH_DIR/php-llvm-pass-registry-interface.patch"
