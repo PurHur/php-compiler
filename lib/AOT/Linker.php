@@ -25,7 +25,13 @@ final class Linker
     ];
 
     /** libz.so symlink is often absent without zlib1g-dev; link the versioned .so directly. */
-    private const RUNTIME_LINK_LIBS = '-lpcre2-8 -lcrypt -l:libz.so.1 -l:libbz2.so.1.0';
+    private const PCRE2_LINK_LIB = '-lpcre2-8';
+
+    private const CRYPT_LINK_LIB = '-lcrypt';
+
+    private const Z_LINK_LIB = '-l:libz.so.1';
+
+    private const BZ2_LINK_LIB = '-l:libbz2.so.1.0';
 
     /** Appended when OpensslSignJitHelper FFI is available at link time (#16454).
      * libcrypto.so symlink is absent without libssl-dev (same trap as libz
@@ -78,12 +84,14 @@ final class Linker
         // carries duplicate ABI definitions by design; the script object is
         // listed first and -z muldefs keeps the first definition, so runtime
         // state stays single-copy while helper bodies resolve from the cache.
-        foreach (HelperRuntimeCache::linkObjects() as $helperObject) {
+        $helperObjects = HelperRuntimeCache::linkObjects();
+        foreach ($helperObjects as $helperObject) {
             $vendorObjects[] = $helperObject;
         }
+        $linkObjectFiles = array_merge($runtimeObjects, [$objectFile], $vendorObjects);
         $llvmDir = getenv('PHP_COMPILER_LLVM_PATH');
         if (false === $llvmDir || '' === $llvmDir) {
-            self::linkWithSystemCompiler($objectFile, $executable, $runtimeObjects, $vendorObjects);
+            self::linkWithSystemCompiler($objectFile, $executable, $runtimeObjects, $vendorObjects, $linkObjectFiles);
 
             return;
         }
@@ -125,7 +133,7 @@ final class Linker
                 '-lc',
                 '-lm',
                 self::HOST_LIB_SEARCH,
-                self::runtimeLinkLibs(),
+                self::runtimeLinkLibs($linkObjectFiles),
                 escapeshellarg($libgcc),
                 escapeshellarg($crtend),
                 escapeshellarg('/usr/lib/x86_64-linux-gnu/crtn.o'),
@@ -152,14 +160,14 @@ final class Linker
             // When linking with the bundled clang, ensure we can still resolve host libraries
             // (libpcre2-8, libcrypt, ...). Some bootstrap envs only ship the runtime .so/.a under
             // /usr/lib/x86_64-linux-gnu without a full sysroot lib tree.
-            $cmd = escapeshellarg($clang).' '.AotDebugSymbols::linkFlag().AotGcSections::linkStripFlag().AotGcSections::linkGcSectionsFlag(true).self::helperMuldefsFlag(' -Wl,-z,muldefs').self::libcNameHideFlag(true).$objects.' '.self::HOST_LIB_SEARCH.' -lm '.self::runtimeLinkLibs().' -o '.escapeshellarg($executable);
+            $cmd = escapeshellarg($clang).' '.AotDebugSymbols::linkFlag().AotGcSections::linkStripFlag().AotGcSections::linkGcSectionsFlag(true).self::helperMuldefsFlag(' -Wl,-z,muldefs').self::libcNameHideFlag(true).$objects.' '.self::HOST_LIB_SEARCH.' -lm '.self::runtimeLinkLibs($linkObjectFiles).' -o '.escapeshellarg($executable);
             self::run($cmd, $env);
             self::unlinkIfTemp($runtimeObjects);
 
             return;
         }
 
-        self::linkWithSystemCompiler($objectFile, $executable, $runtimeObjects, $vendorObjects);
+        self::linkWithSystemCompiler($objectFile, $executable, $runtimeObjects, $vendorObjects, $linkObjectFiles);
     }
 
     /** -z muldefs is only injected while helper-runtime TUs are merged (#15889). */
@@ -234,10 +242,102 @@ final class Linker
         return self::RUNTIME_C_SOURCES;
     }
 
-    private static function runtimeLinkLibs(): string
+    /**
+     * @param list<string> $objectFiles
+     */
+    private static function runtimeLinkLibs(array $objectFiles): string
     {
-        $libs = self::RUNTIME_LINK_LIBS;
-        // Sign (#3324) and pkey_new runtime keygen (#34015) both need libcrypto at link time.
+        if (self::linkAllOptionalLibsForced()) {
+            return self::allOptionalLinkLibs();
+        }
+
+        $undefined = self::collectUndefinedSymbols($objectFiles);
+        if ([] === $undefined) {
+            // nm missing or every object unreadable — keep legacy full link set.
+            return self::allOptionalLinkLibs();
+        }
+
+        return self::linkLibsForUndefinedSymbols($undefined);
+    }
+
+    /**
+     * Map undefined linker symbols to -l flags (#36200).
+     *
+     * @param list<string> $undefinedSymbols
+     */
+    public static function linkLibsForUndefinedSymbols(array $undefinedSymbols): string
+    {
+        $need = [
+            'pcre2' => false,
+            'crypt' => false,
+            'z' => false,
+            'bz2' => false,
+            'openssl' => false,
+            'argon2' => false,
+            'sodium' => false,
+        ];
+        foreach ($undefinedSymbols as $sym) {
+            if (str_starts_with($sym, 'pcre2_')) {
+                $need['pcre2'] = true;
+            }
+            if ('crypt' === $sym || str_starts_with($sym, 'crypt_')) {
+                $need['crypt'] = true;
+            }
+            if (str_starts_with($sym, 'BZ2_')) {
+                $need['bz2'] = true;
+            }
+            if (str_starts_with($sym, 'sodium_')) {
+                $need['sodium'] = true;
+            }
+            if (str_starts_with($sym, 'argon2')) {
+                $need['argon2'] = true;
+            }
+            foreach (['inflate', 'deflate', 'compress', 'uncompress', 'crc32', 'gzopen', 'gzread', 'gzwrite', 'gzdopen', 'gzclose', 'gzflush'] as $zsym) {
+                if ($sym === $zsym || str_starts_with($sym, $zsym.'@')) {
+                    $need['z'] = true;
+                }
+            }
+            foreach (['EVP_', 'RSA_', 'PEM_', 'BIO_', 'OPENSSL_', 'HMAC_', 'SHA256_', 'AES_', 'EC_', 'X509_', 'PKCS'] as $prefix) {
+                if (str_starts_with($sym, $prefix)) {
+                    $need['openssl'] = true;
+                }
+            }
+        }
+
+        $libs = [];
+        if ($need['pcre2']) {
+            $libs[] = self::PCRE2_LINK_LIB;
+        }
+        if ($need['crypt']) {
+            $libs[] = self::CRYPT_LINK_LIB;
+        }
+        if ($need['z']) {
+            $libs[] = self::Z_LINK_LIB;
+        }
+        if ($need['bz2']) {
+            $libs[] = self::BZ2_LINK_LIB;
+        }
+        if ($need['openssl']) {
+            $libs[] = self::OPENSSL_LINK_LIB;
+        }
+        if ($need['argon2']) {
+            $libs[] = self::ARGON2_LINK_LIB;
+        }
+        if ($need['sodium']) {
+            $libs[] = self::SODIUM_LINK_LIB;
+        }
+
+        return implode(' ', $libs);
+    }
+
+    private static function allOptionalLinkLibs(): string
+    {
+        $libs = implode(' ', [
+            self::PCRE2_LINK_LIB,
+            self::CRYPT_LINK_LIB,
+            self::Z_LINK_LIB,
+            self::BZ2_LINK_LIB,
+        ]);
         if (
             OpensslSignRuntime::opensslEvRuntimeAvailable()
             || \PHPCompiler\ext\openssl\VmOpensslPkeyNative::available()
@@ -252,6 +352,75 @@ final class Linker
         }
 
         return $libs;
+    }
+
+    private static function linkAllOptionalLibsForced(): bool
+    {
+        $flag = getenv('PHP_COMPILER_LINK_ALL_LIBS');
+        if (false === $flag || '' === $flag) {
+            return false;
+        }
+
+        return '0' !== $flag && 'false' !== strtolower($flag);
+    }
+
+    /**
+     * @param list<string> $objectFiles
+     *
+     * @return list<string>
+     */
+    private static function collectUndefinedSymbols(array $objectFiles): array
+    {
+        $nm = self::resolveNmBinary();
+        if (null === $nm) {
+            return [];
+        }
+
+        $symbols = [];
+        foreach ($objectFiles as $objectFile) {
+            if (!is_file($objectFile)) {
+                continue;
+            }
+            $captured = self::runCaptured(
+                escapeshellarg($nm).' -u '.escapeshellarg($objectFile),
+                null
+            );
+            if (0 !== $captured['code']) {
+                continue;
+            }
+            foreach (explode("\n", $captured['stdout']."\n".$captured['stderr']) as $line) {
+                $line = trim($line);
+                if ('' === $line) {
+                    continue;
+                }
+                if (preg_match('/\bU\s+(\S+)/', $line, $matches)) {
+                    $symbols[$matches[1]] = true;
+                }
+            }
+        }
+
+        return array_keys($symbols);
+    }
+
+    private static function resolveNmBinary(): ?string
+    {
+        $llvmDir = getenv('PHP_COMPILER_LLVM_PATH');
+        if (false !== $llvmDir && '' !== $llvmDir) {
+            foreach (['llvm-nm', 'llvm-nm-9'] as $name) {
+                $candidate = rtrim($llvmDir, '/').'/'.$name;
+                if (is_executable($candidate)) {
+                    return $candidate;
+                }
+            }
+        }
+        foreach (['llvm-nm-9', 'llvm-nm', 'nm'] as $name) {
+            $path = self::which($name);
+            if (null !== $path) {
+                return $path;
+            }
+        }
+
+        return null;
     }
 
     /** libargon2.so.1 for AOT password_hash(PASSWORD_ARGON2*) thin kernel (#26773). */
@@ -527,8 +696,12 @@ final class Linker
         string $objectFile,
         string $executable,
         array $runtimeObjects = [],
-        array $vendorObjects = []
+        array $vendorObjects = [],
+        array $linkObjectFiles = []
     ): void {
+        if ([] === $linkObjectFiles) {
+            $linkObjectFiles = array_merge($runtimeObjects, [$objectFile], $vendorObjects);
+        }
         $linkers = [
             'clang-9', 'clang', 'clang-17', 'clang-14', 'gcc', 'cc',
         ];
@@ -546,7 +719,7 @@ final class Linker
                 continue;
             }
             $cmd = escapeshellarg($path) . ' '
-                . AotDebugSymbols::linkFlag() . AotGcSections::linkStripFlag() . AotGcSections::linkGcSectionsFlag(true) . self::helperMuldefsFlag(' -Wl,-z,muldefs') . self::libcNameHideFlag(true) . $objects . ' '.self::HOST_LIB_SEARCH.' -lm '.self::RUNTIME_LINK_LIBS.' -o ' . escapeshellarg($executable);
+                . AotDebugSymbols::linkFlag() . AotGcSections::linkStripFlag() . AotGcSections::linkGcSectionsFlag(true) . self::helperMuldefsFlag(' -Wl,-z,muldefs') . self::libcNameHideFlag(true) . $objects . ' '.self::HOST_LIB_SEARCH.' -lm '.self::runtimeLinkLibs($linkObjectFiles).' -o ' . escapeshellarg($executable);
             $captured = self::runCaptured($cmd, null);
             if (0 === $captured['code']) {
                 self::unlinkIfTemp($runtimeObjects);
