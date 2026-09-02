@@ -9341,6 +9341,14 @@ class JIT {
                         && null !== $aliasName
                         && '' !== $aliasName
                         && null === JIT\OperandName::resolve($destOp);
+                    $namedStorageMirrorAliasSlot = null;
+                    if (
+                        $needsNamedStorageAssign
+                        && null !== $op->arg2
+                        && Variable::TYPE_OBJECT === $value->type
+                    ) {
+                        $namedStorageMirrorAliasSlot = (int) $op->arg2;
+                    }
                     if ($needsNamedStorageAssign && !$this->context->hasVariableOp($destOp)) {
                         $this->context->makeVariableFromOp($func, $basicBlock, $block, $destOp);
                     }
@@ -9410,6 +9418,19 @@ class JIT {
                         ) {
                             $this->context->makeVariableFromOp($func, $basicBlock, $block, $aliasOp);
                         }
+                        if (null !== $destOp && null !== $namedStorageMirrorAliasSlot) {
+                            $this->emitNamedStorageDestMirrorAssign(
+                                $func,
+                                $basicBlock,
+                                $block,
+                                $destOp,
+                                $rhsOperand,
+                                $value,
+                                $args,
+                                $thisParamOffset,
+                                $namedStorageMirrorAliasSlot
+                            );
+                        }
                         $this->emitAssignOperandWithByRefFormalFastPath(
                             $block,
                             $aliasOp,
@@ -9424,7 +9445,7 @@ class JIT {
                         // ClosureWithCaptures on `$f` or AOT invoke drops use() snapshots (#24106).
                         $this->preserveClosureInvokeMetadata($aliasOp, $aliasVar, $value);
                         $this->recordListUnpackAssignSlot($aliasOp, $aliasVar);
-                        if (null !== $destOp) {
+                        if (null !== $destOp && null === $namedStorageMirrorAliasSlot) {
                             $destUsed = [] !== $destOp->usages;
                             // `$o->p ??= $x = n` reads Assign.result, not `$x` (#35998 / #29747).
                             $resultConsumedLater = null !== $op->arg1
@@ -11697,10 +11718,12 @@ class JIT {
                                     $this->jitWriteNullForUnset(
                                         JIT\JitValueBox::valuePtrFromVariable($this->context, $bound)
                                     );
-                                    $nullVar = $this->jitNullVariable();
-                                    $this->context->bindVariableByName($resolvedUnset, $nullVar);
-                                    $this->context->setVariableOp($targetOp, $nullVar);
-                                    unset($this->context->namedVariableBindings[$resolvedUnset]);
+                                    // Keep canonical CV; jitNullVariable() split left loop back-edge
+                                    // assigns delref'ing GC orphans (#36245 loop_unset).
+                                    $bound->isNullConstant = true;
+                                    $this->context->bindVariableByName($resolvedUnset, $bound);
+                                    $this->context->setVariableOp($targetOp, $bound);
+                                    $this->jitClearAssignResultObjectMirrorForNamedUnset($block, $op->arg2);
                                     break;
                                 }
                                 if (
@@ -11778,6 +11801,10 @@ class JIT {
                                 $this->jitWriteNullForUnset(
                                     JIT\JitValueBox::valuePtrFromVariable($this->context, $target)
                                 );
+                                $target->isNullConstant = true;
+                                if (null !== $unsetName && '' !== $unsetName) {
+                                    $this->jitClearAssignResultObjectMirrorForNamedUnset($block, $op->arg2);
+                                }
                                 break;
                             }
                             $target->free();
@@ -22730,7 +22757,11 @@ class JIT {
                 // copyBetweenPointers / foreach value fetch may branchToFreshContinue and
                 // seal the insert BB; delref here must not emit parentless IR (#26783 / #26784).
                 JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'assign_same_type_free_cont');
-                $result->free();
+                if ('__object__**' === $this->context->getStringFromType($result->value->typeOf())) {
+                    $this->freeNamedStorageObjectMirrorUnlessMirrorNull($result);
+                } else {
+                    $result->free();
+                }
             }
             if ($value->type & Variable::IS_NATIVE_ARRAY || Variable::TYPE_HASHTABLE === $value->type) {
                 $result->nextFreeElement = $value->nextFreeElement;
@@ -22804,6 +22835,7 @@ class JIT {
                     $this->context->bindVariableByName($resolved, $result);
                 }
             }
+            $this->recordNamedStorageAssignMirrorAfterWrite($resultOp, $result);
             $this->markScopeVariableAssignedIfTracked($resultOp, $result);
 
             return;
@@ -33669,6 +33701,159 @@ class JIT {
             $this->context->lookupFunction('__value__writeNull'),
             $valueBoxPtr
         );
+    }
+
+    /**
+     * Named-storage ASSIGN also updates a TYPE_OBJECT result temp; unset must null it
+     * without delref so loop-carried GC orphans survive (#36245 loop_unset).
+     */
+    private function jitClearAssignResultObjectMirrorForNamedUnset(Block $block, ?int $unsetArgSlot): void
+    {
+        if (null === $unsetArgSlot) {
+            return;
+        }
+        $targetSlot = (int) $unsetArgSlot;
+        $nullObj = $this->context->getTypeFromString('__object__*')->constNull();
+        $seen = new \SplObjectStorage();
+        $clearLlvmMirror = function (\PHPLLVM\Value $llvmMirror) use ($nullObj, $seen): void {
+            if ($seen->contains($llvmMirror)) {
+                return;
+            }
+            $storageTy = $this->context->getStringFromType($llvmMirror->typeOf());
+            if (!str_contains($storageTy, '__object__')) {
+                return;
+            }
+            $seen[$llvmMirror] = true;
+            $this->context->builder->store($nullObj, $llvmMirror);
+        };
+        foreach ($this->context->scopeSlotObjectMirrorLlvmBySlot as $llvmMirror) {
+            $clearLlvmMirror($llvmMirror);
+        }
+        foreach ($block->opCodes as $assignOp) {
+            if (OpCode::TYPE_ASSIGN !== $assignOp->type || null === $assignOp->arg2 || null === $assignOp->arg1) {
+                continue;
+            }
+            if ((int) $assignOp->arg2 !== $targetSlot || $assignOp->arg1 === $assignOp->arg2) {
+                continue;
+            }
+            $destSlot = (int) $assignOp->arg1;
+            if (isset($this->context->scopeSlotObjectMirrorLlvmBySlot[$destSlot])) {
+                $llvmMirror = $this->context->scopeSlotObjectMirrorLlvmBySlot[$destSlot];
+                if (!$seen->contains($llvmMirror)) {
+                    $seen[$llvmMirror] = true;
+                    $this->context->builder->store($nullObj, $llvmMirror);
+                }
+            }
+            $destOp = $block->operandForScopeSlot($destSlot);
+            if (null !== $destOp && $this->context->hasVariableOp($destOp)) {
+                $mirror = $this->context->getVariableFromOp($destOp);
+                if (
+                    Variable::TYPE_OBJECT === $mirror->type
+                    && Variable::KIND_VARIABLE === $mirror->kind
+                    && null === $mirror->objectPropertySlot
+                    && !$mirror->functionStaticGlobal
+                    && str_contains($this->context->getStringFromType($mirror->value->typeOf()), '__object__')
+                    && !$seen->contains($mirror->value)
+                ) {
+                    $seen[$mirror->value] = true;
+                    $this->context->builder->store($nullObj, $mirror->value);
+                }
+            }
+        }
+        foreach ($this->context->assignResultObjectMirrorLlvmByLocalSlot[$targetSlot] ?? [] as $llvmMirror) {
+            if ($seen->contains($llvmMirror)) {
+                continue;
+            }
+            if (!str_contains($this->context->getStringFromType($llvmMirror->typeOf()), '__object__')) {
+                continue;
+            }
+            $seen[$llvmMirror] = true;
+            $this->context->builder->store($nullObj, $llvmMirror);
+        }
+    }
+
+    private function freeNamedStorageObjectMirrorUnlessMirrorNull(Variable $mirror): void
+    {
+        $nullObj = $this->context->getTypeFromString('__object__*')->constNull();
+        $loaded = $this->context->builder->load($mirror->value);
+        $hasObj = $this->context->builder->icmp(
+            \PHPLLVM\Builder::INT_NE,
+            $loaded,
+            $nullObj
+        );
+        $delrefBlock = JIT\BasicBlockHelper::append($this->context, 'named_mirror_delref');
+        $skipBlock = JIT\BasicBlockHelper::append($this->context, 'named_mirror_skip');
+        $this->context->builder->branchIf($hasObj, $delrefBlock, $skipBlock);
+        $this->context->builder->positionAtEnd($delrefBlock);
+        $this->context->refcount->delref($loaded);
+        $this->context->builder->branch($skipBlock);
+        $this->context->builder->positionAtEnd($skipBlock);
+    }
+
+    private function recordNamedStorageAssignObjectMirrorLlvm(int $aliasSlot, \PHPLLVM\Value $llvmMirror): void
+    {
+        $storageTy = $this->context->getStringFromType($llvmMirror->typeOf());
+        if (!str_contains($storageTy, '__object__')) {
+            return;
+        }
+        $this->context->assignResultObjectMirrorLlvmByLocalSlot[$aliasSlot] ??= [];
+        foreach ($this->context->assignResultObjectMirrorLlvmByLocalSlot[$aliasSlot] as $existing) {
+            if ($existing === $llvmMirror) {
+                return;
+            }
+        }
+        $this->context->assignResultObjectMirrorLlvmByLocalSlot[$aliasSlot][] = $llvmMirror;
+    }
+
+    private function recordNamedStorageAssignMirrorAfterWrite(Operand $resultOp, Variable $result): void
+    {
+        $aliasSlot = $this->context->pendingNamedStorageAssignMirrorAliasSlot;
+        if (null === $aliasSlot) {
+            return;
+        }
+        if (
+            Variable::TYPE_OBJECT !== $result->type
+            || Variable::KIND_VARIABLE !== $result->kind
+            || null !== $result->objectPropertySlot
+            || !str_contains($this->context->getStringFromType($result->value->typeOf()), '__object__')
+        ) {
+            return;
+        }
+        $block = $this->context->jitEnclosingBlock;
+        if (null !== $block) {
+            $destSlot = $block->slotForOperand($resultOp);
+            if (null !== $destSlot) {
+                $this->context->scopeSlotObjectMirrorLlvmBySlot[(int) $destSlot] = $result->value;
+            }
+        }
+        $this->recordNamedStorageAssignObjectMirrorLlvm($aliasSlot, $result->value);
+    }
+
+    private function emitNamedStorageDestMirrorAssign(
+        \PHPLLVM\Value\Function_ $func,
+        \PHPLLVM\BasicBlock $basicBlock,
+        Block $block,
+        Operand $destOp,
+        Operand $rhsOperand,
+        Variable $value,
+        array $args,
+        int $thisParamOffset,
+        int $aliasSlot
+    ): void {
+        if (!$this->context->hasVariableOp($destOp)) {
+            $this->context->makeVariableFromOp($func, $basicBlock, $block, $destOp);
+        }
+        $this->context->pendingNamedStorageAssignMirrorAliasSlot = $aliasSlot;
+        $this->emitAssignOperandWithByRefFormalFastPath(
+            $block,
+            $destOp,
+            $rhsOperand,
+            $value,
+            $args,
+            $thisParamOffset,
+            true
+        );
+        $this->context->pendingNamedStorageAssignMirrorAliasSlot = null;
     }
 
     /**
