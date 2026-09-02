@@ -24,6 +24,12 @@ use PHPLLVM\Builder;
 
 class HashTable extends Type
 {
+    /**
+     * Bytes per packed slot — must match LLVM sizeof(%__value__) for inBoundsGep stride (#36214).
+     * Bump to 16 when __value__ becomes 16 B / align 8.
+     */
+    private const PACKED_VALUE_STRIDE = 9;
+
     public PHPLLVM\Type $pointer;
 
     public function register(): void
@@ -476,7 +482,7 @@ class HashTable extends Type
 
         $this->context->builder->positionAtEnd($allocBlock);
         $nc = $this->context->builder->load($capSlot);
-        $valueSize = $sizeT->constInt(16, false);
+        $valueSize = $sizeT->constInt(self::PACKED_VALUE_STRIDE, false);
         $bytes = $this->context->builder->mulNoSignedWrap($nc, $valueSize);
         $valuesPtr = $this->context->builder->load($this->context->builder->structGep($ht, $map['values']));
         $i8p = $this->context->getTypeFromString('int8*');
