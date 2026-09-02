@@ -5314,6 +5314,7 @@ require_once __DIR__.'/../../../lib/Compiler/ClassConstVisibilityInheritCheck.ph
 require_once __DIR__.'/../../../lib/Compiler/CompileFatal.php';
 require_once __DIR__.'/../../../lib/Compiler/CompileTimeEnumCase.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompileTimeFold.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/ParameterAsserts.php';
 require_once __DIR__.'/../../../lib/Compiler/CompileTimeNew.php';
 require_once __DIR__.'/../../../lib/Compiler/DeprecatedMetadata.php';
 require_once __DIR__.'/../../../lib/Compiler/DuplicateUnionMemberCompileCheck.php';
@@ -8182,8 +8183,6 @@ require_once __DIR__.'/../../../lib/AOT/HelperRuntimeCommon.php';
 require_once __DIR__.'/../../../lib/Cli/ProcPipeReader.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ValueBoxWriteDoubleJit.php';
 require_once __DIR__.'/../../../lib/VM/VmValueBoxWriteDouble.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/Type/HashTableDtorLlvm.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/Type/ObjectDtorLlvm.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 
