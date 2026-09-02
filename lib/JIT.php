@@ -238,6 +238,9 @@ class JIT {
         JIT\Progress::noteFunction('jit_compile_finalize_m3_emit_tu_spine_done');
 
         JIT\Progress::noteFunction('jit_compile_done');
+        if ('1' === getenv('PHP_COMPILER_DETACH_CFG_AFTER_JIT')) {
+            Block::detachCfgTree($block, false);
+        }
         JIT\Progress::noteFunction('jit_compile_return_begin');
         return $return;
     }

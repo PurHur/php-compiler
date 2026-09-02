@@ -849,6 +849,9 @@ class Runtime {
         }
 
         $this->assignOpResolver->optimize($block);
+        if ('1' === getenv('PHP_COMPILER_RELEASE_CFG_AFTER_COMPILE')) {
+            Block::detachCfgTree($block, true);
+        }
 
         return $block;
     }
