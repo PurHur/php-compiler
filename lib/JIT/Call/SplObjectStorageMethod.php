@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitOperandTypeLabel;
+use PHPCompiler\JIT\JitNativeMethodReturn;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\Builtin\VmClassMethod;
@@ -321,10 +322,8 @@ final class SplObjectStorageMethod implements Call
             $ht,
             $keyObj
         );
-        $slot = JitValueBox::alloc($context);
-        JitValueBox::writeBool($context, $slot, $isSet);
 
-        return $slot;
+        return JitNativeMethodReturn::bool($context, $isSet);
     }
 
     private function callCount(Context $context, Variable ...$args): Value
@@ -335,14 +334,11 @@ final class SplObjectStorageMethod implements Call
         $ht = self::backingHashtable($context, $args[0]);
         $map = $context->structFieldMap['__hashtable__'];
         $num = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
-        $slot = JitValueBox::alloc($context);
-        JitValueBox::writeLong(
+
+        return JitNativeMethodReturn::long(
             $context,
-            $slot,
             $context->builder->truncOrBitCast($num, $context->getTypeFromString('int64'))
         );
-
-        return $slot;
     }
 
     /**

@@ -12,6 +12,7 @@ use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitNativeMethodReturn;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Builtin\VmClassMethod;
@@ -1544,10 +1545,8 @@ final class JitDateMutation
                 \sprintf('%s() expects exactly 0 arguments, %d given', $function, $argc - 1)
             );
             BasicBlockHelper::ensureOpenInsertBlock($context, 'datetime_gettimestamp_argc_cont');
-            $slot = JitValueBox::alloc($context);
-            JitValueBox::writeLong($context, $slot, $context->getTypeFromString('int64')->constInt(0, true));
 
-            return $slot;
+            return JitNativeMethodReturn::longZero($context);
         }
         $layout = $immutable ? 'DateTimeImmutable' : 'DateTime';
         $i64 = $context->getTypeFromString('int64');
@@ -1562,10 +1561,7 @@ final class JitDateMutation
                 DateTimeSupport::TS_PROPERTY
             );
         }
-        $slot = JitValueBox::alloc($context);
-        JitValueBox::writeLong($context, $slot, $timestamp);
-
-        return $slot;
+        return JitNativeMethodReturn::long($context, $timestamp);
     }
 
     /** DateTime(Immutable)::setTimestamp() — JIT/AOT (#30745). */

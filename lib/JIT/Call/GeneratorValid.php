@@ -9,6 +9,7 @@ use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\GeneratorHelper;
+use PHPCompiler\JIT\JitNativeMethodReturn;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
@@ -54,10 +55,7 @@ final class GeneratorValid implements Call
             $context->builder->icmp(\PHPLLVM\Builder::INT_NE, $resumeIp, $zero)
         );
         $valid = $context->builder->and($notDone, $context->builder->and($notReturned, $active));
-        $slot = JitValueBox::alloc($context);
-        // __value__writeBool takes i32; JitValueBox::writeBool accepts i1 (#34972).
-        JitValueBox::writeBool($context, $slot, $valid);
 
-        return $slot;
+        return JitNativeMethodReturn::bool($context, $valid);
     }
 }
