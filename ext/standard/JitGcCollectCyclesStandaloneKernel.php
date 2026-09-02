@@ -506,7 +506,11 @@ final class JitGcCollectCyclesStandaloneKernel
         $context->builder->positionAtEnd($inBody);
         $i = $context->builder->load($iSlot);
         $obj = GcCollectCyclesRuntime::standaloneRegistryObjectPtr($context, $i);
-        $propCount = GcCollectCyclesRuntime::standaloneRegistryPropCount($context, $i);
+        $objTyped = $context->builder->pointerCast($obj, $objPtr);
+        $propCount = $context->builder->call(
+            $context->lookupFunction('__object__prop_count'),
+            $objTyped
+        );
         $context->builder->store($i32->constInt(0, false), $sSlot);
         $context->builder->branch($sLoop);
 

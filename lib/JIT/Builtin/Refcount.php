@@ -508,6 +508,41 @@ class Refcount extends Builtin {
                 }
                 
                 $this->context->builder->positionAtEnd(array_pop($endBlock));
+                // Zend gc_possible_root — buffer object when refcount hits 1 (#36195, #36245).
+                { $parentFn = $this->context->builder->getInsertBlock()->getParent();
+                    assert($parentFn instanceof PHPLLVM\Value\Function_);
+                    $objMask = $this->context->getTypeFromString('int32')->constInt(self::TYPE_INFO_TYPE_OBJECT, false);
+                    $isObject = $this->context->builder->icmp(
+                        PHPLLVM\Builder::INT_NE,
+                        $this->context->builder->bitwiseAnd($typeinfo, $objMask),
+                        $objMask->typeOf()->constInt(0, false)
+                    );
+                    $one = $current->typeOf()->constInt(1, false);
+                    $isOne = $this->context->builder->icmp(PHPLLVM\Builder::INT_EQ, $current, $one);
+                    $isPossibleRoot = $this->context->builder->bitwiseAnd($isObject, $isOne);
+                    $registerBlock = $parentFn->appendBasicBlock('delref_gc_possible_root');
+                    $afterRegisterBlock = $parentFn->appendBasicBlock('delref_after_gc_root');
+                    $this->context->builder->branchIf($isPossibleRoot, $registerBlock, $afterRegisterBlock);
+                    $this->context->builder->positionAtEnd($registerBlock);
+                    $obj = $this->context->builder->pointerCast(
+                        $refVirtual,
+                        $this->context->getTypeFromString('__object__*')
+                    );
+                    $propCount = $this->context->builder->call(
+                        $this->context->lookupFunction('__object__prop_count'),
+                        $obj
+                    );
+                    $this->context->builder->call(
+                        $this->context->lookupFunction('phpc_gc_register'),
+                        $this->context->builder->pointerCast(
+                            $refVirtual,
+                            $this->context->getTypeFromString('int8*')
+                        ),
+                        $propCount
+                    );
+                    $this->context->builder->branch($afterRegisterBlock);
+                    $this->context->builder->positionAtEnd($afterRegisterBlock);
+                }
     }
                 if ($this->context->builder->getInsertBlock()->getTerminator() === null) {
                     $this->context->builder->branch(end($endBlock));
