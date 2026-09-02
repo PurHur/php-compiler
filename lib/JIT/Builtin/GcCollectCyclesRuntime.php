@@ -796,7 +796,7 @@ final class GcCollectCyclesRuntime
 
     private static function implementCollectCyclesImpl(Context $context): void
     {
-        if (self::usesPhpRegistry($context)) {
+        if (self::usesPhpRegistry($context) || self::usesUserScriptStandaloneCollect($context)) {
             self::implementCollectCyclesPhpBridge($context);
 
             return;
@@ -1013,6 +1013,11 @@ final class GcCollectCyclesRuntime
         return Builtin::LOAD_TYPE_STANDALONE !== $context->loadType;
     }
 
+    private static function usesUserScriptStandaloneCollect(Context $context): bool
+    {
+        return Builtin::LOAD_TYPE_STANDALONE === $context->loadType && $context->isUserScriptAot();
+    }
+
     /**
      * User-script {main}: helper .o static init pollutes the GC registry before user code (#36245).
      */
@@ -1068,29 +1073,29 @@ final class GcCollectCyclesRuntime
      */
     private static function ensurePhpRegistryUserScriptBodies(Context $context): void
     {
-        if (!self::usesPhpRegistry($context)) {
+        if (!self::usesUserScriptStandaloneCollect($context)) {
             return;
         }
         $freeFn = $context->module->getNamedFunction('phpc_gc_free_object');
-        if (null !== $freeFn && $freeFn->countBasicBlocks() > 0) {
-            return;
+        if (null === $freeFn || 0 === $freeFn->countBasicBlocks()) {
+            $objPtr = $context->getTypeFromString('__object__*');
+            $voidpp = $context->getTypeFromString('void**');
+            $slotFn = $context->module->getNamedFunction('phpc_gc_slot_read_object');
+            if (null === $slotFn) {
+                $slotFn = $context->module->addFunction(
+                    'phpc_gc_slot_read_object',
+                    $context->context->functionType($objPtr, false, $voidpp)
+                );
+                $context->registerFunction('phpc_gc_slot_read_object', $slotFn);
+            }
+            JitGcCollectCyclesStandaloneKernel::ensureSlotReadObject($context);
+            self::implementFreeObjectPhpBridge($context);
         }
-        $objPtr = $context->getTypeFromString('__object__*');
-        $voidpp = $context->getTypeFromString('void**');
-        $slotFn = $context->module->getNamedFunction('phpc_gc_slot_read_object');
-        if (null === $slotFn) {
-            $slotFn = $context->module->addFunction(
-                'phpc_gc_slot_read_object',
-                $context->context->functionType($objPtr, false, $voidpp)
-            );
-            $context->registerFunction('phpc_gc_slot_read_object', $slotFn);
-        }
-        JitGcCollectCyclesStandaloneKernel::ensureSlotReadObject($context);
-        self::implementFreeObjectPhpBridge($context);
         $implFn = $context->module->getNamedFunction('phpc_gc_collect_cycles_impl');
         if (null === $implFn || 0 === $implFn->countBasicBlocks()) {
             self::implementCollectCyclesPhpBridge($context);
         }
+        GcCollectCyclesCollectRuntime::implementCollectBridge($context);
     }
 
     private static function ensureDestructAllowDelrefJitHelperCompiled(Context $context): void
