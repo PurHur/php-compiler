@@ -5898,6 +5898,17 @@ restart:
                     $arg1->bool($arg2->toBool($this) !== $arg3->toBool($this));
                     break;
                 case OpCode::TYPE_SMALLER:
+                    if (1 === $frame->pos) {
+                        $jumpIfOp = $frame->block->opCodes[1] ?? null;
+                        if ($jumpIfOp instanceof OpCode && OpCode::TYPE_JUMPIF === $jumpIfOp->type) {
+                            $loopExit = $this->tryExecuteCountedIntForLoopAtJumpIf($frame, $jumpIfOp);
+                            if (null !== $loopExit) {
+                                $frame = $loopExit;
+                                continue 2;
+                            }
+                        }
+                    }
+                    // fall through
                 case OpCode::TYPE_GREATER:
                 case OpCode::TYPE_SMALLER_OR_EQUAL:
                 case OpCode::TYPE_GREATER_OR_EQUAL:
@@ -11505,11 +11516,13 @@ restart:
      */
     private function tryExecuteCountedIntForLoopAtJumpIf(Frame $frame, OpCode $jumpIfOp): ?Frame
     {
-        $headerPos = $frame->pos - 1;
-        if ($headerPos < 1) {
+        if (2 !== $frame->block->nOpCodes
+            || OpCode::TYPE_JUMPIF !== $frame->block->opCodes[1]->type
+            || $frame->block->opCodes[1] !== $jumpIfOp
+        ) {
             return null;
         }
-        $compareOp = $frame->block->opCodes[$headerPos - 1];
+        $compareOp = $frame->block->opCodes[0];
         if (OpCode::TYPE_SMALLER !== $compareOp->type) {
             return null;
         }
@@ -11562,23 +11575,30 @@ restart:
             return null;
         }
         $limit = $limitVar->toInt($this);
-        $bodyTargets = [];
+        $bodyValues = [];
         foreach ($bodyIncSlots as $bodySlot) {
-            $bodyTargets[] = $frame->scope[$bodySlot]->resolveIndirect();
+            $bodyValues[] = $frame->scope[$bodySlot]->resolveIndirect()->toInt($this);
         }
+        $i = $counterVar->toInt($this);
         $limits = $this->context->executionLimits;
-        $checkEvery = 10000;
+        $checkEvery = 100000;
         $iter = 0;
-        while ($counterVar->toInt($this) < $limit) {
-            foreach ($bodyTargets as $bodyTarget) {
-                $bodyTarget->applyIncrement($this, $frame);
+        while ($i < $limit) {
+            foreach ($bodyValues as $idx => $_unused) {
+                ++$bodyValues[$idx];
             }
-            $counterVar->applyIncrement($this, $frame);
+            ++$i;
             ++$iter;
             if (0 === ($iter % $checkEvery) && !$limits->isTimerDisabled()) {
                 $limits->check($this->context, $frame);
             }
         }
+        $counterVar->int($i);
+        foreach ($bodyIncSlots as $idx => $bodySlot) {
+            $frame->scope[$bodySlot]->resolveIndirect()->int($bodyValues[$idx]);
+            $this->markScopeSlotInitialized($frame, $bodySlot);
+        }
+        $this->markScopeSlotInitialized($frame, $counterSlot);
 
         return $this->frameForBranch($frame, $exitBlock);
     }
