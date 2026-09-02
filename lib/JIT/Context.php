@@ -488,6 +488,23 @@ class Context {
     /** Scope slot => ?? result operand for runtime reload at chained call-arg send (#17590). */
     public array $coalesceMergeSlotOperands = [];
 
+    /**
+     * CFG scope slot => {@see __object__**} entry alloca for ASSIGN result temps (#36245 loop_unset).
+     *
+     * @var array<int, \PHPLLVM\Value>
+     */
+    public array $scopeSlotObjectMirrorLlvmBySlot = [];
+
+    /** Active alias slot while lowering named-storage dest mirror assign (#36245). */
+    public ?int $pendingNamedStorageAssignMirrorAliasSlot = null;
+
+    /**
+     * Named-storage ASSIGN alias slot => LLVM {@see __object__**} mirror allocas (#36245 loop_unset).
+     *
+     * @var array<int, list<\PHPLLVM\Value>>
+     */
+    public array $assignResultObjectMirrorLlvmByLocalSlot = [];
+
     /** `return $c ? $a : $b` shared merge operand — emit direct returns per arm (#8555 AOT). */
     public ?Operand $ternarySharedReturnOperand = null;
 
@@ -4426,6 +4443,29 @@ class Context {
         }
         $this->scope->variables[$op] = Variable::fromOp($this, $func, $basicBlock, $block, $op);
         $this->scope->variables[$op]->initialize();
+        $this->recordScopeSlotObjectMirrorLlvm($block, $op, $this->scope->variables[$op]);
+    }
+
+    /**
+     * Track primary {@see __object__**} entry allocas by CFG scope slot (#36245 loop_unset).
+     */
+    public function recordScopeSlotObjectMirrorLlvm(Block $block, Operand $op, Variable $var): void
+    {
+        if (Variable::TYPE_OBJECT !== $var->type || Variable::KIND_VARIABLE !== $var->kind) {
+            return;
+        }
+        if ($var->functionStaticGlobal || null !== $var->objectPropertySlot) {
+            return;
+        }
+        $storageTy = $this->getStringFromType($var->value->typeOf());
+        if (!str_contains($storageTy, '__object__')) {
+            return;
+        }
+        $cfgSlot = $block->slotForOperand($op);
+        if (null === $cfgSlot) {
+            return;
+        }
+        $this->scopeSlotObjectMirrorLlvmBySlot[(int) $cfgSlot] = $var->value;
     }
 
     /**
