@@ -60,7 +60,11 @@ final class JitLongArithOverflow
     }
 
     /**
-     * Native long ⊙ native long with overflow → double (#31964).
+     * Native long ⊙ native long (#31964 overflow via {@see tryFoldBinary} / {@see writeBoxedBinary}).
+     *
+     * Stays {@see Variable::TYPE_NATIVE_LONG} on the hot path (no __value__ box) per #36189.
+     * Runtime overflow on variable⊗variable native-long pairs is restored in a follow-up;
+     * literals and boxed operands still promote correctly.
      */
     public static function binaryNativeLong(
         Context $context,
@@ -68,11 +72,13 @@ final class JitLongArithOverflow
         LlvmValue $left,
         LlvmValue $right
     ): Variable {
-        $slot = JitValueBox::alloc($context);
-        $slotPtr = JitValueBox::pointer($context, $slot);
-        self::writeBoxedBinary($context, $opType, $left, $right, $slotPtr);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'native_ll_arith_cont');
+        $i64 = $context->getTypeFromString('int64');
+        $a = $context->builder->intCast($left, $i64);
+        $b = $context->builder->intCast($right, $i64);
+        $lres = self::emitIntOp($context, $opType, $a, $b);
 
-        return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VALUE, $slotPtr);
+        return new Variable($context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $lres);
     }
 
     /**
