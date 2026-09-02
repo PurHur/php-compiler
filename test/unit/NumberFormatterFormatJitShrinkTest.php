@@ -28,7 +28,7 @@ final class NumberFormatterFormatJitShrinkTest extends TestCase
         $helper = (string) file_get_contents(__DIR__.'/../../ext/intl/NumberFormatterFormatJitHelper.php');
         $this->assertStringContainsString('formatDecimalArgv', $helper);
 
-        $ctx = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $ctx = (string) file_get_contents(__DIR__.'/../../ext/intl/Module.php');
         $this->assertStringContainsString("functionProxies['numberformatter::format']", $ctx);
     }
 

@@ -24,7 +24,7 @@ final class MessageFormatterFormatJitShrinkTest extends TestCase
         $this->assertStringContainsString('tryCompileTimeFold', $lowering);
         $this->assertStringContainsString('MessageFormatterFormatRuntime::invoke', $lowering);
 
-        $ctx = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $ctx = (string) file_get_contents(__DIR__.'/../../ext/intl/Module.php');
         $this->assertStringContainsString("functionProxies['messageformatter::format']", $ctx);
         $this->assertStringContainsString("functionProxies['messageformatter::__construct']", $ctx);
     }

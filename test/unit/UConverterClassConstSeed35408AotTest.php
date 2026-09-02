@@ -16,7 +16,7 @@ final class UConverterClassConstSeed35408AotTest extends TestCase
     public function testSeedHookExists(): void
     {
         $src = (string) file_get_contents(
-            __DIR__.'/../../lib/JIT/Builtin/Type/Object_.php'
+            __DIR__.'/../../ext/intl/Module.php'
         );
         $this->assertStringContainsString('VmUConverter::classConstants()', $src);
         $this->assertStringContainsString('#35408', $src);

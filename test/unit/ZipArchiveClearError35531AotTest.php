@@ -32,7 +32,7 @@ final class ZipArchiveClearError35531AotTest extends TestCase
     public function testProxyAndHelperOpPresent(): void
     {
         $root = dirname(__DIR__, 2);
-        $src = (string) file_get_contents($root.'/lib/JIT/Context.php');
+        $src = (string) file_get_contents($root.'/ext/zip/Module.php');
         $this->assertStringContainsString("'clearError'", $src);
         $helper = (string) file_get_contents($root.'/ext/zip/ZipArchiveJitHelper.php');
         $this->assertStringContainsString("'ce'", $helper);

@@ -39,7 +39,7 @@ final class ZipArchiveReplaceFile35496AotTest extends TestCase
         $this->assertStringContainsString('function replaceEntry', $helper);
         $call = (string) file_get_contents($root.'/lib/JIT/Call/ZipArchiveMethod.php');
         $this->assertStringContainsString("'replacefile'", $call);
-        $ctx = (string) file_get_contents($root.'/lib/JIT/Context.php');
+        $ctx = (string) file_get_contents($root.'/ext/zip/Module.php');
         $this->assertStringContainsString("'replaceFile'", $ctx);
     }
 

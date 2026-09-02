@@ -32,7 +32,7 @@ final class ZipArchiveCount35466AotTest extends TestCase
     public function testProxyRegisteredForCount(): void
     {
         $root = dirname(__DIR__, 2);
-        $src = (string) file_get_contents($root.'/lib/JIT/Context.php');
+        $src = (string) file_get_contents($root.'/ext/zip/Module.php');
         $this->assertStringContainsString("'count'", $src);
         $dispatch = (string) file_get_contents($root.'/lib/JIT/Call/ZipArchiveMethod.php');
         $this->assertStringContainsString("'count'", $dispatch);

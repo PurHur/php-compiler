@@ -2535,90 +2535,7 @@ class Context {
         $this->functionProxies['datetimeimmutable::__construct'] = new Call\DateTimeImmutableConstruct();
         // DOMDocument::__construct — seed nodeType for thin AOT (#33607).
         $this->functionProxies['domdocument::__construct'] = new Call\DomDocumentConstruct();
-        // ZipArchive::__construct — seed stub props for thin AOT (#35002 leftover of #20584).
-        $this->functionProxies['ziparchive::__construct'] = new Call\ZipArchiveConstruct();
-        // ZipArchive methods — NestedJIT helper (peer HashContext #3357; #35424 / #35437 / #35440 / #35449 / #35450 / #35455 / #35465 / #35466 / #35467 / #35472 / #35476 / #35486 / #35489 / #35491 / #35496 / #35498 / #35500 / #35504 / #35506 / #35508 leftover of #6414).
-        foreach ([
-            'open',
-            'addFromString',
-            'addEmptyDir',
-            'addFile',
-            'close',
-            'getFromName',
-            'locateName',
-            'getFromIndex',
-            'getNameIndex',
-            'renameName',
-            'renameIndex',
-            'deleteName',
-            'deleteIndex',
-            'extractTo',
-            'getStatusString',
-            'count',
-            'isWritable',
-            'setReadOnly',
-            'setArchiveComment',
-            'getArchiveComment',
-            'setCommentName',
-            'getCommentName',
-            'setCommentIndex',
-            'getCommentIndex',
-            'unchangeAll',
-            'unchangeArchive',
-            'unchangeIndex',
-            'unchangeName',
-            'replaceFile',
-            'isCompressionMethodSupported',
-            'isEncryptionMethodSupported',
-            'setPassword',
-            'setCompressionName',
-            'setCompressionIndex',
-            'setEncryptionName',
-            'setEncryptionIndex',
-            'setExternalAttributesName',
-            'setExternalAttributesIndex',
-            'getExternalAttributesName',
-            'getExternalAttributesIndex',
-            'statName',
-            'statIndex',
-            'setMtimeName',
-            'setMtimeIndex',
-            'setArchiveFlag',
-            'getArchiveFlag',
-            'clearError',
-            'getStream',
-            'getStreamIndex',
-            'getStreamName',
-            'addGlob',
-            'addPattern',
-            'registerProgressCallback',
-            'registerCancelCallback',
-        ] as $zipMethod) {
-            $this->functionProxies['ziparchive::'.strtolower($zipMethod)] = new Call\ZipArchiveMethod(
-                $zipMethod
-            );
-        }
-        // SQLite3 construct/exec/querySingle/lastInsertRowID/changes/lastError*/busyTimeout/enableExceptions/escapeString/version/open/prepare/query — NestedJIT leftover of advertise-only AOT (#35931 / #35966 / #35972 / #35975 / #35977 / #35991 / #36001 / #36010 / #20565).
-        if (CompilerVersion::supportsSqlite3()) {
-            $this->type->object->lookup('SQLite3');
-            foreach (['__construct', 'exec', 'querySingle', 'close', 'lastInsertRowID', 'changes', 'lastErrorCode', 'lastErrorMsg', 'busyTimeout', 'enableExceptions', 'escapeString', 'version', 'open', 'prepare', 'query'] as $sqliteMethod) {
-                $this->functionProxies['sqlite3::'.strtolower($sqliteMethod)] = new Call\Sqlite3Method(
-                    $sqliteMethod
-                );
-            }
-            $this->type->object->lookup('SQLite3Stmt');
-            foreach (['getSQL', 'paramCount', 'bindValue', 'bindParam', 'execute', 'readOnly'] as $stmtMethod) {
-                $this->functionProxies['sqlite3stmt::'.strtolower($stmtMethod)] = new Call\Sqlite3StmtMethod(
-                    $stmtMethod
-                );
-            }
-            $this->type->object->lookup('SQLite3Result');
-            foreach (['fetchArray', 'columnType'] as $resultMethod) {
-                $this->functionProxies['sqlite3result::'.strtolower($resultMethod)] = new Call\Sqlite3ResultMethod(
-                    $resultMethod
-                );
-            }
-        }
+        // ZipArchive / SQLite3 thin-AOT Call proxies: registered by ext/zip + ext/sqlite3 Module::jitInit (#36204).
         $this->functionProxies['datetimezone::__construct'] = new Call\DateTimeZoneConstruct();
         $this->functionProxies['dateinterval::__construct'] = new Call\DateIntervalConstruct();
         $this->functionProxies['dateinterval::format'] = new Call\DateIntervalFormat();
@@ -2718,23 +2635,9 @@ class Context {
         $this->functionProxies['datetimezone::listidentifiers'] = new Call\DateTimeZoneListIdentifiers();
         // DateTimeZone::listAbbreviations — avoid ExternalMethod silent NULL on thin AOT (#30780).
         $this->functionProxies['datetimezone::listabbreviations'] = new Call\DateTimeZoneListAbbreviations();
-        // Locale::* thin-AOT Call proxies: registered by ext/intl/Module::jitInit (#36204 / #20760).
-        // NumberFormatter::create / format — avoid ExternalMethod silent NULL on thin AOT (#27385, #28648).
-        $this->functionProxies['numberformatter::create'] = new Call\NumberFormatterCreate();
-        $this->functionProxies['numberformatter::format'] = new Call\NumberFormatterFormat();
-        // IntlDateFormatter::create / format — avoid ExternalMethod silent NULL on thin AOT (#27361).
-        $this->functionProxies['intldateformatter::create'] = new Call\IntlDateFormatterCreate();
-        $this->functionProxies['intldateformatter::format'] = new Call\IntlDateFormatterFormat();
-        // Collator::compare — avoid ExternalMethod silent NULL on thin AOT (#28649).
-        $this->functionProxies['collator::compare'] = new Call\CollatorCompare();
-        // Normalizer::normalize — avoid ExternalMethod silent NULL / segfault on thin AOT (#28654).
-        $this->functionProxies['normalizer::normalize'] = new Call\NormalizerNormalize();
-        // MessageFormatter::__construct / format — avoid ExternalMethod silent NULL on thin AOT (#28655).
-        $this->functionProxies['messageformatter::__construct'] = new Call\MessageFormatterConstruct();
-        $this->functionProxies['messageformatter::format'] = new Call\MessageFormatterFormat();
-        // Transliterator::create / transliterate — avoid ExternalMethod silent NULL on thin AOT (#28657).
-        $this->functionProxies['transliterator::create'] = new Call\TransliteratorCreate();
-        $this->functionProxies['transliterator::transliterate'] = new Call\TransliteratorTransliterate();
+        // Locale::* + NumberFormatter / IntlDateFormatter / Collator / Normalizer /
+        // MessageFormatter / Transliterator thin-AOT Call proxies:
+        // registered by ext/intl/Module::jitInit (#36204 / #20760 / #27385 / #27361 / #28649 / #28654 / #28655 / #28657).
         // finfo::__construct / finfo::file / finfo::buffer / finfo::set_flags — thin AOT (#27196, #28660, #34688).
         $this->functionProxies['finfo::__construct'] = new Call\FinfoConstruct();
         $this->functionProxies['finfo::file'] = new Call\FinfoFile();

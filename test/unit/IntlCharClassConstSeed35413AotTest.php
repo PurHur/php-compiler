@@ -16,7 +16,7 @@ final class IntlCharClassConstSeed35413AotTest extends TestCase
     public function testSeedHookExists(): void
     {
         $src = (string) file_get_contents(
-            __DIR__.'/../../lib/JIT/Builtin/Type/Object_.php'
+            __DIR__.'/../../ext/intl/Module.php'
         );
         $this->assertStringContainsString('VmIntlChar::classConstants()', $src);
         $this->assertStringContainsString('#35413', $src);

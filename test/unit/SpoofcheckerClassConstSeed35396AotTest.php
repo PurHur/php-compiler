@@ -16,7 +16,7 @@ final class SpoofcheckerClassConstSeed35396AotTest extends TestCase
     public function testSeedHookExists(): void
     {
         $src = (string) file_get_contents(
-            __DIR__.'/../../lib/JIT/Builtin/Type/Object_.php'
+            __DIR__.'/../../ext/intl/Module.php'
         );
         $this->assertStringContainsString('VmSpoofchecker::classConstants()', $src);
         $this->assertStringContainsString('#35396', $src);

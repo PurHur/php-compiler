@@ -32,7 +32,7 @@ final class ZipArchiveUnchange35489AotTest extends TestCase
     public function testProxyRegisteredForUnchange(): void
     {
         $root = dirname(__DIR__, 2);
-        $src = (string) file_get_contents($root.'/lib/JIT/Context.php');
+        $src = (string) file_get_contents($root.'/ext/zip/Module.php');
         $this->assertStringContainsString("'unchangeAll'", $src);
         $this->assertStringContainsString("'unchangeArchive'", $src);
         $helper = (string) file_get_contents($root.'/ext/zip/ZipArchiveJitHelper.php');

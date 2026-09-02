@@ -46,26 +46,87 @@ class Module extends ModuleAbstract
     }
 
     /**
-     * Locale::* thin-AOT Call proxies — owned by ext/intl, not lib/JIT/Context (#36204 / #20760).
+     * intl thin-AOT Call proxies + ClassConstFetch seeds — owned by ext/intl (#36204).
      *
-     * Context::defineBuiltins used to `new \PHPCompiler\ext\intl\…` directly (core→ext import).
-     * registerModule() calls jitInit after Context construction, so these land before user compile.
+     * Context::defineBuiltins used to register Locale::* via core→ext imports and seed
+     * Normalizer/NumberFormatter/… constants inside Object_. Both live here now.
      */
     public function jitInit(JIT\Context $context): void
     {
-        // Locale::canonicalize — avoid ExternalMethod null stub on user-script AOT (#20760).
+        // Locale::* — avoid ExternalMethod null stub on user-script AOT (#20760 / #28656 / #32118–#32120).
         $context->functionProxies['locale::canonicalize'] = new LocaleCanonicalize();
-        // Locale::acceptFromHttp — avoid ExternalMethod silent NULL on thin AOT (#28656).
         $context->functionProxies['locale::acceptfromhttp'] = new LocaleAcceptFromHttp();
-        // Locale::lookup — RFC 4647 via JitLocaleLookup / VmLocale (#32118).
         $context->functionProxies['locale::lookup'] = new LocaleLookup();
-        // Locale::filterMatches — prefix filter via JitLocaleFilterMatches / VmLocale (#32119).
         $context->functionProxies['locale::filtermatches'] = new LocaleFilterMatches();
-        // Locale::getDisplayName — ICU display name via JitLocaleGetDisplayName / VmLocale (#32120).
         $context->functionProxies['locale::getdisplayname'] = new LocaleGetDisplayName();
         // NumberFormatter / IntlDateFormatter / Collator / Normalizer / MessageFormatter /
-        // Transliterator thin-AOT Call proxies stay registered from Context for this slice —
-        // they live under lib/JIT/Call\ (no core→ext import); move in a follow-up.
+        // Transliterator — Call classes live under lib/JIT/Call\ (no core→ext import).
+        $context->functionProxies['numberformatter::create'] = new JIT\Call\NumberFormatterCreate();
+        $context->functionProxies['numberformatter::format'] = new JIT\Call\NumberFormatterFormat();
+        $context->functionProxies['intldateformatter::create'] = new JIT\Call\IntlDateFormatterCreate();
+        $context->functionProxies['intldateformatter::format'] = new JIT\Call\IntlDateFormatterFormat();
+        $context->functionProxies['collator::compare'] = new JIT\Call\CollatorCompare();
+        $context->functionProxies['normalizer::normalize'] = new JIT\Call\NormalizerNormalize();
+        $context->functionProxies['messageformatter::__construct'] = new JIT\Call\MessageFormatterConstruct();
+        $context->functionProxies['messageformatter::format'] = new JIT\Call\MessageFormatterFormat();
+        $context->functionProxies['transliterator::create'] = new JIT\Call\TransliteratorCreate();
+        $context->functionProxies['transliterator::transliterate'] = new JIT\Call\TransliteratorTransliterate();
+
+        $object = $context->type->object;
+        // ClassConstFetch folds FORM_*/SHORT/… to compile-time long
+        // (#28654 / #35360 / #35366 / #35379 / #35384 / #35389 / #35396 / #35397 /
+        // #35401 / #35407 / #35408 / #35413 / #35416 / #35422).
+        $object->registerExternalClassSeeder('normalizer', static function ($obj, int $id): void {
+            $obj->seedExternalClassConstants($id, VmNormalizer::classConstants());
+        });
+        $object->registerExternalClassSeeder('intldateformatter', static function ($obj, int $id): void {
+            $obj->seedExternalClassConstants($id, VmIntlDateFormatter::classConstants());
+        });
+        $object->registerExternalClassSeeder('numberformatter', static function ($obj, int $id): void {
+            $obj->seedExternalClassConstants($id, VmNumberFormatter::classConstants());
+        });
+        $object->registerExternalClassSeeder('collator', static function ($obj, int $id): void {
+            $obj->seedExternalClassConstants($id, VmCollator::classConstants());
+        });
+        $object->registerExternalClassSeeder('transliterator', static function ($obj, int $id): void {
+            $obj->seedExternalClassConstants($id, VmTransliterator::classConstants());
+        });
+        $object->registerExternalClassSeeder('intlcalendar', static function ($obj, int $id): void {
+            $obj->seedExternalClassConstants($id, VmIntlCalendar::classConstants());
+        });
+        $object->registerExternalClassSeeder('intlgregoriancalendar', static function ($obj, int $id): void {
+            $obj->seedExternalClassConstants($id, VmIntlCalendar::classConstants());
+        });
+        $object->registerExternalClassSeeder('spoofchecker', static function ($obj, int $id): void {
+            $obj->seedExternalClassConstants($id, VmSpoofchecker::classConstants());
+        });
+        $object->registerExternalClassSeeder('intltimezone', static function ($obj, int $id): void {
+            $obj->seedExternalClassConstants($id, VmIntlTimeZone::classConstants());
+        });
+        $object->registerExternalClassSeeder('intlbreakiterator', static function ($obj, int $id): void {
+            $obj->seedExternalClassConstants($id, VmBreakIterator::classConstants());
+        });
+        $object->registerExternalClassSeeder('intlrulebasedbreakiterator', static function ($obj, int $id): void {
+            $obj->seedExternalClassConstants($id, VmBreakIterator::classConstants());
+        });
+        $object->registerExternalClassSeeder('intlcodepointbreakiterator', static function ($obj, int $id): void {
+            $obj->seedExternalClassConstants($id, VmBreakIterator::classConstants());
+        });
+        $object->registerExternalClassSeeder('intlpartsiterator', static function ($obj, int $id): void {
+            $obj->seedExternalClassConstants($id, VmBreakIterator::partsIteratorConstants());
+        });
+        $object->registerExternalClassSeeder('uconverter', static function ($obj, int $id): void {
+            $obj->seedExternalClassConstants($id, VmUConverter::classConstants());
+        });
+        $object->registerExternalClassSeeder('intllistformatter', static function ($obj, int $id): void {
+            $obj->seedExternalClassConstants($id, VmIntlListFormatter::classConstants());
+        });
+        $object->registerExternalClassSeeder('intlchar', static function ($obj, int $id): void {
+            $obj->seedExternalClassConstants($id, VmIntlChar::classConstants());
+        });
+        $object->registerExternalClassSeeder('locale', static function ($obj, int $id): void {
+            $obj->seedExternalClassConstants($id, VmLocale::classConstants());
+        });
     }
 
     public function init(Runtime $runtime): void

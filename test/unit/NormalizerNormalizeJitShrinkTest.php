@@ -32,8 +32,8 @@ final class NormalizerNormalizeJitShrinkTest extends TestCase
         $this->assertStringContainsString('UnicodeCanonical.php', $runtime);
         $this->assertStringContainsString('ensureCompiledBundle', $runtime);
 
-        $ctx = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
-        $this->assertStringContainsString("functionProxies['normalizer::normalize']", $ctx);
+        $mod = (string) file_get_contents(__DIR__.'/../../ext/intl/Module.php');
+        $this->assertStringContainsString("functionProxies['normalizer::normalize']", $mod);
     }
 
     public function testJitHelperNfcCombiningAcute(): void

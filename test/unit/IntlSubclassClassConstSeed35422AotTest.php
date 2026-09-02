@@ -16,10 +16,10 @@ final class IntlSubclassClassConstSeed35422AotTest extends TestCase
     public function testSeedHookExists(): void
     {
         $src = (string) file_get_contents(
-            __DIR__.'/../../lib/JIT/Builtin/Type/Object_.php'
+            __DIR__.'/../../ext/intl/Module.php'
         );
-        $this->assertStringContainsString("'intlgregoriancalendar' === \$lcname", $src);
-        $this->assertStringContainsString("'intlrulebasedbreakiterator' === \$lcname", $src);
+        $this->assertStringContainsString("registerExternalClassSeeder('intlgregoriancalendar'", $src);
+        $this->assertStringContainsString("registerExternalClassSeeder('intlrulebasedbreakiterator'", $src);
         $this->assertStringContainsString('partsIteratorConstants()', $src);
         $this->assertStringContainsString('#35422', $src);
     }

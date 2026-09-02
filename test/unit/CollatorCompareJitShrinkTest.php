@@ -22,7 +22,7 @@ final class CollatorCompareJitShrinkTest extends TestCase
         $this->assertStringContainsString('JitStringCompare::strcmp', $lowering);
         $this->assertStringNotContainsString('CollatorCompareRuntime', $lowering);
 
-        $ctx = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $ctx = (string) file_get_contents(__DIR__.'/../../ext/intl/Module.php');
         $this->assertStringContainsString("functionProxies['collator::compare']", $ctx);
     }
 
