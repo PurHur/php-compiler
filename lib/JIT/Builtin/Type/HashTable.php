@@ -427,11 +427,7 @@ class HashTable extends Type
         // Leave refcount at 0 — the next owner (direct store addref or __value__writeHashtable)
         // establishes the sole reference. Eager addref here plus writeHashtable's retain left
         // value-boxed script locals at rc=2 and O(n²) append COW (#36252).
-        $this->context->builder->call(
-            $this->context->lookupFunction('__hashtable__grow'),
-            $ht,
-            $sizeT->constInt(1, false)
-        );
+        // values stays null until first setAt — grow() allocates on write (#36214).
         $this->context->builder->returnValue($ht);
     }
 
