@@ -2001,6 +2001,12 @@ class Block {
             if ([] !== $frame->calledArgs) {
                 $return->calledArgs = $frame->calledArgs;
             }
+            // Foreach ITER_* state is per execute_data (Frame). CFG block edges must
+            // carry frame->iterators; otherwise VALID falls back to context->foreachIterators
+            // keyed only by slot and a nested/recursive call clobbers the caller (#36354).
+            if ($this->isSameFunctionCfgEdge($frame) && [] !== $frame->iterators) {
+                $return->iterators = $frame->iterators;
+            }
         }
         return $return;
     }
