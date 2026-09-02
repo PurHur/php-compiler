@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8072 |
-| Phase A inventory files (M2 ratio SSOT) | 8072 |
+| PHP files on vm.php path | 8073 |
+| Phase A inventory files (M2 ratio SSOT) | 8073 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 25673 |
+| Source constructs flagged (warnings) | 25674 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7065,6 +7065,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/JitLongArithOverflow.php` | 0 | 6 |
 | `lib/JIT/JitLongDiv.php` | 0 | 5 |
 | `lib/JIT/JitMemoryUsageArg.php` | 0 | 1 |
+| `lib/JIT/JitNativeMethodReturn.php` | 0 | 1 |
 | `lib/JIT/JitNativeString.php` | 0 | 11 |
 | `lib/JIT/JitNestedHelperCoerce.php` | 0 | 1 |
 | `lib/JIT/JitNonNumericStringArithGuard.php` | 0 | 1 |
@@ -31613,28 +31614,28 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitDateMutation.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 94)
-- new ArgumentCountError (line 358)
-- new ArgumentCountError (line 646)
-- new JITVariable (line 1214)
-- new JITVariable (line 1233)
-- new JITVariable (line 1245)
-- new JITVariable (line 1449)
-- new ArgumentCountError (line 1493)
-- new ArgumentCountError (line 1519)
-- new ArgumentCountError (line 1650)
-- new ArgumentCountError (line 1691)
-- new ArgumentCountError (line 1777)
-- new ArgumentCountError (line 1823)
-- new ArgumentCountError (line 1828)
-- new ArgumentCountError (line 1904)
-- new ArgumentCountError (line 2179)
+- new ArgumentCountError (line 95)
+- new ArgumentCountError (line 359)
+- new ArgumentCountError (line 647)
+- new JITVariable (line 1215)
+- new JITVariable (line 1234)
+- new JITVariable (line 1246)
+- new JITVariable (line 1450)
+- new ArgumentCountError (line 1494)
+- new ArgumentCountError (line 1520)
+- new ArgumentCountError (line 1646)
+- new ArgumentCountError (line 1687)
+- new ArgumentCountError (line 1773)
+- new ArgumentCountError (line 1819)
+- new ArgumentCountError (line 1824)
+- new ArgumentCountError (line 1900)
+- new ArgumentCountError (line 2175)
 - 66 class method(s)
 
 ### `ext/standard/JitDateOffsetGet.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 26)
+- new ArgumentCountError (line 27)
 - 3 class method(s)
 
 ### `ext/standard/JitDateParse.php`
@@ -57069,8 +57070,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/SplObjectStorageMethod.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 407)
-- new Variable (line 453)
+- new Variable (line 403)
+- new Variable (line 449)
 - 12 class method(s)
 
 ### `lib/JIT/Call/SplPriorityQueueMethod.php`
@@ -58506,6 +58507,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 6 class method(s)
+
+### `lib/JIT/JitNativeMethodReturn.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `lib/JIT/JitNativeString.php`
 
