@@ -430,6 +430,7 @@ class Refcount extends Builtin {
                 $ifBlock = $prev->insertBasicBlock('ifBlock');
                 $prev->moveBefore($ifBlock);
                 
+                $outerCountedEnd = end($endBlock);
                 $endBlock[] = $tmp = $ifBlock->insertBasicBlock('endBlock');
                     $this->context->builder->branchIf($bool, $ifBlock, $tmp);
                 
@@ -501,10 +502,45 @@ class Refcount extends Builtin {
                 );
                 $this->context->builder->branch($freeBlock);
                 $this->context->builder->positionAtEnd($freeBlock);
+                $typeMask = $this->context->getTypeFromString('int32')->constInt(self::TYPE_INFO_TYPEMASK, false);
+                $type = $this->context->builder->bitwiseAnd($typeinfo, $typeMask);
+                $htType = $this->context->getTypeFromString('int32')->constInt(self::TYPE_INFO_TYPE_MASKED_ARRAY, false);
+                $isHashtable = $this->context->builder->icmp(PHPLLVM\Builder::INT_EQ, $type, $htType);
+                $htDtorBlock = $parentFn->appendBasicBlock('delref_ht_dtor');
+                $afterHtDtor = $parentFn->appendBasicBlock('delref_after_ht_dtor');
+                $this->context->builder->branchIf($isHashtable, $htDtorBlock, $afterHtDtor);
+                $this->context->builder->positionAtEnd($htDtorBlock);
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__hashtable__dtor'),
+                    $this->context->builder->pointerCast(
+                        $refVirtual,
+                        $this->context->getTypeFromString('__hashtable__*')
+                    )
+                );
+                $this->context->builder->branch($afterHtDtor);
+                $this->context->builder->positionAtEnd($afterHtDtor);
+                // TYPE_MASKED_ARRAY (0b1100) includes TYPE_OBJECT bit — use exact type match
+                // so hashtables never reach __object__dtor (Refcount.pre elseif, #36409).
+                $objType = $this->context->getTypeFromString('int32')->constInt(self::TYPE_INFO_TYPE_OBJECT, false);
+                $isObjectExact = $this->context->builder->icmp(PHPLLVM\Builder::INT_EQ, $type, $objType);
+                $objDtorBlock = $parentFn->appendBasicBlock('delref_obj_dtor');
+                $afterObjDtor = $parentFn->appendBasicBlock('delref_after_obj_dtor');
+                $this->context->builder->branchIf($isObjectExact, $objDtorBlock, $afterObjDtor);
+                $this->context->builder->positionAtEnd($objDtorBlock);
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__object__dtor'),
+                    $this->context->builder->pointerCast(
+                        $refVirtual,
+                        $this->context->getTypeFromString('__object__*')
+                    )
+                );
+                $this->context->builder->branch($afterObjDtor);
+                $this->context->builder->positionAtEnd($afterObjDtor);
                 $this->context->memory->free($refVirtual);
     }
                 if ($this->context->builder->getInsertBlock()->getTerminator() === null) {
-                    $this->context->builder->branch(end($endBlock));
+                    // Destroy path must not fall through to gc_possible_root (#36331 / #36409).
+                    $this->context->builder->branch($outerCountedEnd);
                 }
                 
                 $this->context->builder->positionAtEnd(array_pop($endBlock));
