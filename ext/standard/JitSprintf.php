@@ -94,6 +94,8 @@ final class JitSprintf
                 $snprintfArgs[] = self::extractStarLongArg($context, $args[$i + 1]);
             } elseif ('s' === $conv || 'S' === $conv) {
                 $snprintfArgs[] = self::extractAsCString($context, $args[$i + 1], $toFree);
+            } elseif (\in_array($conv, ['f', 'e', 'g', 'a'], true)) {
+                $snprintfArgs[] = self::extractSnprintfFloatArg($context, $args[$i + 1]);
             } else {
                 $snprintfArgs[] = self::extractSnprintfArg($context, $args[$i + 1], $toFree);
             }
@@ -341,6 +343,40 @@ final class JitSprintf
         }
 
         return $context->helper->loadValue($arg);
+    }
+
+    /** `%f` / `%e` / `%g` / `%a` — boxed floats must use readDouble, not readLong (#36353). */
+    private static function extractSnprintfFloatArg(Context $context, JITVariable $arg): Value
+    {
+        if (JITVariable::TYPE_NULL === $arg->type) {
+            return $context->getTypeFromString('double')->constReal(0.0);
+        }
+        if (JITVariable::TYPE_NATIVE_DOUBLE === $arg->type) {
+            return $context->helper->loadValue($arg);
+        }
+        if (JITVariable::TYPE_VALUE === $arg->type
+            || null !== $arg->valueBoxAliasPtr
+            || \in_array(
+                $context->getStringFromType($arg->value->typeOf()),
+                ['__value__*', '__value__value*'],
+                true
+            )) {
+            $valuePtr = null !== $arg->valueBoxAliasPtr
+                ? JitValueBox::normalizeValuePtr($context, $arg->valueBoxAliasPtr)
+                : JitValueBox::valuePtrFromVariable($context, $arg);
+
+            return $context->builder->call(
+                $context->lookupFunction('__value__readDouble'),
+                $valuePtr
+            );
+        }
+        if (JITVariable::TYPE_NATIVE_LONG === $arg->type || JITVariable::TYPE_NATIVE_BOOL === $arg->type) {
+            $lng = $context->helper->loadValue($arg);
+
+            return $context->builder->siToFp($lng, $context->getTypeFromString('double'));
+        }
+
+        return $context->getTypeFromString('double')->constReal(0.0);
     }
 
     /**
