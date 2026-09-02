@@ -103,13 +103,27 @@ if (is_readable($manifestPath)) {
 }
 $provenance = is_array($manifest) ? trim((string) ($manifest['provenance'] ?? '')) : '';
 
+$tagAtBuild = '';
+$tagExact = gen0_git($root, 'describe', '--tags', '--exact-match', $buildSha);
+if ('' !== $tagExact['out']) {
+    $tagAtBuild = $tagExact['out'];
+} else {
+    $tagNearest = gen0_git($root, 'describe', '--tags', '--abbrev=0', '--always', $buildSha);
+    if ('' !== $tagNearest['out'] && !str_starts_with($tagNearest['out'], $buildSha)) {
+        $tagAtBuild = $tagNearest['out'];
+    }
+}
+
 $stale = $loweringCommits > 0;
 $result = [
     'status' => $stale ? 'stale' : 'fresh',
     'driver_last_built' => ['commit' => substr($buildSha, 0, 9), 'date' => $buildDate, 'age_days' => $ageDays],
     'lowering_commits_since' => $loweringCommits,
+    'commits_behind' => $loweringCommits,
     'manifest_commits_since' => $manifestCommits,
     'manifest_provenance' => '' === $provenance ? 'unrecorded' : $provenance,
+    'tag_at_build' => '' === $tagAtBuild ? null : $tagAtBuild,
+    'functional_gate' => 'bootstrap-gen0-driver-functional-smoke.sh',
     'message' => $stale
         ? sprintf(
             'committed gen-0 driver bytes are from %s (%s, %s days ago); %d commit(s) have changed lowering sources since, and the manifest was rewritten %d time(s) — the seed was not built from current sources',

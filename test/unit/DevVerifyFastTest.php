@@ -18,6 +18,8 @@ final class DevVerifyFastTest extends TestCase
         $body = (string) file_get_contents($script);
         $this->assertStringContainsString('bootstrap-trust-preflight.sh', $body);
         $this->assertStringContainsString('tier 0', $body);
+        $this->assertStringContainsString('bootstrap-gen0-driver-functional-smoke', $body);
+        $this->assertStringContainsString('tier 0f', $body);
         $this->assertStringContainsString('non-blocking', $body);
     }
 

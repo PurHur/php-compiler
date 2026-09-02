@@ -41,6 +41,7 @@ Usage: script/north-star5-verify.sh [--fast] [--require-llvm] [--strict] [--with
 M5 ladder presenter (#1416, #1492):
 
   3t. bootstrap-trust-preflight after vendor check (warn on --fast; strict on --strict — #36145)
+  3f. gen-0 driver functional smoke — committed seed must compile never-seen scripts (#36218, #23468)
   1. php script/bootstrap-inventory.php --check
   2. php script/bootstrap-spine-count.php + check-selfhost-spine-coverage-sync.php (live N/N)
   3. php script/bootstrap-vendor-objects.php --check
@@ -231,6 +232,12 @@ if ! ns5_gen0_trust_preflight; then
   exit 1
 fi
 echo "north-star5-verify: step 3t ok"
+
+# Behavioral gen-0 gate: stamp/manifest sync alone stayed green while the driver failed
+# parseAndCompile on every input (#23468). Staleness from 3t is warn-only on --fast.
+if [[ "${BOOTSTRAP_GEN0_DRIVER_FUNCTIONAL_GATE:-1}" == "1" ]]; then
+  ns5_run 3f "gen-0 driver functional smoke (#36218)" make -C "${_CI_REPO_ROOT}" bootstrap-gen0-driver-functional-smoke
+fi
 
 if [[ "${FAST_M5}" -eq 1 ]]; then
   echo

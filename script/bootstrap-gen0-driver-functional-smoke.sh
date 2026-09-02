@@ -8,7 +8,7 @@
 # Usage:
 #   ./script/bootstrap-gen0-driver-functional-smoke.sh
 #   make bootstrap-gen0-driver-functional-smoke
-#   BOOTSTRAP_GEN0_DRIVER_FUNCTIONAL_GATE=1  # release-readiness / ci-fast opt-in→default
+#   BOOTSTRAP_GEN0_DRIVER_FUNCTIONAL_GATE=0  # opt-out (default on — #36218)
 #
 # Exit codes:
 #   0  driver produced a matching runnable binary

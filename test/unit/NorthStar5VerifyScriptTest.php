@@ -64,6 +64,9 @@ final class NorthStar5VerifyScriptTest extends TestCase
         $this->assertStringContainsString('ns5_gen0_trust_preflight', $body);
         $this->assertStringContainsString('bootstrap-trust-preflight.sh', $body);
         $this->assertStringContainsString('step 3t: gen-0 trust preflight', $body);
+        $this->assertStringContainsString('bootstrap-gen0-driver-functional-smoke', $body);
+        $this->assertStringContainsString('ns5_run 3f', $body);
+        $this->assertStringContainsString('#36218', $body);
         $this->assertStringContainsString('#36145', $body);
     }
 
