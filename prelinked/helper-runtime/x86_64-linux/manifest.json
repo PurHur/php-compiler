@@ -9,5 +9,9 @@
     "published_fresh": 1,
     "kept_live_unpublished": 0,
     "total_bytes": 829020666,
-    "refresh": "php script/publish-helper-units-prelink.php (targeted dom refresh #32122)"
+    "refresh": "php script/publish-helper-units-prelink.php (targeted dom refresh #32122)",
+    "common_object_sha256": "460cc7680f59db5030b3c900629ac91fe8b927a468491c50d634e80a8cc6459c",
+    "common_object_bytes": 1649928,
+    "common_bitcode_bytes": 1116,
+    "common_emitted_at": "2026-09-02T22:19:24+00:00"
 }

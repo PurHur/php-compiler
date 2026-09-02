@@ -375,6 +375,8 @@ bootstrap-gen0-refresh-argv-driver:
 	./script/bootstrap-gen0-refresh-argv-driver.sh
 helper-runtime-prelink-refresh:
 	php script/emit-helper-runtime-object.php --prelink
+helper-runtime-common-publish:
+	php script/emit-helper-runtime-common.php --from-prelinked
 helper-runtime-prelink-check:
 	php script/check-helper-runtime-prelink.php
 bootstrap-init:

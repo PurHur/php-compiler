@@ -19,6 +19,7 @@ declare(strict_types=1);
  */
 
 use PHPCompiler\AOT\HelperRuntimeCache;
+use PHPCompiler\AOT\HelperRuntimeCommon;
 
 $root = dirname(__DIR__);
 require $root.'/vendor/autoload.php';
@@ -34,6 +35,7 @@ if (!is_dir($unitsDir)) {
     exit($strict ? 1 : 0);
 }
 
+$commonBroken = false;
 if (is_file($archManifestPath)) {
     $archManifest = json_decode((string) file_get_contents($archManifestPath), true);
     $committedCore = \is_array($archManifest) ? (string) ($archManifest['core_fingerprint'] ?? '') : '';
@@ -45,6 +47,17 @@ if (is_file($archManifestPath)) {
         ));
         if ($strict) {
             exit(1);
+        }
+    }
+    $expectedCommonSha = \is_array($archManifest) ? (string) ($archManifest['common_object_sha256'] ?? '') : '';
+    if ('' !== $expectedCommonSha) {
+        $commonPath = HelperRuntimeCommon::commonObjectPath();
+        if (!is_file($commonPath)) {
+            ++$commonBroken;
+            fwrite(STDOUT, "  BROKEN common.o (manifest expects shared runtime prologue)\n");
+        } elseif (!HelperRuntimeCommon::commonObjectIsLinkable()) {
+            ++$commonBroken;
+            fwrite(STDOUT, "  STALE  common.o (sha256 or core_fingerprint mismatch)\n");
         }
     }
 }
@@ -84,12 +97,16 @@ foreach ($manifests as $manifestPath) {
     ++$fresh;
 }
 
+$commonNote = HelperRuntimeCommon::commonObjectIsLinkable()
+    ? ', common.o fresh'
+    : (is_file(HelperRuntimeCommon::commonObjectPath()) ? ', common.o stale' : ', common.o absent');
 fwrite(STDOUT, sprintf(
-    "check-helper-runtime-prelink: %s — %d fresh, %d stale, %d broken%s\n",
+    "check-helper-runtime-prelink: %s — %d fresh, %d stale, %d broken%s%s\n",
     $arch,
     $fresh,
     $stale,
     $broken,
-    ($stale + $broken) > 0 ? ' — refresh: php script/emit-helper-runtime-object.php --prelink' : ''
+    $commonBroken > 0 ? ', common broken' : $commonNote,
+    ($stale + $broken + $commonBroken) > 0 ? ' — refresh: php script/emit-helper-runtime-object.php --prelink; common: php script/emit-helper-runtime-common.php --from-prelinked' : ''
 ));
-exit($strict && ($stale + $broken) > 0 ? 1 : 0);
+exit($strict && ($stale + $broken + $commonBroken) > 0 ? 1 : 0);
