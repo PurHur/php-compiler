@@ -66,6 +66,10 @@ final class GcCollectCyclesRuntime
 
     private const RELEASE_STORAGE_HELPER_PATH = '/ext/standard/GcObjectReleaseStorageJitHelper.php';
 
+    private const FREE_HELPER_PATH = '/ext/standard/GcCollectCyclesFreeJitHelper.php';
+
+    private const FREE_CYCLIC = 'PHPCompiler\\ext\\standard\\GcCollectCyclesFreeJitHelper::freeCyclicRegistryObject';
+
     private const SET_ALLOW_DELREF = 'PHPCompiler\\ext\\standard\\GcDestructAllowDelrefJitHelper::setAllowDelref';
 
     private const DELREF_ALLOWED = 'PHPCompiler\\ext\\standard\\GcDestructAllowDelrefJitHelper::delrefAllowed';
@@ -73,6 +77,11 @@ final class GcCollectCyclesRuntime
     private const RUN_SHUTDOWN_DESTRUCTORS = 'PHPCompiler\\ext\\standard\\GcDestructShutdownJitHelper::runShutdownDestructors';
 
     private const TRY_INVOKE = 'PHPCompiler\\ext\\standard\\GcDestructTryInvokeJitHelper::tryInvoke';
+
+    /** @var list<string> */
+    private const FREE_COMPILED_HELPERS = [
+        self::FREE_CYCLIC,
+    ];
 
     private const RELEASE_STORAGE = 'PHPCompiler\\ext\\standard\\GcObjectReleaseStorageJitHelper::release';
 
@@ -197,6 +206,7 @@ final class GcCollectCyclesRuntime
 
         $probe = $context->module->getNamedFunction('phpc_destruct_delref_allowed');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            self::ensurePhpRegistryUserScriptBodies($context);
             self::registerLinkedRuntime($context);
 
             return;
@@ -606,6 +616,19 @@ final class GcCollectCyclesRuntime
         self::implementDestructMarkInvoked($context);
         if (!self::usesPhpRegistry($context)) {
             JitGcCollectCyclesStandaloneKernel::ensureCycleScanInternals($context);
+        } else {
+            $objPtr = $context->getTypeFromString('__object__*');
+            $voidpp = $context->getTypeFromString('void**');
+            $fn = $context->module->getNamedFunction('phpc_gc_slot_read_object');
+            if (null === $fn) {
+                $fn = $context->module->addFunction(
+                    'phpc_gc_slot_read_object',
+                    $context->context->functionType($objPtr, false, $voidpp)
+                );
+            }
+            $context->registerFunction('phpc_gc_slot_read_object', $fn);
+            JitGcCollectCyclesStandaloneKernel::ensureSlotReadObject($context);
+            self::implementFreeObjectPhpBridge($context);
         }
         self::implementCollectCyclesImpl($context);
         self::implementObjectReleaseStorage($context);
@@ -981,7 +1004,45 @@ final class GcCollectCyclesRuntime
 
     private static function usesPhpRegistry(Context $context): bool
     {
-        return Builtin::LOAD_TYPE_STANDALONE !== $context->loadType;
+        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
+            return true;
+        }
+
+        // Standalone user-script AOT: LLVM cycle scan in JitGcCollectCyclesStandaloneKernel
+        // segfaults on multi-object registry collects (#36245). Route registry + scan through
+        // GcCollectCyclesNativeScanJitHelper PHP (peer embed #13882 / standalone #18630).
+        return $context->isUserScriptAot();
+    }
+
+    /**
+     * Bodies required for user-script PHP registry collect — must run even when
+     * {@see implement()} early-returns after destruct bridges (#36245).
+     */
+    private static function ensurePhpRegistryUserScriptBodies(Context $context): void
+    {
+        if (!self::usesPhpRegistry($context)) {
+            return;
+        }
+        $freeFn = $context->module->getNamedFunction('phpc_gc_free_object');
+        if (null !== $freeFn && $freeFn->countBasicBlocks() > 0) {
+            return;
+        }
+        $objPtr = $context->getTypeFromString('__object__*');
+        $voidpp = $context->getTypeFromString('void**');
+        $slotFn = $context->module->getNamedFunction('phpc_gc_slot_read_object');
+        if (null === $slotFn) {
+            $slotFn = $context->module->addFunction(
+                'phpc_gc_slot_read_object',
+                $context->context->functionType($objPtr, false, $voidpp)
+            );
+            $context->registerFunction('phpc_gc_slot_read_object', $slotFn);
+        }
+        JitGcCollectCyclesStandaloneKernel::ensureSlotReadObject($context);
+        self::implementFreeObjectPhpBridge($context);
+        $implFn = $context->module->getNamedFunction('phpc_gc_collect_cycles_impl');
+        if (null === $implFn || 0 === $implFn->countBasicBlocks()) {
+            self::implementCollectCyclesPhpBridge($context);
+        }
     }
 
     private static function ensureDestructAllowDelrefJitHelperCompiled(Context $context): void
@@ -1241,11 +1302,11 @@ final class GcCollectCyclesRuntime
         }
 
         GcCollectCyclesCollectRuntime::ensureCollectHelperCompiled($context);
-        $collectEmbed = self::collectEmbedHelperFunction($context);
+        $collectHelper = GcCollectCyclesCollectRuntime::collectImplHelperFunction($context);
         $i32 = $context->getTypeFromString('int32');
         $entry = $fn->appendBasicBlock('collect_impl_php_entry');
         $context->builder->positionAtEnd($entry);
-        $collected = $context->builder->call($collectEmbed);
+        $collected = $context->builder->call($collectHelper);
         // NestedJIT PHP int is i64; ABI is i32 (#21109).
         $context->builder->returnValue($context->builder->trunc($collected, $i32));
         $context->builder->clearInsertionPosition();
@@ -1335,6 +1396,42 @@ final class GcCollectCyclesRuntime
         self::ensureReleaseStorageJitHelperCompiled($context);
 
         return JitVmHelperLink::lookupCompiled($context, $logical, '#26333');
+    }
+
+    private static function ensureFreeJitHelperCompiled(Context $context): void
+    {
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::FREE_HELPER_PATH,
+            self::FREE_COMPILED_HELPERS,
+            '#36245'
+        );
+    }
+
+    private static function freeHelperFunction(Context $context, string $logical): LlvmFunction
+    {
+        self::ensureFreeJitHelperCompiled($context);
+
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#36245');
+    }
+
+    private static function implementFreeObjectPhpBridge(Context $context): void
+    {
+        $voidTy = $context->getTypeFromString('void');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $ft = $context->context->functionType($voidTy, false, $i8p);
+        $fn = self::functionOrCreate($context, 'phpc_gc_free_object', $ft);
+        if ($fn->countBasicBlocks() > 0) {
+            return;
+        }
+        $entry = $fn->appendBasicBlock('free_obj_php_entry');
+        $context->builder->positionAtEnd($entry);
+        $objI64 = $context->builder->ptrToInt($fn->getParam(0), $i64);
+        $context->builder->call(self::freeHelperFunction($context, self::FREE_CYCLIC), $objI64);
+        $context->builder->returnVoid();
+        $context->builder->clearInsertionPosition();
+        $context->registerFunction('phpc_gc_free_object', $fn);
     }
 
     private static function collectEmbedHelperFunction(Context $context): LlvmFunction

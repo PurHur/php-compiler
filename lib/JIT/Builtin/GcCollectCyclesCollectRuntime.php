@@ -21,6 +21,8 @@ final class GcCollectCyclesCollectRuntime
 {
     private const HELPER_PATH = '/ext/standard/GcCollectCyclesJitHelper.php';
 
+    private const STANDALONE_HELPER_PATH = '/ext/standard/GcCollectCyclesStandaloneJitHelper.php';
+
     private const RECORD_COLLECT = 'PHPCompiler\\ext\\standard\\GcCollectCyclesJitHelper::recordNativeCollect';
 
     private const RUNS = 'PHPCompiler\\ext\\standard\\GcCollectCyclesJitHelper::runs';
@@ -33,6 +35,8 @@ final class GcCollectCyclesCollectRuntime
 
     private const COLLECT_EMBED = 'PHPCompiler\\ext\\standard\\GcCollectCyclesJitHelper::collectCyclesEmbed';
 
+    private const COLLECT_STANDALONE = 'PHPCompiler\\ext\\standard\\GcCollectCyclesStandaloneJitHelper::collectCyclesStandalone';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::RECORD_COLLECT,
@@ -43,9 +47,30 @@ final class GcCollectCyclesCollectRuntime
         self::COLLECT_EMBED,
     ];
 
+    /** @var list<string> */
+    private const STANDALONE_COMPILED_HELPERS = [
+        self::COLLECT_STANDALONE,
+    ];
+
     public static function ensureCollectHelperCompiled(Context $context): void
     {
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            self::ensureStandaloneJitHelperCompiled($context);
+
+            return;
+        }
         self::ensureJitHelperCompiled($context);
+    }
+
+    public static function collectImplHelperFunction(Context $context): LlvmFunction
+    {
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            self::ensureStandaloneJitHelperCompiled($context);
+
+            return JitVmHelperLink::lookupCompiled($context, self::COLLECT_STANDALONE, '#36245');
+        }
+
+        return self::helperFunction($context, self::COLLECT_EMBED);
     }
 
     public static function implementCollectBridge(Context $context): void
@@ -169,6 +194,16 @@ final class GcCollectCyclesCollectRuntime
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
             '#26532'
+        );
+    }
+
+    private static function ensureStandaloneJitHelperCompiled(Context $context): void
+    {
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::STANDALONE_HELPER_PATH,
+            self::STANDALONE_COMPILED_HELPERS,
+            '#36245'
         );
     }
 }

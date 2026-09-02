@@ -435,6 +435,7 @@ function run(string $filename, string $code, array $options): void
         putenv('PHP_COMPILER_AOT_USER_SCRIPT=1');
         $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
         $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
+        \PHPCompiler\JIT\UserScriptAotEnv::latchUserScript();
     }
     if ($needHelperRuntimeO && \function_exists('putenv')) {
         // Default-on helper-runtime split compilation for user scripts (#15889)

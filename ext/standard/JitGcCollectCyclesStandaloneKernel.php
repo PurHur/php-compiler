@@ -56,6 +56,11 @@ final class JitGcCollectCyclesStandaloneKernel
         self::implementFreeObject($context);
     }
 
+    public static function ensureSlotReadObject(Context $context): void
+    {
+        self::implementSlotReadObject($context);
+    }
+
     private static function implementSlotReadObject(Context $context): void
     {
         $fn = $context->lookupFunction('phpc_gc_slot_read_object');
