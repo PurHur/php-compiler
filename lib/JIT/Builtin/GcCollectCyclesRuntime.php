@@ -443,9 +443,13 @@ final class GcCollectCyclesRuntime
         $lastProp = $context->builder->load(self::arrayElemPtr($context, self::G_PROP_COUNTS, $i32, $lastExt));
         $i8 = $context->getTypeFromString('int8');
         $lastInv = $context->builder->load(self::arrayElemPtr($context, self::G_DESTRUCT_INVOKED, $i8, $lastExt));
+        $lastMarked = $context->builder->load(self::arrayElemPtr($context, self::G_MARKED, $i8, $lastExt));
+        $lastInbound = $context->builder->load(self::arrayElemPtr($context, self::G_INBOUND, $i32, $lastExt));
         $context->builder->store($lastObj, self::arrayElemPtr($context, self::G_OBJECTS, $i8p, $idxExt));
         $context->builder->store($lastProp, self::arrayElemPtr($context, self::G_PROP_COUNTS, $i32, $idxExt));
         $context->builder->store($lastInv, self::arrayElemPtr($context, self::G_DESTRUCT_INVOKED, $i8, $idxExt));
+        $context->builder->store($lastMarked, self::arrayElemPtr($context, self::G_MARKED, $i8, $idxExt));
+        $context->builder->store($lastInbound, self::arrayElemPtr($context, self::G_INBOUND, $i32, $idxExt));
         $context->builder->branch($decBb);
 
         $context->builder->positionAtEnd($decBb);
@@ -1004,14 +1008,7 @@ final class GcCollectCyclesRuntime
 
     private static function usesPhpRegistry(Context $context): bool
     {
-        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
-            return true;
-        }
-
-        // Standalone user-script AOT: LLVM cycle scan in JitGcCollectCyclesStandaloneKernel
-        // segfaults on multi-object registry collects (#36245). Route registry + scan through
-        // GcCollectCyclesNativeScanJitHelper PHP (peer embed #13882 / standalone #18630).
-        return $context->isUserScriptAot();
+        return Builtin::LOAD_TYPE_STANDALONE !== $context->loadType;
     }
 
     /**

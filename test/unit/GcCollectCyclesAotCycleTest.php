@@ -13,12 +13,19 @@ use PHPUnit\Framework\TestCase;
  */
 final class GcCollectCyclesAotCycleTest extends TestCase
 {
-    public function testStandaloneUserScriptRoutesCollectThroughPhpRegistry(): void
+    public function testUnregisterSwapCopiesMarkedAndInbound(): void
     {
         $runtime = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Builtin/GcCollectCyclesRuntime.php');
-        $collect = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Builtin/GcCollectCyclesCollectRuntime.php');
-        $this->assertStringContainsString('ensurePhpRegistryUserScriptBodies', $runtime);
-        $this->assertStringContainsString('GcCollectCyclesStandaloneJitHelper::collectCyclesStandalone', $collect);
-        $this->assertStringContainsString('collectImplHelperFunction', $collect);
+        $this->assertStringContainsString('G_MARKED', $runtime);
+        $this->assertStringContainsString('G_INBOUND', $runtime);
+        $this->assertStringContainsString('$lastMarked', $runtime);
+        $this->assertStringContainsString('$lastInbound', $runtime);
+    }
+
+    public function testNativeScanSweepUsesPointerFreeList(): void
+    {
+        $scan = (string) file_get_contents(dirname(__DIR__, 2).'/ext/standard/GcCollectCyclesNativeScanJitHelper.php');
+        $this->assertStringContainsString('$toFree', $scan);
+        $this->assertStringContainsString('foreach ($toFree as $objPtr)', $scan);
     }
 }

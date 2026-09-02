@@ -59,17 +59,20 @@ final class GcCollectCyclesNativeScanJitHelper
         }
 
         $collected = 0;
-        $i = 0;
-        while ($i < GcCollectCyclesRegistryJitHelper::count()) {
-            if (!$marked[$i]) {
+        /** @var list<int> $toFree */
+        $toFree = [];
+        $count = GcCollectCyclesRegistryJitHelper::count();
+        for ($i = 0; $i < $count; ++$i) {
+            if (!($marked[$i] ?? false)) {
                 $objPtr = GcCollectCyclesRegistryJitHelper::objectPtr($i);
                 if ($objPtr > 0) {
-                    phpc_gc_native_free_object($objPtr);
-                    ++$collected;
+                    $toFree[] = $objPtr;
                 }
-            } else {
-                ++$i;
             }
+        }
+        foreach ($toFree as $objPtr) {
+            phpc_gc_native_free_object($objPtr);
+            ++$collected;
         }
 
         return $collected;
