@@ -33361,6 +33361,20 @@ class Compiler {
             if ($this->isUnaryInlineSiblingCallArgExpr($mid)) {
                 continue;
             }
+            // sprintf("n=%d avg=%.3f", count($a), $sum / count($a)) — Div between the first
+            // count() producer and sprintf must not reject the unused-usages count sibling (#36353).
+            // Only skip when this producer is *not* an operand of the BinaryOp (that producer feeds
+            // the arithmetic only; the earlier dead-temp count still feeds sprintf).
+            if ($mid instanceof Op\Expr\BinaryOp) {
+                if (
+                    null !== $producer->result
+                    && !$this->cfgExprUsesOperand($mid, $producer->result)
+                ) {
+                    continue;
+                }
+
+                return false;
+            }
             if ($mid instanceof Op\Expr\ArrowFunction
                 || $mid instanceof Op\Expr\Closure
                 || $mid instanceof Op\Expr\FirstClassCallable) {
@@ -33983,7 +33997,15 @@ class Compiler {
                 $deadArgs[] = $arg;
             }
         }
-        if (\count($deadArgs) < 2 || \count($deadArgs) !== \count($consumer->args)) {
+        // sprintf("…", count($a), $sum / count($a)) — leading format literal is not a dead temp;
+        // compare against non-embedded arg count (#36353).
+        $hoistedArgCount = 0;
+        foreach ($consumer->args as $arg) {
+            if (null !== $arg && !$this->isEmbeddedCallLiteralArg($arg)) {
+                ++$hoistedArgCount;
+            }
+        }
+        if (\count($deadArgs) < 2 || \count($deadArgs) !== $hoistedArgCount) {
             return false;
         }
         if (!$this->callArgsAreDistinctInlineTemporaries($deadArgs)) {
@@ -34343,6 +34365,10 @@ class Compiler {
             if ($this->isUnaryInlineSiblingCallArgExpr($stmt)) {
                 continue;
             }
+            // sprintf(..., count($a), $sum / count($a)) — Div between sibling counts (#36353).
+            if ($stmt instanceof Op\Expr\BinaryOp) {
+                continue;
+            }
             if ($stmt instanceof Op\Expr\ArrowFunction
                 || $stmt instanceof Op\Expr\Closure
                 || $stmt instanceof Op\Expr\FirstClassCallable) {
@@ -34500,6 +34526,12 @@ class Compiler {
                 --$i;
                 continue;
             }
+            // sprintf(..., count($a), $sum / count($a)) — Div immediately before the consumer
+            // must not hide earlier count() sibling producers (#36353).
+            if ($child instanceof Op\Expr\BinaryOp) {
+                --$i;
+                continue;
+            }
             if ($child instanceof Op\Expr\ArrowFunction
                 || $child instanceof Op\Expr\Closure
                 || $child instanceof Op\Expr\FirstClassCallable) {
@@ -34648,6 +34680,11 @@ class Compiler {
                 continue;
             }
             if ($this->isUnaryInlineSiblingCallArgExpr($child)) {
+                --$i;
+                continue;
+            }
+            // sprintf(..., count($a), $sum / count($a)) — skip Div between sibling counts (#36353).
+            if ($child instanceof Op\Expr\BinaryOp) {
                 --$i;
                 continue;
             }
