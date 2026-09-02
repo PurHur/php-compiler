@@ -393,12 +393,22 @@ final class JitValueBox
                         BasicBlockHelper::ensureOpenInsertBlock($context, 'assign_formal_box');
                     }
                     $slot = self::alloc($context);
+                    $slotPtr = self::pointer($context, $slot);
+                    $context->builder->call(
+                        $context->lookupFunction('__value__valueDelref'),
+                        $slotPtr
+                    );
                     $context->builder->store($value->value, $slot);
                     self::copyIntoPointer(
                         $context,
                         $destPtr,
-                        self::pointer($context, $slot)
+                        $slotPtr
                     );
+                    $context->builder->call(
+                        $context->lookupFunction('__value__valueDelref'),
+                        $slotPtr
+                    );
+                    self::releaseEphemeralAssignSource($context, $value);
 
                     return;
                 }
@@ -413,6 +423,11 @@ final class JitValueBox
                             BasicBlockHelper::ensureOpenInsertBlock($context, 'assign_formal_ptr');
                         }
                         $slot = self::alloc($context);
+                        $slotPtr = self::pointer($context, $slot);
+                        $context->builder->call(
+                            $context->lookupFunction('__value__valueDelref'),
+                            $slotPtr
+                        );
                         if ('__value__' === $valTyName) {
                             $context->builder->store($value->value, $slot);
                         } else {
@@ -425,8 +440,13 @@ final class JitValueBox
                         self::copyIntoPointer(
                             $context,
                             $destPtr,
-                            self::pointer($context, $slot)
+                            $slotPtr
                         );
+                        $context->builder->call(
+                            $context->lookupFunction('__value__valueDelref'),
+                            $slotPtr
+                        );
+                        self::releaseEphemeralAssignSource($context, $value);
 
                         return;
                     }
@@ -436,6 +456,7 @@ final class JitValueBox
                     $destPtr,
                     self::valuePtrFromVariable($context, $value)
                 );
+                self::releaseEphemeralAssignSource($context, $value);
 
                 return;
             case Variable::TYPE_NATIVE_LONG:
@@ -495,12 +516,12 @@ final class JitValueBox
                 return;
             case Variable::TYPE_HASHTABLE:
                 $ht = $context->helper->loadValue($value);
-                $context->refcount->addref($ht);
                 $context->builder->call(
                     $context->lookupFunction('__value__writeHashtable'),
                     $destPtr,
                     $ht
                 );
+                self::releaseEphemeralAssignSource($context, $value);
 
                 return;
         }
@@ -517,6 +538,72 @@ final class JitValueBox
         throw new \LogicException(
             'assignToPointer: unsupported source type '.Variable::getStringType($value->type)
         );
+    }
+
+    /**
+     * Drop an ephemeral assign-source value box after its payload was copied into the lvalue
+     * (Zend zval_ptr_dtor on the source zval after COPY). Skips named locals (#36215).
+     */
+    public static function releaseEphemeralAssignSource(Context $context, Variable $source): void
+    {
+        if (Variable::KIND_VALUE !== $source->kind) {
+            return;
+        }
+        if (Variable::TYPE_VALUE === $source->type) {
+            if (Variable::KIND_VARIABLE === $source->kind) {
+                $context->builder->call(
+                    $context->lookupFunction('__value__valueDelref'),
+                    self::pointer($context, $source->value)
+                );
+
+                return;
+            }
+            $tyName = $context->getStringFromType($source->value->typeOf());
+            if ('__value__*' === $tyName) {
+                $context->builder->call(
+                    $context->lookupFunction('__value__valueDelref'),
+                    self::normalizeValuePtr($context, $source->value)
+                );
+            }
+
+            return;
+        }
+        if ($source->type & Variable::IS_REFCOUNTED) {
+            $ptr = Variable::KIND_VALUE === $source->kind
+                ? $source->value
+                : $context->helper->loadValue($source);
+            $context->refcount->delref($ptr);
+        }
+    }
+
+    /**
+     * After {@see copyFromPointer} / {@see copyIntoPointer} into $dest, drop the source box
+     * when it is a distinct stack slot (call-result temps are KIND_VARIABLE) (#36215).
+     */
+    public static function releaseAssignSourceBoxAfterCopy(
+        Context $context,
+        Variable $dest,
+        Variable $source
+    ): void {
+        if (Variable::TYPE_VALUE !== $source->type) {
+            self::releaseEphemeralAssignSource($context, $source);
+
+            return;
+        }
+        if ($dest->value === $source->value) {
+            return;
+        }
+        if (Variable::KIND_VALUE === $source->kind) {
+            self::releaseEphemeralAssignSource($context, $source);
+
+            return;
+        }
+        if (Variable::KIND_VARIABLE === $source->kind) {
+            $context->builder->call(
+                $context->lookupFunction('__value__valueDelref'),
+                self::pointer($context, $source->value)
+            );
+        }
     }
 
     /**
@@ -596,6 +683,11 @@ final class JitValueBox
     public static function copyIntoPointer(Context $context, Value $destPtr, Value $srcPtr): void
     {
         self::copyBetweenPointers($context, self::normalizeValuePtr($context, $destPtr), $srcPtr);
+        // Zend: drop the source box after COPY into the destination lvalue (#36215).
+        $context->builder->call(
+            $context->lookupFunction('__value__valueDelref'),
+            self::normalizeValuePtr($context, $srcPtr)
+        );
     }
 
     /**
@@ -604,6 +696,11 @@ final class JitValueBox
     public static function copyFromPointer(Context $context, Value $destSlot, Value $srcPtr): void
     {
         self::copyBetweenPointers($context, self::pointer($context, $destSlot), $srcPtr);
+        // Zend: zval_ptr_dtor on the source after COPY into the lvalue (#36215).
+        $context->builder->call(
+            $context->lookupFunction('__value__valueDelref'),
+            self::normalizeValuePtr($context, $srcPtr)
+        );
     }
 
     /**
@@ -795,9 +892,13 @@ final class JitValueBox
         }
         if ('__value__' === $tyName) {
             $slot = self::alloc($context);
+            $slotPtr = self::pointer($context, $slot);
+            $context->builder->call(
+                $context->lookupFunction('__value__valueDelref'),
+                $slotPtr
+            );
             $context->builder->store($raw, $slot);
-
-            return self::pointer($context, $slot);
+            return $slotPtr;
         }
         if ('int64' === $tyName) {
             $slot = self::alloc($context);

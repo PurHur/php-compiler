@@ -26,6 +26,11 @@ class HashTable extends Type
 {
     public PHPLLVM\Type $pointer;
 
+    public function jitContext(): \PHPCompiler\JIT\Context
+    {
+        return $this->context;
+    }
+
     public function register(): void
     {
         $nodeStruct = $this->context->context->namedStructType('__strkey_node__');
@@ -129,6 +134,7 @@ class HashTable extends Type
         $this->registerFn('__value__readHashtable', '__hashtable__*', ['__value__*']);
         $this->registerFn('__value__writeHashtable', 'void', ['__value__*', '__hashtable__*']);
         $this->registerFn('__hashtable__ptrIsNonEmpty', 'int1', ['__hashtable__*']);
+        HashTableDtorLlvm::register($this);
         // ksort()/krsort() string-key maps — NestedJIT KeySortJitHelper aborts under thin AOT (#27227 / peer #26975).
         $this->registerFn('__hashtable__sortStringKeys', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__sortStringKeysCase', 'void', ['__hashtable__*']);
@@ -300,6 +306,7 @@ class HashTable extends Type
         // strKey natsort stays eager so valueToString/strnatcmp first-link cannot plant
         // ret void into user main (empty stdout after natsort).
         // implementMultisortPacked deferred to ensureMultisortPacked (#35904).
+        HashTableDtorLlvm::implement($this);
         $this->context->builder->clearInsertionPosition();
     }
 

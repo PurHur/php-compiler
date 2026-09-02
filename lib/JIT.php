@@ -20465,6 +20465,7 @@ class JIT {
             $slotPtr,
             $value
         );
+        JIT\JitValueBox::releaseEphemeralAssignSource($this->context, $value);
         if (null !== $oldAlloca) {
             $readLong = $this->context->lookupFunction('__value__readLong');
             $longVal = $this->context->builder->call($readLong, $slotPtr);
@@ -20540,6 +20541,7 @@ class JIT {
             $globalPtr,
             $value
         );
+        JIT\JitValueBox::releaseAssignSourceBoxAfterCopy($this->context, $globalVar, $value);
         JIT\JitValueBox::publishAfterWrite($this->context, $globalPtr);
         $this->invalidateScriptGlobalCompileTimeMetadata($globalVar);
         $globalVar->compileTimeEnumCase = $value->compileTimeEnumCase;
@@ -22263,6 +22265,7 @@ class JIT {
                 JIT\JitValueBox::valuePtrFromVariable($this->context, $result),
                 $value
             );
+            JIT\JitValueBox::releaseAssignSourceBoxAfterCopy($this->context, $result, $value);
             // Script globals reuse functionStaticGlobal; keep valueBoxHashtable so
             // FETCH_DIM_W does not take ValueBoxDimWrite (#32830 / #32814).
             $this->copyValueBoxJitFlags($result, $value);
@@ -22627,7 +22630,11 @@ class JIT {
                 $this->context->builder->store($value->value, $result->value);
                 $this->maybeCopyObjectPropertyBacking($result, $value, $force);
                 if (null === $result->objectPropertySlot) {
-                    $result->addref();
+                    if (Variable::KIND_VALUE === $value->kind) {
+                        JIT\JitValueBox::releaseEphemeralAssignSource($this->context, $value);
+                    } else {
+                        $result->addref();
+                    }
                 }
                 $this->copyValueBoxJitFlags($result, $value, $force);
                 $result->compileTimeConstantName = $value->compileTimeConstantName;
@@ -22705,7 +22712,7 @@ class JIT {
                     }
                     $this->maybeCopyObjectPropertyBacking($result, $value, $force);
                     if (null === $result->objectPropertySlot) {
-                        $result->addref();
+                        JIT\JitValueBox::releaseAssignSourceBoxAfterCopy($this->context, $result, $value);
                     }
                     $this->copyValueBoxJitFlags($result, $value, $force);
                     $result->compileTimeConstantName = $value->compileTimeConstantName;
@@ -22729,7 +22736,11 @@ class JIT {
             );
             $this->maybeCopyObjectPropertyBacking($result, $value, $force);
             if (null === $result->objectPropertySlot) {
-                $result->addref();
+                if (Variable::TYPE_HASHTABLE === $value->type && Variable::KIND_VALUE === $value->kind) {
+                    JIT\JitValueBox::releaseEphemeralAssignSource($this->context, $value);
+                } else {
+                    $result->addref();
+                }
             }
             $this->copyValueBoxJitFlags($result, $value, $force);
             $result->compileTimeConstantName = $value->compileTimeConstantName;
@@ -22763,8 +22774,8 @@ class JIT {
                     $valueRef,
                     $ht
                 );
-                $this->context->refcount->addref($ht);
                 $result->valueBoxHashtable = true;
+                JIT\JitValueBox::releaseEphemeralAssignSource($this->context, $value);
 
                 return;
             }
@@ -22907,6 +22918,7 @@ class JIT {
                         $this->context->helper->loadValue($value)
                     );
                     $result->valueBoxHashtable = true;
+                    JIT\JitValueBox::releaseEphemeralAssignSource($this->context, $value);
 
                     return;
                 case Variable::TYPE_OBJECT:
@@ -22953,6 +22965,7 @@ class JIT {
                         $valueRef,
                         $this->valueBoxPointer($value)
                     );
+                    JIT\JitValueBox::releaseAssignSourceBoxAfterCopy($this->context, $result, $value);
                     $this->copyValueBoxJitFlags($result, $value, $force);
                     $this->preserveClosureInvokeMetadata($resultOp, $result, $value);
                     $this->recordListUnpackAssignSlot($resultOp, $result);
@@ -23033,6 +23046,7 @@ class JIT {
                 $result->value,
                 $this->valueBoxPointer($value)
             );
+            JIT\JitValueBox::releaseAssignSourceBoxAfterCopy($this->context, $result, $value);
             $this->copyValueBoxJitFlags($result, $value, $force);
             $result->compileTimeConstantName = $value->compileTimeConstantName;
             $result->compileTimeEnumCase = $value->compileTimeEnumCase;
@@ -23561,6 +23575,9 @@ class JIT {
             }
             if (Variable::KIND_VALUE === $dest->kind) {
                 // Folded spine-guard bindings and foreach/try phi temps (#16828).
+                if (Variable::TYPE_VALUE === $dest->type || ($dest->type & Variable::IS_REFCOUNTED)) {
+                    JIT\JitValueBox::releaseEphemeralAssignSource($this->context, $dest);
+                }
                 $this->context->makeVariableFromValueOp($value, $result);
 
                 return;
@@ -23688,7 +23705,16 @@ class JIT {
             JIT\JitValueBox::copyFromPointer($this->context, $dest->value, $value);
             $this->context->builder->branch($doneBlock);
             $this->context->builder->positionAtEnd($doneBlock);
-            $dest->addref();
+            JIT\JitValueBox::releaseAssignSourceBoxAfterCopy(
+                $this->context,
+                $dest,
+                new Variable(
+                    $this->context,
+                    Variable::TYPE_VALUE,
+                    Variable::KIND_VALUE,
+                    $value
+                )
+            );
 
             return;
         }
@@ -23712,7 +23738,7 @@ class JIT {
                 }
                 if ('__value__' === $valueTy && $destPointsAtStruct) {
                     $this->context->builder->store($value, $dest->value);
-                    $dest->addref();
+                    JIT\JitValueBox::releaseEphemeralAssignSource($this->context, $source);
                     $this->copyValueBoxJitFlags($dest, $source);
 
                     return;
@@ -23725,7 +23751,7 @@ class JIT {
                 } else {
                     $this->context->builder->store($ptr, $dest->value);
                 }
-                $dest->addref();
+                JIT\JitValueBox::releaseAssignSourceBoxAfterCopy($this->context, $dest, $source);
                 $this->copyValueBoxJitFlags($dest, $source);
 
                 return;
