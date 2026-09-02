@@ -1678,36 +1678,31 @@ class HashTable extends Type
             $newNode->typeOf()->constNull(),
             $this->context->builder->structGep($newNode, $nodeMap['next'])
         );
-        $tail = $fn->appendBasicBlock('strkey_null_tail');
-        $emptyHead = $fn->appendBasicBlock('strkey_null_empty_head');
-        $tailWalk = $fn->appendBasicBlock('strkey_null_tail_walk');
-        $tailDone = $fn->appendBasicBlock('strkey_null_tail_done');
-        $this->context->builder->branch($tail);
-
-        $this->context->builder->positionAtEnd($tail);
-        $currentHead = $this->loadStrKeysHead($headSlot);
-        $isEmpty = $this->context->builder->icmp(Builder::INT_EQ, $currentHead, $currentHead->typeOf()->constNull());
-        $this->context->builder->branchIf($isEmpty, $emptyHead, $tailWalk);
-
-        $this->context->builder->positionAtEnd($tailWalk);
-        $walkNode = $this->context->builder->phi($currentHead->typeOf());
-        $walkNode->addIncoming($currentHead, $tail);
-        $nextWalk = $this->context->builder->load($this->context->builder->structGep($walkNode, $nodeMap['next']));
-        $atEnd = $this->context->builder->icmp(Builder::INT_EQ, $nextWalk, $nextWalk->typeOf()->constNull());
-        $this->context->builder->branchIf($atEnd, $tailDone, $tailWalk);
-        $walkNode->addIncoming($nextWalk, $tailWalk);
-
-        $this->context->builder->positionAtEnd($tailDone);
-        $this->context->builder->store(
-            $newNode,
-            $this->context->builder->structGep($walkNode, $nodeMap['next'])
+        $keyHash = $this->context->builder->call(
+            $this->context->lookupFunction('__hashtable__hashStringKey'),
+            $key
         );
-        $this->incrementNumElements($ht);
-        $this->context->builder->branch($done);
-
-        $this->context->builder->positionAtEnd($emptyHead);
-        $this->stampPackedPrefixEndIfUnset($ht);
-        $this->context->builder->store($newNode, $headSlot);
+        $this->context->builder->store(
+            $keyHash,
+            $this->context->builder->structGep($newNode, $nodeMap['hash'])
+        );
+        $this->context->builder->store(
+            $newNode->typeOf()->constNull(),
+            $this->context->builder->structGep($newNode, $nodeMap['hashNext'])
+        );
+        $this->context->builder->call(
+            $this->context->lookupFunction('__hashtable__ensureStrHashIndex'),
+            $ht
+        );
+        $this->context->builder->call(
+            $this->context->lookupFunction('__hashtable__prependStrKeyHashChain'),
+            $ht,
+            $newNode,
+            $keyHash
+        );
+        $afterAppend = $fn->appendBasicBlock('strkey_null_after_append');
+        $this->appendStrKeyNodeAtTail($fn, $prepend, $ht, $headSlot, $newNode, 'strkey_null', $afterAppend);
+        $this->context->builder->positionAtEnd($afterAppend);
         $this->incrementNumElements($ht);
         $this->context->builder->branch($done);
 
