@@ -13,6 +13,7 @@ lib/Printer.php
 lib/Runtime.php
 lib/OpCodeNames.php
 lib/VM/Variable.php
+lib/CompilerVersion.php
 lib/Module.php
 lib/ModuleAbstract.php
 lib/VM/Refcount.php
@@ -31,3 +32,6 @@ lib/Func/Internal.php
 lib/Func/JIT.php
 lib/JIT/Variable.php
 lib/VM/Builtin/VmClassMethod.php
+lib/VM/SapiOutput.php
+lib/VM/ValueEchoSupport.php
+lib/VM/VmStringCompare.php

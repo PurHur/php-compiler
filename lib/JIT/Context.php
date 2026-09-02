@@ -1262,6 +1262,7 @@ class Context {
             'intval',
             'is_float',
             'is_nan',
+            'is_numeric',
             'sprintf',
             'strlen',
             'strpbrk',

@@ -7,6 +7,8 @@ ext/standard/in_array.php
 ext/standard/intdiv.php
 ext/standard/intval.php
 ext/standard/SetcookieLine.php
+ext/standard/strncasecmp.php
+ext/standard/VmMath.php
 ext/standard/VmAssertState.php
 ext/standard/VmDate.php
 ext/standard/VmFs.php
