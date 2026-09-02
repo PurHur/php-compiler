@@ -27660,7 +27660,7 @@ class Compiler {
         }
         if (null === $block->slotForOperand($cast->result)) {
             foreach ($this->compileExpr($cast, $block) as $op) {
-                $block->opCodes[] = $op;
+                $block->addOpCode($op);
             }
         }
         $slot = $block->slotForOperand($cast->result);

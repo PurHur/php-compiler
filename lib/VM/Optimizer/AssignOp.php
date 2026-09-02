@@ -82,12 +82,7 @@ class AssignOp extends Optimizer
             }
             $priorPrior = $prior;
             $prior = $op;
-            if (null !== $op->block1) {
-                $this->optimize($op->block1, $seen);
-            }
-            if (null !== $op->block2) {
-                $this->optimize($op->block2, $seen);
-            }
+            $this->optimizeControlFlowTargets($op, $seen);
         }
 
         if (! empty($toRemove)) {
@@ -96,6 +91,22 @@ class AssignOp extends Optimizer
             }
             $block->opCodes = array_values($block->opCodes);
             $block->nOpCodes = \count($block->opCodes);
+        }
+    }
+
+    /**
+     * Walk jump targets, nullsafe/coalesce merge arms, and FUNCDEF/DECLARE_* member bodies (#36249).
+     */
+    private function optimizeControlFlowTargets(OpCode $op, ?\SplObjectStorage $seen): void
+    {
+        if (null !== $op->block1) {
+            $this->optimize($op->block1, $seen);
+        }
+        if (null !== $op->block2) {
+            $this->optimize($op->block2, $seen);
+        }
+        if (null !== $op->block3) {
+            $this->optimize($op->block3, $seen);
         }
     }
 
