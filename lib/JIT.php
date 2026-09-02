@@ -33279,6 +33279,31 @@ class JIT {
      * @param list<Operand|null> $operands
      * @param list<Variable> $args
      */
+    /**
+     * Echo prefers native {@see __string__*} allocas over empty {main} script-global boxes
+     * (#36366). Builtin call args must match or strlen/htmlspecialchars read stale sidecars.
+     */
+    private function preferNativeStringBindingForCallArg(string $scopeName, Variable $arg): Variable
+    {
+        $resolved = $this->context->resolveRefAliasName($scopeName);
+        $bound = $this->context->namedVariableBindings[$resolved] ?? null;
+        if (
+            $bound instanceof Variable
+            && $bound !== $arg
+            && Variable::KIND_VARIABLE === $bound->kind
+            && Variable::TYPE_STRING === $bound->type
+            && (
+                Variable::TYPE_VALUE === $arg->type
+                || $arg->functionStaticGlobal
+                || Variable::TYPE_STRING !== $arg->type
+            )
+        ) {
+            return $bound;
+        }
+
+        return $arg;
+    }
+
     private function promoteCompileTimeStringOnCallArgs(Block $block, array $operands, array $args): void
     {
         foreach ($args as $i => $arg) {
@@ -33299,6 +33324,8 @@ class JIT {
             ) {
                 $scopeName = JIT\OperandName::resolve($operand);
                 if (null !== $scopeName && '' !== $scopeName) {
+                    $args[$i] = $this->preferNativeStringBindingForCallArg($scopeName, $arg);
+                    $arg = $args[$i];
                     if ($this->jitNamedLocalHasDivergentBranchCompileTimeStrings($block, $scopeName)
                         || $this->jitNamedLocalScopeHasConcatMutation($block, $scopeName)) {
                         $arg->compileTimeString = null;
@@ -33318,6 +33345,10 @@ class JIT {
                             } else {
                                 $arg->compileTimeString = $effective;
                             }
+                        } elseif (null !== $arg->compileTimeString) {
+                            // Loop/branch merge could not prove a literal — stale init '' must
+                            // not fold strlen/htmlspecialchars (#36406).
+                            $arg->compileTimeString = null;
                         }
                     }
 
@@ -33659,6 +33690,30 @@ class JIT {
                 }
             }
         }
+        if (\count($block->parents) > 1) {
+            // Loop headers and branch merges: all incoming paths must agree (#36244, #36406).
+            // Returning the first parent alone folded strlen($s) to init '' after a `.=` loop.
+            $agreed = null;
+            foreach ($block->parents as $parent) {
+                if (!$parent instanceof Block) {
+                    return null;
+                }
+                // Copy-on-write branch visited — fresh [] re-enters loop headers forever (#36406).
+                $branchVisited = $visited;
+                $resolved = $this->jitEffectiveNamedLocalCompileTimeString($parent, $name, $branchVisited);
+                if (null === $resolved) {
+                    return null;
+                }
+                if (null === $agreed) {
+                    $agreed = $resolved;
+                } elseif ($agreed !== $resolved) {
+                    return null;
+                }
+            }
+
+            return $agreed;
+        }
+
         foreach ($block->parents as $parent) {
             if (!$parent instanceof Block) {
                 continue;
@@ -33671,7 +33726,8 @@ class JIT {
         $bound = $this->context->namedVariableBindings[
             $this->context->resolveRefAliasName($name)
         ] ?? null;
-        if (null !== $bound && null !== $bound->compileTimeString) {
+        // Stale init '' on script-global boxes survives `.=` — never treat as proof (#36406).
+        if (null !== $bound && null !== $bound->compileTimeString && '' !== $bound->compileTimeString) {
             return $bound->compileTimeString;
         }
 
