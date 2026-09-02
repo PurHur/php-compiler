@@ -51207,18 +51207,30 @@ class Compiler {
                         $haystackArgProbe instanceof Operand
                         && $this->callArgIsDeadInlineTemporary($haystackArgProbe)
                     ) {
-                        $haystackProducer = $this->leadingCallbackFirstHaystackFuncCallBeforeCfgCall(
+                        // $data = json_decode(...); array_map('intval', $data['scores']) —
+                        // prefer ArrayDimFetch over the prior FuncCall EXEC_RETURN (#36355).
+                        $dimHaystackSlot = $this->resolvePrecedingArrayDimFetchCallArgSlot(
+                            $haystackArgProbe,
+                            $block,
                             $cfgCallOp,
-                            $block
+                            1
                         );
-                        if ($haystackProducer instanceof Op\Expr\FuncCall
-                            || $haystackProducer instanceof Op\Expr\NsFuncCall) {
-                            $fccInlineArgSlot = $block->slotForOperand($haystackProducer->result);
-                            if (null === $fccInlineArgSlot) {
-                                foreach ($this->compileExpr($haystackProducer, $block) as $op) {
-                                    $sends[] = $op;
-                                }
+                        if (null !== $dimHaystackSlot) {
+                            $fccInlineArgSlot = (int) $dimHaystackSlot;
+                        } else {
+                            $haystackProducer = $this->leadingCallbackFirstHaystackFuncCallBeforeCfgCall(
+                                $cfgCallOp,
+                                $block
+                            );
+                            if ($haystackProducer instanceof Op\Expr\FuncCall
+                                || $haystackProducer instanceof Op\Expr\NsFuncCall) {
                                 $fccInlineArgSlot = $block->slotForOperand($haystackProducer->result);
+                                if (null === $fccInlineArgSlot) {
+                                    foreach ($this->compileExpr($haystackProducer, $block) as $op) {
+                                        $sends[] = $op;
+                                    }
+                                    $fccInlineArgSlot = $block->slotForOperand($haystackProducer->result);
+                                }
                             }
                         }
                     }
