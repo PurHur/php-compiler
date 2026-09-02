@@ -9,8 +9,9 @@ use PHPCompiler\VM\HashTable;
 /**
  * Thin standalone AOT PregJitHelper — same symbols as PregJitHelper (#24115).
  *
- * Fast-path only (no VmPregNative). Captures are string slots read by
- * {@see PregMatchRuntime} LLVM bridge (NestedJIT cannot return `__hashtable__*`).
+ * Fast-path only (no VmPregNative). {@see matchExArgvCapsBundle} packs captures into one
+ * string; stateless thinBundle* parsers let LLVM fill $matches without cross-call statics
+ * (#24115 / j08_preg).
  */
 final class PregJitHelper
 {
@@ -101,6 +102,137 @@ final class PregJitHelper
     public static function thinMatchExHasCapName(int $groupIndex): int
     {
         return PregAotFastPath::lastCapHasName($groupIndex);
+    }
+
+    /**
+     * Match + capture pack for thin AOT — one NestedJIT return carries all caps (#24115).
+     *
+     * Layout: status(1) [capCount(1) cap0\0 cap1\0 … name1\0] when status is match.
+     * status: \xFF = error, \0 = no match, \1 = matched.
+     */
+    public static function matchExArgvCapsBundle(string $pattern, string $subject, int $flags, int $offset): string
+    {
+        self::$lastMatchExHt = null;
+        if ('/(\\d+)/' === $pattern || '#(\\d+)#' === $pattern) {
+            return self::packDigitPlusGroupCapsBundle($subject, $offset);
+        }
+        $code = PregAotFastPath::matchCount($pattern, $subject, $offset);
+        if ($code < 0) {
+            return "\xFF";
+        }
+        if (0 === $code) {
+            return "\x00";
+        }
+
+        return "\x01\x01\0\0";
+    }
+
+    /** /(\d+)/ and #(\d+)# — local pack only (#24115 / j08_preg). */
+    private static function packDigitPlusGroupCapsBundle(string $subject, int $offset): string
+    {
+        $subLen = \strlen($subject);
+        if ($offset < 0 || $offset > $subLen) {
+            return "\xFF";
+        }
+        $i = $offset;
+        while ($i < $subLen) {
+            $c = \ord(\substr($subject, $i, 1));
+            if ($c >= 48 && $c <= 57) {
+                $j = $i + 1;
+                while ($j < $subLen) {
+                    $c2 = \ord(\substr($subject, $j, 1));
+                    if ($c2 < 48 || $c2 > 57) {
+                        break;
+                    }
+                    ++$j;
+                }
+                $full = \substr($subject, $i, $j - $i);
+
+                return "\x01\x02" . $full . "\0" . $full . "\0\0";
+            }
+            ++$i;
+        }
+
+        return "\x00";
+    }
+
+    /** @return int -1 error, 0 no match, 1 matched */
+    public static function thinBundleStatus(string $bundle): int
+    {
+        if ('' === $bundle) {
+            return -1;
+        }
+        $tag = $bundle[0];
+        if ("\xFF" === $tag) {
+            return -1;
+        }
+        if ("\x00" === $tag) {
+            return 0;
+        }
+
+        return 1;
+    }
+
+    public static function thinBundleCapCount(string $bundle): int
+    {
+        if ('' === $bundle || "\x01" !== $bundle[0] || \strlen($bundle) < 2) {
+            return 0;
+        }
+
+        return \ord($bundle[1]);
+    }
+
+    public static function thinBundleCap(string $bundle, int $index): string
+    {
+        $count = self::thinBundleCapCount($bundle);
+        if ($index < 0 || $index >= $count) {
+            return '';
+        }
+        $cursor = 2;
+        for ($i = 0; $i < $count; ++$i) {
+            $end = \strpos($bundle, "\0", $cursor);
+            if (false === $end) {
+                return '';
+            }
+            if ($i === $index) {
+                return \substr($bundle, $cursor, $end - $cursor);
+            }
+            $cursor = $end + 1;
+        }
+
+        return '';
+    }
+
+    public static function thinBundleCapNameFromBundle(string $bundle, int $groupIndex): string
+    {
+        if (1 !== $groupIndex) {
+            return '';
+        }
+        $count = self::thinBundleCapCount($bundle);
+        $cursor = 2;
+        for ($i = 0; $i < $count; ++$i) {
+            $end = \strpos($bundle, "\0", $cursor);
+            if (false === $end) {
+                return '';
+            }
+            $cursor = $end + 1;
+        }
+        $end = \strpos($bundle, "\0", $cursor);
+        if (false === $end) {
+            return '';
+        }
+
+        return \substr($bundle, $cursor, $end - $cursor);
+    }
+
+    /** @return int 1 when group has a name */
+    public static function thinBundleHasCapName(string $bundle, int $groupIndex): int
+    {
+        if (1 !== $groupIndex) {
+            return 0;
+        }
+
+        return '' !== self::thinBundleCapNameFromBundle($bundle, $groupIndex) ? 1 : 0;
     }
 
     public static function matchAllExArgv(string $pattern, string $subject, int $flags, int $offset): int
