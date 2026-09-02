@@ -105,6 +105,12 @@ final class JitGcCollectCyclesStandaloneKernel
 
         $context->builder->positionAtEnd($boxed);
         $slotVal = $context->builder->load($slotPtr);
+        $voidp = $context->getTypeFromString('void*');
+        $slotEmpty = $context->builder->icmp(Builder::INT_EQ, $slotVal, $voidp->constNull());
+        $slotReadBb = $fn->appendBasicBlock('slot_read_nonempty');
+        $context->builder->branchIf($slotEmpty, $nullRet, $slotReadBb);
+
+        $context->builder->positionAtEnd($slotReadBb);
         $slotI8 = $context->builder->pointerCast($slotVal, $i8p);
         $boxedVal = $context->builder->pointerCast($slotI8, $valuePtr);
         $typePtr = $context->builder->pointerCast($boxedVal, $i8p);

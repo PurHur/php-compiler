@@ -26,8 +26,11 @@ final class GcCollectCyclesAotCycleTest extends TestCase
     {
         $scan = (string) file_get_contents(dirname(__DIR__, 2).'/ext/standard/GcCollectCyclesNativeScanJitHelper.php');
         $free = (string) file_get_contents(dirname(__DIR__, 2).'/ext/standard/GcCollectCyclesNativeFreeJitHelper.php');
+        $kernel = (string) file_get_contents(dirname(__DIR__, 2).'/ext/standard/JitGcCollectCyclesStandaloneKernel.php');
         $this->assertStringContainsString('$toFree', $scan);
         $this->assertStringContainsString('foreach ($toFree as $objPtr)', $scan);
         $this->assertStringContainsString('freeRegistryObject', $free);
+        $this->assertStringContainsString('$slotEmpty', $kernel);
+        $this->assertStringContainsString('slot_read_nonempty', $kernel);
     }
 }
