@@ -17,8 +17,9 @@ class Value extends Type {
     public function register(): void {
         declare {
             struct __value__ {
+                // 16 B / align 8 — pad before 8-byte payload (#36214).
                 int8 $type;
-                // NOTE: 8 bytes because that covers all needed types
+                int8[7] $pad;
                 int8[8] $value;
             }
             struct __value__value {

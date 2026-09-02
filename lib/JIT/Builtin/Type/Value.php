@@ -28,14 +28,16 @@ class Value extends Type {
             $this->context->registerType('__value__' . '*', $struct___cfcd208495d565ef66e7dff9f98764da->pointerType(0));
             $this->context->registerType('__value__' . '**', $struct___cfcd208495d565ef66e7dff9f98764da->pointerType(0)->pointerType(0));
             $struct___cfcd208495d565ef66e7dff9f98764da->setBody(
-                false ,  // packed
+                false ,  // 16 B / align 8 — pad before payload (#36214)
                 $this->context->getTypeFromString('int8')
+                , $this->context->getTypeFromString('int8[7]')
                 , $this->context->getTypeFromString('int8[8]')
                 
             );
             $this->context->structFieldMap['__value__'] = [
                 'type' => 0
-                , 'value' => 1
+                , 'pad' => 1
+                , 'value' => 2
                 
             ];
         
