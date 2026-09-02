@@ -994,6 +994,59 @@ class String_ extends Type {
         $this->context->builder->store($destValue, $dest->value);
     }
 
+    /**
+     * In-place `$dest .= $right` — geometric realloc then append right bytes only (#36410).
+     * Caller must ensure $dest already holds the accumulated string (AssignOp in-place CONCAT).
+     */
+    public function appendInPlace(Variable $dest, Variable $right): void
+    {
+        assert($dest->type === Variable::TYPE_STRING);
+        if ($dest->kind === Variable::KIND_VALUE) {
+            throw new \LogicException('Unknown how to assign to a value');
+        }
+        $destSlotTy = $this->context->getStringFromType($dest->value->typeOf());
+        if (in_array($destSlotTy, ['__value__*', '__value__'], true)) {
+            throw new \LogicException('appendInPlace requires a native __string__* slot');
+        }
+        $this->context->intrinsic->builder = $this->context->builder;
+        if (null !== ($right->compileTimeString ?? null)) {
+            $rightVar = $this->context->builder->load(
+                $this->context->constantStringFromString($right->compileTimeString)
+            );
+        } else {
+            $right = \PHPCompiler\JIT\JitNativeString::coerce($this->context, $right);
+            $rightVar = $this->context->helper->loadValue($right);
+        }
+        $map = $this->context->structFieldMap['__string__'];
+        $destVar = $dest->value;
+        $destValue = $this->context->builder->load($destVar);
+        $oldSize = $this->context->builder->load(
+            $this->context->builder->structGep($destValue, $map['length'])
+        );
+        $rightSize = $this->context->builder->load(
+            $this->context->builder->structGep($rightVar, $map['length'])
+        );
+        $newSize = $this->context->builder->addNoUnsignedWrap(
+            $oldSize,
+            $this->context->builder->intCast($rightSize, $oldSize->typeOf())
+        );
+        $this->context->builder->call(
+            $this->context->lookupFunction('__string__realloc'),
+            $destVar,
+            $newSize
+        );
+        $destValue = $this->context->builder->load($destVar);
+        $this->context->builder->store(
+            $newSize,
+            $this->context->builder->structGep($destValue, $map['length'])
+        );
+        $char = $this->context->builder->structGep($destValue, $map['value']);
+        $char = $this->context->builder->gep($char, $oldSize);
+        $rightChar = $this->context->builder->structGep($rightVar, $map['value']);
+        $this->context->intrinsic->memcpy($char, $rightChar, $rightSize, false);
+        $this->context->builder->store($destValue, $dest->value);
+    }
+
     private function copy(\gcc_jit_block_ptr $block, Variable $dest, Variable $other, \gcc_jit_rvalue_ptr $offset): void {
         /*
         $addr = \gcc_jit_lvalue_get_address(

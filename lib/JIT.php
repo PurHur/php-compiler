@@ -11176,6 +11176,57 @@ class JIT {
                             $result = $this->context->getVariableFromOp($destOp);
                             $result->compileTimeString = $newVal->compileTimeString;
                         }
+                    } elseif (
+                        (int) $op->arg1 === (int) $op->arg2
+                        && (Variable::TYPE_VALUE === $result->type || JIT\JitValueBox::isValueOperand($result))
+                        && Variable::KIND_VARIABLE === $result->kind
+                        && null === $result->objectPropertySlot
+                        && null === $result->writableHt
+                        && null === $result->staticPropertyGlobal
+                        && null === $result->functionStaticGlobal
+                    ) {
+                        // Loop `$s .= 'x'` on a value-boxed CV — promote once to a native
+                        // __string__* entry slot so geometric realloc applies (#36410).
+                        $slot = JIT\BasicBlockHelper::entryAllocaForFunction(
+                            $this->context,
+                            $func,
+                            $this->context->getTypeFromString('__string__*')
+                        );
+                        $promoted = new Variable(
+                            $this->context,
+                            Variable::TYPE_STRING,
+                            Variable::KIND_VARIABLE,
+                            $slot
+                        );
+                        $seedStr = $this->context->builder->call(
+                            $this->context->lookupFunction('__value__readString'),
+                            JIT\JitValueBox::valuePtrFromVariable($this->context, $result)
+                        );
+                        $this->context->builder->store($seedStr, $slot);
+                        $this->context->setVariableOp($destOp, $promoted);
+                        $this->bindPromotedStringConcatDest($block, $destOp, $promoted);
+                        if (null !== ($result->compileTimeString ?? null)) {
+                            $promoted->compileTimeString = $result->compileTimeString;
+                        }
+                        $result = $promoted;
+                        $left = $promoted;
+                        $right = $this->context->getVariableFromOp(
+                            $this->resolveTernaryPhiConcatOperand($block, (int) $op->arg3)
+                        );
+                        $right = JIT\JitNativeString::coerce(
+                            $this->context,
+                            $right,
+                            $block->getOperand($op->arg3)
+                        );
+                        $this->context->type->string->appendInPlace($result, $right);
+                        $nativeConcatVal = new Variable(
+                            $this->context,
+                            Variable::TYPE_STRING,
+                            Variable::KIND_VALUE,
+                            $this->context->helper->loadValue($result)
+                        );
+                        $this->publishMainScriptNamedConcatResult($block, $destOp, $nativeConcatVal);
+                        $this->markScopeVariableAssignedIfTracked($destOp, $result);
                     } elseif (Variable::TYPE_VALUE === $result->type || JIT\JitValueBox::isValueOperand($result)) {
                         $newVal = $this->compileConcatIntoNewString(
                             $left,
@@ -11198,19 +11249,36 @@ class JIT {
                         $this->publishMainScriptNamedConcatResult($block, $destOp, $newVal);
                         $this->markScopeVariableAssignedIfTracked($destOp, $result);
                     } else {
-                        // Fresh and in-place native concat: JitStringConcat + store. Avoid
-                        // string->concat __string__realloc on entry allocas (AOT strlen→0, #15642).
                         $leftVar = $this->context->helper->loadValue(
                             JIT\JitNativeString::coerce($this->context, $left, $block->getOperand($op->arg2))
                         );
                         $rightVar = $this->context->helper->loadValue(
                             JIT\JitNativeString::coerce($this->context, $right, $block->getOperand($op->arg3))
                         );
-                        $newStr = \PHPCompiler\ext\standard\JitStringConcat::concat(
-                            $this->context,
-                            $leftVar,
-                            $rightVar
-                        );
+                        $inPlaceNative = (int) $op->arg1 === (int) $op->arg2
+                            && Variable::TYPE_STRING === $result->type
+                            && Variable::KIND_VARIABLE === $result->kind;
+                        if ($inPlaceNative) {
+                            $leftNative = JIT\JitNativeString::coerce(
+                                $this->context,
+                                $left,
+                                $block->getOperand($op->arg2)
+                            );
+                            $rightNative = JIT\JitNativeString::coerce(
+                                $this->context,
+                                $right,
+                                $block->getOperand($op->arg3)
+                            );
+                            $this->context->type->string->appendInPlace($result, $rightNative);
+                            $newStr = $this->context->helper->loadValue($result);
+                        } else {
+                            // Fresh concat: allocate a new __string__ (not in-place realloc — #15642).
+                            $newStr = \PHPCompiler\ext\standard\JitStringConcat::concat(
+                                $this->context,
+                                $leftVar,
+                                $rightVar
+                            );
+                        }
                         // A KIND_VALUE destination has no slot to store into: ->value IS the
                         // immediate. The promotion above only covers TYPE_STRING, so a dest whose
                         // inferred type never settled on string reached here and emitted
@@ -11255,7 +11323,9 @@ class JIT {
                             $this->bindPromotedStringConcatDest($block, $destOp, $promoted);
                             $result = $promoted;
                         }
-                        $this->context->builder->store($newStr, $destSlot);
+                        if (!$inPlaceNative) {
+                            $this->context->builder->store($newStr, $destSlot);
+                        }
                         $nativeConcatVal = new Variable(
                             $this->context,
                             Variable::TYPE_STRING,
