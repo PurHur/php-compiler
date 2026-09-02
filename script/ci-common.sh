@@ -78,6 +78,10 @@ ci_ensure_generated_doc() {
   fi
   echo "Regenerating stale ${label} (issue #765)..."
   "$PHP_BIN" "${PHP_OPTS[@]}" "$script"
+  if ! "$PHP_BIN" "${PHP_OPTS[@]}" "$script" --check; then
+    echo "ci_ensure_generated_doc: ${label} still stale after regeneration (#36248)" >&2
+    return 1
+  fi
 }
 
 ci_run_capability_syntax_check() {

@@ -67,7 +67,8 @@ if ! { [[ -f /.dockerenv ]] && [[ -f /opt/llvm9/libLLVM-9.so.1 ]]; } \
     exec ./script/docker-exec.sh -- bash -lc "source script/php-env.sh && ./script/differential-sweep.sh ${args}"
 fi
 
-DIR="$ROOT/test/differential/cases"
+DEFAULT_DIR="$ROOT/test/differential/cases"
+DIR="$DEFAULT_DIR"
 BACKEND=vm
 QUIET=0
 REPEAT=1
@@ -175,6 +176,26 @@ for f in "$DIR"/*.php; do
         printf '  %-4s: %s\n' "$BACKEND" "$(printf '%s' "$bad" | tr '\n' '~')"
     fi
 done
+
+if [ "$total" -eq 0 ]; then
+    echo "differential-sweep: no .php cases under $DIR (empty corpus is not a pass — #36248)" >&2
+    exit 2
+fi
+
+min_cases=0
+if [ "$DIR" = "$DEFAULT_DIR" ] && [ -f "$ROOT/test/differential/COUNT" ]; then
+    min_cases="$(tr -d '[:space:]' <"$ROOT/test/differential/COUNT")"
+    case "$min_cases" in
+        ''|*[!0-9]*)
+            echo "differential-sweep: invalid MIN_CASES in test/differential/COUNT: $(cat "$ROOT/test/differential/COUNT")" >&2
+            exit 2
+            ;;
+    esac
+    if [ "$total" -lt "$min_cases" ]; then
+        echo "differential-sweep: found $total case(s) under $DIR but test/differential/COUNT requires >= $min_cases (#36248)" >&2
+        exit 2
+    fi
+fi
 
 if [ "$skipped" -gt 0 ]; then
     printf '\n%d/%d match Zend (%s backend, %d skipped)\n' \

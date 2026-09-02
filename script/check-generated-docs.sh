@@ -42,6 +42,9 @@ step "composer.lock content-hash" "$PHP_BIN" script/check-composer-lock-hash.php
 # 6. Vendor patches apply to pristine *.orig snapshots — #36209
 step "apply-patches --verify-pristine" script/apply-patches.sh --verify-pristine
 
+# 7. Gate honesty probes — empty corpus / missing rg must not read as green (#36248)
+step "check-gate-honesty" script/check-gate-honesty.sh
+
 if [[ "$fail" -ne 0 ]]; then
   echo "check-generated-docs: drift detected — regenerate in the pinned env (see CONTRIBUTING 'Generated docs')" >&2
   exit 1
