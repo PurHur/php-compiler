@@ -285,6 +285,12 @@ class Block {
     /** @var array<int, Operand|null> lazy {@see getOperand} results — cleared when scope slots change (#36226). */
     private array $operandBySlotCache = [];
 
+    /** Cached {@see isNamedVariableSlot()} — scope-stable at runtime (#36207). */
+    private array $isNamedVariableSlotCache = [];
+
+    /** Cached {@see operandForScopeSlot()} — scope-stable at runtime (#36207). */
+    private array $operandForScopeSlotCache = [];
+
     /** assign.result temp => CV lvalue slot for reads after in-place mutation (#15125). */
     private array $assignResultToLvalueSlot = [];
 
@@ -525,10 +531,12 @@ class Block {
     {
         if (null === $slot) {
             $this->operandBySlotCache = [];
+            $this->isNamedVariableSlotCache = [];
+            $this->operandForScopeSlotCache = [];
 
             return;
         }
-        unset($this->operandBySlotCache[$slot]);
+        unset($this->operandBySlotCache[$slot], $this->isNamedVariableSlotCache[$slot], $this->operandForScopeSlotCache[$slot]);
     }
 
     private function bindScopeOperandSlot(Operand $operand, int $slot): void
@@ -1306,11 +1314,17 @@ class Block {
         if (isset($this->namedAssignDestSlotIndexes[$slot])) {
             return true;
         }
+        if (\array_key_exists($slot, $this->isNamedVariableSlotCache)) {
+            return $this->isNamedVariableSlotCache[$slot];
+        }
         foreach ($this->scope as $operand) {
             if ($this->scope[$operand] === $slot && null !== self::resolveVariableName($operand)) {
+                $this->isNamedVariableSlotCache[$slot] = true;
+
                 return true;
             }
         }
+        $this->isNamedVariableSlotCache[$slot] = false;
 
         return false;
     }
@@ -1598,11 +1612,17 @@ class Block {
 
     public function operandForScopeSlot(int $slot): ?Operand
     {
+        if (\array_key_exists($slot, $this->operandForScopeSlotCache)) {
+            return $this->operandForScopeSlotCache[$slot];
+        }
         foreach ($this->scope as $operand) {
             if ($this->scope[$operand] === $slot) {
+                $this->operandForScopeSlotCache[$slot] = $operand;
+
                 return $operand;
             }
         }
+        $this->operandForScopeSlotCache[$slot] = null;
 
         return null;
     }
