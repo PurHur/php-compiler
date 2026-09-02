@@ -50,7 +50,7 @@ final class UndefinedVariableHelper
             return;
         }
         $name = self::resolveTrackableName($op, $var);
-        if (null === $name) {
+        if (null === $name || self::isFormalParameter($context, $name)) {
             return;
         }
         if (null === BasicBlockHelper::tryGetInsertBlock($context)) {
@@ -73,7 +73,7 @@ final class UndefinedVariableHelper
             return;
         }
         $name = self::resolveTrackableName($op, $var);
-        if (null === $name) {
+        if (null === $name || self::isFormalParameter($context, $name)) {
             return;
         }
         $resolved = $context->resolveRefAliasName($name);
@@ -112,7 +112,7 @@ final class UndefinedVariableHelper
             return;
         }
         $name = self::resolveTrackableName($op, $var);
-        if (null === $name) {
+        if (null === $name || self::isFormalParameter($context, $name)) {
             return;
         }
         self::emitAssignedFlagGuard($context, $name);
@@ -130,8 +130,35 @@ final class UndefinedVariableHelper
         self::emitAssignedFlagGuard($context, $name);
     }
 
+    /** Formal parameters are always defined — Zend never ZEND_CHECK_UNDEFINED_VAR on CV params. */
+    private static function isFormalParameter(Context $context, string $name): bool
+    {
+        $resolved = $context->resolveRefAliasName($name);
+        $block = $context->jitFunctionRootBlock
+            ?? $context->jitEnclosingBlock
+            ?? $context->jitCurrentBlock;
+        if ($block instanceof \PHPCompiler\Block) {
+            if (null !== $block->paramSlotForName($resolved) || null !== $block->paramSlotForName($name)) {
+                return true;
+            }
+        }
+        $active = strtolower($context->activeFunction);
+        if ('' !== $active && isset($context->functionProxies[$active])) {
+            $proxy = $context->functionProxies[$active];
+            if ($proxy instanceof Call\Native) {
+                return in_array($resolved, $proxy->paramNames, true)
+                    || in_array($name, $proxy->paramNames, true);
+            }
+        }
+
+        return false;
+    }
+
     private static function emitAssignedFlagGuard(Context $context, string $name): void
     {
+        if (self::isFormalParameter($context, $name)) {
+            return;
+        }
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         if (null === $savedInsert) {
             return;
