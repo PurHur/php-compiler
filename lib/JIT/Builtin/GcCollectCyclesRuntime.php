@@ -792,12 +792,14 @@ final class GcCollectCyclesRuntime
 
     private static function implementCollectCyclesImpl(Context $context): void
     {
-        if (self::usesPhpRegistry($context) || self::usesUserScriptStandaloneCollect($context)) {
+        if (self::usesPhpRegistry($context)) {
             self::implementCollectCyclesPhpBridge($context);
 
             return;
         }
 
+        // User-script standalone keeps LLVM phpc_gc_register; native scan shares the
+        // module-local registry. PHP sync+NativeScan split prelinked statics (#36245).
         JitGcCollectCyclesStandaloneKernel::implementCollectCyclesImpl($context);
     }
 

@@ -125,6 +125,27 @@ final class JitGcCollectCyclesStandaloneKernel
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($direct);
+        // TYPE_OBJECT propertyStore writes raw __object__* into void** slots (#36245).
+        // Offset-4 typeinfo is __value__-tagged storage only; constructed on __object__
+        // matches Object_::propertyStore (peer GcCollectCyclesNativeOpsJit).
+        $objMap = $context->structFieldMap['__object__'] ?? null;
+        $rawObjBb = $fn->appendBasicBlock('slot_read_raw_obj');
+        $taggedBb = $fn->appendBasicBlock('slot_read_tagged');
+        if (null !== $objMap && isset($objMap['constructed'])) {
+            $objCandidate = $context->builder->pointerCast($slotVal, $objPtr);
+            $constructedField = $context->builder->structGep($objCandidate, $objMap['constructed']);
+            $constructed = $context->builder->load($constructedField);
+            $isConstructed = $context->builder->icmp(Builder::INT_NE, $constructed, $i8->constInt(0, false));
+            $context->builder->branchIf($isConstructed, $rawObjBb, $taggedBb);
+        } else {
+            $context->builder->branch($taggedBb);
+        }
+
+        $context->builder->positionAtEnd($rawObjBb);
+        $objDirect = $context->builder->pointerCast($slotVal, $objPtr);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($taggedBb);
         $headTypeinfoPtr = $context->builder->pointerCast(
             $context->builder->inBoundsGEP($slotI8, $i32->constInt(4, false)),
             $i32->pointerType(0)
@@ -141,7 +162,7 @@ final class JitGcCollectCyclesStandaloneKernel
         $context->builder->branchIf($isDirectObj, $directObj, $nullRet);
 
         $context->builder->positionAtEnd($directObj);
-        $objDirect = $context->builder->pointerCast($slotI8, $objPtr);
+        $objTagged = $context->builder->pointerCast($slotI8, $objPtr);
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($nullRet);
@@ -151,7 +172,8 @@ final class JitGcCollectCyclesStandaloneKernel
         $phi = $context->builder->phi($objPtr);
         $phi->addIncoming($objPtr->constNull(), $nullRet);
         $phi->addIncoming($objFromBox, $readBoxed);
-        $phi->addIncoming($objDirect, $directObj);
+        $phi->addIncoming($objDirect, $rawObjBb);
+        $phi->addIncoming($objTagged, $directObj);
         $context->builder->returnValue($phi);
         $context->builder->clearInsertionPosition();
     }
