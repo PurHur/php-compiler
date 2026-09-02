@@ -27,6 +27,7 @@ All submissions, including by project members, require review via GitHub pull re
 - `php script/bootstrap-inventory.php` when the `bin/vm.php` dependency path changes
 - `php script/bootstrap-selfhost-compile-probe.php --update-inventory` writes `docs/bootstrap-inventory-live-probe.md` (not `docs/bootstrap-inventory.md`; #2891); run `php script/bootstrap-inventory.php` if inventory headers drift
 - `php script/capability-matrix.php` / `php script/capability-syntax.php` when builtins or unsupported-syntax registry change
+- `php script/opcode-corpus-md5.php --update` when a `lib/Compiler.php` Concern extraction (or intentional opcode change) alters `Printer::print` dumps (#36230); check mode is part of `./script/check-generated-docs.sh`
 
 Also run `php script/bootstrap-inventory.php --check` before push when bootstrap paths change.
 

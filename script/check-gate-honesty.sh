@@ -42,6 +42,18 @@ step "differential-sweep empty corpus" bash -c "
   [[ \"\$out\" == *'empty corpus is not a pass'* ]] || exit 1
 "
 
+# opcode-corpus-md5: empty glob must not exit 0 (#36230 / #36248)
+step "opcode-corpus-md5 empty corpus" bash -c "
+  set -euo pipefail
+  mkdir -p '$tmp/opcode-empty'
+  # Point the PHP worker at an empty glob by running from a throwaway copy is heavy;
+  # instead invoke php with a one-shot override via env consumed by the script.
+  out=\"\$(OPCODE_CORPUS_GLOB_OVERRIDE='$tmp/opcode-empty/*.php' php script/opcode-corpus-md5.php --check 2>&1)\" || ec=\$?
+  ec=\"\${ec:-0}\"
+  [[ \"\$ec\" -ne 0 ]] || exit 1
+  [[ \"\$out\" == *'empty corpus is not a pass'* ]] || exit 1
+"
+
 # check-stale-issue-refs must fail when rg is absent (Dockerfile should ship rg)
 step "check-stale-issue-refs requires rg" bash -c '
   set -euo pipefail
