@@ -297,6 +297,9 @@ class Block {
     /** Cached compiler temp slots (not named locals / constants) for VM JUMPIF release (#36411). */
     private ?array $ephemeralScopeSlotIndexesCache = null;
 
+    /** Cached {@see simpleCountedIntForLoopSpec()} — false when not a match (#36411). */
+    private array|false|null $simpleCountedIntForLoopSpecCache = null;
+
     /** assign.result temp => CV lvalue slot for reads after in-place mutation (#15125). */
     private array $assignResultToLvalueSlot = [];
 
@@ -1706,6 +1709,113 @@ class Block {
         $this->ephemeralScopeSlotIndexesCache = array_values($slots);
 
         return $this->ephemeralScopeSlotIndexesCache;
+    }
+
+    /**
+     * `for ($i = …; $i < N; ++$i) { ++$body; }` — header/body/incr three-block back-edge (#36411).
+     *
+     * @return null|array{counterSlot:int,limit:int,bodyIncSlots:list<int>,exitBlock:Block}
+     */
+    public function simpleCountedIntForLoopSpec(): ?array
+    {
+        if (false === $this->simpleCountedIntForLoopSpecCache) {
+            return null;
+        }
+        if (null !== $this->simpleCountedIntForLoopSpecCache) {
+            return $this->simpleCountedIntForLoopSpecCache;
+        }
+        if (2 !== $this->nOpCodes) {
+            $this->simpleCountedIntForLoopSpecCache = false;
+
+            return null;
+        }
+        $cmp = $this->opCodes[0];
+        $jumpif = $this->opCodes[1];
+        if (OpCode::TYPE_SMALLER !== $cmp->type || OpCode::TYPE_JUMPIF !== $jumpif->type) {
+            $this->simpleCountedIntForLoopSpecCache = false;
+
+            return null;
+        }
+        $counterSlot = null;
+        $limit = null;
+        if (isset($this->constants[(int) $cmp->arg3])) {
+            $limit = $this->constantSlotIntValue($this->constants[(int) $cmp->arg3]);
+            $counterSlot = (int) $cmp->arg2;
+        } elseif (isset($this->constants[(int) $cmp->arg2])) {
+            $limit = $this->constantSlotIntValue($this->constants[(int) $cmp->arg2]);
+            $counterSlot = (int) $cmp->arg3;
+        }
+        if (null === $limit || null === $counterSlot || !$this->isNamedVariableSlot($counterSlot)) {
+            $this->simpleCountedIntForLoopSpecCache = false;
+
+            return null;
+        }
+        $bodyBlock = $jumpif->block1;
+        $exitBlock = $jumpif->block2;
+        if (!$bodyBlock instanceof self || !$exitBlock instanceof self) {
+            $this->simpleCountedIntForLoopSpecCache = false;
+
+            return null;
+        }
+        $bodyIncSlots = [];
+        $incrBlock = null;
+        if (2 === $bodyBlock->nOpCodes
+            && OpCode::TYPE_PRE_INC === $bodyBlock->opCodes[0]->type
+            && OpCode::TYPE_JUMP === $bodyBlock->opCodes[1]->type
+            && (int) $bodyBlock->opCodes[0]->arg2 === (int) $bodyBlock->opCodes[0]->arg3
+            && $bodyBlock->isNamedVariableSlot((int) $bodyBlock->opCodes[0]->arg2)
+        ) {
+            $bodySlot = (int) $bodyBlock->opCodes[0]->arg2;
+            if ($bodySlot === $counterSlot) {
+                $this->simpleCountedIntForLoopSpecCache = false;
+
+                return null;
+            }
+            $bodyIncSlots = [$bodySlot];
+            $incrBlock = $bodyBlock->opCodes[1]->block1;
+        } elseif (1 === $bodyBlock->nOpCodes && OpCode::TYPE_JUMP === $bodyBlock->opCodes[0]->type) {
+            $incrBlock = $bodyBlock->opCodes[0]->block1;
+        } else {
+            $this->simpleCountedIntForLoopSpecCache = false;
+
+            return null;
+        }
+        if (!$incrBlock instanceof self || 2 !== $incrBlock->nOpCodes) {
+            $this->simpleCountedIntForLoopSpecCache = false;
+
+            return null;
+        }
+        $incrOp = $incrBlock->opCodes[0];
+        $incrJump = $incrBlock->opCodes[1];
+        if (OpCode::TYPE_PRE_INC !== $incrOp->type
+            || OpCode::TYPE_JUMP !== $incrJump->type
+            || (int) $incrOp->arg2 !== $counterSlot
+            || (int) $incrOp->arg3 !== $counterSlot
+            || $incrJump->block1 !== $this
+        ) {
+            $this->simpleCountedIntForLoopSpecCache = false;
+
+            return null;
+        }
+        $spec = [
+            'counterSlot' => $counterSlot,
+            'limit' => $limit,
+            'bodyIncSlots' => $bodyIncSlots,
+            'exitBlock' => $exitBlock,
+        ];
+        $this->simpleCountedIntForLoopSpecCache = $spec;
+
+        return $spec;
+    }
+
+    private function constantSlotIntValue(Variable $const): ?int
+    {
+        $resolved = $const->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $resolved->type) {
+            return null;
+        }
+
+        return $resolved->toInt();
     }
 
     /**

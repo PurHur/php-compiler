@@ -5898,6 +5898,14 @@ restart:
                     $arg1->bool($arg2->toBool($this) !== $arg3->toBool($this));
                     break;
                 case OpCode::TYPE_SMALLER:
+                    if (1 === $frame->pos) {
+                        $loopExitFrame = $this->tryExecuteCountedIntForLoop($frame);
+                        if (null !== $loopExitFrame) {
+                            $frame = $loopExitFrame;
+                            continue 2;
+                        }
+                    }
+                    // fall through
                 case OpCode::TYPE_GREATER:
                 case OpCode::TYPE_SMALLER_OR_EQUAL:
                 case OpCode::TYPE_GREATER_OR_EQUAL:
@@ -6365,6 +6373,20 @@ restart:
                     $frame->callSiteLine = $savedCallSiteLine;
                     break;
                 case OpCode::TYPE_JUMP:
+                    if (
+                        [] === $this->context->activeTryHandlerFrames
+                        && null === $this->context->activeCatchHandlerFrame
+                        && !$this->frameIsInFinallyBody($frame)
+                    ) {
+                        if (
+                            null !== $frame->listUnpackAssignMergeBlock
+                            && $op->block1 === $frame->listUnpackAssignMergeBlock
+                        ) {
+                            $frame->listUnpackAssignMergeBlock = null;
+                        }
+                        $frame = $this->frameForBranch($frame, $op->block1);
+                        continue 2;
+                    }
                     if ($this->completeActiveFinallyUnwind($frame)) {
                         goto restart;
                     }
@@ -6398,7 +6420,7 @@ restart:
                         && !$this->frameIsInFinallyBody($frame)
                     ) {
                         $frame = $this->frameForBranch($frame, $branchTarget);
-                        goto restart;
+                        continue 2;
                     }
                     // break/continue lower to JumpIf edges that leave the try body; run finally
                     // before the branch target (Zend ZEND_BRK/ZEND_CONT, #25240).
@@ -11285,7 +11307,7 @@ restart:
         $write = $frame->scope[$op->arg3];
         $result = $frame->scope[$op->arg1];
         if ($this->canUseIncDecSimpleLocalFastPath($frame, $op, $write)) {
-            if ($this->tryExecuteIncDecFastPath($frame, $read, $write, $result, $increment, $prefix, (int) $op->arg3)) {
+            if ($this->tryExecuteIncDecFastPath($frame, $read, $write, $result, $increment, $prefix, (int) $op->arg3, (int) $op->arg1)) {
                 return null;
             }
         }
@@ -11356,7 +11378,7 @@ restart:
         if (Variable::TYPE_STRING_OFFSET === $write->resolveIndirect()->type) {
             return $this->dispatchVmError(Variable::STRING_OFFSET_INCDEC_ERROR, $frame);
         }
-        if ($this->tryExecuteIncDecFastPath($frame, $read, $write, $result, $increment, $prefix, (int) $op->arg3)) {
+        if ($this->tryExecuteIncDecFastPath($frame, $read, $write, $result, $increment, $prefix, (int) $op->arg3, (int) $op->arg1)) {
             return null;
         }
         $working = $this->incDecScratch(0);
@@ -11463,9 +11485,94 @@ restart:
         if (Variable::TYPE_INTEGER !== $left->type || Variable::TYPE_INTEGER !== $right->type) {
             return false;
         }
-        try {
-            $frame->scope[$op->arg1]->compareOp($op->type, $leftVar, $rightVar, $this);
-        } catch (\TypeError) {
+        $result = $frame->scope[$op->arg1];
+        $leftInt = $left->toInt($this);
+        $rightInt = $right->toInt($this);
+        $truth = match ($op->type) {
+            OpCode::TYPE_SMALLER => $leftInt < $rightInt,
+            OpCode::TYPE_GREATER => $leftInt > $rightInt,
+            OpCode::TYPE_SMALLER_OR_EQUAL => $leftInt <= $rightInt,
+            OpCode::TYPE_GREATER_OR_EQUAL => $leftInt >= $rightInt,
+            default => null,
+        };
+        if (null === $truth) {
+            return false;
+        }
+        $result->assignBoolInPlace($truth);
+
+        return true;
+    }
+
+    /**
+     * Run a simple `for ($i …; $i < N; ++$i) { ++$body; }` loop without per-iteration opcode dispatch (#36411).
+     */
+    private function tryExecuteCountedIntForLoop(Frame $frame): ?Frame
+    {
+        if (
+            [] !== $this->context->activeTryHandlerFrames
+            || null !== $this->context->activeCatchHandlerFrame
+            || $this->frameIsInFinallyBody($frame)
+        ) {
+            return null;
+        }
+        $spec = $frame->block->simpleCountedIntForLoopSpec();
+        if (null === $spec) {
+            return null;
+        }
+        $counterSlot = $spec['counterSlot'];
+        if (!isset($frame->initializedSlots[$counterSlot], $frame->scope[$counterSlot])) {
+            return null;
+        }
+        $counter = $frame->scope[$counterSlot]->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $counter->type) {
+            return null;
+        }
+        $limit = $spec['limit'];
+        $bodyValues = [];
+        foreach ($spec['bodyIncSlots'] as $bodySlot) {
+            if (!isset($frame->initializedSlots[$bodySlot], $frame->scope[$bodySlot])) {
+                return null;
+            }
+            $bodyVar = $frame->scope[$bodySlot]->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $bodyVar->type) {
+                return null;
+            }
+            $bodyValues[$bodySlot] = $bodyVar->toInt($this);
+        }
+        $i = $counter->toInt($this);
+        while ($i < $limit) {
+            foreach ($spec['bodyIncSlots'] as $bodySlot) {
+                ++$bodyValues[$bodySlot];
+            }
+            ++$i;
+        }
+        $counter->int($i);
+        foreach ($spec['bodyIncSlots'] as $bodySlot) {
+            $frame->scope[$bodySlot]->resolveIndirect()->int($bodyValues[$bodySlot]);
+        }
+        $this->markScopeSlotInitialized($frame, $counterSlot);
+        foreach ($spec['bodyIncSlots'] as $bodySlot) {
+            $this->markScopeSlotInitialized($frame, $bodySlot);
+        }
+        $exitFrame = $this->frameForBranch($frame, $spec['exitBlock']);
+        $this->executingFrame = $exitFrame;
+
+        return $exitFrame;
+    }
+
+    /** Prefix/postfix ++/-- result temp is dead after this opcode (#36411). */
+    private function vmIncDecResultSlotIsDeadAfterOp(Frame $frame, int $resultSlot): bool
+    {
+        if ($frame->block->isNamedVariableSlot($resultSlot)) {
+            return false;
+        }
+        if ($this->isVmScopeSlotUsedByFollowingOps($frame, $resultSlot)) {
+            return false;
+        }
+        if ($frame->block->scopeSlotReadInJumpTargets($resultSlot)) {
+            return false;
+        }
+        if ($frame->block->scopeSlotReadInDirectJumpTargets($resultSlot)) {
             return false;
         }
 
@@ -11479,7 +11586,8 @@ restart:
         Variable $result,
         bool $increment,
         bool $prefix,
-        int $writeSlot
+        int $writeSlot,
+        int $resultSlot
     ): bool {
         $resolvedWrite = $write->resolveIndirect();
         if (Variable::TYPE_STRING_OFFSET === $resolvedWrite->type) {
@@ -11506,10 +11614,14 @@ restart:
                     $write->copyFrom($target);
                 }
                 if ($result !== $target && $result !== $write) {
-                    $result->copyFrom($target);
+                    if (!$this->vmIncDecResultSlotIsDeadAfterOp($frame, $resultSlot)) {
+                        $result->copyFrom($target);
+                    }
                 }
             } else {
-                $result->copyFrom($target);
+                if (!$this->vmIncDecResultSlotIsDeadAfterOp($frame, $resultSlot)) {
+                    $result->copyFrom($target);
+                }
                 if ($increment) {
                     $target->applyIncrement($this, $frame);
                 } else {
@@ -24741,6 +24853,17 @@ restart:
         }
         $var = $frame->scope[$slot]->resolveIndirect();
         if ($var->generatorYieldStorage) {
+            return;
+        }
+        // Scalar compiler temps — skip object-alias scans on hot JUMPIF release (#36411).
+        if (
+            Variable::TYPE_INTEGER === $var->type
+            || Variable::TYPE_BOOLEAN === $var->type
+            || Variable::TYPE_FLOAT === $var->type
+            || Variable::TYPE_NULL === $var->type
+        ) {
+            $frame->scope[$slot]->null();
+
             return;
         }
         if (Variable::TYPE_OBJECT === $var->type) {

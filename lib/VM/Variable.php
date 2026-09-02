@@ -927,6 +927,41 @@ final class Variable {
         $this->bool = $value;
     }
 
+    /** Reuse an existing bool slot without reset — loop compare/JUMPIF hot path (#36411). */
+    public function assignBoolInPlace(bool $value): void
+    {
+        if (self::TYPE_BOOLEAN === $this->type) {
+            $this->bool = $value;
+
+            return;
+        }
+        $this->bool($value);
+    }
+
+    /** In-place integer ++ for counted-loop fast path (#36411). */
+    public function bumpIntegerInPlace(?\PHPCompiler\VM $vm = null, ?\PHPCompiler\Frame $frame = null): void
+    {
+        if (self::TYPE_INDIRECT === $this->type) {
+            $this->indirect->bumpIntegerInPlace($vm, $frame);
+
+            return;
+        }
+        if (self::TYPE_INTEGER !== $this->type) {
+            $this->applyIncrement($vm, $frame);
+
+            return;
+        }
+        if ($this->isVmResource()) {
+            throw new \TypeError('Cannot increment resource');
+        }
+        if (\PHP_INT_MAX === $this->integer) {
+            $this->float(VmIncDec::overflowIncrementFloat());
+
+            return;
+        }
+        ++$this->integer;
+    }
+
     public function toBool(?\PHPCompiler\VM $vm = null): bool {
         if (self::TYPE_INDIRECT === $this->type) {
             return $this->indirect->toBool($vm);
