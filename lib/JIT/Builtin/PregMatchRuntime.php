@@ -63,6 +63,18 @@ final class PregMatchRuntime
 
     private const THIN_MATCH_EX_HAS_CAP_NAME = 'PHPCompiler\\ext\\standard\\PregJitHelper::thinMatchExHasCapName';
 
+    private const MATCH_EX_BUNDLE_HELPER = 'PHPCompiler\\ext\\standard\\PregJitHelper::matchExArgvCapsBundle';
+
+    private const THIN_BUNDLE_STATUS = 'PHPCompiler\\ext\\standard\\PregJitHelper::thinBundleStatus';
+
+    private const THIN_BUNDLE_CAP_COUNT = 'PHPCompiler\\ext\\standard\\PregJitHelper::thinBundleCapCount';
+
+    private const THIN_BUNDLE_CAP = 'PHPCompiler\\ext\\standard\\PregJitHelper::thinBundleCap';
+
+    private const THIN_BUNDLE_CAP_NAME = 'PHPCompiler\\ext\\standard\\PregJitHelper::thinBundleCapNameFromBundle';
+
+    private const THIN_BUNDLE_HAS_CAP_NAME = 'PHPCompiler\\ext\\standard\\PregJitHelper::thinBundleHasCapName';
+
     private const THIN_SPLIT_PART_COUNT = 'PHPCompiler\\ext\\standard\\PregJitHelper::thinSplitPartCount';
 
     private const THIN_SPLIT_PART = 'PHPCompiler\\ext\\standard\\PregJitHelper::thinSplitPart';
@@ -112,6 +124,12 @@ final class PregMatchRuntime
         self::THIN_MATCH_EX_CAP,
         self::THIN_MATCH_EX_CAP_NAME,
         self::THIN_MATCH_EX_HAS_CAP_NAME,
+        self::MATCH_EX_BUNDLE_HELPER,
+        self::THIN_BUNDLE_STATUS,
+        self::THIN_BUNDLE_CAP_COUNT,
+        self::THIN_BUNDLE_CAP,
+        self::THIN_BUNDLE_CAP_NAME,
+        self::THIN_BUNDLE_HAS_CAP_NAME,
         self::THIN_SPLIT_PART_COUNT,
         self::THIN_SPLIT_PART,
         self::MATCH_ALL_EX_HELPER,
@@ -293,6 +311,17 @@ final class PregMatchRuntime
         bool $thinMatchAll
     ): void {
         $probe = $context->module->getNamedFunction($abiName);
+        if ($context->isThinStandaloneAotMain() && !$thinMatchAll && '__compiler_preg_match_ex' === $abiName) {
+            if (null !== $probe && $probe->countBasicBlocks() > 0) {
+                $context->registerFunction($abiName, $probe);
+
+                return;
+            }
+            self::implementThinMatchExBundleBridge($context, $abiName, $probe);
+
+            return;
+        }
+
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction($abiName, $probe);
 
@@ -374,6 +403,167 @@ final class PregMatchRuntime
         );
         $context->builder->returnValue($countI64);
         $context->registerFunction($abiName, $fn);
+    }
+
+    /**
+     * Thin AOT preg_match(..., $matches): one NestedJIT bundle call + stateless parsers (#24115).
+     */
+    private static function implementThinMatchExBundleBridge(
+        Context $context,
+        string $abiName,
+        ?LlvmFunction $probe
+    ): void {
+        $strPtr = $context->getTypeFromString('__string__*');
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $i64 = $context->getTypeFromString('int64');
+        $negOne = $i64->constInt(-1, true);
+        $zero = $i64->constInt(0, true);
+        $one = $i64->constInt(1, true);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($i64, false, $strPtr, $strPtr, $valuePtr, $i64, $i64)
+            );
+
+        $entry = $fn->appendBasicBlock('preg_match_ex_bundle_entry');
+        $failBb = $fn->appendBasicBlock('preg_match_ex_bundle_fail');
+        $nomatchBb = $fn->appendBasicBlock('preg_match_ex_bundle_nomatch');
+        $okBb = $fn->appendBasicBlock('preg_match_ex_bundle_ok');
+        $context->builder->positionAtEnd($entry);
+        $bundleRaw = $context->builder->call(
+            self::helperFunction($context, self::MATCH_EX_BUNDLE_HELPER),
+            $fn->getParam(0),
+            $fn->getParam(1),
+            $fn->getParam(3),
+            $fn->getParam(4)
+        );
+        $bundle = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $bundleRaw);
+        $statusRaw = $context->builder->call(
+            self::helperFunction($context, self::THIN_BUNDLE_STATUS),
+            $bundle
+        );
+        $status = JitNestedHelperCoerce::scalarToI64($context, $statusRaw, $statusRaw->typeOf());
+        $isError = $context->builder->icmp(Builder::INT_SLT, $status, $zero);
+        $isMatch = $context->builder->icmp(Builder::INT_EQ, $status, $one);
+        $afterErr = $fn->appendBasicBlock('preg_match_ex_bundle_after_err');
+        $context->builder->branchIf($isError, $failBb, $afterErr);
+        $context->builder->positionAtEnd($afterErr);
+        $context->builder->branchIf($isMatch, $okBb, $nomatchBb);
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($negOne);
+
+        $context->builder->positionAtEnd($nomatchBb);
+        $context->builder->returnValue($zero);
+
+        $context->builder->positionAtEnd($okBb);
+        $filledHt = self::emitThinMatchExHashtableFromBundle($context, $fn, $bundle);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $fn->getParam(2),
+            $filledHt
+        );
+        $context->builder->returnValue($one);
+        $context->registerFunction($abiName, $fn);
+    }
+
+    /**
+     * Build $matches from a packed caps bundle (stateless thinBundle* helpers).
+     */
+    private static function emitThinMatchExHashtableFromBundle(
+        Context $context,
+        LlvmFunction $fn,
+        Value $bundle
+    ): Value {
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $capCountRaw = $context->builder->call(
+            self::helperFunction($context, self::THIN_BUNDLE_CAP_COUNT),
+            $bundle
+        );
+        $capCount = JitNestedHelperCoerce::scalarToI64($context, $capCountRaw, $capCountRaw->typeOf());
+        $hasCaps = $context->builder->icmp(
+            Builder::INT_SGT,
+            $capCount,
+            $i64->constInt(0, true)
+        );
+        $fillBb = $fn->appendBasicBlock('preg_match_ex_bundle_fill');
+        $doneBb = $fn->appendBasicBlock('preg_match_ex_bundle_done');
+        $context->builder->branchIf($hasCaps, $fillBb, $doneBb);
+
+        $context->builder->positionAtEnd($fillBb);
+        $max = 8;
+        for ($i = 0; $i < $max; ++$i) {
+            $idxBb = $fn->appendBasicBlock('preg_match_ex_bundle_cap_'.$i);
+            $skipBb = $fn->appendBasicBlock('preg_match_ex_bundle_skip_'.$i);
+            $need = $context->builder->icmp(
+                Builder::INT_SGT,
+                $capCount,
+                $i64->constInt($i, true)
+            );
+            $context->builder->branchIf($need, $idxBb, $skipBb);
+
+            $context->builder->positionAtEnd($idxBb);
+            $capRaw = $context->builder->call(
+                self::helperFunction($context, self::THIN_BUNDLE_CAP),
+                $bundle,
+                $i64->constInt($i, true)
+            );
+            $capStr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $capRaw);
+            $slot = new Variable(
+                $context,
+                Variable::TYPE_STRING,
+                Variable::KIND_VALUE,
+                $capStr
+            );
+            HashTableHelper::setAtIndex($context, $ht, $sizeT->constInt($i, false), $slot);
+            if (1 === $i) {
+                $hasNameRaw = $context->builder->call(
+                    self::helperFunction($context, self::THIN_BUNDLE_HAS_CAP_NAME),
+                    $bundle,
+                    $i64->constInt(1, true)
+                );
+                $hasName = JitNestedHelperCoerce::scalarToI64(
+                    $context,
+                    $hasNameRaw,
+                    $hasNameRaw->typeOf()
+                );
+                $nameBb = $fn->appendBasicBlock('preg_match_ex_bundle_name_1');
+                $afterNameBb = $fn->appendBasicBlock('preg_match_ex_bundle_after_name_1');
+                $wantName = $context->builder->icmp(
+                    Builder::INT_SGT,
+                    $hasName,
+                    $i64->constInt(0, true)
+                );
+                $context->builder->branchIf($wantName, $nameBb, $afterNameBb);
+                $context->builder->positionAtEnd($nameBb);
+                $nameRaw = $context->builder->call(
+                    self::helperFunction($context, self::THIN_BUNDLE_CAP_NAME),
+                    $bundle,
+                    $i64->constInt(1, true)
+                );
+                $nameStr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $nameRaw);
+                $nameSlot = new Variable(
+                    $context,
+                    Variable::TYPE_STRING,
+                    Variable::KIND_VALUE,
+                    $capStr
+                );
+                HashTableHelper::setAtStringKey($context, $ht, $nameStr, $nameSlot);
+                $context->builder->branch($afterNameBb);
+                $context->builder->positionAtEnd($afterNameBb);
+            }
+            $context->builder->branch($skipBb);
+
+            $context->builder->positionAtEnd($skipBb);
+        }
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+
+        return $ht;
     }
 
     /**
