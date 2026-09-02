@@ -14,7 +14,7 @@ namespace PHPCompiler\AOT;
  */
 final class HelperRuntimeCommon
 {
-    /** Opt-in: PHP_COMPILER_HELPER_RUNTIME_COMMON=1 */
+    /** Opt-in until units are re-emitted with AotGcSections: PHP_COMPILER_HELPER_RUNTIME_COMMON=1 */
     public const ENV = 'PHP_COMPILER_HELPER_RUNTIME_COMMON';
 
     /**
@@ -129,8 +129,8 @@ final class HelperRuntimeCommon
             'arch' => HelperRuntimeCache::archKey(),
             'role' => 'committed per-arch split-compilation helper units (#15889)',
         ];
-        $manifest['core_fingerprint'] = HelperRuntimeCache::coreFingerprint();
-        $manifest['llvm_identity_token'] = HelperRuntimeCache::llvmIdentityToken();
+        // Preserve arch-level fields written by --prelink (unit_count, total_bytes, …).
+        // Only refresh common.o metadata; do not rewrite core_fingerprint here (#36246).
         $manifest['common_object_sha256'] = hash_file('sha256', $objectPath) ?: '';
         $manifest['common_object_bytes'] = is_file($objectPath) ? filesize($objectPath) : 0;
         $manifest['common_bitcode_bytes'] = is_file($bitcodePath) ? filesize($bitcodePath) : 0;
