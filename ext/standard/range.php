@@ -20,6 +20,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\JIT\LibcExtern;
@@ -111,7 +112,9 @@ final class range extends Internal
                 continue;
             }
             if (JITVariable::TYPE_NATIVE_LONG !== $arg->type
-                && JITVariable::TYPE_NATIVE_DOUBLE !== $arg->type) {
+                && JITVariable::TYPE_NATIVE_DOUBLE !== $arg->type
+                && !JitValueBox::isValueOperand($arg)
+                && JITVariable::TYPE_STRING !== $arg->type) {
                 throw new \LogicException('range() float path requires native numeric operands in this compiler build');
             }
         }
@@ -154,6 +157,11 @@ final class range extends Internal
         if (JITVariable::TYPE_NATIVE_DOUBLE === $arg->type) {
             return $context->helper->loadValue($arg);
         }
+        if (JitValueBox::isValueOperand($arg)) {
+            $long = JitLongArg::lower($context, $arg, 'range() float bound');
+
+            return $context->builder->sitofp($long, $double);
+        }
 
         return $context->builder->sitofp($context->helper->loadValue($arg), $double);
     }
@@ -194,7 +202,21 @@ final class range extends Internal
 
     private static function jitIntEndpointOk(JITVariable $arg): bool
     {
-        return JITVariable::TYPE_NATIVE_LONG === $arg->type || self::jitIsNullArg($arg);
+        if (JITVariable::TYPE_NATIVE_LONG === $arg->type || self::jitIsNullArg($arg)) {
+            return true;
+        }
+        // Runtime locals and arithmetic results are boxed __value__ (#36243).
+        if (JitValueBox::isValueOperand($arg)) {
+            return true;
+        }
+        if (JITVariable::TYPE_NATIVE_BOOL === $arg->type) {
+            return true;
+        }
+        if (JITVariable::TYPE_STRING === $arg->type) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -296,10 +318,11 @@ final class range extends Internal
 
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
-        // Z_PARAM_NUMBER: bool → 0/1 via JitLongArg zext (#29505); long/double as before.
+        // Z_PARAM_NUMBER: bool → 0/1 via JitLongArg zext (#29505); long/double/boxed as before.
         if (JITVariable::TYPE_NATIVE_LONG !== $arg->type
             && JITVariable::TYPE_NATIVE_BOOL !== $arg->type
-            && JITVariable::TYPE_NATIVE_DOUBLE !== $arg->type) {
+            && JITVariable::TYPE_NATIVE_DOUBLE !== $arg->type
+            && !JitValueBox::isValueOperand($arg)) {
             throw new \LogicException('range() step must be an integer in this compiler build');
         }
 

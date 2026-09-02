@@ -58,6 +58,7 @@ final class RangeIntAot33896Test extends TestCase
             ['test/repro/aot_range_int.php'],
             ['test/repro/aot_range_char.php'],
             ['test/repro/aot_range_float.php'],
+            ['test/repro/aot_range_runtime_int.php'],
         ];
     }
 }
