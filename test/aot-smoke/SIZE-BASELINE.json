@@ -1,0 +1,26 @@
+{
+    "version": 1,
+    "generated_at": "2026-09-02T01:05:00+00:00",
+    "arch": "x86_64-linux",
+    "tolerance_percent": 10,
+    "cases": {
+        "echo": {
+            "file_bytes": 14138984,
+            "text": 12527897,
+            "data": 1111460,
+            "bss": 69876784,
+            "needed_count": 9,
+            "init_array": 1,
+            "ir_lines": 140353,
+            "ir_defines": 385
+        },
+        "class": {
+            "file_bytes": 15836344,
+            "text": 13848025,
+            "data": 1432564,
+            "bss": 76811872,
+            "needed_count": 9,
+            "init_array": 1
+        }
+    }
+}
