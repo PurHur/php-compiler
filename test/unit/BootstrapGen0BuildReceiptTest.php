@@ -29,12 +29,10 @@ final class BootstrapGen0BuildReceiptTest extends TestCase
         $this->root = sys_get_temp_dir().'/phpc-gen0-receipt-'.bin2hex(random_bytes(6));
         mkdir($this->root.'/build', 0775, true);
         mkdir($this->root.'/prelinked/bootstrap-gen0', 0775, true);
-        putenv('BOOTSTRAP_GEN0_ALLOW_UNVERIFIED_STAMP');
     }
 
     protected function tearDown(): void
     {
-        putenv('BOOTSTRAP_GEN0_ALLOW_UNVERIFIED_STAMP');
         $this->removeTree($this->root);
     }
 
@@ -97,20 +95,14 @@ final class BootstrapGen0BuildReceiptTest extends TestCase
         bootstrap_gen0_manifest_stamp_lowering_fingerprint($this->root, self::FP_A);
     }
 
-    public function testOverrideRecordsTheClaimAsUnverifiedAndWarns(): void
+    public function testUnverifiedStampOverrideRemoved(): void
     {
         $this->linkProducing('gen-0 bytes v1');
         $this->publish();
 
-        putenv('BOOTSTRAP_GEN0_ALLOW_UNVERIFIED_STAMP=1');
-        $manifest = bootstrap_gen0_manifest_stamp_lowering_fingerprint($this->root, self::FP_B);
-
-        $this->assertSame(self::FP_B, $manifest['lowering_source_fingerprint']);
-        $this->assertSame('unverified-restamp', $manifest['provenance']);
-
-        $warnings = bootstrap_gen0_manifest_sync_warnings($this->root);
-        $this->assertNotSame([], $warnings);
-        $this->assertStringContainsString('unverified-restamp', implode("\n", $warnings));
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/without a matching build receipt/');
+        bootstrap_gen0_manifest_stamp_lowering_fingerprint($this->root, self::FP_B);
     }
 
     /** Write the build/ artifacts a spine link would leave behind, including its linked binary. */

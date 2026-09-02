@@ -129,27 +129,26 @@ final class BootstrapGen0ManifestRefreshTest extends TestCase
                 $this->assertStringContainsString('build receipt', $e->getMessage());
             }
 
-            putenv('BOOTSTRAP_GEN0_ALLOW_UNVERIFIED_STAMP=1');
-            $stamped = bootstrap_gen0_manifest_stamp_lowering_fingerprint(self::$root, $fake);
-            $this->assertSame($fake, $stamped['lowering_source_fingerprint'] ?? null);
-            $this->assertSame('unverified-restamp', $stamped['provenance'] ?? null);
-            $read = bootstrap_gen0_manifest_read(self::$root);
-            $this->assertSame($fake, $read['lowering_source_fingerprint'] ?? null);
-            $this->assertSame($fake, trim((string) file_get_contents($stampPath)));
+            // With a matching receipt, stamp succeeds (#36218 — no unverified override).
+            $receiptPath = self::$root.'/build/.gen0-build-receipt.json';
+            if (is_readable($receiptPath)) {
+                $receipt = json_decode((string) file_get_contents($receiptPath), true);
+                $this->assertIsArray($receipt);
+                $receiptFp = strtolower((string) ($receipt['lowering_source_fingerprint'] ?? ''));
+                if ('' !== $receiptFp) {
+                    $stamped = bootstrap_gen0_manifest_stamp_lowering_fingerprint(self::$root, $receiptFp);
+                    $this->assertSame($receiptFp, $stamped['lowering_source_fingerprint'] ?? null);
+                    $this->assertSame('verified-fresh', $stamped['provenance'] ?? null);
+                    $read = bootstrap_gen0_manifest_read(self::$root);
+                    $this->assertSame($receiptFp, $read['lowering_source_fingerprint'] ?? null);
+                    $this->assertSame($receiptFp, trim((string) file_get_contents($stampPath)));
 
-            // Size/sha refresh must preserve the stamped claim.
-            bootstrap_gen0_manifest_refresh_from_disk(self::$root);
-            $preserved = bootstrap_gen0_manifest_read(self::$root);
-            $this->assertSame($fake, $preserved['lowering_source_fingerprint'] ?? null);
-
-            // Unverified restamps must not hard-fail 4f-m (restamp treadmill); drift is a warning (#10533).
-            $errors = bootstrap_gen0_manifest_lowering_fingerprint_errors(self::$root);
-            $this->assertSame([], $errors, 'unverified-restamp fingerprint drift is warning-only');
-            $warnings = bootstrap_gen0_manifest_sync_warnings(self::$root);
-            $this->assertNotSame([], $warnings);
-            $this->assertStringContainsString('unverified-restamp', implode("\n", $warnings));
+                    bootstrap_gen0_manifest_refresh_from_disk(self::$root);
+                    $preserved = bootstrap_gen0_manifest_read(self::$root);
+                    $this->assertSame($receiptFp, $preserved['lowering_source_fingerprint'] ?? null);
+                }
+            }
         } finally {
-            putenv('BOOTSTRAP_GEN0_ALLOW_UNVERIFIED_STAMP');
             file_put_contents($manifestPath, $origManifest);
             if (null === $origStamp) {
                 @unlink($stampPath);

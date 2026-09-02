@@ -14,6 +14,11 @@ start=$(date +%s)
 echo "dev-verify-fast: tier 0 — bootstrap trust preflight (non-blocking)..."
 ./script/bootstrap-trust-preflight.sh
 
+if [[ "${BOOTSTRAP_GEN0_DRIVER_FUNCTIONAL_GATE:-1}" == "1" ]]; then
+  echo "dev-verify-fast: tier 0f — gen-0 driver functional smoke (blocking)..."
+  make bootstrap-gen0-driver-functional-smoke
+fi
+
 echo "dev-verify-fast: tier 1 — aot-smoke (8 programs)..."
 ./script/aot-smoke.sh
 

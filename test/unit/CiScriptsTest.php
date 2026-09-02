@@ -500,6 +500,8 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('check-root-readme-sync.php', $body);
         $this->assertStringContainsString('north-star5-verify-fast', $body);
         $this->assertStringContainsString('bootstrap-selfhost-vm-driver-execute-probe', $body);
+        $this->assertStringContainsString('bootstrap-gen0-driver-functional-smoke', $body);
+        $this->assertStringContainsString('gen0-driver-functional', $body);
         $this->assertStringContainsString('bootstrap-honest-compile-metric.sh', $body);
         $this->assertStringContainsString('_RR_HONEST_COMPILE_JSON', $body);
         $this->assertStringContainsString('examples-aot-smoke.sh', $body);

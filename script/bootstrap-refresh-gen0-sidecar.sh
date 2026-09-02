@@ -43,8 +43,7 @@ Provenance is earned by the link, at two levels:
      still match the committed blobs. That one binds at the function level, so it also
      covers stamping invoked directly (php -r ...) rather than through this script —
      which is how the manifest accumulated 225 restamps past its last real build.
-     BOOTSTRAP_GEN0_ALLOW_UNVERIFIED_STAMP=1 overrides it, recording
-     `provenance: unverified-restamp` in the manifest so the claim ships with the artifact.
+     Unverified restamps are no longer permitted (#36218).
 
 See docs/bootstrap-m5-fast-path.md and GETTING-STARTED §7b (#8704, #21905, #22642).
 

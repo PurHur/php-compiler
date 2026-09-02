@@ -571,9 +571,7 @@ function bootstrap_gen0_build_receipt_errors(string $root, string $fingerprint):
  * Record lowering provenance after a verified-fresh copy into prelinked/bootstrap-gen0/ (#21905).
  *
  * Refuses unless a build receipt proves the committed blobs came from a link at $fingerprint
- * (#22642). BOOTSTRAP_GEN0_ALLOW_UNVERIFIED_STAMP=1 still permits a restamp, but records
- * `provenance: unverified-restamp` in the manifest so the claim is visible in the artifact
- * rather than implied by a green gate.
+ * (#22642). Unverified restamps are no longer permitted (#36218).
  *
  * @return array<string, mixed>
  */
@@ -593,17 +591,16 @@ function bootstrap_gen0_manifest_stamp_lowering_fingerprint(string $root, ?strin
     }
 
     $receiptErrors = bootstrap_gen0_build_receipt_errors($root, $fp);
-    if ([] !== $receiptErrors && '1' !== getenv('BOOTSTRAP_GEN0_ALLOW_UNVERIFIED_STAMP')) {
+    if ([] !== $receiptErrors) {
         throw new \RuntimeException(
-            "refusing to stamp lowering_source_fingerprint without a matching build receipt (#22642):\n  - "
+            "refusing to stamp lowering_source_fingerprint without a matching build receipt (#22642, #36218):\n  - "
             .implode("\n  - ", $receiptErrors)
-            ."\nRebuild via script/bootstrap-refresh-gen0-sidecar.sh, or set"
-            .' BOOTSTRAP_GEN0_ALLOW_UNVERIFIED_STAMP=1 to record an explicitly unverified stamp.'
+            ."\nRebuild via script/bootstrap-refresh-gen0-sidecar.sh or script/bootstrap-gen0-refresh-argv-driver.sh."
         );
     }
 
     $manifest['lowering_source_fingerprint'] = $fp;
-    $manifest['provenance'] = [] === $receiptErrors ? 'verified-fresh' : 'unverified-restamp';
+    $manifest['provenance'] = 'verified-fresh';
     $manifest['generated_at'] = gmdate('c');
 
     $encoded = json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n";
