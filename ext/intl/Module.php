@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\intl;
 
 use PHPCompiler\CompilerVersion;
+use PHPCompiler\JIT;
 use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
 use PHPCompiler\VM;
@@ -42,6 +43,29 @@ class Module extends ModuleAbstract
         }
 
         return ['intl'];
+    }
+
+    /**
+     * Locale::* thin-AOT Call proxies — owned by ext/intl, not lib/JIT/Context (#36204 / #20760).
+     *
+     * Context::defineBuiltins used to `new \PHPCompiler\ext\intl\…` directly (core→ext import).
+     * registerModule() calls jitInit after Context construction, so these land before user compile.
+     */
+    public function jitInit(JIT\Context $context): void
+    {
+        // Locale::canonicalize — avoid ExternalMethod null stub on user-script AOT (#20760).
+        $context->functionProxies['locale::canonicalize'] = new LocaleCanonicalize();
+        // Locale::acceptFromHttp — avoid ExternalMethod silent NULL on thin AOT (#28656).
+        $context->functionProxies['locale::acceptfromhttp'] = new LocaleAcceptFromHttp();
+        // Locale::lookup — RFC 4647 via JitLocaleLookup / VmLocale (#32118).
+        $context->functionProxies['locale::lookup'] = new LocaleLookup();
+        // Locale::filterMatches — prefix filter via JitLocaleFilterMatches / VmLocale (#32119).
+        $context->functionProxies['locale::filtermatches'] = new LocaleFilterMatches();
+        // Locale::getDisplayName — ICU display name via JitLocaleGetDisplayName / VmLocale (#32120).
+        $context->functionProxies['locale::getdisplayname'] = new LocaleGetDisplayName();
+        // NumberFormatter / IntlDateFormatter / Collator / Normalizer / MessageFormatter /
+        // Transliterator thin-AOT Call proxies stay registered from Context for this slice —
+        // they live under lib/JIT/Call\ (no core→ext import); move in a follow-up.
     }
 
     public function init(Runtime $runtime): void

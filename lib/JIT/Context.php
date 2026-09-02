@@ -2158,19 +2158,7 @@ class Context {
                 $giMethod
             );
         }
-        // SplHeap family — `__spl_heap` + Iterator protocol for thin AOT foreach (#26784).
-        foreach ([
-            'splmaxheap' => \PHPCompiler\ext\spl\SplHeapBuiltin::KIND_MAX,
-            'splminheap' => \PHPCompiler\ext\spl\SplHeapBuiltin::KIND_MIN,
-            'splheap' => \PHPCompiler\ext\spl\SplHeapBuiltin::KIND_USER,
-        ] as $heapLc => $heapKind) {
-            foreach ([
-                '__construct', 'insert', 'extract', 'top', 'count', 'isempty',
-                'rewind', 'valid', 'current', 'key', 'next',
-            ] as $heapMethod) {
-                $this->functionProxies[$heapLc.'::'.$heapMethod] = new Call\SplHeapMethod($heapMethod, $heapKind);
-            }
-        }
+        // SplHeap family — registered by ext/spl/Module::jitInit (#36204 / #26784).
         // SplPriorityQueue — parallel data/priority HTs + Iterator foreach (#27277, #28708).
         // setExtractFlags/getExtractFlags — thin AOT was a silent null stub (#33861).
         $this->type->object->lookup('SplPriorityQueue');
@@ -2729,16 +2717,7 @@ class Context {
         $this->functionProxies['datetimezone::listidentifiers'] = new Call\DateTimeZoneListIdentifiers();
         // DateTimeZone::listAbbreviations — avoid ExternalMethod silent NULL on thin AOT (#30780).
         $this->functionProxies['datetimezone::listabbreviations'] = new Call\DateTimeZoneListAbbreviations();
-        // Locale::canonicalize — avoid ExternalMethod null stub on user-script AOT (#20760).
-        $this->functionProxies['locale::canonicalize'] = new \PHPCompiler\ext\intl\LocaleCanonicalize();
-        // Locale::acceptFromHttp — avoid ExternalMethod silent NULL on thin AOT (#28656).
-        $this->functionProxies['locale::acceptfromhttp'] = new \PHPCompiler\ext\intl\LocaleAcceptFromHttp();
-        // Locale::lookup — RFC 4647 via JitLocaleLookup / VmLocale (#32118).
-        $this->functionProxies['locale::lookup'] = new \PHPCompiler\ext\intl\LocaleLookup();
-        // Locale::filterMatches — prefix filter via JitLocaleFilterMatches / VmLocale (#32119).
-        $this->functionProxies['locale::filtermatches'] = new \PHPCompiler\ext\intl\LocaleFilterMatches();
-        // Locale::getDisplayName — ICU display name via JitLocaleGetDisplayName / VmLocale (#32120).
-        $this->functionProxies['locale::getdisplayname'] = new \PHPCompiler\ext\intl\LocaleGetDisplayName();
+        // Locale::* thin-AOT Call proxies: registered by ext/intl/Module::jitInit (#36204 / #20760).
         // NumberFormatter::create / format — avoid ExternalMethod silent NULL on thin AOT (#27385, #28648).
         $this->functionProxies['numberformatter::create'] = new Call\NumberFormatterCreate();
         $this->functionProxies['numberformatter::format'] = new Call\NumberFormatterFormat();

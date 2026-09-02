@@ -24,10 +24,6 @@ class Module extends ModuleAbstract
      *
      * @return list<string>
      */
-    public function getExtensionDependencies(): array
-    {
-        return ['libxml'];
-    }
     /** php-src ext/dom/php_dom.h DOM_API_VERSION — libxml DOM module version (#15439). */
     private const DOM_API_VERSION = '20031129';
 

@@ -23,10 +23,6 @@ class Module extends ModuleAbstract
      *
      * @return list<string>
      */
-    public function getExtensionDependencies(): array
-    {
-        return ['libxml'];
-    }
     public function init(Runtime $runtime): void
     {
         parent::init($runtime);

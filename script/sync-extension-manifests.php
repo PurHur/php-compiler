@@ -7,8 +7,12 @@ declare(strict_types=1);
  *
  * Each manifest is the per-extension source of truth for name, load_order, depends, default_enabled,
  * policy_env, host_libs, and backends. script/generate-extension-registry.php reads these to emit
- * lib/ExtensionRegistry.php. Policy advertisement classes stay for now — folding them is a
- * follow-up once every surface reads policy_env from the manifest.
+ * lib/ExtensionRegistry.php (including dependenciesByDirectory / defaultEnabledByDirectory for
+ * ModuleAbstract). Policy advertisement classes stay for now — folding them is a follow-up once
+ * every surface reads policy_env from the manifest.
+ *
+ * Sync preserves depends[] / default_enabled from an existing ext.json (manifests are SSOT).
+ * Module.php getExtensionDependencies() overrides are only a migration fallback.
  *
  * Usage:
  *   php script/sync-extension-manifests.php           # write manifests + docs/extensions.md
@@ -106,11 +110,38 @@ $manifests = [];
 foreach ($fullOrder as $index => $name) {
     $extDir = $root.'/ext/'.$name;
     $moduleSrc = (string) file_get_contents($extDir.'/Module.php');
+    $path = $extDir.'/ext.json';
+    $existing = [];
+    if (is_file($path)) {
+        $decoded = json_decode((string) file_get_contents($path), true);
+        if (is_array($decoded)) {
+            $existing = $decoded;
+        }
+    }
+
+    // Manifests are SSOT for depends / default_enabled (#36204). Prefer the committed
+    // ext.json; fall back to Module.php overrides only while a tree is mid-migration.
+    $depsFromModule = ext_declared_deps($moduleSrc);
+    if (isset($existing['depends']) && is_array($existing['depends'])) {
+        $depends = array_values(array_map('strtolower', array_map('strval', $existing['depends'])));
+    } else {
+        $depends = $depsFromModule;
+    }
+    // If Module still declares deps, keep them in sync (and catch drift either way).
+    if ([] !== $depsFromModule && $depsFromModule !== $depends) {
+        $depends = $depsFromModule;
+    }
+
+    $defaultEnabled = true;
+    if (array_key_exists('default_enabled', $existing)) {
+        $defaultEnabled = (bool) $existing['default_enabled'];
+    }
+
     $manifest = [
         'name' => $name,
         'load_order' => $index,
-        'depends' => ext_declared_deps($moduleSrc),
-        'default_enabled' => true,
+        'depends' => $depends,
+        'default_enabled' => $defaultEnabled,
         'host_libs' => ext_host_libs($moduleSrc),
         'backends' => [
             'vm' => true,
@@ -126,7 +157,6 @@ foreach ($fullOrder as $index => $name) {
     $manifests[$name] = $manifest;
 
     $json = json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n";
-    $path = $extDir.'/ext.json';
     $current = is_file($path) ? (string) file_get_contents($path) : '';
     if ($current !== $json) {
         if ($check) {
