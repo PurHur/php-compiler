@@ -15,8 +15,6 @@ use PHPLLVM\Value;
 
 final class JitValueBox
 {
-    private static int $copySeq = 0;
-
     public static function alloc(Context $context): Value
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'value_box_alloc_cont');
@@ -608,166 +606,20 @@ final class JitValueBox
         self::copyBetweenPointers($context, self::pointer($context, $destSlot), $srcPtr);
     }
 
+    /**
+     * Copy between two {@see __value__*} pointers — delegates to outlined __value__copy (#36193).
+     */
     private static function copyBetweenPointers(Context $context, Value $destPtr, Value $srcPtr): void
     {
         if (!BasicBlockHelper::unsealAndContinue($context)) {
             BasicBlockHelper::ensureOpenInsertBlockReplacingVoidReturn($context, 'value_copy_cont');
         }
-        $map = $context->structFieldMap['__value__'];
-        $typeByte = $context->builder->load(
-            $context->builder->structGep($srcPtr, $map['type'])
-        );
-        $i8 = $context->getTypeFromString('int8');
-        // Mask IS_REFCOUNTED — HT slots may store VM TYPE_STRING (4) or JIT (4|0x80).
-        // Unmasked compare missed VM tags → empty copy → NestedJIT toString strlen=0 (#21921).
-        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
-
-        $tag = 'v'.(string) self::$copySeq++;
-        $stringBlock = BasicBlockHelper::append($context, 'value_copy_string_'.$tag);
-        $hashtableBlock = BasicBlockHelper::append($context, 'value_copy_hashtable_'.$tag);
-        $objectBlock = BasicBlockHelper::append($context, 'value_copy_object_'.$tag);
-        $longBlock = BasicBlockHelper::append($context, 'value_copy_long_'.$tag);
-        $doubleBlock = BasicBlockHelper::append($context, 'value_copy_double_'.$tag);
-        $boolBlock = BasicBlockHelper::append($context, 'value_copy_bool_'.$tag);
-        $nullBlock = BasicBlockHelper::append($context, 'value_copy_null_'.$tag);
-        $done = BasicBlockHelper::append($context, 'value_copy_done_'.$tag);
-
-        $isString = $context->builder->icmp(
-            Builder::INT_EQ,
-            $kind,
-            $i8->constInt(Variable::TYPE_STRING & 0x7f, false)
-        );
-        $isHashtable = $context->builder->icmp(
-            Builder::INT_EQ,
-            $kind,
-            $i8->constInt(Variable::TYPE_HASHTABLE & 0x7f, false)
-        );
-        $isObject = $context->builder->icmp(
-            Builder::INT_EQ,
-            $kind,
-            $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false)
-        );
-        $isLong = $context->builder->icmp(
-            Builder::INT_EQ,
-            $kind,
-            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
-        );
-        $isBool = $context->builder->icmp(
-            Builder::INT_EQ,
-            $kind,
-            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
-        );
-        $isDouble = $context->builder->icmp(
-            Builder::INT_EQ,
-            $kind,
-            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
-        );
-        $isNull = $context->builder->icmp(
-            Builder::INT_EQ,
-            $kind,
-            $i8->constInt(Variable::TYPE_NULL, false)
-        );
-
-        $afterString = BasicBlockHelper::append($context, 'value_copy_after_string_'.$tag);
-        $context->builder->branchIf($isString, $stringBlock, $afterString);
-
-        $context->builder->positionAtEnd($stringBlock);
-        $str = $context->builder->call(
-            $context->lookupFunction('__value__readString'),
+        Builtin\ValueBoxCopyJit::ensureLinked($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__copy'),
+            $destPtr,
             $srcPtr
         );
-        self::writeStringToValuePtrByAddref($context, $destPtr, $str);
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($afterString);
-        $afterHashtable = BasicBlockHelper::append($context, 'value_copy_after_hashtable_'.$tag);
-        $context->builder->branchIf($isHashtable, $hashtableBlock, $afterHashtable);
-
-        $context->builder->positionAtEnd($hashtableBlock);
-        $ht = $context->builder->call(
-            $context->lookupFunction('__value__readHashtable'),
-            $srcPtr
-        );
-        $context->refcount->addref($ht);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeHashtable'),
-            $destPtr,
-            $ht
-        );
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($afterHashtable);
-        $afterObject = BasicBlockHelper::append($context, 'value_copy_after_object_'.$tag);
-        $context->builder->branchIf($isObject, $objectBlock, $afterObject);
-
-        $context->builder->positionAtEnd($objectBlock);
-        $obj = $context->builder->call(
-            $context->lookupFunction('__value__readObject'),
-            $srcPtr
-        );
-        // writeObject addrefs internally (#4096); do not addref here.
-        $context->builder->call(
-            $context->lookupFunction('__value__writeObject'),
-            $destPtr,
-            $obj
-        );
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($afterObject);
-        $afterLong = BasicBlockHelper::append($context, 'value_copy_after_long_'.$tag);
-        $context->builder->branchIf($isLong, $longBlock, $afterLong);
-
-        $context->builder->positionAtEnd($longBlock);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeLong'),
-            $destPtr,
-            $context->builder->call($context->lookupFunction('__value__readLong'), $srcPtr)
-        );
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($afterLong);
-        $afterBool = BasicBlockHelper::append($context, 'value_copy_after_bool_'.$tag);
-        $context->builder->branchIf($isBool, $boolBlock, $afterBool);
-
-        $context->builder->positionAtEnd($boolBlock);
-        // __value__readLong has no TYPE_NATIVE_BOOL arm (returns 0) — #21892 / JitZendScalarCast.
-        $boolByte = self::readBoolByte($context, $srcPtr);
-        $i32 = $context->getTypeFromString('int32');
-        $context->builder->call(
-            $context->lookupFunction('__value__writeBool'),
-            $destPtr,
-            $context->builder->zExt(
-                $context->builder->icmp(
-                    Builder::INT_NE,
-                    $boolByte,
-                    $context->getTypeFromString('int8')->constInt(0, false)
-                ),
-                $i32
-            )
-        );
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($afterBool);
-        $afterDouble = BasicBlockHelper::append($context, 'value_copy_after_double_'.$tag);
-        $context->builder->branchIf($isDouble, $doubleBlock, $afterDouble);
-
-        $context->builder->positionAtEnd($doubleBlock);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeDouble'),
-            $destPtr,
-            $context->builder->call($context->lookupFunction('__value__readDouble'), $srcPtr)
-        );
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($afterDouble);
-        $context->builder->branchIf($isNull, $nullBlock, $done);
-
-        $context->builder->positionAtEnd($nullBlock);
-        $context->builder->call($context->lookupFunction('__value__writeNull'), $destPtr);
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($done);
-        BasicBlockHelper::branchToFreshContinue($context, 'after_value_copy_'.$tag);
     }
 
     /**

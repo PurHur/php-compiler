@@ -38,6 +38,8 @@ class Value extends Type {
             static inline function __value__writeString(__value__*, __string__*): void;
 
             static inline function __value__writeNull(__value__*): void;
+
+            static inline function __value__copy(__value__*, __value__*): void;
         }
     }
 
@@ -52,6 +54,7 @@ class Value extends Type {
         // __value__writeLong deferred — Context::lookupFunction ensureLinked (#36135).
         // __value__writeNull deferred — Context::lookupFunction ensureLinked (#36124).
         // __value__writeBool deferred — Context::lookupFunction ensureLinked (#36108).
+        // __value__copy deferred — Context::lookupFunction ensureLinked (#36193).
     }
 
     public function initialize(): void {
