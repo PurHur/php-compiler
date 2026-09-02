@@ -484,15 +484,7 @@ final class JitValueBox
                     // Function-static / alloca slots are __string__**; writeString wants * (#31966).
                     $strPtr = $context->builder->load($strPtr);
                 }
-                $owned = $context->builder->call(
-                    $context->lookupFunction('__string__separate'),
-                    $strPtr
-                );
-                $context->builder->call(
-                    $context->lookupFunction('__value__writeString'),
-                    $destPtr,
-                    $owned
-                );
+                self::writeStringToValuePtrByAddref($context, $destPtr, $strPtr);
 
                 return;
             case Variable::TYPE_OBJECT:
@@ -568,14 +560,10 @@ final class JitValueBox
                 $context->builder->call($context->lookupFunction('__value__writeNull'), $ptr);
                 break;
             case Variable::TYPE_STRING:
-                $owned = $context->builder->call(
-                    $context->lookupFunction('__string__separate'),
-                    $context->helper->loadValue($var)
-                );
-                $context->builder->call(
-                    $context->lookupFunction('__value__writeString'),
+                self::writeStringToValuePtrByAddref(
+                    $context,
                     $ptr,
-                    $owned
+                    $context->helper->loadValue($var)
                 );
                 break;
             case Variable::TYPE_OBJECT:
@@ -688,15 +676,7 @@ final class JitValueBox
             $context->lookupFunction('__value__readString'),
             $srcPtr
         );
-        $owned = $context->builder->call(
-            $context->lookupFunction('__string__separate'),
-            $str
-        );
-        $context->builder->call(
-            $context->lookupFunction('__value__writeString'),
-            $destPtr,
-            $owned
-        );
+        self::writeStringToValuePtrByAddref($context, $destPtr, $str);
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($afterString);
@@ -788,6 +768,20 @@ final class JitValueBox
 
         $context->builder->positionAtEnd($done);
         BasicBlockHelper::branchToFreshContinue($context, 'after_value_copy_'.$tag);
+    }
+
+    /**
+     * Share a refcounted {@see __string__} into a value box (Zend zend_string_copy semantics).
+     * {@see __string__separate} is for mutation / hashtable-key ownership, not assignment copy.
+     */
+    private static function writeStringToValuePtrByAddref(Context $context, Value $destPtr, Value $strPtr): void
+    {
+        $context->refcount->addref($strPtr);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $destPtr,
+            $strPtr
+        );
     }
 
     /**
@@ -888,14 +882,10 @@ final class JitValueBox
                 );
                 break;
             case Variable::TYPE_STRING:
-                $owned = $context->builder->call(
-                    $context->lookupFunction('__string__separate'),
-                    $native
-                );
-                $context->builder->call(
-                    $context->lookupFunction('__value__writeString'),
+                self::writeStringToValuePtrByAddref(
+                    $context,
                     self::pointer($context, $slot),
-                    $owned
+                    $native
                 );
                 break;
             case Variable::TYPE_OBJECT:
@@ -976,14 +966,10 @@ final class JitValueBox
         }
         if ('__string__*' === $tyName) {
             $slot = self::alloc($context);
-            $owned = $context->builder->call(
-                $context->lookupFunction('__string__separate'),
-                $raw
-            );
-            $context->builder->call(
-                $context->lookupFunction('__value__writeString'),
+            self::writeStringToValuePtrByAddref(
+                $context,
                 self::pointer($context, $slot),
-                $owned
+                $raw
             );
 
             return self::pointer($context, $slot);
