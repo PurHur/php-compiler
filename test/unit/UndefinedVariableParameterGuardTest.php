@@ -9,7 +9,10 @@ use PHPUnit\Framework\TestCase;
 require_once __DIR__.'/../LlvmToolchain.php';
 
 /**
- * Typed parameters and per-frame assigned flags — no module-global guards (#36190).
+ * Typed parameters and per-frame assigned flags (#36190).
+ *
+ * User-function CVs use entry allocas; {main} script CVs keep module globals so
+ * __init__ and @main share one slot — assertions scope to user @fn bodies only.
  *
  * @group llvm
  * @group jit
@@ -38,24 +41,25 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'undef_param_guard_fibo.php');
         $runtime->jitCompileBlock($block);
         $ir = $runtime->loadJitContext()->module->printToString();
+        $this->assertMatchesRegularExpression('/define i64 @fibo_r/', $ir);
+        $this->assertMatchesRegularExpression('/define i64 @fibo_r.*?^}/ms', $ir, 'fibo_r IR missing');
+        preg_match('/define i64 @fibo_r.*?^}/ms', $ir, $fiboMatch);
+        $fiboIr = $fiboMatch[0];
         $this->assertStringNotContainsString(
             'phpc_scope_var_init',
-            $ir,
-            'assigned flags must be entry allocas, not module globals (#36190)'
+            $fiboIr,
+            'user-function CV flags must be entry allocas, not module globals (#36190)'
         );
-        $this->assertMatchesRegularExpression('/define i64 @fibo_r/', $ir);
-        if (preg_match('/define i64 @fibo_r.*?^}/ms', $ir, $match)) {
-            $this->assertStringNotContainsString(
-                'trigger_error',
-                $match[0],
-                'typed parameters must not emit undefined-variable guards (#36190)'
-            );
-            $this->assertStringNotContainsString(
-                'undef_var_warn',
-                $match[0],
-                'typed parameters must not branch on assigned flags (#36190)'
-            );
-        }
+        $this->assertStringNotContainsString(
+            'trigger_error',
+            $fiboIr,
+            'typed parameters must not emit undefined-variable guards (#36190)'
+        );
+        $this->assertStringNotContainsString(
+            'undef_var_warn',
+            $fiboIr,
+            'typed parameters must not branch on assigned flags (#36190)'
+        );
     }
 
     public function testRecursiveMaybeUndefinedLocalUsesEntryAllocaNotGlobal(): void
@@ -100,17 +104,19 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'undef_recur_alloca.php');
         $runtime->jitCompileBlock($block);
         $ir = $runtime->loadJitContext()->module->printToString();
+        $fPos = strpos($ir, 'define %__value__ @f(');
+        $this->assertNotFalse($fPos, 'function f IR missing');
+        // User @f is large; scan a prefix for per-frame i8 allocas (not whole-module {main} globals).
+        $fPrefix = substr($ir, $fPos, 20000);
         $this->assertStringNotContainsString(
             'phpc_scope_var_init',
-            $ir,
-            'maybe-undefined locals use per-frame entry allocas (#36190)'
+            $fPrefix,
+            'user-function maybe-undefined locals use per-frame entry allocas (#36190)'
         );
-        if (preg_match('/define void @f.*?^}/ms', $ir, $match)) {
-            $this->assertStringContainsString(
-                'alloca i8',
-                $match[0],
-                'assigned flag should be an i8 entry alloca (#36190)'
-            );
-        }
+        $this->assertStringContainsString(
+            'alloca i8',
+            $fPrefix,
+            'assigned flag should be an i8 entry alloca (#36190)'
+        );
     }
 }
