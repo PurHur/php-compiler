@@ -10,7 +10,7 @@ declare(strict_types=1);
  *   php script/compile-memory-probe.php [--check] [--release-cfg] [--sequential]
  *
  * --check          exit non-zero when sequential retention exceeds 2× baseline
- * --release-cfg    set PHP_COMPILER_RELEASE_CFG_AFTER_COMPILE=1 (full detachCfgTree)
+ * --release-cfg    call Block::detachCfgTree after each compile (full scope+orig release)
  * --sequential     compile all fixtures in one Runtime (spine-shaped); default is one fixture each
  */
 
@@ -20,9 +20,8 @@ $check = in_array('--check', $argv, true);
 $releaseCfg = in_array('--release-cfg', $argv, true);
 $sequential = in_array('--sequential', $argv, true);
 
-if ($releaseCfg) {
-    putenv('PHP_COMPILER_RELEASE_CFG_AFTER_COMPILE=1');
-}
+// Probe calls detachCfgTree explicitly after compile — do not set
+// PHP_COMPILER_RELEASE_CFG_AFTER_COMPILE (that runs before AOT JIT and breaks emit).
 
 $fixtures = [
     'lib/Lint/Linter.php' => 11_000,
@@ -51,6 +50,9 @@ if ($sequential) {
         if (null === $block) {
             fwrite(STDERR, "compile-memory-probe: compile failed for {$relPath}\n");
             exit(1);
+        }
+        if ($releaseCfg) {
+            PHPCompiler\Block::detachCfgTree($block, true);
         }
         unset($block);
         gc_collect_cycles();
@@ -90,6 +92,9 @@ if ($sequential) {
         if (null === $block) {
             fwrite(STDERR, "compile-memory-probe: compile failed for {$relPath}\n");
             exit(1);
+        }
+        if ($releaseCfg) {
+            PHPCompiler\Block::detachCfgTree($block, true);
         }
         unset($block);
         gc_collect_cycles();
