@@ -5287,6 +5287,12 @@ apply_php_cfg_simplifier_use_chain_overlay() {
       return 0
     fi
     echo "Repair php-cfg-simplifier-use-chain.patch (duplicate replaceVariablesByCfgWalk; #36250)"
+  else
+    # Pristine vendor: the committed .patch renames replaceVariables → replaceVariablesByCfgWalk.
+    # The Python overlay below only flips replaceVariables and cannot create the helper on its own (#36377).
+    if apply_patch_file_direct "$PATCH_DIR/php-cfg-simplifier-use-chain.patch"; then
+      return 0
+    fi
   fi
   python3 - "$simplifier" <<'PY'
 import re
