@@ -994,6 +994,75 @@ class String_ extends Type {
         $this->context->builder->store($destValue, $dest->value);
     }
 
+    /**
+     * In-place `$dest .= $right` on a refcount-1 native string slot: grow via
+     * {@see __string__realloc} and append the right payload only (#36410).
+     */
+    public function appendInPlace(Variable $dest, Variable $right): void
+    {
+        if (Variable::TYPE_STRING !== $dest->type) {
+            throw new \LogicException('appendInPlace requires a string destination');
+        }
+        if (Variable::KIND_VARIABLE !== $dest->kind) {
+            throw new \LogicException('appendInPlace requires a variable destination slot');
+        }
+        $this->context->intrinsic->builder = $this->context->builder;
+        $right = \PHPCompiler\JIT\JitNativeString::coerce($this->context, $right);
+        $rightVar = $this->context->helper->loadValue($right);
+        $map = $this->context->structFieldMap['__string__'];
+        $destSlot = $dest->value;
+        $curStr = $this->context->builder->load($destSlot);
+        $strPtrTy = $this->context->getTypeFromString('__string__*');
+        $i64 = $this->context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $rightSize = $this->context->builder->load(
+            $this->context->builder->structGep($rightVar, $map['length'])
+        );
+
+        $tag = 'appendInPlace'.(string) spl_object_id($dest);
+        $nullBlock = \PHPCompiler\JIT\BasicBlockHelper::append($this->context, 'append_null_'.$tag);
+        $bodyBlock = \PHPCompiler\JIT\BasicBlockHelper::append($this->context, 'append_body_'.$tag);
+        $workBlock = \PHPCompiler\JIT\BasicBlockHelper::append($this->context, 'append_work_'.$tag);
+        $isNull = $this->context->builder->icmp(
+            \PHPLLVM\Builder::INT_EQ,
+            $curStr,
+            $strPtrTy->constNull()
+        );
+        $this->context->builder->branchIf(
+            $this->context->castToBool($isNull),
+            $nullBlock,
+            $bodyBlock
+        );
+
+        $this->context->builder->positionAtEnd($nullBlock);
+        $this->context->builder->branch($workBlock);
+
+        $this->context->builder->positionAtEnd($bodyBlock);
+        $loadedLen = $this->context->builder->load(
+            $this->context->builder->structGep($curStr, $map['length'])
+        );
+        $this->context->builder->branch($workBlock);
+
+        $this->context->builder->positionAtEnd($workBlock);
+        $oldLen = $this->context->builder->phi($i64);
+        $oldLen->addIncoming($zero, $nullBlock);
+        $oldLen->addIncoming($loadedLen, $bodyBlock);
+        $newSize = $this->context->builder->addNoUnsignedWrap(
+            $oldLen,
+            $this->context->builder->intCast($rightSize, $oldLen->typeOf())
+        );
+        $this->context->builder->call(
+            $this->context->lookupFunction('__string__realloc'),
+            $destSlot,
+            $newSize
+        );
+        $destStr = $this->context->builder->load($destSlot);
+        $destChar = $this->context->builder->structGep($destStr, $map['value']);
+        $destChar = $this->context->builder->gep($destChar, $oldLen);
+        $rightChar = $this->context->builder->structGep($rightVar, $map['value']);
+        $this->context->intrinsic->memcpy($destChar, $rightChar, $rightSize, false);
+    }
+
     private function copy(\gcc_jit_block_ptr $block, Variable $dest, Variable $other, \gcc_jit_rvalue_ptr $offset): void {
         /*
         $addr = \gcc_jit_lvalue_get_address(
