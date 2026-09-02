@@ -53,6 +53,9 @@ step "check-extension-dependencies" "$PHP_BIN" script/check-extension-dependenci
 # 9. Opcode dump corpus — Compiler.php Concern extractions must keep zero opcode diff (#36230)
 step "opcode-corpus-md5 --check" "$PHP_BIN" script/opcode-corpus-md5.php --check
 
+# 10. Configuration env registry docs (#36201)
+step "generate-configuration-docs --check" "$PHP_BIN" script/generate-configuration-docs.php --check
+
 if [[ "$fail" -ne 0 ]]; then
   echo "check-generated-docs: drift detected — regenerate in the pinned env (see CONTRIBUTING 'Generated docs')" >&2
   exit 1
