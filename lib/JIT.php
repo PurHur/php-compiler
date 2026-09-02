@@ -9659,6 +9659,23 @@ class JIT {
                     }
                     if (null === $srcName) {
                         $this->context->foreachByRefLocalNames[$this->context->resolveRefAliasName($destName)] = true;
+                        // php-cfg lowers `foreach ($a as &$v)` as ITER_VALUE (by-value temp) +
+                        // ASSIGN_REF `$v` — bind through compileValueByRef, not the copy (#36366).
+                        if (null !== $destName) {
+                            $byRefVar = $this->tryCompileForeachIteratorValueByRef($block, $i, $op);
+                            if (null !== $byRefVar) {
+                                JIT\TypedPropertyUninitGuard::emitBeforeByRef($this->context, $byRefVar);
+                                $this->markAssignRefLvalueAlias($byRefVar);
+                                $this->context->bindVariableByName($destName, $byRefVar);
+                                $this->context->setVariableOp($destOp, $byRefVar);
+                                JIT\UndefinedVariableHelper::markAssigned(
+                                    $this->context,
+                                    $destOp,
+                                    $byRefVar
+                                );
+                                break;
+                            }
+                        }
                     }
                     if (null !== $srcName) {
                         if ($this->context->hasVariableOp($srcOp)) {
@@ -11904,6 +11921,7 @@ class JIT {
                             && (
                                 null !== $earlyBound->valueBoxAliasPtr
                                 || $earlyBound->borrowedValueEntry
+                                || null !== $earlyBound->foreachByRefPackedArm
                                 || $earlyBound->assignRefLvalueAlias
                             )
                         ) {
@@ -21391,6 +21409,41 @@ class JIT {
     }
 
     /**
+     * php-cfg `foreach ($a as &$v)` → ITER_VALUE temp + ASSIGN_REF `$v` (#36366).
+     *
+     * @see VmIteratorForeach::compileValueByRef
+     */
+    private function tryCompileForeachIteratorValueByRef(
+        Block $block,
+        int $assignRefIndex,
+        OpCode $assignRefOp
+    ): ?Variable {
+        if ($assignRefIndex <= 0) {
+            return null;
+        }
+        $prior = $block->opCodes[$assignRefIndex - 1];
+        if (OpCode::TYPE_ITER_VALUE !== $prior->type) {
+            return null;
+        }
+        if (null === $assignRefOp->arg2 || (int) $prior->arg1 !== (int) $assignRefOp->arg2) {
+            return null;
+        }
+        $arrayOp = $block->getOperand($prior->arg2);
+        $array = $this->context->getVariableFromOp($arrayOp);
+        JIT\GeneratorHelper::hydrateGeneratorMetadata($this->context, $array);
+        if (JIT\GeneratorHelper::isGeneratorVariable($array)) {
+            return null;
+        }
+
+        return JIT\IteratorHelper::compileValueByRef(
+            $this->context,
+            $array,
+            self::foreachContainerUserType($arrayOp, $array),
+            $this
+        );
+    }
+
+    /**
      * Live `__value__*` for an ASSIGN_REF dim dest (append entry or packed writableHt).
      *
      * Packed `$a[0]=&$x` on an empty HT must materialise the slot first — a bare GEP into
@@ -21937,9 +21990,26 @@ class JIT {
         }
         $result = $this->resolveAssignLvalue($resultOp);
         $result = $this->ensureNamedNativeLongLocalAlloca($resultOp, $result);
+        $resolvedAssignName = JIT\OperandName::resolve($resultOp);
+        if (null !== $resolvedAssignName && '' !== $resolvedAssignName) {
+            $resolvedBinding = $this->context->resolveRefAliasName($resolvedAssignName);
+            if (isset($this->context->namedVariableBindings[$resolvedBinding])) {
+                $namedBinding = $this->context->namedVariableBindings[$resolvedBinding];
+                if (
+                    null !== $namedBinding->foreachByRefPackedArm
+                    || ($namedBinding->borrowedValueEntry && null !== $namedBinding->writableHt)
+                ) {
+                    $result = $namedBinding;
+                    $this->context->setVariableOp($resultOp, $namedBinding);
+                }
+            }
+        }
         // Foreach by-ref must write through the borrowed HT entry before script-global
         // promotion (#4364, #36366 — assoc string-key arrays in {main}).
-        if (null !== $result->foreachByRefPackedArm) {
+        if (
+            null !== $result->foreachByRefPackedArm
+            || ($result->borrowedValueEntry && null !== $result->writableHt && null !== $result->writableIndex)
+        ) {
             JIT\HashTableHelper::assignForeachByRefWritable($this->context, $result, $value);
             $this->markScopeVariableAssignedIfTracked($resultOp, $result);
 
