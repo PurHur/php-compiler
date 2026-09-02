@@ -11191,6 +11191,7 @@ class JIT {
                         if (null !== ($newVal->compileTimeString ?? null)) {
                             $result->compileTimeString = $newVal->compileTimeString;
                         }
+                        $this->publishMainScriptNamedConcatResult($block, $destOp, $newVal);
                         $this->markScopeVariableAssignedIfTracked($destOp, $result);
                     } else {
                         // Fresh and in-place native concat: JitStringConcat + store. Avoid
@@ -11251,6 +11252,13 @@ class JIT {
                             $result = $promoted;
                         }
                         $this->context->builder->store($newStr, $destSlot);
+                        $nativeConcatVal = new Variable(
+                            $this->context,
+                            Variable::TYPE_STRING,
+                            Variable::KIND_VALUE,
+                            $newStr
+                        );
+                        $this->publishMainScriptNamedConcatResult($block, $destOp, $nativeConcatVal);
                     }
                     if (
                         null !== ($left->compileTimeString ?? null)
@@ -26465,6 +26473,11 @@ class JIT {
      *
      * assignOperand → makeVariableFromValueOp left a bare {@see KIND_VALUE} __string__*; a second
      * concat from the same local then double-freed or corrupted the heap under AOT.
+     *
+     * At {main}, also publish into the script-global heap box for every CV name on the dest
+     * slot — echo / ARG_SEND / var_export resolve named locals via ensureScriptGlobal and
+     * would otherwise read an empty box while the ephemeral alloca held the real string
+     * (#36366 p16: `$out = implode(...) . "\n"` printed checksum=0:0).
      */
     private function assignEphemeralConcatOperand(
         Block $block,
@@ -26499,6 +26512,64 @@ class JIT {
         $this->bindPromotedStringConcatDest($block, $destOp, $promoted);
         if (null !== ($newVal->compileTimeString ?? null)) {
             $promoted->compileTimeString = $newVal->compileTimeString;
+        }
+        $this->publishMainScriptNamedConcatResult($block, $destOp, $newVal);
+    }
+
+    /**
+     * {main} CV reads go through ensureScriptGlobal() boxes (#23842). Ephemeral /
+     * promoted CONCAT stores only an __string__* alloca — without this write, echo and
+     * ARG_SEND of `$b = $a . "x"` at top level see NULL / empty (#36366).
+     */
+    private function publishMainScriptNamedConcatResult(
+        Block $block,
+        Operand $destOp,
+        Variable $stringVal
+    ): void {
+        if (!$block->isMainScript()) {
+            return;
+        }
+        $names = [];
+        $destName = JIT\OperandName::resolve($destOp);
+        if (null !== $destName && '' !== $destName) {
+            $names[$destName] = true;
+        }
+        $slot = $block->slotForOperand($destOp);
+        if (null !== $slot) {
+            foreach ($block->scopedOperands() as $scopeOp) {
+                if ($block->slotForOperand($scopeOp) !== $slot) {
+                    continue;
+                }
+                $scopeName = JIT\OperandName::resolve($scopeOp);
+                if (null !== $scopeName && '' !== $scopeName) {
+                    $names[$scopeName] = true;
+                }
+            }
+        }
+        foreach ($names as $name => $_) {
+            $name = (string) $name;
+            if (\PHPCompiler\Web\Superglobals::isSuperglobalName($name)) {
+                continue;
+            }
+            if ($this->shouldDeferScriptGlobalForInlineIncludeBinding($name, $destOp, $block)) {
+                continue;
+            }
+            $sg = $this->context->ensureScriptGlobal($name);
+            JIT\JitValueBox::assignToPointer(
+                $this->context,
+                JIT\JitValueBox::valuePtrFromVariable($this->context, $sg),
+                $stringVal
+            );
+            JIT\JitValueBox::publishAfterWrite(
+                $this->context,
+                JIT\JitValueBox::valuePtrFromVariable($this->context, $sg)
+            );
+            if (null !== ($stringVal->compileTimeString ?? null)) {
+                $sg->compileTimeString = $stringVal->compileTimeString;
+            }
+            $sg->isNullConstant = false;
+            $this->context->bindVariableByName($name, $sg);
+            JIT\UndefinedVariableHelper::markAssigned($this->context, $destOp, $sg);
         }
     }
 
