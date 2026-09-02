@@ -1232,17 +1232,25 @@ final class Variable {
         }
         switch ($this->type) {
             case self::TYPE_STRING:
-                // assign to null
-                $this->context->builder->store($this->context->type->string->pointer->constNull(), $this->value);
+                BasicBlockHelper::storeAtFunctionEntry(
+                    $this->context,
+                    BasicBlockHelper::parentFunction($this->context),
+                    $this->context->type->string->pointer->constNull(),
+                    $this->value
+                );
                 break;
             case self::TYPE_OBJECT:
-                $this->context->builder->store(
+                BasicBlockHelper::storeAtFunctionEntry(
+                    $this->context,
+                    BasicBlockHelper::parentFunction($this->context),
                     $this->context->type->object->pointer->constNull(),
                     $this->value
                 );
                 break;
             case self::TYPE_HASHTABLE:
-                $this->context->builder->store(
+                BasicBlockHelper::storeAtFunctionEntry(
+                    $this->context,
+                    BasicBlockHelper::parentFunction($this->context),
                     $this->context->getTypeFromString('__hashtable__*')->constNull(),
                     $this->value
                 );

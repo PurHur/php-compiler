@@ -1538,7 +1538,13 @@ class JIT {
      */
     private function maybeRefreshIncludeBindingsBeforeUse(): void
     {
-        if ($this->context->inlineIncludeDepth > 0) {
+        // Outer include binding refresh must not run while NestedJIT lowers a helper body
+        // (htmlspecialchars inside layout.php include) — it stores into outer frame slots
+        // using inner-function alloca indices (#36253).
+        if (
+            $this->context->inlineIncludeDepth > 0
+            && !JIT\NestedJitCompileScope::isActive()
+        ) {
             JIT\IncludeHelper::refreshInlineIncludeBindings($this->context);
         }
     }
