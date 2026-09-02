@@ -42,9 +42,9 @@ final class ValueBoxCopyOutlineTest extends TestCase
         $vm = (string) file_get_contents(dirname(__DIR__, 2).'/lib/VM/VmValueCopy.php');
         $this->assertStringContainsString('#36193', $vm);
         $this->assertStringContainsString('value_copy_string', $vm);
-        $this->assertStringContainsString('writeStringToValuePtrByAddref', $vm);
-        $this->assertStringContainsString('$context->refcount->addref($strPtr)', $vm);
-        $this->assertStringNotContainsString('lookupFunction(\'__string__separate\')', $vm);
+        // Inter-box copy uses separate — assignment addref stays in JitValueBox (#26367 / #36192).
+        $this->assertStringContainsString("lookupFunction('__string__separate')", $vm);
+        $this->assertStringNotContainsString('writeStringToValuePtrByAddref', $vm);
     }
 
     public function testValuePreDeclaresCopyShell(): void

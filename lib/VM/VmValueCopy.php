@@ -110,7 +110,17 @@ final class VmValueCopy
             $context->lookupFunction('__value__readString'),
             $srcPtr
         );
-        self::writeStringToValuePtrByAddref($context, $destPtr, $str);
+        // Inter-box copy (formals, nested helpers): separate — addref alone leaves json_encode
+        // callers with dangling __string__* after the source temp is delref'd (#26367 / #36192).
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $str
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $destPtr,
+            $owned
+        );
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($afterString);
@@ -200,18 +210,5 @@ final class VmValueCopy
 
         $context->builder->positionAtEnd($done);
         $context->builder->returnVoid();
-    }
-
-    /**
-     * Zend zend_string_copy semantics — addref, not __string__separate (#36192).
-     */
-    private static function writeStringToValuePtrByAddref(Context $context, Value $destPtr, Value $strPtr): void
-    {
-        $context->refcount->addref($strPtr);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeString'),
-            $destPtr,
-            $strPtr
-        );
     }
 }

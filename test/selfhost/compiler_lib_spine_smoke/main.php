@@ -6760,6 +6760,7 @@ require_once __DIR__.'/../../../lib/JIT/NestedJitCompileScope.php';
 require_once __DIR__.'/../../../lib/JIT/NestedVmActiveContextLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/NestedVmHashTableMethodLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/NestedVmObjectMethodLlvm.php';
+require_once __DIR__.'/../../../lib/JIT/SpineChunkNestedVmBind.php';
 require_once __DIR__.'/../../../lib/JIT/NestedVmVariableMethodLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/NoDiscardCallGuard.php';
 require_once __DIR__.'/../../../lib/JIT/DeprecatedCallGuard.php';
