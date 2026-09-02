@@ -32,6 +32,8 @@ final class GcCollectCyclesAotCycleTest extends TestCase
         $this->assertStringContainsString('freeRegistryObject', $free);
         $this->assertStringContainsString('$slotEmpty', $kernel);
         $this->assertStringContainsString('slot_read_nonempty', $kernel);
+        $this->assertStringContainsString('slot_read_raw_obj', $kernel);
+        $this->assertStringContainsString("objMap['constructed']", $kernel);
     }
 
     public function testUnsetDelrefsBeforeWriteNull(): void

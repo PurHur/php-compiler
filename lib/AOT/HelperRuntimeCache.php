@@ -115,6 +115,9 @@ final class HelperRuntimeCache
         'phpcompiler\\ext\\standard\\gccollectcyclesregistryjithelper::count' => true,
         'phpcompiler\\ext\\standard\\gccollectcyclesregistryjithelper::objectptr' => true,
         'phpcompiler\\ext\\standard\\gccollectcyclesregistryjithelper::propcount' => true,
+        'phpcompiler\\ext\\standard\\gccollectcyclesregistrysyncjithelper::syncfromllvmregistry' => true,
+        'phpcompiler\\ext\\standard\\gccollectcyclesnativescanjithelper::collect' => true,
+        'phpcompiler\\ext\\standard\\gccollectcyclesnativefreejithelper::freeregistryobject' => true,
         'phpcompiler\\ext\\standard\\gctogglejithelper::isenabled' => true,
         // #27020 — helper-runtime unit.o for JsonEncodeJitHelper embeds eager
         // `$ctx->runtime->vm` / VmJson::export and SIGSEGVs on thin standalone.
