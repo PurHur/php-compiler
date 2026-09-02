@@ -40,6 +40,7 @@ final class SpineChunkRequiresSyncTest extends TestCase
             "'includepathresolvejithelper' => '/ext/standard/IncludePathResolveJitHelper.php'",
             $standardBind
         );
+        $this->assertContains('ext/standard/VmStatPath.php', $requires);
     }
 
     /**

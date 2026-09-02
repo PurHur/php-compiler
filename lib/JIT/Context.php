@@ -1300,11 +1300,10 @@ class Context {
             }
         }
 
-        // Spine split-TU: chunk entry is bare require_once lines — registerModule() never
-        // runs, so a few stdlib Internal leaves would ExternalMethod-null (#36147). Whitelist
-        // only type-check/count kernels safe to emit without the full stdlib surface (#15417).
-        if ([] === $this->modules
-            && \PHPCompiler\AOT\ExternalMethodBind::spineChunkMode()
+        // Spine split-TU: chunk TUs may register their extension module while stdlib kernels
+        // (explode, file_exists, …) live only on Runtime modules (#36147). After the chunk-local
+        // scan above, fall back to Runtime for the whitelisted kernel set.
+        if (\PHPCompiler\AOT\ExternalMethodBind::spineChunkMode()
             && self::isSpineChunkRuntimeInternalKernel($lc)
             && [] !== $this->runtime->modules
         ) {
@@ -1404,13 +1403,18 @@ class Context {
     {
         return match ($lc) {
             'count',
+            'explode',
+            'file_exists',
             'in_array',
             'intdiv',
             'intval',
             'is_float',
             'is_nan',
             'is_numeric',
+            'realpath',
+            'rtrim',
             'sprintf',
+            'str_contains',
             'strlen',
             'strpbrk',
             'strpos',
