@@ -3,25 +3,19 @@
 declare(strict_types=1);
 
 /**
- * Generates lib/ExtensionRegistry.php from the load list in Runtime::loadCoreModules().
+ * Generates lib/ExtensionRegistry.php from ext/<name>/ext.json (#36204 / RELEASE-PLAN Phase 2.5).
  *
- * RELEASE-PLAN Phase 2.5: "a per-extension manifest enumerated at build time, replacing 75
- * constructor calls". This is the first half — move the list out of a hand-maintained method in a
- * core file and into a generated one, WITHOUT changing the order.
+ * Per-extension manifests are the source of truth for load_order, depends, and default_enabled.
+ * This script emits literal `new \PHPCompiler\ext\{name}\Module()` expressions — the AOT compiler
+ * resolves those statically; a dynamic class string would leave modules unreferenced and uncompiled.
  *
- * Two deliberate constraints:
- *
- *   1. The generated file emits literal `new \PHPCompiler\ext\<name>\Module()` expressions, not
- *      dynamic instantiation from strings. The AOT compiler resolves these statically; a
- *      `new $className` would leave the modules unreferenced and they would not be compiled in.
- *
- *   2. The order is copied verbatim from the current hardcoded list. Ordering constraints here are
- *      real (libxml before dom before xsl) and partly still undeclared, so deriving a fresh order
- *      from dependencies is a separate, later step that must be proven equivalent first.
+ * Order comes from each manifest's load_order (stable across regenerations). Deriving order solely
+ * from depends[] is a later step that must be proven equivalent first.
  *
  * Usage:
  *   php script/generate-extension-registry.php            # write lib/ExtensionRegistry.php
  *   php script/generate-extension-registry.php --check    # fail if the file is out of date
+ *   php script/generate-extension-registry.php --only=standard,spl,types,ctype,hash,random
  */
 
 $root = dirname(__DIR__);
@@ -47,34 +41,75 @@ foreach ($argv as $arg) {
     }
 }
 
-$runtimeSrc = (string) file_get_contents($root.'/lib/Runtime.php');
+/**
+ * @return array{order: list<string>, deps: array<string, list<string>>, default_enabled: array<string, bool>}
+ */
+$loadManifests = static function () use ($root): array {
+    $rows = [];
+    foreach (glob($root.'/ext/*/ext.json') ?: [] as $path) {
+        $data = json_decode((string) file_get_contents($path), true);
+        if (!is_array($data) || !isset($data['name']) || !is_string($data['name'])) {
+            fwrite(STDERR, "generate-extension-registry: invalid manifest $path\n");
+            exit(2);
+        }
+        $name = $data['name'];
+        $rows[] = [
+            'name' => $name,
+            'load_order' => isset($data['load_order']) ? (int) $data['load_order'] : PHP_INT_MAX,
+            'depends' => array_values(array_map('strtolower', array_map('strval', $data['depends'] ?? []))),
+            'default_enabled' => !array_key_exists('default_enabled', $data) || (bool) $data['default_enabled'],
+        ];
+    }
+    if ([] === $rows) {
+        return ['order' => [], 'deps' => [], 'default_enabled' => []];
+    }
+    usort($rows, static function (array $a, array $b): int {
+        if ($a['load_order'] === $b['load_order']) {
+            return strcmp($a['name'], $b['name']);
+        }
 
-// Prefer the hardcoded list while it still exists; once Runtime consumes the registry, the
-// committed registry is the source of truth and regeneration is a no-op that still verifies.
-$order = [];
-if (preg_match('/private function loadCoreModules\(\): void \{(.*?)\n    \}/s', $runtimeSrc, $m)
-    && preg_match_all('/\$this->load\(new ext\\\\([A-Za-z0-9_]+)\\\\Module\)/', $m[1], $mm)
-) {
-    $order = $mm[1];
-}
+        return $a['load_order'] <=> $b['load_order'];
+    });
+    $order = [];
+    $deps = [];
+    $defaultEnabled = [];
+    foreach ($rows as $row) {
+        $order[] = $row['name'];
+        $deps[$row['name']] = $row['depends'];
+        $defaultEnabled[$row['name']] = $row['default_enabled'];
+    }
 
-if ([] === $order && is_file($target)) {
-    // Runtime already delegates; re-read the committed registry so --check stays meaningful.
-    $existing = (string) file_get_contents($target);
-    if (preg_match_all('/new \\\\PHPCompiler\\\\ext\\\\([A-Za-z0-9_]+)\\\\Module\(\)/', $existing, $em)) {
-        $order = $em[1];
+    return ['order' => $order, 'deps' => $deps, 'default_enabled' => $defaultEnabled];
+};
+
+$manifested = $loadManifests();
+$order = $manifested['order'];
+$declaredDeps = $manifested['deps'];
+$defaultEnabled = $manifested['default_enabled'];
+
+if ([] === $order) {
+    // Bootstrapping before the first sync-extension-manifests run: fall back to committed registry.
+    if (is_file($target)) {
+        $existing = (string) file_get_contents($target);
+        if (preg_match_all('/new \\\\PHPCompiler\\\\ext\\\\([A-Za-z0-9_]+)\\\\Module\(\)/', $existing, $em)) {
+            $order = $em[1];
+        }
     }
 }
 
 if ([] === $order) {
-    fwrite(STDERR, "generate-extension-registry: could not determine the load order\n");
+    fwrite(STDERR, "generate-extension-registry: no ext/<name>/ext.json and no committed registry\n");
+    fwrite(STDERR, "  run: php script/sync-extension-manifests.php\n");
     exit(2);
 }
 
 // Apply selection, then pull in declared dependencies so a selected extension never loses one.
 if (null !== $only || [] !== $without) {
-    $declaredDeps = [];
+    // Prefer manifest depends; fall back to Module.php for trees mid-migration.
     foreach ($order as $name) {
+        if (isset($declaredDeps[$name])) {
+            continue;
+        }
         $modSrc = @file_get_contents($root.'/ext/'.$name.'/Module.php');
         if (false !== $modSrc
             && preg_match('/function getExtensionDependencies\(\): array\s*\{\s*return \[(.*?)\];/s', $modSrc, $dm)
@@ -86,6 +121,13 @@ if (null !== $only || [] !== $without) {
 
     $selected = null === $only ? $order : array_values(array_intersect($order, $only));
     $selected = array_values(array_diff($selected, $without));
+    // Honour default_enabled when selecting the full set via --without only.
+    if (null === $only) {
+        $selected = array_values(array_filter(
+            $selected,
+            static fn (string $n): bool => $defaultEnabled[$n] ?? true
+        ));
+    }
 
     // Dependency closure: keeping dom must keep libxml, or the build loses it silently.
     $changed = true;
@@ -150,9 +192,9 @@ declare(strict_types=1);
  * The entries are literal `new` expressions on purpose: the AOT compiler resolves these statically,
  * and instantiating from a string would leave every module unreferenced and uncompiled.
  *
- * {$count} extensions, all default-enabled — matching current behaviour, where every build pays for
- * every extension. Selecting a subset is the next step and will filter on
- * {@see \\PHPCompiler\\Module::isDefaultEnabled}.
+ * {$count} extensions from ext/<name>/ext.json (#36204). Subset builds use
+ * `--only=` / `--without=` on this script; runtime {@see \\PHPCompiler\\Module::isDefaultEnabled}
+ * mirrors each manifest's default_enabled.
  */
 
 namespace PHPCompiler;

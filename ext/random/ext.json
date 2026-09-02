@@ -1,0 +1,17 @@
+{
+    "name": "random",
+    "load_order": 42,
+    "depends": [],
+    "default_enabled": true,
+    "host_libs": [],
+    "backends": {
+        "vm": true,
+        "jit": true,
+        "aot": true
+    },
+    "provides": {
+        "functions": [],
+        "classes": []
+    },
+    "policy_env": []
+}

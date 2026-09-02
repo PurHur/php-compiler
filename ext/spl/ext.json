@@ -1,0 +1,17 @@
+{
+    "name": "spl",
+    "load_order": 1,
+    "depends": [],
+    "default_enabled": true,
+    "host_libs": [],
+    "backends": {
+        "vm": true,
+        "jit": true,
+        "aot": true
+    },
+    "provides": {
+        "functions": [],
+        "classes": []
+    },
+    "policy_env": []
+}

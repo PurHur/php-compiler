@@ -17,9 +17,9 @@ declare(strict_types=1);
  * The entries are literal `new` expressions on purpose: the AOT compiler resolves these statically,
  * and instantiating from a string would leave every module unreferenced and uncompiled.
  *
- * 84 extensions, all default-enabled — matching current behaviour, where every build pays for
- * every extension. Selecting a subset is the next step and will filter on
- * {@see \PHPCompiler\Module::isDefaultEnabled}.
+ * 84 extensions from ext/<name>/ext.json (#36204). Subset builds use
+ * `--only=` / `--without=` on this script; runtime {@see \PHPCompiler\Module::isDefaultEnabled}
+ * mirrors each manifest's default_enabled.
  */
 
 namespace PHPCompiler;

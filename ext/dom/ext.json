@@ -1,0 +1,19 @@
+{
+    "name": "dom",
+    "load_order": 6,
+    "depends": [
+        "libxml"
+    ],
+    "default_enabled": true,
+    "host_libs": [],
+    "backends": {
+        "vm": true,
+        "jit": true,
+        "aot": true
+    },
+    "provides": {
+        "functions": [],
+        "classes": []
+    },
+    "policy_env": []
+}

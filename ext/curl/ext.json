@@ -1,0 +1,19 @@
+{
+    "name": "curl",
+    "load_order": 30,
+    "depends": [],
+    "default_enabled": true,
+    "host_libs": [],
+    "backends": {
+        "vm": true,
+        "jit": true,
+        "aot": true
+    },
+    "provides": {
+        "functions": [],
+        "classes": []
+    },
+    "policy_env": [
+        "PHP_COMPILER_ENABLE_CURL"
+    ]
+}

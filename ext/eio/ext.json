@@ -1,0 +1,19 @@
+{
+    "name": "eio",
+    "load_order": 57,
+    "depends": [],
+    "default_enabled": true,
+    "host_libs": [],
+    "backends": {
+        "vm": true,
+        "jit": true,
+        "aot": true
+    },
+    "provides": {
+        "functions": [],
+        "classes": []
+    },
+    "policy_env": [
+        "PHP_COMPILER_ENABLE_EIO"
+    ]
+}
