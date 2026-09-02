@@ -8063,6 +8063,7 @@ require_once __DIR__.'/../../../ext/soap/SoapHeaderXml.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/NumberFormatRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/SprintfSnprintfRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/JitLongArithOverflow.php';
+require_once __DIR__.'/../../../lib/JIT/JitNativeMethodReturn.php';
 require_once __DIR__.'/../../../lib/JIT/UnboundThisGuard.php';
 require_once __DIR__.'/../../../ext/ldap/JitLdapResult.php';
 require_once __DIR__.'/../../../ext/ldap/LdapResultJitHelper.php';
