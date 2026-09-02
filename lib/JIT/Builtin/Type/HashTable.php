@@ -993,41 +993,19 @@ class HashTable extends Type
         $htMap = $this->context->structFieldMap['__hashtable__'];
         $nodeMap = $this->context->structFieldMap['__strkey_node__'];
         $headSlot = $this->context->builder->structGep($ht, $htMap['strKeys']);
-        $head = $this->context->builder->load($headSlot);
 
         $done = $fn->appendBasicBlock('strkey_set_done');
         $prepend = $fn->appendBasicBlock('strkey_set_prepend');
-        $emptyHead = $fn->appendBasicBlock('strkey_set_empty_head');
-        $loopHead = $fn->appendBasicBlock('strkey_set_head');
-        $loopBody = $fn->appendBasicBlock('strkey_set_body');
-        $this->context->builder->branch($loopHead);
-
-        $this->context->builder->positionAtEnd($loopHead);
-        $node = $this->context->builder->phi($head->typeOf());
-        $node->addIncoming($head, $block);
-        $isNull = $this->context->builder->icmp(Builder::INT_EQ, $node, $node->typeOf()->constNull());
-        $this->context->builder->branchIf($isNull, $prepend, $loopBody);
-
-        $this->context->builder->positionAtEnd($loopBody);
-        $nodeKey = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['key']));
-        $isMatch = JitStringCompare::identical($this->context, $key, $nodeKey);
         $update = $fn->appendBasicBlock('strkey_set_update');
-        $next = $fn->appendBasicBlock('strkey_set_next');
-        $this->context->builder->branchIf($isMatch, $update, $next);
+        $valPtr = $this->lookupStringKeyForWriteBranch($fn, $block, $ht, $key, $update, $prepend, 'strkey_set');
 
         $this->context->builder->positionAtEnd($update);
-        $valField = $this->context->builder->structGep($node, $nodeMap['value']);
         $this->context->builder->call(
             $this->context->lookupFunction('__value__writeString'),
-            $valField,
+            $valPtr,
             $str
         );
         $this->context->builder->branch($done);
-
-        $this->context->builder->positionAtEnd($next);
-        $nextNode = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['next']));
-        $this->context->builder->branch($loopHead);
-        $node->addIncoming($nextNode, $next);
 
         $this->context->builder->positionAtEnd($prepend);
         $nodeType = $this->context->getTypeFromString('__strkey_node__');
@@ -1096,40 +1074,19 @@ class HashTable extends Type
         $htMap = $this->context->structFieldMap['__hashtable__'];
         $nodeMap = $this->context->structFieldMap['__strkey_node__'];
         $headSlot = $this->context->builder->structGep($ht, $htMap['strKeys']);
-        $head = $this->context->builder->load($headSlot);
 
         $done = $fn->appendBasicBlock('strkey_ht_done');
         $prepend = $fn->appendBasicBlock('strkey_ht_prepend');
-        $loopHead = $fn->appendBasicBlock('strkey_ht_head');
-        $loopBody = $fn->appendBasicBlock('strkey_ht_body');
-        $this->context->builder->branch($loopHead);
-
-        $this->context->builder->positionAtEnd($loopHead);
-        $node = $this->context->builder->phi($head->typeOf());
-        $node->addIncoming($head, $block);
-        $isNull = $this->context->builder->icmp(Builder::INT_EQ, $node, $node->typeOf()->constNull());
-        $this->context->builder->branchIf($isNull, $prepend, $loopBody);
-
-        $this->context->builder->positionAtEnd($loopBody);
-        $nodeKey = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['key']));
-        $isMatch = JitStringCompare::identical($this->context, $key, $nodeKey);
         $update = $fn->appendBasicBlock('strkey_ht_update');
-        $next = $fn->appendBasicBlock('strkey_ht_next');
-        $this->context->builder->branchIf($isMatch, $update, $next);
+        $valPtr = $this->lookupStringKeyForWriteBranch($fn, $block, $ht, $key, $update, $prepend, 'strkey_ht');
 
         $this->context->builder->positionAtEnd($update);
-        $valField = $this->context->builder->structGep($node, $nodeMap['value']);
         $this->context->builder->call(
             $this->context->lookupFunction('__value__writeHashtable'),
-            $valField,
+            $valPtr,
             $child
         );
         $this->context->builder->branch($done);
-
-        $this->context->builder->positionAtEnd($next);
-        $nextNode = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['next']));
-        $this->context->builder->branch($loopHead);
-        $node->addIncoming($nextNode, $next);
 
         $this->context->builder->positionAtEnd($prepend);
         $nodeType = $this->context->getTypeFromString('__strkey_node__');
@@ -1172,40 +1129,19 @@ class HashTable extends Type
         $htMap = $this->context->structFieldMap['__hashtable__'];
         $nodeMap = $this->context->structFieldMap['__strkey_node__'];
         $headSlot = $this->context->builder->structGep($ht, $htMap['strKeys']);
-        $head = $this->context->builder->load($headSlot);
 
         $done = $fn->appendBasicBlock('strkey_obj_done');
         $prepend = $fn->appendBasicBlock('strkey_obj_prepend');
-        $loopHead = $fn->appendBasicBlock('strkey_obj_head');
-        $loopBody = $fn->appendBasicBlock('strkey_obj_body');
-        $this->context->builder->branch($loopHead);
-
-        $this->context->builder->positionAtEnd($loopHead);
-        $node = $this->context->builder->phi($head->typeOf());
-        $node->addIncoming($head, $block);
-        $isNull = $this->context->builder->icmp(Builder::INT_EQ, $node, $node->typeOf()->constNull());
-        $this->context->builder->branchIf($isNull, $prepend, $loopBody);
-
-        $this->context->builder->positionAtEnd($loopBody);
-        $nodeKey = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['key']));
-        $isMatch = JitStringCompare::identical($this->context, $key, $nodeKey);
         $update = $fn->appendBasicBlock('strkey_obj_update');
-        $next = $fn->appendBasicBlock('strkey_obj_next');
-        $this->context->builder->branchIf($isMatch, $update, $next);
+        $valPtr = $this->lookupStringKeyForWriteBranch($fn, $block, $ht, $key, $update, $prepend, 'strkey_obj');
 
         $this->context->builder->positionAtEnd($update);
-        $valField = $this->context->builder->structGep($node, $nodeMap['value']);
         $this->context->builder->call(
             $this->context->lookupFunction('__value__writeObject'),
-            $valField,
+            $valPtr,
             $child
         );
         $this->context->builder->branch($done);
-
-        $this->context->builder->positionAtEnd($next);
-        $nextNode = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['next']));
-        $this->context->builder->branch($loopHead);
-        $node->addIncoming($nextNode, $next);
 
         $this->context->builder->positionAtEnd($prepend);
         $nodeType = $this->context->getTypeFromString('__strkey_node__');
@@ -1248,40 +1184,19 @@ class HashTable extends Type
         $htMap = $this->context->structFieldMap['__hashtable__'];
         $nodeMap = $this->context->structFieldMap['__strkey_node__'];
         $headSlot = $this->context->builder->structGep($ht, $htMap['strKeys']);
-        $head = $this->context->builder->load($headSlot);
 
         $done = $fn->appendBasicBlock('strkey_long_done');
         $prepend = $fn->appendBasicBlock('strkey_long_prepend');
-        $loopHead = $fn->appendBasicBlock('strkey_long_head');
-        $loopBody = $fn->appendBasicBlock('strkey_long_body');
-        $this->context->builder->branch($loopHead);
-
-        $this->context->builder->positionAtEnd($loopHead);
-        $node = $this->context->builder->phi($head->typeOf());
-        $node->addIncoming($head, $block);
-        $isNull = $this->context->builder->icmp(Builder::INT_EQ, $node, $node->typeOf()->constNull());
-        $this->context->builder->branchIf($isNull, $prepend, $loopBody);
-
-        $this->context->builder->positionAtEnd($loopBody);
-        $nodeKey = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['key']));
-        $isMatch = JitStringCompare::identical($this->context, $key, $nodeKey);
         $update = $fn->appendBasicBlock('strkey_long_update');
-        $next = $fn->appendBasicBlock('strkey_long_next');
-        $this->context->builder->branchIf($isMatch, $update, $next);
+        $valPtr = $this->lookupStringKeyForWriteBranch($fn, $block, $ht, $key, $update, $prepend, 'strkey_long');
 
         $this->context->builder->positionAtEnd($update);
-        $valField = $this->context->builder->structGep($node, $nodeMap['value']);
         $this->context->builder->call(
             $this->context->lookupFunction('__value__writeLong'),
-            $valField,
+            $valPtr,
             $long
         );
         $this->context->builder->branch($done);
-
-        $this->context->builder->positionAtEnd($next);
-        $nextNode = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['next']));
-        $this->context->builder->branch($loopHead);
-        $node->addIncoming($nextNode, $next);
 
         $this->context->builder->positionAtEnd($prepend);
         $nodeType = $this->context->getTypeFromString('__strkey_node__');
@@ -1350,40 +1265,19 @@ class HashTable extends Type
         $htMap = $this->context->structFieldMap['__hashtable__'];
         $nodeMap = $this->context->structFieldMap['__strkey_node__'];
         $headSlot = $this->context->builder->structGep($ht, $htMap['strKeys']);
-        $head = $this->context->builder->load($headSlot);
 
         $done = $fn->appendBasicBlock('strkey_double_done');
         $prepend = $fn->appendBasicBlock('strkey_double_prepend');
-        $loopHead = $fn->appendBasicBlock('strkey_double_head');
-        $loopBody = $fn->appendBasicBlock('strkey_double_body');
-        $this->context->builder->branch($loopHead);
-
-        $this->context->builder->positionAtEnd($loopHead);
-        $node = $this->context->builder->phi($head->typeOf());
-        $node->addIncoming($head, $block);
-        $isNull = $this->context->builder->icmp(Builder::INT_EQ, $node, $node->typeOf()->constNull());
-        $this->context->builder->branchIf($isNull, $prepend, $loopBody);
-
-        $this->context->builder->positionAtEnd($loopBody);
-        $nodeKey = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['key']));
-        $isMatch = JitStringCompare::identical($this->context, $key, $nodeKey);
         $update = $fn->appendBasicBlock('strkey_double_update');
-        $next = $fn->appendBasicBlock('strkey_double_next');
-        $this->context->builder->branchIf($isMatch, $update, $next);
+        $valPtr = $this->lookupStringKeyForWriteBranch($fn, $block, $ht, $key, $update, $prepend, 'strkey_double');
 
         $this->context->builder->positionAtEnd($update);
-        $valField = $this->context->builder->structGep($node, $nodeMap['value']);
         $this->context->builder->call(
             $this->context->lookupFunction('__value__writeDouble'),
-            $valField,
+            $valPtr,
             $double
         );
         $this->context->builder->branch($done);
-
-        $this->context->builder->positionAtEnd($next);
-        $nextNode = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['next']));
-        $this->context->builder->branch($loopHead);
-        $node->addIncoming($nextNode, $next);
 
         $this->context->builder->positionAtEnd($prepend);
         $nodeType = $this->context->getTypeFromString('__strkey_node__');
@@ -1425,38 +1319,16 @@ class HashTable extends Type
 
         $htMap = $this->context->structFieldMap['__hashtable__'];
         $nodeMap = $this->context->structFieldMap['__strkey_node__'];
-        $valMap = $this->context->structFieldMap['__value__'];
         $headSlot = $this->context->builder->structGep($ht, $htMap['strKeys']);
-        $head = $this->context->builder->load($headSlot);
 
         $done = $fn->appendBasicBlock('strkey_bool_done');
         $prepend = $fn->appendBasicBlock('strkey_bool_prepend');
-        $loopHead = $fn->appendBasicBlock('strkey_bool_head');
-        $loopBody = $fn->appendBasicBlock('strkey_bool_body');
-        $this->context->builder->branch($loopHead);
-
-        $this->context->builder->positionAtEnd($loopHead);
-        $node = $this->context->builder->phi($head->typeOf());
-        $node->addIncoming($head, $block);
-        $isNull = $this->context->builder->icmp(Builder::INT_EQ, $node, $node->typeOf()->constNull());
-        $this->context->builder->branchIf($isNull, $prepend, $loopBody);
-
-        $this->context->builder->positionAtEnd($loopBody);
-        $nodeKey = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['key']));
-        $isMatch = JitStringCompare::identical($this->context, $key, $nodeKey);
         $update = $fn->appendBasicBlock('strkey_bool_update');
-        $next = $fn->appendBasicBlock('strkey_bool_next');
-        $this->context->builder->branchIf($isMatch, $update, $next);
+        $valPtr = $this->lookupStringKeyForWriteBranch($fn, $block, $ht, $key, $update, $prepend, 'strkey_bool');
 
         $this->context->builder->positionAtEnd($update);
-        $valField = $this->context->builder->structGep($node, $nodeMap['value']);
-        $this->writeBoolToValueField($valField, $bool);
+        $this->writeBoolToValueField($valPtr, $bool);
         $this->context->builder->branch($done);
-
-        $this->context->builder->positionAtEnd($next);
-        $nextNode = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['next']));
-        $this->context->builder->branch($loopHead);
-        $node->addIncoming($nextNode, $next);
 
         $this->context->builder->positionAtEnd($prepend);
         $nodeType = $this->context->getTypeFromString('__strkey_node__');
@@ -1497,39 +1369,18 @@ class HashTable extends Type
         $htMap = $this->context->structFieldMap['__hashtable__'];
         $nodeMap = $this->context->structFieldMap['__strkey_node__'];
         $headSlot = $this->context->builder->structGep($ht, $htMap['strKeys']);
-        $head = $this->context->builder->load($headSlot);
 
         $done = $fn->appendBasicBlock('strkey_null_done');
         $prepend = $fn->appendBasicBlock('strkey_null_prepend');
-        $loopHead = $fn->appendBasicBlock('strkey_null_head');
-        $loopBody = $fn->appendBasicBlock('strkey_null_body');
-        $this->context->builder->branch($loopHead);
-
-        $this->context->builder->positionAtEnd($loopHead);
-        $node = $this->context->builder->phi($head->typeOf());
-        $node->addIncoming($head, $block);
-        $isNull = $this->context->builder->icmp(Builder::INT_EQ, $node, $node->typeOf()->constNull());
-        $this->context->builder->branchIf($isNull, $prepend, $loopBody);
-
-        $this->context->builder->positionAtEnd($loopBody);
-        $nodeKey = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['key']));
-        $isMatch = JitStringCompare::identical($this->context, $key, $nodeKey);
         $update = $fn->appendBasicBlock('strkey_null_update');
-        $next = $fn->appendBasicBlock('strkey_null_next');
-        $this->context->builder->branchIf($isMatch, $update, $next);
+        $valPtr = $this->lookupStringKeyForWriteBranch($fn, $block, $ht, $key, $update, $prepend, 'strkey_null');
 
         $this->context->builder->positionAtEnd($update);
-        $valField = $this->context->builder->structGep($node, $nodeMap['value']);
         $this->context->builder->call(
             $this->context->lookupFunction('__value__writeNull'),
-            $valField
+            $valPtr
         );
         $this->context->builder->branch($done);
-
-        $this->context->builder->positionAtEnd($next);
-        $nextNode = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['next']));
-        $this->context->builder->branch($loopHead);
-        $node->addIncoming($nextNode, $next);
 
         $this->context->builder->positionAtEnd($prepend);
         $nodeType = $this->context->getTypeFromString('__strkey_node__');
@@ -3819,6 +3670,32 @@ class HashTable extends Type
     /**
      * @param array<string, int> $map
      */
+    /**
+     * Hash-index lookup for string-key write paths; branch insert vs update (#36408).
+     */
+    private function lookupStringKeyForWriteBranch(
+        PHPLLVM\Value\Function_ $fn,
+        PHPLLVM\BasicBlock $entryBlock,
+        PHPLLVM\Value $ht,
+        PHPLLVM\Value $key,
+        PHPLLVM\BasicBlock $updateBlock,
+        PHPLLVM\BasicBlock $insertBlock,
+        string $prefix
+    ): PHPLLVM\Value {
+        $valPtr = $this->lookupStringKeyValue($fn, $entryBlock, $ht, $key);
+        $afterLookup = $fn->appendBasicBlock($prefix.'_after_lookup');
+        $this->context->builder->branch($afterLookup);
+        $this->context->builder->positionAtEnd($afterLookup);
+        $isNull = $this->context->builder->icmp(
+            Builder::INT_EQ,
+            $valPtr,
+            $valPtr->typeOf()->constNull()
+        );
+        $this->context->builder->branchIf($isNull, $insertBlock, $updateBlock);
+
+        return $valPtr;
+    }
+
     /** Reload strKeys list head after earlier inserts in the same LLVM function. */
     private function loadStrKeysHead(PHPLLVM\Value $headSlot): PHPLLVM\Value
     {
@@ -4283,28 +4160,43 @@ class HashTable extends Type
         );
     }
 
-    /** Allocate 8-bucket string-key hash index on first use (#36191). */
+    /**
+     * Allocate the string-key hash index on first use and grow at load factor ≥ 1 (#36191, #36408).
+     *
+     * Zend doubles nTableSize when nNumUsed reaches the current bucket count; without resize the
+     * fixed 8-bucket index devolves to O(n) chains and isset-heavy probes go ~n².
+     */
     private function implementEnsureStrHashIndex(): void
     {
         $fn = $this->context->lookupFunction('__hashtable__ensureStrHashIndex');
         $entry = $fn->appendBasicBlock('main');
-        $done = $fn->appendBasicBlock('done');
         $init = $fn->appendBasicBlock('init');
+        $growCheck = $fn->appendBasicBlock('strhash_grow_check');
+        $growWork = $fn->appendBasicBlock('strhash_grow_work');
+        $rehashHead = $fn->appendBasicBlock('strhash_rehash_head');
+        $rehashBody = $fn->appendBasicBlock('strhash_rehash_body');
+        $rehashDone = $fn->appendBasicBlock('strhash_rehash_done');
+        $done = $fn->appendBasicBlock('done');
+
         $this->context->builder->positionAtEnd($entry);
         $ht = $fn->getParam(0);
         $map = $this->context->structFieldMap['__hashtable__'];
+        $nodeMap = $this->context->structFieldMap['__strkey_node__'];
         $sizeT = $this->context->getTypeFromString('size_t');
         $zero = $sizeT->constInt(0, false);
         $one = $sizeT->constInt(1, false);
+        $two = $sizeT->constInt(2, false);
+        $ptrSize = $sizeT->constInt(8, false);
         $maskSlot = $this->context->builder->structGep($ht, $map['strHashMask']);
         $slotsSlot = $this->context->builder->structGep($ht, $map['strHashSlots']);
         $mask = $this->context->builder->load($maskSlot);
         $needsInit = $this->context->builder->icmp(Builder::INT_EQ, $mask, $zero);
-        $this->context->builder->branchIf($needsInit, $init, $done);
+        $this->context->builder->branchIf($needsInit, $init, $growCheck);
+
         $this->context->builder->positionAtEnd($init);
         $initialMask = $sizeT->constInt(self::STR_HASH_INITIAL_MASK, false);
         $slotCount = $this->context->builder->addNoSignedWrap($initialMask, $one);
-        $bytes = $this->context->builder->mulNoSignedWrap($slotCount, $sizeT->constInt(8, false));
+        $bytes = $this->context->builder->mulNoSignedWrap($slotCount, $ptrSize);
         $raw = $this->context->builder->call($this->context->lookupFunction('__mm__malloc'), $bytes);
         $i8 = $this->context->getTypeFromString('int8');
         $this->context->intrinsic->memset($raw, $i8->constInt(0, false), $bytes, false);
@@ -4313,7 +4205,68 @@ class HashTable extends Type
             $slotsSlot
         );
         $this->context->builder->store($initialMask, $maskSlot);
-        $this->context->builder->branch($done);
+        $this->context->builder->branch($growCheck);
+
+        $this->context->builder->positionAtEnd($growCheck);
+        $mask = $this->context->builder->load($maskSlot);
+        $tableSize = $this->context->builder->addNoSignedWrap($mask, $one);
+        $numElements = $this->context->builder->load(
+            $this->context->builder->structGep($ht, $map['numElements'])
+        );
+        $needsGrow = $this->context->builder->icmp(Builder::INT_UGE, $numElements, $tableSize);
+        $this->context->builder->branchIf($needsGrow, $growWork, $done);
+
+        $this->context->builder->positionAtEnd($growWork);
+        $newTableSize = $this->context->builder->mulNoSignedWrap($tableSize, $two);
+        $newMask = $this->context->builder->sub($newTableSize, $one);
+        $newBytes = $this->context->builder->mulNoSignedWrap($newTableSize, $ptrSize);
+        $newRaw = $this->context->builder->call($this->context->lookupFunction('__mm__malloc'), $newBytes);
+        $this->context->intrinsic->memset($newRaw, $i8->constInt(0, false), $newBytes, false);
+        $newSlots = $this->context->builder->pointerCast(
+            $newRaw,
+            $this->context->getTypeFromString('__strkey_node__**')
+        );
+        $nodePtrType = $this->context->getTypeFromString('__strkey_node__*');
+        $nullNode = $nodePtrType->constNull();
+        $curSlot = $this->context->builder->alloca($nodePtrType, 1, 'strhash_rehash_cur');
+        $this->context->builder->store(
+            $this->context->builder->load($this->context->builder->structGep($ht, $map['strKeys'])),
+            $curSlot
+        );
+        $this->context->builder->branch($rehashHead);
+
+        $this->context->builder->positionAtEnd($rehashHead);
+        $cur = $this->context->builder->load($curSlot);
+        $curIsNull = $this->context->builder->icmp(Builder::INT_EQ, $cur, $nullNode);
+        $this->context->builder->branchIf($curIsNull, $rehashDone, $rehashBody);
+
+        $this->context->builder->positionAtEnd($rehashBody);
+        $nodeHash = $this->context->builder->load($this->context->builder->structGep($cur, $nodeMap['hash']));
+        $hashU = $this->context->builder->truncOrBitCast($nodeHash, $sizeT);
+        $newMaskU = $this->context->builder->truncOrBitCast($newMask, $sizeT);
+        $bucket = $this->context->builder->and($hashU, $newMaskU);
+        $slotPtr = $this->context->builder->inBoundsGep($newSlots, $bucket);
+        $oldHead = $this->context->builder->load($slotPtr);
+        $this->context->builder->store($oldHead, $this->context->builder->structGep($cur, $nodeMap['hashNext']));
+        $this->context->builder->store($cur, $slotPtr);
+        $nextNode = $this->context->builder->load($this->context->builder->structGep($cur, $nodeMap['next']));
+        $this->context->builder->store($nextNode, $curSlot);
+        $this->context->builder->branch($rehashHead);
+
+        $this->context->builder->positionAtEnd($rehashDone);
+        $oldSlots = $this->context->builder->load($slotsSlot);
+        $oldSlotsNull = $this->context->builder->icmp(Builder::INT_EQ, $oldSlots, $newSlots->typeOf()->constNull());
+        $freeOld = $fn->appendBasicBlock('strhash_free_old');
+        $afterFree = $fn->appendBasicBlock('strhash_after_free');
+        $this->context->builder->branchIf($oldSlotsNull, $afterFree, $freeOld);
+        $this->context->builder->positionAtEnd($freeOld);
+        $this->context->memory->free($oldSlots);
+        $this->context->builder->branch($afterFree);
+        $this->context->builder->positionAtEnd($afterFree);
+        $this->context->builder->store($newMask, $maskSlot);
+        $this->context->builder->store($newSlots, $slotsSlot);
+        $this->context->builder->branch($growCheck);
+
         $this->context->builder->positionAtEnd($done);
         $this->context->builder->returnVoid();
     }
