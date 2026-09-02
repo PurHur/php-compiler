@@ -33459,6 +33459,8 @@ class JIT {
             $this->context->lookupFunction('phpc_weakref_clear_object'),
             $objI8
         );
+        // Zend decrements refcount on unset — valueDelref alone leaves extra GC roots (#36245).
+        $this->context->refcount->delref($obj);
         $this->context->builder->branch($doneBlock);
         $this->context->builder->positionAtEnd($doneBlock);
         $this->jitNoteMemoryReleaseForUnset($valueBoxPtr);

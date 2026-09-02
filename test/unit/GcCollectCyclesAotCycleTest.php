@@ -33,4 +33,11 @@ final class GcCollectCyclesAotCycleTest extends TestCase
         $this->assertStringContainsString('$slotEmpty', $kernel);
         $this->assertStringContainsString('slot_read_nonempty', $kernel);
     }
+
+    public function testUnsetDelrefsBeforeWriteNull(): void
+    {
+        $jit = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT.php');
+        $this->assertStringContainsString('valueDelref alone leaves extra GC roots (#36245)', $jit);
+        $this->assertStringContainsString('refcount->delref($obj)', $jit);
+    }
 }
