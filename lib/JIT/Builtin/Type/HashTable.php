@@ -84,6 +84,8 @@ class HashTable extends Type
             $this->context->getTypeFromString('int64'),
             /** nextFree when the first string key was inserted — foreach insertion order (#34977). */
             $this->context->getTypeFromString('size_t'),
+            /** Tail of strKeys insertion-order list — O(1) append (#36191 partial). */
+            $this->context->getTypeFromString('__strkey_node__*'),
         );
         $this->context->structFieldMap['__hashtable__'] = [
             'ref' => 0,
@@ -96,6 +98,7 @@ class HashTable extends Type
             /** Zend HT internal pointer for key/current/next (#4967, #5504). */
             'internalPointer' => 7,
             'packedPrefixEnd' => 8,
+            'strKeysTail' => 9,
         ];
 
         $this->registerFn('__hashtable__alloc', '__hashtable__*', []);
@@ -419,6 +422,10 @@ class HashTable extends Type
         $this->context->builder->store(
             $sizeT->constInt(\PHP_INT_MAX, false),
             $this->context->builder->structGep($ht, $map['packedPrefixEnd'])
+        );
+        $this->context->builder->store(
+            $nullStrKeys,
+            $this->context->builder->structGep($ht, $map['strKeysTail'])
         );
         $typeinfo = $this->context->getTypeFromString('int32')->constInt(
             Refcount::TYPE_INFO_TYPE_MASKED_ARRAY | Refcount::TYPE_INFO_REFCOUNTED,
@@ -1019,35 +1026,9 @@ class HashTable extends Type
             $newNode->typeOf()->constNull(),
             $this->context->builder->structGep($newNode, $nodeMap['next'])
         );
-        $tail = $fn->appendBasicBlock('strkey_set_tail');
-        $tailWalk = $fn->appendBasicBlock('strkey_set_tail_walk');
-        $tailDone = $fn->appendBasicBlock('strkey_set_tail_done');
-        $this->context->builder->branch($tail);
-
-        $this->context->builder->positionAtEnd($tail);
-        $currentHead = $this->loadStrKeysHead($headSlot);
-        $isEmpty = $this->context->builder->icmp(Builder::INT_EQ, $currentHead, $currentHead->typeOf()->constNull());
-        $this->context->builder->branchIf($isEmpty, $emptyHead, $tailWalk);
-
-        $this->context->builder->positionAtEnd($tailWalk);
-        $walkNode = $this->context->builder->phi($currentHead->typeOf());
-        $walkNode->addIncoming($currentHead, $tail);
-        $nextWalk = $this->context->builder->load($this->context->builder->structGep($walkNode, $nodeMap['next']));
-        $atEnd = $this->context->builder->icmp(Builder::INT_EQ, $nextWalk, $nextWalk->typeOf()->constNull());
-        $this->context->builder->branchIf($atEnd, $tailDone, $tailWalk);
-        $walkNode->addIncoming($nextWalk, $tailWalk);
-
-        $this->context->builder->positionAtEnd($tailDone);
-        $this->context->builder->store(
-            $newNode,
-            $this->context->builder->structGep($walkNode, $nodeMap['next'])
-        );
-        $this->incrementNumElements($ht);
-        $this->context->builder->branch($done);
-
-        $this->context->builder->positionAtEnd($emptyHead);
-        $this->stampPackedPrefixEndIfUnset($ht);
-        $this->context->builder->store($newNode, $headSlot);
+        $afterAppend = $fn->appendBasicBlock('strkey_set_after_append');
+        $this->appendStrKeyNodeAtTail($fn, $prepend, $ht, $headSlot, $newNode, 'strkey_set', $afterAppend);
+        $this->context->builder->positionAtEnd($afterAppend);
         $this->incrementNumElements($ht);
         $this->context->builder->branch($done);
 
@@ -1339,36 +1320,9 @@ class HashTable extends Type
             $newNode->typeOf()->constNull(),
             $this->context->builder->structGep($newNode, $nodeMap['next'])
         );
-        $tail = $fn->appendBasicBlock('strkey_long_tail');
-        $emptyHead = $fn->appendBasicBlock('strkey_long_empty_head');
-        $tailWalk = $fn->appendBasicBlock('strkey_long_tail_walk');
-        $tailDone = $fn->appendBasicBlock('strkey_long_tail_done');
-        $this->context->builder->branch($tail);
-
-        $this->context->builder->positionAtEnd($tail);
-        $currentHead = $this->loadStrKeysHead($headSlot);
-        $isEmpty = $this->context->builder->icmp(Builder::INT_EQ, $currentHead, $currentHead->typeOf()->constNull());
-        $this->context->builder->branchIf($isEmpty, $emptyHead, $tailWalk);
-
-        $this->context->builder->positionAtEnd($tailWalk);
-        $walkNode = $this->context->builder->phi($currentHead->typeOf());
-        $walkNode->addIncoming($currentHead, $tail);
-        $nextWalk = $this->context->builder->load($this->context->builder->structGep($walkNode, $nodeMap['next']));
-        $atEnd = $this->context->builder->icmp(Builder::INT_EQ, $nextWalk, $nextWalk->typeOf()->constNull());
-        $this->context->builder->branchIf($atEnd, $tailDone, $tailWalk);
-        $walkNode->addIncoming($nextWalk, $tailWalk);
-
-        $this->context->builder->positionAtEnd($tailDone);
-        $this->context->builder->store(
-            $newNode,
-            $this->context->builder->structGep($walkNode, $nodeMap['next'])
-        );
-        $this->incrementNumElements($ht);
-        $this->context->builder->branch($done);
-
-        $this->context->builder->positionAtEnd($emptyHead);
-        $this->stampPackedPrefixEndIfUnset($ht);
-        $this->context->builder->store($newNode, $headSlot);
+        $afterAppend = $fn->appendBasicBlock('strkey_long_after_append');
+        $this->appendStrKeyNodeAtTail($fn, $prepend, $ht, $headSlot, $newNode, 'strkey_long', $afterAppend);
+        $this->context->builder->positionAtEnd($afterAppend);
         $this->incrementNumElements($ht);
         $this->context->builder->branch($done);
 
@@ -3867,6 +3821,47 @@ class HashTable extends Type
     private function loadStrKeysHead(PHPLLVM\Value $headSlot): PHPLLVM\Value
     {
         return $this->context->builder->load($headSlot);
+    }
+
+    /**
+     * Append a new string-key node in insertion order using strKeysTail — O(1) (#36191).
+     */
+    private function appendStrKeyNodeAtTail(
+        PHPLLVM\Value\Function_ $fn,
+        PHPLLVM\BasicBlock $fromBlock,
+        PHPLLVM\Value $ht,
+        PHPLLVM\Value $headSlot,
+        PHPLLVM\Value $newNode,
+        string $prefix,
+        PHPLLVM\BasicBlock $joinBlock
+    ): void {
+        $map = $this->context->structFieldMap['__hashtable__'];
+        $nodeMap = $this->context->structFieldMap['__strkey_node__'];
+        $nodePtr = $newNode->typeOf();
+        $null = $nodePtr->constNull();
+        $tailSlot = $this->context->builder->structGep($ht, $map['strKeysTail']);
+        $tail = $this->context->builder->load($tailSlot);
+        $empty = $fn->appendBasicBlock($prefix.'_append_empty');
+        $append = $fn->appendBasicBlock($prefix.'_append_tail');
+        $this->context->builder->positionAtEnd($fromBlock);
+        $this->context->builder->branchIf(
+            $this->context->builder->icmp(Builder::INT_EQ, $tail, $null),
+            $empty,
+            $append
+        );
+        $this->context->builder->positionAtEnd($empty);
+        $this->stampPackedPrefixEndIfUnset($ht);
+        $this->context->builder->store($newNode, $headSlot);
+        $this->context->builder->store($newNode, $tailSlot);
+        $this->context->builder->branch($joinBlock);
+        $this->context->builder->positionAtEnd($append);
+        $this->context->builder->store(
+            $newNode,
+            $this->context->builder->structGep($tail, $nodeMap['next'])
+        );
+        $this->context->builder->store($newNode, $tailSlot);
+        $this->context->builder->branch($joinBlock);
+        $this->context->builder->positionAtEnd($joinBlock);
     }
 
     private function incrementNumElements(PHPLLVM\Value $ht): void
