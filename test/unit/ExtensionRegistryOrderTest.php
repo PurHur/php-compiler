@@ -81,4 +81,27 @@ final class ExtensionRegistryOrderTest extends TestCase
         );
         self::assertGreaterThan(70, \count($names), 'registry looks truncated');
     }
+
+    /** Manifest depends[] flow through ModuleAbstract (#36204). */
+    public function testManifestDependenciesReachModules(): void
+    {
+        $byDir = ExtensionRegistry::dependenciesByDirectory();
+        self::assertSame(['libxml'], $byDir['dom'] ?? null);
+        self::assertSame(['libxml', 'dom'], $byDir['xsl'] ?? null);
+
+        $dom = null;
+        $xsl = null;
+        foreach (ExtensionRegistry::defaultModules() as $module) {
+            $class = \get_class($module);
+            if (str_ends_with($class, '\\dom\\Module')) {
+                $dom = $module;
+            } elseif (str_ends_with($class, '\\xsl\\Module')) {
+                $xsl = $module;
+            }
+        }
+        self::assertNotNull($dom);
+        self::assertNotNull($xsl);
+        self::assertSame(['libxml'], $dom->getExtensionDependencies());
+        self::assertSame(['libxml', 'dom'], $xsl->getExtensionDependencies());
+    }
 }

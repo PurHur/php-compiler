@@ -19,7 +19,7 @@ declare(strict_types=1);
  *
  * 84 extensions from ext/<name>/ext.json (#36204). Subset builds use
  * `--only=` / `--without=` on this script; runtime {@see \PHPCompiler\Module::isDefaultEnabled}
- * mirrors each manifest's default_enabled.
+ * mirrors each manifest's default_enabled via {@see self::isDefaultEnabledFor()}.
  */
 
 namespace PHPCompiler;
@@ -117,5 +117,132 @@ final class ExtensionRegistry
             new \PHPCompiler\ext\reflection\Module(),
             new \PHPCompiler\ext\standard\Module(),
         ];
+    }
+
+    /**
+     * Declared depends[] from every ext/<name>/ext.json (#36204).
+     *
+     * Keyed by ext/ directory name (not getExtensionName() — 20 modules report 'standard').
+     *
+     * @return array<string, list<string>>
+     */
+    public static function dependenciesByDirectory(): array
+    {
+        return [
+            'dom' => ['libxml'],
+            'xsl' => ['libxml', 'dom'],
+            'simplexml' => ['libxml'],
+            'xml' => ['libxml'],
+            'xmlreader' => ['libxml'],
+            'xmlwriter' => ['libxml'],
+        ];
+    }
+
+    /**
+     * default_enabled from every ext/<name>/ext.json (#36204).
+     *
+     * @return array<string, bool>
+     */
+    public static function defaultEnabledByDirectory(): array
+    {
+        return [
+            'types' => true,
+            'spl' => true,
+            'ds' => true,
+            'intl' => true,
+            'zip' => true,
+            'libxml' => true,
+            'dom' => true,
+            'xsl' => true,
+            'simplexml' => true,
+            'xml' => true,
+            'xmlrpc' => true,
+            'wddx' => true,
+            'xmlreader' => true,
+            'xmlwriter' => true,
+            'gd' => true,
+            'imagick' => true,
+            'exif' => true,
+            'fileinfo' => true,
+            'iconv' => true,
+            'gettext' => true,
+            'mbstring' => true,
+            'filter' => true,
+            'calendar' => true,
+            'ldap' => true,
+            'session' => true,
+            'bcmath' => true,
+            'gmp' => true,
+            'stats' => true,
+            'opcache' => true,
+            'openssl' => true,
+            'curl' => true,
+            'hash' => true,
+            'posix' => true,
+            'inotify' => true,
+            'pcntl' => true,
+            'sockets' => true,
+            'zmq' => true,
+            'ftp' => true,
+            'soap' => true,
+            'ffi' => true,
+            'ctype' => true,
+            'tokenizer' => true,
+            'random' => true,
+            'igbinary' => true,
+            'msgpack' => true,
+            'simdjson' => true,
+            'yaml' => true,
+            'redis' => true,
+            'memcached' => true,
+            'mongodb' => true,
+            'snmp' => true,
+            'zstd' => true,
+            'lzf' => true,
+            'lz4' => true,
+            'bz2' => true,
+            'rar' => true,
+            'imap' => true,
+            'eio' => true,
+            'ssh2' => true,
+            'brotli' => true,
+            'sodium' => true,
+            'sqlite3' => true,
+            'pgsql' => true,
+            'odbc' => true,
+            'oci8' => true,
+            'dba' => true,
+            'mailparse' => true,
+            'enchant' => true,
+            'gnupg' => true,
+            'pspell' => true,
+            'mysqli' => true,
+            'sqlsrv' => true,
+            'tidy' => true,
+            'pdo' => true,
+            'phar' => true,
+            'uri' => true,
+            'uuid' => true,
+            'uploadprogress' => true,
+            'apcu' => true,
+            'sysvshm' => true,
+            'sysvsem' => true,
+            'sysvmsg' => true,
+            'reflection' => true,
+            'standard' => true,
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function dependenciesFor(string $directory): array
+    {
+        return self::dependenciesByDirectory()[$directory] ?? [];
+    }
+
+    public static function isDefaultEnabledFor(string $directory): bool
+    {
+        return self::defaultEnabledByDirectory()[$directory] ?? true;
     }
 }

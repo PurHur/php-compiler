@@ -172,6 +172,21 @@ foreach ($order as $name) {
 $body = implode("\n", $lines);
 $count = count($order);
 
+// Full manifest maps (all ext/*/ext.json) — ModuleAbstract reads these for deps / default_enabled.
+$allDepsLines = [];
+$allDefaultLines = [];
+foreach ($manifested['order'] as $name) {
+    $deps = $manifested['deps'][$name] ?? [];
+    if ([] !== $deps) {
+        $quoted = array_map(static fn (string $d): string => "'".$d."'", $deps);
+        $allDepsLines[] = sprintf("            '%s' => [%s],", $name, implode(', ', $quoted));
+    }
+    $enabled = $manifested['default_enabled'][$name] ?? true;
+    $allDefaultLines[] = sprintf("            '%s' => %s,", $name, $enabled ? 'true' : 'false');
+}
+$depsBody = [] === $allDepsLines ? '' : "\n".implode("\n", $allDepsLines)."\n        ";
+$defaultBody = "\n".implode("\n", $allDefaultLines)."\n        ";
+
 $out = <<<PHP
 <?php
 
@@ -194,7 +209,7 @@ declare(strict_types=1);
  *
  * {$count} extensions from ext/<name>/ext.json (#36204). Subset builds use
  * `--only=` / `--without=` on this script; runtime {@see \\PHPCompiler\\Module::isDefaultEnabled}
- * mirrors each manifest's default_enabled.
+ * mirrors each manifest's default_enabled via {@see self::isDefaultEnabledFor()}.
  */
 
 namespace PHPCompiler;
@@ -209,6 +224,41 @@ final class ExtensionRegistry
         return [
 {$body}
         ];
+    }
+
+    /**
+     * Declared depends[] from every ext/<name>/ext.json (#36204).
+     *
+     * Keyed by ext/ directory name (not getExtensionName() — 20 modules report 'standard').
+     *
+     * @return array<string, list<string>>
+     */
+    public static function dependenciesByDirectory(): array
+    {
+        return [{$depsBody}];
+    }
+
+    /**
+     * default_enabled from every ext/<name>/ext.json (#36204).
+     *
+     * @return array<string, bool>
+     */
+    public static function defaultEnabledByDirectory(): array
+    {
+        return [{$defaultBody}];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function dependenciesFor(string \$directory): array
+    {
+        return self::dependenciesByDirectory()[\$directory] ?? [];
+    }
+
+    public static function isDefaultEnabledFor(string \$directory): bool
+    {
+        return self::defaultEnabledByDirectory()[\$directory] ?? true;
     }
 }
 

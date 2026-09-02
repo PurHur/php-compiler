@@ -52,28 +52,40 @@ abstract class ModuleAbstract implements Module {
     }
 
     /**
-     * No declared dependencies by default (RELEASE-PLAN Phase 2.5).
+     * Declared depends[] from ext/<name>/ext.json (#36204).
      *
-     * Overriding this is how an extension states an ordering constraint that is currently only
-     * implicit in Runtime::loadCoreModules() — e.g. ext/dom depends on libxml. Defaulting to none
-     * keeps every existing module behaving exactly as before.
+     * Identity is the ext/ directory, not {@see getExtensionName()} (20 modules report
+     * {@code standard}). Overrides on Module.php are removed once manifests are SSOT.
      *
      * @return list<string>
      */
     public function getExtensionDependencies(): array
     {
-        return [];
+        return ExtensionRegistry::dependenciesFor($this->extensionDirectoryName());
     }
 
     /**
-     * Default-enabled, matching today's behaviour: all 76 extensions load unconditionally.
+     * default_enabled from ext/<name>/ext.json (#36204).
      *
-     * An extension that should be opt-in overrides this to false. Nothing selects on it yet — the
-     * declaration comes first so the set can be made selectable without a flag day.
+     * An extension that should be opt-in sets {@code "default_enabled": false} in its manifest.
+     * Nothing selects on it yet beyond {@see ExtensionRegistry} `--only` / `--without` generation.
      */
     public function isDefaultEnabled(): bool
     {
-        return true;
+        return ExtensionRegistry::isDefaultEnabledFor($this->extensionDirectoryName());
+    }
+
+    /**
+     * ext/ directory name for this Module class — unique even when getExtensionName() is 'standard'.
+     */
+    private function extensionDirectoryName(): string
+    {
+        $class = static::class;
+        if (preg_match('#\\\\ext\\\\([^\\\\]+)\\\\Module$#', $class, $matches)) {
+            return $matches[1];
+        }
+
+        return strtolower(preg_replace('#.*\\\\([^\\\\]+)$#', '$1', $class));
     }
 
     /**

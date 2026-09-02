@@ -25,10 +25,6 @@ class Module extends ModuleAbstract
      *
      * @return list<string>
      */
-    public function getExtensionDependencies(): array
-    {
-        return ['libxml', 'dom'];
-    }
     public function getExtensionVersion(): string
     {
         if (XsltHostBridge::available()) {
