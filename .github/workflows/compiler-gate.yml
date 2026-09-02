@@ -23,6 +23,8 @@ on:
       - 'patches/**'
       - 'script/differential-sweep.sh'
       - 'script/aot-smoke.sh'
+      - 'script/bench-gate.sh'
+      - 'benchmarks/**'
       - 'test/differential/**'
       - '.github/workflows/compiler-gate.yml'
   pull_request:
@@ -34,6 +36,8 @@ on:
       - 'patches/**'
       - 'script/differential-sweep.sh'
       - 'script/aot-smoke.sh'
+      - 'script/bench-gate.sh'
+      - 'benchmarks/**'
       - 'test/differential/**'
       - '.github/workflows/compiler-gate.yml'
   workflow_dispatch:
@@ -112,6 +116,12 @@ jobs:
               # here is a real regression and the job should fail on it.
               echo "=== differential sweep (VM) ==="
               script/differential-sweep.sh --repeat 2
+
+              # Tier 3 — generated-code performance vs committed baseline (#36196).
+              # Ratio baselines come from benchmarks/README.md; intentionally red on
+              # fibo(30) until typed-int boxing is fixed (#36189).
+              echo "=== bench gate (AOT/Zend ratio + IR) ==="
+              PHP_8_2=$(command -v php) script/bench-gate.sh
             '
 
   aot-differential:

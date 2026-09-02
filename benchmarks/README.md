@@ -91,5 +91,8 @@ the optimised level and compare failing case **names** — optimisation can expo
 generated IR, and that sweep has not been completed at any non-zero level.
 
 Regenerate with `PHP_8_2=$(command -v php) php script/bench.php`. Note that `script/bench.php`
-exits **0 while measuring nothing** if no `PHP_X_Y` runtime is exported — check that the table
-actually changed before trusting a run.
+dies with a non-zero exit if no `PHP_X_Y` runtime is exported.
+
+**Performance gate:** `script/bench-gate.sh` compares AOT/Zend ratios and LLVM IR size against
+`benchmarks/BASELINE.json` (ratio baselines from the table above; IR from the pinned image).
+Refresh the baseline only after a verified perf fix: `PHP_8_2=$(command -v php) ./script/bench-gate.sh --update`.
