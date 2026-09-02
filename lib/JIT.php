@@ -33891,11 +33891,18 @@ class JIT {
                 )
             );
             $this->context->refcount->delref($ptr);
-            if (Variable::KIND_VARIABLE === $var->kind && Variable::TYPE_VALUE !== $var->type) {
-                $this->context->builder->call(
-                    $this->context->lookupFunction('__value__writeNull'),
-                    JIT\JitValueBox::valuePtrFromVariable($this->context, $var)
-                );
+            if (Variable::KIND_VARIABLE === $var->kind && null !== $var->value) {
+                // Mirror Variable::free(): native __hashtable__/__string__/__object__ slots
+                // hold the heap pointer directly. __value__writeNull boxes via
+                // valuePtrFromNativeVariable and would addref after delref destroyed
+                // the payload (#36409 / #36245 loop_unset peer).
+                $slotTy = $var->value->typeOf();
+                if (\PHPLLVM\Type::KIND_POINTER === $slotTy->getKind()) {
+                    $this->context->builder->store(
+                        $slotTy->getElementType()->constNull(),
+                        $var->value
+                    );
+                }
             }
             $released[$name] = true;
         }
