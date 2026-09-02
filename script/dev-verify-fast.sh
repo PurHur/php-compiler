@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Sub-minute dev feedback loop: AOT toolchain smoke + VM differential tier-0.
 #
+# Invoked by `make check` and `make dev-verify-fast` (#36211).
 # Use while iterating on lowering / builtins. Before merge, run:
 #   make north-star5-verify-fast     (~4 min, M5 daily gate)
 #   script/differential-sweep.sh --aot --repeat 3   (full AOT corpus)
