@@ -33378,40 +33378,185 @@ class JIT {
         if ('{main}' === $fnName || str_ends_with($fnName, '::__destruct')) {
             return;
         }
-        $writeNull = $this->context->lookupFunction('__value__writeNull');
         $byRefParamNames = [];
         foreach ($block->paramByRef as $paramIdx => $_) {
             if (isset($block->paramNames[$paramIdx]) && '' !== $block->paramNames[$paramIdx]) {
                 $byRefParamNames[$block->paramNames[$paramIdx]] = true;
             }
         }
-        foreach ($block->eachNamedScopeSlot() as [$name, $slotIdx]) {
-            if ('this' === $name) {
+        /** @var array<string, true> $released */
+        $released = [];
+        foreach ($this->jitFunctionNamedScopeSlots($block) as [$name, $slotIdx, $scopeBlock]) {
+            $this->releaseJitNamedLocalAtReturn($block, $name, $slotIdx, $scopeBlock, $byRefParamNames, $released);
+        }
+        foreach ($this->jitFunctionAssignTargets($block) as $destOp) {
+            $name = JIT\OperandName::resolve($destOp);
+            if (null === $name || '' === $name || isset($released[$name])) {
                 continue;
             }
-            // By-ref formals alias caller storage (ZEND_SEND_REF); nulling them would
-            // wipe the caller's lvalue after `$x = …` (#24162).
-            if (isset($byRefParamNames[$name])) {
+            $slotIdx = null;
+            $scopeBlockForOp = $block;
+            foreach ($this->jitFunctionNamedScopeSlots($block) as [, $candidateSlot, $candidateBlock]) {
+                $candidateSlotIdx = $candidateBlock->slotForOperand($destOp);
+                if (null !== $candidateSlotIdx) {
+                    $scopeBlockForOp = $candidateBlock;
+                    $slotIdx = $candidateSlotIdx;
+                    break;
+                }
+            }
+            if (null === $slotIdx) {
+                $slotIdx = $block->slotForOperand($destOp);
+            }
+            if (null === $slotIdx) {
                 continue;
             }
-            $scopedOp = $block->operandForScopeSlot($slotIdx);
-            if (null === $scopedOp || !$this->context->hasVariableOp($scopedOp)) {
+            $this->releaseJitNamedLocalAtReturn($block, $name, $slotIdx, $scopeBlockForOp, $byRefParamNames, $released);
+        }
+        // php-cfg marks function-end CVs dead before RETURN_VOID; scope->variables may
+        // already be detached so release by dead-operand name (#36245 make_pair).
+        foreach ($block->orig->deadOperands ?? [] as $deadOp) {
+            $name = JIT\OperandName::resolve($deadOp);
+            if (null === $name || '' === $name || isset($released[$name])) {
                 continue;
             }
-            $var = $this->context->getVariableFromOp($scopedOp);
-            if (Variable::KIND_VARIABLE !== $var->kind || Variable::TYPE_VALUE !== $var->type) {
+            $slotIdx = $block->slotForOperand($deadOp);
+            if (null === $slotIdx) {
                 continue;
             }
-            // Formal storage was rebound to the caller's box (#24162).
-            if ($var->borrowedValueEntry || null !== $var->valueBoxAliasPtr) {
-                continue;
+            $this->releaseJitNamedLocalAtReturn($block, $name, $slotIdx, $block, $byRefParamNames, $released);
+        }
+    }
+
+    /**
+     * @param array<string, true> $byRefParamNames
+     * @param array<string, true> $released
+     */
+    private function releaseJitNamedLocalAtReturn(
+        Block $returnBlock,
+        string $name,
+        int $slotIdx,
+        Block $scopeBlock,
+        array $byRefParamNames,
+        array &$released
+    ): void {
+        if ('this' === $name || isset($released[$name])) {
+            return;
+        }
+        if (isset($byRefParamNames[$name])) {
+            return;
+        }
+        $resolved = $this->context->resolveRefAliasName($name);
+        $var = $this->context->namedVariableBindings[$resolved] ?? null;
+        if (null === $var) {
+            $scopedOp = $scopeBlock->operandForScopeSlot($slotIdx);
+            if (null === $scopedOp) {
+                return;
             }
-            // value may already be a __value__* (bindCaptureSlotByReference).
-            $llvmTy = $this->context->getStringFromType($var->value->typeOf());
-            $nullPtr = '__value__*' === $llvmTy
+            try {
+                $var = $this->context->getVariableFromOp($scopedOp);
+            } catch (\LogicException) {
+                return;
+            }
+        }
+        if (Variable::KIND_VARIABLE !== $var->kind) {
+            return;
+        }
+        if ($var->borrowedValueEntry || null !== $var->valueBoxAliasPtr) {
+            return;
+        }
+        if (Variable::TYPE_VALUE === $var->type && Variable::KIND_VARIABLE === $var->kind) {
+            $this->jitWriteNullForUnset(JIT\JitValueBox::valuePtrFromVariable($this->context, $var));
+            $released[$name] = true;
+
+            return;
+        }
+        if ($var->type & Variable::IS_REFCOUNTED) {
+            if (null !== $var->objectPropertySlot) {
+                return;
+            }
+            $ptr = Variable::KIND_VALUE === $var->kind
                 ? $var->value
-                : JIT\JitValueBox::pointer($this->context, $var->value);
-            $this->context->builder->call($writeNull, $nullPtr);
+                : $this->context->helper->loadValue($var);
+            if ($this->context->type->object->hasUserDestructors()) {
+                \PHPCompiler\JIT\Builtin\GcCollectCyclesRuntime::ensureLinked($this->context);
+                $this->context->builder->call(
+                    $this->context->lookupFunction('phpc_destruct_try_invoke'),
+                    $this->context->builder->pointerCast(
+                        $ptr,
+                        $this->context->getTypeFromString('int8*')
+                    )
+                );
+            }
+            JIT\Builtin\WeakRefRuntime::ensureLinked($this->context);
+            $this->context->builder->call(
+                $this->context->lookupFunction('phpc_weakref_clear_object'),
+                $this->context->builder->pointerCast(
+                    $ptr,
+                    $this->context->getTypeFromString('int8*')
+                )
+            );
+            $this->context->refcount->delref($ptr);
+            if (Variable::KIND_VARIABLE === $var->kind && Variable::TYPE_VALUE !== $var->type) {
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeNull'),
+                    JIT\JitValueBox::valuePtrFromVariable($this->context, $var)
+                );
+            }
+            $released[$name] = true;
+        }
+    }
+
+    /**
+     * @return list<\PHPCfg\Operand>
+     */
+    private function jitFunctionAssignTargets(Block $returnBlock): array
+    {
+        /** @var list<\PHPCfg\Operand> $targets */
+        $targets = [];
+        $seen = new \SplObjectStorage();
+        foreach ($this->jitFunctionNamedScopeSlots($returnBlock) as [, , $scopeBlock]) {
+            foreach ($this->listUnpackAssignTargetsInBlock($scopeBlock) as $dest) {
+                if ($seen->contains($dest)) {
+                    continue;
+                }
+                $seen[$dest] = true;
+                $targets[] = $dest;
+            }
+        }
+
+        return $targets;
+    }
+
+    /**
+     * All named CV slots in the returning function — return-block scope alone omits
+     * live-at-return locals php-cfg already marked dead (#36245 make_pair).
+     *
+     * @return \Generator<int, array{0: string, 1: int, 2: Block}, mixed, void>
+     */
+    private function jitFunctionNamedScopeSlots(Block $returnBlock): \Generator
+    {
+        $root = $this->context->jitFunctionRootBlock ?? $returnBlock;
+        /** @var array<int, true> $seenBlocks */
+        $seenBlocks = [];
+        /** @var list<Block> $queue */
+        $queue = [$root];
+        while ([] !== $queue) {
+            $scan = array_shift($queue);
+            $blockId = spl_object_id($scan);
+            if (isset($seenBlocks[$blockId])) {
+                continue;
+            }
+            $seenBlocks[$blockId] = true;
+            foreach ($scan->eachNamedScopeSlot() as [$name, $slotIdx]) {
+                yield [$name, $slotIdx, $scan];
+            }
+            foreach ($scan->opCodes as $op) {
+                foreach ([$op->block1 ?? null, $op->block2 ?? null, $op->block3 ?? null] as $target) {
+                    if ($target instanceof Block && !isset($seenBlocks[spl_object_id($target)])) {
+                        $queue[] = $target;
+                    }
+                }
+            }
         }
     }
 

@@ -312,6 +312,7 @@ final class CompileCache
         }
         $parts[] = HelperRuntimeCache::llvmIdentityToken();
         $parts[] = hash_file('sha256', __DIR__.'/../JIT/Context.php') ?: '';
+        $parts[] = hash_file('sha256', __DIR__.'/../JIT.php') ?: '';
         $parts[] = hash_file('sha256', __DIR__.'/Builtin/AttributeRegistryLowering.php') ?: '';
         $parts[] = hash_file('sha256', __DIR__.'/../Runtime.php') ?: '';
         $parts[] = LazyBuiltins::fingerprintSegment();
