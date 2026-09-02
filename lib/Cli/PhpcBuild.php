@@ -48,16 +48,15 @@ final class PhpcBuild
             ];
         }
         fclose($pipes[0]);
-        $stdout = stream_get_contents($pipes[1]);
-        $stderr = stream_get_contents($pipes[2]);
+        $captured = ProcPipeReader::readUntilProcessExit($proc, $pipes[1], $pipes[2]);
         fclose($pipes[1]);
         fclose($pipes[2]);
-        $exit = proc_close($proc);
+        proc_close($proc);
 
         return [
-            'exit' => is_int($exit) ? $exit : 1,
-            'stdout' => false !== $stdout ? $stdout : '',
-            'stderr' => false !== $stderr ? $stderr : '',
+            'exit' => $captured['exitcode'],
+            'stdout' => $captured['stdout'],
+            'stderr' => $captured['stderr'],
         ];
     }
 
@@ -427,18 +426,17 @@ final class PhpcBuild
             return ['exit' => 1, 'bytes' => 0, 'stdout' => ''];
         }
         fclose($pipes[0]);
-        $stdout = stream_get_contents($pipes[1]);
-        $stderr = stream_get_contents($pipes[2]);
+        $captured = ProcPipeReader::readUntilProcessExit($proc, $pipes[1], $pipes[2]);
         fclose($pipes[1]);
         fclose($pipes[2]);
-        $exit = proc_close($proc);
-        $stdout = false !== $stdout ? $stdout : '';
-        if (false !== $stderr && '' !== $stderr) {
-            fwrite(STDERR, $stderr);
+        proc_close($proc);
+        $stdout = $captured['stdout'];
+        if ('' !== $captured['stderr']) {
+            fwrite(STDERR, $captured['stderr']);
         }
 
         return [
-            'exit' => is_int($exit) ? $exit : 1,
+            'exit' => $captured['exitcode'],
             'bytes' => strlen($stdout),
             'stdout' => $stdout,
         ];
