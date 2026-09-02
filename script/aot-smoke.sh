@@ -16,6 +16,7 @@
 # Run it before believing any sweep result. Usage:
 #   script/aot-smoke.sh            # compile+run each case, diff against expected
 #   script/aot-smoke.sh --keep     # keep the built binaries for inspection
+#   script/aot-smoke.sh --update-size-baseline  # bless test/aot-smoke/SIZE-BASELINE.json
 #
 # On RunForge / hosts without image LLVM, re-execs via docker-exec.sh (#34536) — same
 # honesty gate as phpunit.sh. Host-green smoke alone can miss image/host glibc skew.
@@ -36,9 +37,18 @@ if ! { [[ -f /.dockerenv ]] && [[ -f /opt/llvm9/libLLVM-9.so.1 ]]; } \
 fi
 
 KEEP=0
-[ "${1:-}" = "--keep" ] && KEEP=1
+UPDATE_SIZE_BASELINE=0
+for arg in "$@"; do
+    case "$arg" in
+        --keep) KEEP=1 ;;
+        --update-size-baseline) UPDATE_SIZE_BASELINE=1 ;;
+    esac
+done
+
+SIZE_BASELINE="$REPO_ROOT/test/aot-smoke/SIZE-BASELINE.json"
 
 WORK="$(mktemp -d)"
+SIZE_MEASUREMENTS="$WORK/aot-smoke-size.json"
 cleanup() { [ "$KEEP" -eq 1 ] || rm -rf "$WORK"; }
 trap cleanup EXIT
 
@@ -156,4 +166,42 @@ if [ "$fail" -ne 0 ]; then
     echo "has nothing to do with the cases it is testing. Fix or revert before measuring anything." >&2
     exit 1
 fi
-exit 0
+
+# Binary + IR size regression gate (#36197) — echo/class only; other cases share the same link shape.
+echo '{}' > "$SIZE_MEASUREMENTS"
+for size_name in echo class; do
+    size_bin="$WORK/$size_name.bin"
+    if [ ! -f "$size_bin" ]; then
+        echo "aot-smoke: size gate SKIP — missing $size_name.bin" >&2
+        exit 1
+    fi
+    ir_arg=()
+    if [ "$size_name" = "echo" ]; then
+        PHP_COMPILER_DUMP_IR=1 "$PHP_BIN" bin/compile.php -o "$WORK/echo-ir.bin" "$WORK/echo.php" \
+            > "$WORK/echo-ir.compile.log" 2>&1 || true
+        if [ -f /tmp/phpc-last.ll ]; then
+            ir_arg=(--ir /tmp/phpc-last.ll)
+        fi
+    fi
+    python3 "$REPO_ROOT/script/aot-smoke-size-gate.py" measure \
+        --binary "$size_bin" \
+        --out "$SIZE_MEASUREMENTS" \
+        --name "$size_name" \
+        "${ir_arg[@]}"
+done
+
+if [ "$UPDATE_SIZE_BASELINE" -eq 1 ]; then
+    python3 "$REPO_ROOT/script/aot-smoke-size-gate.py" update \
+        --baseline "$SIZE_BASELINE" \
+        --measurements "$SIZE_MEASUREMENTS"
+    exit 0
+fi
+
+if [ ! -f "$SIZE_BASELINE" ]; then
+    echo "aot-smoke: size gate SKIP — missing $SIZE_BASELINE" >&2
+    exit 1
+fi
+python3 "$REPO_ROOT/script/aot-smoke-size-gate.py" check \
+    --baseline "$SIZE_BASELINE" \
+    --measurements "$SIZE_MEASUREMENTS"
+exit $?
