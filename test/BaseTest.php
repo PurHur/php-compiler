@@ -171,8 +171,37 @@ abstract class BaseTest extends TestCase {
             $cmd[] = '-d';
             $cmd[] = 'memory_limit='.$memoryLimit;
         }
+        foreach (self::opcacheCliFlags() as $flag) {
+            $cmd[] = $flag;
+        }
 
         return $cmd;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function opcacheCliFlags(): array
+    {
+        $disable = getenv('PHP_COMPILER_OPCACHE_CLI');
+        if (false !== $disable && ('0' === $disable || 'false' === strtolower($disable))) {
+            return [];
+        }
+        $root = dirname(__DIR__);
+        $sha = trim((string) shell_exec('git -C '.escapeshellarg($root).' rev-parse HEAD 2>/dev/null'));
+        if ('' === $sha) {
+            $sha = 'unknown';
+        }
+        $dir = $root.'/build/opcache-'.substr($sha, 0, 12);
+        if (!is_dir($dir) && !@mkdir($dir, 0755, true) && !is_dir($dir)) {
+            return [];
+        }
+
+        return [
+            '-d', 'opcache.enable_cli=1',
+            '-d', 'opcache.file_cache='.$dir,
+            '-d', 'opcache.validate_timestamps=0',
+        ];
     }
 
     /**
