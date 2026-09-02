@@ -29222,7 +29222,7 @@ class JIT {
         string $methodLc,
         Variable $receiverVar
     ): bool {
-        if (!JIT\NestedJitCompileScope::isActive()) {
+        if (!JIT\NestedJitCompileScope::isActive() && !\PHPCompiler\AOT\ExternalMethodBind::spineChunkMode()) {
             return false;
         }
         // Prefer TYPE_HASHTABLE / HashTable class before ObjectEntry — both expose

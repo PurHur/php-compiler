@@ -1111,6 +1111,10 @@ class Context {
         if (null !== $bound) {
             return $bound;
         }
+        $nestedObject = SpineChunkNestedVmBind::tryBindObjectStaticProxy($this, $lc);
+        if (null !== $nestedObject) {
+            return $nestedObject;
+        }
         if ($this->isUserScriptAot() && str_contains($lc, '::')) {
             $vmOnly = self::findInternalClassMethodInVmRegistry($this, $lc);
             if (null !== $vmOnly && !self::internalBuiltinHasJitLowering($vmOnly)) {
@@ -1139,6 +1143,12 @@ class Context {
                 $bound = \PHPCompiler\AOT\ExternalMethodBind::tryBind($this, $proxyName);
                 if (null !== $bound && !($bound instanceof Call\ExternalMethod)) {
                     return $bound;
+                }
+                $nestedObject = SpineChunkNestedVmBind::tryBindObjectStaticProxy($this, $lc);
+                if (null !== $nestedObject) {
+                    $this->functionProxies[$lc] = $nestedObject;
+
+                    return $nestedObject;
                 }
             }
 
@@ -1253,7 +1263,14 @@ class Context {
 
         // Registered builtin class methods with JIT lowering — one table for VM and JIT (#36202).
         // VM-only handlers stay on ExternalMethod until call() is implemented (helper infra).
+        // Under SPINE_CHUNK only phpcompiler\vm\* — opening ext/standard via registry fails
+        // module verify in isolation (#36147 / #15417).
         if (!\PHPCompiler\AOT\ExternalMethodBind::spineChunkMode()) {
+            $vmMethod = self::findInternalClassMethodInVmRegistry($this, $lc);
+            if (null !== $vmMethod && self::internalBuiltinHasJitLowering($vmMethod)) {
+                return $vmMethod;
+            }
+        } elseif (self::isSpineChunkVmRegistryClass($lc)) {
             $vmMethod = self::findInternalClassMethodInVmRegistry($this, $lc);
             if (null !== $vmMethod && self::internalBuiltinHasJitLowering($vmMethod)) {
                 return $vmMethod;
@@ -1261,6 +1278,17 @@ class Context {
         }
 
         return null;
+    }
+
+    /** VM class methods safe to resolve from registry during SPINE_CHUNK chunk emits. */
+    private static function isSpineChunkVmRegistryClass(string $lc): bool
+    {
+        if (!str_contains($lc, '::')) {
+            return false;
+        }
+        $classLc = strtolower(explode('::', $lc, 2)[0]);
+
+        return str_starts_with($classLc, 'phpcompiler\\vm\\');
     }
 
     /**
