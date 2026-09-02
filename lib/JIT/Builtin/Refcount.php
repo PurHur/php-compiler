@@ -501,6 +501,36 @@ class Refcount extends Builtin {
                 );
                 $this->context->builder->branch($freeBlock);
                 $this->context->builder->positionAtEnd($freeBlock);
+                $typeMask = $this->context->getTypeFromString('int32')->constInt(self::TYPE_INFO_TYPEMASK, false);
+                $type = $this->context->builder->bitwiseAnd($typeinfo, $typeMask);
+                $htType = $this->context->getTypeFromString('int32')->constInt(self::TYPE_INFO_TYPE_MASKED_ARRAY, false);
+                $isHashtable = $this->context->builder->icmp(PHPLLVM\Builder::INT_EQ, $type, $htType);
+                $htDtorBlock = $parentFn->appendBasicBlock('delref_ht_dtor');
+                $afterHtDtor = $parentFn->appendBasicBlock('delref_after_ht_dtor');
+                $this->context->builder->branchIf($isHashtable, $htDtorBlock, $afterHtDtor);
+                $this->context->builder->positionAtEnd($htDtorBlock);
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__hashtable__dtor'),
+                    $this->context->builder->pointerCast(
+                        $refVirtual,
+                        $this->context->getTypeFromString('__hashtable__*')
+                    )
+                );
+                $this->context->builder->branch($afterHtDtor);
+                $this->context->builder->positionAtEnd($afterHtDtor);
+                $objDtorBlock = $parentFn->appendBasicBlock('delref_obj_dtor');
+                $afterObjDtor = $parentFn->appendBasicBlock('delref_after_obj_dtor');
+                $this->context->builder->branchIf($isObject, $objDtorBlock, $afterObjDtor);
+                $this->context->builder->positionAtEnd($objDtorBlock);
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__object__dtor'),
+                    $this->context->builder->pointerCast(
+                        $refVirtual,
+                        $this->context->getTypeFromString('__object__*')
+                    )
+                );
+                $this->context->builder->branch($afterObjDtor);
+                $this->context->builder->positionAtEnd($afterObjDtor);
                 $this->context->memory->free($refVirtual);
     }
                 if ($this->context->builder->getInsertBlock()->getTerminator() === null) {
