@@ -2682,6 +2682,7 @@ require_once __DIR__.'/../../../ext/standard/GcCollectCyclesNativeFreeJitHelper.
 require_once __DIR__.'/../../../ext/standard/GcCollectCyclesNativeScanJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GcCollectCyclesRegistryJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GcCollectCyclesStandaloneJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/phpc_gc_native_clear_slot_at.php';
 require_once __DIR__.'/../../../ext/standard/GcDestructAllowDelrefJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GcDestructShutdownJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GcDestructTryInvokeJitHelper.php';
