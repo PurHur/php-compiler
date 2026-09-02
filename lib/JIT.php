@@ -13933,7 +13933,7 @@ class JIT {
                         ) {
                             JIT\JitValueBox::publishAfterWrite(
                                 $this->context,
-                                JIT\JitValueBox::pointer($this->context, $sendValue->value)
+                                JIT\JitValueBox::valuePtrFromVariable($this->context, $sendValue)
                             );
                         }
                     }
