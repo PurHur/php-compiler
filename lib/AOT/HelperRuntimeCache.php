@@ -105,6 +105,17 @@ final class HelperRuntimeCache
         'phpcompiler\\ext\\standard\\vmclosureinvoke::invokevariabletwo' => true,
         // #26772 — helper-runtime unit.o stubs format → null; NestedJIT self-contained helper.
         'phpcompiler\\ext\\standard\\datetimeformatjithelper::formatstateargv' => true,
+        // #36245 — prelinked GC registry/scan unit.o splits PHP statics from main-module
+        // phpc_gc_register; route user-script standalone through PHP registry + NativeScan
+        // inlined into the user AOT module (peer embed #13882).
+        'phpcompiler\\ext\\standard\\gccollectcyclesstandalonejithelper::collectcyclesstandalone' => true,
+        'phpcompiler\\ext\\standard\\gccollectcyclesregistryjithelper::appendobject' => true,
+        'phpcompiler\\ext\\standard\\gccollectcyclesregistryjithelper::removeobject' => true,
+        'phpcompiler\\ext\\standard\\gccollectcyclesregistryjithelper::indexof' => true,
+        'phpcompiler\\ext\\standard\\gccollectcyclesregistryjithelper::count' => true,
+        'phpcompiler\\ext\\standard\\gccollectcyclesregistryjithelper::objectptr' => true,
+        'phpcompiler\\ext\\standard\\gccollectcyclesregistryjithelper::propcount' => true,
+        'phpcompiler\\ext\\standard\\gctogglejithelper::isenabled' => true,
         // #27020 — helper-runtime unit.o for JsonEncodeJitHelper embeds eager
         // `$ctx->runtime->vm` / VmJson::export and SIGSEGVs on thin standalone.
         // NestedJIT JsonEncodeNestedJitHelper (Context-free) into the user AOT module.
@@ -1264,6 +1275,10 @@ final class HelperRuntimeCache
             return [];
         }
         $objects = [];
+        $common = HelperRuntimeCommon::linkObject();
+        if (null !== $common) {
+            $objects[] = $common;
+        }
         foreach (array_keys(self::$usedUnits) as $unitDir) {
             $object = $unitDir.'/unit.o';
             if (self::unitObjectIsLinkable($unitDir)) {
