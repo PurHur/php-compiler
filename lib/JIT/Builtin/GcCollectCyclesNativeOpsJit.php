@@ -103,6 +103,40 @@ final class GcCollectCyclesNativeOpsJit
         return $context->builder->sext($refcount, $i64);
     }
 
+    /** LLVM global phpc_gc_count for user-script standalone registry mirror (#36245). */
+    public static function llvmRegistryCount(Context $context): Value
+    {
+        GcCollectCyclesRuntime::ensureLinked($context);
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $count = GcCollectCyclesRuntime::standaloneRegistryCount($context);
+
+        return $context->builder->sext($count, $i64);
+    }
+
+    public static function llvmRegistryObjectAt(Context $context, JITVariable $index): Value
+    {
+        GcCollectCyclesRuntime::ensureLinked($context);
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $idx = $context->builder->trunc(self::i64FromVar($context, $index), $i32);
+        $obj = GcCollectCyclesRuntime::standaloneRegistryObjectPtr($context, $idx);
+
+        return $context->builder->ptrToInt($context->builder->pointerCast($obj, $i8p), $i64);
+    }
+
+    public static function llvmRegistryPropCountAt(Context $context, JITVariable $index): Value
+    {
+        GcCollectCyclesRuntime::ensureLinked($context);
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $idx = $context->builder->trunc(self::i64FromVar($context, $index), $i32);
+        $props = GcCollectCyclesRuntime::standaloneRegistryPropCount($context, $idx);
+
+        return $context->builder->sext($props, $i64);
+    }
+
     public static function freeObject(Context $context, JITVariable $objPtr): void
     {
         GcCollectCyclesRuntime::ensureLinked($context);

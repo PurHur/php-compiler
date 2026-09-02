@@ -38,6 +38,8 @@ final class GcCollectCyclesStandaloneJitHelper
             return 0;
         }
 
+        GcCollectCyclesRegistrySyncJitHelper::syncFromLlvmRegistry();
+
         return GcCollectCyclesNativeScanJitHelper::collect();
     }
 
