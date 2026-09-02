@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
+use PHPCompiler\Config;
 
 /**
  * JIT/AOT link hook for mb_encode/decode_numericentity() — MbNumericEntityJitHelper (#35210 leftover of #7237).
@@ -75,7 +76,7 @@ final class MbNumericEntity
         // NestedJIT of this helper under PHP_COMPILER_PROFILE=8.4 soft-null produces a
         // thin-AOT SIGSEGV on encode4/decode4 (default profile is fine). Clear profile
         // for the NestedJIT TU only — call sites keep 8.4 soft-null. (#35265 leftover of #35254)
-        $prevProfile = getenv('PHP_COMPILER_PROFILE');
+        $prevProfile = Config::getenv('PHP_COMPILER_PROFILE');
         $cleared = false;
         if (false !== $prevProfile && '' !== (string) $prevProfile && \function_exists('putenv')) {
             putenv('PHP_COMPILER_PROFILE=');

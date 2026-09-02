@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\AOT;
 
+
+use PHPCompiler\Config;
+
 /**
  * Skip PHP/LLVM destructor teardown after a successful self-host AOT emit.
  *
@@ -58,14 +61,14 @@ final class AotEmitFastExit
         ?string $sourceFilename = null,
         ?string $outfile = null
     ): void {
-        $noFastExit = getenv('PHP_COMPILER_AOT_NO_FAST_EXIT');
+        $noFastExit = Config::getenv('PHP_COMPILER_AOT_NO_FAST_EXIT');
         if ('1' === $noFastExit || 'true' === strtolower((string) $noFastExit)) {
             return;
         }
         $normalized = null !== $sourceFilename && '' !== $sourceFilename
             ? str_replace('\\', '/', $sourceFilename)
             : '';
-        $selfhostEnv = getenv('PHP_COMPILER_SELFHOST_AOT');
+        $selfhostEnv = Config::getenv('PHP_COMPILER_SELFHOST_AOT');
         $isSelfhostPath = '' !== $normalized && str_contains($normalized, 'test/selfhost/');
         $isSelfhostEnv = '1' === $selfhostEnv || 'true' === strtolower((string) $selfhostEnv);
         $spineChunkEnv = getenv(ExternalMethodBind::ENV_SPINE_CHUNK);

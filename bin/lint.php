@@ -26,7 +26,7 @@ require __DIR__.'/../script/bootstrap-lib.php';
 // compile defaults (#23056, #36225). Force them here so lint stays fast when
 // PHPCFG_SIMPLIFIER_LEGACY=1 or PHPTYPES_RESOLVER_LEGACY=1 is set in the env.
 // PHP_COMPILER_LINT_FRONTEND_FAST=0 opts out.
-if ('0' !== getenv('PHP_COMPILER_LINT_FRONTEND_FAST')) {
+if ('0' !== \PHPCompiler\Config::getenv('PHP_COMPILER_LINT_FRONTEND_FAST')) {
     putenv('PHPCFG_SIMPLIFIER_USECHAIN=1');
     putenv('PHPCFG_SIMPLIFIER_LEGACY');
     putenv('PHPTYPES_RESOLVER_WORKLIST=1');
@@ -144,10 +144,10 @@ try {
         // full-inventory lint took 2h+; a warm cache answers in seconds and a
         // cold run fans out over CPU cores. Keyed by file content hash + a
         // linter fingerprint so linter changes invalidate everything.
-        $cacheEnabled = '0' !== getenv('PHP_COMPILER_LINT_CACHE');
+        $cacheEnabled = '0' !== \PHPCompiler\Config::getenv('PHP_COMPILER_LINT_CACHE');
         $cachePath = $repoRoot.'/build/lint-cache/bootstrap-inventory.json';
         $linterFingerprint = (static function () use ($repoRoot): string {
-            $parts = [(string) getenv('PHP_COMPILER_LINT_CACHE_SALT')];
+            $parts = [(string) \PHPCompiler\Config::getenv('PHP_COMPILER_LINT_CACHE_SALT')];
             foreach ([
                 __FILE__,
                 $repoRoot.'/lib/Lint/Linter.php',
@@ -188,7 +188,7 @@ try {
         }
 
         if ([] !== $pending) {
-            $jobs = max(1, (int) (getenv('PHP_COMPILER_LINT_JOBS') ?: (function_exists('shell_exec')
+            $jobs = max(1, (int) (\PHPCompiler\Config::getenv('PHP_COMPILER_LINT_JOBS') ?: (function_exists('shell_exec')
                 ? max(1, ((int) shell_exec('nproc 2>/dev/null')) - 2)
                 : 4)));
             $jobs = min($jobs, count($pending));

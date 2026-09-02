@@ -400,7 +400,7 @@ class Compiler {
         if (\defined('PHP_COMPILER_DEBUG_LAST_PHASE') && PHP_COMPILER_DEBUG_LAST_PHASE) {
             return true;
         }
-        $v = $_SERVER['PHP_COMPILER_DEBUG_LAST_PHASE'] ?? $_ENV['PHP_COMPILER_DEBUG_LAST_PHASE'] ?? getenv('PHP_COMPILER_DEBUG_LAST_PHASE');
+        $v = $_SERVER['PHP_COMPILER_DEBUG_LAST_PHASE'] ?? $_ENV['PHP_COMPILER_DEBUG_LAST_PHASE'] ?? Config::getenv('PHP_COMPILER_DEBUG_LAST_PHASE');
         if (false === $v || null === $v || '' === $v) {
             return false;
         }
@@ -414,7 +414,7 @@ class Compiler {
         if (\defined('PHP_COMPILER_DEBUG_LAST_PHASE_FILE') && is_string(PHP_COMPILER_DEBUG_LAST_PHASE_FILE) && '' !== PHP_COMPILER_DEBUG_LAST_PHASE_FILE) {
             return PHP_COMPILER_DEBUG_LAST_PHASE_FILE;
         }
-        $explicit = $_SERVER['PHP_COMPILER_DEBUG_LAST_PHASE_FILE'] ?? $_ENV['PHP_COMPILER_DEBUG_LAST_PHASE_FILE'] ?? getenv('PHP_COMPILER_DEBUG_LAST_PHASE_FILE');
+        $explicit = $_SERVER['PHP_COMPILER_DEBUG_LAST_PHASE_FILE'] ?? $_ENV['PHP_COMPILER_DEBUG_LAST_PHASE_FILE'] ?? Config::getenv('PHP_COMPILER_DEBUG_LAST_PHASE_FILE');
         if (is_string($explicit) && '' !== $explicit) {
             return $explicit;
         }
@@ -466,7 +466,7 @@ class Compiler {
             (null === $input || '' === $input || (str_contains(str_replace('\\', '/', (string) $input), '/test/selfhost/') && str_ends_with(str_replace('\\', '/', (string) $input), '/compile_driver.php')))
             && \function_exists('getenv')
         ) {
-            $fromSource = getenv('PHP_COMPILER_M3_SOURCE');
+            $fromSource = Config::getenv('PHP_COMPILER_M3_SOURCE');
             if (is_string($fromSource) && '' !== $fromSource) {
                 $input = $fromSource;
             }
@@ -497,7 +497,7 @@ class Compiler {
         }
         $stderr = (\defined('PHP_COMPILER_DEBUG_LAST_PHASE_STDERR') && PHP_COMPILER_DEBUG_LAST_PHASE_STDERR)
             ? '1'
-            : ($_SERVER['PHP_COMPILER_DEBUG_LAST_PHASE_STDERR'] ?? $_ENV['PHP_COMPILER_DEBUG_LAST_PHASE_STDERR'] ?? getenv('PHP_COMPILER_DEBUG_LAST_PHASE_STDERR'));
+            : ($_SERVER['PHP_COMPILER_DEBUG_LAST_PHASE_STDERR'] ?? $_ENV['PHP_COMPILER_DEBUG_LAST_PHASE_STDERR'] ?? Config::getenv('PHP_COMPILER_DEBUG_LAST_PHASE_STDERR'));
         if (false !== $stderr && null !== $stderr && '' !== $stderr && '0' !== $stderr) {
             @\fwrite(STDERR, "last_phase: {$line}");
         }
@@ -13726,13 +13726,13 @@ class Compiler {
 
     protected function shouldStubClosureForBootstrap(): bool
     {
-        $userScript = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+        $userScript = Config::getenv('PHP_COMPILER_AOT_USER_SCRIPT');
         if ('1' === $userScript || 'true' === strtolower((string) $userScript)) {
             return false;
         }
 
-        return '1' === (string) getenv('PHP_COMPILER_VENDOR_PRELINK')
-            || '1' === (string) getenv('PHP_COMPILER_SELFHOST_AOT');
+        return '1' === (string) Config::getenv('PHP_COMPILER_VENDOR_PRELINK')
+            || '1' === (string) Config::getenv('PHP_COMPILER_SELFHOST_AOT');
     }
 
     protected function markFunctionGenerator(Block $block): void
@@ -42659,7 +42659,7 @@ class Compiler {
         if (null === $this->seen) {
             return null;
         }
-        if ('1' !== getenv('PHP_COMPILER_PRODUCER_INDEX_LEGACY')) {
+        if ('1' !== Config::getenv('PHP_COMPILER_PRODUCER_INDEX_LEGACY')) {
             // O(1) exact lookup instead of re-walking every seen block tree per
             // call — the walk was the top lint/compile hotspot on 30k-line files
             // (#16077). Index misses (root-match producers, blocks mutated after

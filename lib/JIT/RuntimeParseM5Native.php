@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPLLVM\Value;
+use PHPCompiler\Config;
 
 /**
  * C-floor Runtime::parse for M5 argv / gen-0 seed (#26756 / re-#23468 / #27426).
@@ -88,7 +89,7 @@ final class RuntimeParseM5Native
      */
     private static function shouldCallNestedJitParser(): bool
     {
-        $flag = getenv('PHP_COMPILER_M5_FORCE_PARSER_NESTEDJIT_CALL');
+        $flag = Config::getenv('PHP_COMPILER_M5_FORCE_PARSER_NESTEDJIT_CALL');
 
         return '1' === $flag || 'true' === strtolower((string) $flag);
     }

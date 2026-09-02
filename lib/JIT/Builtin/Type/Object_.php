@@ -55,6 +55,7 @@ use PHPCompiler\VM\TraitCompositionConflictMessage;
 use PHPCompiler\VM\TraitPropertyCompatibility;
 use PHPCompiler\VM\Variable as VMVariable;
 use PHPLLVM;
+use PHPCompiler\Config;
 
 class Object_ extends Type {
     public PHPLLVM\Type $pointer;
@@ -4508,8 +4509,8 @@ class Object_ extends Type {
             $this->defineProperty($id, 'scriptStack', Variable::TYPE_OBJECT);
         }
         if ('phpcompiler\runtime' === $lcname) {
-            $selfHostAot = getenv('PHP_COMPILER_SELFHOST_AOT');
-            $m5DriverHost = getenv('PHP_COMPILER_M5_DRIVER_HOST');
+            $selfHostAot = Config::getenv('PHP_COMPILER_SELFHOST_AOT');
+            $m5DriverHost = Config::getenv('PHP_COMPILER_M5_DRIVER_HOST');
             $m5Host = '1' === $m5DriverHost || 'true' === strtolower((string) $m5DriverHost);
             // SELFHOST_AOT normally keeps only `mode` — full Runtime property init segfaults
             // LLVM 9 when NestedJIT-lowering `new Runtime()` (#2600). M5 argv / gen-0 seed uses

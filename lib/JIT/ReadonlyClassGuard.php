@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPCompiler\MethodVisibility;
 use PHPCompiler\PropertyVisibility;
 use PHPLLVM\Builder;
+use PHPCompiler\Config;
 
 /**
  * Emit readonly-class and readonly-property instance write checks before JIT property stores (#1360, #3432).
@@ -370,7 +371,7 @@ final class ReadonlyClassGuard
         Variable $var,
         ?\PHPCompiler\JIT $jit = null
     ): void {
-        $m5 = getenv('PHP_COMPILER_M5_DRIVER_HOST');
+        $m5 = Config::getenv('PHP_COMPILER_M5_DRIVER_HOST');
         if ('1' === $m5 || 'true' === strtolower((string) $m5)) {
             return;
         }

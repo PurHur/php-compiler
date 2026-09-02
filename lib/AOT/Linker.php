@@ -7,6 +7,7 @@ namespace PHPCompiler\AOT;
 use PHPCompiler\JIT\AotDebugSymbols;
 use PHPCompiler\JIT\AotGcSections;
 use PHPCompiler\JIT\Builtin\OpensslSignRuntime;
+use PHPCompiler\Config;
 
 /**
  * Link an LLVM object file into a standalone executable using the bundled toolchain.
@@ -89,7 +90,7 @@ final class Linker
             $vendorObjects[] = $helperObject;
         }
         $linkObjectFiles = array_merge($runtimeObjects, [$objectFile], $vendorObjects);
-        $llvmDir = getenv('PHP_COMPILER_LLVM_PATH');
+        $llvmDir = Config::getenv('PHP_COMPILER_LLVM_PATH');
         if (false === $llvmDir || '' === $llvmDir) {
             self::linkWithSystemCompiler($objectFile, $executable, $runtimeObjects, $vendorObjects, $linkObjectFiles);
 
@@ -199,7 +200,7 @@ final class Linker
     {
         $objects = [];
         $compiler = self::resolveRuntimeCompiler();
-        $llvmDir = getenv('PHP_COMPILER_LLVM_PATH');
+        $llvmDir = Config::getenv('PHP_COMPILER_LLVM_PATH');
         // When we use a host compiler (gcc/cc), prefer the host sysroot/headers.
         // The bundled LLVM sysroot is primarily for clang-9; it can be incomplete in some
         // environments and break libc headers (eg stddef.h).
@@ -356,7 +357,7 @@ final class Linker
 
     private static function linkAllOptionalLibsForced(): bool
     {
-        $flag = getenv('PHP_COMPILER_LINK_ALL_LIBS');
+        $flag = Config::getenv('PHP_COMPILER_LINK_ALL_LIBS');
         if (false === $flag || '' === $flag) {
             return false;
         }
@@ -404,7 +405,7 @@ final class Linker
 
     private static function resolveNmBinary(): ?string
     {
-        $llvmDir = getenv('PHP_COMPILER_LLVM_PATH');
+        $llvmDir = Config::getenv('PHP_COMPILER_LLVM_PATH');
         if (false !== $llvmDir && '' !== $llvmDir) {
             foreach (['llvm-nm', 'llvm-nm-9'] as $name) {
                 $candidate = rtrim($llvmDir, '/').'/'.$name;
@@ -457,7 +458,7 @@ final class Linker
 
     private static function progressAbiEnabled(): bool
     {
-        $flag = getenv('PHP_COMPILER_PROGRESS_ABI');
+        $flag = Config::getenv('PHP_COMPILER_PROGRESS_ABI');
         if (false === $flag || '' === $flag) {
             return true;
         }
@@ -482,7 +483,7 @@ final class Linker
 
     private static function resolveBundledClang(): string
     {
-        $llvmDir = getenv('PHP_COMPILER_LLVM_PATH');
+        $llvmDir = Config::getenv('PHP_COMPILER_LLVM_PATH');
         if (false !== $llvmDir && '' !== $llvmDir) {
             foreach (['clang-9', 'clang'] as $name) {
                 $candidate = $llvmDir.'/'.$name;
@@ -522,7 +523,7 @@ final class Linker
     private static function runtimeCIncludeFlags(): string
     {
         $flags = '';
-        $llvmDir = getenv('PHP_COMPILER_LLVM_PATH');
+        $llvmDir = Config::getenv('PHP_COMPILER_LLVM_PATH');
         if (false !== $llvmDir && '' !== $llvmDir) {
             $sysroot = $llvmDir.'/sysroot';
             if (is_file($sysroot.'/usr/include/stdio.h')) {
@@ -630,7 +631,7 @@ final class Linker
             }
         }
 
-        $llvmDir = getenv('PHP_COMPILER_LLVM_PATH');
+        $llvmDir = Config::getenv('PHP_COMPILER_LLVM_PATH');
         $llvmPrefix = (false !== $llvmDir && '' !== $llvmDir) ? realpath($llvmDir) : false;
         // Prefer the host toolchain for runtime C: bundled LLVM clang often lacks system headers.
         foreach (['clang', 'gcc', 'cc'] as $name) {
@@ -741,7 +742,7 @@ final class Linker
      */
     private static function resolvePrelinkedVendorObjects(): array
     {
-        $flag = getenv('PHP_COMPILER_VENDOR_PRELINK');
+        $flag = Config::getenv('PHP_COMPILER_VENDOR_PRELINK');
         if ('1' !== $flag && 'true' !== strtolower((string) $flag)) {
             return [];
         }
@@ -834,9 +835,9 @@ final class Linker
      */
     public static function resolveEffectiveOutputPath(string $requestedOut): string
     {
-        $keepObject = getenv('PHP_COMPILER_KEEP_OBJECT_FILE');
-        $vendorPrelink = getenv('PHP_COMPILER_VENDOR_PRELINK');
-        $selfhostAot = getenv('PHP_COMPILER_SELFHOST_AOT');
+        $keepObject = Config::getenv('PHP_COMPILER_KEEP_OBJECT_FILE');
+        $vendorPrelink = Config::getenv('PHP_COMPILER_VENDOR_PRELINK');
+        $selfhostAot = Config::getenv('PHP_COMPILER_SELFHOST_AOT');
         $vendorObjectOnly = ('1' === $vendorPrelink || 'true' === strtolower((string) $vendorPrelink))
             && ('0' === $selfhostAot || 'false' === strtolower((string) $selfhostAot));
         $keepingObjectOnly = ('1' === $keepObject || 'true' === strtolower((string) $keepObject))

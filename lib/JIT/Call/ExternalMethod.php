@@ -13,6 +13,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM;
 use PHPLLVM\Value;
+use PHPCompiler\Config;
 
 /**
  * Compile-time no-op for instance/static methods on classes not lowered into the bundle (#579).
@@ -68,7 +69,7 @@ final class ExternalMethod implements Call
      */
     private static function emitStubReachedWarning(Context $context, string $proxyName): void
     {
-        $flag = getenv('PHP_COMPILER_WARN_EXTERNAL_STUBS');
+        $flag = Config::getenv('PHP_COMPILER_WARN_EXTERNAL_STUBS');
         if ('1' !== $flag && 'true' !== strtolower((string) $flag)) {
             return;
         }

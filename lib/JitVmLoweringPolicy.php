@@ -11,7 +11,7 @@ final class JitVmLoweringPolicy
 {
     public static function jitRequireEnabled(): bool
     {
-        $v = $_SERVER['PHP_COMPILER_JIT_REQUIRE'] ?? $_ENV['PHP_COMPILER_JIT_REQUIRE'] ?? getenv('PHP_COMPILER_JIT_REQUIRE');
+        $v = $_SERVER['PHP_COMPILER_JIT_REQUIRE'] ?? $_ENV['PHP_COMPILER_JIT_REQUIRE'] ?? Config::getenv('PHP_COMPILER_JIT_REQUIRE');
         if (false === $v || null === $v || '' === $v) {
             return false;
         }

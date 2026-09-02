@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\MethodVisibility;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
+use PHPCompiler\Config;
 
 /**
  * Uninitialized typed property read guards for JIT/AOT (#4569, #4614, zend_object_handlers.c).
@@ -21,7 +22,7 @@ final class TypedPropertyUninitGuard
         // M5 argv / gen-0 seed: CFG split + NestedJIT ErrorRaise leaves parentless / mid-BB
         // terminators while host-lowering Runtime::parse (#26756). Typed init checks are not
         // required for never-seen functional smoke.
-        $m5 = getenv('PHP_COMPILER_M5_DRIVER_HOST');
+        $m5 = Config::getenv('PHP_COMPILER_M5_DRIVER_HOST');
         if ('1' === $m5 || 'true' === strtolower((string) $m5)) {
             return;
         }
@@ -135,7 +136,7 @@ final class TypedPropertyUninitGuard
      */
     public static function emitBeforeByRef(Context $context, Variable $var): void
     {
-        $m5 = getenv('PHP_COMPILER_M5_DRIVER_HOST');
+        $m5 = Config::getenv('PHP_COMPILER_M5_DRIVER_HOST');
         if ('1' === $m5 || 'true' === strtolower((string) $m5)) {
             return;
         }
@@ -238,7 +239,7 @@ final class TypedPropertyUninitGuard
      */
     public static function emitBeforeDimWrite(Context $context, Variable $var): void
     {
-        $m5 = getenv('PHP_COMPILER_M5_DRIVER_HOST');
+        $m5 = Config::getenv('PHP_COMPILER_M5_DRIVER_HOST');
         if ('1' === $m5 || 'true' === strtolower((string) $m5)) {
             return;
         }

@@ -465,7 +465,7 @@ final class Doctor
             ? 'ready at '.$llvmInfo['dir'].' ('.$llvmInfo['source'].')'
             : 'missing — LLVM steps in north-star1-verify skip unless --require-llvm';
 
-        $skipServe = getenv('PHP_COMPILER_SKIP_SERVE_TESTS');
+        $skipServe = Config::getenv('PHP_COMPILER_SKIP_SERVE_TESTS');
         $serveSkipped = false !== $skipServe && '' !== $skipServe;
         $loopback = self::checkLoopback($repoRoot);
         $serveDetail = $serveSkipped
@@ -1436,7 +1436,7 @@ final class Doctor
      */
     private static function checkExtensions(): array
     {
-        $extDir = getenv('PHP_COMPILER_EXT_DIR') ?: '/usr/lib/php/20220829';
+        $extDir = Config::getenv('PHP_COMPILER_EXT_DIR') ?: '/usr/lib/php/20220829';
         $checks = [];
         foreach (self::REQUIRED_EXTENSIONS as $ext) {
             $loaded = extension_loaded($ext);
@@ -1635,7 +1635,7 @@ final class Doctor
     {
         $info = self::resolveLlvmInfo($repoRoot);
         if (null === $info['dir']) {
-            $envHint = getenv('PHP_COMPILER_LLVM_PATH');
+            $envHint = Config::getenv('PHP_COMPILER_LLVM_PATH');
             $envSet = false !== $envHint && '' !== $envHint ? $envHint : '(unset)';
 
             return [
@@ -1866,7 +1866,7 @@ final class Doctor
      */
     private static function checkLoopback(string $repoRoot): array
     {
-        $skipServe = getenv('PHP_COMPILER_SKIP_SERVE_TESTS');
+        $skipServe = Config::getenv('PHP_COMPILER_SKIP_SERVE_TESTS');
         if (false !== $skipServe && '' !== $skipServe) {
             return [
                 'name' => 'Loopback TCP',
@@ -1944,7 +1944,7 @@ final class Doctor
      */
     private static function checkDockerImage(): array
     {
-        $image = getenv('PHP_COMPILER_DEV_IMAGE') ?: 'php-compiler:22.04-dev';
+        $image = Config::getenv('PHP_COMPILER_DEV_IMAGE') ?: 'php-compiler:22.04-dev';
         $descriptorSpec = [
             0 => ['pipe', 'r'],
             1 => ['pipe', 'w'],
@@ -1986,7 +1986,7 @@ final class Doctor
     private static function resolveLlvmInfo(string $repoRoot): array
     {
         $candidates = [];
-        $fromEnv = getenv('PHP_COMPILER_LLVM_PATH');
+        $fromEnv = Config::getenv('PHP_COMPILER_LLVM_PATH');
         if (false !== $fromEnv && '' !== $fromEnv) {
             $candidates[] = ['dir' => $fromEnv, 'source' => 'PHP_COMPILER_LLVM_PATH'];
         }
@@ -2008,7 +2008,7 @@ final class Doctor
 
     private static function applyLlvmProcessEnv(string $llvmDir): void
     {
-        if ('' === getenv('PHP_COMPILER_LLVM_PATH')) {
+        if ('' === Config::getenv('PHP_COMPILER_LLVM_PATH')) {
             putenv('PHP_COMPILER_LLVM_PATH='.$llvmDir);
             $_ENV['PHP_COMPILER_LLVM_PATH'] = $llvmDir;
             $_SERVER['PHP_COMPILER_LLVM_PATH'] = $llvmDir;
@@ -2052,12 +2052,12 @@ final class Doctor
      */
     private static function phpBinary(): array
     {
-        $phpEnv = getenv('PHP_COMPILER_PHP');
+        $phpEnv = Config::getenv('PHP_COMPILER_PHP');
         if (false !== $phpEnv && '' !== $phpEnv) {
             return preg_split('/\s+/', $phpEnv) ?: [PHP_BINARY];
         }
         $cmd = [PHP_BINARY];
-        $extDir = getenv('PHP_COMPILER_EXT_DIR') ?: '/usr/lib/php/20220829';
+        $extDir = Config::getenv('PHP_COMPILER_EXT_DIR') ?: '/usr/lib/php/20220829';
         if (is_dir($extDir)) {
             foreach (self::REQUIRED_EXTENSIONS as $ext) {
                 $so = $extDir.'/'.$ext.'.so';

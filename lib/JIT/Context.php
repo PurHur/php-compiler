@@ -23,6 +23,7 @@ use PHPLLVM;
 use PHPCompiler\Func\Internal as FuncInternal;
 use PHPCompiler\JIT\SuperglobalInit;
 use PHPCompiler\Web\Superglobals;
+use PHPCompiler\Config;
 
 class Context {
 
@@ -819,11 +820,11 @@ class Context {
         if ('' !== $entry && str_contains($entry, 'bootstrap-aot/')) {
             return true;
         }
-        $bootstrapLink = getenv('PHP_COMPILER_BOOTSTRAP_AOT_LINK');
+        $bootstrapLink = Config::getenv('PHP_COMPILER_BOOTSTRAP_AOT_LINK');
         if ('1' === $bootstrapLink || 'true' === strtolower((string) $bootstrapLink)) {
             return true;
         }
-        $flag = getenv('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN');
+        $flag = Config::getenv('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN');
 
         return '1' === $flag || 'true' === strtolower((string) $flag);
     }
@@ -1059,7 +1060,7 @@ class Context {
      */
     public function rebindInitShutdownAfterModuleReplace(): void
     {
-        $suffix = (string) getenv('PHP_COMPILER_INIT_SYMBOL_SUFFIX');
+        $suffix = (string) Config::getenv('PHP_COMPILER_INIT_SYMBOL_SUFFIX');
         $init = $this->module->getNamedFunction('__init__'.$suffix);
         if ($init instanceof PHPLLVM\Value\Function_) {
             $this->initFunc = $init;
@@ -1634,14 +1635,14 @@ class Context {
         if ([] === $this->externalMethodStubs) {
             return;
         }
-        $strict = '1' === getenv('PHP_COMPILER_FAIL_ON_EXTERNAL_STUBS');
-        if (!$strict && '1' !== getenv('PHP_COMPILER_REPORT_EXTERNAL_STUBS')) {
+        $strict = '1' === Config::getenv('PHP_COMPILER_FAIL_ON_EXTERNAL_STUBS');
+        if (!$strict && '1' !== Config::getenv('PHP_COMPILER_REPORT_EXTERNAL_STUBS')) {
             return;
         }
 
         $names = array_keys($this->externalMethodStubs);
         sort($names, SORT_STRING);
-        $jsonPath = getenv('PHP_COMPILER_EXTERNAL_STUBS_JSON');
+        $jsonPath = Config::getenv('PHP_COMPILER_EXTERNAL_STUBS_JSON');
         if (is_string($jsonPath) && '' !== $jsonPath) {
             $payload = [
                 'stub_count' => count($names),
@@ -1679,7 +1680,7 @@ class Context {
      */
     private function exportChunkMethodManifestIfRequested(): void
     {
-        $exportPath = getenv('PHP_COMPILER_EXTERNAL_METHOD_MANIFEST_EXPORT');
+        $exportPath = Config::getenv('PHP_COMPILER_EXTERNAL_METHOD_MANIFEST_EXPORT');
         if (!is_string($exportPath) || '' === $exportPath) {
             return;
         }
@@ -1691,7 +1692,7 @@ class Context {
             $methods[strtolower($logical)] = ['symbol' => $symbol];
         }
         ksort($methods, SORT_STRING);
-        $bitcodeEnv = getenv('PHP_COMPILER_EMIT_BITCODE');
+        $bitcodeEnv = Config::getenv('PHP_COMPILER_EMIT_BITCODE');
         $bitcodeRel = null;
         if (is_string($bitcodeEnv) && '' !== $bitcodeEnv) {
             $manifestDir = dirname($exportPath);
@@ -2837,7 +2838,7 @@ class Context {
     /** bootstrap-aot-link: thin LLVM during Context init — defer nested php-in-PHP JIT (#14459, #13245). */
     private function shouldUseBootstrapAotStandaloneBodies(): bool
     {
-        $bootstrapLink = getenv('PHP_COMPILER_BOOTSTRAP_AOT_LINK');
+        $bootstrapLink = Config::getenv('PHP_COMPILER_BOOTSTRAP_AOT_LINK');
         if ('1' === $bootstrapLink || 'true' === strtolower((string) $bootstrapLink)) {
             return true;
         }
@@ -3216,7 +3217,7 @@ class Context {
 
         $this->runModuleOptimizationPasses();
 
-        $bitcodePath = getenv('PHP_COMPILER_EMIT_BITCODE');
+        $bitcodePath = Config::getenv('PHP_COMPILER_EMIT_BITCODE');
         if (is_string($bitcodePath) && '' !== $bitcodePath) {
             $bcDir = dirname($bitcodePath);
             if (!is_dir($bcDir) && !mkdir($bcDir, 0775, true) && !is_dir($bcDir)) {
@@ -3232,9 +3233,9 @@ class Context {
         if (!is_null($this->debugFile)) {
             $machine->emitToFile($this->module, $this->debugFile . '.s', $machine::CODEGEN_FILE_TYPE_ASM);
         }
-        $keepObject = getenv('PHP_COMPILER_KEEP_OBJECT_FILE');
-        $vendorPrelink = getenv('PHP_COMPILER_VENDOR_PRELINK');
-        $selfhostAot = getenv('PHP_COMPILER_SELFHOST_AOT');
+        $keepObject = Config::getenv('PHP_COMPILER_KEEP_OBJECT_FILE');
+        $vendorPrelink = Config::getenv('PHP_COMPILER_VENDOR_PRELINK');
+        $selfhostAot = Config::getenv('PHP_COMPILER_SELFHOST_AOT');
         $vendorObjectOnly = ('1' === $vendorPrelink || 'true' === strtolower((string) $vendorPrelink))
             && ('0' === $selfhostAot || 'false' === strtolower((string) $selfhostAot));
         $keepingObjectOnly = ('1' === $keepObject || 'true' === strtolower((string) $keepObject))
@@ -3362,7 +3363,7 @@ class Context {
         // script's __init__ can call them explicitly — colliding symbols were
         // silently discarded and unit module state never initialized
         // (#15889 / #16075 step 4).
-        $suffix = (string) getenv('PHP_COMPILER_INIT_SYMBOL_SUFFIX');
+        $suffix = (string) Config::getenv('PHP_COMPILER_INIT_SYMBOL_SUFFIX');
         $this->initFunc = $this->module->addFunction('__init__'.$suffix, $signature);
         $this->initBlock = $this->initFunc->appendBasicBlock('main');
         $this->initLinearBlock = $this->initBlock;
@@ -3436,7 +3437,7 @@ class Context {
         Builtin\ReflectionMethodQueryLowering::implementLookupFunctions($this);
         VmActiveContextInitLlvm::emitPendingBeforeSeal($this);
         $this->sealInitFunction();
-        $initSuffix = (string) getenv('PHP_COMPILER_INIT_SYMBOL_SUFFIX');
+        $initSuffix = (string) Config::getenv('PHP_COMPILER_INIT_SYMBOL_SUFFIX');
         if ('' !== $initSuffix) {
             \PHPCompiler\AOT\HelperUnitGlobalCtor::register($this, '__init__'.$initSuffix);
         }
@@ -3462,7 +3463,7 @@ class Context {
         }
         Progress::noteFunction('jit_context_verify_begin');
         $this->debugScanForPostTerminatorInstructions();
-        $dumpIr = getenv('PHP_COMPILER_DUMP_IR');
+        $dumpIr = Config::getenv('PHP_COMPILER_DUMP_IR');
         if ('1' === $dumpIr || 'true' === strtolower((string) $dumpIr)) {
             $this->module->printToFile('/tmp/phpc-last.ll');
         }
@@ -3524,7 +3525,7 @@ class Context {
      */
     private function runModuleOptimizationPasses(): void
     {
-        $raw = getenv('PHP_COMPILER_OPT_LEVEL');
+        $raw = Config::getenv('PHP_COMPILER_OPT_LEVEL');
         if (is_string($raw)) {
             $normalized = strtolower(trim($raw));
             if (in_array($normalized, ['none', 'off', 'false'], true)) {
@@ -3611,7 +3612,7 @@ class Context {
 
     private function runHeavyModuleOptimizationPasses(int $level): void
     {
-        $sizeLevel = getenv('PHP_COMPILER_OPT_SIZE_LEVEL');
+        $sizeLevel = Config::getenv('PHP_COMPILER_OPT_SIZE_LEVEL');
         $sizeLevel = is_string($sizeLevel) && ctype_digit($sizeLevel) ? min((int) $sizeLevel, 2) : 0;
 
         Progress::noteFunction('jit_context_opt_passes_begin');
@@ -3636,7 +3637,7 @@ class Context {
 
     private function debugScanForPostTerminatorInstructions(): void
     {
-        $flag = getenv('PHP_COMPILER_DEBUG_LLVM_BLOCKS');
+        $flag = Config::getenv('PHP_COMPILER_DEBUG_LLVM_BLOCKS');
         if ('1' !== $flag && 'true' !== strtolower((string) $flag)) {
             return;
         }
@@ -4225,7 +4226,7 @@ class Context {
      */
     private function moduleLocalConstGlobalName(string $prefix, int $index): string
     {
-        $suffix = (string) getenv('PHP_COMPILER_INIT_SYMBOL_SUFFIX');
+        $suffix = (string) Config::getenv('PHP_COMPILER_INIT_SYMBOL_SUFFIX');
         if ('' === $suffix) {
             $suffix = '_main';
         }

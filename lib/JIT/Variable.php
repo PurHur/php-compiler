@@ -18,6 +18,7 @@ use PHPTypes\Type;
 use PHPCompiler\VM\Variable as VMVariable;
 
 use PHPLLVM;
+use PHPCompiler\Config;
 
 final class Variable {
     const TYPE_NULL = 0;
@@ -1181,7 +1182,7 @@ final class Variable {
                 && null === $this->objectPropertySlot
                 && !$this->borrowedValueEntry
             ) {
-                $assert = getenv('PHP_COMPILER_LLVM_ASSERT');
+                $assert = Config::getenv('PHP_COMPILER_LLVM_ASSERT');
                 if ('1' === $assert || 'true' === strtolower((string) $assert)) {
                     $slotTy = $this->context->getStringFromType($this->value->typeOf());
                     if ('__value__*' !== $slotTy && '__value__value*' !== $slotTy) {

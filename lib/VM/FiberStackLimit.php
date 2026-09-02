@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+
+use PHPCompiler\Config;
+
 /**
  * Fiber call-stack guard (issue #7267; php-src Zend/zend_execute.c zend_call_stack_size_error).
  *
@@ -20,7 +23,7 @@ final class FiberStackLimit
 
     public static function maxStackBytes(): int
     {
-        $raw = getenv('PHP_COMPILER_FIBER_MAX_STACK_BYTES');
+        $raw = Config::getenv('PHP_COMPILER_FIBER_MAX_STACK_BYTES');
         if (is_string($raw) && '' !== $raw && is_numeric($raw)) {
             return max(1, (int) $raw);
         }
@@ -30,7 +33,7 @@ final class FiberStackLimit
 
     public static function maxStackFrames(): int
     {
-        $raw = getenv('PHP_COMPILER_FIBER_MAX_STACK_FRAMES');
+        $raw = Config::getenv('PHP_COMPILER_FIBER_MAX_STACK_FRAMES');
         if (is_string($raw) && '' !== $raw && is_numeric($raw)) {
             return max(1, (int) $raw);
         }

@@ -9,9 +9,8 @@ use PHPUnit\Framework\TestCase;
 /**
  * Config registry + phpc doctor --env (#36201).
  *
- * Full lib/bin getenv migration is deferred so the self-host spine does not need a
- * new require_once for Config.php in this slice; call sites adopt Config::getenv()
- * behind the spine sync gate in a follow-up.
+ * Call sites in lib/ and bin/ use Config::getenv() for PHP_COMPILER_* (#36201 follow-up).
+ * Config.php is on the self-host spine (required before Doctor.php).
  */
 final class ConfigRegistryTest extends TestCase
 {
@@ -106,5 +105,49 @@ final class ConfigRegistryTest extends TestCase
                 $_ENV[$name] = $prev;
             }
         }
+    }
+
+    public function testLibBinNoRawPhpCompilerGetenv(): void
+    {
+        $root = $this->repoRoot();
+        $left = [];
+        foreach (['lib', 'bin'] as $dir) {
+            $it = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root.'/'.$dir));
+            foreach ($it as $file) {
+                if (!$file->isFile() || !str_ends_with($file->getFilename(), '.php')) {
+                    continue;
+                }
+                if ('Config.php' === $file->getFilename()) {
+                    continue;
+                }
+                $path = $file->getPathname();
+                $lines = file($path) ?: [];
+                foreach ($lines as $i => $line) {
+                    if (!str_contains($line, 'PHP_COMPILER_') || !str_contains($line, 'getenv')) {
+                        continue;
+                    }
+                    if (str_contains($line, 'Config::getenv')) {
+                        continue;
+                    }
+                    if (str_contains($line, '{@see getenv()')) {
+                        continue;
+                    }
+                    if (preg_match("/getenv\\s*\\(\\s*['\"]PHP_COMPILER_/", $line)) {
+                        $left[] = $path.':'.($i + 1);
+                    }
+                }
+            }
+        }
+        $this->assertSame([], $left, 'raw getenv(PHP_COMPILER_*) must go through Config::getenv (#36201)');
+    }
+
+    public function testConfigOnSelfHostSpine(): void
+    {
+        $spine = (string) file_get_contents($this->repoRoot().'/test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString(
+            "require_once __DIR__.'/../../../lib/Config.php';",
+            $spine,
+            'Config.php must be on compiler_lib_spine_smoke (#36201)'
+        );
     }
 }

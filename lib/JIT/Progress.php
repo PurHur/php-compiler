@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT;
 
 use PHPCompiler\ext\standard\ProgressJitHelper;
 use PHPCompiler\JIT\Builtin\ProgressNoteRuntime;
+use PHPCompiler\Config;
 
 /** Optional JIT compile progress file for native AOT segfault triage (issue #816). */
 final class Progress
@@ -43,7 +44,7 @@ final class Progress
                 $path = self::$cachedPath;
             } else {
                 self::$pathResolved = true;
-                $env = getenv('PHP_COMPILER_JIT_PROGRESS_FILE');
+                $env = Config::getenv('PHP_COMPILER_JIT_PROGRESS_FILE');
                 if (false !== $env && '' !== $env) {
                     self::$cachedPath = $env;
                     $path = self::$cachedPath;

@@ -16,6 +16,7 @@ use PHPCompiler\Func;
 use PHPCompiler\OpCode;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\Config;
 
 /**
  * Whether a call argument may bind to an &-parameter (Zend zend_execute.c ZEND_SEND_REF).
@@ -43,7 +44,7 @@ final class ReferencableCheck
         if (version_compare($profile, '8.4.0', '>=')) {
             return 'could not';
         }
-        $raw = getenv('PHP_COMPILER_PROFILE');
+        $raw = Config::getenv('PHP_COMPILER_PROFILE');
         if (\is_string($raw) && '' !== trim($raw)) {
             return 'cannot';
         }

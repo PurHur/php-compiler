@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT;
 use PHPCompiler\Func as CoreFunc;
 use PHPCfg\Op;
 use PHPCfg\Operand;
+use PHPCompiler\Config;
 
 /**
  * Force NestedJIT of {@see M5ParserAstPeer} methods into the M5 argv / gen-0 module (#27426).
@@ -41,7 +42,7 @@ final class RuntimeParseM5AstPeer
         callable $compileFunc,
         callable $parseFile
     ): bool {
-        $flag = getenv('PHP_COMPILER_M5_FORCE_PARSER_NESTEDJIT');
+        $flag = Config::getenv('PHP_COMPILER_M5_FORCE_PARSER_NESTEDJIT');
         if ('1' !== $flag && 'true' !== strtolower((string) $flag)) {
             return false;
         }

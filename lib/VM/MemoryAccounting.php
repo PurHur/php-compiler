@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+
+use PHPCompiler\Config;
+
 /**
  * Zend emalloc-style byte accounting for memory_get_* (false $real_usage).
  *
@@ -146,7 +149,7 @@ final class MemoryAccounting
 
     private static function resolveInitialMmCache(): int
     {
-        $override = getenv('PHP_COMPILER_MM_CACHE_INITIAL');
+        $override = Config::getenv('PHP_COMPILER_MM_CACHE_INITIAL');
         if (false !== $override && '' !== $override) {
             return (int) $override;
         }
