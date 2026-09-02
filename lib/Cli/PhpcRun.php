@@ -280,20 +280,19 @@ final class PhpcRun
             return 1;
         }
         fclose($pipes[0]);
-        $stdout = stream_get_contents($pipes[1]);
-        $stderr = stream_get_contents($pipes[2]);
+        $captured = ProcPipeReader::readUntilProcessExit($proc, $pipes[1], $pipes[2]);
         fclose($pipes[1]);
         fclose($pipes[2]);
-        $code = proc_close($proc);
+        proc_close($proc);
 
-        $stdoutStr = false !== $stdout ? $stdout : '';
-        $stderrStr = false !== $stderr ? $stderr : '';
+        $stdoutStr = $captured['stdout'];
+        $stderrStr = $captured['stderr'];
         if ('' !== $stderrStr) {
             fwrite(STDERR, $stderrStr);
         }
         fwrite(STDOUT, $stdoutStr);
 
-        $exit = is_int($code) ? $code : 1;
+        $exit = $captured['exitcode'];
 
         return self::finalizeExit($exit, $stdoutStr, $requireNonemptyStdout);
     }
