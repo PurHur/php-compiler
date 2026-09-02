@@ -32,6 +32,7 @@ final class NestedVmVariableMethodLlvm
         'string' => Call\VariableWriteNested::class,
         'float' => Call\VariableWriteNested::class,
         'array' => Call\VariableWriteNested::class,
+        'object' => Call\VariableWriteNested::class,
     ];
 
     public static function ensureMethod(Context $context, string $methodLc): bool

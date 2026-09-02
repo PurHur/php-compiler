@@ -228,7 +228,7 @@ final class ExternalMethodBindTest extends TestCase
     }
 
     /**
-     * Spine chunk keeps cross-TU class methods on ExternalMethod until manifest bind (#24429).
+     * Spine chunk keeps non-vm cross-TU class methods on ExternalMethod until manifest bind (#24429).
      */
     public function testSpineChunkSkipsVmRegistryClassMethodLookup(): void
     {
@@ -237,6 +237,38 @@ final class ExternalMethodBindTest extends TestCase
         $runtime = new Runtime(Runtime::MODE_AOT);
         $ctx = new JIT\Context($runtime, JIT\Builtin::LOAD_TYPE_STANDALONE);
         $proxy = $ctx->resolveFunctionProxy('datetime::__serialize');
+        $this->assertInstanceOf(ExternalMethod::class, $proxy);
+    }
+
+    /**
+     * SPINE_CHUNK binds object::method static proxies to NestedVm Variable/HashTable helpers
+     * (#36147 / #36155 follow-up).
+     */
+    public function testSpineChunkBindsObjectStaticProxyToNestedVmVariable(): void
+    {
+        putenv(ExternalMethodBind::ENV_SPINE_CHUNK.'=1');
+        $_ENV[ExternalMethodBind::ENV_SPINE_CHUNK] = '1';
+        $runtime = new Runtime(Runtime::MODE_AOT);
+        $ctx = new JIT\Context($runtime, JIT\Builtin::LOAD_TYPE_STANDALONE);
+        $proxy = $ctx->resolveFunctionProxy('object::copyfrom');
+        $this->assertNotInstanceOf(ExternalMethod::class, $proxy);
+        $this->assertInstanceOf(JIT\Call::class, $proxy);
+        $toint = $ctx->resolveFunctionProxy('object::toint');
+        $this->assertNotInstanceOf(ExternalMethod::class, $toint);
+        $add = $ctx->resolveFunctionProxy('object::add');
+        $this->assertNotInstanceOf(ExternalMethod::class, $add);
+    }
+
+    /**
+     * SPINE_CHUNK vm registry whitelist does not bind VM-only static helpers (no JIT call()).
+     */
+    public function testSpineChunkVmRegistryLeavesVmOnlyStaticExternal(): void
+    {
+        putenv(ExternalMethodBind::ENV_SPINE_CHUNK.'=1');
+        $_ENV[ExternalMethodBind::ENV_SPINE_CHUNK] = '1';
+        $runtime = new Runtime(Runtime::MODE_AOT);
+        $ctx = new JIT\Context($runtime, JIT\Builtin::LOAD_TYPE_STANDALONE);
+        $proxy = $ctx->resolveFunctionProxy('phpcompiler\\vm\\variable::isintegralnumericstring');
         $this->assertInstanceOf(ExternalMethod::class, $proxy);
     }
 

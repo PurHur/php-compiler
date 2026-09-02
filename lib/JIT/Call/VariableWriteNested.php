@@ -86,6 +86,16 @@ final class VariableWriteNested implements Call
                     self::nativePointer($context, $args[1], '__value__readHashtable', '__hashtable__*')
                 );
                 break;
+            case 'object':
+                if (count($args) < 2) {
+                    throw new \LogicException('object() requires an ObjectEntry value');
+                }
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeObject'),
+                    $destPtr,
+                    self::nativePointer($context, $args[1], '__value__readObject', '__object__*')
+                );
+                break;
             default:
                 throw new \LogicException('VariableWriteNested does not implement '.$this->methodLc.'()');
         }
