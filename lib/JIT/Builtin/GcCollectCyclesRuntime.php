@@ -24,7 +24,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  */
 final class GcCollectCyclesRuntime
 {
-    private const MAX_OBJECTS = 65536;
+    /** Standalone LLVM registry row cap — was 65536, now matches Zend buffer default (#36195). */
+    private const MAX_OBJECTS = CycleCollector::DEFAULT_BUFFER_SIZE;
 
     private const TYPE_OBJECT = 5;
 
