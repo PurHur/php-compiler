@@ -22,6 +22,11 @@ SCAN_PATHS=(
 
 fail=0
 
+if ! command -v rg >/dev/null 2>&1; then
+  echo "check-stale-issue-refs: ripgrep (rg) required but not found (#36248)" >&2
+  exit 2
+fi
+
 line_is_exempt() {
   local line="$1"
   [[ "$line" == *"stale-issue-ok:"* ]]
