@@ -21444,6 +21444,79 @@ class JIT {
     }
 
     /**
+     * Foreach by-ref assigns must write through the ITER_VALUE operand slot, not a stale
+     * {main} script-global named binding (#36366 — assoc string-key HT nodes).
+     */
+    private function tryAssignOperandForeachByRefWritable(Operand $resultOp, Variable $value): bool
+    {
+        $scoped = $this->resolveForeachByRefWritableBindingForAssign($resultOp);
+        if (null === $scoped) {
+            return false;
+        }
+        JIT\HashTableHelper::assignForeachByRefWritable($this->context, $scoped, $value);
+        $this->context->setVariableOp($resultOp, $scoped);
+        $resolved = JIT\OperandName::resolve($resultOp);
+        if (null !== $resolved && '' !== $resolved) {
+            $this->context->bindVariableByName($resolved, $scoped);
+        }
+        $this->markScopeVariableAssignedIfTracked($resultOp, $scoped);
+
+        return true;
+    }
+
+    private function resolveForeachByRefWritableBindingForAssign(Operand $resultOp): ?Variable
+    {
+        if ($this->context->scope->variables->contains($resultOp)) {
+            $scoped = $this->context->scope->variables[$resultOp];
+            if ($this->variableIsForeachByRefWritable($scoped)) {
+                return $scoped;
+            }
+        }
+        $name = JIT\OperandName::resolve($resultOp);
+        if (null !== $name && '' !== $name) {
+            $resolved = $this->context->resolveRefAliasName($name);
+            if (isset($this->context->namedVariableBindings[$resolved])) {
+                $named = $this->context->namedVariableBindings[$resolved];
+                if ($this->variableIsForeachByRefWritable($named)) {
+                    return $named;
+                }
+            }
+        }
+        $block = $this->context->jitEnclosingBlock;
+        if (null === $block) {
+            return null;
+        }
+        $slot = $block->slotForOperand($resultOp);
+        if (null === $slot) {
+            return null;
+        }
+        foreach ($this->context->scope->variables as $scopeOp) {
+            if (!$scopeOp instanceof Operand) {
+                continue;
+            }
+            if ($block->slotForOperand($scopeOp) !== $slot) {
+                continue;
+            }
+            $candidate = $this->context->scope->variables[$scopeOp];
+            if ($this->variableIsForeachByRefWritable($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private function variableIsForeachByRefWritable(Variable $var): bool
+    {
+        return null !== $var->foreachByRefPackedArm
+            || (
+                $var->borrowedValueEntry
+                && null !== $var->writableHt
+                && null !== $var->writableIndex
+            );
+    }
+
+    /**
      * Live `__value__*` for an ASSIGN_REF dim dest (append entry or packed writableHt).
      *
      * Packed `$a[0]=&$x` on an empty HT must materialise the slot first — a bare GEP into
@@ -21794,6 +21867,9 @@ class JIT {
             $value = $this->detachScalarObjectPropertyAliasForAssign($value);
         }
         $value = $this->coerceNamedLocalNativeLongPropertyAssign($resultOp, $value);
+        if ($this->tryAssignOperandForeachByRefWritable($resultOp, $value)) {
+            return;
+        }
         $branchMergeTarget = $force && $this->context->coalesceAssignTargets->contains($resultOp);
         // ?: false arm (`'null'`) after the true arm fetched `$o->tagName`: bindPropertyFetchResult
         // can leave objectPropertySlot on a TYPE_VALUE phi temp, so a later scalar assign skips

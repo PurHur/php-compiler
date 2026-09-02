@@ -4686,9 +4686,23 @@ class Context {
                 }
             }
             if (isset($this->namedVariableBindings[$resolved])) {
-                $this->scope->variables[$op] = $this->namedVariableBindings[$resolved];
+                $named = $this->namedVariableBindings[$resolved];
+                if ($this->scope->variables->contains($op)) {
+                    $scoped = $this->scope->variables[$op];
+                    if (
+                        (
+                            null !== $scoped->foreachByRefPackedArm
+                            || ($scoped->borrowedValueEntry && null !== $scoped->writableHt)
+                        )
+                        && null === $named->foreachByRefPackedArm
+                        && !$named->borrowedValueEntry
+                    ) {
+                        return $scoped;
+                    }
+                }
+                $this->scope->variables[$op] = $named;
 
-                return $this->namedVariableBindings[$resolved];
+                return $named;
             }
         }
         // Try-body folded constants (e.g. UnaryMinus → -1) must win over empty parent-hoist
