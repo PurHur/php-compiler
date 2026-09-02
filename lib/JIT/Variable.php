@@ -1217,6 +1217,18 @@ final class Variable {
                 ? $this->value
                 : $this->context->helper->loadValue($this);
             $this->context->refcount->delref($ptr);
+            // KIND_VARIABLE entry allocas must not keep a stale pointer: loop-backed
+            // NEW/ASSIGN reuses the same alloca and would double-delref after unset
+            // already dropped the script-global ref (#36245 loop_unset).
+            if (self::KIND_VARIABLE === $this->kind && null !== $this->value) {
+                $slotTy = $this->value->typeOf();
+                if (\PHPLLVM\Type::KIND_POINTER === $slotTy->getKind()) {
+                    $this->context->builder->store(
+                        $slotTy->getElementType()->constNull(),
+                        $this->value
+                    );
+                }
+            }
 
             return;
         }

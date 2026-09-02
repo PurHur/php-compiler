@@ -33797,6 +33797,9 @@ class JIT {
         $this->context->refcount->delref($loaded);
         $this->context->builder->branch($skipBlock);
         $this->context->builder->positionAtEnd($skipBlock);
+        // Always clear — unset may have nulled without delref; next NEW must not
+        // load a stale pointer (#36245 / Variable::free peer).
+        $this->context->builder->store($nullObj, $mirror->value);
     }
 
     /**
