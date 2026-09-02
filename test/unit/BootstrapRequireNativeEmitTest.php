@@ -23,6 +23,21 @@ final class BootstrapRequireNativeEmitTest extends TestCase
         $this->assertStringContainsString('refusing prelinked sidecar COPY in place of a native emit', $script);
         $this->assertStringContainsString('refusing emit_path=native-prelinked-sidecar', $script);
         $this->assertStringContainsString('#36146', $script);
+        $this->assertStringContainsString('BOOTSTRAP_M4_REQUIRE_NATIVE_EMIT:-0}" != "1"', $script);
+    }
+
+    public function testCompileInvokeRefusesSidecarWhenRequireNativeEmit(): void
+    {
+        $script = (string) file_get_contents(self::$root.'/script/bootstrap-resolve-compile-invoke.sh');
+        $this->assertStringContainsString('REQUIRE_NATIVE_EMIT=1 — refusing sidecar emit fallback', $script);
+        $this->assertStringContainsString('BOOTSTRAP_M3_REQUIRE_NATIVE_EMIT', $script);
+        $this->assertStringContainsString('BOOTSTRAP_M4_REQUIRE_NATIVE_EMIT', $script);
+    }
+
+    public function testBootstrapLoopProbePropagatesRequireNativeEmitToM3(): void
+    {
+        $script = (string) file_get_contents(self::$root.'/script/bootstrap-loop-probe.sh');
+        $this->assertStringContainsString('export BOOTSTRAP_M3_REQUIRE_NATIVE_EMIT', $script);
     }
 
     public function testHelloWorldProbeRefusesSidecarWhenRequireNativeEmit(): void

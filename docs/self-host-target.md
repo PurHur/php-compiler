@@ -55,7 +55,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | M4 `make bootstrap-loop-gen1-full-spine-emit` | 🚧 gen-1→gen-2 full spine — heavy opt-in |
 | M4 `make bootstrap-selfhost-full-revision-probe` | ✅ gen-2 inventory argv → gen-3 + fixture smoke ([#2880](https://github.com/PurHur/php-compiler/issues/2880)) |
 | M4 `make bootstrap-loop-gen2-recompile-spine` | ✅ gen-2→gen-3 full spine native argv |
-| M4 `make bootstrap-loop-probe` | 🚧 **DEGRADED** — gen-1→gen-2 is a prelinked sidecar COPY, not a native compile ([#21860](https://github.com/PurHur/php-compiler/issues/21860)); gen-2→gen-3 + full-revision then run on that copy, so byte-comparing gen-0/gen-2/gen-3 proves nothing. Require a real emit: `BOOTSTRAP_M4_REQUIRE_NATIVE_EMIT=1` ([#1498](https://github.com/PurHur/php-compiler/issues/1498)) |
+| M4 `make bootstrap-loop-probe` | 🚧 **DEGRADED** — gen-1→gen-2 native emit still segfaults; ladder falls back to prelinked sidecar COPY ([#21860](https://github.com/PurHur/php-compiler/issues/21860)). Default probe exits **2** (not false OK). Require real emit: `BOOTSTRAP_M4_REQUIRE_NATIVE_EMIT=1` ([#1498](https://github.com/PurHur/php-compiler/issues/1498), [#36146](https://github.com/PurHur/php-compiler/issues/36146)) — refuses sidecar COPY. M0/M2/M3 prerequisites green via committed prelinked gen-0 trust (#36145). |
 | `make bootstrap-aot-link` | ✅ **7410/7412** |
 | `make bootstrap-inventory-check` | ✅ **7410/7412** Phase A files, **0** source blockers |
 | `make north-star5-verify-fast` | ✅ daily M5 PR gate (~1–2 min) |

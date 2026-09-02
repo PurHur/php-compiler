@@ -274,6 +274,7 @@ if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
     echo "bootstrap-selfhost-helloworld-probe: native emit helper from gen-0 argv driver (${EMIT_HELPER}, ${m3_link_mode})"
   elif [[ "${BOOTSTRAP_M3_FORCE_EMIT_HELPER_LINK:-0}" != "1" ]] \
     && [[ "${BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING:-1}" == "1" ]] \
+    && [[ "${BOOTSTRAP_M3_REQUIRE_NATIVE_EMIT:-0}" != "1" ]] \
     && bootstrap_gen0_sidecar_emit_fallback "${EMIT_HELPER}" "${m3_emit_source}"; then
     # Argv absent — use compile_driver sidecar only as last prelinked resort (#9704).
     m3_emit_helper_from_prelinked=1

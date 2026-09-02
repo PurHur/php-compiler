@@ -116,6 +116,7 @@ if [[ "${BOOTSTRAP_M4_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
   set +e
   if [[ "${BOOTSTRAP_M4_FORCE_EMIT_HELPER_LINK:-0}" != "1" ]] \
     && [[ "${BOOTSTRAP_M4_COMPILE_DRIVER_REAL_LOWERING:-${BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING:-1}}" == "1" ]] \
+    && [[ "${BOOTSTRAP_M4_REQUIRE_NATIVE_EMIT:-0}" != "1" ]] \
     && bootstrap_gen0_sidecar_emit_fallback "${EMIT_HELPER}" "${m4_emit_entry}"; then
     m4_emit_helper_from_prelinked=1
     emit_link_code=0
@@ -133,6 +134,7 @@ if [[ "${BOOTSTRAP_M4_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
     emit_link_code=$?
   fi
   if [[ ! -x "${EMIT_HELPER}" ]] \
+    && [[ "${BOOTSTRAP_M4_REQUIRE_NATIVE_EMIT:-0}" != "1" ]] \
     && bootstrap_try_sidecar_emit_fallback "${EMIT_HELPER}" "${m4_emit_entry}" "${emit_link_code}"; then
     m4_emit_helper_from_prelinked=1
     emit_link_code=0

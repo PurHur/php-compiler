@@ -117,6 +117,21 @@ bootstrap_lowering_source_seed_build_stamp_from_prelinked() {
   fi
 }
 
+# Committed prelinked/bootstrap-gen0 bytes may lag live lowering fingerprints (#36145) while
+# still passing gen-0 functional smoke — allow bootstrap gates to use them (north-star5 fast path).
+bootstrap_lowering_source_committed_prelinked_bytes() {
+  local artifact=$1
+  local prelinked=$2
+  [[ -n "${artifact}" && -n "${prelinked}" ]] \
+    && [[ -f "${artifact}" && -f "${prelinked}" && -s "${prelinked}" ]] \
+    && cmp -s "${artifact}" "${prelinked}"
+}
+
+bootstrap_lowering_source_warn_committed_prelinked_reuse() {
+  local label=$1
+  echo "bootstrap-lowering-freshness: using committed prelinked gen-0 ${label} (lowering fingerprint stale — refresh via script/bootstrap-refresh-gen0-sidecar.sh; #36145)" >&2
+}
+
 bootstrap_native_compile_driver_lowering_fresh() {
   local driver=$1
   local root="${ROOT:-}"
@@ -128,12 +143,15 @@ bootstrap_native_compile_driver_lowering_fresh() {
     && "${driver}" != "${root}/build/bin-compile-aot-inventory" ]]; then
     return 0
   fi
-  local stamp
-  if [[ -f "${seed}" ]] && cmp -s "${driver}" "${seed}" 2>/dev/null; then
-    stamp="$(bootstrap_lowering_source_prelinked_stamp)"
-  else
-    stamp="$(bootstrap_lowering_source_build_stamp)"
+  if bootstrap_lowering_source_committed_prelinked_bytes "${driver}" "${seed}"; then
+    if bootstrap_lowering_source_stamp_matches "$(bootstrap_lowering_source_prelinked_stamp)"; then
+      return 0
+    fi
+    bootstrap_lowering_source_warn_committed_prelinked_reuse "native compile driver ${driver}"
+    return 0
   fi
+  local stamp
+  stamp="$(bootstrap_lowering_source_build_stamp)"
   if bootstrap_lowering_source_refuse_stale_reuse "${stamp}" "native compile driver ${driver}"; then
     return 0
   fi

@@ -117,10 +117,29 @@ bootstrap_gen0_sidecar_blob_for_entry() {
   lowering_stamp="$(bootstrap_lowering_source_prelinked_stamp)"
   local build_blob="${root}/${rel}"
   if [[ -f "${build_blob}" && -s "${build_blob}" ]]; then
-    if [[ -f "$(bootstrap_lowering_source_build_stamp)" ]]; then
+    local prelinked_sidecar=""
+    case "${rel}" in
+      build/.m3_compiler_minimal_aot_blob) prelinked_sidecar="${root}/prelinked/bootstrap-gen0/compiler_minimal_aot_blob" ;;
+      build/.m3_bin_compile_aot_blob) prelinked_sidecar="${root}/prelinked/bootstrap-gen0/bin-compile-aot" ;;
+      build/.m3_compiler_lib_aot_blob) prelinked_sidecar="${root}/prelinked/bootstrap-gen0/compiler_lib_aot_blob" ;;
+      build/.m3_*)
+        local sidecar_name="${rel#build/}"
+        if [[ -f "${root}/prelinked/bootstrap-gen0/${sidecar_name}" ]]; then
+          prelinked_sidecar="${root}/prelinked/bootstrap-gen0/${sidecar_name}"
+        fi
+        ;;
+    esac
+    if [[ -n "${prelinked_sidecar}" ]] \
+      && bootstrap_lowering_source_committed_prelinked_bytes "${build_blob}" "${prelinked_sidecar}"; then
+      if ! bootstrap_lowering_source_stamp_matches "$(bootstrap_lowering_source_prelinked_stamp)"; then
+        bootstrap_lowering_source_warn_committed_prelinked_reuse "sidecar ${rel}"
+      fi
+    elif [[ -f "$(bootstrap_lowering_source_build_stamp)" ]]; then
       lowering_stamp="$(bootstrap_lowering_source_build_stamp)"
-    fi
-    if ! bootstrap_lowering_source_refuse_stale_reuse "${lowering_stamp}" "build sidecar ${rel}"; then
+      if ! bootstrap_lowering_source_refuse_stale_reuse "${lowering_stamp}" "build sidecar ${rel}"; then
+        return 1
+      fi
+    elif ! bootstrap_lowering_source_refuse_stale_reuse "${lowering_stamp}" "build sidecar ${rel}"; then
       return 1
     fi
     if [[ "${rel}" == "build/.m3_compiler_lib_aot_blob" ]] \
@@ -157,8 +176,8 @@ bootstrap_gen0_sidecar_blob_for_entry() {
       ;;
   esac
   if [[ -n "${prelinked}" && -f "${prelinked}" && -s "${prelinked}" ]]; then
-    if ! bootstrap_lowering_source_refuse_stale_reuse "$(bootstrap_lowering_source_prelinked_stamp)" "prelinked sidecar ${rel}"; then
-      return 1
+    if ! bootstrap_lowering_source_stamp_matches "$(bootstrap_lowering_source_prelinked_stamp)"; then
+      bootstrap_lowering_source_warn_committed_prelinked_reuse "prelinked sidecar ${rel}"
     fi
     if [[ "${rel}" == "build/.m3_compiler_lib_aot_blob" ]] \
       && declare -F bootstrap_compiler_lib_spine_entry_sha >/dev/null 2>&1; then
@@ -213,6 +232,10 @@ bootstrap_gen0_sidecar_emit_fallback() {
 bootstrap_sidecar_emit_fallback_allowed() {
   local last_code=${1:-0}
   local entry="${2:-}"
+  if [[ "${BOOTSTRAP_M3_REQUIRE_NATIVE_EMIT:-0}" == "1" || "${BOOTSTRAP_M4_REQUIRE_NATIVE_EMIT:-0}" == "1" ]]; then
+    echo "bootstrap-compile-invoke: REQUIRE_NATIVE_EMIT=1 — refusing sidecar emit fallback (#21860 / #36146)" >&2
+    return 1
+  fi
   if [[ "${BOOTSTRAP_M5_NO_ZEND:-0}" == "1" ]]; then
     echo "bootstrap-compile-invoke: BOOTSTRAP_M5_NO_ZEND=1 — refusing sidecar emit fallback (#3053)" >&2
     return 1
