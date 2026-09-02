@@ -142,6 +142,8 @@ final class ExternalMethodBindTest extends TestCase
         $this->assertNotInstanceOf(ExternalMethod::class, $strlen);
         $substr = $ctx->resolveFunctionProxy('substr');
         $this->assertNotInstanceOf(ExternalMethod::class, $substr);
+        $isNumeric = $ctx->resolveFunctionProxy('phpcompiler\\vm\\is_numeric');
+        $this->assertNotInstanceOf(ExternalMethod::class, $isNumeric);
     }
 
     /**
