@@ -505,7 +505,7 @@ final class JitValueBox
                 return;
             case Variable::TYPE_HASHTABLE:
                 $ht = $context->helper->loadValue($value);
-                // writeHashtable addrefs (#24226).
+                $context->refcount->addref($ht);
                 $context->builder->call(
                     $context->lookupFunction('__value__writeHashtable'),
                     $destPtr,
@@ -708,7 +708,7 @@ final class JitValueBox
             $context->lookupFunction('__value__readHashtable'),
             $srcPtr
         );
-        // writeHashtable addrefs internally (same as writeObject, #24226).
+        $context->refcount->addref($ht);
         $context->builder->call(
             $context->lookupFunction('__value__writeHashtable'),
             $destPtr,

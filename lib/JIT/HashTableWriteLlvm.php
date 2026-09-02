@@ -2686,6 +2686,7 @@ final class HashTableWriteLlvm
 
             return;
         }
+        $context->refcount->addref($ht);
         $context->builder->store($ht, $result->value);
     }
 
@@ -3019,7 +3020,6 @@ final class HashTableWriteLlvm
             JitValueBox::pointer($context, $slot),
             $ptr
         );
-        $context->refcount->addref($ptr);
         $var = new Variable(
             $context,
             Variable::TYPE_VALUE,

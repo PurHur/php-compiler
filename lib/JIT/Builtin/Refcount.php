@@ -463,11 +463,12 @@ class Refcount extends Builtin {
                         $allowDestructDelref,
                         $allowDestructDelref->typeOf()->constInt(0, false)
                     );
+                    $deferObjectDestroy = $this->context->builder->bitwiseAnd($deferDestroy, $isObject);
                     $deferBlock = $parentFn->appendBasicBlock('delref_defer_destroy');
                     $destroyBlock = $parentFn->appendBasicBlock('delref_destroy');
-                    $this->context->builder->branchIf($deferDestroy, $deferBlock, $destroyBlock);
+                    $this->context->builder->branchIf($deferObjectDestroy, $deferBlock, $destroyBlock);
                     $this->context->builder->positionAtEnd($deferBlock);
-                    // {main} defers free until shutdown (#4013), but WeakReference::get must
+                    // {main} defers object free until shutdown (#4013), but WeakReference::get must
                     // observe null as soon as the referent refcount hits 0 (#26795).
                     $this->context->builder->call(
                         $this->context->lookupFunction('phpc_weakref_clear_object_typed'),
@@ -487,6 +488,10 @@ class Refcount extends Builtin {
                     ),
                     $typeinfo
                 );
+                $gcUnregisterBlock = $parentFn->appendBasicBlock('delref_gc_unregister');
+                $freeBlock = $parentFn->appendBasicBlock('delref_free');
+                $this->context->builder->branchIf($isObject, $gcUnregisterBlock, $freeBlock);
+                $this->context->builder->positionAtEnd($gcUnregisterBlock);
                 $this->context->builder->call(
                     $this->context->lookupFunction('phpc_gc_unregister'),
                     $this->context->builder->pointerCast(
@@ -494,6 +499,8 @@ class Refcount extends Builtin {
                         $this->context->getTypeFromString('int8*')
                     )
                 );
+                $this->context->builder->branch($freeBlock);
+                $this->context->builder->positionAtEnd($freeBlock);
                 $this->context->memory->free($refVirtual);
     }
                 if ($this->context->builder->getInsertBlock()->getTerminator() === null) {
