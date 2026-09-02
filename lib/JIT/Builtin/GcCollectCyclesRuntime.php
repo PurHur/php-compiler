@@ -8,6 +8,7 @@ use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\UserScriptAotEnv;
 use PHPCompiler\VM\CycleCollector;
 use PHPCompiler\ext\standard\JitGcCollectCyclesStandaloneKernel;
 use PHPLLVM\Builder;
@@ -792,7 +793,7 @@ final class GcCollectCyclesRuntime
 
     private static function implementCollectCyclesImpl(Context $context): void
     {
-        if (self::usesPhpRegistry($context) || self::usesUserScriptStandaloneCollect($context)) {
+        if (self::usesPhpRegistry($context)) {
             self::implementCollectCyclesPhpBridge($context);
 
             return;
@@ -1048,16 +1049,50 @@ final class GcCollectCyclesRuntime
 
             return;
         }
+        self::ensureGlobals($context);
         $voidTy = $context->getTypeFromString('void');
         $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
         $ft = $context->context->functionType($voidTy, false);
         $fn = null !== $probe ? $probe : $context->module->addFunction($name, $ft);
         $entry = $fn->appendBasicBlock('gc_reset_standalone_entry');
         $context->builder->positionAtEnd($entry);
-        $context->builder->store(
-            $i32->constInt(0, false),
-            self::globalPtr($context, self::G_COUNT, $i32)
-        );
+        $countPtr = self::globalPtr($context, self::G_COUNT, $i32);
+        $prevCount = $context->builder->load($countPtr);
+        $context->builder->store($i32->constInt(0, false), $countPtr);
+        // Helper .o ctors leave stale slots/prop_counts before user {main} (#36245).
+        \PHPCompiler\JIT\LibcExtern::ensureMemsetDecl($context);
+        $hasStale = $context->builder->icmp(Builder::INT_SGT, $prevCount, $i32->constInt(0, false));
+        $clearBb = $fn->appendBasicBlock('gc_reset_clear_stale');
+        $doneBb = $fn->appendBasicBlock('gc_reset_done');
+        $context->builder->branchIf($hasStale, $clearBb, $doneBb);
+        $context->builder->positionAtEnd($clearBb);
+        $prevExt = $context->builder->zext($prevCount, $sizeT);
+        $objectsGlobal = $context->module->getNamedGlobal(self::G_OBJECTS);
+        if (null !== $objectsGlobal) {
+            $objectsBase = $context->builder->pointerCast($objectsGlobal, $i8p);
+            $objectsBytes = $context->builder->mul($prevExt, $sizeT->constInt(8, false));
+            $context->builder->call(
+                $context->lookupFunction('memset'),
+                $objectsBase,
+                $i32->constInt(0, false),
+                $objectsBytes
+            );
+        }
+        $propGlobal = $context->module->getNamedGlobal(self::G_PROP_COUNTS);
+        if (null !== $propGlobal) {
+            $propBase = $context->builder->pointerCast($propGlobal, $i8p);
+            $propBytes = $context->builder->mul($prevExt, $sizeT->constInt(4, false));
+            $context->builder->call(
+                $context->lookupFunction('memset'),
+                $propBase,
+                $i32->constInt(0, false),
+                $propBytes
+            );
+        }
+        $context->builder->branch($doneBb);
+        $context->builder->positionAtEnd($doneBb);
         $context->builder->returnVoid();
         $context->builder->clearInsertionPosition();
         $context->registerFunction($name, $fn);

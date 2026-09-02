@@ -40,4 +40,14 @@ final class GcCollectCyclesAotCycleTest extends TestCase
         $this->assertStringContainsString('valueDelref alone leaves extra GC roots (#36245)', $jit);
         $this->assertStringContainsString('refcount->delref($obj)', $jit);
     }
+
+    public function testUserScriptStandaloneRegistryResetWiredAtMain(): void
+    {
+        $ctx = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Context.php');
+        $this->assertStringContainsString(
+            'emitUserScriptStandaloneRegistryReset',
+            $ctx
+        );
+        $this->assertStringContainsString('isUserScriptAot()', $ctx);
+    }
 }
