@@ -22,6 +22,7 @@ final class SpineChunkStandardHelperBind
         'errorsilencejithelper' => '/ext/standard/ErrorSilenceJitHelper.php',
         'executionlimitsjithelper' => '/ext/standard/ExecutionLimitsJitHelper.php',
         'includepathjithelper' => '/ext/standard/IncludePathJitHelper.php',
+        'includepathresolvejithelper' => '/ext/standard/IncludePathResolveJitHelper.php',
     ];
 
     public static function tryBind(Context $context, string $proxyName): ?Call

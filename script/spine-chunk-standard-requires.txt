@@ -3,6 +3,7 @@
 ext/standard/ErrorSilenceJitHelper.php
 ext/standard/ExecutionLimitsJitHelper.php
 ext/standard/IncludePathJitHelper.php
+ext/standard/IncludePathResolveJitHelper.php
 ext/standard/in_array.php
 ext/standard/intdiv.php
 ext/standard/intval.php

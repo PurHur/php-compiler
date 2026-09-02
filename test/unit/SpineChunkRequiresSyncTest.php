@@ -31,9 +31,15 @@ final class SpineChunkRequiresSyncTest extends TestCase
             'ext/standard/strncasecmp.php',
             'ext/standard/VmMath.php',
             'ext/standard/VmIni.php',
+            'ext/standard/IncludePathResolveJitHelper.php',
         ] as $path) {
             $this->assertContains($path, $requires, 'standard hub must include '.$path);
         }
+        $standardBind = (string) file_get_contents($root.'/lib/JIT/SpineChunkStandardHelperBind.php');
+        $this->assertStringContainsString(
+            "'includepathresolvejithelper' => '/ext/standard/IncludePathResolveJitHelper.php'",
+            $standardBind
+        );
     }
 
     /**
