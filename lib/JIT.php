@@ -11694,6 +11694,10 @@ class JIT {
                                     $this->jitWriteNullForUnset(
                                         JIT\JitValueBox::valuePtrFromVariable($this->context, $bound)
                                     );
+                                    $nullVar = $this->jitNullVariable();
+                                    $this->context->bindVariableByName($resolvedUnset, $nullVar);
+                                    $this->context->setVariableOp($targetOp, $nullVar);
+                                    unset($this->context->namedVariableBindings[$resolvedUnset]);
                                     break;
                                 }
                                 if (

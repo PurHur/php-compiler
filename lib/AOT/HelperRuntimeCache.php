@@ -23,11 +23,13 @@ use PHPCompiler\JIT\Context;
  *   v2 (manifest has deps[]): sha256(global + unit source + each dep's content)
  *   v1 (legacy, no deps):     sha256(legacy lowering core + unit source)
  *
- * Global inputs ({@see coreFingerprint}) are only composer.lock, patches, and
- * LLVM library identity (#24381) — content hash of libLLVM-9.so.1, not the
- * install path string, so host `.llvm` and Docker `/opt/llvm9` with the same
- * bytes share a fingerprint. Editing lib/JIT.php no longer invalidates the
- * whole corpus. Emit records the NestedJIT closure in deps[]; editing one
+ * Global inputs ({@see coreFingerprint}) are composer.lock, patches, LLVM
+ * library identity (#24381), and runtime struct layout sources
+ * ({@see runtimeLayoutFingerprintPaths}) — content hash of libLLVM-9.so.1,
+ * not the install path string, so host `.llvm` and Docker `/opt/llvm9` with
+ * the same bytes share a fingerprint. Editing lib/JIT.php no longer
+ * invalidates the whole corpus; editing a layout `.pre` (e.g. __value__ ABI
+ * #36214) does. Emit records the NestedJIT closure in deps[]; editing one
  * reached lowering invalidates only units that listed it. Legacy manifests
  * keep the old JIT-core key until re-emitted so the committed prelinked tier
  * stays usable.
@@ -441,7 +443,8 @@ final class HelperRuntimeCache
     }
 
     /**
-     * Global inputs only (#23458 / #24381): composer.lock, patches, LLVM library.
+     * Global inputs (#23458 / #24381): composer.lock, patches, LLVM library,
+     * runtime struct layout `.pre` sources (#36214).
      *
      * Deliberately excludes lib/JIT.php / Context.php / Runtime.php — those change
      * most days and were switching the whole corpus off. Per-unit deps[] cover the
@@ -650,8 +653,26 @@ final class HelperRuntimeCache
         foreach ($patchFiles as $patch) {
             $parts[] = substr($patch, \strlen($root)).':'.@hash_file('sha256', $patch);
         }
+        foreach (self::runtimeLayoutFingerprintPaths() as $rel) {
+            $file = $root.$rel;
+            $parts[] = $rel.':'.(is_file($file) ? hash_file('sha256', $file) : 'missing');
+        }
 
         return substr(hash('sha256', implode("\n", $parts)), 0, 20);
+    }
+
+    /**
+     * LLVM runtime struct layout sources — edits regenerate Value.php / String_.php
+     * and change helper object ABI (#36214).
+     *
+     * @return list<string> repo-root-relative paths
+     */
+    public static function runtimeLayoutFingerprintPaths(): array
+    {
+        return [
+            '/lib/JIT/Builtin/Type/Value.pre',
+            '/lib/JIT/Builtin/Type/String_.pre',
+        ];
     }
 
     private static function globalFingerprintMaterial(): string
@@ -668,6 +689,10 @@ final class HelperRuntimeCache
         sort($patchFiles, SORT_STRING);
         foreach ($patchFiles as $patch) {
             $parts[] = substr($patch, \strlen($root)).':'.@hash_file('sha256', $patch);
+        }
+        foreach (self::runtimeLayoutFingerprintPaths() as $rel) {
+            $file = $root.$rel;
+            $parts[] = $rel.':'.(is_file($file) ? hash_file('sha256', $file) : 'missing');
         }
 
         return implode("\n", $parts);

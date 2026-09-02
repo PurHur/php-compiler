@@ -1425,6 +1425,7 @@ class Block {
         return match ($op->type) {
             OpCode::TYPE_ECHO => [$op->arg1],
             OpCode::TYPE_PRINT => [$op->arg1, $op->arg2],
+            OpCode::TYPE_FUNCCALL_INIT => [$op->arg1],
             OpCode::TYPE_FUNCCALL_EXEC_RETURN => [$op->arg1],
             OpCode::TYPE_FUNCCALL_EXEC_NORETURN => [],
             OpCode::TYPE_NEW => [$op->arg1, $op->arg2],
