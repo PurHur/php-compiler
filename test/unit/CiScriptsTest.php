@@ -2292,6 +2292,15 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('chmod +x "${ROOT}/script/apply-patches.sh"', $body);
     }
 
+    public function testCiMemoryEnvSurfacesApplyPatchesFailure(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-memory-env.sh');
+        $this->assertStringContainsString('apply-patches failed (#36247)', $body);
+        $this->assertStringNotContainsString('|| true', $body);
+        $phpEnv = (string) file_get_contents(dirname(__DIR__, 2).'/script/php-env.sh');
+        $this->assertStringContainsString('ci_ensure_vendor_patches || exit 1', $phpEnv);
+    }
+
     public function testSelfhostPreflightScriptDefinesModesAndDockerPath(): void
     {
         $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/selfhost-preflight.sh');

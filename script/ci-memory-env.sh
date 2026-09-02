@@ -32,8 +32,10 @@ ci_ensure_vendor_patches() {
     if "${root}/script/apply-patches.sh" --verify-only >/dev/null 2>&1; then
       return 0
     fi
-    # Redirect stderr of the *invoking shell* too, so a crashing subprocess doesn't spam CI logs.
-    { "${root}/script/apply-patches.sh" >/dev/null; } 2>/dev/null || true
+    if ! "${root}/script/apply-patches.sh" >/dev/null 2>&1; then
+      echo "ci_ensure_vendor_patches: apply-patches failed (#36247)" >&2
+      return 1
+    fi
   fi
 }
 
