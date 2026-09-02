@@ -3624,21 +3624,49 @@ class Block {
         return false;
     }
 
+    /**
+     * @return list<string> Human-readable deferral reasons (issue refs included).
+     */
+    public static function requiresVmLoweringReasons(?self $root): array
+    {
+        if (null === $root) {
+            return [];
+        }
+        $reasons = [];
+        foreach (self::vmLoweringReasonCatalog() as [$method, $label]) {
+            if (self::$method($root)) {
+                $reasons[] = $label;
+            }
+        }
+
+        return $reasons;
+    }
+
     public static function requiresVmLowering(?self $root): bool
     {
-        return self::containsGeneratorOpcodesInScriptScope($root)
-            || self::containsFinallyOpcodesInScriptScope($root)
-            || self::containsTypedNonVoidReturnOpcodes($root)
-            || self::containsReadonlyPropertyOpcodes($root)
-            || self::containsUserClassDeclaredInstancePropertyOpcodes($root)
-            || self::containsDynamicPropertyDeprecationOpcodes($root)
-            || self::containsFiberSuspendOpcodesInScriptScope($root)
-            || self::containsEmptyTraitBodyMcjitDeferral($root)
-            || self::containsReflectionAttributeNewInstanceOpcodes($root)
-            || self::containsNonLiteralEvalOpcodes($root)
-            || self::containsInterfaceAbstractStaticMcjitDeferral($root)
-            || self::containsNonStaticStaticCallOpcodes($root)
-            || self::containsParamRuntimeNewDefaultOpcodes($root);
+        return [] !== self::requiresVmLoweringReasons($root);
+    }
+
+    /**
+     * @return list<array{0: string, 1: string}> [static method name, stderr label]
+     */
+    private static function vmLoweringReasonCatalog(): array
+    {
+        return [
+            ['containsGeneratorOpcodesInScriptScope', 'generator yield in script scope (#3074)'],
+            ['containsFinallyOpcodesInScriptScope', 'finally in script scope (#2114)'],
+            ['containsTypedNonVoidReturnOpcodes', 'typed non-void return (#2114)'],
+            ['containsReadonlyPropertyOpcodes', 'readonly property (#4082)'],
+            ['containsUserClassDeclaredInstancePropertyOpcodes', 'user class declared instance property (#5111)'],
+            ['containsDynamicPropertyDeprecationOpcodes', 'dynamic property deprecation (#4570)'],
+            ['containsFiberSuspendOpcodesInScriptScope', 'fiber suspend in script scope (#3074)'],
+            ['containsEmptyTraitBodyMcjitDeferral', 'empty trait body (#6284)'],
+            ['containsReflectionAttributeNewInstanceOpcodes', 'ReflectionAttribute::newInstance() (#4598)'],
+            ['containsNonLiteralEvalOpcodes', 'eval() not safe to MCJIT-inline (#10248)'],
+            ['containsInterfaceAbstractStaticMcjitDeferral', 'interface abstract static call (#5090)'],
+            ['containsNonStaticStaticCallOpcodes', 'static call to instance method (#5339)'],
+            ['containsParamRuntimeNewDefaultOpcodes', 'parameter default uses new (#6652)'],
+        ];
     }
 
     /** Constructor/function parameters with `new` default expressions (#6652). */

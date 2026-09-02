@@ -25,6 +25,7 @@ require __DIR__.'/../src/llvm-env.php';
 require __DIR__.'/../vendor/autoload.php';
 
 use PHPCompiler\Block;
+use PHPCompiler\JitVmLoweringPolicy;
 use PHPCompiler\Runtime;
 use PHPCompiler\VM\OutputBuffer;
 use PHPCompiler\VM\ShutdownQueue;
@@ -82,14 +83,18 @@ $executeScript = static function (
         }
 
         $mode = 'jit';
-        try {
-            $runtime->jit($block, $code, $script);
-        } catch (\Throwable $e) {
+        if (JitVmLoweringPolicy::announceWholeScriptVmFallback($block)) {
             $mode = 'vm';
-            fwrite(
-                STDERR,
-                'serve-jit: JIT compile failed for '.$script.', falling back to VM: '.$e->getMessage()."\n"
-            );
+        } else {
+            try {
+                $runtime->jit($block, $code, $script);
+            } catch (\Throwable $e) {
+                $mode = 'vm';
+                fwrite(
+                    STDERR,
+                    'serve-jit: JIT compile failed for '.$script.', falling back to VM: '.$e->getMessage()."\n"
+                );
+            }
         }
         $jitCache[$cacheKey] = ['mode' => $mode, 'runtime' => $runtime, 'block' => $block];
     }
