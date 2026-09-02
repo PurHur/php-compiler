@@ -33684,6 +33684,9 @@ class JIT {
     /**
      * Named-storage ASSIGN also updates a TYPE_OBJECT result temp; unset must null it
      * without delref so loop-carried GC orphans survive (#36245 loop_unset).
+     *
+     * Also null the ASSIGN RHS NEW temp (`$t` in `$a = new N`) — that alloca, not the
+     * assign-result slot, is what loop back-edges free() on the next iteration.
      */
     private function jitClearAssignResultObjectMirrorForNamedUnset(Block $block, ?int $unsetArgSlot): void
     {
@@ -33693,22 +33696,15 @@ class JIT {
         $targetSlot = (int) $unsetArgSlot;
         $nullObj = $this->context->getTypeFromString('__object__*')->constNull();
         $seen = new \SplObjectStorage();
-        foreach ($block->opCodes as $assignOp) {
-            if (OpCode::TYPE_ASSIGN !== $assignOp->type || null === $assignOp->arg2 || null === $assignOp->arg1) {
-                continue;
-            }
-            if ((int) $assignOp->arg2 !== $targetSlot || $assignOp->arg1 === $assignOp->arg2) {
-                continue;
-            }
-            $destSlot = (int) $assignOp->arg1;
-            if (isset($this->context->scopeSlotObjectMirrorLlvmBySlot[$destSlot])) {
-                $llvmMirror = $this->context->scopeSlotObjectMirrorLlvmBySlot[$destSlot];
+        $clearSlot = function (int $slot) use ($block, $nullObj, $seen): void {
+            if (isset($this->context->scopeSlotObjectMirrorLlvmBySlot[$slot])) {
+                $llvmMirror = $this->context->scopeSlotObjectMirrorLlvmBySlot[$slot];
                 if (!$seen->contains($llvmMirror)) {
                     $seen[$llvmMirror] = true;
                     $this->context->builder->store($nullObj, $llvmMirror);
                 }
             }
-            $destOp = $block->operandForScopeSlot($destSlot);
+            $destOp = $block->operandForScopeSlot($slot);
             if (null !== $destOp && $this->context->hasVariableOp($destOp)) {
                 $mirror = $this->context->getVariableFromOp($destOp);
                 if (
@@ -33722,6 +33718,22 @@ class JIT {
                     $seen[$mirror->value] = true;
                     $this->context->builder->store($nullObj, $mirror->value);
                 }
+            }
+        };
+        foreach ($block->opCodes as $assignOp) {
+            if (OpCode::TYPE_ASSIGN !== $assignOp->type || null === $assignOp->arg2) {
+                continue;
+            }
+            if ((int) $assignOp->arg2 !== $targetSlot) {
+                continue;
+            }
+            if (null !== $assignOp->arg1 && $assignOp->arg1 !== $assignOp->arg2) {
+                $clearSlot((int) $assignOp->arg1);
+            }
+            // RHS of `$a = $newTemp` — primary stale alloca for loop_unset (#36245).
+            $rhsSlot = $this->assignRhsSlot($assignOp);
+            if ($rhsSlot !== $targetSlot) {
+                $clearSlot($rhsSlot);
             }
         }
     }
@@ -33743,6 +33755,9 @@ class JIT {
         $this->context->refcount->delref($loaded);
         $this->context->builder->branch($skipBlock);
         $this->context->builder->positionAtEnd($skipBlock);
+        // Always clear — unset may have nulled without delref; next NEW must not
+        // load a stale pointer (#36245 loop_unset / Variable::free peer).
+        $this->context->builder->store($nullObj, $mirror->value);
     }
 
     /**
