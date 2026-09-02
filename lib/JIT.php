@@ -20646,6 +20646,70 @@ class JIT {
     }
 
     /**
+     * Widen `$x = 0; $x = 0.7` locals to a native double alloca instead of a heap
+     * __value__ box so float loops stay on fadd/fmul (#36407 / #23471).
+     */
+    private function promoteNativeLongLvalueToNativeDouble(
+        Operand $resultOp,
+        Variable $result,
+        Variable $value
+    ): void {
+        $oldAlloca = null;
+        if (Variable::KIND_VARIABLE === $result->kind
+            && Variable::TYPE_NATIVE_LONG === $result->type
+            && null !== $result->value
+        ) {
+            $oldAlloca = $result->value;
+        }
+        if (!$result->includeBinding) {
+            $result->free();
+        }
+        $doubleTy = $this->context->getTypeFromString('double');
+        $slot = JIT\BasicBlockHelper::entryAlloca($this->context, $doubleTy);
+        if (Variable::TYPE_NATIVE_DOUBLE === $value->type) {
+            $fp = $this->context->helper->loadValue($value);
+        } elseif (Variable::TYPE_VALUE === $value->type && null !== $value->compileTimeFloat) {
+            $fp = $doubleTy->constReal($value->compileTimeFloat);
+        } else {
+            throw new \LogicException('promoteNativeLongLvalueToNativeDouble: unexpected value type '.$value->type);
+        }
+        $this->context->builder->store($fp, $slot);
+        if (null !== $oldAlloca) {
+            $longVal = $this->context->builder->fpToSi(
+                $fp,
+                $this->context->getTypeFromString('int64')
+            );
+            $this->context->builder->store($longVal, $oldAlloca);
+        }
+        $promoted = new Variable(
+            $this->context,
+            Variable::TYPE_NATIVE_DOUBLE,
+            Variable::KIND_VARIABLE,
+            $slot
+        );
+        $promoted->compileTimeConstantName = $value->compileTimeConstantName;
+        $promoted->compileTimeEnumCase = $value->compileTimeEnumCase;
+        $promoted->compileTimeFloat = $value->compileTimeFloat;
+        $promoted->compileTimeLong = null;
+        $this->syncCompileTimeString($promoted, $value, false);
+        $this->context->setVariableOp($resultOp, $promoted);
+        $resolved = JIT\OperandName::resolve($resultOp);
+        if (null !== $resolved && '' !== $resolved) {
+            $this->context->bindVariableByName(
+                $this->context->resolveRefAliasName($resolved),
+                $promoted
+            );
+        }
+        $this->markScopeVariableAssignedIfTracked($resultOp, $promoted);
+    }
+
+    private function nativeLongWidenAssignIsNativeDouble(Variable $value): bool
+    {
+        return Variable::TYPE_NATIVE_DOUBLE === $value->type
+            || (Variable::TYPE_VALUE === $value->type && null !== $value->compileTimeFloat);
+    }
+
+    /**
      * First assignment to a script global must populate the heap box (#1492 bootstrap-aot).
      *
      * Without this, makeVariableFromValueOp keeps an SSA rvalue while a later VAR_FETCH rebinds
@@ -23211,11 +23275,15 @@ class JIT {
         } elseif ($result->type === Variable::TYPE_NATIVE_LONG && Variable::TYPE_VALUE === $value->type) {
             // Untyped locals must widen on float (and other) assigns — truncating via
             // fpToSi made `$s = 0; $s = 0.028` store 0 and broke mandelbrot AOT (#23471).
-            $this->promoteNativeLongLvalueToValueBox($resultOp, $result, $value);
+            if ($this->nativeLongWidenAssignIsNativeDouble($value)) {
+                $this->promoteNativeLongLvalueToNativeDouble($resultOp, $result, $value);
+            } else {
+                $this->promoteNativeLongLvalueToValueBox($resultOp, $result, $value);
+            }
 
             return;
         } elseif ($result->type === Variable::TYPE_NATIVE_LONG && Variable::TYPE_NATIVE_DOUBLE === $value->type) {
-            $this->promoteNativeLongLvalueToValueBox($resultOp, $result, $value);
+            $this->promoteNativeLongLvalueToNativeDouble($resultOp, $result, $value);
 
             return;
         } elseif ($result->type === Variable::TYPE_NATIVE_LONG && Variable::TYPE_NATIVE_BOOL === $value->type) {
