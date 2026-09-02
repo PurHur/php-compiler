@@ -18117,7 +18117,7 @@ restart:
         // ITER_RESET always addRef's a snapshot wrapper (by-value COW). Switching to the
         // live CV must drop that extra HT ref — otherwise `$a[]` during foreach-by-ref
         // zend_array_dup's and leaves IS_REFERENCE aliases on the iterated slot (#32128).
-        $old = $this->context->foreachIterators[$slot] ?? ($frame->iterators[$slot] ?? null);
+        $old = $frame->iterators[$slot] ?? ($this->context->foreachIterators[$slot] ?? null);
         if (null !== $old && $old !== $live) {
             $resolved = $old->resolveIndirect();
             if (Variable::TYPE_ARRAY === $resolved->type) {
@@ -18134,11 +18134,18 @@ restart:
 
     private function resolveForeachContainer(Frame $frame, int $slot): Variable
     {
+        // Prefer the per-frame cache. context->foreachIterators is keyed only by operand
+        // slot index, so a nested/recursive call that reuses the same slot number would
+        // otherwise leave the caller's ITER_VALID reading the callee's exhausted HT
+        // (recursive flatten / foreach-in-function calling foreach — #36354; Zend keeps
+        // FE state on execute_data, see zend_execute.c ZEND_FE_RESET / FE_FETCH).
+        if (isset($frame->iterators[$slot])) {
+            $this->context->foreachIterators[$slot] = $frame->iterators[$slot];
+
+            return $frame->iterators[$slot]->resolveIndirect();
+        }
         if (isset($this->context->foreachIterators[$slot])) {
             return $this->context->foreachIterators[$slot]->resolveIndirect();
-        }
-        if (isset($frame->iterators[$slot])) {
-            return $frame->iterators[$slot]->resolveIndirect();
         }
         if ($this->isForeachObjectIteratorSlot($slot)) {
             throw new \LogicException('Foreach iterator container slot is not initialized');
