@@ -12,6 +12,7 @@ namespace PHPCompiler\ext\standard;
  */
 final class GcCollectCyclesRegistryJitHelper
 {
+    /** Legacy name kept for grep/tests — no longer enforced (#36195). */
     public const MAX_OBJECTS = 65536;
 
     private static int $count = 0;
@@ -42,9 +43,6 @@ final class GcCollectCyclesRegistryJitHelper
     public static function appendObject(int $objPtr, int $propCount): void
     {
         if ($objPtr <= 0) {
-            return;
-        }
-        if (self::$count >= self::MAX_OBJECTS) {
             return;
         }
         if (self::indexOf($objPtr) >= 0) {
