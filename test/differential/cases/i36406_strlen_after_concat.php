@@ -1,7 +1,5 @@
---TEST--
-Language: AOT strlen() must not fold on stale init compileTimeString after `.=` (#36244)
---FILE--
 <?php
+// #36406 / re-#36244: strlen() must read runtime length after `.=` / loop concat, not stale init compileTimeString.
 $s = '';
 for ($i = 0; $i < 5; $i++) {
     $s .= 'x';
@@ -15,10 +13,6 @@ echo $t, '|', strlen($t), "\n";
 
 $u = 'a';
 for ($i = 0; $i < 5; $i++) {
-    $u = $u . 'x';
+    $u = $u.'x';
 }
 echo $u, '|', strlen($u), "\n";
---EXPECT--
-xxxxx|5
-abcd|4
-axxxxx|6

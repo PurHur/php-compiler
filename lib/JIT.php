@@ -33295,7 +33295,8 @@ class JIT {
             ) {
                 $scopeName = JIT\OperandName::resolve($operand);
                 if (null !== $scopeName && '' !== $scopeName) {
-                    if ($this->jitNamedLocalHasDivergentBranchCompileTimeStrings($block, $scopeName)) {
+                    if ($this->jitNamedLocalHasDivergentBranchCompileTimeStrings($block, $scopeName)
+                        || $this->jitNamedLocalScopeHasConcatMutation($block, $scopeName)) {
                         $arg->compileTimeString = null;
                     } else {
                         $effective = $this->jitEffectiveNamedLocalCompileTimeString(
@@ -33467,6 +33468,52 @@ class JIT {
         }
 
         return $bound->compileTimeString;
+    }
+
+    /**
+     * True when $name was mutated via CONCAT on any block reachable walking parents.
+     * Init-literal back-walk cannot soundly describe loop-carried `.=` growth (#36406).
+     *
+     * @param array<int, true> $visited
+     */
+    private function jitNamedLocalScopeHasConcatMutation(
+        Block $block,
+        string $name,
+        array &$visited = []
+    ): bool {
+        $id = spl_object_id($block);
+        if (isset($visited[$id])) {
+            return false;
+        }
+        $visited[$id] = true;
+        $slot = null;
+        foreach ($block->eachNamedScopeSlot() as [$scopeName, $scopeSlot]) {
+            if ($scopeName === $name) {
+                $slot = $scopeSlot;
+                break;
+            }
+        }
+        if (null !== $slot) {
+            $aliases = $this->jitNamedScopeSlotAliases($block, $slot);
+            foreach ($block->opCodes as $prior) {
+                if (
+                    OpCode::TYPE_CONCAT === $prior->type
+                    && \in_array($prior->arg1, $aliases, true)
+                ) {
+                    return true;
+                }
+            }
+        }
+        foreach ($block->parents as $parent) {
+            if (!$parent instanceof Block) {
+                continue;
+            }
+            if ($this->jitNamedLocalScopeHasConcatMutation($parent, $name, $visited)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
