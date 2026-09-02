@@ -119,4 +119,50 @@ PHP;
             'assigned flag should be an i8 entry alloca (#36190)'
         );
     }
+
+    public function testAssignedLocalBeforeEchoHasNoUndefWarningAot(): void
+    {
+        $this->skipUnlessLlvmReady();
+        $code = <<<'PHP'
+<?php
+function fibo_r(int $n): int
+{
+    return ($n < 2) ? 1 : fibo_r($n - 2) + fibo_r($n - 1);
+}
+function fibo(int $n): void
+{
+    $r = fibo_r($n);
+    echo $r, "\n";
+}
+fibo(5);
+PHP;
+        $root = dirname(__DIR__, 2);
+        $src = sys_get_temp_dir().'/phpc_undef_assign_echo_'.getmypid().'.php';
+        file_put_contents($src, $code);
+        $bin = sys_get_temp_dir().'/phpc_undef_assign_echo_'.getmypid().'.bin';
+        $compile = 'env PHP_COMPILER_HELPER_RUNTIME_O=0 '
+            .escapeshellarg(PHP_BINARY).' '
+            .escapeshellarg($root.'/bin/compile.php')
+            .' -o '.escapeshellarg($bin).' '.escapeshellarg($src).' 2>&1';
+        exec($compile, $compileOut, $compileRc);
+        $this->assertSame(0, $compileRc, implode("\n", $compileOut));
+
+        $zendCmd = escapeshellarg(PHP_BINARY).' '.escapeshellarg($src).' 2>&1';
+        exec($zendCmd, $zendOut, $zendRc);
+        $this->assertSame(0, $zendRc, implode("\n", $zendOut));
+
+        try {
+            exec(escapeshellarg($bin).' 2>&1', $aotOut, $aotRc);
+            $this->assertSame(0, $aotRc, implode("\n", $aotOut));
+            $this->assertSame(implode("\n", $zendOut), implode("\n", $aotOut));
+            $this->assertStringNotContainsString(
+                'Undefined variable',
+                implode("\n", $aotOut),
+                'assigned locals must not warn on echo (#36405)'
+            );
+        } finally {
+            @unlink($bin);
+            @unlink($src);
+        }
+    }
 }

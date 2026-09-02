@@ -9365,6 +9365,7 @@ class JIT {
                             if ([] !== $destOp->usages || $forceAssign) {
                                 $this->assignOperand($destOp, $value, $forceAssign);
                             }
+                            $this->propagateAssignAliasBinding($destOp, $aliasOp, false);
                             $this->maybeBindNamedVariable($aliasOp);
                             $this->recordTernaryEchoPhiByAliasSlot($block, $op, $destOp, $aliasOp, $rhsSlot);
                             break;
@@ -9491,6 +9492,9 @@ class JIT {
                         $this->jitClearAssignTempOperand($destOp);
                     }
                     if (null !== $aliasOp) {
+                        if ($op->arg1 !== $op->arg2) {
+                            $this->propagateAssignAliasBinding($destOp, $aliasOp, $needsNamedStorageAssign);
+                        }
                         $this->maybeBindNamedVariable($aliasOp);
                         // Only ternary/?? merge assigns need echo→phi redirect (#18052). Recording
                         // every `$n = 1` made later by-ref updates invisible to echo (#24162).
@@ -34244,6 +34248,40 @@ class JIT {
             return;
         }
         $var->free();
+    }
+
+    /**
+     * php-cfg ASSIGN(resultTemp, namedAlias, rhs) — mark the named CV, not only the dead temp (#36405).
+     */
+    private function propagateAssignAliasBinding(
+        ?Operand $destOp,
+        Operand $aliasOp,
+        bool $namedAliasReceivedAssign
+    ): void {
+        $aliasName = JIT\OperandName::resolve($aliasOp);
+        if (null === $aliasName || '' === $aliasName) {
+            return;
+        }
+        if ($namedAliasReceivedAssign) {
+            if ($this->context->hasVariableOp($aliasOp)) {
+                JIT\UndefinedVariableHelper::markAssigned(
+                    $this->context,
+                    $aliasOp,
+                    $this->context->getVariableFromOp($aliasOp)
+                );
+            }
+
+            return;
+        }
+        if (null !== $destOp && $this->context->hasVariableOp($destOp)) {
+            $destVar = $this->context->getVariableFromOp($destOp);
+            $this->context->setVariableOp($aliasOp, $destVar);
+            $this->context->bindVariableByName(
+                $this->context->resolveRefAliasName($aliasName),
+                $destVar
+            );
+            JIT\UndefinedVariableHelper::markAssigned($this->context, $aliasOp, $destVar);
+        }
     }
 
     private function maybeBindNamedVariable(Operand $op): void
