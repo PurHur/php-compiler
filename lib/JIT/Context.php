@@ -1046,6 +1046,41 @@ class Context {
         $this->intrinsic->builder = $this->builder;
     }
 
+    /**
+     * After {@see replaceModuleFromBitcodeFile()}, Context init pointers still reference
+     * the discarded module — rebind from the restored bitcode (#36199).
+     */
+    public function rebindInitShutdownAfterModuleReplace(): void
+    {
+        $suffix = (string) getenv('PHP_COMPILER_INIT_SYMBOL_SUFFIX');
+        $init = $this->module->getNamedFunction('__init__'.$suffix);
+        if ($init instanceof PHPLLVM\Value\Function_) {
+            $this->initFunc = $init;
+            $this->initBlock = $this->firstBasicBlock($init);
+            $this->initLinearBlock = $this->initBlock;
+        }
+        $shutdown = $this->module->getNamedFunction('__shutdown__'.$suffix);
+        if ($shutdown instanceof PHPLLVM\Value\Function_) {
+            $this->shutdownFunc = $shutdown;
+            $this->shutdownBlock = $this->firstBasicBlock($shutdown);
+        }
+        $headerPreFlush = $this->module->getNamedFunction('__header_pre_flush__'.$suffix);
+        if ($headerPreFlush instanceof PHPLLVM\Value\Function_) {
+            $this->headerPreFlushFunc = $headerPreFlush;
+            $this->headerPreFlushBlock = $this->firstBasicBlock($headerPreFlush);
+        }
+        $this->initShutdownBlocksReady = true;
+    }
+
+    private function firstBasicBlock(PHPLLVM\Value\Function_ $func): ?PHPLLVM\BasicBlock
+    {
+        foreach ($func->getBasicBlocks() as $block) {
+            return $block;
+        }
+
+        return null;
+    }
+
     public function addExport(string $name, string $signature, Block $block): void {
         $this->exports[] = [$name, $signature, $block];
         CompileCache::recordExport($name, $signature, $block);

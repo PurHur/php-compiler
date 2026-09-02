@@ -980,8 +980,48 @@ class Runtime {
             // User-script AOT NestedJITs PregJitHelper via PregMatchRuntime (#21212 / #21200 shape).
             \PHPCompiler\JIT\Builtin\StringPregMatch::ensureLinked($context);
         }
-        $context->setMain($this->loadJit()->compile($block));
+
+        $this->jitLoadedFromDiskCache = false;
+        $this->jitCompileCacheKey = null;
+        $restoredMain = null;
+        if (
+            null !== $block
+            && is_string($sourceCode)
+            && is_string($sourceFilename)
+            && JIT\CompileCache::isEnabled()
+        ) {
+            $cacheKey = JIT\CompileCache::computeKey($sourceFilename, $sourceCode);
+            $this->jitCompileCacheKey = $cacheKey;
+            if (JIT\CompileCache::isFresh($cacheKey, $sourceFilename, $sourceCode)) {
+                if (JIT\CompileCache::tryRestore($context, $block, $cacheKey)) {
+                    $this->jitLoadedFromDiskCache = true;
+                    $restoredMain = JIT\CompileCache::resolveRestoredMainFunction($context, $cacheKey);
+                }
+            }
+            if (!$this->jitLoadedFromDiskCache) {
+                JIT\CompileCache::beginRecording($cacheKey);
+            }
+        }
+
+        if ($this->jitLoadedFromDiskCache && null !== $restoredMain) {
+            $context->setMain($restoredMain);
+        } else {
+            if ($this->jitLoadedFromDiskCache) {
+                $this->jitLoadedFromDiskCache = false;
+            }
+            $context->setMain($this->loadJit()->compile($block));
+        }
         \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_compile_done');
+
+        if (
+            !$this->jitLoadedFromDiskCache
+            && null !== $this->jitCompileCacheKey
+            && null !== $this->jitContext
+        ) {
+            JIT\CompileCache::save($this->jitContext, $this->jitCompileCacheKey);
+        }
+        JIT\CompileCache::finishRecording();
+
         $context->compileToFile($outfile);
         \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_compiletofile_done');
         // Self-host AOT: returning destroys $context / LLVM EE and can spin 15+ min

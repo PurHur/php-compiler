@@ -458,6 +458,27 @@ final class HelperRuntimeCache
     }
 
     /**
+     * Digest of linkable helper-runtime units for MCJIT/AOT compile-cache keys (#36199).
+     *
+     * Empty when helper-runtime O is off — still stable across runs.
+     */
+    public static function cacheKeySegment(): string
+    {
+        static $segment = null;
+        if (null !== $segment) {
+            return $segment;
+        }
+        $parts = [self::coreFingerprint()];
+        $index = self::helperIndex();
+        ksort($index, SORT_STRING);
+        foreach ($index as $logical => $entry) {
+            $parts[] = strtolower($logical)."\0".$entry['symbol']."\0".basename($entry['dir']);
+        }
+
+        return $segment = hash('sha256', implode("\0", $parts));
+    }
+
+    /**
      * Pre-#23458 lowering-machinery key — must match the old coreFingerprint()
      * byte-for-byte so committed manifests without deps[] stay fresh.
      */
