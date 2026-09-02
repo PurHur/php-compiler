@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Ast;
 
+use PHPCompiler\SourceUnit;
+
 /**
  * Detect list destructuring spread assignment for reference-profile rejection (#17182).
  *
@@ -22,7 +24,7 @@ final class ListSpreadAssignSyntax
             return null;
         }
 
-        $tokens = token_get_all($code);
+        $tokens = SourceUnit::tokens($code);
         for ($i = 0, $c = \count($tokens); $i < $c; ++$i) {
             if (!\is_array($tokens[$i]) || T_ELLIPSIS !== $tokens[$i][0]) {
                 continue;
@@ -149,6 +151,6 @@ final class ListSpreadAssignSyntax
 
     private static function byteOffsetToLine(string $code, int $offset): int
     {
-        return substr_count(substr($code, 0, max(0, $offset)), "\n") + 1;
+        return SourceUnit::byteOffsetToLine($code, max(0, $offset));
     }
 }

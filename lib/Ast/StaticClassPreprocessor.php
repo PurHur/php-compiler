@@ -7,6 +7,7 @@ namespace PHPCompiler\Ast;
 use PHPCompiler\Compiler\CompileFatal;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\ReferenceProfileTokenScan;
+use PHPCompiler\SourceUnit;
 
 /**
  * Strip `static class` for nikic/php-parser (no class-level T_STATIC before T_CLASS) (#6929).
@@ -45,7 +46,7 @@ final class StaticClassPreprocessor
         while (preg_match($pattern, $code, $m, PREG_OFFSET_CAPTURE, $offset)) {
             $matchOffset = $m[0][1];
             $pieces[] = substr($code, $offset, $matchOffset - $offset);
-            $line = substr_count(substr($code, 0, $matchOffset), "\n") + 1;
+            $line = SourceUnit::byteOffsetToLine($code, $matchOffset);
             $this->staticLines[$line] = true;
             $pieces[] = 'class ';
             $offset = $matchOffset + strlen($m[0][0]);

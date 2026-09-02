@@ -36,6 +36,11 @@ final class ReferenceProfileTokenScan
 
         $normalized = str_replace('\\', '/', $filename);
 
-        return str_contains($normalized, '/lib/');
+        // Relative paths (`lib/Foo.php`) and absolute (`/compiler/lib/Foo.php`) both skip (#36228).
+        if (str_contains($normalized, '/lib/') || str_starts_with($normalized, 'lib/')) {
+            return true;
+        }
+
+        return str_contains($normalized, '/ext/') || str_starts_with($normalized, 'ext/');
     }
 }

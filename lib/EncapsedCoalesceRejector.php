@@ -30,7 +30,7 @@ final class EncapsedCoalesceRejector
             return $code;
         }
 
-        $tokens = token_get_all($code);
+        $tokens = SourceUnit::tokens($code);
 
         for ($i = 0, $c = \count($tokens); $i < $c; ++$i) {
             $closeIdx = null;

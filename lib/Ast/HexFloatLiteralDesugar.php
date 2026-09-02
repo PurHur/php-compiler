@@ -6,6 +6,7 @@ namespace PHPCompiler\Ast;
 
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\HexFloat;
+use PHPCompiler\SourceUnit;
 use PhpParser\Error as ParserError;
 
 /**
@@ -35,7 +36,7 @@ final class HexFloatLiteralDesugar
             return $code;
         }
 
-        $tokens = token_get_all($code);
+        $tokens = SourceUnit::tokens($code);
         $replacements = [];
         $codeOffset = 0;
 

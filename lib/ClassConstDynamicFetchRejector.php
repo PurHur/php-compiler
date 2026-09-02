@@ -33,7 +33,7 @@ final class ClassConstDynamicFetchRejector
             return $code;
         }
 
-        $tokens = token_get_all($code);
+        $tokens = SourceUnit::tokens($code);
         $count = \count($tokens);
         for ($i = 0; $i < $count; ++$i) {
             if (!self::isDoubleColon($tokens, $i)) {

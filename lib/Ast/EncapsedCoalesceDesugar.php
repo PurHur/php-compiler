@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\Ast;
 
 use PHPCompiler\CompilerVersion;
+use PHPCompiler\SourceUnit;
 
 /**
  * Desugar PHP 8.4+ null coalesce inside double-quoted `{$...}` interpolation (#14063, #14113).
@@ -29,7 +30,7 @@ final class EncapsedCoalesceDesugar
             return $code;
         }
 
-        $tokens = token_get_all($code);
+        $tokens = SourceUnit::tokens($code);
         $offsets = self::tokenByteOffsets($tokens);
         $replacements = [];
         $tempCounter = 0;

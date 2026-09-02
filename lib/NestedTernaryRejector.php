@@ -139,7 +139,7 @@ final class NestedTernaryRejector
             return substr_count($code, '?');
         }
         $count = 0;
-        foreach (token_get_all($code) as $token) {
+        foreach (SourceUnit::tokens($code) as $token) {
             if (\is_string($token) && '?' === $token) {
                 ++$count;
             }

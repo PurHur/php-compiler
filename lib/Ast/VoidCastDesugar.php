@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\Ast;
 
 use PHPCompiler\CompilerVersion;
+use PHPCompiler\SourceUnit;
 
 /**
  * Desugar statement-level `(void)` cast for nikic/php-parser when PROFILE≥8.5 (#7346, #28441).
@@ -26,7 +27,7 @@ final class VoidCastDesugar
             return $code;
         }
 
-        $tokens = token_get_all($code);
+        $tokens = SourceUnit::tokens($code);
         $replacements = [];
         for ($i = 0, $c = \count($tokens); $i < $c; ++$i) {
             if (!self::isVoidCastPrefix($tokens, $i, $voidCloseIdx)) {

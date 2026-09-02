@@ -28,7 +28,7 @@ final class ReadonlyFunctionRejector
             return $code;
         }
 
-        $tokens = token_get_all($code);
+        $tokens = SourceUnit::tokens($code);
         $braceDepth = 0;
         $classBodyDepth = null;
         $methodBodyDepth = null;

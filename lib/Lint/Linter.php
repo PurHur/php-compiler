@@ -30,6 +30,11 @@ final class Linter
     /** @var list<string> */
     private array $dynamicIncludeWarnings = [];
 
+    private bool $includeLintCacheActive = false;
+
+    /** @var array<string, Script> */
+    private array $includeLintParsed = [];
+
     public function __construct(?Runtime $runtime = null)
     {
         $this->runtime = $runtime ?? new Runtime();
@@ -53,31 +58,36 @@ final class Linter
      */
     public function lintProject(string $entry): array
     {
-        $issues = $this->lintFile($entry);
-        [$projectDir, $manifest] = ProjectBootstrap::resolveFromScript($entry);
-        if (null === $projectDir || null === $manifest) {
-            return $issues;
-        }
-
-        $graph = ProjectGraph::resolve($projectDir);
-        foreach ($graph['errors'] as $message) {
-            $issues[] = new Issue($entry, 0, 'project-graph', $message, 154);
-        }
-        $extraFiles = $graph['files'];
-
-        $entryReal = realpath($entry) ?: $entry;
-        foreach ($extraFiles as $file) {
-            $fileReal = realpath($file) ?: $file;
-            if ($fileReal === $entryReal || !is_file($file)) {
-                continue;
+        $this->beginIncludeLintCache();
+        try {
+            $issues = $this->lintFile($entry);
+            [$projectDir, $manifest] = ProjectBootstrap::resolveFromScript($entry);
+            if (null === $projectDir || null === $manifest) {
+                return $issues;
             }
-            $issues = array_merge(
-                $issues,
-                $this->lintSource((string) file_get_contents($file), $file)
-            );
-        }
 
-        return $this->dedupeIssues($issues);
+            $graph = ProjectGraph::resolve($projectDir);
+            foreach ($graph['errors'] as $message) {
+                $issues[] = new Issue($entry, 0, 'project-graph', $message, 154);
+            }
+            $extraFiles = $graph['files'];
+
+            $entryReal = realpath($entry) ?: $entry;
+            foreach ($extraFiles as $file) {
+                $fileReal = realpath($file) ?: $file;
+                if ($fileReal === $entryReal || !is_file($file)) {
+                    continue;
+                }
+                $issues = array_merge(
+                    $issues,
+                    $this->lintSource((string) file_get_contents($file), $file)
+                );
+            }
+
+            return $this->dedupeIssues($issues);
+        } finally {
+            $this->endIncludeLintCache();
+        }
     }
 
     /**
@@ -99,14 +109,19 @@ final class Linter
         }
         $this->dynamicIncludeWarnings = [];
         $issues = [];
-        foreach ($files as $file) {
-            $issues = array_merge(
-                $issues,
-                $this->lintSource((string) file_get_contents($file), $file)
-            );
-        }
+        $this->beginIncludeLintCache();
+        try {
+            foreach ($files as $file) {
+                $issues = array_merge(
+                    $issues,
+                    $this->lintSource((string) file_get_contents($file), $file)
+                );
+            }
 
-        return $this->dedupeIssues($issues);
+            return $this->dedupeIssues($issues);
+        } finally {
+            $this->endIncludeLintCache();
+        }
     }
 
     /**
@@ -158,7 +173,7 @@ final class Linter
     {
         $issues = [];
         try {
-            $script = $this->parseForLint($code, $filename);
+            $script = $this->parseForLintCached($code, $filename);
         } catch (\Throwable $e) {
             return $this->issuesFromParseFailure($e, $filename);
         }
@@ -180,7 +195,7 @@ final class Linter
                 }
                 $seenFiles[$resolved] = true;
                 try {
-                    $included = $this->parseForLint(
+                    $included = $this->parseForLintCached(
                         (string) file_get_contents($resolved),
                         $resolved
                     );
@@ -218,6 +233,34 @@ final class Linter
         $this->runtime->detector->detect($script);
 
         return $script;
+    }
+
+    private function beginIncludeLintCache(): void
+    {
+        $this->includeLintCacheActive = true;
+        $this->includeLintParsed = [];
+    }
+
+    private function endIncludeLintCache(): void
+    {
+        $this->includeLintCacheActive = false;
+        $this->includeLintParsed = [];
+    }
+
+    private function parseForLintCached(string $code, string $filename): Script
+    {
+        if ($this->includeLintCacheActive) {
+            $key = realpath($filename) ?: $filename;
+            if (isset($this->includeLintParsed[$key])) {
+                return $this->includeLintParsed[$key];
+            }
+            $script = $this->parseForLint($code, $filename);
+            $this->includeLintParsed[$key] = $script;
+
+            return $script;
+        }
+
+        return $this->parseForLint($code, $filename);
     }
 
     /**

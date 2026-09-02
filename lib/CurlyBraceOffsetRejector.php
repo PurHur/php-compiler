@@ -33,7 +33,7 @@ final class CurlyBraceOffsetRejector
             return $code;
         }
 
-        $tokens = token_get_all($code);
+        $tokens = SourceUnit::tokens($code);
         $encapsedBraceDepth = 0;
 
         for ($i = 0, $n = \count($tokens); $i < $n; ++$i) {

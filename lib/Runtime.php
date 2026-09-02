@@ -415,13 +415,17 @@ class Runtime {
         TryCatchElseSupport::beginCompilationUnit();
         CatchIntersectionSupport::beginCompilationUnit();
         $code = TryCatchElseSupport::extract($code);
+        SourceUnit::bind($code);
         $sealedPreprocessor = new SealedClassPreprocessor();
         [$code, $permitsByLine] = $sealedPreprocessor->preprocess($code);
+        SourceUnit::bind($code);
         $this->sealedClassAnnotator->setPermitsByLine($permitsByLine);
         $staticPreprocessor = new StaticClassPreprocessor();
         [$code, $staticLines] = $staticPreprocessor->preprocess($code, $filename);
+        SourceUnit::bind($code);
         $this->staticClassAnnotator->setStaticLines($staticLines);
         [$code, $newRegistry] = (new SourcePreprocessor\PropertyHooks())->process($code, $filename);
+        SourceUnit::bind($code);
         // Request-lifetime registry: merge on every compile unit (require/include/eval).
         // Replacing wiped interface/abstract hook metadata before DECLARE of later files (#28374, #7031).
         $this->vmContext->propertyHookRegistry = self::mergePropertyHookRegistry(
@@ -487,13 +491,16 @@ class Runtime {
      */
     public function prepareSourceForParser(string $code, string $filename = 'unknown'): array
     {
+        SourceUnit::begin($code);
         $profileScope = LanguageProfileScope::beginForCompilationUnit($code, $filename);
         try {
             [$code, $bareRethrowLines] = $this->preprocessSourceForParse($code, $filename);
+            SourceUnit::bind($code);
             $code = $this->rewriteSourceBeforeParser($code, $filename);
 
             return [$code, $bareRethrowLines];
         } finally {
+            SourceUnit::end();
             $profileScope->end();
         }
     }
@@ -645,14 +652,23 @@ class Runtime {
     }
 
     /** php-parser NameResolver aliases persist across traversals on one PHPCfg Parser (#1416). */
+    private static ?\ReflectionProperty $parserAstTraverserRef = null;
+
+    private static ?\ReflectionProperty $traverserVisitorsRef = null;
+
     private function resetParserNameResolverState(): void
     {
-        $parserRef = new \ReflectionProperty(\PHPCfg\Parser::class, 'astTraverser');
-        $parserRef->setAccessible(true);
-        $traverser = $parserRef->getValue($this->parser);
-        $visitorsRef = new \ReflectionProperty($traverser, 'visitors');
-        $visitorsRef->setAccessible(true);
-        foreach ($visitorsRef->getValue($traverser) as $visitor) {
+        if (null === self::$parserAstTraverserRef) {
+            self::$parserAstTraverserRef = new \ReflectionProperty(\PHPCfg\Parser::class, 'astTraverser');
+            self::$parserAstTraverserRef->setAccessible(true);
+            self::$traverserVisitorsRef = new \ReflectionProperty(
+                self::$parserAstTraverserRef->getValue($this->parser),
+                'visitors'
+            );
+            self::$traverserVisitorsRef->setAccessible(true);
+        }
+        $traverser = self::$parserAstTraverserRef->getValue($this->parser);
+        foreach (self::$traverserVisitorsRef->getValue($traverser) as $visitor) {
             if ($visitor instanceof \PHPCompiler\Ast\MultiBlockNameResolver) {
                 $context = $visitor->getNameContext();
                 if ($context instanceof \PHPCompiler\Ast\MultiBlockNameContext) {
