@@ -294,6 +294,9 @@ class Block {
     /** Cached {@see argRecvOpcodes()} — CFG-stable (#36207). */
     private ?array $argRecvOpcodesCache = null;
 
+    /** Cached compiler temp slots (not named locals / constants) for VM JUMPIF release (#36411). */
+    private ?array $ephemeralScopeSlotIndexesCache = null;
+
     /** assign.result temp => CV lvalue slot for reads after in-place mutation (#15125). */
     private array $assignResultToLvalueSlot = [];
 
@@ -536,10 +539,12 @@ class Block {
             $this->operandBySlotCache = [];
             $this->isNamedVariableSlotCache = [];
             $this->operandForScopeSlotCache = [];
+            $this->ephemeralScopeSlotIndexesCache = null;
 
             return;
         }
         unset($this->operandBySlotCache[$slot], $this->isNamedVariableSlotCache[$slot], $this->operandForScopeSlotCache[$slot]);
+        $this->ephemeralScopeSlotIndexesCache = null;
     }
 
     private function bindScopeOperandSlot(Operand $operand, int $slot): void
@@ -1675,6 +1680,32 @@ class Block {
         $this->operandForScopeSlotCache[$slot] = null;
 
         return null;
+    }
+
+    /**
+     * Compiler temp scope slots (excludes named CVs and literal constants) — hot JUMPIF dead-temp scan (#36411).
+     *
+     * @return list<int>
+     */
+    public function ephemeralScopeSlotIndexes(): array
+    {
+        if (null !== $this->ephemeralScopeSlotIndexesCache) {
+            return $this->ephemeralScopeSlotIndexesCache;
+        }
+        $slots = [];
+        foreach ($this->scope as $operand) {
+            $slot = $this->scope[$operand];
+            if (!is_int($slot)) {
+                continue;
+            }
+            if (isset($this->constants[$slot]) || $this->isNamedVariableSlot($slot)) {
+                continue;
+            }
+            $slots[$slot] = $slot;
+        }
+        $this->ephemeralScopeSlotIndexesCache = array_values($slots);
+
+        return $this->ephemeralScopeSlotIndexesCache;
     }
 
     /**
