@@ -11278,7 +11278,41 @@ class JIT {
                                 = $result->compileTimeString;
                         }
                     }
-                    $this->markScopeVariableAssignedIfTracked($destOp, $result);
+                    // {main} `$out = $a.$b` must populate the script-global heap box that
+                    // attachEchoScriptGlobalName makes ECHO read. Native-string CONCAT only
+                    // wrote a local `__string__*` alloca (#36366). Use the opcode $block
+                    // (not jitEnclosingBlock) — same predicate echo uses for script-globals.
+                    if (!$this->publishConcatResultToMainScriptGlobal(
+                        $block,
+                        $destOp,
+                        $result,
+                        (int) $op->arg1
+                    )) {
+                        $this->markScopeVariableAssignedIfTracked($destOp, $result);
+                        // Keep named binding on the native string alloca so ECHO can prefer
+                        // it over an empty script-global box (#36366).
+                        $bindName = JIT\OperandName::resolve($destOp);
+                        if (null === $bindName || '' === $bindName) {
+                            $slot = $block->slotForOperand($destOp);
+                            if (null !== $slot) {
+                                foreach ($block->scopedOperands() as $scopeOp) {
+                                    if ($block->slotForOperand($scopeOp) !== $slot) {
+                                        continue;
+                                    }
+                                    $bindName = JIT\OperandName::resolve($scopeOp);
+                                    if (null !== $bindName && '' !== $bindName) {
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        if (null !== $bindName && '' !== $bindName) {
+                            $this->context->bindVariableByName(
+                                $this->context->resolveRefAliasName($bindName),
+                                $result
+                            );
+                        }
+                    }
                     $this->maybeRefreshIncludeBindingsBeforeUse();
                     break;
                 case OpCode::TYPE_CONST_FETCH:
@@ -11895,20 +11929,30 @@ class JIT {
                     if (
                         null !== $echoNameForByRefEarly
                         && '' !== $echoNameForByRefEarly
-                        && isset($this->context->namedVariableBindings[$echoNameForByRefEarly])
                     ) {
-                        $earlyBound = $this->context->namedVariableBindings[$echoNameForByRefEarly];
-                        if (
-                            Variable::KIND_VARIABLE === $earlyBound->kind
-                            && Variable::TYPE_VALUE === $earlyBound->type
-                            && (
-                                null !== $earlyBound->valueBoxAliasPtr
-                                || $earlyBound->borrowedValueEntry
-                                || $earlyBound->assignRefLvalueAlias
-                            )
-                        ) {
-                            $scriptGlobalEchoName = null;
-                            $arg = $earlyBound;
+                        $echoNameForByRefEarly = $this->context->resolveRefAliasName($echoNameForByRefEarly);
+                        if (isset($this->context->namedVariableBindings[$echoNameForByRefEarly])) {
+                            $earlyBound = $this->context->namedVariableBindings[$echoNameForByRefEarly];
+                            if (
+                                Variable::KIND_VARIABLE === $earlyBound->kind
+                                && Variable::TYPE_VALUE === $earlyBound->type
+                                && (
+                                    null !== $earlyBound->valueBoxAliasPtr
+                                    || $earlyBound->borrowedValueEntry
+                                    || $earlyBound->assignRefLvalueAlias
+                                )
+                            ) {
+                                $scriptGlobalEchoName = null;
+                                $arg = $earlyBound;
+                            } elseif (
+                                // {main} `$out = $a.$b` keeps a native `__string__*` alloca while
+                                // echoScriptGlobalName points at an empty heap box (#36366).
+                                Variable::KIND_VARIABLE === $earlyBound->kind
+                                && Variable::TYPE_STRING === $earlyBound->type
+                            ) {
+                                $scriptGlobalEchoName = null;
+                                $arg = $earlyBound;
+                            }
                         }
                     }
                     if (null === $arg && null !== $scriptGlobalEchoName) {
@@ -13873,14 +13917,32 @@ class JIT {
                             $this->context->scope->toCall,
                             $outgoingArgIndex
                         );
+                        // Prefer a live native `__string__*` named binding over the {main}
+                        // script-global heap box. CONCAT stores the bytes in a local alloca
+                        // while ARG_SEND/strlen used to read the empty module box (#36366).
+                        $sendValue = null;
+                        if (null !== $sendLocalName && '' !== $sendLocalName) {
+                            $boundName = $this->context->resolveRefAliasName($sendLocalName);
+                            if (isset($this->context->namedVariableBindings[$boundName])) {
+                                $bound = $this->context->namedVariableBindings[$boundName];
+                                if (
+                                    Variable::KIND_VARIABLE === $bound->kind
+                                    && Variable::TYPE_STRING === $bound->type
+                                ) {
+                                    $sendValue = $bound;
+                                }
+                            }
+                        }
                         // {main} script globals: scope slots can retain stale NATIVE_LONG after
                         // the heap box was updated (echo path #23842; substr_compare $length #4297).
-                        $sendValue = $this->resolveScriptGlobalForRuntimeRead(
-                            $sendOperand,
-                            $block,
-                            null,
-                            $skipUndefGuardForByRefSend
-                        );
+                        if (null === $sendValue) {
+                            $sendValue = $this->resolveScriptGlobalForRuntimeRead(
+                                $sendOperand,
+                                $block,
+                                null,
+                                $skipUndefGuardForByRefSend
+                            );
+                        }
                         if (null === $sendValue) {
                             $sendValue = $this->context->getVariableFromOp($sendOperand);
                             if (null !== $sendLocalName && '' !== $sendLocalName) {
@@ -20611,6 +20673,72 @@ class JIT {
         $this->syncCompileTimeDatePeriod($globalVar, $value, false);
         $this->context->bindVariableByName($this->context->resolveRefAliasName($name), $globalVar);
         $this->markScopeVariableAssignedIfTracked($resultOp, $globalVar);
+
+        return true;
+    }
+
+    /**
+     * Publish CONCAT into the {main} script-global box ECHO reads (#36366).
+     *
+     * Uses the opcode {@see Block} (same as attachEchoScriptGlobalName), not
+     * {@see Context::$jitEnclosingBlock}, which can disagree mid-compile.
+     */
+    private function publishConcatResultToMainScriptGlobal(
+        Block $block,
+        Operand $destOp,
+        JIT\Variable $value,
+        ?int $destSlot = null
+    ): bool {
+        if (!$block->isMainScript()) {
+            return false;
+        }
+        // Same name resolution markAssigned uses — OperandName alone can miss when
+        // the CONCAT dest Temporary shares a slot with a named Variable (#36366).
+        $name = null;
+        if (null !== $destSlot) {
+            $name = $this->resolveLocalNameForOperand($block, $destOp, $destSlot);
+        }
+        if (null === $name || '' === $name) {
+            $name = JIT\UndefinedVariableHelper::resolveTrackableName($destOp, $value);
+        }
+        if (null === $name || '' === $name) {
+            $name = JIT\OperandName::resolve($destOp);
+        }
+        if (null === $name || '' === $name) {
+            $slot = $destSlot ?? $block->slotForOperand($destOp);
+            if (null !== $slot) {
+                foreach ($block->scopedOperands() as $scopeOp) {
+                    if ($block->slotForOperand($scopeOp) !== $slot) {
+                        continue;
+                    }
+                    $scopeName = JIT\OperandName::resolve($scopeOp);
+                    if (null !== $scopeName && '' !== $scopeName) {
+                        $name = $scopeName;
+                        break;
+                    }
+                }
+            }
+        }
+        if (
+            null === $name
+            || '' === $name
+            || \PHPCompiler\Web\Superglobals::isSuperglobalName($name)
+            || $this->context->isForeachByRefLocalName($name, $block)
+        ) {
+            return false;
+        }
+        $globalVar = $this->context->ensureScriptGlobal($name);
+        $globalPtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $globalVar);
+        JIT\JitValueBox::assignToPointer($this->context, $globalPtr, $value);
+        JIT\JitValueBox::publishAfterWrite($this->context, $globalPtr);
+        $this->invalidateScriptGlobalCompileTimeMetadata($globalVar);
+        $this->syncCompileTimeString($globalVar, $value, false);
+        // Keep dest / named binding on the native `__string__*` result. Rebinding to
+        // the script-global TYPE_VALUE box made ECHO read an empty heap box when
+        // assignToPointer did not materialize the string bytes (#36366).
+        $this->context->setVariableOp($destOp, $value);
+        $this->context->bindVariableByName($this->context->resolveRefAliasName($name), $value);
+        $this->markScopeVariableAssignedIfTracked($destOp, $value);
 
         return true;
     }
