@@ -1,0 +1,17 @@
+{
+    "name": "lz4",
+    "load_order": 53,
+    "depends": [],
+    "default_enabled": true,
+    "host_libs": [],
+    "backends": {
+        "vm": true,
+        "jit": true,
+        "aot": false
+    },
+    "provides": {
+        "functions": [],
+        "classes": []
+    },
+    "policy_env": "PHP_COMPILER_ENABLE_LZ4"
+}

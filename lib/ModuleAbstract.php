@@ -52,11 +52,11 @@ abstract class ModuleAbstract implements Module {
     }
 
     /**
-     * No declared dependencies by default (RELEASE-PLAN Phase 2.5).
+     * No declared dependencies by default (RELEASE-PLAN Phase 2.5 / #36204).
      *
-     * Overriding this is how an extension states an ordering constraint that is currently only
-     * implicit in Runtime::loadCoreModules() — e.g. ext/dom depends on libxml. Defaulting to none
-     * keeps every existing module behaving exactly as before.
+     * Overriding this is how an extension states an ordering constraint — e.g. ext/dom depends on
+     * libxml. Keep the same list in `ext/<name>/ext.json` (`depends`) and regenerate manifests /
+     * ExtensionRegistry via script/generate-extension-manifests.php.
      *
      * @return list<string>
      */

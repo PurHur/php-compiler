@@ -1,0 +1,17 @@
+{
+    "name": "standard",
+    "load_order": 83,
+    "depends": [],
+    "default_enabled": true,
+    "host_libs": [],
+    "backends": {
+        "vm": true,
+        "jit": true,
+        "aot": false
+    },
+    "provides": {
+        "functions": [],
+        "classes": []
+    },
+    "policy_env": null
+}

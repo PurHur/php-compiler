@@ -1,0 +1,17 @@
+{
+    "name": "pcntl",
+    "load_order": 34,
+    "depends": [],
+    "default_enabled": true,
+    "host_libs": [],
+    "backends": {
+        "vm": true,
+        "jit": false,
+        "aot": false
+    },
+    "provides": {
+        "functions": [],
+        "classes": []
+    },
+    "policy_env": null
+}

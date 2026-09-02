@@ -1,0 +1,17 @@
+{
+    "name": "pgsql",
+    "load_order": 62,
+    "depends": [],
+    "default_enabled": true,
+    "host_libs": [],
+    "backends": {
+        "vm": true,
+        "jit": false,
+        "aot": false
+    },
+    "provides": {
+        "functions": [],
+        "classes": []
+    },
+    "policy_env": "PHP_COMPILER_ENABLE_PGSQL"
+}

@@ -3,40 +3,23 @@
 declare(strict_types=1);
 
 /**
- * Generates lib/ExtensionRegistry.php from the load list in Runtime::loadCoreModules().
+ * Generates lib/ExtensionRegistry.php from ext/<name>/ext.json manifests (#36204 / RELEASE-PLAN Phase 2.5).
  *
- * RELEASE-PLAN Phase 2.5: "a per-extension manifest enumerated at build time, replacing 75
- * constructor calls". This is the first half — move the list out of a hand-maintained method in a
- * core file and into a generated one, WITHOUT changing the order.
- *
- * Two deliberate constraints:
- *
- *   1. The generated file emits literal `new \PHPCompiler\ext\<name>\Module()` expressions, not
- *      dynamic instantiation from strings. The AOT compiler resolves these statically; a
- *      `new $className` would leave the modules unreferenced and they would not be compiled in.
- *
- *   2. The order is copied verbatim from the current hardcoded list. Ordering constraints here are
- *      real (libxml before dom before xsl) and partly still undeclared, so deriving a fresh order
- *      from dependencies is a separate, later step that must be proven equivalent first.
+ * Manifests are produced by script/generate-extension-manifests.php. Order comes from each
+ * manifest's `load_order` field (copied from the historical Runtime::loadCoreModules list) until
+ * a proven topological sort lands. Entries remain literal `new` expressions so AOT resolves them.
  *
  * Usage:
  *   php script/generate-extension-registry.php            # write lib/ExtensionRegistry.php
  *   php script/generate-extension-registry.php --check    # fail if the file is out of date
+ *   php script/generate-extension-registry.php --only=standard,spl
+ *   php script/generate-extension-registry.php --without=intl,gmp
  */
 
 $root = dirname(__DIR__);
 $check = in_array('--check', $argv, true);
 $target = $root.'/lib/ExtensionRegistry.php';
 
-/**
- * Build-time extension selection (RELEASE-PLAN Phase 2.5).
- *
- * Selection has to happen HERE rather than at runtime: the registry emits literal `new` expressions
- * and the AOT compiler resolves them statically, so a module that is referenced is compiled in even
- * if a runtime filter later skips loading it. Dropping the cost means dropping the reference.
- *
- * Identity is the ext/ DIRECTORY. getExtensionName() is not usable — 20 modules report 'standard'.
- */
 $only = null;
 $without = [];
 foreach ($argv as $arg) {
@@ -47,32 +30,84 @@ foreach ($argv as $arg) {
     }
 }
 
-$runtimeSrc = (string) file_get_contents($root.'/lib/Runtime.php');
-
-// Prefer the hardcoded list while it still exists; once Runtime consumes the registry, the
-// committed registry is the source of truth and regeneration is a no-op that still verifies.
-$order = [];
-if (preg_match('/private function loadCoreModules\(\): void \{(.*?)\n    \}/s', $runtimeSrc, $m)
-    && preg_match_all('/\$this->load\(new ext\\\\([A-Za-z0-9_]+)\\\\Module\)/', $m[1], $mm)
-) {
-    $order = $mm[1];
-}
-
-if ([] === $order && is_file($target)) {
-    // Runtime already delegates; re-read the committed registry so --check stays meaningful.
-    $existing = (string) file_get_contents($target);
-    if (preg_match_all('/new \\\\PHPCompiler\\\\ext\\\\([A-Za-z0-9_]+)\\\\Module\(\)/', $existing, $em)) {
-        $order = $em[1];
+/**
+ * @return array{order: list<string>, depends: array<string, list<string>>}
+ */
+function load_manifest_order(string $root): array
+{
+    $manifests = [];
+    foreach (glob($root.'/ext/*/ext.json') ?: [] as $path) {
+        $name = basename(dirname($path));
+        $data = json_decode((string) file_get_contents($path), true);
+        if (!is_array($data) || ($data['name'] ?? null) !== $name) {
+            fwrite(STDERR, "generate-extension-registry: invalid manifest {$path}\n");
+            exit(2);
+        }
+        if (!isset($data['load_order']) || !is_int($data['load_order'])) {
+            fwrite(STDERR, "generate-extension-registry: missing int load_order in {$path}\n");
+            exit(2);
+        }
+        $depends = [];
+        if (isset($data['depends']) && is_array($data['depends'])) {
+            foreach ($data['depends'] as $dep) {
+                if (is_string($dep) && $dep !== '') {
+                    $depends[] = strtolower($dep);
+                }
+            }
+        }
+        $manifests[$name] = [
+            'load_order' => $data['load_order'],
+            'depends' => $depends,
+            'default_enabled' => !isset($data['default_enabled']) || (bool) $data['default_enabled'],
+        ];
     }
+
+    if ($manifests === []) {
+        return ['order' => [], 'depends' => []];
+    }
+
+    uasort($manifests, static function (array $a, array $b): int {
+        return $a['load_order'] <=> $b['load_order'];
+    });
+
+    $order = array_keys($manifests);
+    $depends = [];
+    foreach ($manifests as $name => $info) {
+        $depends[$name] = $info['depends'];
+    }
+
+    return ['order' => $order, 'depends' => $depends];
 }
 
-if ([] === $order) {
-    fwrite(STDERR, "generate-extension-registry: could not determine the load order\n");
-    exit(2);
+/**
+ * Legacy fallback while manifests are being introduced.
+ *
+ * @return list<string>
+ */
+function legacy_order(string $root, string $target): array
+{
+    $runtimeSrc = (string) file_get_contents($root.'/lib/Runtime.php');
+    if (preg_match('/private function loadCoreModules\(\): void \{(.*?)\n    \}/s', $runtimeSrc, $m)
+        && preg_match_all('/\$this->load\(new ext\\\\([A-Za-z0-9_]+)\\\\Module\)/', $m[1], $mm)
+    ) {
+        return $mm[1];
+    }
+    if (is_file($target)) {
+        $existing = (string) file_get_contents($target);
+        if (preg_match_all('/new \\\\PHPCompiler\\\\ext\\\\([A-Za-z0-9_]+)\\\\Module\(\)/', $existing, $em)) {
+            return $em[1];
+        }
+    }
+
+    return [];
 }
 
-// Apply selection, then pull in declared dependencies so a selected extension never loses one.
-if (null !== $only || [] !== $without) {
+$loaded = load_manifest_order($root);
+$order = $loaded['order'];
+$declaredDeps = $loaded['depends'];
+
+if ($order === []) {
+    $order = legacy_order($root, $target);
     $declaredDeps = [];
     foreach ($order as $name) {
         $modSrc = @file_get_contents($root.'/ext/'.$name.'/Module.php');
@@ -83,11 +118,40 @@ if (null !== $only || [] !== $without) {
             $declaredDeps[$name] = array_map('strtolower', $dn[1]);
         }
     }
+}
 
+if ($order === []) {
+    fwrite(STDERR, "generate-extension-registry: could not determine the load order\n");
+    exit(2);
+}
+
+// Every Module.php directory must have a manifest once manifests exist.
+$moduleDirs = [];
+foreach (glob($root.'/ext/*/Module.php') ?: [] as $modulePath) {
+    $moduleDirs[] = basename(dirname($modulePath));
+}
+sort($moduleDirs);
+$manifestNames = $order;
+sort($manifestNames);
+if ($loaded['order'] !== [] && $moduleDirs !== $manifestNames) {
+    $missingManifest = array_diff($moduleDirs, $manifestNames);
+    $extraManifest = array_diff($manifestNames, $moduleDirs);
+    if ($missingManifest !== []) {
+        fwrite(STDERR, 'generate-extension-registry: Module.php without ext.json: '
+            .implode(', ', $missingManifest)."\n");
+        exit(2);
+    }
+    if ($extraManifest !== []) {
+        fwrite(STDERR, 'generate-extension-registry: ext.json without Module.php: '
+            .implode(', ', $extraManifest)."\n");
+        exit(2);
+    }
+}
+
+if (null !== $only || [] !== $without) {
     $selected = null === $only ? $order : array_values(array_intersect($order, $only));
     $selected = array_values(array_diff($selected, $without));
 
-    // Dependency closure: keeping dom must keep libxml, or the build loses it silently.
     $changed = true;
     while ($changed) {
         $changed = false;
@@ -107,7 +171,6 @@ if (null !== $only || [] !== $without) {
             .implode(', ', $pulled)."\n");
     }
 
-    // Preserve the original relative order — it is load-bearing and only partly declared.
     $order = array_values(array_filter($order, static fn (string $n): bool => in_array($n, $selected, true)));
 }
 
@@ -138,21 +201,21 @@ declare(strict_types=1);
 /**
  * GENERATED by script/generate-extension-registry.php — do not edit by hand.
  *
- * The default extension set and the order it loads in (RELEASE-PLAN Phase 2.5). Regenerate with
+ * The default extension set and the order it loads in (RELEASE-PLAN Phase 2.5 / #36204).
+ * Source of truth: ext/<name>/ext.json (load_order, depends). Regenerate with
  * `php script/generate-extension-registry.php`; `--check` fails when this file is out of date.
+ * Refresh manifests first via `php script/generate-extension-manifests.php` when Module.php deps change.
  *
- * Order is significant and is copied verbatim from what Runtime::loadCoreModules() did before this
- * file existed. Some constraints are declared on the modules themselves
- * ({@see \\PHPCompiler\\Module::getExtensionDependencies}) and verified by
- * script/check-extension-dependencies.php; others are still only implicit, which is why the order is
- * preserved rather than derived.
+ * Order is significant. `load_order` currently mirrors the historical Runtime::loadCoreModules()
+ * list; topological derivation from `depends` is a later step once every edge is declared and
+ * verified by script/check-extension-dependencies.php.
  *
  * The entries are literal `new` expressions on purpose: the AOT compiler resolves these statically,
  * and instantiating from a string would leave every module unreferenced and uncompiled.
  *
- * {$count} extensions, all default-enabled — matching current behaviour, where every build pays for
- * every extension. Selecting a subset is the next step and will filter on
- * {@see \\PHPCompiler\\Module::isDefaultEnabled}.
+ * {$count} extensions — matching current behaviour, where every build pays for every
+ * default-enabled extension. Selecting a subset uses `--only=` / `--without=` (and later
+ * {@see \\PHPCompiler\\Module::isDefaultEnabled}).
  */
 
 namespace PHPCompiler;

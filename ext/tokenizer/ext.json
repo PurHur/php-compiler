@@ -1,0 +1,17 @@
+{
+    "name": "tokenizer",
+    "load_order": 41,
+    "depends": [],
+    "default_enabled": true,
+    "host_libs": [],
+    "backends": {
+        "vm": true,
+        "jit": true,
+        "aot": true
+    },
+    "provides": {
+        "functions": [],
+        "classes": []
+    },
+    "policy_env": null
+}

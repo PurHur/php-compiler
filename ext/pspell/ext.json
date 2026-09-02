@@ -1,0 +1,17 @@
+{
+    "name": "pspell",
+    "load_order": 69,
+    "depends": [],
+    "default_enabled": true,
+    "host_libs": [],
+    "backends": {
+        "vm": true,
+        "jit": false,
+        "aot": false
+    },
+    "provides": {
+        "functions": [],
+        "classes": []
+    },
+    "policy_env": "PHP_COMPILER_ENABLE_PSPELL"
+}

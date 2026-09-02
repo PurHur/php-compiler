@@ -90,6 +90,42 @@ foreach ($declared as $ext => $deps) {
     }
 }
 
+// ext.json must mirror Module.php depends + cover every loaded extension (#36204).
+foreach ($order as $ext) {
+    $manifestPath = $root.'/ext/'.$ext.'/ext.json';
+    if (!is_file($manifestPath)) {
+        $problems[] = sprintf('%s is loaded but ext/%s/ext.json is missing', $ext, $ext);
+        continue;
+    }
+    $data = json_decode((string) file_get_contents($manifestPath), true);
+    if (!is_array($data)) {
+        $problems[] = sprintf('ext/%s/ext.json is not valid JSON', $ext);
+        continue;
+    }
+    if (($data['name'] ?? null) !== $ext) {
+        $problems[] = sprintf('ext/%s/ext.json name field must be "%s"', $ext, $ext);
+    }
+    $manifestDeps = [];
+    if (isset($data['depends']) && is_array($data['depends'])) {
+        foreach ($data['depends'] as $dep) {
+            if (is_string($dep) && $dep !== '') {
+                $manifestDeps[] = strtolower($dep);
+            }
+        }
+    }
+    $moduleDeps = $declared[$ext] ?? [];
+    sort($manifestDeps);
+    sort($moduleDeps);
+    if ($manifestDeps !== $moduleDeps) {
+        $problems[] = sprintf(
+            '%s: ext.json depends [%s] != Module.php getExtensionDependencies() [%s]',
+            $ext,
+            implode(', ', $manifestDeps),
+            implode(', ', $moduleDeps)
+        );
+    }
+}
+
 if ($json) {
     echo json_encode([
         'status' => [] === $problems ? 'ok' : 'fail',

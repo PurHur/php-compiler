@@ -1,0 +1,17 @@
+{
+    "name": "sysvmsg",
+    "load_order": 81,
+    "depends": [],
+    "default_enabled": true,
+    "host_libs": [],
+    "backends": {
+        "vm": true,
+        "jit": true,
+        "aot": false
+    },
+    "provides": {
+        "functions": [],
+        "classes": []
+    },
+    "policy_env": null
+}
