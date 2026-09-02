@@ -98,9 +98,10 @@ final class HelperRuntimeCacheFingerprintTest extends TestCase
     {
         $root = \dirname(__DIR__, 3);
         $src = (string) file_get_contents($root.'/lib/AOT/HelperRuntimeCache.php');
-        $this->assertStringContainsString('Global inputs only (#23458 / #24381)', $src);
+        $this->assertStringContainsString('Global inputs (#23458 / #24381)', $src);
         $this->assertStringContainsString('llvmIdentityToken', $src);
         $this->assertStringContainsString('equivalentCoreFingerprints', $src);
+        $this->assertStringContainsString('runtimeLayoutFingerprintPaths', $src);
         $this->assertMatchesRegularExpression(
             '/function coreFingerprint\(\)[\s\S]*?globalFingerprintMaterial\(\)/',
             $src,
@@ -116,6 +117,25 @@ final class HelperRuntimeCacheFingerprintTest extends TestCase
             HelperRuntimeCache::legacyLoweringFingerprint(),
             'narrow global core must differ from legacy lowering key'
         );
+    }
+
+    /**
+     * @runInSeparateProcess
+     */
+    public function testRuntimeLayoutPreEditChangesCoreFingerprint(): void
+    {
+        $root = \dirname(__DIR__, 3);
+        $valuePre = $root.'/lib/JIT/Builtin/Type/Value.pre';
+        $this->assertFileExists($valuePre);
+        $before = $this->coreFingerprintViaSubprocess($root, getenv('PHP_COMPILER_LLVM_PATH') ?: '/opt/llvm9');
+        $backup = (string) file_get_contents($valuePre);
+        try {
+            file_put_contents($valuePre, $backup."\n// fingerprint probe #36214\n");
+            $after = $this->coreFingerprintViaSubprocess($root, getenv('PHP_COMPILER_LLVM_PATH') ?: '/opt/llvm9');
+            $this->assertNotSame($before, $after, 'Value.pre ABI edit must invalidate helper-runtime core fingerprint');
+        } finally {
+            file_put_contents($valuePre, $backup);
+        }
     }
 
     public function testLegacyLoweringFingerprintStillMatchesCommittedUnits(): void
