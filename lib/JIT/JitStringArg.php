@@ -135,7 +135,11 @@ final class JitStringArg
         if (Variable::KIND_VARIABLE === $arg->kind && Variable::TYPE_STRING === $arg->type) {
             return self::stringPtrFromVariable($context, $arg);
         }
-        $literal = self::compileTimeLiteral($arg);
+        // Boxed string CVs keep init compileTimeString after `.=` / loop concat (#36406).
+        if (Variable::KIND_VARIABLE === $arg->kind && Variable::TYPE_VALUE === $arg->type) {
+            return self::stringPtrFromVariable($context, $arg);
+        }
+        $literal = self::compileTimeLiteralForFold($arg);
         if (null !== $literal) {
             return $context->builder->load($context->constantStringFromString($literal));
         }
@@ -182,6 +186,21 @@ final class JitStringArg
         }
 
         return $arg->compileTimeString ?? null;
+    }
+
+    /**
+     * Literal safe for folds that must match runtime string bytes (strlen, json_encode, …).
+     *
+     * Slot-backed locals keep init {@see Variable::$compileTimeString} after `.=` / loop
+     * concat while the heap slot holds the grown string (#36406 / re-#36244).
+     */
+    public static function compileTimeLiteralForFold(Variable $arg): ?string
+    {
+        if (Variable::KIND_VALUE !== $arg->kind) {
+            return null;
+        }
+
+        return self::compileTimeLiteral($arg);
     }
 
     /**
