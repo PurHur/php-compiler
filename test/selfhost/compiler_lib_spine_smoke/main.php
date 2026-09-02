@@ -6806,6 +6806,7 @@ require_once __DIR__.'/../../../lib/JIT/SelfHostBuiltinPolicy.php';
 require_once __DIR__.'/../../../lib/JIT/SensitiveParamHelper.php';
 require_once __DIR__.'/../../../lib/JIT/ShutdownCallbackPolicy.php';
 require_once __DIR__.'/../../../lib/JIT/SidecarPathRemap.php';
+require_once __DIR__.'/../../../lib/JIT/SpineChunkNestedVmBind.php';
 require_once __DIR__.'/../../../lib/JIT/SimpleXmlInstanceMethodJit.php';
 require_once __DIR__.'/../../../lib/JIT/SplAutoloadCallbackPolicy.php';
 require_once __DIR__.'/../../../lib/JIT/StaticPropertyVisibilityJitGuard.php';
