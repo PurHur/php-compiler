@@ -83,16 +83,14 @@ PHP;
         exec($compile, $compileOut, $compileRc);
         $this->assertSame(0, $compileRc, implode("\n", $compileOut));
 
-        $vmCmd = escapeshellarg(PHP_BINARY).' '
-            .escapeshellarg($root.'/bin/vm.php').' '
-            .escapeshellarg($src).' 2>&1';
-        exec($vmCmd, $vmOut, $vmRc);
-        $this->assertSame(0, $vmRc, implode("\n", $vmOut));
+        $zendCmd = escapeshellarg(PHP_BINARY).' '.escapeshellarg($src).' 2>&1';
+        exec($zendCmd, $zendOut, $zendRc);
+        $this->assertSame(0, $zendRc, implode("\n", $zendOut));
 
         try {
             exec(escapeshellarg($bin).' 2>&1', $aotOut, $aotRc);
             $this->assertSame(0, $aotRc, implode("\n", $aotOut));
-            $this->assertSame(implode("\n", $vmOut), implode("\n", $aotOut));
+            $this->assertSame(implode("\n", $zendOut), implode("\n", $aotOut));
         } finally {
             @unlink($bin);
             @unlink($src);
