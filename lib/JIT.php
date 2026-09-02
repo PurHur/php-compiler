@@ -11198,26 +11198,7 @@ class JIT {
                         $this->publishMainScriptNamedConcatResult($block, $destOp, $newVal);
                         $this->markScopeVariableAssignedIfTracked($destOp, $result);
                     } else {
-                        // Fresh and in-place native concat: JitStringConcat + store. Avoid
-                        // string->concat __string__realloc on entry allocas (AOT strlen→0, #15642).
-                        $leftVar = $this->context->helper->loadValue(
-                            JIT\JitNativeString::coerce($this->context, $left, $block->getOperand($op->arg2))
-                        );
-                        $rightVar = $this->context->helper->loadValue(
-                            JIT\JitNativeString::coerce($this->context, $right, $block->getOperand($op->arg3))
-                        );
-                        $newStr = \PHPCompiler\ext\standard\JitStringConcat::concat(
-                            $this->context,
-                            $leftVar,
-                            $rightVar
-                        );
-                        // A KIND_VALUE destination has no slot to store into: ->value IS the
-                        // immediate. The promotion above only covers TYPE_STRING, so a dest whose
-                        // inferred type never settled on string reached here and emitted
-                        // `store %__string__* %x, i64 N`, failing module verification (#21886).
-                        // KIND_VARIABLE string locals already hold an `__string__**` alloca —
-                        // do not treat that pointer-to-pointer as "wrong" and allocate a second
-                        // slot (load $out from %8 / store concat into %0 — #22845).
+                        // Resolve/promote the native string slot before concat (#22845).
                         $destSlot = $result->value;
                         $destSlotTy = null !== $destSlot
                             ? $this->context->getStringFromType($destSlot->typeOf())
@@ -11254,8 +11235,34 @@ class JIT {
                             $this->context->setVariableOp($destOp, $promoted);
                             $this->bindPromotedStringConcatDest($block, $destOp, $promoted);
                             $result = $promoted;
+                            $hasStringAlloca = true;
                         }
-                        $this->context->builder->store($newStr, $destSlot);
+                        // `$s .= $rhs` on a native slot: grow in place instead of alloc+copy
+                        // both halves every iteration (#36410).
+                        if ((int) $op->arg1 === (int) $op->arg2 && $hasStringAlloca) {
+                            $this->context->type->string->appendInPlace(
+                                $result,
+                                JIT\JitNativeString::coerce(
+                                    $this->context,
+                                    $right,
+                                    $block->getOperand($op->arg3)
+                                )
+                            );
+                            $newStr = $this->context->builder->load($destSlot);
+                        } else {
+                            $leftVar = $this->context->helper->loadValue(
+                                JIT\JitNativeString::coerce($this->context, $left, $block->getOperand($op->arg2))
+                            );
+                            $rightVar = $this->context->helper->loadValue(
+                                JIT\JitNativeString::coerce($this->context, $right, $block->getOperand($op->arg3))
+                            );
+                            $newStr = \PHPCompiler\ext\standard\JitStringConcat::concat(
+                                $this->context,
+                                $leftVar,
+                                $rightVar
+                            );
+                            $this->context->builder->store($newStr, $destSlot);
+                        }
                         $nativeConcatVal = new Variable(
                             $this->context,
                             Variable::TYPE_STRING,
