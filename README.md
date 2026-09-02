@@ -338,7 +338,7 @@ Two release channels — do not conflate them ([#15605](https://github.com/PurHu
 
 ## Development & quality gates
 
-Merge quality is enforced **locally or in Docker** (GitHub Actions / CircleCI are disabled on this fork).
+Merge quality is enforced **locally or in Docker** — see [docs/local-ci-matrix.md](docs/local-ci-matrix.md) for the gate ladder.
 
 | Goal | Command |
 |------|---------|

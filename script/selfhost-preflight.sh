@@ -162,9 +162,16 @@ selfhost_apply_patches_if_needed() {
     return 0
   fi
   chmod +x "${root}/script/apply-patches.sh" 2>/dev/null || true
-  # Redirect stderr of the *invoking shell* too, so a crashing subprocess doesn't spam bootstrap logs.
+  # Fast path: grep-only marker check (~ms). Full apply-patches is ~17s when already applied.
+  if "${root}/script/apply-patches.sh" --verify-only >/dev/null 2>&1; then
+    export SELFHOST_APPLY_PATCHES_DONE=1
+    return 0
+  fi
   # Invoke via bash: some clones lose the git executable bit (100644) and `./apply-patches.sh` then
   # fails with Permission denied, aborting bootstrap-selfhost-link.
-  { bash "${root}/script/apply-patches.sh" >/dev/null; } 2>/dev/null || true
+  if ! bash "${root}/script/apply-patches.sh" >/dev/null 2>&1; then
+    echo "selfhost-preflight: apply-patches failed (#36247)" >&2
+    return 1
+  fi
   export SELFHOST_APPLY_PATCHES_DONE=1
 }

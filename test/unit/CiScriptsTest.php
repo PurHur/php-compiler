@@ -2301,6 +2301,29 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('ci_ensure_vendor_patches || exit 1', $phpEnv);
     }
 
+    public function testSelfhostPreflightSurfacesApplyPatchesFailure(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/selfhost-preflight.sh');
+        $this->assertStringContainsString('apply-patches failed (#36247)', $body);
+        $this->assertStringContainsString('--verify-only', $body);
+        $this->assertDoesNotMatchRegularExpression(
+            '/bash\s+"\$\{root\}\/script\/apply-patches\.sh"[^\\n]*\\|\\| true/',
+            $body,
+            'selfhost-preflight must not swallow apply-patches failures'
+        );
+    }
+
+    public function testCiInstallDepsInvokesApplyPatchesWithoutSwallow(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('script/apply-patches.sh', $body);
+        $this->assertDoesNotMatchRegularExpression(
+            '/apply-patches\\.sh\\s*\\|\\| true/',
+            $body,
+            'ci_install_deps must not swallow apply-patches failures (#36247)'
+        );
+    }
+
     public function testSelfhostPreflightScriptDefinesModesAndDockerPath(): void
     {
         $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/selfhost-preflight.sh');
