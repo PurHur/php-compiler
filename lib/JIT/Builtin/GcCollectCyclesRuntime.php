@@ -208,6 +208,7 @@ final class GcCollectCyclesRuntime
 
         $probe = $context->module->getNamedFunction('phpc_destruct_delref_allowed');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            self::ensurePhpRegistryUserScriptBodies($context);
             self::registerLinkedRuntime($context);
 
             return;
@@ -620,9 +621,7 @@ final class GcCollectCyclesRuntime
         self::implementIndexOf($context);
         self::implementDestructAlreadyInvoked($context);
         self::implementDestructMarkInvoked($context);
-        if (!self::usesPhpRegistry($context)) {
-            JitGcCollectCyclesStandaloneKernel::ensureCycleScanInternals($context);
-        } else {
+        if (self::usesPhpRegistry($context)) {
             $objPtr = $context->getTypeFromString('__object__*');
             $voidpp = $context->getTypeFromString('void**');
             $fn = $context->module->getNamedFunction('phpc_gc_slot_read_object');
@@ -635,6 +634,8 @@ final class GcCollectCyclesRuntime
             $context->registerFunction('phpc_gc_slot_read_object', $fn);
             JitGcCollectCyclesStandaloneKernel::ensureSlotReadObject($context);
             self::implementFreeObjectPhpBridge($context);
+        } else {
+            JitGcCollectCyclesStandaloneKernel::ensureCycleScanInternals($context);
         }
         self::implementCollectCyclesImpl($context);
         self::implementObjectReleaseStorage($context);
@@ -795,14 +796,12 @@ final class GcCollectCyclesRuntime
 
     private static function implementCollectCyclesImpl(Context $context): void
     {
-        if (self::usesPhpRegistry($context)) {
+        if (self::usesPhpCollectBridge($context)) {
             self::implementCollectCyclesPhpBridge($context);
 
             return;
         }
 
-        // User-script standalone keeps LLVM phpc_gc_register; native scan shares the
-        // module-local registry. PHP sync+NativeScan split prelinked statics (#36245).
         JitGcCollectCyclesStandaloneKernel::implementCollectCyclesImpl($context);
     }
 
@@ -1016,7 +1015,14 @@ final class GcCollectCyclesRuntime
 
     private static function usesUserScriptStandaloneCollect(Context $context): bool
     {
-        return Builtin::LOAD_TYPE_STANDALONE === $context->loadType && $context->isUserScriptAot();
+        return Builtin::LOAD_TYPE_STANDALONE === $context->loadType
+            && UserScriptAotEnv::isActiveOrLatched();
+    }
+
+    /** Embed JIT registry only — user-script standalone uses LLVM kernel + live prop_count (#36245). */
+    private static function usesPhpCollectBridge(Context $context): bool
+    {
+        return self::usesPhpRegistry($context);
     }
 
     /**
@@ -1389,11 +1395,11 @@ final class GcCollectCyclesRuntime
             return;
         }
 
-        GcCollectCyclesCollectRuntime::ensureCollectHelperCompiled($context);
-        $collectHelper = GcCollectCyclesCollectRuntime::collectImplHelperFunction($context);
         $i32 = $context->getTypeFromString('int32');
         $entry = $fn->appendBasicBlock('collect_impl_php_entry');
         $context->builder->positionAtEnd($entry);
+        GcCollectCyclesCollectRuntime::ensureCollectHelperCompiled($context);
+        $collectHelper = GcCollectCyclesCollectRuntime::collectImplHelperFunction($context);
         $collected = $context->builder->call($collectHelper);
         // NestedJIT PHP int is i64; ABI is i32 (#21109).
         $context->builder->returnValue($context->builder->trunc($collected, $i32));
