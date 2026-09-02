@@ -606,6 +606,21 @@ final class JitGcCollectCyclesStandaloneKernel
 
         $context->builder->positionAtEnd($sweepExit);
         $finalCollected = $context->builder->load($collectedSlot);
+        // Do not leave marked/inbound from a no-op collect for the next call (#36245).
+        $countFinal = GcCollectCyclesRuntime::standaloneRegistryCount($context);
+        $countFinalExt = $context->builder->zext($countFinal, $sizeT);
+        $context->builder->call(
+            $context->lookupFunction('memset'),
+            $context->builder->pointerCast($markedBase, $i8p),
+            $i32->constInt(0, false),
+            $countFinalExt
+        );
+        $context->builder->call(
+            $context->lookupFunction('memset'),
+            $context->builder->pointerCast($inboundBase, $i8p),
+            $i32->constInt(0, false),
+            $context->builder->mul($countFinalExt, $sizeT->constInt(4, false))
+        );
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($sweepBody);

@@ -3162,6 +3162,10 @@ class Context {
                     $emitInStandaloneMain(fn () => ExceptionBridge::emitClearForStandaloneMain($this));
                 }
             }
+            if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType && $this->isUserScriptAot()) {
+                // Helper .o static ctors register into phpc_gc_count before user code (#36245).
+                $emitInStandaloneMain(fn () => Builtin\GcCollectCyclesRuntime::emitUserScriptStandaloneRegistryReset($this));
+            }
             $emitInStandaloneMain(fn () => Progress::emitNativeNote($this, 'c:main_before_php'));
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
                 $emitInStandaloneMain(fn () => Builtin\ObjectHandleRuntime::emitSnapBaselineForStandaloneMain($this));
