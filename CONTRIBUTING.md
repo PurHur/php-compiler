@@ -40,7 +40,7 @@ Generated-doc drift that lands on `master` turns the fast gate red for every dow
 
 ### Verifying your change
 
-Merge gates are **local/Docker only** — GitHub Actions and CircleCI are disabled ([#394](https://github.com/PurHur/php-compiler/issues/394)); optional mirrors live under [`.github/workflows-disabled/`](.github/workflows-disabled/). See the full matrix in [docs/local-ci-matrix.md](docs/local-ci-matrix.md).
+Merge gates are **local/Docker only** ([#394](https://github.com/PurHur/php-compiler/issues/394)); optional workflow mirrors live under [`.github/workflows-disabled/`](.github/workflows-disabled/). See the full matrix in [docs/local-ci-matrix.md](docs/local-ci-matrix.md).
 
 #### Host PHP available
 
