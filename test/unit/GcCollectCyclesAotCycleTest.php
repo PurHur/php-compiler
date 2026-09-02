@@ -43,6 +43,14 @@ final class GcCollectCyclesAotCycleTest extends TestCase
         $this->assertStringContainsString('refcount->delref($obj)', $jit);
     }
 
+    public function testFunctionReturnDelrefsTypedObjectLocals(): void
+    {
+        $jit = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT.php');
+        $this->assertStringContainsString('releaseJitNamedLocalAtReturn', $jit);
+        $this->assertStringContainsString('jitFunctionAssignTargets', $jit);
+        $this->assertStringContainsString('$var->type & Variable::IS_REFCOUNTED', $jit);
+    }
+
     public function testUserScriptStandaloneRegistryResetWiredAtMain(): void
     {
         $ctx = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Context.php');
