@@ -54,4 +54,37 @@ final class CapabilityMatrixAdvertisementTest extends TestCase
             $this->assertNotEmpty($capabilities[$fn]['notes']);
         }
     }
+
+    public function testClassMethodMatrixUsesProxyIndexNotVmClassMethodStub(): void
+    {
+        $root = dirname(__DIR__, 2);
+        require_once $root.'/script/capability-matrix.php';
+
+        $classMethods = collectClassMethodCapabilities(
+            $root,
+            buildJitClassMethodProxyIndex($root)
+        );
+
+        $this->assertArrayHasKey('SQLite3::exec', $classMethods);
+        $this->assertTrue($classMethods['SQLite3::exec']['jit']);
+        $this->assertSame('fold', $classMethods['SQLite3::exec']['aot']);
+
+        $this->assertArrayHasKey('XMLReader::read', $classMethods);
+        $this->assertTrue($classMethods['XMLReader::read']['jit']);
+        $this->assertSame('fold', $classMethods['XMLReader::read']['aot']);
+    }
+
+    public function testFunctionAotIsNotBlindJitCopyWhenDeferred(): void
+    {
+        $root = dirname(__DIR__, 2);
+        require_once $root.'/script/capability-matrix.php';
+
+        $capabilities = collectCapabilities($root);
+        if (!isset($capabilities['connection_aborted'])) {
+            $this->markTestSkipped('connection_aborted not in matrix');
+        }
+        if ($capabilities['connection_aborted']['jit']) {
+            $this->assertTrue($capabilities['connection_aborted']['aot']);
+        }
+    }
 }
