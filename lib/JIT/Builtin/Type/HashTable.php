@@ -27,9 +27,8 @@ class HashTable extends Type
 {
     /**
      * Bytes per packed slot — must match LLVM sizeof(%__value__) for inBoundsGep stride (#36214).
-     * Bump to 16 when __value__ becomes 16 B / align 8.
      */
-    private const PACKED_VALUE_STRIDE = 9;
+    private const PACKED_VALUE_STRIDE = 16;
 
     /** Initial string-key hash buckets: 2^3 (Zend MIN_SIZE). */
     private const STR_HASH_INITIAL_MASK = 7;
