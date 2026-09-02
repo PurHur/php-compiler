@@ -140,10 +140,23 @@ final class JitValueNumeric
     public static function valueBoxToDouble(Context $context, Variable $boxed): Value
     {
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $boxed);
-        $map = $context->structFieldMap['__value__'];
-        $typeByte = $context->builder->load(
-            $context->builder->structGep($valuePtr, $map['type'])
+
+        return self::valueBoxToDoubleWithTypeByte(
+            $context,
+            $valuePtr,
+            self::loadTypeByte($context, $valuePtr)
         );
+    }
+
+    /**
+     * @param Value $valuePtr pointer to {@see __value__}
+     * @param Value $typeByte cached `__value__::type` byte for $valuePtr
+     */
+    private static function valueBoxToDoubleWithTypeByte(
+        Context $context,
+        Value $valuePtr,
+        Value $typeByte
+    ): Value {
         $i8 = $context->getTypeFromString('int8');
         $f64 = $context->getTypeFromString('double');
         $done = BasicBlockHelper::append($context, 'vbox_to_d_done');
@@ -383,22 +396,24 @@ final class JitValueNumeric
     ): Variable {
         $leftPtr = JitValueBox::valuePtrFromVariable($context, $left);
         $rightPtr = JitValueBox::valuePtrFromVariable($context, $right);
+        $leftTypeByte = self::loadTypeByte($context, $leftPtr);
+        $rightTypeByte = self::loadTypeByte($context, $rightPtr);
         $slot = JitValueBox::alloc($context);
         $slotPtr = JitValueBox::pointer($context, $slot);
 
         $eitherPromote = OpCode::TYPE_DIV === $opType
             ? $context->builder->or(
-                self::valueIsDouble($context, $left),
-                self::valueIsDouble($context, $right)
+                self::typeByteIsDouble($context, $leftTypeByte),
+                self::typeByteIsDouble($context, $rightTypeByte)
             )
             : $context->builder->or(
                 $context->builder->or(
-                    self::valueIsDouble($context, $left),
-                    self::valueIsDouble($context, $right)
+                    self::typeByteIsDouble($context, $leftTypeByte),
+                    self::typeByteIsDouble($context, $rightTypeByte)
                 ),
                 $context->builder->or(
-                    self::valueIsString($context, $left),
-                    self::valueIsString($context, $right)
+                    self::typeByteIsString($context, $leftTypeByte),
+                    self::typeByteIsString($context, $rightTypeByte)
                 )
             );
         $floatBlock = BasicBlockHelper::append($context, 'vbox_vbox_arith_float');
@@ -407,8 +422,8 @@ final class JitValueNumeric
         $context->builder->branchIf($eitherPromote, $floatBlock, $longBlock);
 
         $context->builder->positionAtEnd($floatBlock);
-        $ld = self::valueBoxToDouble($context, $left);
-        $rd = self::valueBoxToDouble($context, $right);
+        $ld = self::valueBoxToDoubleWithTypeByte($context, $leftPtr, $leftTypeByte);
+        $rd = self::valueBoxToDoubleWithTypeByte($context, $rightPtr, $rightTypeByte);
         if (OpCode::TYPE_DIV === $opType) {
             JitNumericDivisionGuard::emitZeroDoubleDivisorGuard($context, $rd, 'Division by zero');
             $fres = $context->builder->fdiv($ld, $rd);
@@ -481,5 +496,42 @@ final class JitValueNumeric
             default:
                 throw new \LogicException('JitValueNumeric: unsupported long opcode');
         }
+    }
+
+    private static function loadTypeByte(Context $context, Value $valuePtr): Value
+    {
+        $map = $context->structFieldMap['__value__'];
+
+        return $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+    }
+
+    private static function typeByteIsDouble(Context $context, Value $typeByte): Value
+    {
+        $i8 = $context->getTypeFromString('int8');
+
+        return $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+        );
+    }
+
+    private static function typeByteIsString(Context $context, Value $typeByte): Value
+    {
+        $i8 = $context->getTypeFromString('int8');
+        $jitStr = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING, false)
+        );
+        $vmStr = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_STRING, false)
+        );
+
+        return $context->builder->or($jitStr, $vmStr);
     }
 }
