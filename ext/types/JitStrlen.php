@@ -39,14 +39,15 @@ final class JitStrlen
         }
         if (JITVariable::TYPE_VALUE === $arg->type) {
             $literal = JitStringArg::compileTimeLiteralForFold($arg);
-            if (null !== $literal) {
+            // Non-empty only — script-global boxes keep stale init '' after `.=` (#36406).
+            if (null !== $literal && '' !== $literal) {
                 return $context->getTypeFromString('int64')->constInt(\strlen($literal), false);
             }
 
             return self::lowerLengthFromValueBox($context, $arg);
         }
         $literal = JitStringArg::compileTimeLiteralForFold($arg);
-        if (null !== $literal) {
+        if (null !== $literal && '' !== $literal) {
             return $context->getTypeFromString('int64')->constInt(\strlen($literal), false);
         }
         $strPtr = self::lowerStringOperand($context, $arg);

@@ -8,6 +8,12 @@ for ($i = 0; $i < 5; $i++) {
 }
 echo $s, '|', strlen($s), "\n";
 
+$u = 'a';
+for ($i = 0; $i < 5; $i++) {
+    $u = $u . 'x';
+}
+echo $u, '|', strlen($u), "\n";
+
 $t = '';
 $t .= 'ab';
 $t .= 'cd';
@@ -20,5 +26,6 @@ for ($i = 0; $i < 5; $i++) {
 echo $u, '|', strlen($u), "\n";
 --EXPECT--
 xxxxx|5
+axxxxx|6
 abcd|4
 axxxxx|6
