@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Builtin\WeakRefNative;
 use PHPCompiler\JIT\Builtin\WeakRefRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\HashTableWriteLlvm;
 use PHPCompiler\JIT\DatePeriodForeachSnapshot;
 use PHPCompiler\JIT\IteratorProtocolHelper;
 use PHPCompiler\JIT\JitValueBox;
@@ -1480,6 +1481,23 @@ final class VmIteratorForeach
     }
 
     /**
+     * Commit a foreach by-ref mutation through the borrowed HT entry (#36366).
+     */
+    public static function emitForeachByRefAssign(Context $context, JitVariable $lvalue, JitVariable $element): void
+    {
+        if (null === $lvalue->writableHt || null === $lvalue->foreachByRefPackedArm || null === $lvalue->writableIndex) {
+            throw new \LogicException('emitForeachByRefAssign requires foreach by-ref writable markers');
+        }
+        if ($lvalue->borrowedValueEntry) {
+            JitValueBox::assignToPointer($context, $lvalue->value, $element);
+            JitValueBox::publishAfterWrite($context, $lvalue->value);
+
+            return;
+        }
+        HashTableWriteLlvm::setAtIndex($context, $lvalue->writableHt, $lvalue->writableIndex, $element);
+    }
+
+    /**
      * php-src zend_execute.c FE_RESET_RW — array-backed SPL containers (#19444).
      */
     private static function isArrayBackedSplIteratorUserType(?string $containerUserType): bool
@@ -1558,6 +1576,50 @@ final class VmIteratorForeach
         }
         $ht = $context->helper->loadValue($array);
         $map = $context->structFieldMap['__hashtable__'];
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $legacy = $fn->appendBasicBlock('foreach_valref_mode_legacy');
+        $insertion = $fn->appendBasicBlock('foreach_valref_mode_insertion');
+        $done = $fn->appendBasicBlock('foreach_valref_mode_done');
+        $context->builder->branchIf(self::usesInsertionOrderForeach($context, $ht, $map), $insertion, $legacy);
+
+        $context->builder->positionAtEnd($legacy);
+        $legacyVar = self::compileValueByRefHashtableLegacyBody($context, $array, $slotKey);
+        $legacyEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($insertion);
+        $insertionVar = self::compileValueByRefHashtableInsertionBody($context, $array, $slotKey);
+        $insertionEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+        $entry = $context->builder->phi($legacyVar->value->typeOf());
+        $entry->addIncoming($legacyVar->value, $legacyEnd);
+        $entry->addIncoming($insertionVar->value, $insertionEnd);
+        $i1 = $context->getTypeFromString('int1');
+        $packedArm = $context->builder->phi($i1);
+        $packedArm->addIncoming($legacyVar->foreachByRefPackedArm, $legacyEnd);
+        $packedArm->addIncoming($insertionVar->foreachByRefPackedArm, $insertionEnd);
+        $idx = $context->builder->phi($legacyVar->writableIndex->typeOf());
+        $idx->addIncoming($legacyVar->writableIndex, $legacyEnd);
+        $idx->addIncoming($insertionVar->writableIndex, $insertionEnd);
+
+        $var = new JitVariable($context, JitVariable::TYPE_VALUE, JitVariable::KIND_VARIABLE, $entry);
+        $var->borrowedValueEntry = true;
+        $var->writableHt = $ht;
+        $var->writableIndex = $idx;
+        $var->foreachByRefPackedArm = $packedArm;
+
+        return $var;
+    }
+
+    private static function compileValueByRefHashtableLegacyBody(
+        Context $context,
+        JitVariable $array,
+        JitVariable $slotKey
+    ): JitVariable {
+        $ht = $context->helper->loadValue($array);
+        $map = $context->structFieldMap['__hashtable__'];
         $nodeMap = $context->structFieldMap['__strkey_node__'];
         $idx = $context->builder->load(self::indexSlot($context, $slotKey));
         $nextFree = $context->builder->load($context->builder->structGep($ht, $map['nextFreeElement']));
@@ -1579,14 +1641,75 @@ final class VmIteratorForeach
         $entry = $context->builder->phi($packedEntry->typeOf());
         $entry->addIncoming($packedEntry, $packed);
         $entry->addIncoming($strEntry, $strEntryBlock);
-        $var = new JitVariable($context, JitVariable::TYPE_VALUE, JitVariable::KIND_VARIABLE, $entry);
-        $var->borrowedValueEntry = true;
-        $var->writableHt = $ht;
-        $var->writableIndex = $idx;
         $i1 = $context->getTypeFromString('int1');
         $packedArm = $context->builder->phi($i1);
         $packedArm->addIncoming($i1->constInt(1, false), $packed);
         $packedArm->addIncoming($i1->constInt(0, false), $strEntryBlock);
+
+        $var = new JitVariable($context, JitVariable::TYPE_VALUE, JitVariable::KIND_VARIABLE, $entry);
+        $var->borrowedValueEntry = true;
+        $var->writableHt = $ht;
+        $var->writableIndex = $idx;
+        $var->foreachByRefPackedArm = $packedArm;
+
+        return $var;
+    }
+
+    private static function compileValueByRefHashtableInsertionBody(
+        Context $context,
+        JitVariable $array,
+        JitVariable $slotKey
+    ): JitVariable {
+        $ht = $context->helper->loadValue($array);
+        $map = $context->structFieldMap['__hashtable__'];
+        $nodeMap = $context->structFieldMap['__strkey_node__'];
+        $linearPos = $context->builder->load(self::indexSlot($context, $slotKey));
+        $prefixEnd = $context->builder->load($context->builder->structGep($ht, $map['packedPrefixEnd']));
+        $strCount = self::foreachStringKeyCount($context, $ht, $map);
+        $strEnd = $context->builder->addNoSignedWrap($prefixEnd, $strCount);
+        $inPrefix = self::icmpUltSizeT($context, $linearPos, $prefixEnd);
+        $inStr = self::icmpUltSizeT($context, $linearPos, $strEnd);
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $prefix = $fn->appendBasicBlock('foreach_valref_ins_prefix');
+        $str = $fn->appendBasicBlock('foreach_valref_ins_str');
+        $late = $fn->appendBasicBlock('foreach_valref_ins_late');
+        $done = $fn->appendBasicBlock('foreach_valref_ins_done');
+        $routeLate = $fn->appendBasicBlock('foreach_valref_ins_route_late');
+        $context->builder->branchIf($inPrefix, $prefix, $routeLate);
+        $context->builder->positionAtEnd($routeLate);
+        $context->builder->branchIf($inStr, $str, $late);
+        $context->builder->positionAtEnd($prefix);
+        $prefixEntry = HashTableHelper::listEntryPointer($context, $ht, $linearPos);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($late);
+        $lateOffset = $context->builder->sub(
+            $context->builder->sub($linearPos, $prefixEnd),
+            $strCount
+        );
+        $lateIdx = $context->builder->addNoSignedWrap($prefixEnd, $lateOffset);
+        $lateEntry = HashTableHelper::listEntryPointer($context, $ht, $lateIdx);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($str);
+        $ord = $context->builder->sub($linearPos, $prefixEnd);
+        $node = self::stringKeyNodeAtOrdinal($context, $ht, $map, $nodeMap, $ord);
+        $strEntry = $context->builder->structGep($node, $nodeMap['value']);
+        $strBlock = $context->builder->getInsertBlock();
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
+        $entry = $context->builder->phi($prefixEntry->typeOf());
+        $entry->addIncoming($prefixEntry, $prefix);
+        $entry->addIncoming($strEntry, $strBlock);
+        $entry->addIncoming($lateEntry, $late);
+        $i1 = $context->getTypeFromString('int1');
+        $packedArm = $context->builder->phi($i1);
+        $packedArm->addIncoming($i1->constInt(1, false), $prefix);
+        $packedArm->addIncoming($i1->constInt(1, false), $late);
+        $packedArm->addIncoming($i1->constInt(0, false), $strBlock);
+
+        $var = new JitVariable($context, JitVariable::TYPE_VALUE, JitVariable::KIND_VARIABLE, $entry);
+        $var->borrowedValueEntry = true;
+        $var->writableHt = $ht;
+        $var->writableIndex = $linearPos;
         $var->foreachByRefPackedArm = $packedArm;
 
         return $var;

@@ -20850,6 +20850,9 @@ class JIT {
                 $block->declaresGlobalName($name)
                 || isset($this->context->jitImportedGlobalNames[$name])
             )) {
+                if ($this->context->isForeachByRefLocalName($name, $block)) {
+                    return $result;
+                }
                 $global = $this->context->ensureScriptGlobal($name);
                 $this->context->bindVariableByName($name, $global);
                 $this->context->scope->variables[$resultOp] = $global;
@@ -20922,6 +20925,9 @@ class JIT {
             if (null === $scopeName || '' === $scopeName) {
                 continue;
             }
+            if ($this->context->isForeachByRefLocalName($scopeName, $block)) {
+                continue;
+            }
             if (
                 !$block->declaresGlobalName($scopeName)
                 && !isset($this->context->jitImportedGlobalNames[$scopeName])
@@ -20963,6 +20969,10 @@ class JIT {
             }
         }
         if (null === $name || '' === $name || \PHPCompiler\Web\Superglobals::isSuperglobalName($name)) {
+            return null;
+        }
+        $block = $this->context->jitEnclosingBlock;
+        if (null !== $block && $this->context->isForeachByRefLocalName($name, $block)) {
             return null;
         }
         $resolved = $this->context->resolveRefAliasName($name);
@@ -21798,6 +21808,8 @@ class JIT {
                     || null !== $boundLv->objectPropertySlot
                     || null !== $boundLv->valueBoxAliasPtr
                     || null !== $boundLv->writableHt
+                    || $boundLv->borrowedValueEntry
+                    || null !== $boundLv->foreachByRefPackedArm
                     || $boundLv->assignRefLvalueAlias
                 ) {
                     $this->context->setVariableOp($resultOp, $boundLv);
@@ -21925,6 +21937,14 @@ class JIT {
         }
         $result = $this->resolveAssignLvalue($resultOp);
         $result = $this->ensureNamedNativeLongLocalAlloca($resultOp, $result);
+        // Foreach by-ref must write through the borrowed HT entry before script-global
+        // promotion (#4364, #36366 — assoc string-key arrays in {main}).
+        if (null !== $result->foreachByRefPackedArm) {
+            JIT\HashTableHelper::assignForeachByRefWritable($this->context, $result, $value);
+            $this->markScopeVariableAssignedIfTracked($resultOp, $result);
+
+            return;
+        }
         // Locals that still carry a non-hashtable property alias from a prior read assign
         // must rebind — writing through would mutate the previous object (#34465).
         // Intentional ASSIGN_REF aliases (`$o->p =& $v`) must keep the slot (#34649).
@@ -22010,28 +22030,6 @@ class JIT {
             // Param prologue can bind the LLVM formal Variable as the CV then re-assign
             // the same object — still mark assigned so undefined-variable guards stay quiet
             // (Router::dispatch $route as `__value__` ABI, #31101).
-            $this->markScopeVariableAssignedIfTracked($resultOp, $result);
-
-            return;
-        }
-        // Foreach by-ref must use hashtable index writes, not valueBoxAliasPtr (#4364, AOT {main}).
-        if (null !== $result->foreachByRefPackedArm) {
-            JIT\HashTableHelper::assignForeachByRefWritable($this->context, $result, $value);
-            $this->markScopeVariableAssignedIfTracked($resultOp, $result);
-
-            return;
-        }
-        if (
-            $result->borrowedValueEntry
-            && null !== $result->writableHt
-            && null !== $result->writableIndex
-        ) {
-            JIT\HashTableHelper::setAtIndex(
-                $this->context,
-                $result->writableHt,
-                $result->writableIndex,
-                $value
-            );
             $this->markScopeVariableAssignedIfTracked($resultOp, $result);
 
             return;

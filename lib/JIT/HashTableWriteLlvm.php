@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT;
 use PHPCompiler\VM\ArraySpread;
 use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\VM\HashTable as VmHashTable;
+use PHPCompiler\VM\VmIteratorForeach;
 use PHPCompiler\VM\HashTableJitHelper;
 use PHPCompiler\JIT\Builtin\CallUnpackRuntime;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
@@ -324,13 +325,10 @@ final class HashTableWriteLlvm
         $context->builder->positionAtEnd($done);
     }
 
-    /** Foreach by-ref: packed index writes vs borrowed string-key entry (#4364, #31977 v10). */
+    /** Foreach by-ref: packed index vs string-key node entry (#4364, #36366). */
     public static function assignForeachByRefWritable(Context $context, Variable $lvalue, Variable $element): void
     {
-        if (null === $lvalue->writableHt || null === $lvalue->foreachByRefPackedArm || null === $lvalue->writableIndex) {
-            throw new \LogicException('assignForeachByRefWritable requires foreach by-ref writable markers');
-        }
-        self::setAtIndex($context, $lvalue->writableHt, $lvalue->writableIndex, $element);
+        VmIteratorForeach::emitForeachByRefAssign($context, $lvalue, $element);
     }
 
     public static function setAtIndex(Context $context, Value $ht, Value $index, Variable $element): void
