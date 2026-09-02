@@ -6,6 +6,7 @@ namespace PHPCompiler\Compiler\Concern;
 
 use PHPCfg\Op;
 use PHPCfg\Operand;
+use PHPTypes\Type;
 use PHPCompiler\Block;
 use PHPCompiler\OpCode;
 
