@@ -80,12 +80,16 @@ final class CliArgvGlobalInit
         // even after runtime init; defer to the user-level CLI entry reading `$argv` (#2930, #2967).
         self::emitRefreshAfterStoreArgv($context);
 
-        return new Variable(
+        $var = new Variable(
             $context,
             Variable::TYPE_VALUE,
             Variable::KIND_VARIABLE,
             self::$global
         );
+        // Module-global slot — must not valueDelref on {main} scope exit (#36195).
+        $var->scriptGlobalSlot = true;
+
+        return $var;
     }
 
     public static function loadArgc(Context $context): Variable
@@ -96,11 +100,14 @@ final class CliArgvGlobalInit
         // Keep behavior consistent with argv: ensure globals are refreshed on first access.
         self::emitRefreshAfterStoreArgv($context);
 
-        return new Variable(
+        $var = new Variable(
             $context,
             Variable::TYPE_VALUE,
             Variable::KIND_VARIABLE,
             self::$argcGlobal
         );
+        $var->scriptGlobalSlot = true;
+
+        return $var;
     }
 }
