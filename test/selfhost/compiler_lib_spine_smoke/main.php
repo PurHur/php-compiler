@@ -6792,6 +6792,7 @@ require_once __DIR__.'/../../../lib/JIT/ScopeBuiltinEmitHelper.php';
 require_once __DIR__.'/../../../lib/JIT/ScopeBuiltinHelper.php';
 require_once __DIR__.'/../../../lib/JIT/ScopeBuiltinIndexLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/ScopeVariableAssignedFlags.php';
+require_once __DIR__.'/../../../lib/JIT/StaticImmortalStringLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/ScriptMagic.php';
 require_once __DIR__.'/../../../lib/JIT/SelfHostBuiltinPolicy.php';
 require_once __DIR__.'/../../../lib/JIT/SensitiveParamHelper.php';

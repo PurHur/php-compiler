@@ -3885,33 +3885,12 @@ class Context {
             // #16075). Bare string_const_N merges across helper-runtime .o files; later unit
             // __init__ overwrites the main script's literals (SessionsWeb sid became
             // "/index.php"; session wire encode emptied — #26411).
-            $global = $this->module->addGlobal(
-                $this->type->string->pointer,
-                $this->moduleLocalConstGlobalName('string_const_', count($this->stringConstantMap))
+            $globalName = $this->moduleLocalConstGlobalName('string_const_', \count($this->stringConstantMap));
+            $this->stringConstantMap[$string] = StaticImmortalStringLlvm::definePtrGlobal(
+                $this,
+                $string,
+                $globalName
             );
-            $global->setInitializer($this->type->string->pointer->constNull());
-            $oldBuilder = $this->builder;
-            // Capture before swapping builders — restore must not leave Runtime::parse
-            // insert cleared/on __init__ (parentless jit_strcmp / seal unreachable — #26756).
-            $savedInsert = BasicBlockHelper::tryGetInsertBlock($this);
-            $resumeInitEmission = $this->emitsInitLinearIR();
-            $this->builder = $this->context->builderCreate();
-            $this->positionBuilderAtInitEmission();
-            $this->type->string->init(
-                $global,
-                $this->constantFromString($string),
-                $this->constantFromInteger(strlen($string), 'size_t'),
-                true
-            );
-            $this->builder->positionAtEnd($this->shutdownBlock);
-            $this->memory->free($this->builder->load($global));
-            $this->builder = $oldBuilder;
-            if ($resumeInitEmission) {
-                $this->positionBuilderAtInitEmission();
-            } else {
-                BasicBlockHelper::restoreInsertBlock($this, $savedInsert);
-            }
-            $this->stringConstantMap[$string] = $global;
         }
         return $this->stringConstantMap[$string];
     }
