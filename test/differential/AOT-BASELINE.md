@@ -69,3 +69,29 @@ look like real defects. Re-measure alone if a result is suspicious.
 
 Regenerate after any batch of lowering work and update the SHA. A name-diff only catches *newly
 failing* cases — it cannot see a case getting **worse** while remaining in the failing set.
+
+## Program-shaped corpus (#36221)
+
+Thirty end-to-end programs live under `test/differential/cases/programs/` (COUNT=30).
+They are **not** part of the default expression-shaped corpus; run them explicitly:
+
+```bash
+script/differential-sweep.sh --dir test/differential/cases/programs
+script/differential-sweep.sh --aot --dir test/differential/cases/programs
+script/differential-sweep.sh --jit --dir test/differential/cases/programs
+```
+
+VM must stay **30/30**. AOT/JIT failing **names** (not counts) should be recorded here
+and turned into focused issues — see also `test/differential/JIT-BASELINE.md`.
+
+VM mismatches found while authoring (repros under `test/repro/`, issues filed):
+
+| repro | issue |
+|---|---|
+| `i36221_sprintf_double_count.php` | #36353 |
+| `i36221_flatten_nested.php` | #36354 |
+| `i36221_json_array_map_sprintf.php` | #36355 |
+
+Initial AOT sample (partial run on an earlier tree): several programs SEGFAULT / COMPILE-abort /
+wrong output (`p01`/`p02`/`p10` core; `p03`/`p05`/`p07` compile abort; `p04` regex mismatch;
+`p08`/`p09` empty or undef). Re-measure on current tip before filing per-program AOT issues.
