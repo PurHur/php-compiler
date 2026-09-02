@@ -277,6 +277,19 @@ final class ExternalMethodBindTest extends TestCase
     }
 
     /**
+     * SPINE_CHUNK binds Throwable::__toString without loading Exception into the chunk module.
+     */
+    public function testSpineChunkBindsExceptionToStringIntrinsic(): void
+    {
+        putenv(ExternalMethodBind::ENV_SPINE_CHUNK.'=1');
+        $_ENV[ExternalMethodBind::ENV_SPINE_CHUNK] = '1';
+        $runtime = new Runtime(Runtime::MODE_AOT);
+        $ctx = new JIT\Context($runtime, JIT\Builtin::LOAD_TYPE_STANDALONE);
+        $proxy = $ctx->resolveFunctionProxy('exception::__tostring');
+        $this->assertInstanceOf(JIT\Call\ExceptionToString::class, $proxy);
+    }
+
+    /**
      * SPINE_CHUNK vm registry whitelist does not bind VM-only static helpers (no JIT call()).
      */
     public function testSpineChunkVmRegistryLeavesVmOnlyStaticExternal(): void

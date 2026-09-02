@@ -1146,6 +1146,10 @@ class Context {
         if (null !== $bound) {
             return $bound;
         }
+        $intrinsic = SpineChunkIntrinsicCallBind::tryBind($this, $proxyName);
+        if (null !== $intrinsic) {
+            return $intrinsic;
+        }
         $standard = SpineChunkStandardHelperBind::tryBind($this, $proxyName);
         if (null !== $standard) {
             return $standard;
@@ -1182,6 +1186,12 @@ class Context {
                 $bound = \PHPCompiler\AOT\ExternalMethodBind::tryBind($this, $proxyName);
                 if (null !== $bound && !($bound instanceof Call\ExternalMethod)) {
                     return $bound;
+                }
+                $intrinsic = SpineChunkIntrinsicCallBind::tryBind($this, $proxyName);
+                if (null !== $intrinsic && !($intrinsic instanceof Call\ExternalMethod)) {
+                    $this->functionProxies[$lc] = $intrinsic;
+
+                    return $intrinsic;
                 }
                 $standard = SpineChunkStandardHelperBind::tryBind($this, $proxyName);
                 if (null !== $standard && !($standard instanceof Call\ExternalMethod)) {
