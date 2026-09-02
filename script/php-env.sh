@@ -51,6 +51,19 @@ if [[ -d "$EXT_DIR" ]]; then
   done
 fi
 unset _PHP_LOADED_MODULES
+# CLI opcache file cache — measured ~2.7x autoload speedup (#36206). Opt out: PHP_COMPILER_OPCACHE_CLI=0
+if [[ "${PHP_COMPILER_OPCACHE_CLI:-1}" != "0" ]]; then
+  _REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  _OC_SHA="$(git -C "$_REPO_ROOT" rev-parse HEAD 2>/dev/null || echo unknown)"
+  _OC_DIR="$_REPO_ROOT/build/opcache-${_OC_SHA:0:12}"
+  mkdir -p "$_OC_DIR"
+  PHP_OPTS+=(
+    -d opcache.enable_cli=1
+    -d "opcache.file_cache=${_OC_DIR}"
+    -d opcache.validate_timestamps=0
+  )
+  unset _REPO_ROOT _OC_SHA _OC_DIR
+fi
 if [[ -f "$(dirname "${BASH_SOURCE[0]}")/ci-memory-env.sh" ]]; then
   # shellcheck source=ci-memory-env.sh
   source "$(dirname "${BASH_SOURCE[0]}")/ci-memory-env.sh"
