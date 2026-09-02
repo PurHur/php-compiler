@@ -10,6 +10,7 @@ namespace PHPCompiler\JIT\Builtin\Type;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\Refcount;
+use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Builtin\SpaceshipRuntime;
 use PHPCompiler\JIT\Builtin\StringNaturalCompare;
 use PHPCompiler\JIT\Builtin\StringStrcoll;
@@ -148,6 +149,7 @@ class HashTable extends Type
         $this->registerFn('__hashtable__sortPackedReverseStringCase', 'void', ['__hashtable__*']);
         // locale / packed-natural decls deferred to ensureSortAbi (#35904).
         // __multisort__packed deferred to ensureMultisortPacked (#35904).
+        HashTableDtorLlvm::register($this);
         $this->pointer = $this->context->getTypeFromString('__hashtable__*');
     }
 
@@ -300,6 +302,7 @@ class HashTable extends Type
         // strKey natsort stays eager so valueToString/strnatcmp first-link cannot plant
         // ret void into user main (empty stdout after natsort).
         // implementMultisortPacked deferred to ensureMultisortPacked (#35904).
+        HashTableDtorLlvm::implement($this);
         $this->context->builder->clearInsertionPosition();
     }
 
@@ -4173,6 +4176,11 @@ class HashTable extends Type
             $newNum,
             $this->context->builder->structGep($ht, $map['numElements'])
         );
+    }
+
+    public function jitContext(): Context
+    {
+        return $this->context;
     }
 
 }

@@ -341,6 +341,7 @@ class Object_ extends Type {
         $this->registerFn('__object__prop_count', 'int32', ['__object__*']);
         $this->registerFn('__value__readObject', '__object__*', ['__value__*']);
         $this->registerFn('__value__writeObject', 'void', ['__value__*', '__object__*']);
+        ObjectDtorLlvm::register($this);
     }
 
     /**
@@ -369,6 +370,7 @@ class Object_ extends Type {
         $this->implementObjectPropCount();
         $this->implementValueReadObject();
         $this->implementValueWriteObject();
+        ObjectDtorLlvm::implement($this);
     }
 
     public function shutdown(): void
