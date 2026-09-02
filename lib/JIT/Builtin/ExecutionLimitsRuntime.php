@@ -24,11 +24,14 @@ final class ExecutionLimitsRuntime
 
     private const CONNECTION_ABORTED = 'PHPCompiler\\ext\\standard\\ExecutionLimitsJitHelper::connectionAborted';
 
+    private const APPLY_MAX_EXECUTION_TIME = 'PHPCompiler\\ext\\standard\\ExecutionLimitsJitHelper::applyMaxExecutionTime';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::SET_TIME_LIMIT,
         self::IGNORE_USER_ABORT,
         self::CONNECTION_ABORTED,
+        self::APPLY_MAX_EXECUTION_TIME,
     ];
 
     /** @var list<string> */
