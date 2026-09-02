@@ -2694,7 +2694,7 @@ class Context {
 
     public function isUserScriptAot(): bool
     {
-        return UserScriptAotEnv::isActiveOrLatched();
+        return UserScriptAotEnv::isActive();
     }
 
     /** bootstrap-aot-link: thin LLVM during Context init — defer nested php-in-PHP JIT (#14459, #13245). */
