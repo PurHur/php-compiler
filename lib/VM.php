@@ -4643,7 +4643,10 @@ restart:
 
         while ($frame->pos < $frame->block->nOpCodes) {
             $this->executingFrame = $frame;
-            $this->context->executionLimits->check($this->context, $frame);
+            $limits = $this->context->executionLimits;
+            if (!$limits->isTimerDisabled()) {
+                $limits->check($this->context, $frame);
+            }
             $op = $frame->block->opCodes[$frame->pos++];
             try {
                 $this->assertDeferredDefinitionsBeforeRuntime($op->type);
@@ -11707,6 +11710,9 @@ restart:
     private function isUnboundLocalScopeRead(Frame $frame, int $slot): bool
     {
         if (!isset($frame->scope[$slot])) {
+            return false;
+        }
+        if (isset($frame->initializedSlots[$slot])) {
             return false;
         }
         if (null !== $frame->catchVarSlot && $slot === $frame->catchVarSlot) {
@@ -20229,13 +20235,20 @@ restart:
             OpCode::TYPE_FUNCDEF => true,
             OpCode::TYPE_DECLARE_GLOBAL_CONST => true,
         ];
-        if (!isset($declarationOpcodes[$opType])) {
-            $this->finalizeDeferredTraitUses();
-            // Forward-ref class constants (e.g. C::ITEM = E::A before enum E) may stay
-            // pending until a later declaration opcode flushes them (#9664, #15737).
-            $this->flushDeferredClassConstants();
-            $this->finalizeDeferredParentInheritance();
+        if (isset($declarationOpcodes[$opType])) {
+            return;
         }
+        $ctx = $this->context;
+        if ([] === $ctx->deferredTraitUses
+            && [] === $ctx->deferredClassConstants
+            && [] === $ctx->deferredParentInheritance) {
+            return;
+        }
+        $this->finalizeDeferredTraitUses();
+        // Forward-ref class constants (e.g. C::ITEM = E::A before enum E) may stay
+        // pending until a later declaration opcode flushes them (#9664, #15737).
+        $this->flushDeferredClassConstants();
+        $this->finalizeDeferredParentInheritance();
     }
 
     /**

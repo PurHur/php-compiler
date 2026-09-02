@@ -52,6 +52,7 @@ final class VmExecutionLimitsTest extends TestCase
         $ref = new \ReflectionProperty(VmExecutionLimits::class, 'deadline');
         $ref->setAccessible(true);
         $this->assertSame(0.0, $ref->getValue($limits));
+        $this->assertTrue($limits->isTimerDisabled());
         $this->assertSame('-1', VmIni::getStoredMaxExecutionTime());
     }
 }
