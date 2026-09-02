@@ -31,7 +31,10 @@ final class ScopeVariableAssignedFlags
             return '{main}'."\0".$resolved;
         }
 
-        return $context->activeFunction."\0".$resolved;
+        // User-function CV flags are scoped by the owning LLVM function in ensureFlag()
+        // (spl_object_id(parentFunction)); do not prefix activeFunction — it can disagree
+        // with jitEnclosingBlock during call lowering (#36405).
+        return $resolved;
     }
 
     public static function ensureFlag(Context $context, string $key): Value
@@ -40,7 +43,7 @@ final class ScopeVariableAssignedFlags
             return self::ensureMainModuleFlag($context, $key);
         }
 
-        $owner = BasicBlockHelper::parentFunction($context);
+        $owner = self::ownerFunctionForScopeFlags($context);
         $cacheKey = spl_object_id($owner)."\0".$key;
         if (!isset(self::$flags[$cacheKey])) {
             $i8 = $context->getTypeFromString('int8');
@@ -86,5 +89,31 @@ final class ScopeVariableAssignedFlags
         }
 
         return self::$mainFlags[$key];
+    }
+
+    /**
+     * Use the CFG root LLVM function when the insert block is in that function; otherwise
+     * parentFunction() (nested helpers / callee emission must not write root entry allocas).
+     */
+    private static function ownerFunctionForScopeFlags(Context $context): \PHPLLVM\Value\Function_
+    {
+        $insertOwner = BasicBlockHelper::parentFunction($context);
+        $rootBlock = $context->jitFunctionRootBlock;
+        if (null === $rootBlock || null === $rootBlock->func) {
+            return $insertOwner;
+        }
+        $scoped = strtolower($rootBlock->func->getScopedName());
+        if ('' === $scoped || !isset($context->functions[$scoped])) {
+            return $insertOwner;
+        }
+        $rootFn = $context->functions[$scoped];
+        if (!$rootFn instanceof \PHPLLVM\Value\Function_) {
+            return $insertOwner;
+        }
+        if (!TryCatchHelper::sameLlvmFunction($insertOwner, $rootFn)) {
+            return $insertOwner;
+        }
+
+        return $rootFn;
     }
 }
