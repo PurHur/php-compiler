@@ -136,6 +136,9 @@ class Compiler {
     /** spl_object_id(callOp) => index in owning cfg block children (#36224). */
     private array $cfgCallOpIndexCache = [];
 
+    /** spl_object_id(CfgBlock)|string => children count when op-index map was last built (#36224). */
+    private array $cfgChildrenOpIndexBuiltCount = [];
+
     /** @var SplObjectStorage<CfgBlock, SplObjectStorage<CfgVariable, int>> ?: merge var slots (#3790) */
     private SplObjectStorage $ternaryMergeVarSlots;
 
@@ -678,6 +681,7 @@ class Compiler {
         $this->closureRichNameByFunc = new SplObjectStorage;
         $this->precedingInlineCallArgProducersCache = [];
         $this->cfgCallOpIndexCache = [];
+        $this->cfgChildrenOpIndexBuiltCount = [];
         $this->debugWriteLastPhase('Compiler::compile enter');
 
         Compiler\InheritanceVariance::validateScript(
@@ -4779,7 +4783,7 @@ class Compiler {
         if (null === $block->orig) {
             return false;
         }
-        $idx = array_search($coalesce, $block->orig->children, true);
+        $idx = $this->cfgCallOpIndexInChildren($block->orig->children, $coalesce, $block->orig);
 
         return \is_int($idx) && $this->followingFuncCallHasChainedCoalesceArg($block, $idx);
     }
@@ -4794,7 +4798,7 @@ class Compiler {
         if (null === $block->orig) {
             return false;
         }
-        $idx = array_search($coalesce, $block->orig->children, true);
+        $idx = $this->cfgCallOpIndexInChildren($block->orig->children, $coalesce, $block->orig);
         if (!\is_int($idx)) {
             return false;
         }
@@ -16304,7 +16308,7 @@ class Compiler {
         if (null === $block->orig) {
             return;
         }
-        $fetchIndex = array_search($fetch, $block->orig->children, true);
+        $fetchIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $fetch, $block->orig);
         if (!is_int($fetchIndex)) {
             return;
         }
@@ -16358,7 +16362,7 @@ class Compiler {
         if (null === $block->orig) {
             return;
         }
-        $fetchIndex = array_search($fetch, $block->orig->children, true);
+        $fetchIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $fetch, $block->orig);
         if (!is_int($fetchIndex)) {
             return;
         }
@@ -18367,13 +18371,7 @@ class Compiler {
         Op $cfgCallOp,
         int $argIndex
     ): ?Op\Expr {
-        $callIndex = null;
-        foreach ($block->orig->children as $i => $child) {
-            if ($child === $cfgCallOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (null === $callIndex) {
             return null;
         }
@@ -18422,13 +18420,7 @@ class Compiler {
         if (null === $block->orig) {
             return false;
         }
-        $callIndex = null;
-        foreach ($block->orig->children as $i => $child) {
-            if ($child === $cfgCallOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (null === $callIndex || $callIndex < 1) {
             return false;
         }
@@ -19956,13 +19948,7 @@ class Compiler {
                 }
             }
         }
-        $callIndex = null;
-        foreach ($cfgChildren as $i => $child) {
-            if ($child === $callOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($cfgChildren, $callOp);
         if (null !== $callIndex) {
             $prev = $cfgChildren[$callIndex - 1] ?? null;
             if ($prev instanceof Op\Expr\ArrayDimFetch) {
@@ -21273,13 +21259,7 @@ class Compiler {
         // php-cfg may lower a boolean-producing inline Expr (e.g. `===`) to a distinct arg temp with
         // no dataflow edge, leaving the arg slot empty. Prefer the immediately preceding binary op
         // producer when its inferred type matches the arg (#9030).
-        $callIndex = null;
-        foreach ($block->orig->children as $i => $child) {
-            if ($child === $callOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $callOp, $block->orig);
         if (null !== $callIndex && $callIndex > 0) {
             $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
             $arrayProducerCount = 0;
@@ -21661,7 +21641,7 @@ class Compiler {
             ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
             && null !== $block->orig
         ) {
-            $nestedProducerIndex = array_search($producer, $block->orig->children, true);
+            $nestedProducerIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $producer, $block->orig);
             if (\is_int($nestedProducerIndex)) {
                 $callArgProbe = $callOp->args[$argIndex] ?? null;
                 if (
@@ -22891,13 +22871,7 @@ class Compiler {
                 ? (string) $block->slotForOperand($arrayProducer->result)
                 : null;
         }
-        $callIndex = null;
-        foreach ($cfgChildren as $i => $child) {
-            if ($child === $cfgCallOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($cfgChildren, $cfgCallOp);
         if (null === $callIndex) {
             $slot = $block->slotForOperand($arrayProducer->result);
 
@@ -23121,7 +23095,7 @@ class Compiler {
         if (null === $block->orig || !\is_array($cfgCallOp->args ?? null)) {
             return false;
         }
-        $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (!\is_int($callIndex)) {
             return false;
         }
@@ -23176,7 +23150,7 @@ class Compiler {
                 return true;
             }
         }
-        $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (!\is_int($callIndex)) {
             return false;
         }
@@ -23604,13 +23578,7 @@ class Compiler {
             }
         }
         $leadingFcc = null;
-        $callIndex = null;
-        foreach ($block->orig->children as $i => $child) {
-            if ($child === $callOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $callOp, $block->orig);
         if (null !== $callIndex) {
             for ($i = $callIndex - 1; $i >= 0; --$i) {
                 $prev = $block->orig->children[$i];
@@ -23773,13 +23741,7 @@ class Compiler {
             }
         }
         if (null === $callbackProducer) {
-            $callIndex = null;
-            foreach ($block->orig->children as $i => $child) {
-                if ($child === $cfgCallOp) {
-                    $callIndex = $i;
-                    break;
-                }
-            }
+            $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
             if (null !== $callIndex) {
                 for ($i = $callIndex - 1; $i >= 0; --$i) {
                     $prev = $block->orig->children[$i];
@@ -24205,13 +24167,7 @@ class Compiler {
             && null !== $block->orig
             && $this->callArgIsDeadInlineTemporary($callArg)
         ) {
-            $callIndex = null;
-            foreach ($block->orig->children as $i => $child) {
-                if ($child === $cfgCallOp) {
-                    $callIndex = $i;
-                    break;
-                }
-            }
+            $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
             if (null !== $callIndex && $callIndex > 0) {
                 $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex(
                     $callIndex,
@@ -24295,13 +24251,7 @@ class Compiler {
             && null !== $block->orig
             && $this->consumerImmediateUnaryHoistedDeadTempArgZero($cfgCallOp, $block)
         ) {
-            $callIndex = null;
-            foreach ($block->orig->children as $i => $child) {
-                if ($child === $cfgCallOp) {
-                    $callIndex = $i;
-                    break;
-                }
-            }
+            $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
             if (null !== $callIndex && $callIndex > 0) {
                 $immediate = $block->orig->children[$callIndex - 1] ?? null;
                 if ($immediate instanceof Op\Expr\UnaryMinus || $immediate instanceof Op\Expr\UnaryPlus) {
@@ -27656,13 +27606,7 @@ class Compiler {
         if ([] === $cfgChildren && null !== $block->orig) {
             $cfgChildren = $block->orig->children;
         }
-        $callIndex = null;
-        foreach ($cfgChildren as $i => $child) {
-            if ($child === $cfgCallOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($cfgChildren, $cfgCallOp);
         if (null === $callIndex) {
             $containing = $this->findCfgBlockContainingExpr($cfgCallOp);
             if (null !== $containing) {
@@ -28230,7 +28174,7 @@ class Compiler {
         if (null === $block->orig) {
             return false;
         }
-        $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (!\is_int($callIndex) || $callIndex < 1) {
             return false;
         }
@@ -28258,13 +28202,7 @@ class Compiler {
         if (null === $block->orig) {
             return [];
         }
-        $callIndex = null;
-        foreach ($block->orig->children as $i => $child) {
-            if ($child === $callOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $callOp, $block->orig);
         if (null === $callIndex || $callIndex < 1) {
             return [];
         }
@@ -28359,13 +28297,7 @@ class Compiler {
         }
         // var_export(f(), true) / var_export($o->m(), true) — ConstFetch true sits between nested call and consumer (#16556, #17251).
         if (0 === $argIndex && null !== $block->orig) {
-            $callIndex = null;
-            foreach ($block->orig->children as $i => $child) {
-                if ($child === $callOp) {
-                    $callIndex = $i;
-                    break;
-                }
-            }
+            $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $callOp, $block->orig);
             if (null !== $callIndex) {
                 for ($i = $callIndex - 1; $i >= 0; --$i) {
                     $prev = $block->orig->children[$i] ?? null;
@@ -28457,7 +28389,7 @@ class Compiler {
         }
         $producers = $this->hoistedPreludeProducersImmediatelyBeforeCall($callOp, $block);
         if (null !== $block->orig) {
-            $callIndex = array_search($callOp, $block->orig->children, true);
+            $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $callOp, $block->orig);
             if (\is_int($callIndex)) {
                 $nestedForArgZero = $this->nestedFuncCallProducerBeforeTrailingConstFetchPreludes(
                     $callOp,
@@ -28469,7 +28401,7 @@ class Compiler {
                         // tempnam(g(), E::A) — nested FuncCall feeds arg #0, not trailing enum (#10303, #16558).
                         return null;
                     }
-                    $nestedIndex = array_search($nestedForArgZero, $block->orig->children, true);
+                    $nestedIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $nestedForArgZero, $block->orig);
                     if (\is_int($nestedIndex)) {
                         $targetArg = $this->siblingMultiArgFuncCallProducerTargetArgIndex(
                             $nestedIndex,
@@ -29168,13 +29100,7 @@ class Compiler {
         if (null === $block->orig) {
             return null;
         }
-        $callIndex = null;
-        foreach ($block->orig->children as $i => $child) {
-            if ($child === $callOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $callOp, $block->orig);
         if (null === $callIndex || $callIndex < 2) {
             return null;
         }
@@ -29258,8 +29184,8 @@ class Compiler {
         [$constFetch, $funcProducer] = $constFuncPrelude;
         // ConstFetch true/false/null before nested print_r/var_export feeds that callee, not outer args (#24372).
         if ($constFetch instanceof Op\Expr\ConstFetch) {
-            $callIndex = array_search($cfgCallOp, $block->orig->children, true);
-            $constIndex = array_search($constFetch, $block->orig->children, true);
+            $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
+            $constIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $constFetch, $block->orig);
             if (
                 \is_int($callIndex)
                 && \is_int($constIndex)
@@ -29340,13 +29266,7 @@ class Compiler {
         if (1 !== $deadHoisted) {
             return false;
         }
-        $callIndex = null;
-        foreach ($block->orig->children as $i => $child) {
-            if ($child === $cfgCallOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (null === $callIndex || $callIndex < 1) {
             return false;
         }
@@ -29878,7 +29798,7 @@ class Compiler {
         if (!$this->isInlineExprCallArgProducer($producer)) {
             return null;
         }
-        $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (!\is_int($callIndex)) {
             return null;
         }
@@ -30754,7 +30674,7 @@ class Compiler {
                 if (!$producer instanceof Op\Expr\ArrayDimFetch) {
                     return true;
                 }
-                $index = array_search($producer, $cfgChildren, true);
+                $index = $this->cfgCallOpIndexInChildren($cfgChildren, $producer);
                 if (false === $index) {
                     return true;
                 }
@@ -30770,23 +30690,44 @@ class Compiler {
     }
 
     /**
+     * One O(n) pass over cfg block children indexes every op — avoids ~80 independent
+     * O(n) linear scans per compileCallArgSends (#36224).
+     *
      * @param list<Op> $cfgChildren
      */
-    private function cfgCallOpIndexInChildren(array $cfgChildren, Op $callOp): ?int
+    private function ensureCfgChildrenOpIndicesBuilt(array $cfgChildren, ?CfgBlock $cfgBlock = null): void
     {
-        $cacheKey = spl_object_id($callOp);
-        if (array_key_exists($cacheKey, $this->cfgCallOpIndexCache)) {
-            return $this->cfgCallOpIndexCache[$cacheKey];
+        if ([] === $cfgChildren) {
+            return;
         }
-        foreach ($cfgChildren as $i => $child) {
-            if ($child === $callOp) {
-                $this->cfgCallOpIndexCache[$cacheKey] = $i;
-
-                return $i;
+        $mapKey = null !== $cfgBlock
+            ? (string) spl_object_id($cfgBlock)
+            : 'c_' . spl_object_id($cfgChildren[0]);
+        $count = \count($cfgChildren);
+        $prev = $this->cfgChildrenOpIndexBuiltCount[$mapKey] ?? 0;
+        if ($prev === $count) {
+            return;
+        }
+        if ($prev > $count) {
+            $prev = 0;
+        }
+        for ($i = $prev; $i < $count; ++$i) {
+            $child = $cfgChildren[$i];
+            if ($child instanceof Op) {
+                $this->cfgCallOpIndexCache[spl_object_id($child)] = $i;
             }
         }
+        $this->cfgChildrenOpIndexBuiltCount[$mapKey] = $count;
+    }
 
-        return null;
+    /**
+     * @param list<Op> $cfgChildren
+     */
+    private function cfgCallOpIndexInChildren(array $cfgChildren, Op $callOp, ?CfgBlock $cfgBlock = null): ?int
+    {
+        $this->ensureCfgChildrenOpIndicesBuilt($cfgChildren, $cfgBlock);
+
+        return $this->cfgCallOpIndexCache[spl_object_id($callOp)] ?? null;
     }
 
     /**
@@ -30826,13 +30767,7 @@ class Compiler {
         if (!$hasFuncCallProducer) {
             return $producers;
         }
-        $callIndex = null;
-        foreach ($cfgChildren as $i => $child) {
-            if ($child === $callOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($cfgChildren, $callOp);
         if (null === $callIndex || $callIndex < 2) {
             return $producers;
         }
@@ -30945,13 +30880,7 @@ class Compiler {
         if ($this->inlineClosureArrayPairCallbackArgIndex($funcName) < 0) {
             return null;
         }
-        $callIndex = null;
-        foreach ($block->orig->children as $i => $child) {
-            if ($child === $cfgCallOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (null === $callIndex) {
             return null;
         }
@@ -31024,13 +30953,7 @@ class Compiler {
         if (0 !== $this->inlineClosureArrayPairCallbackArgIndex($funcName)) {
             return null;
         }
-        $callIndex = null;
-        foreach ($block->orig->children as $i => $child) {
-            if ($child === $cfgCallOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (null === $callIndex) {
             return null;
         }
@@ -31083,13 +31006,7 @@ class Compiler {
             // array_filter($b, fn|/string) — real CV haystack, not a hoisted sibling FuncCall (#27344).
             return null;
         }
-        $callIndex = null;
-        foreach ($block->orig->children as $i => $child) {
-            if ($child === $cfgCallOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (null === $callIndex) {
             return null;
         }
@@ -31647,13 +31564,7 @@ class Compiler {
         if (!property_exists($cfgCallOp, 'args') || !is_array($cfgCallOp->args) || 1 !== \count($cfgCallOp->args)) {
             return null;
         }
-        $callIndex = null;
-        foreach ($block->orig->children as $i => $child) {
-            if ($child === $cfgCallOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (null === $callIndex || $callIndex < 2) {
             return null;
         }
@@ -32727,13 +32638,7 @@ class Compiler {
         if (null === $cfgCallOp || null === $block->orig || $argIndex < 0) {
             return null;
         }
-        $callIndex = null;
-        foreach ($block->orig->children as $i => $child) {
-            if ($child === $cfgCallOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (null === $callIndex) {
             return null;
         }
@@ -32766,13 +32671,7 @@ class Compiler {
         if ([] === $cfgChildren) {
             return null;
         }
-        $callIndex = null;
-        foreach ($cfgChildren as $i => $child) {
-            if ($child === $cfgCallOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($cfgChildren, $cfgCallOp);
         if (!is_int($callIndex)) {
             return null;
         }
@@ -32838,13 +32737,7 @@ class Compiler {
         if ([] === $cfgChildren) {
             return null;
         }
-        $callIndex = null;
-        foreach ($cfgChildren as $i => $child) {
-            if ($child === $cfgCallOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($cfgChildren, $cfgCallOp);
         if (!is_int($callIndex)) {
             return null;
         }
@@ -32904,7 +32797,7 @@ class Compiler {
         if (!\in_array($callee, ['array_merge', 'array_merge_recursive', 'array_replace', 'array_replace_recursive'], true)) {
             return false;
         }
-        $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (!is_int($callIndex)) {
             return false;
         }
@@ -33021,13 +32914,7 @@ class Compiler {
         if ([] === $cfgChildren) {
             return null;
         }
-        $callIndex = null;
-        foreach ($cfgChildren as $i => $child) {
-            if ($child === $callOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($cfgChildren, $callOp);
         if (null === $callIndex || $callIndex < 1) {
             return null;
         }
@@ -35280,7 +35167,7 @@ class Compiler {
         if (null === $block->orig) {
             return null;
         }
-        $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (\is_int($callIndex)) {
             return $callIndex;
         }
@@ -35458,17 +35345,12 @@ class Compiler {
             return;
         }
         $argCount = \count($cfgCallOp->args);
-        $callIndex = null;
-        foreach ($block->orig->children as $i => $child) {
-            if ($child === $cfgCallOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $cfgChildren = $block->orig->children;
+        $this->ensureCfgChildrenOpIndicesBuilt($cfgChildren, $block->orig);
+        $callIndex = $this->cfgCallOpIndexInChildren($cfgChildren, $cfgCallOp, $block->orig);
         if (null === $callIndex) {
             return;
         }
-        $cfgChildren = $block->orig->children;
         if (
             $argCount < 2
             && !(
@@ -35570,7 +35452,7 @@ class Compiler {
                 if ($isFuncProducer && $this->funcCallExprHasByRefMutatingSideEffects($producer)) {
                     continue;
                 }
-                $producerIndex = array_search($producer, $block->orig->children, true);
+                $producerIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $producer, $block->orig);
                 if (!is_int($producerIndex)) {
                     continue;
                 }
@@ -35848,13 +35730,7 @@ class Compiler {
         if (!$cfgCallOp instanceof Op\Expr\FuncCall && !$cfgCallOp instanceof Op\Expr\NsFuncCall) {
             return false;
         }
-        $callIndex = null;
-        foreach ($block->orig->children as $i => $child) {
-            if ($child === $cfgCallOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (null === $callIndex) {
             return false;
         }
@@ -36048,13 +35924,7 @@ class Compiler {
                 return $hoistedScalarSlot;
             }
         }
-        $callIndex = null;
-        foreach ($block->orig->children as $i => $child) {
-            if ($child === $cfgCallOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (null === $callIndex) {
             return null;
         }
@@ -36467,7 +36337,7 @@ class Compiler {
         if (null === $block->orig || !\is_array($cfgCallOp->args ?? null)) {
             return null;
         }
-        $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (!\is_int($callIndex)) {
             return null;
         }
@@ -36877,7 +36747,7 @@ class Compiler {
         Op $consumer,
         array $cfgChildren
     ): ?int {
-        $producerIndex = array_search($producer, $cfgChildren, true);
+        $producerIndex = $this->cfgCallOpIndexInChildren($cfgChildren, $producer);
         $consumerIndex = array_search($consumer, $cfgChildren, true);
         if (!is_int($producerIndex) || !is_int($consumerIndex)) {
             return null;
@@ -36992,7 +36862,7 @@ class Compiler {
                 $producer,
                 $consumer,
                 $producerIndex,
-                array_search($consumer, $block->orig->children, true) ?: -1
+                $this->cfgCallOpIndexInChildren($block->orig->children, $consumer, $block->orig) ?: -1
             )
         ) {
             $recent = $this->slotForLastEmittedInlineCallResultBeforePendingFuncCall($block);
@@ -37413,7 +37283,7 @@ class Compiler {
         ) {
             return null;
         }
-        $producerIndex = array_search($producer, $cfgChildren, true);
+        $producerIndex = $this->cfgCallOpIndexInChildren($cfgChildren, $producer);
         $consumerIndex = array_search($consumer, $cfgChildren, true);
         if (!is_int($producerIndex) || !is_int($consumerIndex)) {
             return null;
@@ -37476,7 +37346,7 @@ class Compiler {
             return (string) $hoistedScalarSlot;
         }
 
-        $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (!\is_int($callIndex) || $callIndex < 1) {
             return null;
         }
@@ -37570,7 +37440,7 @@ class Compiler {
             1 === $argIndex
             && 'substr' === strtolower($this->resolveInlineCallArgFuncName($cfgCallOp, null) ?? '')
         ) {
-            $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+            $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
             if (\is_int($callIndex)) {
                 $cfgChildren = $block->orig->children;
                 for ($j = $callIndex - 1; $j >= 0; --$j) {
@@ -37593,7 +37463,7 @@ class Compiler {
         if (null !== $constPreludeSlot) {
             return $constPreludeSlot;
         }
-        $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (!\is_int($callIndex)) {
             return null;
         }
@@ -37817,13 +37687,7 @@ class Compiler {
         if (null === $block->orig) {
             return null;
         }
-        $callIndex = null;
-        foreach ($block->orig->children as $i => $child) {
-            if ($child === $cfgCallOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (null === $callIndex || $callIndex < 1) {
             return null;
         }
@@ -38244,13 +38108,7 @@ class Compiler {
         if ([] === $producers) {
             return $producers;
         }
-        $callIndex = null;
-        foreach ($cfgChildren as $i => $child) {
-            if ($child === $callOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($cfgChildren, $callOp);
         if (null === $callIndex) {
             return $producers;
         }
@@ -38509,13 +38367,7 @@ class Compiler {
             || $leadingCallback instanceof Op\Expr\FirstClassCallable) {
             return [];
         }
-        $callIndex = null;
-        foreach ($block->orig->children as $i => $child) {
-            if ($child === $cfgCallOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (null === $callIndex) {
             return [];
         }
@@ -38605,13 +38457,7 @@ class Compiler {
         if ($argCount < 2 || $argIndex >= $argCount) {
             return null;
         }
-        $callIndex = null;
-        foreach ($block->orig->children as $i => $child) {
-            if ($child === $cfgCallOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (null === $callIndex) {
             return null;
         }
@@ -39036,13 +38882,7 @@ class Compiler {
             return null;
         }
         if (0 === $argIndex) {
-            $callIndex = null;
-            foreach ($block->orig->children as $i => $child) {
-                if ($child === $cfgCallOp) {
-                    $callIndex = $i;
-                    break;
-                }
-            }
+            $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
             if (null === $callIndex) {
                 return null;
             }
@@ -39471,13 +39311,7 @@ class Compiler {
         if (2 !== \count($cfgCallOp->args)) {
             return null;
         }
-        $callIndex = null;
-        foreach ($block->orig->children as $i => $child) {
-            if ($child === $cfgCallOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (null === $callIndex || $callIndex < 2) {
             return null;
         }
@@ -39590,13 +39424,7 @@ class Compiler {
         if (!$this->isEmbeddedCallLiteralArg($cfgCallOp->args[1] ?? null)) {
             return null;
         }
-        $callIndex = null;
-        foreach ($block->orig->children as $i => $child) {
-            if ($child === $cfgCallOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (null === $callIndex || $callIndex < 2) {
             return null;
         }
@@ -40567,13 +40395,7 @@ class Compiler {
         $timeArgSlot = null;
         $sunfuncsArgSlot = null;
         $longitudeSlot = null;
-        $callIndex = null;
-        foreach ($block->orig->children as $i => $child) {
-            if ($child === $cfgCallOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         foreach ($this->hoistedPreludeProducersImmediatelyBeforeCall($cfgCallOp, $block) as $prelude) {
             if ($prelude instanceof Op\Expr\ConstFetch) {
                 $name = strtolower($this->staticNameFromOperand($prelude->name) ?? '');
@@ -40852,13 +40674,7 @@ class Compiler {
         ) {
             return null;
         }
-        $callIndex = null;
-        foreach ($block->orig->children as $i => $child) {
-            if ($child === $cfgCallOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (\is_int($callIndex) && $callIndex > 0) {
             $immediatePrelude = $block->orig->children[$callIndex - 1] ?? null;
             // two('L', $el->tagName) — PropertyFetch prelude is not a nested call producer; do not
@@ -41257,13 +41073,7 @@ class Compiler {
         if (1 !== \count($args) || 0 !== $argIndex) {
             return null;
         }
-        $callIndex = null;
-        foreach ($block->orig->children as $i => $child) {
-            if ($child === $cfgCallOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (null === $callIndex || $callIndex < 1) {
             return null;
         }
@@ -42027,13 +41837,7 @@ class Compiler {
                 return false;
             }
         }
-        $callIndex = null;
-        foreach ($block->orig->children as $i => $child) {
-            if ($child === $cfgCallOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (null === $callIndex) {
             return false;
         }
@@ -42095,13 +41899,7 @@ class Compiler {
         if (null === $unaryArg || $argIndex !== $unaryArg) {
             return null;
         }
-        $callIndex = null;
-        foreach ($block->orig->children as $i => $child) {
-            if ($child === $cfgCallOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (null === $callIndex || $callIndex < 1) {
             return null;
         }
@@ -42134,13 +41932,7 @@ class Compiler {
         if ('fseek' !== $name || 2 !== $argIndex || null === $block->orig) {
             return null;
         }
-        $callIndex = null;
-        foreach ($block->orig->children as $i => $child) {
-            if ($child === $cfgCallOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (null === $callIndex || $callIndex < 1) {
             return null;
         }
@@ -42364,13 +42156,7 @@ class Compiler {
 
             return null;
         }
-        $callIndex = null;
-        foreach ($cfgChildren as $i => $child) {
-            if ($child === $callOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($cfgChildren, $callOp);
         // Exact link before positional guessing: the hoisted argument temporary is a distinct Operand
         // from the producer's ->result, but records that producer as its sole writer, so it names the
         // producer for THIS index directly. Positional mapping handed arg #0 the trailing producer —
@@ -44011,13 +43797,7 @@ class Compiler {
         if ([] === $cfgChildren) {
             return false;
         }
-        $callIndex = null;
-        foreach ($cfgChildren as $i => $child) {
-            if ($child === $cfgCallOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($cfgChildren, $cfgCallOp);
         if (null === $callIndex) {
             return false;
         }
@@ -44204,7 +43984,7 @@ class Compiler {
             }
         }
         if (!$feedsConsumerArg && null !== $cfgChildren) {
-            $producerIndex = array_search($producer, $cfgChildren, true);
+            $producerIndex = $this->cfgCallOpIndexInChildren($cfgChildren, $producer);
             $consumerIndex = array_search($consumer, $cfgChildren, true);
             if (is_int($producerIndex) && is_int($consumerIndex)) {
                 $feedsConsumerArg = $this->isNestedCallArgProducerSeparatedByConsumerLiteralPreludes(
@@ -45910,7 +45690,7 @@ class Compiler {
                 return $child;
             }
         }
-        $callIndex = array_search($callOp, $block->orig->children, true);
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $callOp, $block->orig);
         if (\is_int($callIndex) && $callIndex > 0) {
             $prev = $block->orig->children[$callIndex - 1] ?? null;
             if ($prev instanceof Op\Expr\Array_) {
@@ -46990,13 +46770,7 @@ class Compiler {
         if (!$this->callArgIsDeadInlineTemporary($callArg)) {
             return null;
         }
-        $callIndex = null;
-        foreach ($block->orig->children as $i => $child) {
-            if ($child === $cfgCallOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (null === $callIndex || $callIndex < 1) {
             return null;
         }
@@ -47125,13 +46899,7 @@ class Compiler {
         if ($this->isEmbeddedCallLiteralArg($callArg)) {
             return null;
         }
-        $callIndex = null;
-        foreach ($block->orig->children as $i => $child) {
-            if ($child === $cfgCallOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (null === $callIndex || $callIndex < 1) {
             return null;
         }
@@ -47464,13 +47232,7 @@ class Compiler {
      */
     private function precedingClassConstFetchesBeforeCfgOp(array $cfgChildren, Op $callOp): array
     {
-        $callIndex = null;
-        foreach ($cfgChildren as $i => $child) {
-            if ($child === $callOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($cfgChildren, $callOp);
         if (null === $callIndex) {
             return [];
         }
@@ -48184,7 +47946,7 @@ class Compiler {
         if (!$this->callArgIsDeadInlineTemporary($callArg)) {
             return false;
         }
-        $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (!\is_int($callIndex) || $callIndex < 1) {
             return false;
         }
@@ -48251,7 +48013,7 @@ class Compiler {
                 }
             }
         }
-        $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (!\is_int($callIndex) || $callIndex < 1) {
             return false;
         }
@@ -49082,7 +48844,7 @@ class Compiler {
         if (null === $block->orig) {
             return false;
         }
-        $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (!\is_int($callIndex) || $callIndex < 1) {
             return false;
         }
@@ -49131,13 +48893,7 @@ class Compiler {
         if (null === $cfgCallOp || null === $block->orig) {
             return null;
         }
-        $callIndex = null;
-        foreach ($block->orig->children as $i => $child) {
-            if ($child === $cfgCallOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (null === $callIndex) {
             return null;
         }
@@ -49183,13 +48939,7 @@ class Compiler {
         if (null === $cfgCallOp || null === $block->orig) {
             return null;
         }
-        $callIndex = null;
-        foreach ($block->orig->children as $i => $child) {
-            if ($child === $cfgCallOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (null === $callIndex) {
             return null;
         }
@@ -49232,13 +48982,7 @@ class Compiler {
         if (null === $callOp || null === $block->orig) {
             return null;
         }
-        $callIndex = null;
-        foreach ($block->orig->children as $i => $child) {
-            if ($child === $callOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $callOp, $block->orig);
         if (null === $callIndex) {
             return null;
         }
@@ -49321,13 +49065,7 @@ class Compiler {
         if (null === $callOp || null === $block->orig) {
             return false;
         }
-        $callIndex = null;
-        foreach ($block->orig->children as $i => $child) {
-            if ($child === $callOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $callOp, $block->orig);
         if (null === $callIndex || $callIndex < 2) {
             return false;
         }
@@ -49362,13 +49100,7 @@ class Compiler {
         if (null === $callOp || null === $block->orig) {
             return null;
         }
-        $callIndex = null;
-        foreach ($block->orig->children as $i => $child) {
-            if ($child === $callOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $callOp, $block->orig);
         if (null === $callIndex) {
             return null;
         }
@@ -49786,6 +49518,10 @@ class Compiler {
     ): array
     {
         $this->validateCallArgOrder($args);
+
+        if (null !== $cfgCallOp && null !== $block->orig) {
+            $this->ensureCfgChildrenOpIndicesBuilt($block->orig->children, $block->orig);
+        }
 
         if (null !== $cfgCallOp) {
             $explodeSends = $this->compileExplodeLeadingConstFetchFuncCallInlineCallArgSends($args, $block, $cfgCallOp);
@@ -50487,7 +50223,7 @@ class Compiler {
                     )
                 )
             ) {
-                $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+                $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
                 $leadingCallback = \is_int($callIndex) && $callIndex > 0
                     ? ($block->orig->children[$callIndex - 1] ?? null)
                     : null;
@@ -50510,7 +50246,7 @@ class Compiler {
                 )
             ) {
                 $countFamilyCallArg = $cfgCallOp->args[0] ?? $arg;
-                $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+                $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
                 if (
                     \is_int($callIndex)
                     && $callIndex > 0
@@ -50754,7 +50490,7 @@ class Compiler {
                     ) {
                         // Skip — ConcatList / non-ClassConst New_ arg (#22971).
                     } else {
-                    $callIndexForEnumPrelude = array_search($cfgCallOp, $block->orig->children, true);
+                    $callIndexForEnumPrelude = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
                     $enumFeedsTrailingArgOnly = \is_int($callIndexForEnumPrelude)
                         && 0 === (int) $argIndex
                         && null !== $this->nestedFuncCallProducerBeforeTrailingConstFetchPreludes(
@@ -50788,7 +50524,7 @@ class Compiler {
                 && null !== $block->orig
                 && 0 === (int) $argIndex
             ) {
-                $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+                $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
                 if (\is_int($callIndex) && $callIndex > 0) {
                     $immediatePrelude = $block->orig->children[$callIndex - 1] ?? null;
                     if ($immediatePrelude instanceof Op\Expr\ClassConstFetch) {
@@ -51502,7 +51238,7 @@ class Compiler {
                 : null;
             if (null !== $exprPreludeSlot) {
                 if (null !== $cfgCallOp && null !== $block->orig) {
-                    $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+                    $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
                     if (\is_int($callIndex) && $callIndex > 0) {
                         $prelude = $block->orig->children[$callIndex - 1] ?? null;
                         if (
@@ -52164,7 +51900,7 @@ class Compiler {
                     && null !== $block->orig
                     && $this->arrayMergeHasLeadingInlineArrayBeforeArrayKeysSibling($block, $cfgCallOp)
                 ) {
-                    $mergeCallIndex = array_search($cfgCallOp, $block->orig->children, true);
+                    $mergeCallIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
                     if (is_int($mergeCallIndex)) {
                         for ($mai = 0; $mai < $mergeCallIndex; ++$mai) {
                             $mergeChild = $block->orig->children[$mai] ?? null;
@@ -54353,13 +54089,7 @@ class Compiler {
                 && 'filter_input' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')
             ) {
                 $hoisted = [];
-                $callIndex = null;
-                foreach ($block->orig->children as $i => $child) {
-                    if ($child === $cfgCallOp) {
-                        $callIndex = $i;
-                        break;
-                    }
-                }
+                $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
                 if (null !== $callIndex) {
                     for ($i = $callIndex - 1; $i >= 0; --$i) {
                         $child = $block->orig->children[$i];
@@ -54632,13 +54362,7 @@ class Compiler {
                 $siblingEmit = [];
                 $siblingFuncCount = 0;
                 if (null !== $block->orig) {
-                    $callIndex = null;
-                    foreach ($block->orig->children as $i => $child) {
-                        if ($child === $cfgCallOp) {
-                            $callIndex = $i;
-                            break;
-                        }
-                    }
+                    $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
                     if (null !== $callIndex) {
                         $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex(
                             $callIndex,
@@ -55177,13 +54901,7 @@ class Compiler {
                 && 'filter_input' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')
                 && (0 === (int) $argIndex || 2 === (int) $argIndex)
             ) {
-                $callIndex = null;
-                foreach ($block->orig->children as $i => $child) {
-                    if ($child === $cfgCallOp) {
-                        $callIndex = $i;
-                        break;
-                    }
-                }
+                $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
                 if (null !== $callIndex) {
                     $wantPrefix = 0 === (int) $argIndex ? 'input_' : 'filter_';
                     for ($i = $callIndex - 1; $i >= 0; --$i) {
@@ -55214,13 +54932,7 @@ class Compiler {
                 && \is_array($cfgCallOp->args ?? null)
                 && 3 === \count($cfgCallOp->args)
             ) {
-                $callIndex = null;
-                foreach ($block->orig->children as $i => $child) {
-                    if ($child === $cfgCallOp) {
-                        $callIndex = $i;
-                        break;
-                    }
-                }
+                $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
                 if (null !== $callIndex) {
                     if (1 === (int) $argIndex) {
                         for ($i = $callIndex - 1; $i >= 0; --$i) {
@@ -55317,7 +55029,7 @@ class Compiler {
                     && $this->callArgIsDeadInlineTemporary($cfgCallOp->args[(int) $argIndex] ?? $arg)
                 )
             ) {
-                $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+                $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
                 if (\is_int($callIndex) && $callIndex > 0) {
                     $prevStmt = $block->orig->children[$callIndex - 1] ?? null;
                     if ($prevStmt instanceof Op\Expr\FuncCall || $prevStmt instanceof Op\Expr\NsFuncCall) {
@@ -55400,7 +55112,7 @@ class Compiler {
                     && $this->callArgOperandExpectsArrayProducer($varExportArg)
                     && null !== $block->orig
                 ) {
-                    $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+                    $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
                     $stmtBeforeVarExport = \is_int($callIndex)
                         ? ($block->orig->children[$callIndex - 1] ?? null)
                         : null;
@@ -55467,7 +55179,7 @@ class Compiler {
                 && (int) $argIndex === \count($cfgCallOp->args) - 1
                 && $this->callHasNamedVariableArgument($cfgCallOp)
             ) {
-                $mixedCallIndex = array_search($cfgCallOp, $block->orig->children, true);
+                $mixedCallIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
                 if (\is_int($mixedCallIndex) && $mixedCallIndex > 0) {
                     $adjacentProducer = $block->orig->children[$mixedCallIndex - 1] ?? null;
                     if ($adjacentProducer instanceof Op\Expr\FuncCall || $adjacentProducer instanceof Op\Expr\NsFuncCall) {
@@ -55509,7 +55221,7 @@ class Compiler {
                 if (null !== $constPreludeSlot) {
                     $valueSlot = $constPreludeSlot;
                 }
-                $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+                $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
                 $firstSibling = \is_int($callIndex)
                     ? $this->firstSiblingInlineFuncCallProducerIndexImpl($callIndex, $block->orig->children)
                     : null;
@@ -55743,7 +55455,7 @@ class Compiler {
                     }
                 }
                 if (1 === $deadTempCount) {
-                    $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+                    $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
                     if (\is_int($callIndex) && $callIndex > 0) {
                         $adjacentIndex = $callIndex - 1;
                         while ($adjacentIndex >= 0) {
@@ -56083,7 +55795,7 @@ class Compiler {
                 );
                 if (null === $bitmaskSlot) {
                     $trailingBitmaskArgIndex = $this->trailingNonEmbeddedCallArgIndex($cfgCallOp);
-                    $bitmaskCallIndex = array_search($cfgCallOp, $block->orig->children, true);
+                    $bitmaskCallIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
                     if (\is_int($bitmaskCallIndex) && $bitmaskCallIndex > 0) {
                         $bitmaskImmediate = $block->orig->children[$bitmaskCallIndex - 1] ?? null;
                         if ($bitmaskImmediate instanceof Op\Expr\Assign) {
@@ -56247,7 +55959,7 @@ class Compiler {
         ) {
             return null;
         }
-        $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (!\is_int($callIndex) || $callIndex < 1) {
             return null;
         }
@@ -56633,13 +56345,7 @@ class Compiler {
             return null;
         }
         $hoisted = [];
-        $callIndex = null;
-        foreach ($block->orig->children as $i => $child) {
-            if ($child === $cfgCallOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (null === $callIndex) {
             return null;
         }
@@ -58320,7 +58026,7 @@ class Compiler {
                     && \is_array($consumer->args)
                     && 1 === \count($consumer->args)
                 ) {
-                    $iifeProducerIndex = array_search($cfgCallOp, $cfgChildren, true);
+                    $iifeProducerIndex = $this->cfgCallOpIndexInChildren($cfgChildren, $cfgCallOp);
                     if (
                         \is_int($iifeProducerIndex)
                         && $cfgCallOp instanceof Op\Expr
@@ -58384,7 +58090,7 @@ class Compiler {
             return false;
         }
         $cfgChildren = $block->orig->children;
-        $producerIndex = array_search($cfgCallOp, $cfgChildren, true);
+        $producerIndex = $this->cfgCallOpIndexInChildren($cfgChildren, $cfgCallOp);
         if (!is_int($producerIndex)) {
             return false;
         }
@@ -58508,7 +58214,7 @@ class Compiler {
             return false;
         }
         $cfgChildren = $block->orig->children;
-        $producerIndex = array_search($cfgCallOp, $cfgChildren, true);
+        $producerIndex = $this->cfgCallOpIndexInChildren($cfgChildren, $cfgCallOp);
         if (!\is_int($producerIndex)) {
             return false;
         }
@@ -58535,7 +58241,7 @@ class Compiler {
             return false;
         }
         $cfgChildren = $block->orig->children;
-        $producerIndex = array_search($cfgCallOp, $cfgChildren, true);
+        $producerIndex = $this->cfgCallOpIndexInChildren($cfgChildren, $cfgCallOp);
         if (!\is_int($producerIndex)) {
             return false;
         }
@@ -58576,7 +58282,7 @@ class Compiler {
             return false;
         }
         $cfgChildren = $block->orig->children;
-        $producerIndex = array_search($cfgCallOp, $cfgChildren, true);
+        $producerIndex = $this->cfgCallOpIndexInChildren($cfgChildren, $cfgCallOp);
         if (!\is_int($producerIndex)) {
             return false;
         }
@@ -58629,7 +58335,7 @@ class Compiler {
             return false;
         }
         $cfgChildren = $block->orig->children;
-        $producerIndex = array_search($cfgCallOp, $cfgChildren, true);
+        $producerIndex = $this->cfgCallOpIndexInChildren($cfgChildren, $cfgCallOp);
         if (!is_int($producerIndex) || $producerIndex < 1) {
             return false;
         }
@@ -59037,7 +58743,7 @@ class Compiler {
         // array_keys(array_flip([...])) / array_keys($ao->getArrayCopy()) — adjacent call result
         // feeds arg #0; do not steal nested INIT_ARRAY (#21981, #25812).
         if (null !== $block->orig) {
-            $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+            $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
             if (\is_int($callIndex) && $callIndex > 0) {
                 $adjacentIndex = $callIndex - 1;
                 while ($adjacentIndex >= 0) {
@@ -59820,7 +59526,7 @@ class Compiler {
         if (!\is_array($cfgCallOp->args ?? null) || [] === $cfgCallOp->args) {
             return;
         }
-        $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (!\is_int($callIndex) || $callIndex < 1) {
             return;
         }
@@ -60064,7 +59770,7 @@ class Compiler {
                 }
                 // var_export((string)$xml['a']) — Cast feeds arg #0; dim-fetch is the Cast operand (#25339).
                 // Skip trailing true/false return-flag ConstFetch so two-arg form still sees the Cast.
-                $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+                $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
                 if (\is_int($callIndex) && $callIndex > 0) {
                     $probeIndex = $callIndex - 1;
                     while ($probeIndex >= 0) {
@@ -60142,7 +59848,7 @@ class Compiler {
             return;
         }
         if (null !== $block->orig) {
-            $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+            $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
             if (\is_int($callIndex) && $callIndex > 0) {
                 $stmtBefore = $block->orig->children[$callIndex - 1] ?? null;
                 $hoistedNullFeedsSoleArg = $stmtBefore instanceof Op\Expr\ConstFetch
@@ -60201,7 +59907,7 @@ class Compiler {
         }
         $execSlot = null;
         if (null !== $block->orig) {
-            $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+            $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
             if (\is_int($callIndex) && $callIndex > 0) {
                 $probeIndex = $callIndex - 1;
                 while ($probeIndex >= 0) {
@@ -60520,7 +60226,7 @@ class Compiler {
         if (!$callArg instanceof Operand || !$this->callArgIsDeadInlineTemporary($callArg)) {
             return;
         }
-        $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+        $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (!\is_int($callIndex) || $callIndex < 1) {
             return;
         }
@@ -60891,7 +60597,7 @@ class Compiler {
             && null !== $block->orig
             && 'var_export' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')
         ) {
-            $consumerCfgIndex = array_search($cfgCallOp, $block->orig->children, true);
+            $consumerCfgIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
             if (\is_int($consumerCfgIndex)) {
                 $skipPrependForSiblingFuncProducer = null !== $this->firstSiblingInlineFuncCallProducerIndex(
                     $consumerCfgIndex,
