@@ -1,39 +1,39 @@
 {
     "version": 1,
-    "generated_at": "2026-07-27T00:00:00Z",
+    "generated_at": "2026-09-02T22:50:38Z",
     "arch": "x86_64-linux",
     "ratio_tolerance_percent": 30,
     "ir_tolerance_percent": 20,
     "regeneration": "PHP_8_2=$(command -v php) ./script/bench-gate.sh --update",
-    "note": "Ratio baselines from benchmarks/README.md (verified-output table, 2026-07-27). IR counts from pinned php-compiler:22.04-dev image. Gate is intentionally red on fibo(30) until typed-int boxing is fixed (#36189 / #31980).",
+    "note": "Blessed from master 2026-09-02 after wave-1 mandelbrot timeout fix (#36331 revert of broken delref dtor CFG). Absolute targets: mandelbrot ≤0.3s, simple ≤0.25s (#36407). Ratio/IR track regressions vs this snapshot.",
     "cases": {
         "fibo(30)": {
-            "ratio_aot_over_zend": 0.168651,
-            "zend_wall": 0.1008,
-            "aot_wall": 0.017,
-            "ir_lines": 91484,
-            "ir_defines": 406
+            "ratio_aot_over_zend": 0.312172,
+            "zend_wall": 0.04675,
+            "aot_wall": 0.014594,
+            "ir_lines": 98165,
+            "ir_defines": 419
         },
         "simple": {
-            "ratio_aot_over_zend": 7.615269,
-            "zend_wall": 0.0668,
-            "aot_wall": 0.5087,
-            "ir_lines": 98599,
-            "ir_defines": 411
+            "ratio_aot_over_zend": 5.544432,
+            "zend_wall": 0.024646,
+            "aot_wall": 0.136647,
+            "ir_lines": 105320,
+            "ir_defines": 424
         },
         "mandelbrot": {
-            "ratio_aot_over_zend": 1.119236,
-            "zend_wall": 0.1518,
-            "aot_wall": 0.1699,
-            "ir_lines": 252831,
-            "ir_defines": 400
+            "ratio_aot_over_zend": 1.691168,
+            "zend_wall": 0.052598,
+            "aot_wall": 0.088952,
+            "ir_lines": 248707,
+            "ir_defines": 413
         },
         "Ack(3,8)": {
-            "ratio_aot_over_zend": 2.655172,
-            "zend_wall": 0.0986,
-            "aot_wall": 0.2618,
-            "ir_lines": 95429,
-            "ir_defines": 412
+            "ratio_aot_over_zend": 0.606491,
+            "zend_wall": 0.048246,
+            "aot_wall": 0.029261,
+            "ir_lines": 102112,
+            "ir_defines": 425
         }
     }
 }
