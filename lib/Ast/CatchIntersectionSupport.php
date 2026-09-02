@@ -6,6 +6,7 @@ namespace PHPCompiler\Ast;
 
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\ReferenceProfileTokenScan;
+use PHPCompiler\SourceUnit;
 
 /**
  * Reject (and historically rewrite) catch intersection types (#28439 / #28205).
@@ -61,7 +62,7 @@ final class CatchIntersectionSupport
             return null;
         }
 
-        $tokens = token_get_all($code);
+        $tokens = SourceUnit::tokens($code);
         foreach (self::findCatchTypeSpans($tokens) as $span) {
             $hasAnd = false;
             $hasOr = false;
@@ -111,7 +112,7 @@ final class CatchIntersectionSupport
             return $code;
         }
 
-        $tokens = token_get_all($code);
+        $tokens = SourceUnit::tokens($code);
         $spans = self::findCatchTypeSpans($tokens);
         if ([] === $spans) {
             return $code;

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\Ast;
 
 use PHPCompiler\CompilerVersion;
+use PHPCompiler\SourceUnit;
 
 /**
  * Desugar PHP 8.5+ pipe operator (|>) before nikic/php-parser (#3243, #7219, #22792).
@@ -35,7 +36,7 @@ final class PipeOperatorDesugar
             return null;
         }
 
-        $tokens = token_get_all($code);
+        $tokens = SourceUnit::tokens($code);
         for ($i = 0, $c = count($tokens); $i < $c; ++$i) {
             if (!self::isPipeAt($tokens, $i)) {
                 continue;
@@ -70,7 +71,7 @@ final class PipeOperatorDesugar
         }
 
         for ($guard = 0; $guard < 512 && str_contains($code, '|>'); ++$guard) {
-            $tokens = token_get_all($code);
+            $tokens = SourceUnit::tokens($code);
             $pipeIdx = self::findPipeTokenIndex($tokens);
             if (null === $pipeIdx) {
                 break;
@@ -913,6 +914,6 @@ final class PipeOperatorDesugar
 
     private static function byteOffsetToLine(string $code, int $offset): int
     {
-        return substr_count(substr($code, 0, max(0, $offset)), "\n") + 1;
+        return SourceUnit::byteOffsetToLine($code, max(0, $offset));
     }
 }

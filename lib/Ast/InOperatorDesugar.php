@@ -6,6 +6,7 @@ namespace PHPCompiler\Ast;
 
 use PHPCompiler\Compiler\CompileFatal;
 use PHPCompiler\ReferenceProfileTokenScan;
+use PHPCompiler\SourceUnit;
 
 /**
  * php-src has no `$needle in $haystack` operator (Zend/zend_language_parser.y).
@@ -55,7 +56,7 @@ final class InOperatorDesugar
             return null;
         }
 
-        $tokens = token_get_all($code);
+        $tokens = SourceUnit::tokens($code);
         for ($i = 0, $c = count($tokens); $i < $c; ++$i) {
             $token = $tokens[$i];
             if (!\is_array($token) || T_STRING !== $token[0]) {

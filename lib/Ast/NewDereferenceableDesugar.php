@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\Ast;
 
 use PHPCompiler\CompilerVersion;
+use PHPCompiler\SourceUnit;
 
 /**
  * Desugar PHP 8.4+ dereferencable `new` without outer parentheses before nikic/php-parser (#6974).
@@ -46,7 +47,7 @@ final class NewDereferenceableDesugar
             return null;
         }
 
-        $tokens = token_get_all($code);
+        $tokens = SourceUnit::tokens($code);
         if (!\is_array($tokens) || [] === $tokens) {
             return null;
         }
@@ -111,7 +112,7 @@ final class NewDereferenceableDesugar
             return null;
         }
 
-        $tokens = token_get_all($code);
+        $tokens = SourceUnit::tokens($code);
         if (!\is_array($tokens) || [] === $tokens) {
             return null;
         }
@@ -167,7 +168,7 @@ final class NewDereferenceableDesugar
             return $code;
         }
 
-        $tokens = token_get_all($code);
+        $tokens = SourceUnit::tokens($code);
         if (!\is_array($tokens) || [] === $tokens) {
             return $code;
         }
@@ -305,7 +306,7 @@ final class NewDereferenceableDesugar
             return 1;
         }
 
-        return substr_count(substr($code, 0, $offset), "\n") + 1;
+        return SourceUnit::byteOffsetToLine($code, $offset);
     }
 
     /**

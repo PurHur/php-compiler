@@ -43,7 +43,7 @@ final class AbstractClassConstRejector
             return $code;
         }
 
-        $tokens = token_get_all($code);
+        $tokens = SourceUnit::tokens($code);
         $n = \count($tokens);
         for ($i = 0; $i < $n; ++$i) {
             $tok = $tokens[$i];

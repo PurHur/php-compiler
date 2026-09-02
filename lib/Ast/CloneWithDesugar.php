@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\Ast;
 
 use PHPCompiler\CompilerVersion;
+use PHPCompiler\SourceUnit;
 
 /**
  * Desugar PHP 8.5+ `clone($obj, ['prop' => $value, ...])` before nikic/php-parser
@@ -44,7 +45,7 @@ final class CloneWithDesugar
             return null;
         }
 
-        $tokens = token_get_all($code);
+        $tokens = SourceUnit::tokens($code);
         $withSpan = self::findCloneWithSpan($code, $tokens);
         if (null === $withSpan) {
             return null;
@@ -67,7 +68,7 @@ final class CloneWithDesugar
             return null;
         }
 
-        $tokens = token_get_all($code);
+        $tokens = SourceUnit::tokens($code);
         $callSpan = self::findCloneCallSpan($code, $tokens);
         if (null === $callSpan) {
             return null;
@@ -105,7 +106,7 @@ final class CloneWithDesugar
 
         // Only parenthesized `clone($obj, [...])` — keyword `with` forms are rejected (#29187).
         for ($guard = 0; $guard < 256; ++$guard) {
-            $tokens = token_get_all($code);
+            $tokens = SourceUnit::tokens($code);
             $span = self::findCloneCallSpan($code, $tokens);
             if (null === $span) {
                 break;
@@ -1189,6 +1190,6 @@ final class CloneWithDesugar
 
     private static function byteOffsetToLine(string $code, int $offset): int
     {
-        return substr_count(substr($code, 0, max(0, $offset)), "\n") + 1;
+        return SourceUnit::byteOffsetToLine($code, max(0, $offset));
     }
 }

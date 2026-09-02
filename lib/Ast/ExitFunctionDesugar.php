@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\Ast;
 
 use PHPCompiler\CompilerVersion;
+use PHPCompiler\SourceUnit;
 
 /**
  * Desugar PHP 8.4+ parenthesized exit/die to callable builtins before nikic/php-parser (#6975).
@@ -38,7 +39,7 @@ final class ExitFunctionDesugar
             return null;
         }
 
-        $tokens = token_get_all($code);
+        $tokens = SourceUnit::tokens($code);
         for ($i = 0, $c = \count($tokens); $i < $c; ++$i) {
             if (!self::isExitKeyword($tokens, $i) || !self::hasParenCall($tokens, $i)) {
                 continue;
@@ -70,7 +71,7 @@ final class ExitFunctionDesugar
             return $code;
         }
 
-        $tokens = token_get_all($code);
+        $tokens = SourceUnit::tokens($code);
         $replacements = [];
         for ($i = 0, $c = \count($tokens); $i < $c; ++$i) {
             if (!self::isExitKeyword($tokens, $i) || !self::hasParenCall($tokens, $i)) {
@@ -226,6 +227,6 @@ final class ExitFunctionDesugar
 
     private static function byteOffsetToLine(string $code, int $offset): int
     {
-        return 1 + substr_count(substr($code, 0, max(0, $offset)), "\n");
+        return SourceUnit::byteOffsetToLine($code, max(0, $offset));
     }
 }

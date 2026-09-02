@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Ast;
 
+use PHPCompiler\SourceUnit;
+
 /**
  * Strip sealed / permits syntax for nikic/php-parser (no T_SEALED) and record metadata (#3322).
  *
@@ -26,7 +28,7 @@ final class SealedClassPreprocessor
         while (preg_match($pattern, $code, $m, PREG_OFFSET_CAPTURE, $offset)) {
             $matchOffset = $m[0][1];
             $pieces[] = substr($code, $offset, $matchOffset - $offset);
-            $line = substr_count(substr($code, 0, $matchOffset), "\n") + 1;
+            $line = SourceUnit::byteOffsetToLine($code, $matchOffset);
             $kind = $m[1][0];
             $name = $m[2][0];
             $permitsRaw = isset($m[3]) ? $m[3][0] : '';

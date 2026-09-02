@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\Ast;
 
 use PHPCompiler\CompilerVersion;
+use PHPCompiler\SourceUnit;
 
 /**
  * Detect try/catch/else for php-src-strict Parse error (#31159).
@@ -57,7 +58,7 @@ final class TryCatchElseSupport
             return null;
         }
 
-        $tokens = token_get_all($code);
+        $tokens = SourceUnit::tokens($code);
         for ($i = 0, $c = \count($tokens); $i < $c; ++$i) {
             if (!self::isTryKeyword($tokens, $i)) {
                 continue;
@@ -93,7 +94,7 @@ final class TryCatchElseSupport
         }
 
         for ($guard = 0; $guard < 256; ++$guard) {
-            $tokens = token_get_all($code);
+            $tokens = SourceUnit::tokens($code);
             $span = self::findNextTryCatchElseSpan($code, $tokens);
             if (null === $span) {
                 break;
@@ -334,6 +335,6 @@ final class TryCatchElseSupport
 
     private static function byteOffsetToLine(string $code, int $offset): int
     {
-        return substr_count(substr($code, 0, $offset), "\n") + 1;
+        return SourceUnit::byteOffsetToLine($code, $offset);
     }
 }
