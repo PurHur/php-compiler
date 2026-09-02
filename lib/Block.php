@@ -3962,4 +3962,49 @@ class Block {
             && null !== $this->func->class
             && (($this->func->flags ?? 0) & Func::FLAG_STATIC) !== 0;
     }
+
+    /**
+     * Release php-cfg CFG backing storage after compile/JIT lowering (#36231).
+     *
+     * VM execution still needs {@see $orig} for dead-temp release; call only after JIT
+     * lowering when the block will not be interpreted, or with {@see $releaseScope} for
+     * compile-only discard paths (memory probes, spine chunk emit after native link).
+     */
+    public static function detachCfgTree(?self $root, bool $releaseScope = false): void
+    {
+        if (null === $root) {
+            return;
+        }
+        $seen = new \SplObjectStorage();
+        self::detachCfgFrom($root, $releaseScope, $seen);
+    }
+
+    private static function detachCfgFrom(self $block, bool $releaseScope, \SplObjectStorage $seen): void
+    {
+        if ($seen->contains($block)) {
+            return;
+        }
+        $seen->attach($block);
+
+        foreach ($block->opCodes as $op) {
+            foreach ([$op->block1, $op->block2, $op->block3] as $child) {
+                if ($child instanceof self) {
+                    self::detachCfgFrom($child, $releaseScope, $seen);
+                }
+            }
+        }
+        foreach ($block->blocks as $child) {
+            if ($child instanceof self) {
+                self::detachCfgFrom($child, $releaseScope, $seen);
+            }
+        }
+
+        if ($releaseScope) {
+            $block->scope = new \SplObjectStorage();
+            $block->operandBySlotCache = [];
+            $block->isNamedVariableSlotCache = [];
+            $block->operandForScopeSlotCache = [];
+        }
+        $block->orig = null;
+    }
 }
