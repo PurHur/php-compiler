@@ -31,6 +31,9 @@ class HashTable extends Type
      */
     private const PACKED_VALUE_STRIDE = 9;
 
+    /** Initial string-key hash buckets: 2^3 (Zend MIN_SIZE). */
+    private const STR_HASH_INITIAL_MASK = 7;
+
     public PHPLLVM\Type $pointer;
 
     public function register(): void
@@ -44,12 +47,16 @@ class HashTable extends Type
             $this->context->getTypeFromString('__string__*'),
             $this->context->getTypeFromString('__value__'),
             $nodeStruct->pointerType(0),
+            $this->context->getTypeFromString('int64'),
+            $nodeStruct->pointerType(0),
         );
         $this->context->structFieldMap['__strkey_node__'] = [
             'ref' => 0,
             'key' => 1,
             'value' => 2,
             'next' => 3,
+            'hash' => 4,
+            'hashNext' => 5,
         ];
 
         $objNodeStruct = $this->context->context->namedStructType('__objkey_node__');
@@ -86,6 +93,10 @@ class HashTable extends Type
             $this->context->getTypeFromString('size_t'),
             /** Tail of strKeys insertion-order list — O(1) append (#36191 partial). */
             $this->context->getTypeFromString('__strkey_node__*'),
+            /** String-key hash mask (power-of-two minus one); 0 = no index (#36191). */
+            $this->context->getTypeFromString('size_t'),
+            /** Bucket heads — __strkey_node__*[mask+1]. */
+            $nodeStruct->pointerType(0)->pointerType(0),
         );
         $this->context->structFieldMap['__hashtable__'] = [
             'ref' => 0,
@@ -99,6 +110,8 @@ class HashTable extends Type
             'internalPointer' => 7,
             'packedPrefixEnd' => 8,
             'strKeysTail' => 9,
+            'strHashMask' => 10,
+            'strHashSlots' => 11,
         ];
 
         $this->registerFn('__hashtable__alloc', '__hashtable__*', []);
@@ -113,6 +126,9 @@ class HashTable extends Type
         $this->registerFn('__hashtable__readLongAt', 'int64', ['__hashtable__*', 'size_t']);
         $this->registerFn('__hashtable__readStringAt', '__string__*', ['__hashtable__*', 'size_t']);
         $this->registerFn('__hashtable__getNumElements', 'size_t', ['__hashtable__*']);
+        $this->registerFn('__hashtable__hashStringKey', 'int64', ['__string__*']);
+        $this->registerFn('__hashtable__ensureStrHashIndex', 'void', ['__hashtable__*']);
+        $this->registerFn('__hashtable__prependStrKeyHashChain', 'void', ['__hashtable__*', '__strkey_node__*', 'int64']);
         $this->registerFn('__hashtable__offsetIsSet', 'int1', ['__hashtable__*', 'size_t']);
         $this->registerFn('__hashtable__unsetLongAt', 'void', ['__hashtable__*', 'size_t']);
         $this->registerFn('__hashtable__unsetStringKey', 'void', ['__hashtable__*', '__string__*']);
@@ -272,6 +288,9 @@ class HashTable extends Type
         $this->implementReadLongAt();
         $this->implementReadStringAt();
         $this->implementGetNumElements();
+        $this->implementHashStringKey();
+        $this->implementEnsureStrHashIndex();
+        $this->implementPrependStrKeyHashChain();
         $this->implementOffsetIsSet();
         $this->implementUnsetLongAt();
         $this->implementUnsetStringKey();
@@ -426,6 +445,14 @@ class HashTable extends Type
         $this->context->builder->store(
             $nullStrKeys,
             $this->context->builder->structGep($ht, $map['strKeysTail'])
+        );
+        $this->context->builder->store(
+            $zero,
+            $this->context->builder->structGep($ht, $map['strHashMask'])
+        );
+        $this->context->builder->store(
+            $this->context->getTypeFromString('__strkey_node__**')->constNull(),
+            $this->context->builder->structGep($ht, $map['strHashSlots'])
         );
         $typeinfo = $this->context->getTypeFromString('int32')->constInt(
             Refcount::TYPE_INFO_TYPE_MASKED_ARRAY | Refcount::TYPE_INFO_REFCOUNTED,
@@ -1026,6 +1053,28 @@ class HashTable extends Type
             $newNode->typeOf()->constNull(),
             $this->context->builder->structGep($newNode, $nodeMap['next'])
         );
+        $keyHash = $this->context->builder->call(
+            $this->context->lookupFunction('__hashtable__hashStringKey'),
+            $key
+        );
+        $this->context->builder->store(
+            $keyHash,
+            $this->context->builder->structGep($newNode, $nodeMap['hash'])
+        );
+        $this->context->builder->store(
+            $newNode->typeOf()->constNull(),
+            $this->context->builder->structGep($newNode, $nodeMap['hashNext'])
+        );
+        $this->context->builder->call(
+            $this->context->lookupFunction('__hashtable__ensureStrHashIndex'),
+            $ht
+        );
+        $this->context->builder->call(
+            $this->context->lookupFunction('__hashtable__prependStrKeyHashChain'),
+            $ht,
+            $newNode,
+            $keyHash
+        );
         $afterAppend = $fn->appendBasicBlock('strkey_set_after_append');
         $this->appendStrKeyNodeAtTail($fn, $prepend, $ht, $headSlot, $newNode, 'strkey_set', $afterAppend);
         $this->context->builder->positionAtEnd($afterAppend);
@@ -1319,6 +1368,28 @@ class HashTable extends Type
         $this->context->builder->store(
             $newNode->typeOf()->constNull(),
             $this->context->builder->structGep($newNode, $nodeMap['next'])
+        );
+        $keyHash = $this->context->builder->call(
+            $this->context->lookupFunction('__hashtable__hashStringKey'),
+            $key
+        );
+        $this->context->builder->store(
+            $keyHash,
+            $this->context->builder->structGep($newNode, $nodeMap['hash'])
+        );
+        $this->context->builder->store(
+            $newNode->typeOf()->constNull(),
+            $this->context->builder->structGep($newNode, $nodeMap['hashNext'])
+        );
+        $this->context->builder->call(
+            $this->context->lookupFunction('__hashtable__ensureStrHashIndex'),
+            $ht
+        );
+        $this->context->builder->call(
+            $this->context->lookupFunction('__hashtable__prependStrKeyHashChain'),
+            $ht,
+            $newNode,
+            $keyHash
         );
         $afterAppend = $fn->appendBasicBlock('strkey_long_after_append');
         $this->appendStrKeyNodeAtTail($fn, $prepend, $ht, $headSlot, $newNode, 'strkey_long', $afterAppend);
@@ -2179,7 +2250,68 @@ class HashTable extends Type
         $nodeMap = $this->context->structFieldMap['__strkey_node__'];
         $head = $this->context->builder->load($this->context->builder->structGep($ht, $htMap['strKeys']));
         $nodePtrType = $head->typeOf();
+        $sizeT = $this->context->getTypeFromString('size_t');
+        $mask = $this->context->builder->load(
+            $this->context->builder->structGep($ht, $htMap['strHashMask'])
+        );
+        $hasHashIndex = $this->context->builder->icmp(
+            Builder::INT_UGT,
+            $mask,
+            $sizeT->constInt(0, false)
+        );
+        $hashLookup = $fn->appendBasicBlock('strkey_lookup_hash');
+        $listLookup = $fn->appendBasicBlock('strkey_lookup_list');
+        $this->context->builder->branchIf($hasHashIndex, $hashLookup, $listLookup);
 
+        $this->context->builder->positionAtEnd($hashLookup);
+        $keyHash = $this->context->builder->call(
+            $this->context->lookupFunction('__hashtable__hashStringKey'),
+            $key
+        );
+        $hashU = $this->context->builder->truncOrBitCast($keyHash, $sizeT);
+        $maskU = $this->context->builder->truncOrBitCast($mask, $sizeT);
+        $bucket = $this->context->builder->and($hashU, $maskU);
+        $slots = $this->context->builder->load(
+            $this->context->builder->structGep($ht, $htMap['strHashSlots'])
+        );
+        $hashSlotPtr = $this->context->builder->inBoundsGep($slots, $bucket);
+        $hashCurSlot = $this->context->builder->alloca($nodePtrType, 1, 'strkey_hash_cur');
+        $this->context->builder->store($this->context->builder->load($hashSlotPtr), $hashCurSlot);
+        $hashLoopHead = $fn->appendBasicBlock('strkey_hash_head');
+        $hashLoopBody = $fn->appendBasicBlock('strkey_hash_body');
+        $this->context->builder->branch($hashLoopHead);
+
+        $this->context->builder->positionAtEnd($hashLoopHead);
+        $hashNode = $this->context->builder->load($hashCurSlot);
+        $hashIsNull = $this->context->builder->icmp(Builder::INT_EQ, $hashNode, $nodePtrType->constNull());
+        $this->context->builder->branchIf($hashIsNull, $notFound, $hashLoopBody);
+
+        $this->context->builder->positionAtEnd($hashLoopBody);
+        $nodeHash = $this->context->builder->load($this->context->builder->structGep($hashNode, $nodeMap['hash']));
+        $hashMatches = $this->context->builder->icmp(Builder::INT_EQ, $nodeHash, $keyHash);
+        $hashCmpKey = $fn->appendBasicBlock('strkey_hash_cmp_key');
+        $hashNext = $fn->appendBasicBlock('strkey_hash_next');
+        $this->context->builder->branchIf($hashMatches, $hashCmpKey, $hashNext);
+
+        $this->context->builder->positionAtEnd($hashCmpKey);
+        $nodeKey = $this->context->builder->load($this->context->builder->structGep($hashNode, $nodeMap['key']));
+        $isMatch = JitStringCompare::identical($this->context, $key, $nodeKey);
+        $hashFound = $fn->appendBasicBlock('strkey_hash_found');
+        $this->context->builder->branchIf($isMatch, $hashFound, $hashNext);
+
+        $this->context->builder->positionAtEnd($hashFound);
+        $hashValField = $this->context->builder->structGep($hashNode, $nodeMap['value']);
+        $this->context->builder->store($hashValField, $resultSlot);
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($hashNext);
+        $nextHashNode = $this->context->builder->load(
+            $this->context->builder->structGep($hashNode, $nodeMap['hashNext'])
+        );
+        $this->context->builder->store($nextHashNode, $hashCurSlot);
+        $this->context->builder->branch($hashLoopHead);
+
+        $this->context->builder->positionAtEnd($listLookup);
         $currentSlot = $this->context->builder->alloca($nodePtrType, 1, 'strkey_current');
         $this->context->builder->store($head, $currentSlot);
         $this->context->builder->branch($loopHead);
@@ -4182,6 +4314,126 @@ class HashTable extends Type
     public function jitContext(): Context
     {
         return $this->context;
+    }
+
+    /** php-src zend_string_hash_val — DJB33 on key bytes (#36191). */
+    private function implementHashStringKey(): void
+    {
+        $fn = $this->context->lookupFunction('__hashtable__hashStringKey');
+        $entry = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($entry);
+        $key = $fn->getParam(0);
+        $map = $this->context->structFieldMap['__string__'];
+        $i64 = $this->context->getTypeFromString('int64');
+        $len = $this->context->builder->load($this->context->builder->structGep($key, $map['length']));
+        $dataPtr = $this->stringDataPtr($key);
+        $hashSlot = $this->context->builder->alloca($i64, 1, 'djb_hash');
+        $idxSlot = $this->context->builder->alloca($i64, 1, 'djb_idx');
+        $this->context->builder->store($i64->constInt(5381, false), $hashSlot);
+        $this->context->builder->store($i64->constInt(0, false), $idxSlot);
+        $loopHead = $fn->appendBasicBlock('djb_head');
+        $loopBody = $fn->appendBasicBlock('djb_body');
+        $done = $fn->appendBasicBlock('djb_done');
+        $this->context->builder->branch($loopHead);
+        $this->context->builder->positionAtEnd($loopHead);
+        $idx = $this->context->builder->load($idxSlot);
+        $finished = $this->context->builder->icmp(Builder::INT_SGE, $idx, $len);
+        $this->context->builder->branchIf($finished, $done, $loopBody);
+        $this->context->builder->positionAtEnd($loopBody);
+        $byte = $this->context->builder->zExt(
+            $this->context->builder->load($this->context->builder->inBoundsGep($dataPtr, $idx)),
+            $i64
+        );
+        $hash = $this->context->builder->load($hashSlot);
+        $mixed = $this->context->builder->addNoSignedWrap(
+            $this->context->builder->addNoSignedWrap(
+                $this->context->builder->shl($hash, $i64->constInt(5, false)),
+                $hash
+            ),
+            $byte
+        );
+        $this->context->builder->store(
+            $this->context->builder->and($mixed, $i64->constInt(0x7FFFFFFF, false)),
+            $hashSlot
+        );
+        $this->context->builder->store(
+            $this->context->builder->addNoSignedWrap($idx, $i64->constInt(1, false)),
+            $idxSlot
+        );
+        $this->context->builder->branch($loopHead);
+        $this->context->builder->positionAtEnd($done);
+        $this->context->builder->returnValue(
+            $this->context->builder->or(
+                $this->context->builder->load($hashSlot),
+                $i64->constInt(\PHP_INT_MIN, true)
+            )
+        );
+    }
+
+    /** Allocate 8-bucket string-key hash index on first use (#36191). */
+    private function implementEnsureStrHashIndex(): void
+    {
+        $fn = $this->context->lookupFunction('__hashtable__ensureStrHashIndex');
+        $entry = $fn->appendBasicBlock('main');
+        $done = $fn->appendBasicBlock('done');
+        $init = $fn->appendBasicBlock('init');
+        $this->context->builder->positionAtEnd($entry);
+        $ht = $fn->getParam(0);
+        $map = $this->context->structFieldMap['__hashtable__'];
+        $sizeT = $this->context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $maskSlot = $this->context->builder->structGep($ht, $map['strHashMask']);
+        $slotsSlot = $this->context->builder->structGep($ht, $map['strHashSlots']);
+        $mask = $this->context->builder->load($maskSlot);
+        $needsInit = $this->context->builder->icmp(Builder::INT_EQ, $mask, $zero);
+        $this->context->builder->branchIf($needsInit, $init, $done);
+        $this->context->builder->positionAtEnd($init);
+        $initialMask = $sizeT->constInt(self::STR_HASH_INITIAL_MASK, false);
+        $slotCount = $this->context->builder->addNoSignedWrap($initialMask, $one);
+        $bytes = $this->context->builder->mulNoSignedWrap($slotCount, $sizeT->constInt(8, false));
+        $raw = $this->context->builder->call($this->context->lookupFunction('__mm__malloc'), $bytes);
+        $i8 = $this->context->getTypeFromString('int8');
+        $this->context->intrinsic->memset($raw, $i8->constInt(0, false), $bytes, false);
+        $this->context->builder->store(
+            $this->context->builder->pointerCast($raw, $this->context->getTypeFromString('__strkey_node__**')),
+            $slotsSlot
+        );
+        $this->context->builder->store($initialMask, $maskSlot);
+        $this->context->builder->branch($done);
+        $this->context->builder->positionAtEnd($done);
+        $this->context->builder->returnVoid();
+    }
+
+    /** Prepend a node to its hash bucket chain (#36191). */
+    private function implementPrependStrKeyHashChain(): void
+    {
+        $fn = $this->context->lookupFunction('__hashtable__prependStrKeyHashChain');
+        $entry = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($entry);
+        $ht = $fn->getParam(0);
+        $node = $fn->getParam(1);
+        $hash = $fn->getParam(2);
+        $htMap = $this->context->structFieldMap['__hashtable__'];
+        $nodeMap = $this->context->structFieldMap['__strkey_node__'];
+        $sizeT = $this->context->getTypeFromString('size_t');
+        $mask = $this->context->builder->load(
+            $this->context->builder->structGep($ht, $htMap['strHashMask'])
+        );
+        $hashU = $this->context->builder->truncOrBitCast($hash, $sizeT);
+        $maskU = $this->context->builder->truncOrBitCast($mask, $sizeT);
+        $bucket = $this->context->builder->and($hashU, $maskU);
+        $slots = $this->context->builder->load(
+            $this->context->builder->structGep($ht, $htMap['strHashSlots'])
+        );
+        $slotPtr = $this->context->builder->inBoundsGep($slots, $bucket);
+        $oldHead = $this->context->builder->load($slotPtr);
+        $this->context->builder->store($node, $slotPtr);
+        $this->context->builder->store(
+            $oldHead,
+            $this->context->builder->structGep($node, $nodeMap['hashNext'])
+        );
+        $this->context->builder->returnVoid();
     }
 
 }

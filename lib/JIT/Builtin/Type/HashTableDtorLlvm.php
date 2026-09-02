@@ -42,6 +42,7 @@ final class HashTableDtorLlvm
         self::destroyPackedValues($context, $fn, $entry, $ht);
         self::destroyStrKeyChain($context, $fn, $ht);
         self::destroyObjKeyChain($context, $fn, $ht);
+        self::freeStrHashSlots($context, $ht);
         self::freeValuesArray($context, $ht);
 
         $context->builder->returnVoid();
@@ -200,6 +201,32 @@ final class HashTableDtorLlvm
 
         $context->builder->positionAtEnd($done);
         $context->builder->store($nodePtrType->constNull(), $headSlot);
+    }
+
+    private static function freeStrHashSlots(Context $context, PHPLLVM\Value $ht): void
+    {
+        $map = $context->structFieldMap['__hashtable__'];
+        $slotsPtr = $context->builder->structGep($ht, $map['strHashSlots']);
+        $slots = $context->builder->load($slotsPtr);
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $slots,
+            $slots->typeOf()->constNull()
+        );
+        $parentFn = $context->builder->getInsertBlock()->getParent();
+        assert($parentFn instanceof PHPLLVM\Value\Function_);
+        $freeBlock = $parentFn->appendBasicBlock('ht_dtor_free_hash_slots');
+        $after = $parentFn->appendBasicBlock('ht_dtor_after_hash_slots');
+        $context->builder->branchIf($isNull, $after, $freeBlock);
+        $context->builder->positionAtEnd($freeBlock);
+        $context->memory->free($slots);
+        $context->builder->store($slots->typeOf()->constNull(), $slotsPtr);
+        $context->builder->store(
+            $context->getTypeFromString('size_t')->constInt(0, false),
+            $context->builder->structGep($ht, $map['strHashMask'])
+        );
+        $context->builder->branch($after);
+        $context->builder->positionAtEnd($after);
     }
 
     private static function freeValuesArray(Context $context, PHPLLVM\Value $ht): void
