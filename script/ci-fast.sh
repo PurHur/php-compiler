@@ -35,6 +35,10 @@ ci_jit_preflight_gate
 ci_report_llvm_status
 echo 'AOT build smoke (AOT_BUILD_SMOKE_GATE=1, #16010)...'
 ./script/check-aot-build-smoke.sh
+if [[ "${COMPILE_MEMORY_PROBE_GATE:-1}" == "1" ]]; then
+  echo "compile-memory-probe (COMPILE_MEMORY_PROBE_GATE=1, #36231)..."
+  php script/compile-memory-probe.php --check --release-cfg --sequential
+fi
 ci_run_inventory_checks
 ci_run_bootstrap_vendor_hygiene
 ci_run_bootstrap_test_subset

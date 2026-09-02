@@ -1043,6 +1043,8 @@ class Runtime {
 
         $context->compileToFile($outfile);
         \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_compiletofile_done');
+        // AOT emit complete — release php-cfg pins before process teardown (#36231).
+        Block::detachCfgTree($block, true);
         // Self-host AOT: returning destroys $context / LLVM EE and can spin 15+ min
         // after -o is linked (#31726, #21925). Exit before that teardown.
         \PHPCompiler\AOT\AotEmitFastExit::exitAfterSuccessfulSelfhostEmit($sourceFilename, $outfile);
