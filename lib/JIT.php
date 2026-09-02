@@ -33682,8 +33682,13 @@ class JIT {
     }
 
     /**
-     * Named-storage ASSIGN also updates a TYPE_OBJECT result temp; unset must null it
-     * without delref so loop-carried GC orphans survive (#36245 loop_unset).
+     * Named-storage `$a = new T` keeps the object in the NEW/ASSIGN result
+     * {@see __object__**} alloca as well as the CV value-box. Unset (and null
+     * assign) must null those mirrors without delref — otherwise the next
+     * loop-body NEW freeObjectMirrorUnlessNull double-delrefs the orphan and
+     * GC sees roots=0 (#36245 loop_unset). Distinct Operand instances share a
+     * CFG slot, so clear via getOperand (assign's operand) not only
+     * operandForScopeSlot (prologue).
      */
     private function jitClearAssignResultObjectMirrorForNamedUnset(Block $block, ?int $unsetArgSlot): void
     {
@@ -33691,38 +33696,87 @@ class JIT {
             return;
         }
         $targetSlot = (int) $unsetArgSlot;
-        $nullObj = $this->context->getTypeFromString('__object__*')->constNull();
         $seen = new \SplObjectStorage();
         foreach ($block->opCodes as $assignOp) {
-            if (OpCode::TYPE_ASSIGN !== $assignOp->type || null === $assignOp->arg2 || null === $assignOp->arg1) {
+            if (OpCode::TYPE_ASSIGN !== $assignOp->type || null === $assignOp->arg2) {
                 continue;
             }
-            if ((int) $assignOp->arg2 !== $targetSlot || $assignOp->arg1 === $assignOp->arg2) {
+            if ((int) $assignOp->arg2 !== $targetSlot) {
                 continue;
             }
-            $destSlot = (int) $assignOp->arg1;
-            if (isset($this->context->scopeSlotObjectMirrorLlvmBySlot[$destSlot])) {
-                $llvmMirror = $this->context->scopeSlotObjectMirrorLlvmBySlot[$destSlot];
-                if (!$seen->contains($llvmMirror)) {
-                    $seen[$llvmMirror] = true;
-                    $this->context->builder->store($nullObj, $llvmMirror);
-                }
+            // Property/dim assigns use arg1 === arg2; still clear RHS object mirrors.
+            $slots = [];
+            if (null !== $assignOp->arg1 && $assignOp->arg1 !== $assignOp->arg2) {
+                $slots[] = (int) $assignOp->arg1;
             }
-            $destOp = $block->operandForScopeSlot($destSlot);
-            if (null !== $destOp && $this->context->hasVariableOp($destOp)) {
-                $mirror = $this->context->getVariableFromOp($destOp);
-                if (
-                    Variable::TYPE_OBJECT === $mirror->type
-                    && Variable::KIND_VARIABLE === $mirror->kind
-                    && null === $mirror->objectPropertySlot
-                    && !$mirror->functionStaticGlobal
-                    && str_contains($this->context->getStringFromType($mirror->value->typeOf()), '__object__')
-                    && !$seen->contains($mirror->value)
-                ) {
-                    $seen[$mirror->value] = true;
-                    $this->context->builder->store($nullObj, $mirror->value);
+            try {
+                $rhs = $this->assignRhsSlot($assignOp);
+                if ($rhs !== $targetSlot) {
+                    $slots[] = $rhs;
                 }
+            } catch (\LogicException $e) {
+                // Missing RHS slot — named unset still clears assign-result mirrors.
             }
+            foreach ($slots as $slot) {
+                $this->jitNullObjectMirrorForScopeSlot($block, $slot, $seen);
+            }
+        }
+    }
+
+    /**
+     * Null every {@see __object__**} alloca bound to $slot (map + all Operand aliases).
+     *
+     * @param \SplObjectStorage<\PHPLLVM\Value, mixed> $seen
+     */
+    private function jitNullObjectMirrorForScopeSlot(Block $block, int $slot, \SplObjectStorage $seen): void
+    {
+        $nullObj = $this->context->getTypeFromString('__object__*')->constNull();
+        if (isset($this->context->scopeSlotObjectMirrorLlvmBySlot[$slot])) {
+            $llvmMirror = $this->context->scopeSlotObjectMirrorLlvmBySlot[$slot];
+            if (!$seen->contains($llvmMirror)) {
+                $seen[$llvmMirror] = true;
+                $this->context->builder->store($nullObj, $llvmMirror);
+            }
+        }
+        $operands = [];
+        $scoped = $block->operandForScopeSlot($slot);
+        if (null !== $scoped) {
+            $operands[] = $scoped;
+        }
+        // Prefer the exact Operand getOperand returns — assign/NEW lower against it (#36245).
+        $fromOpcode = $block->getOperand($slot);
+        if (null !== $fromOpcode) {
+            $operands[] = $fromOpcode;
+        }
+        foreach ($block->scopedOperands() as $scopedOp) {
+            if ($block->slotForOperand($scopedOp) === $slot) {
+                $operands[] = $scopedOp;
+            }
+        }
+        foreach ($operands as $op) {
+            if (!$this->context->hasVariableOp($op) && !$this->context->scope->variables->contains($op)) {
+                continue;
+            }
+            $mirror = $this->context->hasVariableOp($op)
+                ? $this->context->getVariableFromOp($op)
+                : $this->context->scope->variables[$op];
+            if (
+                Variable::TYPE_OBJECT !== $mirror->type
+                || Variable::KIND_VARIABLE !== $mirror->kind
+                || null !== $mirror->objectPropertySlot
+                || $mirror->functionStaticGlobal
+            ) {
+                continue;
+            }
+            if (!str_contains($this->context->getStringFromType($mirror->value->typeOf()), '__object__')) {
+                continue;
+            }
+            if ($seen->contains($mirror->value)) {
+                continue;
+            }
+            $seen[$mirror->value] = true;
+            $this->context->builder->store($nullObj, $mirror->value);
+            $this->context->scopeSlotObjectMirrorLlvmBySlot[$slot] = $mirror->value;
         }
     }
 
