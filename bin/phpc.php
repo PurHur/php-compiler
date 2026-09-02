@@ -28,11 +28,12 @@ declare(strict_types=1);
  *   phpc lint --bootstrap-inventory [--check] [--json]
  *   phpc init [--profile default|miniwebapp|sessionsweb|apijson|fileupload|throwsweb|selfhostprobe|fastcgiweb] [--force] [target-dir]
  *   phpc test [--fast] [--bootstrap] [--bootstrap-strict] [--native] [-- phpunit/ci-local args...]
- *   phpc doctor [--gates] [--selfhost] [--no-lint] [--jit-probe] [--aot-project-probe [dir]]  Env probes; --gates MiniWebApp; --selfhost NS2 (#2053)
+ *   phpc doctor [--env] [--gates] [--selfhost] [--no-lint] [--jit-probe] [--aot-project-probe [dir]]  Env probes; --env Config registry (#36201); --gates MiniWebApp; --selfhost NS2 (#2053)
  *   phpc validate-manifest [dir]                 Validate phpc.json schema and paths (issue #263)
  */
 
 $repoRoot = realpath(__DIR__.'/..') ?: __DIR__.'/..';
+require_once $repoRoot.'/lib/Config.php';
 $php = phpCommand();
 $args = $argv;
 array_shift($args);
@@ -89,8 +90,9 @@ php-compiler CLI
   phpc test [--fast] [args...]                  Run ci-local.sh (full) or ci-fast.sh (no LLVM)
   phpc test --bootstrap [--strict]              Bootstrap subset (inventory + spine sync; #1961)
   phpc test --native                            Native harness subset (AOT + VM compliance; #15599)
-  phpc doctor [--gates] [--selfhost] [--no-lint] [--jit-probe] [--aot-project-probe [dir]]
+  phpc doctor [--env] [--gates] [--selfhost] [--no-lint] [--jit-probe] [--aot-project-probe [dir]]
                                               Probe environment; LLVM/JIT readiness (#717, #746)
+      --env                                       Dump Config registry + Dockerfile/ci-defaults drift (#36201)
       --gates                                     MiniWebApp ladder + self-host + 005-SessionsWeb (#1969)
       --selfhost                                  Self-host bootstrap gates only (#2053, #1492)
       --jit-probe                                 Run MCJIT smoke (script/jit-runtime-probe.php)
@@ -415,11 +417,16 @@ switch ($command) {
         require $repoRoot.'/vendor/autoload.php';
         $gates = false;
         $selfhost = false;
+        $env = false;
         $noLint = false;
         $jitProbe = false;
         $aotProjectProbe = false;
         $aotProjectPath = null;
         foreach ($args as $arg) {
+            if ('--env' === $arg) {
+                $env = true;
+                continue;
+            }
             if ('--gates' === $arg) {
                 $gates = true;
                 continue;
@@ -446,6 +453,9 @@ switch ($command) {
             }
             fwrite(STDERR, "phpc doctor: unknown option: {$arg}\n");
             exit(1);
+        }
+        if ($env) {
+            exit(\PHPCompiler\Doctor::runEnv($repoRoot));
         }
         if ($selfhost) {
             exit(\PHPCompiler\Doctor::runSelfhost($repoRoot));
@@ -498,12 +508,12 @@ switch ($command) {
  */
 function phpCommand(): array
 {
-    $phpEnv = getenv('PHP_COMPILER_PHP');
+    $phpEnv = \PHPCompiler\Config::getenv('PHP_COMPILER_PHP');
     if (false !== $phpEnv && '' !== $phpEnv) {
         return preg_split('/\s+/', $phpEnv) ?: [PHP_BINARY];
     }
     $cmd = [PHP_BINARY];
-    $extDir = getenv('PHP_COMPILER_EXT_DIR') ?: '/usr/lib/php/20220829';
+    $extDir = \PHPCompiler\Config::getenv('PHP_COMPILER_EXT_DIR') ?: '/usr/lib/php/20220829';
     if (is_dir($extDir)) {
         foreach (['tokenizer', 'mbstring', 'dom', 'xml', 'xmlwriter', 'ffi', 'posix', 'phar'] as $ext) {
             $so = $extDir.'/'.$ext.'.so';

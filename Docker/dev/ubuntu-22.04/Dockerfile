@@ -48,7 +48,7 @@ ENV PHP_COMPILER_CI_RAM_GB=8
 ENV PHP_COMPILER_MEMORY_LIMIT=1536M
 # Keep in sync with script/ci-defaults.env — image ENV wins over its ${:-default}
 # and silently pinned step 4a at 4096M after the bump (#21104).
-ENV PHP_COMPILER_LLVM_MEMORY_LIMIT=6144M
+ENV PHP_COMPILER_LLVM_MEMORY_LIMIT=8192M
 
 WORKDIR /compiler
 

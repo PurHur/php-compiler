@@ -69,6 +69,63 @@ final class Doctor
     }
 
     /**
+     * Print every Config-registered knob with effective value and origin (#36201).
+     * Exits 1 when Dockerfile ENV pins drift from script/ci-defaults.env.
+     */
+    public static function runEnv(string $repoRoot): int
+    {
+        Config::warnUnknownPhpCompilerEnv();
+
+        fwrite(STDOUT, "phpc doctor --env — PHP_COMPILER_* registry (#36201)\n");
+        fwrite(STDOUT, str_repeat('-', 72)."\n");
+
+        $rows = [];
+        foreach (Config::registry() as $name => $spec) {
+            $resolved = Config::resolve($name, $repoRoot);
+            $rows[] = [
+                'name' => $name,
+                'value' => $resolved['value'] ?? '(unset)',
+                'origin' => $resolved['origin'],
+                'scope' => $spec['scope'],
+                'description' => $spec['description'],
+            ];
+        }
+        usort($rows, static fn (array $a, array $b): int => $a['name'] <=> $b['name']);
+
+        foreach ($rows as $row) {
+            fwrite(STDOUT, sprintf(
+                "%-42s %-18s %-28s [%s] %s\n",
+                $row['name'],
+                $row['value'],
+                $row['origin'],
+                $row['scope'],
+                $row['description']
+            ));
+        }
+
+        $drift = Config::dockerfileCiDefaultsDrift($repoRoot);
+        fwrite(STDOUT, "\n");
+        if ([] === $drift) {
+            fwrite(STDOUT, "Dockerfile ↔ ci-defaults.env: OK (no ENV pin drift)\n");
+
+            return 0;
+        }
+
+        fwrite(STDOUT, "Dockerfile ↔ ci-defaults.env: DRIFT (image ENV shadows script defaults)\n");
+        foreach ($drift as $d) {
+            fwrite(STDOUT, sprintf(
+                "  %s: Dockerfile=%s  ci-defaults=%s\n",
+                $d['name'],
+                $d['dockerfile'],
+                $d['ci_defaults']
+            ));
+        }
+        fwrite(STDOUT, "Fix: keep Docker/dev/ubuntu-22.04/Dockerfile ENV in sync with script/ci-defaults.env (#36201)\n");
+
+        return 1;
+    }
+
+    /**
      * Print MiniWebApp CI gate ladder (delegates to script/miniwebapp-gates.sh — issues #472, #657).
      */
     public static function runGates(string $repoRoot, bool $noLint = false): int
