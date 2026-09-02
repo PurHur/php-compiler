@@ -6769,6 +6769,7 @@ require_once __DIR__.'/../../../lib/JIT/NestedVmHashTableMethodLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/NestedVmObjectMethodLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/SpineChunkNestedVmBind.php';
 require_once __DIR__.'/../../../lib/JIT/SpineChunkIntrinsicCallBind.php';
+require_once __DIR__.'/../../../lib/JIT/SpineChunkOnDemandBind.php';
 require_once __DIR__.'/../../../lib/JIT/SpineChunkStandardHelperBind.php';
 require_once __DIR__.'/../../../lib/JIT/NestedVmVariableMethodLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/NoDiscardCallGuard.php';

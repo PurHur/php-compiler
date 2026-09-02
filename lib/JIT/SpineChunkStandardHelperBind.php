@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
-use PHPCompiler\AOT\ExternalMethodBind;
 use PHPCompiler\JIT\Call;
 
 /**
@@ -25,62 +24,18 @@ final class SpineChunkStandardHelperBind
         'includepathresolvejithelper' => '/ext/standard/IncludePathResolveJitHelper.php',
     ];
 
+    private const PREFIXES = [
+        'phpcompiler\\ext\\standard\\',
+    ];
+
     public static function tryBind(Context $context, string $proxyName): ?Call
     {
-        if (!ExternalMethodBind::spineChunkMode()) {
-            return null;
-        }
-        $lc = strtolower(ltrim($proxyName, '\\'));
-        if (!str_starts_with($lc, 'phpcompiler\\ext\\standard\\')) {
-            return null;
-        }
-        if (!str_contains($lc, '::')) {
-            return null;
-        }
-        [$classLc, $_methodLc] = explode('::', $lc, 2);
-        $short = substr($classLc, strrpos($classLc, '\\') + 1);
-        $path = self::CLASS_FILES[$short] ?? null;
-        if (null === $path) {
-            return null;
-        }
-        if (isset($context->functions[$lc])) {
-            return self::nativeCall($context, $lc, $proxyName);
-        }
-        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        try {
-            JitVmHelperLink::ensureCompiled(
-                $context,
-                $path,
-                [$proxyName],
-                'spine-chunk-standard',
-                true
-            );
-        } catch (\Throwable) {
-            return null;
-        } finally {
-            if (null !== $savedInsert) {
-                $context->builder->positionAtEnd($savedInsert);
-            } else {
-                $context->builder->clearInsertionPosition();
-            }
-        }
-        if (!isset($context->functions[$lc])) {
-            return null;
-        }
-
-        return self::nativeCall($context, $lc, $proxyName);
-    }
-
-    private static function nativeCall(Context $context, string $lc, string $proxyName): Call
-    {
-        $fn = $context->functions[$lc];
-        $argTypes = [];
-        for ($i = 0, $n = $fn->countParams(); $i < $n; ++$i) {
-            $argTypes[] = $fn->getParam($i)->typeOf();
-        }
-        $native = new Call\Native($fn, $proxyName, $argTypes);
-        $context->functionProxies[$lc] = $native;
-
-        return $native;
+        return SpineChunkOnDemandBind::tryBind(
+            $context,
+            $proxyName,
+            self::CLASS_FILES,
+            self::PREFIXES,
+            'spine-chunk-standard',
+        );
     }
 }
