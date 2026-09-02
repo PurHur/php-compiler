@@ -38,6 +38,7 @@ final class JitGcCollectCyclesStandaloneKernel
             'phpc_gc_visit_object' => [$voidTy, false, [$i32]],
             'phpc_gc_free_object' => [$voidTy, false, [$i8p]],
             'phpc_gc_clear_slots_pointing_to' => [$voidTy, false, [$i8p]],
+            'phpc_gc_clear_object_own_slots' => [$voidTy, false, [$i8p]],
         ];
         foreach ($internals as $name => [$ret, $vararg, $params]) {
             $fn = $context->module->getNamedFunction($name);
@@ -52,6 +53,7 @@ final class JitGcCollectCyclesStandaloneKernel
 
         self::implementSlotReadObject($context);
         self::implementVisitObject($context);
+        self::implementClearObjectOwnSlots($context);
         self::implementClearSlotsPointingTo($context);
         self::implementFreeObject($context);
     }
@@ -306,6 +308,66 @@ final class JitGcCollectCyclesStandaloneKernel
         $context->builder->returnVoid();
         $context->builder->clearInsertionPosition();
     }
+
+    private static function implementClearObjectOwnSlots(Context $context): void
+    {
+        $fn = $context->lookupFunction('phpc_gc_clear_object_own_slots');
+        if ($fn->countBasicBlocks() > 0) {
+            return;
+        }
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $voidpp = $context->getTypeFromString('void**');
+        $voidp = $context->getTypeFromString('void*');
+        $entry = $fn->appendBasicBlock('clear_own_entry');
+        $done = $fn->appendBasicBlock('clear_own_done');
+        $work = $fn->appendBasicBlock('clear_own_work');
+        $sLoop = $fn->appendBasicBlock('clear_own_s_head');
+        $sBody = $fn->appendBasicBlock('clear_own_s_body');
+        $sNext = $fn->appendBasicBlock('clear_own_s_next');
+        $context->builder->positionAtEnd($entry);
+
+        $target = $fn->getParam(0);
+        $idx = $context->builder->call($context->lookupFunction('phpc_gc_index_of'), $target);
+        $found = $context->builder->icmp(Builder::INT_SGE, $idx, $i32->constInt(0, false));
+        $context->builder->branchIf($found, $work, $done);
+
+        $context->builder->positionAtEnd($work);
+        $obj = GcCollectCyclesRuntime::standaloneRegistryObjectPtr($context, $idx);
+        $propCount = GcCollectCyclesRuntime::standaloneRegistryPropCount($context, $idx);
+        $sSlot = $context->builder->alloca($i32, 1, 'clear_own_s');
+        $context->builder->store($i32->constInt(0, false), $sSlot);
+        $context->builder->branch($sLoop);
+
+        $context->builder->positionAtEnd($sLoop);
+        $s = $context->builder->load($sSlot);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_SLT, $s, $propCount),
+            $sBody,
+            $done
+        );
+
+        $context->builder->positionAtEnd($sBody);
+        $headerSize = GcCollectCyclesRuntime::standaloneObjectHeaderSizeConst($context);
+        $base = $context->builder->pointerCast($obj, $i8p);
+        $slotOff = $context->builder->add(
+            $headerSize,
+            $context->builder->mul($context->builder->zext($s, $sizeT), $sizeT->constInt(8, false))
+        );
+        $slotPtr = $context->builder->pointerCast($context->builder->gep($base, $slotOff), $voidpp);
+        $context->builder->store($voidp->constNull(), $slotPtr);
+        $context->builder->branch($sNext);
+
+        $context->builder->positionAtEnd($sNext);
+        $context->builder->store($context->builder->add($s, $i32->constInt(1, false)), $sSlot);
+        $context->builder->branch($sLoop);
+
+        $context->builder->positionAtEnd($done);
+        $context->builder->returnVoid();
+        $context->builder->clearInsertionPosition();
+    }
+
     private static function implementFreeObject(Context $context): void
     {
         $fn = $context->lookupFunction('phpc_gc_free_object');
@@ -317,6 +379,7 @@ final class JitGcCollectCyclesStandaloneKernel
         $obj = $fn->getParam(0);
         $context->builder->call($context->lookupFunction('phpc_destruct_try_invoke'), $obj);
         $context->builder->call($context->lookupFunction('phpc_gc_notify_object_freed'), $obj);
+        $context->builder->call($context->lookupFunction('phpc_gc_clear_object_own_slots'), $obj);
         $context->builder->call($context->lookupFunction('phpc_gc_clear_slots_pointing_to'), $obj);
         $context->builder->call($context->lookupFunction('phpc_gc_unregister'), $obj);
         $context->builder->call($context->lookupFunction('__mm__free'), $obj);

@@ -20,9 +20,22 @@ final class GcCollectCyclesNativeFreeJitHelper
         }
         phpc_destruct_try_invoke_native($objPtr);
         phpc_gc_notify_object_freed_native($objPtr);
+        self::clearOwnSlots($objPtr);
         self::clearSlotsPointingTo($objPtr);
         GcCollectCyclesRegistryJitHelper::removeObject($objPtr);
         phpc_mm_free_native($objPtr);
+    }
+
+    private static function clearOwnSlots(int $objPtr): void
+    {
+        $idx = GcCollectCyclesRegistryJitHelper::indexOf($objPtr);
+        if ($idx < 0) {
+            return;
+        }
+        $propCount = GcCollectCyclesRegistryJitHelper::propCount($idx);
+        for ($s = 0; $s < $propCount; ++$s) {
+            phpc_gc_native_clear_slot_at($objPtr, $s);
+        }
     }
 
     private static function clearSlotsPointingTo(int $targetPtr): void
