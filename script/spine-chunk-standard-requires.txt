@@ -18,5 +18,6 @@ ext/standard/VmIniIntrospection.php
 ext/standard/VmOpenBasedir.php
 ext/standard/VmSerializeFormat.php
 ext/standard/VmSession.php
+ext/standard/VmStatPath.php
 ext/standard/VmString.php
 ext/standard/VmUrlRewriterOb.php

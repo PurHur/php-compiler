@@ -274,6 +274,10 @@ final class ExternalMethodBindTest extends TestCase
         $this->assertNotInstanceOf(ExternalMethod::class, $proxy);
         $apply = $ctx->resolveFunctionProxy('phpcompiler\\ext\\standard\\executionlimitsjithelper::applymaxexecutiontime');
         $this->assertNotInstanceOf(ExternalMethod::class, $apply);
+        $explode = $ctx->resolveFunctionProxy('explode');
+        $this->assertNotInstanceOf(ExternalMethod::class, $explode);
+        $fileExists = $ctx->resolveFunctionProxy('file_exists');
+        $this->assertNotInstanceOf(ExternalMethod::class, $fileExists);
     }
 
     /**
