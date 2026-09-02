@@ -15,5 +15,11 @@ Cases that exercise shapes MCJIT still whole-script-falls-back on may use
 `@differential-skip-jit:` with a reason (#98 / #36222). Prefer recording a real DIFF
 over skipping when the backend produces output.
 
-Update this file after each JIT sweep of the program corpus — list failing **names**,
-not counts.
+Measured on `85d9ec7fdc` (2026-09-02): not yet run end-to-end — MCJIT can hit the 300 s
+`bin/jit.php` timeout per program (#36222 whole-script VM fallback). Run:
+
+```bash
+script/differential-sweep.sh --jit --dir test/differential/cases/programs
+```
+
+Record failing **names** here (not counts) after the sweep completes.

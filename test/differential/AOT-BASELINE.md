@@ -92,6 +92,30 @@ VM mismatches found while authoring (repros under `test/repro/`, issues filed):
 | `i36221_flatten_nested.php` | #36354 |
 | `i36221_json_array_map_sprintf.php` | #36355 |
 
-Initial AOT sample (partial run on an earlier tree): several programs SEGFAULT / COMPILE-abort /
-wrong output (`p01`/`p02`/`p10` core; `p03`/`p05`/`p07` compile abort; `p04` regex mismatch;
-`p08`/`p09` empty or undef). Re-measure on current tip before filing per-program AOT issues.
+Measured on `85d9ec7fdc` (2026-09-02, `php-compiler:22.04-dev`), program corpus only:
+
+```bash
+script/differential-sweep.sh --dir test/differential/cases/programs          # 30/30 VM
+script/differential-sweep.sh --aot --dir test/differential/cases/programs      # partial (see below)
+```
+
+| case | outcome |
+|---|---|
+| `p01_json_api_handler.php` | SEGFAULT |
+| `p02_template_render.php` | SEGFAULT |
+| `p03_csv_report.php` | COMPILE abort |
+| `p04_regex_log_parser.php` | wrong output (regex / preg_match) |
+| `p05_datetime_arith.php` | COMPILE abort |
+| `p06_sort_pipeline.php` | wrong output (empty checksum) |
+| `p07_oop_inheritance.php` | COMPILE abort |
+| `p08_traits_aliases.php` | wrong output (empty checksum) |
+| `p09_interfaces_contracts.php` | wrong output (undefined `$t`) |
+| `p10_enums_readonly.php` | SEGFAULT |
+| `p11_closures_compose.php` | SEGFAULT |
+| `p12_generators_foreach.php` | COMPILE abort |
+| `p13_exceptions_closures.php` | SEGFAULT |
+| `p14_references_swap.php` | wrong output (ref / array key) |
+| `p15`–`p30` | not re-measured on this tip — run the sweep before filing per-program issues |
+
+Turn each row into a focused AOT-vs-Zend issue; do not `@differential-skip-aot` unless the backend
+genuinely cannot implement the shape.
