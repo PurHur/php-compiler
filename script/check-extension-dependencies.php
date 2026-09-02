@@ -48,11 +48,24 @@ if ([] === $order) {
 }
 $position = array_flip($order);
 
-// Declared dependencies, read from source rather than by loading 76 modules (which would need a
-// full Runtime and is far more than this check needs).
+// Declared dependencies: prefer ext/*/ext.json (#36204), fall back to Module.php overrides.
 $declared = [];
+foreach (glob($root.'/ext/*/ext.json') ?: [] as $path) {
+    $data = json_decode((string) file_get_contents($path), true);
+    if (!is_array($data) || !isset($data['name']) || !is_string($data['name'])) {
+        continue;
+    }
+    $deps = $data['depends'] ?? [];
+    if (!is_array($deps) || [] === $deps) {
+        continue;
+    }
+    $declared[$data['name']] = array_values(array_map('strtolower', array_map('strval', $deps)));
+}
 foreach (glob($root.'/ext/*/Module.php') ?: [] as $path) {
     $ext = basename(dirname($path));
+    if (isset($declared[$ext])) {
+        continue;
+    }
     $src = (string) file_get_contents($path);
     if (!preg_match('/function getExtensionDependencies\(\): array\s*\{\s*return \[(.*?)\];/s', $src, $dm)) {
         continue;

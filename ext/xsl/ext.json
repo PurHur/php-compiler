@@ -1,0 +1,20 @@
+{
+    "name": "xsl",
+    "load_order": 7,
+    "depends": [
+        "libxml",
+        "dom"
+    ],
+    "default_enabled": true,
+    "host_libs": [],
+    "backends": {
+        "vm": true,
+        "jit": true,
+        "aot": true
+    },
+    "provides": {
+        "functions": [],
+        "classes": []
+    },
+    "policy_env": []
+}

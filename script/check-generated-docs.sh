@@ -45,6 +45,11 @@ step "apply-patches --verify-pristine" script/apply-patches.sh --verify-pristine
 # 7. Gate honesty probes — empty corpus / missing rg must not read as green (#36248)
 step "check-gate-honesty" script/check-gate-honesty.sh
 
+# 8. Per-extension manifests + docs/extensions.md (#36204)
+step "sync-extension-manifests --check" "$PHP_BIN" script/sync-extension-manifests.php --check
+step "generate-extension-registry --check" "$PHP_BIN" script/generate-extension-registry.php --check
+step "check-extension-dependencies" "$PHP_BIN" script/check-extension-dependencies.php
+
 if [[ "$fail" -ne 0 ]]; then
   echo "check-generated-docs: drift detected — regenerate in the pinned env (see CONTRIBUTING 'Generated docs')" >&2
   exit 1
