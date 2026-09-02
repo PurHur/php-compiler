@@ -67,9 +67,15 @@ final class VmExecutionLimits
         return 0;
     }
 
+    /** True when max_execution_time is 0 / -1 and the opcode loop may skip polling (#36207). */
+    public function isTimerDisabled(): bool
+    {
+        return 0.0 === $this->deadline;
+    }
+
     public function check(Context $ctx, Frame $frame): void
     {
-        if (0.0 === $this->deadline) {
+        if ($this->isTimerDisabled()) {
             return;
         }
         if ((++$this->opcodeCheckCounter & 0xFF) !== 0) {
