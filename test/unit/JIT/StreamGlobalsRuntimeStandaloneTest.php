@@ -33,10 +33,13 @@ final class StreamGlobalsRuntimeStandaloneTest extends TestCase
             StreamGlobalsJit::GLOBAL_CHUNK_SIZE,
             StreamGlobalsJit::GLOBAL_WRITE_BUFFER,
             StreamGlobalsJit::GLOBAL_READ_BUFFER,
-            StreamGlobalsJit::GLOBAL_WRITE_BUFFER_STORAGE,
         ] as $name) {
             $this->assertNotNull($ctx->module->getNamedGlobal($name), $name);
         }
+        $this->assertNull(
+            $ctx->module->getNamedGlobal(StreamGlobalsJit::GLOBAL_WRITE_BUFFER_STORAGE),
+            'write buffer byte storage must not bloat .bss — allocate on first fwrite (#36195)'
+        );
     }
 
     public function testPhpcStreamCDeletedFromRuntime(): void
