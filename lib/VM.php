@@ -5901,6 +5901,9 @@ restart:
                 case OpCode::TYPE_GREATER:
                 case OpCode::TYPE_SMALLER_OR_EQUAL:
                 case OpCode::TYPE_GREATER_OR_EQUAL:
+                    if ($this->tryExecuteRelationalCompareFastPath($frame, $op)) {
+                        break;
+                    }
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2);
                     $arg3 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg3);
@@ -6386,9 +6389,29 @@ restart:
                 case OpCode::TYPE_JUMPIF:
                     $condSlot = (int) $op->arg1;
                     $arg1 = $frame->scope[$condSlot]->toBool();
+                    if (
+                        $arg1
+                        && [] === $this->context->activeTryHandlerFrames
+                        && null === $this->context->activeCatchHandlerFrame
+                        && !$this->frameIsInFinallyBody($frame)
+                    ) {
+                        $loopExit = $this->tryExecuteCountedIntForLoopAtJumpIf($frame, $op);
+                        if (null !== $loopExit) {
+                            $frame = $loopExit;
+                            goto restart;
+                        }
+                    }
                     $this->releaseVmStatementDeadTemps($frame, $condSlot);
                     $this->releaseVmJumpIfCondTemps($frame, $condSlot);
                     $branchTarget = $arg1 ? $op->block1 : $op->block2;
+                    if (
+                        [] === $this->context->activeTryHandlerFrames
+                        && null === $this->context->activeCatchHandlerFrame
+                        && !$this->frameIsInFinallyBody($frame)
+                    ) {
+                        $frame = $this->frameForBranch($frame, $branchTarget);
+                        goto restart;
+                    }
                     // break/continue lower to JumpIf edges that leave the try body; run finally
                     // before the branch target (Zend ZEND_BRK/ZEND_CONT, #25240).
                     if ($this->completeActiveFinallyUnwind($frame)) {
@@ -11273,6 +11296,11 @@ restart:
         $read = $frame->scope[$op->arg2];
         $write = $frame->scope[$op->arg3];
         $result = $frame->scope[$op->arg1];
+        if ($this->canUseIncDecSimpleLocalFastPath($frame, $op, $write)) {
+            if ($this->tryExecuteIncDecFastPath($frame, $read, $write, $result, $increment, $prefix, (int) $op->arg3)) {
+                return null;
+            }
+        }
         $catchFrame = $this->enforceReadonlyPropertyWrite($write, $frame);
         if (null !== $catchFrame) {
             return $catchFrame;
@@ -11400,6 +11428,213 @@ restart:
     /**
      * In-place ++/-- for plain locals/refs — no per-op Variable heap churn (#15906, #36148).
      */
+    /**
+     * ++/-- on an initialized simple local (same read/write slot) — skip property/magic guards (#36411).
+     */
+    private function canUseIncDecSimpleLocalFastPath(Frame $frame, OpCode $op, Variable $write): bool
+    {
+        if ((int) $op->arg2 !== (int) $op->arg3) {
+            return false;
+        }
+        if (!isset($frame->initializedSlots[(int) $op->arg3])) {
+            return false;
+        }
+        if (!$this->isSimpleVariableIncDecLvalue($write)) {
+            return false;
+        }
+        $resolved = $write->resolveIndirect();
+        if (Variable::TYPE_STRING_OFFSET === $resolved->type || $resolved->isArrayAccessOffset()) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Relational compare initialized int local vs block constant — loop/header shape (#36411).
+     */
+    private function tryExecuteRelationalCompareFastPath(Frame $frame, OpCode $op): bool
+    {
+        $leftSlot = (int) $op->arg2;
+        $rightSlot = (int) $op->arg3;
+        $leftVar = null;
+        $rightVar = null;
+        if (isset($frame->initializedSlots[$leftSlot], $frame->scope[$leftSlot])
+            && isset($frame->block->constants[$rightSlot])) {
+            $leftVar = $frame->scope[$leftSlot];
+            $rightVar = $frame->block->constants[$rightSlot];
+        } elseif (isset($frame->initializedSlots[$rightSlot], $frame->scope[$rightSlot])
+            && isset($frame->block->constants[$leftSlot])) {
+            $leftVar = $frame->block->constants[$leftSlot];
+            $rightVar = $frame->scope[$rightSlot];
+        } else {
+            return false;
+        }
+        $left = $leftVar->resolveIndirect();
+        $right = $rightVar->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $left->type || Variable::TYPE_INTEGER !== $right->type) {
+            return false;
+        }
+        $this->writeRelationalIntCompareBool(
+            $frame->scope[$op->arg1],
+            $op->type,
+            $left->toInt($this),
+            $right->toInt($this)
+        );
+
+        return true;
+    }
+
+    /** Relational compare int vs int — skip compareOp/reset on loop headers (#36411). */
+    private function writeRelationalIntCompareBool(Variable $result, int $opType, int $left, int $right): void
+    {
+        $value = match ($opType) {
+            OpCode::TYPE_SMALLER => $left < $right,
+            OpCode::TYPE_GREATER => $left > $right,
+            OpCode::TYPE_SMALLER_OR_EQUAL => $left <= $right,
+            OpCode::TYPE_GREATER_OR_EQUAL => $left >= $right,
+            default => false,
+        };
+        $result->bool($value);
+    }
+
+    /**
+     * `for ($i = …; $i < N; ++$i) { ++$a; … }` — run body+increment in one host loop (#36411).
+     *
+     * @return null|Frame exit-block frame when the pattern matched; null to fall back to per-op dispatch
+     */
+    private function tryExecuteCountedIntForLoopAtJumpIf(Frame $frame, OpCode $jumpIfOp): ?Frame
+    {
+        $headerPos = $frame->pos - 1;
+        if ($headerPos < 1) {
+            return null;
+        }
+        $compareOp = $frame->block->opCodes[$headerPos - 1];
+        if (OpCode::TYPE_SMALLER !== $compareOp->type) {
+            return null;
+        }
+        $counterSlot = (int) $compareOp->arg2;
+        $limitSlot = (int) $compareOp->arg3;
+        if (!isset($frame->block->constants[$limitSlot])) {
+            return null;
+        }
+        if (!isset($frame->initializedSlots[$counterSlot], $frame->scope[$counterSlot])) {
+            return null;
+        }
+        $bodyBlock = $jumpIfOp->block1;
+        $exitBlock = $jumpIfOp->block2;
+        if (null === $bodyBlock || null === $exitBlock) {
+            return null;
+        }
+        $incBlock = $this->blockPreIncChainJumpTarget($bodyBlock);
+        if (null === $incBlock || !$this->blockIsCounterPreIncJumpBack($incBlock, $counterSlot, $frame->block)) {
+            return null;
+        }
+        $bodyIncSlots = $this->preIncSelfSlotsInBlock($bodyBlock);
+        if ([] === $bodyIncSlots) {
+            return null;
+        }
+        foreach ($bodyIncSlots as $bodySlot) {
+            if (!isset($frame->initializedSlots[$bodySlot], $frame->scope[$bodySlot])) {
+                return null;
+            }
+            $bodyWrite = $frame->scope[$bodySlot];
+            if (!$this->isSimpleVariableIncDecLvalue($bodyWrite)) {
+                return null;
+            }
+            $resolved = $bodyWrite->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $resolved->type || Variable::TYPE_STRING_OFFSET === $resolved->type) {
+                return null;
+            }
+            if (VmIncDec::typedSlotRejectsOverflowDouble($resolved)) {
+                return null;
+            }
+        }
+        $counterVar = $frame->scope[$counterSlot]->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $counterVar->type) {
+            return null;
+        }
+        if (VmIncDec::typedSlotRejectsOverflowDouble($counterVar)) {
+            return null;
+        }
+        $limitVar = $frame->block->constants[$limitSlot]->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $limitVar->type) {
+            return null;
+        }
+        $limit = $limitVar->toInt($this);
+        $bodyTargets = [];
+        foreach ($bodyIncSlots as $bodySlot) {
+            $bodyTargets[] = $frame->scope[$bodySlot]->resolveIndirect();
+        }
+        $limits = $this->context->executionLimits;
+        $checkEvery = 10000;
+        $iter = 0;
+        while ($counterVar->toInt($this) < $limit) {
+            foreach ($bodyTargets as $bodyTarget) {
+                $bodyTarget->applyIncrement($this, $frame);
+            }
+            $counterVar->applyIncrement($this, $frame);
+            ++$iter;
+            if (0 === ($iter % $checkEvery) && !$limits->isTimerDisabled()) {
+                $limits->check($this->context, $frame);
+            }
+        }
+
+        return $this->frameForBranch($frame, $exitBlock);
+    }
+
+    /** @return list<int> self PRE_INC write slots excluding the trailing JUMP */
+    private function preIncSelfSlotsInBlock(Block $block): array
+    {
+        if ($block->nOpCodes < 2) {
+            return [];
+        }
+        $slots = [];
+        for ($i = 0; $i < $block->nOpCodes - 1; ++$i) {
+            $op = $block->opCodes[$i];
+            if (OpCode::TYPE_PRE_INC !== $op->type || (int) $op->arg2 !== (int) $op->arg3) {
+                return [];
+            }
+            $slots[] = (int) $op->arg3;
+        }
+
+        return $slots;
+    }
+
+    /** Block ends with TYPE_JUMP; returns jump target when prefix is only self PRE_INC ops. */
+    private function blockPreIncChainJumpTarget(Block $block): ?Block
+    {
+        if ($block->nOpCodes < 2) {
+            return null;
+        }
+        $last = $block->opCodes[$block->nOpCodes - 1];
+        if (OpCode::TYPE_JUMP !== $last->type || null === $last->block1) {
+            return null;
+        }
+        if ([] === $this->preIncSelfSlotsInBlock($block)) {
+            return null;
+        }
+
+        return $last->block1;
+    }
+
+    private function blockIsCounterPreIncJumpBack(Block $block, int $counterSlot, Block $headerBlock): bool
+    {
+        if (2 !== $block->nOpCodes) {
+            return false;
+        }
+        $incOp = $block->opCodes[0];
+        $jumpOp = $block->opCodes[1];
+        if (OpCode::TYPE_PRE_INC !== $incOp->type || OpCode::TYPE_JUMP !== $jumpOp->type) {
+            return false;
+        }
+        if ((int) $incOp->arg2 !== $counterSlot || (int) $incOp->arg3 !== $counterSlot) {
+            return false;
+        }
+
+        return $jumpOp->block1 === $headerBlock;
+    }
+
     private function tryExecuteIncDecFastPath(
         Frame $frame,
         Variable $read,
@@ -11430,8 +11665,12 @@ restart:
                 } else {
                     $target->applyDecrement($this, $frame);
                 }
-                $write->copyFrom($target);
-                $result->copyFrom($target);
+                if ($write !== $target) {
+                    $write->copyFrom($target);
+                }
+                if ($result !== $target && $result !== $write) {
+                    $result->copyFrom($target);
+                }
             } else {
                 $result->copyFrom($target);
                 if ($increment) {
@@ -11439,7 +11678,9 @@ restart:
                 } else {
                     $target->applyDecrement($this, $frame);
                 }
-                $write->copyFrom($target);
+                if ($write !== $target) {
+                    $write->copyFrom($target);
+                }
             }
         } catch (\TypeError|\Error) {
             return false;
@@ -11760,6 +12001,9 @@ restart:
 
     private function markScopeSlotInitialized(Frame $frame, int $slot): void
     {
+        if (isset($frame->initializedSlots[$slot])) {
+            return;
+        }
         $frame->initializedSlots[$slot] = true;
         if (!isset($frame->scope[$slot])) {
             return;
@@ -24600,11 +24844,12 @@ restart:
      */
     private function releaseVmJumpIfCondTemps(Frame $frame, int $keepSlot): void
     {
-        foreach ($frame->scope as $slot => $_var) {
-            if ($slot === $keepSlot || $frame->block->isNamedVariableSlot($slot)) {
-                continue;
-            }
-            if (isset($frame->block->constants[$slot])) {
+        $ephemeral = $frame->block->ephemeralScopeSlotIndexes();
+        if ([] === $ephemeral) {
+            return;
+        }
+        foreach ($ephemeral as $slot) {
+            if ($slot === $keepSlot || !isset($frame->scope[$slot])) {
                 continue;
             }
             if (isset($frame->block->deferredArrayLiteralKeepSlots[$slot])) {
