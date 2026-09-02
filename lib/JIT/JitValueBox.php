@@ -831,6 +831,11 @@ final class JitValueBox
      */
     public static function valuePtrFromNativeVariable(Context $context, Variable $var): Value
     {
+        if (null !== $var->longArithOverflowPromoted) {
+            $materialized = JitLongArithOverflow::materializeOverflowableNativeLong($context, $var);
+
+            return self::valuePtrFromVariable($context, $materialized);
+        }
         // By-ref capture / param formals may keep a scalar inferred type while LLVM storage
         // is already a boxed {@see __value__*} (module verify: writeLong gets __value__* — #22642).
         $storageTy = $context->getStringFromType($var->value->typeOf());
