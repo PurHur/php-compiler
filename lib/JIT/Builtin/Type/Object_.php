@@ -16,11 +16,7 @@ use PHPCompiler\ClassConstVisibility;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\dom\DomConstants;
 use PHPCompiler\ext\dom\VmDomLiving;
-use PHPCompiler\ext\sqlite3\Sqlite3Constants;
 use PHPCompiler\ext\standard\ThrowableManifest;
-use PHPCompiler\ext\zip\VmZipArchive;
-use PHPCompiler\ext\zip\ZipArchiveConstants;
-use PHPCompiler\ext\zip\ZipExtensionPolicy;
 use PHPCompiler\VM\ExceptionSupport;
 use PHPCompiler\MethodVisibility;
 use PHPCompiler\PseudoClassScope;
@@ -155,6 +151,16 @@ class Object_ extends Type {
     private array $userDeclareOpcodeByLc = [];
     /** @var array<int, array<string, array{type: int, value: int|float|bool|string|null}>> */
     private array $classConstants = [];
+
+    /**
+     * Extension-owned ClassConstFetch / stub-property seeders (#36204).
+     *
+     * Modules register via {@see registerExternalClassSeeder()} from Module::jitInit so
+     * lib/JIT/Builtin/Type/Object_ does not import PHPCompiler\ext\<non-standard>.
+     *
+     * @var array<string, list<callable(self, int): void>> lowercase class => seeders
+     */
+    private array $externalClassSeeders = [];
 
     /** @var array<int, array<string, int>> class id => const lc => visibility flags (#4651, #6664) */
     private array $constVisibility = [];
@@ -4060,169 +4066,29 @@ class Object_ extends Type {
         if ('datetimeinterface' === $lcname) {
             $this->seedExternalClassConstants($id, \PHPCompiler\VM\DateTimeInterfaceSupport::classConstants());
         }
-        // Normalizer::normalize Call proxy is always registered (#28654); seed FORM_* so
-        // ClassConstFetch folds to compile-time long. Without this, pending ErrorRaise leaves
-        // a null form arg and thin AOT segfaults (re-#28654 / AotTest normalizer_normalize_28654).
-        if ('normalizer' === $lcname) {
-            $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmNormalizer::classConstants());
+        // intl / zip / sqlite3 ClassConstFetch + stub props: Module::jitInit seeders (#36204).
+        foreach ($this->externalClassSeeders[$lcname] ?? [] as $seeder) {
+            $seeder($this, $id);
         }
-        // IntlDateFormatter::create Call proxy is linked (#27361) even when host lacks ext-intl;
-        // seed SHORT/NONE/GREGORIAN/… so ClassConstFetch folds to compile-time long. Without this,
-        // null style args reach create/format and thin AOT aborts (#35360 peer of #35358).
-        if ('intldateformatter' === $lcname) {
-            $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmIntlDateFormatter::classConstants());
-        }
-        // NumberFormatter::create Call proxy is linked even when host lacks ext-intl; seed
-        // DECIMAL/CURRENCY/… so ClassConstFetch folds to compile-time long (#35366 peer of #35360).
-        if ('numberformatter' === $lcname) {
-            $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmNumberFormatter::classConstants());
-        }
-        // Collator Call proxies are linked (#28649); seed PRIMARY/SORT_*/… so ClassConstFetch
-        // folds to compile-time long (#35379 peer of #35366). Without this, thin AOT raises
-        // Undefined constant Collator::PRIMARY at runtime.
-        if ('collator' === $lcname) {
-            $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmCollator::classConstants());
-        }
-        // Transliterator::create / transliterate Call proxies are linked (#28657); seed
-        // FORWARD/REVERSE so ClassConstFetch folds to compile-time long (#35384 peer of #35379).
-        // Without this, thin AOT raises Undefined constant Transliterator::FORWARD at runtime.
-        if ('transliterator' === $lcname) {
-            $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmTransliterator::classConstants());
-        }
-        // IntlCalendar Call proxies are linked (#6151/#20756); seed FIELD_*/DOW_*/… so
-        // ClassConstFetch folds to compile-time long (#35389 peer of #35384). Without this,
-        // thin AOT raises Undefined constant IntlCalendar::FIELD_YEAR at runtime.
-        if ('intlcalendar' === $lcname) {
-            $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmIntlCalendar::classConstants());
-        }
-        // IntlGregorianCalendar extends IntlCalendar (calendar.stub.php); seed the same FIELD_*/DOW_*
-        // table for ClassConstFetch (#35422 peer of #35389). Without this, thin AOT raises
-        // Undefined constant IntlGregorianCalendar::FIELD_YEAR at runtime.
-        if ('intlgregoriancalendar' === $lcname) {
-            $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmIntlCalendar::classConstants());
-        }
-        // Spoofchecker Call proxies are linked (#20035); seed SINGLE_SCRIPT/INVISIBLE/… so
-        // ClassConstFetch folds to compile-time long (#35396 peer of #35389). Without this,
-        // thin AOT raises Undefined constant Spoofchecker::INVISIBLE at runtime.
-        if ('spoofchecker' === $lcname) {
-            $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmSpoofchecker::classConstants());
-        }
-        // IntlTimeZone is registered with IntlCalendar (#6151); seed DISPLAY_*/TYPE_* so
-        // ClassConstFetch folds to compile-time long (#35397 peer of #35389). Without this,
-        // thin AOT raises Undefined constant IntlTimeZone::DISPLAY_SHORT at runtime.
-        if ('intltimezone' === $lcname) {
-            $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmIntlTimeZone::classConstants());
-        }
-        // IntlBreakIterator Call proxies are linked (#6188/#20771); seed DONE/WORD_*/… so
-        // ClassConstFetch folds to compile-time long (#35401 peer of #35397). Without this,
-        // thin AOT raises Undefined constant IntlBreakIterator::DONE at runtime.
-        if ('intlbreakiterator' === $lcname) {
-            $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmBreakIterator::classConstants());
-        }
-        // IntlRuleBasedBreakIterator / IntlCodePointBreakIterator extend IntlBreakIterator
-        // (breakiterator.stub.php); seed the same DONE/WORD_* table (#35422 peer of #35401).
-        // Without this, thin AOT raises Undefined constant …::DONE at runtime.
-        if ('intlrulebasedbreakiterator' === $lcname || 'intlcodepointbreakiterator' === $lcname) {
-            $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmBreakIterator::classConstants());
-        }
-        // IntlPartsIterator KEY_* live on the parts iterator ClassEntry (#20985); seed for
-        // ClassConstFetch (#35422 peer of #35401). Without this, thin AOT raises
-        // Undefined constant IntlPartsIterator::KEY_SEQUENTIAL at runtime.
-        if ('intlpartsiterator' === $lcname) {
-            $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmBreakIterator::partsIteratorConstants());
-        }
-        // UConverter Call proxies are linked (#6171/#20770); seed REASON_*/UTF8/… so
-        // ClassConstFetch folds to compile-time long (#35408 peer of #35401). Without this,
-        // thin AOT raises Undefined constant UConverter::REASON_ILLEGAL at runtime.
-        if ('uconverter' === $lcname) {
-            $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmUConverter::classConstants());
-        }
-        // IntlListFormatter VM class entry is linked (#28132); seed TYPE_*/WIDTH_* so
-        // ClassConstFetch folds to compile-time long (#35407 peer of #35401). Without this,
-        // thin AOT raises Undefined constant IntlListFormatter::TYPE_AND at runtime.
-        if ('intllistformatter' === $lcname) {
-            $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmIntlListFormatter::classConstants());
-        }
-        // IntlChar Call proxies are linked (#6150/#20755); seed PROPERTY_*/FOLD_CASE_* so
-        // ClassConstFetch folds to compile-time long (#35413 peer of #35408). Without this,
-        // thin AOT raises Undefined constant IntlChar::PROPERTY_ALPHABETIC at runtime.
-        if ('intlchar' === $lcname) {
-            $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmIntlChar::classConstants());
-        }
-        // Locale Call proxies are linked (#6696/#9576); seed ACTUAL_LOCALE/VALID_LOCALE so
-        // ClassConstFetch folds to compile-time long (#35416 peer of #35413). Without this,
-        // thin AOT raises Undefined constant Locale::ACTUAL_LOCALE at runtime.
-        if ('locale' === $lcname) {
-            $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmLocale::classConstants());
-        }
-        // Gate on advertisement (host ext/zip or PHP_COMPILER_ENABLE_ZIP), not PROFILE-only
-        // supportsZip() — ENABLE_ZIP on the reference profile must seed CREATE/OVERWRITE for
-        // ClassConstFetch (#34412 leftover of #28110); PROFILE=8.4 alone must not phantom-seed.
-        if ('ziparchive' === $lcname && ZipExtensionPolicy::advertisesExtension()) {
-            // php-src ext/zip/php_zip.c REGISTER_ZIPARCHIVE_CLASS_CONST_* (#20712).
-            // Host PHP often lacks ext-zip; seed from ZipArchiveConstants for AOT/JIT.
-            $this->seedExternalClassConstants($id, ZipArchiveConstants::CLASS_CONSTANTS);
-        }
-        if ('sqlite3' === $lcname && CompilerVersion::supportsSqlite3()) {
-            // php-src ext/sqlite3/sqlite3.c — authorizer + open flags (#28098 / #20683).
-            // Seed for AOT/JIT ClassConstFetch (peer ZipArchive #28110).
-            $this->seedExternalClassConstants($id, Sqlite3Constants::CLASS_CONSTANTS);
-            // NestedJIT handle — late defineProperty after new SIGSEGVs (peer ZipArchive #35002 / #35914).
-            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::PROP_ID, Variable::TYPE_NATIVE_LONG);
-            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::PROP_ROW, Variable::TYPE_NATIVE_LONG);
-            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::PROP_HAS, Variable::TYPE_NATIVE_LONG);
-            // lastInsertRowID/changes + multi-row COUNT/SUM/INTPK (#35931 / #35956).
-            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::PROP_LAST_ROWID, Variable::TYPE_NATIVE_LONG);
-            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::PROP_CHANGES, Variable::TYPE_NATIVE_LONG);
-            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::PROP_ROW_COUNT, Variable::TYPE_NATIVE_LONG);
-            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::PROP_SUM, Variable::TYPE_NATIVE_LONG);
-            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::PROP_INT_PK, Variable::TYPE_NATIVE_LONG);
-            // enableExceptions prior-mode fold (#35975 leftover of #35972).
-            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::PROP_EXCEPTIONS, Variable::TYPE_NATIVE_LONG);
-            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::PROP_FOLD_ID, Variable::TYPE_NATIVE_LONG);
-            $this->markHasConstructor($id);
-            $pub = \PHPCfg\Func::FLAG_PUBLIC;
-            $pubStatic = \PHPCfg\Func::FLAG_PUBLIC | \PHPCfg\Func::FLAG_STATIC;
-            foreach ([
-                '__construct', 'open', 'exec', 'query', 'prepare', 'querySingle',
-                'close', 'lastInsertRowID', 'changes', 'lastErrorCode', 'lastErrorMsg',
-                'busyTimeout', 'enableExceptions',
-            ] as $method) {
-                $this->defineMethodVisibility($id, $method, $pub);
-            }
-            foreach (['escapeString', 'version'] as $method) {
-                $this->defineMethodVisibility($id, $method, $pubStatic);
-            }
-        }
-        if ('sqlite3stmt' === $lcname && CompilerVersion::supportsSqlite3()) {
-            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::STMT_PROP_SQL, Variable::TYPE_STRING);
-            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::STMT_PROP_PARAM_COUNT, Variable::TYPE_NATIVE_LONG);
-            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::STMT_PROP_FOLD_ID, Variable::TYPE_NATIVE_LONG);
-            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::STMT_PROP_READONLY, Variable::TYPE_NATIVE_LONG);
-            $this->seedExternalClassConstants($id, Sqlite3Constants::STMT_CLASS_CONSTANTS);
-            $this->markHasConstructor($id);
-            $pub = \PHPCfg\Func::FLAG_PUBLIC;
-            foreach (['bindParam', 'bindValue', 'clear', 'close', 'execute', 'getSQL', 'paramCount', 'readOnly', 'reset'] as $method) {
-                $this->defineMethodVisibility($id, $method, $pub);
-            }
-        }
-        if ('sqlite3result' === $lcname && CompilerVersion::supportsSqlite3()) {
-            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::RESULT_PROP_ROW, Variable::TYPE_NATIVE_LONG);
-            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::RESULT_PROP_HAS, Variable::TYPE_NATIVE_LONG);
-            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::RESULT_PROP_CURSOR, Variable::TYPE_NATIVE_LONG);
-            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::RESULT_PROP_ROW_COUNT, Variable::TYPE_NATIVE_LONG);
-            $this->markHasConstructor($id);
-            $pub = \PHPCfg\Func::FLAG_PUBLIC;
-            foreach (['fetchArray', 'numColumns', 'columnName', 'columnType', 'reset', 'finalize'] as $method) {
-                $this->defineMethodVisibility($id, $method, $pub);
-            }
-        }
+    }
+
+    /**
+     * Register an extension-owned seeder for ClassConstFetch / stub properties (#36204).
+     *
+     * Invoked from {@see ensureExternalClassConstants()} on every lookup (idempotent).
+     * Call from Module::jitInit, then {@see lookup()} if defineBuiltins already touched the class.
+     *
+     * @param callable(self, int): void $seeder
+     */
+    public function registerExternalClassSeeder(string $lcname, callable $seeder): void
+    {
+        $this->externalClassSeeders[strtolower($lcname)][] = $seeder;
     }
 
     /**
      * @param array<string, int|float|bool|string|null> $constants
      */
-    private function seedExternalClassConstants(int $id, array $constants): void
+    public function seedExternalClassConstants(int $id, array $constants): void
     {
         foreach ($constants as $name => $value) {
             // Seed tables use lowercase map keys; PHP declared names are UPPER_SNAKE (#25929).
@@ -4465,19 +4331,7 @@ class Object_ extends Type {
             $this->defineProperty($id, \PHPCompiler\ext\standard\ZlibIncrementalJitSupport::PROP_READ_LEN, Variable::TYPE_NATIVE_LONG);
             $this->markFinalClass($lcname);
         }
-        // ZipArchive stub props — late defineProperty after new SIGSEGVs (#35002 leftover of #20584).
-        // TYPE_VALUE for filename/comment: emitSetStringPropertyFromCstr stores heap __value__* boxes.
-        if ('ziparchive' === $lcname) {
-            $this->defineProperty($id, VmZipArchive::PROP_STATUS, Variable::TYPE_NATIVE_LONG);
-            $this->defineProperty($id, VmZipArchive::PROP_STATUS_SYS, Variable::TYPE_NATIVE_LONG);
-            $this->defineProperty($id, VmZipArchive::PROP_LAST_ID, Variable::TYPE_NATIVE_LONG);
-            $this->defineProperty($id, VmZipArchive::PROP_NUM_FILES, Variable::TYPE_NATIVE_LONG);
-            $this->defineProperty($id, VmZipArchive::PROP_FILENAME, Variable::TYPE_VALUE);
-            $this->defineProperty($id, VmZipArchive::PROP_COMMENT, Variable::TYPE_VALUE);
-            // NestedJIT handle into ZipArchiveJitHelper (#35424).
-            $this->defineProperty($id, \PHPCompiler\ext\zip\ZipArchiveJitSupport::PROP_ID, Variable::TYPE_NATIVE_LONG);
-            $this->markHasConstructor($id);
-        }
+        // ZipArchive stub props — registered by ext/zip/Module::jitInit seeder (#36204 / #35002).
         // OpenSSLAsymmetricKey PEM for thin AOT openssl_pkey_new (#34015).
         if ('opensslasymmetrickey' === $lcname) {
             $this->defineProperty(

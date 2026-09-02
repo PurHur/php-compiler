@@ -29,7 +29,7 @@ final class Sqlite3EnableExceptionsAotTest extends TestCase
     public function testProxyRegisteredForEnableExceptions(): void
     {
         $root = dirname(__DIR__, 2);
-        $src = (string) file_get_contents($root.'/lib/JIT/Context.php');
+        $src = (string) file_get_contents($root.'/ext/sqlite3/Module.php');
         $this->assertStringContainsString("'enableExceptions'", $src);
         $dispatch = (string) file_get_contents($root.'/lib/JIT/Call/Sqlite3Method.php');
         $this->assertStringContainsString("'enableexceptions'", $dispatch);
@@ -38,7 +38,7 @@ final class Sqlite3EnableExceptionsAotTest extends TestCase
         $this->assertStringContainsString('#35975', $jit);
         $support = (string) file_get_contents($root.'/ext/sqlite3/Sqlite3JitSupport.php');
         $this->assertStringContainsString('PROP_EXCEPTIONS', $support);
-        $layout = (string) file_get_contents($root.'/lib/JIT/Builtin/Type/Object_.php');
+        $layout = (string) file_get_contents($root.'/ext/sqlite3/Module.php');
         $this->assertStringContainsString('PROP_EXCEPTIONS', $layout);
         $this->assertFileDoesNotExist($root.'/lib/AOT/runtime/sqlite3_enableexceptions.c');
         $this->assertFileDoesNotExist($root.'/runtime/sqlite3_enableexceptions.c');

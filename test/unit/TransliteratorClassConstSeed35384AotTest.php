@@ -16,7 +16,7 @@ final class TransliteratorClassConstSeed35384AotTest extends TestCase
     public function testSeedHookExists(): void
     {
         $src = (string) file_get_contents(
-            __DIR__.'/../../lib/JIT/Builtin/Type/Object_.php'
+            __DIR__.'/../../ext/intl/Module.php'
         );
         $this->assertStringContainsString('VmTransliterator::classConstants()', $src);
         $this->assertStringContainsString('#35384', $src);

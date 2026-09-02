@@ -18,7 +18,7 @@ final class LocaleAcceptFromHttpJitShrinkTest extends TestCase
         $method = (string) file_get_contents(__DIR__.'/../../ext/intl/LocaleAcceptFromHttp.php');
         $this->assertStringContainsString('JitLocaleParser::acceptFromHttp', $method);
 
-        $ctx = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $ctx = (string) file_get_contents(__DIR__.'/../../ext/intl/Module.php');
         $this->assertStringContainsString("functionProxies['locale::acceptfromhttp']", $ctx);
 
         $parser = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/LocaleParser.php');

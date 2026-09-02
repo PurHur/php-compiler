@@ -68,7 +68,7 @@ final class ZipArchiveCreateEnableZipAotTest extends TestCase
     public function testSeedGateUsesExtensionPolicy(): void
     {
         $root = dirname(__DIR__, 2);
-        $src = (string) file_get_contents($root.'/lib/JIT/Builtin/Type/Object_.php');
+        $src = (string) file_get_contents($root.'/ext/zip/Module.php');
         $this->assertStringContainsString('ZipExtensionPolicy::advertisesExtension()', $src);
         $this->assertStringContainsString('seedExternalClassConstants($id, ZipArchiveConstants::CLASS_CONSTANTS)', $src);
         // Must not gate ZipArchive ClassConstFetch solely on PROFILE supportsZip().

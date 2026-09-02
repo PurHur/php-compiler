@@ -33,7 +33,7 @@ final class IntlDateFormatterCreateJitShrinkTest extends TestCase
         $formatLowering = (string) file_get_contents(__DIR__.'/../../ext/intl/JitIntlDateFormatterFormat.php');
         $this->assertStringContainsString('DateTimeFormatRuntime::invoke', $formatLowering);
 
-        $ctx = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $ctx = (string) file_get_contents(__DIR__.'/../../ext/intl/Module.php');
         $this->assertStringContainsString("functionProxies['intldateformatter::create']", $ctx);
         $this->assertStringContainsString("functionProxies['intldateformatter::format']", $ctx);
 

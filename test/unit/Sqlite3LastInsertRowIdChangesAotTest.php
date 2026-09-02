@@ -29,7 +29,7 @@ final class Sqlite3LastInsertRowIdChangesAotTest extends TestCase
     public function testProxyRegisteredForLastInsertRowIdAndChanges(): void
     {
         $root = dirname(__DIR__, 2);
-        $src = (string) file_get_contents($root.'/lib/JIT/Context.php');
+        $src = (string) file_get_contents($root.'/ext/sqlite3/Module.php');
         $this->assertStringContainsString("'lastInsertRowID'", $src);
         $this->assertStringContainsString("'changes'", $src);
         $dispatch = (string) file_get_contents($root.'/lib/JIT/Call/Sqlite3Method.php');

@@ -28,7 +28,7 @@ final class TransliteratorTransliterateJitShrinkTest extends TestCase
         $this->assertStringContainsString('tryFoldIdSubject', $lowering);
         $this->assertStringContainsString('TransliteratorTransliterateRuntime::invokeCafe', $lowering);
 
-        $ctx = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $ctx = (string) file_get_contents(__DIR__.'/../../ext/intl/Module.php');
         $this->assertStringContainsString("functionProxies['transliterator::transliterate']", $ctx);
         $this->assertStringContainsString("functionProxies['transliterator::create']", $ctx);
     }

@@ -29,7 +29,7 @@ final class Sqlite3EscapeStringAotTest extends TestCase
     public function testProxyRegisteredForEscapeString(): void
     {
         $root = dirname(__DIR__, 2);
-        $src = (string) file_get_contents($root.'/lib/JIT/Context.php');
+        $src = (string) file_get_contents($root.'/ext/sqlite3/Module.php');
         $this->assertStringContainsString("'escapeString'", $src);
         $dispatch = (string) file_get_contents($root.'/lib/JIT/Call/Sqlite3Method.php');
         $this->assertStringContainsString("'escapestring'", $dispatch);

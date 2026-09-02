@@ -23,7 +23,7 @@ final class NumberFormatterCreateJitShrinkTest extends TestCase
         $this->assertStringContainsString("lookup('NumberFormatter')", $lowering);
         $this->assertStringContainsString('__value__writeObject', $lowering);
 
-        $ctx = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $ctx = (string) file_get_contents(__DIR__.'/../../ext/intl/Module.php');
         $this->assertStringContainsString("functionProxies['numberformatter::create']", $ctx);
 
         $call = (string) file_get_contents(__DIR__.'/../../lib/JIT/Call/NumberFormatterCreate.php');

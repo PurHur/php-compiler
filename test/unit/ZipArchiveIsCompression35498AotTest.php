@@ -32,7 +32,7 @@ final class ZipArchiveIsCompression35498AotTest extends TestCase
     public function testProxyRegisteredForStaticSupportProbes(): void
     {
         $root = dirname(__DIR__, 2);
-        $src = (string) file_get_contents($root.'/lib/JIT/Context.php');
+        $src = (string) file_get_contents($root.'/ext/zip/Module.php');
         $this->assertStringContainsString("'isCompressionMethodSupported'", $src);
         $this->assertStringContainsString("'isEncryptionMethodSupported'", $src);
         $jit = (string) file_get_contents($root.'/ext/zip/JitZipArchive.php');
