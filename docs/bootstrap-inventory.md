@@ -49982,8 +49982,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 32480)
 - new Variable (line 32539)
 - new Variable (line 32758)
-- new Variable (line 34198)
-- 599 class method(s)
+- new Variable (line 34343)
+- 602 class method(s)
 - 26 closure(s)
 
 ### `lib/JIT/Analyzer.php`
