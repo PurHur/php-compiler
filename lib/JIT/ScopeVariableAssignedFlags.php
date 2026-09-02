@@ -6,10 +6,15 @@ namespace PHPCompiler\JIT;
 
 use PHPLLVM\Value;
 
-/** Per-scope-variable assigned flags for JIT undefined-variable guards (#10360). */
+/**
+ * Per-scope-variable assigned flags for JIT undefined-variable guards (#10360).
+ *
+ * Flags are per-activation entry allocas (Zend frame initializedSlots), not module
+ * globals — a process-wide bit breaks recursion semantics (#36190).
+ */
 final class ScopeVariableAssignedFlags
 {
-    /** @var array<string, Value> */
+    /** @var array<string, Value> entry-block i8 alloca per flag key */
     private static array $flags = [];
 
     public static function flagKey(Context $context, string $name): string
@@ -29,9 +34,14 @@ final class ScopeVariableAssignedFlags
     {
         if (!isset(self::$flags[$key])) {
             $i8 = $context->getTypeFromString('int8');
-            $flagName = 'phpc_scope_var_init_'.substr(hash('sha256', $key), 0, 16);
-            $flag = $context->module->addGlobal($i8, $flagName);
-            $flag->setInitializer($i8->constInt(0, false));
+            $fn = BasicBlockHelper::parentFunction($context);
+            $flag = BasicBlockHelper::entryAllocaForFunction($context, $fn, $i8);
+            BasicBlockHelper::storeAtFunctionEntry(
+                $context,
+                $fn,
+                $i8->constInt(0, false),
+                $flag
+            );
             self::$flags[$key] = $flag;
         }
 
