@@ -11697,10 +11697,12 @@ class JIT {
                                     $this->jitWriteNullForUnset(
                                         JIT\JitValueBox::valuePtrFromVariable($this->context, $bound)
                                     );
-                                    $nullVar = $this->jitNullVariable();
-                                    $this->context->bindVariableByName($resolvedUnset, $nullVar);
-                                    $this->context->setVariableOp($targetOp, $nullVar);
-                                    unset($this->context->namedVariableBindings[$resolvedUnset]);
+                                    // Keep canonical CV; jitNullVariable() split left loop back-edge
+                                    // assigns delref'ing GC orphans (#36245 loop_unset).
+                                    $bound->isNullConstant = true;
+                                    $this->context->bindVariableByName($resolvedUnset, $bound);
+                                    $this->context->setVariableOp($targetOp, $bound);
+                                    $this->jitClearAssignResultObjectMirrorForNamedUnset($block, $op->arg2);
                                     break;
                                 }
                                 if (
@@ -11778,6 +11780,10 @@ class JIT {
                                 $this->jitWriteNullForUnset(
                                     JIT\JitValueBox::valuePtrFromVariable($this->context, $target)
                                 );
+                                $target->isNullConstant = true;
+                                if (null !== $unsetName && '' !== $unsetName) {
+                                    $this->jitClearAssignResultObjectMirrorForNamedUnset($block, $op->arg2);
+                                }
                                 break;
                             }
                             $target->free();
@@ -22730,7 +22736,11 @@ class JIT {
                 // copyBetweenPointers / foreach value fetch may branchToFreshContinue and
                 // seal the insert BB; delref here must not emit parentless IR (#26783 / #26784).
                 JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'assign_same_type_free_cont');
-                $result->free();
+                if ('__object__**' === $this->context->getStringFromType($result->value->typeOf())) {
+                    $this->freeObjectMirrorUnlessNull($result);
+                } else {
+                    $result->free();
+                }
             }
             if ($value->type & Variable::IS_NATIVE_ARRAY || Variable::TYPE_HASHTABLE === $value->type) {
                 $result->nextFreeElement = $value->nextFreeElement;
@@ -33669,6 +33679,124 @@ class JIT {
             $this->context->lookupFunction('__value__writeNull'),
             $valueBoxPtr
         );
+    }
+
+    /**
+     * Named-storage `$a = new T` keeps the object in the NEW/ASSIGN result
+     * {@see __object__**} alloca as well as the CV value-box. Unset (and null
+     * assign) must null those mirrors without delref — otherwise the next
+     * loop-body NEW freeObjectMirrorUnlessNull double-delrefs the orphan and
+     * GC sees roots=0 (#36245 loop_unset). Distinct Operand instances share a
+     * CFG slot, so clear via getOperand (assign's operand) not only
+     * operandForScopeSlot (prologue).
+     */
+    private function jitClearAssignResultObjectMirrorForNamedUnset(Block $block, ?int $unsetArgSlot): void
+    {
+        if (null === $unsetArgSlot) {
+            return;
+        }
+        $targetSlot = (int) $unsetArgSlot;
+        $seen = new \SplObjectStorage();
+        foreach ($block->opCodes as $assignOp) {
+            if (OpCode::TYPE_ASSIGN !== $assignOp->type || null === $assignOp->arg2) {
+                continue;
+            }
+            if ((int) $assignOp->arg2 !== $targetSlot) {
+                continue;
+            }
+            // Property/dim assigns use arg1 === arg2; still clear RHS object mirrors.
+            $slots = [];
+            if (null !== $assignOp->arg1 && $assignOp->arg1 !== $assignOp->arg2) {
+                $slots[] = (int) $assignOp->arg1;
+            }
+            try {
+                $rhs = $this->assignRhsSlot($assignOp);
+                if ($rhs !== $targetSlot) {
+                    $slots[] = $rhs;
+                }
+            } catch (\LogicException $e) {
+                // Missing RHS slot — named unset still clears assign-result mirrors.
+            }
+            foreach ($slots as $slot) {
+                $this->jitNullObjectMirrorForScopeSlot($block, $slot, $seen);
+            }
+        }
+    }
+
+    /**
+     * Null every {@see __object__**} alloca bound to $slot (map + all Operand aliases).
+     *
+     * @param \SplObjectStorage<\PHPLLVM\Value, mixed> $seen
+     */
+    private function jitNullObjectMirrorForScopeSlot(Block $block, int $slot, \SplObjectStorage $seen): void
+    {
+        $nullObj = $this->context->getTypeFromString('__object__*')->constNull();
+        if (isset($this->context->scopeSlotObjectMirrorLlvmBySlot[$slot])) {
+            $llvmMirror = $this->context->scopeSlotObjectMirrorLlvmBySlot[$slot];
+            if (!$seen->contains($llvmMirror)) {
+                $seen[$llvmMirror] = true;
+                $this->context->builder->store($nullObj, $llvmMirror);
+            }
+        }
+        $operands = [];
+        $scoped = $block->operandForScopeSlot($slot);
+        if (null !== $scoped) {
+            $operands[] = $scoped;
+        }
+        // Prefer the exact Operand getOperand returns — assign/NEW lower against it (#36245).
+        $fromOpcode = $block->getOperand($slot);
+        if (null !== $fromOpcode) {
+            $operands[] = $fromOpcode;
+        }
+        foreach ($block->scopedOperands() as $scopedOp) {
+            if ($block->slotForOperand($scopedOp) === $slot) {
+                $operands[] = $scopedOp;
+            }
+        }
+        foreach ($operands as $op) {
+            if (!$this->context->hasVariableOp($op) && !$this->context->scope->variables->contains($op)) {
+                continue;
+            }
+            $mirror = $this->context->hasVariableOp($op)
+                ? $this->context->getVariableFromOp($op)
+                : $this->context->scope->variables[$op];
+            if (
+                Variable::TYPE_OBJECT !== $mirror->type
+                || Variable::KIND_VARIABLE !== $mirror->kind
+                || null !== $mirror->objectPropertySlot
+                || $mirror->functionStaticGlobal
+            ) {
+                continue;
+            }
+            if (!str_contains($this->context->getStringFromType($mirror->value->typeOf()), '__object__')) {
+                continue;
+            }
+            if ($seen->contains($mirror->value)) {
+                continue;
+            }
+            $seen[$mirror->value] = true;
+            $this->context->builder->store($nullObj, $mirror->value);
+            $this->context->scopeSlotObjectMirrorLlvmBySlot[$slot] = $mirror->value;
+        }
+    }
+
+    /** Delref an {@see __object__**} mirror only when it still holds a non-null pointer (#36245). */
+    private function freeObjectMirrorUnlessNull(Variable $mirror): void
+    {
+        $nullObj = $this->context->getTypeFromString('__object__*')->constNull();
+        $loaded = $this->context->builder->load($mirror->value);
+        $hasObj = $this->context->builder->icmp(
+            \PHPLLVM\Builder::INT_NE,
+            $loaded,
+            $nullObj
+        );
+        $delrefBlock = JIT\BasicBlockHelper::append($this->context, 'obj_mirror_delref');
+        $skipBlock = JIT\BasicBlockHelper::append($this->context, 'obj_mirror_skip');
+        $this->context->builder->branchIf($hasObj, $delrefBlock, $skipBlock);
+        $this->context->builder->positionAtEnd($delrefBlock);
+        $this->context->refcount->delref($loaded);
+        $this->context->builder->branch($skipBlock);
+        $this->context->builder->positionAtEnd($skipBlock);
     }
 
     /**

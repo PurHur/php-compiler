@@ -488,6 +488,13 @@ class Context {
     /** Scope slot => ?? result operand for runtime reload at chained call-arg send (#17590). */
     public array $coalesceMergeSlotOperands = [];
 
+    /**
+     * CFG scope slot => {@see __object__**} entry alloca for ASSIGN result temps (#36245 loop_unset).
+     *
+     * @var array<int, \PHPLLVM\Value>
+     */
+    public array $scopeSlotObjectMirrorLlvmBySlot = [];
+
     /** `return $c ? $a : $b` shared merge operand — emit direct returns per arm (#8555 AOT). */
     public ?Operand $ternarySharedReturnOperand = null;
 
@@ -4426,6 +4433,29 @@ class Context {
         }
         $this->scope->variables[$op] = Variable::fromOp($this, $func, $basicBlock, $block, $op);
         $this->scope->variables[$op]->initialize();
+        $this->recordScopeSlotObjectMirrorLlvm($block, $op, $this->scope->variables[$op]);
+    }
+
+    /**
+     * Track primary {@see __object__**} entry allocas by CFG scope slot (#36245 loop_unset).
+     */
+    public function recordScopeSlotObjectMirrorLlvm(Block $block, Operand $op, Variable $var): void
+    {
+        if (Variable::TYPE_OBJECT !== $var->type || Variable::KIND_VARIABLE !== $var->kind) {
+            return;
+        }
+        if ($var->functionStaticGlobal || null !== $var->objectPropertySlot) {
+            return;
+        }
+        $storageTy = $this->getStringFromType($var->value->typeOf());
+        if (!str_contains($storageTy, '__object__')) {
+            return;
+        }
+        $cfgSlot = $block->slotForOperand($op);
+        if (null === $cfgSlot) {
+            return;
+        }
+        $this->scopeSlotObjectMirrorLlvmBySlot[(int) $cfgSlot] = $var->value;
     }
 
     /**
