@@ -1096,4 +1096,59 @@ PHP;
             file_put_contents($parser, $original);
         }
     }
+
+    public function testNoHunklessPatchStubsRemain(): void
+    {
+        $dir = self::$root.'/patches';
+        self::assertDirectoryExists($dir);
+        $hunkless = [];
+        foreach (glob($dir.'/*.patch') ?: [] as $path) {
+            $body = (string) file_get_contents($path);
+            if (!preg_match('/^@@/m', $body)) {
+                $hunkless[] = basename($path);
+            }
+        }
+        self::assertSame(
+            [],
+            $hunkless,
+            'hunkless .patch stubs are forbidden (#36229); call overlays by name instead'
+        );
+    }
+
+    public function testApplyPatchesUsesZeroFuzzAndRejectsHunkless(): void
+    {
+        $script = (string) file_get_contents(self::$root.'/script/apply-patches.sh');
+        self::assertStringContainsString(
+            'run_patch()',
+            $script,
+            'apply-patches must centralize patch(1) through run_patch (#36229)'
+        );
+        self::assertStringContainsString(
+            'patch -F0',
+            $script,
+            'patch(1) must use -F0 (no fuzz) (#36229)'
+        );
+        self::assertStringContainsString(
+            'reject_hunkless_patches',
+            $script,
+            'apply-patches must reject hunkless stubs (#36229)'
+        );
+        // No forced fuzzy applies outside run_patch.
+        self::assertSame(
+            0,
+            preg_match_all('/(?<!run_)patch -[^\n]*-f\b/', $script),
+            'patch(1) must not use -f force (masks partial applies) outside run_patch'
+        );
+    }
+
+    public function testVerifyPristineRejectsHunkless(): void
+    {
+        $script = self::$root.'/script/apply-patches.sh';
+        $output = [];
+        $exitCode = 0;
+        exec('bash '.escapeshellarg($script).' --verify-pristine 2>&1', $output, $exitCode);
+        $joined = implode("\n", $output);
+        self::assertSame(0, $exitCode, "verify-pristine failed:\n".$joined);
+        self::assertStringContainsString('no hunkless stubs', $joined);
+    }
 }
