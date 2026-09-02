@@ -69,3 +69,42 @@ look like real defects. Re-measure alone if a result is suspicious.
 
 Regenerate after any batch of lowering work and update the SHA. A name-diff only catches *newly
 failing* cases — it cannot see a case getting **worse** while remaining in the failing set.
+
+## Program-shaped corpus (#36221)
+
+Thirty end-to-end programs live under `test/differential/cases/programs/` (COUNT=30).
+They are **not** part of the default expression-shaped corpus; run them explicitly:
+
+```bash
+script/differential-sweep.sh --dir test/differential/cases/programs
+script/differential-sweep.sh --aot --dir test/differential/cases/programs
+script/differential-sweep.sh --jit --dir test/differential/cases/programs
+```
+
+VM must stay **30/30**. AOT/JIT failing **names** (not counts) should be recorded here
+and turned into focused issues — see also `test/differential/JIT-BASELINE.md`.
+
+VM mismatches found while authoring (repros under `test/repro/`, issues filed):
+
+| repro | issue |
+|---|---|
+| `i36221_sprintf_double_count.php` | #36353 |
+| `i36221_flatten_nested.php` | #36354 |
+| `i36221_json_array_map_sprintf.php` | #36355 |
+
+Measured on `85d9ec7fdc` / full AOT sweep (2026-09-02, `php-compiler:22.04-dev`), program corpus only:
+
+```bash
+script/differential-sweep.sh --dir test/differential/cases/programs          # 30/30 VM
+script/differential-sweep.sh --aot --dir test/differential/cases/programs      # 1/30 AOT
+```
+
+**Match (1):** `p21_json_template_combo.php`
+
+**COMPILE abort (6):**
+`p03_csv_report.php`, `p05_datetime_arith.php`, `p07_oop_inheritance.php`, `p12_generators_foreach.php`, `p24_regex_replace_callback.php`, `p25_datetime_format_tz.php`
+
+**DIFF / runtime crash (23):**
+`p01_json_api_handler.php`, `p02_template_render.php`, `p04_regex_log_parser.php`, `p06_sort_pipeline.php`, `p08_traits_aliases.php`, `p09_interfaces_contracts.php`, `p10_enums_readonly.php`, `p11_closures_compose.php`, `p13_exceptions_closures.php`, `p14_references_swap.php`, `p15_static_global_state.php`, `p16_sprintf_numbers.php`, `p17_mbstring_basics.php`, `p18_spl_structures.php`, `p19_late_static_self.php`, `p20_match_expr_pipeline.php`, `p22_string_builder.php`, `p23_array_nest_walk.php`, `p26_usort_objects.php`, `p27_oo_exceptions_hierarchy.php`, `p28_generator_exceptions.php`, `p29_spl_iterators.php`, `p30_mini_request_pipeline.php`
+
+Umbrella follow-up: #36366. Do not `@differential-skip-aot` unless the backend genuinely cannot implement the shape.

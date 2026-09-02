@@ -1,5 +1,5 @@
 <?php
-// #36353 — sprintf with count() twice in one arg list yields 0 for first %d on VM
+// #36353 / #36221 — sprintf with count() twice in one arg list yields 0 for first %d on VM
 $users = [["score" => 98.5], ["score" => 100.0], ["score" => 91.25]];
 $sum = 0.0;
 foreach ($users as $u) {

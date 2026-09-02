@@ -8,8 +8,10 @@
 #
 #   script/differential-sweep.sh                      # VM backend, bundled corpus
 #   script/differential-sweep.sh --aot                # AOT backend (slow; compiles each program)
+#   script/differential-sweep.sh --jit                # MCJIT via bin/jit.php (#36221)
 #   script/differential-sweep.sh --dir path/to/cases  # your own programs
 #   script/differential-sweep.sh --aot --repeat 10    # run each built binary 10x (see below)
+#   script/differential-sweep.sh --dir test/differential/cases/programs
 #
 # On RunForge / hosts without image LLVM, this re-execs via docker-exec.sh (same gate as
 # phpunit.sh). Host glibc ≠ Ubuntu 22.04 image glibc: AOT binaries that match Zend in the
@@ -76,11 +78,12 @@ REPEAT=1
 while [ $# -gt 0 ]; do
     case "$1" in
         --aot)    BACKEND=aot; shift ;;
+        --jit)    BACKEND=jit; shift ;;
         --vm)     BACKEND=vm; shift ;;
         --dir)    DIR="$2"; shift 2 ;;
         --quiet)  QUIET=1; shift ;;
         --repeat) REPEAT="$2"; shift 2 ;;
-        -h|--help) sed -n '2,40p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,45p' "$0"; exit 0 ;;
         *) echo "unknown option: $1" >&2; exit 2 ;;
     esac
 done
@@ -109,6 +112,7 @@ for f in "$DIR"/*.php; do
     # implement. Without this, such a case fails forever regardless of compiler state and the exit
     # status stops meaning "regressions" — see #23779. The marker must carry a reason:
     #     // @differential-skip-aot: var_dump() of non-scalars needs Runtime->vm (#23540)
+    #     // @differential-skip-jit: MCJIT whole-script VM fallback / gap (#98 / #36221)
     # Use it ONLY for genuinely unsupported features, never to silence a real defect.
     if grep -q "@differential-skip-$BACKEND\b" "$f" 2>/dev/null; then
         reason="$(sed -n "s|.*@differential-skip-$BACKEND: *||p" "$f" | head -1)"
@@ -147,6 +151,8 @@ for f in "$DIR"/*.php; do
     while [ "$i" -le "$runs" ]; do
         if [ "$BACKEND" = aot ]; then
             got="$(timeout 120 "$bin" 2>&1)"
+        elif [ "$BACKEND" = jit ]; then
+            got="$(timeout 300 php -d error_reporting=1 -d log_errors=1 -d display_errors=stderr bin/jit.php "$f" 2>&1)"
         else
             got="$(timeout 120 php -d error_reporting=1 -d log_errors=1 -d display_errors=stderr bin/vm.php "$f" 2>&1)"
         fi
@@ -183,16 +189,22 @@ if [ "$total" -eq 0 ]; then
 fi
 
 min_cases=0
-if [ "$DIR" = "$DEFAULT_DIR" ] && [ -f "$ROOT/test/differential/COUNT" ]; then
-    min_cases="$(tr -d '[:space:]' <"$ROOT/test/differential/COUNT")"
+count_file=""
+if [ -f "$DIR/COUNT" ]; then
+    count_file="$DIR/COUNT"
+elif [ "$DIR" = "$DEFAULT_DIR" ] && [ -f "$ROOT/test/differential/COUNT" ]; then
+    count_file="$ROOT/test/differential/COUNT"
+fi
+if [ -n "$count_file" ]; then
+    min_cases="$(tr -d '[:space:]' <"$count_file")"
     case "$min_cases" in
         ''|*[!0-9]*)
-            echo "differential-sweep: invalid MIN_CASES in test/differential/COUNT: $(cat "$ROOT/test/differential/COUNT")" >&2
+            echo "differential-sweep: invalid MIN_CASES in $count_file: $(cat "$count_file")" >&2
             exit 2
             ;;
     esac
     if [ "$total" -lt "$min_cases" ]; then
-        echo "differential-sweep: found $total case(s) under $DIR but test/differential/COUNT requires >= $min_cases (#36248)" >&2
+        echo "differential-sweep: found $total case(s) under $DIR but $count_file requires >= $min_cases (#36248/#36221)" >&2
         exit 2
     fi
 fi
