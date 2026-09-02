@@ -11,10 +11,30 @@ namespace PHPCompiler\JIT;
  */
 final class UserScriptAotEnv
 {
+    /** Sticky across NestedJIT env clear during helper compile (#15407, #36245). */
+    private static bool $latchedUserScript = false;
+
+    public static function latchUserScript(): void
+    {
+        if (self::isActive()) {
+            self::$latchedUserScript = true;
+        }
+    }
+
+    public static function resetLatchForTest(): void
+    {
+        self::$latchedUserScript = false;
+    }
+
     public static function isActive(): bool
     {
         $userScript = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
 
         return '1' === $userScript || 'true' === strtolower((string) $userScript);
+    }
+
+    public static function isActiveOrLatched(): bool
+    {
+        return self::$latchedUserScript || self::isActive();
     }
 }

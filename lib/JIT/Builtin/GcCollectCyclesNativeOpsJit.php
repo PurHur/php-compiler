@@ -8,6 +8,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\ext\standard\JitGcCollectCyclesStandaloneKernel;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -20,7 +21,7 @@ final class GcCollectCyclesNativeOpsJit
 {
     public static function childAt(Context $context, JITVariable $objPtr, JITVariable $slotIndex): Value
     {
-        GcCollectCyclesRuntime::ensureLinked($context);
+        JitGcCollectCyclesStandaloneKernel::ensureSlotReadObjectDecl($context);
 
         $i64 = $context->getTypeFromString('int64');
         $i8p = $context->getTypeFromString('int8*');
@@ -52,6 +53,38 @@ final class GcCollectCyclesNativeOpsJit
         );
 
         return $context->builder->pointerCast($child, $i64);
+    }
+
+    public static function clearSlotAt(Context $context, JITVariable $objPtr, JITVariable $slotIndex): void
+    {
+        JitGcCollectCyclesStandaloneKernel::ensureSlotReadObjectDecl($context);
+
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $voidpp = $context->getTypeFromString('void**');
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $voidp = $context->getTypeFromString('void*');
+
+        $obj = JitNestedHelperCoerce::i64ToTypedPtr(
+            $context,
+            self::i64FromVar($context, $objPtr),
+            $objPtrTy
+        );
+        $base = $context->builder->pointerCast($obj, $i8p);
+        $headerSize = self::objectHeaderSizeConst($context);
+        $slotOff = $context->builder->add(
+            $headerSize,
+            $context->builder->mul(
+                $context->builder->zext(self::i64FromVar($context, $slotIndex), $sizeT),
+                $sizeT->constInt(8, false)
+            )
+        );
+        $slotPtr = $context->builder->pointerCast(
+            $context->builder->gep($base, $slotOff),
+            $voidpp
+        );
+        $context->builder->store($voidp->constNull(), $slotPtr);
     }
 
     public static function objectRefcount(Context $context, JITVariable $objPtr): Value
