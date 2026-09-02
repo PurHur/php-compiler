@@ -130,6 +130,12 @@ class Compiler {
     /** Identity of the $seen storage the index was built against; rebuilt when $seen is replaced. */
     private ?SplObjectStorage $cfgProducerIndexSeenSource = null;
 
+    /** spl_object_id(callOp) => preceding inline producers (#36224). */
+    private array $precedingInlineCallArgProducersCache = [];
+
+    /** spl_object_id(callOp) => index in owning cfg block children (#36224). */
+    private array $cfgCallOpIndexCache = [];
+
     /** @var SplObjectStorage<CfgBlock, SplObjectStorage<CfgVariable, int>> ?: merge var slots (#3790) */
     private SplObjectStorage $ternaryMergeVarSlots;
 
@@ -670,6 +676,8 @@ class Compiler {
         $this->rewrittenNeNullReturnJumpIf = new SplObjectStorage;
         $this->earlyBoundFunctionOps = new SplObjectStorage;
         $this->closureRichNameByFunc = new SplObjectStorage;
+        $this->precedingInlineCallArgProducersCache = [];
+        $this->cfgCallOpIndexCache = [];
         $this->debugWriteLastPhase('Compiler::compile enter');
 
         Compiler\InheritanceVariance::validateScript(
@@ -29944,14 +29952,15 @@ class Compiler {
      */
     private function precedingInlineCallArgProducersBeforeCfgOp(array $cfgChildren, Op $callOp): array
     {
-        $callIndex = null;
-        foreach ($cfgChildren as $i => $child) {
-            if ($child === $callOp) {
-                $callIndex = $i;
-                break;
-            }
+        $cacheKey = spl_object_id($callOp);
+        if (isset($this->precedingInlineCallArgProducersCache[$cacheKey])) {
+            return $this->precedingInlineCallArgProducersCache[$cacheKey];
         }
+
+        $callIndex = $this->cfgCallOpIndexInChildren($cfgChildren, $callOp);
         if (null === $callIndex) {
+            $this->precedingInlineCallArgProducersCache[$cacheKey] = [];
+
             return [];
         }
         $producers = [];
@@ -30754,7 +30763,30 @@ class Compiler {
             }
         ));
 
-        return $this->filterDeadVoidStatementMethodCallProducers($producers, $callOp, $cfgChildren);
+        $result = $this->filterDeadVoidStatementMethodCallProducers($producers, $callOp, $cfgChildren);
+        $this->precedingInlineCallArgProducersCache[$cacheKey] = $result;
+
+        return $result;
+    }
+
+    /**
+     * @param list<Op> $cfgChildren
+     */
+    private function cfgCallOpIndexInChildren(array $cfgChildren, Op $callOp): ?int
+    {
+        $cacheKey = spl_object_id($callOp);
+        if (array_key_exists($cacheKey, $this->cfgCallOpIndexCache)) {
+            return $this->cfgCallOpIndexCache[$cacheKey];
+        }
+        foreach ($cfgChildren as $i => $child) {
+            if ($child === $callOp) {
+                $this->cfgCallOpIndexCache[$cacheKey] = $i;
+
+                return $i;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -44526,34 +44558,63 @@ class Compiler {
     private function indexCfgProducerBlockTree(CfgBlock $cfgBlock): void
     {
         $childCount = \count($cfgBlock->children);
-        if ($this->cfgProducerIndexedBlocks->contains($cfgBlock)
-            && $this->cfgProducerIndexedBlocks[$cfgBlock] === $childCount) {
+        $prevCount = $this->cfgProducerIndexedBlocks->contains($cfgBlock)
+            ? $this->cfgProducerIndexedBlocks[$cfgBlock]
+            : null;
+        if ($prevCount === $childCount) {
             return;
         }
+        if (null !== $prevCount && $prevCount > $childCount) {
+            // Block shrunk — rebuild this subtree in the index (#36224).
+            $this->reindexCfgProducerBlockTreeFromScratch($cfgBlock);
+
+            return;
+        }
+        $startIndex = null !== $prevCount ? $prevCount : 0;
         $this->cfgProducerIndexedBlocks[$cfgBlock] = $childCount;
+        for ($i = $startIndex; $i < $childCount; ++$i) {
+            $this->indexCfgProducerTreeNode($cfgBlock->children[$i]);
+        }
+    }
+
+    /**
+     * @param Op|CfgBlock $node
+     */
+    private function indexCfgProducerTreeNode($node): void
+    {
+        if ($node instanceof Op\Expr) {
+            $result = $node->result;
+            if ($result instanceof Operand) {
+                if (!$this->cfgProducerExprIndex->contains($result)) {
+                    $this->cfgProducerExprIndex[$result] = $node;
+                }
+                $resultRoot = Block::cfgVarRoot($result);
+                if (null !== $resultRoot) {
+                    $this->cfgProducerRootsWithCandidates[spl_object_id($resultRoot)] = true;
+                }
+            }
+
+            return;
+        }
+        if ($node instanceof CfgBlock) {
+            $this->indexCfgProducerBlockTree($node);
+
+            return;
+        }
+        if ($node instanceof Op\Stmt\JumpIf) {
+            foreach ([$node->if ?? null, $node->else ?? null] as $branch) {
+                if ($branch instanceof CfgBlock) {
+                    $this->indexCfgProducerBlockTree($branch);
+                }
+            }
+        }
+    }
+
+    private function reindexCfgProducerBlockTreeFromScratch(CfgBlock $cfgBlock): void
+    {
+        $this->cfgProducerIndexedBlocks[$cfgBlock] = \count($cfgBlock->children);
         foreach ($cfgBlock->children as $child) {
-            if ($child instanceof Op\Expr) {
-                $result = $child->result;
-                if ($result instanceof Operand) {
-                    if (!$this->cfgProducerExprIndex->contains($result)) {
-                        $this->cfgProducerExprIndex[$result] = $child;
-                    }
-                    $resultRoot = Block::cfgVarRoot($result);
-                    if (null !== $resultRoot) {
-                        $this->cfgProducerRootsWithCandidates[spl_object_id($resultRoot)] = true;
-                    }
-                }
-            }
-            if ($child instanceof CfgBlock) {
-                $this->indexCfgProducerBlockTree($child);
-            }
-            if ($child instanceof Op\Stmt\JumpIf) {
-                foreach ([$child->if ?? null, $child->else ?? null] as $branch) {
-                    if ($branch instanceof CfgBlock) {
-                        $this->indexCfgProducerBlockTree($branch);
-                    }
-                }
-            }
+            $this->indexCfgProducerTreeNode($child);
         }
     }
 
