@@ -531,10 +531,7 @@ function run(string $filename, string $code, array $options): void
                 $_ENV['PHP_COMPILER_SELFHOST_AOT'] = '0';
                 $_SERVER['PHP_COMPILER_SELFHOST_AOT'] = '0';
             }
-            // Stale MCJIT cache can resurrect pre-#13031 superglobal refresh bodies (#15624).
-            putenv('PHP_COMPILER_CACHE=0');
-            $_ENV['PHP_COMPILER_CACHE'] = '0';
-            $_SERVER['PHP_COMPILER_CACHE'] = '0';
+            // MCJIT bitcode cache is keyed on source + helper-runtime digest (#36199, #15624).
         }
         $prevBootstrapAotLink = getenv('PHP_COMPILER_BOOTSTRAP_AOT_LINK');
         $setBootstrapAotLink = $bootstrapAotFixture && !$isBootstrapAotLink && \function_exists('putenv');

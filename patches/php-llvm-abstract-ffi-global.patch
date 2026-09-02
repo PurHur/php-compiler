@@ -1,0 +1,29 @@
+--- vendor/ircmaxell/php-llvm/lib/LLVMAbstract/LLVM.php
++++ vendor/ircmaxell/php-llvm/lib/LLVMAbstract/LLVM.php
+@@ -69,7 +69,7 @@ abstract class LLVM implements CoreLLVM {
+     }
+ 
+     public function fromStringPointer(string_ptr $string): string {
+-        return FFI::string($string->getData()[0]);
++        return \FFI::string($string->getData()[0]);
+     }
+ 
+     public function getDefaultTargetTriple(): string {
+@@ -85,7 +85,7 @@ abstract class LLVM implements CoreLLVM {
+     }
+ 
+     public function getTargetFromTriple(string $triple, string &$errorMessage): CoreTarget {
+-        $error = new string_ptr(FFI::addr(FFI::new('char*')));
++        $error = new string_ptr(\FFI::addr(\FFI::new('char*')));
+         $target = new LLVMTargetRef($this->lib->getFFI()->new('LLVMTargetRef'));
+         if (!$this->fromBool($this->lib->LLVMGetTargetFromTriple($triple, $target->addr(), $error))) {
+             $errorMessage = $error->deref(0);
+@@ -160,7 +160,7 @@ abstract class LLVM implements CoreLLVM {
+     }
+ 
+     public function createMemoryBufferWithFile(string $path, string &$message): CoreMemoryBuffer {
+-        $error = new string_ptr(FFI::addr(FFI::new('char*')));
++        $error = new string_ptr(\FFI::addr(\FFI::new('char*')));
+         $buffer = new LLVMMemoryBufferRef($this->lib->getFFI()->new('LLVMMemoryBufferRef'));
+         if (!$this->fromBool($this->lib->LLVMCreateMemoryBufferWithContentsOfFile($path, $buffer->addr(), $error))) {
+             $message = $error->deref(0);

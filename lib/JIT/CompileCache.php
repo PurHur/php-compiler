@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\AOT\HelperRuntimeCache;
 use PHPCompiler\Block;
 
 /**
@@ -169,9 +170,37 @@ final class CompileCache
 
         SuperglobalInit::rebindGlobalsFromModule($context);
         self::restoreExports($context, $block, $meta['exports']);
+        $context->rebindInitShutdownAfterModuleReplace();
+        $context->syncIntrinsicBuilder();
         self::$skipModuleFuncCompile = true;
 
         return true;
+    }
+
+    /**
+     * User-script main LLVM function after {@see tryRestore()} (#36199).
+     */
+    public static function resolveRestoredMainFunction(Context $context, string $key): ?\PHPLLVM\Value\Function_
+    {
+        $meta = self::readMeta($key);
+        if (null === $meta) {
+            return null;
+        }
+        foreach ($meta['exports'] as $entry) {
+            if (($entry['scoped'] ?? '') !== '{main}') {
+                continue;
+            }
+            $llvm = (string) ($entry['llvm'] ?? '');
+            if ('' === $llvm) {
+                continue;
+            }
+            $func = $context->module->getNamedFunction($llvm);
+            if ($func instanceof \PHPLLVM\Value\Function_) {
+                return $func;
+            }
+        }
+
+        return null;
     }
 
     public static function save(Context $context, string $key): void
@@ -281,23 +310,17 @@ final class CompileCache
         if (is_file($lock)) {
             $parts[] = hash_file('sha256', $lock) ?: '';
         }
-        $repoRoot = dirname(__DIR__, 2);
-        $llvmDir = getenv('PHP_COMPILER_LLVM_PATH');
-        if (false === $llvmDir || '' === $llvmDir) {
-            $candidate = $repoRoot.'/.llvm';
-            if (is_file($candidate.'/libLLVM-9.so.1')) {
-                $llvmDir = $candidate;
-            } elseif (is_file('/opt/llvm9/libLLVM-9.so.1')) {
-                $llvmDir = '/opt/llvm9';
-            } else {
-                $llvmDir = 'no-llvm';
-            }
-        }
-        $parts[] = $llvmDir;
+        $parts[] = HelperRuntimeCache::llvmIdentityToken();
         $parts[] = hash_file('sha256', __DIR__.'/../JIT/Context.php') ?: '';
         $parts[] = hash_file('sha256', __DIR__.'/Builtin/AttributeRegistryLowering.php') ?: '';
         $parts[] = hash_file('sha256', __DIR__.'/../Runtime.php') ?: '';
         $parts[] = LazyBuiltins::fingerprintSegment();
+        $parts[] = HelperRuntimeCache::coreFingerprint();
+        $parts[] = HelperRuntimeCache::cacheKeySegment();
+        foreach (['PHP_COMPILER_AOT_USER_SCRIPT', 'PHP_COMPILER_HELPER_RUNTIME_O'] as $envKey) {
+            $flag = getenv($envKey);
+            $parts[] = $envKey.'='.(false === $flag ? '' : $flag);
+        }
 
         $cached = hash('sha256', implode("\0", $parts));
 
