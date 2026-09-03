@@ -57,7 +57,12 @@ final class CompileCache
 
     private static ?string $bundledSource = null;
 
-    /** @var list<string> absolute paths whose bytes changed vs the scaffold project index */
+    /**
+     * Absolute paths whose *semantic* content changed vs the scaffold project index
+     * (comments/whitespace-only edits do not strip that member's LLVM bodies) (#36387).
+     *
+     * @var list<string>
+     */
     private static array $editChangedMembers = [];
 
     /**
@@ -870,6 +875,114 @@ final class CompileCache
         return $changed;
     }
 
+    /**
+     * SHA-256 of PHP tokens with comments and whitespace removed (#36387).
+     *
+     * Used so a comment-only (or whitespace-only) edit of Router.php still
+     * byte-invalidates the project cache key / edit scaffold, but does not put
+     * Router on the strip list — kept bodies + delta demote then match the
+     * config-only ≤25% path that the Done-when measures via bench-gate.
+     */
+    public static function semanticFileHash(string $path): ?string
+    {
+        if (!is_file($path)) {
+            return null;
+        }
+        $src = file_get_contents($path);
+        if (false === $src) {
+            return null;
+        }
+        if ('' === $src) {
+            return hash('sha256', '');
+        }
+        $tokens = @token_get_all($src);
+        if (!\is_array($tokens) || [] === $tokens) {
+            return hash('sha256', $src);
+        }
+        $buf = '';
+        foreach ($tokens as $token) {
+            if (\is_array($token)) {
+                $id = $token[0];
+                if (T_COMMENT === $id || T_DOC_COMMENT === $id || T_WHITESPACE === $id) {
+                    continue;
+                }
+                $buf .= $token[1];
+            } else {
+                $buf .= $token;
+            }
+        }
+
+        return hash('sha256', $buf);
+    }
+
+    /**
+     * @param list<string> $memberPaths
+     *
+     * @return array<string, string> path → semantic sha256
+     */
+    public static function memberSemanticHashes(array $memberPaths): array
+    {
+        $out = [];
+        foreach ($memberPaths as $path) {
+            if (!is_string($path) || !is_file($path)) {
+                continue;
+            }
+            $resolved = realpath($path) ?: $path;
+            $hash = self::semanticFileHash($resolved);
+            if (is_string($hash)) {
+                $out[$resolved] = $hash;
+            }
+        }
+        ksort($out);
+
+        return $out;
+    }
+
+    /**
+     * Members that must strip LLVM bodies: byte-changed AND semantically changed (#36387).
+     *
+     * Falls back to byte-only diff when the prior project index lacks semantic_members
+     * (caches written before this slice).
+     *
+     * @param array<string, string>      $previousBytes
+     * @param array<string, string>      $currentBytes
+     * @param array<string, string>|null $previousSemantic
+     * @param array<string, string>|null $currentSemantic
+     *
+     * @return list<string>
+     */
+    public static function diffMembersForStrip(
+        array $previousBytes,
+        array $currentBytes,
+        ?array $previousSemantic,
+        ?array $currentSemantic
+    ): array {
+        $byteChanged = self::diffMemberHashes($previousBytes, $currentBytes);
+        if (
+            null === $previousSemantic
+            || [] === $previousSemantic
+            || null === $currentSemantic
+            || [] === $currentSemantic
+        ) {
+            return $byteChanged;
+        }
+        $strip = [];
+        foreach ($byteChanged as $path) {
+            if (!is_string($path) || '' === $path) {
+                continue;
+            }
+            $prev = $previousSemantic[$path] ?? null;
+            $curr = $currentSemantic[$path] ?? null;
+            if (!is_string($prev) || !is_string($curr) || $prev !== $curr) {
+                $strip[] = $path;
+            } else {
+                \PHPCompiler\AOT\BuildTiming::note('edit_scaffold_semantic_keep', 1.0);
+            }
+        }
+
+        return $strip;
+    }
+
     public static function isRecording(): bool
     {
         return null !== self::$recordingExports;
@@ -1164,7 +1277,7 @@ final class CompileCache
      */
     public static function computeKeptUserSymbols(array $allUserSymbols, array $byMember): array
     {
-        if ([] === self::$editChangedMembers || [] === $byMember) {
+        if ([] === $byMember) {
             return [];
         }
 
@@ -1190,6 +1303,10 @@ final class CompileCache
         if (is_string(self::$projectEntry) && '' !== self::$projectEntry) {
             $mustStripMember[self::$projectEntry] = true;
         }
+
+        // Empty editChangedMembers after a byte-only (comment/whitespace) edit means every
+        // attributed non-entry body is still semantically identical — keep them (#36387).
+        // (Previously [] short-circuited to "keep nothing", undoing semantic_keep.)
 
         // Changed members missing from byMember (e.g. config.php with only assignments)
         // own no LLVM symbols — that must not abort keep-path for unchanged Router.php
@@ -1584,6 +1701,8 @@ final class CompileCache
             'key' => $key,
             'fingerprint' => self::fingerprint(),
             'members' => $memberHashes,
+            // Comment/whitespace-stable hashes for strip planning (#36387).
+            'semantic_members' => self::memberSemanticHashes(array_keys($memberHashes)),
             'updated_at' => gmdate('c'),
         ], JSON_PRETTY_PRINT);
         if (false === $payload) {

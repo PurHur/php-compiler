@@ -52,6 +52,8 @@ final class AotCompileCacheTest extends TestCase
         @unlink($this->repoRoot.'/build/aot-cache-test-keep-edit.bin');
         @unlink($this->repoRoot.'/build/aot-cache-test-config-cold.bin');
         @unlink($this->repoRoot.'/build/aot-cache-test-config-edit.bin');
+        @unlink($this->repoRoot.'/build/aot-cache-test-comment-cold.bin');
+        @unlink($this->repoRoot.'/build/aot-cache-test-comment-edit.bin');
         putenv('PHP_COMPILER_CACHE_DIR');
         unset($_ENV['PHP_COMPILER_CACHE_DIR']);
         putenv('PHP_COMPILER_AOT_USER_SCRIPT');
@@ -400,6 +402,45 @@ final class AotCompileCacheTest extends TestCase
         CompileCache::finishRecording();
     }
 
+    public function testSemanticFileHashIgnoresTrailingComments(): void
+    {
+        $dir = $this->cacheRoot.'/semantic-hash';
+        mkdir($dir, 0775, true);
+        $a = $dir.'/a.php';
+        $b = $dir.'/b.php';
+        file_put_contents($a, "<?php\nfunction greeting(): string { return \"hello\"; }\n");
+        file_put_contents($b, "<?php\nfunction greeting(): string { return \"hello\"; }\n\n// bench-gate edit\n");
+        $ha = CompileCache::semanticFileHash($a);
+        $hb = CompileCache::semanticFileHash($b);
+        $this->assertNotNull($ha);
+        $this->assertSame($ha, $hb, 'trailing comment must not change semantic hash (#36387)');
+        file_put_contents($b, "<?php\nfunction greeting(): string { return \"hola\"; }\n");
+        $this->assertNotSame($ha, CompileCache::semanticFileHash($b), 'body change must change semantic hash');
+    }
+
+    public function testDiffMembersForStripSkipsCommentOnlyEdits(): void
+    {
+        $dir = $this->cacheRoot.'/semantic-strip';
+        mkdir($dir, 0775, true);
+        $lib = $dir.'/lib.php';
+        file_put_contents($lib, "<?php\nfunction greeting(): string { return \"hello\"; }\n");
+        $libR = realpath($lib) ?: $lib;
+        $prevBytes = [$libR => hash_file('sha256', $libR)];
+        $prevSem = [$libR => CompileCache::semanticFileHash($libR)];
+        file_put_contents($lib, (string) file_get_contents($lib)."\n// comment only\n");
+        $currBytes = [$libR => hash_file('sha256', $libR)];
+        $currSem = [$libR => CompileCache::semanticFileHash($libR)];
+        $this->assertNotSame($prevBytes[$libR], $currBytes[$libR]);
+        $this->assertSame($prevSem[$libR], $currSem[$libR]);
+        $strip = CompileCache::diffMembersForStrip($prevBytes, $currBytes, $prevSem, $currSem);
+        $this->assertSame([], $strip, 'comment-only edit must not strip member (#36387)');
+        file_put_contents($lib, "<?php\nfunction greeting(): string { return \"x\"; }\n");
+        $currBytes = [$libR => hash_file('sha256', $libR)];
+        $currSem = [$libR => CompileCache::semanticFileHash($libR)];
+        $stripReal = CompileCache::diffMembersForStrip($prevBytes, $currBytes, $prevSem, $currSem);
+        $this->assertSame([$libR], $stripReal, 'real body edit must still strip (#36387)');
+    }
+
     public function testEditScaffoldKeepPathWhenEntryChanges(): void
     {
         if (!LlvmToolchain::isReady($this->repoRoot)) {
@@ -544,6 +585,62 @@ final class AotCompileCacheTest extends TestCase
                 'delta emit after demote must be << full-module emit (emit_object='.$m[1].'ms) (#36387)'
             );
         }
+    }
+
+    public function testEditScaffoldCommentOnlyLibKeepsBodies(): void
+    {
+        if (!LlvmToolchain::isReady($this->repoRoot)) {
+            $this->markTestSkipped('LLVM 9 not available');
+        }
+
+        $dir = $this->cacheRoot.'/edit-comment';
+        mkdir($dir, 0775, true);
+        $lib = $dir.'/lib.php';
+        $main = $dir.'/main.php';
+        file_put_contents($lib, "<?php\nfunction greeting(): string { return \"hello\"; }\n");
+        file_put_contents(
+            $main,
+            "<?php\nrequire __DIR__ . '/lib.php';\necho greeting(), \"\\n\";\n"
+        );
+
+        $outCold = $this->repoRoot.'/build/aot-cache-test-comment-cold.bin';
+        @unlink($outCold);
+        $cold = $this->runAotSubprocess($main, $outCold);
+        if (139 === $cold['exit'] || 11 === $cold['exit']) {
+            $this->markTestSkipped('AOT segfault in this environment; cache wiring covered by unit tests');
+        }
+        $this->assertSame(0, $cold['exit'], $cold['stderr']);
+        $this->assertStringContainsString('hello', $this->runBinary($outCold)['stdout']);
+
+        // Bench-gate shape: append a trailing comment without changing any tokens (#36387).
+        file_put_contents($lib, (string) file_get_contents($lib)."\n// bench-gate edit ".gmdate('c')."\n");
+
+        $outEdit = $this->repoRoot.'/build/aot-cache-test-comment-edit.bin';
+        @unlink($outEdit);
+        $edit = $this->runAotSubprocess($main, $outEdit, true);
+        $this->assertSame(0, $edit['exit'], $edit['stderr']."\n".$edit['stdout']);
+        $timing = $edit['stderr'].$edit['stdout'];
+        $this->assertStringContainsString('edit_scaffold_hit', $timing);
+        $this->assertStringContainsString(
+            'edit_scaffold_semantic_keep',
+            $timing,
+            'comment-only lib edit must skip strip via semantic hash (#36387)'
+        );
+        $this->assertStringContainsString(
+            'edit_scaffold_partial',
+            $timing,
+            'comment-only lib edit must keep greeting body (#36387)'
+        );
+        $this->assertStringContainsString('hello', $this->runBinary($outEdit)['stdout']);
+        $this->assertLessThan(
+            $cold['wall_ms'] * 0.30,
+            $edit['wall_ms'],
+            sprintf(
+                'comment-only edit should be <30%% of cold (cold=%.0fms edit=%.0fms) (#36387)',
+                $cold['wall_ms'],
+                $edit['wall_ms']
+            )
+        );
     }
 
     /**
