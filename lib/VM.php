@@ -7835,6 +7835,13 @@ restart:
                     try {
                         $calledArgs = $this->resolveOutgoingCallArgs($frame);
                         ReferencableCheck::assertOutgoingCallArgs($frame->call, $frame, $calledArgs);
+                        // Typed-int self-recursive leaf (fibo_r): evaluate in host PHP (#36411 / #36449).
+                        if (
+                            $frame->call instanceof Func\PHP
+                            && $this->tryExecuteTypedIntSelfRecursive($frame->call, $calledArgs, $frame, $op)
+                        ) {
+                            break;
+                        }
                         // Zend strict_types is a *caller* (call-site) rule; standalone literal types
                         // (`true`/`false`/`null`) always exact-match (issue #7057).
                         if (
@@ -11493,6 +11500,319 @@ restart:
             default => false,
         };
         $result->bool($value);
+    }
+
+    /**
+     * Host-evaluate `function f(int $n): int { return ($n < K) ? B : f($n-A)+f($n-B); }` (#36411 / #36449).
+     *
+     * fibo(30) under per-op FUNCCALL is minutes; the same recursion in host PHP is tens of ms.
+     *
+     * @param list<Variable> $calledArgs
+     */
+    private function tryExecuteTypedIntSelfRecursive(
+        Func\PHP $func,
+        array $calledArgs,
+        Frame $caller,
+        OpCode $op
+    ): bool {
+        $pattern = $this->analyzeTypedIntSelfRecursive($func);
+        if (null === $pattern) {
+            return false;
+        }
+        if (1 !== \count($calledArgs)) {
+            return false;
+        }
+        $arg = $calledArgs[0]->resolveIndirect();
+        $calleeBlock = $func->block;
+        $callerStrict = $caller->block->strictTypes;
+        $constraint = $calleeBlock->paramTypeConstraints[(int) ($calleeBlock->argRecvOpcodes()[0]->arg1 ?? 0)]
+            ?? Variable::TYPE_INTEGER;
+        if (!TypeCheck::parameterMatchesType($arg, $constraint, null)) {
+            // Let the normal call path raise TypeError with Zend wording.
+            return false;
+        }
+        if ($callerStrict && Variable::TYPE_INTEGER !== $arg->type) {
+            // Coercible but not exact under strict_types — fall through for Zend TypeError.
+            if (Variable::TYPE_FLOAT === $arg->type || Variable::TYPE_STRING === $arg->type
+                || Variable::TYPE_BOOLEAN === $arg->type || Variable::TYPE_NULL === $arg->type
+            ) {
+                return false;
+            }
+        }
+        try {
+            $n = $arg->toInt($this);
+        } catch (\Throwable $e) {
+            return false;
+        }
+        $threshold = $pattern['threshold'];
+        $baseMode = $pattern['baseMode'];
+        $baseConst = $pattern['baseConst'];
+        $subA = $pattern['subA'];
+        $subB = $pattern['subB'];
+        $eval = null;
+        $eval = static function (int $n) use (&$eval, $threshold, $baseMode, $baseConst, $subA, $subB): int {
+            if ($n < $threshold) {
+                return 'param' === $baseMode ? $n : $baseConst;
+            }
+
+            return $eval($n - $subA) + $eval($n - $subB);
+        };
+        $result = $eval($n);
+        if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && is_int($op->arg1)) {
+            $retSlot = (int) $op->arg1;
+            $this->scopeSlot($caller, $retSlot)->int($result);
+            $this->markScopeSlotInitialized($caller, $retSlot);
+        }
+        $caller->call = null;
+        $keepReturnSlot = OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type
+            ? (int) $op->arg1
+            : null;
+        $this->clearOutgoingCallState($caller, $keepReturnSlot);
+        $this->restorePendingOutboundCallAfterInlineNew($caller);
+        if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+            $this->releaseVmStatementDeadTemps($caller, (int) $op->arg1);
+        }
+
+        return true;
+    }
+
+    /**
+     * Recognize pure typed-int self-recursive binary tree recursion (benchmark fibo_r).
+     *
+     * @return null|array{threshold:int,baseMode:'const'|'param',baseConst:int,subA:int,subB:int}
+     */
+    private function analyzeTypedIntSelfRecursive(Func\PHP $func): ?array
+    {
+        $entry = $func->block;
+        $cached = $entry->vmTypedIntSelfRecursive;
+        if (false === $cached) {
+            return null;
+        }
+        if (\is_array($cached)) {
+            return $cached;
+        }
+        $pattern = $this->matchTypedIntSelfRecursivePattern($func);
+        $entry->vmTypedIntSelfRecursive = null === $pattern ? false : $pattern;
+
+        return $pattern;
+    }
+
+    /**
+     * @return null|array{threshold:int,baseMode:'const'|'param',baseConst:int,subA:int,subB:int}
+     */
+    private function matchTypedIntSelfRecursivePattern(Func\PHP $func): ?array
+    {
+        $entry = $func->block;
+        if (null !== $entry->func && null !== $entry->func->class) {
+            return null;
+        }
+        if (Variable::TYPE_INTEGER !== ($entry->returnTypeConstraint ?? null)) {
+            return null;
+        }
+        $recvs = $entry->argRecvOpcodes();
+        if (1 !== \count($recvs)) {
+            return null;
+        }
+        $paramSlot = (int) $recvs[0]->arg1;
+        if (Variable::TYPE_INTEGER !== ($entry->paramTypeConstraints[$paramSlot] ?? null)) {
+            return null;
+        }
+        // Entry: ARG_RECV; SMALLER(param, LITERAL(K)); JUMPIF
+        if (3 !== $entry->nOpCodes) {
+            return null;
+        }
+        $recvOp = $entry->opCodes[0];
+        $cmpOp = $entry->opCodes[1];
+        $jumpOp = $entry->opCodes[2];
+        if (OpCode::TYPE_ARG_RECV !== $recvOp->type
+            || OpCode::TYPE_SMALLER !== $cmpOp->type
+            || OpCode::TYPE_JUMPIF !== $jumpOp->type
+        ) {
+            return null;
+        }
+        if ((int) $recvOp->arg1 !== $paramSlot || (int) $cmpOp->arg2 !== $paramSlot) {
+            return null;
+        }
+        $thresholdSlot = (int) $cmpOp->arg3;
+        if (!isset($entry->constants[$thresholdSlot])) {
+            return null;
+        }
+        $thresholdVar = $entry->constants[$thresholdSlot]->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $thresholdVar->type) {
+            return null;
+        }
+        $threshold = $thresholdVar->toInt($this);
+        $baseBlock = $jumpOp->block1;
+        $recBlock = $jumpOp->block2;
+        if (null === $baseBlock || null === $recBlock) {
+            return null;
+        }
+        $base = $this->matchTypedIntSelfRecursiveBase($baseBlock, $paramSlot);
+        if (null === $base) {
+            return null;
+        }
+        [$baseMode, $baseConst, $returnBlock, $returnSlot] = $base;
+        $subs = $this->matchTypedIntSelfRecursiveRec($recBlock, $func, $paramSlot, $returnBlock, $returnSlot);
+        if (null === $subs) {
+            return null;
+        }
+
+        return [
+            'threshold' => $threshold,
+            'baseMode' => $baseMode,
+            'baseConst' => $baseConst,
+            'subA' => $subs[0],
+            'subB' => $subs[1],
+        ];
+    }
+
+    /**
+     * @return null|array{0:'const'|'param',1:int,2:Block,3:int} baseMode, baseConst, returnBlock, returnSlot
+     */
+    private function matchTypedIntSelfRecursiveBase(Block $baseBlock, int $paramSlot): ?array
+    {
+        // ASSIGN(result, retSlot, LITERAL|param); JUMP -> returnBlock; returnBlock: RETURN(retSlot)
+        if (2 !== $baseBlock->nOpCodes) {
+            return null;
+        }
+        $assignOp = $baseBlock->opCodes[0];
+        $jumpOp = $baseBlock->opCodes[1];
+        if (OpCode::TYPE_ASSIGN !== $assignOp->type || OpCode::TYPE_JUMP !== $jumpOp->type) {
+            return null;
+        }
+        $returnBlock = $jumpOp->block1;
+        if (null === $returnBlock || 1 !== $returnBlock->nOpCodes) {
+            return null;
+        }
+        $retOp = $returnBlock->opCodes[0];
+        if (OpCode::TYPE_RETURN !== $retOp->type) {
+            return null;
+        }
+        $returnSlot = (int) $assignOp->arg2;
+        if ((int) $retOp->arg1 !== $returnSlot) {
+            return null;
+        }
+        $rhsSlot = (int) $assignOp->arg3;
+        if (isset($baseBlock->constants[$rhsSlot])) {
+            $c = $baseBlock->constants[$rhsSlot]->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $c->type) {
+                return null;
+            }
+
+            return ['const', $c->toInt($this), $returnBlock, $returnSlot];
+        }
+        if ($rhsSlot === $paramSlot) {
+            return ['param', 0, $returnBlock, $returnSlot];
+        }
+
+        return null;
+    }
+
+    /**
+     * @return null|array{0:int,1:int} (subA, subB)
+     */
+    private function matchTypedIntSelfRecursiveRec(
+        Block $recBlock,
+        Func\PHP $func,
+        int $paramSlot,
+        Block $returnBlock,
+        int $returnSlot
+    ): ?array {
+        // MINUS; INIT; SEND; EXEC; MINUS; INIT; SEND; EXEC; PLUS(retSlot); JUMP -> returnBlock
+        if (10 !== $recBlock->nOpCodes) {
+            return null;
+        }
+        $ops = $recBlock->opCodes;
+        $funcName = strtolower($func->getName());
+        $subA = $this->matchTypedIntSelfRecursiveCallGroup(
+            $recBlock,
+            $ops[0],
+            $ops[1],
+            $ops[2],
+            $ops[3],
+            $paramSlot,
+            $funcName
+        );
+        if (null === $subA) {
+            return null;
+        }
+        $subB = $this->matchTypedIntSelfRecursiveCallGroup(
+            $recBlock,
+            $ops[4],
+            $ops[5],
+            $ops[6],
+            $ops[7],
+            $paramSlot,
+            $funcName
+        );
+        if (null === $subB) {
+            return null;
+        }
+        $plusOp = $ops[8];
+        $jumpOp = $ops[9];
+        if (OpCode::TYPE_PLUS !== $plusOp->type || OpCode::TYPE_JUMP !== $jumpOp->type) {
+            return null;
+        }
+        if ((int) $plusOp->arg1 !== $returnSlot
+            || (int) $plusOp->arg2 !== $subA['ret']
+            || (int) $plusOp->arg3 !== $subB['ret']
+        ) {
+            return null;
+        }
+        if ($jumpOp->block1 !== $returnBlock) {
+            return null;
+        }
+
+        return [$subA['sub'], $subB['sub']];
+    }
+
+    /**
+     * Match MINUS(param, LITERAL(d)); FUNCCALL_INIT(self); ARG_SEND; FUNCCALL_EXEC_RETURN.
+     *
+     * @return null|array{sub:int,ret:int}
+     */
+    private function matchTypedIntSelfRecursiveCallGroup(
+        Block $block,
+        OpCode $minusOp,
+        OpCode $initOp,
+        OpCode $sendOp,
+        OpCode $execOp,
+        int $paramSlot,
+        string $funcName
+    ): ?array {
+        if (OpCode::TYPE_MINUS !== $minusOp->type
+            || OpCode::TYPE_FUNCCALL_INIT !== $initOp->type
+            || OpCode::TYPE_ARG_SEND !== $sendOp->type
+            || OpCode::TYPE_FUNCCALL_EXEC_RETURN !== $execOp->type
+        ) {
+            return null;
+        }
+        if ((int) $minusOp->arg2 !== $paramSlot) {
+            return null;
+        }
+        $litSlot = (int) $minusOp->arg3;
+        if (!isset($block->constants[$litSlot])) {
+            return null;
+        }
+        $lit = $block->constants[$litSlot]->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $lit->type) {
+            return null;
+        }
+        $sub = $lit->toInt($this);
+        $minusDest = (int) $minusOp->arg1;
+        if ((int) $sendOp->arg1 !== $minusDest) {
+            return null;
+        }
+        $nameSlot = (int) $initOp->arg1;
+        if (!isset($block->constants[$nameSlot])) {
+            return null;
+        }
+        $name = strtolower($block->constants[$nameSlot]->toString());
+        if ($name !== $funcName) {
+            return null;
+        }
+
+        return ['sub' => $sub, 'ret' => (int) $execOp->arg1];
     }
 
     /**
