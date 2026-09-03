@@ -72,7 +72,7 @@ final class XmlWriterInstanceMethodJit
 
     public static function isUserScriptAot(): bool
     {
-        return \PHPCompiler\ext\xmlwriter\JitXmlWriterUserScript::isUserScriptAot();
+        return UserScriptAotEnv::isActive();
     }
 
     public static function ensureProxy(Context $context, string $proxyName): void

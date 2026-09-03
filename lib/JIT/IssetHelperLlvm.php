@@ -179,7 +179,7 @@ final class IssetHelperLlvm
         if ($issetOnProperty) {
             $propName = VmIsset::literalStringKey($dimOp);
             if (null !== $propName) {
-                $sxePropIsset = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryFoldPropIsset(
+                $sxePropIsset = $context->extensionLowering->tryFoldSimpleXmlPropIsset(
                     $context,
                     $container,
                     $propName
@@ -191,7 +191,7 @@ final class IssetHelperLlvm
         }
         // Thin-AOT SXE is often TYPE_VALUE — ArrayAccess isset is skipped (#34555).
         if (!$issetOnProperty) {
-            $sxeIsset = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryFoldDimIsset(
+            $sxeIsset = $context->extensionLowering->tryFoldSimpleXmlDimIsset(
                 $context,
                 $container,
                 $dim

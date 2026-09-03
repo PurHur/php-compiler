@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Call;
-use PHPCompiler\ext\xsl\JitXsltUserScript;
 
 /** Lazy registration for XSLTProcessor user-script AOT proxies (#20392). */
 final class XsltInstanceMethodJit
@@ -29,7 +28,7 @@ final class XsltInstanceMethodJit
 
     public static function isUserScriptAot(): bool
     {
-        return JitXsltUserScript::isUserScriptAot();
+        return UserScriptAotEnv::isActive();
     }
 
     public static function ensureProxy(Context $context, string $proxyName): void

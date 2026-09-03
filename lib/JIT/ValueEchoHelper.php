@@ -111,7 +111,7 @@ final class ValueEchoHelper
         // Thin AOT: SimpleXMLElement has no NestedJIT __toString; cast folds via baked
         // __phpc_sxe_text / host tree. Echo must use the same path or prints "Object"
         // for `$sxe['attr']` while `(string)$sxe['attr']` is correct (php-src sxe.c).
-        $sxeFold = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryFoldStringCast(
+        $sxeFold = $context->extensionLowering->tryFoldSimpleXmlStringCast(
             $context,
             $objectVar,
             $classHint

@@ -75,7 +75,7 @@ final class XmlReaderInstanceMethodJit
 
     public static function isUserScriptAot(): bool
     {
-        return \PHPCompiler\ext\xmlreader\JitXmlReaderUserScript::isUserScriptAot();
+        return UserScriptAotEnv::isActive();
     }
 
     public static function ensureProxy(Context $context, string $proxyName): void

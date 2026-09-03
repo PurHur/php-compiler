@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
-use PHPCompiler\ext\simplexml\JitSimpleXmlUserScript;
-
 /**
  * Thin-AOT SimpleXMLElement foreach via host-tree child snapshot → hashtable (#27535).
  *
@@ -18,14 +16,14 @@ use PHPCompiler\ext\simplexml\JitSimpleXmlUserScript;
  */
 final class SimpleXmlForeachSnapshot
 {
-    public static function canLower(Variable $array): bool
+    public static function canLower(Context $context, Variable $array): bool
     {
-        return null !== JitSimpleXmlUserScript::hostTreeForForeach($array);
+        return null !== $context->extensionLowering->simpleXmlHostTreeForForeach($array);
     }
 
     public static function compileReset(Context $context, Variable $array, Variable $slotKey): void
     {
-        $tree = JitSimpleXmlUserScript::hostTreeForForeach($array);
+        $tree = $context->extensionLowering->simpleXmlHostTreeForForeach($array);
         if (null === $tree) {
             throw new \LogicException('SimpleXML foreach snapshot missing host tree (#27535)');
         }
@@ -47,7 +45,7 @@ final class SimpleXmlForeachSnapshot
                     $obj
                 );
                 // Bind host child so nested getName/cast/foreach can fold (#27535).
-                JitSimpleXmlUserScript::bindHostTreeForSnapshot($context, $receiver, $child);
+                $context->extensionLowering->bindSimpleXmlHostTreeForSnapshot($context, $receiver, $child);
                 if (\is_int($key)) {
                     HashTableHelper::setAtIndex(
                         $context,
