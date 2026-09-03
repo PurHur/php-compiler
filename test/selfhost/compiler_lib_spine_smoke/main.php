@@ -7476,6 +7476,7 @@ require_once __DIR__.'/../../../lib/VM/OutputBufferHandlers.php';
 require_once __DIR__.'/../../../lib/VM/ParamArgumentCountError.php';
 require_once __DIR__.'/../../../lib/VM/ParamTypeError.php';
 require_once __DIR__.'/../../../lib/VM/PathSupport.php';
+require_once __DIR__.'/../../../lib/VM/ProjectIncludeAllowlist.php';
 require_once __DIR__.'/../../../lib/VM/PropertyHookFiberSuspendSignal.php';
 require_once __DIR__.'/../../../lib/VM/PropertyHookJitHelper.php';
 require_once __DIR__.'/../../../lib/VM/PropertyHookRef.php';

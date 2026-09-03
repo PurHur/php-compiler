@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8086 |
-| Phase A inventory files (M2 ratio SSOT) | 8086 |
+| PHP files on vm.php path | 8087 |
+| Phase A inventory files (M2 ratio SSOT) | 8087 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 25718 |
+| Source constructs flagged (warnings) | 25721 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5445,6 +5445,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/zstd/zstd_uncompress_init.php` | 0 | 2 |
 | `lib/AOT/AotEmitFastExit.php` | 0 | 1 |
 | `lib/AOT/AutoloadDiscovery.php` | 0 | 2 |
+| `lib/AOT/CompileTarget.php` | 0 | 3 |
 | `lib/AOT/ComposerVendorMap.php` | 0 | 2 |
 | `lib/AOT/ExternalMethodBind.php` | 0 | 2 |
 | `lib/AOT/HelperRuntimeCache.php` | 0 | 2 |
@@ -48186,6 +48187,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 9 class method(s)
 - 2 closure(s)
 
+### `lib/AOT/CompileTarget.php`
+
+**Warnings** (review for bootstrap subset):
+- new self (line 127)
+- new self (line 140)
+- 22 class method(s)
+
 ### `lib/AOT/ComposerVendorMap.php`
 
 **Warnings** (review for bootstrap subset):
@@ -48217,7 +48225,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/AOT/Linker.php`
 
 **Warnings** (review for bootstrap subset):
-- 34 class method(s)
+- 35 class method(s)
 
 ### `lib/AOT/LinkerProcessPolyfill.php`
 
@@ -49729,7 +49737,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Doctor.php`
 
 **Warnings** (review for bootstrap subset):
-- 40 class method(s)
+- 41 class method(s)
 - 1 closure(s)
 
 ### `lib/DollarBraceStringDeprecation.php`
