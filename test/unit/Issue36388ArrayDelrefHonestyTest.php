@@ -50,6 +50,21 @@ final class Issue36388ArrayDelrefHonestyTest extends TestCase
         $this->assertStringContainsString('skipAddrefForHashtableMove', $jit);
     }
 
+    public function testStringKeyInsertOwnsHeapCopyNotImmortalShare(): void
+    {
+        $src = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Builtin/Type/HashTable.php');
+        $this->assertStringContainsString(
+            'Own a heap copy of the key. Sharing immortal/static literals via addref',
+            $src,
+            'strkey insert must separate immortal keys before HT dtor (#36388)'
+        );
+        $this->assertSame(
+            0,
+            substr_count($src, 'Share key via addref instead of deep-copying (#36468)'),
+            'must not share immortal keys via addref-only (#36388 / re-#36468)'
+        );
+    }
+
     public function testNativePackedValueBoxElementSkipsHeapPromote(): void
     {
         $src = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/HashTableWriteLlvm.php');
@@ -99,5 +114,48 @@ final class Issue36388ArrayDelrefHonestyTest extends TestCase
         $this->assertSame(0, $runRc, implode("\n", $runOut));
         $line = $runOut[0] ?? '';
         $this->assertMatchesRegularExpression('/delta=0\b/', $line, $line);
+    }
+
+    /**
+     * Functional: assoc `$a = ['x' => $i]; unset($a)` must not SIGSEGV or grow (#36388).
+     *
+     * Immortal string keys shared via addref were freed in __hashtable__dtor (re-#36468).
+     *
+     * @group llvm
+     * @group aot
+     */
+    public function testAssocShortLivedArrayDeltaZeroUnderAot(): void
+    {
+        if (!\PHPCompiler\LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $root = dirname(__DIR__, 2);
+        $src = $root.'/test/repro/issue_36388_short_lived_array_leak.php';
+        $bin = sys_get_temp_dir().'/phpc_36388_assoc_'.getmypid();
+        $compile = escapeshellarg(PHP_BINARY).' '
+            .escapeshellarg($root.'/bin/compile.php').' -o '
+            .escapeshellarg($bin).' '
+            .escapeshellarg($src);
+        $cwd = getcwd();
+        chdir($root);
+        exec($compile.' 2>&1', $out, $rc);
+        chdir($cwd);
+        $this->assertSame(0, $rc, implode("\n", $out));
+        $sig = 0;
+        $ok = 0;
+        for ($i = 0; $i < 15; ++$i) {
+            $runOut = [];
+            $runRc = 0;
+            exec(escapeshellarg($bin).' 20 2>&1', $runOut, $runRc);
+            if (0 === $runRc) {
+                ++$ok;
+                $this->assertMatchesRegularExpression('/delta=0\b/', $runOut[0] ?? '', $runOut[0] ?? '');
+            } else {
+                ++$sig;
+            }
+        }
+        @unlink($bin);
+        $this->assertSame(0, $sig, "assoc short-lived unset SIGSEGV rate {$sig}/15 (#36388)");
+        $this->assertSame(15, $ok);
     }
 }
