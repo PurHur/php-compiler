@@ -59,6 +59,13 @@ class JIT {
 
     private array $queue = [];
 
+    /**
+     * Deferred single-use CONCAT temps: operand id → leaf operands to append later (#36386).
+     *
+     * @var array<int, list<\PHPCfg\Operand>>
+     */
+    private array $concatPendingLeaves = [];
+
     /** @var \SplObjectStorage<OpCode, true> DECLARE_GLOBAL_CONST opcodes that registered (#4941). */
     private \SplObjectStorage $registeredGlobalConstDeclareOpcodes;
 
@@ -10880,6 +10887,11 @@ class JIT {
                     }
                     $destOp = $block->getOperand($op->arg1);
                     if (null === $destOp) {
+                        break;
+                    }
+                    // `$s .= lit.$i.lit…` — defer single-use concat temps and append leaves
+                    // into the destination (php-src smart_str / ZEND_ASSIGN_CONCAT) (#36386).
+                    if ($this->tryCompileConcatChainFlatten($func, $block, $op, $i)) {
                         break;
                     }
                     // Ternary echo-phi: CONCAT dest is the merge slot. Store into the shared
@@ -27084,6 +27096,374 @@ class JIT {
             $this->context->bindVariableByName($name, $sg);
             JIT\UndefinedVariableHelper::markAssigned($this->context, $destOp, $sg);
         }
+    }
+
+    /**
+     * Defer single-use CONCAT temps and flatten in-place `.=` into sequential appends (#36386).
+     *
+     * php-src: Zend/zend_operators.c ZEND_ASSIGN_CONCAT / zend_string_extend /
+     * Zend/zend_string.h zend_print_long_to_buf (via appendInPlaceLong).
+     */
+    private function tryCompileConcatChainFlatten(
+        PHPLLVM\Value $func,
+        Block $block,
+        OpCode $op,
+        int $opIndex
+    ): bool {
+        if (null === $op->arg1 || null === $op->arg2 || null === $op->arg3) {
+            return false;
+        }
+        $destOp = $block->getOperand($op->arg1);
+        $leftOp = $this->resolveTernaryPhiConcatOperand($block, (int) $op->arg2);
+        $rightOp = $this->resolveTernaryPhiConcatOperand($block, (int) $op->arg3);
+        if (null === $destOp || null === $leftOp || null === $rightOp) {
+            return false;
+        }
+        $destSlotNum = (int) $op->arg1;
+        if (isset($this->context->coalesceMergeSlotOperands[$destSlotNum])) {
+            return false;
+        }
+        if ($this->context->coalesceAssignTargets->contains($destOp)) {
+            return false;
+        }
+
+        $leftLeaves = $this->consumeConcatPendingLeaves($leftOp);
+        $rightLeaves = $this->consumeConcatPendingLeaves($rightOp);
+        $merged = array_merge($leftLeaves, $rightLeaves);
+        $hadPending = \count($merged) > 2
+            || \count($leftLeaves) > 1
+            || \count($rightLeaves) > 1;
+        $inPlace = (int) $op->arg1 === (int) $op->arg2;
+
+        if ($inPlace) {
+            if (!$this->context->hasVariableOp($destOp) && !$this->context->hasVariableOp($leftOp)) {
+                // Re-store leaves so a later materialize path can still see them.
+                if ($hadPending) {
+                    $this->concatPendingLeaves[spl_object_id($rightOp)] = $rightLeaves;
+                    if (\count($leftLeaves) > 1) {
+                        $this->concatPendingLeaves[spl_object_id($leftOp)] = $leftLeaves;
+                    }
+                }
+
+                return false;
+            }
+            $result = $this->context->hasVariableOp($destOp)
+                ? $this->context->getVariableFromOp($destOp)
+                : $this->context->getVariableFromOp($leftOp);
+            if (
+                null !== $result->writableHt
+                || null !== $result->objectPropertySlot
+                || null !== $result->staticPropertyGlobal
+                || JIT\StringOffsetHelper::isWritableCharOffsetLvalue($result, $this->context)
+            ) {
+                if ($hadPending) {
+                    $newVal = $this->materializeConcatLeaves($merged, $block);
+                    $this->assignOperand($destOp, $newVal, true);
+                    $this->maybeRefreshIncludeBindingsBeforeUse();
+
+                    return true;
+                }
+
+                return false;
+            }
+            // Simple `$a .= $b` (one leaf each, no pending): keep the existing path.
+            if (!$hadPending && 2 === \count($merged)) {
+                return false;
+            }
+            $dest = $this->ensureNativeStringSlotForConcatFlatten($func, $block, $op, $destOp, $result);
+            if (null === $dest) {
+                if ($hadPending) {
+                    $newVal = $this->materializeConcatLeaves($merged, $block);
+                    $this->assignOperand($destOp, $newVal, true);
+                    $this->maybeRefreshIncludeBindingsBeforeUse();
+
+                    return true;
+                }
+
+                return false;
+            }
+            $this->dropMainScriptStringAliasIfSame($block, $destOp, $dest->value);
+            if (
+                Variable::TYPE_VALUE === $result->type
+                || JIT\JitValueBox::isValueOperand($result)
+            ) {
+                $this->dropValueBoxStringAliasIfSame($result, $dest->value);
+            }
+            foreach ($merged as $leafOp) {
+                // Skip the in-place left CV itself when it appears as the first leaf
+                // (CONCAT($s,$s,$rhs) → leaves are [$s, ...rhs]); appending $s onto $s
+                // would alias the buffer during realloc.
+                if ($leafOp === $destOp || $leafOp === $leftOp) {
+                    if ($leafOp === $merged[0] && $inPlace) {
+                        continue;
+                    }
+                }
+                $this->appendConcatLeafToNativeString($dest, $leafOp, $block);
+            }
+            $dest->compileTimeString = null;
+            $this->markScopeVariableAssignedIfTracked($destOp, $dest);
+            $this->maybeRefreshIncludeBindingsBeforeUse();
+
+            return true;
+        }
+
+        // Non-in-place: defer single-use temps that only feed another CONCAT.
+        if ($this->isSingleUseConcatChainTemp($block, $destOp, (int) $op->arg1, $opIndex)) {
+            $this->concatPendingLeaves[spl_object_id($destOp)] = $merged;
+
+            return true;
+        }
+
+        // Consumed pending leaves but cannot defer — materialize into a fresh string.
+        if ($hadPending) {
+            $newVal = $this->materializeConcatLeaves($merged, $block);
+            $this->assignOperand($destOp, $newVal, true);
+            $this->publishMainScriptNamedConcatResult($block, $destOp, $newVal);
+            $this->markScopeVariableAssignedIfTracked($destOp, $newVal);
+            $this->maybeRefreshIncludeBindingsBeforeUse();
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * @return list<\PHPCfg\Operand>
+     */
+    private function consumeConcatPendingLeaves(\PHPCfg\Operand $op): array
+    {
+        $id = spl_object_id($op);
+        if (isset($this->concatPendingLeaves[$id])) {
+            $leaves = $this->concatPendingLeaves[$id];
+            unset($this->concatPendingLeaves[$id]);
+
+            return $leaves;
+        }
+
+        return [$op];
+    }
+
+    private function isSingleUseConcatChainTemp(
+        Block $block,
+        \PHPCfg\Operand $resultOp,
+        int $resultSlot,
+        int $fromIndex
+    ): bool {
+        $name = JIT\OperandName::resolve($resultOp);
+        if (null !== $name && '' !== $name) {
+            return false;
+        }
+        $useCount = 0;
+        $n = \count($block->opCodes);
+        for ($j = $fromIndex + 1; $j < $n; ++$j) {
+            $other = $block->opCodes[$j];
+            $reads = false;
+            if (null !== $other->arg2 && (int) $other->arg2 === $resultSlot) {
+                $reads = true;
+            }
+            if (null !== $other->arg3 && (int) $other->arg3 === $resultSlot) {
+                $reads = true;
+            }
+            if (!$reads) {
+                continue;
+            }
+            ++$useCount;
+            if (OpCode::TYPE_CONCAT !== $other->type) {
+                return false;
+            }
+        }
+
+        return 1 === $useCount;
+    }
+
+    private function ensureNativeStringSlotForConcatFlatten(
+        PHPLLVM\Value $func,
+        Block $block,
+        OpCode $op,
+        \PHPCfg\Operand $destOp,
+        Variable $result
+    ): ?Variable {
+        if (
+            Variable::TYPE_STRING === $result->type
+            && Variable::KIND_VARIABLE === $result->kind
+        ) {
+            $destSlotTy = null !== $result->value
+                ? $this->context->getStringFromType($result->value->typeOf())
+                : '';
+            if ('__string__**' === $destSlotTy || 'ptr' === $destSlotTy) {
+                return $result;
+            }
+        }
+        if (
+            Variable::TYPE_VALUE === $result->type
+            || JIT\JitValueBox::isValueOperand($result)
+            || (
+                Variable::TYPE_STRING === $result->type
+                && Variable::KIND_VALUE === $result->kind
+            )
+        ) {
+            $destSlot = JIT\BasicBlockHelper::entryAllocaForFunction(
+                $this->context,
+                $func,
+                $this->context->getTypeFromString('__string__*')
+            );
+            $promoted = new Variable(
+                $this->context,
+                Variable::TYPE_STRING,
+                Variable::KIND_VARIABLE,
+                $destSlot
+            );
+            JIT\BasicBlockHelper::storeAtFunctionEntry(
+                $this->context,
+                $func,
+                $this->context->type->string->pointer->constNull(),
+                $destSlot
+            );
+            if (
+                Variable::TYPE_VALUE === $result->type
+                || JIT\JitValueBox::isValueOperand($result)
+            ) {
+                $this->seedNativeStringSlotFromValueBox($result, $destSlot);
+            } elseif (null !== $result->value && Variable::KIND_VALUE === $result->kind) {
+                JIT\BasicBlockHelper::storeAtFunctionEntry(
+                    $this->context,
+                    $func,
+                    $result->value,
+                    $destSlot
+                );
+                $promoted->addref();
+            }
+            $this->context->setVariableOp($destOp, $promoted);
+            $this->bindPromotedStringConcatDest($block, $destOp, $promoted);
+
+            return $promoted;
+        }
+
+        return null;
+    }
+
+    private function appendConcatLeafToNativeString(
+        Variable $dest,
+        \PHPCfg\Operand $leafOp,
+        Block $block
+    ): void {
+        if ($leafOp instanceof Operand\Literal && \is_string($leafOp->value)) {
+            if ('' === $leafOp->value) {
+                return;
+            }
+            $lit = new Variable(
+                $this->context,
+                Variable::TYPE_STRING,
+                Variable::KIND_VALUE,
+                $this->context->builder->load(
+                    $this->context->constantStringFromString($leafOp->value)
+                )
+            );
+            $lit->compileTimeString = $leafOp->value;
+            $this->context->type->string->appendInPlace($dest, $lit);
+
+            return;
+        }
+        if (!$this->context->hasVariableOp($leafOp)) {
+            // Literal ints / unresolved — coerce via makeVariable if possible.
+            if ($leafOp instanceof Operand\Literal && \is_int($leafOp->value)) {
+                $i64 = $this->context->getTypeFromString('int64');
+                $this->context->type->string->appendInPlaceLong(
+                    $dest,
+                    $i64->constInt((int) $leafOp->value, true)
+                );
+
+                return;
+            }
+            $this->context->makeVariableFromOp(
+                JIT\BasicBlockHelper::parentFunction($this->context),
+                $this->context->builder->getInsertBlock(),
+                $block,
+                $leafOp
+            );
+        }
+        $leaf = $this->context->getVariableFromOp($leafOp);
+        if (Variable::TYPE_NATIVE_LONG === $leaf->type
+            && JIT\IncDecResourceProvenance::cannotBeResourceForString($leafOp)
+        ) {
+            $this->context->type->string->appendInPlaceLong(
+                $dest,
+                $this->context->helper->loadValue($leaf)
+            );
+
+            return;
+        }
+        $coerced = JIT\JitNativeString::coerce($this->context, $leaf, $leafOp);
+        $this->context->type->string->appendInPlace($dest, $coerced);
+    }
+
+    /**
+     * @param list<\PHPCfg\Operand> $leaves
+     */
+    private function materializeConcatLeaves(array $leaves, Block $block): Variable
+    {
+        if ([] === $leaves) {
+            return new Variable(
+                $this->context,
+                Variable::TYPE_STRING,
+                Variable::KIND_VALUE,
+                $this->context->builder->load($this->context->constantStringFromString(''))
+            );
+        }
+        $acc = null;
+        foreach ($leaves as $leafOp) {
+            if (!$this->context->hasVariableOp($leafOp)) {
+                if ($leafOp instanceof Operand\Literal && \is_string($leafOp->value)) {
+                    $next = new Variable(
+                        $this->context,
+                        Variable::TYPE_STRING,
+                        Variable::KIND_VALUE,
+                        $this->context->builder->load(
+                            $this->context->constantStringFromString($leafOp->value)
+                        )
+                    );
+                    $next->compileTimeString = $leafOp->value;
+                } elseif ($leafOp instanceof Operand\Literal && \is_int($leafOp->value)) {
+                    $i64 = $this->context->getTypeFromString('int64');
+                    $next = new Variable(
+                        $this->context,
+                        Variable::TYPE_NATIVE_LONG,
+                        Variable::KIND_VALUE,
+                        $i64->constInt((int) $leafOp->value, true)
+                    );
+                } else {
+                    $this->context->makeVariableFromOp(
+                        JIT\BasicBlockHelper::parentFunction($this->context),
+                        $this->context->builder->getInsertBlock(),
+                        $block,
+                        $leafOp
+                    );
+                    $next = $this->context->getVariableFromOp($leafOp);
+                }
+            } else {
+                $next = $this->context->getVariableFromOp($leafOp);
+            }
+            if (null === $acc) {
+                if (Variable::TYPE_NATIVE_LONG === $next->type) {
+                    $acc = new Variable(
+                        $this->context,
+                        Variable::TYPE_STRING,
+                        Variable::KIND_VALUE,
+                        JIT\JitNativeString::fromLong(
+                            $this->context,
+                            $this->context->helper->loadValue($next)
+                        )
+                    );
+                } else {
+                    $acc = JIT\JitNativeString::coerce($this->context, $next, $leafOp);
+                }
+                continue;
+            }
+            $acc = $this->compileConcatIntoNewString($acc, $next, null, $leafOp);
+        }
+
+        return $acc;
     }
 
     /** Allocate a fresh native string holding left . right (php-src string concat semantics). */

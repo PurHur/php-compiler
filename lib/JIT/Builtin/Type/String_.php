@@ -973,11 +973,6 @@ class String_ extends Type {
         $right = \PHPCompiler\JIT\JitNativeString::coerce($this->context, $right);
         $rightVar = $this->context->helper->loadValue($right);
         $map = $this->context->structFieldMap['__string__'];
-        $destSlot = $dest->value;
-        $curStr = $this->context->builder->load($destSlot);
-        $strPtrTy = $this->context->getTypeFromString('__string__*');
-        $i64 = $this->context->getTypeFromString('int64');
-        $zero = $i64->constInt(0, false);
         // Pin non-literal RHS across realloc. {main} concat temps can be delref'd while
         // freelist reuse recycles that block into the grown dest (#36386). Skip when the
         // RHS is a compile-time literal — those are often shared/interned.
@@ -988,8 +983,50 @@ class String_ extends Type {
         $rightSize = $this->context->builder->load(
             $this->context->builder->structGep($rightVar, $map['length'])
         );
+        $rightBytes = $this->context->builder->structGep($rightVar, $map['value']);
+        $this->appendInPlaceBytes($dest, $rightBytes, $rightSize);
+        if ($pinRhs) {
+            $this->context->refcount->delref($rightVar);
+        }
+    }
 
-        $tag = 'appendInPlace'.(string) spl_object_id($dest);
+    /**
+     * Append decimal digits of a native long (php-src smart_str_append_long /
+     * zend_print_long_to_buf) without a heap digit string (#36386).
+     */
+    public function appendInPlaceLong(Variable $dest, \PHPLLVM\Value $longVal): void
+    {
+        [$digits, $digitLen] = \PHPCompiler\JIT\JitNativeString::writeDecimalDigits(
+            $this->context,
+            $longVal
+        );
+        $this->appendInPlaceBytes($dest, $digits, $digitLen);
+    }
+
+    /**
+     * Grow {@see $dest} and memcpy {@see $bytes}/{@see $length} (php-src zend_string_extend).
+     *
+     * @param \PHPLLVM\Value $bytes i8* payload (need not outlive this call once copied)
+     * @param \PHPLLVM\Value $length byte count
+     */
+    public function appendInPlaceBytes(Variable $dest, \PHPLLVM\Value $bytes, \PHPLLVM\Value $length): void
+    {
+        if (Variable::TYPE_STRING !== $dest->type) {
+            throw new \LogicException('appendInPlaceBytes requires a string destination');
+        }
+        if (Variable::KIND_VARIABLE !== $dest->kind) {
+            throw new \LogicException('appendInPlaceBytes requires a variable destination slot');
+        }
+        $this->context->intrinsic->builder = $this->context->builder;
+        $map = $this->context->structFieldMap['__string__'];
+        $destSlot = $dest->value;
+        $curStr = $this->context->builder->load($destSlot);
+        $strPtrTy = $this->context->getTypeFromString('__string__*');
+        $i64 = $this->context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $rightSize = $this->context->builder->intCast($length, $i64);
+
+        $tag = 'appendInPlace'.(string) spl_object_id($dest).'_'.(string) spl_object_id($bytes);
         $nullBlock = \PHPCompiler\JIT\BasicBlockHelper::append($this->context, 'append_null_'.$tag);
         $bodyBlock = \PHPCompiler\JIT\BasicBlockHelper::append($this->context, 'append_body_'.$tag);
         $fitBlock = \PHPCompiler\JIT\BasicBlockHelper::append($this->context, 'append_fit_'.$tag);
@@ -1065,7 +1102,7 @@ class String_ extends Type {
         );
         $this->context->intrinsic->memcpy(
             $fitDestChar,
-            $this->context->builder->structGep($rightVar, $map['value']),
+            $bytes,
             $rightSize,
             false
         );
@@ -1100,8 +1137,7 @@ class String_ extends Type {
         );
         $destChar = $this->context->builder->structGep($destStr, $map['value']);
         $destChar = $this->context->builder->gep($destChar, $oldLen);
-        $rightChar = $this->context->builder->structGep($rightVar, $map['value']);
-        $this->context->intrinsic->memcpy($destChar, $rightChar, $rightSize, false);
+        $this->context->intrinsic->memcpy($destChar, $bytes, $rightSize, false);
         // realloc grow zeros [oldLen, newSize) then we overwrite that with RHS;
         // the terminator at newSize is never written unless we do it here.
         // substr/echo C-string walks need the NUL (php-src zend_string_extend).
@@ -1117,9 +1153,6 @@ class String_ extends Type {
         $this->context->builder->branch($doneBlock);
 
         $this->context->builder->positionAtEnd($doneBlock);
-        if ($pinRhs) {
-            $this->context->refcount->delref($rightVar);
-        }
     }
 
     private function copy(\gcc_jit_block_ptr $block, Variable $dest, Variable $other, \gcc_jit_rvalue_ptr $offset): void {
