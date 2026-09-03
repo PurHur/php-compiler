@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\Block;
+use PHPCompiler\OpCode;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_;
 
@@ -32,11 +33,11 @@ final class ScopeVariableAssignedFlags
     private static array $definitelyAssigned = [];
 
     /**
-     * Names assigned inside a CFG {@see Block} (spl_object_id → name → true).
-     * Used with {@see Block::$parents} dataflow so mid-function for-init that
-     * dominates a later loop header elides undef guards (#36386).
+     * Names assigned inside a CFG {@see Block}.
+     * Keyed by moduleId\\0cvName → blockId so lookups are O(assigns of that name)
+     * and a later compile cannot reuse a dead spl_object_id (#36386).
      *
-     * @var array<int, array<string, true>>
+     * @var array<string, array<int, true>>
      */
     private static array $cfgBlockAssigned = [];
 
@@ -85,15 +86,10 @@ final class ScopeVariableAssignedFlags
         $context->builder->store($i8->constInt(1, false), self::ensureFlag($context, $key));
         $cfg = $context->jitCurrentBlock;
         if ($cfg instanceof Block) {
-            $id = spl_object_id($cfg);
-            if (!isset(self::$cfgBlockAssigned[$id])) {
-                self::$cfgBlockAssigned[$id] = [];
-            }
-            // flagKey may be "{main}\0name" or plain name — store the resolved CV name.
             $cvName = str_starts_with($key, '{main}'."\0")
                 ? substr($key, strlen('{main}'."\0"))
                 : $key;
-            self::$cfgBlockAssigned[$id][$cvName] = true;
+            self::$cfgBlockAssigned[self::cfgAssignNameKey($context, $cvName)][spl_object_id($cfg)] = true;
         }
         if (self::isInsertInOwningEntryBlock($context, $key)) {
             self::$definitelyAssigned[self::definiteCacheKey($context, $key)] = true;
@@ -131,11 +127,11 @@ final class ScopeVariableAssignedFlags
     }
 
     /**
-     * Cached immediate-dominator map keyed by root block spl_object_id.
-     * Stores only idom[blockId] = parentId (O(blocks) memory) — full dominator
-     * sets OOMed large TUs (#36386 / g07).
+     * Cached idom + CFG membership keyed by moduleId\\0rootBlockId.
+     * idom is blockId => parentId (O(blocks) memory) — full dominator sets
+     * OOMed large TUs (#36386 / g07). Walk the CFG once per root, not per guard.
      *
-     * @var array<int, array<int, int>>
+     * @var array<string, array{idom: array<int, int>, inCfg: array<int, true>}>
      */
     private static array $cfgIdomCache = [];
 
@@ -149,9 +145,32 @@ final class ScopeVariableAssignedFlags
         if (!$current instanceof Block) {
             return false;
         }
+        $nameKey = self::cfgAssignNameKey($context, $cvName);
+        if (!isset(self::$cfgBlockAssigned[$nameKey])) {
+            return false;
+        }
+        $root = $context->jitFunctionRootBlock ?? $current;
+        $modId = spl_object_id($context->module);
+        $rootId = spl_object_id($root);
+        $idomKey = $modId."\0".$rootId;
+        if (!isset(self::$cfgIdomCache[$idomKey])) {
+            $blocks = self::collectCfgBlocks($root);
+            if ([] === $blocks) {
+                $blocks = [$current];
+            }
+            $inCfg = [];
+            foreach ($blocks as $b) {
+                $inCfg[spl_object_id($b)] = true;
+            }
+            self::$cfgIdomCache[$idomKey] = [
+                'idom' => self::cfgImmediateDominators($blocks, $root),
+                'inCfg' => $inCfg,
+            ];
+        }
+        $cached = self::$cfgIdomCache[$idomKey];
         $assignBlocks = [];
-        foreach (self::$cfgBlockAssigned as $id => $names) {
-            if (isset($names[$cvName])) {
+        foreach (self::$cfgBlockAssigned[$nameKey] as $id => $_) {
+            if (isset($cached['inCfg'][$id])) {
                 $assignBlocks[$id] = true;
             }
         }
@@ -162,18 +181,8 @@ final class ScopeVariableAssignedFlags
         if (isset($assignBlocks[$curId])) {
             return true;
         }
-        $root = $context->jitFunctionRootBlock ?? $current;
-        $rootId = spl_object_id($root);
-        if (!isset(self::$cfgIdomCache[$rootId])) {
-            $blocks = self::collectCfgBlocks($root);
-            if ([] === $blocks) {
-                $blocks = [$current];
-            }
-            self::$cfgIdomCache[$rootId] = self::cfgImmediateDominators($blocks, $root);
-        }
-        $idom = self::$cfgIdomCache[$rootId];
         foreach ($assignBlocks as $aid => $_) {
-            if (self::idomDominates($idom, $rootId, $aid, $curId)) {
+            if (self::idomDominates($cached['idom'], $rootId, $aid, $curId)) {
                 return true;
             }
         }
@@ -261,6 +270,11 @@ final class ScopeVariableAssignedFlags
                 }
             }
         }
+        if ($changed) {
+            // Incomplete fixpoint — elide nothing via idom (entry-prologue still uses
+            // $definitelyAssigned). Wrong idom can skip a Zend undef warning (#36386).
+            return [$entryId => $entryId];
+        }
 
         return $idom;
     }
@@ -314,19 +328,32 @@ final class ScopeVariableAssignedFlags
             $out[] = $b;
             foreach ($b->opCodes as $op) {
                 foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
-                    if ($sub instanceof Block) {
-                        $stack[] = $sub;
+                    if (!$sub instanceof Block) {
+                        continue;
                     }
-                }
-            }
-            foreach ($b->blocks as $sub) {
-                if ($sub instanceof Block) {
+                    // Nested callables are separate CVs — walking them lets an outer
+                    // assign of $x dominate an uncaptured inner $x (Zend still warns).
+                    if (
+                        $sub === $op->block1
+                        && in_array($op->type, [
+                            OpCode::TYPE_FUNCDEF,
+                            OpCode::TYPE_DECLARE_METHOD,
+                            OpCode::TYPE_CLOSURE,
+                        ], true)
+                    ) {
+                        continue;
+                    }
                     $stack[] = $sub;
                 }
             }
         }
 
         return $out;
+    }
+
+    private static function cfgAssignNameKey(Context $context, string $cvName): string
+    {
+        return spl_object_id($context->module)."\0".$cvName;
     }
 
     private static function definiteCacheKey(Context $context, string $key): string
