@@ -1019,8 +1019,10 @@ class HashTable extends Type
             $this->context->getTypeFromString('__ref__virtual*')
         );
         $this->context->builder->call($this->context->lookupFunction('__ref__init'), $typeinfo, $ref);
-        $storedKey = $this->context->builder->call($this->context->lookupFunction('__string__separate'), $key);
-        $this->context->builder->store($storedKey, $this->context->builder->structGep($newNode, $nodeMap['key']));
+        // Share key via addref instead of deep-copying (#36468).
+        $keyRef = $this->context->builder->pointerCast($key, $this->context->getTypeFromString('__ref__virtual*'));
+        $this->context->builder->call($this->context->lookupFunction('__ref__addref'), $keyRef);
+        $this->context->builder->store($key, $this->context->builder->structGep($newNode, $nodeMap['key']));
         $this->context->builder->call(
             $this->context->lookupFunction('__value__writeString'),
             $this->context->builder->structGep($newNode, $nodeMap['value']),
@@ -1100,8 +1102,10 @@ class HashTable extends Type
             $this->context->getTypeFromString('__ref__virtual*')
         );
         $this->context->builder->call($this->context->lookupFunction('__ref__init'), $typeinfo, $ref);
-        $storedKey = $this->context->builder->call($this->context->lookupFunction('__string__separate'), $key);
-        $this->context->builder->store($storedKey, $this->context->builder->structGep($newNode, $nodeMap['key']));
+        // Share key via addref instead of deep-copying (#36468).
+        $keyRef = $this->context->builder->pointerCast($key, $this->context->getTypeFromString('__ref__virtual*'));
+        $this->context->builder->call($this->context->lookupFunction('__ref__addref'), $keyRef);
+        $this->context->builder->store($key, $this->context->builder->structGep($newNode, $nodeMap['key']));
         $this->context->builder->call(
             $this->context->lookupFunction('__value__writeHashtable'),
             $this->context->builder->structGep($newNode, $nodeMap['value']),
@@ -1155,8 +1159,10 @@ class HashTable extends Type
             $this->context->getTypeFromString('__ref__virtual*')
         );
         $this->context->builder->call($this->context->lookupFunction('__ref__init'), $typeinfo, $ref);
-        $storedKey = $this->context->builder->call($this->context->lookupFunction('__string__separate'), $key);
-        $this->context->builder->store($storedKey, $this->context->builder->structGep($newNode, $nodeMap['key']));
+        // Share key via addref instead of deep-copying (#36468).
+        $keyRef = $this->context->builder->pointerCast($key, $this->context->getTypeFromString('__ref__virtual*'));
+        $this->context->builder->call($this->context->lookupFunction('__ref__addref'), $keyRef);
+        $this->context->builder->store($key, $this->context->builder->structGep($newNode, $nodeMap['key']));
         $this->context->builder->call(
             $this->context->lookupFunction('__value__writeObject'),
             $this->context->builder->structGep($newNode, $nodeMap['value']),
@@ -1210,8 +1216,14 @@ class HashTable extends Type
             $this->context->getTypeFromString('__ref__virtual*')
         );
         $this->context->builder->call($this->context->lookupFunction('__ref__init'), $typeinfo, $ref);
-        $storedKey = $this->context->builder->call($this->context->lookupFunction('__string__separate'), $key);
-        $this->context->builder->store($storedKey, $this->context->builder->structGep($newNode, $nodeMap['key']));
+        // Share the key string via addref instead of deep-copying via __string__separate (#36468).
+        // PHP strings are immutable, so sharing is safe; Zend does the same (ZSTR_ADDREF).
+        $keyRef = $this->context->builder->pointerCast(
+            $key,
+            $this->context->getTypeFromString('__ref__virtual*')
+        );
+        $this->context->builder->call($this->context->lookupFunction('__ref__addref'), $keyRef);
+        $this->context->builder->store($key, $this->context->builder->structGep($newNode, $nodeMap['key']));
         $this->context->builder->call(
             $this->context->lookupFunction('__value__writeLong'),
             $this->context->builder->structGep($newNode, $nodeMap['value']),
@@ -1291,8 +1303,10 @@ class HashTable extends Type
             $this->context->getTypeFromString('__ref__virtual*')
         );
         $this->context->builder->call($this->context->lookupFunction('__ref__init'), $typeinfo, $ref);
-        $storedKey = $this->context->builder->call($this->context->lookupFunction('__string__separate'), $key);
-        $this->context->builder->store($storedKey, $this->context->builder->structGep($newNode, $nodeMap['key']));
+        // Share key via addref instead of deep-copying (#36468).
+        $keyRef = $this->context->builder->pointerCast($key, $this->context->getTypeFromString('__ref__virtual*'));
+        $this->context->builder->call($this->context->lookupFunction('__ref__addref'), $keyRef);
+        $this->context->builder->store($key, $this->context->builder->structGep($newNode, $nodeMap['key']));
         $this->context->builder->call(
             $this->context->lookupFunction('__value__writeDouble'),
             $this->context->builder->structGep($newNode, $nodeMap['value']),
@@ -1342,8 +1356,10 @@ class HashTable extends Type
             $this->context->getTypeFromString('__ref__virtual*')
         );
         $this->context->builder->call($this->context->lookupFunction('__ref__init'), $typeinfo, $ref);
-        $storedKey = $this->context->builder->call($this->context->lookupFunction('__string__separate'), $key);
-        $this->context->builder->store($storedKey, $this->context->builder->structGep($newNode, $nodeMap['key']));
+        // Share key via addref instead of deep-copying (#36468).
+        $keyRef = $this->context->builder->pointerCast($key, $this->context->getTypeFromString('__ref__virtual*'));
+        $this->context->builder->call($this->context->lookupFunction('__ref__addref'), $keyRef);
+        $this->context->builder->store($key, $this->context->builder->structGep($newNode, $nodeMap['key']));
         $this->writeBoolToValueField(
             $this->context->builder->structGep($newNode, $nodeMap['value']),
             $bool
@@ -1394,8 +1410,10 @@ class HashTable extends Type
             $this->context->getTypeFromString('__ref__virtual*')
         );
         $this->context->builder->call($this->context->lookupFunction('__ref__init'), $typeinfo, $ref);
-        $storedKey = $this->context->builder->call($this->context->lookupFunction('__string__separate'), $key);
-        $this->context->builder->store($storedKey, $this->context->builder->structGep($newNode, $nodeMap['key']));
+        // Share key via addref instead of deep-copying (#36468).
+        $keyRef = $this->context->builder->pointerCast($key, $this->context->getTypeFromString('__ref__virtual*'));
+        $this->context->builder->call($this->context->lookupFunction('__ref__addref'), $keyRef);
+        $this->context->builder->store($key, $this->context->builder->structGep($newNode, $nodeMap['key']));
         $this->context->builder->call(
             $this->context->lookupFunction('__value__writeNull'),
             $this->context->builder->structGep($newNode, $nodeMap['value'])
