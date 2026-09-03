@@ -1019,6 +1019,13 @@ class String_ extends Type {
         $strPtrTy = $this->context->getTypeFromString('__string__*');
         $i64 = $this->context->getTypeFromString('int64');
         $zero = $i64->constInt(0, false);
+        // Pin non-literal RHS across realloc. {main} concat temps can be delref'd while
+        // freelist reuse recycles that block into the grown dest (#36386). Skip when the
+        // RHS is a compile-time literal — those are often shared/interned.
+        $pinRhs = null === ($right->compileTimeString ?? null);
+        if ($pinRhs) {
+            $this->context->refcount->addref($rightVar);
+        }
         $rightSize = $this->context->builder->load(
             $this->context->builder->structGep($rightVar, $map['length'])
         );
@@ -1070,6 +1077,9 @@ class String_ extends Type {
         $destChar = $this->context->builder->gep($destChar, $oldLen);
         $rightChar = $this->context->builder->structGep($rightVar, $map['value']);
         $this->context->intrinsic->memcpy($destChar, $rightChar, $rightSize, false);
+        if ($pinRhs) {
+            $this->context->refcount->delref($rightVar);
+        }
     }
 
     private function copy(\gcc_jit_block_ptr $block, Variable $dest, Variable $other, \gcc_jit_rvalue_ptr $offset): void {
