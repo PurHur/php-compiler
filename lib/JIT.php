@@ -24577,6 +24577,12 @@ class JIT {
                 $destPtr,
                 $htPtr
             );
+            $this->context->refcount->delref(
+                $this->context->builder->pointerCast(
+                    $htPtr,
+                    $this->context->getTypeFromString('__ref__virtual*')
+                )
+            );
 
             return;
         }

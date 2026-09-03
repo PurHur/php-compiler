@@ -380,6 +380,12 @@ final class HashTableHelper
         return HashTableWriteLlvm::materializeNativeArrayForCall($context, $array);
     }
 
+    /** Widen a native packed list to a value-boxed hashtable (Call/Native ABI, #36388). */
+    public static function promoteNativeArrayVariableToHashtable(Context $context, Variable $array): void
+    {
+        HashTableWriteLlvm::promoteNativeArrayVariableToHashtable($context, $array);
+    }
+
     /**
      * Normalize a call/unpack operand to a packed __hashtable__* (issue #1361).
      */
