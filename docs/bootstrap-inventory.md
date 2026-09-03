@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8110 |
-| Phase A inventory files (M2 ratio SSOT) | 8110 |
+| PHP files on vm.php path | 8113 |
+| Phase A inventory files (M2 ratio SSOT) | 8113 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 25771 |
+| Source constructs flagged (warnings) | 25774 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -158,6 +158,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/calendar/JitCalFromJd.php` | 0 | 2 |
 | `ext/calendar/JitCalInfo.php` | 0 | 2 |
 | `ext/calendar/JitCalToJd.php` | 0 | 2 |
+| `ext/calendar/JitCalendarExtensionHooksFacade.php` | 0 | 1 |
 | `ext/calendar/JitEasterDate.php` | 0 | 2 |
 | `ext/calendar/JitEasterDays.php` | 0 | 2 |
 | `ext/calendar/JitFrenchtojd.php` | 0 | 2 |
@@ -172,7 +173,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/calendar/JitJuliantojd.php` | 0 | 2 |
 | `ext/calendar/JitUnixtojd.php` | 0 | 2 |
 | `ext/calendar/JuliantojdJitHelper.php` | 0 | 1 |
-| `ext/calendar/Module.php` | 0 | 20 |
+| `ext/calendar/Module.php` | 0 | 21 |
 | `ext/calendar/UnixtojdJitHelper.php` | 0 | 1 |
 | `ext/calendar/VmCalendar.php` | 0 | 11 |
 | `ext/calendar/VmJewishFrenchCalendar.php` | 0 | 1 |
@@ -6533,6 +6534,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ZendDoubleStringRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ZipArchiveEmbedBridge.php` | 0 | 1 |
 | `lib/JIT/Builtin/ZlibRuntime.php` | 0 | 1 |
+| `lib/JIT/CalendarExtensionHooks.php` | 0 | 1 |
 | `lib/JIT/Call.php` | 0 | 1 |
 | `lib/JIT/Call/AppendIteratorMethod.php` | 0 | 6 |
 | `lib/JIT/Call/ArrayIteratorConstruct.php` | 0 | 8 |
@@ -8886,6 +8888,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 20)
 - 4 class method(s)
 
+### `ext/calendar/JitCalendarExtensionHooksFacade.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
 ### `ext/calendar/JitEasterDate.php`
 
 **Warnings** (review for bootstrap subset):
@@ -8973,25 +8980,26 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new VM\Variable (line 22)
-- new cal_days_in_month (line 31)
-- new cal_from_jd (line 32)
-- new cal_info (line 33)
-- new cal_to_jd (line 34)
-- new easter_date (line 35)
-- new easter_days (line 36)
-- new gregoriantojd (line 37)
-- new juliantojd (line 38)
-- new jewishtojd (line 39)
-- new jdtojewish (line 40)
-- new jdtofrench (line 41)
-- new frenchtojd (line 42)
-- new jddayofweek (line 43)
-- new jdmonthname (line 44)
-- new jdtogregorian (line 45)
-- new jdtojulian (line 46)
-- new unixtojd (line 47)
-- new jdtounix (line 48)
-- 2 class method(s)
+- new JitCalendarExtensionHooksFacade (line 30)
+- new cal_days_in_month (line 36)
+- new cal_from_jd (line 37)
+- new cal_info (line 38)
+- new cal_to_jd (line 39)
+- new easter_date (line 40)
+- new easter_days (line 41)
+- new gregoriantojd (line 42)
+- new juliantojd (line 43)
+- new jewishtojd (line 44)
+- new jdtojewish (line 45)
+- new jdtofrench (line 46)
+- new frenchtojd (line 47)
+- new jddayofweek (line 48)
+- new jdmonthname (line 49)
+- new jdtogregorian (line 50)
+- new jdtojulian (line 51)
+- new unixtojd (line 52)
+- new jdtounix (line 53)
+- 3 class method(s)
 
 ### `ext/calendar/UnixtojdJitHelper.php`
 
@@ -48284,7 +48292,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/AOT/Linker.php`
 
 **Warnings** (review for bootstrap subset):
-- 36 class method(s)
+- 37 class method(s)
 
 ### `lib/AOT/LinkerProcessPolyfill.php`
 
@@ -55022,6 +55030,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 6 class method(s)
 
+### `lib/JIT/CalendarExtensionHooks.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
 ### `lib/JIT/Call.php`
 
 **Warnings** (review for bootstrap subset):
@@ -57501,8 +57514,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/CompileCache.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\Native (line 1187)
-- 71 class method(s)
+- new Call\Native (line 1416)
+- 78 class method(s)
 
 ### `lib/JIT/CompilerOperandChainNative.php`
 
@@ -57923,20 +57936,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\PdoConstruct (line 2971)
 - new Call\PdoGetAvailableDrivers (line 2972)
 - new Call\PdoQuote (line 2973)
-- new Result (line 3597)
-- new Result (line 3618)
-- new Variable (line 4791)
-- new Variable (line 5126)
-- new Variable (line 5419)
-- new Variable (line 5546)
-- new VMVariable (line 5764)
-- new VMVariable (line 5780)
-- new VMVariable (line 5786)
-- new VMVariable (line 5792)
+- new Result (line 3620)
+- new Result (line 3641)
+- new Variable (line 4814)
+- new Variable (line 5149)
+- new Variable (line 5442)
+- new Variable (line 5569)
+- new VMVariable (line 5787)
 - new VMVariable (line 5803)
-- new Variable (line 5867)
-- new Variable (line 5887)
-- new Variable (line 5932)
+- new VMVariable (line 5809)
+- new VMVariable (line 5815)
+- new VMVariable (line 5826)
+- new Variable (line 5890)
+- new Variable (line 5910)
+- new Variable (line 5955)
 - 144 class method(s)
 - 36 closure(s)
 
@@ -58204,7 +58217,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ExtensionLoweringHooks.php`
 
 **Warnings** (review for bootstrap subset):
-- 66 class method(s)
+- 67 class method(s)
 
 ### `lib/JIT/FiberHelper.php`
 

@@ -157,6 +157,42 @@ final class JitPhpExtensionLoweringHooksTest extends TestCase
         }
     }
 
+    public function testCalendarBuiltinsDoNotImportCalendarExtension(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $module = (string) file_get_contents($root.'/ext/calendar/Module.php');
+        $this->assertStringContainsString(
+            'calendar = new JitCalendarExtensionHooksFacade()',
+            $module,
+            'ext/calendar Module::jitInit must register JitCalendarExtensionHooksFacade'
+        );
+        $this->assertStringContainsString(
+            'requireCalendar',
+            (string) file_get_contents($root.'/lib/JIT/ExtensionLoweringHooks.php'),
+            'ExtensionLoweringHooks must expose requireCalendar()'
+        );
+        $files = [
+            'lib/JIT/Builtin/CalInfoRuntime.php',
+            'lib/JIT/Builtin/CalFromJdRuntime.php',
+        ];
+        foreach ($files as $rel) {
+            $src = (string) file_get_contents($root.'/'.$rel);
+            $stripped = (string) preg_replace('~/\*.*?\*/~s', '', $src);
+            $stripped = (string) preg_replace('~//.*$~m', '', $stripped);
+            // NestedJIT helper FQCN strings use doubled backslashes; ban single-\ use/imports.
+            $this->assertDoesNotMatchRegularExpression(
+                '/PHPCompiler\\\\ext\\\\calendar\\\\/',
+                $stripped,
+                $rel.' still imports ext\\calendar — use CalendarExtensionHooks'
+            );
+            $this->assertStringContainsString(
+                'requireCalendar()',
+                $src,
+                $rel.' must dispatch compile-time embeds via requireCalendar()'
+            );
+        }
+    }
+
     /**
      * @dataProvider coreJitHelperFilesWithoutNonStandardExtImports
      */

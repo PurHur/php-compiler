@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\calendar\CalInfoJitHelper;
-use PHPCompiler\ext\calendar\CalendarConstants;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\CalendarIds;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPLLVM\Value;
@@ -14,12 +13,12 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for cal_info() (#27354).
  *
- * NestedJIT of {@see CalInfoJitHelper} returns a PHP {@see \PHPCompiler\VM\HashTable}
+ * NestedJIT of calendar CalInfoJitHelper returns a PHP {@see \PHPCompiler\VM\HashTable}
  * that is not a thin-AOT `__hashtable__` (empty dim results — peer range #26956 /
  * array_keys NestedJIT #20533). Embed via {@see HashTableHelper::variableFromVmHashTable}
- * from host-side {@see CalInfoJitHelper} / {@see \PHPCompiler\ext\calendar\VmCalendar}.
+ * from host-side hooks ({@see \PHPCompiler\JIT\CalendarExtensionHooks}).
  *
- * SSOT: {@see CalInfoJitHelper} → {@see \PHPCompiler\ext\calendar\VmCalendar}
+ * SSOT: hooks → {@see \PHPCompiler\ext\calendar\VmCalendar}
  * php-src: ext/calendar/calendar.c — PHP_FUNCTION(cal_info)
  */
 final class CalInfoRuntime
@@ -39,7 +38,7 @@ final class CalInfoRuntime
     /** Compile-time calendar id — embed Gregorian/Julian/Jewish/French meta table. */
     public static function emitOne(Context $context, int $calendar): Value
     {
-        $ht = CalInfoJitHelper::calInfoArgv($calendar);
+        $ht = $context->extensionLowering->requireCalendar()->calInfoArgv($calendar);
 
         return HashTableHelper::variableFromVmHashTable($context, $ht)->value;
     }
@@ -47,7 +46,7 @@ final class CalInfoRuntime
     /** Compile-time cal_info() with no args — all calendars. */
     public static function emitAll(Context $context): Value
     {
-        $ht = CalInfoJitHelper::calInfoAllArgv();
+        $ht = $context->extensionLowering->requireCalendar()->calInfoAllArgv();
 
         return HashTableHelper::variableFromVmHashTable($context, $ht)->value;
     }
@@ -92,7 +91,7 @@ final class CalInfoRuntime
         $resultSlot = $context->builder->alloca($htPtr, 1, 'cal_info_result');
 
         $caseBlocks = [];
-        for ($id = 0; $id < CalendarConstants::CAL_NUM_CALS; ++$id) {
+        for ($id = 0; $id < CalendarIds::CAL_NUM_CALS; ++$id) {
             $caseBlocks[$id] = BasicBlockHelper::append($context, 'cal_info_case_'.$id);
         }
 
@@ -100,9 +99,9 @@ final class CalInfoRuntime
         $switch = $context->builder->branchSwitch(
             $cal,
             $defaultBb,
-            CalendarConstants::CAL_NUM_CALS + 1
+            CalendarIds::CAL_NUM_CALS + 1
         );
-        for ($id = 0; $id < CalendarConstants::CAL_NUM_CALS; ++$id) {
+        for ($id = 0; $id < CalendarIds::CAL_NUM_CALS; ++$id) {
             $switch->addCase($i64->constInt($id, false), $caseBlocks[$id]);
         }
         $switch->addCase($i64->constInt(-1, true), $allBb);
