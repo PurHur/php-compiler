@@ -587,12 +587,20 @@ class Native implements Call {
                             $context->getTypeFromString('__hashtable__*')
                         );
                     case Variable::TYPE_VALUE:
-                        return $context->builder->call(
+                        // Always valuePtrFromVariable — script globals are `__value__**`;
+                        // pointerCast of the global slot is not a box (#36386 nbody / typed
+                        // `array` formals). Pair with addref like TYPE_HASHTABLE so ARG_RECV
+                        // / return delref does not free the caller's sole-owner HT.
+                        // php-src: Zend/zend_execute_API.c zend_get_parameters_array_ex ADDREF
+                        $htFromBox = $context->builder->call(
                             $context->lookupFunction('__value__readHashtable'),
-                            Variable::KIND_VARIABLE === $arg->kind
-                                ? \PHPCompiler\JIT\JitValueBox::pointer($context, $arg->value)
-                                : $value
+                            \PHPCompiler\JIT\JitValueBox::valuePtrFromVariable($context, $arg)
                         );
+                        if (!isset($this->paramByRefByArg[$argNum])) {
+                            $context->refcount->addref($htFromBox);
+                        }
+
+                        return $htFromBox;
                 }
                 break;
             case '__string__*':
