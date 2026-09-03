@@ -31249,6 +31249,10 @@ class JIT {
     private function invokeJitCall(JIT\Call $toCall, array $callArgs): \PHPLLVM\Value
     {
         JIT\DeprecatedCallGuard::emitBeforeCall($this->context, $toCall);
+        $trackUncaught = JIT\Builtin\UncaughtThrowPrinter::shouldTrackCall($this->context, $toCall);
+        if ($trackUncaught) {
+            JIT\Builtin\UncaughtThrowPrinter::emitPushFrame($this->context, $toCall);
+        }
         if ($toCall instanceof JIT\Call\Native) {
             $result = $toCall->callWithArgMap($this->context, $callArgs);
         } else {
@@ -31262,6 +31266,9 @@ class JIT {
                 );
             }
             $result = $toCall->call($this->context, ...array_values($callArgs));
+        }
+        if ($trackUncaught) {
+            JIT\Builtin\UncaughtThrowPrinter::emitPopFrame($this->context);
         }
         // Enum::from() (and other callees) set throw-pending then return; catch here (#24219).
         JIT\TryCatchHelper::emitCheckPendingThrowAfterCall($this->context);

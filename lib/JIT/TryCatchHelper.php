@@ -1290,6 +1290,7 @@ final class TryCatchHelper
             $builder->positionAtEnd($validThrow);
             $obj = self::loadThrownObject($context, $thrown);
             ExceptionThrowToStringSeed::seed($context, $obj, $block);
+            UncaughtThrowPrinter::emitSnapshot($context);
             if (null !== $context->generatorStateParam) {
                 // Body throw during resume: close generator (not has_returned) and pend for
                 // the caller — Zend zend_generator_close on uncaught body throw (#34455).
@@ -1357,6 +1358,7 @@ final class TryCatchHelper
         }
 
         ExceptionThrowToStringSeed::seed($context, $obj, $block);
+        UncaughtThrowPrinter::emitSnapshot($context);
         $builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $obj);
         $builder->branch($dispatchBb);
     }
@@ -1695,6 +1697,7 @@ final class TryCatchHelper
             $lineVar
         );
         ExceptionThrowToStringSeed::seed($context, $errObj, $block);
+        UncaughtThrowPrinter::emitSnapshot($context);
         if (self::isNonMainUserFunction($block)) {
             $context->builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $errObj);
             self::emitPropagateReturn($context, $func);
