@@ -120,7 +120,7 @@ script/differential-sweep.sh --stderr --aot --dir test/differential/cases/errors
 
 VM is **40/40** (stdout + stderr + exit vs Zend; paths normalised).
 
-AOT executed cases that **match** Zend streams+exit include uncaught `{main}` `Exception`/`Error` (`e02`, `e03`, `e05`, `e24`, `e25`), `exit` status (`e01`, `e15`, `e20`, `e21`, `e31`), and non-throwing programs.
+AOT executed cases that **match** Zend streams+exit include uncaught `{main}` `Exception`/`Error` (`e02`, `e03`, `e05`, `e24`, `e25`), nested uncaught frames (`e18`, #36394), `exit` status (`e01`, `e15`, `e20`, `e21`, `e31`), and non-throwing programs.
 
 AOT `@differential-skip-aot` names (reason on the case; not a silent green):
 
@@ -131,7 +131,6 @@ AOT `@differential-skip-aot` names (reason on the case; not a silent green):
 | `e12_trigger_warning` / `e19_warning_in_loop` / `e23_user_notice` | no stdout `Warning:`/`Notice:` display_errors copy |
 | `e14_fwrite_stderr_exit1` / `e32_fwrite_stdout` | compile fails on `fwrite(STD*)` |
 | `e17_modulo_zero` | `Error` not `DivisionByZeroError` |
-| `e18_throw_in_nested` | stack is `#0 {main}` only |
 | `e22_type_error_return` | segfault rc=139 |
 | `e38_sprintf` | compile hang |
 
