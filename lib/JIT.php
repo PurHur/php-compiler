@@ -11181,26 +11181,127 @@ class JIT {
                             $result->compileTimeString = $newVal->compileTimeString;
                         }
                     } elseif (Variable::TYPE_VALUE === $result->type || JIT\JitValueBox::isValueOperand($result)) {
-                        $newVal = $this->compileConcatIntoNewString(
-                            $left,
-                            $right,
-                            $block->getOperand($op->arg2),
-                            $block->getOperand($op->arg3)
-                        );
-                        JIT\JitValueBox::assignToPointer(
-                            $this->context,
-                            $this->valueBoxPointer($result),
-                            $newVal
-                        );
-                        JIT\JitValueBox::publishAfterWrite(
-                            $this->context,
-                            $this->valueBoxPointer($result)
-                        );
-                        if (null !== ($newVal->compileTimeString ?? null)) {
-                            $result->compileTimeString = $newVal->compileTimeString;
+                        // {main} / untyped CVs stay TYPE_VALUE — `$buf .= …` used to alloc+memcpy
+                        // both halves every iteration (str-builder / template-render). Promote the
+                        // in-place CV to a native __string__** once, seed from the box, then
+                        // appendInPlace like typed locals (#36386 / unfinished #36410).
+                        $inPlaceBoxed = (int) $op->arg1 === (int) $op->arg2
+                            && (
+                                Variable::KIND_VARIABLE === $result->kind
+                                || Variable::KIND_VALUE === $result->kind
+                            )
+                            && null === $result->objectPropertySlot
+                            && null === $result->writableHt
+                            && null === $result->staticPropertyGlobal
+                            // `$s .= $s` must not realloc while the RHS aliases the same buffer.
+                            && (int) $op->arg2 !== (int) $op->arg3;
+                        if ($inPlaceBoxed) {
+                            $destSlot = JIT\BasicBlockHelper::entryAllocaForFunction(
+                                $this->context,
+                                $func,
+                                $this->context->getTypeFromString('__string__*')
+                            );
+                            $promoted = new Variable(
+                                $this->context,
+                                Variable::TYPE_STRING,
+                                Variable::KIND_VARIABLE,
+                                $destSlot
+                            );
+                            JIT\BasicBlockHelper::storeAtFunctionEntry(
+                                $this->context,
+                                $func,
+                                $this->context->type->string->pointer->constNull(),
+                                $destSlot
+                            );
+                            $this->seedNativeStringSlotFromValueBox($result, $destSlot);
+                            $this->context->setVariableOp($destOp, $promoted);
+                            $this->bindPromotedStringConcatDest($block, $destOp, $promoted);
+                            if (null !== ($result->compileTimeString ?? null)) {
+                                $promoted->compileTimeString = $result->compileTimeString;
+                            }
+                            // Literal RHS: grow in place. Dynamic RHS (int→string temps) still
+                            // takes the full concat path — appendInPlace + __string__separate
+                            // corrupts lengths under load (#36386 / master #36410 gap).
+                            $rightCoerced = JIT\JitNativeString::coerce(
+                                $this->context,
+                                $right,
+                                $block->getOperand($op->arg3)
+                            );
+                            if (
+                                null !== ($rightCoerced->compileTimeString ?? null)
+                                || null !== ($right->compileTimeString ?? null)
+                            ) {
+                                $this->context->type->string->appendInPlace($promoted, $rightCoerced);
+                                $newStr = $this->context->builder->load($destSlot);
+                                $newVal = new Variable(
+                                    $this->context,
+                                    Variable::TYPE_STRING,
+                                    Variable::KIND_VALUE,
+                                    $newStr
+                                );
+                            } else {
+                                $newVal = $this->compileConcatIntoNewString(
+                                    $promoted,
+                                    $rightCoerced,
+                                    $destOp,
+                                    $block->getOperand($op->arg3)
+                                );
+                                $this->context->builder->store(
+                                    $this->context->helper->loadValue($newVal),
+                                    $destSlot
+                                );
+                            }
+                            if (
+                                null !== ($left->compileTimeString ?? null)
+                                && null !== ($right->compileTimeString ?? null)
+                            ) {
+                                $newVal->compileTimeString = $left->compileTimeString.$right->compileTimeString;
+                                $promoted->compileTimeString = $newVal->compileTimeString;
+                            } else {
+                                $promoted->compileTimeString = null;
+                            }
+                            // KIND_VARIABLE boxes can be updated in place; KIND_VALUE {main}
+                            // CVs rely on publishMainScriptNamedConcatResult (#36366). Function
+                            // statics (also flagged on some {main} CVs) need the value-box write.
+                            if (
+                                Variable::KIND_VARIABLE === $result->kind
+                                || $result->functionStaticGlobal
+                            ) {
+                                JIT\JitValueBox::assignToPointer(
+                                    $this->context,
+                                    JIT\JitValueBox::valuePtrFromVariable($this->context, $result),
+                                    $newVal
+                                );
+                                JIT\JitValueBox::publishAfterWrite(
+                                    $this->context,
+                                    JIT\JitValueBox::valuePtrFromVariable($this->context, $result)
+                                );
+                            }
+                            $this->publishMainScriptNamedConcatResult($block, $destOp, $newVal);
+                            $this->markScopeVariableAssignedIfTracked($destOp, $promoted);
+                            $result = $promoted;
+                        } else {
+                            $newVal = $this->compileConcatIntoNewString(
+                                $left,
+                                $right,
+                                $block->getOperand($op->arg2),
+                                $block->getOperand($op->arg3)
+                            );
+                            JIT\JitValueBox::assignToPointer(
+                                $this->context,
+                                $this->valueBoxPointer($result),
+                                $newVal
+                            );
+                            JIT\JitValueBox::publishAfterWrite(
+                                $this->context,
+                                $this->valueBoxPointer($result)
+                            );
+                            if (null !== ($newVal->compileTimeString ?? null)) {
+                                $result->compileTimeString = $newVal->compileTimeString;
+                            }
+                            $this->publishMainScriptNamedConcatResult($block, $destOp, $newVal);
+                            $this->markScopeVariableAssignedIfTracked($destOp, $result);
                         }
-                        $this->publishMainScriptNamedConcatResult($block, $destOp, $newVal);
-                        $this->markScopeVariableAssignedIfTracked($destOp, $result);
                     } else {
                         // Resolve/promote the native string slot before concat (#22845).
                         $destSlot = $result->value;
@@ -11241,18 +11342,32 @@ class JIT {
                             $result = $promoted;
                             $hasStringAlloca = true;
                         }
-                        // `$s .= $rhs` on a native slot: grow in place instead of alloc+copy
-                        // both halves every iteration (#36410).
+                        // `$s .= $rhs` on a native slot: grow in place for literal RHS (#36410).
+                        // Dynamic RHS keeps alloc+copy — safer than separate-across-realloc (#36386).
                         if ((int) $op->arg1 === (int) $op->arg2 && $hasStringAlloca) {
-                            $this->context->type->string->appendInPlace(
-                                $result,
-                                JIT\JitNativeString::coerce(
-                                    $this->context,
-                                    $right,
-                                    $block->getOperand($op->arg3)
-                                )
+                            $rightCoerced = JIT\JitNativeString::coerce(
+                                $this->context,
+                                $right,
+                                $block->getOperand($op->arg3)
                             );
-                            $newStr = $this->context->builder->load($destSlot);
+                            if (
+                                null !== ($rightCoerced->compileTimeString ?? null)
+                                || null !== ($right->compileTimeString ?? null)
+                            ) {
+                                $this->context->type->string->appendInPlace($result, $rightCoerced);
+                                $newStr = $this->context->builder->load($destSlot);
+                            } else {
+                                $leftVar = $this->context->helper->loadValue(
+                                    JIT\JitNativeString::coerce($this->context, $left, $block->getOperand($op->arg2))
+                                );
+                                $rightVar = $this->context->helper->loadValue($rightCoerced);
+                                $newStr = \PHPCompiler\ext\standard\JitStringConcat::concat(
+                                    $this->context,
+                                    $leftVar,
+                                    $rightVar
+                                );
+                                $this->context->builder->store($newStr, $destSlot);
+                            }
                         } else {
                             $leftVar = $this->context->helper->loadValue(
                                 JIT\JitNativeString::coerce($this->context, $left, $block->getOperand($op->arg2))
@@ -26668,6 +26783,43 @@ class JIT {
             $promoted->compileTimeString = $newVal->compileTimeString;
         }
         $this->publishMainScriptNamedConcatResult($block, $destOp, $newVal);
+    }
+
+    /**
+     * Seed a promoted `__string__**` from a boxed CV when the slot is still null.
+     *
+     * Emitted into the CONCAT block so the first `$buf .= …` after `$buf = '…'` copies the
+     * box payload (via {@see __string__separate}) before {@see String_::appendInPlace}.
+     * Later iterations keep the grown native pointer (#36386 / #36410).
+     */
+    private function seedNativeStringSlotFromValueBox(Variable $valueBox, PHPLLVM\Value $destSlot): void
+    {
+        $strPtrTy = $this->context->getTypeFromString('__string__*');
+        $cur = $this->context->builder->load($destSlot);
+        $tag = 'seedStrFromBox'.(string) spl_object_id($valueBox);
+        $nullBlock = JIT\BasicBlockHelper::append($this->context, 'seed_null_'.$tag);
+        $readyBlock = JIT\BasicBlockHelper::append($this->context, 'seed_ready_'.$tag);
+        $isNull = $this->context->builder->icmp(
+            \PHPLLVM\Builder::INT_EQ,
+            $cur,
+            $strPtrTy->constNull()
+        );
+        $this->context->builder->branchIf(
+            $this->context->castToBool($isNull),
+            $nullBlock,
+            $readyBlock
+        );
+
+        $this->context->builder->positionAtEnd($nullBlock);
+        $fromBox = JIT\JitNativeString::coerce($this->context, $valueBox);
+        $owned = $this->context->builder->call(
+            $this->context->lookupFunction('__string__separate'),
+            $this->context->helper->loadValue($fromBox)
+        );
+        $this->context->builder->store($owned, $destSlot);
+        $this->context->builder->branch($readyBlock);
+
+        $this->context->builder->positionAtEnd($readyBlock);
     }
 
     /**

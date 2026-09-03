@@ -1,0 +1,128 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\Test\Unit;
+
+use PHPUnit\Framework\TestCase;
+
+/**
+ * {main} `$buf .= …` must grow via appendInPlace, not alloc+memcpy both halves (#36386 / #36410).
+ *
+ * php-src: Zend/zend_operators.c zend_string_extend / ZEND_ASSIGN_OP (CONCAT).
+ *
+ * @group aot-lint
+ */
+final class MainScriptInPlaceAppendAotTest extends TestCase
+{
+    public function testMainScriptAppendUsesReallocNotFullAlloc(): void
+    {
+        $src = <<<'PHP'
+        <?php
+        $buf = '';
+        for ($i = 0; $i < 3; ++$i) {
+            $buf .= 'x';
+        }
+        echo strlen($buf), "\n";
+        PHP;
+        $path = sys_get_temp_dir().'/phpc_main_inplace_append_'.getmypid().'.php';
+        $bin = sys_get_temp_dir().'/phpc_main_inplace_append_'.getmypid().'.bin';
+        file_put_contents($path, $src);
+        try {
+            putenv('PHP_COMPILER_DUMP_IR=1');
+            $cmd = escapeshellarg(PHP_BINARY).' '
+                .escapeshellarg(__DIR__.'/../../bin/compile.php').' -o '
+                .escapeshellarg($bin).' '.escapeshellarg($path).' 2>&1';
+            exec($cmd, $out, $rc);
+            $this->assertSame(0, $rc, implode("\n", $out));
+            $this->assertFileExists('/tmp/phpc-last.ll');
+            $ll = (string) file_get_contents('/tmp/phpc-last.ll');
+            $fnStart = strpos($ll, 'define void @internal_');
+            $this->assertNotFalse($fnStart, 'missing @internal_* {main} body');
+            // Prefer the largest internal_* (user script), not a tiny stub.
+            $bestStart = $fnStart;
+            $bestLen = 0;
+            $offset = 0;
+            while (false !== ($s = strpos($ll, 'define void @internal_', $offset))) {
+                $e = strpos($ll, "\ndefine ", $s + 1);
+                $len = false === $e ? strlen($ll) - $s : $e - $s;
+                if ($len > $bestLen) {
+                    $bestLen = $len;
+                    $bestStart = $s;
+                }
+                $offset = $s + 1;
+            }
+            $fnEnd = strpos($ll, "\ndefine ", $bestStart + 1);
+            $body = false === $fnEnd ? substr($ll, $bestStart) : substr($ll, $bestStart, $fnEnd - $bestStart);
+            $this->assertMatchesRegularExpression(
+                '/call void @__string__realloc\(/',
+                $body,
+                '{main} $buf .= must use __string__realloc (#36386)'
+            );
+            $this->assertStringContainsString('append_', $body, 'expected appendInPlace blocks');
+            exec(escapeshellarg($bin), $runOut, $runRc);
+            $this->assertSame(0, $runRc);
+            $this->assertSame(['3'], $runOut);
+        } finally {
+            putenv('PHP_COMPILER_DUMP_IR');
+            @unlink($path);
+            @unlink($bin);
+        }
+    }
+
+    public function testMainScriptSeededAppendKeepsPrefix(): void
+    {
+        $src = <<<'PHP'
+        <?php
+        $buf = 'ab';
+        $buf .= 'cd';
+        echo $buf, '|', strlen($buf), "\n";
+        PHP;
+        $path = sys_get_temp_dir().'/phpc_main_seed_append_'.getmypid().'.php';
+        $bin = sys_get_temp_dir().'/phpc_main_seed_append_'.getmypid().'.bin';
+        file_put_contents($path, $src);
+        try {
+            $cmd = escapeshellarg(PHP_BINARY).' '
+                .escapeshellarg(__DIR__.'/../../bin/compile.php').' -o '
+                .escapeshellarg($bin).' '.escapeshellarg($path).' 2>&1';
+            exec($cmd, $out, $rc);
+            $this->assertSame(0, $rc, implode("\n", $out));
+            exec(escapeshellarg($bin), $runOut, $runRc);
+            $this->assertSame(0, $runRc, implode("\n", $runOut));
+            $this->assertSame(['abcd|4'], $runOut);
+        } finally {
+            @unlink($path);
+            @unlink($bin);
+        }
+    }
+
+    public function testMainScriptIntInterpAppendMatchesZend(): void
+    {
+        $src = <<<'PHP'
+        <?php
+        $buf = '';
+        for ($i = 0; $i < 5; ++$i) {
+            $buf .= 'row-'.$i.';';
+        }
+        echo strlen($buf), '|', $buf, "\n";
+        PHP;
+        $path = sys_get_temp_dir().'/phpc_main_int_append_'.getmypid().'.php';
+        $bin = sys_get_temp_dir().'/phpc_main_int_append_'.getmypid().'.bin';
+        file_put_contents($path, $src);
+        try {
+            exec(escapeshellarg(PHP_BINARY).' '.escapeshellarg($path).' 2>&1', $zendOut, $zendRc);
+            $this->assertSame(0, $zendRc, implode("\n", $zendOut));
+            $cmd = escapeshellarg(PHP_BINARY).' '
+                .escapeshellarg(__DIR__.'/../../bin/compile.php').' -o '
+                .escapeshellarg($bin).' '.escapeshellarg($path).' 2>&1';
+            exec($cmd, $out, $rc);
+            $this->assertSame(0, $rc, implode("\n", $out));
+            exec(escapeshellarg($bin).' 2>&1', $runOut, $runRc);
+            $this->assertSame(0, $runRc, implode("\n", $runOut));
+            $this->assertSame($zendOut, $runOut);
+        } finally {
+            @unlink($path);
+            @unlink($bin);
+        }
+    }
+}
