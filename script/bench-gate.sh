@@ -9,6 +9,8 @@
 # Usage:
 #   script/bench-gate.sh            # check against committed baseline
 #   script/bench-gate.sh --update   # bless benchmarks/BASELINE.json from current master
+#   script/bench-gate.sh --compile  # compile-time gate (#36387)
+#   script/bench-gate.sh --compile --update
 #
 # On RunForge / hosts without image LLVM, re-execs via docker-exec.sh (same as aot-smoke.sh).
 set -uo pipefail

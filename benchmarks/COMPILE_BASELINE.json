@@ -1,0 +1,41 @@
+{
+    "version": 1,
+    "generated_at": "2026-09-03T01:18:29Z",
+    "arch": "x86_64-linux",
+    "wall_tolerance_percent": 20,
+    "scaling_tolerance_percent": 20,
+    "regeneration": "PHP_8_2=$(command -v php) ./script/bench-gate.sh --compile --update",
+    "note": "Compile-time gate for hello-warm, MiniWebApp, Block lint, and Compiler::compile scaling (#36387). Absolute targets live in the issue; this baseline tracks regressions.",
+    "cases": {
+        "hello-warm": {
+            "ok": true,
+            "wall_s": 5.655482,
+            "peak_rss_kb": 1588
+        },
+        "miniwebapp": {
+            "ok": true,
+            "wall_s": 22.350112,
+            "peak_rss_kb": 1532
+        },
+        "block-lint": {
+            "ok": true,
+            "wall_s": 2.472746,
+            "peak_rss_kb": 1572
+        },
+        "scale-50": {
+            "ok": true,
+            "wall_s": 3.354535,
+            "ms_per_statement": 67.091
+        },
+        "scale-100": {
+            "ok": true,
+            "wall_s": 19.723806,
+            "ms_per_statement": 197.238
+        },
+        "scale-200": {
+            "ok": true,
+            "wall_s": 124.11888,
+            "ms_per_statement": 620.594
+        }
+    }
+}
