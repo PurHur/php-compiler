@@ -7,19 +7,18 @@ Interim honesty rules (until php-cfg/php-types are forked):
 - Every `patches/*.patch` must contain at least one `@@` hunk (no comment-only stubs).
 - `script/apply-patches.sh` applies `patch(1)` with **`-F0`** (no fuzz) and fails on partial applies.
 - Overlay-only edits are invoked by name from `apply-patches.sh`; they do not leave empty `.patch` files.
-- `./script/apply-patches.sh --verify-pristine` rejects hunkless stubs and applies the **full php-llvm patch stack in order** to `patches/pristine-snapshots/ircmaxell/php-llvm/` (composer.lock SHA in `ORIGIN`); a patch missing from the `apply_patch` list is a failure.
+- `./script/apply-patches.sh --verify-pristine` rejects hunkless stubs, **rejects orphan** `patches/*.patch` files not referenced by `apply_patch` / `apply_patch_file_direct`, and applies the **full php-llvm patch stack in order** to `patches/pristine-snapshots/ircmaxell/php-llvm/` (composer.lock SHA in `ORIGIN`); a php-llvm patch missing from the `apply_patch` list is a failure.
 
 | prefix | count |
 |---|---|
-| `php-cfg` | 69 |
-| `php-types` | 77 |
+| `php-cfg` | 65 |
+| `php-types` | 76 |
 | `php-llvm` | 27 |
 | `other` | 4 |
-| **total** | 177 |
+| **total** | 172 |
 
 | patch | hunks | primary target(s) | note |
 |---|---|---|---|
-| `php-cfg-anonymous-class-name.patch` | 3 | `vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php` | vendor divergence |
 | `php-cfg-anonymous-class.patch` | 1 | `vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php` | vendor divergence |
 | `php-cfg-assertion-expr-property.patch` | 1 | `vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Assertion.php` | vendor divergence |
 | `php-cfg-assertion-fn-arity.patch` | 1 | `vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php` | vendor divergence |
@@ -34,10 +33,8 @@ Interim honesty rules (until php-cfg/php-types are forked):
 | `php-cfg-ctor-promotion.patch` | 2 | `vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php, vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php` | vendor divergence |
 | `php-cfg-dollars-brace.patch` | 1 | `vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php` | vendor divergence |
 | `php-cfg-enum-abstract.patch` | 1 | `vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Enum_.php` | vendor divergence |
-| `php-cfg-enum-class-const.patch` | 3 | `vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/Const_.php, vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php` | vendor divergence |
 | `php-cfg-enum-class-method.patch` | 1 | `vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php` | vendor divergence |
 | `php-cfg-enum-implements.patch` | 1 | `vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Enum_.php` | vendor divergence |
-| `php-cfg-enum-trait-use.patch` | 1 | `vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php` | vendor divergence |
 | `php-cfg-enum.patch` | 2 | `vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Enum_.php, vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php` | vendor divergence |
 | `php-cfg-error-suppress-cv-temp.patch` | 1 | `vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php` | vendor divergence |
 | `php-cfg-error-suppress-read.patch` | 1 | `vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php` | vendor divergence |
@@ -48,7 +45,6 @@ Interim honesty rules (until php-cfg/php-types are forked):
 | `php-cfg-halt-compiler.patch` | 2 | `vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/HaltCompiler.php, vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php` | vendor divergence |
 | `php-cfg-intersection-type.patch` | 3 | `vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Type/Intersection.php, vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php, vendor/ircmaxell/php-cfg/lib/PHPCfg/Printer.php` | vendor divergence |
 | `php-cfg-is-resource-no-assertion.patch` | 1 | `vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php` | vendor divergence |
-| `php-cfg-lazy-property.patch` | 1 | `vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php` | vendor divergence |
 | `php-cfg-list-assignment-attr.patch` | 1 | `vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php` | vendor divergence |
 | `php-cfg-list-destruct-byref.patch` | 1 | `vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php` | vendor divergence |
 | `php-cfg-list-skip-slot.patch` | 1 | `vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php` | vendor divergence |
@@ -180,7 +176,6 @@ Interim honesty rules (until php-cfg/php-types are forked):
 | `php-types-realpath-cache-get-array.patch` | 1 | `vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php` | vendor divergence |
 | `php-types-realpath-cache-size-int.patch` | 1 | `vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php` | vendor divergence |
 | `php-types-remove-type-empty-union.patch` | 1 | `vendor/ircmaxell/php-types/lib/PHPTypes/Type.php` | vendor divergence |
-| `php-types-resolver-worklist.patch` | 1 | `vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php` | vendor divergence |
 | `php-types-round-float.patch` | 1 | `vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php` | vendor divergence |
 | `php-types-sem-get-auto-release-bool.patch` | 1 | `vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php` | vendor divergence |
 | `php-types-soap-dorequest-arginfo.patch` | 1 | `vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php` | vendor divergence |
