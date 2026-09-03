@@ -11265,13 +11265,7 @@ class JIT {
                             } else {
                                 $promoted->compileTimeString = null;
                             }
-                            // KIND_VARIABLE boxes can be updated in place; KIND_VALUE {main}
-                            // CVs rely on publishMainScriptNamedConcatResult (#36366). Function
-                            // statics (also flagged on some {main} CVs) need the value-box write.
-                            if (
-                                Variable::KIND_VARIABLE === $result->kind
-                                || $result->functionStaticGlobal
-                            ) {
+                            if ($result->functionStaticGlobal) {
                                 JIT\JitValueBox::assignToPointer(
                                     $this->context,
                                     JIT\JitValueBox::valuePtrFromVariable($this->context, $result),
@@ -11282,7 +11276,11 @@ class JIT {
                                     JIT\JitValueBox::valuePtrFromVariable($this->context, $result)
                                 );
                             }
-                            $this->publishMainScriptNamedConcatResult($block, $destOp, $newVal);
+                            // Skip per-iter {main} script-global publish: destSlot is the
+                            // unique owner after drop*; republishing addrefs so the next
+                            // __ref__separate COWs O(n) (#36386). Echo/strlen use the
+                            // promoted native slot (bindPromotedStringConcatDest). php-src:
+                            // Zend/zend_operators.c ZEND_ASSIGN_CONCAT / zend_string_extend.
                             $this->markScopeVariableAssignedIfTracked($destOp, $promoted);
                             $result = $promoted;
                         } else {
@@ -11351,6 +11349,10 @@ class JIT {
                         // Dynamic and literal share appendInPlace now that realloc publishes
                         // the moved pointer (#36386).
                         if ((int) $op->arg1 === (int) $op->arg2 && $hasStringAlloca) {
+                            // {main} publishMainScriptNamedConcatResult addrefs the same
+                            // buffer into a script-global box. Without dropping that alias,
+                            // __ref__separate COWs the whole string on every .= (#36386).
+                            $this->dropMainScriptStringAliasIfSame($block, $destOp, $destSlot);
                             $rightCoerced = JIT\JitNativeString::coerce(
                                 $this->context,
                                 $right,
@@ -11378,7 +11380,14 @@ class JIT {
                             Variable::KIND_VALUE,
                             $newStr
                         );
-                        $this->publishMainScriptNamedConcatResult($block, $destOp, $nativeConcatVal);
+                        // In-place {main} $buf .= already mutated destSlot. Re-publishing
+                        // into the script-global box every iteration addrefs the same
+                        // buffer so the next __ref__separate COWs O(n) (#36386). Echo /
+                        // strlen read the promoted native slot via bindPromotedStringConcatDest.
+                        // Publish only when the CONCAT was not in-place (new buffer).
+                        if ((int) $op->arg1 !== (int) $op->arg2 || !$hasStringAlloca) {
+                            $this->publishMainScriptNamedConcatResult($block, $destOp, $nativeConcatVal);
+                        }
                     }
                     if (
                         null !== ($left->compileTimeString ?? null)

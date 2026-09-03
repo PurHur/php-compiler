@@ -541,216 +541,169 @@ class String_ extends Type {
     $this->context->builder->clearInsertionPosition();
     }
 
+    /**
+     * Hand-maintained (#36386) — do not regenerate from String_.pre.
+     *
+     * php-src: Zend/zend_string.h zend_string_alloc / smart_str_erealloc —
+     * grow geometrically but skip realloc when the existing malloc block still
+     * has room. Capacity is not a struct field (keeps helper-runtime GEP ABI);
+     * glibc malloc_usable_size is the same family as Zend chunk introspection
+     * (see MemoryManager\Native). Thin C ABI: existing malloc_usable_size(3).
+     */
     private function implementRealloc(): void {
-        $fn___8f14e45fceea167a5a36dedd4bea2543 = $this->context->lookupFunction('__string__realloc');
-    $block___8f14e45fceea167a5a36dedd4bea2543 = $fn___8f14e45fceea167a5a36dedd4bea2543->appendBasicBlock('main');
-    $this->context->builder->positionAtEnd($block___8f14e45fceea167a5a36dedd4bea2543);
-    $doublePtr = $fn___8f14e45fceea167a5a36dedd4bea2543->getParam(0);
-    $newSize = $fn___8f14e45fceea167a5a36dedd4bea2543->getParam(1);
-    
-    $__type = $this->context->getTypeFromString('__ref__virtual**');
-                        
-                    
-                    $__kind = $__type->getKind();
-                    $__value = $doublePtr;
-                    switch ($__kind) {
-                        case \PHPLLVM\Type::KIND_INTEGER:
-                            if (!is_object($__value)) {
-                                $refVirtual = $__type->constInt($__value, false);
-                                break;
-                            }
-                            $__other_type = $__value->typeOf();
-                            switch ($__other_type->getKind()) {
-                                case \PHPLLVM\Type::KIND_INTEGER:
-                                    if ($__other_type->getWidth() >= $__type->getWidth()) {
-                                        $refVirtual = $this->context->builder->truncOrBitCast($__value, $__type);
-                                    } else {
-                                        $refVirtual = $this->context->builder->zExtOrBitCast($__value, $__type);
-                                    }
-                                    break;
-                                case \PHPLLVM\Type::KIND_DOUBLE:
-                                    
-                                    $refVirtual = $this->context->builder->fpToSi($__value, $__type);
-                                    
-                                    break;
-                                case \PHPLLVM\Type::KIND_ARRAY:
-                                case \PHPLLVM\Type::KIND_POINTER:
-                                    $refVirtual = $this->context->builder->ptrToInt($__value, $__type);
-                                    break;
-                                default:
-                                    throw new \LogicException("Unknown how to handle type pair (int, " . $__other_type->toString() . ")");
-                            }
-                            break;
-                        case \PHPLLVM\Type::KIND_DOUBLE:
-                            if (!is_object($__value)) {
-                                $refVirtual = $__type->constReal($doublePtr);
-                                break;
-                            }
-                            $__other_type = $__value->typeOf();
-                            switch ($__other_type->getKind()) {
-                                case \PHPLLVM\Type::KIND_INTEGER:
-                                    
-                                    $refVirtual = $this->context->builder->siToFp($__value, $__type);
-                                    
-                                    break;
-                                case \PHPLLVM\Type::KIND_DOUBLE:
-                                    $refVirtual = $this->context->builder->fpCast($__value, $__type);
-                                    break;
-                                default:
-                                    throw new \LogicException("Unknown how to handle type pair (double, " . $__other_type->toString() . ")");
-                            }
-                            break;
-                        case \PHPLLVM\Type::KIND_ARRAY:
-                        case \PHPLLVM\Type::KIND_POINTER:
-                            if (!is_object($__value)) {
-                                // this is very likely very wrong...
-                                $refVirtual = $__type->constInt($__value, false);
-                                break;
-                            }
-                            $__other_type = $__value->typeOf();
-                            switch ($__other_type->getKind()) {
-                                case \PHPLLVM\Type::KIND_INTEGER:
-                                    $refVirtual = $this->context->builder->intToPtr($__value, $__type);
-                                    break;
-                                case \PHPLLVM\Type::KIND_ARRAY:
-                                    // $__tmp = $this->context->builder->($__value, $this->context->context->int64Type());
-                                    // $(result) = $this->context->builder->intToPtr($__tmp, $__type);
-                                    // break;
-                                case \PHPLLVM\Type::KIND_POINTER:
-                                    $refVirtual = $this->context->builder->pointerCast($__value, $__type);
-                                    break;
-                                default:
-                                    throw new \LogicException("Unknown how to handle type pair (double, " . $__other_type->toString() . ")");
-                            }
-                            break;
-                        default:
-                            throw new \LogicException("Unsupported type cast: " . $__type->toString());
-                    }
-    $this->context->builder->call(
-                    $this->context->lookupFunction('__ref__separate') , 
-                    $refVirtual
-                    
-                );
-    $destVar = $this->context->builder->load($doublePtr);
-    $test = $this->context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $destVar, $destVar->typeOf()->constNull());
-    $bool = $this->context->castToBool($test);
-                $prev = $this->context->builder->getInsertBlock();
-                $ifBlock = $prev->insertBasicBlock('ifBlock');
-                $prev->moveBefore($ifBlock);
-                
-                $endBlock[] = $tmp = $ifBlock->insertBasicBlock('endBlock');
-                    $this->context->builder->branchIf($bool, $ifBlock, $tmp);
-                
-                $this->context->builder->positionAtEnd($ifBlock);
-                { $result = $this->context->builder->call(
-                        $this->context->lookupFunction('__string__alloc') , 
-                        $newSize
-                        
-                    );
-    $this->context->builder->store($result, $doublePtr);
-    $this->context->builder->returnVoid();
+        $fn = $this->context->lookupFunction('__string__realloc');
+        $entry = $fn->appendBasicBlock('realloc_entry');
+        $allocNull = $fn->appendBasicBlock('realloc_null');
+        $haveStr = $fn->appendBasicBlock('realloc_have');
+        $fit = $fn->appendBasicBlock('realloc_fit');
+        $grow = $fn->appendBasicBlock('realloc_grow');
+        $this->context->builder->positionAtEnd($entry);
+
+        $doublePtr = $fn->getParam(0);
+        $newSize = $fn->getParam(1);
+        $i8p = $this->context->getTypeFromString('int8*');
+        $i64 = $this->context->getTypeFromString('int64');
+        $sizeT = $this->context->getTypeFromString('size_t');
+        $strPtrTy = $this->context->getTypeFromString('__string__*');
+        $map = $this->context->structFieldMap['__string__'];
+
+        $this->ensureMallocUsableSizeDecl();
+
+        $refVirtual = $this->context->builder->pointerCast(
+            $doublePtr,
+            $this->context->getTypeFromString('__ref__virtual**')
+        );
+        $this->context->builder->call(
+            $this->context->lookupFunction('__ref__separate'),
+            $refVirtual
+        );
+        $destVar = $this->context->builder->load($doublePtr);
+        $isNull = $this->context->builder->icmp(
+            \PHPLLVM\Builder::INT_EQ,
+            $destVar,
+            $strPtrTy->constNull()
+        );
+        $this->context->builder->branchIf(
+            $this->context->castToBool($isNull),
+            $allocNull,
+            $haveStr
+        );
+
+        $this->context->builder->positionAtEnd($allocNull);
+        $fresh = $this->context->builder->call(
+            $this->context->lookupFunction('__string__alloc'),
+            $newSize
+        );
+        $this->context->builder->store($fresh, $doublePtr);
+        $this->context->builder->returnVoid();
+
+        $this->context->builder->positionAtEnd($haveStr);
+        $oldSize = $this->context->builder->load(
+            $this->context->builder->structGep($destVar, $map['length'])
+        );
+        $raw = $this->context->builder->pointerCast($destVar, $i8p);
+        $usable = $this->context->builder->call(
+            $this->context->lookupFunction('malloc_usable_size'),
+            $raw
+        );
+        $usableI64 = $this->context->builder->intCast($usable, $i64);
+        $strTy = $this->context->getTypeFromString('__string__');
+        $headerBytes = $this->context->builder->ptrToInt(
+            $this->context->builder->gep(
+                $strTy->pointerType(0)->constNull(),
+                $this->context->context->int32Type()->constInt(1, false)
+            ),
+            $i64
+        );
+        // mallocWithExtra(type, cap) = sizeof(type)+cap; value is the last byte of
+        // sizeof(type), so payload room from &value is usable - (sizeof-1).
+        $one = $i64->constInt(1, false);
+        $hdrMinus = $this->context->builder->subNoSignedWrap($headerBytes, $one);
+        $payloadRoom = $this->context->builder->subNoSignedWrap($usableI64, $hdrMinus);
+        // Keep a NUL in the spare byte when possible.
+        $need = $this->context->builder->addNoSignedWrap($newSize, $one);
+        $fits = $this->context->builder->icmp(\PHPLLVM\Builder::INT_SLE, $need, $payloadRoom);
+        $this->context->builder->branchIf(
+            $this->context->castToBool($fits),
+            $fit,
+            $grow
+        );
+
+        $this->context->builder->positionAtEnd($fit);
+        $this->context->builder->store(
+            $newSize,
+            $this->context->builder->structGep($destVar, $map['length'])
+        );
+        $charFit = $this->context->builder->structGep($destVar, $map['value']);
+        $nulAt = $this->context->builder->gep($charFit, $newSize);
+        $this->context->intrinsic->memset(
+            $nulAt,
+            $this->context->context->int8Type()->constInt(0, false),
+            $one,
+            false
+        );
+        $this->context->builder->returnVoid();
+
+        $this->context->builder->positionAtEnd($grow);
+        $two = $newSize->typeOf()->constInt(2, false);
+        $half = $this->context->builder->unsignedDiv($newSize, $two);
+        $grown = $this->context->builder->addNoSignedWrap($newSize, $half);
+        $minCap = $newSize->typeOf()->constInt(32, false);
+        $needsMin = $this->context->builder->icmp(\PHPLLVM\Builder::INT_SLT, $grown, $minCap);
+        $targetCap = $this->context->builder->select($needsMin, $minCap, $grown);
+        $destValue = $this->context->memory->realloc($destVar, $targetCap);
+        $this->context->builder->store($destValue, $doublePtr);
+        $this->context->builder->store(
+            $newSize,
+            $this->context->builder->structGep($destValue, $map['length'])
+        );
+        $char = $this->context->builder->structGep($destValue, $map['value']);
+        $grew = $this->context->builder->icmp(\PHPLLVM\Builder::INT_SGT, $newSize, $oldSize);
+        $grewBlock = $fn->appendBasicBlock('realloc_grew');
+        $shrunkBlock = $fn->appendBasicBlock('realloc_shrunk');
+        $this->context->builder->branchIf(
+            $this->context->castToBool($grew),
+            $grewBlock,
+            $shrunkBlock
+        );
+
+        $this->context->builder->positionAtEnd($grewBlock);
+        $tail = $this->context->builder->gep($char, $oldSize);
+        $diff = $this->context->builder->subNoSignedWrap($newSize, $oldSize);
+        $this->context->intrinsic->memset(
+            $tail,
+            $this->context->context->int8Type()->constInt(0, false),
+            $diff,
+            false
+        );
+        $this->context->builder->returnVoid();
+
+        $this->context->builder->positionAtEnd($shrunkBlock);
+        $endChar = $this->context->builder->gep($char, $newSize);
+        $this->context->intrinsic->memset(
+            $endChar,
+            $this->context->context->int8Type()->constInt(0, false),
+            $one,
+            false
+        );
+        $this->context->builder->returnVoid();
+
+        $this->context->builder->clearInsertionPosition();
     }
-                if ($this->context->builder->getInsertBlock()->getTerminator() === null) {
-                    $this->context->builder->branch(end($endBlock));
-                }
-                
-                $this->context->builder->positionAtEnd(array_pop($endBlock));
-    $offset = $this->context->structFieldMap[$this->context->structNameForValue($destVar)]['length'];
-                    $oldSize = $this->context->builder->load(
-                        $this->context->builder->structGep($destVar, $offset)
-                    );
-    $two = $newSize->typeOf()->constInt(2, false);
-    $half = $this->context->builder->unsignedDiv($newSize, $two);
-    $grown = $this->context->builder->addNoSignedWrap($newSize, $half);
-    $minCap = $newSize->typeOf()->constInt(32, false);
-    $needsMin = $this->context->builder->icmp(\PHPLLVM\Builder::INT_SLT, $grown, $minCap);
-    $targetCap = $this->context->builder->select($needsMin, $minCap, $grown);
-    $destValue = $this->context->memory->realloc($destVar, $targetCap);
-    // memory->realloc may return a moved pointer — publish it back to the caller's
-    // `__string__**` slot. Without this, appendInPlace/concat keep writing through the
-    // freed old buffer after the first geometric grow past the initial 32-byte cap (#36386).
-    $this->context->builder->store($destValue, $doublePtr);
-    $offset = $this->context->structFieldMap[$this->context->structNameForValue($destValue)]['length'];
-                $this->context->builder->store(
-                    $newSize,
-                    $this->context->builder->structGep($destValue, $offset)
-                );
-    $offset = $this->context->structFieldMap[$this->context->structNameForValue($destValue)]['value'];
-                    $char = $this->context->builder->structGep($destValue, $offset);
-    $__right = $this->context->builder->intCast($oldSize, $newSize->typeOf());
-                            
-                            
-                        
 
-                        
+    private function ensureMallocUsableSizeDecl(): void
+    {
+        if (null !== $this->context->module->getNamedFunction('malloc_usable_size')) {
+            $fn = $this->context->module->getNamedFunction('malloc_usable_size');
+            $this->context->registerFunction('malloc_usable_size', $fn);
 
-                        
-
-                        
-
-                        
-
-                        
-
-                        
-
-                        
-
-                        
-
-                        
-
-                        
-
-                        
-                            $cmp = \PHPLLVM\Builder::INT_SGT;
-                            
-                            $test = $this->context->builder->icmp($cmp, $newSize, $__right);
-    $bool = $this->context->castToBool($test);
-                $prev = $this->context->builder->getInsertBlock();
-                $ifBlock = $prev->insertBasicBlock('ifBlock');
-                $prev->moveBefore($ifBlock);
-                
-                $endBlock[] = $tmp = $ifBlock->insertBasicBlock('endBlock');
-                    $this->context->builder->branchIf($bool, $ifBlock, $tmp);
-                
-                $this->context->builder->positionAtEnd($ifBlock);
-                { $char = $this->context->builder->gep(
-                        $char,
-                        //$this->context->context->int32Type()->constInt(0, false),
-                        //$this->context->context->int32Type()->constInt(0, false),
-                        $oldSize
-                    );
-    $__right = $this->context->builder->intCast($oldSize, $newSize->typeOf());
-                            
-                            
-                        
-
-                        
-
-                        
-
-                        
-
-                        
-
-                        
-                            $diff = $this->context->builder->subNoSignedWrap($newSize, $__right);
-    $this->context->intrinsic->memset(
-                    $char, 
-                    $this->context->context->int8Type()->constInt(0x20, false),
-                    $diff, 
-                    false
-                );
-    }
-                if ($this->context->builder->getInsertBlock()->getTerminator() === null) {
-                    $this->context->builder->branch(end($endBlock));
-                }
-                
-                $this->context->builder->positionAtEnd(array_pop($endBlock));
-    $this->context->builder->returnVoid();
-    
-    $this->context->builder->clearInsertionPosition();
+            return;
+        }
+        $sizeT = $this->context->getTypeFromString('size_t');
+        $i8p = $this->context->getTypeFromString('int8*');
+        $ft = $this->context->context->functionType($sizeT, false, $i8p);
+        $fn = $this->context->module->addFunction('malloc_usable_size', $ft);
+        $this->context->registerFunction('malloc_usable_size', $fn);
     }
 
     private function implementSeparate(): void {
@@ -1004,8 +957,9 @@ class String_ extends Type {
     }
 
     /**
-     * In-place `$dest .= $right` on a native string slot: grow via
-     * {@see __string__realloc} and append the right payload only (#36410 / #36386).
+     * In-place `$dest .= $right` on a native string slot (#36410 / #36386).
+     * Unique-owner + spare capacity: memcpy only (php-src zend_string_extend).
+     * Else {@see __string__realloc} then append the right payload.
      */
     public function appendInPlace(Variable $dest, Variable $right): void
     {
@@ -1038,7 +992,9 @@ class String_ extends Type {
         $tag = 'appendInPlace'.(string) spl_object_id($dest);
         $nullBlock = \PHPCompiler\JIT\BasicBlockHelper::append($this->context, 'append_null_'.$tag);
         $bodyBlock = \PHPCompiler\JIT\BasicBlockHelper::append($this->context, 'append_body_'.$tag);
-        $workBlock = \PHPCompiler\JIT\BasicBlockHelper::append($this->context, 'append_work_'.$tag);
+        $fitBlock = \PHPCompiler\JIT\BasicBlockHelper::append($this->context, 'append_fit_'.$tag);
+        $growBlock = \PHPCompiler\JIT\BasicBlockHelper::append($this->context, 'append_grow_'.$tag);
+        $doneBlock = \PHPCompiler\JIT\BasicBlockHelper::append($this->context, 'append_done_'.$tag);
         $isNull = $this->context->builder->icmp(
             \PHPLLVM\Builder::INT_EQ,
             $curStr,
@@ -1051,15 +1007,80 @@ class String_ extends Type {
         );
 
         $this->context->builder->positionAtEnd($nullBlock);
-        $this->context->builder->branch($workBlock);
+        $this->context->builder->branch($growBlock);
 
         $this->context->builder->positionAtEnd($bodyBlock);
         $loadedLen = $this->context->builder->load(
             $this->context->builder->structGep($curStr, $map['length'])
         );
-        $this->context->builder->branch($workBlock);
+        $this->ensureMallocUsableSizeDecl();
+        $i8p = $this->context->getTypeFromString('int8*');
+        $raw = $this->context->builder->pointerCast($curStr, $i8p);
+        $usable = $this->context->builder->call(
+            $this->context->lookupFunction('malloc_usable_size'),
+            $raw
+        );
+        $usableI64 = $this->context->builder->intCast($usable, $i64);
+        $strTy = $this->context->getTypeFromString('__string__');
+        $headerBytes = $this->context->builder->ptrToInt(
+            $this->context->builder->gep(
+                $strTy->pointerType(0)->constNull(),
+                $this->context->context->int32Type()->constInt(1, false)
+            ),
+            $i64
+        );
+        $one = $i64->constInt(1, false);
+        $hdrMinus = $this->context->builder->subNoSignedWrap($headerBytes, $one);
+        $payloadRoom = $this->context->builder->subNoSignedWrap($usableI64, $hdrMinus);
+        $newSizeProbe = $this->context->builder->addNoUnsignedWrap(
+            $loadedLen,
+            $this->context->builder->intCast($rightSize, $loadedLen->typeOf())
+        );
+        $need = $this->context->builder->addNoSignedWrap($newSizeProbe, $one);
+        $fitsCap = $this->context->builder->icmp(\PHPLLVM\Builder::INT_SLE, $need, $payloadRoom);
+        $refMap = $this->context->structFieldMap['__ref__'];
+        $refPtr = $this->context->builder->structGep($curStr, $map['ref']);
+        $rc = $this->context->builder->load(
+            $this->context->builder->structGep($refPtr, $refMap['refcount'])
+        );
+        $unique = $this->context->builder->icmp(
+            \PHPLLVM\Builder::INT_EQ,
+            $rc,
+            $rc->typeOf()->constInt(1, false)
+        );
+        $canFit = $this->context->builder->bitwiseAnd(
+            $this->context->castToBool($fitsCap),
+            $this->context->castToBool($unique)
+        );
+        $this->context->builder->branchIf($canFit, $fitBlock, $growBlock);
 
-        $this->context->builder->positionAtEnd($workBlock);
+        $this->context->builder->positionAtEnd($fitBlock);
+        $this->context->builder->store(
+            $newSizeProbe,
+            $this->context->builder->structGep($curStr, $map['length'])
+        );
+        $fitDestChar = $this->context->builder->gep(
+            $this->context->builder->structGep($curStr, $map['value']),
+            $loadedLen
+        );
+        $this->context->intrinsic->memcpy(
+            $fitDestChar,
+            $this->context->builder->structGep($rightVar, $map['value']),
+            $rightSize,
+            false
+        );
+        $this->context->intrinsic->memset(
+            $this->context->builder->gep(
+                $this->context->builder->structGep($curStr, $map['value']),
+                $newSizeProbe
+            ),
+            $this->context->context->int8Type()->constInt(0, false),
+            $one,
+            false
+        );
+        $this->context->builder->branch($doneBlock);
+
+        $this->context->builder->positionAtEnd($growBlock);
         $oldLen = $this->context->builder->phi($i64);
         $oldLen->addIncoming($zero, $nullBlock);
         $oldLen->addIncoming($loadedLen, $bodyBlock);
@@ -1073,7 +1094,6 @@ class String_ extends Type {
             $newSize
         );
         $destStr = $this->context->builder->load($destSlot);
-        // Realloc already wrote $newSize into length; store again to match concat().
         $this->context->builder->store(
             $newSize,
             $this->context->builder->structGep($destStr, $map['length'])
@@ -1082,6 +1102,9 @@ class String_ extends Type {
         $destChar = $this->context->builder->gep($destChar, $oldLen);
         $rightChar = $this->context->builder->structGep($rightVar, $map['value']);
         $this->context->intrinsic->memcpy($destChar, $rightChar, $rightSize, false);
+        $this->context->builder->branch($doneBlock);
+
+        $this->context->builder->positionAtEnd($doneBlock);
         if ($pinRhs) {
             $this->context->refcount->delref($rightVar);
         }
