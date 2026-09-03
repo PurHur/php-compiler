@@ -95,7 +95,11 @@ final class SortRuntime
     {
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
         $context->builder->call($context->lookupFunction($abi), $ht);
-        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+        // In-place LLVM sort — only rebind native int[] into a value box. Writing the same
+        // HT back into a TYPE_VALUE box valueDelref's it (#36388 / peer UsortRuntime).
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
+            HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+        }
     }
 
     private static function invokeHelperPackedSort(Context $context, JITVariable $array, string $abi): void
@@ -103,7 +107,9 @@ final class SortRuntime
         self::ensureLocaleNaturalLinked($context);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
         $context->builder->call($context->lookupFunction($abi), $ht);
-        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
+            HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+        }
     }
 
     public static function ensureLinked(Context $context): void

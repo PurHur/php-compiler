@@ -1107,14 +1107,20 @@ final class HashTableWriteLlvm
         if (0 === ($array->type & Variable::IS_NATIVE_ARRAY)) {
             return;
         }
-        // materializeNativeArrayForCall returns rc=0; writeHashtable → rc=1 (sole owner).
-        // No delref — the prior delref freed the HT at rc=0 (#36484 / re-#36388).
+        // materialize addrefs to rc=1; writeHashtable → rc=2; delref → sole owner (#36388).
+        // Same-pointer writeHashtable is a no-op (#36388) so in-place mutators stay safe.
         $ht = self::materializeNativeArrayForCall($context, $array);
         $slot = JitValueBox::alloc($context);
         $context->builder->call(
             $context->lookupFunction('__value__writeHashtable'),
             JitValueBox::pointer($context, $slot),
             $ht
+        );
+        $context->refcount->delref(
+            $context->builder->pointerCast(
+                $ht,
+                $context->getTypeFromString('__ref__virtual*')
+            )
         );
         $array->type = Variable::TYPE_VALUE;
         $array->value = $slot;

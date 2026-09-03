@@ -1955,16 +1955,40 @@ class HashTable extends Type
         $hashtable = $fn->getParam(1);
         $map = $this->context->structFieldMap['__value__'];
         $htPtr = $this->context->getTypeFromString('__hashtable__*');
+        $typeSlot = $this->context->builder->structGep($value, $map['type']);
+        $ptrField = $this->context->builder->structGep($value, $map['value']);
+        $htSlot = $this->context->builder->pointerCast($ptrField, $htPtr->pointerType(0));
+        // Same-pointer store must be a no-op. valueDelref + addref on the live HT frees it
+        // when rc=1 (usort/sort writeback after in-place mutate; #36388 / re-#36484).
+        $curType = $this->context->builder->load($typeSlot);
+        $isHt = $this->context->builder->icmp(
+            \PHPLLVM\Builder::INT_EQ,
+            $curType,
+            $this->context->getTypeFromString('int8')->constInt(Variable::TYPE_HASHTABLE, false)
+        );
+        $curHt = $this->context->builder->load($htSlot);
+        $samePtr = $this->context->builder->icmp(
+            \PHPLLVM\Builder::INT_EQ,
+            $curHt,
+            $hashtable
+        );
+        $same = $this->context->builder->and($isHt, $samePtr);
+        $parentFn = $block->getParent();
+        assert($parentFn instanceof \PHPLLVM\Value\Function_);
+        $noop = $parentFn->appendBasicBlock('write_ht_same_noop');
+        $write = $parentFn->appendBasicBlock('write_ht_replace');
+        $this->context->builder->branchIf($same, $noop, $write);
+        $this->context->builder->positionAtEnd($noop);
+        $this->context->builder->returnVoid();
+        $this->context->builder->positionAtEnd($write);
         $this->context->builder->call(
             $this->context->lookupFunction('__value__valueDelref'),
             $value
         );
         $this->context->builder->store(
             $this->context->getTypeFromString('int8')->constInt(Variable::TYPE_HASHTABLE, false),
-            $this->context->builder->structGep($value, $map['type'])
+            $typeSlot
         );
-        $ptrField = $this->context->builder->structGep($value, $map['value']);
-        $htSlot = $this->context->builder->pointerCast($ptrField, $htPtr->pointerType(0));
         $this->context->builder->store($hashtable, $htSlot);
         // Sole owner claim for the value box (Zend zval array assignment). Callers that
         // store a shared HT must addref before writeHashtable (#24226 / #36252).
