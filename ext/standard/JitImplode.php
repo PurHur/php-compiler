@@ -11,6 +11,7 @@ declare(strict_types=1);
  * 0..numElements-1 (#26970).
  *
  * Elements are coerced with strval() (php-src php_implode); do not assume __string__*.
+ * Rest parts grow via String_::appendInPlace (smart_str_appendl), not full concat (#36386).
  */
 
 namespace PHPCompiler\ext\standard;
@@ -163,17 +164,31 @@ final class JitImplode
         $started = $context->builder->load($startedSlot);
         $context->builder->branchIf($started, $restBb, $firstBb);
 
+        $glueVar = new Variable($context, Variable::TYPE_STRING, Variable::KIND_VALUE, $glue);
+        $partVar = new Variable($context, Variable::TYPE_STRING, Variable::KIND_VALUE, $part);
+        // Skip appendInPlace RHS pin/delref: glue/parts are interned literals or
+        // strval temps that must outlive the accumulator grow (pin delref of an
+        // interned literal frees it — segfault on implode of ['a','b']) (#36386).
+        $glueVar->compileTimeString = '';
+        $partVar->compileTimeString = '';
+        // Distinct Variable wrappers: appendInPlace names blocks by spl_object_id.
+        $destFirst = new Variable($context, Variable::TYPE_STRING, Variable::KIND_VARIABLE, $resultSlot);
+        $destGlue = new Variable($context, Variable::TYPE_STRING, Variable::KIND_VARIABLE, $resultSlot);
+        $destPart = new Variable($context, Variable::TYPE_STRING, Variable::KIND_VARIABLE, $resultSlot);
+
         $context->builder->positionAtEnd($firstBb);
-        $owned = $context->builder->call($context->lookupFunction('__string__separate'), $part);
-        $context->builder->store($owned, $resultSlot);
+        // Grow the malloc'd empty accumulator. Do not __string__separate interned
+        // literals into resultSlot — malloc_usable_size on non-heap is UB (#36386).
+        $context->type->string->appendInPlace($destFirst, $partVar);
         $context->builder->store($i1->constInt(1, false), $startedSlot);
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($restBb);
-        $acc = $context->builder->load($resultSlot);
-        $withGlue = JitStringConcat::concat($context, $acc, $glue);
-        $acc = JitStringConcat::concat($context, $withGlue, $part);
-        $context->builder->store($acc, $resultSlot);
+        // php-src ext/standard/string.c php_implode: smart_str_appendl(delim) then
+        // smart_str_appendl(tmp) — geometric growth, not alloc+memcpy of the whole
+        // accumulator per element (O(n²) via JitStringConcat).
+        $context->type->string->appendInPlace($destGlue, $glueVar);
+        $context->type->string->appendInPlace($destPart, $partVar);
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($done);
