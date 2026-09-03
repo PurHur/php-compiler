@@ -1846,7 +1846,7 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `DOMCharacterData::replaceWith` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DOMCharacterData::substringData` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DOMComment::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `DOMDocument::__construct` | yes | yes | fold | standard | compile-time fold — non-literal inputs fail AOT build (#36203) |
+| `DOMDocument::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DOMDocument::adoptNode` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DOMDocument::append` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DOMDocument::appendChild` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -2277,8 +2277,8 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `Dom\HTMLCollection::item` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `Dom\HTMLCollection::namedItem` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `Dom\HTMLDocument::createEmpty` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `Dom\HTMLDocument::createFromFile` | yes | yes | yes | standard |  |
-| `Dom\HTMLDocument::createFromString` | yes | yes | yes | standard |  |
+| `Dom\HTMLDocument::createFromFile` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `Dom\HTMLDocument::createFromString` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `Dom\HTMLDocument::getElementById` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `Dom\HTMLDocument::querySelector` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `Dom\HTMLDocument::querySelectorAll` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -2338,8 +2338,8 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `Dom\TokenList::toggle` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `Dom\XMLDocument::createEmpty` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `Dom\XMLDocument::createEntityReference` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `Dom\XMLDocument::createFromFile` | yes | yes | yes | standard |  |
-| `Dom\XMLDocument::createFromString` | yes | yes | yes | standard |  |
+| `Dom\XMLDocument::createFromFile` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `Dom\XMLDocument::createFromString` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `Dom\XMLDocument::querySelector` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `Dom\XMLDocument::querySelectorAll` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `Dom\XMLDocument::saveXmlFile` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -3501,28 +3501,28 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `SNMP::set` | yes | no | no | snmp | not implemented for JIT in this compiler build |
 | `SNMP::setSecurity` | yes | no | no | snmp | not implemented for JIT in this compiler build |
 | `SNMP::walk` | yes | no | no | snmp | not implemented for JIT in this compiler build |
-| `SQLite3::__construct` | yes | yes | fold | sqlite3 | compile-time fold — non-literal inputs fail AOT build (#36203) |
+| `SQLite3::__construct` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
 | `SQLite3::backup` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
-| `SQLite3::busyTimeout` | yes | yes | fold | sqlite3 | compile-time fold — non-literal inputs fail AOT build (#36203) |
-| `SQLite3::changes` | yes | yes | fold | sqlite3 | compile-time fold — non-literal inputs fail AOT build (#36203) |
-| `SQLite3::close` | yes | yes | fold | sqlite3 | compile-time fold — non-literal inputs fail AOT build (#36203) |
+| `SQLite3::busyTimeout` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
+| `SQLite3::changes` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
+| `SQLite3::close` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
 | `SQLite3::createAggregate` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
 | `SQLite3::createCollation` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
 | `SQLite3::createFunction` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
-| `SQLite3::enableExceptions` | yes | yes | fold | sqlite3 | compile-time fold — non-literal inputs fail AOT build (#36203) |
-| `SQLite3::escapeString` | yes | yes | fold | sqlite3 | compile-time fold — non-literal inputs fail AOT build (#36203) |
-| `SQLite3::exec` | yes | yes | fold | sqlite3 | compile-time fold — non-literal inputs fail AOT build (#36203) |
-| `SQLite3::lastErrorCode` | yes | yes | fold | sqlite3 | compile-time fold — non-literal inputs fail AOT build (#36203) |
-| `SQLite3::lastErrorMsg` | yes | yes | fold | sqlite3 | compile-time fold — non-literal inputs fail AOT build (#36203) |
-| `SQLite3::lastInsertRowID` | yes | yes | fold | sqlite3 | compile-time fold — non-literal inputs fail AOT build (#36203) |
+| `SQLite3::enableExceptions` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
+| `SQLite3::escapeString` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
+| `SQLite3::exec` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
+| `SQLite3::lastErrorCode` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
+| `SQLite3::lastErrorMsg` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
+| `SQLite3::lastInsertRowID` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
 | `SQLite3::loadExtension` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
-| `SQLite3::open` | yes | yes | fold | sqlite3 | compile-time fold — non-literal inputs fail AOT build (#36203) |
+| `SQLite3::open` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
 | `SQLite3::openBlob` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
-| `SQLite3::prepare` | yes | yes | fold | sqlite3 | compile-time fold — non-literal inputs fail AOT build (#36203) |
-| `SQLite3::query` | yes | yes | fold | sqlite3 | compile-time fold — non-literal inputs fail AOT build (#36203) |
-| `SQLite3::querySingle` | yes | yes | fold | sqlite3 | compile-time fold — non-literal inputs fail AOT build (#36203) |
+| `SQLite3::prepare` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
+| `SQLite3::query` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
+| `SQLite3::querySingle` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
 | `SQLite3::setauthorizer` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
-| `SQLite3::version` | yes | yes | fold | sqlite3 | compile-time fold — non-literal inputs fail AOT build (#36203) |
+| `SQLite3::version` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
 | `SQLite3Exception::__construct` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
 | `SQLite3Exception::__toString` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
 | `SQLite3Exception::__wakeup` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
@@ -3534,22 +3534,22 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `SQLite3Exception::getTrace` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
 | `SQLite3Exception::getTraceAsString` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
 | `SQLite3Result::columnName` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
-| `SQLite3Result::columnType` | yes | yes | yes | sqlite3 |  |
+| `SQLite3Result::columnType` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
 | `SQLite3Result::fetchAll` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
-| `SQLite3Result::fetchArray` | yes | yes | yes | sqlite3 |  |
+| `SQLite3Result::fetchArray` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
 | `SQLite3Result::finalize` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
 | `SQLite3Result::numColumns` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
 | `SQLite3Result::reset` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
-| `SQLite3Stmt::bindParam` | yes | yes | fold | sqlite3 | compile-time fold — non-literal inputs fail AOT build (#36203) |
-| `SQLite3Stmt::bindValue` | yes | yes | fold | sqlite3 | compile-time fold — non-literal inputs fail AOT build (#36203) |
+| `SQLite3Stmt::bindParam` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
+| `SQLite3Stmt::bindValue` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
 | `SQLite3Stmt::busy` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
 | `SQLite3Stmt::clear` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
 | `SQLite3Stmt::close` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
-| `SQLite3Stmt::execute` | yes | yes | fold | sqlite3 | compile-time fold — non-literal inputs fail AOT build (#36203) |
+| `SQLite3Stmt::execute` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
 | `SQLite3Stmt::explain` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
-| `SQLite3Stmt::getSQL` | yes | yes | fold | sqlite3 | compile-time fold — non-literal inputs fail AOT build (#36203) |
-| `SQLite3Stmt::paramCount` | yes | yes | fold | sqlite3 | compile-time fold — non-literal inputs fail AOT build (#36203) |
-| `SQLite3Stmt::readOnly` | yes | yes | fold | sqlite3 | compile-time fold — non-literal inputs fail AOT build (#36203) |
+| `SQLite3Stmt::getSQL` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
+| `SQLite3Stmt::paramCount` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
+| `SQLite3Stmt::readOnly` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
 | `SQLite3Stmt::reset` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
 | `SQLite3Stmt::setExplain` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
 | `SensitiveParameter::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
