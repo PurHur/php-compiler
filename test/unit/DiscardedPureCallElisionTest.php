@@ -79,6 +79,9 @@ final class DiscardedPureCallElisionTest extends TestCase
         $this->assertStringContainsString('DiscardedPureCallElision::tryElide', $source);
         $this->assertStringContainsString('TYPE_FUNCCALL_EXEC_NORETURN', $source);
         $this->assertStringContainsString('discardedCallElisionVoidNatives', $source);
+        // void(*)(…) formals must still register (#36386 simpleucall hallo(string)).
+        $this->assertStringContainsString('$isVoidReturn', $source);
+        $this->assertStringContainsString('Capture before appending', $source);
     }
 
     private function makeContext(): Context

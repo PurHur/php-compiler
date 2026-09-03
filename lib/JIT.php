@@ -2965,6 +2965,7 @@ class JIT {
         $rawTypes = [];
         $argVars = [];
         $returnsByRef = false;
+        $isVoidReturn = false;
         if (!is_null($block->func)) {
             $returnsByRef = $this->cfgFunctionReturnsByRef($block->func);
             $callbackType = $returnsByRef
@@ -2984,6 +2985,9 @@ class JIT {
             if ($this->isM5NestedJitPhpCfgParserParse($logicalName)) {
                 $callbackType = '__object__*';
             }
+            // Capture before appending `(*)(…)` — elision registry must see void returns
+            // with typed params (`void(*)(__string__*)`), not only bare `void` (#36386).
+            $isVoidReturn = 'void' === $callbackType;
             $returnType = $this->context->getTypeFromString($callbackType);
             $this->context->functionReturnType[strtolower($logicalName ?? $internalName)] = $callbackType;
 
@@ -3150,7 +3154,7 @@ class JIT {
                 JIT\NoDiscardCallGuard::registerCallee($this->context, $funcName, $block);
                 JIT\DeprecatedCallGuard::registerCallee($this->context, $funcName, $block);
                 if (
-                    'void' === $callbackType
+                    $isVoidReturn
                     && Block::isEffectFreeVoidCalleeBody($block)
                     && !$block->noDiscard
                     && null === $block->deprecated
