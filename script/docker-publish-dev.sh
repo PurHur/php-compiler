@@ -6,16 +6,19 @@
 #   ./script/docker-publish-dev.sh              # build + tag locally (no push)
 #   ./script/docker-publish-dev.sh --push       # buildx build --push to registry
 #   ./script/docker-publish-dev.sh --dry-run    # print commands only
+#   PLATFORMS=linux/amd64,linux/arm64 ./script/docker-publish-dev.sh --push   # multi-arch (#36391)
 #
 # Tags (override via env):
 #   LOCAL_DEV_IMAGE=php-compiler:22.04-dev
 #   PHP_COMPILER_DEV_IMAGE=ghcr.io/PurHur/php-compiler:dev
+#   PLATFORMS=linux/amd64                     # default; add linux/arm64 for multi-arch push
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 LOCAL_TAG="${LOCAL_DEV_IMAGE:-php-compiler:22.04-dev}"
 REGISTRY_TAG="${PHP_COMPILER_DEV_IMAGE:-ghcr.io/PurHur/php-compiler:dev}"
 DOCKERFILE="Docker/dev/ubuntu-22.04/Dockerfile"
+PLATFORMS="${PLATFORMS:-linux/amd64}"
 PUSH=0
 DRY_RUN=0
 
@@ -30,6 +33,8 @@ Usage: script/docker-publish-dev.sh [--push] [--dry-run]
 Environment:
   LOCAL_DEV_IMAGE          local tag (default: php-compiler:22.04-dev)
   PHP_COMPILER_DEV_IMAGE   registry tag (default: ghcr.io/PurHur/php-compiler:dev)
+  PLATFORMS                buildx platforms (default: linux/amd64; #36391:
+                           linux/amd64,linux/arm64 for multi-arch ghcr)
 
 Contributors without registry access: make docker-build-22
 EOF
@@ -58,13 +63,13 @@ if ! docker info >/dev/null 2>&1; then
 fi
 
 if [[ "${PUSH}" -eq 1 ]]; then
-  echo "Publishing ${REGISTRY_TAG} (and ${LOCAL_TAG}) via buildx..."
+  echo "Publishing ${REGISTRY_TAG} (and ${LOCAL_TAG}) via buildx (platforms=${PLATFORMS})..."
   cmd=(docker buildx build -f "${DOCKERFILE}"
     -t "${LOCAL_TAG}" -t "${REGISTRY_TAG}"
-    --platform linux/amd64
+    --platform "${PLATFORMS}"
     --push .)
   run "${cmd[@]}"
-  echo "Published ${REGISTRY_TAG}"
+  echo "Published ${REGISTRY_TAG} (${PLATFORMS})"
   echo "Consumers: export PHP_COMPILER_DEV_IMAGE=${REGISTRY_TAG}"
   echo "           docker pull ${REGISTRY_TAG}"
   exit 0
