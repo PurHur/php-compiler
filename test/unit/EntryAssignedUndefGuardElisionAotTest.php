@@ -141,4 +141,79 @@ final class EntryAssignedUndefGuardElisionAotTest extends TestCase
             @unlink($bin);
         }
     }
+
+    public function testNestedClosureUncapturedVarStillWarns(): void
+    {
+        $src = <<<'PHP'
+        <?php
+        function outer(): void {
+            $x = 1;
+            $f = function () {
+                echo $x, "\n";
+            };
+            $f();
+        }
+        outer();
+        PHP;
+        $path = sys_get_temp_dir().'/phpc_undef_closure_'.getmypid().'.php';
+        $bin = sys_get_temp_dir().'/phpc_undef_closure_'.getmypid().'.bin';
+        file_put_contents($path, $src);
+        try {
+            $cmd = escapeshellarg(PHP_BINARY).' '
+                .escapeshellarg(__DIR__.'/../../bin/compile.php').' -o '
+                .escapeshellarg($bin).' '.escapeshellarg($path).' 2>&1';
+            exec($cmd, $out, $rc);
+            $this->assertSame(0, $rc, implode("\n", $out));
+
+            $zendCmd = escapeshellarg(PHP_BINARY).' '.escapeshellarg($path).' 2>&1';
+            exec($zendCmd, $zendOut, $zendRc);
+            $this->assertSame(0, $zendRc, implode("\n", $zendOut));
+
+            exec(escapeshellarg($bin).' 2>&1', $aotOut, $aotRc);
+            $this->assertSame(0, $aotRc, implode("\n", $aotOut));
+            $this->assertSame(implode("\n", $zendOut), implode("\n", $aotOut));
+            $joined = implode("\n", $aotOut);
+            $this->assertStringContainsString('Undefined variable', $joined);
+        } finally {
+            @unlink($path);
+            @unlink($bin);
+        }
+    }
+
+    public function testNestedFunctionUncapturedVarStillWarns(): void
+    {
+        $src = <<<'PHP'
+        <?php
+        function outer(): void {
+            $x = 1;
+            function inner(): void {
+                echo $x, "\n";
+            }
+            inner();
+        }
+        outer();
+        PHP;
+        $path = sys_get_temp_dir().'/phpc_undef_nestedfn_'.getmypid().'.php';
+        $bin = sys_get_temp_dir().'/phpc_undef_nestedfn_'.getmypid().'.bin';
+        file_put_contents($path, $src);
+        try {
+            $cmd = escapeshellarg(PHP_BINARY).' '
+                .escapeshellarg(__DIR__.'/../../bin/compile.php').' -o '
+                .escapeshellarg($bin).' '.escapeshellarg($path).' 2>&1';
+            exec($cmd, $out, $rc);
+            $this->assertSame(0, $rc, implode("\n", $out));
+
+            $zendCmd = escapeshellarg(PHP_BINARY).' '.escapeshellarg($path).' 2>&1';
+            exec($zendCmd, $zendOut, $zendRc);
+            $this->assertSame(0, $zendRc, implode("\n", $zendOut));
+
+            exec(escapeshellarg($bin).' 2>&1', $aotOut, $aotRc);
+            $this->assertSame(0, $aotRc, implode("\n", $aotOut));
+            $this->assertSame(implode("\n", $zendOut), implode("\n", $aotOut));
+            $this->assertStringContainsString('Undefined variable', implode("\n", $aotOut));
+        } finally {
+            @unlink($path);
+            @unlink($bin);
+        }
+    }
 }
