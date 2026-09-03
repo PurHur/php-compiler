@@ -49,4 +49,19 @@ final class Issue36388ArrayDelrefHonestyTest extends TestCase
         $this->assertStringContainsString('ephemeralArrayTemp = true', $ht);
         $this->assertStringContainsString('skipAddrefForHashtableMove', $jit);
     }
+
+    public function testNativePackedValueBoxElementSkipsHeapPromote(): void
+    {
+        $src = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/HashTableWriteLlvm.php');
+        $this->assertStringContainsString(
+            'Prefer storing via `__value__read*` into the native slot',
+            $src,
+            'TYPE_VALUE into int[] must not heap-promote (#36388 packed leak)'
+        );
+        $this->assertStringContainsString(
+            'Delref the materialize claim so the value-box is sole owner',
+            $src,
+            'promoteNativeArrayVariableToHashtable must balance writeHashtable retain (#36388)'
+        );
+    }
 }

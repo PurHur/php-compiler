@@ -1074,15 +1074,32 @@ final class HashTableWriteLlvm
         };
     }
 
-    /** Native packed arrays inferred as scalar must widen when storing enum case objects (#5722, #5638). */
+    /**
+     * Native packed arrays inferred as scalar must widen when storing enum case objects (#5722, #5638).
+     *
+     * Untyped locals (`$i` in {main}) are {@see Variable::TYPE_VALUE} even when they hold a
+     * native long. Promoting `int[]` → heap HT on every `[$i]` left rc=2 and leaked ~240 B/iter
+     * under thin AOT (#36388). Prefer storing via `__value__read*` into the native slot.
+     */
     public static function nativeArrayNeedsHashtablePromotion(Variable $array, Variable $element): bool
     {
         if (0 === ($array->type & Variable::IS_NATIVE_ARRAY)) {
             return false;
         }
         $elemType = $array->type & ~Variable::IS_NATIVE_ARRAY;
+        if ($element->type === $elemType) {
+            return false;
+        }
+        if (Variable::TYPE_VALUE === $element->type) {
+            return match ($elemType) {
+                Variable::TYPE_NATIVE_LONG,
+                Variable::TYPE_NATIVE_DOUBLE,
+                Variable::TYPE_NATIVE_BOOL => false,
+                default => true,
+            };
+        }
 
-        return $element->type !== $elemType;
+        return true;
     }
 
     public static function promoteNativeArrayVariableToHashtable(Context $context, Variable $array): void
@@ -1090,12 +1107,21 @@ final class HashTableWriteLlvm
         if (0 === ($array->type & Variable::IS_NATIVE_ARRAY)) {
             return;
         }
+        // materializeNativeArrayForCall addrefs to rc=1; writeHashtable addrefs again.
+        // Delref the materialize claim so the value-box is sole owner (rc=1) — otherwise
+        // reassign/unset never reach __hashtable__dtor (#36388 / peer initArray ephemeral move).
         $ht = self::materializeNativeArrayForCall($context, $array);
         $slot = JitValueBox::alloc($context);
         $context->builder->call(
             $context->lookupFunction('__value__writeHashtable'),
             JitValueBox::pointer($context, $slot),
             $ht
+        );
+        $context->refcount->delref(
+            $context->builder->pointerCast(
+                $ht,
+                $context->getTypeFromString('__ref__virtual*')
+            )
         );
         $array->type = Variable::TYPE_VALUE;
         $array->value = $slot;
@@ -1150,9 +1176,43 @@ final class HashTableWriteLlvm
         $elemType = $array->type & ~Variable::IS_NATIVE_ARRAY;
         if (Variable::TYPE_STRING === $elemType) {
             $context->builder->store(self::ownedString($context, $element), $slot);
-        } else {
-            $context->builder->store($context->helper->loadValue($element), $slot);
+
+            return;
         }
+        // Untyped value-box scalars → native packed slots without heap promote (#36388).
+        if (Variable::TYPE_VALUE === $element->type) {
+            $valPtr = JitValueBox::valuePtrFromVariable($context, $element);
+            if (Variable::TYPE_NATIVE_LONG === $elemType) {
+                $context->builder->store(
+                    $context->builder->call($context->lookupFunction('__value__readLong'), $valPtr),
+                    $slot
+                );
+
+                return;
+            }
+            if (Variable::TYPE_NATIVE_DOUBLE === $elemType) {
+                $context->builder->store(
+                    $context->builder->call($context->lookupFunction('__value__readDouble'), $valPtr),
+                    $slot
+                );
+
+                return;
+            }
+            if (Variable::TYPE_NATIVE_BOOL === $elemType) {
+                // No __value__readBool ABI — writeBool stores int8; native slots are int1.
+                $boolByte = JitValueBox::readBoolByte($context, $valPtr);
+                $context->builder->store(
+                    $context->builder->truncOrBitCast(
+                        $boolByte,
+                        $context->getTypeFromString('int1')
+                    ),
+                    $slot
+                );
+
+                return;
+            }
+        }
+        $context->builder->store($context->helper->loadValue($element), $slot);
     }
 
     public static function setValueBoxKey(
