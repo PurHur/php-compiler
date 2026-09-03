@@ -351,6 +351,35 @@ class Compiler {
     /** @var array<string, true> reentrancy set while computing a cache entry (#36387). */
     private array $isSiblingMultiArgFuncCallProducerComputing = [];
 
+    /**
+     * Memoize deferredSiblingInlineCallArgConsumerIndex per producer (#36387).
+     *
+     * @var array<int, int> spl_object_id(producer) => consumer index, or -1 for null
+     */
+    private array $deferredSiblingInlineCallArgConsumerIndexCache = [];
+
+    /**
+     * Memoize callArgIsDeadInlineTemporary per operand (#36387).
+     *
+     * @var array<int, bool>
+     */
+    private array $callArgIsDeadInlineTemporaryCache = [];
+
+    /**
+     * Memoize resolveCfgFuncCallName per call op (#36387).
+     *
+     * @var array<int, string|null>
+     */
+    private array $resolveCfgFuncCallNameCache = [];
+
+    /**
+     * Memoize deadInlineTemporaryArgCount per consumer op (#36387).
+     *
+     * @var array<int, int>
+     */
+    private array $deadInlineTemporaryArgCountCache = [];
+
+
     /** Catch variable name (lc) => scope slot while lowering catch bodies (#9887). */
     private array $activeCatchVarSlotsByName = [];
 
@@ -716,6 +745,10 @@ class Compiler {
         $this->firstSiblingInlineFuncCallProducerCache = [];
         $this->isSiblingMultiArgFuncCallProducerCache = [];
         $this->isSiblingMultiArgFuncCallProducerComputing = [];
+        $this->deferredSiblingInlineCallArgConsumerIndexCache = [];
+        $this->callArgIsDeadInlineTemporaryCache = [];
+        $this->resolveCfgFuncCallNameCache = [];
+        $this->deadInlineTemporaryArgCountCache = [];
         $this->cfgProducerIndexLastSyncFingerprint = -1;
         $this->debugWriteLastPhase('Compiler::compile enter');
 
@@ -18993,16 +19026,8 @@ class Compiler {
                 || $producer instanceof Op\Expr\StaticCall
                 || $producer instanceof Op\Expr\MethodCall)
         ) {
-            $callIndex = null;
-            $producerIndex = null;
-            foreach ($block->orig->children as $i => $child) {
-                if ($child === $callOp) {
-                    $callIndex = $i;
-                }
-                if ($child === $producer) {
-                    $producerIndex = $i;
-                }
-            }
+            $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $callOp, $block->orig);
+            $producerIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $producer, $block->orig);
             if (
                 null !== $callIndex
                 && null !== $producerIndex
@@ -19131,16 +19156,8 @@ class Compiler {
         }
         // php-cfg uses distinct result/arg temps for `$f($a[0])` (#8814, zend_compile.c).
         if ($producer instanceof Op\Expr\ArrayDimFetch) {
-            $callIndex = null;
-            $producerIndex = null;
-            foreach ($block->orig->children as $i => $child) {
-                if ($child === $callOp) {
-                    $callIndex = $i;
-                }
-                if ($child === $producer) {
-                    $producerIndex = $i;
-                }
-            }
+            $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $callOp, $block->orig);
+            $producerIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $producer, $block->orig);
             if (null !== $callIndex && null !== $producerIndex && $producerIndex === $callIndex - 1) {
                 return $producerSlot;
             }
@@ -19151,16 +19168,8 @@ class Compiler {
             || $producer instanceof Op\Expr\NullsafePropertyFetch
             || $producer instanceof Op\Expr\NullsafeMethodCall
         ) {
-            $callIndex = null;
-            $producerIndex = null;
-            foreach ($block->orig->children as $i => $child) {
-                if ($child === $callOp) {
-                    $callIndex = $i;
-                }
-                if ($child === $producer) {
-                    $producerIndex = $i;
-                }
-            }
+            $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $callOp, $block->orig);
+            $producerIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $producer, $block->orig);
             if (null !== $callIndex && null !== $producerIndex && $producerIndex === $callIndex - 1) {
                 return $producerSlot;
             }
@@ -19176,16 +19185,8 @@ class Compiler {
                 || $producer instanceof Op\Expr\MethodCall
                 || $producer instanceof Op\Expr\StaticCall)
         ) {
-            $callIndex = null;
-            $producerIndex = null;
-            foreach ($block->orig->children as $i => $child) {
-                if ($child === $callOp) {
-                    $callIndex = $i;
-                }
-                if ($child === $producer) {
-                    $producerIndex = $i;
-                }
-            }
+            $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $callOp, $block->orig);
+            $producerIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $producer, $block->orig);
             if (
                 null !== $callIndex
                 && null !== $producerIndex
@@ -19215,16 +19216,8 @@ class Compiler {
             || $producer instanceof Op\Expr\StaticCall
             || $producer instanceof Op\Expr\MethodCall
         ) {
-            $callIndex = null;
-            $producerIndex = null;
-            foreach ($block->orig->children as $i => $child) {
-                if ($child === $callOp) {
-                    $callIndex = $i;
-                }
-                if ($child === $producer) {
-                    $producerIndex = $i;
-                }
-            }
+            $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $callOp, $block->orig);
+            $producerIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $producer, $block->orig);
             if (
                 null !== $callIndex
                 && null !== $producerIndex
@@ -28585,12 +28578,17 @@ class Compiler {
         if (null === $consumer || !property_exists($consumer, 'args') || !\is_array($consumer->args)) {
             return 0;
         }
+        $cacheKey = spl_object_id($consumer);
+        if (\array_key_exists($cacheKey, $this->deadInlineTemporaryArgCountCache)) {
+            return $this->deadInlineTemporaryArgCountCache[$cacheKey];
+        }
         $count = 0;
         foreach ($consumer->args as $arg) {
             if ($this->callArgIsDeadInlineTemporary($arg)) {
                 ++$count;
             }
         }
+        $this->deadInlineTemporaryArgCountCache[$cacheKey] = $count;
 
         return $count;
     }
@@ -29382,6 +29380,28 @@ class Compiler {
      */
     private function deferredSiblingInlineCallArgConsumerIndex(Op $op, array $ops, int $producerIndex): ?int
     {
+        $cacheKey = spl_object_id($op);
+        if (\array_key_exists($cacheKey, $this->deferredSiblingInlineCallArgConsumerIndexCache)) {
+            $cached = $this->deferredSiblingInlineCallArgConsumerIndexCache[$cacheKey];
+
+            return $cached < 0 ? null : $cached;
+        }
+        $result = $this->computeDeferredSiblingInlineCallArgConsumerIndex($op, $ops, $producerIndex);
+        $this->deferredSiblingInlineCallArgConsumerIndexCache[$cacheKey] = null === $result ? -1 : $result;
+
+        return $result;
+    }
+
+    /**
+     * Forward scan for the multi-arg consumer that should compile a hoisted sibling producer.
+     *
+     * Bound the walk: isSibling rejects pairs beyond max(8, arity×4), and scanning every later
+     * FuncCall in a block of repeated nested call stmts was O(n²) PHP call overhead (#36387).
+     *
+     * @param Op[] $ops
+     */
+    private function computeDeferredSiblingInlineCallArgConsumerIndex(Op $op, array $ops, int $producerIndex): ?int
+    {
         if (!$this->isSiblingInlineCallProducerExpr($op)) {
             return null;
         }
@@ -29392,7 +29412,9 @@ class Compiler {
             return null;
         }
         $opCount = \count($ops);
-        for ($j = $producerIndex + 1; $j < $opCount; ++$j) {
+        // Hard cap past isSibling's practical maxDistance (arity×4); prelude-heavy nests stay inside.
+        $scanLimit = min($opCount, $producerIndex + 1 + 32);
+        for ($j = $producerIndex + 1; $j < $scanLimit; ++$j) {
             $next = $ops[$j];
             if ($next instanceof Op\Expr\FuncCall || $next instanceof Op\Expr\NsFuncCall) {
                 if ($this->isInlineExprCallArgConsumer($next)
@@ -29430,6 +29452,15 @@ class Compiler {
                     return $j;
                 }
 
+                // var_dump($g(), $g()) — keep scanning past 0/1-arg sibling producers toward the
+                // multi-arg consumer. A non-matching ≥2-arg call is the next statement's nest
+                // (or an unrelated consumer) — stop so nested stmt blocks stay O(n) (#36387).
+                $nextArgCount = property_exists($next, 'args') && \is_array($next->args)
+                    ? \count($next->args)
+                    : 0;
+                if ($nextArgCount >= 2) {
+                    break;
+                }
                 continue;
             }
             if ($next instanceof Op\Expr\MethodCall || $next instanceof Op\Expr\StaticCall) {
@@ -29456,6 +29487,13 @@ class Compiler {
                     && $this->methodCallFeedsMultiArgConsumerAcrossScalarConstFetch($op, $next)
                 ) {
                     return $j;
+                }
+                // Non-matching multi-arg MethodCall/StaticCall ends the deferred-consumer search (#36387).
+                $nextArgCount = property_exists($next, 'args') && \is_array($next->args)
+                    ? \count($next->args)
+                    : 0;
+                if ($nextArgCount >= 2) {
+                    break;
                 }
                 continue;
             }
@@ -39367,18 +39405,33 @@ class Compiler {
         if (null === $arg) {
             return false;
         }
+        $cacheKey = spl_object_id($arg);
+        if (\array_key_exists($cacheKey, $this->callArgIsDeadInlineTemporaryCache)) {
+            return $this->callArgIsDeadInlineTemporaryCache[$cacheKey];
+        }
+        // Hot path: most php-cfg call-arg temps are Operand\Temporary (#36387).
+        if ($arg instanceof Operand\Temporary) {
+            // Bare named locals are SSA temps cloned for call-site flags (#8560) — not dead inline.
+            $result = null === Block::resolveVariableName($arg);
+            $this->callArgIsDeadInlineTemporaryCache[$cacheKey] = $result;
+
+            return $result;
+        }
         if ($this->isNamedVariableOperand($arg)) {
+            $this->callArgIsDeadInlineTemporaryCache[$cacheKey] = false;
+
             return false;
         }
         if (null !== Block::resolveVariableName($arg)) {
             // preg_match(..., $m, PREG_OFFSET_CAPTURE) — by-ref named local must not map to hoisted ConstFetch (#13714).
+            $this->callArgIsDeadInlineTemporaryCache[$cacheKey] = false;
+
             return false;
         }
-        if ($arg instanceof Operand\Temporary) {
-            return true;
-        }
+        $result = $arg instanceof Operand\Variable && !$this->isNamedVariableOperand($arg);
+        $this->callArgIsDeadInlineTemporaryCache[$cacheKey] = $result;
 
-        return $arg instanceof Operand\Variable && !$this->isNamedVariableOperand($arg);
+        return $result;
     }
 
     /** php-cfg embeds hoisted `($v = expr)` assign-in-call in the call-arg Temporary (#18524). */
@@ -41130,17 +41183,21 @@ class Compiler {
         if (!$call instanceof Op\Expr) {
             return null;
         }
+        $cacheKey = spl_object_id($call);
+        if (\array_key_exists($cacheKey, $this->resolveCfgFuncCallNameCache)) {
+            return $this->resolveCfgFuncCallNameCache[$cacheKey];
+        }
+        $result = null;
         if ($call instanceof Op\Expr\FuncCall && $call->name instanceof Operand\Literal) {
-            return strtolower((string) $call->name->value);
+            $result = strtolower((string) $call->name->value);
+        } elseif ($call instanceof Op\Expr\NsFuncCall && $call->name instanceof Operand\Literal) {
+            $result = strtolower((string) $call->name->value);
+        } elseif ($call instanceof Op\Expr\MethodCall && $call->name instanceof Operand\Literal) {
+            $result = strtolower((string) $call->name->value);
         }
-        if ($call instanceof Op\Expr\NsFuncCall && $call->name instanceof Operand\Literal) {
-            return strtolower((string) $call->name->value);
-        }
-        if ($call instanceof Op\Expr\MethodCall && $call->name instanceof Operand\Literal) {
-            return strtolower((string) $call->name->value);
-        }
+        $this->resolveCfgFuncCallNameCache[$cacheKey] = $result;
 
-        return null;
+        return $result;
     }
 
     /** Folded callee hint for variable calls ($fn = 'array_all'; $fn(...), #12766). */
