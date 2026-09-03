@@ -2005,4 +2005,43 @@ PHP;
         );
     }
 
+    /**
+     * Nested if with assignment-in-condition must not be rewritten as a property hook (#36382).
+     * Repro: nyholm/psr7 UploadedFile::moveTo — `if (false === $resource = @fopen(...)) {`.
+     */
+    public function testNestedAssignInIfConditionIsNotPropertyHook(): void
+    {
+        $src = <<<'PHP'
+<?php
+class UploadedFile {
+    private $file;
+    public function moveTo($targetPath): void {
+        if (null !== $this->file) {
+            return;
+        } else {
+            if (false === $resource = @\fopen($targetPath, 'w')) {
+                throw new \RuntimeException('nope');
+            }
+        }
+    }
+}
+PHP;
+        $err = PropertyHooks::referenceProfileHookSyntaxError($src);
+        self::assertNull($err, null !== $err ? ($err['message'] ?? 'unexpected hook reject') : '');
+
+        [$out] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString(
+            'if (false === $resource = @\fopen($targetPath, \'w\')) {',
+            $out
+        );
+        self::assertStringNotContainsString(
+            'if (false === $resource = @\fopen($targetPath, \'w\'));',
+            $out
+        );
+
+        $runtime = new Runtime(Runtime::MODE_AOT);
+        $block = $runtime->parseAndCompile($src, 'uploaded_assign_if.php');
+        self::assertNotNull($block);
+    }
+
 }

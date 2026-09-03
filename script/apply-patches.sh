@@ -108,6 +108,9 @@ patch_already_applied() {
     php-types-generics-fallback.patch)
       grep -q "non-empty-string" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
       ;;
+    php-types-class-generics-fallback.patch)
+      grep -q "Class generics from PHPStan/Psalm docblocks: App<T>" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
+      ;;
     php-types-generics-list-array.patch)
       grep -qE "preg_match\('/\^\(list\|array" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null \
         || grep -qF "preg_match('/^(list|array|iterable)" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
@@ -7336,6 +7339,51 @@ PY
     echo "Applied php-types-generics-fallback.patch (overlay)"
     return 0
   fi
+  if [[ "$(basename "$patch")" == "php-types-class-generics-fallback.patch" ]]; then
+    local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
+    if grep -q "Class generics from PHPStan/Psalm docblocks: App<T>" "$target" 2>/dev/null; then
+      echo "Skip php-types-class-generics-fallback.patch (already applied)"
+      return 0
+    fi
+    if [[ -f "$PATCH_DIR/php-types-class-generics-fallback.patch" ]] \
+      && run_patch -p0 --forward --dry-run < "$PATCH_DIR/php-types-class-generics-fallback.patch" >/dev/null 2>&1; then
+      if ! run_patch -p0 --forward < "$PATCH_DIR/php-types-class-generics-fallback.patch"; then
+        record_patch_failure "php-types-class-generics-fallback.patch" "patch(1) -F0 partial or failed"
+        return 1
+      fi
+      echo "Applied php-types-class-generics-fallback.patch"
+      return 0
+    fi
+    python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+anchor = """        if (preg_match('/^(list|array|iterable)\\s*</i', trim($decl))) {
+            return new self(self::TYPE_ARRAY);
+        }
+        if (preg_match('/@anonymous\\x00/', $decl)) {
+"""
+insert = """        if (preg_match('/^(list|array|iterable)\\s*</i', trim($decl))) {
+            return new self(self::TYPE_ARRAY);
+        }
+        // Class generics from PHPStan/Psalm docblocks: App<T> (#36382 Slim).
+        if (preg_match('/^(.+?)\\s*<.*>\\s*$/s', trim($decl), $genericClass)) {
+            return self::fromDecl(trim($genericClass[1]));
+        }
+        if (preg_match('/@anonymous\\x00/', $decl)) {
+"""
+if "Class generics from PHPStan/Psalm docblocks: App<T>" in text:
+    sys.exit(0)
+if anchor not in text:
+    sys.stderr.write("php-types-class-generics-fallback: anchor not found in Type.php\n")
+    sys.exit(1)
+path.write_text(text.replace(anchor, insert, 1))
+PY
+    echo "Applied php-types-class-generics-fallback.patch (overlay)"
+    return 0
+  fi
   if [[ "$(basename "$patch")" == "php-types-fromdecl-trailing-comma.patch" ]]; then
     apply_php_types_fromdecl_trailing_comma_overlay
     return $?
@@ -7783,6 +7831,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-docblock-first-token.patch"
   apply_patch "$PATCH_DIR/php-types-array-shape.patch"
   apply_patch "$PATCH_DIR/php-types-generics-fallback.patch"
+  apply_patch "$PATCH_DIR/php-types-class-generics-fallback.patch"
   apply_patch "$PATCH_DIR/php-types-generics-list-array.patch"
   apply_patch "$PATCH_DIR/php-types-iterable-generic.patch"
   apply_patch "$PATCH_DIR/php-types-docblock-trailing-text.patch"

@@ -1,0 +1,13 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
+@@ -456,6 +456,10 @@
+         if (preg_match('/^(list|array|iterable)\s*</i', trim($decl))) {
+             return new self(self::TYPE_ARRAY);
+         }
++        // Class generics from PHPStan/Psalm docblocks: App<T> (#36382 Slim).
++        if (preg_match('/^(.+?)\s*<.*>\s*$/s', trim($decl), $genericClass)) {
++            return self::fromDecl(trim($genericClass[1]));
++        }
+         if (preg_match('/@anonymous\x00/', $decl)) {
+             return new self(self::TYPE_OBJECT, [], $decl);
+         }
