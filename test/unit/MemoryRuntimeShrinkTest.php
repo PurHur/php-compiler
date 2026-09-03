@@ -33,7 +33,11 @@ final class MemoryRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('G_EMALLOC_CURRENT', $source);
         $this->assertStringContainsString('emitNoteEmallocDelta', $source);
         $this->assertStringContainsString('isThinStandaloneAotMain', $source);
-        $this->assertLessThan(520, \substr_count($source, "\n") + 1);
+        $this->assertStringContainsString('phpc_request_begin', $source);
+        $this->assertStringContainsString('phpc_request_end', $source);
+        $this->assertStringContainsString('emitRequestBeginForStandaloneMain', $source);
+        $this->assertStringContainsString('emitRequestEndForStandaloneMain', $source);
+        $this->assertLessThan(620, \substr_count($source, "\n") + 1);
     }
 
     public function testMemoryJitHelperDelegatesToVmMemoryAndAccounting(): void
@@ -62,5 +66,12 @@ final class MemoryRuntimeShrinkTest extends TestCase
     public function testNoteAllocAbiNameUnchanged(): void
     {
         $this->assertSame('__phpc_memory_note_alloc', MemoryRuntime::NOTE_ALLOC);
+    }
+
+    public function testRequestBoundaryAbiNames(): void
+    {
+        $this->assertSame('phpc_request_begin', MemoryRuntime::REQUEST_BEGIN);
+        $this->assertSame('phpc_request_end', MemoryRuntime::REQUEST_END);
+        $this->assertSame('__phpc_mm_request_reset', MemoryRuntime::EMALLOC_REQUEST_RESET);
     }
 }

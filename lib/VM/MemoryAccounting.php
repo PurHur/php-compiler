@@ -122,10 +122,28 @@ final class MemoryAccounting
     /** Seed Zend MM cache bucket at request start (php_gc.c gc_mem_caches parity, #9160, #12921). */
     public static function beginRequest(): void
     {
+        // php_request_startup: fresh per-request emalloc baseline (#36388).
+        self::$currentEmalloc = 0;
+        self::$peakEmalloc = 0;
         self::$mmCacheRemaining = self::initialMmCache();
-        self::resetPeakToCurrent();
         self::$hasPeakQueryEmalloc = false;
+        self::$lastPeakQueryEmalloc = 0;
         self::$debugEmalloc = null;
+    }
+
+    /**
+     * php_request_shutdown memory half — zero emalloc counters (#36388).
+     *
+     * Pair with {@see beginRequest} around each FastCGI/CGI VM request so
+     * `memory_get_usage(false)` does not accumulate across keep-alive cycles.
+     */
+    public static function endRequest(): void
+    {
+        self::$currentEmalloc = 0;
+        self::$peakEmalloc = 0;
+        self::$mmCacheRemaining = 0;
+        self::$hasPeakQueryEmalloc = false;
+        self::$lastPeakQueryEmalloc = 0;
     }
 
     private static function debugEmallocEnabled(): bool

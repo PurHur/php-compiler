@@ -3372,6 +3372,10 @@ class Context {
                 // Helper .o static ctors register into phpc_gc_count before user code (#36245).
                 $emitInStandaloneMain(fn () => Builtin\GcCollectCyclesRuntime::emitUserScriptStandaloneRegistryReset($this));
             }
+            // Request boundary: reset Native emalloc counters (php_request_startup) (#36388).
+            if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
+                $emitInStandaloneMain(fn () => Builtin\MemoryRuntime::emitRequestBeginForStandaloneMain($this));
+            }
             $emitInStandaloneMain(fn () => Progress::emitNativeNote($this, 'c:main_before_php'));
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
                 $emitInStandaloneMain(fn () => Builtin\ObjectHandleRuntime::emitSnapBaselineForStandaloneMain($this));
@@ -3387,6 +3391,10 @@ class Context {
                 $emitInStandaloneMain(fn () => $this->builder->call($this->main));
             }
             $emitInStandaloneMain(fn () => Progress::emitNativeNote($this, 'c:main_after_php'));
+            // Request boundary: reset counters after user script (php_request_shutdown half) (#36388).
+            if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
+                $emitInStandaloneMain(fn () => Builtin\MemoryRuntime::emitRequestEndForStandaloneMain($this));
+            }
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
                 // Always abort pending Errors after user script — thin AOT previously skipped this
                 // and silently no-op'd final/readonly writes (#23665, readonly_property_write AOT).
