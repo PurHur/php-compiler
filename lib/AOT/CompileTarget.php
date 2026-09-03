@@ -168,6 +168,70 @@ final class CompileTarget
         };
     }
 
+    /**
+     * php-llvm {@see \PHPLLVM\LLVM::initialize} TargetSet class name (X86 / AArch64).
+     *
+     * {@see \PHPLLVM\LLVM::initializeNative} only loads the host TargetSet; AArch64::isNative()
+     * is hard-false in php-llvm, so cross (and even native aarch64) emit must call this.
+     */
+    public function llvmBackendName(): ?string
+    {
+        return match ($this->id) {
+            self::ID_AARCH64_LINUX, self::ID_AARCH64_DARWIN => 'AArch64',
+            self::ID_X86_64_LINUX => 'X86',
+            default => null,
+        };
+    }
+
+    /**
+     * Initialize host + this target's LLVM backend so {@see llvmTargetName} is registered.
+     *
+     * @throws \RuntimeException when a non-native target's backend is missing from libLLVM
+     */
+    public function initializeLlvm(\PHPLLVM\LLVM $llvm): void
+    {
+        $llvm->initializeNative();
+        $backend = $this->llvmBackendName();
+        if (null === $backend) {
+            return;
+        }
+        try {
+            $llvm->initialize($backend);
+        } catch (\LogicException $e) {
+            if (!$this->isHostNative()) {
+                throw new \RuntimeException(
+                    'LLVM backend '.$backend.' is not available for target '.$this->id()
+                    .' (#36391): '.$e->getMessage(),
+                    0,
+                    $e
+                );
+            }
+        }
+    }
+
+    /** Triple + data-layout on an LLVM module before types/codegen (AOT standalone). */
+    public function applyToModule(\PHPLLVM\Module $module): void
+    {
+        if (!isset(self::SPECS[$this->id])) {
+            return;
+        }
+        $module->setTarget($this->llvmTriple());
+        $layout = $this->dataLayout();
+        if ('' !== $layout) {
+            $module->setDataLayout($layout);
+        }
+    }
+
+    /** ELF e_machine (little-endian) for Linux targets; null for Mach-O / unknown. */
+    public function elfMachine(): ?int
+    {
+        return match ($this->id) {
+            self::ID_X86_64_LINUX => 62,   // EM_X86_64
+            self::ID_AARCH64_LINUX => 183, // EM_AARCH64
+            default => null,
+        };
+    }
+
     /** PHPLLVM\Target::RELOC_* for {@see createTargetMachine} (#36387). */
     public function llvmRelocModeConst(): int
     {

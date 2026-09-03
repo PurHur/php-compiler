@@ -1041,9 +1041,16 @@ class Context {
         $this->listUnpackMergeLlvmBlocks = new \SplObjectStorage();
         $this->loadType = $loadType;
         $this->llvm = PHPLLVM\Chooser::choose();
-        $this->llvm->initializeNative();
+        if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
+            CompileTarget::current()->initializeLlvm($this->llvm);
+        } else {
+            $this->llvm->initializeNative();
+        }
         $this->context = $this->llvm->contextCreate();
         $this->module = $this->context->moduleCreateWithName('main');
+        if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
+            CompileTarget::current()->applyToModule($this->module);
+        }
         $this->targetData = $this->module->getModuleDataLayout();
         $this->builder = $this->context->builderCreate();
         $this->intrinsic = $this->module->intrinsic($this->builder);
@@ -3450,15 +3457,17 @@ class Context {
     }
 
     /**
-     * TargetMachine for AOT object emit without creating an MCJIT ExecutionEngine (#36387).
+     * TargetMachine for AOT object emit without creating an MCJIT ExecutionEngine (#36387 / #36391).
      *
-     * Falls back to EE->getTargetMachine() when the php-llvm createTargetMachine patch is
-     * missing or the arch name is unknown.
+     * Uses {@see CompileTarget} triple/CPU/reloc. Host MCJIT EE fallback is native-only —
+     * a missing aarch64 backend must not silently emit x86_64 objects.
      */
     private function createAotTargetMachine(): PHPLLVM\TargetMachine
     {
+        $target = CompileTarget::current();
+        $target->initializeLlvm($this->llvm);
+        $target->applyToModule($this->module);
         try {
-            $target = CompileTarget::current();
             $llvmTarget = $this->llvm->getTargetFromName($target->llvmTargetName());
             $optEnv = Config::getenv('PHP_COMPILER_AOT_CODEGEN_OPT');
             $optLevel = PHPLLVM\Target::OPT_LEVEL_NONE;
@@ -3480,6 +3489,14 @@ class Context {
                 PHPLLVM\Target::CODE_MODEL_DEFAULT
             );
         } catch (\Throwable $e) {
+            if (!$target->isHostNative()) {
+                throw new \RuntimeException(
+                    'AOT TargetMachine for '.$target->id().' failed (refusing host MCJIT fallback) (#36391): '
+                    .$e->getMessage(),
+                    0,
+                    $e
+                );
+            }
             $engine = $this->module->createExecutionEngine();
 
             return $engine->getTargetMachine();
