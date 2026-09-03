@@ -319,6 +319,7 @@ final class Config
             'PHP_COMPILER_SELFHOST_AOT' => $bool(self::SCOPE_COMPILE, 'Self-host AOT emit mode', null, null),
             'PHP_COMPILER_VENDOR_PRELINK' => $bool(self::SCOPE_COMPILE, 'Use vendor prelinked objects', null, null),
             'PHP_COMPILER_AOT_USER_SCRIPT' => $str(self::SCOPE_COMPILE, 'User script path for AOT driver', null, null),
+            'PHP_COMPILER_AOT_CODEGEN_OPT' => $str(self::SCOPE_COMPILE, 'AOT TargetMachine codegen opt: none|less|default|aggressive', null, '#36387'),
             'PHP_COMPILER_KEEP_OBJECT_FILE' => $str(self::SCOPE_DEBUG, 'Keep intermediate .o path', null, null),
             'PHP_COMPILER_EMIT_BITCODE' => $str(self::SCOPE_DEBUG, 'Emit LLVM bitcode path', null, null),
             'PHP_COMPILER_EMIT_HELPER_LINK' => $bool(self::SCOPE_COMPILE, 'Link helper runtime into emit', null, null),

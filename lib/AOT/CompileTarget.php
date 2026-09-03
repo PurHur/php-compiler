@@ -156,6 +156,28 @@ final class CompileTarget
         return $this->spec['cpu'];
     }
 
+    /**
+     * LLVMGetTargetFromName arch token for {@see createTargetMachine} (#36387).
+     * Prefer this over {@see \PHPLLVM\LLVM::getTargetFromTriple} (missing LLVMTargetRef import).
+     */
+    public function llvmTargetName(): string
+    {
+        return match ($this->id) {
+            self::ID_AARCH64_LINUX, self::ID_AARCH64_DARWIN => 'aarch64',
+            default => 'x86-64',
+        };
+    }
+
+    /** PHPLLVM\Target::RELOC_* for {@see createTargetMachine} (#36387). */
+    public function llvmRelocModeConst(): int
+    {
+        return match ($this->relocMode()) {
+            'static' => \PHPLLVM\Target::RELOC_STATIC,
+            'default' => \PHPLLVM\Target::RELOC_DEFAULT,
+            default => \PHPLLVM\Target::RELOC_PIC,
+        };
+    }
+
     /** Reloc model name for LLVMCreateTargetMachine (pic|static|default). */
     public function relocMode(): string
     {

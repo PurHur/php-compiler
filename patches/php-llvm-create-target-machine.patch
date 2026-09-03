@@ -1,0 +1,24 @@
+--- vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Target.php
++++ vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Target.php
+@@ -25,8 +25,18 @@ class Target implements CoreTarget {
+     }
+ 
+     public function createTargetMachine(string $triple, string $cpu, string $features, int $optlevel, int $relocMode, int $codeModel): CoreTargetMachine {
+-        throw new \LogicException("Todo: remap int parameters to llvm parameters");
+-        return $this->llvm->factory->targetMachine($this->llvm->lib->LLVMCreateTargetMachine($this->target, $triple, $cpu, $features, $optLevel, $relocMode, $coreModel));
++        // Int constants match LLVMCodeGenOptLevel / LLVMRelocMode / LLVMCodeModel (#36387).
++        // The previous stub threw LogicException and referenced undefined $optLevel/$coreModel.
++        return $this->llvm->factory->targetMachine(
++            $this->llvm->lib->LLVMCreateTargetMachine(
++                $this->target,
++                $triple,
++                $cpu,
++                $features,
++                $optlevel,
++                $relocMode,
++                $codeModel
++            )
++        );
+     }
+ 
+     public function getName(): string {

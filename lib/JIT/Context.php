@@ -11,6 +11,7 @@ namespace PHPCompiler\JIT;
 
 use PHPCfg\Operand;
 use PHPCompiler\AOT\Linker;
+use PHPCompiler\AOT\CompileTarget;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPCompiler\Block;
@@ -3141,9 +3142,14 @@ class Context {
         }
         $this->exportChunkMethodManifestIfRequested();
 
-        Progress::noteFunction('jit_context_create_execution_engine');
-        $engine = $this->module->createExecutionEngine();
-        $machine = $engine->getTargetMachine();
+        Progress::noteFunction('jit_context_create_target_machine');
+        \PHPCompiler\AOT\BuildTiming::mark('target_machine');
+        // Prefer a standalone TargetMachine over createExecutionEngine(): EE takes module
+        // ownership and pays MCJIT setup we do not need for AOT object emit (#36387).
+        // Default OptLevel None: cold MiniWebApp emitToFile drops ~10s → ~1.7s; IR shape is
+        // already unoptimised so Default codegen buys wall time without observable wins.
+        $machine = $this->createAotTargetMachine();
+        \PHPCompiler\AOT\BuildTiming::end('target_machine');
         if (!is_null($this->debugFile)) {
             $machine->emitToFile($this->module, $this->debugFile . '.s', $machine::CODEGEN_FILE_TYPE_ASM);
         }
@@ -3156,9 +3162,13 @@ class Context {
             || $vendorObjectOnly;
         // M5 vendor argv uses -o path ending in .o; do not append a second .o (#3054).
         $objectFile = $keepingObjectOnly && str_ends_with($file, '.o') ? $file : $file.'.o';
+        \PHPCompiler\AOT\BuildTiming::mark('gc_sections');
         AotGcSections::applyFunctionSections($this->llvm, $this->module);
+        \PHPCompiler\AOT\BuildTiming::end('gc_sections');
         Progress::noteFunction('jit_context_emit_object_begin');
+        \PHPCompiler\AOT\BuildTiming::mark('emit_object');
         $machine->emitToFile($this->module, $objectFile, $machine::CODEGEN_FILE_TYPE_OBJECT);
+        \PHPCompiler\AOT\BuildTiming::end('emit_object');
         Progress::noteFunction('jit_context_emit_object_done');
         if ($keepingObjectOnly) {
             Linker::assertNonEmptyOutputFile($objectFile);
@@ -3166,7 +3176,9 @@ class Context {
             return;
         }
         Progress::noteFunction('jit_context_link_begin');
+        \PHPCompiler\AOT\BuildTiming::mark('ld_link');
         Linker::link($objectFile, $file);
+        \PHPCompiler\AOT\BuildTiming::end('ld_link');
         Progress::noteFunction('jit_context_link_done');
         Linker::assertNonEmptyOutputFile($file);
         if (null !== $this->aotCompileCacheKey && '' !== $this->aotCompileCacheKey) {
@@ -3177,6 +3189,43 @@ class Context {
             );
         }
         unlink($objectFile);
+    }
+
+    /**
+     * TargetMachine for AOT object emit without creating an MCJIT ExecutionEngine (#36387).
+     *
+     * Falls back to EE->getTargetMachine() when the php-llvm createTargetMachine patch is
+     * missing or the arch name is unknown.
+     */
+    private function createAotTargetMachine(): PHPLLVM\TargetMachine
+    {
+        try {
+            $target = CompileTarget::current();
+            $llvmTarget = $this->llvm->getTargetFromName($target->llvmTargetName());
+            $optEnv = Config::getenv('PHP_COMPILER_AOT_CODEGEN_OPT');
+            $optLevel = PHPLLVM\Target::OPT_LEVEL_NONE;
+            if (is_string($optEnv) && '' !== $optEnv) {
+                $optLevel = match (strtolower($optEnv)) {
+                    'less' => PHPLLVM\Target::OPT_LEVEL_LESS,
+                    'default' => PHPLLVM\Target::OPT_LEVEL_DEFAULT,
+                    'aggressive' => PHPLLVM\Target::OPT_LEVEL_AGGRESSIVE,
+                    default => PHPLLVM\Target::OPT_LEVEL_NONE,
+                };
+            }
+
+            return $llvmTarget->createTargetMachine(
+                $target->llvmTriple(),
+                $target->cpu(),
+                '',
+                $optLevel,
+                $target->llvmRelocModeConst(),
+                PHPLLVM\Target::CODE_MODEL_DEFAULT
+            );
+        } catch (\Throwable $e) {
+            $engine = $this->module->createExecutionEngine();
+
+            return $engine->getTargetMachine();
+        }
     }
 
     public function jitResult(): ?Result
