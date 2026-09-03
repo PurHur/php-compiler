@@ -16455,6 +16455,72 @@ class Compiler {
     }
 
     /**
+     * php-cfg expands AssignOp to BinaryOp(left=prop) + Assign(var=prop); ??= stays read (#35978).
+     *
+     * The trailing Assign often is absent from operand->usages (only BinaryOp is listed).
+     */
+    private function isAssignOpBinaryUsingPropertyFetch($usage, Op\Expr\PropertyFetch $fetch, Block $block): bool
+    {
+        if (!$usage instanceof Op\Expr\BinaryOp) {
+            return false;
+        }
+        if ($usage instanceof Op\Expr\BinaryOp\Coalesce) {
+            return false;
+        }
+        if ($usage->left !== $fetch->result) {
+            return false;
+        }
+        foreach ($fetch->result->usages as $u) {
+            if (
+                $u instanceof Op\Expr\Assign
+                && $u->var === $fetch->result
+                && $u->expr === $usage->result
+            ) {
+                return true;
+            }
+        }
+        if (null === $block->orig) {
+            return false;
+        }
+        foreach ($block->orig->children as $child) {
+            if (
+                $child instanceof Op\Expr\Assign
+                && $child->var === $fetch->result
+                && $child->expr === $usage->result
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param list<Op> $children
+     */
+    private function isAssignOpPatternFollowingPropertyFetch(
+        Op\Expr\PropertyFetch $fetch,
+        Op\Expr\BinaryOp $bin,
+        array $children,
+        int $fetchIndex
+    ): bool {
+        if ($bin instanceof Op\Expr\BinaryOp\Coalesce) {
+            return false;
+        }
+        if ($bin->left !== $fetch->result) {
+            return false;
+        }
+        if ($fetchIndex + 2 >= \count($children)) {
+            return false;
+        }
+        $assign = $children[$fetchIndex + 2];
+
+        return $assign instanceof Op\Expr\Assign
+            && $assign->var === $fetch->result
+            && $assign->expr === $bin->result;
+    }
+
+    /**
      * sscanf('%d', $a[0]) — php-cfg dead arg temps; dim fetch immediately precedes call (#4512).
      */
     private function arrayDimFetchPrecedesByRefBuiltinCall(
@@ -16801,6 +16867,9 @@ class Compiler {
             if ($this->isIncDecUsingOperand($usage, $fetch->result)) {
                 continue;
             }
+            if ($this->isAssignOpBinaryUsingPropertyFetch($usage, $fetch, $block)) {
+                continue;
+            }
             if ($this->propertyFetchUsedAsByRefCallArg($fetch, $usage, $block)) {
                 continue;
             }
@@ -16852,6 +16921,12 @@ class Compiler {
                 return true;
             }
             if ($this->isIncDecUsingOperand($next, $fetch->result)) {
+                return true;
+            }
+            if (
+                $next instanceof Op\Expr\BinaryOp
+                && $this->isAssignOpPatternFollowingPropertyFetch($fetch, $next, $children, $i)
+            ) {
                 return true;
             }
             if ($this->propertyFetchPrecedesByRefCall($fetch, $next, $block, $i, $children)) {

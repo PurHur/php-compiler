@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\ext\standard\pow;
+use PHPCompiler\JIT\Builtin\MathFpow;
+use PHPCompiler\JIT\Builtin\PowIntRuntime;
 use PHPCompiler\OpCode;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -249,6 +252,72 @@ final class JitValueNumeric
         Variable $right
     ): Variable {
         return self::emitBoxedNumericResult($context, $opType, $left, $right);
+    }
+
+    /**
+     * Boxed ** when at least one operand aliases a property slot (#35978).
+     *
+     * {@see emitBoxedNumericResult} long path; JitPow::invokeBoxedRuntimeDispatch mis-reads
+     * property temps that still carry objectPropertySlot metadata.
+     */
+    public static function powValueOperands(
+        Context $context,
+        Variable $base,
+        Variable $exp
+    ): Value {
+        $basePtr = JitValueBox::valuePtrFromVariable($context, $base);
+        $expPtr = JitValueBox::valuePtrFromVariable($context, $exp);
+        $baseTypeByte = self::loadTypeByte($context, $basePtr);
+        $expTypeByte = self::loadTypeByte($context, $expPtr);
+        $slot = JitValueBox::alloc($context);
+        $slotPtr = JitValueBox::pointer($context, $slot);
+
+        $eitherPromote = $context->builder->or(
+            $context->builder->or(
+                self::typeByteIsDouble($context, $baseTypeByte),
+                self::typeByteIsDouble($context, $expTypeByte)
+            ),
+            $context->builder->or(
+                self::typeByteIsString($context, $baseTypeByte),
+                self::typeByteIsString($context, $expTypeByte)
+            )
+        );
+        $floatBlock = BasicBlockHelper::append($context, 'vbox_pow_float');
+        $longBlock = BasicBlockHelper::append($context, 'vbox_pow_long');
+        $doneBlock = BasicBlockHelper::append($context, 'vbox_pow_done');
+        $context->builder->branchIf($eitherPromote, $floatBlock, $longBlock);
+
+        $context->builder->positionAtEnd($floatBlock);
+        $double = $context->getTypeFromString('double');
+        $baseD = pow::toJitDouble($context, $base, $double);
+        $expD = pow::toJitDouble($context, $exp, $double);
+        $fres = MathFpow::invoke($context, $baseD, $expD);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeDouble'),
+            $slotPtr,
+            $fres
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($longBlock);
+        $baseL = JitLongArg::lower($context, $base, 'pow() base');
+        $expL = JitLongArg::lower($context, $exp, 'pow() exponent');
+        $double = $context->getTypeFromString('double');
+        $i64 = $context->getTypeFromString('int64');
+        $baseD = $context->builder->siToFp($baseL, $double);
+        $expD = $context->builder->siToFp($expL, $double);
+        $fres = MathFpow::invoke($context, $baseD, $expD);
+        $longRes = $context->builder->fpToSi($fres, $i64);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            $slotPtr,
+            $longRes
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $slotPtr;
     }
 
     /**

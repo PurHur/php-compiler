@@ -39,6 +39,13 @@ final class JitPow
     {
         JitPowNumericOperandGuard::guardOperands($context, $args[0], $args[1]);
         JitEnumNumericOperandGuard::guardPow($context, $args[0], $args[1]);
+        if (self::needsBoxedPowLowering(...$args)) {
+            if (JitValueBox::isValueOperand($args[0]) && JitValueBox::isValueOperand($args[1])) {
+                return JitValueNumeric::powValueOperands($context, $args[0], $args[1]);
+            }
+
+            return self::invokeMixedBoxedPow($context, $args[0], $args[1]);
+        }
         $slot = JitValueBox::alloc($context);
         $slotPtr = JitValueBox::pointer($context, $slot);
 
@@ -47,15 +54,7 @@ final class JitPow
             if (null !== $folded) {
                 return $folded;
             }
-            PowIntRuntime::ensureLinked($context);
-            $baseL = JitLongArg::lower($context, $args[0], 'pow() base');
-            $expL = JitLongArg::lower($context, $args[1], 'pow() exponent');
-            $context->builder->call(
-                $context->lookupFunction('__phpc_pow_int'),
-                $slotPtr,
-                $baseL,
-                $expL
-            );
+            self::emitIntegerPowViaMathFpow($context, $slotPtr, $args[0], $args[1]);
 
             return $slotPtr;
         }
@@ -86,13 +85,110 @@ final class JitPow
         $context->builder->branchIf($bothIntegral, $intBlock, $floatBlock);
 
         $context->builder->positionAtEnd($intBlock);
+        self::emitIntegerPowViaMathFpow($context, $slotPtr, $base, $exp);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($floatBlock);
+        $double = $context->getTypeFromString('double');
+        $baseD = pow::toJitDouble($context, $base, $double);
+        $expD = pow::toJitDouble($context, $exp, $double);
+        $result = MathFpow::invoke($context, $baseD, $expD);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeDouble'),
+            $slotPtr,
+            $result
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+
+        return $slotPtr;
+    }
+
+    /**
+     * Property/dim/by-ref boxed operands and runtime locals — {@see __phpc_pow_int} mis-reads
+     * dynamic i64 from value boxes (mul/** divergence; #35978 / leftover #35984).
+     */
+    private static function needsBoxedPowLowering(JITVariable ...$args): bool
+    {
+        foreach ($args as $arg) {
+            if (!JitValueBox::isValueOperand($arg)) {
+                continue;
+            }
+            if (
+                null !== $arg->objectPropertySlot
+                || null !== $arg->writableHt
+                || null !== $arg->valueBoxAliasPtr
+                || $arg->assignRefLvalueAlias
+                || $arg->borrowedValueEntry
+            ) {
+                return true;
+            }
+        }
+
+        return JitValueBox::isValueOperand($args[0]) || JitValueBox::isValueOperand($args[1]);
+    }
+
+    /** Integer ** via MathFpow — avoids broken __phpc_pow_int on boxed operands (#35978). */
+    private static function emitIntegerPowViaMathFpow(
+        Context $context,
+        Value $slotPtr,
+        JITVariable $base,
+        JITVariable $exp
+    ): void {
+        MathFpow::ensureLinked($context);
         $baseL = JitLongArg::lower($context, $base, 'pow() base');
         $expL = JitLongArg::lower($context, $exp, 'pow() exponent');
+        $double = $context->getTypeFromString('double');
+        $i64 = $context->getTypeFromString('int64');
+        $baseD = $context->builder->siToFp($baseL, $double);
+        $expD = $context->builder->siToFp($expL, $double);
+        $fres = MathFpow::invoke($context, $baseD, $expD);
+        $longRes = $context->builder->fpToSi($fres, $i64);
         $context->builder->call(
-            $context->lookupFunction('__phpc_pow_int'),
+            $context->lookupFunction('__value__writeLong'),
             $slotPtr,
-            $baseL,
-            $expL
+            $longRes
+        );
+    }
+
+    /** Property/native mix — never valuePtrFromVariable the native long literal (#35978). */
+    private static function invokeMixedBoxedPow(
+        Context $context,
+        JITVariable $base,
+        JITVariable $exp
+    ): Value {
+        $slot = JitValueBox::alloc($context);
+        $slotPtr = JitValueBox::pointer($context, $slot);
+        PowIntRuntime::ensureLinked($context);
+        MathFpow::ensureLinked($context);
+
+        $boxed = JitValueBox::isValueOperand($base) ? $base : $exp;
+        $other = $boxed === $base ? $exp : $base;
+        $boxedTy = JitValueNumeric::valueIsDouble($context, $boxed);
+        $i1 = $context->getTypeFromString('int1');
+        $otherIsDouble = JITVariable::TYPE_NATIVE_DOUBLE === $other->type
+            ? $i1->constInt(1, false)
+            : $i1->constInt(0, false);
+        $needsFloat = $context->builder->or($boxedTy, $otherIsDouble);
+        $intBlock = BasicBlockHelper::append($context, 'pow_mixed_int');
+        $floatBlock = BasicBlockHelper::append($context, 'pow_mixed_float');
+        $done = BasicBlockHelper::append($context, 'pow_mixed_done');
+        $context->builder->branchIf($needsFloat, $floatBlock, $intBlock);
+
+        $context->builder->positionAtEnd($intBlock);
+        $baseL = JitLongArg::lower($context, $base, 'pow() base');
+        $expL = JitLongArg::lower($context, $exp, 'pow() exponent');
+        $double = $context->getTypeFromString('double');
+        $i64 = $context->getTypeFromString('int64');
+        $baseD = $context->builder->siToFp($baseL, $double);
+        $expD = $context->builder->siToFp($expL, $double);
+        $fres = MathFpow::invoke($context, $baseD, $expD);
+        $longRes = $context->builder->fpToSi($fres, $i64);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            $slotPtr,
+            $longRes
         );
         $context->builder->branch($done);
 
@@ -334,6 +430,12 @@ final class JitPow
             || JITVariable::TYPE_HASHTABLE === $operand->type) {
             return false;
         }
+        if (
+            null !== $operand->compileTimeLong
+            && JitValueBox::isValueOperand($operand)
+        ) {
+            return false;
+        }
         if (JITVariable::TYPE_NATIVE_LONG === $operand->type
             || JITVariable::TYPE_NATIVE_BOOL === $operand->type
             || null !== $operand->compileTimeLong) {
@@ -350,6 +452,12 @@ final class JitPow
     /** Compile-time long for fold — includes integral numeric strings (#35344). */
     private static function compileTimeIntegralLong(JITVariable $operand): ?int
     {
+        if (
+            null !== $operand->compileTimeLong
+            && JitValueBox::isValueOperand($operand)
+        ) {
+            return null;
+        }
         if (null !== $operand->compileTimeLong) {
             return $operand->compileTimeLong;
         }
