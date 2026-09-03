@@ -14,7 +14,13 @@ declare(strict_types=1);
  * Usage:
  *   PHP_8_2=$(command -v php) php script/bench-gate.php
  *   PHP_8_2=$(command -v php) php script/bench-gate.php --update
+ *   PHP_8_2=$(command -v php) php script/bench-gate.php --compile
+ *   PHP_8_2=$(command -v php) php script/bench-gate.php --compile --update
  */
+
+const COMPILE_BASELINE_REL = 'benchmarks/COMPILE_BASELINE.json';
+const COMPILE_WALL_TOLERANCE_PERCENT = 20;
+const COMPILE_SCALING_TOLERANCE_PERCENT = 20;
 
 const BENCH_GATE_CASES = [
     'fibo(30)',
@@ -29,7 +35,14 @@ const TIMING_RUNS = 3;
 
 $root = dirname(__DIR__);
 $baselinePath = $root.'/benchmarks/BASELINE.json';
-$update = in_array('--update', $argv ?? [], true);
+$argvList = $argv ?? [];
+$update = in_array('--update', $argvList, true);
+$compileMode = in_array('--compile', $argvList, true);
+
+if ($compileMode) {
+    runCompileGate($root, $root.'/'.COMPILE_BASELINE_REL, $update);
+    exit(0);
+}
 
 $zend = resolveZendRuntime();
 if (null === $zend) {
@@ -301,6 +314,331 @@ function compareToBaseline(array $baseline, array $measured): array
                     $irGrowth,
                     $irTol
                 );
+            }
+        }
+    }
+
+    return $errors;
+}
+
+function runCompileGate(string $root, string $baselinePath, bool $update): void
+{
+    $llvmEnv = resolveLlvmEnv($root);
+    if ('' === $llvmEnv) {
+        fwrite(STDERR, "bench-gate --compile: LLVM 9 required\n");
+        exit(1);
+    }
+
+    $work = $root.'/build/bench-gate-compile';
+    if (!is_dir($work) && !mkdir($work, 0777, true) && !is_dir($work)) {
+        fwrite(STDERR, "bench-gate --compile: cannot create {$work}\n");
+        exit(1);
+    }
+
+    $php = escapeshellcmd(PHP_BINARY);
+    $measured = [];
+
+    $hello = $root.'/examples/000-HelloWorld/example.php';
+    if (!is_file($hello)) {
+        fwrite(STDERR, "bench-gate --compile: missing {$hello}\n");
+        exit(1);
+    }
+    $helloBin = $work.'/hello.bin';
+    $measured['hello-warm'] = measureCompileCommand(
+        $llvmEnv.' '.$php.' '.escapeshellarg($root.'/bin/compile.php')
+        .' -o '.escapeshellarg($helloBin).' '.escapeshellarg($hello),
+        $root
+    );
+    if (!is_executable($helloBin)) {
+        fwrite(STDERR, "bench-gate --compile: hello-warm did not emit {$helloBin}\n");
+        exit(1);
+    }
+
+    $mwIndex = $root.'/examples/003-MiniWebApp/public/index.php';
+    $mwConfig = $root.'/examples/003-MiniWebApp/config.php';
+    $mwRouter = $root.'/examples/003-MiniWebApp/src/Router.php';
+    if (!is_file($mwIndex) || !is_file($mwConfig) || !is_file($mwRouter)) {
+        fwrite(STDERR, "bench-gate --compile: MiniWebApp example tree incomplete\n");
+        exit(1);
+    }
+    $mwBin = $work.'/miniwebapp.bin';
+    $measured['miniwebapp'] = measureCompileCommand(
+        $llvmEnv.' '.$php.' '.escapeshellarg($root.'/bin/compile.php')
+        .' -o '.escapeshellarg($mwBin)
+        .' --include '.escapeshellarg($mwConfig)
+        .' --include '.escapeshellarg($mwRouter).' '
+        .escapeshellarg($mwIndex),
+        $root
+    );
+    if (!is_executable($mwBin)) {
+        fwrite(STDERR, "bench-gate --compile: miniwebapp did not emit {$mwBin}\n");
+        exit(1);
+    }
+
+    $block = $root.'/lib/Block.php';
+    if (!is_file($block)) {
+        fwrite(STDERR, "bench-gate --compile: missing {$block}\n");
+        exit(1);
+    }
+    $measured['block-lint'] = measureCompileCommand(
+        $llvmEnv.' '.$php.' '.escapeshellarg($root.'/bin/compile.php')
+        .' -l '.escapeshellarg($block),
+        $root
+    );
+
+    foreach ([50, 100, 200] as $count) {
+        $row = measureCompileScaling($count);
+        if (null === $row) {
+            fwrite(STDERR, "bench-gate --compile: scaling probe failed at {$count} statements\n");
+            exit(1);
+        }
+        $measured['scale-'.$count] = $row;
+    }
+
+    printCompileTable($measured);
+
+    if ($update) {
+        writeCompileBaseline($baselinePath, $measured);
+        echo "bench-gate --compile: updated {$baselinePath}\n";
+        exit(0);
+    }
+
+    if (!is_file($baselinePath)) {
+        fwrite(STDERR, "bench-gate --compile: missing {$baselinePath} — run with --compile --update\n");
+        exit(1);
+    }
+
+    $baseline = json_decode((string) file_get_contents($baselinePath), true);
+    if (!is_array($baseline)) {
+        fwrite(STDERR, "bench-gate --compile: invalid JSON in {$baselinePath}\n");
+        exit(1);
+    }
+
+    $errors = compareCompileToBaseline($baseline, $measured);
+    if ([] !== $errors) {
+        fwrite(STDERR, "bench-gate --compile: COMPILE-TIME REGRESSION\n");
+        foreach ($errors as $err) {
+            fwrite(STDERR, "  {$err}\n");
+        }
+        exit(1);
+    }
+
+    $wallTol = (int) ($baseline['wall_tolerance_percent'] ?? COMPILE_WALL_TOLERANCE_PERCENT);
+    $scaleTol = (int) ($baseline['scaling_tolerance_percent'] ?? COMPILE_SCALING_TOLERANCE_PERCENT);
+    echo "bench-gate --compile: OK (wall <= +{$wallTol}%, scale <= +{$scaleTol}% vs baseline)\n";
+}
+
+/** @return array{wall_s: float, peak_rss_kb: int, ok: bool} */
+function measureCompileCommand(string $cmd, string $cwd): array
+{
+    $bash = <<<'BASH'
+set -uo pipefail
+cd %s
+peak_kb=0
+start=$(date +%%s.%%N)
+collect_peak() {
+  local pid="$1"
+  if [[ -r "/proc/${pid}/status" ]]; then
+    local rss
+    rss=$(awk '/^VmRSS:/ {print $2}' "/proc/${pid}/status" 2>/dev/null || echo 0)
+    if [[ "$rss" -gt "$peak_kb" ]]; then peak_kb=$rss; fi
+  fi
+}
+timeout --signal=KILL %d env %s &
+root_pid=$!
+while kill -0 "$root_pid" 2>/dev/null; do
+  collect_peak "$root_pid"
+  sleep 0.1
+done
+wait "$root_pid" || true
+rc=$?
+if [[ "$rc" -eq 0 ]]; then rc=0; elif [[ "$rc" -gt 128 ]]; then rc=124; fi
+collect_peak "$root_pid"
+end=$(date +%%s.%%N)
+wall=$(awk -v s="$start" -v e="$end" 'BEGIN {printf "%%.6f", e - s}')
+printf 'peak_kb=%%s\nwall_rc=%%s\nwall_s=%%s\n' "$peak_kb" "$rc" "$wall"
+BASH;
+
+    $script = sprintf($bash, escapeshellarg($cwd), buildCapSeconds(), $cmd);
+    $descriptorSpec = [
+        0 => ['pipe', 'r'],
+        1 => ['pipe', 'w'],
+        2 => ['pipe', 'w'],
+    ];
+    $proc = proc_open(['bash', '-c', $script], $descriptorSpec, $pipes, $cwd);
+    if (!is_resource($proc)) {
+        fwrite(STDERR, "bench-gate --compile: could not start: {$cmd}\n");
+        exit(1);
+    }
+    fclose($pipes[0]);
+    $stdout = (string) stream_get_contents($pipes[1]);
+    $stderr = (string) stream_get_contents($pipes[2]);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+    $shellRc = proc_close($proc);
+
+    $peakKb = 0;
+    $rc = $shellRc;
+    $wall = 0.0;
+    foreach (explode("\n", trim($stdout)) as $line) {
+        if (str_starts_with($line, 'peak_kb=')) {
+            $peakKb = (int) substr($line, 8);
+        } elseif (str_starts_with($line, 'wall_rc=')) {
+            $rc = (int) substr($line, 8);
+        } elseif (str_starts_with($line, 'wall_s=')) {
+            $wall = (float) substr($line, 7);
+        }
+    }
+
+    if (0 !== $rc || 0 !== $shellRc) {
+        fwrite(STDERR, "bench-gate --compile: command failed (rc={$rc}, shell={$shellRc}): {$cmd}\n");
+        if ('' !== trim($stderr)) {
+            fwrite(STDERR, substr(trim($stderr), 0, 2000)."\n");
+        }
+        exit(1);
+    }
+
+    return [
+        'wall_s' => $wall,
+        'peak_rss_kb' => $peakKb,
+        'ok' => true,
+    ];
+}
+
+function measureCompileScaling(int $count): ?array
+{
+    require_once dirname(__DIR__).'/vendor/autoload.php';
+
+    $src = "<?php function f() {\n";
+    for ($i = 0; $i < $count; ++$i) {
+        $src .= '    str_pad(implode(",", array_map("strval", [1,2,3])), 5);'."\n";
+    }
+    $src .= "}\n";
+
+    $runtime = new \PHPCompiler\Runtime();
+    $filename = 'build/bench-gate-scale-'.$count.'.php';
+    $script = $runtime->parse($src, $filename);
+
+    $compiler = new \PHPCompiler\Compiler();
+    $t0 = hrtime(true);
+    $compiler->compile($script);
+    $wall = (hrtime(true) - $t0) / 1_000_000_000;
+    $msPer = ($wall * 1000.0) / $count;
+
+    return [
+        'ms_per_statement' => $msPer,
+        'wall_s' => $wall,
+        'ok' => true,
+    ];
+}
+
+/** @param array<string, array<string, float|int|bool>> $measured */
+function printCompileTable(array $measured): void
+{
+    echo "bench-gate compile measurements (#36387):\n";
+    printf("%-14s %12s %12s %12s\n", 'case', 'wall(s)', 'peak_rss_mb', 'ms/stmt');
+    foreach ($measured as $name => $row) {
+        $wall = (float) ($row['wall_s'] ?? 0.0);
+        $rssMb = isset($row['peak_rss_kb']) ? (int) $row['peak_rss_kb'] / 1024.0 : 0.0;
+        $msStmt = isset($row['ms_per_statement']) ? (float) $row['ms_per_statement'] : 0.0;
+        printf(
+            "%-14s %12.3f %12.1f %12.1f\n",
+            $name,
+            $wall,
+            $rssMb,
+            $msStmt
+        );
+    }
+    echo "\n";
+}
+
+/** @param array<string, array<string, float|int|bool>> $measured */
+function writeCompileBaseline(string $path, array $measured): void
+{
+    $cases = [];
+    foreach ($measured as $name => $row) {
+        $entry = ['ok' => (bool) ($row['ok'] ?? true)];
+        if (isset($row['wall_s'])) {
+            $entry['wall_s'] = round((float) $row['wall_s'], 6);
+        }
+        if (isset($row['peak_rss_kb'])) {
+            $entry['peak_rss_kb'] = (int) $row['peak_rss_kb'];
+        }
+        if (isset($row['ms_per_statement'])) {
+            $entry['ms_per_statement'] = round((float) $row['ms_per_statement'], 3);
+        }
+        $cases[$name] = $entry;
+    }
+
+    $doc = [
+        'version' => 1,
+        'generated_at' => gmdate('Y-m-d\TH:i:s\Z'),
+        'arch' => 'x86_64-linux',
+        'wall_tolerance_percent' => COMPILE_WALL_TOLERANCE_PERCENT,
+        'scaling_tolerance_percent' => COMPILE_SCALING_TOLERANCE_PERCENT,
+        'regeneration' => 'PHP_8_2=$(command -v php) ./script/bench-gate.sh --compile --update',
+        'note' => 'Compile-time gate for hello-warm, MiniWebApp, Block lint, and Compiler::compile scaling (#36387). Absolute targets live in the issue; this baseline tracks regressions.',
+        'cases' => $cases,
+    ];
+    file_put_contents($path, json_encode($doc, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES)."\n");
+}
+
+/**
+ * @param array<string, mixed> $baseline
+ * @param array<string, array<string, float|int|bool>> $measured
+ *
+ * @return list<string>
+ */
+function compareCompileToBaseline(array $baseline, array $measured): array
+{
+    $errors = [];
+    $wallTol = (int) ($baseline['wall_tolerance_percent'] ?? COMPILE_WALL_TOLERANCE_PERCENT);
+    $scaleTol = (int) ($baseline['scaling_tolerance_percent'] ?? COMPILE_SCALING_TOLERANCE_PERCENT);
+    $baseCases = $baseline['cases'] ?? [];
+    if (!is_array($baseCases)) {
+        return ['baseline cases missing or invalid'];
+    }
+
+    foreach ($measured as $name => $row) {
+        if (!isset($baseCases[$name]) || !is_array($baseCases[$name])) {
+            $errors[] = "{$name}: no baseline entry";
+            continue;
+        }
+        $base = $baseCases[$name];
+
+        if (isset($base['wall_s'], $row['wall_s'])) {
+            $baseWall = (float) $base['wall_s'];
+            $curWall = (float) $row['wall_s'];
+            if ($baseWall > 0.0) {
+                $growth = ($curWall - $baseWall) * 100.0 / $baseWall;
+                if ($growth > $wallTol) {
+                    $errors[] = sprintf(
+                        '%s.wall_s: %.3fs exceeds baseline %.3fs by %.1f%% (limit +%d%%)',
+                        $name,
+                        $curWall,
+                        $baseWall,
+                        $growth,
+                        $wallTol
+                    );
+                }
+            }
+        }
+
+        if (isset($base['ms_per_statement'], $row['ms_per_statement'])) {
+            $baseMs = (float) $base['ms_per_statement'];
+            $curMs = (float) $row['ms_per_statement'];
+            if ($baseMs > 0.0) {
+                $growth = ($curMs - $baseMs) * 100.0 / $baseMs;
+                if ($growth > $scaleTol) {
+                    $errors[] = sprintf(
+                        '%s.ms_per_statement: %.1f exceeds baseline %.1f by %.1f%% (limit +%d%%)',
+                        $name,
+                        $curMs,
+                        $baseMs,
+                        $growth,
+                        $scaleTol
+                    );
+                }
             }
         }
     }
