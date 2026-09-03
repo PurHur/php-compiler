@@ -33856,44 +33856,40 @@ class JIT {
         }
         /** @var array<string, true> $released */
         $released = [];
-        foreach ($this->jitFunctionNamedScopeSlots($block) as [$name, $slotIdx, $scopeBlock]) {
-            $this->releaseJitNamedLocalAtReturn($block, $name, $slotIdx, $scopeBlock, $byRefParamNames, $released);
+        /** @var array<string, true> $localNames */
+        $localNames = [];
+        foreach ($this->jitFunctionNamedScopeSlots($block) as [$name, ,]) {
+            if ('this' !== $name && '' !== $name) {
+                $localNames[$name] = true;
+            }
         }
         foreach ($this->jitFunctionAssignTargets($block) as $destOp) {
             $name = JIT\OperandName::resolve($destOp);
-            if (null === $name || '' === $name || isset($released[$name])) {
-                continue;
+            if (null !== $name && '' !== $name) {
+                $localNames[$name] = true;
             }
-            $slotIdx = null;
-            $scopeBlockForOp = $block;
-            foreach ($this->jitFunctionNamedScopeSlots($block) as [, $candidateSlot, $candidateBlock]) {
-                $candidateSlotIdx = $candidateBlock->slotForOperand($destOp);
-                if (null !== $candidateSlotIdx) {
-                    $scopeBlockForOp = $candidateBlock;
-                    $slotIdx = $candidateSlotIdx;
-                    break;
-                }
-            }
-            if (null === $slotIdx) {
-                $slotIdx = $block->slotForOperand($destOp);
-            }
-            if (null === $slotIdx) {
-                continue;
-            }
-            $this->releaseJitNamedLocalAtReturn($block, $name, $slotIdx, $scopeBlockForOp, $byRefParamNames, $released);
         }
-        // php-cfg marks function-end CVs dead before RETURN_VOID; scope->variables may
-        // already be detached so release by dead-operand name (#36245 make_pair).
         foreach ($block->orig->deadOperands ?? [] as $deadOp) {
             $name = JIT\OperandName::resolve($deadOp);
-            if (null === $name || '' === $name || isset($released[$name])) {
+            if (null !== $name && '' !== $name) {
+                $localNames[$name] = true;
+            }
+        }
+        foreach (array_keys($localNames) as $name) {
+            if (isset($released[$name])) {
                 continue;
             }
-            $slotIdx = $block->slotForOperand($deadOp);
-            if (null === $slotIdx) {
+            $resolved = $this->context->resolveRefAliasName($name);
+            $var = $this->context->namedVariableBindings[$resolved] ?? null;
+            if (null === $var) {
                 continue;
             }
-            $this->releaseJitNamedLocalAtReturn($block, $name, $slotIdx, $block, $byRefParamNames, $released);
+            $this->releaseJitCanonicalNamedLocalAtReturn(
+                $name,
+                $var,
+                $byRefParamNames,
+                $released
+            );
         }
     }
 
@@ -33901,11 +33897,9 @@ class JIT {
      * @param array<string, true> $byRefParamNames
      * @param array<string, true> $released
      */
-    private function releaseJitNamedLocalAtReturn(
-        Block $returnBlock,
+    private function releaseJitCanonicalNamedLocalAtReturn(
         string $name,
-        int $slotIdx,
-        Block $scopeBlock,
+        Variable $var,
         array $byRefParamNames,
         array &$released
     ): void {
@@ -33915,26 +33909,13 @@ class JIT {
         if (isset($byRefParamNames[$name])) {
             return;
         }
-        $resolved = $this->context->resolveRefAliasName($name);
-        $var = $this->context->namedVariableBindings[$resolved] ?? null;
-        if (null === $var) {
-            $scopedOp = $scopeBlock->operandForScopeSlot($slotIdx);
-            if (null === $scopedOp) {
-                return;
-            }
-            try {
-                $var = $this->context->getVariableFromOp($scopedOp);
-            } catch (\LogicException) {
-                return;
-            }
-        }
         if (Variable::KIND_VARIABLE !== $var->kind) {
             return;
         }
         if ($var->borrowedValueEntry || null !== $var->valueBoxAliasPtr) {
             return;
         }
-        if (Variable::TYPE_VALUE === $var->type && Variable::KIND_VARIABLE === $var->kind) {
+        if (Variable::TYPE_VALUE === $var->type) {
             $this->jitWriteNullForUnset(JIT\JitValueBox::valuePtrFromVariable($this->context, $var));
             $released[$name] = true;
 
@@ -33967,10 +33948,6 @@ class JIT {
             );
             $this->context->refcount->delref($ptr);
             if (Variable::KIND_VARIABLE === $var->kind && null !== $var->value) {
-                // Mirror Variable::free(): native __hashtable__/__string__/__object__ slots
-                // hold the heap pointer directly. __value__writeNull boxes via
-                // valuePtrFromNativeVariable and would addref after delref destroyed
-                // the payload (#36409 / #36245 loop_unset peer).
                 $slotTy = $var->value->typeOf();
                 if (\PHPLLVM\Type::KIND_POINTER === $slotTy->getKind()) {
                     $this->context->builder->store(
@@ -33981,6 +33958,46 @@ class JIT {
             }
             $released[$name] = true;
         }
+    }
+
+    /**
+     * @param array<string, true> $byRefParamNames
+     * @param array<string, true> $released
+     */
+    private function releaseJitNamedLocalAtReturn(
+        Block $returnBlock,
+        string $name,
+        int $slotIdx,
+        Block $scopeBlock,
+        array $byRefParamNames,
+        array &$released
+    ): void {
+        if ('this' === $name || isset($released[$name])) {
+            return;
+        }
+        if (isset($byRefParamNames[$name])) {
+            return;
+        }
+        $resolved = $this->context->resolveRefAliasName($name);
+        $var = $this->context->namedVariableBindings[$resolved] ?? null;
+        if (null !== $var) {
+            $this->releaseJitCanonicalNamedLocalAtReturn($name, $var, $byRefParamNames, $released);
+
+            return;
+        }
+        if ($slotIdx < 0) {
+            return;
+        }
+        $scopedOp = $scopeBlock->operandForScopeSlot($slotIdx);
+        if (null === $scopedOp) {
+            return;
+        }
+        try {
+            $var = $this->context->getVariableFromOp($scopedOp);
+        } catch (\LogicException) {
+            return;
+        }
+        $this->releaseJitCanonicalNamedLocalAtReturn($name, $var, $byRefParamNames, $released);
     }
 
     /**
@@ -34431,6 +34448,31 @@ class JIT {
             );
 
             return;
+        }
+        if (
+            Variable::TYPE_OBJECT === $var->type
+            && Variable::KIND_VARIABLE === $var->kind
+            && null !== $var->value
+            && \in_array($var->value, $this->context->scopeSlotObjectMirrorLlvmBySlot, true)
+        ) {
+            $isCanonicalCv = false;
+            foreach ($this->context->namedVariableBindings as $bound) {
+                if ($bound === $var) {
+                    $isCanonicalCv = true;
+                    break;
+                }
+            }
+            if (!$isCanonicalCv) {
+                $slotTy = $var->value->typeOf();
+                if (\PHPLLVM\Type::KIND_POINTER === $slotTy->getKind()) {
+                    $this->context->builder->store(
+                        $slotTy->getElementType()->constNull(),
+                        $var->value
+                    );
+                }
+
+                return;
+            }
         }
         $var->free();
     }

@@ -5014,7 +5014,60 @@ class Context {
                 $returnVarNames[$name] = true;
             }
         }
+        $isUserFunctionReturnVoid = false;
+        if (null !== $block->func) {
+            $fnName = $block->func->name;
+            if ('{main}' !== $fnName && !str_ends_with($fnName, '::__destruct')) {
+                foreach ($block->opCodes as $blockOp) {
+                    if (
+                        OpCode::TYPE_RETURN_VOID === $blockOp->type
+                        || (OpCode::TYPE_RETURN === $blockOp->type && null === $blockOp->arg1)
+                    ) {
+                        $isUserFunctionReturnVoid = true;
+                        break;
+                    }
+                }
+            }
+        }
         foreach ($block->orig->deadOperands as $op) {
+            if ($isUserFunctionReturnVoid) {
+                // releaseJitFunctionLocalsAtReturn owns named CV delref; unnamed
+                // assign-result mirrors must be nulled without delref (#36245 scope_exit).
+                $name = OperandName::resolve($op);
+                if (null !== $name && '' !== $name) {
+                    continue;
+                }
+                if (!$this->scope->variables->contains($op)) {
+                    continue;
+                }
+                $var = $this->scope->variables[$op];
+                if (
+                    Variable::TYPE_OBJECT === $var->type
+                    && Variable::KIND_VARIABLE === $var->kind
+                    && null !== $var->value
+                ) {
+                    $isCanonicalCv = false;
+                    foreach ($this->namedVariableBindings as $bound) {
+                        if ($bound === $var) {
+                            $isCanonicalCv = true;
+                            break;
+                        }
+                    }
+                    if (
+                        !$isCanonicalCv
+                        && \in_array($var->value, $this->scopeSlotObjectMirrorLlvmBySlot, true)
+                    ) {
+                        $slotTy = $var->value->typeOf();
+                        if (\PHPLLVM\Type::KIND_POINTER === $slotTy->getKind()) {
+                            $this->builder->store(
+                                $slotTy->getElementType()->constNull(),
+                                $var->value
+                            );
+                        }
+                        continue;
+                    }
+                }
+            }
             if ($returnOperands->contains($op)) {
                 continue;
             }
@@ -5024,6 +5077,11 @@ class Context {
             }
             $name = OperandName::resolve($op);
             if (null !== $name && isset($returnVarNames[$name])) {
+                continue;
+            }
+            // releaseJitFunctionLocalsAtReturn already delref'd named CVs; freeing
+            // them again here drops orphan cycles to refcount 0 (#36245 scope_exit).
+            if ($isUserFunctionReturnVoid && null !== $name && '' !== $name) {
                 continue;
             }
             if ($coalesceResults->contains($op)) {
