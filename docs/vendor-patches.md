@@ -7,6 +7,7 @@ Interim honesty rules (until php-cfg/php-types are forked):
 - Every `patches/*.patch` must contain at least one `@@` hunk (no comment-only stubs).
 - `script/apply-patches.sh` applies `patch(1)` with **`-F0`** (no fuzz) and fails on partial applies.
 - Overlay-only edits are invoked by name from `apply-patches.sh`; they do not leave empty `.patch` files.
+- A warm `apply-patches.sh` on an already-patched tree must print **zero** `Applied …` lines (no-op `cp` / marker greps say `Skip`). `install_overlay_file` cmp-skips identical overlay bodies (#36229).
 - `./script/apply-patches.sh --verify-pristine` rejects hunkless stubs, **rejects orphan** `patches/*.patch` files not referenced by `apply_patch` / `apply_patch_file_direct`, and applies the **full php-llvm patch stack in order** to `patches/pristine-snapshots/ircmaxell/php-llvm/` (composer.lock SHA in `ORIGIN`); a php-llvm patch missing from the `apply_patch` list is a failure.
 
 | prefix | count |
