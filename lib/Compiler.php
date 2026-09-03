@@ -31984,8 +31984,88 @@ class Compiler {
         if ($this->inlineCallArgProducerFeedsConsumer($child, $consumer)) {
             return false;
         }
+        // While firstSibling is Active, isSiblingMultiArgFuncCallProducer returns false
+        // (reentrancy guard — #36387). That incorrectly stopped the scan on the leading
+        // empty-usage count() in sprintf(..., count($a), $sum / count($a)), so the first
+        // count compiled as EXEC_NORETURN and ARG_SEND wired a dead 0 (#36353 regression).
+        if (
+            $this->firstSiblingInlineFuncCallProducerIndexActive
+            && $this->emptyUsageFuncCallIsHoistedSiblingBeforeBinaryOp(
+                $producerIndex,
+                $consumerIndex,
+                $cfgChildren,
+                $consumer
+            )
+        ) {
+            return false;
+        }
 
         return true;
+    }
+
+    /**
+     * Empty-usage FuncCall separated from a multi-arg consumer only by BinaryOp and/or
+     * other sibling producers (and scalar preludes) — the #36353 sprintf/count/Div shape.
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function emptyUsageFuncCallIsHoistedSiblingBeforeBinaryOp(
+        int $producerIndex,
+        int $consumerIndex,
+        array $cfgChildren,
+        Op $consumer
+    ): bool {
+        if (
+            !($consumer instanceof Op\Expr\FuncCall || $consumer instanceof Op\Expr\NsFuncCall)
+            || !property_exists($consumer, 'args')
+            || !\is_array($consumer->args)
+            || \count($consumer->args) < 2
+        ) {
+            return false;
+        }
+        $deadTemps = 0;
+        foreach ($consumer->args as $arg) {
+            if ($this->callArgIsDeadInlineTemporary($arg)) {
+                ++$deadTemps;
+            }
+        }
+        if ($deadTemps < 1) {
+            return false;
+        }
+        $sawBinaryOp = false;
+        for ($j = $producerIndex + 1; $j < $consumerIndex; ++$j) {
+            $mid = $cfgChildren[$j] ?? null;
+            if ($mid instanceof Op\Expr\BinaryOp) {
+                $sawBinaryOp = true;
+                continue;
+            }
+            if ($this->isSiblingInlineCallProducerExpr($mid)) {
+                continue;
+            }
+            if ($mid instanceof Op\Expr\ConstFetch || $mid instanceof Op\Expr\ClassConstFetch) {
+                continue;
+            }
+            if ($mid instanceof Op\Expr\Array_) {
+                continue;
+            }
+            if ($this->isUnaryInlineSiblingCallArgExpr($mid)) {
+                continue;
+            }
+            if (
+                $mid instanceof Op\Expr\ArrowFunction
+                || $mid instanceof Op\Expr\Closure
+                || $mid instanceof Op\Expr\FirstClassCallable
+            ) {
+                continue;
+            }
+            if ($mid instanceof Op\Expr\New_ || $mid instanceof Op\Expr\Clone_) {
+                continue;
+            }
+
+            return false;
+        }
+
+        return $sawBinaryOp;
     }
 
     /**
