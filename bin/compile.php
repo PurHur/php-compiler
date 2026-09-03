@@ -466,14 +466,23 @@ function run(string $filename, string $code, array $options): void
         }
         $out = (string) $opts['-o'];
         $key = \PHPCompiler\JIT\CompileCache::computeKey($srcPath, $srcCode);
-        if (!\PHPCompiler\JIT\CompileCache::tryRestoreArtifact($key, $out, $srcPath, $srcCode)) {
-            return false;
-        }
-        \PHPCompiler\AOT\Linker::assertNonEmptyRequestedOutput($out);
-        \PHPCompiler\AOT\BuildTiming::note('artifact_cache_hit', 1.0);
-        \PHPCompiler\AOT\BuildTiming::finish($out);
+        if (\PHPCompiler\JIT\CompileCache::tryRestoreArtifact($key, $out, $srcPath, $srcCode)) {
+            \PHPCompiler\AOT\Linker::assertNonEmptyRequestedOutput($out);
+            \PHPCompiler\AOT\BuildTiming::note('artifact_cache_hit', 1.0);
+            \PHPCompiler\AOT\BuildTiming::finish($out);
 
-        return true;
+            return true;
+        }
+        // Mid-tier: link cached aot.o when aot.bin is absent (#36387).
+        if (\PHPCompiler\JIT\CompileCache::tryRestoreObjectAndLink($key, $out, $srcPath, $srcCode)) {
+            \PHPCompiler\AOT\Linker::assertNonEmptyRequestedOutput($out);
+            \PHPCompiler\AOT\BuildTiming::note('object_cache_hit', 1.0);
+            \PHPCompiler\AOT\BuildTiming::finish($out);
+
+            return true;
+        }
+
+        return false;
     };
 
     // Fast warm path for single-file scripts: restore before include discovery / Runtime (#36387).

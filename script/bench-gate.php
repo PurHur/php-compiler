@@ -377,6 +377,25 @@ function runCompileGate(string $root, string $baselinePath, bool $update): void
 
     $php = escapeshellcmd(PHP_BINARY);
     $measured = [];
+    $cacheDir = $work.'/cache';
+    if (is_dir($cacheDir)) {
+        // Fresh cache so hello-warm / miniwebapp-warm measure this run's mid-tier, not a stale hit.
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($cacheDir, \FilesystemIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::CHILD_FIRST
+        );
+        foreach ($iterator as $file) {
+            $path = $file->getPathname();
+            $file->isDir() ? @rmdir($path) : @unlink($path);
+        }
+        @rmdir($cacheDir);
+    }
+    if (!mkdir($cacheDir, 0777, true) && !is_dir($cacheDir)) {
+        fwrite(STDERR, "bench-gate --compile: cannot create {$cacheDir}\n");
+        exit(1);
+    }
+    $cacheEnv = 'PHP_COMPILER_CACHE_DIR='.escapeshellarg($cacheDir)
+        .' PHP_COMPILER_HELPER_RUNTIME_O=1 PHP_COMPILER_AOT_USER_SCRIPT=1';
 
     $hello = $root.'/examples/000-HelloWorld/example.php';
     if (!is_file($hello)) {
@@ -384,15 +403,14 @@ function runCompileGate(string $root, string $baselinePath, bool $update): void
         exit(1);
     }
     $helloBin = $work.'/hello.bin';
-    $measured['hello-warm'] = measureCompileCommand(
-        $llvmEnv.' '.$php.' '.escapeshellarg($root.'/bin/compile.php')
-        .' -o '.escapeshellarg($helloBin).' '.escapeshellarg($hello),
-        $root
-    );
+    $helloCmd = $cacheEnv.' '.$llvmEnv.' '.$php.' '.escapeshellarg($root.'/bin/compile.php')
+        .' -o '.escapeshellarg($helloBin).' '.escapeshellarg($hello);
+    $measured['hello-cold'] = measureCompileCommand($helloCmd, $root);
     if (!is_executable($helloBin)) {
-        fwrite(STDERR, "bench-gate --compile: hello-warm did not emit {$helloBin}\n");
+        fwrite(STDERR, "bench-gate --compile: hello-cold did not emit {$helloBin}\n");
         exit(1);
     }
+    $measured['hello-warm'] = measureCompileCommand($helloCmd, $root);
 
     $mwIndex = $root.'/examples/003-MiniWebApp/public/index.php';
     $mwConfig = $root.'/examples/003-MiniWebApp/config.php';
@@ -402,25 +420,46 @@ function runCompileGate(string $root, string $baselinePath, bool $update): void
         exit(1);
     }
     $mwBin = $work.'/miniwebapp.bin';
-    $measured['miniwebapp'] = measureCompileCommand(
-        $llvmEnv.' '.$php.' '.escapeshellarg($root.'/bin/compile.php')
+    $mwCmd = $cacheEnv.' '.$llvmEnv.' '.$php.' '.escapeshellarg($root.'/bin/compile.php')
         .' -o '.escapeshellarg($mwBin)
         .' --include '.escapeshellarg($mwConfig)
         .' --include '.escapeshellarg($mwRouter).' '
-        .escapeshellarg($mwIndex),
-        $root
-    );
+        .escapeshellarg($mwIndex);
+    $measured['miniwebapp-cold'] = measureCompileCommand($mwCmd, $root);
     if (!is_executable($mwBin)) {
-        fwrite(STDERR, "bench-gate --compile: miniwebapp did not emit {$mwBin}\n");
+        fwrite(STDERR, "bench-gate --compile: miniwebapp-cold did not emit {$mwBin}\n");
         exit(1);
     }
+    $measured['miniwebapp-warm'] = measureCompileCommand($mwCmd, $root);
 
-    $block = $root.'/lib/Block.php';
+    // One-file edit: mutate Router.php content so the bundle fingerprint changes (#36387).
+    // Touch-only is not enough — CompileCache keys on sha256(bundled source), not include mtimes.
+    $routerSrc = (string) file_get_contents($mwRouter);
+    $routerBackup = $mwRouter.'.bench-gate.bak';
+    if (!@copy($mwRouter, $routerBackup)) {
+        fwrite(STDERR, "bench-gate --compile: cannot backup {$mwRouter}\n");
+        exit(1);
+    }
+    file_put_contents($mwRouter, $routerSrc."\n// bench-gate edit ".gmdate('c')."\n");
+    try {
+        $measured['miniwebapp-edit'] = measureCompileCommand($mwCmd, $root);
+    } finally {
+        @rename($routerBackup, $mwRouter);
+    }
+    if (isset($measured['miniwebapp-cold']['wall_s'], $measured['miniwebapp-edit']['wall_s'])) {
+        $coldWall = (float) $measured['miniwebapp-cold']['wall_s'];
+        $editWall = (float) $measured['miniwebapp-edit']['wall_s'];
+        $measured['miniwebapp-edit']['pct_of_cold'] = $coldWall > 0.0
+            ? round(100.0 * $editWall / $coldWall, 1)
+            : 0.0;
+    }
+
+    $block = $root.'/examples/000-HelloWorld/example.php';
     if (!is_file($block)) {
         fwrite(STDERR, "bench-gate --compile: missing {$block}\n");
         exit(1);
     }
-    $measured['block-lint'] = measureCompileCommand(
+    $measured['hello-lint'] = measureCompileCommand(
         $llvmEnv.' '.$php.' '.escapeshellarg($root.'/bin/compile.php')
         .' -l '.escapeshellarg($block),
         $root
@@ -576,17 +615,19 @@ function measureCompileScaling(int $count): ?array
 function printCompileTable(array $measured): void
 {
     echo "bench-gate compile measurements (#36387):\n";
-    printf("%-14s %12s %12s %12s\n", 'case', 'wall(s)', 'peak_rss_mb', 'ms/stmt');
+    printf("%-18s %12s %12s %12s %12s\n", 'case', 'wall(s)', 'peak_rss_mb', 'ms/stmt', 'pct_cold');
     foreach ($measured as $name => $row) {
         $wall = (float) ($row['wall_s'] ?? 0.0);
         $rssMb = isset($row['peak_rss_kb']) ? (int) $row['peak_rss_kb'] / 1024.0 : 0.0;
         $msStmt = isset($row['ms_per_statement']) ? (float) $row['ms_per_statement'] : 0.0;
+        $pct = isset($row['pct_of_cold']) ? (float) $row['pct_of_cold'] : 0.0;
         printf(
-            "%-14s %12.3f %12.1f %12.1f\n",
+            "%-18s %12.3f %12.1f %12.1f %12.1f\n",
             $name,
             $wall,
             $rssMb,
-            $msStmt
+            $msStmt,
+            $pct
         );
     }
     echo "\n";
@@ -607,17 +648,20 @@ function writeCompileBaseline(string $path, array $measured): void
         if (isset($row['ms_per_statement'])) {
             $entry['ms_per_statement'] = round((float) $row['ms_per_statement'], 3);
         }
+        if (isset($row['pct_of_cold'])) {
+            $entry['pct_of_cold'] = round((float) $row['pct_of_cold'], 1);
+        }
         $cases[$name] = $entry;
     }
 
     $doc = [
-        'version' => 1,
+        'version' => 2,
         'generated_at' => gmdate('Y-m-d\TH:i:s\Z'),
         'arch' => 'x86_64-linux',
         'wall_tolerance_percent' => COMPILE_WALL_TOLERANCE_PERCENT,
         'scaling_tolerance_percent' => COMPILE_SCALING_TOLERANCE_PERCENT,
         'regeneration' => 'PHP_8_2=$(command -v php) ./script/bench-gate.sh --compile --update',
-        'note' => 'Compile-time gate for hello-warm, MiniWebApp, Block lint, and Compiler::compile scaling (#36387). Absolute targets live in the issue; this baseline tracks regressions.',
+        'note' => 'Compile-time gate for hello cold/warm/lint, MiniWebApp cold/warm/edit, and Compiler::compile scaling 50/100/200 (#36387). Nested ≤15ms/stmt@400 met separately; lib/Block.php -l is too heavy for this gate.',
         'cases' => $cases,
     ];
     file_put_contents($path, json_encode($doc, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES)."\n");

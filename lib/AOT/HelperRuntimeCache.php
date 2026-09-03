@@ -1339,6 +1339,58 @@ final class HelperRuntimeCache
         return $objects;
     }
 
+    /**
+     * Basenames of helper units currently selected for link (#36387 object mid-tier).
+     *
+     * @return list<string>
+     */
+    public static function usedUnitSlugs(): array
+    {
+        $slugs = [];
+        foreach (array_keys(self::$usedUnits) as $unitDir) {
+            $slug = basename((string) $unitDir);
+            if ('' !== $slug) {
+                $slugs[] = $slug;
+            }
+        }
+
+        return $slugs;
+    }
+
+    /**
+     * Rebuild {@see $usedUnits} from cached slugs so {@see linkObjects()} works without
+     * a fresh lowering pass (#36387 mid-tier `.o` restore).
+     *
+     * @param list<string> $slugs
+     */
+    public static function adoptUnitSlugsForLink(array $slugs): void
+    {
+        self::$usedUnits = [];
+        foreach ($slugs as $slug) {
+            if (!is_string($slug) || '' === $slug) {
+                continue;
+            }
+            $dir = self::resolveLinkableUnitDir($slug);
+            if (null !== $dir) {
+                self::$usedUnits[$dir] = true;
+            }
+        }
+    }
+
+    /**
+     * Local tier first, then committed prelinked tier (#36387).
+     */
+    public static function resolveLinkableUnitDir(string $slug): ?string
+    {
+        foreach ([self::unitDir($slug), self::prelinkedUnitsDir().'/'.$slug] as $dir) {
+            if (self::unitObjectIsLinkable($dir)) {
+                return $dir;
+            }
+        }
+
+        return null;
+    }
+
     public static function markEmitting(): void
     {
         putenv(self::ENV_EMITTING.'=1');
