@@ -860,27 +860,35 @@ final class Variable {
                 $literal = (int) $op->value;
                 break;
             case self::TYPE_STRING:
-                // Mirror JitValueBox::alloc — entryAlloca with cleared insert leaves the
-                // separate/store parentless under NestedJIT / M5 argv (#26756).
+                // Keep a heap-owned copy (builtins may realloc / mutate) but emit
+                // load+__string__separate+store in the function entry block — not in the
+                // caller's CFG arm. Otherwise `strlen('hallo')` in a loop re-copied the
+                // immortal literal every iteration even when the call was elided (#36386 /
+                // benchmarks/simple.php simplecall). Peer of storeAtFunctionEntry (#22845).
                 BasicBlockHelper::ensureOpenInsertBlock($context, 'string_literal_alloc_cont');
-                $slot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__string__*'));
+                $fn = BasicBlockHelper::parentFunction($context);
+                $slot = BasicBlockHelper::entryAllocaForFunction(
+                    $context,
+                    $fn,
+                    $context->getTypeFromString('__string__*')
+                );
                 $resume = BasicBlockHelper::tryGetInsertBlock($context);
-                $global = $context->constantStringFromString($op->value);
+                $global = $context->constantStringFromString((string) $op->value);
                 // constantStringFromString may emit on a temp init builder; always resume the
-                // caller's open BB before load/separate/store (#26756).
+                // caller's open BB before entry init (#26756).
                 if (null !== $resume) {
                     BasicBlockHelper::restoreInsertBlock($context, $resume);
                 } else {
                     BasicBlockHelper::ensureOpenInsertBlock($context, 'string_literal_init_cont');
                 }
-                $loaded = $context->builder->load($global);
-                $owned = $context->builder->call(
-                    $context->lookupFunction('__string__separate'),
-                    $loaded
-                );
-                $context->builder->store($owned, $slot);
-                // Keep insert on the open store BB — callers loadValue/compare immediately and
-                // NestedJIT may have cleared insert mid-fromLiteral (#26756).
+                BasicBlockHelper::emitAtFunctionEntry($context, $fn, static function () use ($context, $global, $slot): void {
+                    $loaded = $context->builder->load($global);
+                    $owned = $context->builder->call(
+                        $context->lookupFunction('__string__separate'),
+                        $loaded
+                    );
+                    $context->builder->store($owned, $slot);
+                });
                 BasicBlockHelper::ensureOpenInsertBlock($context, 'string_literal_after_store_cont');
                 $var = new Variable(
                     $context,

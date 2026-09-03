@@ -529,6 +529,19 @@ final class BasicBlockHelper
         self::restoreInsertBlock($context, $restore);
     }
 
+    /**
+     * Run $emit in $fn's entry after leading allocas, then restore the prior insert block.
+     *
+     * Used to hoist one-time inits (string-literal separate, #36386) out of loop bodies.
+     */
+    public static function emitAtFunctionEntry(Context $context, Function_ $fn, callable $emit): void
+    {
+        $restore = self::tryGetInsertBlock($context);
+        self::positionAfterEntryAllocas($context, $fn);
+        $emit();
+        self::restoreInsertBlock($context, $restore);
+    }
+
     /** Position builder after leading allocas in $fn's entry (before first non-alloca / terminator). */
     private static function positionAfterEntryAllocas(Context $context, Function_ $fn): void
     {
