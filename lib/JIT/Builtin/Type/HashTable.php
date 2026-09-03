@@ -997,7 +997,7 @@ class HashTable extends Type
         $done = $fn->appendBasicBlock('strkey_set_done');
         $prepend = $fn->appendBasicBlock('strkey_set_prepend');
         $update = $fn->appendBasicBlock('strkey_set_update');
-        $valPtr = $this->lookupStringKeyForWriteBranch($fn, $block, $ht, $key, $update, $prepend, 'strkey_set');
+        [$valPtr, $cachedHashSlot] = $this->lookupStringKeyForWriteBranch($fn, $block, $ht, $key, $update, $prepend, 'strkey_set');
 
         $this->context->builder->positionAtEnd($update);
         $this->context->builder->call(
@@ -1030,10 +1030,8 @@ class HashTable extends Type
             $newNode->typeOf()->constNull(),
             $this->context->builder->structGep($newNode, $nodeMap['next'])
         );
-        $keyHash = $this->context->builder->call(
-            $this->context->lookupFunction('__hashtable__hashStringKey'),
-            $key
-        );
+        // Reuse hash from lookup — no second hashStringKey call (#36468).
+        $keyHash = $this->context->builder->load($cachedHashSlot);
         $this->context->builder->store(
             $keyHash,
             $this->context->builder->structGep($newNode, $nodeMap['hash'])
@@ -1078,7 +1076,7 @@ class HashTable extends Type
         $done = $fn->appendBasicBlock('strkey_ht_done');
         $prepend = $fn->appendBasicBlock('strkey_ht_prepend');
         $update = $fn->appendBasicBlock('strkey_ht_update');
-        $valPtr = $this->lookupStringKeyForWriteBranch($fn, $block, $ht, $key, $update, $prepend, 'strkey_ht');
+        [$valPtr, $cachedHashSlot] = $this->lookupStringKeyForWriteBranch($fn, $block, $ht, $key, $update, $prepend, 'strkey_ht');
 
         $this->context->builder->positionAtEnd($update);
         $this->context->builder->call(
@@ -1111,7 +1109,7 @@ class HashTable extends Type
             $newNode->typeOf()->constNull(),
             $this->context->builder->structGep($newNode, $nodeMap['next'])
         );
-        $this->registerNewStrKeyNode($fn, $prepend, $ht, $headSlot, $key, $newNode, 'strkey_ht', $done);
+        $this->registerNewStrKeyNode($fn, $prepend, $ht, $headSlot, $key, $newNode, 'strkey_ht', $done, $cachedHashSlot);
 
         $this->context->builder->positionAtEnd($done);
         $this->context->builder->returnVoid();
@@ -1133,7 +1131,7 @@ class HashTable extends Type
         $done = $fn->appendBasicBlock('strkey_obj_done');
         $prepend = $fn->appendBasicBlock('strkey_obj_prepend');
         $update = $fn->appendBasicBlock('strkey_obj_update');
-        $valPtr = $this->lookupStringKeyForWriteBranch($fn, $block, $ht, $key, $update, $prepend, 'strkey_obj');
+        [$valPtr, $cachedHashSlot] = $this->lookupStringKeyForWriteBranch($fn, $block, $ht, $key, $update, $prepend, 'strkey_obj');
 
         $this->context->builder->positionAtEnd($update);
         $this->context->builder->call(
@@ -1166,7 +1164,7 @@ class HashTable extends Type
             $newNode->typeOf()->constNull(),
             $this->context->builder->structGep($newNode, $nodeMap['next'])
         );
-        $this->registerNewStrKeyNode($fn, $prepend, $ht, $headSlot, $key, $newNode, 'strkey_obj', $done);
+        $this->registerNewStrKeyNode($fn, $prepend, $ht, $headSlot, $key, $newNode, 'strkey_obj', $done, $cachedHashSlot);
 
         $this->context->builder->positionAtEnd($done);
         $this->context->builder->returnVoid();
@@ -1188,7 +1186,7 @@ class HashTable extends Type
         $done = $fn->appendBasicBlock('strkey_long_done');
         $prepend = $fn->appendBasicBlock('strkey_long_prepend');
         $update = $fn->appendBasicBlock('strkey_long_update');
-        $valPtr = $this->lookupStringKeyForWriteBranch($fn, $block, $ht, $key, $update, $prepend, 'strkey_long');
+        [$valPtr, $cachedHashSlot] = $this->lookupStringKeyForWriteBranch($fn, $block, $ht, $key, $update, $prepend, 'strkey_long');
 
         $this->context->builder->positionAtEnd($update);
         $this->context->builder->call(
@@ -1221,10 +1219,8 @@ class HashTable extends Type
             $newNode->typeOf()->constNull(),
             $this->context->builder->structGep($newNode, $nodeMap['next'])
         );
-        $keyHash = $this->context->builder->call(
-            $this->context->lookupFunction('__hashtable__hashStringKey'),
-            $key
-        );
+        // Reuse hash from lookup (#36468).
+        $keyHash = $this->context->builder->load($cachedHashSlot);
         $this->context->builder->store(
             $keyHash,
             $this->context->builder->structGep($newNode, $nodeMap['hash'])
@@ -1269,7 +1265,7 @@ class HashTable extends Type
         $done = $fn->appendBasicBlock('strkey_double_done');
         $prepend = $fn->appendBasicBlock('strkey_double_prepend');
         $update = $fn->appendBasicBlock('strkey_double_update');
-        $valPtr = $this->lookupStringKeyForWriteBranch($fn, $block, $ht, $key, $update, $prepend, 'strkey_double');
+        [$valPtr, $cachedHashSlot] = $this->lookupStringKeyForWriteBranch($fn, $block, $ht, $key, $update, $prepend, 'strkey_double');
 
         $this->context->builder->positionAtEnd($update);
         $this->context->builder->call(
@@ -1302,7 +1298,7 @@ class HashTable extends Type
             $newNode->typeOf()->constNull(),
             $this->context->builder->structGep($newNode, $nodeMap['next'])
         );
-        $this->registerNewStrKeyNode($fn, $prepend, $ht, $headSlot, $key, $newNode, 'strkey_double', $done);
+        $this->registerNewStrKeyNode($fn, $prepend, $ht, $headSlot, $key, $newNode, 'strkey_double', $done, $cachedHashSlot);
 
         $this->context->builder->positionAtEnd($done);
         $this->context->builder->returnVoid();
@@ -1324,7 +1320,7 @@ class HashTable extends Type
         $done = $fn->appendBasicBlock('strkey_bool_done');
         $prepend = $fn->appendBasicBlock('strkey_bool_prepend');
         $update = $fn->appendBasicBlock('strkey_bool_update');
-        $valPtr = $this->lookupStringKeyForWriteBranch($fn, $block, $ht, $key, $update, $prepend, 'strkey_bool');
+        [$valPtr, $cachedHashSlot] = $this->lookupStringKeyForWriteBranch($fn, $block, $ht, $key, $update, $prepend, 'strkey_bool');
 
         $this->context->builder->positionAtEnd($update);
         $this->writeBoolToValueField($valPtr, $bool);
@@ -1352,7 +1348,7 @@ class HashTable extends Type
             $newNode->typeOf()->constNull(),
             $this->context->builder->structGep($newNode, $nodeMap['next'])
         );
-        $this->registerNewStrKeyNode($fn, $prepend, $ht, $headSlot, $key, $newNode, 'strkey_bool', $done);
+        $this->registerNewStrKeyNode($fn, $prepend, $ht, $headSlot, $key, $newNode, 'strkey_bool', $done, $cachedHashSlot);
 
         $this->context->builder->positionAtEnd($done);
         $this->context->builder->returnVoid();
@@ -1373,7 +1369,7 @@ class HashTable extends Type
         $done = $fn->appendBasicBlock('strkey_null_done');
         $prepend = $fn->appendBasicBlock('strkey_null_prepend');
         $update = $fn->appendBasicBlock('strkey_null_update');
-        $valPtr = $this->lookupStringKeyForWriteBranch($fn, $block, $ht, $key, $update, $prepend, 'strkey_null');
+        [$valPtr, $cachedHashSlot] = $this->lookupStringKeyForWriteBranch($fn, $block, $ht, $key, $update, $prepend, 'strkey_null');
 
         $this->context->builder->positionAtEnd($update);
         $this->context->builder->call(
@@ -1404,10 +1400,8 @@ class HashTable extends Type
             $newNode->typeOf()->constNull(),
             $this->context->builder->structGep($newNode, $nodeMap['next'])
         );
-        $keyHash = $this->context->builder->call(
-            $this->context->lookupFunction('__hashtable__hashStringKey'),
-            $key
-        );
+        // Reuse hash from lookup (#36468).
+        $keyHash = $this->context->builder->load($cachedHashSlot);
         $this->context->builder->store(
             $keyHash,
             $this->context->builder->structGep($newNode, $nodeMap['hash'])
@@ -1944,11 +1938,18 @@ class HashTable extends Type
         $this->context->builder->clearInsertionPosition();
     }
 
+    /**
+     * Lookup a string key in the hash table, returning a __value__* (null if not found).
+     *
+     * @param PHPLLVM\Value|null $hashOutputSlot  If non-null, an i64 alloca where the computed
+     *                                            DJB hash is stored (avoids double-hashing on write paths).
+     */
     private function lookupStringKeyValue(
         PHPLLVM\Value\Function_ $fn,
         PHPLLVM\BasicBlock $block,
         PHPLLVM\Value $ht,
-        PHPLLVM\Value $key
+        PHPLLVM\Value $key,
+        ?PHPLLVM\Value $hashOutputSlot = null
     ): PHPLLVM\Value {
         $valuePtrType = $this->context->getTypeFromString('__value__*');
 
@@ -1985,10 +1986,15 @@ class HashTable extends Type
         $this->context->builder->branchIf($hasHashIndex, $hashLookup, $listLookup);
 
         $this->context->builder->positionAtEnd($hashLookup);
-        $keyHash = $this->context->builder->call(
-            $this->context->lookupFunction('__hashtable__hashStringKey'),
-            $key
-        );
+        // Reuse precomputed hash when available; otherwise compute inline (#36468).
+        if (null !== $hashOutputSlot) {
+            $keyHash = $this->context->builder->load($hashOutputSlot);
+        } else {
+            $keyHash = $this->context->builder->call(
+                $this->context->lookupFunction('__hashtable__hashStringKey'),
+                $key
+            );
+        }
         $hashU = $this->context->builder->truncOrBitCast($keyHash, $sizeT);
         $maskU = $this->context->builder->truncOrBitCast($mask, $sizeT);
         $bucket = $this->context->builder->and($hashU, $maskU);
@@ -2033,6 +2039,7 @@ class HashTable extends Type
         $this->context->builder->branch($hashLoopHead);
 
         $this->context->builder->positionAtEnd($listLookup);
+        // Hash is already in hashOutputSlot if provided (precomputed in caller).
         $currentSlot = $this->context->builder->alloca($nodePtrType, 1, 'strkey_current');
         $this->context->builder->store($head, $currentSlot);
         $this->context->builder->branch($loopHead);
@@ -3672,6 +3679,11 @@ class HashTable extends Type
      */
     /**
      * Hash-index lookup for string-key write paths; branch insert vs update (#36408).
+     *
+     * Returns [$valPtr, $hashSlot] — $hashSlot is an i64 alloca holding the DJB hash
+     * computed during lookup, so callers can reuse it without double-hashing (#36468).
+     *
+     * @return array{PHPLLVM\Value, PHPLLVM\Value}
      */
     private function lookupStringKeyForWriteBranch(
         PHPLLVM\Value\Function_ $fn,
@@ -3681,8 +3693,16 @@ class HashTable extends Type
         PHPLLVM\BasicBlock $updateBlock,
         PHPLLVM\BasicBlock $insertBlock,
         string $prefix
-    ): PHPLLVM\Value {
-        $valPtr = $this->lookupStringKeyValue($fn, $entryBlock, $ht, $key);
+    ): array {
+        $i64 = $this->context->getTypeFromString('int64');
+        $hashSlot = $this->context->builder->alloca($i64, 1, $prefix.'_cached_hash');
+        // Compute hash once up front; lookupStringKeyValue reuses it (#36468).
+        $precomputedHash = $this->context->builder->call(
+            $this->context->lookupFunction('__hashtable__hashStringKey'),
+            $key
+        );
+        $this->context->builder->store($precomputedHash, $hashSlot);
+        $valPtr = $this->lookupStringKeyValue($fn, $entryBlock, $ht, $key, $hashSlot);
         $afterLookup = $fn->appendBasicBlock($prefix.'_after_lookup');
         $this->context->builder->branch($afterLookup);
         $this->context->builder->positionAtEnd($afterLookup);
@@ -3693,7 +3713,7 @@ class HashTable extends Type
         );
         $this->context->builder->branchIf($isNull, $insertBlock, $updateBlock);
 
-        return $valPtr;
+        return [$valPtr, $hashSlot];
     }
 
     /** Reload strKeys list head after earlier inserts in the same LLVM function. */
@@ -3746,6 +3766,9 @@ class HashTable extends Type
     /**
      * Insert a newly allocated string-key node into DJB hash buckets and the insertion-order list (#36191).
      */
+    /**
+     * @param PHPLLVM\Value|null $cachedHashSlot  i64 alloca with precomputed hash (#36468).
+     */
     private function registerNewStrKeyNode(
         PHPLLVM\Value\Function_ $fn,
         PHPLLVM\BasicBlock $fromBlock,
@@ -3754,13 +3777,17 @@ class HashTable extends Type
         PHPLLVM\Value $key,
         PHPLLVM\Value $newNode,
         string $prefix,
-        PHPLLVM\BasicBlock $doneBlock
+        PHPLLVM\BasicBlock $doneBlock,
+        ?PHPLLVM\Value $cachedHashSlot = null
     ): void {
         $nodeMap = $this->context->structFieldMap['__strkey_node__'];
-        $keyHash = $this->context->builder->call(
-            $this->context->lookupFunction('__hashtable__hashStringKey'),
-            $key
-        );
+        // Reuse precomputed hash when available; fall back to computing it (#36468).
+        $keyHash = null !== $cachedHashSlot
+            ? $this->context->builder->load($cachedHashSlot)
+            : $this->context->builder->call(
+                $this->context->lookupFunction('__hashtable__hashStringKey'),
+                $key
+            );
         $this->context->builder->store(
             $keyHash,
             $this->context->builder->structGep($newNode, $nodeMap['hash'])
