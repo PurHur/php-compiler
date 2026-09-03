@@ -4,20 +4,19 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\calendar\CalFromJdJitHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for cal_from_jd() via CalFromJdJitHelper PHP (#27359).
+ * JIT/AOT link for cal_from_jd() via calendar hooks (#27359 / #36204).
  *
  * Compile-time JD+calendar: embed via {@see HashTableHelper::variableFromVmHashTable}
  * (peer cal_info #27354 — NestedJIT HashTable alone can yield empty dim under thin AOT).
  * Runtime: NestedJIT bridge returning `__hashtable__*` (peer str_word_count words).
  *
- * SSOT: {@see CalFromJdJitHelper} → {@see \PHPCompiler\ext\calendar\VmCalendar}
+ * SSOT: hooks → {@see \PHPCompiler\ext\calendar\VmCalendar}
  * php-src: ext/calendar/calendar.c — PHP_FUNCTION(cal_from_jd)
  */
 final class CalFromJdRuntime
@@ -55,7 +54,7 @@ final class CalFromJdRuntime
     /** Compile-time JD + calendar — embed breakdown table. */
     public static function emit(Context $context, int $julianDay, int $calendar): Value
     {
-        $ht = CalFromJdJitHelper::calFromJdArgv($julianDay, $calendar);
+        $ht = $context->extensionLowering->requireCalendar()->calFromJdArgv($julianDay, $calendar);
 
         return HashTableHelper::variableFromVmHashTable($context, $ht)->value;
     }

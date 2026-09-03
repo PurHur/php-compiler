@@ -25,6 +25,11 @@ class Module extends ModuleAbstract
         }
     }
 
+    public function jitInit(\PHPCompiler\JIT\Context $context): void
+    {
+        $context->extensionLowering->calendar = new JitCalendarExtensionHooksFacade();
+    }
+
     public function getFunctions(): array
     {
         return [

@@ -203,6 +203,9 @@ final class ExtensionLoweringHooks
     /** filter JIT/VM surfaces — registered from ext/filter Module::jitInit (#36204). */
     public ?FilterExtensionHooks $filter = null;
 
+    /** calendar JIT/VM surfaces — registered from ext/calendar Module::jitInit (#36204). */
+    public ?CalendarExtensionHooks $calendar = null;
+
     public function requirePosixNested(): PosixNestedJitKernels
     {
         if (null === $this->posixNested) {
@@ -223,6 +226,17 @@ final class ExtensionLoweringHooks
         }
 
         return $this->filter;
+    }
+
+    public function requireCalendar(): CalendarExtensionHooks
+    {
+        if (null === $this->calendar) {
+            throw new \RuntimeException(
+                'calendar extension hooks not registered — ext/calendar Module::jitInit missing (#36204)'
+            );
+        }
+
+        return $this->calendar;
     }
 
     public function tryPrepareDimWrite(Context $context, Variable $container, Variable $dim): ?Variable
