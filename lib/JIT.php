@@ -23301,6 +23301,7 @@ class JIT {
             $long = $this->context->builder->zExt($boolVal, $this->context->getTypeFromString('int64'));
             $this->context->builder->store($long, $result->value);
             $result->addref();
+            $this->markScopeVariableAssignedIfTracked($resultOp, $result);
 
             return;
         } elseif ($result->type === Variable::TYPE_NATIVE_LONG && Variable::TYPE_STRING === $value->type) {
@@ -23308,6 +23309,7 @@ class JIT {
             $long = JIT\JitLongArg::lowerStringValue($this->context, $this->context->helper->loadValue($value));
             $this->context->builder->store($long, $result->value);
             $result->addref();
+            $this->markScopeVariableAssignedIfTracked($resultOp, $result);
 
             return;
         } elseif ($result->type === Variable::TYPE_NATIVE_DOUBLE && Variable::TYPE_NATIVE_LONG === $value->type) {
@@ -23316,13 +23318,18 @@ class JIT {
             $fp = $this->context->builder->siToFp($long, $this->context->getTypeFromString('double'));
             $this->context->builder->store($fp, $result->value);
             $result->addref();
+            $this->markScopeVariableAssignedIfTracked($resultOp, $result);
 
             return;
         } elseif ($result->type === Variable::TYPE_NATIVE_DOUBLE && Variable::TYPE_VALUE === $value->type) {
+            // Loop-fused `$zr2 = $zr * $zr` (ASSIGN elided; MUL writes named CV) unboxes a
+            // vbox product into a preallocated native-double slot — must flip the assigned
+            // flag or echo warns (#36405 respin / #36386 mandelbrot).
             $fp = $this->unboxValueToNativeDouble($value);
             $result->free();
             $this->context->builder->store($fp, $result->value);
             $result->addref();
+            $this->markScopeVariableAssignedIfTracked($resultOp, $result);
 
             return;
         } elseif (Variable::TYPE_VALUE === $result->type && Variable::TYPE_VALUE === $value->type) {
