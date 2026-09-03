@@ -7452,12 +7452,20 @@ from pathlib import Path
 
 path = Path(sys.argv[1])
 text = path.read_text()
-anchor = """        if (preg_match('/^(list|array|iterable)\\s*</i', trim($decl))) {
+if "Class generics from PHPStan/Psalm docblocks: App<T>" in text:
+    sys.exit(0)
+
+# Prefer end-state (after iterable-generic + anonymous-class-type). Also accept
+# list|array without iterable, and mid-stack after generics-fallback only
+# (positive-int → $regex) so a mis-ordered apply still lands the insert.
+candidates = [
+    (
+        """        if (preg_match('/^(list|array|iterable)\\s*</i', trim($decl))) {
             return new self(self::TYPE_ARRAY);
         }
         if (preg_match('/@anonymous\\x00/', $decl)) {
-"""
-insert = """        if (preg_match('/^(list|array|iterable)\\s*</i', trim($decl))) {
+""",
+        """        if (preg_match('/^(list|array|iterable)\\s*</i', trim($decl))) {
             return new self(self::TYPE_ARRAY);
         }
         // Class generics from PHPStan/Psalm docblocks: App<T> (#36382 Slim).
@@ -7465,13 +7473,46 @@ insert = """        if (preg_match('/^(list|array|iterable)\\s*</i', trim($decl)
             return self::fromDecl(trim($genericClass[1]));
         }
         if (preg_match('/@anonymous\\x00/', $decl)) {
-"""
-if "Class generics from PHPStan/Psalm docblocks: App<T>" in text:
-    sys.exit(0)
-if anchor not in text:
+""",
+    ),
+    (
+        """        if (preg_match('/^(list|array)\\s*</i', trim($decl))) {
+            return new self(self::TYPE_ARRAY);
+        }
+        if (preg_match('/@anonymous\\x00/', $decl)) {
+""",
+        """        if (preg_match('/^(list|array)\\s*</i', trim($decl))) {
+            return new self(self::TYPE_ARRAY);
+        }
+        // Class generics from PHPStan/Psalm docblocks: App<T> (#36382 Slim).
+        if (preg_match('/^(.+?)\\s*<.*>\\s*$/s', trim($decl), $genericClass)) {
+            return self::fromDecl(trim($genericClass[1]));
+        }
+        if (preg_match('/@anonymous\\x00/', $decl)) {
+""",
+    ),
+    (
+        """        if (preg_match('/^(positive|negative|non-zero)-int$/', $pseudo)) {
+            return new self(self::TYPE_LONG);
+        }
+        $regex = """,
+        """        if (preg_match('/^(positive|negative|non-zero)-int$/', $pseudo)) {
+            return new self(self::TYPE_LONG);
+        }
+        // Class generics from PHPStan/Psalm docblocks: App<T> (#36382 Slim).
+        if (preg_match('/^(.+?)\\s*<.*>\\s*$/s', trim($decl), $genericClass)) {
+            return self::fromDecl(trim($genericClass[1]));
+        }
+        $regex = """,
+    ),
+]
+for anchor, insert in candidates:
+    if anchor in text:
+        path.write_text(text.replace(anchor, insert, 1))
+        break
+else:
     sys.stderr.write("php-types-class-generics-fallback: anchor not found in Type.php\n")
     sys.exit(1)
-path.write_text(text.replace(anchor, insert, 1))
 PY
     echo "Applied php-types-class-generics-fallback.patch (overlay)"
     return 0
@@ -7926,7 +7967,6 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-docblock-first-token.patch"
   apply_patch "$PATCH_DIR/php-types-array-shape.patch"
   apply_patch "$PATCH_DIR/php-types-generics-fallback.patch"
-  apply_patch "$PATCH_DIR/php-types-class-generics-fallback.patch"
   apply_patch "$PATCH_DIR/php-types-generics-list-array.patch"
   apply_patch "$PATCH_DIR/php-types-iterable-generic.patch"
   apply_patch "$PATCH_DIR/php-types-docblock-trailing-text.patch"
@@ -7937,6 +7977,10 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-fromdecl-string-literals.patch"
   apply_patch "$PATCH_DIR/php-types-remove-type-empty-union.patch"
   apply_patch "$PATCH_DIR/php-types-anonymous-class-type.patch"
+  # After list|array|iterable + @anonymous exist (#36382). Applying earlier
+  # makes the overlay look for anchors that generics-list-array / iterable /
+  # anonymous-class-type have not inserted yet (cold CI exit 1).
+  apply_patch "$PATCH_DIR/php-types-class-generics-fallback.patch"
   apply_patch "$PATCH_DIR/php-types-ns-func-call.patch"
   apply_patch "$PATCH_DIR/php-types-arrow-function.patch"
   apply_patch "$PATCH_DIR/php-types-closure-unbound-this.patch"
