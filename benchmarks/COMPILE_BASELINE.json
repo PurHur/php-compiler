@@ -1,6 +1,6 @@
 {
     "version": 2,
-    "generated_at": "2026-09-03T12:34:49Z",
+    "generated_at": "2026-09-03T23:39:14Z",
     "arch": "x86_64-linux",
     "wall_tolerance_percent": 20,
     "scaling_tolerance_percent": 20,
@@ -9,54 +9,54 @@
     "cases": {
         "hello-cold": {
             "ok": true,
-            "wall_s": 6.194135,
-            "peak_rss_kb": 1452
+            "wall_s": 3.614939,
+            "peak_rss_kb": 1608
         },
         "hello-warm": {
             "ok": true,
-            "wall_s": 0.51885,
-            "peak_rss_kb": 1692
+            "wall_s": 0.103901,
+            "peak_rss_kb": 1700
         },
         "miniwebapp-cold": {
             "ok": true,
-            "wall_s": 15.574982,
-            "peak_rss_kb": 1740
+            "wall_s": 9.150728,
+            "peak_rss_kb": 1540
         },
         "miniwebapp-warm": {
             "ok": true,
-            "wall_s": 0.103562,
-            "peak_rss_kb": 1596
+            "wall_s": 0.207205,
+            "peak_rss_kb": 1736
         },
         "miniwebapp-edit": {
             "ok": true,
-            "wall_s": 10.47744,
-            "peak_rss_kb": 1596,
-            "pct_of_cold": 67.3
+            "wall_s": 2.259647,
+            "peak_rss_kb": 1612,
+            "pct_of_cold": 24.7
         },
         "hello-lint": {
             "ok": true,
-            "wall_s": 0.308424,
-            "peak_rss_kb": 1540
+            "wall_s": 0.309542,
+            "peak_rss_kb": 1508
         },
         "scale-50": {
             "ok": true,
-            "wall_s": 0.095897,
-            "ms_per_statement": 1.918
+            "wall_s": 0.086527,
+            "ms_per_statement": 1.731
         },
         "scale-100": {
             "ok": true,
-            "wall_s": 0.254565,
-            "ms_per_statement": 2.546
+            "wall_s": 0.219892,
+            "ms_per_statement": 2.199
         },
         "scale-200": {
             "ok": true,
-            "wall_s": 0.81436,
-            "ms_per_statement": 4.072
+            "wall_s": 0.747039,
+            "ms_per_statement": 3.735
         },
         "scale-400": {
             "ok": true,
-            "wall_s": 3.043913,
-            "ms_per_statement": 7.61
+            "wall_s": 2.819191,
+            "ms_per_statement": 7.048
         }
     }
 }

@@ -562,6 +562,7 @@ function run(string $filename, string $code, array $options): void
                 && \PHPCompiler\JIT\CompileCache::canUseEditScaffold($scaffoldKey)
             ) {
                 $prevMembers = [];
+                $idxReload = null;
                 if (isset($idx) && is_array($idx) && is_array($idx['members'] ?? null)) {
                     $prevMembers = $idx['members'];
                 } elseif (is_file($idxFile)) {
@@ -570,8 +571,20 @@ function run(string $filename, string $code, array $options): void
                         $prevMembers = $idxReload['members'];
                     }
                 }
+                $prevSemantic = null;
+                if (isset($idx) && is_array($idx) && is_array($idx['semantic_members'] ?? null)) {
+                    $prevSemantic = $idx['semantic_members'];
+                } elseif (is_array($idxReload) && is_array($idxReload['semantic_members'] ?? null)) {
+                    $prevSemantic = $idxReload['semantic_members'];
+                }
+                $currSemantic = \PHPCompiler\JIT\CompileCache::memberSemanticHashes($memberPaths);
                 \PHPCompiler\JIT\CompileCache::setEditChangedMembers(
-                    \PHPCompiler\JIT\CompileCache::diffMemberHashes($prevMembers, $hashes)
+                    \PHPCompiler\JIT\CompileCache::diffMembersForStrip(
+                        $prevMembers,
+                        $hashes,
+                        is_array($prevSemantic) ? $prevSemantic : null,
+                        $currSemantic
+                    )
                 );
                 \PHPCompiler\JIT\CompileCache::armEditScaffold($scaffoldKey);
             }
