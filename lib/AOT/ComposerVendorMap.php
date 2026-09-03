@@ -12,12 +12,20 @@ use PHPCompiler\Web\ProjectManifest;
  *
  * Prefer including the generated files (same contract Composer uses) when present; fall back to
  * an empty map when vendor/composer is missing. Does not execute vendor/autoload.php itself.
+ *
+ * Default compile seeds are **reachable closure** (classmap + files + include_roots + autoload.php);
+ * PSR-4 prefixes stay in {@see $psr4} for {@see AutoloadDiscovery}. Opt into whole-tree seeds with
+ * `composer_closure: "all"` / `autoload.closure: "all"` — full PSR-4 dumps OOM Slim-sized apps on 8g.
  */
 final class ComposerVendorMap
 {
+    public const CLOSURE_REACHABLE = 'reachable';
+    public const CLOSURE_ALL = 'all';
+
     /**
      * @return array{
      *   enabled: bool,
+     *   closure: string,
      *   classmap: array<string, string>,
      *   psr4: array<string, list<string>>,
      *   files: list<string>,
@@ -29,6 +37,7 @@ final class ComposerVendorMap
     {
         $empty = [
             'enabled' => false,
+            'closure' => self::CLOSURE_REACHABLE,
             'classmap' => [],
             'psr4' => [],
             'files' => [],
@@ -47,6 +56,7 @@ final class ComposerVendorMap
             return $empty;
         }
 
+        $closure = self::closureMode($manifest);
         $errors = [];
         $classmap = self::loadClassmap($composerDir, $errors);
         $psr4 = self::loadPsr4($composerDir, $errors);
@@ -61,8 +71,8 @@ final class ComposerVendorMap
         foreach ($files as $path) {
             self::pushFile($path, $all, $seen);
         }
-        // Whole PSR-4 trees (issue #36382 deliverable: every mapped file).
-        if ([] !== $psr4) {
+        // Whole PSR-4 trees only when explicitly requested — default is AutoloadDiscovery (#36382).
+        if (self::CLOSURE_ALL === $closure && [] !== $psr4) {
             foreach (ProjectAutoload::collectPhpFiles($root, $psr4) as $path) {
                 self::pushFile($path, $all, $seen);
             }
@@ -83,12 +93,38 @@ final class ComposerVendorMap
 
         return [
             'enabled' => true,
+            'closure' => $closure,
             'classmap' => $classmap,
             'psr4' => $psr4,
             'files' => $files,
             'all_files' => $all,
             'errors' => $errors,
         ];
+    }
+
+    /**
+     * @param array<string, mixed>|null $manifest
+     */
+    public static function closureMode(?array $manifest): string
+    {
+        if (null === $manifest) {
+            return self::CLOSURE_REACHABLE;
+        }
+        if (isset($manifest['composer_closure']) && is_string($manifest['composer_closure'])) {
+            $mode = strtolower(trim($manifest['composer_closure']));
+            if (self::CLOSURE_ALL === $mode || self::CLOSURE_REACHABLE === $mode) {
+                return $mode;
+            }
+        }
+        $autoload = $manifest['autoload'] ?? null;
+        if (is_array($autoload) && isset($autoload['closure']) && is_string($autoload['closure'])) {
+            $mode = strtolower(trim($autoload['closure']));
+            if (self::CLOSURE_ALL === $mode || self::CLOSURE_REACHABLE === $mode) {
+                return $mode;
+            }
+        }
+
+        return self::CLOSURE_REACHABLE;
     }
 
     /**
@@ -149,8 +185,9 @@ final class ComposerVendorMap
     }
 
     /**
-     * When a compile unit requires vendor/autoload.php, add Composer-mapped files to $includes
-     * so AOT can stub the dynamic loader without dropping classes (#36382).
+     * When a compile unit requires vendor/autoload.php, add Composer seed files (and, under the
+     * default reachable closure, AutoloadDiscovery hits from the entry) to $includes so AOT can
+     * stub the dynamic loader without dropping referenced classes (#36382).
      *
      * @param list<string> $includes
      *
@@ -199,7 +236,11 @@ final class ComposerVendorMap
             $vendorDir = dirname($autoloadReal);
             $projectRoot = dirname($vendorDir);
             if (is_dir($projectRoot.'/vendor/composer')) {
-                $map = self::load($projectRoot, ['autoload' => 'composer']);
+                $manifest = ProjectManifest::loadManifest($projectRoot) ?? ['autoload' => 'composer'];
+                if (!isset($manifest['autoload'])) {
+                    $manifest['autoload'] = 'composer';
+                }
+                $map = self::load($projectRoot, $manifest);
                 foreach ($map['all_files'] as $path) {
                     $key = realpath($path) ?: $path;
                     if (isset($seen[$key])) {
@@ -207,6 +248,22 @@ final class ComposerVendorMap
                     }
                     $seen[$key] = true;
                     $out[] = $path;
+                }
+                if (self::CLOSURE_REACHABLE === $map['closure'] && [] !== $map['psr4']) {
+                    $entryReal = realpath($entryPath) ?: $entryPath;
+                    if (is_file($entryReal)) {
+                        $runtime = new \PHPCompiler\Runtime(\PHPCompiler\Runtime::MODE_AOT);
+                        $seeds = array_values(array_unique(array_merge([$entryReal], $out)));
+                        $disc = AutoloadDiscovery::discover($runtime, $projectRoot, $map['psr4'], $seeds);
+                        foreach ($disc['files'] as $path) {
+                            $key = realpath($path) ?: $path;
+                            if (isset($seen[$key])) {
+                                continue;
+                            }
+                            $seen[$key] = true;
+                            $out[] = $path;
+                        }
+                    }
                 }
             }
             // Always keep literal require(_once) __DIR__.'…' targets from the autoload body
