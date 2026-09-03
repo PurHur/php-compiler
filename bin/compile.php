@@ -192,6 +192,7 @@ function phpc_compile_ensure_repo_root_env(): void
 function run(string $filename, string $code, array $options): void
 {
     phpc_compile_ensure_repo_root_env();
+    \PHPCompiler\AOT\BuildTiming::boot();
     $normalized = '-' !== $filename ? str_replace('\\', '/', $filename) : '';
     if ('' !== $normalized
         && '-' !== $filename
@@ -368,6 +369,123 @@ function run(string $filename, string $code, array $options): void
     }
     /** @var list<string> $includes */
     $skipBundle = phpc_compile_skip_aot_bundle($normalized);
+
+    // Latch user-script / helper-runtime env before any Runtime so CompileCache fingerprint
+    // and early artifact restore see the same ABI key as standalone emit (#36387).
+    $prevUserScriptAot = \PHPCompiler\Config::getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+    $prevHelperRuntimeO = \PHPCompiler\Config::getenv('PHP_COMPILER_HELPER_RUNTIME_O');
+    $prevLanguageProfile = \PHPCompiler\Config::getenv('PHP_COMPILER_PROFILE');
+    $setUserScriptAot = phpc_compile_is_user_script_aot($normalized);
+    $inventoryArgvSeed = (str_ends_with($normalized, '/bin/compile.php') || 'bin/compile.php' === $normalized)
+        && (('1' === (string) (\PHPCompiler\Config::getenv('PHP_COMPILER_M4_BIN_COMPILE_DRIVER') ?: ''))
+            || 'true' === strtolower((string) (\PHPCompiler\Config::getenv('PHP_COMPILER_M4_BIN_COMPILE_DRIVER') ?: ''))
+            || '1' === (string) (\PHPCompiler\Config::getenv('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER') ?: '')
+            || 'true' === strtolower((string) (\PHPCompiler\Config::getenv('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER') ?: ''))
+            || '1' === (string) (getenv('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER') ?: '')
+            || 'true' === strtolower((string) (getenv('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER') ?: '')));
+    $needHelperRuntimeO = $setUserScriptAot
+        || ($skipBundle && str_contains($normalized, 'compile_driver.php'))
+        || $inventoryArgvSeed;
+    if ($setUserScriptAot && \function_exists('putenv')) {
+        putenv('PHP_COMPILER_AOT_USER_SCRIPT=1');
+        $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
+        $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
+        \PHPCompiler\JIT\UserScriptAotEnv::latchUserScript();
+        // cli.php may have defaulted SELFHOST_AOT=1 for native drivers; that disables
+        // CompileCache::isEnabled() and blocks early artifact restore (#36387 / #26756).
+        $m5DriverHost = \PHPCompiler\Config::getenv('PHP_COMPILER_M5_DRIVER_HOST');
+        $keepSelfHostForM5 = '1' === $m5DriverHost || 'true' === strtolower((string) $m5DriverHost);
+        if (!$keepSelfHostForM5) {
+            putenv('PHP_COMPILER_SELFHOST_AOT=0');
+            $_ENV['PHP_COMPILER_SELFHOST_AOT'] = '0';
+            $_SERVER['PHP_COMPILER_SELFHOST_AOT'] = '0';
+        }
+    }
+    if ($needHelperRuntimeO && \function_exists('putenv')) {
+        $helperCache = \PHPCompiler\Config::getenv('PHP_COMPILER_HELPER_RUNTIME_O');
+        if (false === $helperCache || '' === (string) $helperCache) {
+            putenv('PHP_COMPILER_HELPER_RUNTIME_O=1');
+            $_ENV['PHP_COMPILER_HELPER_RUNTIME_O'] = '1';
+            $_SERVER['PHP_COMPILER_HELPER_RUNTIME_O'] = '1';
+        }
+    }
+    $clearedLanguageProfile = false;
+    if ($setUserScriptAot && false !== $prevLanguageProfile && '' !== (string) $prevLanguageProfile && \function_exists('putenv')) {
+        putenv('PHP_COMPILER_AOT_COMPILE_PROFILE='.$prevLanguageProfile);
+        $_ENV['PHP_COMPILER_AOT_COMPILE_PROFILE'] = $prevLanguageProfile;
+        $_SERVER['PHP_COMPILER_AOT_COMPILE_PROFILE'] = $prevLanguageProfile;
+        putenv('PHP_COMPILER_PROFILE=');
+        unset($_ENV['PHP_COMPILER_PROFILE'], $_SERVER['PHP_COMPILER_PROFILE']);
+        $clearedLanguageProfile = true;
+    }
+
+    $restoreUserScriptEnv = static function () use (
+        $setUserScriptAot,
+        $prevUserScriptAot,
+        $prevHelperRuntimeO,
+        $clearedLanguageProfile,
+        $prevLanguageProfile
+    ): void {
+        if (!$setUserScriptAot || !\function_exists('putenv')) {
+            return;
+        }
+        if (false === $prevUserScriptAot || null === $prevUserScriptAot) {
+            putenv('PHP_COMPILER_AOT_USER_SCRIPT=');
+            unset($_ENV['PHP_COMPILER_AOT_USER_SCRIPT'], $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT']);
+        } else {
+            putenv('PHP_COMPILER_AOT_USER_SCRIPT='.$prevUserScriptAot);
+            $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = $prevUserScriptAot;
+            $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = $prevUserScriptAot;
+        }
+        if (false === $prevHelperRuntimeO || null === $prevHelperRuntimeO) {
+            putenv('PHP_COMPILER_HELPER_RUNTIME_O=');
+            unset($_ENV['PHP_COMPILER_HELPER_RUNTIME_O'], $_SERVER['PHP_COMPILER_HELPER_RUNTIME_O']);
+        } else {
+            putenv('PHP_COMPILER_HELPER_RUNTIME_O='.$prevHelperRuntimeO);
+            $_ENV['PHP_COMPILER_HELPER_RUNTIME_O'] = $prevHelperRuntimeO;
+            $_SERVER['PHP_COMPILER_HELPER_RUNTIME_O'] = $prevHelperRuntimeO;
+        }
+        if ($clearedLanguageProfile) {
+            putenv('PHP_COMPILER_PROFILE='.$prevLanguageProfile);
+            $_ENV['PHP_COMPILER_PROFILE'] = $prevLanguageProfile;
+            $_SERVER['PHP_COMPILER_PROFILE'] = $prevLanguageProfile;
+            putenv('PHP_COMPILER_AOT_COMPILE_PROFILE=');
+            unset($_ENV['PHP_COMPILER_AOT_COMPILE_PROFILE'], $_SERVER['PHP_COMPILER_AOT_COMPILE_PROFILE']);
+        }
+    };
+
+    $tryArtifactRestore = static function (string $srcPath, string $srcCode, array $opts) use ($setUserScriptAot): bool {
+        if (!$setUserScriptAot || isset($opts['-l']) || isset($opts['-y']) || isset($opts['--debug-symbols'])) {
+            return false;
+        }
+        if (!isset($opts['-o']) || true === $opts['-o'] || '' === $srcCode) {
+            return false;
+        }
+        if (!\PHPCompiler\JIT\CompileCache::isEnabled()) {
+            return false;
+        }
+        $out = (string) $opts['-o'];
+        $key = \PHPCompiler\JIT\CompileCache::computeKey($srcPath, $srcCode);
+        if (!\PHPCompiler\JIT\CompileCache::tryRestoreArtifact($key, $out, $srcPath, $srcCode)) {
+            return false;
+        }
+        \PHPCompiler\AOT\Linker::assertNonEmptyRequestedOutput($out);
+        \PHPCompiler\AOT\BuildTiming::note('artifact_cache_hit', 1.0);
+        \PHPCompiler\AOT\BuildTiming::finish($out);
+
+        return true;
+    };
+
+    // Fast warm path for single-file scripts: restore before include discovery / Runtime (#36387).
+    if ('' === $code && '-' !== $filename && is_file($filename) && [] === $includes && !$skipBundle) {
+        $codeProbe = (string) file_get_contents($filename);
+        if ($tryArtifactRestore($filename, $codeProbe, $options)) {
+            $restoreUserScriptEnv();
+
+            return;
+        }
+    }
+
     if ([] === $includes && '-' !== $filename && is_file($filename) && !$skipBundle) {
         $runtime = new Runtime(Runtime::MODE_AOT);
         $includes = LiteralIncludeDiscovery::discoverDirectAbsolutePaths($runtime, $filename);
@@ -382,8 +500,16 @@ function run(string $filename, string $code, array $options): void
         $code = (string) file_get_contents($filename);
     }
 
+    // Bundled multi-file projects: restore after SourceBundler rewrote $code (#36387).
+    if ($tryArtifactRestore($filename, $code, $options)) {
+        $restoreUserScriptEnv();
+
+        return;
+    }
+
     $runtime = new Runtime(Runtime::MODE_AOT);
     $allowlistEnv = getenv('PHP_COMPILER_AOT_INCLUDE_ALLOWLIST');
+
     if (is_string($allowlistEnv) && '' !== $allowlistEnv) {
         $allow = [];
         foreach (preg_split('/\r\n|\n|\r/', $allowlistEnv) ?: [] as $line) {
@@ -432,55 +558,12 @@ function run(string $filename, string $code, array $options): void
         $scriptFilename,
         $scriptName
     );
-    $prevUserScriptAot = \PHPCompiler\Config::getenv('PHP_COMPILER_AOT_USER_SCRIPT');
-    $prevHelperRuntimeO = \PHPCompiler\Config::getenv('PHP_COMPILER_HELPER_RUNTIME_O');
-    $prevLanguageProfile = \PHPCompiler\Config::getenv('PHP_COMPILER_PROFILE');
-    $setUserScriptAot = phpc_compile_is_user_script_aot($normalized);
-    // Skip-bundle inventory compile_driver needs helper-runtime .o for ABIs like
-    // phpc_str_replace — NestedJIT includes hit those calls while NestedJitCompileScope
-    // is active and StringStrReplace::ensureLinked no-ops (#23970 / peer #8559).
-    // Inventory argv seed (Zend compile of bin/compile.php itself) hits the same ABIs (#36144).
-    $inventoryArgvSeed = (str_ends_with($normalized, '/bin/compile.php') || 'bin/compile.php' === $normalized)
-        && (('1' === (string) (\PHPCompiler\Config::getenv('PHP_COMPILER_M4_BIN_COMPILE_DRIVER') ?: ''))
-            || 'true' === strtolower((string) (\PHPCompiler\Config::getenv('PHP_COMPILER_M4_BIN_COMPILE_DRIVER') ?: ''))
-            || '1' === (string) (\PHPCompiler\Config::getenv('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER') ?: '')
-            || 'true' === strtolower((string) (\PHPCompiler\Config::getenv('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER') ?: ''))
-            || '1' === (string) (getenv('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER') ?: '')
-            || 'true' === strtolower((string) (getenv('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER') ?: '')));
-    $needHelperRuntimeO = $setUserScriptAot
-        || ($skipBundle && str_contains($normalized, 'compile_driver.php'))
-        || $inventoryArgvSeed;
-    if ($setUserScriptAot && \function_exists('putenv')) {
-        putenv('PHP_COMPILER_AOT_USER_SCRIPT=1');
-        $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
-        $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
-        \PHPCompiler\JIT\UserScriptAotEnv::latchUserScript();
-    }
-    if ($needHelperRuntimeO && \function_exists('putenv')) {
-        // Default-on helper-runtime split compilation for user scripts (#15889)
-        // and skip-bundle selfhost compile_driver (#23970).
-        $helperCache = \PHPCompiler\Config::getenv('PHP_COMPILER_HELPER_RUNTIME_O');
-        if (false === $helperCache || '' === (string) $helperCache) {
-            putenv('PHP_COMPILER_HELPER_RUNTIME_O=1');
-            $_ENV['PHP_COMPILER_HELPER_RUNTIME_O'] = '1';
-            $_SERVER['PHP_COMPILER_HELPER_RUNTIME_O'] = '1';
-        }
-    }
-    // Explicit PROFILE during user-script AOT compile breaks hash crypto helper ABI
-    // (unset 8.4.0-dev default is fine). Runtime PROFILE still applies when the
-    // binary runs (#21557 / peer AotTest COMPILE_EXCLUDED_ENV).
-    $clearedLanguageProfile = false;
-    if ($setUserScriptAot && false !== $prevLanguageProfile && '' !== (string) $prevLanguageProfile && \function_exists('putenv')) {
-        putenv('PHP_COMPILER_AOT_COMPILE_PROFILE='.$prevLanguageProfile);
-        $_ENV['PHP_COMPILER_AOT_COMPILE_PROFILE'] = $prevLanguageProfile;
-        $_SERVER['PHP_COMPILER_AOT_COMPILE_PROFILE'] = $prevLanguageProfile;
-        putenv('PHP_COMPILER_PROFILE=');
-        unset($_ENV['PHP_COMPILER_PROFILE'], $_SERVER['PHP_COMPILER_PROFILE']);
-        $clearedLanguageProfile = true;
-    }
     // Warm helper-unit cache once per core fingerprint so subsequent builds skip nested helper lowering (#15889).
     \PHPCompiler\AOT\HelperRuntimeCache::warmForUserAotBuild();
+    \PHPCompiler\AOT\BuildTiming::end('boot');
+    \PHPCompiler\AOT\BuildTiming::mark('parse');
     $block = $runtime->parseAndCompile($code, $filename);
+    \PHPCompiler\AOT\BuildTiming::end('parse');
     if (null === $block) {
         if (! isset($options['-l'])) {
             $diag = \PHPCompiler\Runtime::getLastParseFailure();
@@ -564,6 +647,7 @@ function run(string $filename, string $code, array $options): void
             $runtime->standalone($block, $options['-o'], $code, $filename);
             \PHPCompiler\AOT\Linker::assertNonEmptyRequestedOutput((string) $options['-o']);
             $aotEmitOk = true;
+            \PHPCompiler\AOT\BuildTiming::finish((string) $options['-o']);
         } catch (\LogicException $e) {
             fwrite(STDERR, $e->getMessage()."\n");
             exit(2);
@@ -619,31 +703,7 @@ function run(string $filename, string $code, array $options): void
             $normalized."\nlinted-ok " . date('c') . "\n"
         );
     }
-    if ($setUserScriptAot && \function_exists('putenv')) {
-        if (false === $prevUserScriptAot || null === $prevUserScriptAot) {
-            putenv('PHP_COMPILER_AOT_USER_SCRIPT=');
-            unset($_ENV['PHP_COMPILER_AOT_USER_SCRIPT'], $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT']);
-        } else {
-            putenv('PHP_COMPILER_AOT_USER_SCRIPT='.$prevUserScriptAot);
-            $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = $prevUserScriptAot;
-            $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = $prevUserScriptAot;
-        }
-        if (false === $prevHelperRuntimeO || null === $prevHelperRuntimeO) {
-            putenv('PHP_COMPILER_HELPER_RUNTIME_O=');
-            unset($_ENV['PHP_COMPILER_HELPER_RUNTIME_O'], $_SERVER['PHP_COMPILER_HELPER_RUNTIME_O']);
-        } else {
-            putenv('PHP_COMPILER_HELPER_RUNTIME_O='.$prevHelperRuntimeO);
-            $_ENV['PHP_COMPILER_HELPER_RUNTIME_O'] = $prevHelperRuntimeO;
-            $_SERVER['PHP_COMPILER_HELPER_RUNTIME_O'] = $prevHelperRuntimeO;
-        }
-        if ($clearedLanguageProfile) {
-            putenv('PHP_COMPILER_PROFILE='.$prevLanguageProfile);
-            $_ENV['PHP_COMPILER_PROFILE'] = $prevLanguageProfile;
-            $_SERVER['PHP_COMPILER_PROFILE'] = $prevLanguageProfile;
-            putenv('PHP_COMPILER_AOT_COMPILE_PROFILE=');
-            unset($_ENV['PHP_COMPILER_AOT_COMPILE_PROFILE'], $_SERVER['PHP_COMPILER_AOT_COMPILE_PROFILE']);
-        }
-    }
+    $restoreUserScriptEnv();
 }
 
 if (

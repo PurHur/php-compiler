@@ -86,10 +86,20 @@ final class AotCompileCacheTest extends TestCase
         $metaPath = CompileCache::metaPath($key);
         $this->assertFileExists(CompileCache::bitcodePath($key));
         $this->assertFileExists($metaPath);
+        $this->assertFileExists(CompileCache::artifactPath($key), 'linked aot.bin must be cached after cold emit (#36387)');
 
         $warm = $this->runAotSubprocess($script, $outWarm);
         $this->assertSame(0, $warm['exit'], $warm['stderr']);
         $this->assertFileExists($outWarm);
+        $this->assertLessThan(
+            $cold['wall_ms'] * 0.5,
+            $warm['wall_ms'],
+            sprintf(
+                'warm artifact restore should be <50%% of cold (cold=%.0fms warm=%.0fms)',
+                $cold['wall_ms'],
+                $warm['wall_ms']
+            )
+        );
 
         $coldRun = $this->runBinary($outCold);
         $warmRun = $this->runBinary($outWarm);
@@ -97,10 +107,15 @@ final class AotCompileCacheTest extends TestCase
         $this->assertSame(0, $warmRun['exit'], $warmRun['stderr']);
         $this->assertStringContainsString('Hello World', $coldRun['stdout']);
         $this->assertSame(trim($coldRun['stdout']), trim($warmRun['stdout']));
+        $this->assertSame(
+            hash_file('sha256', $outCold),
+            hash_file('sha256', $outWarm),
+            'warm artifact restore must be byte-identical to cold binary'
+        );
     }
 
     /**
-     * @return array{exit: int, stdout: string, stderr: string}
+     * @return array{exit: int, stdout: string, stderr: string, wall_ms: float}
      */
     private function runAotSubprocess(string $target, string $outfile): array
     {
@@ -117,6 +132,7 @@ final class AotCompileCacheTest extends TestCase
         LlvmToolchain::applyProcessEnv($env, $this->repoRoot);
 
         $compile = $this->repoRoot.'/bin/compile.php';
+        $t0 = hrtime(true);
         $proc = proc_open(
             [PHP_BINARY, $compile, '-o', $outfile, $target],
             [
@@ -135,11 +151,13 @@ final class AotCompileCacheTest extends TestCase
         fclose($pipes[1]);
         fclose($pipes[2]);
         $exit = proc_close($proc);
+        $wallMs = (hrtime(true) - $t0) / 1_000_000;
 
         return [
             'exit' => $exit,
             'stdout' => false !== $stdout ? $stdout : '',
             'stderr' => false !== $stderr ? $stderr : '',
+            'wall_ms' => $wallMs,
         ];
     }
 

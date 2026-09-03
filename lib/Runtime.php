@@ -992,7 +992,31 @@ class Runtime {
         \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_begin');
         // Bind libc `_exit` before LLVM FFI grows — post-emit cdef can hang (#31726).
         \PHPCompiler\AOT\AotEmitFastExit::warmup();
+
+        // Unchanged-source warm path: restore linked binary and skip loadJitContext + link (#36387).
+        // Bitcode-only restore still pays ~5s of Context init / object emit for hello-world.
+        $artifactCacheKey = null;
+        $skipDebugArtifact = JIT\AotDebugSymbols::isEnabled() || null !== $this->debugFile;
+        if (
+            !$skipDebugArtifact
+            && null !== $block
+            && is_string($sourceCode)
+            && is_string($sourceFilename)
+            && JIT\CompileCache::isEnabled()
+        ) {
+            $artifactCacheKey = JIT\CompileCache::computeKey($sourceFilename, $sourceCode);
+            if (JIT\CompileCache::tryRestoreArtifact($artifactCacheKey, $outfile, $sourceFilename, $sourceCode)) {
+                \PHPCompiler\AOT\BuildTiming::note('artifact_cache_hit', 1.0);
+                \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_artifact_cache_hit');
+                Block::detachCfgTree($block, true);
+                \PHPCompiler\AOT\AotEmitFastExit::exitAfterSuccessfulSelfhostEmit($sourceFilename, $outfile);
+
+                return;
+            }
+        }
+
         $needsPregPrelink = Block::containsPregPrelinkBuiltinCalls($block);
+        \PHPCompiler\AOT\BuildTiming::mark('codegen');
         $context = $this->loadJitContext();
         if (null !== $sourceFilename && '' !== $sourceFilename) {
             $context->setAotSourceFilename($sourceFilename);
@@ -1016,7 +1040,7 @@ class Runtime {
             && is_string($sourceFilename)
             && JIT\CompileCache::isEnabled()
         ) {
-            $cacheKey = JIT\CompileCache::computeKey($sourceFilename, $sourceCode);
+            $cacheKey = $artifactCacheKey ?? JIT\CompileCache::computeKey($sourceFilename, $sourceCode);
             $this->jitCompileCacheKey = $cacheKey;
             if (JIT\CompileCache::isFresh($cacheKey, $sourceFilename, $sourceCode)) {
                 if (JIT\CompileCache::tryRestore($context, $block, $cacheKey)) {
@@ -1048,8 +1072,14 @@ class Runtime {
         }
         JIT\CompileCache::finishRecording();
 
+        \PHPCompiler\AOT\BuildTiming::end('codegen');
+        \PHPCompiler\AOT\BuildTiming::mark('link');
         $context->compileToFile($outfile);
+        \PHPCompiler\AOT\BuildTiming::end('link');
         \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_compiletofile_done');
+        if (null !== $this->jitCompileCacheKey && !$skipDebugArtifact) {
+            JIT\CompileCache::saveArtifact($this->jitCompileCacheKey, $outfile);
+        }
         // AOT emit complete — release php-cfg pins before process teardown (#36231).
         Block::detachCfgTree($block, true);
         // Self-host AOT: returning destroys $context / LLVM EE and can spin 15+ min
