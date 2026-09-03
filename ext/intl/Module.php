@@ -159,6 +159,19 @@ class Module extends ModuleAbstract
         }
         if (IntlExtensionPolicy::advertisesResourceBundle()) {
             BuiltinClasses::registerResourceBundle($runtime->vmContext);
+            // ResourceBundle read_dimension (php-src resourcebundle_class.c; #25145 / #36204).
+            $runtime->vmContext->registerObjectDimensionHandler(new VM\ObjectDimensionHandler(
+                static fn (VM\ObjectEntry $object): bool => VmResourceBundle::isResourceBundleObject($object),
+                static function (
+                    VM\ObjectEntry $object,
+                    VM\Variable $offset,
+                    VM\Variable $out
+                ) use ($runtime): void {
+                    VmResourceBundle::readDimension($runtime->vmContext, $object, $offset, $out);
+                },
+                null,
+                true
+            ));
         }
         if (IntlExtensionPolicy::advertisesBreakIterator()) {
             BuiltinClasses::registerBreakIterator($runtime->vmContext);

@@ -9,6 +9,7 @@ use PHPCompiler\JIT;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
+use PHPCompiler\VM;
 
 /**
  * dom extension module entry (php-src ext/dom/php_dom.c; issue #6140).
@@ -304,6 +305,18 @@ class Module extends ModuleAbstract
     {
         parent::init($runtime);
         BuiltinClasses::register($runtime->vmContext);
+        // DOMNodeList / DOMNamedNodeMap / Dom\TokenList read_dimension / has_dimension (#20311, #36204).
+        $runtime->vmContext->registerObjectDimensionHandler(new VM\ObjectDimensionHandler(
+            static fn (VM\ObjectEntry $object): bool => VmDomCollectionDimension::isCollection($object),
+            static function (VM\ObjectEntry $object, VM\Variable $offset, VM\Variable $out): void {
+                VmDomCollectionDimension::readDimension($object, $offset, $out);
+            },
+            static fn (VM\ObjectEntry $object, VM\Variable $offset): bool => VmDomCollectionDimension::hasDimension(
+                $object,
+                $offset
+            ),
+            true
+        ));
     }
 
     public function getFunctions(): array

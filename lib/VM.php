@@ -16,15 +16,10 @@ use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\Compiler\NoDiscardMetadata;
 use PHPCompiler\Compiler\SourceLocation;
 use PHPCompiler\Func;
-use PHPCompiler\ext\dom\VmDomCollectionDimension;
-use PHPCompiler\ext\intl\VmResourceBundle;
 use PHPCompiler\ext\standard\VmEval;
 use PHPCompiler\ext\standard\VmForwardStaticCall;
 use PHPCompiler\ext\standard\VmIteratorWalk;
 use PHPCompiler\ext\standard\VmString;
-use PHPCompiler\ext\spl\ArrayObjectBuiltin;
-use PHPCompiler\ext\spl\RecursiveArrayIteratorBuiltin;
-use PHPCompiler\ext\spl\SplArrayStorage;
 use PHPCompiler\VM\ForeachIterator;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\CastSupport;
@@ -984,7 +979,7 @@ class VM {
      */
     private function nativeSplArrayDimensionIsSet(ObjectEntry $object, Variable $key): ?bool
     {
-        if (!SplArrayStorage::hasState($object)) {
+        if (!VM\SplArraySupport::hasState($object)) {
             return null;
         }
         [$declaring, $methodLc] = $this->resolveInstanceMethod($object->class, 'offsetExists');
@@ -993,7 +988,7 @@ class VM {
             return null;
         }
 
-        return SplArrayStorage::dimensionIsSet($object, $key);
+        return VM\SplArraySupport::dimensionIsSet($object, $key);
     }
 
     public function invokeArrayAccessOffsetUnset(
@@ -1116,7 +1111,7 @@ class VM {
         }
         // ArrayObject/ArrayIterator::ARRAY_AS_PROPS — backing keys as properties (spl_array.c; #22576).
         // has_property(isset) shares spl_array_has_dimension null-check (#24398, peer #24251).
-        if (SplArrayStorage::hasArrayAsProps($object)) {
+        if (VM\SplArraySupport::hasArrayAsProps($object)) {
             $key = new Variable(Variable::TYPE_STRING);
             $key->string($propName);
             $native = $this->nativeSplArrayDimensionIsSet($object, $key);
@@ -1124,7 +1119,7 @@ class VM {
                 return $native;
             }
 
-            return SplArrayStorage::offsetExists($object, $key);
+            return VM\SplArraySupport::offsetExists($object, $key);
         }
         if ($this->hasInstanceMethod($object->class, '__isset')) {
             if ($object->isPropertyGuardActive($propName, ObjectEntry::GUARD_IN_ISSET)) {
@@ -1535,11 +1530,11 @@ class VM {
             return null;
         }
         // ARRAY_AS_PROPS storage is not declarative object properties — mirror PROPERTY_FETCH read.
-        if (SplArrayStorage::hasArrayAsProps($object)) {
+        if (VM\SplArraySupport::hasArrayAsProps($object)) {
             $key = new Variable(Variable::TYPE_STRING);
             $key->string($propName);
-            if (SplArrayStorage::offsetExists($object, $key)) {
-                $dst->copyFrom(SplArrayStorage::offsetGet($object, $key));
+            if (VM\SplArraySupport::offsetExists($object, $key)) {
+                $dst->copyFrom(VM\SplArraySupport::offsetGet($object, $key));
             } else {
                 $dst->null();
             }
@@ -1647,15 +1642,15 @@ class VM {
             return $signal->catchFrame;
         }
         // ArrayObject/ArrayIterator::ARRAY_AS_PROPS — empty mirrors offset value truthiness (#22576).
-        if (SplArrayStorage::hasArrayAsProps($object)) {
+        if (VM\SplArraySupport::hasArrayAsProps($object)) {
             $key = new Variable(Variable::TYPE_STRING);
             $key->string($propName);
-            if (!SplArrayStorage::offsetExists($object, $key)) {
+            if (!VM\SplArraySupport::offsetExists($object, $key)) {
                 $dst->bool(true);
 
                 return null;
             }
-            $dst->bool(!ext\standard\boolval::isTruthy(SplArrayStorage::offsetGet($object, $key)));
+            $dst->bool(!ext\standard\boolval::isTruthy(VM\SplArraySupport::offsetGet($object, $key)));
 
             return null;
         }
@@ -1747,10 +1742,10 @@ class VM {
             return;
         }
         // ArrayObject/ArrayIterator::ARRAY_AS_PROPS — unset mirrors offsetUnset (spl_array.c; #22576).
-        if (SplArrayStorage::hasArrayAsProps($object)) {
+        if (VM\SplArraySupport::hasArrayAsProps($object)) {
             $key = new Variable(Variable::TYPE_STRING);
             $key->string($propName);
-            SplArrayStorage::offsetUnset($object, $key);
+            VM\SplArraySupport::offsetUnset($object, $key);
 
             return;
         }
@@ -3109,8 +3104,8 @@ class VM {
 
     public function collectPublicPropertiesForSerialize(ObjectEntry $object, Frame $frame): array
     {
-        if (SplArrayStorage::hasState($object)) {
-            return SplArrayStorage::collectJsonEncodeProperties($object);
+        if (VM\SplArraySupport::hasState($object)) {
+            return VM\SplArraySupport::collectJsonEncodeProperties($object);
         }
         $ctx = $this->context;
         $hookFrame = $this->resolvePropertyHookParentFrame($frame);
@@ -3185,8 +3180,8 @@ class VM {
      */
     public function collectObjectPropertiesForSerialize(ObjectEntry $object, Frame $frame): array
     {
-        if (SplArrayStorage::hasState($object)) {
-            return SplArrayStorage::collectJsonEncodeProperties($object);
+        if (VM\SplArraySupport::hasState($object)) {
+            return VM\SplArraySupport::collectJsonEncodeProperties($object);
         }
         $ctx = $this->context;
         /** @var array<string, Variable> $result */
@@ -3859,7 +3854,7 @@ class VM {
 
             return $proxy;
         }
-        if (SplArrayStorage::hasArrayAsProps($object)) {
+        if (VM\SplArraySupport::hasArrayAsProps($object)) {
             $proxy = new Variable();
             $proxy->arrayAsPropsTarget = $object;
             $proxy->arrayAsPropsName = $name;
@@ -4393,13 +4388,16 @@ class VM {
             return null;
         }
         $entry = $iterable->toObject();
-        if (ArrayObjectBuiltin::CLASS_LC !== strtolower(ltrim($entry->class->name, '\\'))) {
+        if (!VM\SplArraySupport::isArrayObjectClass($entry->class->name)) {
             return null;
         }
-        if (!SplArrayStorage::hasState($entry)) {
+        if (!VM\SplArraySupport::hasState($entry)) {
             return null;
         }
-        $table = SplArrayStorage::getArrayCopy($entry);
+        $table = VM\SplArraySupport::getArrayCopy($entry);
+        if (null === $table) {
+            return null;
+        }
         if ($preserveKeys) {
             return $table;
         }
@@ -4749,7 +4747,7 @@ restart:
                     if (null !== $writeTarget->arrayAsPropsTarget && null !== $writeTarget->arrayAsPropsName) {
                         $key = new Variable(Variable::TYPE_STRING);
                         $key->string($writeTarget->arrayAsPropsName);
-                        SplArrayStorage::offsetSet($writeTarget->arrayAsPropsTarget, $key, $arg3);
+                        VM\SplArraySupport::offsetSet($writeTarget->arrayAsPropsTarget, $key, $arg3);
                         $arg1->copyFrom($arg3);
                         break;
                     }
@@ -5568,28 +5566,26 @@ restart:
                         }
                     } elseif (
                         Variable::TYPE_OBJECT === $container->type
-                        && VmDomCollectionDimension::isCollection($container->toObject())
+                        && null !== ($dimHandler = $this->context->findObjectDimensionHandler($container->toObject()))
                     ) {
-                        // DOMNodeList / DOMNamedNodeMap read_dimension (php-src php_dom.c; #20311).
+                        // Extension-owned read_dimension (DOM collections / ResourceBundle; #20311, #25145, #36204).
                         // Not ArrayAccess — writes stay "Cannot use object of type … as array".
                         if ($forWrite) {
-                            $className = $container->toObject()->class->name;
-                            $catchFrame = $this->dispatchVmError(
-                                'Cannot use object of type ' . $className . ' as array',
-                                $frame
-                            );
-                            if (null !== $catchFrame) {
-                                $frame = $catchFrame;
-                                goto restart;
+                            if ($dimHandler->rejectWrite) {
+                                $className = $container->toObject()->class->name;
+                                $catchFrame = $this->dispatchVmError(
+                                    'Cannot use object of type ' . $className . ' as array',
+                                    $frame
+                                );
+                                if (null !== $catchFrame) {
+                                    $frame = $catchFrame;
+                                    goto restart;
+                                }
                             }
                             break;
                         }
                         try {
-                            VmDomCollectionDimension::readDimension(
-                                $container->toObject(),
-                                $arg3,
-                                $arg1
-                            );
+                            ($dimHandler->read)($container->toObject(), $arg3, $arg1);
                         } catch (\ValueError $e) {
                             $catchFrame = $this->dispatchVmValueError($e, $frame);
                             if (null !== $catchFrame) {
@@ -5604,30 +5600,6 @@ restart:
                                 goto restart;
                             }
                         }
-                    } elseif (
-                        Variable::TYPE_OBJECT === $container->type
-                        && VmResourceBundle::isResourceBundleObject($container->toObject())
-                    ) {
-                        // ResourceBundle read_dimension (php-src resourcebundle_class.c; #25145).
-                        // No has_dimension / write_dimension — isset/write/unset stay Error.
-                        if ($forWrite) {
-                            $className = $container->toObject()->class->name;
-                            $catchFrame = $this->dispatchVmError(
-                                'Cannot use object of type ' . $className . ' as array',
-                                $frame
-                            );
-                            if (null !== $catchFrame) {
-                                $frame = $catchFrame;
-                                goto restart;
-                            }
-                            break;
-                        }
-                        VmResourceBundle::readDimension(
-                            $this->context,
-                            $container->toObject(),
-                            $arg3,
-                            $arg1
-                        );
                     } elseif (
                         Variable::TYPE_OBJECT === $container->type
                         && $this->objectImplementsArrayAccess($container->toObject())
@@ -9424,11 +9396,11 @@ restart:
                         $this->deliverMagicGetRead($result, $propertyObject, $name);
                         break;
                     }
-                    if (SplArrayStorage::hasArrayAsProps($propertyObject)) {
+                    if (VM\SplArraySupport::hasArrayAsProps($propertyObject)) {
                         $key = new Variable(Variable::TYPE_STRING);
                         $key->string($name);
                         // php-src spl_array_read_property — Undefined array key (not property) (#28820).
-                        $result->copyFrom(SplArrayStorage::offsetGet($propertyObject, $key, $frame));
+                        $result->copyFrom(VM\SplArraySupport::offsetGet($propertyObject, $key, $frame));
                         break;
                     }
                     // Undefined property on a non-null object: warn for both -> and ?-> (#23705).
@@ -9761,12 +9733,13 @@ restart:
                             }
                             if (
                                 !$op->issetOnProperty
-                                && VmDomCollectionDimension::isCollection($object)
+                                && null !== ($dimHandler = $this->context->findObjectDimensionHandler($object))
+                                && null !== $dimHandler->has
                             ) {
-                                // isset($list[$i]) via DOM has_dimension (php-src php_dom.c; #20311).
+                                // isset($list[$i]) via extension has_dimension (php-src php_dom.c; #20311 / #36204).
                                 // TokenList illegal offsets TypeError (token_list.c; #23006).
                                 try {
-                                    $dst->bool(VmDomCollectionDimension::hasDimension(
+                                    $dst->bool(($dimHandler->has)(
                                         $object,
                                         $frame->scope[$op->arg3]
                                     ));
@@ -10411,21 +10384,23 @@ restart:
                         if ((bool) $op->arg3) {
                             // Zend FE_RESET_RW allow-list: array-backed SPL iterators (#19444).
                             $iterObj = $container->toObject();
-                            if (SplArrayStorage::allowsForeachByRef($iterObj)) {
-                                $frame->scope[$op->arg1]->indirect(
-                                    SplArrayStorage::foreachCurrentByRef($iterObj)
-                                );
-                                $this->markScopeSlotInitialized($frame, (int) $op->arg1);
-                                $this->context->foreachObjectAdvance[$op->arg2] = true;
-                                break;
+                            if (VM\SplArraySupport::allowsForeachByRef($iterObj)) {
+                                $byRef = VM\SplArraySupport::foreachCurrentByRef($iterObj);
+                                if (null !== $byRef) {
+                                    $frame->scope[$op->arg1]->indirect($byRef);
+                                    $this->markScopeSlotInitialized($frame, (int) $op->arg1);
+                                    $this->context->foreachObjectAdvance[$op->arg2] = true;
+                                    break;
+                                }
                             }
-                            if (RecursiveArrayIteratorBuiltin::allowsForeachByRef($iterObj)) {
-                                $frame->scope[$op->arg1]->indirect(
-                                    RecursiveArrayIteratorBuiltin::foreachCurrentByRef($iterObj)
-                                );
-                                $this->markScopeSlotInitialized($frame, (int) $op->arg1);
-                                $this->context->foreachObjectAdvance[$op->arg2] = true;
-                                break;
+                            if (VM\SplArraySupport::allowsRecursiveArrayIteratorForeachByRef($iterObj)) {
+                                $byRef = VM\SplArraySupport::recursiveArrayIteratorForeachCurrentByRef($iterObj);
+                                if (null !== $byRef) {
+                                    $frame->scope[$op->arg1]->indirect($byRef);
+                                    $this->markScopeSlotInitialized($frame, (int) $op->arg1);
+                                    $this->context->foreachObjectAdvance[$op->arg2] = true;
+                                    break;
+                                }
                             }
                             $catchFrame = $this->dispatchVmError(
                                 'An iterator cannot be used with foreach by reference',
@@ -13073,7 +13048,7 @@ restart:
             return $this->dispatchVmArgumentCountError($e, $callerFrame);
         } catch (\TypeError $e) {
             return $this->dispatchVmTypeError($e, $callerFrame);
-        } catch (\PHPCompiler\ext\simdjson\SimdJsonValueError $e) {
+        } catch (VM\ExtSimdJsonValueError $e) {
             return $this->dispatchVmSimdJsonValueError($e, $callerFrame);
         } catch (\ValueError $e) {
             return $this->dispatchVmValueError($e, $callerFrame);
@@ -13101,7 +13076,7 @@ restart:
             return $this->dispatchVmRedisException($e, $callerFrame);
         } catch (\RarException $e) {
             return $this->dispatchVmRarException($e, $callerFrame);
-        } catch (\PHPCompiler\ext\simdjson\SimdJsonException $e) {
+        } catch (VM\ExtSimdJsonException $e) {
             return $this->dispatchVmSimdJsonException($e, $callerFrame);
         } catch (\FFI\ParserException $e) {
             return $this->dispatchVmFfiException($e, $callerFrame, true);
@@ -14088,7 +14063,7 @@ restart:
     }
 
     private function dispatchVmSimdJsonException(
-        \PHPCompiler\ext\simdjson\SimdJsonException $error,
+        VM\ExtSimdJsonException $error,
         Frame $frame
     ): ?Frame {
         [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
@@ -14104,7 +14079,7 @@ restart:
     }
 
     private function dispatchVmSimdJsonValueError(
-        \PHPCompiler\ext\simdjson\SimdJsonValueError $error,
+        VM\ExtSimdJsonValueError $error,
         Frame $frame
     ): ?Frame {
         [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
@@ -17238,7 +17213,7 @@ restart:
         if ($this->hasInstanceMethod($object->class, '__set')) {
             return null;
         }
-        if (SplArrayStorage::hasArrayAsProps($object)) {
+        if (VM\SplArraySupport::hasArrayAsProps($object)) {
             return null;
         }
 

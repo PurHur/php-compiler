@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 use PHPCompiler\ext\simplexml\SimpleXmlJsonExport;
-use PHPCompiler\ext\spl\SplArrayStorage;
 
 /**
  * (array)/(object) cast lowering for VM (issue #3328, #30098, Zend cast_object / convert_to_array).
@@ -49,7 +48,7 @@ final class CastSupport
                 return self::singletonArrayCast($src);
             }
             // ArrayObject/ArrayIterator: (array) uses backing storage unless STD_PROP_LIST (#19631).
-            $splCast = SplArrayStorage::arrayCastDuplicate($obj);
+            $splCast = SplArraySupport::arrayCastDuplicate($obj);
             if (null !== $splCast) {
                 $result->array($splCast);
 
