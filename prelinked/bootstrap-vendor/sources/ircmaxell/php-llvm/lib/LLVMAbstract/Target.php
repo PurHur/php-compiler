@@ -26,7 +26,6 @@ class Target implements CoreTarget {
 
     public function createTargetMachine(string $triple, string $cpu, string $features, int $optlevel, int $relocMode, int $codeModel): CoreTargetMachine {
         // Int constants match LLVMCodeGenOptLevel / LLVMRelocMode / LLVMCodeModel (#36387).
-        // The previous stub threw LogicException and referenced undefined $optLevel/$coreModel.
         return $this->llvm->factory->targetMachine(
             $this->llvm->lib->LLVMCreateTargetMachine(
                 $this->target,
