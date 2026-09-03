@@ -3122,7 +3122,7 @@ class JIT {
             if (JIT\NestedJitCompileScope::isActive()) {
                 JIT\CompileCache::recordHelperLogical($lcname, $internalName);
             } else {
-                JIT\CompileCache::recordUserLlvmSymbol($internalName);
+                JIT\CompileCache::recordUserLlvmSymbol($internalName, $block);
             }
         }
         if (!is_null($funcName)) {
@@ -3134,7 +3134,7 @@ class JIT {
                 if (JIT\NestedJitCompileScope::isActive()) {
                     JIT\CompileCache::recordHelperLogical($lcname, $internalName);
                 } else {
-                    JIT\CompileCache::recordUserLlvmSymbol($internalName);
+                    JIT\CompileCache::recordUserLlvmSymbol($internalName, $block);
                 }
             }
             if ($isVarArgs) {

@@ -329,6 +329,24 @@ final class AotCompileCacheTest extends TestCase
             'one-file edit must thin-boot from prior module.bc (#36387)'
         );
         $this->assertStringContainsString('beta', $this->runBinary($outEdit)['stdout']);
+        $this->assertLessThan(
+            $cold['wall_ms'] * 0.5,
+            $edit['wall_ms'],
+            sprintf(
+                'one-file edit should be <50%% of cold (cold=%.0fms edit=%.0fms) (#36387)',
+                $cold['wall_ms'],
+                $edit['wall_ms']
+            )
+        );
+        $rawMeta = json_decode((string) file_get_contents(CompileCache::metaPath($idx['key'])), true);
+        $this->assertIsArray($rawMeta);
+        $byMember = $rawMeta['user_symbols_by_member'] ?? null;
+        $this->assertIsArray($byMember, 'cold AOT must record user_symbols_by_member for partial strip (#36387)');
+        $libKey = realpath($lib) ?: $lib;
+        $this->assertNotEmpty(
+            $byMember[$libKey] ?? $byMember[$lib] ?? [],
+            'lib.php symbols must be attributed to that member'
+        );
     }
 
     /**
