@@ -650,7 +650,18 @@ if (in_array('--prelink', $argv, true)) {
             }
         }
     }
-    file_put_contents($archDir.'/manifest.json', json_encode([
+    $anchorSlug = HelperRuntimeCache::slugFor('/ext/ctype/CtypeJitHelper.php');
+    $anchorObject = $prelinkUnits.'/'.$anchorSlug.'/unit.o';
+    $gcSections = HelperRuntimeCache::unitObjectHasPerFunctionSections($anchorObject);
+    $existingManifest = [];
+    $archManifestPath = $archDir.'/manifest.json';
+    if (is_file($archManifestPath)) {
+        $decoded = json_decode((string) file_get_contents($archManifestPath), true);
+        if (\is_array($decoded)) {
+            $existingManifest = $decoded;
+        }
+    }
+    file_put_contents($archManifestPath, json_encode(array_merge($existingManifest, [
         'version' => 1,
         'generated_at' => gmdate('c'),
         'arch' => $arch,
@@ -661,8 +672,9 @@ if (in_array('--prelink', $argv, true)) {
         'published_fresh' => $published,
         'kept_live_unpublished' => $keptLiveUnpublished,
         'total_bytes' => $totalBytes,
+        'gc_sections' => $gcSections,
         'refresh' => 'php script/emit-helper-runtime-object.php --prelink (pinned env; live-site prune guard #25377)',
-    ], JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT)."\n");
+    ]), JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT)."\n");
     fwrite(STDOUT, sprintf(
         "helper-runtime-prelink: %s — %d fresh published (%.1f MB), %d removed, %d kept live-unpublished, %d committed — commit prelinked/helper-runtime when intentional\n",
         $arch,

@@ -62,4 +62,16 @@ final class AotGcSectionsTest extends TestCase
         putenv(AotGcSections::ENV.'=0');
         $this->assertSame('', AotGcSections::linkGcSectionsFlag(false));
     }
+
+    public function testLinkGcSectionsSkippedForGcSectionHelperUnitsWithoutCommon(): void
+    {
+        putenv(\PHPCompiler\AOT\HelperRuntimeCommon::ENV.'=0');
+        $monolithic = '/tmp/monolithic-helper-unit.o';
+        $this->assertSame(' -Wl,--gc-sections ', AotGcSections::linkGcSectionsFlagForHelperLink(true, [$monolithic]));
+        $perFunction = \dirname(__DIR__, 2).'/prelinked/helper-runtime/x86_64-linux/units/ext_ctype_CtypeJitHelper_php/unit.o';
+        if (!\PHPCompiler\AOT\HelperRuntimeCache::unitObjectHasPerFunctionSections($perFunction)) {
+            $this->markTestSkipped('committed anchor unit lacks per-function sections');
+        }
+        $this->assertSame('', AotGcSections::linkGcSectionsFlagForHelperLink(true, [$perFunction]));
+    }
 }

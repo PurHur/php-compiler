@@ -36,6 +36,7 @@ if (!is_dir($unitsDir)) {
 }
 
 $commonBroken = false;
+$gcSectionsMissing = false;
 if (is_file($archManifestPath)) {
     $archManifest = json_decode((string) file_get_contents($archManifestPath), true);
     $committedCore = \is_array($archManifest) ? (string) ($archManifest['core_fingerprint'] ?? '') : '';
@@ -58,6 +59,13 @@ if (is_file($archManifestPath)) {
         } elseif (!HelperRuntimeCommon::commonObjectIsLinkable()) {
             ++$commonBroken;
             fwrite(STDOUT, "  STALE  common.o (sha256 or core_fingerprint mismatch)\n");
+        }
+    }
+    if (!HelperRuntimeCache::prelinkedCorpusHasGcSections()) {
+        ++$gcSectionsMissing;
+        fwrite(STDOUT, "  STALE  gc_sections — committed unit.o uses monolithic .text (refresh with --force --prelink; #36246)\n");
+        if ($strict) {
+            exit(1);
         }
     }
 }
@@ -100,13 +108,15 @@ foreach ($manifests as $manifestPath) {
 $commonNote = HelperRuntimeCommon::commonObjectIsLinkable()
     ? ', common.o fresh'
     : (is_file(HelperRuntimeCommon::commonObjectPath()) ? ', common.o stale' : ', common.o absent');
+$gcNote = HelperRuntimeCache::prelinkedCorpusHasGcSections() ? ', gc_sections ok' : ', gc_sections stale';
 fwrite(STDOUT, sprintf(
-    "check-helper-runtime-prelink: %s — %d fresh, %d stale, %d broken%s%s\n",
+    "check-helper-runtime-prelink: %s — %d fresh, %d stale, %d broken%s%s%s\n",
     $arch,
     $fresh,
     $stale,
     $broken,
     $commonBroken > 0 ? ', common broken' : $commonNote,
-    ($stale + $broken + $commonBroken) > 0 ? ' — refresh: php script/emit-helper-runtime-object.php --prelink; common: php script/emit-helper-runtime-common.php --from-prelinked' : ''
+    $gcSectionsMissing > 0 ? '' : $gcNote,
+    ($stale + $broken + $commonBroken + $gcSectionsMissing) > 0 ? ' — refresh: php script/emit-helper-runtime-object.php --force --prelink; common: php script/emit-helper-runtime-common.php --from-prelinked' : ''
 ));
-exit($strict && ($stale + $broken + $commonBroken) > 0 ? 1 : 0);
+exit($strict && ($stale + $broken + $commonBroken + $gcSectionsMissing) > 0 ? 1 : 0);

@@ -83,6 +83,36 @@ final class AotGcSections
         return $asWlPrefix ? ' -Wl,--gc-sections ' : ' --gc-sections ';
     }
 
+    /**
+     * Whether to pass --gc-sections when helper-runtime unit objects participate in the link.
+     *
+     * Per-function helper sections are not reachable from {main} until common.o provides
+     * the shared runtime root and duplicate bodies can be discarded (#36246).
+     *
+     * @param list<string> $helperObjectPaths paths from {@see HelperRuntimeCache::linkObjects()}
+     */
+    public static function linkGcSectionsFlagForHelperLink(bool $asWlPrefix, array $helperObjectPaths): string
+    {
+        if (!self::isEnabled()) {
+            return '';
+        }
+        $hasGcSectionHelpers = false;
+        foreach ($helperObjectPaths as $path) {
+            if ($path === \PHPCompiler\AOT\HelperRuntimeCommon::commonObjectPath()) {
+                continue;
+            }
+            if (\PHPCompiler\AOT\HelperRuntimeCache::unitObjectHasPerFunctionSections($path)) {
+                $hasGcSectionHelpers = true;
+                break;
+            }
+        }
+        if ($hasGcSectionHelpers && !\PHPCompiler\AOT\HelperRuntimeCommon::isLinkEnabled()) {
+            return '';
+        }
+
+        return self::linkGcSectionsFlag($asWlPrefix);
+    }
+
     public static function linkStripFlag(): string
     {
         return self::stripAtLink() ? '-s ' : '';
