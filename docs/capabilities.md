@@ -3350,7 +3350,7 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `ReflectionMethod::getstaticvariables` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionMethod::gettentativereturntype` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionMethod::hasprototype` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionMethod::hasreturntype` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionMethod::hasreturntype` | yes | yes | yes | standard |  |
 | `ReflectionMethod::hastentativereturntype` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionMethod::innamespace` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionMethod::invoke` | yes | yes | yes | standard |  |

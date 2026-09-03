@@ -46,6 +46,7 @@ All submissions, including by project members, require review via GitHub pull re
 - `php script/capability-matrix.php` / `php script/capability-syntax.php` when builtins or unsupported-syntax registry change
 - `php script/opcode-corpus-md5.php --update` when a `lib/Compiler.php` Concern extraction (or intentional opcode change) alters `Printer::print` dumps (#36230); check mode is part of `./script/check-generated-docs.sh`
 - New compile-time fold / lowering helpers belong in `lib/Compiler/Concern/*.php` traits used by `Compiler` — do not grow `lib/Compiler.php` with new private method clusters (#36230)
+- `./script/check-size-budgets.sh` when growing `lib/Compiler.php` / `lib/JIT.php` / `lib/VM.php` — budgets ratchet down only (#36403); check mode is part of `./script/check-generated-docs.sh`
 
 Also run `php script/bootstrap-inventory.php --check` before push when bootstrap paths change.
 
