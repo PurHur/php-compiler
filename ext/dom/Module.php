@@ -317,6 +317,87 @@ class Module extends ModuleAbstract
             ),
             true
         ));
+        // Computed Dom* properties — lib/VM must not import ext\dom (#36204).
+        // isset/empty order: HTMLDocument → HTMLElement → Node (matches prior VM.php).
+        VM\ObjectComputedPropertySupport::register(new VM\ObjectComputedPropertyHandler(
+            static fn (VM\ObjectEntry $o, string $n): bool => DomHtmlDocumentPropertySupport::isManagedProperty($o, $n),
+            static fn (VM\ObjectEntry $o, string $n): VM\Variable => DomHtmlDocumentPropertySupport::getProperty($o, $n),
+            static fn (VM\ObjectEntry $o, string $n): ?bool => DomHtmlDocumentPropertySupport::propertyIsSet($o, $n),
+            static fn (VM\ObjectEntry $o, string $n): ?bool => DomHtmlDocumentPropertySupport::propertyIsEmpty($o, $n),
+            null,
+            static fn (
+                VM\ObjectEntry $o,
+                string $n,
+                VM\Variable $v,
+                VM\Context $ctx
+            ): bool => DomHtmlDocumentPropertySupport::tryAssign($o, $n, $v, $ctx)
+        ));
+        VM\ObjectComputedPropertySupport::register(new VM\ObjectComputedPropertyHandler(
+            static fn (VM\ObjectEntry $o, string $n): bool => DomHtmlElementPropertySupport::isManagedProperty($o, $n),
+            static fn (VM\ObjectEntry $o, string $n): VM\Variable => DomHtmlElementPropertySupport::getProperty($o, $n),
+            static fn (VM\ObjectEntry $o, string $n): ?bool => DomHtmlElementPropertySupport::propertyIsSet($o, $n),
+            static fn (VM\ObjectEntry $o, string $n): ?bool => DomHtmlElementPropertySupport::propertyIsEmpty($o, $n),
+            null,
+            static fn (
+                VM\ObjectEntry $o,
+                string $n,
+                VM\Variable $v,
+                VM\Context $ctx
+            ): bool => DomHtmlElementPropertySupport::tryAssign($o, $n, $v, $ctx)
+        ));
+        VM\ObjectComputedPropertySupport::register(new VM\ObjectComputedPropertyHandler(
+            static fn (VM\ObjectEntry $o, string $n): bool => DomNodePropertySupport::isManagedProperty($o, $n),
+            static fn (VM\ObjectEntry $o, string $n): VM\Variable => DomNodePropertySupport::getProperty($o, $n),
+            static fn (VM\ObjectEntry $o, string $n): ?bool => DomNodePropertySupport::propertyIsSet($o, $n),
+            static fn (VM\ObjectEntry $o, string $n): ?bool => DomNodePropertySupport::propertyIsEmpty($o, $n),
+            static function (VM\ObjectEntry $o, string $n): void {
+                DomNodePropertySupport::rejectReadOnlyPropertyWrite($o, $n);
+            },
+            static fn (
+                VM\ObjectEntry $o,
+                string $n,
+                VM\Variable $v,
+                VM\Context $ctx
+            ): bool => DomNodePropertySupport::tryAssign($o, $n, $v, $ctx)
+        ));
+        VM\ObjectComputedPropertySupport::register(new VM\ObjectComputedPropertyHandler(
+            static fn (VM\ObjectEntry $o, string $n): bool => DomDocumentPropertySupport::isManagedProperty($o, $n),
+            static fn (VM\ObjectEntry $o, string $n): VM\Variable => DomDocumentPropertySupport::getProperty($o, $n),
+            null,
+            null,
+            static function (VM\ObjectEntry $o, string $n): void {
+                DomDocumentPropertySupport::rejectReadOnlyPropertyWrite($o, $n);
+            },
+            static fn (
+                VM\ObjectEntry $o,
+                string $n,
+                VM\Variable $v,
+                VM\Context $ctx
+            ): bool => DomDocumentPropertySupport::tryAssign($o, $n, $v, $ctx)
+        ));
+        VM\ObjectComputedPropertySupport::register(new VM\ObjectComputedPropertyHandler(
+            static fn (VM\ObjectEntry $o, string $n): bool => DomTokenListPropertySupport::isManagedProperty($o, $n),
+            static fn (VM\ObjectEntry $o, string $n): VM\Variable => DomTokenListPropertySupport::getProperty($o, $n),
+            null,
+            null,
+            null,
+            static fn (
+                VM\ObjectEntry $o,
+                string $n,
+                VM\Variable $v,
+                VM\Context $ctx
+            ): bool => DomTokenListPropertySupport::tryAssign($o, $n, $v, $ctx)
+        ));
+        VM\DomVmRuntimeSupport::setRetainUserHandleFromVariable(
+            static function (VM\Variable $var): void {
+                VmDom::retainUserHandleFromVariable($var);
+            }
+        );
+        VM\DomVmRuntimeSupport::setFetchableNodeErrorMessage(
+            static function (VM\ObjectEntry $node): ?string {
+                return VmDom::fetchableNodeErrorMessage($node);
+            }
+        );
     }
 
     public function getFunctions(): array

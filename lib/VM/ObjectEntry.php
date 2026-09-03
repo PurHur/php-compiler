@@ -240,22 +240,7 @@ class ObjectEntry {
         if ($this->isEnumCase) {
             return EnumCaseSupport::propertyExistsOnCase($this->class, $name);
         }
-        if (\PHPCompiler\ext\dom\DomNodePropertySupport::isManagedProperty($this, $name)) {
-            return true;
-        }
-        if (\PHPCompiler\ext\dom\DomDocumentPropertySupport::isManagedProperty($this, $name)) {
-            return true;
-        }
-        if (\PHPCompiler\ext\dom\DomTokenListPropertySupport::isManagedProperty($this, $name)) {
-            return true;
-        }
-        if (\PHPCompiler\ext\dom\DomHtmlDocumentPropertySupport::isManagedProperty($this, $name)) {
-            return true;
-        }
-        if (\PHPCompiler\ext\dom\DomHtmlElementPropertySupport::isManagedProperty($this, $name)) {
-            return true;
-        }
-        if (\PHPCompiler\ext\xmlreader\XmlReaderPropertySupport::isManagedProperty($this, $name)) {
+        if (ObjectComputedPropertySupport::isManagedProperty($this, $name)) {
             return true;
         }
 
@@ -290,23 +275,9 @@ class ObjectEntry {
         if ($this->isEnumCase) {
             return EnumCaseSupport::getProperty($this, $name);
         }
-        if (\PHPCompiler\ext\dom\DomNodePropertySupport::isManagedProperty($this, $name)) {
-            return \PHPCompiler\ext\dom\DomNodePropertySupport::getProperty($this, $name);
-        }
-        if (\PHPCompiler\ext\dom\DomDocumentPropertySupport::isManagedProperty($this, $name)) {
-            return \PHPCompiler\ext\dom\DomDocumentPropertySupport::getProperty($this, $name);
-        }
-        if (\PHPCompiler\ext\dom\DomTokenListPropertySupport::isManagedProperty($this, $name)) {
-            return \PHPCompiler\ext\dom\DomTokenListPropertySupport::getProperty($this, $name);
-        }
-        if (\PHPCompiler\ext\dom\DomHtmlDocumentPropertySupport::isManagedProperty($this, $name)) {
-            return \PHPCompiler\ext\dom\DomHtmlDocumentPropertySupport::getProperty($this, $name);
-        }
-        if (\PHPCompiler\ext\dom\DomHtmlElementPropertySupport::isManagedProperty($this, $name)) {
-            return \PHPCompiler\ext\dom\DomHtmlElementPropertySupport::getProperty($this, $name);
-        }
-        if (\PHPCompiler\ext\xmlreader\XmlReaderPropertySupport::isManagedProperty($this, $name)) {
-            return \PHPCompiler\ext\xmlreader\XmlReaderPropertySupport::getProperty($this, $name);
+        $managed = ObjectComputedPropertySupport::getProperty($this, $name);
+        if (null !== $managed) {
+            return $managed;
         }
         if (!isset($this->properties[$name])) {
             throw new \LogicException('Undefined property access');
@@ -332,20 +303,10 @@ class ObjectEntry {
 
     public function issetProperty(string $name): bool
     {
-        // Dom\HTMLDocument computed props (body/title/…) ignore the null ClassProperty slot (#20540).
-        $domHtmlIsset = \PHPCompiler\ext\dom\DomHtmlDocumentPropertySupport::propertyIsSet($this, $name);
-        if (null !== $domHtmlIsset) {
-            return $domHtmlIsset;
-        }
-        // Dom\Element::$id|/className|/innerHTML|/outerHTML (#20532).
-        $domHtmlElIsset = \PHPCompiler\ext\dom\DomHtmlElementPropertySupport::propertyIsSet($this, $name);
-        if (null !== $domHtmlElIsset) {
-            return $domHtmlElIsset;
-        }
-        // Dom\* Node/CharacterData/ParentNode computed props (#21033, #21053, #21055).
-        $domChildrenIsset = \PHPCompiler\ext\dom\DomNodePropertySupport::propertyIsSet($this, $name);
-        if (null !== $domChildrenIsset) {
-            return $domChildrenIsset;
+        // Dom\HTMLDocument / Element / Node computed props (#20540, #20532, #21033).
+        $computedIsset = ObjectComputedPropertySupport::propertyIsSet($this, $name);
+        if (null !== $computedIsset) {
+            return $computedIsset;
         }
         if (!isset($this->properties[$name])) {
             return false;

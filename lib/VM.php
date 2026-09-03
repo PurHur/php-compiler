@@ -1073,20 +1073,10 @@ class VM {
         if (null !== $hookedIsset) {
             return $hookedIsset;
         }
-        // Dom\HTMLDocument computed props (body/title/…) — not the null ClassProperty slot (#20540).
-        $domHtmlIsset = ext\dom\DomHtmlDocumentPropertySupport::propertyIsSet($object, $propName);
-        if (null !== $domHtmlIsset) {
-            return $domHtmlIsset;
-        }
-        // Dom\Element::$id|/className|/innerHTML|/outerHTML (#20532).
-        $domHtmlElIsset = ext\dom\DomHtmlElementPropertySupport::propertyIsSet($object, $propName);
-        if (null !== $domHtmlElIsset) {
-            return $domHtmlElIsset;
-        }
-        // Dom\* Node/CharacterData/ParentNode computed props (#21033, #21053, #21055).
-        $domChildrenIsset = ext\dom\DomNodePropertySupport::propertyIsSet($object, $propName);
-        if (null !== $domChildrenIsset) {
-            return $domChildrenIsset;
+        // Dom\HTMLDocument / Element / Node computed props (#20540, #20532, #21033).
+        $computedIsset = VM\ObjectComputedPropertySupport::propertyIsSet($object, $propName);
+        if (null !== $computedIsset) {
+            return $computedIsset;
         }
         // ReflectionAttribute / other C-only slots are not PHP-visible (#22513).
         $meta = $this->classPropertyMeta($object, $propName, $frame);
@@ -1600,33 +1590,10 @@ class VM {
 
             return null;
         }
-        // SimpleXMLElement: empty($s->child) uses string cast of matching children (#19707, sxe.c).
-        if (
-            ext\simplexml\VmSimpleXml::CLASS_LC === strtolower($object->class->name)
-            && ext\simplexml\SimpleXmlRegistry::has($object)
-        ) {
-            $dst->bool(ext\simplexml\VmSimpleXml::childPropertyIsEmpty($object, $propName));
-
-            return null;
-        }
-        // Dom\HTMLDocument::$body|/title — computed get + truthiness (php-src html_document.c; #20540).
-        $domHtmlEmpty = ext\dom\DomHtmlDocumentPropertySupport::propertyIsEmpty($object, $propName);
-        if (null !== $domHtmlEmpty) {
-            $dst->bool($domHtmlEmpty);
-
-            return null;
-        }
-        // Dom\Element::$id|/className|/innerHTML|/outerHTML (#20532).
-        $domHtmlElEmpty = ext\dom\DomHtmlElementPropertySupport::propertyIsEmpty($object, $propName);
-        if (null !== $domHtmlElEmpty) {
-            $dst->bool($domHtmlElEmpty);
-
-            return null;
-        }
-        // Dom\* Node/CharacterData/ParentNode computed props (#21033, #21053, #21055).
-        $domChildrenEmpty = ext\dom\DomNodePropertySupport::propertyIsEmpty($object, $propName);
-        if (null !== $domChildrenEmpty) {
-            $dst->bool($domChildrenEmpty);
+        // SimpleXMLElement / Dom computed empty($obj->prop) (#19707, #20540, #20532, #21033).
+        $computedEmpty = VM\ObjectComputedPropertySupport::propertyIsEmpty($object, $propName);
+        if (null !== $computedEmpty) {
+            $dst->bool($computedEmpty);
 
             return null;
         }
@@ -4789,7 +4756,7 @@ restart:
                         $frame = $catchFrame;
                         goto restart;
                     }
-                    ext\dom\VmDom::retainUserHandleFromVariable($arg2);
+                    VM\DomVmRuntimeSupport::retainUserHandleFromVariable($arg2);
                     if (
                         !$this->shouldDeferVmDeadTempRelease($frame)
                         && $op->arg2 !== $op->arg3
@@ -9263,7 +9230,7 @@ restart:
                                 goto restart;
                             }
                             $propMeta = $this->classPropertyMeta($propertyObject, $name, $frame);
-                            $domStaleMsg = ext\dom\VmDom::fetchableNodeErrorMessage($propertyObject);
+                            $domStaleMsg = VM\DomVmRuntimeSupport::fetchableNodeErrorMessage($propertyObject);
                             if (null !== $domStaleMsg) {
                                 $catchFrame = $this->dispatchVmError($domStaleMsg, $frame);
                                 if (null !== $catchFrame) {
@@ -13519,11 +13486,7 @@ restart:
             $resolved = $dst->resolveIndirect();
             if (null !== $resolved->objectPropertyOwner && null !== $resolved->objectPropertyName) {
                 try {
-                    ext\dom\DomDocumentPropertySupport::rejectReadOnlyPropertyWrite(
-                        $resolved->objectPropertyOwner,
-                        $resolved->objectPropertyName
-                    );
-                    ext\dom\DomNodePropertySupport::rejectReadOnlyPropertyWrite(
+                    VM\ObjectComputedPropertySupport::rejectReadOnlyPropertyWrite(
                         $resolved->objectPropertyOwner,
                         $resolved->objectPropertyName
                     );
@@ -13534,39 +13497,7 @@ restart:
                 } catch (\Error $e) {
                     return $this->dispatchVmError($e->getMessage(), $frame);
                 }
-                if (ext\dom\DomNodePropertySupport::tryAssign(
-                    $resolved->objectPropertyOwner,
-                    $resolved->objectPropertyName,
-                    $src,
-                    $this->context
-                )) {
-                    return null;
-                }
-                if (ext\dom\DomDocumentPropertySupport::tryAssign(
-                    $resolved->objectPropertyOwner,
-                    $resolved->objectPropertyName,
-                    $src,
-                    $this->context
-                )) {
-                    return null;
-                }
-                if (ext\dom\DomHtmlDocumentPropertySupport::tryAssign(
-                    $resolved->objectPropertyOwner,
-                    $resolved->objectPropertyName,
-                    $src,
-                    $this->context
-                )) {
-                    return null;
-                }
-                if (ext\dom\DomHtmlElementPropertySupport::tryAssign(
-                    $resolved->objectPropertyOwner,
-                    $resolved->objectPropertyName,
-                    $src,
-                    $this->context
-                )) {
-                    return null;
-                }
-                if (ext\dom\DomTokenListPropertySupport::tryAssign(
+                if (VM\ObjectComputedPropertySupport::tryAssign(
                     $resolved->objectPropertyOwner,
                     $resolved->objectPropertyName,
                     $src,
@@ -13779,8 +13710,7 @@ restart:
         Frame $frame
     ): ?Frame {
         try {
-            ext\dom\DomDocumentPropertySupport::rejectReadOnlyPropertyWrite($object, $name);
-            ext\dom\DomNodePropertySupport::rejectReadOnlyPropertyWrite($object, $name);
+            VM\ObjectComputedPropertySupport::rejectReadOnlyPropertyWrite($object, $name);
             VM\DatePeriodSupport::rejectReadOnlyPropertyWrite($object, $name);
         } catch (\Error $e) {
             return $this->dispatchVmError($e->getMessage(), $frame);

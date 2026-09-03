@@ -48,6 +48,24 @@ class Module extends ModuleAbstract
     {
         parent::init($runtime);
         BuiltinClasses::register($runtime->vmContext);
+        // empty($sxe->child) — lib/VM must not import ext\simplexml (#36204 / php-src sxe.c).
+        // isManaged stays false: child names are dynamic, not ClassProperty slots.
+        \PHPCompiler\VM\ObjectComputedPropertySupport::register(
+            new \PHPCompiler\VM\ObjectComputedPropertyHandler(
+                static fn (\PHPCompiler\VM\ObjectEntry $_, string $__): bool => false,
+                null,
+                null,
+                static function (\PHPCompiler\VM\ObjectEntry $o, string $n): ?bool {
+                    if (VmSimpleXml::CLASS_LC !== strtolower($o->class->name)
+                        || !SimpleXmlRegistry::has($o)
+                    ) {
+                        return null;
+                    }
+
+                    return VmSimpleXml::childPropertyIsEmpty($o, $n);
+                }
+            )
+        );
     }
 
     public function getFunctions(): array

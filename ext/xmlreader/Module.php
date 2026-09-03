@@ -83,6 +83,13 @@ class Module extends ModuleAbstract
     {
         parent::init($runtime);
         BuiltinClasses::register($runtime->vmContext);
+        // Computed XMLReader properties — lib/VM must not import ext\xmlreader (#36204).
+        \PHPCompiler\VM\ObjectComputedPropertySupport::register(
+            new \PHPCompiler\VM\ObjectComputedPropertyHandler(
+                static fn (\PHPCompiler\VM\ObjectEntry $o, string $n): bool => XmlReaderPropertySupport::isManagedProperty($o, $n),
+                static fn (\PHPCompiler\VM\ObjectEntry $o, string $n): \PHPCompiler\VM\Variable => XmlReaderPropertySupport::getProperty($o, $n)
+            )
+        );
     }
 
     public function getFunctions(): array

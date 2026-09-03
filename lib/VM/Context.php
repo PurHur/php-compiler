@@ -306,6 +306,9 @@ class Context {
 
     public function __construct(Runtime $runtime) {
         $this->runtime = $runtime;
+        // Fresh Runtime → fresh Module registrations (#36204).
+        ObjectComputedPropertySupport::clear();
+        DomVmRuntimeSupport::clear();
         $this->errors = new ErrorReporter();
         $this->exceptionHandlers = new ExceptionHandlerStack();
         $this->scriptStack = new ScriptStack();
