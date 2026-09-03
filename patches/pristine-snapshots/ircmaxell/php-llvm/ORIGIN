@@ -1,0 +1,3 @@
+# Unpatched php-llvm tree used by apply-patches.sh --verify-pristine (#36229 / re-#36143).
+# composer.lock ircmaxell/php-llvm source.reference
+fb89dc0253d0f2c2875007706a551d00490a0920
