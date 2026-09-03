@@ -6684,6 +6684,7 @@ require_once __DIR__.'/../../../lib/JIT/ErrorSilenceHelper.php';
 require_once __DIR__.'/../../../lib/JIT/EvalHelper.php';
 require_once __DIR__.'/../../../lib/JIT/ExceptionBridge.php';
 require_once __DIR__.'/../../../lib/JIT/ExceptionHandlerCallbackPolicy.php';
+require_once __DIR__.'/../../../lib/JIT/ExtensionLoweringHooks.php';
 require_once __DIR__.'/../../../lib/JIT/FiberHelper.php';
 require_once __DIR__.'/../../../lib/JIT/FiberHelperLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/FromCallableHelper.php';

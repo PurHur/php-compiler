@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\xmlwriter;
 
+use PHPCompiler\JIT;
 use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
 
@@ -14,6 +15,18 @@ use PHPCompiler\Runtime;
  */
 class Module extends ModuleAbstract
 {
+
+    public function jitInit(JIT\Context $context): void
+    {
+        // Factory result bind — lib/JIT.php must not import JitXmlWriterUserScript (#36204).
+        $hooks = $context->extensionLowering;
+        $hooks->bindXmlWriterResultHook = static function ($var): void {
+            JitXmlWriterUserScript::bindResultVariable($var);
+        };
+        $hooks->initXmlWriterHook = static function ($ctx, $receiver) {
+            return JitXmlWriterUserScript::tryInit($ctx, $receiver);
+        };
+    }
 
     /**
      * php-src ext/xmlwriter builds on ext/libxml (libxml2).

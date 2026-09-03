@@ -77,6 +77,12 @@ class Module extends ModuleAbstract
                 'xml_declaration' => XmlReaderConstants::XML_DECLARATION,
             ]);
         });
+
+        // Static factory result retag — lib/JIT.php must not import JitXmlReaderUserScript (#36204).
+        $context->extensionLowering->xmlReaderFactoryIsObjectHook = static function (): bool {
+            return !JitXmlReaderUserScript::$lastCallWasInstance
+                && JitXmlReaderUserScript::$lastResultIsObject;
+        };
     }
 
     public function init(Runtime $runtime): void

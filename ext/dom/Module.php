@@ -169,6 +169,18 @@ class Module extends ModuleAbstract
                 return self::preferRuntimePropertyFetchCandidate($candidates, $name);
             }
         );
+
+        // User-script AOT textContent / import / loadXML receiver — lib/JIT.php must not import (#36204).
+        $hooks = $context->extensionLowering;
+        $hooks->domTextContentStoreHook = static function ($ctx, $lvalue, $value): bool {
+            return JitDomElementTextContent::tryEmitStore($ctx, $lvalue, $value);
+        };
+        $hooks->applyPendingDomImportAssignHook = static function ($result): bool {
+            return JitDomImportSimpleXmlUserScript::applyPendingImportAssign($result);
+        };
+        $hooks->setPendingLoadXmlReceiverVarNameHook = static function (?string $name): void {
+            JitDomLoadXMLUserScript::setPendingLoadXmlReceiverVarName($name);
+        };
     }
 
     /**
