@@ -3118,11 +3118,25 @@ class JIT {
         $this->context->functions[$lcname] = $func;
         $this->context->functionLlvmSymbols[$lcname] = $internalName;
         $this->context->activeFunction = $lcname;
+        if (JIT\CompileCache::isRecording()) {
+            if (JIT\NestedJitCompileScope::isActive()) {
+                JIT\CompileCache::recordHelperLogical($lcname, $internalName);
+            } else {
+                JIT\CompileCache::recordUserLlvmSymbol($internalName);
+            }
+        }
         if (!is_null($funcName)) {
             $lcname = strtolower($funcName);
             $this->context->activeFunction = $lcname;
             $this->context->functions[$lcname] = $func;
             $this->context->functionLlvmSymbols[$lcname] = $internalName;
+            if (JIT\CompileCache::isRecording()) {
+                if (JIT\NestedJitCompileScope::isActive()) {
+                    JIT\CompileCache::recordHelperLogical($lcname, $internalName);
+                } else {
+                    JIT\CompileCache::recordUserLlvmSymbol($internalName);
+                }
+            }
             if ($isVarArgs) {
                 $this->context->functionProxies[$lcname] = new JIT\Call\Vararg($func, $funcName, count($args));
             } else {

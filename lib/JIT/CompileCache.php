@@ -24,9 +24,21 @@ final class CompileCache
     /** @var list<array{llvm: string, signature: string, scoped: string}>|null */
     private static ?array $recordingExports = null;
 
+    /** @var list<string>|null LLVM names lowered outside NestedJIT (user TU) (#36387). */
+    private static ?array $recordingUserSymbols = null;
+
+    /** @var array<string, string>|null logical lc → LLVM name for NestedJIT helpers (#36387). */
+    private static ?array $recordingHelperSymbols = null;
+
+    /** @var list<string>|null absolute member paths for multi-file project index (#36387). */
+    private static ?array $projectMembers = null;
+
     private static ?string $recordingKey = null;
 
     private static bool $skipModuleFuncCompile = false;
+
+    /** True after {@see tryRestoreEditScaffold()} — helpers kept, user symbols stripped. */
+    private static bool $editScaffoldActive = false;
 
     public static function isEnabled(): bool
     {
@@ -47,6 +59,37 @@ final class CompileCache
     public static function shouldSkipModuleFuncCompile(): bool
     {
         return self::$skipModuleFuncCompile;
+    }
+
+    public static function isEditScaffoldActive(): bool
+    {
+        return self::$editScaffoldActive;
+    }
+
+    /**
+     * Record absolute source paths that make up a multi-file AOT project (#36387).
+     *
+     * @param list<string> $absolutePaths entry + includes (pre-bundle)
+     */
+    public static function setProjectMembers(array $absolutePaths): void
+    {
+        $clean = [];
+        foreach ($absolutePaths as $path) {
+            if (!is_string($path) || '' === $path) {
+                continue;
+            }
+            $resolved = realpath($path);
+            $clean[] = false !== $resolved ? $resolved : $path;
+        }
+        $clean = array_values(array_unique($clean));
+        sort($clean);
+        self::$projectMembers = $clean;
+    }
+
+    /** @return list<string> */
+    public static function projectMembers(): array
+    {
+        return self::$projectMembers ?? [];
     }
 
     public static function cacheRoot(): string
@@ -214,6 +257,31 @@ final class CompileCache
         if (!self::hasFreshArtifact($key, $sourcePath, $sourceCode)) {
             return false;
         }
+
+        return self::copyArtifactTo($key, $outfile);
+    }
+
+    /**
+     * Warm restore by known cache key (project index hit — skip SourceBundler) (#36387).
+     */
+    public static function tryRestoreArtifactByKey(string $key, string $outfile): bool
+    {
+        if (!self::isEnabled() || '' === $key) {
+            return false;
+        }
+        if (null === self::readMeta($key)) {
+            return false;
+        }
+        $path = self::artifactPath($key);
+        if (!is_file($path) || filesize($path) < 1) {
+            return false;
+        }
+
+        return self::copyArtifactTo($key, $outfile);
+    }
+
+    private static function copyArtifactTo(string $key, string $outfile): bool
+    {
         $src = self::artifactPath($key);
         $outDir = dirname($outfile);
         if ('' !== $outDir && '.' !== $outDir && !is_dir($outDir)) {
@@ -418,6 +486,13 @@ final class CompileCache
     {
         self::$recordingKey = $key;
         self::$recordingExports = [];
+        self::$recordingUserSymbols = [];
+        self::$recordingHelperSymbols = [];
+    }
+
+    public static function isRecording(): bool
+    {
+        return null !== self::$recordingExports;
     }
 
     public static function recordExport(string $llvmName, string $signature, Block $block): void
@@ -430,6 +505,24 @@ final class CompileCache
             'signature' => $signature,
             'scoped' => self::blockScopedName($block),
         ];
+    }
+
+    /** Record a user-TU LLVM symbol (not NestedJIT) for edit-scaffold stripping (#36387). */
+    public static function recordUserLlvmSymbol(string $llvmName): void
+    {
+        if (null === self::$recordingUserSymbols || '' === $llvmName) {
+            return;
+        }
+        self::$recordingUserSymbols[] = $llvmName;
+    }
+
+    /** Record NestedJIT helper logical→LLVM so edit scaffold can rebind without re-NestedJIT (#36387). */
+    public static function recordHelperLogical(string $logicalLc, string $llvmName): void
+    {
+        if (null === self::$recordingHelperSymbols || '' === $logicalLc || '' === $llvmName) {
+            return;
+        }
+        self::$recordingHelperSymbols[strtolower($logicalLc)] = $llvmName;
     }
 
     /**
@@ -457,8 +550,297 @@ final class CompileCache
         $context->rebindInitShutdownAfterModuleReplace();
         $context->syncIntrinsicBuilder();
         self::$skipModuleFuncCompile = true;
+        self::$editScaffoldActive = false;
 
         return true;
+    }
+
+    /**
+     * Same-project edit path (deferred): restore prior module.bc, strip user symbols, rebind helpers.
+     *
+     * Not wired into {@see \PHPCompiler\Runtime::standalone} yet — replacing the module after
+     * {@see Context} construct leaves defineBuiltins Values dangling (SIGSEGV on re-lower).
+     * Next slice needs thin Context init (skip implement, bind from bitcode) before this can land.
+     *
+     * @internal
+     */
+    public static function tryRestoreEditScaffold(Context $context, string $previousKey): bool
+    {
+        $meta = self::readMeta($previousKey);
+        if (null === $meta) {
+            return false;
+        }
+        $bcPath = self::bitcodePath($previousKey);
+        if (!is_file($bcPath)) {
+            return false;
+        }
+        $userSymbols = $meta['user_symbols'] ?? null;
+        $helperSymbols = $meta['helper_symbols'] ?? null;
+        if (!is_array($userSymbols) || [] === $userSymbols) {
+            return false;
+        }
+        if (!is_array($helperSymbols)) {
+            $helperSymbols = [];
+        }
+
+        try {
+            $context->replaceModuleFromBitcodeFile($bcPath);
+        } catch (\Throwable $e) {
+            return false;
+        }
+
+        self::stripUserSymbolsFromModule($context, $userSymbols);
+        self::rebindHelperSymbols($context, $helperSymbols);
+        SuperglobalInit::rebindGlobalsFromModule($context);
+        $context->rebindInitShutdownAfterModuleReplace();
+        $context->reopenInitLinearForEditScaffold();
+        $context->syncIntrinsicBuilder();
+        // Clear PHP-side string/array const maps so re-lower allocates fresh globals (#36387).
+        $context->resetCompileTimeConstantMapsForEditScaffold();
+        self::$skipModuleFuncCompile = true;
+        self::$editScaffoldActive = true;
+        \PHPCompiler\AOT\BuildTiming::note('edit_scaffold_hit', 1.0);
+
+        return true;
+    }
+
+    /**
+     * @param list<mixed> $userSymbols
+     */
+    private static function stripUserSymbolsFromModule(Context $context, array $userSymbols): void
+    {
+        $names = [];
+        foreach ($userSymbols as $name) {
+            if (is_string($name) && '' !== $name) {
+                $names[$name] = true;
+            }
+        }
+        // Always drop standalone main wrapper — recreated in compileToFile.
+        $names['main'] = true;
+
+        foreach (array_keys($names) as $name) {
+            $fn = $context->module->getNamedFunction($name);
+            if ($fn instanceof \PHPLLVM\Value\Function_) {
+                try {
+                    $fn->delete();
+                } catch (\Throwable $e) {
+                    // Leave stale symbol; recompile may fail loudly rather than miscompile.
+                }
+            }
+        }
+
+        // Drop user string/array const globals so re-lower can reuse _main suffixes (#36387).
+        self::stripUserConstGlobals($context);
+    }
+
+    private static function stripUserConstGlobals(Context $context): void
+    {
+        $prefixes = ['string_const_', 'array_const_', 'object_const_'];
+        $toDelete = [];
+        try {
+            $global = $context->module->getFirstGlobal();
+        } catch (\Throwable $e) {
+            return;
+        }
+        $guard = 0;
+        while ($global instanceof \PHPLLVM\Value && $guard < 100000) {
+            ++$guard;
+            $name = '';
+            try {
+                $name = (string) $global->getName();
+            } catch (\Throwable $e) {
+                break;
+            }
+            $isUserConst = false;
+            foreach ($prefixes as $prefix) {
+                if (str_starts_with($name, $prefix) && str_ends_with($name, '_main')) {
+                    $isUserConst = true;
+                    break;
+                }
+            }
+            $next = null;
+            try {
+                if (method_exists($global, 'getNextGlobal')) {
+                    $next = $global->getNextGlobal();
+                }
+            } catch (\Throwable $e) {
+                $next = null;
+            }
+            if ($isUserConst) {
+                $toDelete[] = $global;
+            }
+            if (!$next instanceof \PHPLLVM\Value) {
+                // Fall back: only first-global walk without Next — stop after collecting known names via getNamedGlobal.
+                break;
+            }
+            $global = $next;
+        }
+
+        // Named lookup for dense const indices (0..N) when NextGlobal is unavailable.
+        if ([] === $toDelete) {
+            for ($i = 0; $i < 4096; ++$i) {
+                foreach (['string_const_', 'array_const_', 'object_const_'] as $prefix) {
+                    $g = $context->module->getNamedGlobal($prefix.$i.'_main');
+                    if ($g instanceof \PHPLLVM\Value) {
+                        $toDelete[] = $g;
+                    }
+                }
+            }
+        }
+
+        foreach ($toDelete as $g) {
+            if ($g instanceof \PHPLLVM\Value\Global_ || (is_object($g) && method_exists($g, 'delete'))) {
+                try {
+                    $g->delete();
+                } catch (\Throwable $e) {
+                    // ignore — unused consts are harmless if delete fails
+                }
+            }
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $helperSymbols logical lc → LLVM name
+     */
+    private static function rebindHelperSymbols(Context $context, array $helperSymbols): void
+    {
+        foreach ($helperSymbols as $logical => $llvm) {
+            if (!is_string($logical) || !is_string($llvm) || '' === $logical || '' === $llvm) {
+                continue;
+            }
+            $fn = $context->module->getNamedFunction($llvm);
+            if (!$fn instanceof \PHPLLVM\Value\Function_) {
+                continue;
+            }
+            $lc = strtolower($logical);
+            $context->functions[$lc] = $fn;
+            $context->functionLlvmSymbols[$lc] = $llvm;
+            $argTypes = [];
+            $n = $fn->countParams();
+            for ($i = 0; $i < $n; ++$i) {
+                $argTypes[] = $fn->getParam($i)->typeOf();
+            }
+            $context->functionProxies[$lc] = new Call\Native($fn, $logical, $argTypes);
+        }
+    }
+
+    /**
+     * Project identity = sorted member realpaths (content-independent) (#36387).
+     *
+     * @param list<string> $memberPaths
+     */
+    public static function projectId(array $memberPaths): string
+    {
+        $clean = [];
+        foreach ($memberPaths as $path) {
+            if (!is_string($path) || '' === $path) {
+                continue;
+            }
+            $resolved = realpath($path);
+            $clean[] = false !== $resolved ? $resolved : $path;
+        }
+        $clean = array_values(array_unique($clean));
+        sort($clean);
+
+        return hash('sha256', implode("\0", $clean)."\0".self::fingerprint());
+    }
+
+    /**
+     * @param list<string> $memberPaths
+     *
+     * @return array<string, string> path → sha256 of file bytes
+     */
+    public static function memberHashes(array $memberPaths): array
+    {
+        $out = [];
+        foreach ($memberPaths as $path) {
+            if (!is_string($path) || !is_file($path)) {
+                continue;
+            }
+            $resolved = realpath($path) ?: $path;
+            $hash = hash_file('sha256', $resolved);
+            if (is_string($hash)) {
+                $out[$resolved] = $hash;
+            }
+        }
+        ksort($out);
+
+        return $out;
+    }
+
+    public static function projectIndexPath(string $projectId): string
+    {
+        return self::cacheRoot().'/projects/'.$projectId.'.json';
+    }
+
+    /**
+     * @param array<string, string> $memberHashes
+     */
+    public static function rememberProject(string $projectId, string $key, array $memberHashes): void
+    {
+        if ('' === $projectId || '' === $key) {
+            return;
+        }
+        $dir = self::cacheRoot().'/projects';
+        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+            return;
+        }
+        $payload = json_encode([
+            'version' => 1,
+            'key' => $key,
+            'fingerprint' => self::fingerprint(),
+            'members' => $memberHashes,
+            'updated_at' => gmdate('c'),
+        ], JSON_PRETTY_PRINT);
+        if (false === $payload) {
+            return;
+        }
+        file_put_contents(self::projectIndexPath($projectId), $payload."\n");
+    }
+
+    /**
+     * Prior cache key for this project when at least one member changed (#36387).
+     *
+     * @param array<string, string> $memberHashes
+     */
+    public static function findEditScaffoldKey(string $projectId, array $memberHashes): ?string
+    {
+        $path = self::projectIndexPath($projectId);
+        if (!is_file($path)) {
+            return null;
+        }
+        $raw = file_get_contents($path);
+        if (false === $raw) {
+            return null;
+        }
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded) || (int) ($decoded['version'] ?? 0) !== 1) {
+            return null;
+        }
+        if (($decoded['fingerprint'] ?? '') !== self::fingerprint()) {
+            return null;
+        }
+        $prevKey = $decoded['key'] ?? '';
+        if (!is_string($prevKey) || '' === $prevKey) {
+            return null;
+        }
+        if (!is_file(self::bitcodePath($prevKey))) {
+            return null;
+        }
+        $prevMembers = $decoded['members'] ?? null;
+        if (!is_array($prevMembers) || [] === $prevMembers) {
+            return null;
+        }
+        // Identical members → exact warm path should have hit already; no scaffold.
+        if ($prevMembers === $memberHashes) {
+            return null;
+        }
+        // Require same path set (add/remove file → full rebuild).
+        if (array_keys($prevMembers) !== array_keys($memberHashes)) {
+            return null;
+        }
+
+        return $prevKey;
     }
 
     /**
@@ -552,10 +934,21 @@ final class CompileCache
         }
 
         try {
+            // Capture user main wrapper if present (added in compileToFile before this runs).
+            if (null !== $context) {
+                $main = $context->module->getNamedFunction('main');
+                if ($main instanceof \PHPLLVM\Value\Function_) {
+                    self::recordUserLlvmSymbol('main');
+                }
+            }
+            $userSymbols = array_values(array_unique(self::$recordingUserSymbols ?? []));
+            $helperSymbols = self::$recordingHelperSymbols ?? [];
             $payload = json_encode([
                 'version' => self::META_VERSION,
                 'fingerprint' => self::fingerprint(),
                 'exports' => self::$recordingExports,
+                'user_symbols' => $userSymbols,
+                'helper_symbols' => $helperSymbols,
                 'aot_stamp' => true,
             ], JSON_PRETTY_PRINT);
             if (false !== $payload) {
@@ -564,6 +957,14 @@ final class CompileCache
             file_put_contents(self::stampPath($key), "aot\n");
             if (null !== $context) {
                 $context->module->writeBitcodeToFile(self::bitcodePath($key));
+            }
+            $members = self::projectMembers();
+            if ([] !== $members) {
+                self::rememberProject(
+                    self::projectId($members),
+                    $key,
+                    self::memberHashes($members)
+                );
             }
         } finally {
             flock($lock, LOCK_UN);
@@ -575,7 +976,11 @@ final class CompileCache
     {
         self::$recordingKey = null;
         self::$recordingExports = null;
+        self::$recordingUserSymbols = null;
+        self::$recordingHelperSymbols = null;
         self::$skipModuleFuncCompile = false;
+        self::$editScaffoldActive = false;
+        self::$projectMembers = null;
     }
 
     /**

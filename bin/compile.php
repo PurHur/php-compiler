@@ -506,6 +506,43 @@ function run(string $filename, string $code, array $options): void
     if ([] !== $includes || ('-' !== $filename && is_file($filename))) {
         $includes = \PHPCompiler\AOT\ComposerVendorMap::expandIncludesForAutoload($filename, $includes);
     }
+    // Project member index for edit-scaffold reuse (per-file hashes → prior module.bc) (#36387).
+    if ('-' !== $filename && is_file($filename)) {
+        $memberPaths = array_values(array_unique(array_merge(
+            [realpath($filename) ?: $filename],
+            $includes
+        )));
+        \PHPCompiler\JIT\CompileCache::setProjectMembers($memberPaths);
+        // Warm hit from project index: skip SourceBundler when every member hash matches (#36387).
+        if (
+            !isset($options['-l'])
+            && !isset($options['-y'])
+            && !isset($options['--debug-symbols'])
+            && isset($options['-o'])
+            && true !== $options['-o']
+            && \PHPCompiler\JIT\CompileCache::isEnabled()
+        ) {
+            $projectId = \PHPCompiler\JIT\CompileCache::projectId($memberPaths);
+            $hashes = \PHPCompiler\JIT\CompileCache::memberHashes($memberPaths);
+            $idxFile = \PHPCompiler\JIT\CompileCache::projectIndexPath($projectId);
+            if (is_file($idxFile)) {
+                $idx = json_decode((string) file_get_contents($idxFile), true);
+                if (
+                    is_array($idx)
+                    && ($idx['members'] ?? null) === $hashes
+                    && is_string($idx['key'] ?? null)
+                    && \PHPCompiler\JIT\CompileCache::tryRestoreArtifactByKey($idx['key'], (string) $options['-o'])
+                ) {
+                    \PHPCompiler\AOT\Linker::assertNonEmptyRequestedOutput((string) $options['-o']);
+                    \PHPCompiler\AOT\BuildTiming::note('project_index_cache_hit', 1.0);
+                    \PHPCompiler\AOT\BuildTiming::finish((string) $options['-o']);
+                    $restoreUserScriptEnv();
+
+                    return;
+                }
+            }
+        }
+    }
     if ([] !== $includes && !$skipBundle) {
         $projectRoot = DeployRoot::findProjectRootForPath($filename);
         [$code, $filename] = SourceBundler::bundleForAot($filename, $includes, $projectRoot);
