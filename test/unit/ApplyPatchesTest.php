@@ -1150,6 +1150,7 @@ PHP;
         $joined = implode("\n", $output);
         self::assertSame(0, $exitCode, "verify-pristine failed:\n".$joined);
         self::assertStringContainsString('no hunkless stubs', $joined);
+        self::assertStringContainsString('no orphan patches', $joined);
         self::assertStringContainsString('php-llvm stack', $joined);
         self::assertStringContainsString('php-llvm-structgep-assert.patch (stack)', $joined);
         self::assertStringContainsString('php-llvm-void-star-pointer-i8.patch (stack)', $joined);
@@ -1160,6 +1161,41 @@ PHP;
             'php-llvm stack '.$llvmPatchCount.'/'.$llvmPatchCount,
             $joined,
             'every on-disk php-llvm-*.patch must apply in stack order (#36229 / re-#36143)'
+        );
+    }
+
+    public function testFileBuiltinArgInfoIsArrayOrFalse(): void
+    {
+        $arginfo = self::$root.'/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php';
+        if (!is_readable($arginfo)) {
+            self::markTestSkipped('vendor/ircmaxell/php-types not installed');
+        }
+        $body = (string) file_get_contents($arginfo);
+        self::assertMatchesRegularExpression(
+            "/'file' => \\['array\\|false'/",
+            $body,
+            'file() must be array|false per php-src ext/standard/file.stub.php (#36229)'
+        );
+    }
+
+    public function testNoOrphanPatchFilesOnDisk(): void
+    {
+        $script = self::$root.'/script/apply-patches.sh';
+        $patchDir = self::$root.'/patches';
+        $scriptBody = (string) file_get_contents($script);
+        preg_match_all(
+            '/apply_patch(?:_file_direct)? "\$PATCH_DIR\/([^"]+\.patch)"/',
+            $scriptBody,
+            $m
+        );
+        $reachable = array_unique($m[1]);
+        $onDisk = array_map('basename', glob($patchDir.'/*.patch') ?: []);
+        sort($onDisk);
+        $orphans = array_values(array_diff($onDisk, $reachable));
+        self::assertSame(
+            [],
+            $orphans,
+            'every patches/*.patch must be referenced by apply_patch or apply_patch_file_direct (#36229)'
         );
     }
 }

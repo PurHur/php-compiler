@@ -1584,7 +1584,7 @@ class InternalArgInfo
         'fgetcsv' => ['array', 'fp' => '', 'length=' => 'int', 'delimiter=' => 'string', 'enclosure=' => 'string', 'escape=' => 'string'],
         'fgetss' => ['string', 'fp' => '', 'length=' => 'int', 'allowable_tags=' => 'string'],
         'fgets' => ['string', 'fp' => '', 'length=' => 'int'],
-        'file' => ['array', 'filename' => 'string', 'flags=' => 'int', 'context=' => ''],
+        'file' => ['array|false', 'filename' => 'string', 'flags=' => 'int', 'context=' => ''],
         'fileatime' => ['int', 'filename' => 'string'],
         'filectime' => ['int', 'filename' => 'string'],
         'file_exists' => ['bool', 'filename' => 'string'],

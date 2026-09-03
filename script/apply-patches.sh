@@ -171,6 +171,10 @@ patch_already_applied() {
     php-types-readfile-int-false.patch)
       grep -q "'readfile' => \['int|false'" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
       ;;
+    php-types-file-array-false.patch)
+      # php-src ext/standard/file.stub.php — file(): array|false (#36229 orphan wire-up)
+      grep -q "'file' => \['array|false'" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
+      ;;
     php-types-get-meta-tags-array-false.patch)
       grep -q "'get_meta_tags' => \['array|false'" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
       ;;
@@ -7063,6 +7067,29 @@ list_applied_php_llvm_patches() {
     | sed 's/.*\/\(php-llvm-[^"]*\)".*/\1/'
 }
 
+# Patches reachable from apply_patch / apply_patch_file_direct (source of truth).
+# On-disk *.patch files not in this set are orphans — deleted stubs left behind after
+# overlays took over, or never wired into the apply list (#36229).
+list_reachable_patch_names() {
+  {
+    grep -E 'apply_patch(_file_direct)? "\$PATCH_DIR/[^"]+\.patch"' "$ROOT/script/apply-patches.sh" \
+      | sed -E 's/.*\/([^"/]+\.patch)".*/\1/'
+  } | sort -u
+}
+
+# Fail if patches/*.patch is not referenced by apply_patch / apply_patch_file_direct.
+verify_no_orphan_patches() {
+  local orphans
+  orphans="$(comm -23 <(cd "$PATCH_DIR" && ls -1 *.patch | sort) <(list_reachable_patch_names))"
+  if [[ -n "$orphans" ]]; then
+    echo "verify-pristine: on-disk patches not reachable from apply_patch/apply_patch_file_direct (#36229):" >&2
+    echo "$orphans" >&2
+    return 1
+  fi
+  echo "verify-pristine: no orphan patches (every on-disk *.patch is in the apply list)"
+  return 0
+}
+
 # Fast gate: every on-disk php-llvm-*.patch is in the apply list, and the whole
 # stack applies in order to the committed unpatched snapshot (#36229 / re-#36143).
 # Isolated per-patch checks against Builder.php.orig only covered 2/28 files and
@@ -7072,6 +7099,7 @@ verify_pristine_patches() {
   local snap="$ROOT/patches/pristine-snapshots/ircmaxell/php-llvm"
   local scratch name patch applied listed extra
   reject_hunkless_patches || failed=1
+  verify_no_orphan_patches || failed=1
   if [[ ! -f "$snap/ORIGIN" || ! -d "$snap/lib" ]]; then
     echo "verify-pristine: missing php-llvm snapshot at ${snap} (ORIGIN+lib/) (#36229)" >&2
     return 1
@@ -7847,6 +7875,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-explode-array-return.patch"
   apply_patch "$PATCH_DIR/php-types-splfixedarray-fromarray-return.patch"
   apply_patch "$PATCH_DIR/php-types-readfile-int-false.patch"
+  apply_patch "$PATCH_DIR/php-types-file-array-false.patch"
   apply_patch "$PATCH_DIR/php-types-get-meta-tags-array-false.patch"
   apply_patch "$PATCH_DIR/php-types-array-combine-array-false.patch"
   apply_patch "$PATCH_DIR/php-types-stream-context-array-return.patch"
