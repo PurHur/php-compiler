@@ -3,22 +3,25 @@
 declare(strict_types=1);
 
 /**
- * Performance regression gate for benchmarks/ (#36196).
+ * Performance regression gate for benchmarks/ (#36196) and benchmarks/v2/ (#36385).
  *
  * For each headline micro-benchmark:
  *   1. verify AOT output matches Zend (same rule as script/bench.php);
  *   2. measure best-of-3 wall time for Zend and native run in the same job;
  *   3. record LLVM IR size (load-independent proxy for instruction count);
- *   4. compare ratio (aot/zend) and ir_lines against benchmarks/BASELINE.json.
+ *   4. compare ratio (aot/zend) and ir_lines against the committed baseline.
  *
  * Usage:
  *   PHP_8_2=$(command -v php) php script/bench-gate.php
  *   PHP_8_2=$(command -v php) php script/bench-gate.php --update
+ *   PHP_8_2=$(command -v php) php script/bench-gate.php --v2
+ *   PHP_8_2=$(command -v php) php script/bench-gate.php --v2 --update
  *   PHP_8_2=$(command -v php) php script/bench-gate.php --compile
  *   PHP_8_2=$(command -v php) php script/bench-gate.php --compile --update
  */
 
 const COMPILE_BASELINE_REL = 'benchmarks/COMPILE_BASELINE.json';
+const V2_BASELINE_REL = 'benchmarks/v2/BASELINE.json';
 const COMPILE_WALL_TOLERANCE_PERCENT = 20;
 const COMPILE_SCALING_TOLERANCE_PERCENT = 20;
 
@@ -29,15 +32,26 @@ const BENCH_GATE_CASES = [
     'Ack(3,8)',
 ];
 
+/** Gate subset of v2 — must stay AOT-correct and ratio-stable (#36385). */
+const BENCH_GATE_V2_CASES = [
+    'call-heavy',
+    'assoc-heavy',
+    'str-builder',
+    'k-nucleotide',
+    'template-render',
+];
+
 const RATIO_TOLERANCE_PERCENT = 30;
 const IR_TOLERANCE_PERCENT = 20;
+/** Tighter ratio band for v2 so a deliberate 2× slowdown fails the gate (#36385). */
+const V2_RATIO_TOLERANCE_PERCENT = 20;
 const TIMING_RUNS = 3;
 
 $root = dirname(__DIR__);
-$baselinePath = $root.'/benchmarks/BASELINE.json';
 $argvList = $argv ?? [];
 $update = in_array('--update', $argvList, true);
 $compileMode = in_array('--compile', $argvList, true);
+$v2Mode = in_array('--v2', $argvList, true);
 
 if ($compileMode) {
     runCompileGate($root, $root.'/'.COMPILE_BASELINE_REL, $update);
@@ -56,15 +70,18 @@ if ('' === $llvmEnv) {
     exit(1);
 }
 
-$work = $root.'/build/bench-gate';
+$cases = $v2Mode ? BENCH_GATE_V2_CASES : BENCH_GATE_CASES;
+$suiteRel = $v2Mode ? 'benchmarks/v2' : 'benchmarks';
+$baselinePath = $v2Mode ? $root.'/'.V2_BASELINE_REL : $root.'/benchmarks/BASELINE.json';
+$work = $root.'/build/bench-gate'.($v2Mode ? '-v2' : '');
 if (!is_dir($work) && !mkdir($work, 0777, true) && !is_dir($work)) {
     fwrite(STDERR, "bench-gate: cannot create {$work}\n");
     exit(1);
 }
 
 $measured = [];
-foreach (BENCH_GATE_CASES as $name) {
-    $path = $root.'/benchmarks/'.$name.'.php';
+foreach ($cases as $name) {
+    $path = $root.'/'.$suiteRel.'/'.$name.'.php';
     if (!is_file($path)) {
         fwrite(STDERR, "bench-gate: missing {$path}\n");
         exit(1);
@@ -72,10 +89,10 @@ foreach (BENCH_GATE_CASES as $name) {
     $measured[$name] = measureCase($name, $path, $zend, $llvmEnv, $root, $work);
 }
 
-printTable($measured);
+printTable($measured, $v2Mode ? 'v2' : 'v1');
 
 if ($update) {
-    writeBaseline($baselinePath, $measured);
+    writeBaseline($baselinePath, $measured, $v2Mode);
     echo "bench-gate: updated {$baselinePath}\n";
     exit(0);
 }
@@ -100,17 +117,29 @@ if ([] !== $errors) {
     exit(1);
 }
 
-$ratioTol = (int) ($baseline['ratio_tolerance_percent'] ?? RATIO_TOLERANCE_PERCENT);
+$ratioTol = (int) ($baseline['ratio_tolerance_percent'] ?? ($v2Mode ? V2_RATIO_TOLERANCE_PERCENT : RATIO_TOLERANCE_PERCENT));
 $irTol = (int) ($baseline['ir_tolerance_percent'] ?? IR_TOLERANCE_PERCENT);
-echo "bench-gate: OK (ratio <= +{$ratioTol}%, ir_lines <= +{$irTol}% vs baseline)\n";
+echo 'bench-gate'.($v2Mode ? ' --v2' : '').": OK (ratio <= +{$ratioTol}%, ir_lines <= +{$irTol}% vs baseline)\n";
 exit(0);
 
 /** @return array{ratio: float, zend_wall: float, aot_wall: float, ir_lines: int, ir_defines: int, output_ok: bool} */
 function measureCase(string $name, string $path, string $zend, string $llvmEnv, string $root, string $work): array
 {
-    $binary = $work.'/'.$name.'.bin';
+    // Sanitize shell-meta characters in paths (e.g. fibo(30), Ack(3,8)). Parentheses in the
+    // source path have produced phantom multi-10k-line parse errors under `php bin/compile.php`
+    // when the path is used as-is (#36385); compile a safe copy instead.
+    $safeName = preg_replace('/[^A-Za-z0-9._-]+/', '_', $name) ?? 'case';
+    $binary = $work.'/'.$safeName.'.bin';
+    $compileSrc = $path;
+    if ($safeName !== $name) {
+        $compileSrc = $work.'/'.$safeName.'.php';
+        if (!copy($path, $compileSrc)) {
+            fwrite(STDERR, "bench-gate: cannot copy {$path} -> {$compileSrc}\n");
+            exit(1);
+        }
+    }
     $expected = trim(capture(escapeshellcmd($zend).' '.escapeshellarg($path)));
-    $buildCmd = $llvmEnv.' '.escapeshellcmd($root.'/phpc').' build -o '.escapeshellarg($binary).' '.escapeshellarg($path);
+    $buildCmd = $llvmEnv.' '.escapeshellcmd($root.'/phpc').' build -o '.escapeshellarg($binary).' '.escapeshellarg($compileSrc);
     capture($buildCmd.' 2>&1', $buildRc, buildCapSeconds());
     $outputOk = 0 === $buildRc
         && is_executable($binary)
@@ -212,9 +241,11 @@ function buildCapSeconds(): int
 }
 
 /** @param array<string, array<string, float|int|bool>> $measured */
-function printTable(array $measured): void
+function printTable(array $measured, string $suite = 'v1'): void
 {
-    echo "bench-gate measurements (#36196):\n";
+    echo 'v2' === $suite
+        ? "bench-gate v2 measurements (#36385):\n"
+        : "bench-gate measurements (#36196):\n";
     printf(
         "%-14s %10s %10s %10s %10s %10s\n",
         'case',
@@ -239,7 +270,7 @@ function printTable(array $measured): void
 }
 
 /** @param array<string, array<string, float|int|bool>> $measured */
-function writeBaseline(string $path, array $measured): void
+function writeBaseline(string $path, array $measured, bool $v2 = false): void
 {
     $cases = [];
     foreach ($measured as $name => $row) {
@@ -253,13 +284,22 @@ function writeBaseline(string $path, array $measured): void
     }
     $doc = [
         'version' => 1,
+        'suite' => $v2 ? 'v2' : 'v1',
         'generated_at' => gmdate('Y-m-d\TH:i:s\Z'),
         'arch' => 'x86_64-linux',
-        'ratio_tolerance_percent' => RATIO_TOLERANCE_PERCENT,
+        'ratio_tolerance_percent' => $v2 ? V2_RATIO_TOLERANCE_PERCENT : RATIO_TOLERANCE_PERCENT,
         'ir_tolerance_percent' => IR_TOLERANCE_PERCENT,
-        'regeneration' => 'PHP_8_2=$(command -v php) ./script/bench-gate.sh --update',
+        'regeneration' => $v2
+            ? 'PHP_8_2=$(command -v php) ./script/bench-gate.sh --v2 --update'
+            : 'PHP_8_2=$(command -v php) ./script/bench-gate.sh --update',
+        'note' => $v2
+            ? 'v2 gate subset (#36385). Ratio tolerance 20% so a deliberate ~2× slowdown fails.'
+            : null,
         'cases' => $cases,
     ];
+    if (null === $doc['note']) {
+        unset($doc['note']);
+    }
     file_put_contents($path, json_encode($doc, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES)."\n");
 }
 
