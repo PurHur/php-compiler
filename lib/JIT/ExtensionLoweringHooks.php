@@ -104,7 +104,7 @@ interface DomCompileTimeHooks
  *
  * {@see \PHPCompiler\JIT} must not import {@code ext\simplexml} / {@code ext\dom} /
  * {@code ext\xmlreader} / {@code ext\xmlwriter} / {@code ext\xsl} / {@code ext\mbstring}
- * for these paths; Modules register from jitInit.
+ * / {@code ext\posix} for these paths; Modules register from jitInit.
  */
 final class ExtensionLoweringHooks
 {
@@ -196,6 +196,20 @@ final class ExtensionLoweringHooks
 
     /** DOM compile-time stamps — registered from ext/dom Module::jitInit (#36204). */
     public ?DomCompileTimeHooks $domCompileTime = null;
+
+    /** posix NestedJIT libc leaves — registered from ext/posix Module::jitInit (#36204). */
+    public ?PosixNestedJitKernels $posixNested = null;
+
+    public function requirePosixNested(): PosixNestedJitKernels
+    {
+        if (null === $this->posixNested) {
+            throw new \RuntimeException(
+                'posix NestedJIT kernels not registered — ext/posix Module::jitInit missing (#36204)'
+            );
+        }
+
+        return $this->posixNested;
+    }
 
     public function tryPrepareDimWrite(Context $context, Variable $container, Variable $dim): ?Variable
     {

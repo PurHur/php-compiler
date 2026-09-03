@@ -27,6 +27,11 @@ class Module extends ModuleAbstract
         }
     }
 
+    public function jitInit(\PHPCompiler\JIT\Context $context): void
+    {
+        $context->extensionLowering->posixNested = new JitPosixNestedKernelsFacade();
+    }
+
     public function getFunctions(): array
     {
         return [

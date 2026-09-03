@@ -89,6 +89,41 @@ final class JitPhpExtensionLoweringHooksTest extends TestCase
         );
     }
 
+    public function testPosixBuiltinsDoNotImportPosixKernels(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $module = (string) file_get_contents($root.'/ext/posix/Module.php');
+        $this->assertStringContainsString(
+            'posixNested = new JitPosixNestedKernelsFacade()',
+            $module,
+            'ext/posix Module::jitInit must register JitPosixNestedKernelsFacade'
+        );
+        $this->assertStringContainsString(
+            'requirePosixNested',
+            (string) file_get_contents($root.'/lib/JIT/ExtensionLoweringHooks.php'),
+            'ExtensionLoweringHooks must expose requirePosixNested()'
+        );
+        foreach (glob($root.'/lib/JIT/Builtin/Posix*Jit.php') ?: [] as $path) {
+            $src = (string) file_get_contents($path);
+            $stripped = (string) preg_replace('~/\*.*?\*/~s', '', $src);
+            $stripped = (string) preg_replace('~//.*$~m', '', $stripped);
+            $this->assertDoesNotMatchRegularExpression(
+                '/PHPCompiler\\\\ext\\\\posix\\\\/',
+                $stripped,
+                basename($path).' still imports ext\\posix — use PosixNestedJitKernels'
+            );
+            // posix_getpid NestedJIT leaf lives in ext/standard (shared with getmypid).
+            if ('PosixGetpidJit.php' === basename($path)) {
+                continue;
+            }
+            $this->assertStringContainsString(
+                'requirePosixNested()',
+                $src,
+                basename($path).' must dispatch NestedJIT via requirePosixNested()'
+            );
+        }
+    }
+
     /**
      * @dataProvider coreJitHelperFilesWithoutNonStandardExtImports
      */
@@ -107,7 +142,7 @@ final class JitPhpExtensionLoweringHooksTest extends TestCase
     /** @return list<array{string}> */
     public static function coreJitHelperFilesWithoutNonStandardExtImports(): array
     {
-        return [
+        $files = [
             ['lib/JIT/IssetHelperLlvm.php'],
             ['lib/JIT/EmptyDimensionLlvm.php'],
             ['lib/JIT/UnsetHelperLlvm.php'],
@@ -118,5 +153,10 @@ final class JitPhpExtensionLoweringHooksTest extends TestCase
             ['lib/JIT/XmlWriterInstanceMethodJit.php'],
             ['lib/JIT/XmlReaderInstanceMethodJit.php'],
         ];
+        foreach (glob(dirname(__DIR__, 2).'/lib/JIT/Builtin/Posix*Jit.php') ?: [] as $path) {
+            $files[] = ['lib/JIT/Builtin/'.basename($path)];
+        }
+
+        return $files;
     }
 }
