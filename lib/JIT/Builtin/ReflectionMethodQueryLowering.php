@@ -16,14 +16,15 @@ use PHPCompiler\VM\ReflectionSupport;
  */
 final class ReflectionMethodQueryLowering
 {
-    /** @var array<string, array<string, array{total: int, required: int}>> */
+    /** @var array<string, array<string, array{total: int, required: int, hasReturnType: bool}>> */
     private static array $userMethods = [];
 
     public static function recordUserMethod(
         string $className,
         string $methodName,
         int $paramCount,
-        int $requiredCount
+        int $requiredCount,
+        bool $hasReturnType = false
     ): void {
         $classLc = strtolower(ltrim($className, '\\'));
         $methodLc = strtolower($methodName);
@@ -33,6 +34,7 @@ final class ReflectionMethodQueryLowering
         self::$userMethods[$classLc][$methodLc] = [
             'total' => max(0, $paramCount),
             'required' => max(0, min($requiredCount, max(0, $paramCount))),
+            'hasReturnType' => $hasReturnType,
         ];
     }
 
@@ -48,7 +50,13 @@ final class ReflectionMethodQueryLowering
             }
             ++$required;
         }
-        self::recordUserMethod($className, $methodName, \count($paramNames), $required);
+        self::recordUserMethod(
+            $className,
+            $methodName,
+            \count($paramNames),
+            $required,
+            ReflectionSupport::hasDeclaredReturnType($block->returnDeclaredType)
+        );
     }
 
     public static function implementLookupFunctions(Context $context): void
@@ -90,7 +98,7 @@ final class ReflectionMethodQueryLowering
     /**
      * Resolve method metadata at JIT compile time when class/method are literals (#34216).
      *
-     * @return array{flags: int, total: int, required: int}|null
+     * @return array{flags: int, total: int, required: int, hasReturnType: bool}|null
      */
     public static function compileTimeMethodMetadata(
         Context $context,
@@ -104,6 +112,7 @@ final class ReflectionMethodQueryLowering
         }
         $visibility = self::visibilityMapForContext($context);
         $paramMaps = self::paramCountMapsForContext($context);
+        $hasReturnMap = self::hasReturnTypeMapForContext($context);
         $flags = self::mapLookup($visibility, $classLc, $methodLc);
         if (null === $flags) {
             return null;
@@ -113,12 +122,25 @@ final class ReflectionMethodQueryLowering
         if (null === $total || null === $required) {
             return null;
         }
+        $hasReturn = self::mapLookup($hasReturnMap, $classLc, $methodLc);
 
         return [
             'flags' => $flags,
             'total' => $total,
             'required' => $required,
+            'hasReturnType' => null !== $hasReturn && $hasReturn !== 0,
         ];
+    }
+
+    /**
+     * @return array<string, array<string, int>> class => methodLc => 0|1
+     */
+    public static function hasReturnTypeMapForContext(Context $context): array
+    {
+        return self::buildHasReturnTypeMap(
+            $context,
+            self::filterUserScriptMethods(self::$userMethods)
+        );
     }
 
     /**
@@ -146,9 +168,9 @@ final class ReflectionMethodQueryLowering
     }
 
     /**
-     * @param array<string, array<string, array{total: int, required: int}>> $recorded
+     * @param array<string, array<string, array{total: int, required: int, hasReturnType?: bool}>> $recorded
      *
-     * @return array<string, array<string, array{total: int, required: int}>>
+     * @return array<string, array<string, array{total: int, required: int, hasReturnType?: bool}>>
      */
     private static function filterUserScriptMethods(array $recorded): array
     {
@@ -169,7 +191,7 @@ final class ReflectionMethodQueryLowering
     }
 
     /**
-     * @param array<string, array<string, array{total: int, required: int}>> $userRecorded
+     * @param array<string, array<string, array{total: int, required: int, hasReturnType?: bool}>> $userRecorded
      *
      * @return array<string, array<string, int>>
      */
@@ -197,7 +219,7 @@ final class ReflectionMethodQueryLowering
     }
 
     /**
-     * @param array<string, array<string, array{total: int, required: int}>> $userRecorded
+     * @param array<string, array<string, array{total: int, required: int, hasReturnType?: bool}>> $userRecorded
      *
      * @return array{total: array<string, array<string, int>>, required: array<string, array<string, int>>}
      */
@@ -225,6 +247,33 @@ final class ReflectionMethodQueryLowering
         }
 
         return ['total' => $total, 'required' => $required];
+    }
+
+    /**
+     * @param array<string, array<string, array{total: int, required: int, hasReturnType?: bool}>> $userRecorded
+     *
+     * @return array<string, array<string, int>>
+     */
+    private static function buildHasReturnTypeMap(Context $context, array $userRecorded): array
+    {
+        $out = [];
+        $object = $context->type->object;
+        foreach ($userRecorded as $classLc => $methods) {
+            $classId = $object->classIdForLowerName($classLc);
+            if (null === $classId) {
+                continue;
+            }
+            $display = $object->classNameForId($classId);
+            if (!\is_string($display) || '' === $display) {
+                $display = $classLc;
+            }
+            $classDisplay = ltrim($display, '\\');
+            foreach ($methods as $methodLc => $counts) {
+                $out[$classDisplay][(string) $methodLc] = !empty($counts['hasReturnType']) ? 1 : 0;
+            }
+        }
+
+        return $out;
     }
 
     /** @param array<string, array<string, int>> $map */

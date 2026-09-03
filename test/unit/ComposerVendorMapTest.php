@@ -102,6 +102,50 @@ final class ComposerVendorMapTest extends TestCase
         }
     }
 
+    /** Trait uses must expand before the using class (#36382 Nyholm MessageTrait). */
+    public function testAutoloadDiscoveryIncludesTraitsBeforeUsingClass(): void
+    {
+        $dir = sys_get_temp_dir().'/phpc_trait_disc_'.bin2hex(random_bytes(4));
+        $this->assertTrue(mkdir($dir.'/src', 0777, true));
+        try {
+            file_put_contents(
+                $dir.'/src/HelloTrait.php',
+                "<?php\nnamespace Disc;\ntrait HelloTrait { public function hi(): string { return 'hi'; } }\n"
+            );
+            file_put_contents(
+                $dir.'/src/Greeter.php',
+                "<?php\nnamespace Disc;\nclass Greeter { use HelloTrait; }\n"
+            );
+            file_put_contents($dir.'/entry.php', "<?php\nnew Disc\\Greeter();\n");
+            file_put_contents(
+                $dir.'/phpc.json',
+                json_encode([
+                    'entry' => 'entry.php',
+                    'binary' => '.phpc/bin/app',
+                    'autoload' => [
+                        'psr-4' => ['Disc\\' => 'src/'],
+                    ],
+                ], JSON_THROW_ON_ERROR)
+            );
+
+            $graph = ProjectGraph::resolve($dir);
+            $this->assertSame([], $graph['errors'], implode("\n", $graph['errors']));
+            $rels = [];
+            foreach ($graph['files'] as $abs) {
+                $rels[] = basename($abs);
+            }
+            $this->assertContains('HelloTrait.php', $rels);
+            $this->assertContains('Greeter.php', $rels);
+            $this->assertLessThan(
+                array_search('Greeter.php', $rels, true),
+                array_search('HelloTrait.php', $rels, true),
+                'trait file must precede class that use-s it: '.implode(',', $rels)
+            );
+        } finally {
+            $this->removeTree($dir);
+        }
+    }
+
     public function testAutoloadNoneDisablesComposerMaps(): void
     {
         $dir = sys_get_temp_dir().'/phpc_composer_none_'.bin2hex(random_bytes(4));
@@ -256,6 +300,59 @@ final class ComposerVendorMapTest extends TestCase
         $this->assertStringContainsString('is_array($allow) && [] !== $allow', $window);
         $this->assertStringContainsString('assignIncludeResult', $window);
         $this->assertStringContainsString('compileIncludedFile', $window);
+    }
+
+    /**
+     * phpc build --project: out-of-map require must fail loudly with the path (#36382).
+     * Folded `__DIR__.'/…'` literals are rejected at compile time; non-foldable
+     * computed paths Error at runtime — both must name the path (never silent).
+     *
+     * @group llvm
+     */
+    public function testAotProjectComputedIncludeOutsideMapRaisesWithPath(): void
+    {
+        $dir = sys_get_temp_dir().'/phpc_aot_omap_'.bin2hex(random_bytes(4));
+        $this->assertTrue(mkdir($dir));
+        try {
+            $ok = $dir.'/ok.php';
+            $blocked = $dir.'/blocked.php';
+            $entry = $dir.'/main.php';
+            file_put_contents($ok, "<?php\n");
+            file_put_contents($blocked, "<?php\necho 'leak';\n");
+            // Non-foldable path: basename from argv so ConstStringFolder cannot literalize.
+            file_put_contents(
+                $entry,
+                "<?php\n\$n = \$argv[1] ?? 'blocked';\n\$p = __DIR__.'/'.\$n.'.php';\nrequire \$p;\necho 'ok';\n"
+            );
+            file_put_contents(
+                $dir.'/phpc.json',
+                json_encode([
+                    'entry' => 'main.php',
+                    'binary' => '.phpc/bin/omap',
+                    'includes' => ['ok.php'],
+                    'autoload' => 'none',
+                ], JSON_THROW_ON_ERROR)
+            );
+
+            $root = dirname(__DIR__, 2);
+            $bin = $dir.'/.phpc/bin/omap';
+            @mkdir($dir.'/.phpc/bin', 0777, true);
+            $cmd = 'cd '.escapeshellarg($root)
+                .' && php bin/phpc.php build --project '.escapeshellarg($dir).' 2>&1';
+            exec($cmd, $clog, $crc);
+            $this->assertSame(0, $crc, implode("\n", $clog));
+            $this->assertFileExists($bin);
+
+            $out = [];
+            exec(escapeshellarg($bin).' blocked 2>&1', $out, $rc);
+            $joined = implode("\n", $out);
+            $this->assertNotSame(0, $rc, $joined);
+            $this->assertStringContainsString('include/require path outside project file map', $joined);
+            $this->assertStringContainsString('blocked.php', $joined);
+            $this->assertStringNotContainsString('leak', $joined);
+        } finally {
+            $this->removeTree($dir);
+        }
     }
 
     private function removeTree(string $dir): void

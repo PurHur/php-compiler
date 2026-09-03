@@ -35,4 +35,17 @@ final class ReflectionMethodQueryLookupHelper
 
         return ReflectionMethodQueryConstructHelper::loadRequiredParamCount($context, $obj);
     }
+
+    public static function lookupMethodHasReturnType(Context $context, Variable $thisArg): Value
+    {
+        $obj = ReflectionSetup::loadObjectFromArg($context, $thisArg);
+        $i64 = $context->getTypeFromString('int64');
+        $flag = ReflectionMethodQueryConstructHelper::loadHasReturnType($context, $obj);
+
+        return $context->builder->icmp(
+            \PHPLLVM\Builder::INT_NE,
+            $flag,
+            $i64->constInt(0, false)
+        );
+    }
 }

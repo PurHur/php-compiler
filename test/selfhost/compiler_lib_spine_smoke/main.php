@@ -6559,6 +6559,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/ReflectionMethodGetName.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionMethodGetNamedArguments.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionMethodInvoke.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionMethodIsPublic.php';
+require_once __DIR__.'/../../../lib/JIT/Call/ReflectionMethodHasReturnType.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionMethodIsStatic.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionObjectConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionObjectGetName.php';
