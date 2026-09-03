@@ -58,9 +58,11 @@ ci_install_deps() {
   fi
   "${COMPOSER[@]}" install --no-interaction --ignore-platform-reqs
 
+  # Best-effort bit restore on workspace checkouts that drop +x (#36248 justified).
   chmod +x script/install-llvm9.sh script/apply-patches.sh 2>/dev/null || true
   if [[ -z "${PHP_COMPILER_LLVM_PATH:-}" || ! -f "${PHP_COMPILER_LLVM_PATH}/libLLVM-9.so.1" ]]; then
     if [[ -x script/install-llvm9.sh ]]; then
+      # Host trees may lack LLVM; CI image already has /opt/llvm9 (#36248 justified).
       script/install-llvm9.sh || true
     fi
   fi
@@ -543,6 +545,10 @@ ci_run_init_apijson_parity_check() {
 
 ci_run_inventory_checks() {
   script/check-no-unlimited-memory.sh
+  # Ripgrep is required by check-stale-issue-refs; fetch musl static into tools/bin
+  # when the pinned image has not been rebuilt with the Dockerfile ripgrep package (#36248).
+  script/ensure-ripgrep.sh
+  export PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/tools/bin:${PATH}"
   script/check-stale-issue-refs.sh
   ci_run_init_miniwebapp_parity_check
   ci_run_miniwebapp_lint_zero_check

@@ -94,7 +94,7 @@ for name in "${!T2[@]}"; do
     :
   else
     echo "check-aot-build-smoke: tier-2 still broken: $name (#15642 — report-only)"
-    ((t2_broken++)) || true
+    t2_broken=$((t2_broken + 1))
   fi
 done
 if [[ $t2_broken -eq 0 ]]; then

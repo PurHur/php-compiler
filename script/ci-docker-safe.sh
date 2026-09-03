@@ -6,7 +6,9 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CI_SCRIPT="${1:-ci-fast.sh}"
-shift || true
+if (($# > 0)); then
+  shift
+fi
 
 IMAGE="${PHP_COMPILER_DEV_IMAGE:-php-compiler:22.04-dev}"
 

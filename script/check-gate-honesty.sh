@@ -63,6 +63,35 @@ step "check-stale-issue-refs requires rg" bash -c '
   [[ "$out" == *"ripgrep (rg) required"* ]] || exit 1
 '
 
+# Budget: or-true in ci-*.sh + check-*.sh must stay ≤ 20 with #36248 justified comments.
+step "ci/check or-true budget ≤ 20" bash -c '
+  set -euo pipefail
+  # Count executable or-true only (skip comment-only lines).
+  # Empty grep is fine — count 0 (#36248 justified).
+  mapfile -t hits < <(grep -nE "\|\| true" script/ci-*.sh script/check-*.sh 2>/dev/null | grep -vE "^[^:]+:[0-9]+:[[:space:]]*#" || true)
+  count="${#hits[@]}"
+  if (( count > 20 )); then
+    echo "check-gate-honesty: or-true count ${count} exceeds budget 20 (#36248):" >&2
+    printf "%s\n" "${hits[@]}" >&2
+    exit 1
+  fi
+  unjustified=0
+  for hit in "${hits[@]}"; do
+    file="${hit%%:*}"
+    rest="${hit#*:}"
+    line_no="${rest%%:*}"
+    # Accept a justification on the same line or within the 3 preceding lines.
+    start=$(( line_no > 3 ? line_no - 3 : 1 ))
+    ctx="$(sed -n "${start},${line_no}p" "$file")"
+    if ! grep -qE "#36248 justified" <<<"$ctx"; then
+      echo "check-gate-honesty: unjustified or-true at ${hit}" >&2
+      unjustified=1
+    fi
+  done
+  [[ "$unjustified" -eq 0 ]] || exit 1
+  echo "check-gate-honesty: or-true budget ${count}/20"
+'
+
 if [[ "$fail" -ne 0 ]]; then
   exit 1
 fi
