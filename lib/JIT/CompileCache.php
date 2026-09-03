@@ -40,6 +40,9 @@ final class CompileCache
     /** True after {@see tryRestoreEditScaffold()} — helpers kept, user symbols stripped. */
     private static bool $editScaffoldActive = false;
 
+    /** True after Context parsed prior module.bc before namedStructType (#36387). */
+    private static bool $editScaffoldBitcodeBound = false;
+
     /**
      * Prior cache key armed before {@see Context} construct so defineBuiltins can skip
      * implement() (Values would dangle after module replace) (#36387).
@@ -70,6 +73,41 @@ final class CompileCache
     public static function isEditScaffoldActive(): bool
     {
         return self::$editScaffoldActive;
+    }
+
+    public static function isEditScaffoldBitcodeBound(): bool
+    {
+        return self::$editScaffoldBitcodeBound;
+    }
+
+    /**
+     * Context parsed prior module.bc before CreateNamed — register() may early-return (#36387).
+     */
+    public static function markEditScaffoldBitcodeBound(): void
+    {
+        self::$editScaffoldBitcodeBound = true;
+        self::$editScaffoldActive = true;
+        self::$skipModuleFuncCompile = true;
+    }
+
+    /**
+     * True when prior cache entry has module.bc + user_symbols (safe to thin-boot) (#36387).
+     */
+    public static function canUseEditScaffold(string $previousKey): bool
+    {
+        if ('' === $previousKey || !is_file(self::bitcodePath($previousKey))) {
+            return false;
+        }
+        $raw = json_decode((string) file_get_contents(self::metaPath($previousKey)), true);
+        if (!is_array($raw)) {
+            return false;
+        }
+        $user = $raw['user_symbols'] ?? null;
+        if (!is_array($user) || [] === $user) {
+            return false;
+        }
+
+        return null !== self::readLinkManifest($previousKey);
     }
 
     /**
@@ -600,9 +638,8 @@ final class CompileCache
      * Same-project edit path: restore prior module.bc, strip user symbols, rebind helpers.
      *
      * Requires thin Context boot (bitcode before namedStructType/addFunction) so types and
-     * functionScope bind to the restored module. Wired via {@see armEditScaffold()} +
-     * {@see Context::seedCoreTypesFromModuleForEditScaffold()}; full Runtime hook is the
-     * next slice toward MiniWebApp one-file-edit ≤25% of cold (#36387).
+     * functionScope bind to the restored module. {@see Context} parses {@see bitcodePath()}
+     * when {@see armEditScaffold()} is set, then this strips user symbols for re-lower (#36387).
      *
      * @internal
      */
@@ -625,14 +662,20 @@ final class CompileCache
             $helperSymbols = [];
         }
 
-        try {
-            $context->replaceModuleFromBitcodeFile($bcPath);
-        } catch (\Throwable $e) {
-            return false;
+        if (!self::$editScaffoldBitcodeBound) {
+            try {
+                $context->replaceModuleFromBitcodeFile($bcPath);
+            } catch (\Throwable $e) {
+                return false;
+            }
         }
 
         self::stripUserSymbolsFromModule($context, $userSymbols);
         self::rebindHelperSymbols($context, $helperSymbols);
+        $link = self::readLinkManifest($previousKey);
+        if (null !== $link) {
+            \PHPCompiler\AOT\HelperRuntimeCache::adoptUnitSlugsForLink($link['helper_slugs']);
+        }
         SuperglobalInit::rebindGlobalsFromModule($context);
         $context->rebindFunctionScopeFromModule();
         $context->rebindInitShutdownAfterModuleReplace();
@@ -667,15 +710,22 @@ final class CompileCache
             $fn = $context->module->getNamedFunction($name);
             if ($fn instanceof \PHPLLVM\Value\Function_) {
                 try {
-                    $fn->delete();
+                    // LLVMDeleteFunction is undefined if the symbol still has uses
+                    // (__init__ string-const stores, old main). Rename so re-lower can
+                    // addFunction the original name without dangling IR (#36387).
+                    $fn->setName($name.'.stale');
                 } catch (\Throwable $e) {
-                    // Leave stale symbol; recompile may fail loudly rather than miscompile.
+                    try {
+                        $fn->delete();
+                    } catch (\Throwable $e2) {
+                        // Leave stale symbol; recompile may fail loudly rather than miscompile.
+                    }
                 }
             }
         }
 
-        // Drop user string/array const globals so re-lower can reuse _main suffixes (#36387).
-        self::stripUserConstGlobals($context);
+        // Keep user const globals: deleting them while __init__ still references
+        // them SIGSEGVs on re-lower. resetCompileTimeConstantMaps allocates new names.
     }
 
     private static function stripUserConstGlobals(Context $context): void
@@ -1025,6 +1075,7 @@ final class CompileCache
         self::$recordingHelperSymbols = null;
         self::$skipModuleFuncCompile = false;
         self::$editScaffoldActive = false;
+        self::$editScaffoldBitcodeBound = false;
         self::$pendingEditScaffoldKey = null;
         self::$projectMembers = null;
     }

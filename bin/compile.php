@@ -541,6 +541,13 @@ function run(string $filename, string $code, array $options): void
                     return;
                 }
             }
+            $scaffoldKey = \PHPCompiler\JIT\CompileCache::findEditScaffoldKey($projectId, $hashes);
+            if (
+                is_string($scaffoldKey)
+                && \PHPCompiler\JIT\CompileCache::canUseEditScaffold($scaffoldKey)
+            ) {
+                \PHPCompiler\JIT\CompileCache::armEditScaffold($scaffoldKey);
+            }
         }
     }
     if ([] !== $includes && !$skipBundle) {
