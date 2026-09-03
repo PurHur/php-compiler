@@ -31,10 +31,24 @@ final class BenchGateTest extends TestCase
         $doc = json_decode((string) file_get_contents($path), true);
         $this->assertIsArray($doc);
         $this->assertArrayHasKey('cases', $doc);
-        foreach (['hello-warm', 'miniwebapp', 'block-lint', 'scale-50', 'scale-100', 'scale-200'] as $name) {
+        foreach ([
+            'hello-cold',
+            'hello-warm',
+            'miniwebapp-cold',
+            'miniwebapp-warm',
+            'miniwebapp-edit',
+            'hello-lint',
+            'scale-50',
+            'scale-100',
+            'scale-200',
+            'scale-400',
+        ] as $name) {
             $this->assertArrayHasKey($name, $doc['cases'], $name);
         }
         $this->assertSame(20, $doc['wall_tolerance_percent'] ?? null);
+        $scale400 = $doc['cases']['scale-400'];
+        $this->assertArrayHasKey('ms_per_statement', $scale400);
+        $this->assertLessThanOrEqual(15.0, (float) $scale400['ms_per_statement']);
     }
 
     public function testBenchGatePhpDocumentsCompileMode(): void

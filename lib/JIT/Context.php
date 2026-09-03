@@ -3136,6 +3136,12 @@ class Context {
         $this->runModuleOptimizationPasses();
         \PHPCompiler\AOT\BuildTiming::end('ir_opt');
 
+        // AOT CompileCache: stamp + meta after compileCommon. Full-module bitcode
+        // does not round-trip (Invalid type) — warm paths use aot.bin / aot.o (#36387).
+        if (null !== $this->aotCompileCacheKey && '' !== $this->aotCompileCacheKey) {
+            CompileCache::saveAotStamp($this->aotCompileCacheKey);
+        }
+
         $bitcodePath = Config::getenv('PHP_COMPILER_EMIT_BITCODE');
         if (is_string($bitcodePath) && '' !== $bitcodePath) {
             $bcDir = dirname($bitcodePath);

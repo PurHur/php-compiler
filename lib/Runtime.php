@@ -1075,20 +1075,15 @@ class Runtime {
         }
         \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_compile_done');
 
-        if (
-            !$this->jitLoadedFromDiskCache
-            && null !== $this->jitCompileCacheKey
-            && null !== $this->jitContext
-        ) {
-            JIT\CompileCache::save($this->jitContext, $this->jitCompileCacheKey);
-        }
-        JIT\CompileCache::finishRecording();
-
+        // Persist AOT cache stamp only after compileToFile → compileCommon.
+        // Full-module bitcode is not used for AOT restore (Invalid type); see
+        // CompileCache::saveAotStamp (#36387 / #36199).
         \PHPCompiler\AOT\BuildTiming::end('codegen');
         \PHPCompiler\AOT\BuildTiming::mark('link');
         $context->compileToFile($outfile);
         \PHPCompiler\AOT\BuildTiming::end('link');
         \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_compiletofile_done');
+        JIT\CompileCache::finishRecording();
         if (null !== $this->jitCompileCacheKey && !$skipDebugArtifact) {
             JIT\CompileCache::saveArtifact($this->jitCompileCacheKey, $outfile);
         }

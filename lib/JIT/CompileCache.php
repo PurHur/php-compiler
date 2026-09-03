@@ -13,6 +13,11 @@ use PHPCompiler\Config;
  *
  * Persists verified LLVM bitcode keyed by source bytes + compiler fingerprint so a
  * second `bin/jit.php` process can skip LLVM IR lowering when inputs are unchanged.
+ *
+ * AOT warm rebuilds use {@see artifactPath()} / {@see objectPath()} — full-module
+ * `module.bc` from user-script AOT does not round-trip (`LLVMParseBitcode` → Invalid
+ * type even after compileCommon; same-process rewrite fails). AOT therefore writes
+ * {@see stampPath()} + meta instead of relying on parseable bitcode (#36387).
  */
 final class CompileCache
 {
@@ -79,6 +84,14 @@ final class CompileCache
     public static function bitcodePath(string $key): string
     {
         return self::entryDir($key).'/module.bc';
+    }
+
+    /**
+     * AOT freshness marker when full-module bitcode cannot round-trip (#36387).
+     */
+    public static function stampPath(string $key): string
+    {
+        return self::entryDir($key).'/fresh.stamp';
     }
 
     /**
@@ -153,11 +166,29 @@ final class CompileCache
         if (self::computeKey($sourcePath, $sourceCode) !== $key) {
             return false;
         }
-        if (!is_file(self::bitcodePath($key))) {
+        if (null === self::readMeta($key)) {
             return false;
         }
 
-        return null !== self::readMeta($key);
+        // JIT: module.bc. AOT: fresh.stamp (full-module bitcode does not parse back).
+        // Artifact / object alone also count so mid-tier restore stays valid (#36387).
+        return self::hasDurableMarker($key);
+    }
+
+    /** True when the cache entry has a durable on-disk marker for this key. */
+    public static function hasDurableMarker(string $key): bool
+    {
+        if (is_file(self::stampPath($key))) {
+            return true;
+        }
+        if (is_file(self::bitcodePath($key))) {
+            return true;
+        }
+        if (is_file(self::artifactPath($key)) && filesize(self::artifactPath($key)) > 0) {
+            return true;
+        }
+
+        return is_file(self::objectPath($key)) && filesize(self::objectPath($key)) > 0;
     }
 
     /**
@@ -224,7 +255,7 @@ final class CompileCache
         if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
             return;
         }
-        if (!is_file(self::bitcodePath($key)) || null === self::readMeta($key)) {
+        if (!self::hasDurableMarker($key) || null === self::readMeta($key)) {
             return;
         }
         $dest = self::artifactPath($key);
@@ -310,7 +341,7 @@ final class CompileCache
         if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
             return;
         }
-        if (!is_file(self::bitcodePath($key)) || null === self::readMeta($key)) {
+        if (!self::hasDurableMarker($key) || null === self::readMeta($key)) {
             return;
         }
         $dest = self::objectPath($key);
@@ -488,6 +519,57 @@ final class CompileCache
             ], JSON_PRETTY_PRINT);
             if (false !== $payload) {
                 file_put_contents(self::metaPath($key), $payload);
+            }
+        } finally {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+        }
+    }
+
+    /**
+     * AOT cache entry without full-module bitcode (#36387).
+     *
+     * User-script AOT modules fail `LLVMParseBitcode` with Invalid type even when
+     * written after compileCommon (same LLVMContext rewrite also fails). Persist
+     * meta + {@see stampPath()} so artifact/object warm paths stay honest.
+     */
+    public static function saveAotStamp(string $key): void
+    {
+        if (null === self::$recordingExports) {
+            return;
+        }
+        $dir = self::entryDir($key);
+        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+            return;
+        }
+
+        $lockPath = $dir.'/.lock';
+        $lock = @fopen($lockPath, 'c+');
+        if (false === $lock) {
+            return;
+        }
+        if (!flock($lock, LOCK_EX)) {
+            fclose($lock);
+
+            return;
+        }
+
+        try {
+            $payload = json_encode([
+                'version' => self::META_VERSION,
+                'fingerprint' => self::fingerprint(),
+                'exports' => self::$recordingExports,
+                'aot_stamp' => true,
+            ], JSON_PRETTY_PRINT);
+            if (false !== $payload) {
+                file_put_contents(self::metaPath($key), $payload);
+            }
+            file_put_contents(self::stampPath($key), "aot\n");
+            // Drop any prior unreadable full-module bitcode so isFresh does not
+            // imply tryRestore can succeed.
+            $bc = self::bitcodePath($key);
+            if (is_file($bc)) {
+                @unlink($bc);
             }
         } finally {
             flock($lock, LOCK_UN);
