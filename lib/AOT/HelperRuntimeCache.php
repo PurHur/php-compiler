@@ -1355,6 +1355,49 @@ final class HelperRuntimeCache
         return is_file($object) && filesize($object) > 0;
     }
 
+    /**
+     * True when $objectPath carries AotGcSections per-function ELF sections (.text.<symbol>).
+     *
+     * Monolithic .text units duplicate runtime symbols that common.o cannot gc (#36246).
+     */
+    public static function unitObjectHasPerFunctionSections(string $objectPath): bool
+    {
+        if (!is_file($objectPath) || filesize($objectPath) <= 0) {
+            return false;
+        }
+        $out = [];
+        exec(
+            'readelf -S '.escapeshellarg($objectPath).' 2>/dev/null | grep -c "\.text\."',
+            $out,
+            $rc
+        );
+        if (0 !== $rc || !isset($out[0])) {
+            return false;
+        }
+
+        return (int) $out[0] > 0;
+    }
+
+    /**
+     * Committed prelinked corpus was emitted with AotGcSections (per-function .text.* sections).
+     *
+     * Required before {@see HelperRuntimeCommon} links common.o by default — otherwise
+     * -z muldefs keeps duplicate monolithic .text bodies and binaries grow (#36423).
+     */
+    public static function prelinkedCorpusHasGcSections(): bool
+    {
+        $manifestPath = \dirname(self::prelinkedUnitsDir()).'/manifest.json';
+        if (is_file($manifestPath)) {
+            $decoded = json_decode((string) file_get_contents($manifestPath), true);
+            if (\is_array($decoded) && !empty($decoded['gc_sections'])) {
+                return true;
+            }
+        }
+        $anchor = self::prelinkedUnitsDir().'/'.self::slugFor('/ext/ctype/CtypeJitHelper.php').'/unit.o';
+
+        return self::unitObjectHasPerFunctionSections($anchor);
+    }
+
     private static function shouldInlineOnlyForUserScript(string $logicalLc): bool
     {
         if (!isset(self::USER_SCRIPT_INLINE_ONLY_LOGICALS[$logicalLc])) {

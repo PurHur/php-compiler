@@ -90,9 +90,10 @@ final class Linker
             $vendorObjects[] = $helperObject;
         }
         $linkObjectFiles = array_merge($runtimeObjects, [$objectFile], $vendorObjects);
+        $helperGcLinkPaths = $helperObjects;
         $llvmDir = Config::getenv('PHP_COMPILER_LLVM_PATH');
         if (false === $llvmDir || '' === $llvmDir) {
-            self::linkWithSystemCompiler($objectFile, $executable, $runtimeObjects, $vendorObjects, $linkObjectFiles);
+            self::linkWithSystemCompiler($objectFile, $executable, $runtimeObjects, $vendorObjects, $linkObjectFiles, $helperGcLinkPaths);
 
             return;
         }
@@ -123,7 +124,7 @@ final class Linker
                 escapeshellarg($ld),
                 AotDebugSymbols::linkFlag(),
                 AotGcSections::linkStripFlag(),
-                AotGcSections::linkGcSectionsFlag(false),
+                AotGcSections::linkGcSectionsFlagForHelperLink(false, $helperGcLinkPaths),
                 self::helperMuldefsFlag('-z muldefs'),
                 self::libcNameHideFlag(false),
                 '-dynamic-linker /lib64/ld-linux-x86-64.so.2',
@@ -161,14 +162,14 @@ final class Linker
             // When linking with the bundled clang, ensure we can still resolve host libraries
             // (libpcre2-8, libcrypt, ...). Some bootstrap envs only ship the runtime .so/.a under
             // /usr/lib/x86_64-linux-gnu without a full sysroot lib tree.
-            $cmd = escapeshellarg($clang).' '.AotDebugSymbols::linkFlag().AotGcSections::linkStripFlag().AotGcSections::linkGcSectionsFlag(true).self::helperMuldefsFlag(' -Wl,-z,muldefs').self::libcNameHideFlag(true).$objects.' '.self::HOST_LIB_SEARCH.' -lm '.self::runtimeLinkLibs($linkObjectFiles).' -o '.escapeshellarg($executable);
+            $cmd = escapeshellarg($clang).' '.AotDebugSymbols::linkFlag().AotGcSections::linkStripFlag().AotGcSections::linkGcSectionsFlagForHelperLink(true, $helperGcLinkPaths).self::helperMuldefsFlag(' -Wl,-z,muldefs').self::libcNameHideFlag(true).$objects.' '.self::HOST_LIB_SEARCH.' -lm '.self::runtimeLinkLibs($linkObjectFiles).' -o '.escapeshellarg($executable);
             self::run($cmd, $env);
             self::unlinkIfTemp($runtimeObjects);
 
             return;
         }
 
-        self::linkWithSystemCompiler($objectFile, $executable, $runtimeObjects, $vendorObjects, $linkObjectFiles);
+        self::linkWithSystemCompiler($objectFile, $executable, $runtimeObjects, $vendorObjects, $linkObjectFiles, $helperGcLinkPaths);
     }
 
     /** -z muldefs is only injected while helper-runtime TUs are merged (#15889). */
@@ -698,7 +699,8 @@ final class Linker
         string $executable,
         array $runtimeObjects = [],
         array $vendorObjects = [],
-        array $linkObjectFiles = []
+        array $linkObjectFiles = [],
+        array $helperGcLinkPaths = [],
     ): void {
         if ([] === $linkObjectFiles) {
             $linkObjectFiles = array_merge($runtimeObjects, [$objectFile], $vendorObjects);
@@ -720,7 +722,7 @@ final class Linker
                 continue;
             }
             $cmd = escapeshellarg($path) . ' '
-                . AotDebugSymbols::linkFlag() . AotGcSections::linkStripFlag() . AotGcSections::linkGcSectionsFlag(true) . self::helperMuldefsFlag(' -Wl,-z,muldefs') . self::libcNameHideFlag(true) . $objects . ' '.self::HOST_LIB_SEARCH.' -lm '.self::runtimeLinkLibs($linkObjectFiles).' -o ' . escapeshellarg($executable);
+                . AotDebugSymbols::linkFlag() . AotGcSections::linkStripFlag() . AotGcSections::linkGcSectionsFlagForHelperLink(true, $helperGcLinkPaths) . self::helperMuldefsFlag(' -Wl,-z,muldefs') . self::libcNameHideFlag(true) . $objects . ' '.self::HOST_LIB_SEARCH.' -lm '.self::runtimeLinkLibs($linkObjectFiles).' -o ' . escapeshellarg($executable);
             $captured = self::runCaptured($cmd, null);
             if (0 === $captured['code']) {
                 self::unlinkIfTemp($runtimeObjects);

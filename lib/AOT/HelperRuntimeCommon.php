@@ -14,7 +14,7 @@ namespace PHPCompiler\AOT;
  */
 final class HelperRuntimeCommon
 {
-    /** Opt-in until units are re-emitted with AotGcSections: PHP_COMPILER_HELPER_RUNTIME_COMMON=1 */
+    /** Opt-in: PHP_COMPILER_HELPER_RUNTIME_COMMON=1 when prelinked units carry gc sections. */
     public const ENV = 'PHP_COMPILER_HELPER_RUNTIME_COMMON';
 
     /**
@@ -63,11 +63,15 @@ final class HelperRuntimeCommon
     public static function isLinkEnabled(): bool
     {
         $env = getenv(self::ENV);
+        if ('0' === $env || 'false' === strtolower((string) $env)) {
+            return false;
+        }
         if ('1' !== $env && 'true' !== strtolower((string) $env)) {
             return false;
         }
 
-        return self::commonObjectIsLinkable();
+        // Opt-in until gc-section units + common.o linking pass aot-smoke (#36246 / #36423).
+        return self::commonObjectIsLinkable() && HelperRuntimeCache::prelinkedCorpusHasGcSections();
     }
 
     /**

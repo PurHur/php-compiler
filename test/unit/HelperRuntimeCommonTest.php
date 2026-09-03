@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace test\unit;
 
 use PHPCompiler\AOT\HelperRuntimeCommon;
+use PHPCompiler\AOT\HelperRuntimeCache;
 use PHPUnit\Framework\TestCase;
 
 final class HelperRuntimeCommonTest extends TestCase
@@ -24,19 +25,36 @@ final class HelperRuntimeCommonTest extends TestCase
         $this->assertFalse(HelperRuntimeCommon::isSharedRuntimeSymbol('main'));
     }
 
-    public function testLinkDisabledWithoutOptIn(): void
+    public function testLinkDisabledWithoutOptInWhenCorpusLacksGcSections(): void
     {
+        if (HelperRuntimeCache::prelinkedCorpusHasGcSections()) {
+            $this->markTestSkipped('prelinked corpus already has gc sections');
+        }
         $this->assertNull(HelperRuntimeCommon::linkObject());
     }
 
-    public function testOptInRequiredForLink(): void
+    public function testOptInForcesLinkWhenCommonAndGcCorpus(): void
     {
         putenv(HelperRuntimeCommon::ENV.'=1');
-        if (HelperRuntimeCommon::commonObjectIsLinkable()) {
-            $this->assertSame(HelperRuntimeCommon::commonObjectPath(), HelperRuntimeCommon::linkObject());
-        } else {
-            $this->assertNull(HelperRuntimeCommon::linkObject());
+        if (!HelperRuntimeCommon::commonObjectIsLinkable()) {
+            $this->markTestSkipped('common.o not linkable');
         }
+        if (!HelperRuntimeCache::prelinkedCorpusHasGcSections()) {
+            $this->markTestSkipped('prelinked corpus lacks gc sections');
+        }
+        $this->assertSame(HelperRuntimeCommon::commonObjectPath(), HelperRuntimeCommon::linkObject());
+    }
+
+    public function testAutoLinkWhenPrelinkedCorpusHasGcSections(): void
+    {
+        if (!HelperRuntimeCache::prelinkedCorpusHasGcSections()) {
+            $this->markTestSkipped('prelinked corpus lacks gc sections — run emit --force --prelink');
+        }
+        if (!HelperRuntimeCommon::commonObjectIsLinkable()) {
+            $this->markTestSkipped('common.o not linkable');
+        }
+        $this->assertTrue(HelperRuntimeCommon::isLinkEnabled());
+        $this->assertSame(HelperRuntimeCommon::commonObjectPath(), HelperRuntimeCommon::linkObject());
     }
 
     public function testOptOutViaEnv(): void
