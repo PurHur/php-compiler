@@ -124,8 +124,7 @@ final class string_trim extends Internal
         if (null !== $maskStr) {
             $maskStr = $context->builder->call($context->lookupFunction('__string__separate'), $maskStr);
         }
-        $structName = $str->typeOf()->getElementType()->getName();
-        $map = $context->structFieldMap[$structName];
+        $map = $context->structFieldsFor($str);
         $len = $context->builder->load(
             $context->builder->structGep($str, $map['length'])
         );

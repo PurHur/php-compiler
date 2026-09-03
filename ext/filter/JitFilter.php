@@ -1242,8 +1242,7 @@ final class JitFilter
 
     private static function stringIsFullInteger(Context $context, Value $strPtr): Value
     {
-        $structName = $strPtr->typeOf()->getElementType()->getName();
-        $map = $context->structFieldMap[$structName];
+        $map = $context->structFieldsFor($strPtr);
         $len = $context->builder->load(
             $context->builder->structGep($strPtr, $map['length'])
         );
@@ -1313,8 +1312,7 @@ final class JitFilter
 
     private static function stringToInt64(Context $context, Value $strPtr): Value
     {
-        $structName = $strPtr->typeOf()->getElementType()->getName();
-        $map = $context->structFieldMap[$structName];
+        $map = $context->structFieldsFor($strPtr);
         $charPtr = $context->builder->structGep($strPtr, $map['value']);
         $endPtrSlot = $context->builder->alloca(
             $context->getTypeFromString('int8*'),

@@ -1862,8 +1862,7 @@ final class VmValueCompare
 
     public static function stringIsNumeric(Context $context, Value $strPtr): Value
     {
-        $structName = $strPtr->typeOf()->getElementType()->getName();
-        $map = $context->structFieldMap[$structName];
+        $map = $context->structFieldsFor($strPtr);
         $len = $context->builder->load(
             $context->builder->structGep($strPtr, $map['length'])
         );
@@ -1975,8 +1974,7 @@ final class VmValueCompare
 
     public static function stringToDouble(Context $context, Value $strPtr): Value
     {
-        $structName = $strPtr->typeOf()->getElementType()->getName();
-        $map = $context->structFieldMap[$structName];
+        $map = $context->structFieldsFor($strPtr);
         $charPtr = $context->builder->structGep($strPtr, $map['value']);
         $endPtrSlot = $context->builder->alloca(
             $context->getTypeFromString('int8*'),

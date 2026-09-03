@@ -16,8 +16,7 @@ final class JitStrShuffle
 {
     public static function shuffle(Context $context, Value $str): Value
     {
-        $structName = $str->typeOf()->getElementType()->getName();
-        $map = $context->structFieldMap[$structName];
+        $map = $context->structFieldsFor($str);
         $len = $context->builder->load(
             $context->builder->structGep($str, $map['length'])
         );

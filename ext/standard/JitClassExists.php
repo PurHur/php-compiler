@@ -22,8 +22,7 @@ final class JitClassExists
 
     public static function stringDataPtr(Context $context, Value $strPtr): Value
     {
-        $structName = $strPtr->typeOf()->getElementType()->getName();
-        $off = $context->structFieldMap[$structName]['value'];
+        $off = $context->structFieldIndex($strPtr, 'value');
 
         return $context->builder->structGep($strPtr, $off);
     }

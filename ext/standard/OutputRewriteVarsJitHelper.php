@@ -51,12 +51,15 @@ final class OutputRewriteVarsJitHelper
 
     public static function add(string $name, string $value): void
     {
-        $record = $name."\x1E".$value;
-        if ('' === self::$blob) {
-            self::$blob = $record;
-        } else {
-            self::$blob = self::$blob."\x1D".$record;
+        // Append piece-wise — a single `$record = $name."\x1E".$value` temp was typed as
+        // NATIVE_LONG (strtol) and then `store i64` into `@sp_*_blob` (%__string__**),
+        // which breaks module.bc round-trip / edit-scaffold (#36387).
+        if ('' !== self::$blob) {
+            self::$blob .= "\x1D";
         }
+        self::$blob .= $name;
+        self::$blob .= "\x1E";
+        self::$blob .= $value;
     }
 
     public static function reset(): void

@@ -128,8 +128,7 @@ final class substr extends Internal
             $str = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'substr', 0, 'string');
         }
         BasicBlockHelper::ensureOpenInsertBlock($context, 'substr_str_cont');
-        $structName = $str->typeOf()->getElementType()->getName();
-        $map = $context->structFieldMap[$structName];
+        $map = $context->structFieldsFor($str);
         $len = $context->builder->load(
             $context->builder->structGep($str, $map['length'])
         );

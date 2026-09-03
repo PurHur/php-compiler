@@ -176,8 +176,7 @@ final class HashTableChangeKeyCaseLlvm
         Value $delta
     ): void {
         $tag = (string) self::nextSeq();
-        $structName = $strPtr->typeOf()->getElementType()->getName();
-        $map = $context->structFieldMap[$structName];
+        $map = $context->structFieldsFor($strPtr);
         $len = $context->builder->load(
             $context->builder->structGep($strPtr, $map['length'])
         );

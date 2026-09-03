@@ -115,8 +115,7 @@ final class string_ltrim extends Internal
         if (null !== $early) {
             return $early;
         }
-        $structName = $str->typeOf()->getElementType()->getName();
-        $map = $context->structFieldMap[$structName];
+        $map = $context->structFieldsFor($str);
         $len = $context->builder->load(
             $context->builder->structGep($str, $map['length'])
         );

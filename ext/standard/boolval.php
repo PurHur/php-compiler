@@ -289,17 +289,18 @@ final class boolval extends Internal
 
     public static function stringTruthy(Context $context, Value $strPtr): Value
     {
-        $structName = $strPtr->typeOf()->getElementType()->getName();
-        $map = $context->structFieldMap[$structName];
+        // Prefer structFieldIndex so edit-scaffold uniquified names (__string__.2) resolve (#36387).
+        $lenOff = $context->structFieldIndex($strPtr, 'length');
+        $valOff = $context->structFieldIndex($strPtr, 'value');
         $len = $context->builder->load(
-            $context->builder->structGep($strPtr, $map['length'])
+            $context->builder->structGep($strPtr, $lenOff)
         );
         $zero = $len->typeOf()->constInt(0, false);
         $isEmpty = $context->builder->icmp(Builder::INT_EQ, $len, $zero);
         $one = $len->typeOf()->constInt(1, false);
         $isOne = $context->builder->icmp(Builder::INT_EQ, $len, $one);
         $ch = $context->builder->load(
-            $context->builder->structGep($strPtr, $map['value'])
+            $context->builder->structGep($strPtr, $valOff)
         );
         $charZero = $ch->typeOf()->constInt(ord('0'), false);
         $isCharZero = $context->builder->icmp(Builder::INT_EQ, $ch, $charZero);

@@ -23301,6 +23301,28 @@ class JIT {
                 }
             }
             $toStore = $this->context->helper->loadValue($value);
+            // Refuse typed-mismatched stores (e.g. i64 into %__string__**) — LLVM build
+            // accepts them; bitcode parse rejects and edit-scaffold dies (#36387).
+            if (null !== $result->value && null !== $toStore) {
+                $destTy = $this->context->getStringFromType($result->value->typeOf());
+                $srcTy = $this->context->getStringFromType($toStore->typeOf());
+                $destIsStringSlot = '__string__**' === $destTy
+                    || (str_contains($destTy, '__string__') && str_ends_with($destTy, '**'));
+                $srcIsInt = 'int64' === $srcTy || 'i64' === $srcTy;
+                if ($destIsStringSlot && $srcIsInt) {
+                    $fromLong = $this->context->module->getNamedFunction('__string__fromLong');
+                    if ($fromLong instanceof \PHPLLVM\Value\Function_) {
+                        $strPtr = $this->context->builder->call($fromLong, $toStore);
+                        $this->context->builder->store($strPtr, $result->value);
+                        $this->markScopeVariableAssignedIfTracked($resultOp, $result);
+
+                        return;
+                    }
+                    throw new \LogicException(
+                        "assignOperand: refusing store {$srcTy} into {$destTy} (#36387)"
+                    );
+                }
+            }
             $this->context->builder->store(
                 $toStore,
                 $result->value
@@ -23612,6 +23634,55 @@ class JIT {
 
             return;
         } elseif ($result->type === Variable::TYPE_NATIVE_LONG && Variable::TYPE_STRING === $value->type) {
+            // Guard: never store i64 into a non-i64* slot. Mis-typed static string props
+            // (value=@sp_* string**, type=NATIVE_LONG) produced `store i64, %__string__**`
+            // which LLVM accepts at build time but bitcode parse rejects — blocking
+            // edit-scaffold module.bc round-trip (#36387 / OutputRewriteVarsJitHelper::add).
+            $destTy = null !== $result->value
+                ? $this->context->getStringFromType($result->value->typeOf())
+                : '';
+            if ('__string__**' === $destTy || (str_contains($destTy, '__string__') && str_ends_with($destTy, '**'))) {
+                $strPtr = $this->context->helper->loadValue($value);
+                if (Variable::KIND_VARIABLE === $result->kind || null !== $result->staticPropertyGlobal) {
+                    $old = $this->context->builder->load($result->value);
+                    $this->context->builder->store($strPtr, $result->value);
+                    // Keep the new string alive; delref old if it was a string pointer.
+                    $this->context->builder->call(
+                        $this->context->lookupFunction('__ref__addref'),
+                        $this->context->builder->pointerCast(
+                            $strPtr,
+                            $this->context->getTypeFromString('__ref__virtual*')
+                        )
+                    );
+                    $oldIsNull = $this->context->builder->icmp(
+                        \PHPLLVM\Builder::INT_EQ,
+                        $old,
+                        $old->typeOf()->constNull()
+                    );
+                    $skipOld = $this->context->builder->getInsertBlock()->appendBasicBlock('str_assign_skip_old');
+                    $doOld = $this->context->builder->getInsertBlock()->appendBasicBlock('str_assign_delref_old');
+                    $done = $this->context->builder->getInsertBlock()->appendBasicBlock('str_assign_done');
+                    $this->context->builder->branchIf($oldIsNull, $skipOld, $doOld);
+                    $this->context->builder->positionAtEnd($doOld);
+                    $this->context->builder->call(
+                        $this->context->lookupFunction('__ref__delref'),
+                        $this->context->builder->pointerCast(
+                            $old,
+                            $this->context->getTypeFromString('__ref__virtual*')
+                        )
+                    );
+                    $this->context->builder->branch($done);
+                    $this->context->builder->positionAtEnd($skipOld);
+                    $this->context->builder->branch($done);
+                    $this->context->builder->positionAtEnd($done);
+                } else {
+                    $this->context->builder->store($strPtr, $result->value);
+                }
+                $result->type = Variable::TYPE_STRING;
+                $this->markScopeVariableAssignedIfTracked($resultOp, $result);
+
+                return;
+            }
             $result->free();
             $long = JIT\JitLongArg::lowerStringValue($this->context, $this->context->helper->loadValue($value));
             $this->context->builder->store($long, $result->value);

@@ -46,8 +46,7 @@ final class ord extends Internal
         }
 
         $strPtr = self::jitStringArg($context, $args[0]);
-        $structName = $strPtr->typeOf()->getElementType()->getName();
-        $map = $context->structFieldMap[$structName];
+        $map = $context->structFieldsFor($strPtr);
         $lenPtr = $context->builder->structGep($strPtr, $map['length']);
         $len = $context->builder->load($lenPtr);
         $zero = $len->typeOf()->constInt(0, false);

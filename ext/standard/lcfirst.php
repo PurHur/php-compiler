@@ -64,8 +64,7 @@ final class lcfirst extends Internal
 
     public static function transformFirstAscii(Context $context, Value $strPtr, int $letterMin, int $letterMax, int $delta): void
     {
-        $structName = $strPtr->typeOf()->getElementType()->getName();
-        $map = $context->structFieldMap[$structName];
+        $map = $context->structFieldsFor($strPtr);
         $len = $context->builder->load(
             $context->builder->structGep($strPtr, $map['length'])
         );
@@ -100,8 +99,7 @@ final class lcfirst extends Internal
 
     public static function transformAllAscii(Context $context, Value $strPtr, int $letterMin, int $letterMax, int $delta): void
     {
-        $structName = $strPtr->typeOf()->getElementType()->getName();
-        $map = $context->structFieldMap[$structName];
+        $map = $context->structFieldsFor($strPtr);
         $len = $context->builder->load(
             $context->builder->structGep($strPtr, $map['length'])
         );
