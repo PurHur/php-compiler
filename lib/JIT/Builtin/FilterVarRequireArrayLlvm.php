@@ -9,7 +9,6 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\ext\filter\JitFilter;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -27,7 +26,7 @@ final class FilterVarRequireArrayLlvm
         ?JITVariable $optionsArg
     ): Value {
         if (self::isDefinitelyNonArray($value)) {
-            return JitFilter::boxedFalse($context);
+            return self::boxedFalse($context);
         }
         if (self::isDefinitelyArray($value)) {
             return self::mapAndBox($context, $value, $filterId);
@@ -47,7 +46,7 @@ final class FilterVarRequireArrayLlvm
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($failBlock);
-        $falseResult = JitFilter::boxedFalse($context);
+        $falseResult = self::boxedFalse($context);
         $failTail = $context->builder->getInsertBlock();
         $context->builder->branch($mergeBlock);
 
@@ -113,5 +112,15 @@ final class FilterVarRequireArrayLlvm
             $kind,
             $i8->constInt(JITVariable::TYPE_HASHTABLE & 0x7f, false)
         );
+    }
+
+    /** Peer of {@see \PHPCompiler\ext\filter\JitFilter::boxedFalse} — kept in lib (#36204). */
+    private static function boxedFalse(Context $context): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+
+        return $ptr;
     }
 }

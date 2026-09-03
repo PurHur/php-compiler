@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\filter\VmFilter;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 
@@ -22,7 +21,7 @@ final class FilterInputTypeJit
         if (null === $phpVar) {
             return null;
         }
-        $fromEnum = VmFilter::tryPhpInputFilterInt($phpVar);
+        $fromEnum = $context->extensionLowering->requireFilter()->tryPhpInputFilterInt($phpVar);
         if (null !== $fromEnum) {
             return $fromEnum;
         }

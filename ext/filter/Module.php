@@ -25,6 +25,11 @@ class Module extends ModuleAbstract
         }
     }
 
+    public function jitInit(\PHPCompiler\JIT\Context $context): void
+    {
+        $context->extensionLowering->filter = new JitFilterExtensionHooksFacade();
+    }
+
     public function getFunctions(): array
     {
         return [

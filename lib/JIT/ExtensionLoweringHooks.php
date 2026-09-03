@@ -200,6 +200,9 @@ final class ExtensionLoweringHooks
     /** posix NestedJIT libc leaves — registered from ext/posix Module::jitInit (#36204). */
     public ?PosixNestedJitKernels $posixNested = null;
 
+    /** filter JIT/VM surfaces — registered from ext/filter Module::jitInit (#36204). */
+    public ?FilterExtensionHooks $filter = null;
+
     public function requirePosixNested(): PosixNestedJitKernels
     {
         if (null === $this->posixNested) {
@@ -209,6 +212,17 @@ final class ExtensionLoweringHooks
         }
 
         return $this->posixNested;
+    }
+
+    public function requireFilter(): FilterExtensionHooks
+    {
+        if (null === $this->filter) {
+            throw new \RuntimeException(
+                'filter extension hooks not registered — ext/filter Module::jitInit missing (#36204)'
+            );
+        }
+
+        return $this->filter;
     }
 
     public function tryPrepareDimWrite(Context $context, Variable $container, Variable $dim): ?Variable
