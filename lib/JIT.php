@@ -10008,7 +10008,7 @@ class JIT {
                     // FETCH_DIM_W on a host SXE tree: do not hashtable-write a TYPE_VALUE
                     // box (SIGSEGV). Host-fold at ASSIGN via tryOffsetSet (#35810).
                     if ($forWrite && JIT\UserScriptAotEnv::isActive()) {
-                        $sxeWrite = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryPrepareDimWrite(
+                        $sxeWrite = $this->context->extensionLowering->tryPrepareDimWrite(
                             $this->context,
                             $value,
                             $dim
@@ -10027,7 +10027,7 @@ class JIT {
                             || 'simplemxml_element' === $sxeDimClassLc
                         )
                     ) {
-                        $sxeDim = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryOffsetGet(
+                        $sxeDim = $this->context->extensionLowering->tryOffsetGet(
                             $this->context,
                             $value,
                             $dim
@@ -10042,7 +10042,7 @@ class JIT {
                             $dimVar->magicGetOverloadedClass = 'SimpleXMLElement';
                             // Bind host tree + baked name/text onto the dim result Variable
                             // so (string)$sxe['attr'] / getName fold without NestedJIT (#27438).
-                            \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::applyPendingElementAssign(
+                            $this->context->extensionLowering->applyPendingElementAssign(
                                 $dimVar
                             );
                             break;
@@ -10053,7 +10053,7 @@ class JIT {
                         !$forWrite
                         && JIT\UserScriptAotEnv::isActive()
                     ) {
-                        $sxeListDim = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryFoldXpathListDim(
+                        $sxeListDim = $this->context->extensionLowering->tryFoldXpathListDim(
                             $this->context,
                             $value,
                             $dim
@@ -10220,7 +10220,7 @@ class JIT {
                     if ($value->type === Variable::TYPE_HASHTABLE) {
                         // SimpleXMLElement::xpath() node-set: fold `$n[$i]` to compile-time SXE (#26911).
                         if (!$forWrite) {
-                            $xpathDim = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryFoldXpathListDim(
+                            $xpathDim = $this->context->extensionLowering->tryFoldXpathListDim(
                                 $this->context,
                                 $value,
                                 $dim
@@ -10244,7 +10244,7 @@ class JIT {
                     }
                     if (Variable::TYPE_VALUE === $value->type) {
                         if (!$forWrite) {
-                            $xpathDim = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryFoldXpathListDim(
+                            $xpathDim = $this->context->extensionLowering->tryFoldXpathListDim(
                                 $this->context,
                                 $value,
                                 $dim
@@ -15148,7 +15148,7 @@ class JIT {
                             ) {
                                 // No XMLWriter::__construct — attach host writer at allocate (#19551).
                                 $xwReceiver = $this->context->getVariableFromOp($resultOp);
-                                \PHPCompiler\ext\xmlwriter\JitXmlWriterUserScript::tryInit(
+                                $this->context->extensionLowering->tryInitXmlWriter(
                                     $this->context,
                                     $xwReceiver
                                 );
@@ -15870,7 +15870,7 @@ class JIT {
                                         $this->context,
                                         new Operand\Literal($name->value)
                                     );
-                                    $sxeFetched = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryGet(
+                                    $sxeFetched = $this->context->extensionLowering->tryPropertyGet(
                                         $this->context,
                                         $sxeReceiver,
                                         $sxeName
@@ -15882,7 +15882,7 @@ class JIT {
                                         // Bind host tree + baked name/text onto the property
                                         // result — same as dim (#27438) — so (string)$sxe->child
                                         // folds without NestedJIT / OOB cast (#28639).
-                                        \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::applyPendingElementAssign(
+                                        $this->context->extensionLowering->applyPendingElementAssign(
                                             $magicVar
                                         );
                                         // Stamp class like children()/asXML results (#35828). Without
@@ -17268,7 +17268,7 @@ class JIT {
             // but no classUserType until stampSimpleXmlElementUserType (#35834).
             if ($this->context->hasVariableOpInScopes($obj)) {
                 $recv = $this->context->getVariableFromOpInScopes($obj);
-                if (\PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::isTrackedReceiver($recv)) {
+                if ($this->context->extensionLowering->isTrackedSimpleXmlReceiver($recv)) {
                     return 'SimpleXMLElement';
                 }
             }
@@ -17279,7 +17279,7 @@ class JIT {
         if ('' === $tagLc || \in_array($tagLc, ['object', 'stdclass'], true)) {
             if ($this->context->hasVariableOpInScopes($obj)) {
                 $recv = $this->context->getVariableFromOpInScopes($obj);
-                if (\PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::isTrackedReceiver($recv)) {
+                if ($this->context->extensionLowering->isTrackedSimpleXmlReceiver($recv)) {
                     return 'SimpleXMLElement';
                 }
             }
@@ -18478,7 +18478,7 @@ class JIT {
             return;
         }
         $var = $this->context->getVariableFromOp($result);
-        \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::applyPendingXpathAssign($var);
+        $this->context->extensionLowering->applyPendingXpathAssign($var);
         $name = JIT\OperandName::resolve($result);
         if (null !== $name && '' !== $name) {
             $resolved = $this->context->resolveRefAliasName($name);
@@ -18514,10 +18514,7 @@ class JIT {
                 $toCall instanceof JIT\Call\XmlReaderXML
                 || $toCall instanceof JIT\Call\XmlReaderOpen
             )
-            && (
-                \PHPCompiler\ext\xmlreader\JitXmlReaderUserScript::$lastCallWasInstance
-                || !\PHPCompiler\ext\xmlreader\JitXmlReaderUserScript::$lastResultIsObject
-            )
+            && !$this->context->extensionLowering->xmlReaderFactoryIsObject()
         ) {
             return;
         }
@@ -18560,13 +18557,13 @@ class JIT {
         if ($this->context->hasVariableOp($result)) {
             $var = $this->context->getVariableFromOp($result);
             $var->classUserType = 'XMLWriter';
-            \PHPCompiler\ext\xmlwriter\JitXmlWriterUserScript::bindResultVariable($var);
+            $this->context->extensionLowering->bindXmlWriterResult($var);
             $name = JIT\OperandName::resolve($result);
             if (null !== $name && '' !== $name) {
                 $resolved = $this->context->resolveRefAliasName($name);
                 if (isset($this->context->namedVariableBindings[$resolved])) {
                     $this->context->namedVariableBindings[$resolved]->classUserType = 'XMLWriter';
-                    \PHPCompiler\ext\xmlwriter\JitXmlWriterUserScript::bindResultVariable(
+                    $this->context->extensionLowering->bindXmlWriterResult(
                         $this->context->namedVariableBindings[$resolved]
                     );
                 }
@@ -18804,7 +18801,7 @@ class JIT {
             return;
         }
         $var = $this->context->getVariableFromOp($result);
-        if (!\PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::applyPendingElementAssign($var)) {
+        if (!$this->context->extensionLowering->applyPendingElementAssign($var)) {
             return;
         }
         $this->stampSimpleXmlElementUserType($result, $var);
@@ -18821,7 +18818,7 @@ class JIT {
             return;
         }
         $var = $this->context->getVariableFromOp($result);
-        \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::applyPendingIteratorToArrayHostArray($var);
+        $this->context->extensionLowering->applyPendingIteratorToArrayHostArray($var);
     }
 
     /**
@@ -18856,7 +18853,7 @@ class JIT {
             return;
         }
         $var = $this->context->getVariableFromOp($result);
-        if (!\PHPCompiler\ext\dom\JitDomImportSimpleXmlUserScript::applyPendingImportAssign($var)) {
+        if (!$this->context->extensionLowering->applyPendingDomImportAssign($var)) {
             return;
         }
         $var->classUserType = 'DOMElement';
@@ -19191,10 +19188,7 @@ class JIT {
                         $this->context->scope->toCall instanceof JIT\Call\XmlReaderXML
                         || $this->context->scope->toCall instanceof JIT\Call\XmlReaderOpen
                     )
-                    && (
-                        \PHPCompiler\ext\xmlreader\JitXmlReaderUserScript::$lastCallWasInstance
-                        || !\PHPCompiler\ext\xmlreader\JitXmlReaderUserScript::$lastResultIsObject
-                    )
+                    && !$this->context->extensionLowering->xmlReaderFactoryIsObject()
                 )
             ) {
                 $ptr = JIT\JitValueBox::coerceToValuePtrForStore($this->context, $llvmResult);
@@ -19238,7 +19232,7 @@ class JIT {
                     $slot
                 );
                 $resultVar->classUserType = 'XMLWriter';
-                \PHPCompiler\ext\xmlwriter\JitXmlWriterUserScript::bindResultVariable($resultVar);
+                $this->context->extensionLowering->bindXmlWriterResult($resultVar);
                 $this->context->setVariableOp($result, $resultVar);
                 $result->type = new Type(Type::TYPE_OBJECT, [], 'XMLWriter');
                 $name = JIT\OperandName::resolve($result);
@@ -22300,7 +22294,7 @@ class JIT {
             return;
         }
         // DOMElement::$textContent / $nodeValue — before temp promotion clears receiver (#23251).
-        if (\PHPCompiler\ext\dom\JitDomElementTextContent::tryEmitStore(
+        if ($this->context->extensionLowering->tryDomTextContentStore(
             $this->context,
             $result,
             $value
@@ -22312,7 +22306,7 @@ class JIT {
         // (AOT silent no-op; Zend/zend_object_handlers.c zend_std_write_property).
         if (null !== $result->magicSetReceiver && null !== $result->magicSetName) {
             if (JIT\UserScriptAotEnv::isActive()) {
-                $sxePropSet = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryPropSet(
+                $sxePropSet = $this->context->extensionLowering->tryPropertySet(
                     $this->context,
                     $result,
                     $result->magicSetName,
@@ -22621,7 +22615,7 @@ class JIT {
                 && null !== $result->writableArrayAccessReceiver
                 && null !== $result->writableArrayAccessKey
             ) {
-                $sxeSet = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryOffsetSet(
+                $sxeSet = $this->context->extensionLowering->tryOffsetSet(
                     $this->context,
                     $result->writableArrayAccessReceiver,
                     $result->writableArrayAccessKey,
@@ -27794,7 +27788,7 @@ class JIT {
             }
         }
         if ('loadxml' === strtolower($methodName)) {
-            \PHPCompiler\ext\dom\JitDomLoadXMLUserScript::setPendingLoadXmlReceiverVarName(
+            $this->context->extensionLowering->setPendingLoadXmlReceiverVarName(
                 JIT\OperandName::resolve($receiverOp)
             );
         }

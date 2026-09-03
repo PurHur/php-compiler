@@ -57,6 +57,13 @@ class Context {
     public array $functionProxies = [];
 
     /**
+     * Extension-owned user-script AOT lowering (SimpleXML/DOM/XMLReader/XMLWriter) (#36204).
+     *
+     * Modules register from {@see Module::jitInit}; {@see \PHPCompiler\JIT} must not import those exts.
+     */
+    public ExtensionLoweringHooks $extensionLowering;
+
+    /**
      * Optional VALUE⊙VALUE arith override — BcMath\Number do_operation (#36204 / #24683).
      *
      * Registered by {@see \PHPCompiler\ext\bcmath\Module::jitInit}; core must not import ext\bcmath.
@@ -1024,6 +1031,7 @@ class Context {
     public function __construct(Runtime $runtime, int $loadType) {
         $runtime->claimJitContextSlot($this);
         $this->runtime = $runtime;
+        $this->extensionLowering = new ExtensionLoweringHooks();
         $this->scope = new Scope;
         $this->tryCatch = TryCatchState::create();
         $this->coalesceAssignTargets = new \SplObjectStorage();

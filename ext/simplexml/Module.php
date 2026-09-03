@@ -42,6 +42,39 @@ class Module extends ModuleAbstract
                 $seed($obj, $id, 'simplexmliterator');
             }
         );
+
+        // User-script AOT dim/prop/xpath folds — lib/JIT.php must not import this class (#36204).
+        $hooks = $context->extensionLowering;
+        $hooks->prepareDimWriteHook = static function ($ctx, $container, $dim) {
+            return JitSimpleXmlUserScript::tryPrepareDimWrite($ctx, $container, $dim);
+        };
+        $hooks->offsetGetHook = static function ($ctx, $container, $dim) {
+            return JitSimpleXmlUserScript::tryOffsetGet($ctx, $container, $dim);
+        };
+        $hooks->foldXpathListDimHook = static function ($ctx, $container, $dim) {
+            return JitSimpleXmlUserScript::tryFoldXpathListDim($ctx, $container, $dim);
+        };
+        $hooks->propertyGetHook = static function ($ctx, $receiver, $name) {
+            return JitSimpleXmlUserScript::tryGet($ctx, $receiver, $name);
+        };
+        $hooks->isTrackedSimpleXmlReceiverHook = static function ($receiver): bool {
+            return JitSimpleXmlUserScript::isTrackedReceiver($receiver);
+        };
+        $hooks->applyPendingXpathAssignHook = static function ($result): void {
+            JitSimpleXmlUserScript::applyPendingXpathAssign($result);
+        };
+        $hooks->applyPendingElementAssignHook = static function ($result): bool {
+            return JitSimpleXmlUserScript::applyPendingElementAssign($result);
+        };
+        $hooks->applyPendingIteratorToArrayHostArrayHook = static function ($result): bool {
+            return JitSimpleXmlUserScript::applyPendingIteratorToArrayHostArray($result);
+        };
+        $hooks->propertySetHook = static function ($ctx, $container, string $propName, $value) {
+            return JitSimpleXmlUserScript::tryPropSet($ctx, $container, $propName, $value);
+        };
+        $hooks->offsetSetHook = static function ($ctx, $receiver, $key, $value) {
+            return JitSimpleXmlUserScript::tryOffsetSet($ctx, $receiver, $key, $value);
+        };
     }
 
     public function init(Runtime $runtime): void
