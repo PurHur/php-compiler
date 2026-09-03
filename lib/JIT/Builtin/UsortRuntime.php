@@ -6,7 +6,6 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedClosureInvokeLlvm;
@@ -146,8 +145,12 @@ final class UsortRuntime
         NestedClosureInvokeLlvm::ensureLinked($context);
         VmActiveContextInitLlvm::requestThinStandaloneInit($context);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        // Sort mutates $ht in place. Do not storeHashtableInArrayVariable back into a
+        // TYPE_VALUE box — __value__writeHashtable valueDelref's the same pointer and
+        // frees it when the box is sole owner (rc=1). That made honest assign delref
+        // (#36388 packed leak fix) look like a usort regression (#36484).
+        // Native arrays are rejected above; TYPE_HASHTABLE store was already a no-op.
         UsortPackedLlvm::sortPackedWithClosure($context, $ht, $callback);
-        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
     }
 
     private static function sortKeysWithClosure(Context $context, JITVariable $array, JITVariable $callback): void

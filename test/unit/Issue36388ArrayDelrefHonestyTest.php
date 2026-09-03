@@ -59,9 +59,45 @@ final class Issue36388ArrayDelrefHonestyTest extends TestCase
             'TYPE_VALUE into int[] must not heap-promote (#36388 packed leak)'
         );
         $this->assertStringContainsString(
-            'Delref the materialize claim so the value-box is sole owner',
+            'delref → sole owner (#36388)',
             $src,
             'promoteNativeArrayVariableToHashtable must balance writeHashtable retain (#36388)'
         );
+        $usort = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Builtin/UsortRuntime.php');
+        $this->assertStringContainsString(
+            'Do not storeHashtableInArrayVariable back into a',
+            $usort,
+            'in-place usort must not writeHashtable the same HT (#36388 / re-#36484)'
+        );
+    }
+
+    /**
+     * Functional: packed `$a = [$i]; unset($a)` must not grow usage (#36388).
+     *
+     * @group llvm
+     * @group aot
+     */
+    public function testPackedShortLivedArrayDeltaZeroUnderAot(): void
+    {
+        if (!\PHPCompiler\LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $root = dirname(__DIR__, 2);
+        $src = $root.'/test/repro/issue_36388_packed_array_leak.php';
+        $bin = sys_get_temp_dir().'/phpc_36388_packed_'.getmypid();
+        $compile = escapeshellarg(PHP_BINARY).' '
+            .escapeshellarg($root.'/bin/compile.php').' -o '
+            .escapeshellarg($bin).' '
+            .escapeshellarg($src);
+        $cwd = getcwd();
+        chdir($root);
+        exec($compile.' 2>&1', $out, $rc);
+        chdir($cwd);
+        $this->assertSame(0, $rc, implode("\n", $out));
+        exec(escapeshellarg($bin).' 2000 2>&1', $runOut, $runRc);
+        @unlink($bin);
+        $this->assertSame(0, $runRc, implode("\n", $runOut));
+        $line = $runOut[0] ?? '';
+        $this->assertMatchesRegularExpression('/delta=0\b/', $line, $line);
     }
 }

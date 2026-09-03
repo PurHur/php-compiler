@@ -23247,15 +23247,21 @@ class JIT {
             $valueRef = $result->value;
             $valueFrom = $value->value;
             if ($value->type & Variable::IS_NATIVE_ARRAY) {
-                // materializeNativeArrayForCall returns an HT at rc=0 (alloc leaves rc=0).
-                // writeHashtable addrefs once → rc=1, the value-box's sole-owner claim.
-                // No further addref or delref — the prior delref freed the HT (#36484).
+                // materialize addrefs to rc=1; writeHashtable → rc=2. Delref the materialize
+                // claim so unset reaches dtor (#36388 packed `$a = [$i]`). promoteNativeArray
+                // (usort by-ref) keeps #36484 no-delref — different ownership shape.
                 $ht = JIT\HashTableHelper::materializeNativeArrayForCall($this->context, $value);
                 $destPtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $result);
                 $this->context->builder->call(
                     $this->context->lookupFunction('__value__writeHashtable'),
                     $destPtr,
                     $ht
+                );
+                $this->context->refcount->delref(
+                    $this->context->builder->pointerCast(
+                        $ht,
+                        $this->context->getTypeFromString('__ref__virtual*')
+                    )
                 );
                 $result->valueBoxHashtable = true;
 
@@ -23453,13 +23459,19 @@ class JIT {
                     return;
                 default:
                     if ($value->type & Variable::IS_NATIVE_ARRAY) {
-                        // materialize returns rc=0; writeHashtable → rc=1 (sole owner). No delref (#36484).
+                        // materialize addrefs to rc=1; writeHashtable → rc=2; delref → sole owner (#36388).
                         $ht = JIT\HashTableHelper::materializeNativeArrayForCall($this->context, $value);
                         $destPtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $result);
                         $this->context->builder->call(
                             $this->context->lookupFunction('__value__writeHashtable'),
                             $destPtr,
                             $ht
+                        );
+                        $this->context->refcount->delref(
+                            $this->context->builder->pointerCast(
+                                $ht,
+                                $this->context->getTypeFromString('__ref__virtual*')
+                            )
                         );
                         $result->valueBoxHashtable = true;
 
@@ -24612,12 +24624,18 @@ class JIT {
             return;
         }
         if (0 !== ($src->type & JIT\Variable::IS_NATIVE_ARRAY)) {
-            // materialize returns rc=0; writeHashtable → rc=1 (sole owner). No delref (#36484).
+            // materialize addrefs to rc=1; writeHashtable → rc=2; delref → sole owner (#36388).
             $htPtr = JIT\HashTableHelper::materializeNativeArrayForCall($this->context, $src);
             $this->context->builder->call(
                 $this->context->lookupFunction('__value__writeHashtable'),
                 $destPtr,
                 $htPtr
+            );
+            $this->context->refcount->delref(
+                $this->context->builder->pointerCast(
+                    $htPtr,
+                    $this->context->getTypeFromString('__ref__virtual*')
+                )
             );
 
             return;
