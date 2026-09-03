@@ -11233,6 +11233,12 @@ class JIT {
                             if (null !== ($result->compileTimeString ?? null)) {
                                 $promoted->compileTimeString = $result->compileTimeString;
                             }
+                            // Drop value-box / script-global aliases before realloc so destSlot
+                            // is the unique owner (rc=1). publish() re-addrefs after the grow.
+                            // Shared destSlot+box at rc=2 was not enough when __ref__separate
+                            // raced freelist reuse under {main} concat-temp traffic (#36386).
+                            $this->dropValueBoxStringAliasIfSame($result, $destSlot);
+                            $this->dropMainScriptStringAliasIfSame($block, $destOp, $destSlot);
                             // Grow in place for literal and dynamic RHS (#36386). Requires
                             // __string__realloc to store the moved pointer back into the
                             // `__string__**` slot (fixed this PR) — previously corrupted after
@@ -26886,6 +26892,89 @@ class JIT {
         $this->context->builder->branch($readyBlock);
 
         $this->context->builder->positionAtEnd($readyBlock);
+    }
+
+    /**
+     * If $valueBox holds the same __string__* as $destSlot, clear the box (delref) so
+     * appendInPlace/realloc can move the buffer with a unique owner (#36386).
+     */
+    private function dropValueBoxStringAliasIfSame(Variable $valueBox, PHPLLVM\Value $destSlot): void
+    {
+        if (
+            Variable::TYPE_VALUE !== $valueBox->type
+            && !JIT\JitValueBox::isValueOperand($valueBox)
+        ) {
+            return;
+        }
+        $strPtrTy = $this->context->getTypeFromString('__string__*');
+        $held = JIT\JitValueBox::readStringOrNull($this->context, $valueBox);
+        $cur = $this->context->builder->load($destSlot);
+        $tag = 'dropBoxAlias'.(string) spl_object_id($valueBox).(string) spl_object_id($destSlot);
+        $dropBlock = JIT\BasicBlockHelper::append($this->context, 'drop_alias_'.$tag);
+        $contBlock = JIT\BasicBlockHelper::append($this->context, 'drop_alias_cont_'.$tag);
+        $same = $this->context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $held, $cur);
+        $nonNull = $this->context->builder->icmp(
+            \PHPLLVM\Builder::INT_NE,
+            $cur,
+            $strPtrTy->constNull()
+        );
+        $shouldDrop = $this->context->builder->bitwiseAnd(
+            $this->context->castToBool($same),
+            $this->context->castToBool($nonNull)
+        );
+        $this->context->builder->branchIf($shouldDrop, $dropBlock, $contBlock);
+        $this->context->builder->positionAtEnd($dropBlock);
+        // addref before writeNull so a false-share at rc=1 (box+destSlot without a
+        // matching addref on publish) is not freed out from under destSlot (#36386).
+        $this->context->refcount->addref($cur);
+        $this->context->builder->call(
+            $this->context->lookupFunction('__value__writeNull'),
+            JIT\JitValueBox::valuePtrFromVariable($this->context, $valueBox)
+        );
+        $this->context->builder->branch($contBlock);
+        $this->context->builder->positionAtEnd($contBlock);
+    }
+
+    /**
+     * Same as {@see dropValueBoxStringAliasIfSame} for {main} script-globals that
+     * publishMainScriptNamedConcatResult keeps in sync with the promoted slot.
+     */
+    private function dropMainScriptStringAliasIfSame(
+        Block $block,
+        Operand $destOp,
+        PHPLLVM\Value $destSlot
+    ): void {
+        if (!$block->isMainScript()) {
+            return;
+        }
+        $names = [];
+        $destName = JIT\OperandName::resolve($destOp);
+        if (null !== $destName && '' !== $destName) {
+            $names[$destName] = true;
+        }
+        $slot = $block->slotForOperand($destOp);
+        if (null !== $slot) {
+            foreach ($block->scopedOperands() as $scopeOp) {
+                if ($block->slotForOperand($scopeOp) !== $slot) {
+                    continue;
+                }
+                $scopeName = JIT\OperandName::resolve($scopeOp);
+                if (null !== $scopeName && '' !== $scopeName) {
+                    $names[$scopeName] = true;
+                }
+            }
+        }
+        foreach ($names as $name => $_) {
+            $name = (string) $name;
+            if (\PHPCompiler\Web\Superglobals::isSuperglobalName($name)) {
+                continue;
+            }
+            if ($this->shouldDeferScriptGlobalForInlineIncludeBinding($name, $destOp, $block)) {
+                continue;
+            }
+            $sg = $this->context->ensureScriptGlobal($name);
+            $this->dropValueBoxStringAliasIfSame($sg, $destSlot);
+        }
     }
 
     /**

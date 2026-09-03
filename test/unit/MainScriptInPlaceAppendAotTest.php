@@ -213,6 +213,43 @@ final class MainScriptInPlaceAppendAotTest extends TestCase
         }
     }
 
+    /**
+     * {main} `$buf .= "row-".$i` used to free(): invalid pointer past ~170 iterations —
+     * destSlot shared the buffer with the script-global value box across realloc (#36386).
+     */
+    public function testMainScriptInterpConcatAppendMatchesZendPastHeapThreshold(): void
+    {
+        $src = <<<'PHP'
+        <?php
+        $buf = '';
+        for ($i = 0; $i < 250; ++$i) {
+            $buf .= 'row-'.$i.';';
+        }
+        echo strlen($buf), '|', md5($buf), "\n";
+        PHP;
+        $path = sys_get_temp_dir().'/phpc_main_interp_append_'.getmypid().'.php';
+        $bin = sys_get_temp_dir().'/phpc_main_interp_append_'.getmypid().'.bin';
+        file_put_contents($path, $src);
+        try {
+            exec(escapeshellarg(PHP_BINARY).' '.escapeshellarg($path).' 2>&1', $zendOut, $zendRc);
+            $this->assertSame(0, $zendRc, implode("\n", $zendOut));
+            $cmd = escapeshellarg(PHP_BINARY).' '
+                .escapeshellarg(__DIR__.'/../../bin/compile.php').' -o '
+                .escapeshellarg($bin).' '.escapeshellarg($path).' 2>&1';
+            exec($cmd, $out, $rc);
+            $this->assertSame(0, $rc, implode("\n", $out));
+            for ($r = 0; $r < 5; ++$r) {
+                $runOut = [];
+                exec(escapeshellarg($bin).' 2>&1', $runOut, $runRc);
+                $this->assertSame(0, $runRc, "run $r: ".implode("\n", $runOut));
+                $this->assertSame($zendOut, $runOut, "run $r output mismatch");
+            }
+        } finally {
+            @unlink($path);
+            @unlink($bin);
+        }
+    }
+
     public function testFunctionLocalDynamicAppendMatchesZendAtScale(): void
     {
         $src = <<<'PHP'
