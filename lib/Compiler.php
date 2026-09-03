@@ -366,6 +366,15 @@ class Compiler {
     private array $callArgIsDeadInlineTemporaryCache = [];
 
     /**
+     * Memoize whether a CFG block's children contain any BinaryOp\Coalesce (#36387).
+     * Without this, findCoalesceStmtForCallArg rescans every FuncCall arg in the block
+     * on every call — O(n²) on nested stmt blocks that have no ?? at all.
+     *
+     * @var array<int, bool> spl_object_id(CfgBlock) => has coalesce stmt
+     */
+    private array $cfgBlockHasCoalesceStmtCache = [];
+
+    /**
      * Memoize resolveCfgFuncCallName per call op (#36387).
      *
      * @var array<int, string|null>
@@ -754,6 +763,7 @@ class Compiler {
         $this->isSiblingMultiArgFuncCallProducerComputing = [];
         $this->deferredSiblingInlineCallArgConsumerIndexCache = [];
         $this->callArgIsDeadInlineTemporaryCache = [];
+        $this->cfgBlockHasCoalesceStmtCache = [];
         $this->resolveCfgFuncCallNameCache = [];
         $this->deadInlineTemporaryArgCountCache = [];
         $this->callResultFeedsInlineCallArgCache = [];
@@ -4586,6 +4596,10 @@ class Compiler {
             return true;
         }
         if (null === $block->orig) {
+            return false;
+        }
+        // No stmt-level ?? → no coalesce-assign tail ahead of a call arg (#36387).
+        if (!$this->cfgBlockHasCoalesceStmt($block->orig)) {
             return false;
         }
         foreach ($block->orig->children as $i => $child) {
@@ -18112,6 +18126,27 @@ class Compiler {
     }
 
     /**
+     * True when $cfg's children include any stmt-level BinaryOp\Coalesce (#36387).
+     */
+    private function cfgBlockHasCoalesceStmt(CfgBlock $cfg): bool
+    {
+        $id = spl_object_id($cfg);
+        if (\array_key_exists($id, $this->cfgBlockHasCoalesceStmtCache)) {
+            return $this->cfgBlockHasCoalesceStmtCache[$id];
+        }
+        $has = false;
+        foreach ($cfg->children as $child) {
+            if ($child instanceof Op\Expr\BinaryOp\Coalesce) {
+                $has = true;
+                break;
+            }
+        }
+        $this->cfgBlockHasCoalesceStmtCache[$id] = $has;
+
+        return $has;
+    }
+
+    /**
      * @return ?Op\Expr\BinaryOp\Coalesce
      */
     private function findCoalesceStmtForCallArg(Operand $arg, Block $block): ?Op\Expr\BinaryOp\Coalesce
@@ -18120,6 +18155,11 @@ class Compiler {
             return $coalesce;
         }
         if (null === $block->orig) {
+            return null;
+        }
+        // Nested call stmt blocks with no ?? still paid O(children × args) here via the
+        // FuncCall rescan below — early-out when the CFG has zero Coalesce stmts (#36387).
+        if (!$this->cfgBlockHasCoalesceStmt($block->orig)) {
             return null;
         }
         foreach ($block->orig->children as $child) {
@@ -55025,10 +55065,11 @@ class Compiler {
             return $root;
         }
         if (null !== $block->orig) {
-            foreach ($block->orig->children as $child) {
-                if (!$child instanceof Op\Expr\Array_
-                    || !$this->operandsReferToSameVariable($child->result, $arrayExpr->result)
-                ) {
+            // The Array_ being compiled is the only candidate that matters; walking every
+            // prior Array_ child re-did operandsReferToSameVariable O(n) times per element
+            // and made nested `[1,2,3]` call stmts O(n²) (#36387).
+            foreach ([$arrayExpr] as $child) {
+                if (!$child instanceof Op\Expr\Array_) {
                     continue;
                 }
                 $fetches = $this->precedingClassConstFetchesBeforeCfgOp($block->orig->children, $child);
