@@ -173,9 +173,14 @@ final class UndefinedVariableHelper
         if (null === $savedInsert) {
             return;
         }
+        $key = ScopeVariableAssignedFlags::flagKey($context, $name);
+        // Entry-prologue assigns dominate the whole activation — skip the per-read
+        // load+branch (loop headers were the hot cost, #36386).
+        if (ScopeVariableAssignedFlags::isDefinitelyAssigned($context, $key)) {
+            return;
+        }
         UndefinedVariableRuntime::ensureLinked($context);
         BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-        $key = ScopeVariableAssignedFlags::flagKey($context, $name);
         $isAssigned = ScopeVariableAssignedFlags::isAssignedCondition($context, $key);
         try {
             $fn = BasicBlockHelper::parentFunction($context);

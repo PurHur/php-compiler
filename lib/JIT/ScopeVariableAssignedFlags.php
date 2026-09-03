@@ -21,6 +21,15 @@ final class ScopeVariableAssignedFlags
     /** @var array<string, Value> entry-block i8 alloca per owning LLVM function + user scope key */
     private static array $flags = [];
 
+    /**
+     * Scope keys marked assigned while the insert block was still the function entry
+     * (unconditional prologue). Later reads may skip ZEND_CHECK_UNDEFINED_VAR branches —
+     * hot for-loop CVs were paying a load+icmp+br every iteration (#36386).
+     *
+     * @var array<string, true> moduleId\0ownerOrMain\0key
+     */
+    private static array $definitelyAssigned = [];
+
     public static function flagKey(Context $context, string $name): string
     {
         $resolved = $context->resolveRefAliasName($name);
@@ -64,6 +73,19 @@ final class ScopeVariableAssignedFlags
     {
         $i8 = $context->getTypeFromString('int8');
         $context->builder->store($i8->constInt(1, false), self::ensureFlag($context, $key));
+        if (self::isInsertInOwningEntryBlock($context, $key)) {
+            self::$definitelyAssigned[self::definiteCacheKey($context, $key)] = true;
+        }
+    }
+
+    /**
+     * True when {@see markAssigned} ran in the owning function's entry block — the
+     * assign dominates every subsequent read in the activation (unless unset; unset
+     * currently leaves the runtime flag set, #21940).
+     */
+    public static function isDefinitelyAssigned(Context $context, string $key): bool
+    {
+        return isset(self::$definitelyAssigned[self::definiteCacheKey($context, $key)]);
     }
 
     public static function isAssignedCondition(Context $context, string $key): Value
@@ -76,6 +98,43 @@ final class ScopeVariableAssignedFlags
             $loaded,
             $i8->constInt(0, false)
         );
+    }
+
+    private static function definiteCacheKey(Context $context, string $key): string
+    {
+        $moduleId = spl_object_id($context->module);
+        if (str_starts_with($key, '{main}'."\0")) {
+            return $moduleId."\0".$key;
+        }
+
+        return $moduleId."\0".spl_object_id(self::ownerFunctionForScopeFlags($context))."\0".$key;
+    }
+
+    private static function isInsertInOwningEntryBlock(Context $context, string $key): bool
+    {
+        $insert = BasicBlockHelper::tryGetInsertBlock($context);
+        if (null === $insert) {
+            return false;
+        }
+        if (str_starts_with($key, '{main}'."\0")) {
+            $owner = BasicBlockHelper::parentFunction($context);
+        } else {
+            $owner = self::ownerFunctionForScopeFlags($context);
+        }
+        if ($owner->countBasicBlocks() < 1) {
+            return false;
+        }
+        $entry = $owner->getEntryBasicBlock();
+        // Fresh BasicBlock wrappers are not ===; compare LLVM names within the owner.
+        if ($insert->getName() !== $entry->getName()) {
+            return false;
+        }
+        $insertParent = $insert->getParent();
+        if (!$insertParent instanceof \PHPLLVM\Value\Function_) {
+            return false;
+        }
+
+        return TryCatchHelper::sameLlvmFunction($insertParent, $owner);
     }
 
     private static function ensureMainModuleFlag(Context $context, string $key): Value
