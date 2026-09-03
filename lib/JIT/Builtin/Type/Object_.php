@@ -326,6 +326,11 @@ class Object_ extends Type {
 
     public function register(): void
     {
+        if (\PHPCompiler\JIT\CompileCache::isEditScaffoldActive()) {
+            $this->pointer = $this->context->getTypeFromString('__object__*');
+            return;
+        }
+
         $struct = $this->context->context->namedStructType('__object__');
         $this->context->registerType('__object__', $struct);
         $this->context->registerType('__object__*', $struct->pointerType(0));

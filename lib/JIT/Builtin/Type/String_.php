@@ -22,6 +22,11 @@ class String_ extends Type {
     public PHPLLVM\Type $pointer;
 
     public function register(): void {
+        if (\PHPCompiler\JIT\CompileCache::isEditScaffoldActive()) {
+            $this->pointer = $this->context->getTypeFromString('__string__*');
+            return;
+        }
+
         
 
         
