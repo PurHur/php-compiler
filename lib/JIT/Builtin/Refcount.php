@@ -35,6 +35,10 @@ class Refcount extends Builtin {
     private array $fields;
 
     public function register(): void {
+        if (\PHPCompiler\JIT\CompileCache::isEditScaffoldActive()) {
+            return;
+        }
+
         
 
         

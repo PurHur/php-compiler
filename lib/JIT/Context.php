@@ -1071,6 +1071,71 @@ class Context {
         $this->defineBuiltins($loadType);
     }
 
+    /**
+     * Populate typeMap + structFieldMap from restored bitcode so register() can early-return (#36387).
+     *
+     * Prepared for edit-scaffold thin boot (parse module.bc before namedStructType).
+     */
+    public function seedCoreTypesFromModuleForEditScaffold(): void
+    {
+        $cores = [
+            '__ref__' => ['refcount' => 0, 'typeinfo' => 1],
+            '__ref__virtual' => ['ref' => 0],
+            '__string__' => ['ref' => 0, 'length' => 1, 'value' => 2],
+            '__value__' => ['type' => 0, 'pad' => 1, 'value' => 2],
+            '__value__value' => ['ref' => 0],
+            '__hashtable__' => [
+                'ref' => 0,
+                'numElements' => 1,
+                'nextFreeElement' => 2,
+                'capacity' => 3,
+                'values' => 4,
+                'strKeys' => 5,
+                'objKeys' => 6,
+                'internalPointer' => 7,
+                'packedPrefixEnd' => 8,
+                'strKeysTail' => 9,
+                'strHashMask' => 10,
+                'strHashSlots' => 11,
+            ],
+            '__strkey_node__' => null,
+            '__objkey_node__' => null,
+            '__object__' => [
+                'ref' => 0,
+                'class_id' => 1,
+                'constructed' => 2,
+                'lazy_pending' => 3,
+                'lazy_ghost' => 4,
+                'lazy_init_index' => 5,
+                'dynamic_readonly' => 6,
+                'prop_count' => 7,
+                'user_handle' => 8,
+            ],
+        ];
+        foreach ($cores as $name => $fields) {
+            $ty = null;
+            try {
+                $ty = $this->module->getTypeByName($name);
+            } catch (\Throwable $e) {
+                continue;
+            }
+            if (!$ty instanceof PHPLLVM\Type) {
+                continue;
+            }
+            try {
+                $ty->getKind();
+            } catch (\Throwable $e) {
+                continue;
+            }
+            $this->typeMap[$name] = $ty;
+            $this->typeMap[$name.'*'] = $ty->pointerType(0);
+            $this->typeMap[$name.'**'] = $ty->pointerType(0)->pointerType(0);
+            if (is_array($fields)) {
+                $this->structFieldMap[$name] = $fields;
+            }
+        }
+    }
+
     public function setMain(PHPLLVM\Value\Function_ $func): void {
         $this->main = $func;
     }
@@ -1146,6 +1211,100 @@ class Context {
         $this->objectConstantMap = [];
         $this->boolValues = [];
         $this->constants = [];
+    }
+
+    /**
+     * After edit-scaffold bitcode restore, re-point functionScope at live module Functions (#36387).
+     *
+     * register() stored decls from the throwaway empty module; replaceModule discards them.
+     * Thin boot skips register — import every defined function from the restored module.
+     */
+    public function rebindFunctionScopeFromModule(): void
+    {
+        $names = array_keys($this->functionScope);
+        $this->functionScope = [];
+        foreach ($names as $name) {
+            if (!is_string($name) || '' === $name) {
+                continue;
+            }
+            $fn = $this->module->getNamedFunction($name);
+            if ($fn instanceof PHPLLVM\Value\Function_) {
+                $this->functionScope[$name] = $fn;
+            }
+        }
+        // Thin boot: register() skipped — pull every named function from bitcode (#36387).
+        if (CompileCache::isEditScaffoldActive() && [] === $this->functionScope) {
+            try {
+                $fn = $this->module->getFirstFunction();
+            } catch (\Throwable $e) {
+                $fn = null;
+            }
+            $guard = 0;
+            while ($fn instanceof PHPLLVM\Value\Function_ && $guard < 100000) {
+                ++$guard;
+                try {
+                    $name = (string) $fn->getName();
+                } catch (\Throwable $e) {
+                    break;
+                }
+                if ('' !== $name) {
+                    $this->functionScope[$name] = $fn;
+                }
+                try {
+                    $next = method_exists($fn, 'getNext') ? $fn->getNext() : null;
+                } catch (\Throwable $e) {
+                    $next = null;
+                }
+                if (!$next instanceof PHPLLVM\Value\Function_) {
+                    break;
+                }
+                $fn = $next;
+            }
+        }
+        // Standalone refresh / init symbols may exist only in bitcode (thin init skipped declare).
+        foreach ([
+            '__superglobals__refresh',
+            '__init__',
+            '__shutdown__',
+            '__header_pre_flush__',
+        ] as $extra) {
+            if (isset($this->functionScope[$extra])) {
+                continue;
+            }
+            $fn = $this->module->getNamedFunction($extra);
+            if ($fn instanceof PHPLLVM\Value\Function_) {
+                $this->functionScope[$extra] = $fn;
+            }
+        }
+        // Refresh $functions map entries that still name a live symbol.
+        foreach ($this->functions as $lc => $old) {
+            $llvm = $this->functionLlvmSymbols[$lc] ?? null;
+            if (!is_string($llvm) || '' === $llvm) {
+                if ($old instanceof PHPLLVM\Value\Function_) {
+                    try {
+                        $llvm = (string) $old->getName();
+                    } catch (\Throwable $e) {
+                        unset($this->functions[$lc]);
+                        continue;
+                    }
+                } else {
+                    unset($this->functions[$lc]);
+                    continue;
+                }
+            }
+            $fn = $this->module->getNamedFunction($llvm);
+            if ($fn instanceof PHPLLVM\Value\Function_) {
+                $this->functions[$lc] = $fn;
+            } else {
+                unset($this->functions[$lc]);
+            }
+        }
+    }
+
+    /** Intrinsic holds the old module — rebuild after replaceModuleFromBitcodeFile (#36387). */
+    public function refreshIntrinsicAfterModuleReplace(): void
+    {
+        $this->intrinsic = $this->module->intrinsic($this->builder);
     }
 
     private function firstBasicBlock(PHPLLVM\Value\Function_ $func): ?PHPLLVM\BasicBlock
@@ -3340,11 +3499,15 @@ class Context {
             throw new \RuntimeException('Bitcode read failed: '.$message);
         }
         try {
+            // Caller must parse into a context without colliding named structs (thin boot
+            // loads bitcode before register(); post-register replace uniqueifies names).
             $this->module = $buffer->parseBitcode($this->context);
         } finally {
             $buffer->dispose();
         }
         $this->targetData = $this->module->getModuleDataLayout();
+        $this->builder = $this->context->builderCreate();
+        $this->refreshIntrinsicAfterModuleReplace();
     }
 
     private function sealInitShutdownReturn(\PHPLLVM\BasicBlock $block): void
@@ -3794,6 +3957,19 @@ class Context {
         if (isset($this->functionScope[$name])) {
             return $this->functionScope[$name];
         }
+        // After edit-scaffold / bitcode restore, prefer live module over stale scope (#36387).
+        $fromModule = $this->module->getNamedFunction($name);
+        if ($fromModule instanceof PHPLLVM\Value\Function_) {
+            try {
+                // php-llvm may wrap a null LLVMValueRef; probe before trusting it.
+                $fromModule->countParams();
+                $this->functionScope[$name] = $fromModule;
+
+                return $fromModule;
+            } catch (\Throwable $e) {
+                // fall through to lazy ensure / throw
+            }
+        }
         // Lazy libc exit(3)/abort(3) — Type::register no longer always-on ensures (#35428 /
         // leftover #33267 / peer #35392). ~292 call sites lookup without a nearby ensure.
         // Lazy setlocale(3) — LocaleStartupRuntime ensures before use (#36074 / #30789).
@@ -3840,6 +4016,56 @@ class Context {
 
     public function registerType(string $name, PHPLLVM\Type $type): void {
         $this->typeMap[$name] = $type;
+    }
+
+    /**
+     * Prefer an existing module named struct (edit-scaffold bitcode) over CreateNamed (#36387).
+     *
+     * CreateNamed after parseBitcode uniqueifies (__string__.11) and breaks GEPs.
+     */
+    public function namedStructType(string $name): PHPLLVM\Type
+    {
+        if (CompileCache::isEditScaffoldActive() || null !== CompileCache::pendingEditScaffoldKey()) {
+            try {
+                $existing = $this->module->getTypeByName($name);
+                if ($existing instanceof PHPLLVM\Type\Struct) {
+                    return $existing;
+                }
+                if ($existing instanceof PHPLLVM\Type) {
+                    try {
+                        $existing->getKind();
+
+                        return $existing;
+                    } catch (\Throwable $e) {
+                        // null wrapper — fall through
+                    }
+                }
+            } catch (\Throwable $e) {
+                // fall through to CreateNamed
+            }
+        }
+
+        return $this->context->namedStructType($name);
+    }
+
+    /**
+     * setBody only when the named struct is still opaque (bitcode already defined it) (#36387).
+     */
+    public function setNamedStructBody(PHPLLVM\Type $struct, bool $packed, PHPLLVM\Type ...$elements): void
+    {
+        if ($struct instanceof PHPLLVM\Type\Struct) {
+            try {
+                if (!$struct->isOpaque()) {
+                    return;
+                }
+            } catch (\Throwable $e) {
+                // try setBody anyway
+            }
+        }
+        if (!method_exists($struct, 'setBody')) {
+            return;
+        }
+        $struct->setBody($packed, ...$elements);
     }
 
     public function castToBool(PHPLLVM\Value $value): PHPLLVM\Value {

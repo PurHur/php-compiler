@@ -40,6 +40,12 @@ final class CompileCache
     /** True after {@see tryRestoreEditScaffold()} — helpers kept, user symbols stripped. */
     private static bool $editScaffoldActive = false;
 
+    /**
+     * Prior cache key armed before {@see Context} construct so defineBuiltins can skip
+     * implement() (Values would dangle after module replace) (#36387).
+     */
+    private static ?string $pendingEditScaffoldKey = null;
+
     public static function isEnabled(): bool
     {
         $flag = Config::getenv('PHP_COMPILER_CACHE');
@@ -64,6 +70,39 @@ final class CompileCache
     public static function isEditScaffoldActive(): bool
     {
         return self::$editScaffoldActive;
+    }
+
+    /**
+     * Arm edit-scaffold before Context construct (#36387).
+     *
+     * Thin boot loads prior module.bc first, then {@see Context::seedCoreTypesFromModuleForEditScaffold()}
+     * + type register early-returns bind PHP-side maps without CreateNamed collisions.
+     */
+    public static function armEditScaffold(string $previousKey): void
+    {
+        if ('' === $previousKey) {
+            return;
+        }
+        self::$pendingEditScaffoldKey = $previousKey;
+    }
+
+    public static function pendingEditScaffoldKey(): ?string
+    {
+        return self::$pendingEditScaffoldKey;
+    }
+
+    public static function takePendingEditScaffoldKey(): ?string
+    {
+        $key = self::$pendingEditScaffoldKey;
+        self::$pendingEditScaffoldKey = null;
+
+        return $key;
+    }
+
+    /** True while Context should register decls/types only (no implement IR) (#36387). */
+    public static function shouldSkipBuiltinImplement(): bool
+    {
+        return null !== self::$pendingEditScaffoldKey || self::$editScaffoldActive;
     }
 
     /**
@@ -547,7 +586,9 @@ final class CompileCache
 
         SuperglobalInit::rebindGlobalsFromModule($context);
         self::restoreExports($context, $block, $meta['exports']);
+        $context->rebindFunctionScopeFromModule();
         $context->rebindInitShutdownAfterModuleReplace();
+        $context->refreshIntrinsicAfterModuleReplace();
         $context->syncIntrinsicBuilder();
         self::$skipModuleFuncCompile = true;
         self::$editScaffoldActive = false;
@@ -556,11 +597,12 @@ final class CompileCache
     }
 
     /**
-     * Same-project edit path (deferred): restore prior module.bc, strip user symbols, rebind helpers.
+     * Same-project edit path: restore prior module.bc, strip user symbols, rebind helpers.
      *
-     * Not wired into {@see \PHPCompiler\Runtime::standalone} yet — replacing the module after
-     * {@see Context} construct leaves defineBuiltins Values dangling (SIGSEGV on re-lower).
-     * Next slice needs thin Context init (skip implement, bind from bitcode) before this can land.
+     * Requires thin Context boot (bitcode before namedStructType/addFunction) so types and
+     * functionScope bind to the restored module. Wired via {@see armEditScaffold()} +
+     * {@see Context::seedCoreTypesFromModuleForEditScaffold()}; full Runtime hook is the
+     * next slice toward MiniWebApp one-file-edit ≤25% of cold (#36387).
      *
      * @internal
      */
@@ -592,13 +634,16 @@ final class CompileCache
         self::stripUserSymbolsFromModule($context, $userSymbols);
         self::rebindHelperSymbols($context, $helperSymbols);
         SuperglobalInit::rebindGlobalsFromModule($context);
+        $context->rebindFunctionScopeFromModule();
         $context->rebindInitShutdownAfterModuleReplace();
         $context->reopenInitLinearForEditScaffold();
+        $context->refreshIntrinsicAfterModuleReplace();
         $context->syncIntrinsicBuilder();
         // Clear PHP-side string/array const maps so re-lower allocates fresh globals (#36387).
         $context->resetCompileTimeConstantMapsForEditScaffold();
         self::$skipModuleFuncCompile = true;
         self::$editScaffoldActive = true;
+        self::$pendingEditScaffoldKey = null;
         \PHPCompiler\AOT\BuildTiming::note('edit_scaffold_hit', 1.0);
 
         return true;
@@ -980,6 +1025,7 @@ final class CompileCache
         self::$recordingHelperSymbols = null;
         self::$skipModuleFuncCompile = false;
         self::$editScaffoldActive = false;
+        self::$pendingEditScaffoldKey = null;
         self::$projectMembers = null;
     }
 

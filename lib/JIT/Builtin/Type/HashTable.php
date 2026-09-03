@@ -37,6 +37,11 @@ class HashTable extends Type
 
     public function register(): void
     {
+        if (\PHPCompiler\JIT\CompileCache::isEditScaffoldActive()) {
+            $this->pointer = $this->context->getTypeFromString('__hashtable__*');
+            return;
+        }
+
         $nodeStruct = $this->context->context->namedStructType('__strkey_node__');
         $this->context->registerType('__strkey_node__', $nodeStruct);
         $this->context->registerType('__strkey_node__*', $nodeStruct->pointerType(0));

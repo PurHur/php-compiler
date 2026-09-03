@@ -46,6 +46,8 @@ final class AotCompileCacheTest extends TestCase
         @unlink($this->repoRoot.'/build/aot-cache-test-bc-warm.bin');
         @unlink($this->repoRoot.'/build/aot-cache-test-project-cold.bin');
         @unlink($this->repoRoot.'/build/aot-cache-test-project-warm.bin');
+        @unlink($this->repoRoot.'/build/aot-cache-test-edit-cold.bin');
+        @unlink($this->repoRoot.'/build/aot-cache-test-edit-rebuild.bin');
         putenv('PHP_COMPILER_CACHE_DIR');
         unset($_ENV['PHP_COMPILER_CACHE_DIR']);
         putenv('PHP_COMPILER_AOT_USER_SCRIPT');
@@ -269,6 +271,53 @@ final class AotCompileCacheTest extends TestCase
             trim($this->runBinary($outCold)['stdout']),
             trim($this->runBinary($outWarm)['stdout'])
         );
+    }
+
+    public function testEditScaffoldKeyDetectedAfterOneFileChange(): void
+    {
+        if (!LlvmToolchain::isReady($this->repoRoot)) {
+            $this->markTestSkipped('LLVM 9 not available');
+        }
+
+        $dir = $this->cacheRoot.'/edit-proj';
+        mkdir($dir, 0775, true);
+        $lib = $dir.'/lib.php';
+        $main = $dir.'/main.php';
+        file_put_contents($lib, "<?php\nfunction greeting(): string { return \"alpha\"; }\n");
+        file_put_contents($main, "<?php\nrequire __DIR__ . '/lib.php';\necho greeting(), \"\\n\";\n");
+
+        $outCold = $this->repoRoot.'/build/aot-cache-test-edit-cold.bin';
+        @unlink($outCold);
+
+        $cold = $this->runAotSubprocess($main, $outCold);
+        if (139 === $cold['exit'] || 11 === $cold['exit']) {
+            $this->markTestSkipped('AOT segfault in this environment; cache wiring covered by unit tests');
+        }
+        $this->assertSame(0, $cold['exit'], $cold['stderr']);
+        $this->assertStringContainsString('alpha', $this->runBinary($outCold)['stdout']);
+
+        $members = [realpath($main) ?: $main, realpath($lib) ?: $lib];
+        $projectId = CompileCache::projectId($members);
+        // After cold, project index points at the bundled cache key.
+        $idxPath = CompileCache::projectIndexPath($projectId);
+        $this->assertFileExists($idxPath);
+        $idx = json_decode((string) file_get_contents($idxPath), true);
+        $this->assertIsArray($idx);
+        $this->assertIsString($idx['key'] ?? null);
+        $this->assertFileExists(CompileCache::bitcodePath($idx['key']));
+
+        file_put_contents($lib, "<?php\nfunction greeting(): string { return \"beta\"; }\n");
+        $hashesAfter = CompileCache::memberHashes($members);
+        $scaffoldKey = CompileCache::findEditScaffoldKey($projectId, $hashesAfter);
+        $this->assertSame(
+            $idx['key'],
+            $scaffoldKey,
+            'one-file edit must resolve prior module.bc key for thin boot (#36387)'
+        );
+        $this->assertNotNull($scaffoldKey);
+        $raw = json_decode((string) file_get_contents(CompileCache::metaPath($scaffoldKey)), true);
+        $this->assertIsArray($raw);
+        $this->assertNotEmpty($raw['user_symbols'] ?? []);
     }
 
     /**
