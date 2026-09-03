@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\spl;
 use PHPCompiler\JIT;
 use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
+use PHPCompiler\VM;
 
 /**
  * SPL extension module entry (php-src ext/spl/php_spl.c; issue #4769).
@@ -41,6 +42,8 @@ class Module extends ModuleAbstract
     {
         parent::init($runtime);
         BuiltinClasses::register($runtime->vmContext);
+        // lib/VM must not import ext\spl — register the ArrayObject/ArrayIterator bridge (#36204).
+        VM\SplArraySupport::setHandler(new VmSplArrayHandler());
     }
 
     public function getFunctions(): array

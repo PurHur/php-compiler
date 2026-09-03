@@ -268,6 +268,13 @@ class Context {
     public array $foreachInvalidSlots = [];
 
     /**
+     * Extension-owned object[$offset] handlers (DOM collections, ResourceBundle, …) (#36204).
+     *
+     * @var list<ObjectDimensionHandler>
+     */
+    public array $objectDimensionHandlers = [];
+
+    /**
      * Trait `use` bindings deferred until a forward-referenced trait is declared (#9395).
      *
      * @var list<array{entry: ClassEntry, traitNames: list<string>, adaptations: list<array<string, mixed>>, ownMethods: array<string, true>}>
@@ -610,6 +617,28 @@ class Context {
         $this->globalConstantFilenames[$name] = $file;
 
         return true;
+    }
+
+    /**
+     * Register an extension-owned object[$offset] handler (#36204).
+     */
+    public function registerObjectDimensionHandler(ObjectDimensionHandler $handler): void
+    {
+        $this->objectDimensionHandlers[] = $handler;
+    }
+
+    /**
+     * First matching extension-owned dimension handler, or null.
+     */
+    public function findObjectDimensionHandler(ObjectEntry $object): ?ObjectDimensionHandler
+    {
+        foreach ($this->objectDimensionHandlers as $handler) {
+            if (($handler->matches)($object)) {
+                return $handler;
+            }
+        }
+
+        return null;
     }
 
     /** True when a live user constant still holds the given object id (#17676). */

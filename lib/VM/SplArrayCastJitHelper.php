@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
-use PHPCompiler\ext\spl\SplArrayStorage;
-
 /**
  * Thin JIT/AOT helper for special (array) casts before zend_std property enumeration.
  *
@@ -29,7 +27,7 @@ final class SplArrayCastJitHelper
             return $out;
         }
         $obj = $src->toObject();
-        $dup = SplArrayStorage::arrayCastDuplicate($obj);
+        $dup = SplArraySupport::arrayCastDuplicate($obj);
         if (null !== $dup) {
             $out->array($dup);
 

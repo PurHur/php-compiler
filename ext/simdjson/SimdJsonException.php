@@ -7,6 +7,6 @@ namespace PHPCompiler\ext\simdjson;
 /**
  * PECL simdjson decode/key errors (awesomized/simdjson_php simdjson.stub.php; #22530).
  */
-class SimdJsonException extends \RuntimeException
+class SimdJsonException extends \RuntimeException implements \PHPCompiler\VM\ExtSimdJsonException
 {
 }
