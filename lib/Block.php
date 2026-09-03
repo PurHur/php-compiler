@@ -285,6 +285,16 @@ class Block {
     /** @var array<int, Operand|null> lazy {@see getOperand} results — cleared when scope slots change (#36226). */
     private array $operandBySlotCache = [];
 
+    /**
+     * Slot => operands bound there, in scope-insertion order (#36387 / #36226).
+     *
+     * {@see resolveOperandForSlot} walks this list instead of the whole `$scope`
+     * SplObjectStorage — nested call stmts were O(|scope|) per getOperand miss.
+     *
+     * @var array<int, list<Operand>>
+     */
+    private array $operandsAtSlot = [];
+
     /** Cached {@see isNamedVariableSlot()} — scope-stable at runtime (#36207). */
     private array $isNamedVariableSlotCache = [];
 
@@ -424,7 +434,7 @@ class Block {
     {
         $this->namedAssignDestSlots[$varRoot] = $slot;
         $this->namedAssignDestSlotIndexes[$slot] = true;
-        $this->invalidateOperandSlotCache($slot);
+        $this->refreshOperandSlotCache($slot);
     }
 
     /** True when $slot is a registered `$local = …` assign destination (#16040, #24017). */
@@ -547,10 +557,49 @@ class Block {
         $this->ephemeralScopeSlotIndexesCache = null;
     }
 
+    /**
+     * Drop preference caches for $slot then rebuild {@see operandBySlotCache} via the
+     * per-slot index (O(occupants), not O(|scope|)) (#36387).
+     */
+    private function refreshOperandSlotCache(int $slot): void
+    {
+        $this->invalidateOperandSlotCache($slot);
+        $this->operandBySlotCache[$slot] = $this->resolveOperandForSlot($slot);
+    }
+
+    private function removeOperandFromSlotIndex(Operand $operand, int $slot): void
+    {
+        if (!isset($this->operandsAtSlot[$slot])) {
+            return;
+        }
+        $kept = [];
+        foreach ($this->operandsAtSlot[$slot] as $bound) {
+            if ($bound !== $operand) {
+                $kept[] = $bound;
+            }
+        }
+        if ([] === $kept) {
+            unset($this->operandsAtSlot[$slot]);
+        } else {
+            $this->operandsAtSlot[$slot] = $kept;
+        }
+    }
+
     private function bindScopeOperandSlot(Operand $operand, int $slot): void
     {
+        if ($this->scope->contains($operand)) {
+            $prev = (int) $this->scope[$operand];
+            if ($prev === $slot) {
+                $this->refreshOperandSlotCache($slot);
+
+                return;
+            }
+            $this->removeOperandFromSlotIndex($operand, $prev);
+            $this->invalidateOperandSlotCache($prev);
+        }
         $this->scope[$operand] = $slot;
-        $this->invalidateOperandSlotCache($slot);
+        $this->operandsAtSlot[$slot][] = $operand;
+        $this->refreshOperandSlotCache($slot);
     }
 
     private function detachScopeOperandAtSlot(int $slot, Operand $operand): void
@@ -559,7 +608,8 @@ class Block {
             return;
         }
         $this->scope->detach($operand);
-        $this->invalidateOperandSlotCache($slot);
+        $this->removeOperandFromSlotIndex($operand, $slot);
+        $this->refreshOperandSlotCache($slot);
     }
 
     private function resolveOperandForSlot(int $offset): ?Operand
@@ -570,10 +620,9 @@ class Block {
             }
         }
         $fallback = null;
-        foreach ($this->scope as $operand) {
-            if ($this->scope[$operand] !== $offset) {
-                continue;
-            }
+        // Walk only occupants of this slot (maintained by bind/detach) — same Var >
+        // Temporary > first-Literal preference as the historic full-scope scan (#36387).
+        foreach ($this->operandsAtSlot[$offset] ?? [] as $operand) {
             if ($operand instanceof VarOperand) {
                 return $operand;
             }
@@ -639,7 +688,7 @@ class Block {
         $frag->nOpCodes = count($opCodes);
         $frag->constants = $this->constants;
         foreach ($this->scope as $operand) {
-            $frag->scope[$operand] = $this->scope[$operand];
+            $frag->bindScopeOperandSlot($operand, (int) $this->scope[$operand]);
         }
 
         return $frag;
@@ -1127,10 +1176,7 @@ class Block {
     {
         $this->invalidateOperandSlotCache($slot);
         $toMove = [];
-        foreach ($this->scope as $scopedOp) {
-            if ($this->scope[$scopedOp] !== $slot) {
-                continue;
-            }
+        foreach ($this->operandsAtSlot[$slot] ?? [] as $scopedOp) {
             if ($scopedOp instanceof Operand\Literal) {
                 $toMove[] = $scopedOp;
             }
@@ -1223,7 +1269,7 @@ class Block {
             if (!$this->namedAssignDestSlots->contains($root)) {
                 $destSlot = $parent->namedAssignDestSlots[$root];
                 $this->namedAssignDestSlots[$root] = $destSlot;
-                $this->invalidateOperandSlotCache($destSlot);
+                $this->refreshOperandSlotCache($destSlot);
             }
         }
         foreach ($parent->assignResultToLvalueSlot as $resultSlot => $lvalueSlot) {
@@ -1670,16 +1716,10 @@ class Block {
         if (\array_key_exists($slot, $this->operandForScopeSlotCache)) {
             return $this->operandForScopeSlotCache[$slot];
         }
-        foreach ($this->scope as $operand) {
-            if ($this->scope[$operand] === $slot) {
-                $this->operandForScopeSlotCache[$slot] = $operand;
+        $operand = $this->operandsAtSlot[$slot][0] ?? null;
+        $this->operandForScopeSlotCache[$slot] = $operand;
 
-                return $operand;
-            }
-        }
-        $this->operandForScopeSlotCache[$slot] = null;
-
-        return null;
+        return $operand;
     }
 
     /**
@@ -4038,6 +4078,7 @@ class Block {
 
         if ($releaseScope) {
             $block->scope = new \SplObjectStorage();
+            $block->operandsAtSlot = [];
             $block->operandBySlotCache = [];
             $block->isNamedVariableSlotCache = [];
             $block->operandForScopeSlotCache = [];
