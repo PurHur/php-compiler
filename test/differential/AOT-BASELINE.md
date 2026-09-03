@@ -110,3 +110,30 @@ script/differential-sweep.sh --aot --dir test/differential/cases/programs --repe
 Prior tip (`85d9ec7fdc`) was **1/30** (only `p21`). #36366 fixed `{main}` `$out = $a.$b` feeding ECHO/strlen via an empty script-global while CONCAT wrote a native `__string__*` alloca — see `test/repro/i36366_bare_concat.php`.
 
 Remaining near-misses with matching payload but spurious undef warnings: `p09` (`$t` in typed method foreach `+=`), `p26` (`$c`). Do not `@differential-skip-aot` unless the backend genuinely cannot implement the shape.
+
+## Stderr / exit corpus (#36383)
+
+```bash
+script/differential-sweep.sh --stderr --dir test/differential/cases/errors     # VM 40/40
+script/differential-sweep.sh --stderr --aot --dir test/differential/cases/errors
+```
+
+VM is **40/40** (stdout + stderr + exit vs Zend; paths normalised).
+
+AOT executed cases that **match** Zend streams+exit include uncaught `{main}` `Exception`/`Error` (`e02`, `e03`, `e05`, `e24`, `e25`), `exit` status (`e01`, `e15`, `e20`, `e21`, `e31`), and non-throwing programs.
+
+AOT `@differential-skip-aot` names (reason on the case; not a silent green):
+
+| case | why |
+|---|---|
+| `e06_previous_chain` | `UncaughtThrowPrinter` does not walk `$previous` |
+| `e08_division_by_zero` | compile fails on integer `/ 0` |
+| `e12_trigger_warning` / `e19_warning_in_loop` / `e23_user_notice` | no stdout `Warning:`/`Notice:` display_errors copy |
+| `e14_fwrite_stderr_exit1` / `e32_fwrite_stdout` | compile fails on `fwrite(STD*)` |
+| `e17_modulo_zero` | `Error` not `DivisionByZeroError` |
+| `e18_throw_in_nested` | stack is `#0 {main}` only |
+| `e22_type_error_return` | segfault rc=139 |
+| `e38_sprintf` | compile hang |
+
+Function catch-rethrow silent rc=0 is fixed (`test/repro/fn_catch_rethrow_36383.php`, AOT exit 255). Include-file:line + ArgumentCountError/TypeError trace wording remain follow-ups.
+

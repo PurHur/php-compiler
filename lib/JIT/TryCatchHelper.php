@@ -742,6 +742,33 @@ final class TryCatchHelper
             return;
         }
 
+        // User-function catch rethrow sets throw-pending and returns (#24680). Without a
+        // same-function handler the caller must unwind: nested frames re-pend+return so
+        // an outer try can catch; {main} prints Zend-shaped uncaught + exit 255.
+        // php-src: Zend/zend_execute.c ZEND_HANDLE_EXCEPTION / zend_throw_exception_internal.
+        // Leaving this as a no-op made `function f(){ try { throw; } catch { throw; } } f();`
+        // compile to silent rc=0 under AOT (#36383).
+        $i32User = $context->getTypeFromString('int32');
+        $hasUserPending = $builder->call($context->lookupFunction('phpc_jit_has_throw_pending'));
+        $hasUserBool = $builder->icmp(
+            Builder::INT_NE,
+            $hasUserPending,
+            $i32User->constInt(0, false)
+        );
+        $contUser = self::appendBlock($func, 'after_call_no_user_throw');
+        $pendingUser = self::appendBlock($func, 'after_call_user_throw');
+        $builder->branchIf($hasUserBool, $pendingUser, $contUser);
+        $builder->positionAtEnd($pendingUser);
+        $pendingObj = $builder->call($context->lookupFunction('phpc_jit_take_throw_pending'));
+        $active = strtolower($context->activeFunction);
+        if ('' !== $active && '{main}' !== $active) {
+            $builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $pendingObj);
+            self::emitPropagateReturn($context, $func);
+        } else {
+            self::emitUncaughtUserHandlerOrAbort($context, $pendingObj);
+        }
+        $builder->positionAtEnd($contUser);
+
         // Uncaught: Enum::from also fills the type-error pending message for abort text.
         if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType
             && null !== $context->module->getNamedFunction('phpc_jit_abort_if_pending_type_error')

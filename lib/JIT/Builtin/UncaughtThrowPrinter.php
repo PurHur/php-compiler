@@ -94,6 +94,20 @@ final class UncaughtThrowPrinter
             $fileCstr,
             $lineOut
         );
+        // php-src main/main.c php_error_cb + sapi/cli: display_errors=On mirrors the fatal
+        // to stdout without the "PHP " prefix (one space after "Fatal error:") (#36383).
+        $stdout = self::stdoutFilePtr($context);
+        $builder->call(
+            $context->lookupFunction('fprintf'),
+            $stdout,
+            self::cstrPtr($context, "\nFatal error: Uncaught %s: %s in %s:%d\nStack trace:\n#0 {main}\n  thrown in %s on line %d\n"),
+            $classCstr,
+            $msgCstr,
+            $fileCstr,
+            $lineOut,
+            $fileCstr,
+            $lineOut
+        );
         $builder->call($context->lookupFunction('exit'), $i32->constInt(255, false));
         $context->llvm->lib->LLVMBuildUnreachable($builder->builder);
     }
@@ -247,6 +261,19 @@ final class UncaughtThrowPrinter
         return $i64->constInt(0, false);
     }
 
+    private static function stdoutFilePtr(Context $context): Value
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        if (null === $context->module->getNamedGlobal('stdout')) {
+            $context->module->addGlobal($i8p, 'stdout');
+        }
+        $stdoutGlobal = $context->module->getNamedGlobal('stdout');
+
+        return $context->builder->load(
+            $context->builder->pointerCast($stdoutGlobal, $i8p->pointerType(0))
+        );
+    }
+
     private static function cstrPtr(Context $context, string $literal): Value
     {
         return $context->builder->pointerCast(
@@ -264,6 +291,9 @@ final class UncaughtThrowPrinter
 
         if (null === $context->module->getNamedGlobal('stderr')) {
             $context->module->addGlobal($i8p, 'stderr');
+        }
+        if (null === $context->module->getNamedGlobal('stdout')) {
+            $context->module->addGlobal($i8p, 'stdout');
         }
 
         TypeErrorRaise::ensureDeclInScope(
