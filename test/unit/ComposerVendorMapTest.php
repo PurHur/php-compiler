@@ -138,18 +138,84 @@ final class ComposerVendorMapTest extends TestCase
             $this->expectException(\LogicException::class);
             $this->expectExceptionMessage('include/require path outside project file map');
 
-            // Mirror IncludeHelper allowlist gate (#36382).
             $path = realpath($blocked) ?: $blocked;
             $allow = $runtime->aotIncludeAllowlist;
-            if (!isset($allow[$path]) && !isset($allow[$blocked])) {
+            if (!\PHPCompiler\VM\ProjectIncludeAllowlist::isAllowed($path, $allow)) {
                 throw new \LogicException(
-                    'include/require path outside project file map: '.$path
-                    .' (issue #36382)'
+                    \PHPCompiler\VM\ProjectIncludeAllowlist::denyMessage($path)
                 );
             }
         } finally {
             $this->removeTree($dir);
         }
+    }
+
+    public function testVmComputedIncludeOutsideAllowlistThrowsError(): void
+    {
+        $dir = sys_get_temp_dir().'/phpc_vm_allow_'.bin2hex(random_bytes(4));
+        $this->assertTrue(mkdir($dir));
+        try {
+            $ok = $dir.'/ok.php';
+            $blocked = $dir.'/blocked.php';
+            file_put_contents($ok, "<?php\nreturn 1;\n");
+            file_put_contents($blocked, "<?php\nreturn 2;\n");
+            $main = $dir.'/main.php';
+            file_put_contents(
+                $main,
+                "<?php\n\$p = __DIR__.'/blocked.php';\nrequire \$p;\n"
+            );
+
+            $runtime = new Runtime();
+            $okKey = realpath($ok) ?: $ok;
+            $runtime->aotIncludeAllowlist = [$okKey => true];
+            $block = $runtime->parseAndCompileFile($main);
+            $this->assertNotNull($block);
+
+            $this->expectException(\Error::class);
+            $this->expectExceptionMessage('include/require path outside project file map');
+            $runtime->run($block);
+        } finally {
+            $this->removeTree($dir);
+        }
+    }
+
+    public function testVmComputedIncludeInsideAllowlistRuns(): void
+    {
+        $dir = sys_get_temp_dir().'/phpc_vm_allow_ok_'.bin2hex(random_bytes(4));
+        $this->assertTrue(mkdir($dir));
+        try {
+            $ok = $dir.'/ok.php';
+            file_put_contents($ok, "<?php\necho 'in-map';\n");
+            $main = $dir.'/main.php';
+            file_put_contents(
+                $main,
+                "<?php\n\$p = __DIR__.'/ok.php';\nrequire \$p;\n"
+            );
+
+            $runtime = new Runtime();
+            $okKey = realpath($ok) ?: $ok;
+            $mainKey = realpath($main) ?: $main;
+            $runtime->aotIncludeAllowlist = [$okKey => true, $mainKey => true];
+            $block = $runtime->parseAndCompileFile($main);
+            $this->assertNotNull($block);
+
+            ob_start();
+            $runtime->run($block);
+            $out = (string) ob_get_clean();
+            $this->assertSame('in-map', $out);
+        } finally {
+            $this->removeTree($dir);
+        }
+    }
+
+    public function testProjectIncludeAllowlistEmitKeysStable(): void
+    {
+        $keys = \PHPCompiler\VM\ProjectIncludeAllowlist::emitKeys([
+            '/b' => true,
+            '/a' => true,
+            '/b' => true,
+        ]);
+        $this->assertSame(['/a', '/b'], $keys);
     }
 
     private function removeTree(string $dir): void

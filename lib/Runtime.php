@@ -97,7 +97,8 @@ class Runtime {
     public array $modules = [];
     public int $mode;
     /**
-     * When set (phpc build --project), literal includes outside this realpath set fail loudly (#36382).
+     * When set (phpc build --project), includes outside this realpath set fail loudly (#36382).
+     * Literals are refused at compile time; computed paths are checked at runtime (VM + AOT).
      *
      * @var array<string, true>|null
      */

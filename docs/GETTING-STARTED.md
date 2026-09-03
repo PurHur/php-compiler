@@ -109,7 +109,7 @@ When `vendor/composer/` exists, `phpc build --project` reads Composer’s genera
 # expect: hello world|legacy|stamp
 ```
 
-`phpc.json` knobs: `"autoload": "composer"` (default when `vendor/composer` exists), `"autoload": "none"` to skip, and `"include_roots": ["lib/…"]` for extra trees. An include whose realpath is outside the project file map fails at compile time with the path (never a silent no-op).
+`phpc.json` knobs: `"autoload": "composer"` (default when `vendor/composer` exists), `"autoload": "none"` to skip, and `"include_roots": ["lib/…"]` for extra trees. Literal includes outside the project file map fail at compile time with the path. Computed `include $path` / `require $path` resolve against the same map at runtime: in-map paths are accepted (units already linked via the graph); out-of-map paths raise `Error` with the path (never a silent no-op).
 
 ### 5. (Optional) SessionsWeb — two-request flash (VM)
 
