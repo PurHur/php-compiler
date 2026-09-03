@@ -20406,7 +20406,11 @@ class JIT {
     private function invokeJitCall(JIT\Call $toCall, array $callArgs): \PHPLLVM\Value
     {
         JIT\DeprecatedCallGuard::emitBeforeCall($this->context, $toCall);
-        $trackUncaught = JIT\Builtin\UncaughtThrowPrinter::shouldTrackCall($this->context, $toCall);
+        // Leaf-recursive no-throw callees (fibo_r): skip uncaught-trace frames + pending
+        // throw checks — they cannot appear on an exception path (#36386).
+        $noThrowCallee = JIT\NoThrowCallElision::calleeIsNoThrow($this->context, $toCall);
+        $trackUncaught = !$noThrowCallee
+            && JIT\Builtin\UncaughtThrowPrinter::shouldTrackCall($this->context, $toCall);
         if ($trackUncaught) {
             JIT\Builtin\UncaughtThrowPrinter::emitPushFrame($this->context, $toCall);
         }
@@ -20428,7 +20432,9 @@ class JIT {
             JIT\Builtin\UncaughtThrowPrinter::emitPopFrame($this->context);
         }
         // Enum::from() (and other callees) set throw-pending then return; catch here (#24219).
-        JIT\TryCatchHelper::emitCheckPendingThrowAfterCall($this->context);
+        if (!$noThrowCallee) {
+            JIT\TryCatchHelper::emitCheckPendingThrowAfterCall($this->context);
+        }
 
         return $result;
     }
