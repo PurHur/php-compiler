@@ -1,0 +1,36 @@
+{
+    "name": "web-request",
+    "suite": "v2",
+    "generated_at": "2026-09-03T07:46:10Z",
+    "requests": 200,
+    "routes": [
+        {
+            "path": "/index.php",
+            "needle": "MiniWebApp"
+        },
+        {
+            "path": "/index.php/api/status",
+            "needle": "\"ok\":true"
+        }
+    ],
+    "zend_builtin_s": 1.0224168300628662,
+    "phpc_serve_s": 17.863662004470825,
+    "phpc_serve_aot_s": null,
+    "php_fpm_s": null,
+    "req_per_s": {
+        "zend_builtin": 391.22986656567934,
+        "phpc_serve": 22.391825365923854,
+        "phpc_serve_aot": null,
+        "php_fpm": null
+    },
+    "p99_ms": {
+        "zend_builtin": 3.7488937377929688,
+        "phpc_serve": 51.05113983154297,
+        "phpc_serve_aot": null,
+        "php_fpm": null
+    },
+    "notes": [
+        "phpc_serve_aot warmup failed status=200 path=/index.php",
+        "php_fpm n/a: no php-fpm binary on PATH in this environment"
+    ]
+}

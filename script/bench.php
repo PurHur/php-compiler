@@ -7,6 +7,8 @@ declare(strict_types=1);
  *
  * Default: benchmarks/*.php (legacy micro-suite).
  * --v2:     benchmarks/v2/*.php (#36385) + RESULTS.json + optional history.
+ *           Also runs script/bench-web-request.php (MiniWebApp req/s) and refreshes
+ *           docs/pages/bench.html unless PHP_COMPILER_BENCH_SKIP_WEB=1.
  *
  * Usage (pinned env):
  *   ./script/docker-exec.sh -- bash -lc 'PHP_8_2=$(command -v php) php script/bench.php'
@@ -116,6 +118,16 @@ if ($v2) {
     file_put_contents($resultsJson, json_encode($payload, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES)."\n");
     echo "Wrote {$resultsJson}\n";
 
+    if ('1' !== getenv('PHP_COMPILER_BENCH_SKIP_WEB')) {
+        $webCmd = escapeshellcmd($harnessPhp).' '.escapeshellarg($root.'/script/bench-web-request.php')
+            .' --merge-results';
+        echo "Running web-request column (#36385)...\n";
+        passthru($webCmd, $webRc);
+        if (0 !== $webRc) {
+            fwrite(STDERR, "bench.php --v2: bench-web-request exited {$webRc} (continuing; web column may be incomplete)\n");
+        }
+    }
+
     if ('1' === getenv('PHP_COMPILER_BENCH_HISTORY')) {
         $histDir = $root.'/benchmarks/history';
         if (!is_dir($histDir) && !mkdir($histDir, 0777, true) && !is_dir($histDir)) {
@@ -125,10 +137,20 @@ if ($v2) {
             if ('' === $sha) {
                 $sha = gmdate('YmdHis');
             }
+            $histPayload = json_decode((string) file_get_contents($resultsJson), true);
+            if (!is_array($histPayload)) {
+                $histPayload = $payload;
+            }
             $histPath = $histDir.'/'.$sha.'.json';
-            file_put_contents($histPath, json_encode($payload, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES)."\n");
+            file_put_contents($histPath, json_encode($histPayload, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES)."\n");
             echo "Wrote {$histPath}\n";
         }
+    }
+
+    $chartCmd = escapeshellcmd($harnessPhp).' '.escapeshellarg($root.'/script/generate-bench-chart.php');
+    passthru($chartCmd, $chartRc);
+    if (0 !== $chartRc) {
+        fwrite(STDERR, "bench.php --v2: generate-bench-chart exited {$chartRc}\n");
     }
 } else {
     $readme = file_get_contents($root.'/benchmarks/README.md');
