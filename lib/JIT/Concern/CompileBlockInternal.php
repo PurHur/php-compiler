@@ -412,6 +412,22 @@ trait CompileBlockInternal
                             );
                             break;
                         }
+                        // Prologue already assignOperand'd typed `array` formals onto a
+                        // KIND_VARIABLE slot. A second assignOperand free()s that HT
+                        // (delref) before re-storing — with caller rc=1 that frees the
+                        // table under the callee and the caller's value-box (#36386).
+                        // Same shape as the string skip above (#24137).
+                        if (
+                            Variable::TYPE_HASHTABLE === $args[$recvSlot]->type
+                            && $this->context->hasVariableOp($recvOp)
+                        ) {
+                            \PHPCompiler\JIT\UndefinedVariableHelper::markAssigned(
+                                $this->context,
+                                $recvOp,
+                                $this->context->getVariableFromOp($recvOp)
+                            );
+                            break;
+                        }
                         if ($this->storeJitCalleeValueStructFormal(
                             $recvOp,
                             $this->prepareNestedJitCalleeParamArgument($args[$recvSlot])
