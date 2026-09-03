@@ -510,21 +510,38 @@ final class AotCompileCacheTest extends TestCase
             'unchanged entry must skip Runtime include discovery (#36387)'
         );
         $this->assertStringContainsString('hello-beta', $this->runBinary($outEdit)['stdout']);
-        // Small fixtures floor at ~30% (ld+emit+Runtime); MiniWebApp config-only measured ~26%.
+        // Partial delta emit + prior aot.o link (#36387): MiniWebApp config-only ~15% cold.
         $this->assertLessThan(
-            $cold['wall_ms'] * 0.35,
+            $cold['wall_ms'] * 0.30,
             $edit['wall_ms'],
             sprintf(
-                'config-only edit should be <35%% of cold (cold=%.0fms edit=%.0fms) (#36387)',
+                'config-only edit should be <30%% of cold (cold=%.0fms edit=%.0fms) (#36387)',
                 $cold['wall_ms'],
                 $edit['wall_ms']
             )
+        );
+        $this->assertStringContainsString(
+            'edit_scaffold_demoted',
+            $timing,
+            'partial keep must demote prior aot.o bodies before delta emit (#36387)'
+        );
+        $this->assertStringContainsString(
+            'edit_scaffold_base_link',
+            $timing,
+            'partial keep must link delta against prior aot.o (#36387)'
         );
         if (preg_match('/"edit_scaffold_compile_ms":([0-9.]+)/', $timing, $m)) {
             $this->assertLessThan(
                 200.0,
                 (float) $m[1],
                 'kept lib symbols must not re-lower (compile_ms='.$m[1].') (#36387)'
+            );
+        }
+        if (preg_match('/"emit_object":([0-9.]+)/', $timing, $m)) {
+            $this->assertLessThan(
+                400.0,
+                (float) $m[1],
+                'delta emit after demote must be << full-module emit (emit_object='.$m[1].'ms) (#36387)'
             );
         }
     }
