@@ -14,10 +14,8 @@ use PHPCompiler\Config;
  * Persists verified LLVM bitcode keyed by source bytes + compiler fingerprint so a
  * second `bin/jit.php` process can skip LLVM IR lowering when inputs are unchanged.
  *
- * AOT warm rebuilds use {@see artifactPath()} / {@see objectPath()} — full-module
- * `module.bc` from user-script AOT does not round-trip (`LLVMParseBitcode` → Invalid
- * type even after compileCommon; same-process rewrite fails). AOT therefore writes
- * {@see stampPath()} + meta instead of relying on parseable bitcode (#36387).
+ * AOT warm rebuilds use {@see artifactPath()} / {@see objectPath()} for the fast path.
+ * Full-module {@see bitcodePath()} also round-trips once void* lowers as i8* (#36387).
  */
 final class CompileCache
 {
@@ -170,7 +168,7 @@ final class CompileCache
             return false;
         }
 
-        // JIT: module.bc. AOT: fresh.stamp (full-module bitcode does not parse back).
+        // JIT: module.bc. AOT: fresh.stamp and/or module.bc (void*→i8* makes bitcode legal).
         // Artifact / object alone also count so mid-tier restore stays valid (#36387).
         return self::hasDurableMarker($key);
     }
@@ -527,13 +525,12 @@ final class CompileCache
     }
 
     /**
-     * AOT cache entry without full-module bitcode (#36387).
+     * AOT cache entry: meta + {@see stampPath()} + optional round-trippable module.bc (#36387).
      *
-     * User-script AOT modules fail `LLVMParseBitcode` with Invalid type even when
-     * written after compileCommon (same LLVMContext rewrite also fails). Persist
-     * meta + {@see stampPath()} so artifact/object warm paths stay honest.
+     * void* previously made LLVMParseBitcode fail with Invalid type; opaque pointers now
+     * lower as i8* so bitcode is durable. Warm rebuilds still prefer aot.bin / aot.o.
      */
-    public static function saveAotStamp(string $key): void
+    public static function saveAotStamp(string $key, ?Context $context = null): void
     {
         if (null === self::$recordingExports) {
             return;
@@ -565,11 +562,8 @@ final class CompileCache
                 file_put_contents(self::metaPath($key), $payload);
             }
             file_put_contents(self::stampPath($key), "aot\n");
-            // Drop any prior unreadable full-module bitcode so isFresh does not
-            // imply tryRestore can succeed.
-            $bc = self::bitcodePath($key);
-            if (is_file($bc)) {
-                @unlink($bc);
+            if (null !== $context) {
+                $context->module->writeBitcodeToFile(self::bitcodePath($key));
             }
         } finally {
             flock($lock, LOCK_UN);

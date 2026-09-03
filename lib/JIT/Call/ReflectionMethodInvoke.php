@@ -146,7 +146,8 @@ final class ReflectionMethodInvoke implements Call
             $have = $context->getStringFromType($raw->typeOf());
             if ('__value__*' === $have) {
                 $context->builder->store($raw, $resultSlot);
-            } elseif ('void' === $have || 'void*' === $have) {
+            } elseif ('void' === $have || 'void*' === $have || 'int8*' === $have) {
+                // void* lowers as i8* for bitcode-legal types (#36387); treat opaque ptr as null.
                 $context->builder->store($null, $resultSlot);
             } else {
                 $boxed = JitValueBox::alloc($context);

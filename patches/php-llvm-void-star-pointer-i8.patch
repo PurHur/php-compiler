@@ -1,0 +1,17 @@
+--- vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Type.php
++++ vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Type.php
+@@ -35,7 +35,13 @@
+     }
+ 
+     public function pointerType(int $addressSpace): CorePointerType {
+-        return $this->llvm->factory->type($this->context, $this->llvm->lib->LLVMPointerType($this->type, $addressSpace));
++        // Pointers-to-void are illegal in LLVM bitcode (Invalid type on parse).
++        // Map void* to i8* so full-module module.bc round-trips (#36387).
++        $element = $this->type;
++        if ($this->kind === lib::LLVMVoidTypeKind) {
++            $element = $this->llvm->lib->LLVMInt8TypeInContext($this->context->context);
++        }
++        return $this->llvm->factory->type($this->context, $this->llvm->lib->LLVMPointerType($element, $addressSpace));
+     }
+ 
+     public function vectorType(int $elementCount): CoreVectorType {

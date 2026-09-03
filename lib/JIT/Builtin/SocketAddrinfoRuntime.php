@@ -89,7 +89,7 @@ final class SocketAddrinfoRuntime
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $sizeT = $context->getTypeFromString('size_t');
         $i64 = $context->getTypeFromString('int64');
-        $voidp = $context->getTypeFromString('void')->pointerType(0);
+        $voidp = $context->getTypeFromString('void*');
 
         $ft = $context->context->functionType(
             $htPtr,

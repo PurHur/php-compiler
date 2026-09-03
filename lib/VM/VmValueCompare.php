@@ -578,7 +578,7 @@ final class VmValueCompare
             $valuePtr
         );
         $nativeObj = $context->helper->loadValue($object);
-        $voidp = $context->getTypeFromString('void')->pointerType(0);
+        $voidp = $context->getTypeFromString('void*');
         $sizeT = $context->getTypeFromString('size_t');
         $leftPtr = $context->builder->ptrToInt(
             $context->builder->pointerCast($boxedObj, $voidp),
@@ -769,7 +769,7 @@ final class VmValueCompare
             $context->lookupFunction('__value__readObject'),
             $rightPtr
         );
-        $voidp = $context->getTypeFromString('void')->pointerType(0);
+        $voidp = $context->getTypeFromString('void*');
         $sizeT = $context->getTypeFromString('size_t');
         $leftHandle = $context->builder->ptrToInt(
             $context->builder->pointerCast($leftObj, $voidp),

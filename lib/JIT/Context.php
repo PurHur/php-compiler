@@ -3136,10 +3136,10 @@ class Context {
         $this->runModuleOptimizationPasses();
         \PHPCompiler\AOT\BuildTiming::end('ir_opt');
 
-        // AOT CompileCache: stamp + meta after compileCommon. Full-module bitcode
-        // does not round-trip (Invalid type) — warm paths use aot.bin / aot.o (#36387).
+        // AOT CompileCache: stamp + meta + round-trippable module.bc (void*→i8*, #36387).
+        // Warm paths still prefer aot.bin / aot.o; bitcode enables tryRestore fallback.
         if (null !== $this->aotCompileCacheKey && '' !== $this->aotCompileCacheKey) {
-            CompileCache::saveAotStamp($this->aotCompileCacheKey);
+            CompileCache::saveAotStamp($this->aotCompileCacheKey, $this);
         }
 
         $bitcodePath = Config::getenv('PHP_COMPILER_EMIT_BITCODE');
@@ -3987,6 +3987,14 @@ class Context {
         switch ($type) {
             case 'void':
                 return $this->context->voidType();
+            // LLVM forbids pointers-to-void in bitcode (Invalid type on LLVMParseBitcode).
+            // Map void*/void** to i8*/i8** so full-module module.bc round-trips (#36387).
+            case 'void*':
+            case 'const void*':
+                return $this->context->int8Type()->pointerType(0);
+            case 'void**':
+            case 'const void**':
+                return $this->context->int8Type()->pointerType(0)->pointerType(0);
             case 'const char':
                 return $this->context->int8Type();
             case 'char':
@@ -4028,7 +4036,13 @@ class Context {
 
         }
         if (substr($type, -1) === '*') {
-            return $this->getTypeFromString(substr($type, 0, -1))->pointerType(0);
+            $base = substr($type, 0, -1);
+            // void***… and any peel that would form pointer-to-void (#36387).
+            if ('void' === $base || 'const void' === $base) {
+                return $this->context->int8Type()->pointerType(0);
+            }
+
+            return $this->getTypeFromString($base)->pointerType(0);
         }
         if (substr($type, -1) === ']') {
             // array type
