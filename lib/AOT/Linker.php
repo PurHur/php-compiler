@@ -45,13 +45,14 @@ final class Linker
     /** libsodium for thin AEAD LLVM (#27318) — versioned .so like libz (no -dev symlink required). */
     private const SODIUM_LINK_LIB = '-l:libsodium.so.23';
 
-    /** Host multiarch lib dir for bundled LLVM ld (libz.so.1 lives here, not in LLVM sysroot). */
-    private const HOST_LIB_SEARCH = '-L/usr/lib/x86_64-linux-gnu';
-
     /** Runtime units that need host libc headers layered on the LLVM sysroot (incomplete headers). */
     private const RUNTIME_HOST_LIBC_BASENAMES = [
     ];
 
+    private static function hostLibSearchFlag(): string
+    {
+        return CompileTarget::current()->hostLibSearchFlag();
+    }
     private static function which(string $binary): ?string
     {
         if ('' === $binary) {
@@ -79,6 +80,7 @@ final class Linker
 
     public static function link(string $objectFile, string $executable): void
     {
+        CompileTarget::current()->assertCanLinkOnThisHost();
         $runtimeObjects = self::compileRuntimeObjects($objectFile);
         $vendorObjects = self::resolvePrelinkedVendorObjects();
         // Split compilation (#15889): merge the cached helper-runtime TU. It
@@ -120,6 +122,9 @@ final class Linker
             foreach ($vendorObjects as $vendorObject) {
                 $objects[] = escapeshellarg($vendorObject);
             }
+            $target = CompileTarget::current();
+            $crtDir = $target->crtDir() ?? '/usr/lib/x86_64-linux-gnu';
+            $dynamicLinker = $target->dynamicLinker() ?? '/lib64/ld-linux-x86-64.so.2';
             $cmd = implode(' ', [
                 escapeshellarg($ld),
                 AotDebugSymbols::linkFlag(),
@@ -127,18 +132,18 @@ final class Linker
                 AotGcSections::linkGcSectionsFlagForHelperLink(false, $helperGcLinkPaths),
                 self::helperMuldefsFlag('-z muldefs'),
                 self::libcNameHideFlag(false),
-                '-dynamic-linker /lib64/ld-linux-x86-64.so.2',
-                escapeshellarg('/usr/lib/x86_64-linux-gnu/crt1.o'),
+                '-dynamic-linker '.$dynamicLinker,
+                escapeshellarg($crtDir.'/crt1.o'),
                 escapeshellarg($crtbegin),
-                escapeshellarg('/usr/lib/x86_64-linux-gnu/crti.o'),
+                escapeshellarg($crtDir.'/crti.o'),
                 implode(' ', $objects),
                 '-lc',
                 '-lm',
-                self::HOST_LIB_SEARCH,
+                self::hostLibSearchFlag(),
                 self::runtimeLinkLibs($linkObjectFiles),
                 escapeshellarg($libgcc),
                 escapeshellarg($crtend),
-                escapeshellarg('/usr/lib/x86_64-linux-gnu/crtn.o'),
+                escapeshellarg($crtDir.'/crtn.o'),
                 '-o',
                 escapeshellarg($executable),
             ]);
@@ -161,8 +166,8 @@ final class Linker
             }
             // When linking with the bundled clang, ensure we can still resolve host libraries
             // (libpcre2-8, libcrypt, ...). Some bootstrap envs only ship the runtime .so/.a under
-            // /usr/lib/x86_64-linux-gnu without a full sysroot lib tree.
-            $cmd = escapeshellarg($clang).' '.AotDebugSymbols::linkFlag().AotGcSections::linkStripFlag().AotGcSections::linkGcSectionsFlagForHelperLink(true, $helperGcLinkPaths).self::helperMuldefsFlag(' -Wl,-z,muldefs').self::libcNameHideFlag(true).$objects.' '.self::HOST_LIB_SEARCH.' -lm '.self::runtimeLinkLibs($linkObjectFiles).' -o '.escapeshellarg($executable);
+            // the multiarch lib dir without a full sysroot lib tree (#36391).
+            $cmd = escapeshellarg($clang).' '.AotDebugSymbols::linkFlag().AotGcSections::linkStripFlag().AotGcSections::linkGcSectionsFlagForHelperLink(true, $helperGcLinkPaths).self::helperMuldefsFlag(' -Wl,-z,muldefs').self::libcNameHideFlag(true).$objects.' '.self::hostLibSearchFlag().' -lm '.self::runtimeLinkLibs($linkObjectFiles).' -o '.escapeshellarg($executable);
             self::run($cmd, $env);
             self::unlinkIfTemp($runtimeObjects);
 
@@ -428,10 +433,14 @@ final class Linker
     /** libargon2.so.1 for AOT password_hash(PASSWORD_ARGON2*) thin kernel (#26773). */
     private static function argon2RuntimeAvailable(): bool
     {
-        foreach ([
-            '/usr/lib/x86_64-linux-gnu/libargon2.so.1',
+        $multi = CompileTarget::current()->multiarchLibDir();
+        $candidates = [
             '/usr/lib/libargon2.so.1',
-        ] as $path) {
+        ];
+        if (null !== $multi) {
+            array_unshift($candidates, $multi.'/libargon2.so.1');
+        }
+        foreach ($candidates as $path) {
             if (\is_file($path)) {
                 return true;
             }
@@ -443,12 +452,19 @@ final class Linker
     /** libsodium.so.23 for AOT sodium AEAD/generichash thin LLVM (#27318, #27292). */
     private static function sodiumRuntimeAvailable(): bool
     {
-        foreach ([
-            '/usr/lib/x86_64-linux-gnu/libsodium.so.23',
+        $multi = CompileTarget::current()->multiarchLibDir();
+        $candidates = [
             '/usr/lib/libsodium.so.23',
-            '/usr/lib/x86_64-linux-gnu/libsodium.so',
             '/usr/lib/libsodium.so',
-        ] as $path) {
+        ];
+        if (null !== $multi) {
+            array_unshift(
+                $candidates,
+                $multi.'/libsodium.so.23',
+                $multi.'/libsodium.so',
+            );
+        }
+        foreach ($candidates as $path) {
             if (\is_file($path)) {
                 return true;
             }
@@ -612,9 +628,14 @@ final class Linker
         }
 
         if ([] === $dirs) {
-            foreach (['/usr/include', '/usr/include/x86_64-linux-gnu'] as $fallback) {
-                if (is_dir($fallback)) {
-                    $dirs[$fallback] = true;
+            $fallback = ['/usr/include'];
+            $multiInclude = CompileTarget::current()->includeMultiarchDir();
+            if (null !== $multiInclude) {
+                $fallback[] = $multiInclude;
+            }
+            foreach ($fallback as $dir) {
+                if (is_dir($dir)) {
+                    $dirs[$dir] = true;
                 }
             }
         }
@@ -722,7 +743,7 @@ final class Linker
                 continue;
             }
             $cmd = escapeshellarg($path) . ' '
-                . AotDebugSymbols::linkFlag() . AotGcSections::linkStripFlag() . AotGcSections::linkGcSectionsFlagForHelperLink(true, $helperGcLinkPaths) . self::helperMuldefsFlag(' -Wl,-z,muldefs') . self::libcNameHideFlag(true) . $objects . ' '.self::HOST_LIB_SEARCH.' -lm '.self::runtimeLinkLibs($linkObjectFiles).' -o ' . escapeshellarg($executable);
+                . AotDebugSymbols::linkFlag() . AotGcSections::linkStripFlag() . AotGcSections::linkGcSectionsFlagForHelperLink(true, $helperGcLinkPaths) . self::helperMuldefsFlag(' -Wl,-z,muldefs') . self::libcNameHideFlag(true) . $objects . ' '.self::hostLibSearchFlag().' -lm '.self::runtimeLinkLibs($linkObjectFiles).' -o ' . escapeshellarg($executable);
             $captured = self::runCaptured($cmd, null);
             if (0 === $captured['code']) {
                 self::unlinkIfTemp($runtimeObjects);

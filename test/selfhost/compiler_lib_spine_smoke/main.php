@@ -5225,6 +5225,7 @@ require_once __DIR__.'/../../../ext/zstd/ns_uncompress_init.php';
 require_once __DIR__.'/../../../ext/zstd/ns_uncompress_add.php';
 require_once __DIR__.'/../../../lib/AOT/AutoloadDiscovery.php';
 require_once __DIR__.'/../../../lib/AOT/ExternalMethodBind.php';
+require_once __DIR__.'/../../../lib/AOT/CompileTarget.php';
 require_once __DIR__.'/../../../lib/AOT/HelperRuntimeCache.php';
 require_once __DIR__.'/../../../lib/AOT/HelperUnitGlobalCtor.php';
 require_once __DIR__.'/../../../lib/AOT/Linker.php';

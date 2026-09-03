@@ -97,6 +97,7 @@ defaults — `doctor --env` exits non-zero when they drift.
 | `PHP_COMPILER_SELFHOST_AOT` | bool | compile | — | Self-host AOT emit mode | — |
 | `PHP_COMPILER_SKIP_SERVE_TESTS` | bool | gate | — | Skip @group serve tests (GHA-only) | — |
 | `PHP_COMPILER_SPINE_CHUNK` | string | compile | — | Split-TU spine chunk selector | #36147 |
+| `PHP_COMPILER_TARGET` | string | compile | — | AOT/helper-cache target: x86_64-linux\|aarch64-linux\|aarch64-darwin | #36391 |
 | `PHP_COMPILER_VENDOR_PRELINK` | bool | compile | — | Use vendor prelinked objects | — |
 | `PHP_COMPILER_VM_PEAK_RSS_MB` | int | runtime | `2048` | VM child peak RSS guard (MiB) | #497 |
 | `PHP_COMPILER_VM_RSS_GUARD` | bool | runtime | `1` | Enable VM RSS guard | #497 |
