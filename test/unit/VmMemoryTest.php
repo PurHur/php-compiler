@@ -60,4 +60,29 @@ final class VmMemoryTest extends TestCase
         $this->assertLessThan($peak1, $peak2);
         $this->assertGreaterThan(0, VmMemory::getUsage(true));
     }
+
+    /** beginRequest / endRequest zero emalloc so FastCGI keep-alive stays flat (#36388). */
+    public function testBeginEndRequestZerosEmallocCounters(): void
+    {
+        MemoryAccounting::beginRequest();
+        MemoryAccounting::noteBytes(4096);
+        $this->assertSame(4096, MemoryAccounting::currentBytes());
+        MemoryAccounting::endRequest();
+        $this->assertSame(0, MemoryAccounting::currentBytes());
+        $this->assertSame(0, MemoryAccounting::peakBytes());
+
+        MemoryAccounting::beginRequest();
+        $this->assertSame(0, MemoryAccounting::currentBytes());
+        MemoryAccounting::noteBytes(1024);
+        MemoryAccounting::beginRequest();
+        $this->assertSame(0, MemoryAccounting::currentBytes());
+    }
+
+    public function testRequestHandlerWiresMemoryRequestBoundary(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/Web/FastCgi/RequestHandler.php');
+        $this->assertStringContainsString('MemoryAccounting::beginRequest', $source);
+        $this->assertStringContainsString('MemoryAccounting::endRequest', $source);
+        $this->assertStringContainsString('VmMemory::endRequest', $source);
+    }
 }

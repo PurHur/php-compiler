@@ -42,6 +42,17 @@ final class MemoryRuntime
 
     public const EMALLOC_REQUEST_RESET = '__phpc_mm_request_reset';
 
+    /**
+     * Public request-boundary ABI for long-lived workers (`phpc fcgi`) (#36388).
+     *
+     * php-src: `main/main.c` `php_request_startup` / `php_request_shutdown` —
+     * Zend tears down the per-request emalloc heap; we reset Native `__mm__*`
+     * counters (bump-arena chunk release lands in a follow-up).
+     */
+    public const REQUEST_BEGIN = 'phpc_request_begin';
+
+    public const REQUEST_END = 'phpc_request_end';
+
     private const GET_USAGE = '__phpc_memory_get_usage';
 
     private const GET_PEAK_USAGE = '__phpc_memory_get_peak_usage';
@@ -210,7 +221,7 @@ final class MemoryRuntime
     }
 
     /**
-     * Define `__phpc_mm_emalloc_usage` / peak / request_reset once per module (#36388).
+     * Define `__phpc_mm_emalloc_usage` / peak / request_reset / phpc_request_* once per module (#36388).
      *
      * @param mixed $i64
      * @param mixed $voidTy
@@ -221,6 +232,36 @@ final class MemoryRuntime
         self::implementEmallocMaxFloorQuery($context, self::EMALLOC_USAGE, self::G_EMALLOC_CURRENT, $i64);
         self::implementEmallocMaxFloorQuery($context, self::EMALLOC_PEAK_USAGE, self::G_EMALLOC_PEAK, $i64);
         self::implementEmallocRequestReset($context, $i64, $voidTy);
+        self::implementRequestBoundaryWrappers($context, $i64, $voidTy);
+    }
+
+    /**
+     * Ensure `phpc_request_begin` / `phpc_request_end` exist before standalone main emit (#36388).
+     */
+    public static function ensureRequestBoundaryAbi(Context $context): void
+    {
+        $saved = BasicBlockHelper::tryGetInsertBlock($context);
+        self::ensureEmallocGlobals($context);
+        self::implementEmallocQueryBridges(
+            $context,
+            $context->getTypeFromString('int64'),
+            $context->getTypeFromString('void')
+        );
+        if (null !== $saved) {
+            BasicBlockHelper::restoreInsertBlock($context, $saved);
+        }
+    }
+
+    public static function emitRequestBeginForStandaloneMain(Context $context): void
+    {
+        self::ensureRequestBoundaryAbi($context);
+        $context->builder->call($context->lookupFunction(self::REQUEST_BEGIN));
+    }
+
+    public static function emitRequestEndForStandaloneMain(Context $context): void
+    {
+        self::ensureRequestBoundaryAbi($context);
+        $context->builder->call($context->lookupFunction(self::REQUEST_END));
     }
 
     /**
@@ -279,6 +320,33 @@ final class MemoryRuntime
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
         $context->builder->clearInsertionPosition();
+    }
+
+    /**
+     * `phpc_request_begin` / `phpc_request_end` → `__phpc_mm_request_reset` (#36388).
+     *
+     * @param mixed $i64
+     * @param mixed $voidTy
+     */
+    private static function implementRequestBoundaryWrappers(Context $context, $i64, $voidTy): void
+    {
+        self::implementEmallocRequestReset($context, $i64, $voidTy);
+        foreach ([self::REQUEST_BEGIN => 'mm_req_begin', self::REQUEST_END => 'mm_req_end'] as $abiName => $bbPrefix) {
+            $probe = $context->module->getNamedFunction($abiName);
+            if (null !== $probe && $probe->countBasicBlocks() > 0) {
+                $context->registerFunction($abiName, $probe);
+
+                continue;
+            }
+            $ft = $context->context->functionType($voidTy, false);
+            $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
+            $entry = $fn->appendBasicBlock($bbPrefix);
+            $context->builder->positionAtEnd($entry);
+            $context->builder->call($context->lookupFunction(self::EMALLOC_REQUEST_RESET));
+            $context->builder->returnVoid();
+            $context->registerFunction($abiName, $fn);
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     /**

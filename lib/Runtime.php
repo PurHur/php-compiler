@@ -1317,6 +1317,9 @@ class Runtime {
             OutputBuffer::setActiveContext(null);
             VmObGzhandler::reset();
             Superglobals::setActiveContext(null);
+            // php_request_shutdown memory half — keep FastCGI keep-alive flat (#36388).
+            MemoryAccounting::endRequest();
+            VmMemory::endRequest();
         }
     }
 

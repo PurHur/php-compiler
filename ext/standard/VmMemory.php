@@ -37,6 +37,14 @@ final class VmMemory
         self::$peakReal = 0;
     }
 
+    /** Reset real counters at request end (peer MemoryAccounting::endRequest) (#36388). */
+    public static function endRequest(): void
+    {
+        self::$realBase = -1;
+        self::$emallocAtRealBase = 0;
+        self::$peakReal = 0;
+    }
+
     /**
      * Z_PARAM_BOOL $real_usage — MemoryUsage enum first, then frame-aware bool
      * (strict_types → TypeError on null; soft → DEP+false) (#30346 / #21615).

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\Web\FastCgi;
 
 use PHPCompiler\ext\standard\VmFastCgi;
+use PHPCompiler\ext\standard\VmMemory;
+use PHPCompiler\VM\MemoryAccounting;
 use PHPCompiler\Web\CgiAotDriver;
 use PHPCompiler\Web\CgiDriver;
 use PHPCompiler\Web\DevServer;
@@ -61,11 +63,15 @@ final class RequestHandler
 
     private function dispatchRequest($stream, Request $request): void
     {
+        MemoryAccounting::beginRequest();
+        VmMemory::beginRequest();
         VmFastCgi::markFastCgiRequestActive();
         try {
             $this->dispatchRequestBody($stream, $request);
         } finally {
             VmFastCgi::clearFastCgiRequestActive();
+            MemoryAccounting::endRequest();
+            VmMemory::endRequest();
         }
     }
 
