@@ -1102,6 +1102,18 @@ class String_ extends Type {
         $destChar = $this->context->builder->gep($destChar, $oldLen);
         $rightChar = $this->context->builder->structGep($rightVar, $map['value']);
         $this->context->intrinsic->memcpy($destChar, $rightChar, $rightSize, false);
+        // realloc grow zeros [oldLen, newSize) then we overwrite that with RHS;
+        // the terminator at newSize is never written unless we do it here.
+        // substr/echo C-string walks need the NUL (php-src zend_string_extend).
+        $this->context->intrinsic->memset(
+            $this->context->builder->gep(
+                $this->context->builder->structGep($destStr, $map['value']),
+                $newSize
+            ),
+            $this->context->context->int8Type()->constInt(0, false),
+            $one,
+            false
+        );
         $this->context->builder->branch($doneBlock);
 
         $this->context->builder->positionAtEnd($doneBlock);
