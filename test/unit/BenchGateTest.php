@@ -21,6 +21,27 @@ final class BenchGateTest extends TestCase
         $this->assertStringContainsString('docker-exec.sh', $body);
         $this->assertStringContainsString('bench-gate.php', $body);
         $this->assertStringContainsString('--update', $body);
+        $this->assertStringContainsString('--compile', $body);
+    }
+
+    public function testCompileBaselineJsonHasHeadlineCases(): void
+    {
+        $path = dirname(__DIR__, 2).'/benchmarks/COMPILE_BASELINE.json';
+        $this->assertFileExists($path);
+        $doc = json_decode((string) file_get_contents($path), true);
+        $this->assertIsArray($doc);
+        $this->assertArrayHasKey('cases', $doc);
+        foreach (['hello-warm', 'miniwebapp', 'block-lint', 'scale-50', 'scale-100', 'scale-200'] as $name) {
+            $this->assertArrayHasKey($name, $doc['cases'], $name);
+        }
+        $this->assertSame(20, $doc['wall_tolerance_percent'] ?? null);
+    }
+
+    public function testBenchGatePhpDocumentsCompileMode(): void
+    {
+        $php = (string) file_get_contents(dirname(__DIR__, 2).'/script/bench-gate.php');
+        $this->assertStringContainsString('--compile', $php);
+        $this->assertStringContainsString('COMPILE_BASELINE.json', $php);
     }
 
     public function testBaselineJsonHasHeadlineCases(): void
