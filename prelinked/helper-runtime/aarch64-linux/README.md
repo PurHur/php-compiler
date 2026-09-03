@@ -8,12 +8,21 @@ On an x86_64 host the AArch64 backend is initialized explicitly — it does **no
 to host MCJIT (that would write x86_64 ELF into this tree). `Linker` still refuses a
 non-native link.
 
-Full unit corpus is not published here yet. Emit objects (no link) on any host with LLVM 9
-AArch64, or refresh on a native aarch64 machine:
+`script/check-helper-runtime-prelink.php --all-arches` asserts every committed `unit.o`
+(and `common.o` when present) has ELF `e_machine=183` (EM_AARCH64).
+
+Seed units may be published from any host with LLVM 9 AArch64 (object emit only). Full corpus
+refresh still needs a native aarch64 machine (or a longer QEMU job outside the 20 min cap):
 
 ```bash
-PHP_COMPILER_TARGET=aarch64-linux PHP_COMPILER_KEEP_OBJECT_FILE=1 \
-  php script/emit-helper-runtime-object.php --unit=/ext/standard/…   # one unit, 20 min cap
-# native aarch64 only:
+# one unit → committed tier (unique cache dir; 20 min / 8g cap)
+PHP_COMPILER_TARGET=aarch64-linux \
+PHP_COMPILER_HELPER_RUNTIME_CACHE_DIR=build/helper-runtime-cache-aarch64 \
+  php script/emit-helper-runtime-object.php --unit=/VM/CoalesceJitHelper.php
+PHP_COMPILER_TARGET=aarch64-linux \
+PHP_COMPILER_HELPER_RUNTIME_CACHE_DIR=build/helper-runtime-cache-aarch64 \
+  php script/publish-helper-units-prelink.php /VM/CoalesceJitHelper.php
+
+# native aarch64 only — full corpus:
 PHP_COMPILER_TARGET=aarch64-linux make helper-runtime-prelink-refresh
 ```

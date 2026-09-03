@@ -232,6 +232,55 @@ final class CompileTarget
         };
     }
 
+    /**
+     * Read ELF e_machine from an object/executable, or null when not a little-endian ELF.
+     *
+     * Used to refuse host-arch objects in the wrong prelinked/helper-runtime/<arch>/ tree (#36391).
+     */
+    public static function readElfMachine(string $path): ?int
+    {
+        if (!is_file($path) || filesize($path) < 20) {
+            return null;
+        }
+        $hdr = file_get_contents($path, false, null, 0, 20);
+        if (false === $hdr || strlen($hdr) < 20) {
+            return null;
+        }
+        if ("\x7fELF" !== substr($hdr, 0, 4)) {
+            return null;
+        }
+        // e_ident[EI_DATA]: 1 = ELFDATA2LSB
+        if ("\x01" !== $hdr[5]) {
+            return null;
+        }
+
+        return unpack('v', substr($hdr, 18, 2))[1];
+    }
+
+    /**
+     * @throws \RuntimeException when $path is ELF for a different machine than this target
+     */
+    public function assertObjectMatchesTarget(string $path): void
+    {
+        $want = $this->elfMachine();
+        if (null === $want) {
+            return;
+        }
+        $got = self::readElfMachine($path);
+        if (null === $got) {
+            throw new \RuntimeException(
+                'Expected ELF object for target '.$this->id.' at '.$path
+                .' (missing or not little-endian ELF) (#36391)'
+            );
+        }
+        if ($got !== $want) {
+            throw new \RuntimeException(
+                'Object '.$path.' has ELF e_machine='.$got.' but target '.$this->id
+                .' requires '.$want.' — refusing host/cross mismatch in helper-runtime (#36391)'
+            );
+        }
+    }
+
     /** PHPLLVM\Target::RELOC_* for {@see createTargetMachine} (#36387). */
     public function llvmRelocModeConst(): int
     {

@@ -379,6 +379,9 @@ helper-runtime-common-publish:
 	php script/emit-helper-runtime-common.php --from-prelinked
 helper-runtime-prelink-check:
 	php script/check-helper-runtime-prelink.php
+# ELF e_machine + freshness for every known Linux helper-runtime arch (#36391).
+helper-runtime-prelink-check-all:
+	php script/check-helper-runtime-prelink.php --all-arches
 bootstrap-init:
 	./script/bootstrap-init.sh
 bootstrap-sdk-pack:

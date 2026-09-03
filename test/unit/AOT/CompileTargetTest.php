@@ -206,4 +206,56 @@ final class CompileTargetTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $t->assertCanLinkOnThisHost();
     }
+
+    public function testReadElfMachineAndAssertObjectMatchesTarget(): void
+    {
+        if (!\PHPCompiler\LlvmToolchain::isReady(dirname(__DIR__, 3))) {
+            $this->markTestSkipped('LLVM 9 not available');
+        }
+        $llvm = \PHPLLVM\Chooser::choose();
+        $target = CompileTarget::resolve(CompileTarget::ID_AARCH64_LINUX);
+        try {
+            $target->initializeLlvm($llvm);
+        } catch (\RuntimeException $e) {
+            $this->markTestSkipped($e->getMessage());
+        }
+        $llvmTarget = $llvm->getTargetFromName($target->llvmTargetName());
+        $machine = $llvmTarget->createTargetMachine(
+            $target->llvmTriple(),
+            $target->cpu(),
+            '',
+            \PHPLLVM\Target::OPT_LEVEL_NONE,
+            $target->llvmRelocModeConst(),
+            \PHPLLVM\Target::CODE_MODEL_DEFAULT
+        );
+        $ctx = $llvm->contextCreate();
+        $mod = $ctx->moduleCreateWithName('elf-assert');
+        $target->applyToModule($mod);
+        $i32 = $ctx->int32Type();
+        $fn = $mod->addFunction('main', $ctx->functionType($i32, false));
+        $bb = $fn->appendBasicBlock('entry');
+        $b = $ctx->builderCreate();
+        $b->positionAtEnd($bb);
+        $b->returnValue($i32->constInt(0, false));
+        $out = sys_get_temp_dir().'/phpc-elf-assert-'.bin2hex(random_bytes(4)).'.o';
+        $this->assertTrue($machine->emitToFile($mod, $out, $machine::CODEGEN_FILE_TYPE_OBJECT));
+        $this->assertSame(183, CompileTarget::readElfMachine($out));
+        $target->assertObjectMatchesTarget($out);
+
+        $x86 = CompileTarget::resolve(CompileTarget::ID_X86_64_LINUX);
+        $this->expectException(\RuntimeException::class);
+        try {
+            $x86->assertObjectMatchesTarget($out);
+        } finally {
+            @unlink($out);
+        }
+    }
+
+    public function testReadElfMachineRejectsNonElf(): void
+    {
+        $path = sys_get_temp_dir().'/phpc-not-elf-'.bin2hex(random_bytes(4));
+        file_put_contents($path, 'not an elf');
+        $this->assertNull(CompileTarget::readElfMachine($path));
+        @unlink($path);
+    }
 }
