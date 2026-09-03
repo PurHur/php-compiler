@@ -661,6 +661,10 @@ class String_ extends Type {
     $needsMin = $this->context->builder->icmp(\PHPLLVM\Builder::INT_SLT, $grown, $minCap);
     $targetCap = $this->context->builder->select($needsMin, $minCap, $grown);
     $destValue = $this->context->memory->realloc($destVar, $targetCap);
+    // memory->realloc may return a moved pointer — publish it back to the caller's
+    // `__string__**` slot. Without this, appendInPlace/concat keep writing through the
+    // freed old buffer after the first geometric grow past the initial 32-byte cap (#36386).
+    $this->context->builder->store($destValue, $doublePtr);
     $offset = $this->context->structFieldMap[$this->context->structNameForValue($destValue)]['length'];
                 $this->context->builder->store(
                     $newSize,
@@ -995,8 +999,8 @@ class String_ extends Type {
     }
 
     /**
-     * In-place `$dest .= $right` on a refcount-1 native string slot: grow via
-     * {@see __string__realloc} and append the right payload only (#36410).
+     * In-place `$dest .= $right` on a native string slot: grow via
+     * {@see __string__realloc} and append the right payload only (#36410 / #36386).
      */
     public function appendInPlace(Variable $dest, Variable $right): void
     {
@@ -1057,6 +1061,11 @@ class String_ extends Type {
             $newSize
         );
         $destStr = $this->context->builder->load($destSlot);
+        // Realloc already wrote $newSize into length; store again to match concat().
+        $this->context->builder->store(
+            $newSize,
+            $this->context->builder->structGep($destStr, $map['length'])
+        );
         $destChar = $this->context->builder->structGep($destStr, $map['value']);
         $destChar = $this->context->builder->gep($destChar, $oldLen);
         $rightChar = $this->context->builder->structGep($rightVar, $map['value']);

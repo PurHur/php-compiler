@@ -125,4 +125,125 @@ final class MainScriptInPlaceAppendAotTest extends TestCase
             @unlink($bin);
         }
     }
+
+    public function testMainScriptDynamicAppendUsesReallocNotFullAlloc(): void
+    {
+        $src = <<<'PHP'
+        <?php
+        $buf = '';
+        for ($i = 0; $i < 4; ++$i) {
+            $buf .= 'row-'.$i.';';
+        }
+        echo strlen($buf), "\n";
+        PHP;
+        $path = sys_get_temp_dir().'/phpc_main_dyn_append_'.getmypid().'.php';
+        $bin = sys_get_temp_dir().'/phpc_main_dyn_append_'.getmypid().'.bin';
+        file_put_contents($path, $src);
+        try {
+            putenv('PHP_COMPILER_DUMP_IR=1');
+            $cmd = escapeshellarg(PHP_BINARY).' '
+                .escapeshellarg(__DIR__.'/../../bin/compile.php').' -o '
+                .escapeshellarg($bin).' '.escapeshellarg($path).' 2>&1';
+            exec($cmd, $out, $rc);
+            $this->assertSame(0, $rc, implode("\n", $out));
+            $this->assertFileExists('/tmp/phpc-last.ll');
+            $ll = (string) file_get_contents('/tmp/phpc-last.ll');
+            $bestStart = 0;
+            $bestLen = 0;
+            $offset = 0;
+            while (false !== ($s = strpos($ll, 'define void @internal_', $offset))) {
+                $e = strpos($ll, "\ndefine ", $s + 1);
+                $len = false === $e ? strlen($ll) - $s : $e - $s;
+                if ($len > $bestLen) {
+                    $bestLen = $len;
+                    $bestStart = $s;
+                }
+                $offset = $s + 1;
+            }
+            $this->assertGreaterThan(0, $bestLen, 'missing @internal_* {main} body');
+            $fnEnd = strpos($ll, "\ndefine ", $bestStart + 1);
+            $body = false === $fnEnd ? substr($ll, $bestStart) : substr($ll, $bestStart, $fnEnd - $bestStart);
+            $this->assertMatchesRegularExpression(
+                '/call void @__string__realloc\(/',
+                $body,
+                '{main} $buf .= dynamic must use __string__realloc (#36386)'
+            );
+            $this->assertStringContainsString('append_', $body, 'expected appendInPlace blocks');
+            exec(escapeshellarg($bin), $runOut, $runRc);
+            $this->assertSame(0, $runRc);
+            $this->assertSame(['24'], $runOut); // strlen('row-0;row-1;row-2;row-3;') = 24
+        } finally {
+            putenv('PHP_COMPILER_DUMP_IR');
+            @unlink($path);
+            @unlink($bin);
+        }
+    }
+
+    public function testMainScriptDynamicAppendMatchesZendAtScale(): void
+    {
+        $src = <<<'PHP'
+        <?php
+        $buf = '';
+        for ($i = 0; $i < 300; ++$i) {
+            $buf .= 'x';
+        }
+        if (strlen($buf) > 1000) {
+            $buf = substr($buf, 500);
+        }
+        echo strlen($buf), "\n";
+        PHP;
+        $path = sys_get_temp_dir().'/phpc_main_scale_append_'.getmypid().'.php';
+        $bin = sys_get_temp_dir().'/phpc_main_scale_append_'.getmypid().'.bin';
+        file_put_contents($path, $src);
+        try {
+            exec(escapeshellarg(PHP_BINARY).' '.escapeshellarg($path).' 2>&1', $zendOut, $zendRc);
+            $this->assertSame(0, $zendRc, implode("\n", $zendOut));
+            $cmd = escapeshellarg(PHP_BINARY).' '
+                .escapeshellarg(__DIR__.'/../../bin/compile.php').' -o '
+                .escapeshellarg($bin).' '.escapeshellarg($path).' 2>&1';
+            exec($cmd, $out, $rc);
+            $this->assertSame(0, $rc, implode("\n", $out));
+            exec(escapeshellarg($bin).' 2>&1', $runOut, $runRc);
+            $this->assertSame(0, $runRc, implode("\n", $runOut));
+            $this->assertSame($zendOut, $runOut);
+            $this->assertSame(['300'], $runOut);
+        } finally {
+            @unlink($path);
+            @unlink($bin);
+        }
+    }
+
+    public function testFunctionLocalDynamicAppendMatchesZendAtScale(): void
+    {
+        $src = <<<'PHP'
+        <?php
+        function build(int $n): string {
+            $buf = '';
+            for ($i = 0; $i < $n; ++$i) {
+                $buf .= 'row-'.$i.';';
+            }
+            return $buf;
+        }
+        $s = build(30);
+        echo strlen($s), '|', substr($s, 0, 12), '|', substr($s, 194, 6), "\n";
+        PHP;
+        $path = sys_get_temp_dir().'/phpc_fn_dyn_append_'.getmypid().'.php';
+        $bin = sys_get_temp_dir().'/phpc_fn_dyn_append_'.getmypid().'.bin';
+        file_put_contents($path, $src);
+        try {
+            exec(escapeshellarg(PHP_BINARY).' '.escapeshellarg($path).' 2>&1', $zendOut, $zendRc);
+            $this->assertSame(0, $zendRc, implode("\n", $zendOut));
+            $cmd = escapeshellarg(PHP_BINARY).' '
+                .escapeshellarg(__DIR__.'/../../bin/compile.php').' -o '
+                .escapeshellarg($bin).' '.escapeshellarg($path).' 2>&1';
+            exec($cmd, $out, $rc);
+            $this->assertSame(0, $rc, implode("\n", $out));
+            exec(escapeshellarg($bin).' 2>&1', $runOut, $runRc);
+            $this->assertSame(0, $runRc, implode("\n", $runOut));
+            $this->assertSame($zendOut, $runOut);
+        } finally {
+            @unlink($path);
+            @unlink($bin);
+        }
+    }
 }
