@@ -135,6 +135,169 @@ class Module extends ModuleAbstract
             }
             $obj->markHasConstructor($id);
         });
+
+        // Dom instanceof stand-ins + live property fetch (#33607 / #36204).
+        $context->type->object->registerInstanceOfHook(
+            static function ($ctx, $expr, string $className) {
+                return JitDomStandinGetClass::tryEmitInstanceOf($ctx, $expr, $className);
+            }
+        );
+        $context->type->object->registerPropertyFetchHook(
+            static function (
+                $object,
+                $obj,
+                string $class,
+                string $name,
+                int $classId,
+                bool $forWrite,
+                $receiverVar
+            ) {
+                return self::tryInstancePropertyFetch(
+                    $object,
+                    $obj,
+                    $class,
+                    $name,
+                    $classId,
+                    $forWrite,
+                    $receiverVar
+                );
+            }
+        );
+        $context->type->object->registerRuntimePropertyFetchPreferrer(
+            static function (array $candidates, string $name) {
+                return self::preferRuntimePropertyFetchCandidate($candidates, $name);
+            }
+        );
+    }
+
+    /**
+     * Dom live instance-property fetch previously hard-wired in ObjectInstancePropertyLlvm (#36204).
+     *
+     * @return \PHPCompiler\JIT\Variable|null
+     */
+    private static function tryInstancePropertyFetch(
+        $object,
+        $obj,
+        string $class,
+        string $name,
+        int $classId,
+        bool $forWrite,
+        $receiverVar
+    ) {
+        $classLc = strtolower(str_replace('/', '\\', ltrim($class, '\\')));
+        if (JitDomNodeChildProperty::isDomNodeChildProperty($classLc, strtolower($name))) {
+            return JitDomNodeChildProperty::fetch(
+                $object,
+                $obj,
+                $name,
+                $classLc,
+                $receiverVar
+            );
+        }
+        if (JitDomParentNodeProperty::isDomParentNodeProperty($classLc, strtolower($name))) {
+            return JitDomParentNodeProperty::fetch($object, $obj);
+        }
+        if (JitDomNodeIsConnected::isDomNodeIsConnected($classLc, strtolower($name))) {
+            return JitDomNodeIsConnected::fetch($object, $obj);
+        }
+        if (JitDomElementNavigationProperty::isElementNavigationProperty($classLc, strtolower($name))) {
+            return JitDomElementNavigationProperty::fetch($object, $obj, $name, $class, $receiverVar);
+        }
+        $propLc = strtolower($name);
+        if (JitDomElementTextContent::isDomAttrValueProperty($classLc, $propLc)) {
+            return JitDomElementTextContent::fetchAttrValue($object, $obj, $name, $receiverVar);
+        }
+        // `$o->value` read on living Dom\Attr orphan resolves to SensitiveParameterValue::$value
+        // (TYPE_VALUE box) when both classes declare `value` — writes already redirect (#21083).
+        if ('value' === $propLc
+            && 'sensitiveparametervalue' === $classLc
+            && null !== JitDomLoadXMLUserScript::lastDocumentClass()
+            && str_starts_with(
+                (string) JitDomLoadXMLUserScript::lastDocumentClass(),
+                'Dom\\'
+            )
+        ) {
+            return JitDomElementTextContent::fetchAttrValue($object, $obj, $name, $receiverVar);
+        }
+        if (JitDomElementTextContent::isDomElementTextContent($classLc, $propLc)) {
+            return JitDomElementTextContent::fetchNamed($object, $obj, $name, $receiverVar);
+        }
+        if ('length' === strtolower($name)) {
+            $recv = $receiverVar;
+            if (null !== $recv) {
+                $ownerOp = $recv->objectPropertyReceiverOp;
+                if (null !== $ownerOp) {
+                    $ctx = $object->jitContext();
+                    if ($ctx->hasVariableOpInScopes($ownerOp)) {
+                        $owner = $ctx->getVariableFromOpInScopes($ownerOp);
+                        if (null !== ($owner->compileTimeDomAttrLocalName ?? null)) {
+                            return JitDomNodeListLength::fetch($object, $obj, $recv);
+                        }
+                    }
+                }
+                if ('DOMNodeList' === ($recv->classUserType ?? '')
+                    || null !== ($recv->compileTimeDomNodeListLength ?? null)
+                ) {
+                    return JitDomNodeListLength::fetch($object, $obj, $recv);
+                }
+            }
+        }
+        if (JitDomNodeListLength::isDomNodeListLength($classLc, strtolower($name))) {
+            return JitDomNodeListLength::fetch($object, $obj, $receiverVar);
+        }
+        if (JitDomNamedNodeMap::isLength($classLc, strtolower($name))) {
+            return JitDomNamedNodeMap::fetchLength($object, $obj);
+        }
+        if (JitDomNamedNodeMap::isAttributesProperty($classLc, strtolower($name))) {
+            return JitDomNamedNodeMap::fetchAttributes($object, $obj, $class);
+        }
+        if (JitDomDocumentElement::isDomDocumentElement($classLc, strtolower($name))) {
+            return JitDomDocumentElement::fetch($object, $obj, $receiverVar, $class);
+        }
+        if (JitDomDocumentDoctype::isDomDocumentDoctype($classLc, strtolower($name))) {
+            return JitDomDocumentDoctype::fetch($object, $obj, $class);
+        }
+        if (JitDomNodeBaseUri::isDomNodeBaseUriProperty($classLc, strtolower($name))) {
+            return JitDomNodeBaseUri::fetch($object, $obj, $class);
+        }
+        if (JitDomDocumentMetaProps::isDomDocumentMetaProp($classLc, strtolower($name))) {
+            return JitDomDocumentMetaProps::fetch($object, $obj, $class, $name);
+        }
+        // childNodes must use the DOMNode slot LiveSlots/loadXML write — fetching via
+        // DOMElement defineProperty'd a second index past the allocation (#327xx).
+        if (JitDomChildNodesProperty::isDomChildNodesProperty($classLc, strtolower($name))) {
+            return JitDomChildNodesProperty::fetch($object, $obj, $receiverVar);
+        }
+
+        return null;
+    }
+
+    /**
+     * Prefer Dom\Attr when living Dom\* document shares `value`/`nodeValue` (#27108 / #36204).
+     *
+     * @param array<int, string> $candidates
+     * @return array{0: int, 1: string}|null
+     */
+    private static function preferRuntimePropertyFetchCandidate(array $candidates, string $name): ?array
+    {
+        $propLc = strtolower($name);
+        if (!\in_array($propLc, ['value', 'nodevalue'], true)
+            || null === JitDomLoadXMLUserScript::lastDocumentClass()
+            || !str_starts_with(
+                (string) JitDomLoadXMLUserScript::lastDocumentClass(),
+                'Dom\\'
+            )
+        ) {
+            return null;
+        }
+        foreach ($candidates as $id => $className) {
+            $classLc = strtolower(str_replace('/', '\\', ltrim($className, '\\')));
+            if ('dom\\attr' === $classLc || 'domattr' === $classLc) {
+                return [(int) $id, $className];
+            }
+        }
+
+        return null;
     }
 
     public function init(Runtime $runtime): void
