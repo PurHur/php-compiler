@@ -49,88 +49,16 @@ final class ObjectInstancePropertyLlvm
                 );
             }
         }
-        if (\PHPCompiler\ext\dom\JitDomNodeChildProperty::isDomNodeChildProperty($classLc, strtolower($name))) {
-            return \PHPCompiler\ext\dom\JitDomNodeChildProperty::fetch(
-                $object,
-                $obj,
-                $name,
-                $classLc,
-                $receiverVar
-            );
-        }
-        if (\PHPCompiler\ext\dom\JitDomParentNodeProperty::isDomParentNodeProperty($classLc, strtolower($name))) {
-            return \PHPCompiler\ext\dom\JitDomParentNodeProperty::fetch($object, $obj);
-        }
-        if (\PHPCompiler\ext\dom\JitDomNodeIsConnected::isDomNodeIsConnected($classLc, strtolower($name))) {
-            return \PHPCompiler\ext\dom\JitDomNodeIsConnected::fetch($object, $obj);
-        }
-        if (\PHPCompiler\ext\dom\JitDomElementNavigationProperty::isElementNavigationProperty($classLc, strtolower($name))) {
-            return \PHPCompiler\ext\dom\JitDomElementNavigationProperty::fetch($object, $obj, $name, $class, $receiverVar);
-        }
-        $propLc = strtolower($name);
-        if (\PHPCompiler\ext\dom\JitDomElementTextContent::isDomAttrValueProperty($classLc, $propLc)) {
-            return \PHPCompiler\ext\dom\JitDomElementTextContent::fetchAttrValue($object, $obj, $name, $receiverVar);
-        }
-        // `$o->value` read on living Dom\Attr orphan resolves to SensitiveParameterValue::$value
-        // (TYPE_VALUE box) when both classes declare `value` — writes already redirect (#21083).
-        if ('value' === $propLc
-            && 'sensitiveparametervalue' === $classLc
-            && null !== \PHPCompiler\ext\dom\JitDomLoadXMLUserScript::lastDocumentClass()
-            && str_starts_with(
-                (string) \PHPCompiler\ext\dom\JitDomLoadXMLUserScript::lastDocumentClass(),
-                'Dom\\'
-            )
-        ) {
-            return \PHPCompiler\ext\dom\JitDomElementTextContent::fetchAttrValue($object, $obj, $name, $receiverVar);
-        }
-        if (\PHPCompiler\ext\dom\JitDomElementTextContent::isDomElementTextContent($classLc, $propLc)) {
-            return \PHPCompiler\ext\dom\JitDomElementTextContent::fetchNamed($object, $obj, $name, $receiverVar);
-        }
-        if ('length' === strtolower($name)) {
-            $recv = $receiverVar;
-            if (null !== $recv) {
-                $ownerOp = $recv->objectPropertyReceiverOp;
-                if (null !== $ownerOp) {
-                    $ctx = $object->jitContext();
-                    if ($ctx->hasVariableOpInScopes($ownerOp)) {
-                        $owner = $ctx->getVariableFromOpInScopes($ownerOp);
-                        if (null !== ($owner->compileTimeDomAttrLocalName ?? null)) {
-                            return \PHPCompiler\ext\dom\JitDomNodeListLength::fetch($object, $obj, $recv);
-                        }
-                    }
-                }
-                if ('DOMNodeList' === ($recv->classUserType ?? '')
-                    || null !== ($recv->compileTimeDomNodeListLength ?? null)
-                ) {
-                    return \PHPCompiler\ext\dom\JitDomNodeListLength::fetch($object, $obj, $recv);
-                }
-            }
-        }
-        if (\PHPCompiler\ext\dom\JitDomNodeListLength::isDomNodeListLength($classLc, strtolower($name))) {
-            return \PHPCompiler\ext\dom\JitDomNodeListLength::fetch($object, $obj, $receiverVar);
-        }
-        if (\PHPCompiler\ext\dom\JitDomNamedNodeMap::isLength($classLc, strtolower($name))) {
-            return \PHPCompiler\ext\dom\JitDomNamedNodeMap::fetchLength($object, $obj);
-        }
-        if (\PHPCompiler\ext\dom\JitDomNamedNodeMap::isAttributesProperty($classLc, strtolower($name))) {
-            return \PHPCompiler\ext\dom\JitDomNamedNodeMap::fetchAttributes($object, $obj, $class);
-        }
-        if (\PHPCompiler\ext\dom\JitDomDocumentElement::isDomDocumentElement($classLc, strtolower($name))) {
-            return \PHPCompiler\ext\dom\JitDomDocumentElement::fetch($object, $obj, $receiverVar, $class);
-        }
-        if (\PHPCompiler\ext\dom\JitDomDocumentDoctype::isDomDocumentDoctype($classLc, strtolower($name))) {
-            return \PHPCompiler\ext\dom\JitDomDocumentDoctype::fetch($object, $obj, $class);
-        }
-        if (\PHPCompiler\ext\dom\JitDomNodeBaseUri::isDomNodeBaseUriProperty($classLc, strtolower($name))) {
-            return \PHPCompiler\ext\dom\JitDomNodeBaseUri::fetch($object, $obj, $class);
-        }
-        if (\PHPCompiler\ext\dom\JitDomDocumentMetaProps::isDomDocumentMetaProp($classLc, strtolower($name))) {
-            return \PHPCompiler\ext\dom\JitDomDocumentMetaProps::fetch($object, $obj, $class, $name);
-        }
-        // childNodes must use the DOMNode slot LiveSlots/loadXML write — fetching via
-        // DOMElement defineProperty'd a second index past the allocation (#327xx).
-        if (\PHPCompiler\ext\dom\JitDomChildNodesProperty::isDomChildNodesProperty($classLc, strtolower($name))) {
-            return \PHPCompiler\ext\dom\JitDomChildNodesProperty::fetch($object, $obj, $receiverVar);
+        $extFetch = $object->tryExternalPropertyFetch(
+            $obj,
+            $class,
+            $name,
+            $classId,
+            $forWrite,
+            $receiverVar
+        );
+        if (null !== $extFetch) {
+            return $extFetch;
         }
         if (!$forWrite) {
             $asProps = \PHPCompiler\VM\ArrayObjectJitHelper::tryPropertyFetchRead(
@@ -428,20 +356,16 @@ final class ObjectInstancePropertyLlvm
         // SensitiveParameterValue — multi-candidate dispatch returns a detached
         // TYPE_VALUE box that cannot accept assigns (#27108). Prefer Dom\Attr
         // declared slots when the user-script document is living Dom\*.
-        $propLc = strtolower($name);
-        if (\in_array($propLc, ['value', 'nodevalue'], true)
-            && null !== \PHPCompiler\ext\dom\JitDomLoadXMLUserScript::lastDocumentClass()
-            && str_starts_with(
-                (string) \PHPCompiler\ext\dom\JitDomLoadXMLUserScript::lastDocumentClass(),
-                'Dom\\'
-            )
-        ) {
-            foreach ($candidates as $id => $className) {
-                $classLc = strtolower(str_replace('/', '\\', ltrim($className, '\\')));
-                if ('dom\\attr' === $classLc || 'domattr' === $classLc) {
-                    return self::propertyFetchOrdinary($object, $obj, $className, $name, $id, $forWrite);
-                }
-            }
+        $preferred = $object->preferExternalRuntimePropertyFetch($candidates, $name);
+        if (null !== $preferred) {
+            return self::propertyFetchOrdinary(
+                $object,
+                $obj,
+                $preferred[1],
+                $name,
+                $preferred[0],
+                $forWrite
+            );
         }
         if (1 === \count($candidates)) {
             $classId = array_key_first($candidates);

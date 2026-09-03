@@ -161,6 +161,27 @@ class Object_ extends Type {
      */
     private array $externalClassSeeders = [];
 
+    /**
+     * Extension-owned instanceof hooks (#36204 / Dom stand-ins).
+     *
+     * @var list<callable(Context, Variable, string): ?Variable>
+     */
+    private array $instanceOfHooks = [];
+
+    /**
+     * Extension-owned instance property fetch hooks (#36204 / Dom live props).
+     *
+     * @var list<callable(self, \PHPLLVM\Value, string, string, int, bool, ?Variable): ?Variable>
+     */
+    private array $propertyFetchHooks = [];
+
+    /**
+     * Extension-owned preferrer when runtime class_id multi-candidate fetch resolves (#36204).
+     *
+     * @var list<callable(array<int, string>, string): ?array{0: int, 1: string}>
+     */
+    private array $runtimePropertyFetchPreferrers = [];
+
     /** @var array<int, array<string, int>> class id => const lc => visibility flags (#4651, #6664) */
     private array $constVisibility = [];
 
@@ -4073,6 +4094,83 @@ class Object_ extends Type {
     public function registerExternalClassSeeder(string $lcname, callable $seeder): void
     {
         $this->externalClassSeeders[strtolower($lcname)][] = $seeder;
+    }
+
+    /**
+     * Register an extension-owned instanceof hook (#36204).
+     *
+     * @param callable(Context, Variable, string): ?Variable $hook
+     *        Returns a native-bool Variable when the extension owns the check; null to fall through.
+     */
+    public function registerInstanceOfHook(callable $hook): void
+    {
+        $this->instanceOfHooks[] = $hook;
+    }
+
+    /**
+     * Register an extension-owned instance property fetch hook (#36204).
+     *
+     * @param callable(self, \PHPLLVM\Value, string, string, int, bool, ?Variable): ?Variable $hook
+     */
+    public function registerPropertyFetchHook(callable $hook): void
+    {
+        $this->propertyFetchHooks[] = $hook;
+    }
+
+    /**
+     * Prefer a candidate when runtime multi-class property fetch conflicts (#36204).
+     *
+     * @param callable(array<int, string>, string): ?array{0: int, 1: string} $preferrer
+     */
+    public function registerRuntimePropertyFetchPreferrer(callable $preferrer): void
+    {
+        $this->runtimePropertyFetchPreferrers[] = $preferrer;
+    }
+
+    public function tryExternalInstanceOf(Variable $expr, string $className): ?Variable
+    {
+        foreach ($this->instanceOfHooks as $hook) {
+            $hit = $hook($this->context, $expr, $className);
+            if (null !== $hit) {
+                return $hit;
+            }
+        }
+
+        return null;
+    }
+
+    public function tryExternalPropertyFetch(
+        \PHPLLVM\Value $obj,
+        string $class,
+        string $name,
+        int $classId,
+        bool $forWrite,
+        ?Variable $receiverVar
+    ): ?Variable {
+        foreach ($this->propertyFetchHooks as $hook) {
+            $hit = $hook($this, $obj, $class, $name, $classId, $forWrite, $receiverVar);
+            if (null !== $hit) {
+                return $hit;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<int, string> $candidates
+     * @return array{0: int, 1: string}|null
+     */
+    public function preferExternalRuntimePropertyFetch(array $candidates, string $name): ?array
+    {
+        foreach ($this->runtimePropertyFetchPreferrers as $preferrer) {
+            $hit = $preferrer($candidates, $name);
+            if (null !== $hit) {
+                return $hit;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -8176,11 +8274,7 @@ class Object_ extends Type {
 
     public function emitInstanceOf(Variable $expr, string $className): Variable
     {
-        $standin = \PHPCompiler\ext\dom\JitDomStandinGetClass::tryEmitInstanceOf(
-            $this->context,
-            $expr,
-            $className
-        );
+        $standin = $this->tryExternalInstanceOf($expr, $className);
         if (null !== $standin) {
             return $standin;
         }
@@ -8221,11 +8315,7 @@ class Object_ extends Type {
                 Variable::KIND_VALUE,
                 $obj
             );
-            $standin = \PHPCompiler\ext\dom\JitDomStandinGetClass::tryEmitInstanceOf(
-                $this->context,
-                $objVar,
-                $className
-            );
+            $standin = $this->tryExternalInstanceOf($objVar, $className);
             if (null !== $standin) {
                 $match = $this->context->helper->loadValue($standin);
                 $match = $this->context->builder->and($isObject, $match);
