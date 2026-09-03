@@ -300,6 +300,23 @@ final class VmStringCompare
         // open BB, branchIf to jit_strcmp_* is parentless and sealFunction writes unreachable
         // onto the prior block (#26756).
         BasicBlockHelper::ensureOpenInsertBlock($context, 'jit_strcmp_identical_entry');
+        $i1 = $context->getTypeFromString('int1');
+        $trueVal = $i1->constInt(1, false);
+        $falseVal = $i1->constInt(0, false);
+
+        // Pointer identity — same __string__* is trivially identical (#36468).
+        // With addref-based HT key storage, lookup key and stored key may share the same
+        // pointer, turning the common read-back case into a single icmp.
+        $ptrEq = $context->builder->icmp(Builder::INT_EQ, $leftStr, $rightStr);
+        $ptrMatch = BasicBlockHelper::append($context, 'jit_strcmp_ptr_match');
+        $ptrMiss = BasicBlockHelper::append($context, 'jit_strcmp_ptr_miss');
+        $merge = BasicBlockHelper::append($context, 'jit_strcmp_done');
+        $context->builder->branchIf($ptrEq, $ptrMatch, $ptrMiss);
+
+        $context->builder->positionAtEnd($ptrMatch);
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($ptrMiss);
         $map = $context->structFieldMap['__string__'];
         $leftLen = $context->builder->load(
             $context->builder->structGep($leftStr, $map['length'])
@@ -308,14 +325,11 @@ final class VmStringCompare
             $context->builder->structGep($rightStr, $map['length'])
         );
         $lenEq = $context->builder->icmp(Builder::INT_EQ, $leftLen, $rightLen);
-        $i1 = $context->getTypeFromString('int1');
-        $falseVal = $i1->constInt(0, false);
 
         // __string__ is length-tracked and not guaranteed to be null-terminated; use memcmp
         // guarded by length equality (strcmp can read past the buffer and/or mismatch).
         $lenOk = BasicBlockHelper::append($context, 'jit_strcmp_len_ok');
         $lenBad = BasicBlockHelper::append($context, 'jit_strcmp_len_bad');
-        $merge = BasicBlockHelper::append($context, 'jit_strcmp_done');
         $context->builder->branchIf($lenEq, $lenOk, $lenBad);
 
         $context->builder->positionAtEnd($lenBad);
@@ -339,6 +353,7 @@ final class VmStringCompare
 
         $context->builder->positionAtEnd($merge);
         $phi = $context->builder->phi($i1);
+        $phi->addIncoming($trueVal, $ptrMatch);
         $phi->addIncoming($falseVal, $lenBad);
         $phi->addIncoming($strEq, $lenOk);
 
