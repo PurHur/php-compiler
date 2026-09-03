@@ -12,6 +12,8 @@
 #   script/differential-sweep.sh --dir path/to/cases  # your own programs
 #   script/differential-sweep.sh --aot --repeat 10    # run each built binary 10x (see below)
 #   script/differential-sweep.sh --dir test/differential/cases/programs
+#   script/differential-sweep.sh --stderr --dir test/differential/cases/errors
+#       stdout + stderr + exit vs Zend (#36383)
 #
 # On RunForge / hosts without image LLVM, this re-execs via docker-exec.sh (same gate as
 # phpunit.sh). Host glibc ≠ Ubuntu 22.04 image glibc: AOT binaries that match Zend in the
@@ -74,6 +76,7 @@ DIR="$DEFAULT_DIR"
 BACKEND=vm
 QUIET=0
 REPEAT=1
+COMPARE_STDERR=0
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -83,6 +86,7 @@ while [ $# -gt 0 ]; do
         --dir)    DIR="$2"; shift 2 ;;
         --quiet)  QUIET=1; shift ;;
         --repeat) REPEAT="$2"; shift 2 ;;
+        --stderr) COMPARE_STDERR=1; shift ;;
         -h|--help) sed -n '2,45p' "$0"; exit 0 ;;
         *) echo "unknown option: $1" >&2; exit 2 ;;
     esac
@@ -104,6 +108,33 @@ skipped=0
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
+norm_text() {
+    php "$ROOT/script/differential-stderr-normalize.php" "$ROOT"
+}
+
+run_zend_streams() {
+    local src="$1"
+    timeout 120 php -d error_reporting=-1 -d display_errors=1 -d log_errors=1 "$src" \
+        >"$tmp/zend.out" 2>"$tmp/zend.err"
+    echo $? >"$tmp/zend.rc"
+}
+
+run_got_streams() {
+    local src="$1"
+    if [ "$BACKEND" = aot ]; then
+        timeout 120 "$bin" >"$tmp/got.out" 2>"$tmp/got.err"
+    elif [ "$BACKEND" = jit ]; then
+        timeout 300 php -d error_reporting=-1 -d log_errors=1 bin/jit.php \
+            -d display_errors=1 -d error_reporting=-1 "$src" \
+            >"$tmp/got.out" 2>"$tmp/got.err"
+    else
+        timeout 120 php -d error_reporting=-1 -d log_errors=1 bin/vm.php \
+            -d display_errors=1 -d error_reporting=-1 "$src" \
+            >"$tmp/got.out" 2>"$tmp/got.err"
+    fi
+    echo $? >"$tmp/got.rc"
+}
+
 for f in "$DIR"/*.php; do
     [ -e "$f" ] || continue
     name="$(basename "$f")"
@@ -123,8 +154,6 @@ for f in "$DIR"/*.php; do
 
     total=$((total + 1))
 
-    zend="$(timeout 120 php "$f" 2>&1)"
-
     # A case may ask for extra runs because its failure mode is intermittent. The per-case marker
     # wins only when it is larger, so `--repeat 20` still applies everywhere.
     runs="$REPEAT"
@@ -141,6 +170,52 @@ for f in "$DIR"/*.php; do
             continue
         fi
     fi
+
+    if [ "$COMPARE_STDERR" -eq 1 ]; then
+        run_zend_streams "$f"
+        zend_out="$(norm_text <"$tmp/zend.out")"
+        zend_err="$(norm_text <"$tmp/zend.err")"
+        zend_rc="$(tr -d '[:space:]' <"$tmp/zend.rc")"
+        bad_run=0
+        matched=0
+        i=1
+        while [ "$i" -le "$runs" ]; do
+            run_got_streams "$f"
+            got_out="$(norm_text <"$tmp/got.out")"
+            got_err="$(norm_text <"$tmp/got.err")"
+            got_rc="$(tr -d '[:space:]' <"$tmp/got.rc")"
+            if [ "$zend_out" = "$got_out" ] && [ "$zend_err" = "$got_err" ] && [ "$zend_rc" = "$got_rc" ]; then
+                matched=$((matched + 1))
+            elif [ "$bad_run" -eq 0 ]; then
+                bad_run="$i"
+                bad_out="$got_out"
+                bad_err="$got_err"
+                bad_rc="$got_rc"
+            fi
+            i=$((i + 1))
+        done
+        if [ "$bad_run" -eq 0 ]; then
+            if [ "$QUIET" -eq 1 ]; then :
+            elif [ "$runs" -gt 1 ]; then printf 'ok      %-34s (%d/%d runs)\n' "$name" "$matched" "$runs"
+            else printf 'ok      %s\n' "$name"
+            fi
+        else
+            fail=$((fail + 1))
+            if [ "$runs" -gt 1 ]; then
+                printf 'DIFF    %-34s (%d/%d runs matched — first mismatch on run %d)\n' \
+                    "$name" "$matched" "$runs" "$bad_run"
+            else
+                printf 'DIFF    %s\n' "$name"
+            fi
+            printf '  zend rc=%s stdout=%s\n' "$zend_rc" "$(printf '%s' "$zend_out" | tr '\n' '~')"
+            printf '  zend stderr=%s\n' "$(printf '%s' "$zend_err" | tr '\n' '~')"
+            printf '  %-4s rc=%s stdout=%s\n' "$BACKEND" "$bad_rc" "$(printf '%s' "$bad_out" | tr '\n' '~')"
+            printf '  %-4s stderr=%s\n' "$BACKEND" "$(printf '%s' "$bad_err" | tr '\n' '~')"
+        fi
+        continue
+    fi
+
+    zend="$(timeout 120 php "$f" 2>&1)"
 
     # Repeat the RUN only — the build is already done, so N runs cost N executions, not N compiles.
     got=""
@@ -183,7 +258,7 @@ for f in "$DIR"/*.php; do
     fi
 done
 
-if [ "$total" -eq 0 ]; then
+if [ "$((total + skipped))" -eq 0 ]; then
     echo "differential-sweep: no .php cases under $DIR (empty corpus is not a pass — #36248)" >&2
     exit 2
 fi
@@ -203,8 +278,9 @@ if [ -n "$count_file" ]; then
             exit 2
             ;;
     esac
-    if [ "$total" -lt "$min_cases" ]; then
-        echo "differential-sweep: found $total case(s) under $DIR but $count_file requires >= $min_cases (#36248/#36221)" >&2
+    # COUNT is files on disk; @differential-skip-* still count (#36383 / #36248).
+    if [ "$((total + skipped))" -lt "$min_cases" ]; then
+        echo "differential-sweep: found $total run + $skipped skipped under $DIR but $count_file requires >= $min_cases (#36248/#36221)" >&2
         exit 2
     fi
 fi

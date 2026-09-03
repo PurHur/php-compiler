@@ -645,40 +645,127 @@ final class ExceptionSupport
         ?ObjectEntry $vmEntry = null,
         bool $displayErrors = false,
     ): void {
-        $class = self::uncaughtDisplayClass($native, $vmEntry);
-        $message = $native->getMessage();
-        $file = $native->getFile();
-        $line = $native->getLine();
-        $body = "Uncaught {$class}: {$message}";
-        if ('' !== $file) {
-            $body .= " in {$file}";
-            if ($line > 0) {
-                $body .= ":{$line}";
-            }
-        }
-        $stackTrace = self::formatUncaughtStackTrace($vmEntry);
-        $thrownIn = '';
-        if ($includeThrownIn && '' !== $file && $line > 0) {
-            $thrownIn = "  thrown in {$file} on line {$line}\n";
-        }
+        $text = self::formatUncaughtFatalText($native, $includeThrownIn, $vmEntry);
 
-        fwrite(STDERR, "PHP Fatal error:  {$body}\n");
-        fwrite(STDERR, "Stack trace:\n");
-        fwrite(STDERR, $stackTrace);
-        if ('' !== $thrownIn) {
-            fwrite(STDERR, $thrownIn);
-        }
+        fwrite(STDERR, 'PHP Fatal error:  '.$text);
 
         // php-src CLI: display_errors mirrors uncaught fatals to stdout without the PHP prefix
-        // (sapi/cli/php_cli.c / main/main.c php_error_cb; issue #18561).
+        // (sapi/cli/php_cli.c / main/main.c php_error_cb; issue #18561 / #36383).
         if ($displayErrors) {
-            echo "Fatal error: {$body}\n";
-            echo "Stack trace:\n";
-            echo $stackTrace;
-            if ('' !== $thrownIn) {
-                echo $thrownIn;
+            echo "\nFatal error: ".$text;
+        }
+    }
+
+    /**
+     * zend_exception_error: print the previous-most exception first, then "Next {Class}".
+     * php-src: Zend/zend_exceptions.c zend_exception_error
+     */
+    private static function formatUncaughtFatalText(
+        \Throwable $native,
+        bool $includeThrownIn,
+        ?ObjectEntry $vmEntry,
+    ): string {
+        $frames = self::uncaughtChainFrames($native, $vmEntry);
+        $n = \count($frames);
+        $out = '';
+        foreach ($frames as $i => $frame) {
+            $label = 0 === $i ? 'Uncaught '.$frame['class'] : 'Next '.$frame['class'];
+            $body = $label.': '.$frame['message'];
+            if ('' !== $frame['file']) {
+                $body .= ' in '.$frame['file'];
+                if ($frame['line'] > 0) {
+                    $body .= ':'.$frame['line'];
+                }
+            }
+            $out .= $body."\nStack trace:\n".$frame['trace'];
+            $isLast = $i === $n - 1;
+            if ($isLast && $includeThrownIn && '' !== $frame['file'] && $frame['line'] > 0) {
+                $out .= '  thrown in '.$frame['file'].' on line '.$frame['line']."\n";
+            } elseif (!$isLast) {
+                $out .= "\n";
             }
         }
+
+        return $out;
+    }
+
+    /**
+     * @return list<array{class: string, message: string, file: string, line: int, trace: string}>
+     */
+    private static function uncaughtChainFrames(\Throwable $native, ?ObjectEntry $vmEntry): array
+    {
+        $vmChain = self::vmPreviousChainInnermostFirst($vmEntry);
+        if ([] !== $vmChain) {
+            $frames = [];
+            foreach ($vmChain as $entry) {
+                $nat = self::nativeUncaughtThrowable($entry, self::readThrowableMessage($entry));
+                $frames[] = [
+                    'class' => self::uncaughtDisplayClass($nat, $entry),
+                    'message' => $nat->getMessage(),
+                    'file' => self::readThrowableFile($entry) ?: $nat->getFile(),
+                    'line' => self::readThrowableLine($entry) ?: $nat->getLine(),
+                    'trace' => self::formatUncaughtStackTrace($entry),
+                ];
+            }
+
+            return $frames;
+        }
+
+        $natives = [];
+        $cur = $native;
+        $guard = 0;
+        while ($cur instanceof \Throwable && $guard++ < 32) {
+            $natives[] = $cur;
+            $cur = $cur->getPrevious();
+        }
+        $natives = array_reverse($natives);
+        $frames = [];
+        foreach ($natives as $nat) {
+            $frames[] = [
+                'class' => $nat::class,
+                'message' => $nat->getMessage(),
+                'file' => $nat->getFile(),
+                'line' => $nat->getLine(),
+                'trace' => "#0 {main}\n",
+            ];
+        }
+
+        return $frames;
+    }
+
+    /** @return list<ObjectEntry> innermost-first */
+    private static function vmPreviousChainInnermostFirst(?ObjectEntry $vmEntry): array
+    {
+        if (null === $vmEntry) {
+            return [];
+        }
+        $outerFirst = [];
+        $cur = $vmEntry;
+        $seen = [];
+        $guard = 0;
+        while ($cur instanceof ObjectEntry && $guard++ < 32) {
+            $id = spl_object_id($cur);
+            if (isset($seen[$id])) {
+                break;
+            }
+            $seen[$id] = true;
+            $outerFirst[] = $cur;
+            try {
+                $prevVar = $cur->getProperty(self::PROP_PREVIOUS)->resolveIndirect();
+            } catch (\Throwable) {
+                break;
+            }
+            if (Variable::TYPE_OBJECT !== $prevVar->type) {
+                break;
+            }
+            $next = $prevVar->toObject();
+            if ($next === $cur) {
+                break;
+            }
+            $cur = $next;
+        }
+
+        return array_reverse($outerFirst);
     }
 
     /**
