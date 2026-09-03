@@ -4346,6 +4346,25 @@ class Context {
     }
 
     /**
+     * True when $var is a named CV or a shadow {@see __object__**} alloca of one.
+     * Distinct NEW/ASSIGN result temps have their own addref and must be delref'd
+     * (Zend temp dtor after ZEND_ASSIGN; #36245 scope_exit).
+     */
+    public function objectMirrorSharesNamedCvAlloca(Variable $var): bool
+    {
+        foreach ($this->namedVariableBindings as $bound) {
+            if ($bound === $var) {
+                return true;
+            }
+            if (null !== $bound->value && $bound->value === $var->value) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Bind {@see Block::$constants} for $op when the slot is a folded literal (#29751).
      *
      * TYPE_TRY handler blocks hoist try-body Temporaries into scope before the try-body
@@ -5014,7 +5033,51 @@ class Context {
                 $returnVarNames[$name] = true;
             }
         }
+        $isUserFunctionReturnVoid = false;
+        if (null !== $block->func) {
+            $fnName = $block->func->name;
+            if ('{main}' !== $fnName && !str_ends_with($fnName, '::__destruct')) {
+                foreach ($block->opCodes as $blockOp) {
+                    if (
+                        OpCode::TYPE_RETURN_VOID === $blockOp->type
+                        || (OpCode::TYPE_RETURN === $blockOp->type && null === $blockOp->arg1)
+                    ) {
+                        $isUserFunctionReturnVoid = true;
+                        break;
+                    }
+                }
+            }
+        }
         foreach ($block->orig->deadOperands as $op) {
+            if ($isUserFunctionReturnVoid) {
+                // releaseJitFunctionLocalsAtReturn owns named CV delref. Shadow
+                // allocas of those CVs must not delref again. Distinct NEW-result
+                // temps keep their own addref and must fall through to free()
+                // (Zend/zend_execute.c temp dtor after ZEND_ASSIGN; #36245).
+                $name = OperandName::resolve($op);
+                if (null !== $name && '' !== $name) {
+                    continue;
+                }
+                if (!$this->scope->variables->contains($op)) {
+                    continue;
+                }
+                $var = $this->scope->variables[$op];
+                if (
+                    Variable::TYPE_OBJECT === $var->type
+                    && Variable::KIND_VARIABLE === $var->kind
+                    && null !== $var->value
+                    && $this->objectMirrorSharesNamedCvAlloca($var)
+                ) {
+                    $slotTy = $var->value->typeOf();
+                    if (\PHPLLVM\Type::KIND_POINTER === $slotTy->getKind()) {
+                        $this->builder->store(
+                            $slotTy->getElementType()->constNull(),
+                            $var->value
+                        );
+                    }
+                    continue;
+                }
+            }
             if ($returnOperands->contains($op)) {
                 continue;
             }
@@ -5024,6 +5087,11 @@ class Context {
             }
             $name = OperandName::resolve($op);
             if (null !== $name && isset($returnVarNames[$name])) {
+                continue;
+            }
+            // releaseJitFunctionLocalsAtReturn already delref'd named CVs; freeing
+            // them again here drops orphan cycles to refcount 0 (#36245 scope_exit).
+            if ($isUserFunctionReturnVoid && null !== $name && '' !== $name) {
                 continue;
             }
             if ($coalesceResults->contains($op)) {
