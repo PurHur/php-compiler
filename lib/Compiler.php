@@ -31691,6 +31691,54 @@ class Compiler {
     }
 
     /**
+     * Prior FuncCall in the backward sibling scan is a completed statement, not a hoisted
+     * arg producer for $consumer — stop scanning (#36224 / #36387 compile scaling).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function siblingScanStopsAtPriorFuncCall(
+        Op $child,
+        ?Op $consumer,
+        int $producerIndex,
+        int $consumerIndex,
+        array $cfgChildren
+    ): bool {
+        if (!($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)) {
+            return false;
+        }
+        if (
+            $child instanceof Op\Expr
+            && null !== $child->result
+            && !empty($child->result->usages)
+        ) {
+            return false;
+        }
+        if (!$consumer instanceof Op\Expr) {
+            return true;
+        }
+        if ($this->isNestedCallArgProducerForConsumer($child, $consumer, $producerIndex, $consumerIndex, $cfgChildren)) {
+            return false;
+        }
+        if ($this->isNestedCallArgProducerSeparatedByConsumerLiteralPreludes(
+            $child,
+            $consumer,
+            $producerIndex,
+            $consumerIndex,
+            $cfgChildren
+        )) {
+            return false;
+        }
+        if ($this->isSiblingMultiArgFuncCallProducer($child, $consumer, $producerIndex, $consumerIndex, $cfgChildren)) {
+            return false;
+        }
+        if ($this->inlineCallArgProducerFeedsConsumer($child, $consumer)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
      * First hoisted FuncCall in a sibling inline call-arg chain ending at {@see $consumerIndex}.
      *
      * @param list<Op> $cfgChildren
@@ -31740,6 +31788,12 @@ class Compiler {
                 }
             }
             if ($this->isSiblingInlineCallProducerExpr($child)) {
+                if (
+                    ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
+                    && $this->siblingScanStopsAtPriorFuncCall($child, $consumer, $i, $consumerIndex, $cfgChildren)
+                ) {
+                    break;
+                }
                 if (
                     ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
                     && $this->isStatementLevelSideEffectFuncCall($child)
