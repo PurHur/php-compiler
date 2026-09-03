@@ -18,8 +18,10 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * Replaces RSS/statm LLVM + emalloc globals; SSOT {@see \PHPCompiler\ext\standard\MemoryJitHelper}.
  * php-src: ext/standard/basic_functions.c, Zend/zend_gc.c
  *
- * Thin standalone AOT: NestedJIT MemoryAccounting /proc paths observe 0 (#27238) — report a
- * positive floor so memory_get_* match Zend's "non-zero usage" contract without C runtime growth.
+ * Thin standalone AOT: NestedJIT MemoryAccounting observes 0 (#27238). Native `__mm__*`
+ * (#36388) maintains {@see self::G_EMALLOC_CURRENT}/{@see self::G_EMALLOC_PEAK} from the
+ * size header; memory_get_* report max(floor, counter) so the Zend "non-zero" contract
+ * holds and short-lived allocations are visible after free.
  */
 final class MemoryRuntime
 {
@@ -27,8 +29,18 @@ final class MemoryRuntime
 
     public const GC_MEM_CACHES = '__phpc_gc_mem_caches';
 
-    /** Positive floor when thin AOT NestedJIT counters are unset (#27238). */
-    private const THIN_AOT_USAGE_FLOOR = 4096;
+    /** Positive floor when thin AOT NestedJIT counters are unset (#27238 / #36388). */
+    public const THIN_AOT_USAGE_FLOOR = 4096;
+
+    public const G_EMALLOC_CURRENT = 'phpc_mm_emalloc_current';
+
+    public const G_EMALLOC_PEAK = 'phpc_mm_emalloc_peak';
+
+    public const EMALLOC_USAGE = '__phpc_mm_emalloc_usage';
+
+    public const EMALLOC_PEAK_USAGE = '__phpc_mm_emalloc_peak_usage';
+
+    public const EMALLOC_REQUEST_RESET = '__phpc_mm_request_reset';
 
     private const GET_USAGE = '__phpc_memory_get_usage';
 
@@ -64,8 +76,19 @@ final class MemoryRuntime
 
     public static function getUsageValue(Context $context, Value $realUsage): Value
     {
-        if (self::useThinStandaloneUsageFloor($context)) {
-            return $context->constantFromInteger(self::THIN_AOT_USAGE_FLOOR, 'int64');
+        if (self::useThinStandaloneEmallocCounters($context)) {
+            $saved = BasicBlockHelper::tryGetInsertBlock($context);
+            self::ensureEmallocGlobals($context);
+            self::implementEmallocQueryBridges(
+                $context,
+                $context->getTypeFromString('int64'),
+                $context->getTypeFromString('void')
+            );
+            if (null !== $saved) {
+                BasicBlockHelper::restoreInsertBlock($context, $saved);
+            }
+
+            return $context->builder->call($context->lookupFunction(self::EMALLOC_USAGE));
         }
         self::ensureLinked($context);
 
@@ -77,8 +100,19 @@ final class MemoryRuntime
 
     public static function getPeakUsageValue(Context $context, Value $realUsage): Value
     {
-        if (self::useThinStandaloneUsageFloor($context)) {
-            return $context->constantFromInteger(self::THIN_AOT_USAGE_FLOOR, 'int64');
+        if (self::useThinStandaloneEmallocCounters($context)) {
+            $saved = BasicBlockHelper::tryGetInsertBlock($context);
+            self::ensureEmallocGlobals($context);
+            self::implementEmallocQueryBridges(
+                $context,
+                $context->getTypeFromString('int64'),
+                $context->getTypeFromString('void')
+            );
+            if (null !== $saved) {
+                BasicBlockHelper::restoreInsertBlock($context, $saved);
+            }
+
+            return $context->builder->call($context->lookupFunction(self::EMALLOC_PEAK_USAGE));
         }
         self::ensureLinked($context);
 
@@ -88,7 +122,7 @@ final class MemoryRuntime
         );
     }
 
-    private static function useThinStandaloneUsageFloor(Context $context): bool
+    private static function useThinStandaloneEmallocCounters(Context $context): bool
     {
         return Builtin::LOAD_TYPE_STANDALONE === $context->loadType
             && $context->isThinStandaloneAotMain();
@@ -96,8 +130,168 @@ final class MemoryRuntime
 
     public static function resetPeakUsage(Context $context): void
     {
+        if (self::useThinStandaloneEmallocCounters($context)) {
+            $saved = BasicBlockHelper::tryGetInsertBlock($context);
+            self::ensureEmallocGlobals($context);
+            self::implementEmallocQueryBridges(
+                $context,
+                $context->getTypeFromString('int64'),
+                $context->getTypeFromString('void')
+            );
+            if (null !== $saved) {
+                BasicBlockHelper::restoreInsertBlock($context, $saved);
+            }
+            // Peak ← current (Zend memory_reset_peak_usage).
+            $i64 = $context->getTypeFromString('int64');
+            $cur = $context->builder->load(self::emallocGlobalPtr($context, self::G_EMALLOC_CURRENT, $i64));
+            $context->builder->store($cur, self::emallocGlobalPtr($context, self::G_EMALLOC_PEAK, $i64));
+
+            return;
+        }
         self::ensureLinked($context);
         $context->builder->call($context->lookupFunction(self::RESET_PEAK_USAGE));
+    }
+
+    /** Create emalloc counter globals (Native `__mm__*` + thin AOT queries) (#36388). */
+    public static function ensureEmallocGlobals(Context $context): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        if (null === $context->module->getNamedGlobal(self::G_EMALLOC_CURRENT)) {
+            $g = $context->module->addGlobal($i64, self::G_EMALLOC_CURRENT);
+            $g->setInitializer($i64->constInt(0, false));
+        }
+        if (null === $context->module->getNamedGlobal(self::G_EMALLOC_PEAK)) {
+            $g = $context->module->addGlobal($i64, self::G_EMALLOC_PEAK);
+            $g->setInitializer($i64->constInt(0, false));
+        }
+    }
+
+    /**
+     * Emit IR: current += delta (saturate at 0); peak = max(peak, current).
+     *
+     * Called from Native `__mm__malloc` / realloc / free (#36388).
+     */
+    public static function emitNoteEmallocDelta(Context $context, Value $delta): void
+    {
+        self::ensureEmallocGlobals($context);
+        $i64 = $context->getTypeFromString('int64');
+        $curPtr = self::emallocGlobalPtr($context, self::G_EMALLOC_CURRENT, $i64);
+        $peakPtr = self::emallocGlobalPtr($context, self::G_EMALLOC_PEAK, $i64);
+        $cur = $context->builder->load($curPtr);
+        $sum = $context->builder->add($cur, $delta);
+        $zero = $i64->constInt(0, false);
+        $neg = $context->builder->icmp(\PHPLLVM\Builder::INT_SLT, $sum, $zero);
+        $parentFn = $context->builder->getInsertBlock()->getParent();
+        assert($parentFn instanceof LlvmFunction);
+        $satBb = $parentFn->appendBasicBlock('mm_emalloc_sat_zero');
+        $posBb = $parentFn->appendBasicBlock('mm_emalloc_pos');
+        $joinBb = $parentFn->appendBasicBlock('mm_emalloc_join');
+        $context->builder->branchIf($neg, $satBb, $posBb);
+
+        $context->builder->positionAtEnd($satBb);
+        $context->builder->store($zero, $curPtr);
+        $context->builder->branch($joinBb);
+
+        $context->builder->positionAtEnd($posBb);
+        $context->builder->store($sum, $curPtr);
+        $context->builder->branch($joinBb);
+
+        $context->builder->positionAtEnd($joinBb);
+        $cur2 = $context->builder->load($curPtr);
+        $peak = $context->builder->load($peakPtr);
+        $gt = $context->builder->icmp(\PHPLLVM\Builder::INT_SGT, $cur2, $peak);
+        $updBb = $parentFn->appendBasicBlock('mm_emalloc_peak_upd');
+        $doneBb = $parentFn->appendBasicBlock('mm_emalloc_peak_done');
+        $context->builder->branchIf($gt, $updBb, $doneBb);
+        $context->builder->positionAtEnd($updBb);
+        $context->builder->store($cur2, $peakPtr);
+        $context->builder->branch($doneBb);
+        $context->builder->positionAtEnd($doneBb);
+    }
+
+    /**
+     * Define `__phpc_mm_emalloc_usage` / peak / request_reset once per module (#36388).
+     *
+     * @param mixed $i64
+     * @param mixed $voidTy
+     */
+    public static function implementEmallocQueryBridges(Context $context, $i64, $voidTy): void
+    {
+        self::ensureEmallocGlobals($context);
+        self::implementEmallocMaxFloorQuery($context, self::EMALLOC_USAGE, self::G_EMALLOC_CURRENT, $i64);
+        self::implementEmallocMaxFloorQuery($context, self::EMALLOC_PEAK_USAGE, self::G_EMALLOC_PEAK, $i64);
+        self::implementEmallocRequestReset($context, $i64, $voidTy);
+    }
+
+    /**
+     * @param mixed $i64
+     */
+    private static function implementEmallocMaxFloorQuery(
+        Context $context,
+        string $abiName,
+        string $globalName,
+        $i64
+    ): void {
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+        $ft = $context->context->functionType($i64, false);
+        $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
+        $entry = $fn->appendBasicBlock('mm_emalloc_query_entry');
+        $context->builder->positionAtEnd($entry);
+        $cur = $context->builder->load(self::emallocGlobalPtr($context, $globalName, $i64));
+        $floor = $i64->constInt(self::THIN_AOT_USAGE_FLOOR, false);
+        $gt = $context->builder->icmp(\PHPLLVM\Builder::INT_SGT, $cur, $floor);
+        $hi = $fn->appendBasicBlock('mm_emalloc_query_hi');
+        $lo = $fn->appendBasicBlock('mm_emalloc_query_lo');
+        $context->builder->branchIf($gt, $hi, $lo);
+        $context->builder->positionAtEnd($hi);
+        $context->builder->returnValue($cur);
+        $context->builder->positionAtEnd($lo);
+        $context->builder->returnValue($floor);
+        $context->registerFunction($abiName, $fn);
+        $context->builder->clearInsertionPosition();
+    }
+
+    /**
+     * @param mixed $i64
+     * @param mixed $voidTy
+     */
+    private static function implementEmallocRequestReset(Context $context, $i64, $voidTy): void
+    {
+        $abiName = self::EMALLOC_REQUEST_RESET;
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+        $ft = $context->context->functionType($voidTy, false);
+        $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
+        $entry = $fn->appendBasicBlock('mm_emalloc_req_reset');
+        $context->builder->positionAtEnd($entry);
+        $zero = $i64->constInt(0, false);
+        $context->builder->store($zero, self::emallocGlobalPtr($context, self::G_EMALLOC_CURRENT, $i64));
+        $context->builder->store($zero, self::emallocGlobalPtr($context, self::G_EMALLOC_PEAK, $i64));
+        $context->builder->returnVoid();
+        $context->registerFunction($abiName, $fn);
+        $context->builder->clearInsertionPosition();
+    }
+
+    /**
+     * @param mixed $llvmType
+     */
+    private static function emallocGlobalPtr(Context $context, string $name, $llvmType): Value
+    {
+        $global = $context->module->getNamedGlobal($name);
+        if (null === $global) {
+            throw new \LogicException('MemoryRuntime emalloc global missing: '.$name.' (#36388)');
+        }
+
+        return $context->builder->pointerCast($global, $llvmType->pointerType(0));
     }
 
     public static function noteAlloc(Context $context, Value $delta): void
