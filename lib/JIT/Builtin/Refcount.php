@@ -36,6 +36,10 @@ class Refcount extends Builtin {
 
     public function register(): void {
         if (\PHPCompiler\JIT\CompileCache::isEditScaffoldActive()) {
+            $this->struct = $this->context->getTypeFromString('__ref__');
+            $this->virtualStruct = $this->context->getTypeFromString('__ref__virtual');
+            $this->pointer = $this->context->getTypeFromString('__ref__virtual*');
+            $this->doublePointer = $this->context->getTypeFromString('__ref__virtual**');
             return;
         }
 

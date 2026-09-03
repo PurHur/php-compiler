@@ -39,6 +39,24 @@ class HashTable extends Type
     {
         if (\PHPCompiler\JIT\CompileCache::isEditScaffoldActive()) {
             $this->pointer = $this->context->getTypeFromString('__hashtable__*');
+            if (!isset($this->context->structFieldMap['__strkey_node__'])) {
+                $this->context->structFieldMap['__strkey_node__'] = [
+                    'ref' => 0,
+                    'key' => 1,
+                    'value' => 2,
+                    'next' => 3,
+                    'hash' => 4,
+                    'hashNext' => 5,
+                ];
+            }
+            if (!isset($this->context->structFieldMap['__objkey_node__'])) {
+                $this->context->structFieldMap['__objkey_node__'] = [
+                    'ref' => 0,
+                    'key' => 1,
+                    'value' => 2,
+                    'next' => 3,
+                ];
+            }
             return;
         }
 

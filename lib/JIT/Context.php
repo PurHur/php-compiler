@@ -1056,6 +1056,9 @@ class Context {
             'writeonly' => $this->context->createEnumAttribute($this->context->getEnumAttributeKindForName('writeonly'), 0),
         ];
 
+        // Parse prior module.bc before namedStructType / Helper holds the live module (#36387).
+        $this->tryBindEditScaffoldBitcodeBeforeBuiltins();
+
         $this->analyzer = new Analyzer;
         $this->helper = new Helper($this);
         
@@ -1069,6 +1072,32 @@ class Context {
 
         $this->ensureInitShutdownBlocks();
         $this->defineBuiltins($loadType);
+    }
+
+    /**
+     * Thin-boot: load prior AOT module.bc into this LLVM context before CreateNamed (#36387).
+     *
+     * Post-register {@see replaceModuleFromBitcodeFile()} uniqueifies structs (__string__.11)
+     * and leaves PHP Values pointing at the discarded empty module (SIGSEGV on re-lower).
+     */
+    private function tryBindEditScaffoldBitcodeBeforeBuiltins(): void
+    {
+        $key = CompileCache::pendingEditScaffoldKey();
+        if (null === $key) {
+            return;
+        }
+        $bcPath = CompileCache::bitcodePath($key);
+        if (!is_file($bcPath)) {
+            return;
+        }
+        try {
+            $this->replaceModuleFromBitcodeFile($bcPath);
+            $this->seedCoreTypesFromModuleForEditScaffold();
+            $this->rebindInitShutdownAfterModuleReplace();
+            CompileCache::markEditScaffoldBitcodeBound();
+        } catch (\Throwable $e) {
+            // Leave the empty module; caller falls back to a full Context boot.
+        }
     }
 
     /**
@@ -1098,8 +1127,20 @@ class Context {
                 'strHashMask' => 10,
                 'strHashSlots' => 11,
             ],
-            '__strkey_node__' => null,
-            '__objkey_node__' => null,
+            '__strkey_node__' => [
+                'ref' => 0,
+                'key' => 1,
+                'value' => 2,
+                'next' => 3,
+                'hash' => 4,
+                'hashNext' => 5,
+            ],
+            '__objkey_node__' => [
+                'ref' => 0,
+                'key' => 1,
+                'value' => 2,
+                'next' => 3,
+            ],
             '__object__' => [
                 'ref' => 0,
                 'class_id' => 1,
@@ -1179,28 +1220,21 @@ class Context {
     public function reopenInitLinearForEditScaffold(): void
     {
         $this->rebindInitShutdownAfterModuleReplace();
-        foreach ([$this->initLinearBlock, $this->initBlock, $this->shutdownBlock, $this->headerPreFlushBlock] as $block) {
-            if (!$block instanceof PHPLLVM\BasicBlock) {
-                continue;
-            }
-            $term = $block->getTerminator();
-            if (null !== $term && method_exists($term, 'eraseFromParent')) {
-                $term->eraseFromParent();
-            }
+        if (!$this->initFunc instanceof PHPLLVM\Value\Function_) {
+            return;
         }
-        // Prefer the last basic block of __init__ as the open linear tail (original
-        // main block may have branched away before the sealed return).
-        if ($this->initFunc instanceof PHPLLVM\Value\Function_) {
-            $blocks = $this->initFunc->getBasicBlocks();
-            if ([] !== $blocks) {
-                $tail = $blocks[count($blocks) - 1];
-                $term = $tail->getTerminator();
-                if (null !== $term && method_exists($term, 'eraseFromParent')) {
-                    $term->eraseFromParent();
-                }
-                $this->initLinearBlock = $tail;
-            }
+        $blocks = $this->initFunc->getBasicBlocks();
+        if ([] === $blocks) {
+            return;
         }
+        // Only unseal the linear tail's terminator (typically ret void).
+        // Erasing every block's terminator dropped branches and made {main} a no-op (#36387).
+        $tail = $blocks[count($blocks) - 1];
+        $term = $tail->getTerminator();
+        if (null !== $term && method_exists($term, 'eraseFromParent')) {
+            $term->eraseFromParent();
+        }
+        $this->initLinearBlock = $tail;
     }
 
     /** Clear const caches so edit re-lower does not reuse disposed module Values (#36387). */
@@ -1232,8 +1266,8 @@ class Context {
                 $this->functionScope[$name] = $fn;
             }
         }
-        // Thin boot: register() skipped — pull every named function from bitcode (#36387).
-        if (CompileCache::isEditScaffoldActive() && [] === $this->functionScope) {
+        // Thin boot: register() skipped — merge every named function from bitcode (#36387).
+        if (CompileCache::isEditScaffoldActive()) {
             try {
                 $fn = $this->module->getFirstFunction();
             } catch (\Throwable $e) {
@@ -2031,16 +2065,23 @@ class Context {
         // Stale sg_* from a prior JITContext in the same PHP process breaks SessionDestroy::implement (#4415).
         SuperglobalInit::$globals = [];
         LibcExtern::register($this);
-        LibcExtern::implementMcjitMemBodies($this);
+        if (!CompileCache::shouldSkipBuiltinImplement()) {
+            LibcExtern::implementMcjitMemBodies($this);
+        }
         foreach ($this->builtins as $builtin) {
-            // this is a separate loop, since implementation may
-            // depend on global variables set during init()
-            // so this way, cross-builtin dependencies are honored
+            // Restored bitcode already has __mm__malloc etc. addFunction would mint
+            // empty __mm__malloc.1 and lookupFunction would bind the stub (#36387).
+            if (CompileCache::shouldSkipBuiltinImplement()
+                && $builtin instanceof Builtin\MemoryManager) {
+                continue;
+            }
             $builtin->register();
         }
         if ($loadType === Builtin::LOAD_TYPE_IMPORT) {
             return;
         }
+        // Edit-scaffold: helpers already defined in restored bitcode — skip implement IR (#36387).
+        if (!CompileCache::shouldSkipBuiltinImplement()) {
         foreach ($this->builtins as $builtin) {
             // this is a separate loop, since initialize may
             // depend on functions defined during implement()
@@ -2072,6 +2113,7 @@ class Context {
             } else {
                 $this->ensureFullStandaloneBodies();
             }
+        }
         }
 
         $this->functionProxies['is_null'] = new Builtin\IsNullFn();

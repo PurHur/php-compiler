@@ -1048,6 +1048,40 @@ class Runtime {
         $this->jitLoadedFromDiskCache = false;
         $this->jitCompileCacheKey = null;
         $restoredMain = null;
+        $editScaffoldKey = JIT\CompileCache::pendingEditScaffoldKey();
+        if (is_string($editScaffoldKey) && '' !== $editScaffoldKey) {
+            if (JIT\CompileCache::tryRestoreEditScaffold($context, $editScaffoldKey)) {
+                \PHPCompiler\AOT\BuildTiming::note('edit_scaffold_hit', 1.0);
+                \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_edit_scaffold_hit');
+                $this->jitCompileCacheKey = $artifactCacheKey ?? JIT\CompileCache::computeKey(
+                    (string) $sourceFilename,
+                    (string) $sourceCode
+                );
+                JIT\CompileCache::beginRecording($this->jitCompileCacheKey);
+                \PHPCompiler\AOT\BuildTiming::mark('lower_user');
+                $context->setMain($this->loadJit()->compile($block));
+                \PHPCompiler\AOT\BuildTiming::end('lower_user');
+                \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_compile_done');
+                \PHPCompiler\AOT\BuildTiming::end('codegen');
+                \PHPCompiler\AOT\BuildTiming::mark('link');
+                $context->compileToFile($outfile);
+                \PHPCompiler\AOT\BuildTiming::end('link');
+                \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_compiletofile_done');
+                JIT\CompileCache::finishRecording();
+                if (null !== $this->jitCompileCacheKey && !$skipDebugArtifact) {
+                    JIT\CompileCache::saveArtifact($this->jitCompileCacheKey, $outfile);
+                }
+                Block::detachCfgTree($block, true);
+                \PHPCompiler\AOT\AotEmitFastExit::exitAfterSuccessfulSelfhostEmit($sourceFilename, $outfile);
+
+                return;
+            }
+            if (JIT\CompileCache::isEditScaffoldBitcodeBound()) {
+                throw new \RuntimeException(
+                    'edit-scaffold: module.bc bound in Context but user-symbol strip failed (#36387)'
+                );
+            }
+        }
         if (
             null !== $block
             && is_string($sourceCode)

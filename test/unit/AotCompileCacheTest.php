@@ -318,12 +318,23 @@ final class AotCompileCacheTest extends TestCase
         $raw = json_decode((string) file_get_contents(CompileCache::metaPath($scaffoldKey)), true);
         $this->assertIsArray($raw);
         $this->assertNotEmpty($raw['user_symbols'] ?? []);
+
+        $outEdit = $this->repoRoot.'/build/aot-cache-test-edit-rebuild.bin';
+        @unlink($outEdit);
+        $edit = $this->runAotSubprocess($main, $outEdit, true);
+        $this->assertSame(0, $edit['exit'], $edit['stderr']."\n".$edit['stdout']);
+        $this->assertStringContainsString(
+            'edit_scaffold_hit',
+            $edit['stderr'].$edit['stdout'],
+            'one-file edit must thin-boot from prior module.bc (#36387)'
+        );
+        $this->assertStringContainsString('beta', $this->runBinary($outEdit)['stdout']);
     }
 
     /**
      * @return array{exit: int, stdout: string, stderr: string, wall_ms: float}
      */
-    private function runAotSubprocess(string $target, string $outfile): array
+    private function runAotSubprocess(string $target, string $outfile, bool $timingJson = false): array
     {
         $env = [];
         foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
@@ -335,6 +346,9 @@ final class AotCompileCacheTest extends TestCase
         $env['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
         $env['PHP_COMPILER_SELFHOST_AOT'] = '0';
         $env['PHP_COMPILER_HELPER_RUNTIME_O'] = '1';
+        if ($timingJson) {
+            $env['PHP_COMPILER_BUILD_TIMING'] = 'json';
+        }
         LlvmToolchain::applyProcessEnv($env, $this->repoRoot);
 
         $compile = $this->repoRoot.'/bin/compile.php';
