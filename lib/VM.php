@@ -4606,23 +4606,48 @@ restart:
             goto return_value_complete;
         }
 
+        $this->executingFrame = $frame;
+        $limits = $this->context->executionLimits;
+        $timerDisabled = $limits->isTimerDisabled();
+        // Cache deferred-definitions state: the three arrays are only populated by
+        // declaration opcodes (DECLARE_CLASS etc.), so a block containing none will
+        // never need the flush. Checking a bool per-op is ~20× cheaper than calling
+        // assertDeferredDefinitionsBeforeRuntime() which does three empty-array
+        // comparisons plus a method dispatch (#36411 / #36449).
+        $hasDeferredDefs = [] !== $this->context->deferredTraitUses
+            || [] !== $this->context->deferredClassConstants
+            || [] !== $this->context->deferredParentInheritance;
+
         while ($frame->pos < $frame->block->nOpCodes) {
-            $this->executingFrame = $frame;
-            $limits = $this->context->executionLimits;
-            if (!$limits->isTimerDisabled()) {
+            if (!$timerDisabled) {
                 $limits->check($this->context, $frame);
             }
             $op = $frame->block->opCodes[$frame->pos++];
-            try {
-                $this->assertDeferredDefinitionsBeforeRuntime($op->type);
-            } catch (\Error $deferredParentError) {
-                // Missing extends parent — Zend Error (catchable); was LogicException soft message (#25627).
-                $catchFrame = $this->dispatchVmError($deferredParentError->getMessage(), $frame);
-                if (null !== $catchFrame) {
-                    $frame = $catchFrame;
-                    goto restart;
+            if ($hasDeferredDefs) {
+                try {
+                    $this->assertDeferredDefinitionsBeforeRuntime($op->type);
+                } catch (\Error $deferredParentError) {
+                    $catchFrame = $this->dispatchVmError($deferredParentError->getMessage(), $frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
+                    break;
                 }
-                break;
+                // Re-check after flush: if all resolved, skip on subsequent ops.
+                $hasDeferredDefs = [] !== $this->context->deferredTraitUses
+                    || [] !== $this->context->deferredClassConstants
+                    || [] !== $this->context->deferredParentInheritance;
+            } elseif (
+                OpCode::TYPE_DECLARE_CLASS === $op->type
+                || OpCode::TYPE_DECLARE_ENUM === $op->type
+                || OpCode::TYPE_DECLARE_TRAIT === $op->type
+                || OpCode::TYPE_DECLARE_INTERFACE === $op->type
+                || OpCode::TYPE_FUNCDEF === $op->type
+                || OpCode::TYPE_DECLARE_GLOBAL_CONST === $op->type
+            ) {
+                // Next non-declaration op in this block must flush (#25627).
+                $hasDeferredDefs = true;
             }
             try {
                 switch ($op->type) {
@@ -11500,6 +11525,16 @@ restart:
         if (null === $bodyBlock || null === $exitBlock) {
             return null;
         }
+        $accumExit = $this->tryExecuteCountedIntAccumPlusLoop(
+            $frame,
+            $counterSlot,
+            $limitSlot,
+            $bodyBlock,
+            $exitBlock
+        );
+        if (null !== $accumExit) {
+            return $accumExit;
+        }
         $incBlock = $this->blockPreIncChainJumpTarget($bodyBlock);
         if (null === $incBlock || !$this->blockIsCounterPreIncJumpBack($incBlock, $counterSlot, $frame->block)) {
             return null;
@@ -11562,6 +11597,101 @@ restart:
         $this->markScopeSlotInitialized($frame, $counterSlot);
 
         return $this->frameForBranch($frame, $exitBlock);
+    }
+
+    /**
+     * `for ($i = 0; $i < N; $i++) { $sum += $i; }` — PLUS-in-place body + POST_INC latch (#36411 / #36449).
+     */
+    private function tryExecuteCountedIntAccumPlusLoop(
+        Frame $frame,
+        int $counterSlot,
+        int $limitSlot,
+        Block $bodyBlock,
+        Block $exitBlock
+    ): ?Frame {
+        if (2 !== $bodyBlock->nOpCodes) {
+            return null;
+        }
+        $plusOp = $bodyBlock->opCodes[0];
+        $bodyJump = $bodyBlock->opCodes[1];
+        if (OpCode::TYPE_PLUS !== $plusOp->type || OpCode::TYPE_JUMP !== $bodyJump->type) {
+            return null;
+        }
+        $accSlot = (int) $plusOp->arg1;
+        if ($accSlot !== (int) $plusOp->arg2 || $counterSlot !== (int) $plusOp->arg3) {
+            return null;
+        }
+        if ($accSlot === $counterSlot) {
+            return null;
+        }
+        $incBlock = $bodyJump->block1;
+        if (null === $incBlock || !$this->blockIsCounterIncJumpBack($incBlock, $counterSlot, $frame->block)) {
+            return null;
+        }
+        if (!isset($frame->initializedSlots[$accSlot], $frame->scope[$accSlot])) {
+            return null;
+        }
+        $accWrite = $frame->scope[$accSlot];
+        if (!$this->isSimpleVariableIncDecLvalue($accWrite)) {
+            return null;
+        }
+        $accVar = $accWrite->resolveIndirect();
+        $counterVar = $frame->scope[$counterSlot]->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $accVar->type || Variable::TYPE_INTEGER !== $counterVar->type) {
+            return null;
+        }
+        if (VmIncDec::typedSlotRejectsOverflowDouble($accVar)
+            || VmIncDec::typedSlotRejectsOverflowDouble($counterVar)
+        ) {
+            return null;
+        }
+        $limitVar = $frame->block->constants[$limitSlot]->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $limitVar->type) {
+            return null;
+        }
+        $limit = $limitVar->toInt($this);
+        $i = $counterVar->toInt($this);
+        $sum = $accVar->toInt($this);
+        $limits = $this->context->executionLimits;
+        $checkEvery = 100000;
+        $iter = 0;
+        // Host PHP += matches Zend overflow-to-float (#36411).
+        while ($i < $limit) {
+            $sum += $i;
+            ++$i;
+            ++$iter;
+            if (0 === ($iter % $checkEvery) && !$limits->isTimerDisabled()) {
+                $limits->check($this->context, $frame);
+            }
+        }
+        if (\is_int($sum)) {
+            $accVar->int($sum);
+        } else {
+            $accVar->float((float) $sum);
+        }
+        $counterVar->int($i);
+        $this->markScopeSlotInitialized($frame, $accSlot);
+        $this->markScopeSlotInitialized($frame, $counterSlot);
+
+        return $this->frameForBranch($frame, $exitBlock);
+    }
+
+    /** Inc latch: PRE_INC or POST_INC of $counter then JUMP back to the loop header. */
+    private function blockIsCounterIncJumpBack(Block $block, int $counterSlot, Block $headerBlock): bool
+    {
+        if (2 !== $block->nOpCodes) {
+            return false;
+        }
+        $incOp = $block->opCodes[0];
+        $jumpOp = $block->opCodes[1];
+        if (OpCode::TYPE_JUMP !== $jumpOp->type || $jumpOp->block1 !== $headerBlock) {
+            return false;
+        }
+        if (OpCode::TYPE_PRE_INC !== $incOp->type && OpCode::TYPE_POST_INC !== $incOp->type) {
+            return false;
+        }
+
+        return (int) $incOp->arg2 === $counterSlot && (int) $incOp->arg3 === $counterSlot;
     }
 
     /** @return list<int> self PRE_INC write slots excluding the trailing JUMP */
