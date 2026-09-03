@@ -1694,7 +1694,7 @@ final class Doctor
             ),
             'hint' => $target->canLinkOnThisHost()
                 ? ''
-                : 'AOT link for this target needs a matching host (#36391); helper-cache dir is still selected',
+                : 'AOT link needs a matching host; object emit still uses this triple/CPU (#36391)',
         ];
     }
 
