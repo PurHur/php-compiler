@@ -1150,5 +1150,16 @@ PHP;
         $joined = implode("\n", $output);
         self::assertSame(0, $exitCode, "verify-pristine failed:\n".$joined);
         self::assertStringContainsString('no hunkless stubs', $joined);
+        self::assertStringContainsString('php-llvm stack', $joined);
+        self::assertStringContainsString('php-llvm-structgep-assert.patch (stack)', $joined);
+        self::assertStringContainsString('php-llvm-void-star-pointer-i8.patch (stack)', $joined);
+        self::assertStringNotContainsString('skip (no pristine snapshot', $joined);
+        $llvmPatchCount = count(glob(self::$root.'/patches/php-llvm-*.patch') ?: []);
+        self::assertGreaterThan(2, $llvmPatchCount, 'php-llvm patch glob must not be empty');
+        self::assertStringContainsString(
+            'php-llvm stack '.$llvmPatchCount.'/'.$llvmPatchCount,
+            $joined,
+            'every on-disk php-llvm-*.patch must apply in stack order (#36229 / re-#36143)'
+        );
     }
 }

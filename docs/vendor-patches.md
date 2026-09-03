@@ -7,7 +7,7 @@ Interim honesty rules (until php-cfg/php-types are forked):
 - Every `patches/*.patch` must contain at least one `@@` hunk (no comment-only stubs).
 - `script/apply-patches.sh` applies `patch(1)` with **`-F0`** (no fuzz) and fails on partial applies.
 - Overlay-only edits are invoked by name from `apply-patches.sh`; they do not leave empty `.patch` files.
-- `./script/apply-patches.sh --verify-pristine` rejects hunkless stubs and checks llvm patches against pristine snapshots.
+- `./script/apply-patches.sh --verify-pristine` rejects hunkless stubs and applies the **full php-llvm patch stack in order** to `patches/pristine-snapshots/ircmaxell/php-llvm/` (composer.lock SHA in `ORIGIN`); a patch missing from the `apply_patch` list is a failure.
 
 | prefix | count |
 |---|---|
@@ -104,16 +104,16 @@ Interim honesty rules (until php-cfg/php-types are forked):
 | `php-llvm-mcjit-libc-mem.patch` | 1 | `vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Intrinsic.php` | vendor divergence |
 | `php-llvm-memory-buffer-bitcode.patch` | 2 | `vendor/ircmaxell/php-llvm/lib/LLVMAbstract/MemoryBuffer.php` | vendor divergence |
 | `php-llvm-module-createfunctionpassmanager.patch` | 1 | `vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Module.php` | vendor divergence |
-| `php-llvm-no-closures-array-map.patch` | 2 | `vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Context.php, vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Type/Struct.php` | vendor divergence |
+| `php-llvm-no-closures-array-map.patch` | 3 | `vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Context.php, vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Type/Struct.php` | vendor divergence |
 | `php-llvm-pass-manager-builder-populate.patch` | 3 | `vendor/ircmaxell/php-llvm/lib/LLVMAbstract/PassManagerBuilder.php` | vendor divergence |
 | `php-llvm-pass-manager-builder-semicolon.patch` | 1 | `vendor/ircmaxell/php-llvm/lib/LLVMAbstract/PassManagerBuilder.php` | vendor divergence |
 | `php-llvm-pass-manager-builder-typed-prop.patch` | 1 | `vendor/ircmaxell/php-llvm/lib/LLVMAbstract/PassManagerBuilder.php` | vendor divergence |
 | `php-llvm-pass-registry-interface.patch` | 1 | `vendor/ircmaxell/php-llvm/lib/LLVMAbstract/PassRegistry.php` | vendor divergence |
-| `php-llvm-passmanagerbuilder-signature.patch` | 2 | `lib/LLVMAbstract/PassManagerBuilder.php` | vendor divergence |
 | `php-llvm-structgep-assert.patch` | 2 | `vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php` | vendor divergence |
 | `php-llvm-token-type-kind-typo.patch` | 1 | `vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Type.php` | vendor divergence |
 | `php-llvm-value-addincoming.patch` | 1 | `vendor/ircmaxell/php-llvm/lib/Value.php` | vendor divergence |
 | `php-llvm-vector-get-address-space.patch` | 1 | `vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Type/Vector.php` | vendor divergence |
+| `php-llvm-void-star-pointer-i8.patch` | 1 | `vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Type.php` | vendor divergence |
 | `php-llvm-x86-posix-fallback.patch` | 1 | `vendor/ircmaxell/php-llvm/lib/LLVMAbstract/TargetSet/X86.php` | vendor divergence |
 | `php-parser-final-property.patch` | 1 | `vendor/nikic/php-parser/lib/PhpParser/ParserAbstract.php` | vendor divergence |
 | `php-types-addcslashes-characters.patch` | 1 | `vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php` | vendor divergence |

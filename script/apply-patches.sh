@@ -48,9 +48,6 @@ patch_already_applied() {
     php-llvm-chooser.patch)
       grep -q 'PHP_COMPILER_LLVM_PATH' "$ROOT/vendor/ircmaxell/php-llvm/lib/Chooser.php" 2>/dev/null
       ;;
-    php-llvm-passmanagerbuilder-signature.patch)
-      grep -q 'CorePassManagerIface' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/PassManagerBuilder.php" 2>/dev/null
-      ;;
     php-llvm-module-createfunctionpassmanager.patch)
       grep -q 'LLVMCreateFunctionPassManagerForModule' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Module.php" 2>/dev/null
       ;;
@@ -7059,19 +7056,66 @@ verify_pristine_patch_on_orig() {
   return 1
 }
 
-# Fast gate: llvm git patches must apply to pristine vendor snapshots (*.orig).
-# Also rejects hunkless stub .patch files (#36229 interim).
+# Ordered php-llvm patches that apply_patch actually runs (keep in sync with the
+# apply_patch "$PATCH_DIR/php-llvm-…" list later in this file).
+list_applied_php_llvm_patches() {
+  grep -E '^apply_patch "\$PATCH_DIR/php-llvm-' "$ROOT/script/apply-patches.sh" \
+    | sed 's/.*\/\(php-llvm-[^"]*\)".*/\1/'
+}
+
+# Fast gate: every on-disk php-llvm-*.patch is in the apply list, and the whole
+# stack applies in order to the committed unpatched snapshot (#36229 / re-#36143).
+# Isolated per-patch checks against Builder.php.orig only covered 2/28 files and
+# skipped missing snapshots — the structgep recurrence.
 verify_pristine_patches() {
   local failed=0
-  local llvm_builder_orig="vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php.orig"
+  local snap="$ROOT/patches/pristine-snapshots/ircmaxell/php-llvm"
+  local scratch name patch applied listed extra
   reject_hunkless_patches || failed=1
-  verify_pristine_patch_on_orig "$PATCH_DIR/php-llvm-structgep-assert.patch" "$llvm_builder_orig" || failed=1
-  verify_pristine_patch_on_orig "$PATCH_DIR/php-llvm-icmp-assert.patch" "$llvm_builder_orig" || failed=1
+  if [[ ! -f "$snap/ORIGIN" || ! -d "$snap/lib" ]]; then
+    echo "verify-pristine: missing php-llvm snapshot at ${snap} (ORIGIN+lib/) (#36229)" >&2
+    return 1
+  fi
+  listed="$(list_applied_php_llvm_patches | sort)"
+  extra="$(comm -23 <(cd "$PATCH_DIR" && ls -1 php-llvm-*.patch | sort) <(printf '%s\n' "$listed"))"
+  if [[ -n "$extra" ]]; then
+    echo "verify-pristine: php-llvm patches on disk not in apply_patch list (#36229):" >&2
+    echo "$extra" >&2
+    failed=1
+  fi
+  if [[ ! -d "$snap/ffi" ]]; then
+    echo "verify-pristine: php-llvm snapshot missing ffi/ (makearray patch) (#36229)" >&2
+    failed=1
+  fi
   if [[ "$failed" -ne 0 ]]; then
     echo "verify-pristine: patch drift detected — re-diff against pristine vendor (#36209/#36229)" >&2
     return 1
   fi
+  scratch="$(mktemp -d "${TMPDIR:-/tmp}/phpc-pristine-llvm-stack.XXXXXX")"
+  mkdir -p "$scratch/vendor/ircmaxell/php-llvm"
+  cp -a "$snap/lib" "$scratch/vendor/ircmaxell/php-llvm/lib"
+  cp -a "$snap/ffi" "$scratch/vendor/ircmaxell/php-llvm/ffi"
+  applied=0
+  while IFS= read -r name; do
+    [[ -z "$name" ]] && continue
+    patch="$PATCH_DIR/$name"
+    if ! git -C "$scratch" apply -p0 "$patch" >/dev/null 2>&1; then
+      echo "verify-pristine: FAIL $name (does not apply in php-llvm stack order to snapshot $(grep -v '^#' "$snap/ORIGIN" | head -n1))" >&2
+      git -C "$scratch" apply --check -p0 "$patch" >&2 || true
+      rm -rf "$scratch"
+      echo "verify-pristine: patch drift detected — re-diff against pristine vendor (#36209/#36229)" >&2
+      return 1
+    fi
+    echo "verify-pristine: OK   $name (stack)"
+    applied=$((applied + 1))
+  done < <(list_applied_php_llvm_patches)
+  rm -rf "$scratch"
+  if [[ "$applied" -lt 1 ]]; then
+    echo "verify-pristine: FAIL empty php-llvm apply list" >&2
+    return 1
+  fi
   echo "verify-pristine: llvm patches apply to pristine vendor snapshots; no hunkless stubs"
+  echo "verify-pristine: php-llvm stack ${applied}/$(ls -1 "$PATCH_DIR"/php-llvm-*.patch | wc -l) applied in order to snapshot $(grep -v '^#' "$snap/ORIGIN" | head -n1)"
   return 0
 }
 

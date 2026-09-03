@@ -1,6 +1,6 @@
 --- vendor/ircmaxell/php-llvm/lib/LLVMAbstract/MemoryBuffer.php
 +++ vendor/ircmaxell/php-llvm/lib/LLVMAbstract/MemoryBuffer.php
-@@ -5,8 +5,10 @@ namespace PHPLLVM\LLVMAbstract;
+@@ -5,9 +5,11 @@
  use PHPLLVM\Context as CoreContext;
  use PHPLLVM\MemoryBuffer as CoreMemoryBuffer;
  
@@ -12,8 +12,7 @@
  
  class MemoryBuffer implements CoreMemoryBuffer {
  
-@@ -32,24 +34,24 @@ class MemoryBuffer implements CoreMemoryBuffer {
-     }
+@@ -33,23 +35,23 @@
  
      public function parseBitcode(CoreContext $context): Module {
          $error = new string_ptr(FFI::addr(FFI::new('char*')));
@@ -44,4 +43,6 @@
 -        return $this->llvm->factory->module($context, $mdoule);
 +        return $this->llvm->factory->module($context, $module, 'preg_match_runtime');
      }
- }
+-}
+\ No newline at end of file
++}
