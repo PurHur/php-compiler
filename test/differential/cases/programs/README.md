@@ -1,6 +1,6 @@
 # Program-shaped differential corpus (#36221)
 
-Thirty deterministic end-to-end programs. Each prints a stable summary plus a `checksum=` line (crc32).
+Thirty-two deterministic end-to-end programs. Each prints a stable summary plus a `checksum=` line (crc32).
 
 ```bash
 script/differential-sweep.sh --dir test/differential/cases/programs

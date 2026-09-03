@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT;
 use PHPCfg\Operand;
 use PHPCfg\Operand\Temporary;
 use PHPLLVM\BasicBlock;
+use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_;
 use PHPCompiler\Block;
 use PHPCompiler\Compiler\CompileFatal;
@@ -16,11 +17,14 @@ use PHPCompiler\JIT\OperandName;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\OpCode;
 use PHPCompiler\Runtime;
+use PHPCompiler\VM\ProjectIncludeAllowlist;
 use PHPCompiler\VM\VmInclude;
 use PHPCompiler\ext\standard\IncludeBindingJitHelper;
 use PHPCompiler\ext\standard\IncludeJitHelper;
 use PHPCompiler\Web\DeployRoot;
 use PHPCompiler\Config;
+use PHPCompiler\JIT\Builtin\ErrorRaise;
+use PHPCompiler\JIT\LibcExtern;
 
 /**
  * Compile-time literal include/require for JIT/AOT (issue #54, #475, #485).
@@ -43,6 +47,7 @@ final class IncludeHelper
             return;
         }
         $path = null;
+        $pathOperand = null;
         if (null !== $op->arg3 && isset($callerBlock->literalIncludePaths[$op->arg3])) {
             $path = $callerBlock->literalIncludePaths[$op->arg3];
         }
@@ -51,12 +56,28 @@ final class IncludeHelper
             $path = IncludeJitHelper::resolveLiteralPath($callerBlock, $op->arg1, $pathOperand, $context);
         }
         if (null === $path || '' === $path) {
+            $allow = $context->runtime->aotIncludeAllowlist ?? null;
+            if (is_array($allow) && [] !== $allow) {
+                // Project builds: resolve computed include against the file map at runtime (#36382).
+                self::compileComputedProjectInclude(
+                    $jit,
+                    $callerBlock,
+                    $op,
+                    $resultOperand,
+                    $allow
+                );
+
+                return;
+            }
             if (IncludeJitHelper::shouldStubM3SidecarHostNonLiteralInclude($callerBlock)) {
                 self::emitSkippedSelfHostSpineCliInclude($jit, $callerBlock, $resultOperand);
 
                 return;
             }
             $caller = $callerBlock->scriptPath();
+            if (null === $pathOperand) {
+                $pathOperand = $callerBlock->getOperand($op->arg1);
+            }
             $operandDesc = get_debug_type($pathOperand);
             $name = OperandName::resolve($pathOperand);
             if (null !== $name && '' !== $name) {
@@ -83,16 +104,124 @@ final class IncludeHelper
             return;
         }
         $allow = $context->runtime->aotIncludeAllowlist ?? null;
-        if (is_array($allow) && [] !== $allow) {
-            $resolved = realpath($path) ?: $path;
-            if (!isset($allow[$resolved]) && !isset($allow[$path])) {
-                throw new \LogicException(
-                    'include/require path outside project file map: '.$path
-                    .' (issue #36382)'
-                );
-            }
+        if (is_array($allow) && [] !== $allow
+            && !ProjectIncludeAllowlist::isAllowed($path, $allow)
+        ) {
+            throw new \LogicException(ProjectIncludeAllowlist::denyMessage($path));
         }
         self::compileIncludedFile($jit, $func, $callerBlock, $path, $resultOperand);
+    }
+
+    /**
+     * Runtime allowlist gate for non-literal include/require under phpc build --project (#36382).
+     *
+     * In-map hits are no-ops: SourceBundler / ProjectGraph already linked those units. Out-of-map
+     * paths Error with the path (never a silent no-op).
+     *
+     * @param array<string, true> $allow
+     */
+    private static function compileComputedProjectInclude(
+        JIT $jit,
+        Block $callerBlock,
+        OpCode $op,
+        ?Operand $resultOperand,
+        array $allow
+    ): void {
+        $context = $jit->context;
+        $pathOperand = $callerBlock->getOperand($op->arg1);
+        if (null === $pathOperand) {
+            throw new \LogicException(
+                'computed project include missing path operand (issue #36382)'
+            );
+        }
+        if (!$context->hasVariableOp($pathOperand)) {
+            throw new \LogicException(
+                'computed project include path operand not lowered (issue #36382)'
+            );
+        }
+
+        $keys = ProjectIncludeAllowlist::emitKeys($allow);
+        if ([] === $keys) {
+            throw new \LogicException(
+                'computed project include with empty file map (issue #36382)'
+            );
+        }
+
+        ErrorRaise::ensureLinked($context);
+        LibcExtern::ensureSnprintf($context);
+
+        $pathVar = $context->getVariableFromOp($pathOperand);
+        $pathStr = JitStringArg::lower($context, $pathVar, 'include path');
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $zeroCmp = $i64->constInt(0, false);
+        $tag = 'proj_inc_'.(++self::$includeEntrySerial);
+        $ok = BasicBlockHelper::append($context, $tag.'_ok');
+        $deny = BasicBlockHelper::append($context, $tag.'_deny');
+
+        $n = \count($keys);
+        $checkBlocks = [];
+        for ($i = 0; $i < $n; ++$i) {
+            $checkBlocks[$i] = BasicBlockHelper::append($context, $tag.'_chk_'.$i);
+        }
+        $context->builder->branch($checkBlocks[0]);
+
+        for ($i = 0; $i < $n; ++$i) {
+            $context->builder->positionAtEnd($checkBlocks[$i]);
+            $lit = $context->builder->load($context->constantStringFromString($keys[$i]));
+            $cmp = JitStringCompare::strcmp($context, $pathStr, $lit);
+            $isMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $zeroCmp);
+            $onMiss = ($i < $n - 1) ? $checkBlocks[$i + 1] : $deny;
+            $context->builder->branchIf($isMatch, $ok, $onMiss);
+        }
+
+        $context->builder->positionAtEnd($deny);
+        $pathCstr = $context->builder->structGep(
+            $pathStr,
+            $context->structFieldIndex($pathStr, 'value')
+        );
+        $buf = $context->builder->alloca($i8->arrayType(1024), 1, $tag.'_msg');
+        $bufPtr = $context->builder->pointerCast($buf, $i8p);
+        $written = $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $bufPtr,
+            $context->constantFromInteger(1024, 'size_t'),
+            $context->builder->pointerCast(
+                $context->constantFromString(
+                    ProjectIncludeAllowlist::DENY_PREFIX.'%s'.ProjectIncludeAllowlist::DENY_SUFFIX
+                ),
+                $i8p
+            ),
+            $pathCstr
+        );
+        $len = $context->builder->zext(
+            $context->builder->select(
+                $context->builder->icmp(Builder::INT_SLT, $written, $i32->constInt(0, true)),
+                $i32->constInt(0, false),
+                $written
+            ),
+            $sizeT
+        );
+        $context->builder->call(
+            $context->lookupFunction('__compiler_jit_raise_error'),
+            $bufPtr,
+            $len
+        );
+        if (\PHPCompiler\JIT\Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_error'));
+        } else {
+            $context->builder->call($context->lookupFunction('abort'));
+            $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+        }
+
+        $context->builder->positionAtEnd($ok);
+        if (null !== $resultOperand) {
+            $jit->assignIncludeResult($resultOperand);
+        }
+        BasicBlockHelper::ensureOpenInsertBlock($context, $tag.'_cont');
     }
 
     private static function compileIncludedFile(

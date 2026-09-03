@@ -10000,6 +10000,25 @@ restart:
                         break;
                     }
 
+                    // Project builds refuse includes outside the compile-unit file map (#36382).
+                    $allow = $this->context->runtime->aotIncludeAllowlist ?? null;
+                    if (is_array($allow) && [] !== $allow
+                        && !VM\ProjectIncludeAllowlist::isAllowed($resolved, $allow)
+                    ) {
+                        $catchFrame = $this->dispatchEngineThrow(
+                            $frame,
+                            $this->makeEngineError(
+                                VM\ProjectIncludeAllowlist::denyMessage($resolved),
+                                'Error'
+                            )
+                        );
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    }
+
                     if ($once && $this->context->isCompileUnitLoaded($resolved)) {
                         if (null !== $op->arg2 && isset($frame->scope[$op->arg2])) {
                             // Zend: include_once/require_once return bool(true) when the file was already included.
