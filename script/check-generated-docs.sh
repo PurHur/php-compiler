@@ -56,6 +56,9 @@ step "opcode-corpus-md5 --check" "$PHP_BIN" script/opcode-corpus-md5.php --check
 # 10. Configuration env registry docs (#36201)
 step "generate-configuration-docs --check" "$PHP_BIN" script/generate-configuration-docs.php --check
 
+# 11. Size budgets + ratchet — load-bearing file line ceilings (#36403)
+step "check-size-budgets" ./script/check-size-budgets.sh
+
 if [[ "$fail" -ne 0 ]]; then
   echo "check-generated-docs: drift detected — regenerate in the pinned env (see CONTRIBUTING 'Generated docs')" >&2
   exit 1
