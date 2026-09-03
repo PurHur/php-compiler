@@ -35,6 +35,9 @@ patch_already_applied() {
     php-llvm-icmp-assert.patch)
       grep -q 'iCmp: operands are not of the same type' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php" 2>/dev/null
       ;;
+    php-llvm-create-target-machine.patch)
+      grep -q 'Int constants match LLVMCodeGenOptLevel' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Target.php" 2>/dev/null
+      ;;
     php-llvm-builder-dispose-idempotent.patch)
       grep -q 'private bool \$disposed = false' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php" 2>/dev/null \
         || grep -q 'private bool $disposed = false' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php" 2>/dev/null
@@ -7633,6 +7636,7 @@ apply_patch "$PATCH_DIR/php-llvm-builder-xor.patch"
 repair_php_llvm_assert_env_var
 apply_patch "$PATCH_DIR/php-llvm-structgep-assert.patch"
 apply_patch "$PATCH_DIR/php-llvm-icmp-assert.patch"
+apply_patch "$PATCH_DIR/php-llvm-create-target-machine.patch"
 apply_patch "$PATCH_DIR/php-llvm-pass-registry-interface.patch"
 apply_patch "$PATCH_DIR/php-llvm-pass-manager-builder-semicolon.patch"
 apply_patch "$PATCH_DIR/php-llvm-pass-manager-builder-typed-prop.patch"

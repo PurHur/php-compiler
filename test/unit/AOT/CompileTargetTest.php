@@ -73,4 +73,55 @@ final class CompileTargetTest extends TestCase
         $this->assertArrayHasKey('PHP_COMPILER_TARGET', $reg);
         $this->assertSame('#36391', $reg['PHP_COMPILER_TARGET']['since']);
     }
+
+    public function testLlvmTargetNameAndRelocConsts(): void
+    {
+        $x86 = CompileTarget::resolve(CompileTarget::ID_X86_64_LINUX);
+        $this->assertSame('x86-64', $x86->llvmTargetName());
+        $this->assertSame(\PHPLLVM\Target::RELOC_PIC, $x86->llvmRelocModeConst());
+
+        $arm = CompileTarget::resolve(CompileTarget::ID_AARCH64_LINUX);
+        $this->assertSame('aarch64', $arm->llvmTargetName());
+    }
+
+    public function testCreateTargetMachineBindingEmitsObject(): void
+    {
+        if (!\PHPCompiler\LlvmToolchain::isReady(dirname(__DIR__, 3))) {
+            $this->markTestSkipped('LLVM 9 not available');
+        }
+        $llvm = \PHPLLVM\Chooser::choose();
+        $llvm->initializeNative();
+        $target = CompileTarget::current();
+        $llvmTarget = $llvm->getTargetFromName($target->llvmTargetName());
+        $machine = $llvmTarget->createTargetMachine(
+            $target->llvmTriple(),
+            $target->cpu(),
+            '',
+            \PHPLLVM\Target::OPT_LEVEL_NONE,
+            $target->llvmRelocModeConst(),
+            \PHPLLVM\Target::CODE_MODEL_DEFAULT
+        );
+        $this->assertInstanceOf(\PHPLLVM\TargetMachine::class, $machine);
+
+        $ctx = $llvm->contextCreate();
+        $mod = $ctx->moduleCreateWithName('create-tm-test');
+        $i32 = $ctx->int32Type();
+        $fn = $mod->addFunction('main', $ctx->functionType($i32, false));
+        $bb = $fn->appendBasicBlock('entry');
+        $b = $ctx->builderCreate();
+        $b->positionAtEnd($bb);
+        $b->returnValue($i32->constInt(0, false));
+        $out = sys_get_temp_dir().'/phpc-create-tm-'.bin2hex(random_bytes(4)).'.o';
+        $this->assertTrue($machine->emitToFile($mod, $out, $machine::CODEGEN_FILE_TYPE_OBJECT));
+        $this->assertFileExists($out);
+        $this->assertGreaterThan(0, filesize($out));
+        @unlink($out);
+    }
+
+    public function testConfigRegistryListsCodegenOptKnob(): void
+    {
+        $reg = \PHPCompiler\Config::registry();
+        $this->assertArrayHasKey('PHP_COMPILER_AOT_CODEGEN_OPT', $reg);
+        $this->assertSame('#36387', $reg['PHP_COMPILER_AOT_CODEGEN_OPT']['since']);
+    }
 }
