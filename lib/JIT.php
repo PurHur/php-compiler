@@ -11890,6 +11890,45 @@ class JIT {
                                     );
                                     break;
                                 }
+                                if (
+                                    Variable::KIND_VARIABLE === $bound->kind
+                                    && Variable::TYPE_HASHTABLE === $bound->type
+                                ) {
+                                    // Native __hashtable__* locals: same as objects — named-binding
+                                    // unset must not fall through without delref (#36388). Without
+                                    // this, inferred int[]/$a keeps the HT and every loop iteration
+                                    // leaks (~288 B) under thin AOT.
+                                    // php-src: Zend/zend_execute.c ZEND_UNSET_VAR → zval_ptr_dtor.
+                                    $ht = $this->context->builder->load($bound->value);
+                                    $this->context->refcount->delref(
+                                        $this->context->builder->pointerCast(
+                                            $ht,
+                                            $this->context->getTypeFromString('__ref__virtual*')
+                                        )
+                                    );
+                                    $this->context->builder->store(
+                                        $this->context->getTypeFromString('__hashtable__*')->constNull(),
+                                        $bound->value
+                                    );
+                                    break;
+                                }
+                                if (
+                                    Variable::KIND_VARIABLE === $bound->kind
+                                    && Variable::TYPE_STRING === $bound->type
+                                ) {
+                                    $str = $this->context->builder->load($bound->value);
+                                    $this->context->refcount->delref(
+                                        $this->context->builder->pointerCast(
+                                            $str,
+                                            $this->context->getTypeFromString('__ref__virtual*')
+                                        )
+                                    );
+                                    $this->context->builder->store(
+                                        $this->context->getTypeFromString('__string__*')->constNull(),
+                                        $bound->value
+                                    );
+                                    break;
+                                }
                             } elseif ($foreachByRefUnset) {
                                 // Block order may compile unset before the foreach body; CFG scan
                                 // still knows $v is a foreach-by-ref dest (#24010 / i11 differential).
@@ -23140,12 +23179,26 @@ class JIT {
             // User-function NEW rvalues (KIND_VALUE) already own rc=1; addref into the
             // result temp would leave a root past ZEND_ASSIGN + return (#36245 scope_exit).
             // {main} script-globals use the value-box path and still need the addref.
+            // INIT_ARRAY native temps already hold rc=1 — move into the CV (#36388).
+            $skipAddrefForHashtableMove = $value->ephemeralArrayTemp
+                && Variable::TYPE_HASHTABLE === $value->type
+                && Variable::KIND_VARIABLE === $value->kind
+                && $value !== $result
+                && null !== $value->value;
             $skipAddrefForNewRvalue = Variable::KIND_VALUE === $value->kind
                 && null !== $this->context->jitEnclosingBlock
                 && null !== $this->context->jitEnclosingBlock->func
                 && '{main}' !== $this->context->jitEnclosingBlock->func->name;
-            if (null === $result->objectPropertySlot && !$skipAddrefForNewRvalue) {
+            if (null === $result->objectPropertySlot && !$skipAddrefForNewRvalue && !$skipAddrefForHashtableMove) {
                 $result->addref();
+            }
+            if ($skipAddrefForHashtableMove) {
+                $this->context->builder->store(
+                    $this->context->getTypeFromString('__hashtable__*')->constNull(),
+                    $value->value
+                );
+                $value->ephemeralArrayTemp = false;
+                $result->ephemeralArrayTemp = false;
             }
             $this->copyValueBoxJitFlags($result, $value, $force);
             $result->compileTimeConstantName = $value->compileTimeConstantName;
@@ -23173,13 +23226,21 @@ class JIT {
             $valueRef = $result->value;
             $valueFrom = $value->value;
             if ($value->type & Variable::IS_NATIVE_ARRAY) {
+                // materialize returns owned rc=1; writeHashtable addrefs for the box.
+                // Do not addref again — that left rc≥2 so unset never destroyed (#36388).
                 $ht = JIT\HashTableHelper::materializeNativeArrayForCall($this->context, $value);
+                $destPtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $result);
                 $this->context->builder->call(
                     $this->context->lookupFunction('__value__writeHashtable'),
-                    $valueRef,
+                    $destPtr,
                     $ht
                 );
-                $this->context->refcount->addref($ht);
+                $this->context->refcount->delref(
+                    $this->context->builder->pointerCast(
+                        $ht,
+                        $this->context->getTypeFromString('__ref__virtual*')
+                    )
+                );
                 $result->valueBoxHashtable = true;
 
                 return;
@@ -23377,10 +23438,17 @@ class JIT {
                 default:
                     if ($value->type & Variable::IS_NATIVE_ARRAY) {
                         $ht = JIT\HashTableHelper::materializeNativeArrayForCall($this->context, $value);
+                        $destPtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $result);
                         $this->context->builder->call(
                             $this->context->lookupFunction('__value__writeHashtable'),
-                            $valueRef,
+                            $destPtr,
                             $ht
+                        );
+                        $this->context->refcount->delref(
+                            $this->context->builder->pointerCast(
+                                $ht,
+                                $this->context->getTypeFromString('__ref__virtual*')
+                            )
                         );
                         $result->valueBoxHashtable = true;
 
@@ -23488,11 +23556,34 @@ class JIT {
 
             return;
         } elseif (Variable::TYPE_VALUE === $result->type && Variable::TYPE_HASHTABLE === $value->type) {
+            // INIT_ARRAY temps already hold rc=1. writeHashtable addrefs for the box's
+            // sole-owner claim — without releasing the temp that leaves rc=2 so unset
+            // only drops to 1 and every loop iteration leaks (~288 B) (#36388).
+            // php-src: zend_assign_to_variable moves the zval; no second ADDREF on the array.
+            $htPtr = $this->context->helper->loadValue($value);
             $this->context->builder->call(
                 $this->context->lookupFunction('__value__writeHashtable'),
                 $this->valueBoxPointer($result),
-                $this->context->helper->loadValue($value)
+                $htPtr
             );
+            if (
+                $value->ephemeralArrayTemp
+                && Variable::KIND_VARIABLE === $value->kind
+                && null !== $value->value
+                && $value !== $result
+            ) {
+                $this->context->refcount->delref(
+                    $this->context->builder->pointerCast(
+                        $htPtr,
+                        $this->context->getTypeFromString('__ref__virtual*')
+                    )
+                );
+                $this->context->builder->store(
+                    $this->context->getTypeFromString('__hashtable__*')->constNull(),
+                    $value->value
+                );
+                $value->ephemeralArrayTemp = false;
+            }
             $result->valueBoxHashtable = true;
             $result->compileTimeEmptyArrayLiteral = $value->compileTimeEmptyArrayLiteral;
 

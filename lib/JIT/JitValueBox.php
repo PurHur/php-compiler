@@ -496,21 +496,55 @@ final class JitValueBox
                 return;
             case Variable::TYPE_HASHTABLE:
                 $ht = $context->helper->loadValue($value);
-                $context->refcount->addref($ht);
+                // Do NOT addref here — __value__writeHashtable already retains for the
+                // value-box sole-owner claim. A prior addref left rc=2 so unset/reassign
+                // never reached __hashtable__dtor (#36388 / re-#36252).
+                // php-src: Zend/zend_execute.c zend_assign_to_variable copies zval and
+                // zval_ptr_dtor's the old; fresh array literals start at rc=1 after assign.
                 $context->builder->call(
                     $context->lookupFunction('__value__writeHashtable'),
                     $destPtr,
                     $ht
                 );
+                // INIT_ARRAY native temps already hold rc=1; writeHashtable addrefs again.
+                // Release the temp so the value-box is the sole owner (#36388).
+                // {main} script-globals assign via this path (KIND_VALUE), not assignOperand's
+                // TYPE_VALUE←TYPE_HASHTABLE branch.
+                if (
+                    $value->ephemeralArrayTemp
+                    && Variable::KIND_VARIABLE === $value->kind
+                    && null !== $value->value
+                ) {
+                    $context->refcount->delref(
+                        $context->builder->pointerCast(
+                            $ht,
+                            $context->getTypeFromString('__ref__virtual*')
+                        )
+                    );
+                    $context->builder->store(
+                        $context->getTypeFromString('__hashtable__*')->constNull(),
+                        $value->value
+                    );
+                    $value->ephemeralArrayTemp = false;
+                }
 
                 return;
         }
         if (ArrayBuiltinHelper::isNativeArray($value->type)) {
+            // materializeNativeArrayForCall returns an owned HT (rc=1). writeHashtable
+            // addrefs again — release the materialize claim so the box is sole owner
+            // (#36388 list/packed `$a = [$i]; unset($a)` under {main}).
             $ht = ArrayBuiltinHelper::loadHashTable($context, $value);
             $context->builder->call(
                 $context->lookupFunction('__value__writeHashtable'),
                 $destPtr,
                 $ht
+            );
+            $context->refcount->delref(
+                $context->builder->pointerCast(
+                    $ht,
+                    $context->getTypeFromString('__ref__virtual*')
+                )
             );
 
             return;

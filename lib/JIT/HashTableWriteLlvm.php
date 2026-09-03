@@ -2688,6 +2688,8 @@ final class HashTableWriteLlvm
         }
         $context->refcount->addref($ht);
         $context->builder->store($ht, $result->value);
+        // Named CV ASSIGN must move this rc=1 rather than addref again (#36388).
+        $result->ephemeralArrayTemp = true;
     }
 
     /**
