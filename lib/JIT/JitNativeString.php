@@ -598,6 +598,9 @@ final class JitNativeString
 
     public static function ensureI64Decimal(Context $context): void
     {
+        // __string__fromLong → __string__alloc needs __mm__malloc in functionScope.
+        // Rebind from the module (or register) when the edit-scaffold skip left it unbound (#36386).
+        self::ensureAllocatorDecls($context);
         $dec = $context->module->getNamedFunction('__phpc_i64_decimal');
         $from = $context->module->getNamedFunction('__string__fromLong');
         $decReady = $dec instanceof LlvmFunction && $dec->countBasicBlocks() > 0;
@@ -623,6 +626,29 @@ final class JitNativeString
         } finally {
             BasicBlockHelper::restoreInsertBlock($context, $restore);
         }
+    }
+
+    private static function ensureAllocatorDecls(Context $context): void
+    {
+        if (null !== $context->tryGetRegisteredFunction('__mm__malloc')) {
+            return;
+        }
+        $existing = $context->module->getNamedFunction('__mm__malloc');
+        if ($existing instanceof LlvmFunction) {
+            $context->registerFunction('__mm__malloc', $existing);
+            $realloc = $context->module->getNamedFunction('__mm__realloc');
+            if ($realloc instanceof LlvmFunction) {
+                $context->registerFunction('__mm__realloc', $realloc);
+            }
+            $free = $context->module->getNamedFunction('__mm__free');
+            if ($free instanceof LlvmFunction) {
+                $context->registerFunction('__mm__free', $free);
+            }
+
+            return;
+        }
+        // Decls absent from restored bitcode — safe to register once (#36386 / #36387).
+        $context->memory->register();
     }
 
     private static function implementI64Decimal(Context $context): void

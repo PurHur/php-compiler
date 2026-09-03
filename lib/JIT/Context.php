@@ -2078,8 +2078,24 @@ class Context {
         foreach ($this->builtins as $builtin) {
             // Restored bitcode already has __mm__malloc etc. addFunction would mint
             // empty __mm__malloc.1 and lookupFunction would bind the stub (#36387).
+            // Thin helper-cache AOT may restore bitcode without the mm family — still
+            // register when the decls are absent (str-builder concat flatten, #36386).
             if (CompileCache::shouldSkipBuiltinImplement()
                 && $builtin instanceof Builtin\MemoryManager) {
+                $mm = $this->module->getNamedFunction('__mm__malloc');
+                if ($mm instanceof PHPLLVM\Value\Function_) {
+                    $this->registerFunction('__mm__malloc', $mm);
+                    $realloc = $this->module->getNamedFunction('__mm__realloc');
+                    if ($realloc instanceof PHPLLVM\Value\Function_) {
+                        $this->registerFunction('__mm__realloc', $realloc);
+                    }
+                    $free = $this->module->getNamedFunction('__mm__free');
+                    if ($free instanceof PHPLLVM\Value\Function_) {
+                        $this->registerFunction('__mm__free', $free);
+                    }
+                } else {
+                    $builtin->register();
+                }
                 continue;
             }
             $builtin->register();
@@ -2121,6 +2137,19 @@ class Context {
                 $this->ensureFullStandaloneBodies();
             }
         }
+        } else {
+            // Thin bitcode restore without mm bodies: implement MemoryManager only when
+            // we had to mint empty __mm__* decls above (#36386 / str-builder helper=1).
+            foreach ($this->builtins as $builtin) {
+                if (!$builtin instanceof Builtin\MemoryManager) {
+                    continue;
+                }
+                $mm = $this->module->getNamedFunction('__mm__malloc');
+                if ($mm instanceof PHPLLVM\Value\Function_ && 0 === $mm->countBasicBlocks()) {
+                    $builtin->implement();
+                }
+                break;
+            }
         }
 
         $this->functionProxies['is_null'] = new Builtin\IsNullFn();
