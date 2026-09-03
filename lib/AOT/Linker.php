@@ -128,6 +128,7 @@ final class Linker
             $cmd = implode(' ', [
                 escapeshellarg($ld),
                 AotDebugSymbols::linkFlag(),
+                self::sanitizerLinkFlags(),
                 AotGcSections::linkStripFlag(),
                 AotGcSections::linkGcSectionsFlagForHelperLink(false, $helperGcLinkPaths),
                 self::helperMuldefsFlag('-z muldefs'),
@@ -167,7 +168,7 @@ final class Linker
             // When linking with the bundled clang, ensure we can still resolve host libraries
             // (libpcre2-8, libcrypt, ...). Some bootstrap envs only ship the runtime .so/.a under
             // the multiarch lib dir without a full sysroot lib tree (#36391).
-            $cmd = escapeshellarg($clang).' '.AotDebugSymbols::linkFlag().AotGcSections::linkStripFlag().AotGcSections::linkGcSectionsFlagForHelperLink(true, $helperGcLinkPaths).self::helperMuldefsFlag(' -Wl,-z,muldefs').self::libcNameHideFlag(true).$objects.' '.self::hostLibSearchFlag().' -lm '.self::runtimeLinkLibs($linkObjectFiles).' -o '.escapeshellarg($executable);
+            $cmd = escapeshellarg($clang).' '.AotDebugSymbols::linkFlag().self::sanitizerLinkFlags().AotGcSections::linkStripFlag().AotGcSections::linkGcSectionsFlagForHelperLink(true, $helperGcLinkPaths).self::helperMuldefsFlag(' -Wl,-z,muldefs').self::libcNameHideFlag(true).$objects.' '.self::hostLibSearchFlag().' -lm '.self::runtimeLinkLibs($linkObjectFiles).' -o '.escapeshellarg($executable);
             self::run($cmd, $env);
             self::unlinkIfTemp($runtimeObjects);
 
@@ -177,7 +178,17 @@ final class Linker
         self::linkWithSystemCompiler($objectFile, $executable, $runtimeObjects, $vendorObjects, $linkObjectFiles, $helperGcLinkPaths);
     }
 
-    /** -z muldefs is only injected while helper-runtime TUs are merged (#15889). */
+    /** -fsanitize=address,undefined when PHP_COMPILER_ASAN=1 (#36397). */
+    private static function sanitizerLinkFlags(): string
+    {
+        $flag = Config::getenv('PHP_COMPILER_ASAN');
+        if ('1' !== $flag && 'true' !== strtolower((string) $flag)) {
+            return '';
+        }
+
+        return ' -fsanitize=address -fsanitize=undefined ';
+    }
+
     private static function helperMuldefsFlag(string $flag): string
     {
         return [] !== HelperRuntimeCache::linkObjects() ? ' '.$flag.' ' : '';
@@ -743,7 +754,7 @@ final class Linker
                 continue;
             }
             $cmd = escapeshellarg($path) . ' '
-                . AotDebugSymbols::linkFlag() . AotGcSections::linkStripFlag() . AotGcSections::linkGcSectionsFlagForHelperLink(true, $helperGcLinkPaths) . self::helperMuldefsFlag(' -Wl,-z,muldefs') . self::libcNameHideFlag(true) . $objects . ' '.self::hostLibSearchFlag().' -lm '.self::runtimeLinkLibs($linkObjectFiles).' -o ' . escapeshellarg($executable);
+                . AotDebugSymbols::linkFlag() . self::sanitizerLinkFlags() . AotGcSections::linkStripFlag() . AotGcSections::linkGcSectionsFlagForHelperLink(true, $helperGcLinkPaths) . self::helperMuldefsFlag(' -Wl,-z,muldefs') . self::libcNameHideFlag(true) . $objects . ' '.self::hostLibSearchFlag().' -lm '.self::runtimeLinkLibs($linkObjectFiles).' -o ' . escapeshellarg($executable);
             $captured = self::runCaptured($cmd, null);
             if (0 === $captured['code']) {
                 self::unlinkIfTemp($runtimeObjects);
