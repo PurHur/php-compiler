@@ -2961,6 +2961,9 @@ class JIT {
         ?string $logicalName,
         ?string $funcName
     ): PHPLLVM\Value {
+        // Note: edit-scaffold keep-path (reuse unchanged member LLVM bodies) is intentionally
+        // not gated here yet — early-return on any existing Function_ also matched restored
+        // helper bodies and skipped NestedJIT rebinding, yielding empty AOT stdout (#36387).
         $args = [];
         $rawTypes = [];
         $argVars = [];

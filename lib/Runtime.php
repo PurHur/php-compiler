@@ -1060,6 +1060,8 @@ class Runtime {
                 JIT\CompileCache::beginRecording($this->jitCompileCacheKey);
                 \PHPCompiler\AOT\BuildTiming::mark('lower_user');
                 $context->setMain($this->loadJit()->compile($block));
+                // rebaseStaleUserSymbols is for keep-path CallInst repair; full-strip
+                // re-lower already emits fresh call targets (#36387).
                 \PHPCompiler\AOT\BuildTiming::end('lower_user');
                 \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_compile_done');
                 \PHPCompiler\AOT\BuildTiming::end('codegen');

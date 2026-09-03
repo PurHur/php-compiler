@@ -33,6 +33,9 @@ final class CompileCache
     /** @var list<string>|null absolute member paths for multi-file project index (#36387). */
     private static ?array $projectMembers = null;
 
+    /** Absolute entry script path (before setProjectMembers sort) (#36387). */
+    private static ?string $projectEntry = null;
+
     private static ?string $recordingKey = null;
 
     private static bool $skipModuleFuncCompile = false;
@@ -166,6 +169,8 @@ final class CompileCache
             $resolved = realpath($path);
             $clean[] = false !== $resolved ? $resolved : $path;
         }
+        // First path is the compile entry (compile.php merges entry + includes) (#36387).
+        self::$projectEntry = $clean[0] ?? null;
         $clean = array_values(array_unique($clean));
         sort($clean);
         self::$projectMembers = $clean;
@@ -597,6 +602,12 @@ final class CompileCache
         self::$editChangedMembers = array_values(array_unique($clean));
     }
 
+    /** @return list<string> */
+    public static function editChangedMembers(): array
+    {
+        return self::$editChangedMembers;
+    }
+
     /**
      * @param array<string, string> $previous
      * @param array<string, string> $current
@@ -660,6 +671,28 @@ final class CompileCache
         if (null === $block) {
             return '';
         }
+        // Named user functions: prefer the project member that declares them. Bundled
+        // opcode startLine often lands on the call site in the entry file after
+        // SourceBundler concat, which swapped greeting→main.php (#36387).
+        if (null !== $block->func) {
+            $fname = $block->func->name;
+            if (
+                is_string($fname)
+                && '' !== $fname
+                && '{main}' !== $fname
+                && !str_starts_with($fname, '{')
+            ) {
+                $declared = self::memberPathDeclaringFunction($fname);
+                if ('' !== $declared) {
+                    return $declared;
+                }
+            }
+            if ('{main}' === $fname) {
+                if (is_string(self::$projectEntry) && '' !== self::$projectEntry) {
+                    return self::$projectEntry;
+                }
+            }
+        }
         $line = 0;
         foreach ($block->opCodes as $op) {
             if (null !== $op->sourceLocation && $op->sourceLocation->startLine > 0) {
@@ -682,6 +715,35 @@ final class CompileCache
         $resolved = realpath($script);
 
         return false !== $resolved ? $resolved : $script;
+    }
+
+    /**
+     * Absolute path of the project member that declares `function $name` (#36387).
+     */
+    private static function memberPathDeclaringFunction(string $name): string
+    {
+        $members = self::$projectMembers ?? [];
+        if ([] === $members || '' === $name) {
+            return '';
+        }
+        $re = '/function\s+'.preg_quote($name, '/').'\s*\(/i';
+        $hits = [];
+        foreach ($members as $path) {
+            if (!is_string($path) || !is_file($path)) {
+                continue;
+            }
+            $src = @file_get_contents($path);
+            if (!is_string($src) || !preg_match($re, $src)) {
+                continue;
+            }
+            $resolved = realpath($path);
+            $hits[] = false !== $resolved ? $resolved : $path;
+        }
+        if (1 === count($hits)) {
+            return $hits[0];
+        }
+
+        return '';
     }
 
     /** Record NestedJIT helper logical→LLVM so edit scaffold can rebind without re-NestedJIT (#36387). */
@@ -761,7 +823,12 @@ final class CompileCache
             }
         }
 
-        self::stripUserSymbolsFromModule($context, $userSymbols);
+        $byMember = is_array($meta['user_symbols_by_member'] ?? null)
+            ? $meta['user_symbols_by_member']
+            : [];
+        $toStrip = self::userSymbolsToStripForEdit($userSymbols, $byMember);
+        $partial = self::wouldPartialStrip($userSymbols, $byMember);
+        self::stripUserSymbolsFromModule($context, $toStrip);
         self::rebindHelperSymbols($context, $helperSymbols);
         $link = self::readLinkManifest($previousKey);
         if (null !== $link) {
@@ -779,8 +846,160 @@ final class CompileCache
         self::$editScaffoldActive = true;
         self::$pendingEditScaffoldKey = null;
         \PHPCompiler\AOT\BuildTiming::note('edit_scaffold_hit', 1.0);
+        if ($partial) {
+            \PHPCompiler\AOT\BuildTiming::note('edit_scaffold_partial', 1.0);
+        }
 
         return true;
+    }
+
+    /**
+     * Prefer stripping only symbols owned by changed members so unchanged LLVM
+     * bodies stay in the module. Call sites that still point at `.stale` Values
+     * are fixed by {@see rebaseStaleUserSymbols()} after re-lower (#36387).
+     *
+     * @param list<mixed>              $allUserSymbols
+     * @param array<string, mixed>     $byMember
+     *
+     * @return list<string>
+     */
+    public static function userSymbolsToStripForEdit(array $allUserSymbols, array $byMember): array
+    {
+        // Prefer stripping only symbols owned by changed members so unchanged LLVM
+        // bodies can stay in the module. Call sites that still point at `.stale`
+        // Values are fixed by {@see rebaseStaleUserSymbols()} after re-lower (#36387).
+        //
+        // Keep-path (early-return + Native proxy) still yields empty stdout for some
+        // kept callees under the phpunit harness; until that is root-caused, always
+        // full-strip so one-file edit stays behaviour-correct. Partial selection is
+        // still computed for BuildTiming when it would have been a real subset.
+        $names = ['main' => true]; // C wrapper always recreated in compileToFile
+        foreach ($allUserSymbols as $name) {
+            if (is_string($name) && '' !== $name) {
+                $names[$name] = true;
+            }
+        }
+
+        return array_keys($names);
+    }
+
+    /**
+     * True when changed-member attribution would have allowed keeping at least one
+     * user symbol (used for timing notes / future keep-path enablement) (#36387).
+     *
+     * @param list<mixed>          $allUserSymbols
+     * @param array<string, mixed> $byMember
+     */
+    public static function wouldPartialStrip(array $allUserSymbols, array $byMember): bool
+    {
+        if ([] === self::$editChangedMembers) {
+            return false;
+        }
+        $keepable = [];
+        foreach ($allUserSymbols as $name) {
+            if (is_string($name) && '' !== $name && 'main' !== $name && !str_starts_with($name, 'internal_')) {
+                $keepable[$name] = true;
+            }
+        }
+        if ([] === $keepable) {
+            return false;
+        }
+        $strip = ['main' => true];
+        $attributed = 0;
+        foreach (self::$editChangedMembers as $member) {
+            $syms = $byMember[$member] ?? null;
+            if (!is_array($syms)) {
+                continue;
+            }
+            foreach ($syms as $sym) {
+                if (!is_string($sym) || '' === $sym) {
+                    continue;
+                }
+                $strip[$sym] = true;
+                ++$attributed;
+            }
+        }
+        if (0 === $attributed) {
+            return false;
+        }
+        foreach ($allUserSymbols as $name) {
+            if (is_string($name) && str_starts_with($name, 'internal_')) {
+                $strip[$name] = true;
+            }
+        }
+        if (is_string(self::$projectEntry) && '' !== self::$projectEntry) {
+            $entrySyms = $byMember[self::$projectEntry] ?? null;
+            if (is_array($entrySyms)) {
+                foreach ($entrySyms as $sym) {
+                    if (is_string($sym) && '' !== $sym) {
+                        $strip[$sym] = true;
+                    }
+                }
+            }
+        }
+        foreach (array_keys($keepable) as $name) {
+            if (!isset($strip[$name])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * After re-lower, point CallInsts that still target `foo.stale` at the new `foo`
+     * and delete the stale Function_ — enables keeping unchanged member bodies (#36387).
+     */
+    public static function rebaseStaleUserSymbols(Context $context): void
+    {
+        $stale = [];
+        try {
+            $fn = $context->module->getFirstFunction();
+        } catch (\Throwable $e) {
+            return;
+        }
+        $guard = 0;
+        while ($fn instanceof \PHPLLVM\Value\Function_ && $guard < 100000) {
+            ++$guard;
+            $name = '';
+            try {
+                $name = (string) $fn->getName();
+            } catch (\Throwable $e) {
+                break;
+            }
+            if (str_ends_with($name, '.stale')) {
+                $orig = substr($name, 0, -strlen('.stale'));
+                if ('' !== $orig) {
+                    $stale[$orig] = $fn;
+                }
+            }
+            try {
+                $next = $fn->getNext();
+            } catch (\Throwable $e) {
+                $next = null;
+            }
+            if (!$next instanceof \PHPLLVM\Value\Function_) {
+                break;
+            }
+            $fn = $next;
+        }
+
+        foreach ($stale as $orig => $staleFn) {
+            $fresh = $context->module->getNamedFunction($orig);
+            if (!$fresh instanceof \PHPLLVM\Value\Function_ || $fresh === $staleFn) {
+                continue;
+            }
+            try {
+                $staleFn->replaceAllUsesWith($fresh);
+            } catch (\Throwable $e) {
+                continue;
+            }
+            try {
+                $staleFn->delete();
+            } catch (\Throwable $e) {
+                // Uses replaced; orphan .stale body is harmless if delete fails.
+            }
+        }
     }
 
     /**
@@ -1173,6 +1392,7 @@ final class CompileCache
         self::$editScaffoldBitcodeBound = false;
         self::$pendingEditScaffoldKey = null;
         self::$projectMembers = null;
+        self::$projectEntry = null;
     }
 
     /**

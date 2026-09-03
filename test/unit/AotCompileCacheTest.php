@@ -298,7 +298,6 @@ final class AotCompileCacheTest extends TestCase
 
         $members = [realpath($main) ?: $main, realpath($lib) ?: $lib];
         $projectId = CompileCache::projectId($members);
-        // After cold, project index points at the bundled cache key.
         $idxPath = CompileCache::projectIndexPath($projectId);
         $this->assertFileExists($idxPath);
         $idx = json_decode((string) file_get_contents($idxPath), true);
@@ -318,6 +317,14 @@ final class AotCompileCacheTest extends TestCase
         $raw = json_decode((string) file_get_contents(CompileCache::metaPath($scaffoldKey)), true);
         $this->assertIsArray($raw);
         $this->assertNotEmpty($raw['user_symbols'] ?? []);
+        $byMember = $raw['user_symbols_by_member'] ?? null;
+        $this->assertIsArray($byMember, 'cold AOT must record user_symbols_by_member (#36387)');
+        $libKey = realpath($lib) ?: $lib;
+        $this->assertContains(
+            'greeting',
+            $byMember[$libKey] ?? $byMember[$lib] ?? [],
+            'greeting() must be attributed to lib.php via declaration scan (#36387)'
+        );
 
         $outEdit = $this->repoRoot.'/build/aot-cache-test-edit-rebuild.bin';
         @unlink($outEdit);
@@ -337,15 +344,6 @@ final class AotCompileCacheTest extends TestCase
                 $cold['wall_ms'],
                 $edit['wall_ms']
             )
-        );
-        $rawMeta = json_decode((string) file_get_contents(CompileCache::metaPath($idx['key'])), true);
-        $this->assertIsArray($rawMeta);
-        $byMember = $rawMeta['user_symbols_by_member'] ?? null;
-        $this->assertIsArray($byMember, 'cold AOT must record user_symbols_by_member for partial strip (#36387)');
-        $libKey = realpath($lib) ?: $lib;
-        $this->assertNotEmpty(
-            $byMember[$libKey] ?? $byMember[$lib] ?? [],
-            'lib.php symbols must be attributed to that member'
         );
     }
 
