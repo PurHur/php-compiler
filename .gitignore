@@ -28,6 +28,8 @@ build/bootstrap-driver-smoke-*
 build/lint-cache
 # Per-unit split-compilation cache (#15889); committed variant lives in prelinked/helper-runtime
 build/helper-runtime-cache
+# libLLVM-9.so.1 content-hash sidecar (size+mtime keyed) — avoids 70MB re-hash (#36387)
+build/llvm-identity-cache
 build/opcache-*
 build/.m3_*
 # Gen-0 build receipt (#22642) — proves a local link produced the blobs being stamped.

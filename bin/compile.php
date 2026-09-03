@@ -193,6 +193,7 @@ function run(string $filename, string $code, array $options): void
 {
     phpc_compile_ensure_repo_root_env();
     \PHPCompiler\AOT\BuildTiming::boot();
+    \PHPCompiler\AOT\BuildTiming::mark('boot_setup');
     $normalized = '-' !== $filename ? str_replace('\\', '/', $filename) : '';
     if ('' !== $normalized
         && '-' !== $filename
@@ -495,6 +496,9 @@ function run(string $filename, string $code, array $options): void
         }
     }
 
+    $runtime = null;
+    \PHPCompiler\AOT\BuildTiming::end('boot_setup');
+    \PHPCompiler\AOT\BuildTiming::mark('boot_bundle');
     if ([] === $includes && '-' !== $filename && is_file($filename) && !$skipBundle) {
         $runtime = new Runtime(Runtime::MODE_AOT);
         $includes = LiteralIncludeDiscovery::discoverDirectAbsolutePaths($runtime, $filename);
@@ -516,7 +520,13 @@ function run(string $filename, string $code, array $options): void
         return;
     }
 
-    $runtime = new Runtime(Runtime::MODE_AOT);
+    \PHPCompiler\AOT\BuildTiming::end('boot_bundle');
+    \PHPCompiler\AOT\BuildTiming::mark('boot_runtime');
+    // Reuse discovery Runtime when present — avoid a second MODE_AOT construct (#36387).
+    if (!$runtime instanceof Runtime) {
+        $runtime = new Runtime(Runtime::MODE_AOT);
+    }
+    \PHPCompiler\AOT\BuildTiming::end('boot_runtime');
     $allowlistEnv = getenv('PHP_COMPILER_AOT_INCLUDE_ALLOWLIST');
 
     if (is_string($allowlistEnv) && '' !== $allowlistEnv) {
@@ -568,7 +578,9 @@ function run(string $filename, string $code, array $options): void
         $scriptName
     );
     // Warm helper-unit cache once per core fingerprint so subsequent builds skip nested helper lowering (#15889).
+    \PHPCompiler\AOT\BuildTiming::mark('boot_warm');
     \PHPCompiler\AOT\HelperRuntimeCache::warmForUserAotBuild();
+    \PHPCompiler\AOT\BuildTiming::end('boot_warm');
     \PHPCompiler\AOT\BuildTiming::end('boot');
     \PHPCompiler\AOT\BuildTiming::mark('parse');
     $block = $runtime->parseAndCompile($code, $filename);

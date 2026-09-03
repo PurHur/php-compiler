@@ -468,6 +468,10 @@ final class HelperRuntimeCache
      * Digest of linkable helper-runtime units for MCJIT/AOT compile-cache keys (#36199).
      *
      * Empty when helper-runtime O is off — still stable across runs.
+     *
+     * Uses manifest.json content hashes (not {@see helperIndex()}) so a cold `phpc build`
+     * does not pay a full unit fingerprint walk just to key the bitcode/artifact cache.
+     * Measured: helperIndex path ~1.5s vs ~6ms hashing 446 manifests (#36387).
      */
     public static function cacheKeySegment(): string
     {
@@ -476,10 +480,28 @@ final class HelperRuntimeCache
             return $segment;
         }
         $parts = [self::coreFingerprint()];
-        $index = self::helperIndex();
-        ksort($index, SORT_STRING);
-        foreach ($index as $logical => $entry) {
-            $parts[] = strtolower($logical)."\0".$entry['symbol']."\0".basename($entry['dir']);
+        $rows = [];
+        foreach ([self::unitsDir(), self::prelinkedUnitsDir()] as $unitsRoot) {
+            if (!is_string($unitsRoot) || '' === $unitsRoot || !is_dir($unitsRoot)) {
+                continue;
+            }
+            foreach (glob($unitsRoot.'/*/manifest.json') ?: [] as $manifestPath) {
+                $unitDir = \dirname($manifestPath);
+                $slug = basename($unitDir);
+                // Match helperIndex linkability cheaply: need object + bitcode beside manifest.
+                if (!self::unitObjectIsLinkable($unitDir) || !is_file($unitDir.'/unit.bc')) {
+                    continue;
+                }
+                $hash = hash_file('sha256', $manifestPath);
+                if (false === $hash) {
+                    continue;
+                }
+                $rows[] = $slug."\0".$hash;
+            }
+        }
+        sort($rows, SORT_STRING);
+        foreach ($rows as $row) {
+            $parts[] = $row;
         }
 
         return $segment = hash('sha256', implode("\0", $parts));
@@ -534,7 +556,7 @@ final class HelperRuntimeCache
         if ('' !== $env) {
             $so = rtrim($env, '/').'/libLLVM-9.so.1';
             if (is_file($so)) {
-                return $token = 'lib:'.(string) hash_file('sha256', $so);
+                return $token = 'lib:'.self::hashLlvmSharedObject($so);
             }
 
             return $token = 'path:'.$env;
@@ -543,11 +565,57 @@ final class HelperRuntimeCache
         foreach ([$root.'/.llvm', '/opt/llvm9'] as $dir) {
             $so = $dir.'/libLLVM-9.so.1';
             if (is_file($so)) {
-                return $token = 'lib:'.(string) hash_file('sha256', $so);
+                return $token = 'lib:'.self::hashLlvmSharedObject($so);
             }
         }
 
         return $token = 'path:';
+    }
+
+    /**
+     * SHA-256 of libLLVM-9.so.1 with a size/mtime sidecar so cold builds skip a 70 MB
+     * re-hash (~240ms) when the library bytes are unchanged (#36387 / #24381).
+     */
+    private static function hashLlvmSharedObject(string $so): string
+    {
+        $st = @stat($so);
+        if (false === $st) {
+            return (string) hash_file('sha256', $so);
+        }
+        $meta = ((int) $st['size']).':'.((int) $st['mtime']);
+        $repoCacheDir = \dirname(__DIR__, 2).'/build/llvm-identity-cache';
+        $repoSidecar = $repoCacheDir.'/'.hash('sha256', $so.'|'.$meta).'.sha256';
+        $candidates = [
+            // Prefer repo build/ so the sidecar survives ephemeral Docker /tmp and read-only /opt.
+            $repoSidecar,
+            $so.'.phpc-sha256',
+            sys_get_temp_dir().'/phpc-llvm-'.hash('sha256', $so).'.sha256',
+        ];
+        foreach ($candidates as $sidecar) {
+            if (!is_file($sidecar)) {
+                continue;
+            }
+            $raw = @file_get_contents($sidecar);
+            if (is_string($raw) && 1 === preg_match('/^([0-9a-f]{64})\n'.preg_quote($meta, '/').'\n$/', $raw, $m)) {
+                return $m[1];
+            }
+        }
+        $hash = (string) hash_file('sha256', $so);
+        $payload = $hash."\n".$meta."\n";
+        if (!is_dir($repoCacheDir)) {
+            @mkdir($repoCacheDir, 0775, true);
+        }
+        // Always try the durable repo path first; ignore failures on /opt overlays.
+        foreach ([$repoSidecar, $so.'.phpc-sha256', sys_get_temp_dir().'/phpc-llvm-'.hash('sha256', $so).'.sha256'] as $sidecar) {
+            if (false !== @file_put_contents($sidecar, $payload)) {
+                if ($sidecar === $repoSidecar) {
+                    break;
+                }
+                // Keep going until repo write succeeds when possible.
+            }
+        }
+
+        return $hash;
     }
 
     /**
