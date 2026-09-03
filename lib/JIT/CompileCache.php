@@ -81,6 +81,17 @@ final class CompileCache
         return self::entryDir($key).'/module.bc';
     }
 
+    /**
+     * Linked AOT executable bytes for an unchanged-source rebuild (#36387 / #36199).
+     *
+     * Bitcode restore still re-runs loadJitContext + object emit + link (~5 s for hello).
+     * Caching the final binary lets warm `phpc build` skip that path entirely.
+     */
+    public static function artifactPath(string $key): string
+    {
+        return self::entryDir($key).'/aot.bin';
+    }
+
     public static function metaPath(string $key): string
     {
         return self::entryDir($key).'/meta.json';
@@ -129,6 +140,92 @@ final class CompileCache
         }
 
         return null !== self::readMeta($key);
+    }
+
+    /**
+     * True when a linked binary was saved for this key and inputs are still fresh (#36387).
+     */
+    public static function hasFreshArtifact(string $key, string $sourcePath, string $sourceCode): bool
+    {
+        if (!self::isFresh($key, $sourcePath, $sourceCode)) {
+            return false;
+        }
+        $path = self::artifactPath($key);
+
+        return is_file($path) && filesize($path) > 0;
+    }
+
+    /**
+     * Copy a cached linked binary to {@see $outfile}. Returns true on success (#36387).
+     */
+    public static function tryRestoreArtifact(
+        string $key,
+        string $outfile,
+        string $sourcePath,
+        string $sourceCode
+    ): bool {
+        if (!self::hasFreshArtifact($key, $sourcePath, $sourceCode)) {
+            return false;
+        }
+        $src = self::artifactPath($key);
+        $outDir = dirname($outfile);
+        if ('' !== $outDir && '.' !== $outDir && !is_dir($outDir)) {
+            if (!@mkdir($outDir, 0775, true) && !is_dir($outDir)) {
+                return false;
+            }
+        }
+        $tmp = $outfile.'.tmp.'.getmypid();
+        if (!@copy($src, $tmp)) {
+            @unlink($tmp);
+
+            return false;
+        }
+        @chmod($tmp, 0755);
+        if (!@rename($tmp, $outfile)) {
+            if (!@copy($tmp, $outfile)) {
+                @unlink($tmp);
+
+                return false;
+            }
+            @unlink($tmp);
+            @chmod($outfile, 0755);
+        }
+
+        return is_file($outfile) && filesize($outfile) > 0;
+    }
+
+    /**
+     * Persist the linked executable beside bitcode/meta for the next warm build (#36387).
+     */
+    public static function saveArtifact(string $key, string $outfile): void
+    {
+        if ('' === $key || !is_file($outfile) || filesize($outfile) < 1) {
+            return;
+        }
+        $dir = self::entryDir($key);
+        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+            return;
+        }
+        if (!is_file(self::bitcodePath($key)) || null === self::readMeta($key)) {
+            return;
+        }
+        $dest = self::artifactPath($key);
+        $tmp = $dest.'.tmp.'.getmypid();
+        if (!@copy($outfile, $tmp)) {
+            @unlink($tmp);
+
+            return;
+        }
+        @chmod($tmp, 0755);
+        if (!@rename($tmp, $dest)) {
+            if (!@copy($tmp, $dest)) {
+                @unlink($tmp);
+
+                return;
+            }
+            @unlink($tmp);
+            @chmod($dest, 0755);
+        }
     }
 
     public static function beginRecording(string $key): void

@@ -8070,6 +8070,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/DomAttrIsId.php';
 require_once __DIR__.'/../../../lib/JIT/TypedParamCoerce.php';
 require_once __DIR__.'/../../../lib/JIT/StaticPropertyAsNonStaticJitGuard.php';
 require_once __DIR__.'/../../../lib/AOT/AotEmitFastExit.php';
+require_once __DIR__.'/../../../lib/AOT/BuildTiming.php';
 require_once __DIR__.'/../../../ext/dom/JitDomSaveSerializationArgs.php';
 require_once __DIR__.'/../../../ext/imagick/ImagickClassMethod.php';
 require_once __DIR__.'/../../../ext/imagick/ImagickConstruct.php';
