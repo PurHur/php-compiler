@@ -1654,10 +1654,11 @@ restart:
             }
         }
         if (Variable::TYPE_OBJECT === $leftType && $leftType === $rightType) {
+            // BcMath\Number — hook from ext/bcmath/Module::jitInit (#36204 / #24683).
             if (JitValueNumeric::isArithOpcode($opcode->type)
-                && \PHPCompiler\CompilerVersion::supportsBcmath()
+                && null !== $this->context->arithBinaryObjectObjectHook
             ) {
-                return \PHPCompiler\ext\bcmath\JitBcMathNumberOperators::binaryObjectObject(
+                return ($this->context->arithBinaryObjectObjectHook)(
                     $this->context,
                     $opcode->type,
                     $left,

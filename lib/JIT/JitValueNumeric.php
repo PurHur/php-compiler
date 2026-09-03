@@ -120,16 +120,9 @@ final class JitValueNumeric
             return ArrayBuiltinHelper::arrayUnion($context, $left, $right);
         }
 
-        // BcMath\Number do_operation when either box holds a Number (#24683).
-        if (self::isArithOpcode($opType)
-            && \PHPCompiler\CompilerVersion::supportsBcmath()
-        ) {
-            return \PHPCompiler\ext\bcmath\JitBcMathNumberOperators::binaryValueValue(
-                $context,
-                $opType,
-                $left,
-                $right
-            );
+        // BcMath\Number do_operation — hook from ext/bcmath/Module::jitInit (#36204 / #24683).
+        if (self::isArithOpcode($opType) && null !== $context->arithBinaryValueValueHook) {
+            return ($context->arithBinaryValueValueHook)($context, $opType, $left, $right);
         }
 
         return self::emitBoxedNumericResult($context, $opType, $left, $right);
