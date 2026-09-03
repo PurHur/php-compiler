@@ -95,15 +95,19 @@ final class IncludeHelper
 
             return;
         }
-        if (\PHPCompiler\AOT\ComposerVendorMap::isComposerAutoloadPhp($path)) {
-            // Composer’s loader uses include $file; AOT stubs it and relies on ProjectGraph (#36382 / #1070).
-            if (null !== $resultOperand) {
-                $jit->assignIncludeResult($resultOperand);
-            }
-
-            return;
-        }
         $allow = $context->runtime->aotIncludeAllowlist ?? null;
+        if (\PHPCompiler\AOT\ComposerVendorMap::isComposerAutoloadPhp($path)) {
+            // Project builds: stub the dynamic loader — class files come from ProjectGraph (#36382 / #1070).
+            // Bare AOT (no file map): follow the file so fixture autoloads with literal requires work, and
+            // real Composer `include $file` fails loudly instead of silently omitting classes (#36382).
+            if (is_array($allow) && [] !== $allow) {
+                if (null !== $resultOperand) {
+                    $jit->assignIncludeResult($resultOperand);
+                }
+
+                return;
+            }
+        }
         if (is_array($allow) && [] !== $allow
             && !ProjectIncludeAllowlist::isAllowed($path, $allow)
         ) {

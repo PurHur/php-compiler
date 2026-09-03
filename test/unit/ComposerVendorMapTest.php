@@ -237,6 +237,27 @@ final class ComposerVendorMapTest extends TestCase
         $this->assertSame(['/a', '/b'], $keys);
     }
 
+    /**
+     * Bare AOT must not stub vendor/autoload.php without a project file map — that
+     * silently dropped classes for `$path = __DIR__.'/vendor/autoload.php'; require $path`
+     * (#36382 differential composer_computed_include).
+     */
+    public function testIncludeHelperStubsComposerAutoloadOnlyWithProjectAllowlist(): void
+    {
+        $source = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/IncludeHelper.php');
+        $this->assertStringContainsString('isComposerAutoloadPhp($path)', $source);
+        $this->assertStringContainsString(
+            'Bare AOT (no file map): follow the file',
+            $source
+        );
+        $pos = strpos($source, 'isComposerAutoloadPhp($path)');
+        $this->assertNotFalse($pos);
+        $window = substr($source, $pos, 900);
+        $this->assertStringContainsString('is_array($allow) && [] !== $allow', $window);
+        $this->assertStringContainsString('assignIncludeResult', $window);
+        $this->assertStringContainsString('compileIncludedFile', $window);
+    }
+
     private function removeTree(string $dir): void
     {
         if (!is_dir($dir)) {
