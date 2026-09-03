@@ -465,7 +465,7 @@ function runCompileGate(string $root, string $baselinePath, bool $update): void
         $root
     );
 
-    foreach ([50, 100, 200] as $count) {
+    foreach ([50, 100, 200, 400] as $count) {
         $row = measureCompileScaling($count);
         if (null === $row) {
             fwrite(STDERR, "bench-gate --compile: scaling probe failed at {$count} statements\n");
@@ -661,7 +661,7 @@ function writeCompileBaseline(string $path, array $measured): void
         'wall_tolerance_percent' => COMPILE_WALL_TOLERANCE_PERCENT,
         'scaling_tolerance_percent' => COMPILE_SCALING_TOLERANCE_PERCENT,
         'regeneration' => 'PHP_8_2=$(command -v php) ./script/bench-gate.sh --compile --update',
-        'note' => 'Compile-time gate for hello cold/warm/lint, MiniWebApp cold/warm/edit, and Compiler::compile scaling 50/100/200 (#36387). Nested ≤15ms/stmt@400 met separately; lib/Block.php -l is too heavy for this gate.',
+        'note' => 'Compile-time gate for hello cold/warm/lint, MiniWebApp cold/warm/edit, and Compiler::compile scaling 50/100/200/400 (#36387). Target ≤15 ms/stmt @ 400; lib/Block.php -l is too heavy for this gate.',
         'cases' => $cases,
     ];
     file_put_contents($path, json_encode($doc, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES)."\n");

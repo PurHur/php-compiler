@@ -1,57 +1,62 @@
 {
     "version": 2,
-    "generated_at": "2026-09-03T09:00:41Z",
+    "generated_at": "2026-09-03T12:34:49Z",
     "arch": "x86_64-linux",
     "wall_tolerance_percent": 20,
     "scaling_tolerance_percent": 20,
     "regeneration": "PHP_8_2=$(command -v php) ./script/bench-gate.sh --compile --update",
-    "note": "Compile-time gate for hello cold/warm/lint, MiniWebApp cold/warm/edit, and Compiler::compile scaling 50/100/200 (#36387). Nested \u226415ms/stmt@400 met separately; lib/Block.php -l is too heavy for this gate.",
+    "note": "Compile-time gate for hello cold/warm/lint, MiniWebApp cold/warm/edit, and Compiler::compile scaling 50/100/200/400 (#36387). Target \u226415 ms/stmt @ 400; lib/Block.php -l is too heavy for this gate.",
     "cases": {
         "hello-cold": {
             "ok": true,
-            "wall_s": 5.219381,
-            "peak_rss_kb": 1760
+            "wall_s": 6.194135,
+            "peak_rss_kb": 1452
         },
         "hello-warm": {
             "ok": true,
-            "wall_s": 2.353225,
-            "peak_rss_kb": 1696
+            "wall_s": 0.51885,
+            "peak_rss_kb": 1692
         },
         "miniwebapp-cold": {
             "ok": true,
-            "wall_s": 21.012838,
+            "wall_s": 15.574982,
             "peak_rss_kb": 1740
         },
         "miniwebapp-warm": {
             "ok": true,
-            "wall_s": 2.051934,
-            "peak_rss_kb": 1604
+            "wall_s": 0.103562,
+            "peak_rss_kb": 1596
         },
         "miniwebapp-edit": {
             "ok": true,
-            "wall_s": 33.433708,
-            "peak_rss_kb": 1764,
-            "pct_of_cold": 159.1
+            "wall_s": 10.47744,
+            "peak_rss_kb": 1596,
+            "pct_of_cold": 67.3
         },
         "hello-lint": {
             "ok": true,
-            "wall_s": 1.131947,
-            "peak_rss_kb": 1692
+            "wall_s": 0.308424,
+            "peak_rss_kb": 1540
         },
         "scale-50": {
             "ok": true,
-            "wall_s": 0.188017,
-            "ms_per_statement": 3.76
+            "wall_s": 0.095897,
+            "ms_per_statement": 1.918
         },
         "scale-100": {
             "ok": true,
-            "wall_s": 0.414909,
-            "ms_per_statement": 4.149
+            "wall_s": 0.254565,
+            "ms_per_statement": 2.546
         },
         "scale-200": {
             "ok": true,
-            "wall_s": 1.483622,
-            "ms_per_statement": 7.418
+            "wall_s": 0.81436,
+            "ms_per_statement": 4.072
+        },
+        "scale-400": {
+            "ok": true,
+            "wall_s": 3.043913,
+            "ms_per_statement": 7.61
         }
     }
 }

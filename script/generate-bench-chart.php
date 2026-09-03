@@ -242,7 +242,7 @@ $html = <<<HTML
     var order = [
       'hello-cold', 'hello-warm', 'hello-lint',
       'miniwebapp-cold', 'miniwebapp-warm', 'miniwebapp-edit',
-      'scale-50', 'scale-100', 'scale-200'
+      'scale-50', 'scale-100', 'scale-200', 'scale-400'
     ];
     var names = order.filter(function (n) { return compile.cases[n]; });
     Object.keys(compile.cases).forEach(function (n) {
@@ -265,7 +265,8 @@ $html = <<<HTML
     }).join('');
     var targets = '<ul class="muted">' +
       '<li>Targets (#36387): hello warm ≤ 3 s · MiniWebApp cold ≤ 10 s · one-file edit ≤ 25% of cold · ≤ 15 ms/stmt @ 400</li>' +
-      '<li>Edit rebuild still ≈ cold today: CompileCache module.bc cannot round-trip parse (Invalid type); warm path uses aot.bin only</li>' +
+      '<li>Edit rebuild still ≈ cold: bundling keys CompileCache on whole-project source; per-file user TUs remain</li>' +
+      '<li>AOT cache uses fresh.stamp + aot.bin/aot.o — full-module module.bc does not round-trip (Invalid type)</li>' +
       '</ul>';
     el.innerHTML = '<p class="muted">from <code>benchmarks/COMPILE_BASELINE.json</code>' +
       (compile.generated_at ? (' · ' + esc(compile.generated_at)) : '') +
