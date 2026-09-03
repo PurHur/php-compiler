@@ -6,6 +6,9 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\DomCompileTimeHooks;
+use PHPCompiler\JIT\Scope;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
@@ -181,6 +184,7 @@ class Module extends ModuleAbstract
         $hooks->setPendingLoadXmlReceiverVarNameHook = static function (?string $name): void {
             JitDomLoadXMLUserScript::setPendingLoadXmlReceiverVarName($name);
         };
+        $hooks->domCompileTime = new JitDomCompileTimeFacade();
     }
 
     /**
@@ -426,3 +430,200 @@ class Module extends ModuleAbstract
         return $fns;
     }
 }
+
+if (!interface_exists(\PHPCompiler\JIT\DomCompileTimeHooks::class, false)) {
+    require_once dirname(__DIR__, 2).'/lib/JIT/ExtensionLoweringHooks.php';
+}
+
+/**
+ * DOM compile-time metadata + kernel routing for lib/JIT.php (#36204).
+ *
+ * php-src: ext/dom/php_dom.c — compile-time stamps are php-compiler AOT fold state,
+ * not a Zend C API. Registered from {@see Module::jitInit}.
+ */
+final class JitDomCompileTimeFacade implements DomCompileTimeHooks
+{
+    public function lastLoadWasPureUserScript(): bool
+    {
+        return JitDomLoadXMLUserScript::lastLoadWasPureUserScript();
+    }
+
+    public function lastFetchedTagName(): ?string
+    {
+        return JitDomNodeChildProperty::$lastFetchedTagName;
+    }
+
+    public function lastMaterializedImportTagName(): ?string
+    {
+        return JitDomImportNode::$lastMaterializedTagName;
+    }
+
+    public function lastMaterializedTextData(): ?string
+    {
+        return JitDomCreateTextNode::$lastMaterializedData;
+    }
+
+    public function compileTimeAttributesFor(Variable $src, string $tag): ?array
+    {
+        return JitDomImportNode::compileTimeAttributesFor($src, $tag);
+    }
+
+    public function isDocumentFragmentTag(?string $tag): bool
+    {
+        return JitDomCreateDocumentFragment::TAG_KIND === $tag;
+    }
+
+    public function nextCreateElementId(string $tag): int
+    {
+        return JitDomCreateElementAttrs::nextId($tag);
+    }
+
+    public function lastGetElementByIdHit(): ?array
+    {
+        return JitDomLoadHTMLUserScript::lastGetElementByIdHit();
+    }
+
+    public function lastCompileTimeParsedHtml(): ?string
+    {
+        return JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml();
+    }
+
+    public function parseIdElementArgv(string $html, string $idLit): ?array
+    {
+        return DomParseSimpleHtmlJitHelper::parseIdElementArgv($html, $idLit);
+    }
+
+    public function lastDocumentClass(): ?string
+    {
+        return JitDomLoadXMLUserScript::lastDocumentClass();
+    }
+
+    public function recoveredChildTagName(): ?string
+    {
+        return JitDomNodeChildProperty::$lastFetchedTagName
+            ?? JitDomNodeListItem::$lastFetchedTagName
+            ?? JitDomNodeChildProperty::$stickyChildEdgeTagName;
+    }
+
+    public function recoveredChildIndex(): ?int
+    {
+        return JitDomNodeChildProperty::$lastFetchedChildIndex
+            ?? JitDomNodeListItem::$lastFetchedChildIndex
+            ?? JitDomNodeChildProperty::$stickyChildEdgeChildIndex;
+    }
+
+    public function lastNodeListItemChildIndex(): ?int
+    {
+        return JitDomNodeListItem::$lastFetchedChildIndex;
+    }
+
+    public function lastNodeListItemTagName(): ?string
+    {
+        return JitDomNodeListItem::$lastFetchedTagName;
+    }
+
+    public function createElementAttrsGet(int $id): array
+    {
+        return JitDomCreateElementAttrs::get($id);
+    }
+
+    public function formatCreateElementAttrSuffix(array $attrMap): string
+    {
+        return JitDomCreateElementAttrs::formatSuffix($attrMap);
+    }
+
+    public function documentTypeTagKind(): string
+    {
+        return JitDomCreateDocumentType::TAG_KIND;
+    }
+
+    public function lastCompileTimeXml(): ?string
+    {
+        return JitDomLoadXMLUserScript::lastCompileTimeXml();
+    }
+
+    public function directChildNodesArgv(string $xml): array
+    {
+        return DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
+    }
+
+    public function attributesFromOpenTagArgv(string $open): array
+    {
+        return DomParseSimpleXmlJitHelper::attributesFromOpenTagArgv($open);
+    }
+
+    public function lastCloneResultTagName(): ?string
+    {
+        return JitDomCloneNode::$lastResultTagName;
+    }
+
+    public function lastCloneResultInnerXml(): ?string
+    {
+        return JitDomCloneNode::$lastResultInnerXml;
+    }
+
+    public function lastCreateCommentData(): ?string
+    {
+        return JitDomCreateComment::$lastMaterializedData;
+    }
+
+    public function lastCreateCdataData(): ?string
+    {
+        return JitDomCreateCDATASection::$lastMaterializedData;
+    }
+
+    public function lastCreatePiTarget(): ?string
+    {
+        return JitDomCreateProcessingInstruction::$lastMaterializedTarget;
+    }
+
+    public function lastCreatePiData(): ?string
+    {
+        return JitDomCreateProcessingInstruction::$lastMaterializedData;
+    }
+
+    public function processingInstructionTagKind(): string
+    {
+        return JitDomCreateProcessingInstruction::TAG_KIND;
+    }
+
+    public function lastCreateDocumentFragmentMaterialized(): bool
+    {
+        return JitDomCreateDocumentFragment::$lastMaterialized;
+    }
+
+    public function documentFragmentTagKind(): string
+    {
+        return JitDomCreateDocumentFragment::TAG_KIND;
+    }
+
+    public function lastSplitTextResultData(): ?string
+    {
+        return JitDomSplitText::$lastResultData;
+    }
+
+    public function shouldUseDocumentMethodKernel(Context $context): bool
+    {
+        return JitDomDocumentMethodKernel::shouldUse($context);
+    }
+
+    public function tryRouteExcessArgcNonObjectReceiver(
+        Context $context,
+        string $methodLc,
+        Variable $receiverVar,
+        Scope $scope
+    ): bool {
+        return DomExcessArgcJitRoute::tryRouteNonObjectReceiver(
+            $context,
+            $methodLc,
+            $receiverVar,
+            $scope
+        );
+    }
+
+    public function compileTimeAttrValuePublic(string $ns, string $local): ?string
+    {
+        return JitDomAttrChildEdgeFetch::compileTimeAttrValuePublic($ns, $local);
+    }
+}
+

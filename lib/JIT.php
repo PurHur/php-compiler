@@ -15520,8 +15520,8 @@ class JIT {
                         )
                         && \in_array(strtolower($declaringClass), ['object', 'stdclass', ''], true)
                         && (
-                            \PHPCompiler\ext\dom\JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
-                            || null !== \PHPCompiler\ext\dom\JitDomNodeChildProperty::$lastFetchedTagName
+                            $this->context->extensionLowering->domCompileTime?->lastLoadWasPureUserScript()
+                            || null !== $this->context->extensionLowering->domCompileTime?->lastFetchedTagName()
                         )
                     ) {
                         $declaringClass = 'DOMElement';
@@ -17665,7 +17665,7 @@ class JIT {
             return;
         }
         $resultVar = $this->context->getVariableFromOp($result);
-        $materializedTag = \PHPCompiler\ext\dom\JitDomImportNode::$lastMaterializedTagName;
+        $materializedTag = $this->context->extensionLowering->domCompileTime?->lastMaterializedImportTagName();
         $srcTag = $src->compileTimeDomTagName;
         $leafTag = $materializedTag
             ?? (
@@ -17676,12 +17676,12 @@ class JIT {
         $textData = $src->compileTimeDomTextData
             ?? (
                 '#text' === ($srcTag ?? null)
-                    ? \PHPCompiler\ext\dom\JitDomCreateTextNode::$lastMaterializedData
+                    ? $this->context->extensionLowering->domCompileTime?->lastMaterializedTextData()
                     : null
             )
             ?? (
                 '#text' === ($materializedTag ?? null)
-                    ? \PHPCompiler\ext\dom\JitDomCreateTextNode::$lastMaterializedData
+                    ? $this->context->extensionLowering->domCompileTime?->lastMaterializedTextData()
                     : null
             );
         // Leaf imports: stamp CharacterData body + discriminator (not element tag).
@@ -17737,13 +17737,13 @@ class JIT {
             $resultVar->compileTimeDomGeiHtmlHit = $src->compileTimeDomGeiHtmlHit;
         }
         // Stamp attrs for appendChild INNER_XML sync (compileTimeChildElementMarkup; #33362).
-        $attrs = \PHPCompiler\ext\dom\JitDomImportNode::compileTimeAttributesFor($src, $tag);
+        $attrs = $this->context->extensionLowering->domCompileTime?->compileTimeAttributesFor($src, $tag);
         if (null !== $attrs && [] !== $attrs) {
             $resultVar->compileTimeDomAttributes = $attrs;
         } elseif (null !== $src->compileTimeDomAttributes) {
             $resultVar->compileTimeDomAttributes = $src->compileTimeDomAttributes;
         }
-        if (\PHPCompiler\ext\dom\JitDomCreateDocumentFragment::TAG_KIND === $tag) {
+        if ((null !== $this->context->extensionLowering->domCompileTime && $this->context->extensionLowering->domCompileTime->isDocumentFragmentTag($tag))) {
             $resultVar->compileTimeDomNodeListLength = $deep
                 ? (int) ($src->compileTimeDomNodeListLength ?? 0)
                 : 0;
@@ -17773,7 +17773,7 @@ class JIT {
         }
         $resultVar = $this->context->getVariableFromOp($result);
         $resultVar->compileTimeDomTagName = $tag;
-        $resultVar->compileTimeDomElementId = \PHPCompiler\ext\dom\JitDomCreateElementAttrs::nextId($tag);
+        $resultVar->compileTimeDomElementId = $this->context->extensionLowering->domCompileTime?->nextCreateElementId($tag);
         $valueArg = $callArgs[2] ?? null;
         $inner = '';
         if ($valueArg instanceof Variable && null !== $valueArg->compileTimeString) {
@@ -17805,11 +17805,11 @@ class JIT {
             return;
         }
         $resultVar = $this->context->getVariableFromOp($result);
-        $hit = \PHPCompiler\ext\dom\JitDomLoadHTMLUserScript::lastGetElementByIdHit();
+        $hit = $this->context->extensionLowering->domCompileTime?->lastGetElementByIdHit();
         if (null === $hit || ($hit['id'] ?? '') !== $idLit) {
-            $html = \PHPCompiler\ext\dom\JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml();
+            $html = $this->context->extensionLowering->domCompileTime?->lastCompileTimeParsedHtml();
             if (null !== $html) {
-                $hit = \PHPCompiler\ext\dom\DomParseSimpleHtmlJitHelper::parseIdElementArgv($html, $idLit);
+                $hit = $this->context->extensionLowering->domCompileTime?->parseIdElementArgv($html, $idLit);
             }
         }
         if (null === $hit || '' === ($hit['id'] ?? '')) {
@@ -17881,7 +17881,7 @@ class JIT {
         $resultVar = $this->context->getVariableFromOp($result);
         $resultVar->compileTimeDomAttrLocalName = $local;
         $resultVar->compileTimeDomAttrNamespace = $ns;
-        $livingDoc = \PHPCompiler\ext\dom\JitDomLoadXMLUserScript::lastDocumentClass();
+        $livingDoc = $this->context->extensionLowering->domCompileTime?->lastDocumentClass();
         $resultVar->classUserType = (null !== $livingDoc && str_starts_with($livingDoc, 'Dom\\'))
             ? 'Dom\\Attr'
             : 'DOMAttr';
@@ -17933,15 +17933,11 @@ class JIT {
         ) {
             if (null === $child->compileTimeDomTagName || '' === $child->compileTimeDomTagName) {
                 $child->compileTimeDomTagName =
-                    \PHPCompiler\ext\dom\JitDomNodeChildProperty::$lastFetchedTagName
-                    ?? \PHPCompiler\ext\dom\JitDomNodeListItem::$lastFetchedTagName
-                    ?? \PHPCompiler\ext\dom\JitDomNodeChildProperty::$stickyChildEdgeTagName;
+                    $this->context->extensionLowering->domCompileTime?->recoveredChildTagName();
             }
             if (null === $child->compileTimeDomChildIndex) {
                 $child->compileTimeDomChildIndex =
-                    \PHPCompiler\ext\dom\JitDomNodeChildProperty::$lastFetchedChildIndex
-                    ?? \PHPCompiler\ext\dom\JitDomNodeListItem::$lastFetchedChildIndex
-                    ?? \PHPCompiler\ext\dom\JitDomNodeChildProperty::$stickyChildEdgeChildIndex;
+                    $this->context->extensionLowering->domCompileTime?->recoveredChildIndex();
             }
         }
         // createElement trees (no loadXML): stamp parent inner when LiveMutation did not
@@ -17957,8 +17953,10 @@ class JIT {
             if ($parent instanceof Variable) {
                 $priorInner = $parent->compileTimeDomInnerXml ?? '';
                 // Tag on the parent Variable only — not $lastMaterialized (#35997).
-                $isFrag = \PHPCompiler\ext\dom\JitDomCreateDocumentFragment::TAG_KIND
-                    === ($parent->compileTimeDomTagName ?? null);
+                $isFrag = null !== $this->context->extensionLowering->domCompileTime
+                    && $this->context->extensionLowering->domCompileTime->isDocumentFragmentTag(
+                        $parent->compileTimeDomTagName ?? null
+                    );
                 if ($isFrag) {
                     // LiveMutation records lastChildren + sets InnerXml (#35881). Do not
                     // concat here — that doubled fragment markup for importNode.
@@ -18022,9 +18020,9 @@ class JIT {
         }
         $attrs = '';
         $id = $child->compileTimeDomElementId ?? null;
-        $attrMap = null !== $id ? \PHPCompiler\ext\dom\JitDomCreateElementAttrs::get($id) : [];
+        $attrMap = null !== $id ? $this->context->extensionLowering->domCompileTime?->createElementAttrsGet($id) : [];
         if (null !== $attrMap && [] !== $attrMap) {
-            $attrs = \PHPCompiler\ext\dom\JitDomCreateElementAttrs::formatSuffix($attrMap);
+            $attrs = $this->context->extensionLowering->domCompileTime?->formatCreateElementAttrSuffix($attrMap);
         }
         $inner = $child->compileTimeDomInnerXml ?? '';
         $openAttrs = '' === $attrs ? '' : (str_starts_with($attrs, ' ') ? $attrs : ' '.$attrs);
@@ -18044,14 +18042,14 @@ class JIT {
             return;
         }
         $this->context->getVariableFromOp($result)->compileTimeDomTagName =
-            \PHPCompiler\ext\dom\JitDomCreateDocumentType::TAG_KIND;
+            $this->context->extensionLowering->domCompileTime?->documentTypeTagKind();
     }
 
     /**
      * Stamp childNodes / getElementsByTagName item(N) compile-time index for thin-AOT (#32903).
      *
      * LiveSlots already refresh held pins (#32784); saveXML still reads PROP_USER_SCRIPT_INNER_XML.
-     * Without this index, {@see \PHPCompiler\ext\dom\JitDomReplaceChild} leaves seeded InnerXml
+     * Without this index, {@see JitDomReplaceChild} leaves seeded InnerXml
      * unchanged so serialization keeps the replaced sibling.
      *
      * getElementsByTagName()/XPath //tag ->item($N) is the Nth **tag match**, not
@@ -18059,8 +18057,8 @@ class JIT {
      * {@see JIT\Variable::$compileTimeDomChildIndex} stamped tag `a` for
      * `getElementsByTagName('b')->item(0)` / `query('//b')->item(0)` and
      * setIdAttribute registered id `x` on `<b>` (or SIGSEGV; #35433 / #35447
-     * re-#33957). Prefer {@see \PHPCompiler\ext\dom\JitDomNodeListItem::$lastFetchedChildIndex}
-     * (mapped in {@see \PHPCompiler\ext\dom\JitDomNodeListItem::rememberTagListItemChildIndex},
+     * re-#33957). Prefer {@see $this->context->extensionLowering->domCompileTime?->lastNodeListItemChildIndex()}
+     * (mapped in {@see rememberTagListItemChildIndex},
      * #34780).
      *
      * @param array<int, Variable> $callArgs
@@ -18098,8 +18096,8 @@ class JIT {
         $resultVar = $this->context->getVariableFromOp($result);
         // rememberCompileTimeChildIndex already ran in DomNodeListItem::invoke — use its
         // tag-list → direct-child mapping when present (#35433 / #34780).
-        $resolvedIndex = \PHPCompiler\ext\dom\JitDomNodeListItem::$lastFetchedChildIndex;
-        $resolvedTag = \PHPCompiler\ext\dom\JitDomNodeListItem::$lastFetchedTagName;
+        $resolvedIndex = $this->context->extensionLowering->domCompileTime?->lastNodeListItemChildIndex();
+        $resolvedTag = $this->context->extensionLowering->domCompileTime?->lastNodeListItemTagName();
         if (null !== $resolvedIndex) {
             $resultVar->compileTimeDomChildIndex = $resolvedIndex;
         }
@@ -18128,17 +18126,17 @@ class JIT {
             $this->context->bindVariableByName($resolved, $resultVar);
         }
 
-        $xml = \PHPCompiler\ext\dom\JitDomLoadXMLUserScript::lastCompileTimeXml();
+        $xml = $this->context->extensionLowering->domCompileTime?->lastCompileTimeXml();
         if (
             null === $xml
-            || !\PHPCompiler\ext\dom\JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
+            || !($this->context->extensionLowering->domCompileTime?->lastLoadWasPureUserScript() ?? false)
         ) {
             return;
         }
         if (null === $resolvedIndex) {
             return;
         }
-        $nodes = \PHPCompiler\ext\dom\DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
+        $nodes = $this->context->extensionLowering->domCompileTime?->directChildNodesArgv($xml) ?? [];
         if (!isset($nodes[$resolvedIndex]) || 'element' !== ($nodes[$resolvedIndex]['kind'] ?? null)) {
             return;
         }
@@ -18152,7 +18150,7 @@ class JIT {
             return;
         }
         $attrs = [];
-        foreach (\PHPCompiler\ext\dom\DomParseSimpleXmlJitHelper::attributesFromOpenTagArgv($open) as $pair) {
+        foreach ($this->context->extensionLowering->domCompileTime?->attributesFromOpenTagArgv($open) ?? [] as $pair) {
             $attrs[$pair['qname']] = $pair['value'];
             $pos = strpos($pair['qname'], ':');
             if (false !== $pos) {
@@ -18260,7 +18258,7 @@ class JIT {
         if (!($this->context->scope->toCall instanceof JIT\Call\DomNodeCloneNode)) {
             return;
         }
-        $tag = \PHPCompiler\ext\dom\JitDomCloneNode::$lastResultTagName;
+        $tag = $this->context->extensionLowering->domCompileTime?->lastCloneResultTagName();
         if (null === $tag || '' === $tag) {
             return;
         }
@@ -18269,7 +18267,7 @@ class JIT {
         }
         $var = $this->context->getVariableFromOp($result);
         $var->compileTimeDomTagName = $tag;
-        $inner = \PHPCompiler\ext\dom\JitDomCloneNode::$lastResultInnerXml;
+        $inner = $this->context->extensionLowering->domCompileTime?->lastCloneResultInnerXml();
         if (null !== $inner) {
             $var->compileTimeDomInnerXml = $inner;
         }
@@ -18293,7 +18291,7 @@ class JIT {
         if (!($this->context->scope->toCall instanceof JIT\Call\DomDocumentCreateTextNode)) {
             return;
         }
-        $data = \PHPCompiler\ext\dom\JitDomCreateTextNode::$lastMaterializedData;
+        $data = $this->context->extensionLowering->domCompileTime?->lastMaterializedTextData();
         if (null === $data || !$this->context->hasVariableOp($result)) {
             return;
         }
@@ -18306,7 +18304,7 @@ class JIT {
         if (!($this->context->scope->toCall instanceof JIT\Call\DomDocumentCreateComment)) {
             return;
         }
-        $data = \PHPCompiler\ext\dom\JitDomCreateComment::$lastMaterializedData;
+        $data = $this->context->extensionLowering->domCompileTime?->lastCreateCommentData();
         if (null === $data || !$this->context->hasVariableOp($result)) {
             return;
         }
@@ -18319,7 +18317,7 @@ class JIT {
         if (!($this->context->scope->toCall instanceof JIT\Call\DomDocumentCreateCDATASection)) {
             return;
         }
-        $data = \PHPCompiler\ext\dom\JitDomCreateCDATASection::$lastMaterializedData;
+        $data = $this->context->extensionLowering->domCompileTime?->lastCreateCdataData();
         if (null === $data || !$this->context->hasVariableOp($result)) {
             return;
         }
@@ -18332,14 +18330,14 @@ class JIT {
         if (!($this->context->scope->toCall instanceof JIT\Call\DomDocumentCreateProcessingInstruction)) {
             return;
         }
-        $target = \PHPCompiler\ext\dom\JitDomCreateProcessingInstruction::$lastMaterializedTarget;
+        $target = $this->context->extensionLowering->domCompileTime?->lastCreatePiTarget();
         if (null === $target || !$this->context->hasVariableOp($result)) {
             return;
         }
-        $data = \PHPCompiler\ext\dom\JitDomCreateProcessingInstruction::$lastMaterializedData ?? '';
+        $data = ($this->context->extensionLowering->domCompileTime?->lastCreatePiData() ?? '');
         $this->bindCompileTimeDomLeaf(
             $result,
-            \PHPCompiler\ext\dom\JitDomCreateProcessingInstruction::TAG_KIND,
+            $this->context->extensionLowering->domCompileTime?->processingInstructionTagKind(),
             $data,
             ['target' => $target]
         );
@@ -18351,13 +18349,13 @@ class JIT {
         if (!($this->context->scope->toCall instanceof JIT\Call\DomDocumentCreateDocumentFragment)) {
             return;
         }
-        if (!\PHPCompiler\ext\dom\JitDomCreateDocumentFragment::$lastMaterialized
+        if (!($this->context->extensionLowering->domCompileTime?->lastCreateDocumentFragmentMaterialized() ?? false)
             || !$this->context->hasVariableOp($result)
         ) {
             return;
         }
         $var = $this->context->getVariableFromOp($result);
-        $var->compileTimeDomTagName = \PHPCompiler\ext\dom\JitDomCreateDocumentFragment::TAG_KIND;
+        $var->compileTimeDomTagName = $this->context->extensionLowering->domCompileTime?->documentFragmentTagKind();
         $var->compileTimeDomInnerXml = $var->compileTimeDomInnerXml ?? '';
         $var->compileTimeDomNodeListLength = 0;
         $name = JIT\OperandName::resolve($result);
@@ -18365,7 +18363,7 @@ class JIT {
             $resolved = $this->context->resolveRefAliasName($name);
             if (isset($this->context->namedVariableBindings[$resolved])) {
                 $bound = $this->context->namedVariableBindings[$resolved];
-                $bound->compileTimeDomTagName = \PHPCompiler\ext\dom\JitDomCreateDocumentFragment::TAG_KIND;
+                $bound->compileTimeDomTagName = $this->context->extensionLowering->domCompileTime?->documentFragmentTagKind();
                 $bound->compileTimeDomInnerXml = $bound->compileTimeDomInnerXml ?? '';
                 $bound->compileTimeDomNodeListLength = 0;
             }
@@ -18409,7 +18407,7 @@ class JIT {
         if (!($this->context->scope->toCall instanceof JIT\Call\DomTextSplitText)) {
             return;
         }
-        $data = \PHPCompiler\ext\dom\JitDomSplitText::$lastResultData;
+        $data = $this->context->extensionLowering->domCompileTime?->lastSplitTextResultData();
         if (null === $data || !$this->context->hasVariableOp($result)) {
             return;
         }
@@ -27980,7 +27978,7 @@ class JIT {
             // `$a = $el->appendChild(...)` (#27480).
             if (
                 'appendchild' === $methodLcEarly
-                && \PHPCompiler\ext\dom\JitDomDocumentMethodKernel::shouldUse($this->context)
+                && $this->context->extensionLowering->shouldUseDomDocumentMethodKernel($this->context)
             ) {
                 JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::appendchild');
                 if ($this->context->functionIsRegistered('domnode::appendchild')) {
@@ -27996,7 +27994,7 @@ class JIT {
             // the return falls through to documentElement after loadXML SSOT refresh.
             if (
                 'insertbefore' === $methodLcEarly
-                && \PHPCompiler\ext\dom\JitDomDocumentMethodKernel::shouldUse($this->context)
+                && $this->context->extensionLowering->shouldUseDomDocumentMethodKernel($this->context)
             ) {
                 JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::insertbefore');
                 if ($this->context->functionIsRegistered('domnode::insertbefore')) {
@@ -28011,7 +28009,7 @@ class JIT {
             // so getAttribute/cloneNode on createElement trees lose attrs/inner (#35386 re-open).
             if (
                 'replacechild' === $methodLcEarly
-                && \PHPCompiler\ext\dom\JitDomDocumentMethodKernel::shouldUse($this->context)
+                && $this->context->extensionLowering->shouldUseDomDocumentMethodKernel($this->context)
             ) {
                 JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::replacechild');
                 if ($this->context->functionIsRegistered('domnode::replacechild')) {
@@ -28025,7 +28023,7 @@ class JIT {
             // documentElement temps (:object) — Element getElementsByTagName SIGABRT via RuntimeIndirect (#32454).
             if (
                 'getelementsbytagname' === $methodLcEarly
-                && \PHPCompiler\ext\dom\JitDomDocumentMethodKernel::shouldUse($this->context)
+                && $this->context->extensionLowering->shouldUseDomDocumentMethodKernel($this->context)
             ) {
                 JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::getelementsbytagname');
                 if ($this->context->functionIsRegistered('domelement::getelementsbytagname')) {
@@ -28039,7 +28037,7 @@ class JIT {
             // documentElement temps (:object) — Element getElementsByTagNameNS SIGABRT via RuntimeIndirect (#32511).
             if (
                 'getelementsbytagnamens' === $methodLcEarly
-                && \PHPCompiler\ext\dom\JitDomDocumentMethodKernel::shouldUse($this->context)
+                && $this->context->extensionLowering->shouldUseDomDocumentMethodKernel($this->context)
             ) {
                 JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::getelementsbytagnamens');
                 if ($this->context->functionIsRegistered('domelement::getelementsbytagnamens')) {
@@ -28053,7 +28051,7 @@ class JIT {
             // documentElement temps lose TYPE_OBJECT — C14N via RuntimeIndirect echoes "Object" (#32961).
             if (
                 'c14n' === $methodLcEarly
-                && \PHPCompiler\ext\dom\JitDomDocumentMethodKernel::shouldUse($this->context)
+                && $this->context->extensionLowering->shouldUseDomDocumentMethodKernel($this->context)
             ) {
                 JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::c14n');
                 if ($this->context->functionIsRegistered('domnode::c14n')) {
@@ -28068,7 +28066,7 @@ class JIT {
             // SimpleXMLElement::asXML (FALIAS) which throws at compile time (#34567 / re-#31396).
             if (
                 ('savexml' === $methodLcEarly || 'savehtml' === $methodLcEarly)
-                && \PHPCompiler\ext\dom\JitDomDocumentMethodKernel::shouldUse($this->context)
+                && $this->context->extensionLowering->shouldUseDomDocumentMethodKernel($this->context)
             ) {
                 $receiverVar = $this->context->getVariableFromOp($receiverOp);
                 $hint = strtolower(ltrim(
@@ -28093,7 +28091,7 @@ class JIT {
             // via RuntimeIndirect drop surplus args silently (#31091).
             if (
                 \in_array($methodLcEarly, ['substringdata', 'appenddata', 'replacedata', 'deletedata', 'insertdata'], true)
-                && \PHPCompiler\ext\dom\JitDomDocumentMethodKernel::shouldUse($this->context)
+                && $this->context->extensionLowering->shouldUseDomDocumentMethodKernel($this->context)
             ) {
                 $proxy = 'domtext::'.$methodLcEarly;
                 JIT\DomInstanceMethodJit::ensureProxy($this->context, $proxy);
@@ -28107,7 +28105,7 @@ class JIT {
             }
             // Closure use() / :object temps — RuntimeIndirect drops surplus argc (#31251 / #30814).
             $receiverVar = $this->context->getVariableFromOp($receiverOp);
-            if (\PHPCompiler\ext\dom\DomExcessArgcJitRoute::tryRouteNonObjectReceiver(
+            if ($this->context->extensionLowering->tryRouteDomExcessArgcNonObjectReceiver(
                 $this->context,
                 $methodLcEarly,
                 $receiverVar,
@@ -28518,7 +28516,7 @@ class JIT {
         // append remap corrupts child tagName after an intervening echo (#24973).
         if (
             'appendchild' === $methodLc
-            && \PHPCompiler\ext\dom\JitDomDocumentMethodKernel::shouldUse($this->context)
+            && $this->context->extensionLowering->shouldUseDomDocumentMethodKernel($this->context)
         ) {
             $docAppendClasses = [
                 'domdocument' => true,
@@ -28540,7 +28538,7 @@ class JIT {
         }
         if (
             \in_array($methodLc, ['substringdata', 'appenddata', 'replacedata', 'deletedata', 'insertdata'], true)
-            && \PHPCompiler\ext\dom\JitDomDocumentMethodKernel::shouldUse($this->context)
+            && $this->context->extensionLowering->shouldUseDomDocumentMethodKernel($this->context)
         ) {
             $cdProxy = 'domtext::'.$methodLc;
             JIT\DomInstanceMethodJit::ensureProxy($this->context, $cdProxy);
@@ -29238,7 +29236,7 @@ class JIT {
             // ExternalMethod no-op; force DOMText fold (#34475 / re-#34314).
             if (
                 \in_array($methodLc, ['substringdata', 'appenddata', 'replacedata', 'deletedata', 'insertdata'], true)
-                && \PHPCompiler\ext\dom\JitDomDocumentMethodKernel::shouldUse($this->context)
+                && $this->context->extensionLowering->shouldUseDomDocumentMethodKernel($this->context)
             ) {
                 $cdProxy = 'domtext::'.$methodLc;
                 JIT\DomInstanceMethodJit::ensureProxy($this->context, $cdProxy);
@@ -29378,7 +29376,7 @@ class JIT {
         $staticProxy = $this->context->resolveFunctionProxy($proxyName);
         if (
             \in_array($methodLc, ['substringdata', 'appenddata', 'replacedata', 'deletedata', 'insertdata'], true)
-            && \PHPCompiler\ext\dom\JitDomDocumentMethodKernel::shouldUse($this->context)
+            && $this->context->extensionLowering->shouldUseDomDocumentMethodKernel($this->context)
         ) {
             $cdProxy = 'domtext::'.$methodLc;
             JIT\DomInstanceMethodJit::ensureProxy($this->context, $cdProxy);
@@ -29534,7 +29532,7 @@ class JIT {
                 return;
             }
         }
-        if (\PHPCompiler\ext\dom\DomExcessArgcJitRoute::tryRouteNonObjectReceiver(
+        if ($this->context->extensionLowering->tryRouteDomExcessArgcNonObjectReceiver(
             $this->context,
             $methodLc,
             $receiverVar,
@@ -32848,7 +32846,7 @@ class JIT {
         if (null === $local) {
             return;
         }
-        $valueLit = \PHPCompiler\ext\dom\JitDomAttrChildEdgeFetch::compileTimeAttrValuePublic(
+        $valueLit = $this->context->extensionLowering->domCompileTime?->compileTimeAttrValuePublic(
             $receiverVar->compileTimeDomAttrNamespace ?? '',
             $local
         );
