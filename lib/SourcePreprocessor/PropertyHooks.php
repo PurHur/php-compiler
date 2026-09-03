@@ -807,6 +807,12 @@ final class PropertyHooks
                         $offset = $afterVar + 1;
                         continue;
                     }
+                    // `if (false === $resource = fopen(...)) {` inside a method — not a hooked
+                    // property default (#36382 nyholm/psr7 UploadedFile::moveTo).
+                    if ($this->isConditionalHeaderBraceAfterAssignment($body, $hookOpen)) {
+                        $offset = $afterVar + 1;
+                        continue;
+                    }
 
                     return [$prop, $varStart, $hookOpen];
                 }
@@ -973,6 +979,29 @@ final class PropertyHooks
      */
     private function isForLoopHeaderBraceAfterAssignment(string $body, int $hookOpenPos): bool
     {
+        return $this->isControlHeaderBraceAfterAssignment($body, $hookOpenPos, '/\bfor\s*$/s');
+    }
+
+    /**
+     * Assignment inside if/elseif/while conditions: `if (false === $x = f()) {` (#36382).
+     */
+    private function isConditionalHeaderBraceAfterAssignment(string $body, int $hookOpenPos): bool
+    {
+        return $this->isControlHeaderBraceAfterAssignment(
+            $body,
+            $hookOpenPos,
+            '/\b(?:if|elseif|while)\s*$/s'
+        );
+    }
+
+    /**
+     * Control-structure headers whose condition assigns then opens a body brace.
+     */
+    private function isControlHeaderBraceAfterAssignment(
+        string $body,
+        int $hookOpenPos,
+        string $keywordPattern
+    ): bool {
         if ($hookOpenPos <= 0 || '{' !== $body[$hookOpenPos]) {
             return false;
         }
@@ -993,7 +1022,7 @@ final class PropertyHooks
                 if (0 === $depth) {
                     $before = rtrim(substr($body, 0, $j));
 
-                    return (bool) preg_match('/\bfor\s*$/s', $before);
+                    return (bool) preg_match($keywordPattern, $before);
                 }
             }
         }
@@ -1150,12 +1179,13 @@ final class PropertyHooks
     }
 
     /**
-     * Offsets whose innermost enclosing `{` opens a function body.
+     * Offsets enclosed by any function-body `{` (including nested if/while/for braces).
      *
-     * Mirrors the legacy backward scan exactly: for offset o that scan inspects every brace at a
-     * position strictly below o, so the state established by the brace at p governs offsets
-     * [p + 1, nextBracePos]. Raw byte scan, matching the legacy loop — braces inside strings and
-     * comments confuse both equally, so behaviour is preserved rather than improved.
+     * Nested control braces must stay "inside function": otherwise `$x = f()) {` in a method
+     * is mistaken for a hooked property default (#36382 nyholm UploadedFile::moveTo).
+     *
+     * Raw byte scan — braces inside strings and comments confuse this equally to the legacy
+     * walk, so behaviour stays conservative rather than fully lexer-accurate.
      *
      * @return list<array{0: int, 1: int}>
      */
@@ -1165,6 +1195,7 @@ final class PropertyHooks
         $intervals = [];
         /** @var list<bool> $stack innermost-last: does this brace open a function body? */
         $stack = [];
+        $functionDepth = 0;
         $spanStart = null;
 
         for ($i = 0; $i < $len; ++$i) {
@@ -1179,14 +1210,21 @@ final class PropertyHooks
             }
             if ('{' === $ch) {
                 $before = rtrim(substr($body, 0, $i));
-                $stack[] = (bool) preg_match(
+                $opensFunction = (bool) preg_match(
                     '/\bfunction\s*(?:&\s*)?[\w\\\\]*\s*\([^)]*\)\s*(?::\s*[^ {]+)?\s*$/s',
                     $before
                 );
+                $stack[] = $opensFunction;
+                if ($opensFunction) {
+                    ++$functionDepth;
+                }
             } else {
-                array_pop($stack);
+                $wasFunction = array_pop($stack);
+                if (true === $wasFunction) {
+                    --$functionDepth;
+                }
             }
-            if ([] !== $stack && true === $stack[\count($stack) - 1]) {
+            if ($functionDepth > 0) {
                 $spanStart = $i + 1;
             }
         }
@@ -1223,11 +1261,14 @@ final class PropertyHooks
             } elseif ('{' === $ch) {
                 if (0 === $depth) {
                     $before = rtrim(substr($body, 0, $i));
-
-                    return (bool) preg_match(
+                    if (preg_match(
                         '/\bfunction\s*(?:&\s*)?[\w\\\\]*\s*\([^)]*\)\s*(?::\s*[^ {]+)?\s*$/s',
                         $before
-                    );
+                    )) {
+                        return true;
+                    }
+                    // Walk outward through if/while/for braces to the enclosing function (#36382).
+                    continue;
                 }
                 --$depth;
             }

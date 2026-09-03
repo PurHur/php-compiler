@@ -234,17 +234,49 @@ final class SourceBundler
 
     /**
      * Concatenated AOT units keep one file-level strict_types (#764 MiniWebApp bundle).
+     * Vendor files often place a file docblock before declare (#36382 slim/slim App.php).
      */
     private static function stripStrictTypesDeclare(string $code): string
     {
-        $trimmed = ltrim($code);
-        if (preg_match('/^declare\s*\(\s*strict_types\s*=\s*1\s*\)\s*;/', $trimmed)) {
-            $trimmed = preg_replace('/^declare\s*\(\s*strict_types\s*=\s*1\s*\)\s*;\s*/', '', $trimmed) ?? $trimmed;
-
-            return ltrim($trimmed, " \t\n\r\0\x0B");
+        if (!preg_match('/declare\s*\(\s*strict_types\s*=\s*1\s*\)\s*;/', $code)) {
+            return $code;
         }
+        $len = strlen($code);
+        $i = 0;
+        while ($i < $len) {
+            while ($i < $len && ctype_space($code[$i])) {
+                ++$i;
+            }
+            if ($i >= $len) {
+                break;
+            }
+            if ('/' === $code[$i] && $i + 1 < $len && '*' === $code[$i + 1]) {
+                $end = strpos($code, '*/', $i + 2);
+                if (false === $end) {
+                    break;
+                }
+                $i = $end + 2;
+                continue;
+            }
+            if ('/' === $code[$i] && $i + 1 < $len && '/' === $code[$i + 1]) {
+                $nl = strpos($code, "\n", $i + 2);
+                $i = false === $nl ? $len : $nl + 1;
+                continue;
+            }
+            if ('#' === $code[$i]) {
+                $nl = strpos($code, "\n", $i + 1);
+                $i = false === $nl ? $len : $nl + 1;
+                continue;
+            }
+            break;
+        }
+        $tail = substr($code, $i);
+        if (!preg_match('/^declare\s*\(\s*strict_types\s*=\s*1\s*\)\s*;\s*/', $tail)) {
+            return $code;
+        }
+        $tail = preg_replace('/^declare\s*\(\s*strict_types\s*=\s*1\s*\)\s*;\s*/', '', $tail) ?? $tail;
 
-        return $code;
+        return substr($code, 0, $i).ltrim($tail, " \t\n\r\0\x0B");
     }
 
     /**
@@ -427,6 +459,7 @@ final class SourceBundler
 
     private static function dedupeBundledUseStatements(string $namespaceName, string $body): string
     {
+        $body = self::expandGroupUseStatements($body);
         if (!isset(self::$bundledUseImports[$namespaceName])) {
             self::$bundledUseImports[$namespaceName] = ['stmt' => [], 'local' => []];
         }
@@ -497,6 +530,37 @@ final class SourceBundler
         }
 
         return $result;
+    }
+
+    /**
+     * Expand `use Foo\{A, B as C};` so per-import dedupe works across bundled files (#36382).
+     */
+    private static function expandGroupUseStatements(string $body): string
+    {
+        if (!str_contains($body, '{')) {
+            return $body;
+        }
+
+        return preg_replace_callback(
+            '/^(\s*)use\s+(function\s+|const\s+)?([^;{\s][^;{]*?)\\\\\{([^}]+)\}\s*;\s*$/m',
+            static function (array $m): string {
+                $indent = $m[1];
+                $kind = $m[2];
+                $prefix = rtrim($m[3], '\\');
+                $parts = preg_split('/\s*,\s*/', trim($m[4])) ?: [];
+                $lines = [];
+                foreach ($parts as $part) {
+                    $part = trim($part);
+                    if ('' === $part) {
+                        continue;
+                    }
+                    $lines[] = $indent.'use '.$kind.$prefix.'\\'.$part.';';
+                }
+
+                return [] === $lines ? $m[0] : implode("\n", $lines);
+            },
+            $body
+        ) ?? $body;
     }
 
     private static function normalizeUseImportLocalKey(string $local): string

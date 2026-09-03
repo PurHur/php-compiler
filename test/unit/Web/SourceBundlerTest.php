@@ -393,4 +393,80 @@ final class SourceBundlerTest extends TestCase
             @rmdir($tmp);
         }
     }
+
+    /** Docblock before declare(strict_types=1) must still strip for AOT concat (#36382 Slim). */
+    public function testStripStrictTypesAfterFileDocblock(): void
+    {
+        $dir = sys_get_temp_dir().'/phpc_bundle_'.bin2hex(random_bytes(6));
+        $this->assertTrue(mkdir($dir));
+        $this->assertTrue(mkdir($dir.'/public', 0777, true));
+        try {
+            file_put_contents(
+                $dir.'/lib.php',
+                "<?php\n/**\n * @license MIT\n */\n\ndeclare(strict_types=1);\n\nnamespace Vendor;\n\nclass Lib {}\n"
+            );
+            file_put_contents(
+                $dir.'/public/index.php',
+                "<?php\nrequire __DIR__ . '/../lib.php';\necho 'ok';\n"
+            );
+
+            [$bundled] = SourceBundler::bundleForAot(
+                $dir.'/public/index.php',
+                [realpath($dir.'/lib.php') ?: $dir.'/lib.php']
+            );
+
+            $this->assertSame(1, substr_count($bundled, 'declare(strict_types=1);'));
+            $this->assertStringContainsString('@license MIT', $bundled);
+            $this->assertStringContainsString('namespace Vendor {', $bundled);
+            $this->assertStringNotContainsString(
+                "*/\n\ndeclare(strict_types=1);",
+                $bundled
+            );
+        } finally {
+            @unlink($dir.'/lib.php');
+            @unlink($dir.'/public/index.php');
+            @rmdir($dir.'/public');
+            @rmdir($dir);
+        }
+    }
+
+    /** Group use imports expand so duplicate locals across files dedupe (#36382 nyholm). */
+    public function testGroupUseStatementsDedupedAcrossBundledFiles(): void
+    {
+        $dir = sys_get_temp_dir().'/phpc_bundle_'.bin2hex(random_bytes(6));
+        $this->assertTrue(mkdir($dir));
+        try {
+            file_put_contents(
+                $dir.'/a.php',
+                "<?php\nnamespace Factory;\n\nuse Vendor\\{Request, Response};\n\nclass A {}\n"
+            );
+            file_put_contents(
+                $dir.'/b.php',
+                "<?php\nnamespace Factory;\n\nuse Vendor\\{Request, Stream};\n\nclass B {}\n"
+            );
+            file_put_contents(
+                $dir.'/index.php',
+                "<?php\nrequire __DIR__ . '/a.php';\nrequire __DIR__ . '/b.php';\necho 'ok';\n"
+            );
+
+            [$bundled] = SourceBundler::bundleForAot(
+                $dir.'/index.php',
+                [
+                    realpath($dir.'/a.php') ?: $dir.'/a.php',
+                    realpath($dir.'/b.php') ?: $dir.'/b.php',
+                ]
+            );
+
+            $this->assertSame(1, substr_count($bundled, 'use Vendor\\Request;'));
+            $this->assertSame(1, substr_count($bundled, 'use Vendor\\Response;'));
+            $this->assertSame(1, substr_count($bundled, 'use Vendor\\Stream;'));
+            $this->assertStringNotContainsString('use Vendor\\{', $bundled);
+        } finally {
+            @unlink($dir.'/a.php');
+            @unlink($dir.'/b.php');
+            @unlink($dir.'/index.php');
+            @rmdir($dir);
+        }
+    }
+
 }
