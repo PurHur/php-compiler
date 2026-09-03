@@ -97,6 +97,12 @@ class Runtime {
     public array $modules = [];
     public int $mode;
     /**
+     * When set (phpc build --project), literal includes outside this realpath set fail loudly (#36382).
+     *
+     * @var array<string, true>|null
+     */
+    public ?array $aotIncludeAllowlist = null;
+    /**
      * M5 argv / gen-0 seed: C-floor initParsePipeline sets this so parse() skips
      * prepareSourceForParser list-unpack (SEGV in __string__separate after identity
      * stub setStringAt round-trip — #26756 / re-#23468).

@@ -1,0 +1,6 @@
+{
+    "entry": "public/index.php",
+    "binary": ".phpc/bin/app",
+    "autoload": "composer",
+    "include_roots": ["lib/extra"]
+}
