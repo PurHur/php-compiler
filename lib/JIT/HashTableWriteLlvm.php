@@ -1107,21 +1107,14 @@ final class HashTableWriteLlvm
         if (0 === ($array->type & Variable::IS_NATIVE_ARRAY)) {
             return;
         }
-        // materializeNativeArrayForCall addrefs to rc=1; writeHashtable addrefs again.
-        // Delref the materialize claim so the value-box is sole owner (rc=1) — otherwise
-        // reassign/unset never reach __hashtable__dtor (#36388 / peer initArray ephemeral move).
+        // materializeNativeArrayForCall returns rc=0; writeHashtable → rc=1 (sole owner).
+        // No delref — the prior delref freed the HT at rc=0 (#36484 / re-#36388).
         $ht = self::materializeNativeArrayForCall($context, $array);
         $slot = JitValueBox::alloc($context);
         $context->builder->call(
             $context->lookupFunction('__value__writeHashtable'),
             JitValueBox::pointer($context, $slot),
             $ht
-        );
-        $context->refcount->delref(
-            $context->builder->pointerCast(
-                $ht,
-                $context->getTypeFromString('__ref__virtual*')
-            )
         );
         $array->type = Variable::TYPE_VALUE;
         $array->value = $slot;
