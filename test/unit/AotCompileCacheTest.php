@@ -347,6 +347,102 @@ final class AotCompileCacheTest extends TestCase
         );
     }
 
+    public function testUserSymbolsToStripForEditKeepsUnchangedLib(): void
+    {
+        $dir = $this->cacheRoot.'/strip-plan';
+        mkdir($dir, 0775, true);
+        $lib = $dir.'/lib.php';
+        $main = $dir.'/main.php';
+        file_put_contents($lib, "<?php\nfunction greeting(): string { return \"alpha\"; }\n");
+        file_put_contents($main, "<?php\nrequire __DIR__ . '/lib.php';\necho greeting(), \"\\n\";\n");
+        $libR = realpath($lib) ?: $lib;
+        $mainR = realpath($main) ?: $main;
+
+        CompileCache::setProjectMembers([$mainR, $libR]);
+        CompileCache::setEditChangedMembers([$mainR]);
+        $all = ['greeting', 'main', 'internal_helper'];
+        $byMember = [
+            $mainR => ['main'],
+            $libR => ['greeting'],
+        ];
+        $strip = CompileCache::userSymbolsToStripForEdit($all, $byMember);
+        $this->assertContains('main', $strip);
+        $this->assertContains('internal_helper', $strip);
+        $this->assertNotContains('greeting', $strip, 'unchanged lib.php greeting must be kept (#36387)');
+        $this->assertTrue(CompileCache::isKeptUserSymbol('greeting'));
+        $this->assertTrue(CompileCache::wouldPartialStrip($all, $byMember));
+        CompileCache::finishRecording();
+
+        CompileCache::setProjectMembers([$mainR, $libR]);
+        CompileCache::setEditChangedMembers([$libR]);
+        $stripLib = CompileCache::userSymbolsToStripForEdit($all, $byMember);
+        $this->assertContains('greeting', $stripLib, 'changed lib must strip greeting');
+        $this->assertContains('main', $stripLib, 'entry always stripped');
+        $this->assertFalse(CompileCache::isKeptUserSymbol('greeting'));
+        CompileCache::finishRecording();
+    }
+
+    public function testEditScaffoldKeepPathWhenEntryChanges(): void
+    {
+        if (!LlvmToolchain::isReady($this->repoRoot)) {
+            $this->markTestSkipped('LLVM 9 not available');
+        }
+
+        $dir = $this->cacheRoot.'/edit-keep';
+        mkdir($dir, 0775, true);
+        $lib = $dir.'/lib.php';
+        $main = $dir.'/main.php';
+        file_put_contents($lib, "<?php\nfunction greeting(): string { return \"alpha\"; }\n");
+        file_put_contents($main, "<?php\nrequire __DIR__ . '/lib.php';\necho greeting(), \"\\n\";\n");
+
+        $outCold = $this->repoRoot.'/build/aot-cache-test-keep-cold.bin';
+        @unlink($outCold);
+
+        $cold = $this->runAotSubprocess($main, $outCold);
+        if (139 === $cold['exit'] || 11 === $cold['exit']) {
+            $this->markTestSkipped('AOT segfault in this environment; cache wiring covered by unit tests');
+        }
+        $this->assertSame(0, $cold['exit'], $cold['stderr']);
+        $this->assertStringContainsString('alpha', $this->runBinary($outCold)['stdout']);
+
+        // Change only the entry — lib.php (greeting) should stay via keep-path (#36387).
+        file_put_contents(
+            $main,
+            "<?php\nrequire __DIR__ . '/lib.php';\necho greeting(), \"-kept\\n\";\n"
+        );
+
+        $outEdit = $this->repoRoot.'/build/aot-cache-test-keep-edit.bin';
+        @unlink($outEdit);
+        $edit = $this->runAotSubprocess($main, $outEdit, true);
+        $this->assertSame(0, $edit['exit'], $edit['stderr']."\n".$edit['stdout']);
+        $timing = $edit['stderr'].$edit['stdout'];
+        $this->assertStringContainsString(
+            'edit_scaffold_hit',
+            $timing,
+            'entry-only edit must thin-boot (#36387)'
+        );
+        $this->assertStringContainsString(
+            'edit_scaffold_partial',
+            $timing,
+            'entry-only edit must keep unchanged lib symbols (#36387)'
+        );
+        $stdout = $this->runBinary($outEdit)['stdout'];
+        $this->assertStringContainsString(
+            'alpha-kept',
+            $stdout,
+            'kept greeting() body must still run (not empty stdout) (#36387)'
+        );
+        $this->assertLessThan(
+            $cold['wall_ms'] * 0.5,
+            $edit['wall_ms'],
+            sprintf(
+                'keep-path edit should be <50%% of cold (cold=%.0fms edit=%.0fms) (#36387)',
+                $cold['wall_ms'],
+                $edit['wall_ms']
+            )
+        );
+    }
+
     /**
      * @return array{exit: int, stdout: string, stderr: string, wall_ms: float}
      */

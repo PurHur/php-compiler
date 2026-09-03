@@ -60,6 +60,13 @@ final class CompileCache
     /** @var list<string> absolute paths whose bytes changed vs the scaffold project index */
     private static array $editChangedMembers = [];
 
+    /**
+     * LLVM names of user symbols left in the module after edit-scaffold partial strip (#36387).
+     *
+     * @var array<string, true>
+     */
+    private static array $keptUserSymbols = [];
+
     public static function isEnabled(): bool
     {
         $flag = Config::getenv('PHP_COMPILER_CACHE');
@@ -84,6 +91,12 @@ final class CompileCache
     public static function isEditScaffoldActive(): bool
     {
         return self::$editScaffoldActive;
+    }
+
+    /** True when edit-scaffold left this user LLVM body in the module (#36387). */
+    public static function isKeptUserSymbol(string $llvmName): bool
+    {
+        return '' !== $llvmName && isset(self::$keptUserSymbols[$llvmName]);
     }
 
     public static function isEditScaffoldBitcodeBound(): bool
@@ -858,6 +871,9 @@ final class CompileCache
      * bodies stay in the module. Call sites that still point at `.stale` Values
      * are fixed by {@see rebaseStaleUserSymbols()} after re-lower (#36387).
      *
+     * Only symbols attributed to an *unchanged* non-entry member are kept. Helpers
+     * are never in {@see $allUserSymbols}; NestedJIT must not early-return on them.
+     *
      * @param list<mixed>              $allUserSymbols
      * @param array<string, mixed>     $byMember
      *
@@ -865,14 +881,6 @@ final class CompileCache
      */
     public static function userSymbolsToStripForEdit(array $allUserSymbols, array $byMember): array
     {
-        // Prefer stripping only symbols owned by changed members so unchanged LLVM
-        // bodies can stay in the module. Call sites that still point at `.stale`
-        // Values are fixed by {@see rebaseStaleUserSymbols()} after re-lower (#36387).
-        //
-        // Keep-path (early-return + Native proxy) still yields empty stdout for some
-        // kept callees under the phpunit harness; until that is root-caused, always
-        // full-strip so one-file edit stays behaviour-correct. Partial selection is
-        // still computed for BuildTiming when it would have been a real subset.
         $names = ['main' => true]; // C wrapper always recreated in compileToFile
         foreach ($allUserSymbols as $name) {
             if (is_string($name) && '' !== $name) {
@@ -880,70 +888,109 @@ final class CompileCache
             }
         }
 
+        $kept = self::computeKeptUserSymbols($allUserSymbols, $byMember);
+        self::$keptUserSymbols = $kept;
+        if ([] === $kept) {
+            return array_keys($names);
+        }
+
+        foreach (array_keys($kept) as $name) {
+            unset($names[$name]);
+        }
+        $names['main'] = true;
+
         return array_keys($names);
     }
 
     /**
-     * True when changed-member attribution would have allowed keeping at least one
-     * user symbol (used for timing notes / future keep-path enablement) (#36387).
+     * True when changed-member attribution keeps at least one user symbol (#36387).
      *
      * @param list<mixed>          $allUserSymbols
      * @param array<string, mixed> $byMember
      */
     public static function wouldPartialStrip(array $allUserSymbols, array $byMember): bool
     {
-        if ([] === self::$editChangedMembers) {
-            return false;
+        return [] !== self::computeKeptUserSymbols($allUserSymbols, $byMember);
+    }
+
+    /**
+     * User LLVM names attributed solely to unchanged non-entry members (#36387).
+     *
+     * @param list<mixed>          $allUserSymbols
+     * @param array<string, mixed> $byMember
+     *
+     * @return array<string, true>
+     */
+    public static function computeKeptUserSymbols(array $allUserSymbols, array $byMember): array
+    {
+        if ([] === self::$editChangedMembers || [] === $byMember) {
+            return [];
         }
+
         $keepable = [];
         foreach ($allUserSymbols as $name) {
-            if (is_string($name) && '' !== $name && 'main' !== $name && !str_starts_with($name, 'internal_')) {
+            if (
+                is_string($name)
+                && '' !== $name
+                && 'main' !== $name
+                && !str_starts_with($name, 'internal_')
+            ) {
                 $keepable[$name] = true;
             }
         }
         if ([] === $keepable) {
-            return false;
+            return [];
         }
-        $strip = ['main' => true];
-        $attributed = 0;
+
+        $mustStripMember = [];
         foreach (self::$editChangedMembers as $member) {
+            $mustStripMember[$member] = true;
+        }
+        if (is_string(self::$projectEntry) && '' !== self::$projectEntry) {
+            $mustStripMember[self::$projectEntry] = true;
+        }
+
+        // Require every changed member to appear in byMember (honest attribution).
+        // Entry-only edits often attribute only `main`, which is never keepable (#36387).
+        foreach (self::$editChangedMembers as $member) {
+            if (!isset($byMember[$member]) || !is_array($byMember[$member])) {
+                return [];
+            }
+        }
+
+        $kept = [];
+        foreach ($byMember as $member => $syms) {
+            if (!is_string($member) || !is_array($syms)) {
+                continue;
+            }
+            if (isset($mustStripMember[$member])) {
+                continue;
+            }
+            foreach ($syms as $sym) {
+                if (is_string($sym) && '' !== $sym && isset($keepable[$sym])) {
+                    $kept[$sym] = true;
+                }
+            }
+        }
+
+        if ([] === $kept) {
+            return [];
+        }
+
+        // Symbols also listed under a strip member must not stay.
+        foreach (array_keys($mustStripMember) as $member) {
             $syms = $byMember[$member] ?? null;
             if (!is_array($syms)) {
                 continue;
             }
             foreach ($syms as $sym) {
-                if (!is_string($sym) || '' === $sym) {
-                    continue;
+                if (is_string($sym)) {
+                    unset($kept[$sym]);
                 }
-                $strip[$sym] = true;
-                ++$attributed;
-            }
-        }
-        if (0 === $attributed) {
-            return false;
-        }
-        foreach ($allUserSymbols as $name) {
-            if (is_string($name) && str_starts_with($name, 'internal_')) {
-                $strip[$name] = true;
-            }
-        }
-        if (is_string(self::$projectEntry) && '' !== self::$projectEntry) {
-            $entrySyms = $byMember[self::$projectEntry] ?? null;
-            if (is_array($entrySyms)) {
-                foreach ($entrySyms as $sym) {
-                    if (is_string($sym) && '' !== $sym) {
-                        $strip[$sym] = true;
-                    }
-                }
-            }
-        }
-        foreach (array_keys($keepable) as $name) {
-            if (!isset($strip[$name])) {
-                return true;
             }
         }
 
-        return false;
+        return $kept;
     }
 
     /**
@@ -1387,6 +1434,7 @@ final class CompileCache
         self::$recordingUserSymbolsByMember = null;
         self::$bundledSource = null;
         self::$editChangedMembers = [];
+        self::$keptUserSymbols = [];
         self::$skipModuleFuncCompile = false;
         self::$editScaffoldActive = false;
         self::$editScaffoldBitcodeBound = false;

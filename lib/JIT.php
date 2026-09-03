@@ -2961,9 +2961,9 @@ class JIT {
         ?string $logicalName,
         ?string $funcName
     ): PHPLLVM\Value {
-        // Note: edit-scaffold keep-path (reuse unchanged member LLVM bodies) is intentionally
-        // not gated here yet — early-return on any existing Function_ also matched restored
-        // helper bodies and skipped NestedJIT rebinding, yielding empty AOT stdout (#36387).
+        // Note: edit-scaffold keep-path reuses unchanged member LLVM bodies via
+        // {@see CompileCache::isKeptUserSymbol()} below — never early-return on
+        // restored helpers (NestedJIT must rebind; that bug yielded empty stdout) (#36387).
         $args = [];
         $rawTypes = [];
         $argVars = [];
@@ -3061,6 +3061,100 @@ class JIT {
         }
 
         $isVarArgs = false;
+
+        // Keep-path: reuse unchanged user LLVM body from edit-scaffold. Helpers are never
+        // in keptUserSymbols — NestedJIT early-return there emptied AOT stdout (#36387).
+        if (
+            JIT\CompileCache::isEditScaffoldActive()
+            && !JIT\NestedJitCompileScope::isActive()
+            && JIT\CompileCache::isKeptUserSymbol($internalName)
+        ) {
+            $existing = $this->context->module->getNamedFunction($internalName);
+            if ($existing instanceof PHPLLVM\Value\Function_) {
+                $cfgParamCount = null !== $block->func ? count($block->func->params) : 0;
+                $thisParamOffset = $this->llvmThisParamOffset($block);
+                foreach ($args as $idx => $arg) {
+                    $varType = Variable::getTypeFromType($rawTypes[$idx]);
+                    $cfgIdx = $idx - $thisParamOffset;
+                    $cfgParam = ($cfgIdx >= 0 && $cfgIdx < $cfgParamCount)
+                        ? $block->func->params[$cfgIdx]
+                        : null;
+                    $llvmParamTy = $this->context->getStringFromType($arg);
+                    if ('__value__*' === $llvmParamTy) {
+                        $varType = Variable::TYPE_VALUE;
+                    } elseif ('__object__*' === $llvmParamTy) {
+                        $varType = Variable::TYPE_OBJECT;
+                    } elseif ('__hashtable__*' === $llvmParamTy) {
+                        $varType = Variable::TYPE_HASHTABLE;
+                    } elseif ('__string__*' === $llvmParamTy) {
+                        $varType = Variable::TYPE_STRING;
+                    }
+                    if (null !== $cfgParam && $cfgParam->variadic) {
+                        $varType = Variable::TYPE_HASHTABLE;
+                    }
+                    $argVars[] = new Variable($this->context, $varType, Variable::KIND_VALUE, $existing->getParam($idx));
+                }
+
+                $lcname = strtolower($logicalName ?? $internalName);
+                $this->context->functions[$lcname] = $existing;
+                $this->context->functionLlvmSymbols[$lcname] = $internalName;
+                $this->context->activeFunction = $lcname;
+                if (JIT\CompileCache::isRecording()) {
+                    JIT\CompileCache::recordUserLlvmSymbol($internalName, $block);
+                }
+                if (!is_null($funcName)) {
+                    $lcname = strtolower($funcName);
+                    $this->context->activeFunction = $lcname;
+                    $this->context->functions[$lcname] = $existing;
+                    $this->context->functionLlvmSymbols[$lcname] = $internalName;
+                    if (JIT\CompileCache::isRecording()) {
+                        JIT\CompileCache::recordUserLlvmSymbol($internalName, $block);
+                    }
+                    $defaultArgs = $this->collectParamDefaults($block);
+                    $variadicArgIndex = null;
+                    if (null !== $block->variadicParamIndex) {
+                        $variadicArgIndex = $block->variadicParamIndex;
+                        if ($this->llvmThisParamOffset($block) > 0) {
+                            ++$variadicArgIndex;
+                        }
+                    }
+                    $this->context->functionProxies[$lcname] = new JIT\Call\Native(
+                        $existing,
+                        VM\ParamArgumentCountError::typeErrorDisplayNameForCfgFunc($block->func, $funcName, $block),
+                        $args,
+                        $defaultArgs,
+                        $variadicArgIndex,
+                        $this->paramTypeConstraintsForNativeCall($block),
+                        $this->paramIntersectionConstraintsForNativeCall($block),
+                        $this->paramDnfConstraintsForNativeCall($block),
+                        $this->paramClassConstraintsForNativeCall($block),
+                        $this->paramByRefForNativeCall($block),
+                        $block->paramNames,
+                        $block->variadicParamIndex,
+                        $this->paramImplicitNullableForNativeCall($block),
+                        Block::usesFuncArgsIntrospection($block),
+                        $this->collectPromotedRuntimeNewDefaultProps($block)
+                    );
+                    JIT\NoDiscardCallGuard::registerCallee($this->context, $funcName, $block);
+                    JIT\DeprecatedCallGuard::registerCallee($this->context, $funcName, $block);
+                    if (
+                        $isVoidReturn
+                        && Block::isEffectFreeVoidCalleeBody($block)
+                        && !$block->noDiscard
+                        && null === $block->deprecated
+                        && !Block::usesFuncArgsIntrospection($block)
+                    ) {
+                        $this->context->discardedCallElisionVoidNatives[$lcname] = true;
+                    }
+                    if ($returnsByRef) {
+                        $this->markFunctionReturnsByRef($lcname, $funcName ?? '');
+                    }
+                }
+
+                // Body already in module — do not queue re-lower.
+                return $existing;
+            }
+        }
 
         $func = $this->context->module->addFunction(
             $internalName,
