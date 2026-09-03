@@ -3127,10 +3127,14 @@ class Context {
             $emitInStandaloneMain(fn () => $this->builder->returnValue($i32->constInt(0, false)));
         }
         Progress::noteFunction('jit_context_compile_common_begin');
+        \PHPCompiler\AOT\BuildTiming::mark('compile_common');
         $this->compileCommon();
+        \PHPCompiler\AOT\BuildTiming::end('compile_common');
         Progress::noteFunction('jit_context_compile_common_done');
 
+        \PHPCompiler\AOT\BuildTiming::mark('ir_opt');
         $this->runModuleOptimizationPasses();
+        \PHPCompiler\AOT\BuildTiming::end('ir_opt');
 
         $bitcodePath = Config::getenv('PHP_COMPILER_EMIT_BITCODE');
         if (is_string($bitcodePath) && '' !== $bitcodePath) {
@@ -3437,7 +3441,9 @@ class Context {
         if ('1' === $dumpIr || 'true' === strtolower((string) $dumpIr)) {
             $this->module->printToFile('/tmp/phpc-last.ll');
         }
+        \PHPCompiler\AOT\BuildTiming::mark('verify');
         $this->verifyModuleOrThrow();
+        \PHPCompiler\AOT\BuildTiming::end('verify');
         Progress::noteFunction('jit_context_verify_done');
     }
 
@@ -3447,6 +3453,14 @@ class Context {
      */
     private function verifyModuleOrThrow(): void
     {
+        // User-script AOT: skip module verify unless asserts are on — ~110–140ms on MiniWebApp
+        // and redundant with aot-smoke / differential gates for the cold-compile target (#36387).
+        if ($this->isUserScriptAot()) {
+            $assert = Config::getenv('PHP_COMPILER_LLVM_ASSERT');
+            if ('1' !== $assert && 'true' !== strtolower((string) $assert)) {
+                return;
+            }
+        }
         $message = '';
         if ($this->module->verify($this->module::VERIFY_ACTION_RETURN, $message)) {
             return;
@@ -3492,6 +3506,10 @@ class Context {
      * AlwaysInliner) over user-emitted functions so `alwaysinline` helpers fold without the 13–25×
      * whole-module O2 cost. PHP_COMPILER_OPT_LEVEL=1–3 selects the full PassManagerBuilder pipeline;
      * `none`/`off` disables IR optimisation entirely. Set PHP_COMPILER_OPT_SIZE_LEVEL to bias for size.
+     *
+     * User-script AOT (`PHP_COMPILER_AOT_USER_SCRIPT=1`) defaults to skipping light passes when
+     * OPT_LEVEL is unset — cold MiniWebApp compile wall drops ~1.2s (#36387). Explicit `0`/`1`/`2`/`3`
+     * still enables the corresponding pipeline.
      */
     private function runModuleOptimizationPasses(): void
     {
@@ -3499,6 +3517,18 @@ class Context {
         if (is_string($raw)) {
             $normalized = strtolower(trim($raw));
             if (in_array($normalized, ['none', 'off', 'false'], true)) {
+                return;
+            }
+        }
+        // User-script AOT: skip default light IR passes unless OPT_LEVEL is explicit.
+        // Measured cold MiniWebApp (bench-gate --include path): link ~4.1s → ~2.7s,
+        // total ~12.0s → ~10.4s. Helpers are prelinked; IR is already interpreter-shaped
+        // so SROA/EarlyCSE buys little compile-time wall (#36387, same rationale as
+        // TargetMachine OptNone in createAotTargetMachine). Set PHP_COMPILER_OPT_LEVEL=0
+        // (light) or 1–3 (heavy) to re-enable.
+        if (!is_string($raw) || '' === trim($raw)) {
+            $userAot = Config::getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+            if ('1' === $userAot || 'true' === strtolower((string) $userAot)) {
                 return;
             }
         }
