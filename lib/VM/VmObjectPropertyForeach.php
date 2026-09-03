@@ -55,9 +55,16 @@ final class VmObjectPropertyForeach
         ) {
             return false;
         }
-        // Ambiguous boxed containers without a declared object class use hashtable foreach (#1492).
-        if (JitVariable::TYPE_VALUE === $container->type && (null === $containerUserType || '' === $containerUserType)) {
-            return false;
+        // Ambiguous boxed containers without a concrete object class use hashtable foreach
+        // (#1492). Generic userType `object` (mixed / wide unions tagged by callResultCfgWantsObject)
+        // must not claim property foreach either — function-returned arrays then iterate empty (#36469).
+        if (JitVariable::TYPE_VALUE === $container->type) {
+            if (null === $containerUserType || '' === $containerUserType) {
+                return false;
+            }
+            if ('object' === strtolower(ltrim($containerUserType, '\\'))) {
+                return false;
+            }
         }
         if (null !== $containerUserType && '' !== $containerUserType) {
             $classLc = strtolower(ltrim($containerUserType, '\\'));
