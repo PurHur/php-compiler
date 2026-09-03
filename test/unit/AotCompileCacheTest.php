@@ -40,6 +40,8 @@ final class AotCompileCacheTest extends TestCase
         $this->removeTree($this->cacheRoot);
         @unlink($this->repoRoot.'/build/aot-cache-test-cold.bin');
         @unlink($this->repoRoot.'/build/aot-cache-test-warm.bin');
+        @unlink($this->repoRoot.'/build/aot-cache-test-obj-cold.bin');
+        @unlink($this->repoRoot.'/build/aot-cache-test-obj-mid.bin');
         putenv('PHP_COMPILER_CACHE_DIR');
         unset($_ENV['PHP_COMPILER_CACHE_DIR']);
         putenv('PHP_COMPILER_AOT_USER_SCRIPT');
@@ -112,6 +114,55 @@ final class AotCompileCacheTest extends TestCase
             hash_file('sha256', $outWarm),
             'warm artifact restore must be byte-identical to cold binary'
         );
+    }
+
+    public function testObjectMidTierRestoresWhenArtifactMissing(): void
+    {
+        if (!LlvmToolchain::isReady($this->repoRoot)) {
+            $this->markTestSkipped('LLVM 9 not available');
+        }
+
+        $script = $this->cacheRoot.'/echo-obj.php';
+        file_put_contents($script, "<?php echo \"ObjectCache\\n\";");
+        $outCold = $this->repoRoot.'/build/aot-cache-test-obj-cold.bin';
+        $outMid = $this->repoRoot.'/build/aot-cache-test-obj-mid.bin';
+        @unlink($outCold);
+        @unlink($outMid);
+
+        $cold = $this->runAotSubprocess($script, $outCold);
+        if (139 === $cold['exit'] || 11 === $cold['exit']) {
+            $this->markTestSkipped('AOT segfault in this environment; cache wiring covered by unit tests');
+        }
+        $this->assertSame(0, $cold['exit'], $cold['stderr']);
+        $this->assertFileExists($outCold);
+
+        $key = CompileCache::computeKey($script, (string) file_get_contents($script));
+        $this->assertFileExists(CompileCache::objectPath($key), 'aot.o must be cached after cold emit (#36387)');
+        $this->assertFileExists(CompileCache::linkManifestPath($key), 'link.json must record helper slugs');
+        $this->assertFileExists(CompileCache::artifactPath($key));
+
+        // Drop only the linked binary — mid-tier should re-link from aot.o.
+        $this->assertTrue(@unlink(CompileCache::artifactPath($key)));
+
+        $mid = $this->runAotSubprocess($script, $outMid);
+        $this->assertSame(0, $mid['exit'], $mid['stderr']);
+        $this->assertFileExists($outMid);
+        $this->assertLessThan(
+            $cold['wall_ms'] * 0.75,
+            $mid['wall_ms'],
+            sprintf(
+                'object mid-tier restore should be <75%% of cold (cold=%.0fms mid=%.0fms)',
+                $cold['wall_ms'],
+                $mid['wall_ms']
+            )
+        );
+
+        $coldRun = $this->runBinary($outCold);
+        $midRun = $this->runBinary($outMid);
+        $this->assertSame(0, $coldRun['exit'], $coldRun['stderr']);
+        $this->assertSame(0, $midRun['exit'], $midRun['stderr']);
+        $this->assertSame(trim($coldRun['stdout']), trim($midRun['stdout']));
+        $this->assertFileExists(CompileCache::artifactPath($key), 'mid-tier link must re-save aot.bin');
     }
 
     /**

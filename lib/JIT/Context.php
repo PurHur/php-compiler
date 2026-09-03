@@ -473,6 +473,8 @@ class Context {
     private static int $stringConstantCounter = 0;
     private ?string $debugFile = null;
     private ?string $aotSourceFilename = null;
+    /** When set, {@see compileToFile()} persists `aot.o` + helper slugs into CompileCache (#36387). */
+    public ?string $aotCompileCacheKey = null;
 
     public Helper $helper;
 
@@ -3167,6 +3169,13 @@ class Context {
         Linker::link($objectFile, $file);
         Progress::noteFunction('jit_context_link_done');
         Linker::assertNonEmptyOutputFile($file);
+        if (null !== $this->aotCompileCacheKey && '' !== $this->aotCompileCacheKey) {
+            CompileCache::saveObject(
+                $this->aotCompileCacheKey,
+                $objectFile,
+                \PHPCompiler\AOT\HelperRuntimeCache::usedUnitSlugs()
+            );
+        }
         unlink($objectFile);
     }
 

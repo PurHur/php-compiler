@@ -1013,6 +1013,15 @@ class Runtime {
 
                 return;
             }
+            // Mid-tier: cached user .o + helper slugs → link only (skip emitToFile) (#36387).
+            if (JIT\CompileCache::tryRestoreObjectAndLink($artifactCacheKey, $outfile, $sourceFilename, $sourceCode)) {
+                \PHPCompiler\AOT\BuildTiming::note('object_cache_hit', 1.0);
+                \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_object_cache_hit');
+                Block::detachCfgTree($block, true);
+                \PHPCompiler\AOT\AotEmitFastExit::exitAfterSuccessfulSelfhostEmit($sourceFilename, $outfile);
+
+                return;
+            }
         }
 
         $needsPregPrelink = Block::containsPregPrelinkBuiltinCalls($block);
@@ -1020,6 +1029,9 @@ class Runtime {
         $context = $this->loadJitContext();
         if (null !== $sourceFilename && '' !== $sourceFilename) {
             $context->setAotSourceFilename($sourceFilename);
+        }
+        if (null !== $artifactCacheKey) {
+            $context->aotCompileCacheKey = $artifactCacheKey;
         }
         \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_loadjitcontext_done');
         // Generator bodies use GeneratorHelper resume lowering; script-scope yield still blocked (#3115).
