@@ -24,4 +24,9 @@ class Module extends ModuleAbstract
             $runtime->vmContext->defineConstant($name, $var);
         }
     }
+
+    public function jitInit(\PHPCompiler\JIT\Context $context): void
+    {
+        $context->extensionLowering->random = new JitRandomExtensionHooksFacade();
+    }
 }

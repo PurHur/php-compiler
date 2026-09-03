@@ -193,6 +193,42 @@ final class JitPhpExtensionLoweringHooksTest extends TestCase
         }
     }
 
+    public function testRandomCallProxiesDoNotImportRandomExtension(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $module = (string) file_get_contents($root.'/ext/random/Module.php');
+        $this->assertStringContainsString(
+            'random = new JitRandomExtensionHooksFacade()',
+            $module,
+            'ext/random Module::jitInit must register JitRandomExtensionHooksFacade'
+        );
+        $this->assertStringContainsString(
+            'requireRandom',
+            (string) file_get_contents($root.'/lib/JIT/ExtensionLoweringHooks.php'),
+            'ExtensionLoweringHooks must expose requireRandom()'
+        );
+        $files = [
+            'lib/JIT/Call/RandomizerConstruct.php',
+            'lib/JIT/Call/RandomizerGetBytesFromString.php',
+            'lib/JIT/Call/RandomizerMt19937Construct.php',
+        ];
+        foreach ($files as $rel) {
+            $src = (string) file_get_contents($root.'/'.$rel);
+            $stripped = (string) preg_replace('~/\*.*?\*/~s', '', $src);
+            $stripped = (string) preg_replace('~//.*$~m', '', $stripped);
+            $this->assertDoesNotMatchRegularExpression(
+                '/PHPCompiler\\\\ext\\\\random\\\\/',
+                $stripped,
+                $rel.' still imports ext\\random — use RandomExtensionHooks'
+            );
+            $this->assertStringContainsString(
+                'requireRandom()',
+                $src,
+                $rel.' must dispatch via requireRandom()'
+            );
+        }
+    }
+
     /**
      * @dataProvider coreJitHelperFilesWithoutNonStandardExtImports
      */
