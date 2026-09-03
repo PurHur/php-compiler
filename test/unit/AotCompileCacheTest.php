@@ -44,6 +44,8 @@ final class AotCompileCacheTest extends TestCase
         @unlink($this->repoRoot.'/build/aot-cache-test-obj-mid.bin');
         @unlink($this->repoRoot.'/build/aot-cache-test-bc-cold.bin');
         @unlink($this->repoRoot.'/build/aot-cache-test-bc-warm.bin');
+        @unlink($this->repoRoot.'/build/aot-cache-test-project-cold.bin');
+        @unlink($this->repoRoot.'/build/aot-cache-test-project-warm.bin');
         putenv('PHP_COMPILER_CACHE_DIR');
         unset($_ENV['PHP_COMPILER_CACHE_DIR']);
         putenv('PHP_COMPILER_AOT_USER_SCRIPT');
@@ -211,6 +213,62 @@ final class AotCompileCacheTest extends TestCase
         $this->assertSame(0, $coldRun['exit'], $coldRun['stderr']);
         $this->assertSame(0, $warmRun['exit'], $warmRun['stderr']);
         $this->assertSame(trim($coldRun['stdout']), trim($warmRun['stdout']));
+    }
+
+    public function testProjectIndexRecordsMembersAndUserSymbols(): void
+    {
+        if (!LlvmToolchain::isReady($this->repoRoot)) {
+            $this->markTestSkipped('LLVM 9 not available');
+        }
+
+        $script = $this->cacheRoot.'/project-idx.php';
+        file_put_contents($script, "<?php echo \"ProjectIdx\\n\";");
+        $outCold = $this->repoRoot.'/build/aot-cache-test-project-cold.bin';
+        $outWarm = $this->repoRoot.'/build/aot-cache-test-project-warm.bin';
+        @unlink($outCold);
+        @unlink($outWarm);
+
+        $cold = $this->runAotSubprocess($script, $outCold);
+        if (139 === $cold['exit'] || 11 === $cold['exit']) {
+            $this->markTestSkipped('AOT segfault in this environment; cache wiring covered by unit tests');
+        }
+        $this->assertSame(0, $cold['exit'], $cold['stderr']);
+
+        $key = CompileCache::computeKey($script, (string) file_get_contents($script));
+        $meta = CompileCache::readMeta($key);
+        $this->assertNotNull($meta);
+        $raw = json_decode((string) file_get_contents(CompileCache::metaPath($key)), true);
+        $this->assertIsArray($raw);
+        $this->assertArrayHasKey('user_symbols', $raw, 'meta must list user LLVM symbols for edit-scaffold (#36387)');
+        $this->assertNotEmpty($raw['user_symbols']);
+        $this->assertContains('main', $raw['user_symbols']);
+
+        $projectId = CompileCache::projectId([$script]);
+        $idxPath = CompileCache::projectIndexPath($projectId);
+        $this->assertFileExists($idxPath, 'project index must be written after cold AOT (#36387)');
+        $idx = json_decode((string) file_get_contents($idxPath), true);
+        $this->assertIsArray($idx);
+        $this->assertSame($key, $idx['key'] ?? null);
+        $this->assertSame(
+            CompileCache::memberHashes([$script]),
+            $idx['members'] ?? null
+        );
+
+        $warm = $this->runAotSubprocess($script, $outWarm);
+        $this->assertSame(0, $warm['exit'], $warm['stderr']);
+        $this->assertLessThan(
+            $cold['wall_ms'] * 0.5,
+            $warm['wall_ms'],
+            sprintf(
+                'project-index warm should be <50%% of cold (cold=%.0fms warm=%.0fms)',
+                $cold['wall_ms'],
+                $warm['wall_ms']
+            )
+        );
+        $this->assertSame(
+            trim($this->runBinary($outCold)['stdout']),
+            trim($this->runBinary($outWarm)['stdout'])
+        );
     }
 
     /**

@@ -1107,6 +1107,47 @@ class Context {
         $this->initShutdownBlocksReady = true;
     }
 
+    /**
+     * After edit-scaffold bitcode restore, strip sealed terminators so re-lower can
+     * emit new string/array consts into __init__ (#36387).
+     */
+    public function reopenInitLinearForEditScaffold(): void
+    {
+        $this->rebindInitShutdownAfterModuleReplace();
+        foreach ([$this->initLinearBlock, $this->initBlock, $this->shutdownBlock, $this->headerPreFlushBlock] as $block) {
+            if (!$block instanceof PHPLLVM\BasicBlock) {
+                continue;
+            }
+            $term = $block->getTerminator();
+            if (null !== $term && method_exists($term, 'eraseFromParent')) {
+                $term->eraseFromParent();
+            }
+        }
+        // Prefer the last basic block of __init__ as the open linear tail (original
+        // main block may have branched away before the sealed return).
+        if ($this->initFunc instanceof PHPLLVM\Value\Function_) {
+            $blocks = $this->initFunc->getBasicBlocks();
+            if ([] !== $blocks) {
+                $tail = $blocks[count($blocks) - 1];
+                $term = $tail->getTerminator();
+                if (null !== $term && method_exists($term, 'eraseFromParent')) {
+                    $term->eraseFromParent();
+                }
+                $this->initLinearBlock = $tail;
+            }
+        }
+    }
+
+    /** Clear const caches so edit re-lower does not reuse disposed module Values (#36387). */
+    public function resetCompileTimeConstantMapsForEditScaffold(): void
+    {
+        $this->stringConstantMap = [];
+        $this->arrayConstantMap = [];
+        $this->objectConstantMap = [];
+        $this->boolValues = [];
+        $this->constants = [];
+    }
+
     private function firstBasicBlock(PHPLLVM\Value\Function_ $func): ?PHPLLVM\BasicBlock
     {
         foreach ($func->getBasicBlocks() as $block) {

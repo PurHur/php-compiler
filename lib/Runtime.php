@@ -1026,7 +1026,9 @@ class Runtime {
 
         $needsPregPrelink = Block::containsPregPrelinkBuiltinCalls($block);
         \PHPCompiler\AOT\BuildTiming::mark('codegen');
+        \PHPCompiler\AOT\BuildTiming::mark('load_jit_context');
         $context = $this->loadJitContext();
+        \PHPCompiler\AOT\BuildTiming::end('load_jit_context');
         if (null !== $sourceFilename && '' !== $sourceFilename) {
             $context->setAotSourceFilename($sourceFilename);
         }
@@ -1071,7 +1073,9 @@ class Runtime {
             if ($this->jitLoadedFromDiskCache) {
                 $this->jitLoadedFromDiskCache = false;
             }
+            \PHPCompiler\AOT\BuildTiming::mark('lower_user');
             $context->setMain($this->loadJit()->compile($block));
+            \PHPCompiler\AOT\BuildTiming::end('lower_user');
         }
         \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_compile_done');
 
