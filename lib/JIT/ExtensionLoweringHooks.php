@@ -7,6 +7,99 @@ namespace PHPCompiler\JIT;
 use PHPLLVM\Value;
 
 /**
+ * DOM compile-time metadata + method-kernel routing owned by ext/dom (#36204).
+ *
+ * Implemented in {@code ext/dom/JitDomCompileTimeFacade.php}; {@see JIT} must not
+ * import {@code ext\dom} for these stamps.
+ */
+interface DomCompileTimeHooks
+{
+    public function lastLoadWasPureUserScript(): bool;
+
+    public function lastFetchedTagName(): ?string;
+
+    public function lastMaterializedImportTagName(): ?string;
+
+    public function lastMaterializedTextData(): ?string;
+
+    /** @return array<string, string>|null */
+    public function compileTimeAttributesFor(Variable $src, string $tag): ?array;
+
+    public function isDocumentFragmentTag(?string $tag): bool;
+
+    public function nextCreateElementId(string $tag): int;
+
+    /** @return array<string, mixed>|null */
+    public function lastGetElementByIdHit(): ?array;
+
+    public function lastCompileTimeParsedHtml(): ?string;
+
+    /** @return array<string, mixed>|null */
+    public function parseIdElementArgv(string $html, string $idLit): ?array;
+
+    public function lastDocumentClass(): ?string;
+
+    public function recoveredChildTagName(): ?string;
+
+    public function recoveredChildIndex(): ?int;
+
+    public function lastNodeListItemChildIndex(): ?int;
+
+    public function lastNodeListItemTagName(): ?string;
+
+    /** @return array<string, string> */
+    public function createElementAttrsGet(int $id): array;
+
+    /** @param array<string, string> $attrMap */
+    public function formatCreateElementAttrSuffix(array $attrMap): string;
+
+    public function documentTypeTagKind(): string;
+
+    public function lastCompileTimeXml(): ?string;
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function directChildNodesArgv(string $xml): array;
+
+    /**
+     * @return list<array{qname: string, value: string}>
+     */
+    public function attributesFromOpenTagArgv(string $open): array;
+
+    public function lastCloneResultTagName(): ?string;
+
+    public function lastCloneResultInnerXml(): ?string;
+
+    public function lastCreateCommentData(): ?string;
+
+    public function lastCreateCdataData(): ?string;
+
+    public function lastCreatePiTarget(): ?string;
+
+    public function lastCreatePiData(): ?string;
+
+    public function processingInstructionTagKind(): string;
+
+    public function lastCreateDocumentFragmentMaterialized(): bool;
+
+    public function documentFragmentTagKind(): string;
+
+    public function lastSplitTextResultData(): ?string;
+
+    public function shouldUseDocumentMethodKernel(Context $context): bool;
+
+    public function tryRouteExcessArgcNonObjectReceiver(
+        Context $context,
+        string $methodLc,
+        Variable $receiverVar,
+        Scope $scope
+    ): bool;
+
+    public function compileTimeAttrValuePublic(string $ns, string $local): ?string;
+}
+
+/**
  * Module-registered user-script AOT lowering hooks (#36204).
  *
  * {@see \PHPCompiler\JIT} must not import {@code ext\simplexml} / {@code ext\dom} /
@@ -61,6 +154,9 @@ final class ExtensionLoweringHooks
 
     /** @var (callable(Context, Variable): mixed)|null */
     public $initXmlWriterHook = null;
+
+    /** DOM compile-time stamps — registered from ext/dom Module::jitInit (#36204). */
+    public ?DomCompileTimeHooks $domCompileTime = null;
 
     public function tryPrepareDimWrite(Context $context, Variable $container, Variable $dim): ?Variable
     {
@@ -174,5 +270,26 @@ final class ExtensionLoweringHooks
         return null !== $this->initXmlWriterHook
             ? ($this->initXmlWriterHook)($context, $receiver)
             : null;
+    }
+
+    public function shouldUseDomDocumentMethodKernel(Context $context): bool
+    {
+        return null !== $this->domCompileTime
+            && $this->domCompileTime->shouldUseDocumentMethodKernel($context);
+    }
+
+    public function tryRouteDomExcessArgcNonObjectReceiver(
+        Context $context,
+        string $methodLc,
+        Variable $receiverVar,
+        Scope $scope
+    ): bool {
+        return null !== $this->domCompileTime
+            && $this->domCompileTime->tryRouteExcessArgcNonObjectReceiver(
+                $context,
+                $methodLc,
+                $receiverVar,
+                $scope
+            );
     }
 }
