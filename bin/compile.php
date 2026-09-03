@@ -500,8 +500,23 @@ function run(string $filename, string $code, array $options): void
     \PHPCompiler\AOT\BuildTiming::end('boot_setup');
     \PHPCompiler\AOT\BuildTiming::mark('boot_bundle');
     if ([] === $includes && '-' !== $filename && is_file($filename) && !$skipBundle) {
-        $runtime = new Runtime(Runtime::MODE_AOT);
-        $includes = LiteralIncludeDiscovery::discoverDirectAbsolutePaths($runtime, $filename);
+        // Skip ~200ms Runtime construct when a prior build recorded members for this
+        // entry and the entry bytes are unchanged (config/lib edits) (#36387).
+        $cachedMembers = \PHPCompiler\JIT\CompileCache::isEnabled()
+            ? \PHPCompiler\JIT\CompileCache::lookupEntryMembers($filename)
+            : null;
+        if (null !== $cachedMembers) {
+            $entryResolved = realpath($filename) ?: $filename;
+            foreach ($cachedMembers as $member) {
+                if ($member !== $entryResolved) {
+                    $includes[] = $member;
+                }
+            }
+            \PHPCompiler\AOT\BuildTiming::note('entry_members_cache_hit', 1.0);
+        } else {
+            $runtime = new Runtime(Runtime::MODE_AOT);
+            $includes = LiteralIncludeDiscovery::discoverDirectAbsolutePaths($runtime, $filename);
+        }
     }
     if ([] !== $includes || ('-' !== $filename && is_file($filename))) {
         $includes = \PHPCompiler\AOT\ComposerVendorMap::expandIncludesForAutoload($filename, $includes);

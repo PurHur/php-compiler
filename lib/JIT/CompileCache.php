@@ -67,6 +67,13 @@ final class CompileCache
      */
     private static array $keptUserSymbols = [];
 
+    /**
+     * User LLVM names renamed to `*.stale` during edit-scaffold strip (#36387).
+     *
+     * @var list<string>
+     */
+    private static array $strippedUserSymbols = [];
+
     public static function isEnabled(): bool
     {
         $flag = Config::getenv('PHP_COMPILER_CACHE');
@@ -842,7 +849,12 @@ final class CompileCache
         $toStrip = self::userSymbolsToStripForEdit($userSymbols, $byMember);
         $partial = self::wouldPartialStrip($userSymbols, $byMember);
         self::stripUserSymbolsFromModule($context, $toStrip);
-        self::rebindHelperSymbols($context, $helperSymbols);
+        // Prefer full logical→LLVM map saved at cold emit; fall back to NestedJIT helpers (#36387).
+        $functionSymbols = $meta['function_llvm_symbols'] ?? null;
+        if (!is_array($functionSymbols) || [] === $functionSymbols) {
+            $functionSymbols = $helperSymbols;
+        }
+        self::rebindHelperSymbols($context, $functionSymbols);
         $link = self::readLinkManifest($previousKey);
         if (null !== $link) {
             \PHPCompiler\AOT\HelperRuntimeCache::adoptUnitSlugsForLink($link['helper_slugs']);
@@ -950,14 +962,10 @@ final class CompileCache
             $mustStripMember[self::$projectEntry] = true;
         }
 
-        // Require every changed member to appear in byMember (honest attribution).
-        // Entry-only edits often attribute only `main`, which is never keepable (#36387).
-        foreach (self::$editChangedMembers as $member) {
-            if (!isset($byMember[$member]) || !is_array($byMember[$member])) {
-                return [];
-            }
-        }
-
+        // Changed members missing from byMember (e.g. config.php with only assignments)
+        // own no LLVM symbols — that must not abort keep-path for unchanged Router.php
+        // (#36387 MiniWebApp one-file edit). Only require attribution when we need to
+        // know which symbols the changed file owned; absence ⇒ empty strip set for it.
         $kept = [];
         foreach ($byMember as $member => $syms) {
             if (!is_string($member) || !is_array($syms)) {
@@ -996,56 +1004,58 @@ final class CompileCache
     /**
      * After re-lower, point CallInsts that still target `foo.stale` at the new `foo`
      * and delete the stale Function_ — enables keeping unchanged member bodies (#36387).
+     *
+     * Only probes symbols recorded at strip time — never walks the full restored
+     * module (thousands of builtin funcs via FFI; measured ~1.5s on MiniWebApp).
      */
     public static function rebaseStaleUserSymbols(Context $context): void
     {
-        $stale = [];
-        try {
-            $fn = $context->module->getFirstFunction();
-        } catch (\Throwable $e) {
+        if ([] === self::$strippedUserSymbols) {
             return;
         }
-        $guard = 0;
-        while ($fn instanceof \PHPLLVM\Value\Function_ && $guard < 100000) {
-            ++$guard;
-            $name = '';
-            try {
-                $name = (string) $fn->getName();
-            } catch (\Throwable $e) {
-                break;
+
+        $purged = 0;
+        foreach (self::$strippedUserSymbols as $orig) {
+            if (!is_string($orig) || '' === $orig) {
+                continue;
             }
-            if (str_ends_with($name, '.stale')) {
-                $orig = substr($name, 0, -strlen('.stale'));
-                if ('' !== $orig) {
-                    $stale[$orig] = $fn;
+            $staleFn = $context->module->getNamedFunction($orig.'.stale');
+            if (!$staleFn instanceof \PHPLLVM\Value\Function_) {
+                continue;
+            }
+            $fresh = $context->module->getNamedFunction($orig);
+            if ($fresh instanceof \PHPLLVM\Value\Function_ && $fresh !== $staleFn) {
+                try {
+                    $staleFn->replaceAllUsesWith($fresh);
+                } catch (\Throwable $e) {
+                    // Fall through to delete attempt.
                 }
             }
-            try {
-                $next = $fn->getNext();
-            } catch (\Throwable $e) {
-                $next = null;
+            if (self::tryDeleteFunction($staleFn)) {
+                ++$purged;
             }
-            if (!$next instanceof \PHPLLVM\Value\Function_) {
-                break;
-            }
-            $fn = $next;
         }
+        self::$strippedUserSymbols = [];
 
-        foreach ($stale as $orig => $staleFn) {
-            $fresh = $context->module->getNamedFunction($orig);
-            if (!$fresh instanceof \PHPLLVM\Value\Function_ || $fresh === $staleFn) {
-                continue;
-            }
+        if ($purged > 0) {
+            \PHPCompiler\AOT\BuildTiming::note('edit_scaffold_stale_purged', (float) $purged);
+        }
+    }
+
+    private static function tryDeleteFunction(\PHPLLVM\Value\Function_ $fn): bool
+    {
+        try {
+            $fn->delete();
+
+            return true;
+        } catch (\Throwable $e) {
             try {
-                $staleFn->replaceAllUsesWith($fresh);
-            } catch (\Throwable $e) {
-                continue;
+                $fn->setName((string) $fn->getName().'.dead');
+            } catch (\Throwable $e2) {
+                return false;
             }
-            try {
-                $staleFn->delete();
-            } catch (\Throwable $e) {
-                // Uses replaced; orphan .stale body is harmless if delete fails.
-            }
+
+            return false;
         }
     }
 
@@ -1063,6 +1073,7 @@ final class CompileCache
         // Always drop standalone main wrapper — recreated in compileToFile.
         $names['main'] = true;
 
+        self::$strippedUserSymbols = [];
         foreach (array_keys($names) as $name) {
             $fn = $context->module->getNamedFunction($name);
             if ($fn instanceof \PHPLLVM\Value\Function_) {
@@ -1071,6 +1082,7 @@ final class CompileCache
                     // (__init__ string-const stores, old main). Rename so re-lower can
                     // addFunction the original name without dangling IR (#36387).
                     $fn->setName($name.'.stale');
+                    self::$strippedUserSymbols[] = $name;
                 } catch (\Throwable $e) {
                     try {
                         $fn->delete();
@@ -1226,6 +1238,107 @@ final class CompileCache
     }
 
     /**
+     * Entry → member-path list so warm/edit boots skip Runtime include discovery (#36387).
+     */
+    public static function entryMembersPath(string $entryPath): string
+    {
+        $resolved = realpath($entryPath);
+        $key = hash('sha256', false !== $resolved ? $resolved : $entryPath);
+
+        return self::cacheRoot().'/projects/entry/'.$key.'.json';
+    }
+
+    /**
+     * @param list<string> $memberPaths
+     */
+    public static function rememberEntryMembers(string $entryPath, array $memberPaths): void
+    {
+        if ('' === $entryPath || [] === $memberPaths || !is_file($entryPath)) {
+            return;
+        }
+        $resolved = realpath($entryPath);
+        $entry = false !== $resolved ? $resolved : $entryPath;
+        $entryHash = hash_file('sha256', $entry);
+        if (!is_string($entryHash)) {
+            return;
+        }
+        $clean = [];
+        foreach ($memberPaths as $path) {
+            if (!is_string($path) || '' === $path) {
+                continue;
+            }
+            $r = realpath($path);
+            $clean[] = false !== $r ? $r : $path;
+        }
+        $clean = array_values(array_unique($clean));
+        if ([] === $clean) {
+            return;
+        }
+        $dir = self::cacheRoot().'/projects/entry';
+        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+            return;
+        }
+        $payload = json_encode([
+            'version' => 1,
+            'fingerprint' => self::fingerprint(),
+            'entry' => $entry,
+            'entry_hash' => $entryHash,
+            'members' => $clean,
+            'updated_at' => gmdate('c'),
+        ], JSON_PRETTY_PRINT);
+        if (false === $payload) {
+            return;
+        }
+        file_put_contents(self::entryMembersPath($entry), $payload."\n");
+    }
+
+    /**
+     * Prior member list for this entry when the entry bytes are unchanged (#36387).
+     *
+     * @return list<string>|null
+     */
+    public static function lookupEntryMembers(string $entryPath): ?array
+    {
+        if ('' === $entryPath || !is_file($entryPath)) {
+            return null;
+        }
+        $path = self::entryMembersPath($entryPath);
+        if (!is_file($path)) {
+            return null;
+        }
+        $raw = file_get_contents($path);
+        if (false === $raw) {
+            return null;
+        }
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded) || (int) ($decoded['version'] ?? 0) !== 1) {
+            return null;
+        }
+        if (($decoded['fingerprint'] ?? '') !== self::fingerprint()) {
+            return null;
+        }
+        $entryHash = hash_file('sha256', $entryPath);
+        if (!is_string($entryHash) || ($decoded['entry_hash'] ?? null) !== $entryHash) {
+            // Entry changed — may have gained/lost requires; force rediscovery.
+            return null;
+        }
+        $members = $decoded['members'] ?? null;
+        if (!is_array($members) || [] === $members) {
+            return null;
+        }
+        $out = [];
+        foreach ($members as $member) {
+            if (!is_string($member) || '' === $member || !is_file($member)) {
+                return null;
+            }
+            $r = realpath($member);
+            $out[] = false !== $r ? $r : $member;
+        }
+
+        return array_values(array_unique($out));
+    }
+
+    /**
      * @param array<string, string> $memberHashes
      */
     public static function rememberProject(string $projectId, string $key, array $memberHashes): void
@@ -1248,6 +1361,10 @@ final class CompileCache
             return;
         }
         file_put_contents(self::projectIndexPath($projectId), $payload."\n");
+        $entry = self::$projectEntry;
+        if (is_string($entry) && '' !== $entry) {
+            self::rememberEntryMembers($entry, array_keys($memberHashes));
+        }
     }
 
     /**
@@ -1395,6 +1512,14 @@ final class CompileCache
             }
             $userSymbols = array_values(array_unique(self::$recordingUserSymbols ?? []));
             $helperSymbols = self::$recordingHelperSymbols ?? [];
+            $functionLlvmSymbols = [];
+            if (null !== $context && is_array($context->functionLlvmSymbols)) {
+                foreach ($context->functionLlvmSymbols as $logical => $llvm) {
+                    if (is_string($logical) && is_string($llvm) && '' !== $logical && '' !== $llvm) {
+                        $functionLlvmSymbols[strtolower($logical)] = $llvm;
+                    }
+                }
+            }
             $payload = json_encode([
                 'version' => self::META_VERSION,
                 'fingerprint' => self::fingerprint(),
@@ -1402,6 +1527,9 @@ final class CompileCache
                 'user_symbols' => $userSymbols,
                 'user_symbols_by_member' => self::$recordingUserSymbolsByMember ?? [],
                 'helper_symbols' => $helperSymbols,
+                // Full builtin/user logical→LLVM map so edit-scaffold can rebuild
+                // Context::$functions without re-implement() (#36387).
+                'function_llvm_symbols' => $functionLlvmSymbols,
                 'aot_stamp' => true,
             ], JSON_PRETTY_PRINT);
             if (false !== $payload) {
@@ -1435,6 +1563,7 @@ final class CompileCache
         self::$bundledSource = null;
         self::$editChangedMembers = [];
         self::$keptUserSymbols = [];
+        self::$strippedUserSymbols = [];
         self::$skipModuleFuncCompile = false;
         self::$editScaffoldActive = false;
         self::$editScaffoldBitcodeBound = false;
