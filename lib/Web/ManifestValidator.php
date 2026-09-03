@@ -19,6 +19,7 @@ final class ManifestValidator
         'includes',
         'include_roots',
         'autoload',
+        'composer_closure',
     ];
 
     /**
@@ -90,6 +91,10 @@ final class ManifestValidator
             if (is_array($data['autoload'])) {
                 $errors = array_merge($errors, ProjectAutoload::validatePsr4PathsOnDisk($dir, $data['autoload']));
             }
+        }
+
+        if (isset($data['composer_closure'])) {
+            $errors = array_merge($errors, self::validateComposerClosure($data['composer_closure']));
         }
 
         return $errors;
@@ -200,6 +205,10 @@ final class ManifestValidator
             }
         }
 
+        if (isset($data['composer_closure'])) {
+            $errors = array_merge($errors, self::validateComposerClosure($data['composer_closure']));
+        }
+
         return $errors;
     }
 
@@ -288,13 +297,17 @@ final class ManifestValidator
 
         $errors = [];
         foreach (array_keys($autoload) as $key) {
-            if (!is_string($key) || !in_array($key, ['psr-4', 'composer'], true)) {
+            if (!is_string($key) || !in_array($key, ['psr-4', 'composer', 'closure'], true)) {
                 $errors[] = 'unknown key in autoload: '.(is_string($key) ? $key : '(invalid)');
             }
         }
 
         if (isset($autoload['composer']) && !is_bool($autoload['composer'])) {
             $errors[] = 'autoload.composer must be a boolean';
+        }
+
+        if (isset($autoload['closure'])) {
+            $errors = array_merge($errors, self::validateComposerClosure($autoload['closure'], 'autoload.closure'));
         }
 
         if (!isset($autoload['psr-4'])) {
@@ -318,5 +331,21 @@ final class ManifestValidator
         }
 
         return $errors;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function validateComposerClosure(mixed $value, string $label = 'composer_closure'): array
+    {
+        if (!is_string($value) || '' === $value) {
+            return [$label.' must be "reachable" or "all"'];
+        }
+        $mode = strtolower(trim($value));
+        if (!in_array($mode, ['reachable', 'all'], true)) {
+            return [$label.' must be "reachable" or "all"'];
+        }
+
+        return [];
     }
 }

@@ -76,6 +76,8 @@ final class ProjectGraph
         $psr4Map = ProjectAutoload::parsePsr4Map($root, $manifest);
 
         // Composer vendor maps (#36382): default on when vendor/composer exists.
+        // Seeds are classmap/files/include_roots; PSR-4 trees expand via AutoloadDiscovery
+        // unless composer_closure=all.
         $composer = ComposerVendorMap::load($root, $manifest);
         $errors = array_merge($errors, $composer['errors']);
         foreach ($composer['psr4'] as $prefix => $baseDirs) {

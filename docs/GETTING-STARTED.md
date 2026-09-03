@@ -99,7 +99,7 @@ Layout-edge AOT bisect polish ([#1750](https://github.com/PurHur/php-compiler/is
 
 ### 4a. Build a Composer project
 
-When `vendor/composer/` exists, `phpc build --project` reads Composer’s generated maps (`autoload_classmap.php`, `autoload_psr4.php`, `autoload_files.php`) and adds every mapped PHP file to the compile graph ([#36382](https://github.com/PurHur/php-compiler/issues/36382)). `vendor/autoload.php` is stubbed for AOT (the dynamic `include $file` loader is not executed); classes come from the map instead. PSR-4 prefixes that list **multiple** base directories (Composer’s `Psr\Http\Message\` → `http-factory` + `http-message`) keep every directory — the first path is not enough.
+When `vendor/composer/` exists, `phpc build --project` reads Composer’s generated maps (`autoload_classmap.php`, `autoload_psr4.php`, `autoload_files.php`) and seeds the compile graph from classmap + `files` autoload + `include_roots`, then expands **reachable** PSR-4 classes via static reference discovery ([#36382](https://github.com/PurHur/php-compiler/issues/36382)). Opt into compiling every PSR-4 path with `"composer_closure": "all"` (or `autoload.closure`) — that dumps whole vendor trees and OOMs Slim-sized apps on 8g hosts. `vendor/autoload.php` is stubbed for AOT (the dynamic `include $file` loader is not executed); classes come from the map + discovery instead. PSR-4 prefixes that list **multiple** base directories (Composer’s `Psr\Http\Message\` → `http-factory` + `http-message`) keep every directory — the first path is not enough.
 
 ```bash
 # Fixture: PSR-4 + classmap + files + include_roots

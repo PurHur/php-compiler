@@ -19,16 +19,18 @@ final class ComposerVendorMapTest extends TestCase
         $dir = dirname(__DIR__, 2).'/test/fixtures/aot/projects/composer_mini';
         $map = ComposerVendorMap::load($dir);
         $this->assertTrue($map['enabled']);
+        $this->assertSame(ComposerVendorMap::CLOSURE_REACHABLE, $map['closure']);
         $this->assertSame([], $map['errors'], implode("\n", $map['errors']));
         $this->assertArrayHasKey('LegacyGreeter', $map['classmap']);
         $this->assertArrayHasKey('Pkg\\', $map['psr4']);
         $this->assertIsArray($map['psr4']['Pkg\\']);
         $joined = implode("\n", $map['all_files']);
-        $this->assertStringContainsString('Hello.php', $joined);
+        // Reachable seeds: classmap + files + include_roots + autoload — not whole PSR-4 trees.
         $this->assertStringContainsString('LegacyGreeter.php', $joined);
         $this->assertStringContainsString('functions.php', $joined);
         $this->assertStringContainsString('Extra.php', $joined);
         $this->assertStringContainsString('vendor/autoload.php', $joined);
+        $this->assertStringNotContainsString('Hello.php', $joined);
     }
 
     public function testComposerPsr4KeepsAllBaseDirectories(): void
@@ -63,11 +65,12 @@ final class ComposerVendorMapTest extends TestCase
 
             $map = ComposerVendorMap::load($dir);
             $this->assertTrue($map['enabled']);
+            $this->assertSame(ComposerVendorMap::CLOSURE_REACHABLE, $map['closure']);
             $this->assertSame([], $map['errors'], implode("\n", $map['errors']));
             $this->assertSame([$a, $b], $map['psr4']['Dual\\']);
-            $joined = implode("\n", $map['all_files']);
-            $this->assertStringContainsString('FactoryOnly.php', $joined);
-            $this->assertStringContainsString('Message.php', $joined);
+            $seedJoined = implode("\n", $map['all_files']);
+            $this->assertStringNotContainsString('FactoryOnly.php', $seedJoined);
+            $this->assertStringNotContainsString('Message.php', $seedJoined);
 
             $path = ComposerVendorMap::resolveClassPath('Dual\\Message', $map['classmap'], $map['psr4']);
             $this->assertNotNull($path);
@@ -77,7 +80,23 @@ final class ComposerVendorMapTest extends TestCase
             $this->assertSame([], $graph['errors'], implode("\n", $graph['errors']));
             $graphJoined = implode("\n", $graph['files']);
             $this->assertStringContainsString('Message.php', $graphJoined);
-            $this->assertStringContainsString('FactoryOnly.php', $graphJoined);
+            // Unreferenced sibling under the same prefix stays out of the reachable compile graph.
+            $this->assertStringNotContainsString('FactoryOnly.php', $graphJoined);
+
+            file_put_contents(
+                $dir.'/phpc.json',
+                json_encode([
+                    'entry' => 'entry.php',
+                    'binary' => '.phpc/bin/app',
+                    'autoload' => 'composer',
+                    'composer_closure' => 'all',
+                ], JSON_THROW_ON_ERROR)
+            );
+            $allMap = ComposerVendorMap::load($dir);
+            $this->assertSame(ComposerVendorMap::CLOSURE_ALL, $allMap['closure']);
+            $allJoined = implode("\n", $allMap['all_files']);
+            $this->assertStringContainsString('FactoryOnly.php', $allJoined);
+            $this->assertStringContainsString('Message.php', $allJoined);
         } finally {
             $this->removeTree($dir);
         }
