@@ -44,6 +44,8 @@ Generated-doc drift that lands on `master` turns the fast gate red for every dow
 
 Merge gates are **local/Docker only** ([#394](https://github.com/PurHur/php-compiler/issues/394)); optional workflow mirrors live under [`.github/workflows-disabled/`](.github/workflows-disabled/). See the full matrix in [docs/local-ci-matrix.md](docs/local-ci-matrix.md).
 
+**When master is red** ([#36401](https://github.com/PurHur/php-compiler/issues/36401)): only land PRs labelled `ci-fix` (or equivalent inventory/patch/gate honesty fixes). Feature and IR work waits until `php script/bootstrap-inventory.php --check`, `./script/check-generated-docs.sh`, and `make north-star5-verify-fast` are green on `master`. Do not merge over a known-red inventory or patch-apply failure.
+
 #### Host PHP available
 
 From the repo root (after `composer install` and `script/apply-patches.sh`):
