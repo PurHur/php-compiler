@@ -722,6 +722,11 @@ final class Variable {
             return self::fromGeneratorFrameLocal($context, $name);
         }
         $type = self::getTypeFromType($op->type);
+        // php-types often leaves for-loop CVs as inferred:unknown → TYPE_VALUE; when the
+        // local is int-only (assign literal + ++/-- + compares), keep a native i64 (#36386).
+        if (self::TYPE_VALUE === $type && $context->analyzer->canStayNativeLong($op)) {
+            $type = self::TYPE_NATIVE_LONG;
+        }
         if ($type === self::TYPE_NULL) {
             // Match fromLiteral TYPE_NULL — keep isNullConstant so builtins can treat
             // SSA null temps like literal null (mb_trim $characters, #35199).
