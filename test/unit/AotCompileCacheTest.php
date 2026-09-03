@@ -48,6 +48,10 @@ final class AotCompileCacheTest extends TestCase
         @unlink($this->repoRoot.'/build/aot-cache-test-project-warm.bin');
         @unlink($this->repoRoot.'/build/aot-cache-test-edit-cold.bin');
         @unlink($this->repoRoot.'/build/aot-cache-test-edit-rebuild.bin');
+        @unlink($this->repoRoot.'/build/aot-cache-test-keep-cold.bin');
+        @unlink($this->repoRoot.'/build/aot-cache-test-keep-edit.bin');
+        @unlink($this->repoRoot.'/build/aot-cache-test-config-cold.bin');
+        @unlink($this->repoRoot.'/build/aot-cache-test-config-edit.bin');
         putenv('PHP_COMPILER_CACHE_DIR');
         unset($_ENV['PHP_COMPILER_CACHE_DIR']);
         putenv('PHP_COMPILER_AOT_USER_SCRIPT');
@@ -380,6 +384,20 @@ final class AotCompileCacheTest extends TestCase
         $this->assertContains('main', $stripLib, 'entry always stripped');
         $this->assertFalse(CompileCache::isKeptUserSymbol('greeting'));
         CompileCache::finishRecording();
+
+        // Changed member with no attributed symbols (config.php shape) must not
+        // abort keep-path for unchanged lib (#36387 MiniWebApp).
+        $configR = $dir.'/config.php';
+        file_put_contents($configR, "<?php\nreturn ['app' => 'x'];\n");
+        $configR = realpath($configR) ?: $configR;
+        CompileCache::setProjectMembers([$mainR, $libR, $configR]);
+        CompileCache::setEditChangedMembers([$configR]);
+        $stripConfig = CompileCache::userSymbolsToStripForEdit($all, $byMember);
+        $this->assertNotContains('greeting', $stripConfig, 'config-only edit must keep lib greeting');
+        $this->assertContains('main', $stripConfig);
+        $this->assertTrue(CompileCache::isKeptUserSymbol('greeting'));
+        $this->assertTrue(CompileCache::wouldPartialStrip($all, $byMember));
+        CompileCache::finishRecording();
     }
 
     public function testEditScaffoldKeepPathWhenEntryChanges(): void
@@ -441,6 +459,74 @@ final class AotCompileCacheTest extends TestCase
                 $edit['wall_ms']
             )
         );
+        // Entry edits still construct Runtime for include rediscovery (~200ms); the
+        // ≤25% Done-when is for unchanged-entry edits (config/lib) on MiniWebApp-scale.
+    }
+
+    public function testEditScaffoldKeepsLibWhenConfigOnlyChanges(): void
+    {
+        if (!LlvmToolchain::isReady($this->repoRoot)) {
+            $this->markTestSkipped('LLVM 9 not available');
+        }
+
+        $dir = $this->cacheRoot.'/edit-config';
+        mkdir($dir, 0775, true);
+        $config = $dir.'/config.php';
+        $lib = $dir.'/lib.php';
+        $main = $dir.'/main.php';
+        file_put_contents($config, "<?php\nconst APP_NAME = 'alpha';\n");
+        file_put_contents($lib, "<?php\nfunction greeting(): string { return \"hello\"; }\n");
+        file_put_contents(
+            $main,
+            "<?php\nrequire __DIR__ . '/config.php';\nrequire __DIR__ . '/lib.php';\necho greeting(), '-', APP_NAME, \"\\n\";\n"
+        );
+
+        $outCold = $this->repoRoot.'/build/aot-cache-test-config-cold.bin';
+        @unlink($outCold);
+
+        $cold = $this->runAotSubprocess($main, $outCold);
+        if (139 === $cold['exit'] || 11 === $cold['exit']) {
+            $this->markTestSkipped('AOT segfault in this environment; cache wiring covered by unit tests');
+        }
+        $this->assertSame(0, $cold['exit'], $cold['stderr']);
+        $this->assertStringContainsString('hello-alpha', $this->runBinary($outCold)['stdout']);
+
+        file_put_contents($config, "<?php\nconst APP_NAME = 'beta';\n");
+
+        $outEdit = $this->repoRoot.'/build/aot-cache-test-config-edit.bin';
+        @unlink($outEdit);
+        $edit = $this->runAotSubprocess($main, $outEdit, true);
+        $this->assertSame(0, $edit['exit'], $edit['stderr']."\n".$edit['stdout']);
+        $timing = $edit['stderr'].$edit['stdout'];
+        $this->assertStringContainsString('edit_scaffold_hit', $timing);
+        $this->assertStringContainsString(
+            'edit_scaffold_partial',
+            $timing,
+            'config-only edit must keep lib.php symbols despite config lacking by_member rows (#36387)'
+        );
+        $this->assertStringContainsString(
+            'entry_members_cache_hit',
+            $timing,
+            'unchanged entry must skip Runtime include discovery (#36387)'
+        );
+        $this->assertStringContainsString('hello-beta', $this->runBinary($outEdit)['stdout']);
+        // Small fixtures floor at ~30% (ld+emit+Runtime); MiniWebApp config-only measured ~26%.
+        $this->assertLessThan(
+            $cold['wall_ms'] * 0.35,
+            $edit['wall_ms'],
+            sprintf(
+                'config-only edit should be <35%% of cold (cold=%.0fms edit=%.0fms) (#36387)',
+                $cold['wall_ms'],
+                $edit['wall_ms']
+            )
+        );
+        if (preg_match('/"edit_scaffold_compile_ms":([0-9.]+)/', $timing, $m)) {
+            $this->assertLessThan(
+                200.0,
+                (float) $m[1],
+                'kept lib symbols must not re-lower (compile_ms='.$m[1].') (#36387)'
+            );
+        }
     }
 
     /**

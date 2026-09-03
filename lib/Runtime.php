@@ -1062,8 +1062,13 @@ class Runtime {
                 );
                 JIT\CompileCache::beginRecording($this->jitCompileCacheKey);
                 \PHPCompiler\AOT\BuildTiming::mark('lower_user');
+                $tCompile0 = hrtime(true);
                 $context->setMain($this->loadJit()->compile($block));
+                $tCompile1 = hrtime(true);
                 JIT\CompileCache::rebaseStaleUserSymbols($context);
+                $tRebase1 = hrtime(true);
+                \PHPCompiler\AOT\BuildTiming::note('edit_scaffold_compile_ms', ($tCompile1 - $tCompile0) / 1e6);
+                \PHPCompiler\AOT\BuildTiming::note('edit_scaffold_rebase_ms', ($tRebase1 - $tCompile1) / 1e6);
                 \PHPCompiler\AOT\BuildTiming::end('lower_user');
                 \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_compile_done');
                 \PHPCompiler\AOT\BuildTiming::end('codegen');
