@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 require_once __DIR__.'/../LlvmToolchain.php';
 
 /**
- * AOT: DOMXPath::query() NodeList length must stay fixed after DOM mutations (#36065).
+ * AOT: DOMXPath::query() NodeList length must stay fixed after DOM mutations (#36065 / #36067).
  *
  * php-src: ext/dom/nodelist.c — XPath node-sets are snapshots, not live collections.
  *
@@ -30,7 +30,7 @@ final class DomXPathNodeListSnapshotLengthAotTest extends TestCase
         exec(escapeshellarg(PHP_BINARY).' '.escapeshellarg($src).' 2>&1', $zend, $zRc);
         $this->assertSame(0, $zRc, implode("\n", $zend));
         $expected = implode("\n", $zend)."\n";
-        $compile = 'PHP_COMPILER_HELPER_RUNTIME_O=0 '.escapeshellarg(PHP_BINARY).' '
+        $compile = escapeshellarg(PHP_BINARY).' '
             .escapeshellarg($root.'/bin/compile.php')
             .' -o '.escapeshellarg($bin).' '.escapeshellarg($src).' 2>&1';
         exec($compile, $compileOut, $compileRc);

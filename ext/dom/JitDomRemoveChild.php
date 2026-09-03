@@ -72,6 +72,10 @@ final class JitDomRemoveChild
             self::syncUserScriptInnerXmlAfterRemove($context, $args[0], $args[1]);
             // #33659 bumped live tag pending/count on append; remove must undo (#33679).
             DomUserScriptLiveTagListLlvm::decrementForChildArg($context, $args[1]);
+            // Later XPath NodeList::item() sites must rematerialize snapshots — live
+            // walks after unlink SIGSEGV on //* and shrink held lists (#36067 / php-src
+            // ext/dom/nodelist.c XPath node-sets are fixed at query time).
+            JitDomLoadXMLUserScript::markTreeMutatedSinceLoad();
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_remove_child_post');
 
             return self::boxObjectResult($context, $child);

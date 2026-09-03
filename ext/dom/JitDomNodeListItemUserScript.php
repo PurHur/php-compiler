@@ -147,6 +147,20 @@ final class JitDomNodeListItemUserScript
                 }
                 if (null !== $indexVal) {
                     $snapXml = JitDomXPathQueryUserScript::snapshotXmlForAxisId(0);
+                    $compileTime = self::materializeDynamicIndexQueryMatch(
+                        $context,
+                        $snapXml ?? $xml,
+                        $queryTag,
+                        $arg
+                    );
+                    // After removeChild/etc., do not emit a live walk: itemAt always
+                    // runs before select and SIGSEGVs on //* / unlinked trees (#36067).
+                    if (
+                        JitDomLoadXMLUserScript::treeMutatedSinceLoad()
+                        && null !== $snapXml
+                    ) {
+                        return $compileTime;
+                    }
                     $pinned = DomUserScriptPinnedRootLlvm::load($context);
                     $live = JitDomLiveElementsByTagWalk::itemAt(
                         $context,
@@ -154,12 +168,6 @@ final class JitDomNodeListItemUserScript
                         $queryTag,
                         $indexVal,
                         false
-                    );
-                    $compileTime = self::materializeDynamicIndexQueryMatch(
-                        $context,
-                        $snapXml ?? $xml,
-                        $queryTag,
-                        $arg
                     );
                     $objPtrTy = $context->getTypeFromString('__object__*');
                     $pinNull = $context->builder->icmp(
@@ -241,9 +249,23 @@ final class JitDomNodeListItemUserScript
 
         // XPath //tag lists: prefer live pinned-root walk so item() keeps
         // ownerDocument for setIdAttribute (#35447). After DOM mutations,
-        // snapshot NodeLists rematerialize from query-time XML (#36065).
+        // snapshot NodeLists rematerialize from query-time XML (#36065 / #36067).
         if (null !== $xml && null !== $queryTag && '' !== $queryTag) {
             $snapXml = JitDomXPathQueryUserScript::snapshotXmlForAxisId(0);
+            $compileTime = self::materializeNthQueryMatch(
+                $context,
+                $snapXml ?? $xml,
+                $queryTag,
+                $index
+            );
+            // Live walk IR always runs before select — skip it once the unit has
+            // seen removeChild/etc. so held XPath lists stay snapshot-safe (#36067).
+            if (
+                JitDomLoadXMLUserScript::treeMutatedSinceLoad()
+                && null !== $snapXml
+            ) {
+                return $compileTime;
+            }
             $pinned = DomUserScriptPinnedRootLlvm::load($context);
             $i64 = $context->getTypeFromString('int64');
             $live = JitDomLiveElementsByTagWalk::itemAt(
@@ -252,12 +274,6 @@ final class JitDomNodeListItemUserScript
                 $queryTag,
                 $i64->constInt($index, false),
                 false
-            );
-            $compileTime = self::materializeNthQueryMatch(
-                $context,
-                $snapXml ?? $xml,
-                $queryTag,
-                $index
             );
             $objPtrTy = $context->getTypeFromString('__object__*');
             $pinNull = $context->builder->icmp(
@@ -591,19 +607,22 @@ final class JitDomNodeListItemUserScript
     }
 
     /**
-     * XPath snapshot lists rematerialize only when query-time XML differs from the
-     * current compile-time tree (#36065). On an unchanged tree, live-walk item()
-     * so setIdAttribute keeps ownerDocument and DomRegistry (#35447).
+     * XPath snapshot lists rematerialize after the unit has seen a DOM mutation
+     * (#36065 / #36067). On an unchanged tree, live-walk item() so setIdAttribute
+     * keeps ownerDocument and DomRegistry (#35447).
+     *
+     * Do not use compile-time XML equality as a "tree unchanged" proxy — removeChild
+     * does not rewrite the loadXML literal, so that check always preferred live and
+     * made held //* lists SIGSEGV / shrink after unlink (php-src nodelist.c).
      */
     private static function selectXPathSnapshotOrLiveItem(
         Context $context,
         JITVariable $listVar,
         Value $compileTime,
         Value $liveOrRemat,
-        ?string $snapXml
+        ?string $_snapXml
     ): Value {
-        $currentXml = JitDomLoadXMLUserScript::lastCompileTimeXml();
-        if (null !== $snapXml && null !== $currentXml && $snapXml === $currentXml) {
+        if (!JitDomLoadXMLUserScript::treeMutatedSinceLoad()) {
             return $liveOrRemat;
         }
         $isSnapshot = self::receiverHasXPathSnapshot($context, $listVar);
