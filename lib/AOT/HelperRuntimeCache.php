@@ -571,7 +571,7 @@ final class HelperRuntimeCache
             // the committed manifest's llvm_identity_token so --strict checks
             // pass on hosts without LLVM (#24302).
             $root = \dirname(__DIR__, 2);
-            $archDir = $root.'/prelinked/helper-runtime/'.php_uname('m').'-'.strtolower(php_uname('s'));
+            $archDir = CompileTarget::current()->helperRuntimeArchDir($root);
             $mfPath = $archDir.'/manifest.json';
             if (is_file($mfPath)) {
                 $mf = json_decode((string) file_get_contents($mfPath), true);
@@ -607,7 +607,7 @@ final class HelperRuntimeCache
         // When the LLVM identity matches the committed manifest, accept the
         // manifest's core_fingerprint as equivalent — the compiled objects are
         // identical when only non-LLVM patches changed (#32599).
-        $archDir = $root.'/prelinked/helper-runtime/'.php_uname('m').'-'.strtolower(php_uname('s'));
+        $archDir = CompileTarget::current()->helperRuntimeArchDir($root);
         $mfPath = $archDir.'/manifest.json';
         if (is_file($mfPath)) {
             $mf = json_decode((string) file_get_contents($mfPath), true);
@@ -699,16 +699,16 @@ final class HelperRuntimeCache
         return implode("\n", $parts);
     }
 
-    /** Architecture key for shareable prelinked unit objects, e.g. "x86_64-linux". */
+    /** Architecture key for shareable prelinked unit objects, e.g. "x86_64-linux" (#36391). */
     public static function archKey(): string
     {
-        return php_uname('m').'-'.strtolower(php_uname('s'));
+        return CompileTarget::current()->id();
     }
 
     /** Committed per-arch unit cache: prelinked/helper-runtime/<arch>/units. */
     public static function prelinkedUnitsDir(): string
     {
-        return \dirname(__DIR__, 2).'/prelinked/helper-runtime/'.self::archKey().'/units';
+        return CompileTarget::current()->helperRuntimeArchDir(\dirname(__DIR__, 2)).'/units';
     }
 
     /**

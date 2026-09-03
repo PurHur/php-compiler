@@ -294,6 +294,7 @@ final class Config
             'PHP_COMPILER_OPT_LEVEL' => $int(self::SCOPE_COMPILE, 'LLVM optimization level (0–3)', null, '#36213'),
             'PHP_COMPILER_OPT_SIZE_LEVEL' => $int(self::SCOPE_COMPILE, 'LLVM size optimization level', null, null),
             'PHP_COMPILER_HELPER_RUNTIME_O' => $str(self::SCOPE_COMPILE, 'Path to helper-runtime object / cache override', null, null),
+            'PHP_COMPILER_TARGET' => $str(self::SCOPE_COMPILE, 'AOT/helper-cache target: x86_64-linux|aarch64-linux|aarch64-darwin', null, '#36391'),
             'PHP_COMPILER_CACHE' => $bool(self::SCOPE_COMPILE, 'Enable compile cache when 1', null, null),
             'PHP_COMPILER_CACHE_DIR' => $str(self::SCOPE_COMPILE, 'Compile cache directory', null, null),
             'PHP_COMPILER_SPINE_CHUNK' => $str(self::SCOPE_COMPILE, 'Split-TU spine chunk selector', null, '#36147'),

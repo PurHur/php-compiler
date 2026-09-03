@@ -1406,6 +1406,7 @@ final class Doctor
         $checks[] = self::checkCriticalVendorLanguagePatches($repoRoot);
         $checks[] = self::checkPhpParserHostCompatibility($repoRoot);
         $checks[] = self::checkLlvm($repoRoot);
+        $checks[] = self::checkCompileTarget($repoRoot);
         $checks[] = self::checkJitCompliance($repoRoot);
         $checks[] = self::checkLoopback($repoRoot);
         $checks[] = self::checkDockerImage();
@@ -1653,6 +1654,47 @@ final class Doctor
             'required' => true,
             'detail' => 'libLLVM-9.so.1: yes at '.$info['dir'].' (from '.$info['source'].')',
             'hint' => '',
+        ];
+    }
+
+    /**
+     * @return array{name: string, ok: bool, required: bool, detail: string, hint: string}
+     */
+    private static function checkCompileTarget(string $repoRoot): array
+    {
+        try {
+            $target = AOT\CompileTarget::current();
+        } catch (\Throwable $e) {
+            return [
+                'name' => 'Compile target',
+                'ok' => false,
+                'required' => true,
+                'detail' => $e->getMessage(),
+                'hint' => 'Set PHP_COMPILER_TARGET to x86_64-linux, aarch64-linux, or aarch64-darwin (#36391)',
+            ];
+        }
+        $helperDir = $target->helperRuntimeArchDir($repoRoot);
+        $units = is_dir($helperDir.'/units') ? count(glob($helperDir.'/units/*/unit.o') ?: []) : 0;
+        $native = $target->isHostNative() ? 'native' : 'cross (emit/link limited)';
+        $link = $target->canLinkOnThisHost() ? 'link=ok' : 'link=blocked';
+
+        return [
+            'name' => 'Compile target',
+            'ok' => true,
+            'required' => false,
+            'detail' => sprintf(
+                '%s triple=%s cpu=%s %s %s; helper-cache %s (%d unit.o)',
+                $target->id(),
+                $target->llvmTriple(),
+                $target->cpu(),
+                $native,
+                $link,
+                $helperDir,
+                $units
+            ),
+            'hint' => $target->canLinkOnThisHost()
+                ? ''
+                : 'AOT link for this target needs a matching host (#36391); helper-cache dir is still selected',
         ];
     }
 
