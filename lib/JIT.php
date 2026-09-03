@@ -12119,6 +12119,17 @@ class JIT {
                             ) {
                                 $scriptGlobalEchoName = null;
                                 $arg = $earlyBound;
+                            } elseif (
+                                // {main} int/bool/float counters stay on stack allocas (#36408).
+                                Variable::KIND_VARIABLE === $earlyBound->kind
+                                && (
+                                    Variable::TYPE_NATIVE_LONG === $earlyBound->type
+                                    || Variable::TYPE_NATIVE_BOOL === $earlyBound->type
+                                    || Variable::TYPE_NATIVE_DOUBLE === $earlyBound->type
+                                )
+                            ) {
+                                $scriptGlobalEchoName = null;
+                                $arg = $earlyBound;
                             }
                         }
                     }
@@ -20885,6 +20896,19 @@ class JIT {
         if (!$mainScriptGlobal && !$importedGlobal) {
             return false;
         }
+        // Native scalar {main} counters use stack allocas — do not re-bind them onto a
+        // heap __value__ box (that undoes Variable::fromOp / #36408).
+        $resolved = $this->context->resolveRefAliasName($name);
+        if (isset($this->context->namedVariableBindings[$resolved])) {
+            $existing = $this->context->namedVariableBindings[$resolved];
+            if (
+                Variable::TYPE_NATIVE_LONG === $existing->type
+                || Variable::TYPE_NATIVE_BOOL === $existing->type
+                || Variable::TYPE_NATIVE_DOUBLE === $existing->type
+            ) {
+                return false;
+            }
+        }
         $globalVar = $this->context->ensureScriptGlobal($name);
         $this->context->setVariableOp($resultOp, $globalVar);
         $globalPtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $globalVar);
@@ -21013,6 +21037,19 @@ class JIT {
         if ($block->isMainScript() && !$this->context->isForeachByRefLocalName($name, $block)) {
             if ($this->shouldDeferScriptGlobalForInlineIncludeBinding($name, $op, $block)) {
                 return null;
+            }
+            // Native scalar {main} counters live in stack allocas — do not redirect reads
+            // onto an empty heap box (#36408).
+            $resolved = $this->context->resolveRefAliasName($name);
+            if (isset($this->context->namedVariableBindings[$resolved])) {
+                $existing = $this->context->namedVariableBindings[$resolved];
+                if (
+                    Variable::TYPE_NATIVE_LONG === $existing->type
+                    || Variable::TYPE_NATIVE_BOOL === $existing->type
+                    || Variable::TYPE_NATIVE_DOUBLE === $existing->type
+                ) {
+                    return null;
+                }
             }
 
             return $this->ensureScriptGlobalForRuntimeRead($op, $name, $skipUndefGuard);

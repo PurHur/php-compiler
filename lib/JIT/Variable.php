@@ -702,6 +702,27 @@ final class Variable {
             );
         }
         $name = OperandName::resolve($op);
+        $canStayNativeLong = $context->analyzer->canStayNativeLong($op);
+        if (
+            !$canStayNativeLong
+            && null !== $name
+            && '' !== $name
+            && $block->isMainScript()
+        ) {
+            // Bare Variable operands have empty ops/usages; Temporaries hold the web (#36408).
+            foreach ($block->scopedOperands() as $other) {
+                if (!$other instanceof Operand || $other === $op) {
+                    continue;
+                }
+                if ($name !== OperandName::resolve($other)) {
+                    continue;
+                }
+                if ($context->analyzer->canStayNativeLong($other)) {
+                    $canStayNativeLong = true;
+                    break;
+                }
+            }
+        }
         if (
             null !== $name
             && '' !== $name
@@ -709,7 +730,9 @@ final class Variable {
             && !Superglobals::isSuperglobalName($name)
             && $block->isMainScript()
             && !$context->isForeachByRefLocalName($name, $block)
+            && !$canStayNativeLong
         ) {
+            // {main} non-counters stay on ensureScriptGlobal; int-only counters use i64 (#36408).
             return $context->ensureScriptGlobal($name);
         }
         // Generator resume: named CVs live in state->frame_slots so they survive
@@ -730,7 +753,11 @@ final class Variable {
         $type = self::getTypeFromType($op->type);
         // php-types often leaves for-loop CVs as inferred:unknown → TYPE_VALUE; when the
         // local is int-only (assign literal + ++/-- + compares), keep a native i64 (#36386).
-        if (self::TYPE_VALUE === $type && $context->analyzer->canStayNativeLong($op)) {
+        // Force NATIVE_LONG whenever canStayNativeLong — including inferred:int `$n` — so
+        // {main} `$i < $n` does not mix i64 with a heap box (#36408).
+        if ($canStayNativeLong) {
+            $type = self::TYPE_NATIVE_LONG;
+        } elseif (self::TYPE_VALUE === $type && $context->analyzer->canStayNativeLong($op)) {
             $type = self::TYPE_NATIVE_LONG;
         }
         if ($type === self::TYPE_NULL) {

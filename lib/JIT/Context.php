@@ -4697,16 +4697,48 @@ class Context {
         if (null !== $name && $block->isMainScript()) {
             // Inlined eval {main} without a bound caller $this must not become a script global (#31902 AOT).
             if ('this' !== $name && !$this->isForeachByRefLocalName($name, $block)) {
-                $global = $this->ensureScriptGlobal($name);
-                $this->scope->variables[$op] = $global;
-                $this->bindVariableByName($name, $global);
+                $resolved = $this->resolveRefAliasName($name);
+                if (isset($this->namedVariableBindings[$resolved])) {
+                    $this->scope->variables[$op] = $this->namedVariableBindings[$resolved];
 
-                return;
+                    return;
+                }
+                $stayNative = $this->analyzer->canStayNativeLong($op);
+                if (!$stayNative) {
+                    foreach ($block->scopedOperands() as $other) {
+                        if (!$other instanceof Operand || $other === $op) {
+                            continue;
+                        }
+                        if ($name !== OperandName::resolve($other)) {
+                            continue;
+                        }
+                        if ($this->analyzer->canStayNativeLong($other)) {
+                            $stayNative = true;
+                            break;
+                        }
+                    }
+                }
+                if (!$stayNative) {
+                    $global = $this->ensureScriptGlobal($name);
+                    $this->scope->variables[$op] = $global;
+                    $this->bindVariableByName($name, $global);
+
+                    return;
+                }
+                // Fall through to fromOp + shared bind — do not ensureScriptGlobal (#36408).
             }
         }
         $this->scope->variables[$op] = Variable::fromOp($this, $func, $basicBlock, $block, $op);
         $this->scope->variables[$op]->initialize();
         $this->recordScopeSlotObjectMirrorLlvm($block, $op, $this->scope->variables[$op]);
+        if (
+            null !== $name
+            && '' !== $name
+            && $block->isMainScript()
+            && Variable::TYPE_NATIVE_LONG === $this->scope->variables[$op]->type
+        ) {
+            $this->bindVariableByName($name, $this->scope->variables[$op]);
+        }
     }
 
     /**

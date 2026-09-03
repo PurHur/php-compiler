@@ -347,8 +347,10 @@ class Analyzer
                     if (!$this->isNativeLongAssignExpr($def->expr)) {
                         return false;
                     }
-                    $sawIntLiteralAssign = $sawIntLiteralAssign
-                        || ($def->expr instanceof Operand\Literal && $this->isIntLiteral($def->expr));
+                    // Literal `= 0` or int-shaped `(int)$x` / `$i + 1` all prove the CV
+                    // is an int counter — requiring a literal only left `$n = (int)$argv[1]`
+                    // boxed while `$i` went native, and `$i < $n` spun forever (#36408).
+                    $sawIntLiteralAssign = true;
                     continue;
                 }
                 if (
@@ -366,7 +368,7 @@ class Analyzer
                 if ($usage instanceof Op\Phi) {
                     continue;
                 }
-                if (!$this->isNativeLongUsage($usage)) {
+                if (!$this->isNativeLongUsage($usage, $node)) {
                     return false;
                 }
             }
@@ -458,10 +460,16 @@ class Analyzer
         return false;
     }
 
-    private function isNativeLongUsage(object $usage): bool
+    private function isNativeLongUsage(object $usage, Operand $operand): bool
     {
         if ($usage instanceof Op\Expr\Assign) {
-            return $this->isNativeLongAssignExpr($usage->expr);
+            // Writing INTO this CV must keep an int shape; reading it as the RHS is fine
+            // (`$a[$k] = $i` must not disqualify the loop counter — #36408).
+            if ($this->assignWritesOperand($usage, $operand)) {
+                return $this->isNativeLongAssignExpr($usage->expr);
+            }
+
+            return true;
         }
         if (
             $usage instanceof Op\Expr\PreInc
@@ -477,11 +485,53 @@ class Analyzer
             || $usage instanceof Op\Terminal\Echo_
             || $usage instanceof Op\Expr\Print_
             || $usage instanceof Op\Terminal\Return_
+            // `"k".$i` / `$a[$i]` coerce via JitNativeString / dim paths (#36408 / #36386).
+            || $usage instanceof Op\Expr\BinaryOp\Concat
+            || $usage instanceof Op\Expr\ConcatList
+            || $usage instanceof Op\Expr\ArrayDimFetch
+            || $usage instanceof Op\Expr\Isset_
+            || $usage instanceof Op\Expr\Empty_
         ) {
             return true;
         }
         if ($usage instanceof Op\Expr\BinaryOp) {
+            // Comparisons (`$i < $n`) are fine. Arithmetic usages like `$t + $v` from
+            // `$t += $v` (foreach value) must not keep `$t` as i64 — aot-smoke array (#36408).
+            // Int `$i = $i + 1` is still allowed via isNativeLongAssignExpr on the Assign def.
+            if (
+                $usage instanceof Op\Expr\BinaryOp\Plus
+                || $usage instanceof Op\Expr\BinaryOp\Minus
+                || $usage instanceof Op\Expr\BinaryOp\Mul
+                || $usage instanceof Op\Expr\BinaryOp\Div
+                || $usage instanceof Op\Expr\BinaryOp\Mod
+                || $usage instanceof Op\Expr\BinaryOp\Pow
+                || $usage instanceof Op\Expr\BinaryOp\BitwiseAnd
+                || $usage instanceof Op\Expr\BinaryOp\BitwiseOr
+                || $usage instanceof Op\Expr\BinaryOp\BitwiseXor
+                || $usage instanceof Op\Expr\BinaryOp\ShiftLeft
+                || $usage instanceof Op\Expr\BinaryOp\ShiftRight
+            ) {
+                return false;
+            }
+
             return $this->isNativeLongBinaryOperands($usage->left, $usage->right);
+        }
+
+        return false;
+    }
+
+    /** True when Assign stores into $operand (LHS), not when $operand is merely the RHS. */
+    private function assignWritesOperand(Op\Expr\Assign $assign, Operand $operand): bool
+    {
+        if ($assign->var === $operand) {
+            return true;
+        }
+        // php-cfg often wraps the CV in a Temporary for the write slot.
+        if (
+            $assign->var instanceof Operand\Temporary
+            && $assign->var->original === $operand
+        ) {
+            return true;
         }
 
         return false;
