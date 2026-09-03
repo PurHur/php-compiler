@@ -130,25 +130,31 @@ class Refcount extends Builtin {
                     $test = $current <= 0;
                     if ($test) {
                         $allow = phpc_destruct_delref_allowed();
+                        $typeMask = (int32) self::TYPE_INFO_TYPEMASK;
+                        $type = $typeinfo & $typeMask;
+                        $objType = (int32) self::TYPE_INFO_TYPE_OBJECT;
                         $objMask = (int32) self::TYPE_INFO_TYPE_OBJECT;
-                        if (($typeinfo & $objMask) != 0) {
+                        // Exact TYPE_OBJECT only — TYPE_MASKED_ARRAY includes the object
+                        // bit, so a bitmask check deferred hashtable free under {main}
+                        // (#36388 / #4013). php-src zval_ptr_dtor frees IS_ARRAY now.
+                        $isObjectExact = $type == $objType;
+                        $isGcContainer = ($typeinfo & $objMask) != 0;
+                        if ($isObjectExact) {
                             phpc_destruct_try_invoke((int8*) $refVirtual);
                         }
                         // Clear WeakReference slots when refcount hits 0 even if {main}
                         // defers free until shutdown (#4013 / #26795).
                         phpc_weakref_clear_object_typed((__object__*) $refVirtual, $typeinfo);
-                        if (!$allow && ($typeinfo & $objMask) != 0) {
+                        if (!$allow && $isObjectExact) {
                             return;
                         }
-                        if (($typeinfo & $objMask) != 0) {
+                        if ($isGcContainer) {
                             phpc_gc_unregister((__object__*) $refVirtual);
                         }
-                        $typeMask = (int32) self::TYPE_INFO_TYPEMASK;
-                        $type = $typeinfo & $typeMask;
                         $htType = (int32) self::TYPE_INFO_TYPE_MASKED_ARRAY;
                         if ($type == $htType) {
                             __hashtable__dtor((__hashtable__*) $refVirtual);
-                        } elseif (($typeinfo & $objMask) != 0) {
+                        } elseif ($isObjectExact) {
                             __object__dtor((__object__*) $refVirtual);
                         }
                         free $refVirtual;

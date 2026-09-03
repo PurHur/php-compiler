@@ -308,6 +308,12 @@ final class Variable {
     public bool $ephemeralConcatTemp = false;
 
     /**
+     * INIT_ARRAY native `__hashtable__**` temp that still owns rc=1 (#36388).
+     * ASSIGN into a named CV must move (no second addref) and null this slot.
+     */
+    public bool $ephemeralArrayTemp = false;
+
+    /**
      * By-ref actual is a call/method return temp — notice already emitted; mutator may use it (#25815).
      */
     public bool $nonVariableByRefTempAllowed = false;

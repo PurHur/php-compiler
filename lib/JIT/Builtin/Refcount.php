@@ -438,14 +438,28 @@ class Refcount extends Builtin {
                 { $parentFn = $ifBlock->getParent();
                     assert($parentFn instanceof PHPLLVM\Value\Function_);
                     $objMask = $this->context->getTypeFromString('int32')->constInt(self::TYPE_INFO_TYPE_OBJECT, false);
-                    $isObject = $this->context->builder->icmp(
+                    // Bitmask: TYPE_MASKED_ARRAY includes TYPE_OBJECT — used for GC root
+                    // register/unregister (arrays are cycle-collectable like Zend).
+                    $isGcContainer = $this->context->builder->icmp(
                         PHPLLVM\Builder::INT_NE,
                         $this->context->builder->bitwiseAnd($typeinfo, $objMask),
                         $objMask->typeOf()->constInt(0, false)
                     );
+                    // Exact TYPE_OBJECT only for __destruct defer (#4013) and try_invoke.
+                    // Using the bitmask here deferred __hashtable__dtor + free under {main},
+                    // leaking every short-lived array (#36388 / re-#36409).
+                    // php-src: Zend/zend_variables.c zval_ptr_dtor frees IS_ARRAY immediately.
+                    $typeMaskEarly = $this->context->getTypeFromString('int32')->constInt(self::TYPE_INFO_TYPEMASK, false);
+                    $typeEarly = $this->context->builder->bitwiseAnd($typeinfo, $typeMaskEarly);
+                    $objTypeExact = $this->context->getTypeFromString('int32')->constInt(self::TYPE_INFO_TYPE_OBJECT, false);
+                    $isObjectExact = $this->context->builder->icmp(
+                        PHPLLVM\Builder::INT_EQ,
+                        $typeEarly,
+                        $objTypeExact
+                    );
                     $objDestructBlock = $parentFn->appendBasicBlock('delref_object_destruct');
                     $afterDestructBlock = $parentFn->appendBasicBlock('delref_after_destruct');
-                    $this->context->builder->branchIf($isObject, $objDestructBlock, $afterDestructBlock);
+                    $this->context->builder->branchIf($isObjectExact, $objDestructBlock, $afterDestructBlock);
                     $this->context->builder->positionAtEnd($objDestructBlock);
                     $this->context->builder->call(
                         $this->context->lookupFunction('phpc_destruct_try_invoke'),
@@ -464,7 +478,7 @@ class Refcount extends Builtin {
                         $allowDestructDelref,
                         $allowDestructDelref->typeOf()->constInt(0, false)
                     );
-                    $deferObjectDestroy = $this->context->builder->bitwiseAnd($deferDestroy, $isObject);
+                    $deferObjectDestroy = $this->context->builder->bitwiseAnd($deferDestroy, $isObjectExact);
                     $deferBlock = $parentFn->appendBasicBlock('delref_defer_destroy');
                     $destroyBlock = $parentFn->appendBasicBlock('delref_destroy');
                     $this->context->builder->branchIf($deferObjectDestroy, $deferBlock, $destroyBlock);
@@ -491,7 +505,7 @@ class Refcount extends Builtin {
                 );
                 $gcUnregisterBlock = $parentFn->appendBasicBlock('delref_gc_unregister');
                 $freeBlock = $parentFn->appendBasicBlock('delref_free');
-                $this->context->builder->branchIf($isObject, $gcUnregisterBlock, $freeBlock);
+                $this->context->builder->branchIf($isGcContainer, $gcUnregisterBlock, $freeBlock);
                 $this->context->builder->positionAtEnd($gcUnregisterBlock);
                 $this->context->builder->call(
                     $this->context->lookupFunction('phpc_gc_unregister'),
