@@ -11219,38 +11219,23 @@ class JIT {
                             if (null !== ($result->compileTimeString ?? null)) {
                                 $promoted->compileTimeString = $result->compileTimeString;
                             }
-                            // Literal RHS: grow in place. Dynamic RHS (int→string temps) still
-                            // takes the full concat path — appendInPlace + __string__separate
-                            // corrupts lengths under load (#36386 / master #36410 gap).
+                            // Grow in place for literal and dynamic RHS (#36386). Requires
+                            // __string__realloc to store the moved pointer back into the
+                            // `__string__**` slot (fixed this PR) — previously corrupted after
+                            // the first geometric grow past the 32-byte initial cap.
                             $rightCoerced = JIT\JitNativeString::coerce(
                                 $this->context,
                                 $right,
                                 $block->getOperand($op->arg3)
                             );
-                            if (
-                                null !== ($rightCoerced->compileTimeString ?? null)
-                                || null !== ($right->compileTimeString ?? null)
-                            ) {
-                                $this->context->type->string->appendInPlace($promoted, $rightCoerced);
-                                $newStr = $this->context->builder->load($destSlot);
-                                $newVal = new Variable(
-                                    $this->context,
-                                    Variable::TYPE_STRING,
-                                    Variable::KIND_VALUE,
-                                    $newStr
-                                );
-                            } else {
-                                $newVal = $this->compileConcatIntoNewString(
-                                    $promoted,
-                                    $rightCoerced,
-                                    $destOp,
-                                    $block->getOperand($op->arg3)
-                                );
-                                $this->context->builder->store(
-                                    $this->context->helper->loadValue($newVal),
-                                    $destSlot
-                                );
-                            }
+                            $this->context->type->string->appendInPlace($promoted, $rightCoerced);
+                            $newStr = $this->context->builder->load($destSlot);
+                            $newVal = new Variable(
+                                $this->context,
+                                Variable::TYPE_STRING,
+                                Variable::KIND_VALUE,
+                                $newStr
+                            );
                             if (
                                 null !== ($left->compileTimeString ?? null)
                                 && null !== ($right->compileTimeString ?? null)
@@ -11342,32 +11327,17 @@ class JIT {
                             $result = $promoted;
                             $hasStringAlloca = true;
                         }
-                        // `$s .= $rhs` on a native slot: grow in place for literal RHS (#36410).
-                        // Dynamic RHS keeps alloc+copy — safer than separate-across-realloc (#36386).
+                        // `$s .= $rhs` on a native slot: grow in place (#36410 / #36386).
+                        // Dynamic and literal share appendInPlace now that realloc publishes
+                        // the moved pointer (#36386).
                         if ((int) $op->arg1 === (int) $op->arg2 && $hasStringAlloca) {
                             $rightCoerced = JIT\JitNativeString::coerce(
                                 $this->context,
                                 $right,
                                 $block->getOperand($op->arg3)
                             );
-                            if (
-                                null !== ($rightCoerced->compileTimeString ?? null)
-                                || null !== ($right->compileTimeString ?? null)
-                            ) {
-                                $this->context->type->string->appendInPlace($result, $rightCoerced);
-                                $newStr = $this->context->builder->load($destSlot);
-                            } else {
-                                $leftVar = $this->context->helper->loadValue(
-                                    JIT\JitNativeString::coerce($this->context, $left, $block->getOperand($op->arg2))
-                                );
-                                $rightVar = $this->context->helper->loadValue($rightCoerced);
-                                $newStr = \PHPCompiler\ext\standard\JitStringConcat::concat(
-                                    $this->context,
-                                    $leftVar,
-                                    $rightVar
-                                );
-                                $this->context->builder->store($newStr, $destSlot);
-                            }
+                            $this->context->type->string->appendInPlace($result, $rightCoerced);
+                            $newStr = $this->context->builder->load($destSlot);
                         } else {
                             $leftVar = $this->context->helper->loadValue(
                                 JIT\JitNativeString::coerce($this->context, $left, $block->getOperand($op->arg2))
