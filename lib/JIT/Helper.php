@@ -1701,7 +1701,7 @@ restart:
                 }
                 goto return_bool;
             }
-            $voidp = $this->context->getTypeFromString('void')->pointerType(0);
+            $voidp = $this->context->getTypeFromString('void*');
             $leftNorm = $this->context->builder->pointerCast($leftValue, $voidp);
             $rightNorm = $this->context->builder->pointerCast($rightValue, $voidp);
             $sizeT = $this->context->getTypeFromString('size_t');

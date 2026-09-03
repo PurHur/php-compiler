@@ -1076,8 +1076,8 @@ class Runtime {
         \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_compile_done');
 
         // Persist AOT cache stamp only after compileToFile → compileCommon.
-        // Full-module bitcode is not used for AOT restore (Invalid type); see
-        // CompileCache::saveAotStamp (#36387 / #36199).
+        // AOT also persists module.bc now that void*→i8* makes it parseable (#36387);
+        // warm rebuilds still prefer aot.bin / aot.o over bitcode restore.
         \PHPCompiler\AOT\BuildTiming::end('codegen');
         \PHPCompiler\AOT\BuildTiming::mark('link');
         $context->compileToFile($outfile);

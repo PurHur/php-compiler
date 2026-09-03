@@ -298,6 +298,9 @@ patch_already_applied() {
       grep -q 'LLVMTokenTypeKind' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Type.php" 2>/dev/null \
         && ! grep -q 'LLVMTokenTypeKin' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Type.php" 2>/dev/null
       ;;
+    php-llvm-void-star-pointer-i8.patch)
+      grep -q 'Pointers-to-void are illegal in LLVM bitcode' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Type.php" 2>/dev/null
+      ;;
     php-llvm-function-getbasicblocks-nparams-typo.patch)
       grep -q "LLVMBasicBlockRef\[' . \$nBlocks . '\]" "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Value/Function_.php" 2>/dev/null
       ;;
@@ -7645,6 +7648,7 @@ apply_patch "$PATCH_DIR/php-llvm-module-createfunctionpassmanager.patch"
 apply_patch "$PATCH_DIR/php-llvm-memory-buffer-bitcode.patch"
 apply_patch "$PATCH_DIR/php-llvm-vector-get-address-space.patch"
 apply_patch "$PATCH_DIR/php-llvm-token-type-kind-typo.patch"
+apply_patch "$PATCH_DIR/php-llvm-void-star-pointer-i8.patch"
 apply_patch "$PATCH_DIR/php-llvm-function-getbasicblocks-nparams-typo.patch"
 apply_patch "$PATCH_DIR/php-llvm-x86-posix-fallback.patch"
 repair_php_llvm_token_type_kind_typo_in_prelinked

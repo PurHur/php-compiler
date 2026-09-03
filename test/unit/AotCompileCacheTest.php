@@ -90,7 +90,7 @@ final class AotCompileCacheTest extends TestCase
         $metaPath = CompileCache::metaPath($key);
         $this->assertFileExists($metaPath);
         $this->assertFileExists(CompileCache::stampPath($key), 'AOT cache must write fresh.stamp (#36387)');
-        $this->assertFileDoesNotExist(CompileCache::bitcodePath($key), 'AOT must not persist unreadable full-module bitcode');
+        $this->assertFileExists(CompileCache::bitcodePath($key), 'AOT module.bc must round-trip after void*→i8* (#36387)');
         $this->assertFileExists(CompileCache::artifactPath($key), 'linked aot.bin must be cached after cold emit (#36387)');
 
         $warm = $this->runAotSubprocess($script, $outWarm);
@@ -168,7 +168,7 @@ final class AotCompileCacheTest extends TestCase
         $this->assertFileExists(CompileCache::artifactPath($key), 'mid-tier link must re-save aot.bin');
     }
 
-    public function testAotStampWarmPathWithoutModuleBitcode(): void
+    public function testAotStampAndBitcodeWarmPath(): void
     {
         if (!LlvmToolchain::isReady($this->repoRoot)) {
             $this->markTestSkipped('LLVM 9 not available');
@@ -191,7 +191,7 @@ final class AotCompileCacheTest extends TestCase
         $this->assertFileExists(CompileCache::stampPath($key));
         $this->assertFileExists(CompileCache::metaPath($key));
         $this->assertFileExists(CompileCache::artifactPath($key));
-        $this->assertFileDoesNotExist(CompileCache::bitcodePath($key));
+        $this->assertFileExists(CompileCache::bitcodePath($key), 'void*→i8* makes full-module bitcode durable (#36387)');
 
         $warm = $this->runAotSubprocess($script, $outWarm);
         $this->assertSame(0, $warm['exit'], $warm['stderr']);
