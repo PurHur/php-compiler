@@ -80,8 +80,7 @@ PHP;
         $src = sys_get_temp_dir().'/phpc_undef_recur_'.getmypid().'.php';
         file_put_contents($src, $code);
         $bin = sys_get_temp_dir().'/phpc_undef_recur_'.getmypid().'.bin';
-        $compile = 'env PHP_COMPILER_HELPER_RUNTIME_O=0 '
-            .escapeshellarg(PHP_BINARY).' '
+        $compile = escapeshellarg(PHP_BINARY).' '
             .escapeshellarg($root.'/bin/compile.php')
             .' -o '.escapeshellarg($bin).' '.escapeshellarg($src).' 2>&1';
         exec($compile, $compileOut, $compileRc);
@@ -140,8 +139,9 @@ PHP;
         $src = sys_get_temp_dir().'/phpc_undef_assign_echo_'.getmypid().'.php';
         file_put_contents($src, $code);
         $bin = sys_get_temp_dir().'/phpc_undef_assign_echo_'.getmypid().'.bin';
-        $compile = 'env PHP_COMPILER_HELPER_RUNTIME_O=0 '
-            .escapeshellarg(PHP_BINARY).' '
+        // Do not set PHP_COMPILER_HELPER_RUNTIME_O=0 — on the pinned image that path
+        // segfaults even for `echo "hi"` (helper-runtime objects required).
+        $compile = escapeshellarg(PHP_BINARY).' '
             .escapeshellarg($root.'/bin/compile.php')
             .' -o '.escapeshellarg($bin).' '.escapeshellarg($src).' 2>&1';
         exec($compile, $compileOut, $compileRc);
@@ -159,6 +159,54 @@ PHP;
                 'Undefined variable',
                 implode("\n", $aotOut),
                 'assigned locals must not warn on echo (#36405)'
+            );
+        } finally {
+            @unlink($bin);
+            @unlink($src);
+        }
+    }
+
+    /**
+     * Loop-carried float CVs lower mul/add through the vbox path and leave the
+     * ASSIGN elided (MUL writes the named CV). The native-double←vbox store must
+     * still flip the assigned flag (#36386 / #36405 respin).
+     */
+    public function testFloatMulAssignInLoopHasNoUndefWarningAot(): void
+    {
+        $this->skipUnlessLlvmReady();
+        $code = <<<'PHP'
+<?php
+function f(): void {
+    $zr = 0.0;
+    for ($i = 0; $i < 2; ++$i) {
+        $zr2 = $zr * $zr;
+        echo $zr2, "\n";
+    }
+}
+f();
+PHP;
+        $root = dirname(__DIR__, 2);
+        $src = sys_get_temp_dir().'/phpc_undef_float_loop_'.getmypid().'.php';
+        file_put_contents($src, $code);
+        $bin = sys_get_temp_dir().'/phpc_undef_float_loop_'.getmypid().'.bin';
+        $compile = escapeshellarg(PHP_BINARY).' '
+            .escapeshellarg($root.'/bin/compile.php')
+            .' -o '.escapeshellarg($bin).' '.escapeshellarg($src).' 2>&1';
+        exec($compile, $compileOut, $compileRc);
+        $this->assertSame(0, $compileRc, implode("\n", $compileOut));
+
+        $zendCmd = escapeshellarg(PHP_BINARY).' '.escapeshellarg($src).' 2>&1';
+        exec($zendCmd, $zendOut, $zendRc);
+        $this->assertSame(0, $zendRc, implode("\n", $zendOut));
+
+        try {
+            exec(escapeshellarg($bin).' 2>&1', $aotOut, $aotRc);
+            $this->assertSame(0, $aotRc, implode("\n", $aotOut));
+            $this->assertSame(implode("\n", $zendOut), implode("\n", $aotOut));
+            $this->assertStringNotContainsString(
+                'Undefined variable',
+                implode("\n", $aotOut),
+                'float mul assign in loop must not warn (#36405 respin / #36386)'
             );
         } finally {
             @unlink($bin);

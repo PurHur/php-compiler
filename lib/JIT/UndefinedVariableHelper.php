@@ -50,7 +50,17 @@ final class UndefinedVariableHelper
             return;
         }
         $name = self::resolveTrackableName($op, $var);
-        if (null === $name || self::isFormalParameter($context, $name)) {
+        if (null === $name) {
+            // Float/vbox arithmetic often leaves the named ASSIGN alias as KIND_VALUE
+            // (native/vbox result). resolveTrackableName requires KIND_VARIABLE, so the
+            // flag never flipped while echo still guarded — false "Undefined variable"
+            // on `$zr2 = $zr * $zr; echo $zr2` inside a loop (#36405 respin / #36386).
+            $name = OperandName::resolve($op);
+            if (null === $name || '' === $name || 'this' === $name) {
+                return;
+            }
+        }
+        if (self::isFormalParameter($context, $name)) {
             return;
         }
         if (null === BasicBlockHelper::tryGetInsertBlock($context)) {
