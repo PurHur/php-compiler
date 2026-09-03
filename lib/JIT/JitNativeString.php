@@ -11,6 +11,7 @@ namespace PHPCompiler\JIT;
 use PHPCfg\Operand;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 final class JitNativeString
 {
@@ -287,6 +288,17 @@ final class JitNativeString
         $value = $context->helper->loadValue($var);
         switch ($var->type) {
             case Variable::TYPE_NATIVE_LONG:
+                // Loop counters / arithmetic cannot be resource handles — skip snprintf
+                // malloc and the registry probe (php-src zend_print_long_to_buf) (#36386).
+                if (IncDecResourceProvenance::cannotBeResourceForString($sourceOperand)) {
+                    return new Variable(
+                        $context,
+                        Variable::TYPE_STRING,
+                        Variable::KIND_VALUE,
+                        self::fromLong($context, $value)
+                    );
+                }
+
                 return new Variable(
                     $context,
                     Variable::TYPE_STRING,
@@ -497,6 +509,14 @@ final class JitNativeString
 
     private static function format(Context $context, Value $value, string $format): Value
     {
+        if ('%zu' === $format || '%lld' === $format || '%ld' === $format) {
+            $i64 = $context->getTypeFromString('int64');
+            $asI64 = $value->typeOf() === $i64
+                ? $value
+                : $context->builder->zExt($value, $i64);
+
+            return self::fromLong($context, $asI64);
+        }
         $sizeT = $context->getTypeFromString('size_t');
         $charPtr = $context->getTypeFromString('char*');
         $i64 = $context->getTypeFromString('int64');
@@ -525,5 +545,243 @@ final class JitNativeString
         $context->builder->call($context->lookupFunction('__mm__free'), $buf);
 
         return $str;
+    }
+
+    /**
+     * zend_print_long_to_buf / _zend_i64_to_str — stack digits, one __string__alloc (#36386).
+     *
+     * php-src: Zend/zend_string.h zend_print_long_to_buf
+     */
+    public static function fromLong(Context $context, Value $longVal): Value
+    {
+        self::ensureI64Decimal($context);
+        $i64 = $context->getTypeFromString('int64');
+        $handle = $longVal->typeOf() === $i64
+            ? $longVal
+            : $context->builder->zExt($longVal, $i64);
+
+        return $context->builder->call(
+            $context->lookupFunction('__string__fromLong'),
+            $handle
+        );
+    }
+
+    /**
+     * Write decimal digits of $longVal into a 24-byte entry alloca.
+     *
+     * @return array{0: Value, 1: Value} i8* pointer and i64 length
+     */
+    public static function writeDecimalDigits(Context $context, Value $longVal): array
+    {
+        self::ensureI64Decimal($context);
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $i64 = $context->getTypeFromString('int64');
+        $handle = $longVal->typeOf() === $i64
+            ? $longVal
+            : $context->builder->zExt($longVal, $i64);
+        $fn = BasicBlockHelper::parentFunction($context);
+        $buf = BasicBlockHelper::entryAllocaForFunction(
+            $context,
+            $fn,
+            $i8->arrayType(24)
+        );
+        $ptr = $context->builder->pointerCast($buf, $i8p);
+        $len = $context->builder->call(
+            $context->lookupFunction('__phpc_i64_decimal'),
+            $handle,
+            $ptr
+        );
+
+        return [$ptr, $len];
+    }
+
+    public static function ensureI64Decimal(Context $context): void
+    {
+        $dec = $context->module->getNamedFunction('__phpc_i64_decimal');
+        $from = $context->module->getNamedFunction('__string__fromLong');
+        $decReady = $dec instanceof LlvmFunction && $dec->countBasicBlocks() > 0;
+        $fromReady = $from instanceof LlvmFunction && $from->countBasicBlocks() > 0;
+        if ($decReady && $fromReady) {
+            $context->registerFunction('__phpc_i64_decimal', $dec);
+            $context->registerFunction('__string__fromLong', $from);
+
+            return;
+        }
+        $restore = BasicBlockHelper::tryGetInsertBlock($context);
+        try {
+            if (!$decReady) {
+                self::implementI64Decimal($context);
+            } else {
+                $context->registerFunction('__phpc_i64_decimal', $dec);
+            }
+            if (!$fromReady) {
+                self::implementFromLong($context);
+            } else {
+                $context->registerFunction('__string__fromLong', $from);
+            }
+        } finally {
+            BasicBlockHelper::restoreInsertBlock($context, $restore);
+        }
+    }
+
+    private static function implementI64Decimal(Context $context): void
+    {
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $i64 = $context->getTypeFromString('int64');
+        $existing = $context->module->getNamedFunction('__phpc_i64_decimal');
+        if ($existing instanceof LlvmFunction) {
+            $fn = $existing;
+        } else {
+            $fnType = $context->context->functionType($i64, false, $i64, $i8p);
+            $fn = $context->module->addFunction('__phpc_i64_decimal', $fnType);
+        }
+        $context->registerFunction('__phpc_i64_decimal', $fn);
+        if ($fn->countBasicBlocks() > 0) {
+            return;
+        }
+        $context->intrinsic->builder = $context->builder;
+        $b = $context->builder;
+        $entry = $fn->appendBasicBlock('i64dec_entry');
+        $zeroBb = $fn->appendBasicBlock('i64dec_zero');
+        $checkMin = $fn->appendBasicBlock('i64dec_checkmin');
+        $minBb = $fn->appendBasicBlock('i64dec_min');
+        $negCheck = $fn->appendBasicBlock('i64dec_negcheck');
+        $negBb = $fn->appendBasicBlock('i64dec_neg');
+        $digitsSetup = $fn->appendBasicBlock('i64dec_digits_setup');
+        $digitCond = $fn->appendBasicBlock('i64dec_digit_cond');
+        $digitBody = $fn->appendBasicBlock('i64dec_digit_body');
+        $signBb = $fn->appendBasicBlock('i64dec_sign');
+        $writeMinus = $fn->appendBasicBlock('i64dec_write_minus');
+        $emitBb = $fn->appendBasicBlock('i64dec_emit');
+
+        $b->positionAtEnd($entry);
+        $scratch = $b->alloca($i8->arrayType(24), 1, 'i64dec_scratch');
+        $scratchBase = $b->pointerCast($scratch, $i8p);
+        $posSlot = $b->alloca($i64, 1, 'i64dec_pos');
+        $uSlot = $b->alloca($i64, 1, 'i64dec_u');
+        $negSlot = $b->alloca($i64, 1, 'i64dec_neg');
+        $b->store($i64->constInt(23, false), $posSlot);
+        $b->store($i64->constInt(0, false), $negSlot);
+        $val = $fn->getParam(0);
+        $dest = $fn->getParam(1);
+        $b->branchIf(
+            $b->icmp(Builder::INT_EQ, $val, $i64->constInt(0, false)),
+            $zeroBb,
+            $checkMin
+        );
+
+        $b->positionAtEnd($zeroBb);
+        $b->store($i8->constInt(\ord('0'), false), $dest);
+        $b->returnValue($i64->constInt(1, false));
+
+        $b->positionAtEnd($checkMin);
+        $b->branchIf(
+            $b->icmp(Builder::INT_EQ, $val, $i64->constInt(\PHP_INT_MIN, true)),
+            $minBb,
+            $negCheck
+        );
+
+        $b->positionAtEnd($minBb);
+        $minLit = '-9223372036854775808';
+        $minPtr = $b->pointerCast($context->constantFromString($minLit), $i8p);
+        $context->intrinsic->memcpy(
+            $dest,
+            $minPtr,
+            $i64->constInt(\strlen($minLit), false),
+            false
+        );
+        $b->returnValue($i64->constInt(\strlen($minLit), false));
+
+        $b->positionAtEnd($negCheck);
+        $b->branchIf(
+            $b->icmp(Builder::INT_SLT, $val, $i64->constInt(0, false)),
+            $negBb,
+            $digitsSetup
+        );
+
+        $b->positionAtEnd($negBb);
+        $b->store($i64->constInt(1, false), $negSlot);
+        $b->store($b->negate($val), $uSlot);
+        $b->branch($digitCond);
+
+        $b->positionAtEnd($digitsSetup);
+        $b->store($val, $uSlot);
+        $b->branch($digitCond);
+
+        $b->positionAtEnd($digitCond);
+        $u = $b->load($uSlot);
+        $b->branchIf(
+            $b->icmp(Builder::INT_NE, $u, $i64->constInt(0, false)),
+            $digitBody,
+            $signBb
+        );
+
+        $b->positionAtEnd($digitBody);
+        $ten = $i64->constInt(10, false);
+        $digit = $b->truncOrBitCast($b->signedRem($u, $ten), $i8);
+        $ascii = $b->add($digit, $i8->constInt(\ord('0'), false));
+        $pos = $b->load($posSlot);
+        $b->store($ascii, $b->gep($scratchBase, $pos));
+        $b->store($b->sub($pos, $i64->constInt(1, false)), $posSlot);
+        $b->store($b->signedDiv($u, $ten), $uSlot);
+        $b->branch($digitCond);
+
+        $b->positionAtEnd($signBb);
+        $b->branchIf(
+            $b->icmp(Builder::INT_NE, $b->load($negSlot), $i64->constInt(0, false)),
+            $writeMinus,
+            $emitBb
+        );
+
+        $b->positionAtEnd($writeMinus);
+        $pos = $b->load($posSlot);
+        $b->store($i8->constInt(\ord('-'), false), $b->gep($scratchBase, $pos));
+        $b->store($b->sub($pos, $i64->constInt(1, false)), $posSlot);
+        $b->branch($emitBb);
+
+        $b->positionAtEnd($emitBb);
+        $pos = $b->load($posSlot);
+        $start = $b->gep($scratchBase, $b->add($pos, $i64->constInt(1, false)));
+        $len = $b->sub($i64->constInt(23, false), $pos);
+        $context->intrinsic->memcpy($dest, $start, $len, false);
+        $b->returnValue($len);
+        $b->clearInsertionPosition();
+    }
+
+    private static function implementFromLong(Context $context): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $existing = $context->module->getNamedFunction('__string__fromLong');
+        if ($existing instanceof LlvmFunction) {
+            $fn = $existing;
+        } else {
+            $fnType = $context->context->functionType($strPtr, false, $i64);
+            $fn = $context->module->addFunction('__string__fromLong', $fnType);
+        }
+        $context->registerFunction('__string__fromLong', $fn);
+        if ($fn->countBasicBlocks() > 0) {
+            return;
+        }
+        $entry = $fn->appendBasicBlock('fromlong_entry');
+        $context->builder->positionAtEnd($entry);
+        $buf = $context->builder->alloca($i8->arrayType(24), 1, 'fromlong_buf');
+        $ptr = $context->builder->pointerCast($buf, $i8p);
+        $n = $context->builder->call(
+            $context->lookupFunction('__phpc_i64_decimal'),
+            $fn->getParam(0),
+            $ptr
+        );
+        $str = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $n,
+            $ptr
+        );
+        $context->builder->returnValue($str);
+        $context->builder->clearInsertionPosition();
     }
 }

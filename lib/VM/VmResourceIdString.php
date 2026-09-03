@@ -88,6 +88,9 @@ final class VmResourceIdString
 
     private static function snprintf(Context $context, Value $handle, string $format): Value
     {
+        if ('%lld' === $format || '%ld' === $format) {
+            return \PHPCompiler\JIT\JitNativeString::fromLong($context, $handle);
+        }
         $sizeT = $context->getTypeFromString('size_t');
         $charPtr = $context->getTypeFromString('char*');
         $i64 = $context->getTypeFromString('int64');

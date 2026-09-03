@@ -27074,6 +27074,14 @@ class JIT {
     ): Variable
     {
         $this->context->intrinsic->builder = $this->context->builder;
+        $leftIsLong = Variable::TYPE_NATIVE_LONG === $left->type;
+        $rightIsLong = Variable::TYPE_NATIVE_LONG === $right->type;
+        if ($rightIsLong && !$leftIsLong) {
+            return $this->compileConcatStringAndI64($left, $right, $leftOp, false);
+        }
+        if ($leftIsLong && !$rightIsLong) {
+            return $this->compileConcatStringAndI64($right, $left, $rightOp, true);
+        }
         $left = JIT\JitNativeString::coerce($this->context, $left, $leftOp);
         $right = JIT\JitNativeString::coerce($this->context, $right, $rightOp);
         $leftVar = $this->context->helper->loadValue($left);
@@ -27112,6 +27120,64 @@ class JIT {
         ) {
             $var->compileTimeString = $left->compileTimeString.$right->compileTimeString;
         }
+
+        return $var;
+    }
+
+    /**
+     * string . int / int . string in one alloc (php-src concat + zend_print_long_to_buf).
+     *
+     * Avoids a heap temp for the decimal digits (#36386 / str-builder, template-render).
+     */
+    private function compileConcatStringAndI64(
+        Variable $strSide,
+        Variable $longSide,
+        ?\PHPCfg\Operand $strOp,
+        bool $longFirst
+    ): Variable {
+        $this->context->intrinsic->builder = $this->context->builder;
+        $strSide = JIT\JitNativeString::coerce($this->context, $strSide, $strOp);
+        $strVar = $this->context->helper->loadValue($strSide);
+        $longVal = $this->context->helper->loadValue($longSide);
+        [$digits, $digitLen] = JIT\JitNativeString::writeDecimalDigits($this->context, $longVal);
+        $map = $this->context->structFieldMap['__string__'];
+        $strLen = $this->context->builder->load(
+            $this->context->builder->structGep($strVar, $map['length'])
+        );
+        $strBytes = $this->context->builder->structGep($strVar, $map['value']);
+        $total = $this->context->builder->addNoUnsignedWrap(
+            $strLen,
+            $this->context->builder->intCast($digitLen, $strLen->typeOf())
+        );
+        $result = $this->context->builder->call(
+            $this->context->lookupFunction('__string__alloc'),
+            $total
+        );
+        $dest = $this->context->builder->structGep($result, $map['value']);
+        if ($longFirst) {
+            $this->context->intrinsic->memcpy($dest, $digits, $digitLen, false);
+            $this->context->intrinsic->memcpy(
+                $this->context->builder->gep($dest, $digitLen),
+                $strBytes,
+                $strLen,
+                false
+            );
+        } else {
+            $this->context->intrinsic->memcpy($dest, $strBytes, $strLen, false);
+            $this->context->intrinsic->memcpy(
+                $this->context->builder->gep($dest, $strLen),
+                $digits,
+                $digitLen,
+                false
+            );
+        }
+        $var = new Variable(
+            $this->context,
+            Variable::TYPE_STRING,
+            Variable::KIND_VALUE,
+            $result
+        );
+        $var->compileTimeString = null;
 
         return $var;
     }
