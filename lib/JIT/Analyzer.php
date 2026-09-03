@@ -495,9 +495,12 @@ class Analyzer
             return true;
         }
         if ($usage instanceof Op\Expr\BinaryOp) {
-            // Comparisons (`$i < $n`) are fine. Arithmetic usages like `$t + $v` from
-            // `$t += $v` (foreach value) must not keep `$t` as i64 — aot-smoke array (#36408).
-            // Int `$i = $i + 1` is still allowed via isNativeLongAssignExpr on the Assign def.
+            // Comparisons (`$i < $n`) are fine. Pure arith *reads* (`$m = $i % $n`) must
+            // also keep `$n` as i64 — rejecting Mod boxed `$n` while loop `$i` stayed
+            // native and `$i < $n` spun forever (assoc-heavy / #36386).
+            // Compound assigns (`$t += $v`) still reject: the Plus result is written back
+            // into `$t` (aot-smoke array / #36408). `$i = $i + 1` stays allowed via the
+            // Assign def + isNativeLongAssignExpr path.
             if (
                 $usage instanceof Op\Expr\BinaryOp\Plus
                 || $usage instanceof Op\Expr\BinaryOp\Minus
@@ -511,7 +514,11 @@ class Analyzer
                 || $usage instanceof Op\Expr\BinaryOp\ShiftLeft
                 || $usage instanceof Op\Expr\BinaryOp\ShiftRight
             ) {
-                return false;
+                if ($this->binaryOpResultAssignedToOperand($usage, $operand)) {
+                    return false;
+                }
+
+                return $this->isNativeLongBinaryOperands($usage->left, $usage->right);
             }
 
             return $this->isNativeLongBinaryOperands($usage->left, $usage->right);
@@ -532,6 +539,47 @@ class Analyzer
             && $assign->var->original === $operand
         ) {
             return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * True when a binary op's result is stored back into $operand (`$t += $v` →
+     * Assign(var=$t, expr=Plus($t,$v))). Pure `$m = $i % $n` assigns elsewhere (#36386).
+     *
+     * php-cfg often SSA-splits the write to a fresh Temporary that is still named
+     * `$sum` while the Plus left still points at the pre-if `$sum` — treat same-name
+     * destinations as assign-back so the CV stays one script-global / one alloca.
+     */
+    private function binaryOpResultAssignedToOperand(Op\Expr\BinaryOp $bin, Operand $operand): bool
+    {
+        $result = $bin->result ?? null;
+        if (!$result instanceof Operand) {
+            return false;
+        }
+        $name = OperandName::resolve($operand);
+        foreach ($result->usages as $use) {
+            if (!$use instanceof Op\Expr\Assign) {
+                continue;
+            }
+            if ($this->assignWritesOperand($use, $operand)) {
+                return true;
+            }
+            if (null === $name || '' === $name) {
+                continue;
+            }
+            $dest = $use->var;
+            if ($dest instanceof Operand && OperandName::resolve($dest) === $name) {
+                return true;
+            }
+            if (
+                $dest instanceof Operand\Temporary
+                && $dest->original instanceof Operand
+                && OperandName::resolve($dest->original) === $name
+            ) {
+                return true;
+            }
         }
 
         return false;
