@@ -54,7 +54,7 @@ final class JitNativeString
             }
             $classHint = null !== $classHint ? ltrim($classHint, '\\') : null;
             // Resolve class hint before SXE fold — baked SXE slots must not run on plain objects (#28646).
-            $sxeFold = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryFoldStringCast(
+            $sxeFold = $context->extensionLowering->tryFoldSimpleXmlStringCast(
                 $context,
                 $var,
                 $classHint
@@ -95,7 +95,7 @@ final class JitNativeString
                 $classHint = ltrim((string) $var->magicGetOverloadedClass, '\\');
             }
             // Class hint before SXE fold — same #28646 guard as TYPE_OBJECT.
-            $sxeFold = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryFoldStringCast(
+            $sxeFold = $context->extensionLowering->tryFoldSimpleXmlStringCast(
                 $context,
                 $var,
                 $classHint
@@ -131,21 +131,22 @@ final class JitNativeString
                     $objPtr
                 );
                 // SXE foreach values: read baked text (cast handler, not only __toString) (#34543).
-                if (\PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::valueBoxMayBeSimpleXmlElement(
+                if ($context->extensionLowering->simpleXmlValueBoxMayBeElement(
                     $context,
                     $classHint
                 ) && 'simplexmlelement' === strtolower($classHint)) {
-                    $sxeStr = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::readBakedTextFromObjectPtr(
+                    $sxeStr = $context->extensionLowering->tryReadSimpleXmlBakedText(
                         $context,
                         $objPtr
                     );
-
-                    return new Variable(
-                        $context,
-                        Variable::TYPE_STRING,
-                        Variable::KIND_VALUE,
-                        $sxeStr
-                    );
+                    if (null !== $sxeStr) {
+                        return new Variable(
+                            $context,
+                            Variable::TYPE_STRING,
+                            Variable::KIND_VALUE,
+                            $sxeStr
+                        );
+                    }
                 }
                 $magic = MagicMethodDispatch::coerceObjectToString($context, $objVar, $classHint);
                 $hintLc = strtolower(ltrim($classHint, '\\'));
@@ -199,7 +200,7 @@ final class JitNativeString
                 $objPtr
             );
 
-            $sxeId = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::simpleXmlElementClassId($context);
+            $sxeId = $context->type->object->lookup('SimpleXMLElement');
             $isSxe = $context->builder->icmp(
                 Builder::INT_EQ,
                 $classIdVal,
@@ -210,10 +211,13 @@ final class JitNativeString
             $context->builder->branchIf($isSxe, $yesSxe, $notSxe);
 
             $context->builder->positionAtEnd($yesSxe);
-            $sxeStr = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::readBakedTextFromObjectPtr(
+            $sxeStr = $context->extensionLowering->tryReadSimpleXmlBakedText(
                 $context,
                 $objPtr
             );
+            if (null === $sxeStr) {
+                $sxeStr = $context->builder->load($context->constantStringFromString(''));
+            }
             $sxeEnd = $context->builder->getInsertBlock();
             $context->builder->branch($join);
 

@@ -26,7 +26,7 @@ final class EmptyDimensionLlvm
             return $context->constantFromBool(true);
         }
         // Peer isset fold — TYPE_VALUE SXE never reaches ArrayAccess empty (#34555).
-        $sxeEmpty = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryFoldDimEmpty(
+        $sxeEmpty = $context->extensionLowering->tryFoldSimpleXmlDimEmpty(
             $context,
             $container,
             $dim

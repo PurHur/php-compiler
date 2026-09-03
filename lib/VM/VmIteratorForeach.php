@@ -528,7 +528,7 @@ final class VmIteratorForeach
             }
         }
         // SimpleXMLElement host-tree snapshot before object-property / Iterator stubs (#27535).
-        if (SimpleXmlForeachSnapshot::canLower($array)) {
+        if (SimpleXmlForeachSnapshot::canLower($context, $array)) {
             SimpleXmlForeachSnapshot::compileReset($context, $array, $slotKey);
 
             return;

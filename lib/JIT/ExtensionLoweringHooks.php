@@ -103,7 +103,8 @@ interface DomCompileTimeHooks
  * Module-registered user-script AOT lowering hooks (#36204).
  *
  * {@see \PHPCompiler\JIT} must not import {@code ext\simplexml} / {@code ext\dom} /
- * {@code ext\xmlreader} / {@code ext\xmlwriter} for these paths; Modules register from jitInit.
+ * {@code ext\xmlreader} / {@code ext\xmlwriter} / {@code ext\xsl} / {@code ext\mbstring}
+ * for these paths; Modules register from jitInit.
  */
 final class ExtensionLoweringHooks
 {
@@ -154,6 +155,44 @@ final class ExtensionLoweringHooks
 
     /** @var (callable(Context, Variable): mixed)|null */
     public $initXmlWriterHook = null;
+
+    /** @var (callable(Context, Variable): mixed)|null */
+    public $initXsltHook = null;
+
+    /**
+     * @var (callable(Context, \PHPCompiler\Block, array, array, string): ?Value)|null
+     */
+    public $foldMbNumericEntityHook = null;
+
+    /** @var (callable(Context, Variable, string): ?Value)|null */
+    public $foldSimpleXmlPropIssetHook = null;
+
+    /** @var (callable(Context, Variable, Variable): ?Value)|null */
+    public $foldSimpleXmlDimIssetHook = null;
+
+    /** @var (callable(Context, Variable, Variable): ?Value)|null */
+    public $foldSimpleXmlDimEmptyHook = null;
+
+    /** @var (callable(Context, Variable, ?string): ?Variable)|null */
+    public $foldSimpleXmlStringCastHook = null;
+
+    /** @var (callable(Context, ?string): bool)|null */
+    public $simpleXmlValueBoxMayBeElementHook = null;
+
+    /** @var (callable(Context, Value): Value)|null */
+    public $simpleXmlReadBakedTextHook = null;
+
+    /** @var (callable(Context, Variable, Variable): ?Value)|null */
+    public $simpleXmlOffsetUnsetHook = null;
+
+    /** @var (callable(Context, Variable, string): bool)|null */
+    public $simpleXmlPropUnsetHook = null;
+
+    /** @var (callable(Variable): ?\SimpleXMLElement)|null */
+    public $simpleXmlHostTreeForForeachHook = null;
+
+    /** @var (callable(Context, Variable, \SimpleXMLElement): string)|null */
+    public $simpleXmlBindHostTreeForSnapshotHook = null;
 
     /** DOM compile-time stamps — registered from ext/dom Module::jitInit (#36204). */
     public ?DomCompileTimeHooks $domCompileTime = null;
@@ -270,6 +309,100 @@ final class ExtensionLoweringHooks
         return null !== $this->initXmlWriterHook
             ? ($this->initXmlWriterHook)($context, $receiver)
             : null;
+    }
+
+    public function tryInitXslt(Context $context, Variable $receiver): mixed
+    {
+        return null !== $this->initXsltHook
+            ? ($this->initXsltHook)($context, $receiver)
+            : null;
+    }
+
+    /**
+     * @param list<\PHPCfg\Operand|null> $operands
+     * @param Variable[]                 $args
+     */
+    public function tryFoldMbNumericEntity(
+        Context $context,
+        \PHPCompiler\Block $block,
+        array $operands,
+        array $args,
+        string $fn
+    ): ?Value {
+        return null !== $this->foldMbNumericEntityHook
+            ? ($this->foldMbNumericEntityHook)($context, $block, $operands, $args, $fn)
+            : null;
+    }
+
+    public function tryFoldSimpleXmlPropIsset(Context $context, Variable $container, string $propName): ?Value
+    {
+        return null !== $this->foldSimpleXmlPropIssetHook
+            ? ($this->foldSimpleXmlPropIssetHook)($context, $container, $propName)
+            : null;
+    }
+
+    public function tryFoldSimpleXmlDimIsset(Context $context, Variable $container, Variable $dim): ?Value
+    {
+        return null !== $this->foldSimpleXmlDimIssetHook
+            ? ($this->foldSimpleXmlDimIssetHook)($context, $container, $dim)
+            : null;
+    }
+
+    public function tryFoldSimpleXmlDimEmpty(Context $context, Variable $container, Variable $dim): ?Value
+    {
+        return null !== $this->foldSimpleXmlDimEmptyHook
+            ? ($this->foldSimpleXmlDimEmptyHook)($context, $container, $dim)
+            : null;
+    }
+
+    public function tryFoldSimpleXmlStringCast(Context $context, Variable $var, ?string $classHint): ?Variable
+    {
+        return null !== $this->foldSimpleXmlStringCastHook
+            ? ($this->foldSimpleXmlStringCastHook)($context, $var, $classHint)
+            : null;
+    }
+
+    public function simpleXmlValueBoxMayBeElement(Context $context, ?string $classHint): bool
+    {
+        return null !== $this->simpleXmlValueBoxMayBeElementHook
+            && ($this->simpleXmlValueBoxMayBeElementHook)($context, $classHint);
+    }
+
+    public function tryReadSimpleXmlBakedText(Context $context, Value $objPtr): ?Value
+    {
+        return null !== $this->simpleXmlReadBakedTextHook
+            ? ($this->simpleXmlReadBakedTextHook)($context, $objPtr)
+            : null;
+    }
+
+    public function trySimpleXmlOffsetUnset(Context $context, Variable $container, Variable $dim): ?Value
+    {
+        return null !== $this->simpleXmlOffsetUnsetHook
+            ? ($this->simpleXmlOffsetUnsetHook)($context, $container, $dim)
+            : null;
+    }
+
+    public function trySimpleXmlPropUnset(Context $context, Variable $container, string $propName): bool
+    {
+        return null !== $this->simpleXmlPropUnsetHook
+            && ($this->simpleXmlPropUnsetHook)($context, $container, $propName);
+    }
+
+    public function simpleXmlHostTreeForForeach(Variable $array): ?\SimpleXMLElement
+    {
+        return null !== $this->simpleXmlHostTreeForForeachHook
+            ? ($this->simpleXmlHostTreeForForeachHook)($array)
+            : null;
+    }
+
+    public function bindSimpleXmlHostTreeForSnapshot(
+        Context $context,
+        Variable $receiver,
+        \SimpleXMLElement $tree
+    ): void {
+        if (null !== $this->simpleXmlBindHostTreeForSnapshotHook) {
+            ($this->simpleXmlBindHostTreeForSnapshotHook)($context, $receiver, $tree);
+        }
     }
 
     public function shouldUseDomDocumentMethodKernel(Context $context): bool

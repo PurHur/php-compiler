@@ -105,4 +105,19 @@ class Module extends ModuleAbstract
             new mb_regex_set_options(),
         ];
     }
+
+    public function jitInit(\PHPCompiler\JIT\Context $context): void
+    {
+        $hooks = $context->extensionLowering;
+        $hooks->foldMbNumericEntityHook = static function ($ctx, $block, array $operands, array $args, string $fn) {
+            if ('mb_encode_numericentity' === $fn) {
+                return JitMbNumericEntity::tryEncodeCompileTimeFoldFromCallSite($ctx, $block, $operands, $args);
+            }
+            if ('mb_decode_numericentity' === $fn) {
+                return JitMbNumericEntity::tryDecodeCompileTimeFoldFromCallSite($ctx, $block, $operands, $args);
+            }
+
+            return null;
+        };
+    }
 }

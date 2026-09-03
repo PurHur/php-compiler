@@ -75,6 +75,36 @@ class Module extends ModuleAbstract
         $hooks->offsetSetHook = static function ($ctx, $receiver, $key, $value) {
             return JitSimpleXmlUserScript::tryOffsetSet($ctx, $receiver, $key, $value);
         };
+        $hooks->foldSimpleXmlPropIssetHook = static function ($ctx, $container, string $propName) {
+            return JitSimpleXmlUserScript::tryFoldPropIsset($ctx, $container, $propName);
+        };
+        $hooks->foldSimpleXmlDimIssetHook = static function ($ctx, $container, $dim) {
+            return JitSimpleXmlUserScript::tryFoldDimIsset($ctx, $container, $dim);
+        };
+        $hooks->foldSimpleXmlDimEmptyHook = static function ($ctx, $container, $dim) {
+            return JitSimpleXmlUserScript::tryFoldDimEmpty($ctx, $container, $dim);
+        };
+        $hooks->foldSimpleXmlStringCastHook = static function ($ctx, $var, ?string $classHint) {
+            return JitSimpleXmlUserScript::tryFoldStringCast($ctx, $var, $classHint);
+        };
+        $hooks->simpleXmlValueBoxMayBeElementHook = static function ($ctx, ?string $classHint): bool {
+            return JitSimpleXmlUserScript::valueBoxMayBeSimpleXmlElement($ctx, $classHint);
+        };
+        $hooks->simpleXmlReadBakedTextHook = static function ($ctx, $objPtr) {
+            return JitSimpleXmlUserScript::readBakedTextFromObjectPtr($ctx, $objPtr);
+        };
+        $hooks->simpleXmlOffsetUnsetHook = static function ($ctx, $container, $dim) {
+            return JitSimpleXmlUserScript::tryOffsetUnset($ctx, $container, $dim);
+        };
+        $hooks->simpleXmlPropUnsetHook = static function ($ctx, $container, string $propName): bool {
+            return JitSimpleXmlUserScript::tryPropUnset($ctx, $container, $propName);
+        };
+        $hooks->simpleXmlHostTreeForForeachHook = static function ($array) {
+            return JitSimpleXmlUserScript::hostTreeForForeach($array);
+        };
+        $hooks->simpleXmlBindHostTreeForSnapshotHook = static function ($ctx, $receiver, $tree): string {
+            return JitSimpleXmlUserScript::bindHostTreeForSnapshot($ctx, $receiver, $tree);
+        };
     }
 
     public function init(Runtime $runtime): void

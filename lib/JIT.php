@@ -14559,28 +14559,13 @@ class JIT {
                         && isset($callOperands[1])
                     ) {
                         $mbFn = strtolower($this->context->scope->toCall->getName());
-                        if ('mb_encode_numericentity' === $mbFn) {
-                            $folded = \PHPCompiler\ext\mbstring\JitMbNumericEntity::tryEncodeCompileTimeFoldFromCallSite(
+                        if ('mb_encode_numericentity' === $mbFn || 'mb_decode_numericentity' === $mbFn) {
+                            $folded = $this->context->extensionLowering->tryFoldMbNumericEntity(
                                 $this->context,
                                 $block,
                                 $callOperands,
-                                $callArgs
-                            );
-                            if (null !== $folded) {
-                                $this->assignCallResultOperand(
-                                    $block->getOperand($op->arg1),
-                                    $folded,
-                                    $this->calleeReturnsByRef($this->context->scope->toCall)
-                                );
-                                break;
-                            }
-                        }
-                        if ('mb_decode_numericentity' === $mbFn) {
-                            $folded = \PHPCompiler\ext\mbstring\JitMbNumericEntity::tryDecodeCompileTimeFoldFromCallSite(
-                                $this->context,
-                                $block,
-                                $callOperands,
-                                $callArgs
+                                $callArgs,
+                                $mbFn
                             );
                             if (null !== $folded) {
                                 $this->assignCallResultOperand(
@@ -15328,7 +15313,7 @@ class JIT {
                             ) {
                                 // Attach host XSLTProcessor at allocate for security/EXSLT fold (#20392).
                                 $xsltReceiver = $this->context->getVariableFromOp($resultOp);
-                                \PHPCompiler\ext\xsl\JitXsltUserScript::tryInit(
+                                $this->context->extensionLowering->tryInitXslt(
                                     $this->context,
                                     $xsltReceiver
                                 );

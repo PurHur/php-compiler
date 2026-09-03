@@ -55,6 +55,13 @@ class Module extends ModuleAbstract
         }
     }
 
+    public function jitInit(\PHPCompiler\JIT\Context $context): void
+    {
+        $context->extensionLowering->initXsltHook = static function ($ctx, $receiver) {
+            return JitXsltUserScript::tryInit($ctx, $receiver);
+        };
+    }
+
     public function getFunctions(): array
     {
         return [];
