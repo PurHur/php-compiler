@@ -19,7 +19,7 @@ final class ComposerVendorMap
      * @return array{
      *   enabled: bool,
      *   classmap: array<string, string>,
-     *   psr4: array<string, string>,
+     *   psr4: array<string, list<string>>,
      *   files: list<string>,
      *   all_files: list<string>,
      *   errors: list<string>
@@ -136,7 +136,7 @@ final class ComposerVendorMap
      * Resolve class name via Composer classmap then PSR-4 prefixes.
      *
      * @param array<string, string> $classmap
-     * @param array<string, string> $psr4
+     * @param array<string, string|list<string>> $psr4
      */
     public static function resolveClassPath(string $className, array $classmap, array $psr4): ?string
     {
@@ -316,7 +316,7 @@ final class ComposerVendorMap
     /**
      * @param list<string> $errors
      *
-     * @return array<string, string> prefix => absolute base dir (first path wins)
+     * @return array<string, list<string>> prefix => absolute base dirs (Composer may list several)
      */
     private static function loadPsr4(string $composerDir, array &$errors): array
     {
@@ -330,16 +330,21 @@ final class ComposerVendorMap
                 $prefix .= '\\';
             }
             $list = is_array($dirs) ? $dirs : [$dirs];
+            $resolvedDirs = [];
+            $seen = [];
             foreach ($list as $dir) {
                 if (!is_string($dir) || '' === $dir) {
                     continue;
                 }
                 $resolved = realpath($dir);
-                if (false === $resolved || !is_dir($resolved)) {
+                if (false === $resolved || !is_dir($resolved) || isset($seen[$resolved])) {
                     continue;
                 }
-                $map[$prefix] = $resolved;
-                break;
+                $seen[$resolved] = true;
+                $resolvedDirs[] = $resolved;
+            }
+            if ([] !== $resolvedDirs) {
+                $map[$prefix] = $resolvedDirs;
             }
         }
 

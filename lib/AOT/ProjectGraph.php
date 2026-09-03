@@ -78,10 +78,21 @@ final class ProjectGraph
         // Composer vendor maps (#36382): default on when vendor/composer exists.
         $composer = ComposerVendorMap::load($root, $manifest);
         $errors = array_merge($errors, $composer['errors']);
-        foreach ($composer['psr4'] as $prefix => $baseDir) {
-            if (!isset($psr4Map[$prefix])) {
-                $psr4Map[$prefix] = $baseDir;
+        foreach ($composer['psr4'] as $prefix => $baseDirs) {
+            $extra = ProjectAutoload::normalizeBaseDirs($baseDirs);
+            if ([] === $extra) {
+                continue;
             }
+            if (!isset($psr4Map[$prefix])) {
+                $psr4Map[$prefix] = 1 === count($extra) ? $extra[0] : $extra;
+
+                continue;
+            }
+            $merged = array_values(array_unique(array_merge(
+                ProjectAutoload::normalizeBaseDirs($psr4Map[$prefix]),
+                $extra
+            )));
+            $psr4Map[$prefix] = 1 === count($merged) ? $merged[0] : $merged;
         }
         foreach ($composer['all_files'] as $path) {
             $key = realpath($path) ?: $path;

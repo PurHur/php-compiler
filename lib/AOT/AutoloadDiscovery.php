@@ -91,12 +91,12 @@ final class AutoloadDiscovery
     }
 
     /**
-     * @param array<string, string> $psr4Map
+     * @param array<string, string|list<string>> $psr4Map
      */
     private static function isPsr4Candidate(string $className, array $psr4Map): bool
     {
         foreach ($psr4Map as $prefix => $_base) {
-            if (str_starts_with($className, $prefix)) {
+            if (is_string($prefix) && str_starts_with($className, $prefix)) {
                 return true;
             }
         }
@@ -105,20 +105,29 @@ final class AutoloadDiscovery
     }
 
     /**
-     * @param array<string, string> $psr4Map
+     * @param array<string, string|list<string>> $psr4Map
      */
     private static function expectedRelativePath(string $projectDir, string $className, array $psr4Map): ?string
     {
-        foreach ($psr4Map as $prefix => $baseDir) {
-            if (!str_starts_with($className, $prefix)) {
+        $candidates = [];
+        foreach ($psr4Map as $prefix => $baseDirs) {
+            if (!is_string($prefix) || !str_starts_with($className, $prefix)) {
                 continue;
             }
+            $candidates[] = [$prefix, ProjectAutoload::normalizeBaseDirs($baseDirs)];
+        }
+        usort(
+            $candidates,
+            static fn (array $a, array $b): int => strlen($b[0]) <=> strlen($a[0])
+        );
+
+        foreach ($candidates as [$prefix, $dirs]) {
             $relative = substr($className, strlen($prefix));
-            if ('' === $relative) {
-                return null;
+            if ('' === $relative || [] === $dirs) {
+                continue;
             }
-            $base = rtrim($baseDir, '/\\');
-            $absolute = $base.'/'.str_replace('\\', '/', $relative).'.php';
+            $relPath = str_replace('\\', '/', $relative).'.php';
+            $absolute = rtrim($dirs[0], '/\\').'/'.$relPath;
             $root = ProjectManifest::resolveProjectDir($projectDir) ?? $projectDir;
             $display = ProjectGraph::formatFileList($root, [$absolute]);
 

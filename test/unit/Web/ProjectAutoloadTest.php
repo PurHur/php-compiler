@@ -26,6 +26,30 @@ final class ProjectAutoloadTest extends TestCase
         }
     }
 
+    public function testResolveClassPathTriesSecondaryComposerBaseDir(): void
+    {
+        $dir = sys_get_temp_dir().'/phpc_autoload_dual_'.bin2hex(random_bytes(6));
+        $this->assertTrue(mkdir($dir.'/a', 0777, true));
+        $this->assertTrue(mkdir($dir.'/b', 0777, true));
+        try {
+            file_put_contents($dir.'/a/Factory.php', '<?php namespace Msg; class Factory {}');
+            file_put_contents($dir.'/b/Stream.php', '<?php namespace Msg; class Stream {}');
+            $map = ['Msg\\' => [$dir.'/a', $dir.'/b']];
+            $factory = ProjectAutoload::resolveClassPath('Msg\\Factory', $map);
+            $stream = ProjectAutoload::resolveClassPath('Msg\\Stream', $map);
+            $this->assertNotNull($factory);
+            $this->assertNotNull($stream);
+            $this->assertStringEndsWith('/a/Factory.php', $factory);
+            $this->assertStringEndsWith('/b/Stream.php', $stream);
+            $files = ProjectAutoload::collectPhpFiles($dir, $map);
+            $joined = implode("\n", $files);
+            $this->assertStringContainsString('Factory.php', $joined);
+            $this->assertStringContainsString('Stream.php', $joined);
+        } finally {
+            $this->removeTree($dir);
+        }
+    }
+
     public function testVmAutoloadLoadsClassOnDemand(): void
     {
         $dir = sys_get_temp_dir().'/phpc_autoload_vm_'.bin2hex(random_bytes(6));
