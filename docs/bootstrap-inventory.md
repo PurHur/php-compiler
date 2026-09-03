@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8113 |
-| Phase A inventory files (M2 ratio SSOT) | 8113 |
+| PHP files on vm.php path | 8115 |
+| Phase A inventory files (M2 ratio SSOT) | 8115 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 25774 |
+| Source constructs flagged (warnings) | 25777 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2180,11 +2180,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/random/BuiltinClasses.php` | 0 | 4 |
 | `ext/random/BuiltinEnums.php` | 0 | 3 |
 | `ext/random/GammaSection.php` | 0 | 1 |
+| `ext/random/JitRandomExtensionHooksFacade.php` | 0 | 1 |
 | `ext/random/JitRandomizerConstruct.php` | 0 | 1 |
 | `ext/random/JitRandomizerGetBytesFromString.php` | 0 | 1 |
 | `ext/random/JitRandomizerMt19937Construct.php` | 0 | 1 |
 | `ext/random/JitRandomizerUserScript.php` | 0 | 2 |
-| `ext/random/Module.php` | 0 | 1 |
+| `ext/random/Module.php` | 0 | 2 |
 | `ext/random/Mt19937Instance.php` | 0 | 1 |
 | `ext/random/PcgOneseq128XslRr64Instance.php` | 0 | 1 |
 | `ext/random/RandomConstants.php` | 0 | 1 |
@@ -7158,6 +7159,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/PropertyHookDispatchLlvm.php` | 0 | 6 |
 | `lib/JIT/PropertyIsInitializedHelper.php` | 0 | 1 |
 | `lib/JIT/PropertyIsInitializedLlvm.php` | 0 | 2 |
+| `lib/JIT/RandomExtensionHooks.php` | 0 | 1 |
 | `lib/JIT/RandomizerInstanceMethodJit.php` | 0 | 4 |
 | `lib/JIT/ReadonlyBridge.php` | 0 | 1 |
 | `lib/JIT/ReadonlyClassGuard.php` | 0 | 2 |
@@ -25516,6 +25518,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 9 class method(s)
 
+### `ext/random/JitRandomExtensionHooksFacade.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
 ### `ext/random/JitRandomizerConstruct.php`
 
 **Warnings** (review for bootstrap subset):
@@ -25540,7 +25547,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/random/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- new JitRandomExtensionHooksFacade (line 30)
+- 2 class method(s)
 
 ### `ext/random/Mt19937Instance.php`
 
@@ -58217,7 +58225,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ExtensionLoweringHooks.php`
 
 **Warnings** (review for bootstrap subset):
-- 67 class method(s)
+- 68 class method(s)
 
 ### `lib/JIT/FiberHelper.php`
 
@@ -59163,6 +59171,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 11 class method(s)
 - 2 closure(s)
+
+### `lib/JIT/RandomExtensionHooks.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
 
 ### `lib/JIT/RandomizerInstanceMethodJit.php`
 

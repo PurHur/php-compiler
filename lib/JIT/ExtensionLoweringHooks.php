@@ -206,6 +206,9 @@ final class ExtensionLoweringHooks
     /** calendar JIT/VM surfaces — registered from ext/calendar Module::jitInit (#36204). */
     public ?CalendarExtensionHooks $calendar = null;
 
+    /** random JIT Call surfaces — registered from ext/random Module::jitInit (#36204). */
+    public ?RandomExtensionHooks $random = null;
+
     public function requirePosixNested(): PosixNestedJitKernels
     {
         if (null === $this->posixNested) {
@@ -237,6 +240,17 @@ final class ExtensionLoweringHooks
         }
 
         return $this->calendar;
+    }
+
+    public function requireRandom(): RandomExtensionHooks
+    {
+        if (null === $this->random) {
+            throw new \RuntimeException(
+                'random extension hooks not registered — ext/random Module::jitInit missing (#36204)'
+            );
+        }
+
+        return $this->random;
     }
 
     public function tryPrepareDimWrite(Context $context, Variable $container, Variable $dim): ?Variable

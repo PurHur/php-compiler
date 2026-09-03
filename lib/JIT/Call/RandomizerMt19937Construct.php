@@ -4,17 +4,21 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
-use PHPCompiler\ext\random\JitRandomizerMt19937Construct;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
 
-/** Random\Engine\Mt19937::__construct() — user-script AOT (#19574). */
+/**
+ * Random\Engine\Mt19937::__construct() — user-script AOT (#19574).
+ *
+ * Dispatch via {@see Context::$extensionLowering} so lib/JIT does not import
+ * {@code ext\random} (#36204). php-src: ext/random/engine_mt19937.c.
+ */
 final class RandomizerMt19937Construct implements Call
 {
     public function call(Context $context, Variable ...$args): Value
     {
-        return JitRandomizerMt19937Construct::invoke($context, ...$args);
+        return $context->extensionLowering->requireRandom()->mt19937Construct($context, ...$args);
     }
 }
