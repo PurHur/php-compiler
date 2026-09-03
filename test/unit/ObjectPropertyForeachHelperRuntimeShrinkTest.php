@@ -28,4 +28,12 @@ final class ObjectPropertyForeachHelperRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('emitPropertyNameAtIndex', $source);
         $this->assertGreaterThan(250, substr_count($source, "\n") + 1);
     }
+
+    /** Mixed call results tagged classUserType=object must not claim array foreach (#36469). */
+    public function testCanLowerRejectsGenericObjectUserTypeOnValueBoxes(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/VM/VmObjectPropertyForeach.php');
+        $this->assertStringContainsString('#36469', $source);
+        $this->assertStringContainsString("'object' === strtolower(ltrim(\$containerUserType, '\\\\'))", $source);
+    }
 }
