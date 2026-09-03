@@ -22,6 +22,8 @@ SCAN_PATHS=(
 
 fail=0
 
+# Require ripgrep on PATH (CI image + script/ensure-ripgrep.sh). Do not auto-fetch
+# here — check-gate-honesty probes PATH=/usr/bin:/bin and must still exit 2 (#36248).
 if ! command -v rg >/dev/null 2>&1; then
   echo "check-stale-issue-refs: ripgrep (rg) required but not found (#36248)" >&2
   exit 2
@@ -49,9 +51,8 @@ check_pattern() {
   local issue="$1"
   local pattern="$2"
   local hits
-  if ! hits="$(rg -n --no-heading -S "$pattern" "${SCAN_PATHS[@]}" 2>/dev/null || true)"; then
-    hits=""
-  fi
+  # rg exits 1 when there are no matches — that is success for this gate (#36248).
+  hits="$(rg -n --no-heading -S "$pattern" "${SCAN_PATHS[@]}" 2>/dev/null)" || hits=""
   [[ -n "$hits" ]] || return 0
   while IFS= read -r hit; do
     [[ -n "$hit" ]] || continue

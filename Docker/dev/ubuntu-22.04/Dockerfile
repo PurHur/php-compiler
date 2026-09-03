@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common gnupg \
     && add-apt-repository -y ppa:ondrej/php \
     && apt-get update && apt-get install -y --no-install-recommends \
-    git curl unzip ca-certificates dpkg \
+    git curl unzip ca-certificates dpkg ripgrep \
     php${PHP_VERSION}-cli php${PHP_VERSION}-mbstring php${PHP_VERSION}-xml \
     php${PHP_VERSION}-ffi php${PHP_VERSION}-posix php${PHP_VERSION}-phar \
     php${PHP_VERSION}-tokenizer php${PHP_VERSION}-dom php${PHP_VERSION}-xmlwriter \

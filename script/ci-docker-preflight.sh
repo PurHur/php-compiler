@@ -51,6 +51,7 @@ ci_docker_acquire_single_ci_lock() {
     if [[ -z "${_CI_DOCKER_LOCK_TRAP_INSTALLED:-}" ]]; then
       export _CI_DOCKER_LOCK_TRAP_INSTALLED=1
       export _CI_DOCKER_LOCKFILE="$lockfile"
+      # Trap must not fail the exiting shell if the lockfile is already gone (#36248 justified).
       trap 'rm -f "${_CI_DOCKER_LOCKFILE:-}" 2>/dev/null || true' EXIT INT TERM
     fi
     if [[ "${PHP_COMPILER_CI_VERBOSE:-0}" = "1" ]]; then
@@ -76,6 +77,7 @@ ci_docker_acquire_single_ci_lock() {
   local holder_pid=""
   local holder_ts=""
   if [[ -r "$lockfile" ]]; then
+    # Diagnostics only — unreadable/racy lock metadata must not abort the error path (#36248 justified).
     holder=$(head -n 1 "$lockfile" 2>/dev/null || true)
     holder_pid=$(awk '{print $1}' <<< "$holder" 2>/dev/null || true)
     holder_ts=$(awk '{print $2}' <<< "$holder" 2>/dev/null || true)
@@ -87,11 +89,13 @@ ci_docker_acquire_single_ci_lock() {
   if command -v stat >/dev/null 2>&1; then
     # GNU coreutils: stat -c %Y yields epoch seconds.
     local mtime=""
+    # Best-effort stale-lock heuristics; missing stat output is non-fatal (#36248 justified).
     mtime=$(stat -c %Y "$lockfile" 2>/dev/null || true)
     local size=""
     size=$(stat -c %s "$lockfile" 2>/dev/null || true)
     if [[ -n "$mtime" ]] && [[ "$mtime" =~ ^[0-9]+$ ]]; then
       local now=""
+      # Best-effort clock read for lock age (#36248 justified).
       now=$(date +%s 2>/dev/null || true)
       if [[ -n "$now" ]] && [[ "$now" =~ ^[0-9]+$ ]]; then
         local age=$(( now - mtime ))
@@ -104,6 +108,7 @@ ci_docker_acquire_single_ci_lock() {
             && (( size == 0 )) && (( age >= 5 ))
           then
             echo "ci-docker-preflight: lockfile is empty (size 0) and older than 5s; attempting one-time cleanup + retry" >&2
+            # Stale empty lock cleanup must not fail if another process won the race (#36248 justified).
             rm -f "$lockfile" 2>/dev/null || true
             export _CI_DOCKER_LOCK_STALE_RETRY=1
             ci_docker_acquire_single_ci_lock
@@ -116,6 +121,7 @@ ci_docker_acquire_single_ci_lock() {
             if [[ -n "$holder_pid" ]] && [[ "$holder_pid" =~ ^[0-9]+$ ]] && ! kill -0 "$holder_pid" 2>/dev/null; then
               echo "ci-docker-preflight: lock appears stale (pid ${holder_pid} not running; age ${age}s >= ${stale_after}s)" >&2
               echo "ci-docker-preflight: attempting one-time stale cleanup + retry" >&2
+              # Stale lock cleanup must not fail if another process won the race (#36248 justified).
               rm -f "$lockfile" 2>/dev/null || true
               export _CI_DOCKER_LOCK_STALE_RETRY=1
               ci_docker_acquire_single_ci_lock
@@ -124,6 +130,7 @@ ci_docker_acquire_single_ci_lock() {
             if [[ -z "$holder_pid" ]]; then
               echo "ci-docker-preflight: lock appears stale (missing holder pid; age ${age}s >= ${stale_after}s)" >&2
               echo "ci-docker-preflight: attempting one-time stale cleanup + retry" >&2
+              # Stale lock cleanup must not fail if another process won the race (#36248 justified).
               rm -f "$lockfile" 2>/dev/null || true
               export _CI_DOCKER_LOCK_STALE_RETRY=1
               ci_docker_acquire_single_ci_lock

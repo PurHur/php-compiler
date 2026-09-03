@@ -24,7 +24,8 @@ scan_dirs() {
   local dir line
   for dir in "${FIRST_PARTY_DIRS[@]}"; do
     [[ -d "$dir" ]] || continue
-    grep -RInE "$pattern" "$dir" "$@" 2>/dev/null || true
+    # grep exit 1 = no matches (not a failure under set -e) (#36248)
+    grep -RInE "$pattern" "$dir" "$@" 2>/dev/null || [[ $? -eq 1 ]]
   done
 }
 
@@ -51,7 +52,7 @@ while IFS= read -r hit; do
   fi
   echo "check-no-unlimited-memory: forbidden -d memory_limit=-1: $hit" >&2
   fail=1
-done < <(scan_dirs '(-d[[:space:]]+memory_limit=-1|memory_limit=-1)' --include='*.sh' | grep -vE '^[^:]*:[0-9]+:#' || true)
+done < <(scan_dirs '(-d[[:space:]]+memory_limit=-1|memory_limit=-1)' --include='*.sh' | grep -vE '^[^:]*:[0-9]+:#' || [[ $? -eq 1 ]])
 
 if [[ "$fail" -ne 0 ]]; then
   exit 1

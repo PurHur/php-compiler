@@ -32,7 +32,10 @@ for rel in "${PARITY_FILES[@]}"; do
   fi
   if ! cmp -s "$left" "$right"; then
     echo "check-init-fileupload-parity: drift in ${rel} (sync from ${CANONICAL} → ${TEMPLATE}):" >&2
-    diff -u "$left" "$right" >&2 || true
+    # diff exits 1 on inequality after cmp already failed — keep set -e (#36248)
+    if ! diff -u "$left" "$right" >&2; then
+      :
+    fi
     fail=1
   fi
 done
