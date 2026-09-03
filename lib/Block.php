@@ -323,6 +323,15 @@ class Block {
     private ?int $funccallInitCountCache = null;
 
     /**
+     * Cached pure typed-int self-recursive host accelerator (#36411 / #36449).
+     *
+     * null = not analyzed; false = ineligible; array = pattern for host evaluation.
+     *
+     * @var null|false|array{threshold:int,baseMode:'const'|'param',baseConst:int,subA:int,subB:int}
+     */
+    public null|false|array $vmTypedIntSelfRecursive = null;
+
+    /**
      * Whether opCodes contain ASSIGN / flagged ITER_VALUE that the assign-result
      * fallback scan must search (#36387). Null = recompute after truncate/splice.
      */
