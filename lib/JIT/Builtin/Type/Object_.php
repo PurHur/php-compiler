@@ -4055,7 +4055,8 @@ class Object_ extends Type {
         if ('datetimeinterface' === $lcname) {
             $this->seedExternalClassConstants($id, \PHPCompiler\VM\DateTimeInterfaceSupport::classConstants());
         }
-        // DomNode / SimpleXML / intl / zip / sqlite3 / bcmath: Module::jitInit seeders (#36204).
+        // Dom / SimpleXML / intl / zip / sqlite3 / bcmath / tokenizer / openssl / xmlreader:
+        // Module::jitInit seeders (#36204).
         foreach ($this->externalClassSeeders[$lcname] ?? [] as $seeder) {
             $seeder($this, $id);
         }
@@ -4253,22 +4254,7 @@ class Object_ extends Type {
             // Thin user-script AOT must call __construct (not allocate-only) (#27303 / #26772).
             $this->markHasConstructor($id);
         }
-        if ('phptoken' === $lcname) {
-            // php-src PhpToken public $id/$text/$line/$pos (#27263 / #6794).
-            $this->defineProperty($id, \PHPCompiler\ext\tokenizer\VmPhpToken::PROP_ID, Variable::TYPE_NATIVE_LONG);
-            $this->defineProperty($id, \PHPCompiler\ext\tokenizer\VmPhpToken::PROP_TEXT, Variable::TYPE_VALUE);
-            $this->defineProperty($id, \PHPCompiler\ext\tokenizer\VmPhpToken::PROP_LINE, Variable::TYPE_NATIVE_LONG);
-            $this->defineProperty($id, \PHPCompiler\ext\tokenizer\VmPhpToken::PROP_POS, Variable::TYPE_NATIVE_LONG);
-            $this->markHasConstructor($id);
-            $pub = \PHPCfg\Func::FLAG_PUBLIC;
-            $pubStatic = $pub | \PHPCfg\Func::FLAG_STATIC;
-            $this->defineMethodVisibility($id, '__construct', $pub);
-            $this->defineMethodVisibility($id, 'tokenize', $pubStatic);
-            $this->defineMethodVisibility($id, 'gettokenname', $pub, 'getTokenName');
-            $this->defineMethodVisibility($id, 'is', $pub);
-            $this->defineMethodVisibility($id, 'isignorable', $pub, 'isIgnorable');
-            $this->defineMethodVisibility($id, '__tostring', $pub, '__toString');
-        }
+        // PhpToken props / methods — ext/tokenizer/Module::jitInit seeder (#36204 / #27263).
         if ('reflectionenum' === $lcname) {
             // TYPE_VALUE: emitSetStringPropertyFromCstr stores heap __value__* boxes (#21551 / #27314).
             $this->defineProperty($id, 'name', Variable::TYPE_VALUE);
@@ -4320,31 +4306,8 @@ class Object_ extends Type {
             $this->defineProperty($id, \PHPCompiler\ext\standard\ZlibIncrementalJitSupport::PROP_READ_LEN, Variable::TYPE_NATIVE_LONG);
             $this->markFinalClass($lcname);
         }
-        // ZipArchive stub props — registered by ext/zip/Module::jitInit seeder (#36204 / #35002).
-        // OpenSSLAsymmetricKey PEM for thin AOT openssl_pkey_new (#34015).
-        if ('opensslasymmetrickey' === $lcname) {
-            $this->defineProperty(
-                $id,
-                \PHPCompiler\ext\openssl\OpensslPkeyNewJitSupport::PROP_PEM,
-                Variable::TYPE_STRING
-            );
-        }
-        // OpenSSLCertificate PEM for thin AOT openssl_x509_read (#34048).
-        if ('opensslcertificate' === $lcname) {
-            $this->defineProperty(
-                $id,
-                \PHPCompiler\ext\openssl\OpensslCertificateJitSupport::PROP_PEM,
-                Variable::TYPE_STRING
-            );
-        }
-        // OpenSSLCertificateSigningRequest PEM for thin AOT openssl_csr_new (#34061).
-        if ('opensslcertificatesigningrequest' === $lcname) {
-            $this->defineProperty(
-                $id,
-                \PHPCompiler\ext\openssl\OpensslCsrJitSupport::PROP_PEM,
-                Variable::TYPE_STRING
-            );
-        }
+        // ZipArchive stub props — ext/zip/Module::jitInit seeder (#36204 / #35002).
+        // OpenSSL* PEM slots — ext/openssl/Module::jitInit seeder (#36204 / #34015).
         if ('phpcompiler\vm\context' === $lcname) {
             $this->defineProperty($id, 'runtime', Variable::TYPE_OBJECT);
             $this->defineProperty($id, 'errors', Variable::TYPE_OBJECT);
@@ -4491,105 +4454,7 @@ class Object_ extends Type {
             // Thin user-script AOT must call __construct (not allocate-only) (#26772).
             $this->markHasConstructor($id);
         }
-        if ('domnode' === $lcname) {
-            // Stub for property_exists() + inheritance — computed read via JitDomNodeBaseUri (#34904).
-            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_BASE_URI, Variable::TYPE_VALUE);
-            $this->markPropertyWriteReject($id, \PHPCompiler\ext\dom\VmDom::PROP_BASE_URI);
-            $this->propagateInstancePropertyToSubclasses($id, \PHPCompiler\ext\dom\VmDom::PROP_BASE_URI);
-        }
-        if ('domelement' === $lcname) {
-            $this->defineProperty($id, 'nodeName', Variable::TYPE_STRING);
-            $this->defineProperty($id, 'tagName', Variable::TYPE_STRING);
-            $this->defineProperty($id, 'localName', Variable::TYPE_STRING);
-            $this->defineProperty($id, 'attributes', Variable::TYPE_VALUE);
-            // Thin AOT nodeType seed (#33607) — must be in allocate() layout.
-            $this->defineProperty($id, 'nodeType', Variable::TYPE_NATIVE_LONG);
-            // DocumentType stand-in slots (createDocumentType / loadXML doctype) —
-            // late define after loadXML tree allocate undersizes (#34887 / #33565).
-            $this->defineProperty($id, 'name', Variable::TYPE_STRING);
-            $this->defineProperty($id, 'publicId', Variable::TYPE_STRING);
-            $this->defineProperty($id, 'systemId', Variable::TYPE_STRING);
-            // ParentNode / NonDocumentTypeChildNode — peer Document #34910. createElement
-            // stand-in must pin before allocate or childElementCount NATIVE_LONG SIGSEGVs (#35007).
-            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_FIRST_ELEMENT_CHILD, Variable::TYPE_VALUE);
-            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_LAST_ELEMENT_CHILD, Variable::TYPE_VALUE);
-            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_CHILD_ELEMENT_COUNT, Variable::TYPE_NATIVE_LONG);
-            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_NEXT_ELEMENT_SIBLING, Variable::TYPE_VALUE);
-            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_PREVIOUS_ELEMENT_SIBLING, Variable::TYPE_VALUE);
-        }
-        if ('domdocument' === $lcname) {
-            // Must be in the allocate() prop layout — late defineProperty from
-            // loadXML/appendChild wrote past the object (#32736). Child-link slots
-            // belong on DOMDocument too: writing DOMNode::firstChild indices into a
-            // DOMDocument instance overwrote documentElement (wrong class_id / SIGSEGV).
-            $this->defineProperty($id, 'documentElement', Variable::TYPE_OBJECT);
-            $this->defineProperty($id, 'firstChild', Variable::TYPE_VALUE);
-            $this->defineProperty($id, 'lastChild', Variable::TYPE_VALUE);
-            $this->defineProperty($id, 'childNodes', Variable::TYPE_VALUE);
-            // Thin AOT nodeType seed (#33607).
-            $this->defineProperty($id, 'nodeType', Variable::TYPE_NATIVE_LONG);
-            // loadHTML/loadXML id-map — late defineProperty after new DOMDocument()
-            // OOB in __object__load_value_slot (#33689 / peer #32736).
-            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_ELEMENT_ID_MAP, Variable::TYPE_VALUE);
-            // loadXML $doc->doctype — late defineProperty after new undersizes (#34887 / #32736).
-            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_DOCTYPE, Variable::TYPE_VALUE);
-            // Computed document props — late defineProperty after loadXML SIGSEGVs (#34894 / #34887).
-            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_IMPLEMENTATION, Variable::TYPE_VALUE);
-            // documentURI writable; baseURI read-only alias (#34925 leftover of #34919 / #34904).
-            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_DOCUMENT_URI, Variable::TYPE_VALUE);
-            // encoding writable; xmlEncoding/actualEncoding read-only aliases (#34919 leftover of #34916).
-            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_ENCODING, Variable::TYPE_VALUE);
-            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_XML_ENCODING, Variable::TYPE_VALUE);
-            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_ACTUAL_ENCODING, Variable::TYPE_VALUE);
-            $this->markPropertyWriteReject($id, \PHPCompiler\ext\dom\VmDom::PROP_XML_ENCODING);
-            $this->markPropertyWriteReject($id, \PHPCompiler\ext\dom\VmDom::PROP_ACTUAL_ENCODING);
-            // xmlVersion / xmlStandalone (+ legacy aliases) — slots so writes stick (#34916).
-            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_XML_VERSION, Variable::TYPE_STRING);
-            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_VERSION, Variable::TYPE_STRING);
-            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_XML_STANDALONE, Variable::TYPE_VALUE);
-            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_STANDALONE, Variable::TYPE_VALUE);
-            // libxml option props — VALUE bool boxes so var_export/writes match Zend (#34899 / #34908).
-            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_STRICT_ERROR_CHECKING, Variable::TYPE_VALUE);
-            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_FORMAT_OUTPUT, Variable::TYPE_VALUE);
-            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_VALIDATE_ON_PARSE, Variable::TYPE_VALUE);
-            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_RESOLVE_EXTERNALS, Variable::TYPE_VALUE);
-            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_PRESERVE_WHITE_SPACE, Variable::TYPE_VALUE);
-            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_RECOVER, Variable::TYPE_VALUE);
-            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_SUBSTITUTE_ENTITIES, Variable::TYPE_VALUE);
-            // DOMNode::$baseURI — late defineProperty after loadXML SIGSEGVs (#34904 leftover of #34894).
-            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_BASE_URI, Variable::TYPE_VALUE);
-            $this->markPropertyWriteReject($id, \PHPCompiler\ext\dom\VmDom::PROP_BASE_URI);
-            // ParentNode element-nav — JitDomElementNavigationProperty used DOMElement slots on
-            // Document and SIGSEGVd (#34910 leftover of #34899 / #34352).
-            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_FIRST_ELEMENT_CHILD, Variable::TYPE_VALUE);
-            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_LAST_ELEMENT_CHILD, Variable::TYPE_VALUE);
-            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_CHILD_ELEMENT_COUNT, Variable::TYPE_NATIVE_LONG);
-            // DOMNode identity on Document — late defineProperty after loadXML undersizes /
-            // reads uninitialised slots (#34992 leftover of #34899 / #34910). php-src node.c:
-            // node_name_read → "#document"; namespace_uri/local_name/attributes → null;
-            // prefix → "". previousSibling/nextSibling stay on the child-edge fetch path
-            // (JitDomNodeChildProperty) — pinning them here hangs thin AOT compile.
-            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_NODE_NAME, Variable::TYPE_STRING);
-            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_PREFIX, Variable::TYPE_STRING);
-            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_NAMESPACE_URI, Variable::TYPE_VALUE);
-            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_LOCAL_NAME, Variable::TYPE_VALUE);
-            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_ATTRIBUTES, Variable::TYPE_VALUE);
-            // method_exists on thin-AOT DOMDocument handles (#29853 / re-#19654).
-            $pub = \PHPCfg\Func::FLAG_PUBLIC;
-            foreach ([
-                'adoptnode',
-                'importnode',
-                'loadxml',
-                'loadhtml',
-                'appendchild',
-                'createelement',
-                'savexml',
-                'getelementbyid',
-            ] as $method) {
-                $this->defineMethodVisibility($id, $method, $pub);
-            }
-            $this->markHasConstructor($id);
-        }
+        // DOMNode / DOMElement / DOMDocument layout — ext/dom/Module::jitInit seeders (#36204).
         if ('domattr' === $lcname) {
             foreach ([
                 'nodeName', 'name', 'value', 'nodeValue',
@@ -4726,58 +4591,7 @@ class Object_ extends Type {
                 $this->defineMethodVisibility($id, $method, $pub);
             }
         }
-        if ('xmlreader' === $lcname) {
-            // Thin AOT: pull-parser cursor + virtual props as real slots (#27299 / #35983).
-            // Layout must be complete before `new XMLReader()` allocates — ensureLayout alone
-            // after construction overflows the object and corrupts __xr_pos (read() → false).
-            $this->defineProperty(
-                $id,
-                \PHPCompiler\ext\xmlreader\JitXmlReaderUserScript::PROP_POS,
-                Variable::TYPE_NATIVE_LONG
-            );
-            $this->defineProperty($id, 'nodeType', Variable::TYPE_NATIVE_LONG);
-            $this->defineProperty($id, 'name', Variable::TYPE_STRING);
-            $this->defineProperty($id, 'value', Variable::TYPE_STRING);
-            $this->defineProperty($id, 'depth', Variable::TYPE_NATIVE_LONG);
-            $this->defineProperty($id, 'localName', Variable::TYPE_STRING);
-            $this->defineProperty($id, 'prefix', Variable::TYPE_STRING);
-            $this->defineProperty($id, 'namespaceURI', Variable::TYPE_STRING);
-            $this->defineProperty($id, 'attributeCount', Variable::TYPE_NATIVE_LONG);
-            $this->defineProperty($id, 'hasAttributes', Variable::TYPE_NATIVE_BOOL);
-            $this->defineProperty($id, 'hasValue', Variable::TYPE_NATIVE_BOOL);
-            $this->defineProperty($id, 'isEmptyElement', Variable::TYPE_NATIVE_BOOL);
-            $this->defineProperty($id, 'isDefault', Variable::TYPE_NATIVE_BOOL);
-            $this->defineProperty($id, 'xmlLang', Variable::TYPE_STRING);
-            $this->defineProperty($id, 'baseURI', Variable::TYPE_STRING);
-            $pub = \PHPCfg\Func::FLAG_PUBLIC;
-            $pubStatic = $pub | \PHPCfg\Func::FLAG_STATIC;
-            foreach (['read', 'close', 'next'] as $method) {
-                $this->defineMethodVisibility($id, $method, $pub);
-            }
-            foreach (['open', 'xml', 'fromstring', 'fromuri', 'fromstream'] as $method) {
-                $this->defineMethodVisibility($id, $method, $pubStatic);
-            }
-            $this->seedExternalClassConstants($id, [
-                'none' => \PHPCompiler\ext\xmlreader\XmlReaderConstants::NONE,
-                'element' => \PHPCompiler\ext\xmlreader\XmlReaderConstants::ELEMENT,
-                'attribute' => \PHPCompiler\ext\xmlreader\XmlReaderConstants::ATTRIBUTE,
-                'text' => \PHPCompiler\ext\xmlreader\XmlReaderConstants::TEXT,
-                'cdata' => \PHPCompiler\ext\xmlreader\XmlReaderConstants::CDATA,
-                'entity_ref' => \PHPCompiler\ext\xmlreader\XmlReaderConstants::ENTITY_REF,
-                'entity' => \PHPCompiler\ext\xmlreader\XmlReaderConstants::ENTITY,
-                'pi' => \PHPCompiler\ext\xmlreader\XmlReaderConstants::PI,
-                'comment' => \PHPCompiler\ext\xmlreader\XmlReaderConstants::COMMENT,
-                'doc' => \PHPCompiler\ext\xmlreader\XmlReaderConstants::DOC,
-                'doc_type' => \PHPCompiler\ext\xmlreader\XmlReaderConstants::DOC_TYPE,
-                'doc_fragment' => \PHPCompiler\ext\xmlreader\XmlReaderConstants::DOC_FRAGMENT,
-                'notation' => \PHPCompiler\ext\xmlreader\XmlReaderConstants::NOTATION,
-                'whitespace' => \PHPCompiler\ext\xmlreader\XmlReaderConstants::WHITESPACE,
-                'significant_whitespace' => \PHPCompiler\ext\xmlreader\XmlReaderConstants::SIGNIFICANT_WHITESPACE,
-                'end_element' => \PHPCompiler\ext\xmlreader\XmlReaderConstants::END_ELEMENT,
-                'end_entity' => \PHPCompiler\ext\xmlreader\XmlReaderConstants::END_ENTITY,
-                'xml_declaration' => \PHPCompiler\ext\xmlreader\XmlReaderConstants::XML_DECLARATION,
-            ]);
-        }
+        // XMLReader layout + constants — ext/xmlreader/Module::jitInit seeder (#36204 / #27299).
         if (
             'limititerator' === $lcname
             || 'appenditerator' === $lcname
