@@ -25,6 +25,23 @@ final class ProjectGraphTest extends TestCase
         $this->assertStringNotContainsString('templates/layout.php', $joined);
     }
 
+    public function testResolveGraphAllowlistIncludesMiniWebAppTemplates(): void
+    {
+        $dir = dirname(__DIR__, 2).'/examples/003-MiniWebApp';
+        $entry = realpath($dir.'/public/index.php');
+        $this->assertNotFalse($entry);
+        $resolved = \PHPCompiler\Cli\PhpcBuild::resolveGraphIncludePaths($dir, $entry);
+        $this->assertSame([], $resolved['errors'], implode("\n", $resolved['errors']));
+        $includesJoined = implode("\n", $resolved['includes']);
+        $allowJoined = implode("\n", $resolved['allowlist']);
+        // Bundle units stay main-scope only.
+        $this->assertStringNotContainsString('templates/layout.php', $includesJoined);
+        // File-map allowlist must cover JIT-inlined templates (#36382).
+        $this->assertStringContainsString('templates/layout.php', $allowJoined);
+        $this->assertStringContainsString('templates/thankyou.php', $allowJoined);
+        $this->assertStringContainsString('templates/home.php', $allowJoined);
+    }
+
     public function testDryRunCliPrintsMiniWebAppFiles(): void
     {
         $repoRoot = dirname(__DIR__, 2);

@@ -8,6 +8,8 @@ use PHPCompiler\AOT\ProjectGraph;
 use PHPCompiler\Lint\Issue;
 use PHPCompiler\Lint\Linter;
 use PHPCompiler\Lint\UnsupportedRegistry;
+use PHPCompiler\Runtime;
+use PHPCompiler\Web\LiteralIncludeDiscovery;
 use PHPCompiler\Web\ManifestValidator;
 use PHPCompiler\Web\ProjectManifest;
 
@@ -119,25 +121,50 @@ final class PhpcBuild
     /**
      * Non-entry compile units from ProjectGraph (manifest includes, literal includes, PSR-4).
      *
-     * @return array{includes: list<string>, errors: list<string>}
+     * `includes` are SourceBundler units (main-scope requires only). `allowlist` also covers
+     * method-body / nested literal includes that are JIT-inlined at call sites (MiniWebApp
+     * templates) so `PHP_COMPILER_AOT_INCLUDE_ALLOWLIST` does not reject them (#36382).
+     *
+     * @return array{includes: list<string>, allowlist: list<string>, errors: list<string>}
      */
     public static function resolveGraphIncludePaths(string $projectDir, string $entry): array
     {
         $graph = ProjectGraph::resolve($projectDir);
         if ([] !== $graph['errors']) {
-            return ['includes' => [], 'errors' => $graph['errors']];
+            return ['includes' => [], 'allowlist' => [], 'errors' => $graph['errors']];
         }
 
         $entryKey = realpath($entry) ?: $entry;
         $includes = [];
+        $allowSeen = [];
+        $allowlist = [];
         foreach ($graph['files'] as $path) {
             $key = realpath($path) ?: $path;
             if ($key !== $entryKey) {
                 $includes[] = $path;
             }
+            if (!isset($allowSeen[$key])) {
+                $allowSeen[$key] = true;
+                $allowlist[] = $path;
+            }
         }
 
-        return ['includes' => $includes, 'errors' => []];
+        // Method-body includes are intentionally omitted from the bundle (#739 / #878) but must
+        // still be on the project file map so IncludeHelper can JIT-inline them (#36382).
+        $runtime = new Runtime(Runtime::MODE_AOT);
+        foreach (LiteralIncludeDiscovery::discoverAbsolutePaths($runtime, $entry) as $path) {
+            $key = realpath($path) ?: $path;
+            if (isset($allowSeen[$key])) {
+                continue;
+            }
+            if (!is_file($path)) {
+                continue;
+            }
+            $allowSeen[$key] = true;
+            $allowlist[] = $path;
+        }
+
+        return ['includes' => $includes, 'allowlist' => $allowlist, 'errors' => []];
     }
 
     /**
