@@ -16,9 +16,11 @@ defaults — `doctor --env` exits non-zero when they drift.
 | `PHPCFG_SIMPLIFIER_LEGACY` | bool | compile | — | php-cfg Simplifier legacy walk opt-out | #23070 |
 | `PHPCFG_SIMPLIFIER_USECHAIN` | bool | compile | — | php-cfg Simplifier use-chain (legacy opt-in) | #23070 |
 | `PHPTYPES_RESOLVER_WORKLIST` | bool | compile | — | php-types resolver worklist | #36225 |
+| `PHP_COMPILER_AOT_CODEGEN_OPT` | string | compile | — | AOT TargetMachine codegen opt: none\|less\|default\|aggressive | #36387 |
 | `PHP_COMPILER_AOT_COMPILE_PROFILE` | bool | debug | — | AOT compile profiling | — |
 | `PHP_COMPILER_AOT_NO_FAST_EXIT` | bool | compile | — | Disable AOT fast-exit path | — |
 | `PHP_COMPILER_AOT_USER_SCRIPT` | string | compile | — | User script path for AOT driver | — |
+| `PHP_COMPILER_ASAN` | bool | compile | — | Link AOT binaries with -fsanitize=address,undefined | #36397 |
 | `PHP_COMPILER_BOOTSTRAP_AOT_LINK` | bool | compile | — | Bootstrap AOT link mode | — |
 | `PHP_COMPILER_BUNDLE_LINT_CACHE` | bool | compile | — | Bundle lint cache | — |
 | `PHP_COMPILER_CACHE` | bool | compile | — | Enable compile cache when 1 | — |
@@ -94,6 +96,8 @@ defaults — `doctor --env` exits non-zero when they drift.
 | `PHP_COMPILER_RELEASE_CFG_AFTER_COMPILE` | bool | compile | — | Release CFG after compile | — |
 | `PHP_COMPILER_REPORT_EXTERNAL_STUBS` | bool | debug | — | Report unbound external method stubs | — |
 | `PHP_COMPILER_REPO_ROOT` | string | runtime | — | Override repository root detection | — |
+| `PHP_COMPILER_RUNTIME_ASSERT` | bool | debug | — | Emit __ref__ delref underflow (M1) checks; alias PHPC_RUNTIME_ASSERT | #36397 |
+| `PHP_COMPILER_RUNTIME_ASSERT_INJECT_DOUBLE_DELREF` | bool | debug | — | Call rc=0 delref probe at standalone main (unit test) | #36397 |
 | `PHP_COMPILER_SELFHOST_AOT` | bool | compile | — | Self-host AOT emit mode | — |
 | `PHP_COMPILER_SKIP_SERVE_TESTS` | bool | gate | — | Skip @group serve tests (GHA-only) | — |
 | `PHP_COMPILER_SPINE_CHUNK` | string | compile | — | Split-TU spine chunk selector | #36147 |

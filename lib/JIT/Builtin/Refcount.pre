@@ -66,6 +66,7 @@ class Refcount extends Builtin {
         $this->implementAddref();
         $this->implementDelref();
         $this->implementSeparate();
+        // Runtime-assert fail/inject bodies live in Refcount.php (#36397).
     }
 
     /** WeakReference clear + GC unregister + deferred-destruct probes — delref only (#35802). */

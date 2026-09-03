@@ -2,6 +2,28 @@
 
 Documented behavior for web and array access. See also [#176](https://github.com/PurHur/php-compiler/issues/176) (capability matrix).
 
+## Memory model (#36397)
+
+Numbered ownership invariants. php-src: [Zend/zend_gc.c](https://github.com/php/php-src/blob/master/Zend/zend_gc.c) `zend_gc_collect_cycles`, [Zend/zend_types.h](https://github.com/php/php-src/blob/master/Zend/zend_types.h) `ZEND_RC_MOD_CHECK`. Compile-time checks: `PHP_COMPILER_RUNTIME_ASSERT=1` (alias `PHPC_RUNTIME_ASSERT=1`) rebuilds helper `__ref__*` (use `PHP_COMPILER_HELPER_RUNTIME_O=0`). Link-time ASan/UBSan: `PHP_COMPILER_ASAN=1`.
+
+| Id | Invariant | Who | When it fires |
+|----|-----------|-----|----------------|
+| **M1** | `refcount > 0` before `__ref__delref` decrements a counted header | `__ref__delref` | Double-delref or underflow; abort prints `PHPC_RUNTIME_ASSERT M1` |
+| **M2** | Immortal / non-refcounted headers (`TYPE_INFO_REFCOUNTED` clear) must not take the counted delref path | `__ref__delref` early return | Literal strings, interned keys |
+| **M3** | `__ref__addref` / `__ref__delref` own the count; callers never store `refcount` except init | lowering | Boxed temps, hashtable keys, objects |
+| **M4** | `{main}` may defer object free (`phpc_destruct_delref_allowed`) but still unregisters GC / WeakRef at rc 0 | `__ref__delref` | Request-lifetime objects (#4013) |
+| **M5** | Separate before writing a shared container (`rc > 1`) | `__ref__separate` | Arrays/strings COW |
+| **M6** | Helper-unit objects must not mix NestedJIT vs Runtime ABI for the same symbol | helper cache | leftover `*.1` symbols (#31894) |
+| **M7** | GC roots are objects whose rc hit 1 (`phpc_gc_register`); collector must not read after free | `GcCollectCyclesRuntime` | cyclic graphs (#36245) |
+
+Enable M1 in IR:
+
+```bash
+./script/docker-exec.sh -- bash -lc 'source script/php-env.sh && PHP_COMPILER_RUNTIME_ASSERT=1 PHP_COMPILER_HELPER_RUNTIME_O=0 php bin/compile.php -o /tmp/x FILE.php'
+```
+
+Injected double-delref (unit test only): `PHP_COMPILER_RUNTIME_ASSERT_INJECT_DOUBLE_DELREF=1` calls `phpc_runtime_assert_inject_double_delref` (malloc counted header at rc 0, one delref) before `{main}`.
+
 ## Undefined array keys ([#273](https://github.com/PurHur/php-compiler/issues/273))
 
 When `error_reporting` includes `E_WARNING` (default in VM: full `E_ALL`):

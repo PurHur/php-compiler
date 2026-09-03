@@ -3341,6 +3341,10 @@ class Context {
                 $emitInStandaloneMain(fn () => Builtin\ObjectHandleRuntime::emitSnapBaselineForStandaloneMain($this));
             }
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType
+                && \PHPCompiler\JIT\Builtin\Refcount::runtimeAssertInjectEnabled()) {
+                $emitInStandaloneMain(fn () => \PHPCompiler\JIT\Builtin\Refcount::emitInjectDoubleDelrefCall($this));
+            }
+            if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType
                 && !$this->shouldSkipStandaloneMainEnvProbeGate()) {
                 $emitInStandaloneMain(fn () => VmDriverExecuteNative::emitStandaloneMainEnvProbeGate($this, $this->main));
             } else {
