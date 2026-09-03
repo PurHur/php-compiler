@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\Variable;
 use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
 
@@ -46,8 +47,12 @@ class Module extends ModuleAbstract
             $context->functionProxies['dom\\htmldocument::createfromfile'] = new JIT\Call\DomHtmlDocumentCreateFromFile();
         }
 
-        // DOMNode::DOCUMENT_POSITION_* — php-src php_dom.stub.php (#36204).
+        // DOMNode layout + DOCUMENT_POSITION_* — php-src php_dom.stub.php (#34904 / #36204).
         $context->type->object->registerExternalClassSeeder('domnode', static function ($obj, int $id): void {
+            // Stub for property_exists() + inheritance — computed read via JitDomNodeBaseUri (#34904).
+            $obj->defineProperty($id, VmDom::PROP_BASE_URI, Variable::TYPE_VALUE);
+            $obj->markPropertyWriteReject($id, VmDom::PROP_BASE_URI);
+            $obj->propagateInstancePropertyToSubclasses($id, VmDom::PROP_BASE_URI);
             if (!CompilerVersion::supportsDomNodeCompareDocumentPosition()) {
                 return;
             }
@@ -59,6 +64,76 @@ class Module extends ModuleAbstract
                 'document_position_contained_by' => DomConstants::DOCUMENT_POSITION_CONTAINED_BY,
                 'document_position_implementation_specific' => DomConstants::DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC,
             ]);
+        });
+
+        // DOMElement allocate layout — ParentNode element-nav slots before allocate (#35007 / #36204).
+        $context->type->object->registerExternalClassSeeder('domelement', static function ($obj, int $id): void {
+            $obj->defineProperty($id, 'nodeName', Variable::TYPE_STRING);
+            $obj->defineProperty($id, 'tagName', Variable::TYPE_STRING);
+            $obj->defineProperty($id, 'localName', Variable::TYPE_STRING);
+            $obj->defineProperty($id, 'attributes', Variable::TYPE_VALUE);
+            $obj->defineProperty($id, 'nodeType', Variable::TYPE_NATIVE_LONG);
+            $obj->defineProperty($id, 'name', Variable::TYPE_STRING);
+            $obj->defineProperty($id, 'publicId', Variable::TYPE_STRING);
+            $obj->defineProperty($id, 'systemId', Variable::TYPE_STRING);
+            $obj->defineProperty($id, VmDom::PROP_FIRST_ELEMENT_CHILD, Variable::TYPE_VALUE);
+            $obj->defineProperty($id, VmDom::PROP_LAST_ELEMENT_CHILD, Variable::TYPE_VALUE);
+            $obj->defineProperty($id, VmDom::PROP_CHILD_ELEMENT_COUNT, Variable::TYPE_NATIVE_LONG);
+            $obj->defineProperty($id, VmDom::PROP_NEXT_ELEMENT_SIBLING, Variable::TYPE_VALUE);
+            $obj->defineProperty($id, VmDom::PROP_PREVIOUS_ELEMENT_SIBLING, Variable::TYPE_VALUE);
+        });
+
+        // DOMDocument allocate layout — must be complete before loadXML/appendChild (#32736 / #36204).
+        $context->type->object->registerExternalClassSeeder('domdocument', static function ($obj, int $id): void {
+            $obj->defineProperty($id, 'documentElement', Variable::TYPE_OBJECT);
+            $obj->defineProperty($id, 'firstChild', Variable::TYPE_VALUE);
+            $obj->defineProperty($id, 'lastChild', Variable::TYPE_VALUE);
+            $obj->defineProperty($id, 'childNodes', Variable::TYPE_VALUE);
+            $obj->defineProperty($id, 'nodeType', Variable::TYPE_NATIVE_LONG);
+            $obj->defineProperty($id, VmDom::PROP_ELEMENT_ID_MAP, Variable::TYPE_VALUE);
+            $obj->defineProperty($id, VmDom::PROP_DOCTYPE, Variable::TYPE_VALUE);
+            $obj->defineProperty($id, VmDom::PROP_IMPLEMENTATION, Variable::TYPE_VALUE);
+            $obj->defineProperty($id, VmDom::PROP_DOCUMENT_URI, Variable::TYPE_VALUE);
+            $obj->defineProperty($id, VmDom::PROP_ENCODING, Variable::TYPE_VALUE);
+            $obj->defineProperty($id, VmDom::PROP_XML_ENCODING, Variable::TYPE_VALUE);
+            $obj->defineProperty($id, VmDom::PROP_ACTUAL_ENCODING, Variable::TYPE_VALUE);
+            $obj->markPropertyWriteReject($id, VmDom::PROP_XML_ENCODING);
+            $obj->markPropertyWriteReject($id, VmDom::PROP_ACTUAL_ENCODING);
+            $obj->defineProperty($id, VmDom::PROP_XML_VERSION, Variable::TYPE_STRING);
+            $obj->defineProperty($id, VmDom::PROP_VERSION, Variable::TYPE_STRING);
+            $obj->defineProperty($id, VmDom::PROP_XML_STANDALONE, Variable::TYPE_VALUE);
+            $obj->defineProperty($id, VmDom::PROP_STANDALONE, Variable::TYPE_VALUE);
+            $obj->defineProperty($id, VmDom::PROP_STRICT_ERROR_CHECKING, Variable::TYPE_VALUE);
+            $obj->defineProperty($id, VmDom::PROP_FORMAT_OUTPUT, Variable::TYPE_VALUE);
+            $obj->defineProperty($id, VmDom::PROP_VALIDATE_ON_PARSE, Variable::TYPE_VALUE);
+            $obj->defineProperty($id, VmDom::PROP_RESOLVE_EXTERNALS, Variable::TYPE_VALUE);
+            $obj->defineProperty($id, VmDom::PROP_PRESERVE_WHITE_SPACE, Variable::TYPE_VALUE);
+            $obj->defineProperty($id, VmDom::PROP_RECOVER, Variable::TYPE_VALUE);
+            $obj->defineProperty($id, VmDom::PROP_SUBSTITUTE_ENTITIES, Variable::TYPE_VALUE);
+            $obj->defineProperty($id, VmDom::PROP_BASE_URI, Variable::TYPE_VALUE);
+            $obj->markPropertyWriteReject($id, VmDom::PROP_BASE_URI);
+            $obj->defineProperty($id, VmDom::PROP_FIRST_ELEMENT_CHILD, Variable::TYPE_VALUE);
+            $obj->defineProperty($id, VmDom::PROP_LAST_ELEMENT_CHILD, Variable::TYPE_VALUE);
+            $obj->defineProperty($id, VmDom::PROP_CHILD_ELEMENT_COUNT, Variable::TYPE_NATIVE_LONG);
+            $obj->defineProperty($id, VmDom::PROP_NODE_NAME, Variable::TYPE_STRING);
+            $obj->defineProperty($id, VmDom::PROP_PREFIX, Variable::TYPE_STRING);
+            $obj->defineProperty($id, VmDom::PROP_NAMESPACE_URI, Variable::TYPE_VALUE);
+            $obj->defineProperty($id, VmDom::PROP_LOCAL_NAME, Variable::TYPE_VALUE);
+            $obj->defineProperty($id, VmDom::PROP_ATTRIBUTES, Variable::TYPE_VALUE);
+            $pub = \PHPCfg\Func::FLAG_PUBLIC;
+            foreach ([
+                'adoptnode',
+                'importnode',
+                'loadxml',
+                'loadhtml',
+                'appendchild',
+                'createelement',
+                'savexml',
+                'getelementbyid',
+            ] as $method) {
+                $obj->defineMethodVisibility($id, $method, $pub);
+            }
+            $obj->markHasConstructor($id);
         });
     }
 

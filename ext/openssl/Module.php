@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\openssl;
 
+use PHPCompiler\JIT;
+use PHPCompiler\JIT\Variable;
 use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
 use PHPCompiler\VM;
@@ -16,6 +18,33 @@ use PHPCompiler\VM;
  */
 class Module extends ModuleAbstract
 {
+    /**
+     * OpenSSL* PEM slots for thin AOT (#34015 / #34048 / #34061 / #36204).
+     *
+     * php-src: ext/openssl/openssl.stub.php — OpenSSLAsymmetricKey / Certificate / CSR.
+     */
+    public function jitInit(JIT\Context $context): void
+    {
+        $context->type->object->registerExternalClassSeeder(
+            'opensslasymmetrickey',
+            static function ($obj, int $id): void {
+                $obj->defineProperty($id, OpensslPkeyNewJitSupport::PROP_PEM, Variable::TYPE_STRING);
+            }
+        );
+        $context->type->object->registerExternalClassSeeder(
+            'opensslcertificate',
+            static function ($obj, int $id): void {
+                $obj->defineProperty($id, OpensslCertificateJitSupport::PROP_PEM, Variable::TYPE_STRING);
+            }
+        );
+        $context->type->object->registerExternalClassSeeder(
+            'opensslcertificatesigningrequest',
+            static function ($obj, int $id): void {
+                $obj->defineProperty($id, OpensslCsrJitSupport::PROP_PEM, Variable::TYPE_STRING);
+            }
+        );
+    }
+
     public function init(Runtime $runtime): void
     {
         parent::init($runtime);
