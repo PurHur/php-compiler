@@ -1178,6 +1178,37 @@ PHP;
         );
     }
 
+    public function testWarmApplyPatchesDoesNotClaimAppliedWithoutMutation(): void
+    {
+        if (!is_dir(self::$root.'/vendor/ircmaxell/php-cfg')) {
+            self::markTestSkipped('vendor/ircmaxell/php-cfg not installed');
+        }
+
+        $script = self::$root.'/script/apply-patches.sh';
+        // First run brings markers current; second must be a pure Skip pass (#36229).
+        $warmup = [];
+        $warmupCode = 0;
+        exec('bash '.escapeshellarg($script).' 2>&1', $warmup, $warmupCode);
+        self::assertSame(0, $warmupCode, "warmup apply-patches failed:\n".implode("\n", $warmup));
+
+        $output = [];
+        $exitCode = 0;
+        exec('bash '.escapeshellarg($script).' 2>&1', $output, $exitCode);
+        $joined = implode("\n", $output);
+        self::assertSame(0, $exitCode, "warm apply-patches failed:\n".$joined);
+
+        $applied = array_values(array_filter(
+            $output,
+            static fn(string $line): bool => str_starts_with($line, 'Applied ')
+        ));
+        self::assertSame(
+            [],
+            $applied,
+            'warm apply-patches must not claim Applied when overlays mutate nothing (#36229)'
+        );
+        self::assertStringContainsString('install_overlay_file', (string) file_get_contents($script));
+    }
+
     public function testNoOrphanPatchFilesOnDisk(): void
     {
         $script = self::$root.'/script/apply-patches.sh';

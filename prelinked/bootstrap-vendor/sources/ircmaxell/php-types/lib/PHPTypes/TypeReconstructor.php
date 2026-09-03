@@ -44,7 +44,15 @@ class TypeReconstructor
             return;
         }
 
-        $round = 1;
+        // Worklist is the default (#16077 / #36225): dependency-driven instead of
+        // O(rounds × vars) rescans. Opcode dumps match legacy on a 10-file corpus.
+        // Opt out with PHPTYPES_RESOLVER_WORKLIST=0 or PHPTYPES_RESOLVER_LEGACY=1.
+        $worklistFlag = getenv('PHPTYPES_RESOLVER_WORKLIST');
+        $legacyResolver = ('0' === $worklistFlag)
+            || ('1' === getenv('PHPTYPES_RESOLVER_LEGACY'))
+            || ('false' === strtolower((string) $worklistFlag));
+        if ($legacyResolver) {
+            $round = 1;
         do {
             $start = count($resolved);
             $toRemove = [];
@@ -58,7 +66,70 @@ class TypeReconstructor
             foreach ($toRemove as $remove) {
                 $unresolved->detach($remove);
             }
-        } while (count($unresolved) > 0 && $start < count($resolved));
+        } while (count($unresolved) > 0 && $start < count($resolved));        } else {
+            // Dependency-driven worklist: the round-based loop rescanned every
+            // unresolved variable per round — O(rounds × vars), minutes on
+            // 30k-line files (#16077).
+            $dependents = new SplObjectStorage();
+            foreach ($unresolved as $var) {
+                foreach ($var->ops as $op) {
+                    foreach ($op->getVariableNames() as $name) {
+                        if ($op->isWriteVariable($name)) {
+                            continue;
+                        }
+                        $inputs = $op->{$name};
+                        if (! is_array($inputs)) {
+                            $inputs = [$inputs];
+                        }
+                        foreach ($inputs as $input) {
+                            if (! $input instanceof Operand || $input === $var) {
+                                continue;
+                            }
+                            if (! isset($dependents[$input])) {
+                                $dependents[$input] = [];
+                            }
+                            $deps = $dependents[$input];
+                            $deps[] = $var;
+                            $dependents[$input] = $deps;
+                        }
+                    }
+                }
+            }
+            $queue = [];
+            foreach ($unresolved as $var) {
+                $queue[] = $var;
+            }
+            $queued = new SplObjectStorage();
+            foreach ($queue as $var) {
+                $queued->attach($var);
+            }
+            // Head-index pop: array_shift() reindexes (O(n) per pop, quadratic
+            // on large queues); appends keep integer keys sequential.
+            $head = 0;
+            while (isset($queue[$head])) {
+                $var = $queue[$head];
+                unset($queue[$head]);
+                ++$head;
+                $queued->detach($var);
+                if (! $unresolved->contains($var)) {
+                    continue;
+                }
+                $type = $this->resolveVar($var, $resolved);
+                if (! $type) {
+                    continue;
+                }
+                $resolved[$var] = $type;
+                $unresolved->detach($var);
+                if (isset($dependents[$var])) {
+                    foreach ($dependents[$var] as $dep) {
+                        if ($unresolved->contains($dep) && ! $queued->contains($dep)) {
+                            $queue[] = $dep;
+                            $queued->attach($dep);
+                        }
+                    }
+                }
+            }
+        }
         foreach ($resolved as $var) {
             $var->type = $resolved[$var];
         }

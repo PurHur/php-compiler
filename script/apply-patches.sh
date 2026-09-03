@@ -15,8 +15,27 @@ fi
 php_cfg_enum_implements_parser_applied() {
   local parser="${1:-$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php}"
   [[ -f "$parser" ]] || return 1
-  grep -A30 'function parseStmt_Enum' "$parser" 2>/dev/null \
+  # parseStmt_Enum body is >30 lines once ClassMethod/TraitUse/ClassConst arms land (#36229).
+  grep -A60 'function parseStmt_Enum' "$parser" 2>/dev/null \
     | grep -q 'parseExprList($node->implements)'
+}
+
+# Copy an overlay file only when bytes differ (#36229 honesty: never claim Applied on a no-op cp).
+install_overlay_file() {
+  local dest="$1"
+  local overlay="$2"
+  local label="$3"
+  if [[ ! -f "$overlay" ]]; then
+    echo "Skip ${label} (missing $overlay)" >&2
+    return 1
+  fi
+  mkdir -p "$(dirname "$dest")"
+  if [[ -f "$dest" ]] && cmp -s "$overlay" "$dest"; then
+    echo "Skip ${label} (already applied)"
+    return 0
+  fi
+  cp "$overlay" "$dest"
+  echo "Applied ${label}"
 }
 
 patch_already_applied() {
@@ -99,8 +118,8 @@ patch_already_applied() {
         && grep -qF "(@return\\s+(.+?)(?:\\s*\\*\\/|\\s*$))m" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
       ;;
     php-types-array-shape.patch)
-      grep -qF "preg_match('/array\\\\{/i', \$decl)" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null \
-        && ! grep -qF "preg_match('/\\^array\\\\{/i', \$decl)" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
+      grep -qF "preg_match('/array\\{/i', \$decl)" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null \
+        && ! grep -qF "preg_match('/^array\\{/i', \$decl)" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
       ;;
     php-types-iterable-generic.patch)
       grep -qE "preg_match\('/\^\(list\|array\|iterable\)" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
@@ -280,10 +299,10 @@ patch_already_applied() {
       grep -q 'PassManagerBuilder as CorePassManagerBuilder;' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/PassManagerBuilder.php" 2>/dev/null
       ;;
     php-llvm-pass-manager-builder-typed-prop.patch)
-      grep -q 'LLVMPassManagerBuilderRef \\$passManagerBuilder' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/PassManagerBuilder.php" 2>/dev/null
+      grep -q 'LLVMPassManagerBuilderRef $passManagerBuilder' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/PassManagerBuilder.php" 2>/dev/null
       ;;
     php-llvm-pass-manager-builder-populate.patch)
-      grep -q 'PopulateFunctionPassManager(\\$this->passManagerBuilder, \\$passManager->passManager' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/PassManagerBuilder.php" 2>/dev/null
+      grep -q 'PopulateFunctionPassManager($this->passManagerBuilder, $passManager->passManager' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/PassManagerBuilder.php" 2>/dev/null
       ;;
     php-llvm-context-empty-arrays.patch)
       grep -q '\$paramWrapper = null' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Context.php" 2>/dev/null \
@@ -397,14 +416,14 @@ patch_already_applied() {
         && grep -q "docCommentTypeCallback" "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/NameResolver.php" 2>/dev/null
       ;;
     php-cfg-property-type.patch)
-      grep -q 'public \\$type;' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php" 2>/dev/null \
-        && grep -q 'function __construct(Operand \\$name, int \\$visibility' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php" 2>/dev/null
+      grep -q 'public $type;' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php" 2>/dev/null \
+        && grep -q 'function __construct(Operand $name, int $visibility' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php" 2>/dev/null
       ;;
     php-cfg-typed-class-const.patch)
-      grep -q 'public ?Type \\$declaredType' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/Const_.php" 2>/dev/null
+      grep -q 'public ?Type $declaredType' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/Const_.php" 2>/dev/null
       ;;
     php-cfg-class-const-flags.patch)
-      grep -q 'public int \\$flags = 0' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/Const_.php" 2>/dev/null
+      grep -q 'public int $flags = 0' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/Const_.php" 2>/dev/null
       ;;
     php-cfg-yield-from.overlay)
       grep -q 'function parseExpr_YieldFrom' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
@@ -422,7 +441,7 @@ patch_already_applied() {
         && grep -q 'function extractLazyPropertyFromAttributes' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
     php-cfg-assertion-expr-property.patch)
-      grep -q 'public \\$expr;' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Assertion.php" 2>/dev/null
+      grep -q 'public $expr;' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Assertion.php" 2>/dev/null
       ;;
     php-cfg-match.patch)
       grep -q 'function parseExpr_Match' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
@@ -501,7 +520,7 @@ patch_already_applied() {
       grep -q 'elseif ($stmt instanceof Stmt\\ClassMethod)' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
     php-cfg-enum-class-const.patch)
-      grep -q 'public bool \\$isEnumCase = false' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/Const_.php" 2>/dev/null \
+      grep -q 'public bool $isEnumCase = false' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/Const_.php" 2>/dev/null \
         && grep -q 'Stmt\\ClassConst' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
         && grep -A30 'function parseStmt_Enum' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null | grep -q 'ClassConst'
       ;;
@@ -669,6 +688,7 @@ from pathlib import Path
 
 path = Path(sys.argv[1])
 text = path.read_text()
+original = text
 if "public $type;" not in text:
     text = text.replace(
         "    public $visibility;\n\n    public $static;",
@@ -680,9 +700,12 @@ text = text.replace("$this->visiblity = $visiblity;", "$this->visibility = $visi
 if "public $type;" not in text or "int $visibility," not in text:
     sys.stderr.write("php-cfg-property-type: Property.php overlay anchors not found\n")
     raise SystemExit(1)
-path.write_text(text)
+if text != original:
+    path.write_text(text)
+    print("Applied php-cfg-property-type.patch (overlay)")
+else:
+    print("Skip php-cfg-property-type.patch (already applied)")
 PY
-  echo "Applied php-cfg-property-type.patch (overlay)"
 }
 
 apply_php_cfg_assignop_coalesce_overlay() {
@@ -1955,10 +1978,11 @@ if "enumCaseHasExplicitValue" not in const_fresh and "isEnumCase" in const_fresh
 
 parser_path.write_text(text)
 PY
-  if [[ "$already_applied" -eq 0 ]]; then
-    echo "Applied php-cfg-enum-class-const.patch (overlay)"
+  if grep -q 'enumCaseHasExplicitValue' "$const_file" 2>/dev/null \
+    && grep -q 'enumCaseHasExplicitValue' "$parser" 2>/dev/null; then
+    echo "Skip php-cfg-enum-class-const.patch (already applied)"
   else
-    echo "Synced php-cfg-enum-class-const overlay (#5397 enumCaseHasExplicitValue)"
+    echo "Applied php-cfg-enum-class-const.patch (overlay)"
   fi
 }
 
@@ -2015,7 +2039,7 @@ apply_php_cfg_enum_implements_overlay() {
     echo "Skip php-cfg-enum-implements.patch (parseStmt_Enum missing; apply php-cfg-enum.patch first)" >&2
     return 1
   fi
-  cp "$overlay/Op/Stmt/Enum_.php" "$op"
+  install_overlay_file "$op" "$overlay/Op/Stmt/Enum_.php" "php-cfg-enum-implements Enum_.php"
   if php_cfg_enum_implements_parser_applied "$parser" \
     && grep -q 'public $implements' "$op" 2>/dev/null; then
     echo "Skip php-cfg-enum-implements.patch (already applied)"
@@ -3176,6 +3200,7 @@ from pathlib import Path
 
 const_path = Path(sys.argv[1])
 parser_path = Path(sys.argv[2])
+modified = False
 const_text = const_path.read_text()
 if 'public int $flags = 0' not in const_text:
     for old in (
@@ -3194,6 +3219,7 @@ if 'public int $flags = 0' not in const_text:
                 1,
             )
             const_path.write_text(const_text)
+            modified = True
             break
     else:
         sys.stderr.write("php-cfg-class-const-flags: Const_.php anchor not found\n")
@@ -3211,8 +3237,9 @@ if '$constOp->flags = $node->flags' not in text:
         sys.stderr.write("php-cfg-class-const-flags: Parser parseStmt_ClassConst anchor not found\n")
         raise SystemExit(1)
     parser_path.write_text(text.replace(old, new, 1))
+    modified = True
+print("Applied php-cfg-class-const-flags.patch (overlay)" if modified else "Skip php-cfg-class-const-flags.patch (already applied)")
 PY
-  echo "Applied php-cfg-class-const-flags.patch (overlay)"
 }
 
 apply_php_types_incdec_type_overlay_to_target() {
@@ -4259,21 +4286,23 @@ from pathlib import Path
 path = Path(sys.argv[1])
 text = path.read_text()
 if "preg_match('/array\\{/i', $decl)" in text:
+    print("Skip php-types-array-shape.patch (already applied)")
     raise SystemExit(0)
 old = "        if (preg_match('/^array\\{/i', $decl)) {\n            return new self(self::TYPE_ARRAY);\n        }\n"
 new = "        if (preg_match('/array\\{/i', $decl)) {\n            return new self(self::TYPE_ARRAY);\n        }\n"
 if old in text:
     path.write_text(text.replace(old, new, 1))
+    print("Applied php-types-array-shape.patch (overlay)")
     raise SystemExit(0)
 needle = "        if (strpos($decl, '|') !== false || strpos($decl, '&') !== false || strpos($decl, '(') !== false) {\n"
 insert = "        if (preg_match('/array\\{/i', $decl)) {\n            return new self(self::TYPE_ARRAY);\n        }\n" + needle
 if needle in text:
     path.write_text(text.replace(needle, insert, 1))
+    print("Applied php-types-array-shape.patch (overlay)")
     raise SystemExit(0)
 sys.stderr.write("php-types-array-shape: anchor not found\n")
 raise SystemExit(1)
 PY
-  echo "Applied php-types-array-shape.patch (overlay)"
 }
 
 apply_php_types_anonymous_class_type_overlay() {
@@ -4506,39 +4535,24 @@ PY
 }
 
 apply_php_cfg_in_operator_overlay() {
-  local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/In_.php"
-  local overlay="$PATCH_DIR/overlays/php-cfg/Op/Expr/In_.php"
-  if [[ ! -f "$overlay" ]]; then
-    echo "Skip php-cfg-in-operator overlay (missing $overlay)" >&2
-    return 1
-  fi
-  mkdir -p "$(dirname "$op")"
-  cp "$overlay" "$op"
-  echo "Applied php-cfg-in-operator overlay (In_.php)"
+  install_overlay_file \
+    $ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/In_.php \
+    $PATCH_DIR/overlays/php-cfg/Op/Expr/In_.php \
+    "php-cfg-in-operator overlay (In_.php)"
 }
 
 apply_php_cfg_exit_two_arg_overlay() {
-  local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Exit_.php"
-  local overlay="$PATCH_DIR/overlays/php-cfg/Op/Expr/Exit_.php"
-  if [[ ! -f "$overlay" ]]; then
-    echo "Skip php-cfg-exit-two-arg overlay (missing $overlay)" >&2
-    return 1
-  fi
-  mkdir -p "$(dirname "$op")"
-  cp "$overlay" "$op"
-  echo "Applied php-cfg-exit-two-arg overlay (Exit_.php)"
+  install_overlay_file \
+    $ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Exit_.php \
+    $PATCH_DIR/overlays/php-cfg/Op/Expr/Exit_.php \
+    "php-cfg-exit-two-arg overlay (Exit_.php)"
 }
 
 apply_php_cfg_void_cast_overlay() {
-  local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Cast/Void_.php"
-  local overlay="$PATCH_DIR/overlays/php-cfg/Op/Expr/Cast/Void_.php"
-  if [[ ! -f "$overlay" ]]; then
-    echo "Skip php-cfg-void-cast overlay (missing $overlay)" >&2
-    return 1
-  fi
-  mkdir -p "$(dirname "$op")"
-  cp "$overlay" "$op"
-  echo "Applied php-cfg-void-cast overlay (Void_.php)"
+  install_overlay_file \
+    $ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Cast/Void_.php \
+    $PATCH_DIR/overlays/php-cfg/Op/Expr/Cast/Void_.php \
+    "php-cfg-void-cast overlay (Void_.php)"
 }
 
 apply_php_cfg_typed_class_const_overlay() {
@@ -5899,22 +5913,13 @@ apply_php_cfg_magic_constants_overlay() {
     echo "Skip php-cfg-magic-constants.patch (overlay missing)" >&2
     return 1
   fi
+  # Method uses methodStack (not functionStack); cmp covers full overlay identity (#36229).
   if patch_already_applied "$PATCH_DIR/php-cfg-magic-constants.patch" \
-    && grep -q 'traitStack' "$target" 2>/dev/null \
-    && grep -q 'functionStack' "$target" 2>/dev/null \
-    && grep -q 'MagicConst\\Method' "$target" 2>/dev/null \
-    && grep -A3 'MagicConst\\Method' "$target" | grep -q 'functionStack' \
-    && grep -q 'beginCompilationUnit' "$target" 2>/dev/null \
-    && grep -q "T_FUNC_C / T_METHOD_C inside closures are \"{closure}\"" "$target" 2>/dev/null \
-    && grep -q '#26459' "$target" 2>/dev/null \
-    && grep -q 'phpcLexicalScopeKeyword' "$target" 2>/dev/null \
-    && grep -q 'implements\[0\]' "$target" 2>/dev/null \
-    && ! grep -q "return 'AnonymousClass@'" "$target" 2>/dev/null; then
+    && [[ -f "$target" ]] && cmp -s "$overlay" "$target"; then
     echo "Skip php-cfg-magic-constants.patch (already applied)"
     return 0
   fi
-  cp "$overlay" "$target"
-  echo "Applied php-cfg-magic-constants.patch (overlay)"
+  install_overlay_file "$target" "$overlay" "php-cfg-magic-constants.patch (overlay)"
 }
 
 apply_php_cfg_anonymous_class_name_overlay() {
@@ -6224,9 +6229,10 @@ if modified_any:
 PY
 
   if grep -q 'KIND_HALT_OFFSET' "$vendor_target" 2>/dev/null; then
-    echo "Applied php-types-compiler-halt-offset overlay (#5455)"
-  else
     echo "Skip php-types-compiler-halt-offset overlay (already applied)"
+  else
+    echo "php-types-compiler-halt-offset overlay failed: KIND_HALT_OFFSET missing after repair (#5455)" >&2
+    return 1
   fi
 }
 
