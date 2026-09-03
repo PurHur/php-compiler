@@ -546,6 +546,18 @@ function run(string $filename, string $code, array $options): void
                 is_string($scaffoldKey)
                 && \PHPCompiler\JIT\CompileCache::canUseEditScaffold($scaffoldKey)
             ) {
+                $prevMembers = [];
+                if (isset($idx) && is_array($idx) && is_array($idx['members'] ?? null)) {
+                    $prevMembers = $idx['members'];
+                } elseif (is_file($idxFile)) {
+                    $idxReload = json_decode((string) file_get_contents($idxFile), true);
+                    if (is_array($idxReload) && is_array($idxReload['members'] ?? null)) {
+                        $prevMembers = $idxReload['members'];
+                    }
+                }
+                \PHPCompiler\JIT\CompileCache::setEditChangedMembers(
+                    \PHPCompiler\JIT\CompileCache::diffMemberHashes($prevMembers, $hashes)
+                );
                 \PHPCompiler\JIT\CompileCache::armEditScaffold($scaffoldKey);
             }
         }
@@ -563,6 +575,9 @@ function run(string $filename, string $code, array $options): void
             );
         } else {
             [$code, $filename] = SourceBundler::bundleForAot($filename, $includes, $projectRoot);
+        }
+        if (is_string($code) && '' !== $code) {
+            \PHPCompiler\JIT\CompileCache::setBundledSource($code);
         }
     } elseif ('' === $code && '-' !== $filename && is_file($filename)) {
         $code = (string) file_get_contents($filename);

@@ -49,6 +49,14 @@ final class CompileCache
      */
     private static ?string $pendingEditScaffoldKey = null;
 
+    /** @var array<string, list<string>>|null member path → LLVM names (#36387) */
+    private static ?array $recordingUserSymbolsByMember = null;
+
+    private static ?string $bundledSource = null;
+
+    /** @var list<string> absolute paths whose bytes changed vs the scaffold project index */
+    private static array $editChangedMembers = [];
+
     public static function isEnabled(): bool
     {
         $flag = Config::getenv('PHP_COMPILER_CACHE');
@@ -565,6 +573,49 @@ final class CompileCache
         self::$recordingExports = [];
         self::$recordingUserSymbols = [];
         self::$recordingHelperSymbols = [];
+        self::$recordingUserSymbolsByMember = [];
+    }
+
+    public static function setBundledSource(string $source): void
+    {
+        self::$bundledSource = $source;
+    }
+
+    /**
+     * @param list<string> $paths
+     */
+    public static function setEditChangedMembers(array $paths): void
+    {
+        $clean = [];
+        foreach ($paths as $path) {
+            if (!is_string($path) || '' === $path) {
+                continue;
+            }
+            $resolved = realpath($path);
+            $clean[] = false !== $resolved ? $resolved : $path;
+        }
+        self::$editChangedMembers = array_values(array_unique($clean));
+    }
+
+    /**
+     * @param array<string, string> $previous
+     * @param array<string, string> $current
+     *
+     * @return list<string>
+     */
+    public static function diffMemberHashes(array $previous, array $current): array
+    {
+        $changed = [];
+        foreach ($current as $path => $hash) {
+            if (!is_string($path) || !is_string($hash)) {
+                continue;
+            }
+            if (($previous[$path] ?? null) !== $hash) {
+                $changed[] = $path;
+            }
+        }
+
+        return $changed;
     }
 
     public static function isRecording(): bool
@@ -585,12 +636,52 @@ final class CompileCache
     }
 
     /** Record a user-TU LLVM symbol (not NestedJIT) for edit-scaffold stripping (#36387). */
-    public static function recordUserLlvmSymbol(string $llvmName): void
+    public static function recordUserLlvmSymbol(string $llvmName, ?\PHPCompiler\Block $block = null): void
     {
         if (null === self::$recordingUserSymbols || '' === $llvmName) {
             return;
         }
         self::$recordingUserSymbols[] = $llvmName;
+        if (null === self::$recordingUserSymbolsByMember) {
+            return;
+        }
+        $member = self::memberPathForBlock($block);
+        if ('' === $member) {
+            return;
+        }
+        if (!isset(self::$recordingUserSymbolsByMember[$member])) {
+            self::$recordingUserSymbolsByMember[$member] = [];
+        }
+        self::$recordingUserSymbolsByMember[$member][] = $llvmName;
+    }
+
+    private static function memberPathForBlock(?\PHPCompiler\Block $block): string
+    {
+        if (null === $block) {
+            return '';
+        }
+        $line = 0;
+        foreach ($block->opCodes as $op) {
+            if (null !== $op->sourceLocation && $op->sourceLocation->startLine > 0) {
+                $line = $op->sourceLocation->startLine;
+                break;
+            }
+        }
+        if (is_string(self::$bundledSource) && '' !== self::$bundledSource && $line > 0) {
+            $mapped = \PHPCompiler\Web\SourceBundler::mapBundledLine(self::$bundledSource, $line);
+            if (is_array($mapped) && isset($mapped[0]) && is_string($mapped[0]) && '' !== $mapped[0]) {
+                $resolved = realpath($mapped[0]);
+
+                return false !== $resolved ? $resolved : $mapped[0];
+            }
+        }
+        $script = $block->scriptPath();
+        if ('' === $script) {
+            return '';
+        }
+        $resolved = realpath($script);
+
+        return false !== $resolved ? $resolved : $script;
     }
 
     /** Record NestedJIT helper logical→LLVM so edit scaffold can rebind without re-NestedJIT (#36387). */
@@ -1043,6 +1134,7 @@ final class CompileCache
                 'fingerprint' => self::fingerprint(),
                 'exports' => self::$recordingExports,
                 'user_symbols' => $userSymbols,
+                'user_symbols_by_member' => self::$recordingUserSymbolsByMember ?? [],
                 'helper_symbols' => $helperSymbols,
                 'aot_stamp' => true,
             ], JSON_PRETTY_PRINT);
@@ -1073,6 +1165,9 @@ final class CompileCache
         self::$recordingExports = null;
         self::$recordingUserSymbols = null;
         self::$recordingHelperSymbols = null;
+        self::$recordingUserSymbolsByMember = null;
+        self::$bundledSource = null;
+        self::$editChangedMembers = [];
         self::$skipModuleFuncCompile = false;
         self::$editScaffoldActive = false;
         self::$editScaffoldBitcodeBound = false;
