@@ -1,0 +1,50 @@
+# Benchmark suite v2 (#36385)
+
+Programs under `benchmarks/v2/` exercise shapes the 2015 micro-suite does not cover:
+strings, associative arrays, objects, JSON, regex, exceptions, closures, and classic
+benchmark-game kernels.
+
+**Do not hand-edit numbers.** Regenerate:
+
+```bash
+./script/docker-exec.sh -- bash -lc 'source script/php-env.sh && PHP_8_2=$(command -v php) php script/bench.php --v2'
+```
+
+Gate (AOT/Zend ratio + IR size vs committed baseline; subset that must match Zend under AOT):
+
+```bash
+./script/bench-gate.sh --v2
+./script/bench-gate.sh --v2 --update   # bless after verifying output
+```
+
+`n/a` AOT columns mean build failed, timed out, or output mismatched Zend — intentional honesty
+in `script/bench.php`, not a silent pass. Gate cases: `call-heavy`, `assoc-heavy`, `str-builder`,
+`k-nucleotide`, `template-render`.
+
+History JSON lands in `benchmarks/history/<sha>.json` when `PHP_COMPILER_BENCH_HISTORY=1`.
+The chart page `docs/pages/bench.html` documents the contract.
+
+<!-- v2 benchmark table start -->
+
+Environment: 8.2.32 · LLVM 9 available · 5 iterations averaged, wall time per run.
+
+| Test Name          | Zend       8.2 (s)| bin/vm.php (s) | bin/jit.php (s) | phpc build (s) | native run (s) |
+|--------------------|-------------------|----------------|-----------------|----------------|----------------|
+|        assoc-heavy |            0.0087 |         1.9957 |         2.1369 |         8.4864 |         0.0059 |
+|       binary-trees |            0.0198 |            n/a |            n/a |            n/a |            n/a |
+|         call-heavy |            0.0100 |        13.8233 |        13.9641 |         4.9835 |         0.0039 |
+|      closure-heavy |            0.0091 |         2.1651 |         2.2900 |         5.3873 |         0.0047 |
+|         exceptions |            0.0103 |         3.4846 |         3.6688 |         5.7109 |         0.0052 |
+|     fannkuch-redux |            0.0298 |            n/a |            n/a |            n/a |            n/a |
+|              fasta |            0.0093 |         1.2634 |         1.3142 |            n/a |            n/a |
+|     json-roundtrip |            0.0089 |         0.7887 |         0.8209 |            n/a |            n/a |
+|       k-nucleotide |            0.0109 |         6.0314 |         6.2036 |         6.4826 |         0.0054 |
+|              nbody |            0.0109 |         8.8066 |         8.8836 |            n/a |            n/a |
+|       object-graph |            0.0120 |        11.2522 |        11.2404 |         5.7253 |         0.0071 |
+|        regex-redux |            0.0102 |         0.3812 |         0.3900 |            n/a |            n/a |
+|         sort-mixed |            0.0107 |        12.2563 |        11.9755 |            n/a |            n/a |
+|      spectral-norm |            0.0137 |        13.4940 |        13.1483 |            n/a |            n/a |
+|        str-builder |            0.0092 |         1.2257 |         1.2948 |         6.1904 |         0.0265 |
+|    template-render |            0.0097 |         1.7663 |         1.8927 |         5.9370 |         0.3647 |
+
+<!-- v2 benchmark table end -->

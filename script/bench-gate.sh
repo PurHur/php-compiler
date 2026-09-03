@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 #
-# Performance regression gate for benchmarks/ (#36196).
+# Performance regression gate for benchmarks/ (#36196) and benchmarks/v2/ (#36385).
 #
-# Compares AOT/Zend wall-time ratios and LLVM IR size against benchmarks/BASELINE.json.
+# Compares AOT/Zend wall-time ratios and LLVM IR size against the committed baseline.
 # Ratios are measured in the same job (best-of-3) so shared-box noise cancels; IR line
 # counts are load-independent.
 #
 # Usage:
 #   script/bench-gate.sh            # check against committed baseline
 #   script/bench-gate.sh --update   # bless benchmarks/BASELINE.json from current master
+#   script/bench-gate.sh --v2       # v2 suite gate (#36385)
+#   script/bench-gate.sh --v2 --update
 #   script/bench-gate.sh --compile  # compile-time gate (#36387)
 #   script/bench-gate.sh --compile --update
 #

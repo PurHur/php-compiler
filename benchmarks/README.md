@@ -1,10 +1,23 @@
-# Examples
+# Benchmarks
 
-Each folder here contains a working PHP example `example.php`, and associated generated files (including LLVM IR generated from said file).
+Legacy micro-suite (`*.php` here) plus **v2** under `benchmarks/v2/` (#36385).
+
+Regenerate this table (do not hand-edit numbers between the markers):
+
+```bash
+./script/docker-exec.sh -- bash -lc 'source script/php-env.sh && PHP_8_2=$(command -v php) php script/bench.php'
+```
+
+v2 suite + gate:
+
+```bash
+./script/docker-exec.sh -- bash -lc 'source script/php-env.sh && PHP_8_2=$(command -v php) php script/bench.php --v2'
+./script/bench-gate.sh --v2
+```
 
 # Benchmark Results
 
-Each example includes a benchmark that compares each mode of operation to just running the file with `php` directly.
+Each program is timed under Zend, VM, JIT, and AOT (`phpc build` + native run).
 
 <!-- benchmark table start -->
 

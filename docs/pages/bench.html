@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>php-compiler benchmark history</title>
+  <style>
+    body { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; margin: 2rem; max-width: 60rem; }
+    h1 { font-size: 1.25rem; }
+    table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
+    th, td { border-bottom: 1px solid #ccc; padding: 0.35rem 0.5rem; text-align: left; }
+    .muted { color: #666; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <h1>Benchmark history (#36385)</h1>
+  <p class="muted">
+    Generated from <code>benchmarks/history/*.json</code> (produced by
+    <code>PHP_COMPILER_BENCH_HISTORY=1 php script/bench.php --v2</code>).
+    This page is a static placeholder until a nightly writes history on master;
+    open the JSON files directly for ratios.
+  </p>
+  <p>
+    Gate: <code>./script/bench-gate.sh --v2</code> · Suite README:
+    <code>benchmarks/v2/README.md</code>
+  </p>
+  <noscript>Enable JavaScript to list local history files when served from the docs site.</noscript>
+  <div id="history"></div>
+  <script>
+    // When served beside ../history via a static server, fetch index is optional.
+    // Agents regenerate RESULTS.json; this page documents the contract.
+    document.getElementById('history').textContent =
+      'Commit history JSON under benchmarks/history/ — see RESULTS.json for the latest table.';
+  </script>
+</body>
+</html>

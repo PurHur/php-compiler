@@ -1,0 +1,47 @@
+{
+    "version": 1,
+    "suite": "v2",
+    "generated_at": "2026-09-03T06:24:05Z",
+    "arch": "x86_64-linux",
+    "ratio_tolerance_percent": 20,
+    "ir_tolerance_percent": 20,
+    "regeneration": "PHP_8_2=$(command -v php) ./script/bench-gate.sh --v2 --update",
+    "note": "v2 gate subset (#36385). Ratio tolerance 20% so a deliberate ~2\u00d7 slowdown fails.",
+    "cases": {
+        "call-heavy": {
+            "ratio_aot_over_zend": 0.355224,
+            "zend_wall": 0.00851,
+            "aot_wall": 0.003023,
+            "ir_lines": 101144,
+            "ir_defines": 426
+        },
+        "assoc-heavy": {
+            "ratio_aot_over_zend": 0.647696,
+            "zend_wall": 0.007687,
+            "aot_wall": 0.004979,
+            "ir_lines": 132782,
+            "ir_defines": 455
+        },
+        "str-builder": {
+            "ratio_aot_over_zend": 2.780569,
+            "zend_wall": 0.008562,
+            "aot_wall": 0.023807,
+            "ir_lines": 129358,
+            "ir_defines": 425
+        },
+        "k-nucleotide": {
+            "ratio_aot_over_zend": 0.551674,
+            "zend_wall": 0.008088,
+            "aot_wall": 0.004462,
+            "ir_lines": 139162,
+            "ir_defines": 454
+        },
+        "template-render": {
+            "ratio_aot_over_zend": 41.843912,
+            "zend_wall": 0.008444,
+            "aot_wall": 0.353323,
+            "ir_lines": 120824,
+            "ir_defines": 425
+        }
+    }
+}
