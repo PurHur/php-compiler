@@ -50,6 +50,7 @@ final class GcCollectCyclesAotCycleTest extends TestCase
         $this->assertStringContainsString('releaseJitCanonicalNamedLocalAtReturn', $jit);
         $this->assertStringContainsString('jitFunctionAssignTargets', $jit);
         $this->assertStringContainsString('$var->type & Variable::IS_REFCOUNTED', $jit);
+        $this->assertStringContainsString('skipAddrefForNewRvalue', $jit);
     }
 
     public function testUserScriptStandaloneRegistryResetWiredAtMain(): void
@@ -62,5 +63,6 @@ final class GcCollectCyclesAotCycleTest extends TestCase
         $this->assertStringContainsString('isUserScriptAot()', $ctx);
         $this->assertStringContainsString('OpCode::TYPE_RETURN_VOID', $ctx);
         $this->assertStringContainsString('scope_exit', $ctx);
+        $this->assertStringContainsString('objectMirrorSharesNamedCvAlloca', $ctx);
     }
 }

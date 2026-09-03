@@ -4346,6 +4346,25 @@ class Context {
     }
 
     /**
+     * True when $var is a named CV or a shadow {@see __object__**} alloca of one.
+     * Distinct NEW/ASSIGN result temps have their own addref and must be delref'd
+     * (Zend temp dtor after ZEND_ASSIGN; #36245 scope_exit).
+     */
+    public function objectMirrorSharesNamedCvAlloca(Variable $var): bool
+    {
+        foreach ($this->namedVariableBindings as $bound) {
+            if ($bound === $var) {
+                return true;
+            }
+            if (null !== $bound->value && $bound->value === $var->value) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Bind {@see Block::$constants} for $op when the slot is a folded literal (#29751).
      *
      * TYPE_TRY handler blocks hoist try-body Temporaries into scope before the try-body
@@ -5031,8 +5050,10 @@ class Context {
         }
         foreach ($block->orig->deadOperands as $op) {
             if ($isUserFunctionReturnVoid) {
-                // releaseJitFunctionLocalsAtReturn owns named CV delref; unnamed
-                // assign-result mirrors must be nulled without delref (#36245 scope_exit).
+                // releaseJitFunctionLocalsAtReturn owns named CV delref. Shadow
+                // allocas of those CVs must not delref again. Distinct NEW-result
+                // temps keep their own addref and must fall through to free()
+                // (Zend/zend_execute.c temp dtor after ZEND_ASSIGN; #36245).
                 $name = OperandName::resolve($op);
                 if (null !== $name && '' !== $name) {
                     continue;
@@ -5045,27 +5066,16 @@ class Context {
                     Variable::TYPE_OBJECT === $var->type
                     && Variable::KIND_VARIABLE === $var->kind
                     && null !== $var->value
+                    && $this->objectMirrorSharesNamedCvAlloca($var)
                 ) {
-                    $isCanonicalCv = false;
-                    foreach ($this->namedVariableBindings as $bound) {
-                        if ($bound === $var) {
-                            $isCanonicalCv = true;
-                            break;
-                        }
+                    $slotTy = $var->value->typeOf();
+                    if (\PHPLLVM\Type::KIND_POINTER === $slotTy->getKind()) {
+                        $this->builder->store(
+                            $slotTy->getElementType()->constNull(),
+                            $var->value
+                        );
                     }
-                    if (
-                        !$isCanonicalCv
-                        && \in_array($var->value, $this->scopeSlotObjectMirrorLlvmBySlot, true)
-                    ) {
-                        $slotTy = $var->value->typeOf();
-                        if (\PHPLLVM\Type::KIND_POINTER === $slotTy->getKind()) {
-                            $this->builder->store(
-                                $slotTy->getElementType()->constNull(),
-                                $var->value
-                            );
-                        }
-                        continue;
-                    }
+                    continue;
                 }
             }
             if ($returnOperands->contains($op)) {

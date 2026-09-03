@@ -23028,7 +23028,14 @@ class JIT {
                 $result->value
             );
             $this->maybeCopyObjectPropertyBacking($result, $value, $force);
-            if (null === $result->objectPropertySlot) {
+            // User-function NEW rvalues (KIND_VALUE) already own rc=1; addref into the
+            // result temp would leave a root past ZEND_ASSIGN + return (#36245 scope_exit).
+            // {main} script-globals use the value-box path and still need the addref.
+            $skipAddrefForNewRvalue = Variable::KIND_VALUE === $value->kind
+                && null !== $this->context->jitEnclosingBlock
+                && null !== $this->context->jitEnclosingBlock->func
+                && '{main}' !== $this->context->jitEnclosingBlock->func->name;
+            if (null === $result->objectPropertySlot && !$skipAddrefForNewRvalue) {
                 $result->addref();
             }
             $this->copyValueBoxJitFlags($result, $value, $force);
