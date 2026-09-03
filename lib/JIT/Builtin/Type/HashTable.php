@@ -1042,10 +1042,12 @@ class HashTable extends Type
             $this->context->getTypeFromString('__ref__virtual*')
         );
         $this->context->builder->call($this->context->lookupFunction('__ref__init'), $typeinfo, $ref);
-        // Share key via addref instead of deep-copying (#36468).
-        $keyRef = $this->context->builder->pointerCast($key, $this->context->getTypeFromString('__ref__virtual*'));
-        $this->context->builder->call($this->context->lookupFunction('__ref__addref'), $keyRef);
-        $this->context->builder->store($key, $this->context->builder->structGep($newNode, $nodeMap['key']));
+        // Own a heap copy of the key. Sharing immortal/static literals via addref
+        // left HT dtor calling free() on .rodata → intermittent SIGSEGV (#36388 / re-#36468).
+        // php-src: zend_hash_str_update copies/addrefs; interned ZSTR_RELEASE is a no-op —
+        // our immortal strings are not refcounted, so separate() is the safe owned copy.
+        $storedKey = $this->context->builder->call($this->context->lookupFunction('__string__separate'), $key);
+        $this->context->builder->store($storedKey, $this->context->builder->structGep($newNode, $nodeMap['key']));
         $this->context->builder->call(
             $this->context->lookupFunction('__value__writeString'),
             $this->context->builder->structGep($newNode, $nodeMap['value']),
@@ -1123,10 +1125,12 @@ class HashTable extends Type
             $this->context->getTypeFromString('__ref__virtual*')
         );
         $this->context->builder->call($this->context->lookupFunction('__ref__init'), $typeinfo, $ref);
-        // Share key via addref instead of deep-copying (#36468).
-        $keyRef = $this->context->builder->pointerCast($key, $this->context->getTypeFromString('__ref__virtual*'));
-        $this->context->builder->call($this->context->lookupFunction('__ref__addref'), $keyRef);
-        $this->context->builder->store($key, $this->context->builder->structGep($newNode, $nodeMap['key']));
+        // Own a heap copy of the key. Sharing immortal/static literals via addref
+        // left HT dtor calling free() on .rodata → intermittent SIGSEGV (#36388 / re-#36468).
+        // php-src: zend_hash_str_update copies/addrefs; interned ZSTR_RELEASE is a no-op —
+        // our immortal strings are not refcounted, so separate() is the safe owned copy.
+        $storedKey = $this->context->builder->call($this->context->lookupFunction('__string__separate'), $key);
+        $this->context->builder->store($storedKey, $this->context->builder->structGep($newNode, $nodeMap['key']));
         $this->context->builder->call(
             $this->context->lookupFunction('__value__writeHashtable'),
             $this->context->builder->structGep($newNode, $nodeMap['value']),
@@ -1180,10 +1184,12 @@ class HashTable extends Type
             $this->context->getTypeFromString('__ref__virtual*')
         );
         $this->context->builder->call($this->context->lookupFunction('__ref__init'), $typeinfo, $ref);
-        // Share key via addref instead of deep-copying (#36468).
-        $keyRef = $this->context->builder->pointerCast($key, $this->context->getTypeFromString('__ref__virtual*'));
-        $this->context->builder->call($this->context->lookupFunction('__ref__addref'), $keyRef);
-        $this->context->builder->store($key, $this->context->builder->structGep($newNode, $nodeMap['key']));
+        // Own a heap copy of the key. Sharing immortal/static literals via addref
+        // left HT dtor calling free() on .rodata → intermittent SIGSEGV (#36388 / re-#36468).
+        // php-src: zend_hash_str_update copies/addrefs; interned ZSTR_RELEASE is a no-op —
+        // our immortal strings are not refcounted, so separate() is the safe owned copy.
+        $storedKey = $this->context->builder->call($this->context->lookupFunction('__string__separate'), $key);
+        $this->context->builder->store($storedKey, $this->context->builder->structGep($newNode, $nodeMap['key']));
         $this->context->builder->call(
             $this->context->lookupFunction('__value__writeObject'),
             $this->context->builder->structGep($newNode, $nodeMap['value']),
@@ -1237,14 +1243,12 @@ class HashTable extends Type
             $this->context->getTypeFromString('__ref__virtual*')
         );
         $this->context->builder->call($this->context->lookupFunction('__ref__init'), $typeinfo, $ref);
-        // Share the key string via addref instead of deep-copying via __string__separate (#36468).
-        // PHP strings are immutable, so sharing is safe; Zend does the same (ZSTR_ADDREF).
-        $keyRef = $this->context->builder->pointerCast(
-            $key,
-            $this->context->getTypeFromString('__ref__virtual*')
-        );
-        $this->context->builder->call($this->context->lookupFunction('__ref__addref'), $keyRef);
-        $this->context->builder->store($key, $this->context->builder->structGep($newNode, $nodeMap['key']));
+        // Own a heap copy of the key. Sharing immortal/static literals via addref
+        // left HT dtor calling free() on .rodata → intermittent SIGSEGV (#36388 / re-#36468).
+        // php-src: zend_hash_str_update copies/addrefs; interned ZSTR_RELEASE is a no-op —
+        // our immortal strings are not refcounted, so separate() is the safe owned copy.
+        $storedKey = $this->context->builder->call($this->context->lookupFunction('__string__separate'), $key);
+        $this->context->builder->store($storedKey, $this->context->builder->structGep($newNode, $nodeMap['key']));
         $this->context->builder->call(
             $this->context->lookupFunction('__value__writeLong'),
             $this->context->builder->structGep($newNode, $nodeMap['value']),
@@ -1322,10 +1326,12 @@ class HashTable extends Type
             $this->context->getTypeFromString('__ref__virtual*')
         );
         $this->context->builder->call($this->context->lookupFunction('__ref__init'), $typeinfo, $ref);
-        // Share key via addref instead of deep-copying (#36468).
-        $keyRef = $this->context->builder->pointerCast($key, $this->context->getTypeFromString('__ref__virtual*'));
-        $this->context->builder->call($this->context->lookupFunction('__ref__addref'), $keyRef);
-        $this->context->builder->store($key, $this->context->builder->structGep($newNode, $nodeMap['key']));
+        // Own a heap copy of the key. Sharing immortal/static literals via addref
+        // left HT dtor calling free() on .rodata → intermittent SIGSEGV (#36388 / re-#36468).
+        // php-src: zend_hash_str_update copies/addrefs; interned ZSTR_RELEASE is a no-op —
+        // our immortal strings are not refcounted, so separate() is the safe owned copy.
+        $storedKey = $this->context->builder->call($this->context->lookupFunction('__string__separate'), $key);
+        $this->context->builder->store($storedKey, $this->context->builder->structGep($newNode, $nodeMap['key']));
         $this->context->builder->call(
             $this->context->lookupFunction('__value__writeDouble'),
             $this->context->builder->structGep($newNode, $nodeMap['value']),
@@ -1375,10 +1381,12 @@ class HashTable extends Type
             $this->context->getTypeFromString('__ref__virtual*')
         );
         $this->context->builder->call($this->context->lookupFunction('__ref__init'), $typeinfo, $ref);
-        // Share key via addref instead of deep-copying (#36468).
-        $keyRef = $this->context->builder->pointerCast($key, $this->context->getTypeFromString('__ref__virtual*'));
-        $this->context->builder->call($this->context->lookupFunction('__ref__addref'), $keyRef);
-        $this->context->builder->store($key, $this->context->builder->structGep($newNode, $nodeMap['key']));
+        // Own a heap copy of the key. Sharing immortal/static literals via addref
+        // left HT dtor calling free() on .rodata → intermittent SIGSEGV (#36388 / re-#36468).
+        // php-src: zend_hash_str_update copies/addrefs; interned ZSTR_RELEASE is a no-op —
+        // our immortal strings are not refcounted, so separate() is the safe owned copy.
+        $storedKey = $this->context->builder->call($this->context->lookupFunction('__string__separate'), $key);
+        $this->context->builder->store($storedKey, $this->context->builder->structGep($newNode, $nodeMap['key']));
         $this->writeBoolToValueField(
             $this->context->builder->structGep($newNode, $nodeMap['value']),
             $bool
@@ -1429,10 +1437,12 @@ class HashTable extends Type
             $this->context->getTypeFromString('__ref__virtual*')
         );
         $this->context->builder->call($this->context->lookupFunction('__ref__init'), $typeinfo, $ref);
-        // Share key via addref instead of deep-copying (#36468).
-        $keyRef = $this->context->builder->pointerCast($key, $this->context->getTypeFromString('__ref__virtual*'));
-        $this->context->builder->call($this->context->lookupFunction('__ref__addref'), $keyRef);
-        $this->context->builder->store($key, $this->context->builder->structGep($newNode, $nodeMap['key']));
+        // Own a heap copy of the key. Sharing immortal/static literals via addref
+        // left HT dtor calling free() on .rodata → intermittent SIGSEGV (#36388 / re-#36468).
+        // php-src: zend_hash_str_update copies/addrefs; interned ZSTR_RELEASE is a no-op —
+        // our immortal strings are not refcounted, so separate() is the safe owned copy.
+        $storedKey = $this->context->builder->call($this->context->lookupFunction('__string__separate'), $key);
+        $this->context->builder->store($storedKey, $this->context->builder->structGep($newNode, $nodeMap['key']));
         $this->context->builder->call(
             $this->context->lookupFunction('__value__writeNull'),
             $this->context->builder->structGep($newNode, $nodeMap['value'])
