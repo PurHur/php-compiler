@@ -333,6 +333,24 @@ class Compiler {
     /** Reentrancy guard — statementLevel() ↔ firstSibling() mutual recursion (#9321). */
     private bool $firstSiblingInlineFuncCallProducerIndexActive = false;
 
+    /**
+     * Memoize firstSibling scans per consumer op (nested call-arg compile was O(n²) from
+     * hundreds of identical lookups per statement — #36387 / #36224).
+     *
+     * @var array<string, int> cache key => index, or -1 for null
+     */
+    private array $firstSiblingInlineFuncCallProducerCache = [];
+
+    /**
+     * Memoize isSiblingMultiArgFuncCallProducer(producer, consumer) (#36387).
+     *
+     * @var array<string, bool>
+     */
+    private array $isSiblingMultiArgFuncCallProducerCache = [];
+
+    /** @var array<string, true> reentrancy set while computing a cache entry (#36387). */
+    private array $isSiblingMultiArgFuncCallProducerComputing = [];
+
     /** Catch variable name (lc) => scope slot while lowering catch bodies (#9887). */
     private array $activeCatchVarSlotsByName = [];
 
@@ -695,6 +713,9 @@ class Compiler {
         $this->precedingInlineCallArgProducersCache = [];
         $this->cfgCallOpIndexCache = [];
         $this->cfgChildrenOpIndexBuiltCount = [];
+        $this->firstSiblingInlineFuncCallProducerCache = [];
+        $this->isSiblingMultiArgFuncCallProducerCache = [];
+        $this->isSiblingMultiArgFuncCallProducerComputing = [];
         $this->cfgProducerIndexLastSyncFingerprint = -1;
         $this->debugWriteLastPhase('Compiler::compile enter');
 
@@ -26836,9 +26857,9 @@ class Compiler {
                     $first = $j;
                     continue;
                 }
-                if (null !== $first) {
-                    break;
-                }
+                // Not part of this contiguous chain — do not keep scanning the whole block
+                // (nested call stmts were O(n²) isSiblingMultiArg probes — #36387 / #36224).
+                break;
             } elseif ($child instanceof Op\Expr\ConstFetch || $child instanceof Op\Expr\ClassConstFetch) {
                 if (null !== $first) {
                     break;
@@ -27078,9 +27099,22 @@ class Compiler {
 
             return [];
         }
+        // Bound the backward walk to the hoisted sibling chain for this call. Walking to
+        // index 0 re-probed every prior statement's FuncCalls (O(n²) compile) (#36387).
+        $scanFloor = 0;
+        $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex($callIndex, $cfgChildren);
+        if (null !== $firstSibling) {
+            $scanFloor = $firstSibling;
+        }
         $producers = [];
-        for ($i = $callIndex - 1; $i >= 0; --$i) {
+        for ($i = $callIndex - 1; $i >= $scanFloor; --$i) {
             $child = $cfgChildren[$i];
+            if (
+                ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
+                && $this->siblingScanStopsAtPriorFuncCall($child, $callOp, $i, $callIndex, $cfgChildren)
+            ) {
+                break;
+            }
             if (
                 ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
                 && 'define' === strtolower($this->resolveCfgFuncCallName($child) ?? '')
@@ -30255,7 +30289,54 @@ class Compiler {
         int $consumerIndex,
         array $cfgChildren
     ): bool {
+        $cacheKey = spl_object_id($producer).':'.spl_object_id($consumer);
+        if (\array_key_exists($cacheKey, $this->isSiblingMultiArgFuncCallProducerCache)) {
+            return $this->isSiblingMultiArgFuncCallProducerCache[$cacheKey];
+        }
+        if (isset($this->isSiblingMultiArgFuncCallProducerComputing[$cacheKey])) {
+            // Reentrant same-pair during firstSibling/scan — mirror Active-null conservatism (#36387).
+            return false;
+        }
+        $this->isSiblingMultiArgFuncCallProducerComputing[$cacheKey] = true;
+        try {
+            $result = $this->computeIsSiblingMultiArgFuncCallProducer(
+                $producer,
+                $consumer,
+                $producerIndex,
+                $consumerIndex,
+                $cfgChildren
+            );
+        } finally {
+            unset($this->isSiblingMultiArgFuncCallProducerComputing[$cacheKey]);
+        }
+        $this->isSiblingMultiArgFuncCallProducerCache[$cacheKey] = $result;
+
+        return $result;
+    }
+
+    /**
+     * @param list<Op> $cfgChildren
+     */
+    private function computeIsSiblingMultiArgFuncCallProducer(
+        Op\Expr $producer,
+        Op $consumer,
+        int $producerIndex,
+        int $consumerIndex,
+        array $cfgChildren
+    ): bool {
         if (!$this->isSiblingInlineCallProducerExpr($producer)) {
+            return false;
+        }
+        // Fast reject outside the near sibling window (nested stmts were O(n²) — #36387).
+        if (!property_exists($consumer, 'args') || !\is_array($consumer->args)) {
+            return false;
+        }
+        $argCount = \count($consumer->args);
+        if ($argCount < 2) {
+            return false;
+        }
+        $maxDistance = max(8, $argCount * 4);
+        if (($consumerIndex - $producerIndex) > $maxDistance) {
             return false;
         }
         if (
@@ -31781,14 +31862,23 @@ class Compiler {
         if (!($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)) {
             return false;
         }
-        if (
-            $child instanceof Op\Expr
+        $emptyUsages = $child instanceof Op\Expr
             && null !== $child->result
-            && !empty($child->result->usages)
-        ) {
+            && empty($child->result->usages);
+        if (!$emptyUsages) {
             return false;
         }
         if (!$consumer instanceof Op\Expr) {
+            return true;
+        }
+        // php-cfg often leaves hoisted nested callees with empty usage lists too. Only the
+        // near window (≈ consumer arity) can be a real nested/sibling producer — beyond it,
+        // treat empty-usage FuncCalls as completed statements (#36387).
+        $maxNear = 4;
+        if (property_exists($consumer, 'args') && \is_array($consumer->args)) {
+            $maxNear = max(4, \count($consumer->args) + 2);
+        }
+        if (($consumerIndex - $producerIndex) > $maxNear) {
             return true;
         }
         if ($this->isNestedCallArgProducerForConsumer($child, $consumer, $producerIndex, $consumerIndex, $cfgChildren)) {
@@ -31832,9 +31922,43 @@ class Compiler {
     }
 
     /**
+     * Cache key for {@see firstSiblingInlineFuncCallProducerIndexImpl} (#36387).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function firstSiblingInlineFuncCallProducerCacheKey(int $consumerIndex, array $cfgChildren): string
+    {
+        $consumer = $cfgChildren[$consumerIndex] ?? null;
+        if ($consumer instanceof Op) {
+            return 'o'.spl_object_id($consumer);
+        }
+        $anchor = $cfgChildren[0] ?? null;
+        $anchorId = $anchor instanceof Op ? spl_object_id($anchor) : 0;
+
+        return 'i'.$anchorId.':'.$consumerIndex.':'.\count($cfgChildren);
+    }
+
+    /**
      * @param list<Op> $cfgChildren
      */
     private function firstSiblingInlineFuncCallProducerIndexImpl(int $consumerIndex, array $cfgChildren): ?int
+    {
+        $cacheKey = $this->firstSiblingInlineFuncCallProducerCacheKey($consumerIndex, $cfgChildren);
+        if (\array_key_exists($cacheKey, $this->firstSiblingInlineFuncCallProducerCache)) {
+            $cached = $this->firstSiblingInlineFuncCallProducerCache[$cacheKey];
+
+            return $cached < 0 ? null : $cached;
+        }
+        $result = $this->computeFirstSiblingInlineFuncCallProducerIndex($consumerIndex, $cfgChildren);
+        $this->firstSiblingInlineFuncCallProducerCache[$cacheKey] = null === $result ? -1 : $result;
+
+        return $result;
+    }
+
+    /**
+     * @param list<Op> $cfgChildren
+     */
+    private function computeFirstSiblingInlineFuncCallProducerIndex(int $consumerIndex, array $cfgChildren): ?int
     {
         $deadInlineArgCount = 0;
         $consumer = $cfgChildren[$consumerIndex] ?? null;
