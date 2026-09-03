@@ -35,6 +35,15 @@ trait CompileBlockInternal
         bool $allowRecompile = false,
         Variable ...$args
     ): PHPLLVM\BasicBlock {
+        // Before lowering calls: mark leaf-recursive no-throw bodies so invokeJitCall
+        // can skip exception-stack + pending-throw checks (#36386 / fibo_r).
+        if (null !== $block->func && '{main}' !== $block->func->name) {
+            \PHPCompiler\JIT\NoThrowCallElision::analyzeAndRecord(
+                $this->context,
+                $block,
+                strtolower($block->func->getScopedName())
+            );
+        }
         $this->bindBlockStorageForFunc($func);
         // Builder may still be parked in another LLVM function after NestedJIT / helper emit
         // (#31101). Clear it so we do not continue a foreign instruction stream into $func.

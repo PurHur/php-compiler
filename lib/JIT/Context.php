@@ -126,6 +126,12 @@ class Context {
     public array $externalMethodStubs = [];
     public array $functionReturnType = [];
     public string $activeFunction = '';
+    /**
+     * lc user-function names whose CFG cannot throw and only self-calls (#36386).
+     *
+     * @var array<string, bool>
+     */
+    public array $noThrowUserFunctions = [];
     /** LLVM function owning the in-flight compileBlockInternal lowering (#31101). */
     public ?\PHPLLVM\Value\Function_ $loweringLlvmFunction = null;
 
