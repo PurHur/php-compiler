@@ -20,7 +20,9 @@ class Native extends MemoryManager {
     } 
 
     public function implement(): void {
-        // Todo
+        // Hand-maintained in Native.php (#36388): malloc_usable_size accounting
+        // for memory_get_usage(false). Pointer ABI unchanged (helper-runtime safe).
+        // Do not regenerate from this .pre.
         compile {
             function __mm__malloc($size) {
                 $result = malloc($size);
