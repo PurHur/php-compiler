@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8104 |
-| Phase A inventory files (M2 ratio SSOT) | 8104 |
+| PHP files on vm.php path | 8106 |
+| Phase A inventory files (M2 ratio SSOT) | 8106 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 25764 |
+| Source constructs flagged (warnings) | 25767 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2066,6 +2066,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/posix/JitPosixGetgidKernel.php` | 0 | 1 |
 | `ext/posix/JitPosixGetppidKernel.php` | 0 | 1 |
 | `ext/posix/JitPosixGetuidKernel.php` | 0 | 1 |
+| `ext/posix/JitPosixNestedKernelsFacade.php` | 0 | 1 |
 | `ext/posix/JitPosixSetegidKernel.php` | 0 | 1 |
 | `ext/posix/JitPosixSeteuidKernel.php` | 0 | 1 |
 | `ext/posix/JitPosixSetgidKernel.php` | 0 | 1 |
@@ -2073,7 +2074,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/posix/JitPosixSetsidKernel.php` | 0 | 1 |
 | `ext/posix/JitPosixSetuidKernel.php` | 0 | 1 |
 | `ext/posix/JitPosixTimes.php` | 0 | 1 |
-| `ext/posix/Module.php` | 0 | 43 |
+| `ext/posix/Module.php` | 0 | 44 |
 | `ext/posix/PosixConstants.php` | 0 | 1 |
 | `ext/posix/PosixCtermidJitHelper.php` | 0 | 1 |
 | `ext/posix/PosixFunction.php` | 0 | 3 |
@@ -7143,6 +7144,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/ObjectPropertyForeachHelper.php` | 0 | 1 |
 | `lib/JIT/OperandName.php` | 0 | 1 |
 | `lib/JIT/OperandNameNative.php` | 0 | 2 |
+| `lib/JIT/PosixNestedJitKernels.php` | 0 | 1 |
 | `lib/JIT/PregReplaceCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/PrintRArrayLlvm.php` | 0 | 1 |
 | `lib/JIT/PrintRObjectLlvm.php` | 0 | 2 |
@@ -24718,6 +24720,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/posix/JitPosixNestedKernelsFacade.php`
+
+**Warnings** (review for bootstrap subset):
+- 11 class method(s)
+
 ### `ext/posix/JitPosixSetegidKernel.php`
 
 **Warnings** (review for bootstrap subset):
@@ -24757,48 +24764,49 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new VM\Variable (line 24)
-- new posix_getpid (line 33)
-- new posix_getppid (line 34)
-- new posix_getuid (line 35)
-- new posix_geteuid (line 36)
-- new posix_getgid (line 37)
-- new posix_getegid (line 38)
-- new posix_getgroups (line 39)
-- new posix_uname (line 40)
-- new posix_strerror (line 41)
-- new posix_get_last_error (line 42)
-- new posix_getcwd (line 43)
-- new posix_ctermid (line 44)
-- new posix_errno (line 45)
-- new posix_access (line 46)
-- new posix_eaccess (line 48)
-- new posix_sysconf (line 49)
-- new posix_pathconf (line 50)
-- new posix_fpathconf (line 51)
-- new posix_mknod (line 53)
-- new posix_mkfifo (line 54)
-- new posix_setuid (line 55)
-- new posix_setgid (line 56)
-- new posix_seteuid (line 57)
-- new posix_setegid (line 58)
-- new posix_times (line 59)
-- new posix_getrlimit (line 60)
-- new posix_setrlimit (line 61)
-- new posix_setsid (line 62)
-- new posix_getsid (line 63)
-- new posix_getpgid (line 64)
-- new posix_getpgrp (line 65)
-- new posix_setpgid (line 66)
-- new posix_initgroups (line 67)
-- new posix_kill (line 68)
-- new posix_getlogin (line 69)
-- new posix_ttyname (line 70)
-- new posix_isatty (line 71)
-- new posix_getpwuid (line 72)
-- new posix_getpwnam (line 73)
-- new posix_getgrgid (line 74)
-- new posix_getgrnam (line 75)
-- 2 class method(s)
+- new JitPosixNestedKernelsFacade (line 32)
+- new posix_getpid (line 38)
+- new posix_getppid (line 39)
+- new posix_getuid (line 40)
+- new posix_geteuid (line 41)
+- new posix_getgid (line 42)
+- new posix_getegid (line 43)
+- new posix_getgroups (line 44)
+- new posix_uname (line 45)
+- new posix_strerror (line 46)
+- new posix_get_last_error (line 47)
+- new posix_getcwd (line 48)
+- new posix_ctermid (line 49)
+- new posix_errno (line 50)
+- new posix_access (line 51)
+- new posix_eaccess (line 53)
+- new posix_sysconf (line 54)
+- new posix_pathconf (line 55)
+- new posix_fpathconf (line 56)
+- new posix_mknod (line 58)
+- new posix_mkfifo (line 59)
+- new posix_setuid (line 60)
+- new posix_setgid (line 61)
+- new posix_seteuid (line 62)
+- new posix_setegid (line 63)
+- new posix_times (line 64)
+- new posix_getrlimit (line 65)
+- new posix_setrlimit (line 66)
+- new posix_setsid (line 67)
+- new posix_getsid (line 68)
+- new posix_getpgid (line 69)
+- new posix_getpgrp (line 70)
+- new posix_setpgid (line 71)
+- new posix_initgroups (line 72)
+- new posix_kill (line 73)
+- new posix_getlogin (line 74)
+- new posix_ttyname (line 75)
+- new posix_isatty (line 76)
+- new posix_getpwuid (line 77)
+- new posix_getpwnam (line 78)
+- new posix_getgrgid (line 79)
+- new posix_getgrnam (line 80)
+- 3 class method(s)
 
 ### `ext/posix/PosixConstants.php`
 
@@ -58093,7 +58101,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/DynamicObjectReadonlyGuard.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 5 class method(s)
 
 ### `lib/JIT/DynamicPropertyDeprecationGuard.php`
 
@@ -58187,7 +58195,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ExtensionLoweringHooks.php`
 
 **Warnings** (review for bootstrap subset):
-- 64 class method(s)
+- 65 class method(s)
 
 ### `lib/JIT/FiberHelper.php`
 
@@ -59071,6 +59079,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Call\Native (line 51)
 - 2 class method(s)
+
+### `lib/JIT/PosixNestedJitKernels.php`
+
+**Warnings** (review for bootstrap subset):
+- 11 class method(s)
 
 ### `lib/JIT/PregReplaceCallbackPolicy.php`
 

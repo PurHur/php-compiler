@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\posix\JitPosixGeteuidKernel;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -16,7 +15,7 @@ use PHPLLVM\Value;
  *
  * User-script AOT + embed: {@see \PHPCompiler\ext\posix\PosixGeteuidJitHelper} via
  * {@see JitVmHelperLink} (posix_getuid #30744 / posix_getppid #30728 shape).
- * NestedJIT leaf: module-local geteuid(2) via {@see JitPosixGeteuidKernel}
+ * NestedJIT leaf: module-local geteuid(2) via {@see \PHPCompiler\JIT\PosixNestedJitKernels} (ext/posix Module::jitInit)
  * (avoids re-entering the helper bridge).
  * SSOT (VM): {@see \PHPCompiler\ext\posix\VmPosix::geteuid}.
  * php-src: ext/posix/posix.c — PHP_FUNCTION(posix_geteuid)
@@ -54,7 +53,7 @@ final class PosixGeteuidJit
     public static function invoke(Context $context): Value
     {
         if (NestedJitCompileScope::isActive()) {
-            return JitPosixGeteuidKernel::invoke($context);
+            return $context->extensionLowering->requirePosixNested()->geteuid($context);
         }
 
         self::ensureLinked($context);
