@@ -111,6 +111,9 @@ class String_ extends Type {
                 }
                 $oldSize = $destVar->length;
 
+                // Capacity early-out is hand-maintained in String_.php implementRealloc
+                // (malloc_usable_size; #36386). Keep the store-back below if regenerating.
+
                 $targetCap = $newSize + ($newSize / 2);
                 $minCap = (int64) 32;
                 if ($targetCap < $minCap) {
@@ -118,6 +121,7 @@ class String_ extends Type {
                 }
 
                 $destValue = realloc $destVar $targetCap;
+                store $destValue $doublePtr;
                 $destValue->length = $newSize;
                 $char = &$destValue->value;
 

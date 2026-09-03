@@ -60,6 +60,17 @@ final class MainScriptInPlaceAppendAotTest extends TestCase
                 '{main} $buf .= must use __string__realloc (#36386)'
             );
             $this->assertStringContainsString('append_', $body, 'expected appendInPlace blocks');
+            $reallocStart = strpos($ll, 'define void @__string__realloc');
+            $this->assertNotFalse($reallocStart, 'missing @__string__realloc');
+            $reallocEnd = strpos($ll, "\ndefine ", $reallocStart + 1);
+            $reallocBody = false === $reallocEnd
+                ? substr($ll, $reallocStart)
+                : substr($ll, $reallocStart, $reallocEnd - $reallocStart);
+            $this->assertStringContainsString(
+                'malloc_usable_size',
+                $reallocBody,
+                '__string__realloc must early-out via malloc_usable_size (#36386)'
+            );
             exec(escapeshellarg($bin), $runOut, $runRc);
             $this->assertSame(0, $runRc);
             $this->assertSame(['3'], $runOut);
@@ -207,6 +218,37 @@ final class MainScriptInPlaceAppendAotTest extends TestCase
             $this->assertSame(0, $runRc, implode("\n", $runOut));
             $this->assertSame($zendOut, $runOut);
             $this->assertSame(['300'], $runOut);
+        } finally {
+            @unlink($path);
+            @unlink($bin);
+        }
+    }
+
+    public function testMainScriptHundredThousandAppendsMatchZend(): void
+    {
+        $src = <<<'PHP'
+        <?php
+        $buf = '';
+        for ($i = 0; $i < 100000; ++$i) {
+            $buf .= 'x';
+        }
+        echo strlen($buf), "\n";
+        PHP;
+        $path = sys_get_temp_dir().'/phpc_main_100k_append_'.getmypid().'.php';
+        $bin = sys_get_temp_dir().'/phpc_main_100k_append_'.getmypid().'.bin';
+        file_put_contents($path, $src);
+        try {
+            exec(escapeshellarg(PHP_BINARY).' '.escapeshellarg($path).' 2>&1', $zendOut, $zendRc);
+            $this->assertSame(0, $zendRc, implode("\n", $zendOut));
+            $cmd = escapeshellarg(PHP_BINARY).' '
+                .escapeshellarg(__DIR__.'/../../bin/compile.php').' -o '
+                .escapeshellarg($bin).' '.escapeshellarg($path).' 2>&1';
+            exec($cmd, $out, $rc);
+            $this->assertSame(0, $rc, implode("\n", $out));
+            exec(escapeshellarg($bin).' 2>&1', $runOut, $runRc);
+            $this->assertSame(0, $runRc, implode("\n", $runOut));
+            $this->assertSame($zendOut, $runOut);
+            $this->assertSame(['100000'], $runOut);
         } finally {
             @unlink($path);
             @unlink($bin);
