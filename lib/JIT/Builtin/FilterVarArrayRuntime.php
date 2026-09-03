@@ -4,15 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\Frame;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable as VmVariable;
-use PHPCompiler\ext\filter\JitFilter;
-use PHPCompiler\ext\filter\VmFilter;
-use PHPCompiler\ext\filter\filter_var_array as FilterVarArrayInternal;
 use PHPLLVM\Value;
 
 /**
@@ -20,8 +17,8 @@ use PHPLLVM\Value;
  *
  * Thin AOT NestedJIT of FilterBatchJitHelper fatals on `new HashTable()` /
  * iterateKeyed and mis-marshals Variable returns as empty VmIni (#21981 /
- * peer #26970 / #34572). Const-fold via {@see VmFilter} when possible; else
- * call-site LLVM {@see FilterVarArrayLlvm}.
+ * peer #26970 / #34572). Const-fold via filter ExtensionLoweringHooks when
+ * possible; else call-site LLVM {@see FilterVarArrayLlvm}.
  *
  * php-src: ext/filter/filter.c — php_filter_var_array
  */
@@ -73,10 +70,13 @@ final class FilterVarArrayRuntime
             }
             $def = $filterId;
         }
-        $frame = new Frame(new FilterVarArrayInternal(), null, null);
-        $result = VmFilter::filterVarArray($dataHt, $def, $addEmpty, $frame);
+        $result = $context->extensionLowering->requireFilter()->filterVarArrayConst(
+            $dataHt,
+            $def,
+            $addEmpty
+        );
         if (null === $result) {
-            return JitFilter::boxedFalse($context);
+            return self::boxedFalse($context);
         }
         $htVar = HashTableHelper::variableFromVmHashTable($context, $result);
 
@@ -131,5 +131,15 @@ final class FilterVarArrayRuntime
         }
 
         return $out;
+    }
+
+    /** Peer of {@see \PHPCompiler\ext\filter\JitFilter::boxedFalse} — kept in lib (#36204). */
+    private static function boxedFalse(Context $context): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+
+        return $ptr;
     }
 }

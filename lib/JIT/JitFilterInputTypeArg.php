@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
-use PHPCompiler\ext\filter\VmFilter;
 use PHPCompiler\ext\standard\JitIntdiv;
 use PHPCompiler\JIT\Builtin\FilterInputTypeJit;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
@@ -20,7 +19,7 @@ final class JitFilterInputTypeArg
 {
     public static function lower(Context $context, Variable $arg, string $function = 'filter_input'): Value
     {
-        $param = VmFilter::inputTypeParamName($function);
+        $param = $context->extensionLowering->requireFilter()->inputTypeParamName($function);
         // php-src Z_PARAM_LONG — soft-null DEP+0; strict TypeError (#31486).
         if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
             if ($context->callerStrictTypes) {

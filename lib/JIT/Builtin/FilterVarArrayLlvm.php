@@ -7,14 +7,13 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\FilterIds;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\HashTableReadLlvm;
 use PHPCompiler\JIT\HashTableWriteLlvm;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\ext\filter\JitFilter;
-use PHPCompiler\ext\filter\VmFilter;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -433,48 +432,49 @@ final class FilterVarArrayLlvm
         $failBb = BasicBlockHelper::append($context, 'fva_filt_fail_'.$tag);
         $mergeBb = BasicBlockHelper::append($context, 'fva_filt_merge_'.$tag);
 
+        $filter = $context->extensionLowering->requireFilter();
         // INT/BOOL/FLOAT/DEFAULT + EMAIL/URL/IP/MAC/DOMAIN (#35016 leftover of #34574).
         $switch = $context->builder->branchSwitch($filterId, $failBb, 9);
-        $switch->addCase($i64->constInt(VmFilter::FILTER_VALIDATE_INT, false), $intBb);
-        $switch->addCase($i64->constInt(VmFilter::FILTER_VALIDATE_BOOLEAN, false), $boolBb);
-        $switch->addCase($i64->constInt(VmFilter::FILTER_VALIDATE_FLOAT, false), $floatBb);
-        $switch->addCase($i64->constInt(VmFilter::FILTER_VALIDATE_EMAIL, false), $emailBb);
-        $switch->addCase($i64->constInt(VmFilter::FILTER_VALIDATE_URL, false), $urlBb);
-        $switch->addCase($i64->constInt(VmFilter::FILTER_VALIDATE_IP, false), $ipBb);
-        $switch->addCase($i64->constInt(VmFilter::FILTER_VALIDATE_MAC, false), $macBb);
-        $switch->addCase($i64->constInt(VmFilter::FILTER_VALIDATE_DOMAIN, false), $domainBb);
-        $switch->addCase($i64->constInt(VmFilter::FILTER_DEFAULT, false), $defaultBb);
+        $switch->addCase($i64->constInt(FilterIds::FILTER_VALIDATE_INT, false), $intBb);
+        $switch->addCase($i64->constInt(FilterIds::FILTER_VALIDATE_BOOLEAN, false), $boolBb);
+        $switch->addCase($i64->constInt(FilterIds::FILTER_VALIDATE_FLOAT, false), $floatBb);
+        $switch->addCase($i64->constInt(FilterIds::FILTER_VALIDATE_EMAIL, false), $emailBb);
+        $switch->addCase($i64->constInt(FilterIds::FILTER_VALIDATE_URL, false), $urlBb);
+        $switch->addCase($i64->constInt(FilterIds::FILTER_VALIDATE_IP, false), $ipBb);
+        $switch->addCase($i64->constInt(FilterIds::FILTER_VALIDATE_MAC, false), $macBb);
+        $switch->addCase($i64->constInt(FilterIds::FILTER_VALIDATE_DOMAIN, false), $domainBb);
+        $switch->addCase($i64->constInt(FilterIds::FILTER_DEFAULT, false), $defaultBb);
 
         $context->builder->positionAtEnd($intBb);
-        JitValueBox::copyFromPointer($context, $resultSlot, JitFilter::validateInt($context, $value));
+        JitValueBox::copyFromPointer($context, $resultSlot, $filter->validateInt($context, $value));
         $context->builder->branch($mergeBb);
 
         $context->builder->positionAtEnd($boolBb);
-        JitValueBox::copyFromPointer($context, $resultSlot, JitFilter::validateBoolean($context, $value));
+        JitValueBox::copyFromPointer($context, $resultSlot, $filter->validateBoolean($context, $value));
         $context->builder->branch($mergeBb);
 
         $context->builder->positionAtEnd($floatBb);
-        JitValueBox::copyFromPointer($context, $resultSlot, JitFilter::validateFloat($context, $value));
+        JitValueBox::copyFromPointer($context, $resultSlot, $filter->validateFloat($context, $value));
         $context->builder->branch($mergeBb);
 
         $context->builder->positionAtEnd($emailBb);
-        JitValueBox::copyFromPointer($context, $resultSlot, JitFilter::validateEmail($context, $value));
+        JitValueBox::copyFromPointer($context, $resultSlot, $filter->validateEmail($context, $value));
         $context->builder->branch($mergeBb);
 
         $context->builder->positionAtEnd($urlBb);
-        JitValueBox::copyFromPointer($context, $resultSlot, JitFilter::validateUrl($context, $value));
+        JitValueBox::copyFromPointer($context, $resultSlot, $filter->validateUrl($context, $value));
         $context->builder->branch($mergeBb);
 
         $context->builder->positionAtEnd($ipBb);
-        JitValueBox::copyFromPointer($context, $resultSlot, JitFilter::validateIp($context, $value));
+        JitValueBox::copyFromPointer($context, $resultSlot, $filter->validateIp($context, $value));
         $context->builder->branch($mergeBb);
 
         $context->builder->positionAtEnd($macBb);
-        JitValueBox::copyFromPointer($context, $resultSlot, JitFilter::validateMac($context, $value));
+        JitValueBox::copyFromPointer($context, $resultSlot, $filter->validateMac($context, $value));
         $context->builder->branch($mergeBb);
 
         $context->builder->positionAtEnd($domainBb);
-        JitValueBox::copyFromPointer($context, $resultSlot, JitFilter::validateDomain($context, $value));
+        JitValueBox::copyFromPointer($context, $resultSlot, $filter->validateDomain($context, $value));
         $context->builder->branch($mergeBb);
 
         $context->builder->positionAtEnd($defaultBb);

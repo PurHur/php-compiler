@@ -124,6 +124,39 @@ final class JitPhpExtensionLoweringHooksTest extends TestCase
         }
     }
 
+    public function testFilterBuiltinsDoNotImportFilterExtension(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $module = (string) file_get_contents($root.'/ext/filter/Module.php');
+        $this->assertStringContainsString(
+            'filter = new JitFilterExtensionHooksFacade()',
+            $module,
+            'ext/filter Module::jitInit must register JitFilterExtensionHooksFacade'
+        );
+        $this->assertStringContainsString(
+            'requireFilter',
+            (string) file_get_contents($root.'/lib/JIT/ExtensionLoweringHooks.php'),
+            'ExtensionLoweringHooks must expose requireFilter()'
+        );
+        $files = [
+            'lib/JIT/Builtin/FilterVarArrayLlvm.php',
+            'lib/JIT/Builtin/FilterVarArrayRuntime.php',
+            'lib/JIT/Builtin/FilterVarRequireArrayLlvm.php',
+            'lib/JIT/Builtin/FilterInputTypeJit.php',
+            'lib/JIT/JitFilterInputTypeArg.php',
+        ];
+        foreach ($files as $rel) {
+            $src = (string) file_get_contents($root.'/'.$rel);
+            $stripped = (string) preg_replace('~/\*.*?\*/~s', '', $src);
+            $stripped = (string) preg_replace('~//.*$~m', '', $stripped);
+            $this->assertDoesNotMatchRegularExpression(
+                '/PHPCompiler\\\\ext\\\\filter\\\\/',
+                $stripped,
+                $rel.' still imports ext\\filter — use FilterExtensionHooks'
+            );
+        }
+    }
+
     /**
      * @dataProvider coreJitHelperFilesWithoutNonStandardExtImports
      */
