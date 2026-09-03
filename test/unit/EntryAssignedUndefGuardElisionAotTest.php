@@ -58,6 +58,54 @@ final class EntryAssignedUndefGuardElisionAotTest extends TestCase
         }
     }
 
+    public function testSecondForInitDominatingAssignOmitsUndefVarBranches(): void
+    {
+        $src = <<<'PHP'
+        <?php
+        function simple(): int {
+            $a = 0;
+            for ($i = 0; $i < 2; ++$i) {
+                ++$a;
+            }
+            $b = 0;
+            for ($j = 0; $j < 3; ++$j) {
+                ++$b;
+            }
+            return $a + $b;
+        }
+        echo simple(), "\n";
+        PHP;
+        $path = sys_get_temp_dir().'/phpc_second_for_undef_elide_'.getmypid().'.php';
+        $bin = sys_get_temp_dir().'/phpc_second_for_undef_elide_'.getmypid().'.bin';
+        file_put_contents($path, $src);
+        try {
+            putenv('PHP_COMPILER_DUMP_IR=1');
+            $cmd = escapeshellarg(PHP_BINARY).' '
+                .escapeshellarg(__DIR__.'/../../bin/compile.php').' -o '
+                .escapeshellarg($bin).' '.escapeshellarg($path).' 2>&1';
+            exec($cmd, $out, $rc);
+            $this->assertSame(0, $rc, implode("\n", $out));
+            $this->assertFileExists('/tmp/phpc-last.ll');
+            $ll = (string) file_get_contents('/tmp/phpc-last.ll');
+            $fnStart = strpos($ll, 'define i64 @simple(');
+            $this->assertNotFalse($fnStart, 'missing @simple');
+            $fnEnd = strpos($ll, "\ndefine ", $fnStart + 1);
+            $body = false === $fnEnd ? substr($ll, $fnStart) : substr($ll, $fnStart, $fnEnd - $fnStart);
+            $this->assertStringNotContainsString(
+                'undef_var_warn',
+                $body,
+                'mid-function for-init that dominates the loop header must elide undef guards (#36386)'
+            );
+            exec(escapeshellarg($bin), $runOut, $runRc);
+            $this->assertSame(0, $runRc);
+            $this->assertSame(['5'], $runOut);
+        } finally {
+            putenv('PHP_COMPILER_DUMP_IR');
+            @unlink($path);
+            @unlink($bin);
+        }
+    }
+
     public function testConditionalAssignStillWarnsOnMaybeUndefined(): void
     {
         $src = <<<'PHP'
