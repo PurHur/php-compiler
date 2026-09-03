@@ -379,6 +379,13 @@ class Compiler {
      */
     private array $deadInlineTemporaryArgCountCache = [];
 
+    /**
+     * Memoize callResultFeedsInlineCallArg per result operand (#36387).
+     *
+     * @var array<int, bool>
+     */
+    private array $callResultFeedsInlineCallArgCache = [];
+
 
     /** Catch variable name (lc) => scope slot while lowering catch bodies (#9887). */
     private array $activeCatchVarSlotsByName = [];
@@ -749,6 +756,7 @@ class Compiler {
         $this->callArgIsDeadInlineTemporaryCache = [];
         $this->resolveCfgFuncCallNameCache = [];
         $this->deadInlineTemporaryArgCountCache = [];
+        $this->callResultFeedsInlineCallArgCache = [];
         $this->cfgProducerIndexLastSyncFingerprint = -1;
         $this->debugWriteLastPhase('Compiler::compile enter');
 
@@ -34071,6 +34079,10 @@ class Compiler {
             return null;
         }
         for ($consumerIndex = $producerIndex + 1, $n = \count($cfgChildren); $consumerIndex < $n; ++$consumerIndex) {
+            // Bound: hoisted sibling consumers sit near the producer (#36387).
+            if ($consumerIndex > $producerIndex + 32) {
+                break;
+            }
             $consumer = $cfgChildren[$consumerIndex] ?? null;
             if (!$this->isSiblingMultiArgInlineCallConsumer($consumer)) {
                 continue;
@@ -41386,17 +41398,51 @@ class Compiler {
     /** php-cfg dead temps: inline FuncCall/New_/Array_ producer before a call (#8561, #4633). */
     private function callResultFeedsInlineCallArg(Operand $result, Block $block): bool
     {
+        $cacheKey = spl_object_id($result);
+        if (\array_key_exists($cacheKey, $this->callResultFeedsInlineCallArgCache)) {
+            return $this->callResultFeedsInlineCallArgCache[$cacheKey];
+        }
+        $answer = $this->computeCallResultFeedsInlineCallArg($result, $block);
+        $this->callResultFeedsInlineCallArgCache[$cacheKey] = $answer;
+
+        return $answer;
+    }
+
+    /**
+     * Whether $result is consumed as a hoisted inline call arg (empty php-cfg usages).
+     *
+     * Scan only a near window after the producer: walking every later FuncCall in the
+     * block made nested call stmts O(n²) via matchInlineCallArgProducer (#36387).
+     */
+    private function computeCallResultFeedsInlineCallArg(Operand $result, Block $block): bool
+    {
         if (null === $block->orig) {
             return false;
         }
-        foreach ($block->orig->children as $child) {
+        $children = $block->orig->children;
+        $startIndex = 0;
+        $producer = $this->findCfgProducerExprForOperand($result);
+        if ($producer instanceof Op) {
+            $producerIndex = $this->cfgCallOpIndexInChildren($children, $producer, $block->orig);
+            if (null !== $producerIndex) {
+                $startIndex = $producerIndex + 1;
+            }
+        }
+        $n = \count($children);
+        // Multi-arg nests with ConstFetch/Array_ preludes stay within a small span; 32
+        // matches deferredSiblingInlineCallArgConsumerIndex's hard cap (#36387).
+        $scanEnd = null !== $producer && $startIndex > 0
+            ? min($n, $startIndex + 32)
+            : $n;
+        for ($i = $startIndex; $i < $scanEnd; ++$i) {
+            $child = $children[$i];
             if (!$this->isInlineExprCallArgConsumer($child)) {
                 continue;
             }
-            $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $child);
-            foreach ($producers as $producer) {
-                if ($producer->result === $result || $this->operandsReferToSameVariable($producer->result, $result)) {
-                    if ($this->inlineCallArgProducerPassesByRefGuards($producer, $child, $block->orig->children)) {
+            $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($children, $child);
+            foreach ($producers as $producerCand) {
+                if ($producerCand->result === $result || $this->operandsReferToSameVariable($producerCand->result, $result)) {
+                    if ($this->inlineCallArgProducerPassesByRefGuards($producerCand, $child, $children)) {
                         return true;
                     }
                 }
@@ -41416,7 +41462,7 @@ class Compiler {
                 ) {
                     continue;
                 }
-                if ($this->inlineCallArgProducerPassesByRefGuards($matched, $child, $block->orig->children)) {
+                if ($this->inlineCallArgProducerPassesByRefGuards($matched, $child, $children)) {
                     return true;
                 }
             }
@@ -55516,7 +55562,16 @@ class Compiler {
             return false;
         }
         $cfgChildren = $block->orig->children;
-        foreach ($cfgChildren as $consumerIndex => $consumer) {
+        $producerIndex = $this->cfgCallOpIndexInChildren($cfgChildren, $cfgCallOp, $block->orig);
+        if (!\is_int($producerIndex) || !$cfgCallOp instanceof Op\Expr) {
+            return false;
+        }
+        $n = \count($cfgChildren);
+        // Only consumers in the near window after this producer can use it as a hoisted
+        // sibling arg — scanning the whole block was O(n²) firstSibling (#36387).
+        $scanEnd = min($n, $producerIndex + 1 + 32);
+        for ($consumerIndex = $producerIndex + 1; $consumerIndex < $scanEnd; ++$consumerIndex) {
+            $consumer = $cfgChildren[$consumerIndex] ?? null;
             if (!$this->isInlineExprCallArgConsumer($consumer)) {
                 continue;
             }
@@ -55525,57 +55580,46 @@ class Compiler {
                     property_exists($consumer, 'args')
                     && \is_array($consumer->args)
                     && 1 === \count($consumer->args)
+                    && $this->isIifeHoistedFuncCallArgProducer(
+                        $cfgCallOp,
+                        $consumer,
+                        $producerIndex,
+                        $consumerIndex,
+                        $cfgChildren
+                    )
                 ) {
-                    $iifeProducerIndex = $this->cfgCallOpIndexInChildren($cfgChildren, $cfgCallOp);
-                    if (
-                        \is_int($iifeProducerIndex)
-                        && $cfgCallOp instanceof Op\Expr
-                        && $this->isIifeHoistedFuncCallArgProducer(
-                            $cfgCallOp,
-                            $consumer,
-                            $iifeProducerIndex,
-                            $consumerIndex,
-                            $cfgChildren
-                        )
-                    ) {
-                        return true;
-                    }
+                    return true;
                 }
                 continue;
             }
             $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex($consumerIndex, $cfgChildren);
-            foreach ($cfgChildren as $producerIndex => $producer) {
-                if ($producer !== $cfgCallOp || !$producer instanceof Op\Expr) {
-                    continue;
-                }
-                if ($this->isNestedCallArgProducerSeparatedByConsumerLiteralPreludes(
-                    $producer,
-                    $consumer,
-                    $producerIndex,
-                    $consumerIndex,
-                    $cfgChildren
-                )) {
-                    return true;
-                }
-                // substr(sprintf(...), -N) — lone hoisted FuncCall + UnaryMinus offset (#10673, #13801).
-                if ($this->isSiblingMultiArgFuncCallProducer(
-                    $producer,
-                    $consumer,
-                    $producerIndex,
-                    $consumerIndex,
-                    $cfgChildren
-                )) {
-                    return true;
-                }
-                if (
-                    null === $firstSibling
-                    || $this->countSiblingInlineFuncCallProducers($firstSibling, $consumerIndex, $cfgChildren) < 2
-                ) {
-                    continue;
-                }
-                // Multi-sibling chain (MethodCall + FuncCall around ArrayDimFetch) (#28821).
+            if ($this->isNestedCallArgProducerSeparatedByConsumerLiteralPreludes(
+                $cfgCallOp,
+                $consumer,
+                $producerIndex,
+                $consumerIndex,
+                $cfgChildren
+            )) {
                 return true;
             }
+            // substr(sprintf(...), -N) — lone hoisted FuncCall + UnaryMinus offset (#10673, #13801).
+            if ($this->isSiblingMultiArgFuncCallProducer(
+                $cfgCallOp,
+                $consumer,
+                $producerIndex,
+                $consumerIndex,
+                $cfgChildren
+            )) {
+                return true;
+            }
+            if (
+                null === $firstSibling
+                || $this->countSiblingInlineFuncCallProducers($firstSibling, $consumerIndex, $cfgChildren) < 2
+            ) {
+                continue;
+            }
+            // Multi-sibling chain (MethodCall + FuncCall around ArrayDimFetch) (#28821).
+            return true;
         }
 
         return false;
@@ -55595,6 +55639,10 @@ class Compiler {
             return false;
         }
         for ($consumerIndex = $producerIndex + 1, $n = \count($cfgChildren); $consumerIndex < $n; ++$consumerIndex) {
+            // Bound: nested outer producers sit near the consumer (#36387).
+            if ($consumerIndex > $producerIndex + 32) {
+                break;
+            }
             $consumer = $cfgChildren[$consumerIndex] ?? null;
             if (!$this->isSiblingMultiArgInlineCallConsumer($consumer)) {
                 continue;
