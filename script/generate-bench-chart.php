@@ -1,3 +1,78 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Generate docs/pages/bench.html from benchmarks/history/*.json + RESULTS.json (#36385).
+ *
+ * Embeds history JSON in the page so it works from a static file:// or docs site
+ * without a directory listing API.
+ *
+ * Usage:
+ *   php script/generate-bench-chart.php
+ *   ./script/docker-exec.sh -- bash -lc 'php script/generate-bench-chart.php'
+ */
+
+$root = dirname(__DIR__);
+$historyDir = $root.'/benchmarks/history';
+$resultsPath = $root.'/benchmarks/v2/RESULTS.json';
+$webPath = $root.'/benchmarks/v2/WEB_REQUEST.json';
+$outPath = $root.'/docs/pages/bench.html';
+
+$points = [];
+if (is_dir($historyDir)) {
+    $files = glob($historyDir.'/*.json') ?: [];
+    sort($files, \SORT_STRING);
+    foreach ($files as $file) {
+        $doc = json_decode((string) file_get_contents($file), true);
+        if (!is_array($doc) || !isset($doc['cases']) || !is_array($doc['cases'])) {
+            continue;
+        }
+        $sha = basename($file, '.json');
+        $points[] = [
+            'sha' => $sha,
+            'generated_at' => $doc['generated_at'] ?? null,
+            'cases' => summarizeCases($doc['cases']),
+            'web_request' => summarizeWeb($doc['web_request'] ?? null),
+        ];
+    }
+}
+
+$latest = null;
+if (is_file($resultsPath)) {
+    $doc = json_decode((string) file_get_contents($resultsPath), true);
+    if (is_array($doc) && isset($doc['cases']) && is_array($doc['cases'])) {
+        $latest = [
+            'sha' => 'RESULTS',
+            'generated_at' => $doc['generated_at'] ?? null,
+            'cases' => summarizeCases($doc['cases']),
+            'web_request' => summarizeWeb($doc['web_request'] ?? null),
+        ];
+    }
+}
+
+$webStandalone = null;
+if (is_file($webPath)) {
+    $webDoc = json_decode((string) file_get_contents($webPath), true);
+    if (is_array($webDoc)) {
+        $webStandalone = summarizeWeb($webDoc);
+    }
+}
+
+$payload = [
+    'generated_at' => gmdate('Y-m-d\TH:i:s\Z'),
+    'history' => $points,
+    'latest' => $latest,
+    'web_request' => $webStandalone ?? ($latest['web_request'] ?? null),
+];
+
+$json = json_encode($payload, \JSON_UNESCAPED_SLASHES);
+if (false === $json) {
+    fwrite(STDERR, "generate-bench-chart: json_encode failed\n");
+    exit(1);
+}
+
+$html = <<<HTML
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -36,7 +111,7 @@
   <div id="sparks"></div>
   <h2>Web-request (MiniWebApp)</h2>
   <div id="web"></div>
-  <script type="application/json" id="bench-data">{"generated_at":"2026-09-03T07:46:30Z","history":[{"sha":"c3e02d4ce0","generated_at":"2026-09-03T06:54:29Z","cases":{"assoc-heavy":{"zend":0.008674192428588866,"aot":0.005910158157348633,"ratio_aot_over_zend":0.6813496709929582},"binary-trees":{"zend":0.01982541084289551,"aot":null,"ratio_aot_over_zend":null},"call-heavy":{"zend":0.010001802444458007,"aot":0.0038922309875488283,"ratio_aot_over_zend":0.3891529560959796},"closure-heavy":{"zend":0.009144401550292969,"aot":0.004702186584472657,"ratio_aot_over_zend":0.5142147967377928},"exceptions":{"zend":0.010262584686279297,"aot":0.00520477294921875,"ratio_aot_over_zend":0.5071600486939067},"fannkuch-redux":{"zend":0.02975740432739258,"aot":null,"ratio_aot_over_zend":null},"fasta":{"zend":0.00926380157470703,"aot":null,"ratio_aot_over_zend":null},"json-roundtrip":{"zend":0.008858203887939453,"aot":null,"ratio_aot_over_zend":null},"k-nucleotide":{"zend":0.010933828353881837,"aot":0.005411195755004883,"ratio_aot_over_zend":0.4949040335980532},"nbody":{"zend":0.010899019241333009,"aot":null,"ratio_aot_over_zend":null},"object-graph":{"zend":0.01195216178894043,"aot":0.007098627090454101,"ratio_aot_over_zend":0.593919929783966},"regex-redux":{"zend":0.010166168212890625,"aot":null,"ratio_aot_over_zend":null},"sort-mixed":{"zend":0.010738801956176759,"aot":null,"ratio_aot_over_zend":null},"spectral-norm":{"zend":0.013703012466430664,"aot":null,"ratio_aot_over_zend":null},"str-builder":{"zend":0.00924839973449707,"aot":0.026494407653808595,"ratio_aot_over_zend":2.864755894469279},"template-render":{"zend":0.009662580490112305,"aot":0.36472597122192385,"ratio_aot_over_zend":37.7462285147479}},"web_request":null}],"latest":{"sha":"RESULTS","generated_at":"2026-09-03T07:46:29Z","cases":{"assoc-heavy":{"zend":0.008674192428588866,"aot":0.005910158157348633,"ratio_aot_over_zend":0.6813496709929582},"binary-trees":{"zend":0.01982541084289551,"aot":null,"ratio_aot_over_zend":null},"call-heavy":{"zend":0.010001802444458007,"aot":0.0038922309875488283,"ratio_aot_over_zend":0.3891529560959796},"closure-heavy":{"zend":0.009144401550292969,"aot":0.004702186584472657,"ratio_aot_over_zend":0.5142147967377928},"exceptions":{"zend":0.010262584686279297,"aot":0.00520477294921875,"ratio_aot_over_zend":0.5071600486939067},"fannkuch-redux":{"zend":0.02975740432739258,"aot":null,"ratio_aot_over_zend":null},"fasta":{"zend":0.00926380157470703,"aot":null,"ratio_aot_over_zend":null},"json-roundtrip":{"zend":0.008858203887939453,"aot":null,"ratio_aot_over_zend":null},"k-nucleotide":{"zend":0.010933828353881837,"aot":0.005411195755004883,"ratio_aot_over_zend":0.4949040335980532},"nbody":{"zend":0.010899019241333009,"aot":null,"ratio_aot_over_zend":null},"object-graph":{"zend":0.01195216178894043,"aot":0.007098627090454101,"ratio_aot_over_zend":0.593919929783966},"regex-redux":{"zend":0.010166168212890625,"aot":null,"ratio_aot_over_zend":null},"sort-mixed":{"zend":0.010738801956176759,"aot":null,"ratio_aot_over_zend":null},"spectral-norm":{"zend":0.013703012466430664,"aot":null,"ratio_aot_over_zend":null},"str-builder":{"zend":0.00924839973449707,"aot":0.026494407653808595,"ratio_aot_over_zend":2.864755894469279},"template-render":{"zend":0.009662580490112305,"aot":0.36472597122192385,"ratio_aot_over_zend":37.7462285147479}},"web_request":{"generated_at":"2026-09-03T07:46:10Z","requests":200,"req_per_s":{"zend_builtin":391.22986656567934,"phpc_serve":22.391825365923854,"phpc_serve_aot":null,"php_fpm":null},"p99_ms":{"zend_builtin":3.7488937377929688,"phpc_serve":51.05113983154297,"phpc_serve_aot":null,"php_fpm":null},"notes":["phpc_serve_aot warmup failed status=200 path=/index.php","php_fpm n/a: no php-fpm binary on PATH in this environment"]}},"web_request":{"generated_at":"2026-09-03T07:46:10Z","requests":200,"req_per_s":{"zend_builtin":391.22986656567934,"phpc_serve":22.391825365923854,"phpc_serve_aot":null,"php_fpm":null},"p99_ms":{"zend_builtin":3.7488937377929688,"phpc_serve":51.05113983154297,"phpc_serve_aot":null,"php_fpm":null},"notes":["phpc_serve_aot warmup failed status=200 path=/index.php","php_fpm n/a: no php-fpm binary on PATH in this environment"]}}</script>
+  <script type="application/json" id="bench-data">{$json}</script>
   <script>
 (function () {
   var data = JSON.parse(document.getElementById('bench-data').textContent);
@@ -151,3 +226,63 @@
   </script>
 </body>
 </html>
+HTML;
+
+if (false === file_put_contents($outPath, $html)) {
+    fwrite(STDERR, "generate-bench-chart: failed to write {$outPath}\n");
+    exit(1);
+}
+
+echo "Wrote {$outPath} (history points: ".count($points).")\n";
+
+/**
+ * @param array<string, mixed> $cases
+ * @return array<string, array{zend: ?float, aot: ?float, ratio_aot_over_zend: ?float}>
+ */
+function summarizeCases(array $cases): array
+{
+    $out = [];
+    foreach ($cases as $name => $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+        $zend = null;
+        foreach ($row as $k => $v) {
+            if (is_string($k) && preg_match('/^\\d+\\.\\d+/', $k) && (is_float($v) || is_int($v))) {
+                $zend = (float) $v;
+                break;
+            }
+        }
+        if (null === $zend && isset($row['zend']) && (is_float($row['zend']) || is_int($row['zend']))) {
+            $zend = (float) $row['zend'];
+        }
+        $aot = isset($row['aot']) && (is_float($row['aot']) || is_int($row['aot'])) ? (float) $row['aot'] : null;
+        $ratio = (null !== $zend && null !== $aot && $zend > 0.0) ? ($aot / $zend) : null;
+        $out[(string) $name] = [
+            'zend' => $zend,
+            'aot' => $aot,
+            'ratio_aot_over_zend' => $ratio,
+        ];
+    }
+
+    return $out;
+}
+
+/**
+ * @param mixed $web
+ * @return ?array<string, mixed>
+ */
+function summarizeWeb(mixed $web): ?array
+{
+    if (!is_array($web)) {
+        return null;
+    }
+
+    return [
+        'generated_at' => $web['generated_at'] ?? null,
+        'requests' => $web['requests'] ?? null,
+        'req_per_s' => $web['req_per_s'] ?? null,
+        'p99_ms' => $web['p99_ms'] ?? null,
+        'notes' => $web['notes'] ?? [],
+    ];
+}

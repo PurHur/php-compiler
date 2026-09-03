@@ -72,4 +72,32 @@ final class BenchGateTest extends TestCase
         $this->assertStringContainsString('Specify at least one Zend runtime via PHP_X_Y', $bench);
         $this->assertStringNotContainsString('exit(0)', $bench);
     }
+
+    public function testV2WebRequestAndChartScriptsExist(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $this->assertFileExists($root.'/script/bench-web-request.php');
+        $this->assertFileExists($root.'/script/generate-bench-chart.php');
+        $bench = (string) file_get_contents($root.'/script/bench.php');
+        $this->assertStringContainsString('bench-web-request.php', $bench);
+        $this->assertStringContainsString('generate-bench-chart.php', $bench);
+        $readme = (string) file_get_contents($root.'/benchmarks/README.md');
+        $this->assertStringNotContainsString('9.1x faster', $readme);
+        $this->assertStringNotContainsString('7.6x slower', $readme);
+        $this->assertStringContainsString('Do not hand-edit timing numbers', $readme);
+    }
+
+    public function testGenerateBenchChartEmbedsHistory(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $php = \PHP_BINARY;
+        $cmd = escapeshellcmd($php).' '.escapeshellarg($root.'/script/generate-bench-chart.php');
+        exec($cmd.' 2>&1', $lines, $rc);
+        $this->assertSame(0, $rc, implode("\n", $lines));
+        $html = (string) file_get_contents($root.'/docs/pages/bench.html');
+        $this->assertStringContainsString('id="bench-data"', $html);
+        $this->assertStringContainsString('sparkline', $html);
+        $this->assertStringContainsString('web-request', $html);
+        $this->assertStringContainsString('"history"', $html);
+    }
 }
