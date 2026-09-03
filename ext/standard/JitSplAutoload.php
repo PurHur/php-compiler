@@ -128,7 +128,7 @@ final class JitSplAutoload
             0,
             'class'
         );
-        $map = $context->structFieldMap[$strPtr->typeOf()->getElementType()->getName()];
+        $map = $context->structFieldsFor($strPtr);
         $classPtr = $context->builder->load(
             $context->builder->structGep($strPtr, $map['value'])
         );

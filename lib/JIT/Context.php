@@ -1182,6 +1182,32 @@ class Context {
                 $this->structFieldMap[$name] = $fields;
             }
         }
+        // Alias CreateNamed uniquified siblings (__string__.2) to the same field map (#36387).
+        foreach (array_keys($cores) as $name) {
+            if (!isset($this->structFieldMap[$name])) {
+                continue;
+            }
+            for ($i = 1; $i <= 32; ++$i) {
+                $alias = $name.'.'.$i;
+                try {
+                    $aliasTy = $this->module->getTypeByName($alias);
+                } catch (\Throwable $e) {
+                    continue;
+                }
+                if (!$aliasTy instanceof PHPLLVM\Type) {
+                    continue;
+                }
+                try {
+                    $aliasTy->getKind();
+                } catch (\Throwable $e) {
+                    continue;
+                }
+                $this->typeMap[$alias] = $aliasTy;
+                $this->typeMap[$alias.'*'] = $aliasTy->pointerType(0);
+                $this->typeMap[$alias.'**'] = $aliasTy->pointerType(0)->pointerType(0);
+                $this->structFieldMap[$alias] = $this->structFieldMap[$name];
+            }
+        }
     }
 
     public function setMain(PHPLLVM\Value\Function_ $func): void {
@@ -4305,18 +4331,81 @@ class Context {
     /** structFieldMap index for a struct value or pointer (issue #1880). */
     public function structFieldIndex(PHPLLVM\Value $structOrPtr, string $field): int
     {
+        $map = $this->structFieldsFor($structOrPtr);
+        if (!isset($map[$field])) {
+            $structName = $this->resolveStructMapName(
+                PHPLLVM\Type::KIND_POINTER === $structOrPtr->typeOf()->getKind()
+                    ? $structOrPtr->typeOf()->getElementType()
+                    : $structOrPtr->typeOf()
+            );
+            throw new \LogicException(
+                "structFieldIndex: struct {$structName} has no field {$field} (llvm {$structOrPtr->typeOf()->toString()})"
+            );
+        }
+
+        return $map[$field];
+    }
+
+    /**
+     * Field map for a struct value/pointer, resolving LLVM CreateNamed suffixes (#36387).
+     *
+     * @return array<string, int>
+     */
+    public function structFieldsFor(PHPLLVM\Value $structOrPtr): array
+    {
         $ty = $structOrPtr->typeOf();
         $structTy = PHPLLVM\Type::KIND_POINTER === $ty->getKind()
             ? $ty->getElementType()
             : $ty;
-        $structName = $this->resolveStructMapName($structTy);
-        if (!isset($this->structFieldMap[$structName][$field])) {
-            throw new \LogicException(
-                "structFieldIndex: struct {$structName} has no field {$field} (llvm {$ty->toString()})"
-            );
+
+        return $this->structFieldsForType($structTy);
+    }
+
+    /**
+     * Field map for an LLVM struct type name, resolving `__string__.2` → `__string__` (#36387).
+     *
+     * @return array<string, int>
+     */
+    public function structFieldsForTypeName(string $llvmName): array
+    {
+        if (isset($this->structFieldMap[$llvmName]) && is_array($this->structFieldMap[$llvmName])) {
+            return $this->structFieldMap[$llvmName];
+        }
+        $stripped = self::stripLlvmUniquifySuffix($llvmName);
+        if (
+            $stripped !== $llvmName
+            && isset($this->structFieldMap[$stripped])
+            && is_array($this->structFieldMap[$stripped])
+        ) {
+            // Lazy-alias so subsequent raw map lookups in older call sites succeed.
+            $this->structFieldMap[$llvmName] = $this->structFieldMap[$stripped];
+
+            return $this->structFieldMap[$llvmName];
         }
 
-        return $this->structFieldMap[$structName][$field];
+        throw new \LogicException("structFieldsForTypeName: no field map for {$llvmName}");
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    public function structFieldsForType(PHPLLVM\Type $structTy): array
+    {
+        $name = $this->resolveStructMapName($structTy);
+        if (!isset($this->structFieldMap[$name]) || !is_array($this->structFieldMap[$name])) {
+            throw new \LogicException(
+                'structFieldsForType: no field map for '.$name.' (llvm '.$structTy->toString().')'
+            );
+        }
+        // If LLVM name is uniquified, alias it for raw call sites (#36387).
+        if (method_exists($structTy, 'getName')) {
+            $llvmName = (string) $structTy->getName();
+            if ($llvmName !== $name && $llvmName !== '') {
+                $this->structFieldMap[$llvmName] = $this->structFieldMap[$name];
+            }
+        }
+
+        return $this->structFieldMap[$name];
     }
 
     /** Map an LLVM struct type to a structFieldMap key (issue #1880). */
@@ -4328,11 +4417,20 @@ class Context {
             if (isset($this->structFieldMap[$base])) {
                 return $base;
             }
+            $stripped = self::stripLlvmUniquifySuffix($base);
+            if ($stripped !== $base && isset($this->structFieldMap[$stripped])) {
+                return $stripped;
+            }
         }
         if (method_exists($structTy, 'getName')) {
-            $llvmName = $structTy->getName();
+            $llvmName = (string) $structTy->getName();
             if (isset($this->structFieldMap[$llvmName])) {
                 return $llvmName;
+            }
+            // CreateNamed after bitcode uniqueifies (__string__.2); map to the seeded core (#36387).
+            $stripped = self::stripLlvmUniquifySuffix($llvmName);
+            if ($stripped !== $llvmName && isset($this->structFieldMap[$stripped])) {
+                return $stripped;
             }
         }
         $repr = $structTy->toString();
@@ -4340,6 +4438,16 @@ class Context {
             if (str_contains($repr, $candidate)) {
                 return $candidate;
             }
+        }
+
+        return $name;
+    }
+
+    /** LLVM CreateNamed uniquify suffix: `__string__.2` → `__string__` (#36387). */
+    public static function stripLlvmUniquifySuffix(string $name): string
+    {
+        if (preg_match('/^(.+)\.(\d+)$/', $name, $m)) {
+            return $m[1];
         }
 
         return $name;

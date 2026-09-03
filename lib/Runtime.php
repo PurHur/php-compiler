@@ -357,8 +357,11 @@ class Runtime {
                 $this->jitContext->setDebugFile($this->debugFile);
             }
             // User-script ParseStr/environ nested JIT before registerModule — post-module nested JIT segfaults (#15417).
+            // Edit-scaffold thin boot already has those helpers in restored module.bc — NestedJIT here
+            // CreateNamed-uniquifies core structs (__string__.2) and breaks structFieldMap (#36387).
             if (JIT\Builtin::LOAD_TYPE_STANDALONE === $this->jitContext->loadType
-                && $this->jitContext->isThinStandaloneAotMain()) {
+                && $this->jitContext->isThinStandaloneAotMain()
+                && !JIT\CompileCache::shouldSkipBuiltinImplement()) {
                 JIT\Builtin\SuperglobalRefreshRuntime::ensureUserScriptRefreshPrerequisites($this->jitContext);
             }
             foreach ($this->modules as $module) {

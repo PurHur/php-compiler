@@ -230,7 +230,7 @@ final class JitStrlen
 
     private static function loadStringLength(Context $context, Value $strPtr): Value
     {
-        $offset = $context->structFieldMap[$strPtr->typeOf()->getElementType()->getName()]['length'];
+        $offset = $context->structFieldIndex($strPtr, 'length');
 
         return $context->builder->load(
             $context->builder->structGep($strPtr, $offset)

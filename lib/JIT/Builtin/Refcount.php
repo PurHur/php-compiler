@@ -255,8 +255,8 @@ class Refcount extends Builtin {
         $refPtr = $this->context->builder->structGep($refVirtual, $refField);
         $ref = $this->context->builder->load($refPtr);
         $structType = $ref->typeOf();
-        $rcOff = $this->context->structFieldMap[$structType->getName()]['refcount'];
-        $tiOff = $this->context->structFieldMap[$structType->getName()]['typeinfo'];
+        $rcOff = $this->context->structFieldsForTypeName($structType->getName())['refcount'];
+        $tiOff = $this->context->structFieldsForTypeName($structType->getName())['typeinfo'];
         $ref = $this->context->builder->insertValue(
             $ref,
             $structType->getElementAtIndex($rcOff)->constInt(0, false),
@@ -292,8 +292,8 @@ class Refcount extends Builtin {
         $refPtr = $this->context->builder->structGep($refVirtual, $refField);
         $ref = $this->context->builder->load($refPtr);
         $structName = $ref->typeOf()->getName();
-        $tiOff = $this->context->structFieldMap[$structName]['typeinfo'];
-        $rcOff = $this->context->structFieldMap[$structName]['refcount'];
+        $tiOff = $this->context->structFieldsForTypeName($structName)['typeinfo'];
+        $rcOff = $this->context->structFieldsForTypeName($structName)['refcount'];
         $typeinfo = $this->context->builder->extractValue($ref, $tiOff);
         $refMask = $i32->constInt(self::TYPE_INFO_REFCOUNTED, false);
         $isCounted = $this->context->builder->bitwiseAnd($typeinfo, $refMask);
@@ -342,7 +342,7 @@ class Refcount extends Builtin {
     $offset = $this->context->structFieldIndex($refVirtual, 'ref');
                     $refPtr = $this->context->builder->structGep($refVirtual, $offset);
                     $ref = $this->context->builder->load($refPtr);
-    $offset = $this->context->structFieldMap[$ref->typeOf()->getName()]['typeinfo'];
+    $offset = $this->context->structFieldIndex($ref, 'typeinfo');
                     $typeinfo = $this->context->builder->extractValue($ref, $offset);
     $__type = $this->context->getTypeFromString('int32');
                         
@@ -437,11 +437,11 @@ class Refcount extends Builtin {
                     $this->context->builder->branchIf($bool, $ifBlock, $tmp);
                 
                 $this->context->builder->positionAtEnd($ifBlock);
-                { $offset = $this->context->structFieldMap[$ref->typeOf()->getName()]['refcount'];
+                { $offset = $this->context->structFieldIndex($ref, 'refcount');
                     $current = $this->context->builder->extractValue($ref, $offset);
     $this->emitRuntimeAssertDelrefUnderflow($fn___8f14e45fceea167a5a36dedd4bea2543, $current);
     $current = $this->context->builder->sub($current, $current->typeOf()->constInt(1, false));
-    $offset = $this->context->structFieldMap[$ref->typeOf()->getName()]['refcount'];
+    $offset = $this->context->structFieldIndex($ref, 'refcount');
                 // Persist decremented count before free-or-keep (#24226).
                 $ref = $this->context->builder->insertValue(
                     $ref, 
@@ -683,7 +683,7 @@ class Refcount extends Builtin {
                     $ref = $this->context->builder->load(
                         $this->context->builder->structGep($virtual, $offset)
                     );
-    $offset = $this->context->structFieldMap[$ref->typeOf()->getName()]['typeinfo'];
+    $offset = $this->context->structFieldIndex($ref, 'typeinfo');
                     $typeinfo = $this->context->builder->extractValue($ref, $offset);
     $__type = $this->context->getTypeFromString('int32');
                         
@@ -778,7 +778,7 @@ class Refcount extends Builtin {
                     $this->context->builder->branchIf($bool, $ifBlock, $tmp);
                 
                 $this->context->builder->positionAtEnd($ifBlock);
-                { $offset = $this->context->structFieldMap[$ref->typeOf()->getName()]['refcount'];
+                { $offset = $this->context->structFieldIndex($ref, 'refcount');
                     $current = $this->context->builder->extractValue($ref, $offset);
     $__right = $current->typeOf()->constInt(1, false);
                             
@@ -1240,7 +1240,7 @@ class Refcount extends Builtin {
         $refField = $this->context->structFieldIndex($virtual, 'ref');
         $refPtr = $this->context->builder->structGep($virtual, $refField);
         $ref = $this->context->builder->load($refPtr);
-        $tiOff = $this->context->structFieldMap[$ref->typeOf()->getName()]['typeinfo'];
+        $tiOff = $this->context->structFieldIndex($ref, 'typeinfo');
         $typeinfo = $this->context->builder->extractValue($ref, $tiOff);
         $i32 = $this->context->getTypeFromString('int32');
         $mask = $i32->constInt(self::TYPE_INFO_NONREFCOUNTED_MASK, false);

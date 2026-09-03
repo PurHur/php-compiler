@@ -422,8 +422,7 @@ final class JitStreamFilterApplyKernel
     /** ASCII rot13 in place — peer {@see VmString::strRot13} (no NestedJIT StrRot13). */
     private static function transformRot13(Context $context, LlvmFunction $fn, Value $strPtr): void
     {
-        $structName = $strPtr->typeOf()->getElementType()->getName();
-        $map = $context->structFieldMap[$structName];
+        $map = $context->structFieldsFor($strPtr);
         $len = $context->builder->load($context->builder->structGep($strPtr, $map['length']));
         $i64 = $context->getTypeFromString('int64');
         $i32 = $context->getTypeFromString('int32');
