@@ -174,8 +174,8 @@ final class UndefinedVariableHelper
             return;
         }
         $key = ScopeVariableAssignedFlags::flagKey($context, $name);
-        // Entry-prologue assigns dominate the whole activation — skip the per-read
-        // load+branch (loop headers were the hot cost, #36386).
+        // Assigns that CFG-dominate this read (entry prologue, or mid-function
+        // for-init before a later loop) skip the per-read load+branch (#36386).
         if (ScopeVariableAssignedFlags::isDefinitelyAssigned($context, $key)) {
             return;
         }

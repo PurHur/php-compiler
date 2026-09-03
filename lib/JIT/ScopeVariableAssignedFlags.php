@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\Block;
 use PHPLLVM\Value;
+use PHPLLVM\Value\Function_;
 
 /**
  * Per-scope-variable assigned flags for JIT undefined-variable guards (#10360).
@@ -23,12 +25,20 @@ final class ScopeVariableAssignedFlags
 
     /**
      * Scope keys marked assigned while the insert block was still the function entry
-     * (unconditional prologue). Later reads may skip ZEND_CHECK_UNDEFINED_VAR branches —
-     * hot for-loop CVs were paying a load+icmp+br every iteration (#36386).
+     * (unconditional prologue). Entry dominates every later read (#36386).
      *
      * @var array<string, true> moduleId\0ownerOrMain\0key
      */
     private static array $definitelyAssigned = [];
+
+    /**
+     * Names assigned inside a CFG {@see Block} (spl_object_id → name → true).
+     * Used with {@see Block::$parents} dataflow so mid-function for-init that
+     * dominates a later loop header elides undef guards (#36386).
+     *
+     * @var array<int, array<string, true>>
+     */
+    private static array $cfgBlockAssigned = [];
 
     public static function flagKey(Context $context, string $name): string
     {
@@ -73,19 +83,39 @@ final class ScopeVariableAssignedFlags
     {
         $i8 = $context->getTypeFromString('int8');
         $context->builder->store($i8->constInt(1, false), self::ensureFlag($context, $key));
+        $cfg = $context->jitCurrentBlock;
+        if ($cfg instanceof Block) {
+            $id = spl_object_id($cfg);
+            if (!isset(self::$cfgBlockAssigned[$id])) {
+                self::$cfgBlockAssigned[$id] = [];
+            }
+            // flagKey may be "{main}\0name" or plain name — store the resolved CV name.
+            $cvName = str_starts_with($key, '{main}'."\0")
+                ? substr($key, strlen('{main}'."\0"))
+                : $key;
+            self::$cfgBlockAssigned[$id][$cvName] = true;
+        }
         if (self::isInsertInOwningEntryBlock($context, $key)) {
             self::$definitelyAssigned[self::definiteCacheKey($context, $key)] = true;
         }
     }
 
     /**
-     * True when {@see markAssigned} ran in the owning function's entry block — the
-     * assign dominates every subsequent read in the activation (unless unset; unset
-     * currently leaves the runtime flag set, #21940).
+     * True when an earlier assign reaches the current CFG block on every path —
+     * entry prologue, or a mid-function for-init that dominates the loop header
+     * (unless unset; unset currently leaves the runtime flag set, #21940).
      */
     public static function isDefinitelyAssigned(Context $context, string $key): bool
     {
-        return isset(self::$definitelyAssigned[self::definiteCacheKey($context, $key)]);
+        $cacheKey = self::definiteCacheKey($context, $key);
+        if (isset(self::$definitelyAssigned[$cacheKey])) {
+            return true;
+        }
+        $cvName = str_starts_with($key, '{main}'."\0")
+            ? substr($key, strlen('{main}'."\0"))
+            : $key;
+
+        return self::cfgNameAssignedOnAllPaths($context, $cvName);
     }
 
     public static function isAssignedCondition(Context $context, string $key): Value
@@ -98,6 +128,205 @@ final class ScopeVariableAssignedFlags
             $loaded,
             $i8->constInt(0, false)
         );
+    }
+
+    /**
+     * Cached immediate-dominator map keyed by root block spl_object_id.
+     * Stores only idom[blockId] = parentId (O(blocks) memory) — full dominator
+     * sets OOMed large TUs (#36386 / g07).
+     *
+     * @var array<int, array<int, int>>
+     */
+    private static array $cfgIdomCache = [];
+
+    /**
+     * True when a CFG block that assigned $cvName dominates the current CFG block.
+     * Uses {@see Block::$parents} as predecessors (available before JIT edges exist).
+     */
+    private static function cfgNameAssignedOnAllPaths(Context $context, string $cvName): bool
+    {
+        $current = $context->jitCurrentBlock;
+        if (!$current instanceof Block) {
+            return false;
+        }
+        $assignBlocks = [];
+        foreach (self::$cfgBlockAssigned as $id => $names) {
+            if (isset($names[$cvName])) {
+                $assignBlocks[$id] = true;
+            }
+        }
+        if ([] === $assignBlocks) {
+            return false;
+        }
+        $curId = spl_object_id($current);
+        if (isset($assignBlocks[$curId])) {
+            return true;
+        }
+        $root = $context->jitFunctionRootBlock ?? $current;
+        $rootId = spl_object_id($root);
+        if (!isset(self::$cfgIdomCache[$rootId])) {
+            $blocks = self::collectCfgBlocks($root);
+            if ([] === $blocks) {
+                $blocks = [$current];
+            }
+            self::$cfgIdomCache[$rootId] = self::cfgImmediateDominators($blocks, $root);
+        }
+        $idom = self::$cfgIdomCache[$rootId];
+        foreach ($assignBlocks as $aid => $_) {
+            if (self::idomDominates($idom, $rootId, $aid, $curId)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Walk the idom tree: $a dominates $b iff $a is $b or an ancestor of $b.
+     *
+     * @param array<int, int> $idom
+     */
+    private static function idomDominates(array $idom, int $entryId, int $a, int $b): bool
+    {
+        if ($a === $b) {
+            return true;
+        }
+        $guard = 0;
+        $cur = $b;
+        while ($cur !== $entryId && $guard < 10000) {
+            ++$guard;
+            if (!isset($idom[$cur])) {
+                return false;
+            }
+            $cur = $idom[$cur];
+            if ($cur === $a) {
+                return true;
+            }
+        }
+
+        return $a === $entryId;
+    }
+
+    /**
+     * Iterative immediate-dominator computation (Cooper/Harvey/Kennedy style).
+     *
+     * @param list<Block> $blocks
+     * @return array<int, int> blockId => idom blockId
+     */
+    private static function cfgImmediateDominators(array $blocks, Block $entry): array
+    {
+        $ids = [];
+        foreach ($blocks as $b) {
+            $ids[spl_object_id($b)] = $b;
+        }
+        $entryId = spl_object_id($entry);
+        if (!isset($ids[$entryId])) {
+            $ids[$entryId] = $entry;
+            $blocks[] = $entry;
+        }
+        /** @var array<int, int> $idom */
+        $idom = [$entryId => $entryId];
+        $changed = true;
+        $guard = 0;
+        while ($changed && $guard < 128) {
+            ++$guard;
+            $changed = false;
+            foreach ($blocks as $b) {
+                $id = spl_object_id($b);
+                if ($id === $entryId) {
+                    continue;
+                }
+                $newIdom = null;
+                foreach ($b->parents as $p) {
+                    if (!$p instanceof Block) {
+                        continue;
+                    }
+                    $pid = spl_object_id($p);
+                    if (!isset($idom[$pid])) {
+                        continue;
+                    }
+                    if (null === $newIdom) {
+                        $newIdom = $pid;
+                    } else {
+                        $newIdom = self::idomIntersect($idom, $newIdom, $pid);
+                    }
+                }
+                if (null === $newIdom) {
+                    // No processed preds yet — leave unset until a later pass.
+                    continue;
+                }
+                if (!isset($idom[$id]) || $idom[$id] !== $newIdom) {
+                    $idom[$id] = $newIdom;
+                    $changed = true;
+                }
+            }
+        }
+
+        return $idom;
+    }
+
+    /**
+     * @param array<int, int> $idom
+     */
+    private static function idomIntersect(array $idom, int $b1, int $b2): int
+    {
+        $ancestors = [];
+        $a = $b1;
+        $guard = 0;
+        while ($guard < 10000) {
+            ++$guard;
+            $ancestors[$a] = true;
+            if (!isset($idom[$a]) || $idom[$a] === $a) {
+                break;
+            }
+            $a = $idom[$a];
+        }
+        $b = $b2;
+        $guard = 0;
+        while ($guard < 10000) {
+            ++$guard;
+            if (isset($ancestors[$b])) {
+                return $b;
+            }
+            if (!isset($idom[$b]) || $idom[$b] === $b) {
+                break;
+            }
+            $b = $idom[$b];
+        }
+
+        return $b1;
+    }
+
+    /**
+     * @return list<Block>
+     */
+    private static function collectCfgBlocks(Block $root): array
+    {
+        $seen = new \SplObjectStorage();
+        $out = [];
+        $stack = [$root];
+        while ([] !== $stack) {
+            $b = array_pop($stack);
+            if (!$b instanceof Block || $seen->contains($b)) {
+                continue;
+            }
+            $seen->attach($b);
+            $out[] = $b;
+            foreach ($b->opCodes as $op) {
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof Block) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+            foreach ($b->blocks as $sub) {
+                if ($sub instanceof Block) {
+                    $stack[] = $sub;
+                }
+            }
+        }
+
+        return $out;
     }
 
     private static function definiteCacheKey(Context $context, string $key): string
@@ -130,7 +359,7 @@ final class ScopeVariableAssignedFlags
             return false;
         }
         $insertParent = $insert->getParent();
-        if (!$insertParent instanceof \PHPLLVM\Value\Function_) {
+        if (!$insertParent instanceof Function_) {
             return false;
         }
 
@@ -154,7 +383,7 @@ final class ScopeVariableAssignedFlags
      * Use the CFG root LLVM function when the insert block is in that function; otherwise
      * parentFunction() (nested helpers / callee emission must not write root entry allocas).
      */
-    private static function ownerFunctionForScopeFlags(Context $context): \PHPLLVM\Value\Function_
+    private static function ownerFunctionForScopeFlags(Context $context): Function_
     {
         $insertOwner = BasicBlockHelper::parentFunction($context);
         $rootBlock = $context->jitFunctionRootBlock;
@@ -166,7 +395,7 @@ final class ScopeVariableAssignedFlags
             return $insertOwner;
         }
         $rootFn = $context->functions[$scoped];
-        if (!$rootFn instanceof \PHPLLVM\Value\Function_) {
+        if (!$rootFn instanceof Function_) {
             return $insertOwner;
         }
         if (!TryCatchHelper::sameLlvmFunction($insertOwner, $rootFn)) {
