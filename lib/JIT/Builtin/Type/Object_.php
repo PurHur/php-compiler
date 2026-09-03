@@ -5574,7 +5574,13 @@ class Object_ extends Type {
             $this->setClassInterfaces($canonical, [ThrowableManifest::LC_THROWABLE]);
         }
 
-        // Same slot order as VM BuiltinClasses::registerThrowableClass.
+        // Same slot order + visibility as VM BuiltinClasses::registerThrowableClass
+        // (zend_exceptions.stub.php): protected message/code/file/line; private
+        // previous/trace (+ string on Exception). Missing visibility was treated as
+        // public, so Slim-style `protected $code = 404` looked like illegal narrowing
+        // vs RuntimeException and fatalled composition (#36382).
+        $prot = \PHPCfg\Func::FLAG_PROTECTED;
+        $priv = \PHPCfg\Func::FLAG_PRIVATE;
         foreach (
             [
                 ExceptionSupport::PROP_MESSAGE => Variable::TYPE_STRING,
@@ -5588,6 +5594,11 @@ class Object_ extends Type {
             if (!$this->hasProperty($classId, $prop)) {
                 $this->defineProperty($classId, $prop, $type);
             }
+            $vis = (
+                ExceptionSupport::PROP_PREVIOUS === $prop
+                || ExceptionSupport::PROP_TRACE === $prop
+            ) ? $priv : $prot;
+            $this->definePropertyVisibility($classId, $prop, $vis);
         }
 
         $isErrorFamily = ThrowableManifest::LC_ERROR === $lcname
@@ -5595,11 +5606,25 @@ class Object_ extends Type {
         if (!$isErrorFamily && !$this->hasProperty($classId, ExceptionSupport::PROP_STRING)) {
             $this->defineProperty($classId, ExceptionSupport::PROP_STRING, Variable::TYPE_STRING);
         }
+        if (!$isErrorFamily && $this->hasProperty($classId, ExceptionSupport::PROP_STRING)) {
+            $this->definePropertyVisibility($classId, ExceptionSupport::PROP_STRING, $priv);
+        }
         if (
             ThrowableManifest::LC_ERROR_EXCEPTION === $lcname
             && !$this->hasProperty($classId, ExceptionSupport::PROP_SEVERITY)
         ) {
             $this->defineProperty($classId, ExceptionSupport::PROP_SEVERITY, Variable::TYPE_NATIVE_LONG);
+        }
+        if (
+            ThrowableManifest::LC_ERROR_EXCEPTION === $lcname
+            && $this->hasProperty($classId, ExceptionSupport::PROP_SEVERITY)
+        ) {
+            // zend_exceptions.stub.php — public $severity on ErrorException.
+            $this->definePropertyVisibility(
+                $classId,
+                ExceptionSupport::PROP_SEVERITY,
+                \PHPCfg\Func::FLAG_PUBLIC
+            );
         }
 
         $this->markHasConstructor($classId);

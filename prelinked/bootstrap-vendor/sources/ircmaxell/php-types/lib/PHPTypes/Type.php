@@ -381,9 +381,12 @@ class Type
             || str_starts_with($trimmedDecl, '*/')) {
             return self::mixed();
         }
-        // Docblock callable signatures: vendor only supports bare callable keyword (#8559 spine).
-        if (preg_match('/^callable\s*\(/i', $decl)) {
+        // Docblock callable / Closure(T):R signatures — vendor only supports bare forms (#8559, #36382 Composer ClassLoader).
+        if (preg_match('/^(?:\\\\)?callable\s*\(/i', $decl)) {
             return new self(self::TYPE_CALLABLE);
+        }
+        if (preg_match('/^(?:\\\\)?Closure\s*\(/i', $decl)) {
+            return new self(self::TYPE_OBJECT, [], 'Closure');
         }
         switch (strtolower($decl)) {
             case 'boolean':
