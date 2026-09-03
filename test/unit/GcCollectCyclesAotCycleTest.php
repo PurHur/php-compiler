@@ -48,6 +48,9 @@ final class GcCollectCyclesAotCycleTest extends TestCase
         $jit = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT.php');
         $this->assertStringContainsString('releaseJitNamedLocalAtReturn', $jit);
         $this->assertStringContainsString('releaseJitCanonicalNamedLocalAtReturn', $jit);
+        $this->assertStringContainsString('jitReleaseDeadNewResultAfterNamedAssign', $jit);
+        $this->assertStringContainsString('writeObject already addrefs', $obj = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Builtin/Type/Object_.php'));
+        $this->assertStringContainsString('`$a->o = $b` uncollectable', $obj);
         $this->assertStringContainsString('jitFunctionAssignTargets', $jit);
         $this->assertStringContainsString('$var->type & Variable::IS_REFCOUNTED', $jit);
     }
@@ -62,5 +65,7 @@ final class GcCollectCyclesAotCycleTest extends TestCase
         $this->assertStringContainsString('isUserScriptAot()', $ctx);
         $this->assertStringContainsString('OpCode::TYPE_RETURN_VOID', $ctx);
         $this->assertStringContainsString('scope_exit', $ctx);
+        $block = (string) file_get_contents(dirname(__DIR__, 2).'/lib/Block.php');
+        $this->assertStringContainsString('assignTempSlotIsDeadAfterAssign', $block);
     }
 }

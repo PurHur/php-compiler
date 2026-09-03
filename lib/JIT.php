@@ -9480,7 +9480,24 @@ class JIT {
                         }
                     }
                     $srcOp = $block->getOperand($rhsSlot);
-                    if ($op->arg2 !== $rhsSlot && $block->assignTempSlotIsDead($rhsSlot)) {
+                    $releasedNewRhs = false;
+                    if ($op->arg2 !== $rhsSlot) {
+                        $peerOp = $aliasOp ?? $destOp;
+                        if (null !== $peerOp) {
+                            $releasedNewRhs = $this->jitReleaseDeadNewResultAfterNamedAssign(
+                                $block,
+                                $op,
+                                $peerOp,
+                                $srcOp,
+                                $rhsSlot
+                            );
+                        }
+                    }
+                    if (
+                        !$releasedNewRhs
+                        && $op->arg2 !== $rhsSlot
+                        && $block->assignTempSlotIsDead($rhsSlot)
+                    ) {
                         $this->jitClearAssignTempOperand($srcOp);
                     }
                     if (
@@ -34423,6 +34440,61 @@ class JIT {
         JIT\Builtin\MemoryRuntime::noteAlloc($this->context, $negLen);
         $this->context->builder->branch($doneBlock);
         $this->context->builder->positionAtEnd($doneBlock);
+    }
+
+    /**
+     * `$a = new T` copies the object into the named CV (addref) but php-cfg still
+     * lists this ASSIGN in the NEW result's usages, so the extra temp ref is never
+     * dropped. Zend releases that temp at statement end (#36245 scope_exit).
+     */
+    private function jitReleaseDeadNewResultAfterNamedAssign(
+        Block $block,
+        OpCode $assignOp,
+        Operand $aliasOp,
+        Operand $rhsOp,
+        int $rhsSlot
+    ): bool {
+        if ($block->isMainScript()) {
+            return false;
+        }
+        $rhsName = JIT\OperandName::resolve($rhsOp);
+        if (null !== $rhsName && '' !== $rhsName) {
+            return false;
+        }
+        if (!$this->context->hasVariableOp($rhsOp)) {
+            return false;
+        }
+        if (!$block->assignTempSlotIsDeadAfterAssign($rhsSlot, $assignOp)) {
+            return false;
+        }
+        $rhsVar = $this->context->getVariableFromOp($rhsOp);
+        if (
+            Variable::TYPE_OBJECT !== $rhsVar->type
+            || Variable::KIND_VARIABLE !== $rhsVar->kind
+            || null === $rhsVar->value
+            || $rhsVar->functionStaticGlobal
+            || null !== $rhsVar->objectPropertySlot
+            || $rhsVar->borrowedValueEntry
+        ) {
+            return false;
+        }
+        if ($this->context->hasVariableOp($aliasOp)) {
+            $aliasVar = $this->context->getVariableFromOp($aliasOp);
+            if ($aliasVar === $rhsVar || $aliasVar->value === $rhsVar->value) {
+                return false;
+            }
+        }
+        foreach ($this->context->namedVariableBindings as $bound) {
+            if ($bound === $rhsVar) {
+                return false;
+            }
+        }
+        $this->freeObjectMirrorUnlessNull($rhsVar);
+        if ($this->context->scope->variables->contains($rhsOp)) {
+            $this->context->scope->variables->detach($rhsOp);
+        }
+
+        return true;
     }
 
     /** Drop assign RHS / result temps so block-end dead-operand free cannot re-delref (#4096). */

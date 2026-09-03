@@ -1404,6 +1404,41 @@ class Block {
     }
 
     /**
+     * php-cfg lists the consuming TYPE_ASSIGN in Operand::$usages, so
+     * {@see assignTempSlotIsDead} stays false for `$a = new T` even though the
+     * NEW result is dead after that assign (#36245 scope_exit).
+     */
+    public function assignTempSlotIsDeadAfterAssign(int $slot, OpCode $assignOp): bool
+    {
+        if (isset($this->constants[$slot]) || $this->isNamedVariableSlot($slot)) {
+            return false;
+        }
+        $operand = $this->getOperand($slot);
+        if (null === $operand) {
+            return true;
+        }
+        $afterAssign = false;
+        for ($i = 0; $i < $this->nOpCodes; ++$i) {
+            $op = $this->opCodes[$i] ?? null;
+            if (null === $op) {
+                continue;
+            }
+            if ($op === $assignOp) {
+                $afterAssign = true;
+                continue;
+            }
+            if (!$afterAssign) {
+                continue;
+            }
+            if ($this->opCodeReadsScopeSlot($op, $slot)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * php-cfg may leave assign-expression result temps without usages when the value feeds a call arg (#6758, #9405).
      */
     private function assignResultSlotConsumedByLaterOp(int $slot): bool

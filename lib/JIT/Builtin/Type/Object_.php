@@ -9623,7 +9623,9 @@ class Object_ extends Type {
                 $heapPtr,
                 $this->context->helper->loadValue($value)
             );
-            $value->addref();
+            // writeObject already addrefs (Zend zval copy). A second retain made
+            // `$a->o = $b` uncollectable after the named locals were released (#36245).
+            // Unnamed NEW temps are delref'd by jitReleaseDeadNewResultAfterNamedAssign.
 
             return;
         }
