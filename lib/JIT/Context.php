@@ -57,6 +57,22 @@ class Context {
     public array $functionProxies = [];
 
     /**
+     * Optional VALUE⊙VALUE arith override — BcMath\Number do_operation (#36204 / #24683).
+     *
+     * Registered by {@see \PHPCompiler\ext\bcmath\Module::jitInit}; core must not import ext\bcmath.
+     *
+     * @var (callable(self, int, Variable, Variable): Variable)|null
+     */
+    public $arithBinaryValueValueHook = null;
+
+    /**
+     * Optional OBJECT⊙OBJECT arith override — BcMath\Number do_operation (#36204 / #24683).
+     *
+     * @var (callable(self, int, Variable, Variable): Variable)|null
+     */
+    public $arithBinaryObjectObjectHook = null;
+
+    /**
      * First-class callable targets (function/static names) => invoke proxy (#24166).
      *
      * @var array<string, Call>
@@ -1260,27 +1276,13 @@ class Context {
                 return $this->functionProxies[$lc];
             }
         }
-        $this->ensureDomLivingDocumentFactoryProxies();
+        // Dom\HTMLDocument/XMLDocument factories: ext/dom/Module::jitInit (#36204).
         if (isset($this->functionProxies[$lc])
             && !($this->functionProxies[$lc] instanceof Call\ExternalMethod)) {
             return $this->functionProxies[$lc];
         }
 
         return null;
-    }
-
-    /** Dom\HTMLDocument/XMLDocument factory Call proxies — thin user-script AOT (#27108, #27300, #35804). */
-    private function ensureDomLivingDocumentFactoryProxies(): void
-    {
-        if (!CompilerVersion::supportsDomLivingStandardNamespaceJitLowering()) {
-            return;
-        }
-        if (!isset($this->functionProxies['dom\\htmldocument::createfromstring'])) {
-            $this->functionProxies['dom\\xmldocument::createfromstring'] = new Call\DomXmlDocumentCreateFromString();
-            $this->functionProxies['dom\\htmldocument::createfromstring'] = new Call\DomHtmlDocumentCreateFromString();
-            $this->functionProxies['dom\\xmldocument::createfromfile'] = new Call\DomXmlDocumentCreateFromFile();
-            $this->functionProxies['dom\\htmldocument::createfromfile'] = new Call\DomHtmlDocumentCreateFromFile();
-        }
     }
 
     private function resolveRegisteredInternalBuiltin(string $lc): ?FuncInternal
@@ -2533,8 +2535,7 @@ class Context {
         // DateTime / DateInterval / DatePeriod ctors — thin user-script AOT (#26772).
         $this->functionProxies['datetime::__construct'] = new Call\DateTimeConstruct();
         $this->functionProxies['datetimeimmutable::__construct'] = new Call\DateTimeImmutableConstruct();
-        // DOMDocument::__construct — seed nodeType for thin AOT (#33607).
-        $this->functionProxies['domdocument::__construct'] = new Call\DomDocumentConstruct();
+        // DOMDocument / Dom\ living factories: ext/dom/Module::jitInit (#36204 / #33607).
         // ZipArchive / SQLite3 thin-AOT Call proxies: registered by ext/zip + ext/sqlite3 Module::jitInit (#36204).
         $this->functionProxies['datetimezone::__construct'] = new Call\DateTimeZoneConstruct();
         $this->functionProxies['dateinterval::__construct'] = new Call\DateIntervalConstruct();
@@ -2647,8 +2648,8 @@ class Context {
         $this->functionProxies['pdo::__construct'] = new Call\PdoConstruct();
         $this->functionProxies['pdo::getavailabledrivers'] = new Call\PdoGetAvailableDrivers();
         $this->functionProxies['pdo::quote'] = new Call\PdoQuote();
-        // Dom\XMLDocument / Dom\HTMLDocument::createFromString / createFromFile — avoid ExternalMethod silent NULL (#27108, #27300).
-        $this->ensureDomLivingDocumentFactoryProxies();
+        // Dom\XMLDocument / Dom\HTMLDocument::createFromString / createFromFile +
+        // DOMDocument::__construct: ext/dom/Module::jitInit (#36204 / #27108, #27300, #33607).
         // XMLReader::XML / fromString / read — avoid ExternalMethod silent NULL on thin AOT (#27299, #28670).
         // XML() exists on all profiles; fromString is PROFILE≥8.4 only.
         XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::xml');

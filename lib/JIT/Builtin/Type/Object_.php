@@ -14,8 +14,6 @@ use PHPCfg\Operand\Literal;
 use PHPCompiler\Block;
 use PHPCompiler\ClassConstVisibility;
 use PHPCompiler\CompilerVersion;
-use PHPCompiler\ext\dom\DomConstants;
-use PHPCompiler\ext\dom\VmDomLiving;
 use PHPCompiler\ext\standard\ThrowableManifest;
 use PHPCompiler\VM\ExceptionSupport;
 use PHPCompiler\MethodVisibility;
@@ -2244,24 +2242,25 @@ class Object_ extends Type {
         }
         $this->markInterfaceClass('Dom\\ParentNode');
         $this->markInterfaceClass('Dom\\ChildNode');
-        $this->setClassInterfaces('Dom\\Document', [VmDomLiving::CLASS_PARENT_NODE]);
-        $this->setClassInterfaces('Dom\\HTMLDocument', [VmDomLiving::CLASS_PARENT_NODE]);
-        $this->setClassInterfaces('Dom\\XMLDocument', [VmDomLiving::CLASS_PARENT_NODE]);
-        $this->setClassInterfaces('Dom\\DocumentFragment', [VmDomLiving::CLASS_PARENT_NODE]);
+        // Interface lc keys match php-src Dom\ParentNode / Dom\ChildNode (#20961 / #36204).
+        $this->setClassInterfaces('Dom\\Document', ['dom\\parentnode']);
+        $this->setClassInterfaces('Dom\\HTMLDocument', ['dom\\parentnode']);
+        $this->setClassInterfaces('Dom\\XMLDocument', ['dom\\parentnode']);
+        $this->setClassInterfaces('Dom\\DocumentFragment', ['dom\\parentnode']);
         $this->setClassInterfaces('Dom\\Element', [
-            VmDomLiving::CLASS_PARENT_NODE,
-            VmDomLiving::CLASS_CHILD_NODE,
+            'dom\\parentnode',
+            'dom\\childnode',
         ]);
         $this->setClassInterfaces('Dom\\HTMLElement', [
-            VmDomLiving::CLASS_PARENT_NODE,
-            VmDomLiving::CLASS_CHILD_NODE,
+            'dom\\parentnode',
+            'dom\\childnode',
         ]);
-        $this->setClassInterfaces('Dom\\CharacterData', [VmDomLiving::CLASS_CHILD_NODE]);
-        $this->setClassInterfaces('Dom\\Text', [VmDomLiving::CLASS_CHILD_NODE]);
-        $this->setClassInterfaces('Dom\\Comment', [VmDomLiving::CLASS_CHILD_NODE]);
-        $this->setClassInterfaces('Dom\\CDATASection', [VmDomLiving::CLASS_CHILD_NODE]);
-        $this->setClassInterfaces('Dom\\ProcessingInstruction', [VmDomLiving::CLASS_CHILD_NODE]);
-        $this->setClassInterfaces('Dom\\DocumentType', [VmDomLiving::CLASS_CHILD_NODE]);
+        $this->setClassInterfaces('Dom\\CharacterData', ['dom\\childnode']);
+        $this->setClassInterfaces('Dom\\Text', ['dom\\childnode']);
+        $this->setClassInterfaces('Dom\\Comment', ['dom\\childnode']);
+        $this->setClassInterfaces('Dom\\CDATASection', ['dom\\childnode']);
+        $this->setClassInterfaces('Dom\\ProcessingInstruction', ['dom\\childnode']);
+        $this->setClassInterfaces('Dom\\DocumentType', ['dom\\childnode']);
     }
 
     /** Zend traversable/iterator/iteratoraggregate hierarchy for instanceof (#4754, #4771). */
@@ -2286,8 +2285,10 @@ class Object_ extends Type {
      * (Iterator/Traversable via RecursiveIterator). Not ArrayAccess (Zend instanceof is false).
      * Thin AOT lookup() otherwise yields a class with no interfaces so
      * `$sxe instanceof Traversable` is false (#35831 leftover of #26863).
+     *
+     * Invoked from ext/simplexml/Module::jitInit seeder (#36204).
      */
-    private function seedSimpleXmlElementAotInterfaces(int $id, string $lcname): void
+    public function seedSimpleXmlElementAotInterfaces(int $id, string $lcname): void
     {
         $this->ensureZendBuiltinInterfaces();
         $this->markInterfaceClass('Countable');
@@ -4031,16 +4032,6 @@ class Object_ extends Type {
                 'is_instanceof' => \PHPCompiler\VM\ReflectionSupport::REFLECTION_ATTRIBUTE_IS_INSTANCEOF,
             ]);
         }
-        if ('domnode' === $lcname && CompilerVersion::supportsDomNodeCompareDocumentPosition()) {
-            $this->seedExternalClassConstants($id, [
-                'document_position_disconnected' => DomConstants::DOCUMENT_POSITION_DISCONNECTED,
-                'document_position_preceding' => DomConstants::DOCUMENT_POSITION_PRECEDING,
-                'document_position_following' => DomConstants::DOCUMENT_POSITION_FOLLOWING,
-                'document_position_contains' => DomConstants::DOCUMENT_POSITION_CONTAINS,
-                'document_position_contained_by' => DomConstants::DOCUMENT_POSITION_CONTAINED_BY,
-                'document_position_implementation_specific' => DomConstants::DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC,
-            ]);
-        }
         if ('dateperiod' === $lcname) {
             // php-src REGISTER_DATEPERIOD_CLASS_CONST_LONG (#20071, ext/date/php_date.c).
             $this->seedExternalClassConstants($id, [
@@ -4058,16 +4049,13 @@ class Object_ extends Type {
                 $this->defineEnumCaseConst($id, 'OpenFailed', $backing);
             }
         }
-        if ('simplexmlelement' === $lcname || 'simplexmliterator' === $lcname) {
-            $this->seedSimpleXmlElementAotInterfaces($id, $lcname);
-        }
         // DateTimeInterface format strings live on the interface (php_date.c); concrete
         // DateTime/DateTimeImmutable already inherit via VM ClassEntry, but thin AOT
         // ClassConstFetch on DateTimeInterface::* needs an explicit seed (#35368 peer of #35360).
         if ('datetimeinterface' === $lcname) {
             $this->seedExternalClassConstants($id, \PHPCompiler\VM\DateTimeInterfaceSupport::classConstants());
         }
-        // intl / zip / sqlite3 ClassConstFetch + stub props: Module::jitInit seeders (#36204).
+        // DomNode / SimpleXML / intl / zip / sqlite3 / bcmath: Module::jitInit seeders (#36204).
         foreach ($this->externalClassSeeders[$lcname] ?? [] as $seeder) {
             $seeder($this, $id);
         }
@@ -5341,21 +5329,7 @@ class Object_ extends Type {
                 $this->defineMethodVisibility($id, $method, $pub);
             }
         }
-        if ('bcmath\number' === $lcname && CompilerVersion::supportsBcmath()) {
-            // php-src ext/bcmath/bcmath.stub.php — readonly value/scale (#24683, #7220).
-            $this->defineProperty($id, \PHPCompiler\ext\bcmath\VmBcMathNumber::PROP_VALUE, Variable::TYPE_STRING);
-            $this->defineProperty($id, \PHPCompiler\ext\bcmath\VmBcMathNumber::PROP_SCALE, Variable::TYPE_NATIVE_LONG);
-            $this->setClassReadonly($id, true);
-            $this->markHasConstructor($id);
-            $pub = \PHPCfg\Func::FLAG_PUBLIC;
-            foreach ([
-                '__construct', 'add', 'sub', 'mul', 'div', 'mod', 'divmod', 'powmod', 'pow',
-                'sqrt', 'floor', 'ceil', 'round', 'compare', '__tostring',
-                '__serialize', '__unserialize',
-            ] as $method) {
-                $this->defineMethodVisibility($id, $method, $pub);
-            }
-        }
+        // BcMath\Number props/methods: ext/bcmath/Module::jitInit seeder (#36204 / #24683).
         if ('weakreference' === $lcname) {
             $this->weakReferenceClassId = $id;
             // zend_weakrefs.c — clone_obj unset (#25962).

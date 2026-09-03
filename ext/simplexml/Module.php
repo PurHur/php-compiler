@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\simplexml;
 
+use PHPCompiler\JIT;
 use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
 
@@ -23,6 +24,26 @@ class Module extends ModuleAbstract
      *
      * @return list<string>
      */
+    public function jitInit(JIT\Context $context): void
+    {
+        // Thin AOT instanceof Traversable / method visibility (#35831 / #36204).
+        $seed = static function ($obj, int $id, string $lcname): void {
+            $obj->seedSimpleXmlElementAotInterfaces($id, $lcname);
+        };
+        $context->type->object->registerExternalClassSeeder(
+            'simplexmlelement',
+            static function ($obj, int $id) use ($seed): void {
+                $seed($obj, $id, 'simplexmlelement');
+            }
+        );
+        $context->type->object->registerExternalClassSeeder(
+            'simplexmliterator',
+            static function ($obj, int $id) use ($seed): void {
+                $seed($obj, $id, 'simplexmliterator');
+            }
+        );
+    }
+
     public function init(Runtime $runtime): void
     {
         parent::init($runtime);
