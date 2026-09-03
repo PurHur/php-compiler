@@ -672,8 +672,9 @@ function buildFromProject(
     }
     $includes = $resolved['includes'];
 
-    // Pass the project file map so bin/compile.php can refuse out-of-map includes (#36382).
-    $allowlistPaths = $includes;
+    // Pass the full project file map (bundle units + JIT-inlined method-body includes) so
+    // bin/compile.php can refuse out-of-map includes without blocking MiniWebApp templates (#36382).
+    $allowlistPaths = $resolved['allowlist'] ?? $includes;
     $entryReal = realpath($entry) ?: $entry;
     $allowlistPaths[] = $entryReal;
     putenv('PHP_COMPILER_AOT_INCLUDE_ALLOWLIST='.implode("\n", $allowlistPaths));
