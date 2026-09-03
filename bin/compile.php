@@ -372,6 +372,9 @@ function run(string $filename, string $code, array $options): void
         $runtime = new Runtime(Runtime::MODE_AOT);
         $includes = LiteralIncludeDiscovery::discoverDirectAbsolutePaths($runtime, $filename);
     }
+    if ([] !== $includes || ('-' !== $filename && is_file($filename))) {
+        $includes = \PHPCompiler\AOT\ComposerVendorMap::expandIncludesForAutoload($filename, $includes);
+    }
     if ([] !== $includes && !$skipBundle) {
         $projectRoot = DeployRoot::findProjectRootForPath($filename);
         [$code, $filename] = SourceBundler::bundleForAot($filename, $includes, $projectRoot);
@@ -380,6 +383,22 @@ function run(string $filename, string $code, array $options): void
     }
 
     $runtime = new Runtime(Runtime::MODE_AOT);
+    $allowlistEnv = getenv('PHP_COMPILER_AOT_INCLUDE_ALLOWLIST');
+    if (is_string($allowlistEnv) && '' !== $allowlistEnv) {
+        $allow = [];
+        foreach (preg_split('/\r\n|\n|\r/', $allowlistEnv) ?: [] as $line) {
+            $line = trim($line);
+            if ('' === $line) {
+                continue;
+            }
+            $key = realpath($line) ?: $line;
+            $allow[$key] = true;
+            $allow[$line] = true;
+        }
+        if ([] !== $allow) {
+            $runtime->aotIncludeAllowlist = $allow;
+        }
+    }
     $queryString = $options['-q'] ?? null;
     if (!is_string($queryString) || '' === $queryString) {
         $fromEnv = getenv('QUERY_STRING');

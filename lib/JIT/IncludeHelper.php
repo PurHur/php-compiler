@@ -66,12 +66,31 @@ final class IncludeHelper
                 'include/require must use a compile-time literal path for JIT/AOT (issue #54)'
                 .' — caller='.$caller
                 .' operand='.$operandDesc
+                .' — computed paths outside the project file map fail loudly (issue #36382)'
             );
         }
         if (IncludeJitHelper::shouldSkipSelfHostSpineCliInclude($path)) {
             self::emitSkippedSelfHostSpineCliInclude($jit, $callerBlock, $resultOperand);
 
             return;
+        }
+        if (\PHPCompiler\AOT\ComposerVendorMap::isComposerAutoloadPhp($path)) {
+            // Composer’s loader uses include $file; AOT stubs it and relies on ProjectGraph (#36382 / #1070).
+            if (null !== $resultOperand) {
+                $jit->assignIncludeResult($resultOperand);
+            }
+
+            return;
+        }
+        $allow = $context->runtime->aotIncludeAllowlist ?? null;
+        if (is_array($allow) && [] !== $allow) {
+            $resolved = realpath($path) ?: $path;
+            if (!isset($allow[$resolved]) && !isset($allow[$path])) {
+                throw new \LogicException(
+                    'include/require path outside project file map: '.$path
+                    .' (issue #36382)'
+                );
+            }
         }
         self::compileIncludedFile($jit, $func, $callerBlock, $path, $resultOperand);
     }

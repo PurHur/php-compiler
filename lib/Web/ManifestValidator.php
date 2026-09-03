@@ -17,6 +17,7 @@ final class ManifestValidator
         'entry',
         'index',
         'includes',
+        'include_roots',
         'autoload',
     ];
 
@@ -80,9 +81,15 @@ final class ManifestValidator
             $errors = array_merge($errors, self::validateAssetsOnDisk($dir, $data['assets']));
         }
 
+        if (isset($data['include_roots'])) {
+            $errors = array_merge($errors, self::validateIncludeRootsOnDisk($dir, $data['include_roots']));
+        }
+
         if (isset($data['autoload'])) {
             $errors = array_merge($errors, self::validateAutoload($data['autoload']));
-            $errors = array_merge($errors, ProjectAutoload::validatePsr4PathsOnDisk($dir, $data['autoload']));
+            if (is_array($data['autoload'])) {
+                $errors = array_merge($errors, ProjectAutoload::validatePsr4PathsOnDisk($dir, $data['autoload']));
+            }
         }
 
         return $errors;
@@ -182,9 +189,15 @@ final class ManifestValidator
             $errors = array_merge($errors, self::validateAssetsOnDisk($dir, $data['assets']));
         }
 
+        if (isset($data['include_roots'])) {
+            $errors = array_merge($errors, self::validateIncludeRootsOnDisk($dir, $data['include_roots']));
+        }
+
         if (isset($data['autoload'])) {
             $errors = array_merge($errors, self::validateAutoload($data['autoload']));
-            $errors = array_merge($errors, ProjectAutoload::validatePsr4PathsOnDisk($dir, $data['autoload']));
+            if (is_array($data['autoload'])) {
+                $errors = array_merge($errors, ProjectAutoload::validatePsr4PathsOnDisk($dir, $data['autoload']));
+            }
         }
 
         return $errors;
@@ -234,17 +247,54 @@ final class ManifestValidator
     /**
      * @return list<string>
      */
+    private static function validateIncludeRootsOnDisk(string $projectDir, mixed $roots): array
+    {
+        if (!is_array($roots)) {
+            return ['include_roots must be an array of strings'];
+        }
+
+        $errors = [];
+        foreach ($roots as $i => $item) {
+            if (!is_string($item) || '' === $item) {
+                $errors[] = 'include_roots['.$i.'] must be a non-empty string';
+                continue;
+            }
+            $path = ProjectManifest::resolveRelativePath($projectDir, $item);
+            if (!is_dir($path)) {
+                $errors[] = 'include_roots path not found: '.$item;
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
+     * @return list<string>
+     */
     private static function validateAutoload(mixed $autoload): array
     {
+        if (is_string($autoload)) {
+            $mode = strtolower(trim($autoload));
+            if (in_array($mode, ['composer', 'none'], true)) {
+                return [];
+            }
+
+            return ['autoload string must be "composer" or "none"'];
+        }
+
         if (!is_array($autoload)) {
-            return ['autoload must be an object'];
+            return ['autoload must be an object or "composer"|"none"'];
         }
 
         $errors = [];
         foreach (array_keys($autoload) as $key) {
-            if (!is_string($key) || 'psr-4' !== $key) {
+            if (!is_string($key) || !in_array($key, ['psr-4', 'composer'], true)) {
                 $errors[] = 'unknown key in autoload: '.(is_string($key) ? $key : '(invalid)');
             }
+        }
+
+        if (isset($autoload['composer']) && !is_bool($autoload['composer'])) {
+            $errors[] = 'autoload.composer must be a boolean';
         }
 
         if (!isset($autoload['psr-4'])) {

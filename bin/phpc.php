@@ -672,6 +672,13 @@ function buildFromProject(
     }
     $includes = $resolved['includes'];
 
+    // Pass the project file map so bin/compile.php can refuse out-of-map includes (#36382).
+    $allowlistPaths = $includes;
+    $entryReal = realpath($entry) ?: $entry;
+    $allowlistPaths[] = $entryReal;
+    putenv('PHP_COMPILER_AOT_INCLUDE_ALLOWLIST='.implode("\n", $allowlistPaths));
+    $_ENV['PHP_COMPILER_AOT_INCLUDE_ALLOWLIST'] = implode("\n", $allowlistPaths);
+
     $compileArgv = ['-o', $output];
     foreach ($includes as $includePath) {
         $compileArgv[] = '--include';

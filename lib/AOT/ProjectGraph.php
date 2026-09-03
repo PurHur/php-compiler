@@ -74,6 +74,30 @@ final class ProjectGraph
 
         $manifest = ProjectManifest::loadManifest($root);
         $psr4Map = ProjectAutoload::parsePsr4Map($root, $manifest);
+
+        // Composer vendor maps (#36382): default on when vendor/composer exists.
+        $composer = ComposerVendorMap::load($root, $manifest);
+        $errors = array_merge($errors, $composer['errors']);
+        foreach ($composer['psr4'] as $prefix => $baseDir) {
+            if (!isset($psr4Map[$prefix])) {
+                $psr4Map[$prefix] = $baseDir;
+            }
+        }
+        foreach ($composer['all_files'] as $path) {
+            $key = realpath($path) ?: $path;
+            if (isset($seen[$key])) {
+                continue;
+            }
+            if (!is_file($path)) {
+                $errors[] = 'composer autoload file not found: '.self::displayPath($root, $path);
+
+                continue;
+            }
+            $seen[$key] = true;
+            $files[] = $path;
+        }
+
+        // phpc.json psr-4 (and Composer prefixes) — discover any remaining referenced files.
         if ([] !== $psr4Map) {
             $seedFiles = array_merge($files, [$entry]);
             $autoload = AutoloadDiscovery::discover($runtime, $root, $psr4Map, $seedFiles);
@@ -176,6 +200,10 @@ final class ProjectGraph
         foreach ($entryOnly as $resolved) {
             $base = basename($resolved);
             if (isset($requireAssignBasenames[$base])) {
+                continue;
+            }
+            if (ComposerVendorMap::isComposerAutoloadPhp($resolved)) {
+                // Composer entry is stubbed / mapped via vendor/composer (#36382); do not force includes[].
                 continue;
             }
             if (!isset($manifestBasenames[$base])) {

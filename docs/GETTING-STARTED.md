@@ -97,6 +97,20 @@ Requires LLVM (see prerequisites). From repo root:
 
 Layout-edge AOT bisect polish ([#1750](https://github.com/PurHur/php-compiler/issues/1750)) is opt-in and does not block the execute story above.
 
+### 4a. Build a Composer project
+
+When `vendor/composer/` exists, `phpc build --project` reads Composer’s generated maps (`autoload_classmap.php`, `autoload_psr4.php`, `autoload_files.php`) and adds every mapped PHP file to the compile graph ([#36382](https://github.com/PurHur/php-compiler/issues/36382)). `vendor/autoload.php` is stubbed for AOT (the dynamic `include $file` loader is not executed); classes come from the map instead.
+
+```bash
+# Fixture: PSR-4 + classmap + files + include_roots
+./phpc build --project test/fixtures/aot/projects/composer_mini --dry-run
+./phpc build --project test/fixtures/aot/projects/composer_mini
+./test/fixtures/aot/projects/composer_mini/.phpc/bin/app
+# expect: hello world|legacy|stamp
+```
+
+`phpc.json` knobs: `"autoload": "composer"` (default when `vendor/composer` exists), `"autoload": "none"` to skip, and `"include_roots": ["lib/…"]` for extra trees. An include whose realpath is outside the project file map fails at compile time with the path (never a silent no-op).
+
 ### 5. (Optional) SessionsWeb — two-request flash (VM)
 
 `session_start()` and `$_SESSION['flash']` across HTTP requests ([#1881](https://github.com/PurHur/php-compiler/issues/1881)). `./phpc run` shows the empty form only; use `phpc serve` and a cookie jar for the POST → redirect → GET story.

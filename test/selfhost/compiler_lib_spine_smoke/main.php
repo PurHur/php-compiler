@@ -5229,6 +5229,7 @@ require_once __DIR__.'/../../../lib/AOT/HelperRuntimeCache.php';
 require_once __DIR__.'/../../../lib/AOT/HelperUnitGlobalCtor.php';
 require_once __DIR__.'/../../../lib/AOT/Linker.php';
 require_once __DIR__.'/../../../lib/AOT/LinkerProcessPolyfill.php';
+require_once __DIR__.'/../../../lib/AOT/ComposerVendorMap.php';
 require_once __DIR__.'/../../../lib/AOT/ProjectGraph.php';
 require_once __DIR__.'/../../../lib/AOT/ValueBox.php';
 require_once __DIR__.'/../../../lib/AOT/phpc_run_command_polyfill.php';
