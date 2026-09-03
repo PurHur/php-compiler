@@ -310,6 +310,24 @@ class Block {
     /** assign.result temp => CV lvalue slot for reads after in-place mutation (#15125). */
     private array $assignResultToLvalueSlot = [];
 
+    /**
+     * Cached FUNCCALL_EXEC_RETURN arg1 slots in emit order (#36387).
+     *
+     * Null means rebuild on next read (after truncate/splice). Appends update in place.
+     *
+     * @var list<int>|null
+     */
+    private ?array $funccallExecReturnSlotsCache = null;
+
+    /** Cached FUNCCALL_INIT count; null after truncate/splice (#36387). */
+    private ?int $funccallInitCountCache = null;
+
+    /**
+     * Whether opCodes contain ASSIGN / flagged ITER_VALUE that the assign-result
+     * fallback scan must search (#36387). Null = recompute after truncate/splice.
+     */
+    private ?bool $hasAssignResultScanCandidates = false;
+
     public function __construct(?CfgBlock $block) {
         $this->orig = $block;
         $this->scope = new \SplObjectStorage;
@@ -686,6 +704,7 @@ class Block {
         $frag = new Block(null);
         $frag->opCodes = $opCodes;
         $frag->nOpCodes = count($opCodes);
+        // Derived indexes stay null until first read (#36387).
         $frag->constants = $this->constants;
         foreach ($this->scope as $operand) {
             $frag->bindScopeOperandSlot($operand, (int) $this->scope[$operand]);
@@ -1326,7 +1345,120 @@ class Block {
             $this->stampOpCodeTypeFacts($op);
             $this->nOpCodes++;
             $this->opCodes[] = $op;
+            $this->noteOpCodeAppended($op);
         }
+    }
+
+    /**
+     * Keep EXEC_RETURN / assign-result indexes current on append (#36387).
+     */
+    private function noteOpCodeAppended(OpCode $op): void
+    {
+        if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
+            if (null !== $this->funccallExecReturnSlotsCache) {
+                $this->funccallExecReturnSlotsCache[] = (int) $op->arg1;
+            }
+        }
+        if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+            if (null !== $this->funccallInitCountCache) {
+                ++$this->funccallInitCountCache;
+            }
+        }
+        if (
+            OpCode::TYPE_ASSIGN === $op->type
+            || (
+                OpCode::TYPE_ITER_VALUE === $op->type
+                && 1 === (int) ($op->arg3 ?? 0)
+            )
+        ) {
+            $this->hasAssignResultScanCandidates = true;
+        }
+    }
+
+    /**
+     * Call after truncating, splicing, or replacing {@see $opCodes} (#36387).
+     */
+    public function invalidateOpcodeDerivedIndexes(): void
+    {
+        $this->funccallExecReturnSlotsCache = null;
+        $this->funccallInitCountCache = null;
+        $this->hasAssignResultScanCandidates = null;
+    }
+
+    /**
+     * FUNCCALL_EXEC_RETURN result slots in emit order (O(1) amortized) (#36387).
+     *
+     * @return list<int>
+     */
+    public function funccallExecReturnSlots(): array
+    {
+        if (null !== $this->funccallExecReturnSlotsCache) {
+            return $this->funccallExecReturnSlotsCache;
+        }
+        $slots = [];
+        foreach ($this->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
+                $slots[] = (int) $op->arg1;
+            }
+        }
+        $this->funccallExecReturnSlotsCache = $slots;
+
+        return $slots;
+    }
+
+    public function funccallExecReturnCount(): int
+    {
+        return \count($this->funccallExecReturnSlots());
+    }
+
+    public function funccallInitCount(): int
+    {
+        if (null !== $this->funccallInitCountCache) {
+            return $this->funccallInitCountCache;
+        }
+        $count = 0;
+        foreach ($this->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$count;
+            }
+        }
+        $this->funccallInitCountCache = $count;
+
+        return $count;
+    }
+
+    public function lastFunccallExecReturnSlot(): ?int
+    {
+        $slots = $this->funccallExecReturnSlots();
+        if ([] === $slots) {
+            return null;
+        }
+
+        return $slots[\count($slots) - 1];
+    }
+
+    /**
+     * Fast reject for {@see Compiler::slotForAssignLvalueFromResultSlot} when the
+     * block has no ASSIGN / flagged ITER_VALUE opcodes (#36387).
+     */
+    public function hasAssignResultScanCandidates(): bool
+    {
+        if (null !== $this->hasAssignResultScanCandidates) {
+            return $this->hasAssignResultScanCandidates;
+        }
+        foreach ($this->opCodes as $op) {
+            if (
+                OpCode::TYPE_ASSIGN === $op->type
+                || (
+                    OpCode::TYPE_ITER_VALUE === $op->type
+                    && 1 === (int) ($op->arg3 ?? 0)
+                )
+            ) {
+                return $this->hasAssignResultScanCandidates = true;
+            }
+        }
+
+        return $this->hasAssignResultScanCandidates = false;
     }
 
     /**
