@@ -1,18 +1,21 @@
 diff --git vendor/ircmaxell/php-types/lib/PHPTypes/Type.php vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
 --- vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
 +++ vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
-@@ -384,6 +384,10 @@
+@@ -384,6 +384,14 @@
          if (str_ends_with($trimmedDecl, ',') && !str_contains($trimmedDecl, '|') && !str_contains($trimmedDecl, '&')) {
              return self::fromDecl(rtrim($trimmedDecl, ', '));
          }
-+        // Docblock callable signatures: vendor only supports bare callable keyword (#8559 spine).
-+        if (preg_match('/^callable\s*\(/i', $decl)) {
++        // Docblock callable / Closure(T):R signatures — vendor only supports bare forms (#8559, #36382 Composer ClassLoader).
++        if (preg_match('/^(?:\\\\)?callable\s*\(/i', $decl)) {
 +            return new self(self::TYPE_CALLABLE);
++        }
++        if (preg_match('/^(?:\\\\)?Closure\s*\(/i', $decl)) {
++            return new self(self::TYPE_OBJECT, [], 'Closure');
 +        }
          switch (strtolower($decl)) {
              case 'boolean':
              case 'bool':
-@@ -663,6 +667,10 @@
+@@ -663,6 +671,10 @@
                      break;
                  default:
                      if ($ch <= ' ' && 0 === $depthAngle && 0 === $depthParen && 0 === $depthSquare && 0 === $depthCurly) {

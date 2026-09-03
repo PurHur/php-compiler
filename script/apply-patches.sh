@@ -114,6 +114,10 @@ patch_already_applied() {
     php-types-class-generics-fallback.patch)
       grep -q "Class generics from PHPStan/Psalm docblocks: App<T>" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
       ;;
+    php-types-callable-return-strip.patch)
+      # Closure(T):R + callable(T):R docblock strip (#8559, #36382 Composer ClassLoader).
+      grep -q 'Closure(T):R signatures' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
+      ;;
     php-types-generics-list-array.patch)
       grep -qE "preg_match\('/\^\(list\|array" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null \
         || grep -qF "preg_match('/^(list|array|iterable)" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
@@ -3997,30 +4001,34 @@ if 'callable(T): R' not in text:
         raise SystemExit(1)
     text = text.replace(needle, replacement, 1)
 
-fromdecl_needle = "        // Docblock union splits may leave a lone \"string,\" fragment (M2 spine; #3012).\n"
-fromdecl_insert = (
+fromdecl_block = (
+    "        // Docblock callable / Closure(T):R signatures — vendor only supports bare forms (#8559, #36382 Composer ClassLoader).\n"
+    "        if (preg_match('/^(?:\\\\\\\\)?callable\\s*\\(/i', $decl)) {\n"
+    "            return new self(self::TYPE_CALLABLE);\n"
+    "        }\n"
+    "        if (preg_match('/^(?:\\\\\\\\)?Closure\\s*\\(/i', $decl)) {\n"
+    "            return new self(self::TYPE_OBJECT, [], 'Closure');\n"
+    "        }\n"
+)
+old_callable_only = (
     "        // Docblock callable signatures: vendor only supports bare callable keyword (#8559 spine).\n"
     "        if (preg_match('/^callable\\s*\\(/i', $decl)) {\n"
     "            return new self(self::TYPE_CALLABLE);\n"
     "        }\n"
-    + fromdecl_needle
 )
-fromdecl_alt_needle = "        switch (strtolower($decl)) {\n"
-fromdecl_alt_insert = (
-    "        // Docblock callable signatures: vendor only supports bare callable keyword (#8559 spine).\n"
-    "        if (preg_match('/^callable\\s*\\(/i', $decl)) {\n"
-    "            return new self(self::TYPE_CALLABLE);\n"
-    "        }\n"
-    + fromdecl_alt_needle
-)
-if 'callable signatures: vendor only supports bare callable' not in text:
-    if fromdecl_needle in text:
-        text = text.replace(fromdecl_needle, fromdecl_insert, 1)
-    elif fromdecl_alt_needle in text:
-        text = text.replace(fromdecl_alt_needle, fromdecl_alt_insert, 1)
+if 'Closure(T):R signatures' not in text:
+    if old_callable_only in text:
+        text = text.replace(old_callable_only, fromdecl_block, 1)
     else:
-        sys.stderr.write("php-types-callable-return-strip: fromDecl anchor not found\n")
-        raise SystemExit(1)
+        fromdecl_needle = "        // Docblock union splits may leave a lone \"string,\" fragment (M2 spine; #3012).\n"
+        fromdecl_alt_needle = "        switch (strtolower($decl)) {\n"
+        if fromdecl_needle in text:
+            text = text.replace(fromdecl_needle, fromdecl_block + fromdecl_needle, 1)
+        elif fromdecl_alt_needle in text:
+            text = text.replace(fromdecl_alt_needle, fromdecl_block + fromdecl_alt_needle, 1)
+        else:
+            sys.stderr.write("php-types-callable-return-strip: fromDecl anchor not found\n")
+            raise SystemExit(1)
 
 path.write_text(text)
 PY
