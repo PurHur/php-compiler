@@ -12390,17 +12390,10 @@ class JIT {
                         JIT\StringOffsetHelper::emitAssignOpError($this->context);
                         break;
                     }
-                    $powLeft = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    $powLeft = $this->variableFromOpForRuntimeRead($block->getOperand($op->arg2));
                     // FETCH_DIM_W orphan — ZEND_ASSIGN_DIM_OP for **= (#32798 / leftover #32789).
                     JIT\HashTableHelper::hydrateDimWriteLvalue($this->context, $powLeft);
-                    $pow = new \PHPCompiler\ext\standard\pow();
-                    $this->context->powReturnValueBox = true;
-                    $powResult = $pow->call(
-                        $this->context,
-                        $powLeft,
-                        $this->context->getVariableFromOp($block->getOperand($op->arg3))
-                    );
-                    $this->context->powReturnValueBox = false;
+                    $powRight = $this->variableFromOpForRuntimeRead($block->getOperand($op->arg3));
                     $powDestOp = $block->getOperand($op->arg1);
                     $powDest = $this->context->getVariableFromOp($powDestOp);
                     // In-place `$r **= n` after `$r =& $obj->prop`: php-cfg dest is a dead
@@ -12413,20 +12406,24 @@ class JIT {
                     ) {
                         $powProp = $powLeft;
                     }
-                    if (null !== $powProp->objectPropertySlot && null !== $powProp->objectPropertyType) {
+                    $inPlacePow = (int) $op->arg1 === (int) $op->arg2;
+                    if (
+                        null !== $powProp->objectPropertySlot
+                        && null !== $powProp->objectPropertyType
+                        && $inPlacePow
+                    ) {
                         $this->context->setVariableOp($powDestOp, $powProp);
-                        $this->assignOperand(
-                            $powDestOp,
-                            new Variable(
-                                $this->context,
-                                Variable::TYPE_VALUE,
-                                Variable::KIND_VALUE,
-                                $powResult
-                            ),
-                            true
-                        );
+                        $this->compileObjectPropertyPowOp($powProp, $powLeft, $powRight);
                         break;
                     }
+                    $pow = new \PHPCompiler\ext\standard\pow();
+                    $this->context->powReturnValueBox = true;
+                    $powResult = $pow->call(
+                        $this->context,
+                        $powLeft,
+                        $powRight
+                    );
+                    $this->context->powReturnValueBox = false;
                     // `$r =& $a[$k]` / `$r =& $obj->prop[$k]; $r **= n`: dead dest lacks
                     // writableHt / assignRefLvalueAlias; left was hydrated above. Rebind and
                     // assignOperand (same as TYPE_MUL) so the shared HT entry updates (#35984).
@@ -12444,6 +12441,7 @@ class JIT {
                         || (
                             null === $powDest->valueBoxAliasPtr
                             && null !== $powLeft->valueBoxAliasPtr
+                            && null === $powLeft->objectPropertySlot
                         )
                     ) {
                         $this->context->setVariableOp($powDestOp, $powLeft);
@@ -26527,6 +26525,73 @@ class JIT {
         );
     }
 
+    /** `$obj->prop **= n` / by-ref `$r **= n` in-place — bypass assignOperand slot strip (#35978). */
+    private function compileObjectPropertyPowOp(Variable $dest, Variable $left, Variable $right): void
+    {
+        if (null === $dest->objectPropertySlot || null === $dest->objectPropertyType) {
+            throw new \LogicException('objectPropertySlot requires objectPropertyType');
+        }
+        $pow = new \PHPCompiler\ext\standard\pow();
+        $this->context->powReturnValueBox = true;
+        $powResult = $pow->call($this->context, $left, $right);
+        $this->context->powReturnValueBox = false;
+        $newVal = new Variable(
+            $this->context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VALUE,
+            $powResult
+        );
+        JIT\DynamicObjectReadonlyGuard::emitBeforePropertyStore(
+            $this->context,
+            $dest,
+            $this->context->jitEnclosingBlock
+        );
+        JIT\ReadonlyClassGuard::emitBeforePropertyStore(
+            $this->context,
+            $dest,
+            $this->context->jitEnclosingBlock,
+            'modify',
+            $this
+        );
+        if (JIT\AsymmetricVisibilityGuard::emitBeforePropertyStore(
+            $this->context,
+            $this,
+            $dest,
+            $this->context->jitEnclosingBlock
+        )) {
+            return;
+        }
+        if (null !== $dest->objectPropertyDnfArms) {
+            JIT\DnfParamCheck::enforcePropertyWrite(
+                $this->context,
+                $newVal,
+                $dest->objectPropertyDnfArms
+            );
+        } elseif (
+            null !== $dest->objectPropertyClassConstraint
+            && '' !== $dest->objectPropertyClassConstraint
+        ) {
+            JIT\TypedPropertyClassAssignCheck::enforce(
+                $this->context,
+                $newVal,
+                $dest->objectPropertyClassConstraint,
+                $dest->objectPropertyClassName ?? '',
+                $dest->objectPropertyName ?? 'property',
+                $dest->objectPropertyDeclaredTypeLabel ?? $dest->objectPropertyClassConstraint
+            );
+        }
+        JIT\ReadonlyClassGuard::emitStoreUnlessPending(
+            $this->context,
+            function () use ($dest, $newVal): void {
+                $this->context->type->object->propertyStore(
+                    $dest->objectPropertySlot,
+                    $newVal,
+                    $dest->objectPropertyType
+                );
+            }
+        );
+    }
+
     /**
      * Entry-alloca ephemeral concat when the left operand is a named {@see Operand\Variable} (#23798).
      *
@@ -32880,6 +32945,7 @@ class JIT {
     {
         if ($forWrite) {
             $this->context->scope->variables[$result] = $fetched;
+            $this->context->setVariableOp($result, $fetched);
 
             return;
         }
@@ -32917,8 +32983,8 @@ class JIT {
             $slot
         );
         $boxed->compileTimeString = $fetched->compileTimeString;
-        $boxed->compileTimeLong = $fetched->compileTimeLong;
-        $boxed->compileTimeFloat = $fetched->compileTimeFloat;
+        // Runtime boxFetchedPropertyIntoValue is authoritative — fetch-temp compileTimeLong
+        // can be stale/wrong and made `$obj->n ** 2` / `$t = $obj->n; $t ** 2` fold 1 (#35978).
         $boxed->isNullConstant = $fetched->isNullConstant;
         // Keep typed-prop identity for BP_VAR_R guards (echo/loadValue). Stripping these
         // made unset string props echo garbage instead of Error (#33886 / re-#33007);
