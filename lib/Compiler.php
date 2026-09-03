@@ -833,6 +833,7 @@ class Compiler {
             $main->haltCompilerOffset = $this->haltCompilerOffset;
         }
 
+
         return $main;
     }
 
@@ -12086,14 +12087,7 @@ class Compiler {
 
     private function findFuncCallExecReturnSlot(Block $block): ?int
     {
-        $last = null;
-        foreach ($block->opCodes as $op) {
-            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
-                $last = (int) $op->arg1;
-            }
-        }
-
-        return $last;
+        return $block->lastFunccallExecReturnSlot();
     }
 
     /** TYPE_INCLUDE result slot (arg2) — `@include` / `@require` expression value (#21938). */
@@ -33007,12 +33001,8 @@ class Compiler {
             $contiguousFirst,
             $cfgChildren
         );
-        $execReturnCountAtChainStart = 0;
-        foreach ($block->opCodes as $op) {
-            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
-                ++$execReturnCountAtChainStart;
-            }
-        }
+        // O(1) via Block cache — was a full opCodes scan per multi-arg call (#36387).
+        $execReturnCountAtChainStart = $block->funccallExecReturnCount();
         for ($j = $contiguousFirst; $j < $callIndex; ++$j) {
             $producer = $cfgChildren[$j] ?? null;
             if (!$producer instanceof Op\Expr) {
@@ -33087,12 +33077,7 @@ class Compiler {
                 $cfgChildren,
                 $callIndex
             );
-            $execReturnCountNow = 0;
-            foreach ($block->opCodes as $op) {
-                if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
-                    ++$execReturnCountNow;
-                }
-            }
+            $execReturnCountNow = $block->funccallExecReturnCount();
             if ($execReturnCountNow >= $execReturnCountAtChainStart + $siblingOrdinal + 1) {
                 continue;
             }
@@ -34235,12 +34220,7 @@ class Compiler {
             $consumerIndex,
             $cfgChildren
         );
-        $execReturnCount = 0;
-        foreach ($block->opCodes as $op) {
-            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
-                ++$execReturnCount;
-            }
-        }
+        $execReturnCount = $block->funccallExecReturnCount();
         if ($this->forceDeferredSiblingCallReturnSlot) {
             $execOrdinal = $execReturnCount;
         } elseif (
@@ -35105,12 +35085,7 @@ class Compiler {
                 $callIndex,
                 $block->orig->children
             );
-            $execReturnCount = 0;
-            foreach ($block->opCodes as $op) {
-                if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
-                    ++$execReturnCount;
-                }
-            }
+            $execReturnCount = $block->funccallExecReturnCount();
             if ($this->forceDeferredSiblingCallReturnSlot) {
                 $execOrdinal = $execReturnCount;
             } else {
@@ -44677,12 +44652,7 @@ class Compiler {
      */
     private function slotForLastInlineFuncCallExecReturn(Block $block, array $pendingOps = []): ?int
     {
-        $last = null;
-        foreach ($block->opCodes as $op) {
-            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
-                $last = (int) $op->arg1;
-            }
-        }
+        $last = $block->lastFunccallExecReturnSlot();
         foreach ($pendingOps as $op) {
             if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
                 $last = (int) $op->arg1;
@@ -47136,6 +47106,39 @@ class Compiler {
             }
             $nameSlot = $this->callArgNameSlot($arg, $block);
             $unpackFlag = $this->callArgUnpack($arg) ? 1 : null;
+            // Fast path: plain Operand\Literal args on FuncCall/NsFuncCall (str_pad(..., 5) /
+            // implode(",", …)). Without this, every literal still walked the full heuristic
+            // gauntlet and re-scanned growing opCodes — nested stmt blocks stayed super-linear
+            // (#36387). Skip null literals (soft-null / ConstFetch prelude paths) and skip New_/
+            // MethodCall sites — their slot layouts are asserted positionally (#19731).
+            if (
+                null === $unpackFlag
+                && null !== $cfgCallOp
+                && (
+                    $cfgCallOp instanceof Op\Expr\FuncCall
+                    || $cfgCallOp instanceof Op\Expr\NsFuncCall
+                )
+            ) {
+                $literalArg = $cfgArg instanceof Operand\Literal
+                    ? $cfgArg
+                    : ($arg instanceof Operand\Literal ? $arg : null);
+                if (
+                    $literalArg instanceof Operand\Literal
+                    && null !== $literalArg->value
+                    && null === Block::resolveVariableName($literalArg)
+                ) {
+                    $literalSlot = $this->compileOperand($literalArg, $block, true);
+                    if (null !== $literalSlot) {
+                        $sends[] = new OpCode(
+                            OpCode::TYPE_ARG_SEND,
+                            (string) $literalSlot,
+                            $nameSlot,
+                            $unpackFlag
+                        );
+                        continue;
+                    }
+                }
+            }
             // Fast path: dead-temp arg whose sole writer is a hoisted FuncCall — exact php-cfg
             // link (#23354). Skip the heuristic gauntlet for nested call stmts (#36387).
             // Restricted to FuncCall/NsFuncCall producers so Array_/ternary/spread overrides
@@ -52885,12 +52888,7 @@ class Compiler {
                         && null === $valueSlot
                         && !$this->callArgHasHoistedConstPrelude($cfgCallOp, (int) $argIndex, $block)
                     ) {
-                        $execReturnCount = 0;
-                        foreach ($block->opCodes as $op) {
-                            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
-                                ++$execReturnCount;
-                            }
-                        }
+                        $execReturnCount = $block->funccallExecReturnCount();
                         $execOrdinal = $execReturnCount - $chainProducerCount + $producerOrdinal;
                         $forcedSiblingSlot = $this->slotForSiblingInlineFuncCallProducerExecReturnOrdinal(
                             $block,
@@ -56554,12 +56552,7 @@ class Compiler {
         ) {
             return;
         }
-        $execReturnCount = 0;
-        foreach ($block->opCodes as $op) {
-            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
-                ++$execReturnCount;
-            }
-        }
+        $execReturnCount = $block->funccallExecReturnCount();
         foreach ($pendingNestedProducerOps as $op) {
             if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
                 ++$execReturnCount;
@@ -56740,12 +56733,7 @@ class Compiler {
 
             return;
         }
-        $execReturnCount = 0;
-        foreach ($block->opCodes as $op) {
-            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
-                ++$execReturnCount;
-            }
-        }
+        $execReturnCount = $block->funccallExecReturnCount();
         foreach ($pendingNestedProducerOps as $op) {
             if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
                 ++$execReturnCount;
