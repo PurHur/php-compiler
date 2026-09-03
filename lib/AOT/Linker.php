@@ -91,11 +91,19 @@ final class Linker
         foreach ($helperObjects as $helperObject) {
             $vendorObjects[] = $helperObject;
         }
-        $linkObjectFiles = array_merge($runtimeObjects, [$objectFile], $vendorObjects);
+        // Partial edit delta: emit-only rebuilt symbols, then prior aot.o supplies
+        // kept user + runtime bodies via -z muldefs (#36387).
+        $scriptObjects = [$objectFile];
+        $partialBase = \PHPCompiler\JIT\CompileCache::consumePartialEmitBaseObject();
+        if (is_string($partialBase) && is_file($partialBase) && filesize($partialBase) > 0) {
+            $scriptObjects[] = $partialBase;
+            \PHPCompiler\AOT\BuildTiming::note('edit_scaffold_base_link', 1.0);
+        }
+        $linkObjectFiles = array_merge($runtimeObjects, $scriptObjects, $vendorObjects);
         $helperGcLinkPaths = $helperObjects;
         $llvmDir = Config::getenv('PHP_COMPILER_LLVM_PATH');
         if (false === $llvmDir || '' === $llvmDir) {
-            self::linkWithSystemCompiler($objectFile, $executable, $runtimeObjects, $vendorObjects, $linkObjectFiles, $helperGcLinkPaths);
+            self::linkWithSystemCompiler($objectFile, $executable, $runtimeObjects, $vendorObjects, $linkObjectFiles, $helperGcLinkPaths, $scriptObjects);
 
             return;
         }
@@ -118,7 +126,9 @@ final class Linker
             foreach ($runtimeObjects as $runtimeObject) {
                 $objects[] = escapeshellarg($runtimeObject);
             }
-            $objects[] = escapeshellarg($objectFile);
+            foreach ($scriptObjects as $scriptObject) {
+                $objects[] = escapeshellarg($scriptObject);
+            }
             foreach ($vendorObjects as $vendorObject) {
                 $objects[] = escapeshellarg($vendorObject);
             }
@@ -161,7 +171,9 @@ final class Linker
             foreach ($runtimeObjects as $runtimeObject) {
                 $objects .= ' '.escapeshellarg($runtimeObject);
             }
-            $objects .= ' '.escapeshellarg($objectFile);
+            foreach ($scriptObjects as $scriptObject) {
+                $objects .= ' '.escapeshellarg($scriptObject);
+            }
             foreach ($vendorObjects as $vendorObject) {
                 $objects .= ' '.escapeshellarg($vendorObject);
             }
@@ -175,7 +187,57 @@ final class Linker
             return;
         }
 
-        self::linkWithSystemCompiler($objectFile, $executable, $runtimeObjects, $vendorObjects, $linkObjectFiles, $helperGcLinkPaths);
+        self::linkWithSystemCompiler($objectFile, $executable, $runtimeObjects, $vendorObjects, $linkObjectFiles, $helperGcLinkPaths, $scriptObjects);
+    }
+
+    /**
+     * `ld -r --allow-multiple-definition` combine for caching a full aot.o after delta emit (#36387).
+     *
+     * @param list<string> $objectFiles
+     */
+    public static function combineRelocatableObjects(array $objectFiles, string $outFile): bool
+    {
+        $inputs = [];
+        foreach ($objectFiles as $path) {
+            if (!is_string($path) || '' === $path || !is_file($path) || filesize($path) < 1) {
+                return false;
+            }
+            $inputs[] = $path;
+        }
+        if (count($inputs) < 2) {
+            return false;
+        }
+        $ld = null;
+        $llvmDir = Config::getenv('PHP_COMPILER_LLVM_PATH');
+        if (is_string($llvmDir) && '' !== $llvmDir) {
+            foreach ([$llvmDir.'/ld', $llvmDir.'/bin/ld.lld', $llvmDir.'/bin/ld'] as $cand) {
+                if (is_executable($cand)) {
+                    $ld = $cand;
+                    break;
+                }
+            }
+        }
+        if (null === $ld) {
+            $ld = self::which('ld');
+        }
+        if (null === $ld) {
+            return false;
+        }
+        $args = [escapeshellarg($ld), '-r', '--allow-multiple-definition', '-o', escapeshellarg($outFile)];
+        foreach ($inputs as $path) {
+            $args[] = escapeshellarg($path);
+        }
+        $cmd = implode(' ', $args);
+        $env = is_string($llvmDir) && '' !== $llvmDir ? self::toolchainEnvironment($llvmDir) : null;
+        try {
+            self::run($cmd, $env);
+        } catch (\Throwable $e) {
+            @unlink($outFile);
+
+            return false;
+        }
+
+        return is_file($outFile) && filesize($outFile) > 0;
     }
 
     /** -fsanitize=address,undefined when PHP_COMPILER_ASAN=1 (#36397). */
@@ -725,6 +787,7 @@ final class Linker
     /**
      * @param list<string> $runtimeObjects
      * @param list<string> $vendorObjects
+     * @param list<string> $scriptObjects user delta + optional prior aot.o (#36387)
      */
     private static function linkWithSystemCompiler(
         string $objectFile,
@@ -733,9 +796,13 @@ final class Linker
         array $vendorObjects = [],
         array $linkObjectFiles = [],
         array $helperGcLinkPaths = [],
+        array $scriptObjects = [],
     ): void {
+        if ([] === $scriptObjects) {
+            $scriptObjects = [$objectFile];
+        }
         if ([] === $linkObjectFiles) {
-            $linkObjectFiles = array_merge($runtimeObjects, [$objectFile], $vendorObjects);
+            $linkObjectFiles = array_merge($runtimeObjects, $scriptObjects, $vendorObjects);
         }
         $linkers = [
             'clang-9', 'clang', 'clang-17', 'clang-14', 'gcc', 'cc',
@@ -744,7 +811,9 @@ final class Linker
         foreach ($runtimeObjects as $runtimeObject) {
             $objects .= ' '.escapeshellarg($runtimeObject);
         }
-        $objects .= ' '.escapeshellarg($objectFile);
+        foreach ($scriptObjects as $scriptObject) {
+            $objects .= ' '.escapeshellarg($scriptObject);
+        }
         foreach ($vendorObjects as $vendorObject) {
             $objects .= ' '.escapeshellarg($vendorObject);
         }

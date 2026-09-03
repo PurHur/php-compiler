@@ -3462,8 +3462,16 @@ class Context {
 
         // AOT CompileCache: stamp + meta + round-trippable module.bc (void*→i8*, #36387).
         // Warm paths still prefer aot.bin / aot.o; bitcode enables tryRestore fallback.
+        // Persist FULL module before partial demote so the next edit can thin-boot (#36387).
         if (null !== $this->aotCompileCacheKey && '' !== $this->aotCompileCacheKey) {
             CompileCache::saveAotStamp($this->aotCompileCacheKey, $this);
+        }
+
+        // Partial keep: demote bodies already in prior aot.o → tiny delta emit (#36387).
+        if (CompileCache::isEditScaffoldPartial() && null !== CompileCache::peekPartialEmitBaseObject()) {
+            \PHPCompiler\AOT\BuildTiming::mark('partial_demote');
+            CompileCache::demoteBodiesForPartialObjectEmit($this);
+            \PHPCompiler\AOT\BuildTiming::end('partial_demote');
         }
 
         $bitcodePath = Config::getenv('PHP_COMPILER_EMIT_BITCODE');
@@ -3509,6 +3517,7 @@ class Context {
 
             return;
         }
+        $partialBase = CompileCache::peekPartialEmitBaseObject();
         Progress::noteFunction('jit_context_link_begin');
         \PHPCompiler\AOT\BuildTiming::mark('ld_link');
         Linker::link($objectFile, $file);
@@ -3516,11 +3525,25 @@ class Context {
         Progress::noteFunction('jit_context_link_done');
         Linker::assertNonEmptyOutputFile($file);
         if (null !== $this->aotCompileCacheKey && '' !== $this->aotCompileCacheKey) {
+            $objectToCache = $objectFile;
+            $combinedTmp = null;
+            // Materialize a full aot.o for the new key (delta + prior base) so mid-tier
+            // restore stays valid after a partial edit (#36387).
+            if (is_string($partialBase) && is_file($partialBase) && filesize($partialBase) > 0) {
+                $combinedTmp = $objectFile.'.full.'.getmypid();
+                if (Linker::combineRelocatableObjects([$objectFile, $partialBase], $combinedTmp)) {
+                    $objectToCache = $combinedTmp;
+                    \PHPCompiler\AOT\BuildTiming::note('edit_scaffold_object_combine', 1.0);
+                }
+            }
             CompileCache::saveObject(
                 $this->aotCompileCacheKey,
-                $objectFile,
+                $objectToCache,
                 \PHPCompiler\AOT\HelperRuntimeCache::usedUnitSlugs()
             );
+            if (null !== $combinedTmp) {
+                @unlink($combinedTmp);
+            }
         }
         unlink($objectFile);
     }

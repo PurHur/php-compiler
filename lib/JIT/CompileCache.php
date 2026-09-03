@@ -74,6 +74,17 @@ final class CompileCache
      */
     private static array $strippedUserSymbols = [];
 
+    /** True when edit-scaffold kept at least one unchanged user body (#36387). */
+    private static bool $editScaffoldPartial = false;
+
+    /**
+     * Prior cold `aot.o` linked after a demoted delta emit on partial keep (#36387).
+     *
+     * Delta object is listed first; `-z muldefs` keeps rebuilt symbols from the delta
+     * and everything else (runtime + kept user bodies) from this base object.
+     */
+    private static ?string $partialEmitBaseObject = null;
+
     public static function isEnabled(): bool
     {
         $flag = Config::getenv('PHP_COMPILER_CACHE');
@@ -100,10 +111,220 @@ final class CompileCache
         return self::$editScaffoldActive;
     }
 
+    /** True when edit-scaffold kept unchanged member bodies (#36387). */
+    public static function isEditScaffoldPartial(): bool
+    {
+        return self::$editScaffoldPartial;
+    }
+
     /** True when edit-scaffold left this user LLVM body in the module (#36387). */
     public static function isKeptUserSymbol(string $llvmName): bool
     {
         return '' !== $llvmName && isset(self::$keptUserSymbols[$llvmName]);
+    }
+
+    /**
+     * Prior `aot.o` for partial delta link, or null when full emit is required (#36387).
+     */
+    public static function peekPartialEmitBaseObject(): ?string
+    {
+        $path = self::$partialEmitBaseObject;
+        if (!is_string($path) || '' === $path || !is_file($path) || filesize($path) < 1) {
+            return null;
+        }
+
+        return $path;
+    }
+
+    /**
+     * Consume the base object path once (Linker inserts it after the delta `.o`) (#36387).
+     */
+    public static function consumePartialEmitBaseObject(): ?string
+    {
+        $path = self::peekPartialEmitBaseObject();
+        self::$partialEmitBaseObject = null;
+
+        return $path;
+    }
+
+    /**
+     * Before TargetMachine emit on partial keep: drop bodies that already exist in the
+     * prior `aot.o`, leaving declarations. Rebuild set (stripped user symbols + main +
+     * init/shutdown) and any symbol absent from the base object keep their bodies so
+     * NestedJIT during the thin re-lower still lands in the delta `.o` (#36387).
+     *
+     * @return int number of functions demoted to declarations
+     */
+    public static function demoteBodiesForPartialObjectEmit(Context $context): int
+    {
+        $base = self::peekPartialEmitBaseObject();
+        if (null === $base || !self::$editScaffoldPartial) {
+            return 0;
+        }
+        $prevDefs = self::objectDefinedSymbols($base);
+        if ([] === $prevDefs) {
+            return 0;
+        }
+
+        $mustKeepBody = ['main' => true];
+        foreach (self::$strippedUserSymbols as $name) {
+            if (is_string($name) && '' !== $name) {
+                $mustKeepBody[$name] = true;
+            }
+        }
+        foreach ([$context->initFunc, $context->shutdownFunc] as $lifecycle) {
+            if ($lifecycle instanceof \PHPLLVM\Value\Function_) {
+                try {
+                    $n = (string) $lifecycle->getName();
+                } catch (\Throwable $e) {
+                    $n = '';
+                }
+                if ('' !== $n) {
+                    $mustKeepBody[$n] = true;
+                }
+            }
+        }
+        // Candidates: unchanged user bodies (kept) plus shared runtime symbols already
+        // defined in the prior aot.o. Do not demote arbitrary prevDefs — NestedJIT /
+        // helper exports can share names while closing over delta-local sp_* layout
+        // and muldefs would bind base bodies to delta globals (#36387).
+        $candidates = [];
+        foreach (array_keys(self::$keptUserSymbols) as $name) {
+            if (is_string($name) && '' !== $name) {
+                $candidates[$name] = true;
+            }
+        }
+        foreach (array_keys($prevDefs) as $name) {
+            if (!is_string($name) || '' === $name) {
+                continue;
+            }
+            if (self::isSharedRuntimeDemoteCandidate($name)) {
+                $candidates[$name] = true;
+            }
+        }
+
+        $demoted = 0;
+        foreach (array_keys($candidates) as $name) {
+            if (isset($mustKeepBody[$name]) || str_ends_with($name, '.stale') || str_starts_with($name, 'llvm.')) {
+                continue;
+            }
+            if (!isset($prevDefs[$name])) {
+                continue;
+            }
+            $fn = null;
+            try {
+                $fn = $context->module->getNamedFunction($name);
+            } catch (\Throwable $e) {
+                continue;
+            }
+            if (!$fn instanceof \PHPLLVM\Value\Function_) {
+                continue;
+            }
+            $blocks = 0;
+            try {
+                $blocks = (int) $fn->countBasicBlocks();
+            } catch (\Throwable $e) {
+                continue;
+            }
+            if ($blocks < 1) {
+                continue;
+            }
+            if (self::demoteFunctionBodyToDeclaration($fn)) {
+                ++$demoted;
+            }
+        }
+
+        if ($demoted > 0) {
+            \PHPCompiler\AOT\BuildTiming::note('edit_scaffold_demoted', (float) $demoted);
+        }
+
+        return $demoted;
+    }
+
+    /**
+     * Runtime prologue symbols safe to take from prior aot.o on partial edit (#36387).
+     *
+     * Matches {@see \PHPCompiler\AOT\HelperRuntimeCommon::isSharedRuntimeSymbol()} plus
+     * typed-box helpers that are always present in user-script modules.
+     */
+    private static function isSharedRuntimeDemoteCandidate(string $name): bool
+    {
+        if ('' === $name || str_starts_with($name, 'PHPCompiler_')) {
+            return false;
+        }
+
+        return str_starts_with($name, '__value__')
+            || str_starts_with($name, '__string__')
+            || str_starts_with($name, '__hashtable__')
+            || str_starts_with($name, '__ref__')
+            || str_starts_with($name, '__object__')
+            || str_starts_with($name, 'phpc_')
+            || str_starts_with($name, '__compiler_')
+            || str_starts_with($name, '__phpc_')
+            || str_starts_with($name, '__superglobals__');
+    }
+
+    /**
+     * Delete every basic block so the function becomes an extern declaration (#36387).
+     */
+    private static function demoteFunctionBodyToDeclaration(\PHPLLVM\Value\Function_ $fn): bool
+    {
+        try {
+            $blocks = $fn->getBasicBlocks();
+        } catch (\Throwable $e) {
+            return false;
+        }
+        if ([] === $blocks) {
+            return false;
+        }
+        // Delete in reverse so predecessors vanish after successors.
+        for ($i = count($blocks) - 1; $i >= 0; --$i) {
+            $bb = $blocks[$i];
+            try {
+                if (method_exists($bb, 'delete')) {
+                    $bb->delete();
+                }
+            } catch (\Throwable $e) {
+                return false;
+            }
+        }
+
+        try {
+            return 0 === (int) $fn->countBasicBlocks();
+        } catch (\Throwable $e) {
+            return true;
+        }
+    }
+
+    /**
+     * Defined ELF symbol names in an object file (nm -g --defined-only) (#36387).
+     *
+     * @return array<string, true>
+     */
+    private static function objectDefinedSymbols(string $objectPath): array
+    {
+        if (!is_file($objectPath) || filesize($objectPath) < 1) {
+            return [];
+        }
+        $out = [];
+        $rc = 1;
+        exec('nm -g --defined-only '.escapeshellarg($objectPath).' 2>/dev/null', $out, $rc);
+        if (0 !== $rc) {
+            return [];
+        }
+        $defs = [];
+        foreach ($out as $line) {
+            $parts = preg_split('/\s+/', trim((string) $line));
+            if (!is_array($parts) || count($parts) < 3) {
+                continue;
+            }
+            $name = $parts[count($parts) - 1];
+            if (is_string($name) && '' !== $name && !str_starts_with($name, '.')) {
+                $defs[$name] = true;
+            }
+        }
+
+        return $defs;
     }
 
     public static function isEditScaffoldBitcodeBound(): bool
@@ -869,6 +1090,14 @@ final class CompileCache
         $context->resetCompileTimeConstantMapsForEditScaffold();
         self::$skipModuleFuncCompile = true;
         self::$editScaffoldActive = true;
+        self::$editScaffoldPartial = $partial;
+        self::$partialEmitBaseObject = null;
+        if ($partial) {
+            $baseObject = self::objectPath($previousKey);
+            if (is_file($baseObject) && filesize($baseObject) > 0) {
+                self::$partialEmitBaseObject = $baseObject;
+            }
+        }
         self::$pendingEditScaffoldKey = null;
         \PHPCompiler\AOT\BuildTiming::note('edit_scaffold_hit', 1.0);
         if ($partial) {
@@ -1566,6 +1795,8 @@ final class CompileCache
         self::$strippedUserSymbols = [];
         self::$skipModuleFuncCompile = false;
         self::$editScaffoldActive = false;
+        self::$editScaffoldPartial = false;
+        self::$partialEmitBaseObject = null;
         self::$editScaffoldBitcodeBound = false;
         self::$pendingEditScaffoldKey = null;
         self::$projectMembers = null;
