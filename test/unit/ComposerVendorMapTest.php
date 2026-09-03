@@ -355,6 +355,52 @@ final class ComposerVendorMapTest extends TestCase
         }
     }
 
+    /**
+     * scripts under the compiler checkout must not invent the repo vendor/ map
+     * (#36382 — benchmarks/simple.php mega-bundle / yay parse error).
+     */
+    public function testExpandIncludesDoesNotInventRepoVendorForBareScripts(): void
+    {
+        $repo = dirname(__DIR__, 2);
+        $simple = $repo.'/benchmarks/simple.php';
+        $this->assertFileExists($simple);
+        $out = ComposerVendorMap::expandIncludesForAutoload($simple, []);
+        $this->assertSame([], $out);
+
+        $fibo = $repo.'/benchmarks/fibo(30).php';
+        $this->assertFileExists($fibo);
+        $this->assertSame([], ComposerVendorMap::expandIncludesForAutoload($fibo, []));
+    }
+
+    /**
+     * Nearby vendor/autoload guesses still work when the entry requires Composer.
+     */
+    public function testExpandIncludesGuessesParentVendorWhenEntryRequiresAutoload(): void
+    {
+        $dir = sys_get_temp_dir().'/phpc_expand_guess_'.bin2hex(random_bytes(4));
+        $this->assertTrue(mkdir($dir.'/src', 0777, true));
+        $this->assertTrue(mkdir($dir.'/vendor/composer', 0777, true));
+        try {
+            file_put_contents($dir.'/vendor/autoload.php', "<?php\nrequire __DIR__.'/composer/autoload_real.php';\n");
+            file_put_contents($dir.'/vendor/composer/autoload_real.php', "<?php\n");
+            file_put_contents($dir.'/vendor/composer/autoload_classmap.php', "<?php\nreturn [];\n");
+            file_put_contents($dir.'/vendor/composer/autoload_psr4.php', "<?php\nreturn [];\n");
+            file_put_contents($dir.'/vendor/composer/autoload_files.php', "<?php\nreturn [];\n");
+            $entry = $dir.'/src/index.php';
+            file_put_contents(
+                $entry,
+                "<?php\nrequire __DIR__.'/../vendor/autoload.php';\necho 'ok';\n"
+            );
+
+            $out = ComposerVendorMap::expandIncludesForAutoload($entry, []);
+            $joined = implode("\n", $out);
+            $this->assertStringContainsString('vendor/autoload.php', $joined);
+            $this->assertStringContainsString('autoload_real.php', $joined);
+        } finally {
+            $this->removeTree($dir);
+        }
+    }
+
     private function removeTree(string $dir): void
     {
         if (!is_dir($dir)) {

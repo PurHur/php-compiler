@@ -189,6 +189,11 @@ final class ComposerVendorMap
      * default reachable closure, AutoloadDiscovery hits from the entry) to $includes so AOT can
      * stub the dynamic loader without dropping referenced classes (#36382).
      *
+     * Does **not** invent a parent `vendor/autoload.php` merely because one exists next to the
+     * compiler checkout — that mega-bundled unrelated scripts under `benchmarks/` (#36382).
+     * Nearby guesses run only when the entry source references `vendor/autoload.php`. The
+     * php-compiler repo's own vendor/ is never used as a Composer seed tree for SourceBundler.
+     *
      * @param list<string> $includes
      *
      * @return list<string>
@@ -205,7 +210,13 @@ final class ComposerVendorMap
             $autoloadPaths[] = $entryPath;
         }
         if ([] === $autoloadPaths) {
-            // Entry may literal-require vendor/autoload.php without it appearing in $includes yet.
+            // Only invent nearby vendor/autoload.php when the entry source actually
+            // requires/includes it. Blind parent guesses pulled this repo's own
+            // vendor/ into benchmarks/simple.php (one level under the root) and
+            // SourceBundler mega-concatenated ~1k files → parse errors (#36382).
+            if (!self::entrySourceReferencesComposerAutoload($entryPath)) {
+                return $includes;
+            }
             $entryDir = dirname(realpath($entryPath) ?: $entryPath);
             $guess = $entryDir.'/vendor/autoload.php';
             if (is_file($guess)) {
@@ -235,6 +246,11 @@ final class ComposerVendorMap
             $autoloadReal = realpath($autoloadPhp) ?: $autoloadPhp;
             $vendorDir = dirname($autoloadReal);
             $projectRoot = dirname($vendorDir);
+            // Never seed SourceBundler from php-compiler's own vendor tree — that
+            // dumps yay/php-cs-fixer/… into unrelated user scripts (#36382).
+            if (self::isPhpCompilerRepoRoot($projectRoot)) {
+                continue;
+            }
             if (is_dir($projectRoot.'/vendor/composer')) {
                 $manifest = ProjectManifest::loadManifest($projectRoot) ?? ['autoload' => 'composer'];
                 if (!isset($manifest['autoload'])) {
@@ -320,6 +336,35 @@ final class ComposerVendorMap
         $norm = str_replace('\\', '/', $path);
 
         return str_ends_with($norm, '/vendor/autoload.php');
+    }
+
+    /**
+     * Entry source mentions require/include of vendor/autoload.php (literal or concat).
+     */
+    private static function entrySourceReferencesComposerAutoload(string $entryPath): bool
+    {
+        $real = realpath($entryPath) ?: $entryPath;
+        if (!is_file($real)) {
+            return false;
+        }
+        $code = (string) file_get_contents($real);
+
+        return 1 === preg_match(
+            '/\b(?:require|include)(?:_once)?\b[^;]*vendor\/autoload\.php/i',
+            $code
+        );
+    }
+
+    /**
+     * True when $dir is this php-compiler checkout (not a user Composer app).
+     */
+    private static function isPhpCompilerRepoRoot(string $dir): bool
+    {
+        $root = realpath($dir) ?: $dir;
+
+        return is_file($root.'/bin/compile.php')
+            && is_file($root.'/lib/Compiler.php')
+            && is_file($root.'/lib/AOT/ComposerVendorMap.php');
     }
 
     /**
