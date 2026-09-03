@@ -18,6 +18,23 @@ Please follow [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) in all project interactio
 
 The sections below are for **maintainers and collaborators who have already coordinated** on other channels.
 
+### Definition of Done ([#36400](https://github.com/PurHur/php-compiler/issues/36400))
+
+An issue may be closed by a PR only when **all** of the following hold:
+
+1. Every checkbox under the issue’s `## Done when` section appears in the PR body as a **ticked** copy (`- [x]` + the same text), together with the command output that proves it.
+2. The named gates for that change class were run in the **pinned Docker image** (`./script/docker-exec.sh` / `./script/phpunit.sh`), and the transcript is in the PR.
+3. Partial work uses **`Part of #N`** (not `Closes #N`) and lists what remains. Issues without a `## Done when` list get one **before** being claimed.
+
+Gate (local / PR body check):
+
+```bash
+php script/check-issue-close-scope.php --self-test
+php script/check-issue-close-scope.php --pr-body /tmp/pr.md --repo PurHur/php-compiler
+```
+
+A `Closes #N` without the full ticked Done-when list **fails** the gate; `Part of #N` does not. Weekly audit: `php script/audit-closed-but-partial.php --days 7 --dry-run` (post with `--post --tracker 36379`; optional `--apply-labels`). See [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md).
+
 ### Pull request process
 
 All submissions, including by project members, require review via GitHub pull requests. See [GitHub Help](https://help.github.com/articles/about-pull-requests/) for using pull requests.

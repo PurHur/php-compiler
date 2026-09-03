@@ -123,6 +123,14 @@ ci_run_m2_spine_issue_hygiene_check() {
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-m2-spine-issue-hygiene.php
 }
 
+ci_run_issue_close_scope_check() {
+  if [[ "${ISSUE_CLOSE_SCOPE_GATE:-1}" != "1" ]]; then
+    return 0
+  fi
+  echo "Issue close-scope self-test (ISSUE_CLOSE_SCOPE_GATE=1, issue #36400)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/check-issue-close-scope.php --self-test
+}
+
 ci_run_examples_readme_sync_check() {
   if [[ "${EXAMPLES_README_SYNC_GATE:-1}" != "1" ]]; then
     return 0
@@ -558,6 +566,7 @@ ci_run_inventory_checks() {
   ci_ensure_generated_doc script/bootstrap-profile.php docs/bootstrap-profile.json
   ci_run_wave3_roadmap_sync_check
   ci_run_m2_spine_issue_hygiene_check
+  ci_run_issue_close_scope_check
   ci_run_examples_readme_sync_check
   ci_run_examples_ladder_discovery_check
   ci_run_rebuild_examples_005_sync_check
