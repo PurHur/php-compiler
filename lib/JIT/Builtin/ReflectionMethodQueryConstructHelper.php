@@ -19,6 +19,8 @@ final class ReflectionMethodQueryConstructHelper
 
     public const PROP_COMPILER_METHOD_REQUIRED_PARAM_COUNT = '__compilerMethodRequiredParamCount';
 
+    public const PROP_COMPILER_METHOD_HAS_RETURN_TYPE = '__compilerMethodHasReturnType';
+
     public static function emitStoreQueryMetadata(
         Context $context,
         Value $obj,
@@ -55,6 +57,13 @@ final class ReflectionMethodQueryConstructHelper
                     self::PROP_COMPILER_METHOD_REQUIRED_PARAM_COUNT,
                     $meta['required']
                 );
+                ReflectionSetup::emitSetIntegerProperty(
+                    $context,
+                    $obj,
+                    'ReflectionMethod',
+                    self::PROP_COMPILER_METHOD_HAS_RETURN_TYPE,
+                    $meta['hasReturnType'] ? 1 : 0
+                );
 
                 return;
             }
@@ -83,6 +92,12 @@ final class ReflectionMethodQueryConstructHelper
             $methodStr,
             $maps['required']
         );
+        $hasReturn = ReflectionMethodQueryLookupRuntime::lookupParamCountInlineFromStrings(
+            $context,
+            $classStr,
+            $methodStr,
+            ReflectionMethodQueryLowering::hasReturnTypeMapForContext($context)
+        );
         ReflectionSetup::emitSetLongPropertyFromValue(
             $context,
             $obj,
@@ -103,6 +118,13 @@ final class ReflectionMethodQueryConstructHelper
             'ReflectionMethod',
             self::PROP_COMPILER_METHOD_REQUIRED_PARAM_COUNT,
             $required
+        );
+        ReflectionSetup::emitSetLongPropertyFromValue(
+            $context,
+            $obj,
+            'ReflectionMethod',
+            self::PROP_COMPILER_METHOD_HAS_RETURN_TYPE,
+            $hasReturn
         );
     }
 
@@ -133,6 +155,16 @@ final class ReflectionMethodQueryConstructHelper
             $obj,
             'ReflectionMethod',
             self::PROP_COMPILER_METHOD_REQUIRED_PARAM_COUNT
+        );
+    }
+
+    public static function loadHasReturnType(Context $context, Value $obj): Value
+    {
+        return ReflectionSetup::integerPropertyAsI64(
+            $context,
+            $obj,
+            'ReflectionMethod',
+            self::PROP_COMPILER_METHOD_HAS_RETURN_TYPE
         );
     }
 }

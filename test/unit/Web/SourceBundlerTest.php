@@ -469,4 +469,53 @@ final class SourceBundlerTest extends TestCase
         }
     }
 
+    /** Large --include lists skip mega-concat (#36382 Slim OOM). */
+    public function testIncrementalRequiresThresholdAndPrelude(): void
+    {
+        $prev = getenv('PHP_COMPILER_AOT_INCREMENTAL_INCLUDES');
+        putenv('PHP_COMPILER_AOT_INCREMENTAL_INCLUDES');
+        unset($_ENV['PHP_COMPILER_AOT_INCREMENTAL_INCLUDES'], $_SERVER['PHP_COMPILER_AOT_INCREMENTAL_INCLUDES']);
+
+        $few = array_fill(0, 3, '/tmp/a.php');
+        $many = array_fill(0, SourceBundler::INCREMENTAL_REQUIRES_UNIT_THRESHOLD, '/tmp/a.php');
+        $this->assertFalse(SourceBundler::shouldUseIncrementalRequires($few));
+        $this->assertTrue(SourceBundler::shouldUseIncrementalRequires($many));
+
+        putenv('PHP_COMPILER_AOT_INCREMENTAL_INCLUDES=1');
+        $this->assertTrue(SourceBundler::shouldUseIncrementalRequires($few));
+        putenv('PHP_COMPILER_AOT_INCREMENTAL_INCLUDES=0');
+        $this->assertFalse(SourceBundler::shouldUseIncrementalRequires($many));
+
+        if (false === $prev || null === $prev) {
+            putenv('PHP_COMPILER_AOT_INCREMENTAL_INCLUDES');
+            unset($_ENV['PHP_COMPILER_AOT_INCREMENTAL_INCLUDES'], $_SERVER['PHP_COMPILER_AOT_INCREMENTAL_INCLUDES']);
+        } else {
+            putenv('PHP_COMPILER_AOT_INCREMENTAL_INCLUDES='.$prev);
+            $_ENV['PHP_COMPILER_AOT_INCREMENTAL_INCLUDES'] = $prev;
+            $_SERVER['PHP_COMPILER_AOT_INCREMENTAL_INCLUDES'] = $prev;
+        }
+
+        $dir = sys_get_temp_dir().'/phpc_incr_'.bin2hex(random_bytes(4));
+        $this->assertTrue(mkdir($dir));
+        try {
+            $lib = $dir.'/lib.php';
+            $entry = $dir.'/main.php';
+            file_put_contents($lib, "<?php\nfunction incr_hi(): string { return 'hi'; }\n");
+            file_put_contents(
+                $entry,
+                "<?php\nrequire __DIR__.'/lib.php';\necho incr_hi();\n"
+            );
+            $libReal = realpath($lib) ?: $lib;
+            $src = SourceBundler::entryWithIncrementalRequires($entry, [$libReal]);
+            $this->assertStringContainsString('require_once '.var_export($libReal, true), $src);
+            $this->assertStringContainsString('echo incr_hi();', $src);
+            // Entry's duplicate require of lib.php is stripped.
+            $this->assertSame(1, substr_count($src, 'require'));
+        } finally {
+            @unlink($dir.'/lib.php');
+            @unlink($dir.'/main.php');
+            @rmdir($dir);
+        }
+    }
+
 }

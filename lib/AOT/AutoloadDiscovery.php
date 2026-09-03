@@ -40,27 +40,35 @@ final class AutoloadDiscovery
         $errors = [];
         $files = [];
         $seenFiles = [];
-        $queue = [];
+        $visiting = [];
 
-        foreach ($seedFiles as $path) {
-            $resolved = realpath($path) ?: $path;
-            if (!is_file($resolved) || isset($seenFiles[$resolved])) {
-                continue;
+        $visit = null;
+        $visit = static function (string $file) use (
+            &$visit,
+            $runtime,
+            $projectDir,
+            $psr4Map,
+            &$errors,
+            &$files,
+            &$seenFiles,
+            &$visiting
+        ): void {
+            $resolved = realpath($file) ?: $file;
+            if (isset($seenFiles[$resolved]) || !is_file($resolved)) {
+                return;
             }
-            $seenFiles[$resolved] = true;
-            $queue[] = $resolved;
-        }
-
-        while ([] !== $queue) {
-            $file = array_shift($queue);
-            if (!is_file($file)) {
-                continue;
+            if (isset($visiting[$resolved])) {
+                return;
             }
+            $visiting[$resolved] = true;
 
             try {
-                $script = self::parseScript($runtime, $file);
+                $script = self::parseScript($runtime, $resolved);
             } catch (\Throwable) {
-                continue;
+                unset($visiting[$resolved]);
+                $seenFiles[$resolved] = true;
+
+                return;
             }
 
             foreach (StaticClassReferenceScanner::fromScript($script) as $className) {
@@ -77,13 +85,43 @@ final class AutoloadDiscovery
                     continue;
                 }
 
-                $key = realpath($resolvedPath) ?: $resolvedPath;
-                if (isset($seenFiles[$key])) {
+                $visit($resolvedPath);
+            }
+
+            unset($visiting[$resolved]);
+            if (isset($seenFiles[$resolved])) {
+                return;
+            }
+            $seenFiles[$resolved] = true;
+            // Post-order: traits/deps before the class that use-s them (#36382 Nyholm).
+            $files[] = $resolved;
+        };
+
+        foreach ($seedFiles as $path) {
+            $resolved = realpath($path) ?: $path;
+            if (!is_file($resolved) || isset($seenFiles[$resolved])) {
+                continue;
+            }
+            // Seeds are already on the compile list; only expand their references.
+            $seenFiles[$resolved] = true;
+            try {
+                $script = self::parseScript($runtime, $resolved);
+            } catch (\Throwable) {
+                continue;
+            }
+            foreach (StaticClassReferenceScanner::fromScript($script) as $className) {
+                if (!self::isPsr4Candidate($className, $psr4Map)) {
                     continue;
                 }
-                $seenFiles[$key] = true;
-                $files[] = $key;
-                $queue[] = $key;
+                $resolvedPath = ProjectAutoload::resolveClassPath($className, $psr4Map);
+                if (null === $resolvedPath) {
+                    $expected = self::expectedRelativePath($projectDir, $className, $psr4Map);
+                    $errors[] = 'autoload: unresolved class '.$className
+                        .($expected ? ' (expected '.$expected.')' : '');
+
+                    continue;
+                }
+                $visit($resolvedPath);
             }
         }
 
@@ -197,6 +235,12 @@ final class StaticClassReferenceScanner
                 self::collectOperand($child->extends, $names);
                 foreach ($child->implements as $iface) {
                     self::collectOperand($iface, $names);
+                }
+            } elseif ($child instanceof Op\Stmt\TraitUse) {
+                // Nyholm Request uses MessageTrait/RequestTrait — without this, reachable
+                // Composer graphs omit traits and AOT dies with "Trait not found" (#36382).
+                foreach ($child->traits as $trait) {
+                    self::collectOperand($trait, $names);
                 }
             } elseif ($child instanceof Op\Stmt\Interface_) {
                 foreach ($child->extends as $parent) {

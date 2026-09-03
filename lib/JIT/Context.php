@@ -2429,6 +2429,8 @@ class Context {
         $this->functionProxies['reflectionmethod::isstatic'] = new Call\ReflectionMethodIsStatic();
         $this->functionProxies['reflectionmethod::getnumberofparameters'] = new Call\ReflectionMethodGetNumberOfParameters();
         $this->functionProxies['reflectionmethod::getnumberofrequiredparameters'] = new Call\ReflectionMethodGetNumberOfRequiredParameters();
+        // Thin AOT: unbound hasReturnType blocks Nyholm StreamTrait top-level guard (#36382).
+        $this->functionProxies['reflectionmethod::hasreturntype'] = new Call\ReflectionMethodHasReturnType();
         $this->functionProxies['reflectionclassconstant::__construct'] = new Call\ReflectionClassConstantConstruct();
         $this->functionProxies['reflectionclassconstant::getname'] = new Call\ReflectionClassConstantGetName();
         if (CompilerVersion::supportsReflectionPropertyGetMangledName()) {

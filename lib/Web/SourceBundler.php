@@ -18,6 +18,70 @@ final class SourceBundler
     private static array $bundledDeclaredTypes = [];
 
     /**
+     * Mega-concat threshold: Slim+nyholm reachable graphs (~90+ units) peak >8GiB RSS under
+     * SourceBundler on 8g hosts. Prefer IncludeHelper one-file-at-a-time instead (#36382).
+     */
+    public const INCREMENTAL_REQUIRES_UNIT_THRESHOLD = 32;
+
+    /**
+     * When true, compile.php emits require_once literals for each --include and skips
+     * SourceBundler mega-concat (spine skip-bundle shape for Composer projects, #36382).
+     *
+     * Opt in/out: PHP_COMPILER_AOT_INCREMENTAL_INCLUDES=1|0. Default: auto by unit count.
+     *
+     * @param list<string> $includePaths
+     */
+    public static function shouldUseIncrementalRequires(array $includePaths): bool
+    {
+        if ([] === $includePaths) {
+            return false;
+        }
+        $env = getenv('PHP_COMPILER_AOT_INCREMENTAL_INCLUDES');
+        if (is_string($env) && '' !== $env) {
+            $v = strtolower($env);
+            if (in_array($v, ['1', 'true', 'yes', 'on'], true)) {
+                return true;
+            }
+            if (in_array($v, ['0', 'false', 'no', 'off'], true)) {
+                return false;
+            }
+        }
+
+        return \count($includePaths) >= self::INCREMENTAL_REQUIRES_UNIT_THRESHOLD;
+    }
+
+    /**
+     * Build entry source that require_once's each project unit as an absolute literal so
+     * JIT IncludeHelper lowers files incrementally (never one 99-file CFG, #36382).
+     *
+     * @param list<string> $includePaths absolute paths, compiled before entry
+     */
+    public static function entryWithIncrementalRequires(string $entryPath, array $includePaths): string
+    {
+        $entryRaw = file_get_contents($entryPath);
+        if (false === $entryRaw) {
+            throw new \RuntimeException('cannot read entry: '.$entryPath);
+        }
+
+        $lines = ['<?php', 'declare(strict_types=1);'];
+        foreach ($includePaths as $path) {
+            $resolved = realpath($path);
+            if (false === $resolved) {
+                $resolved = $path;
+            }
+            $lines[] = 'require_once '.var_export($resolved, true).';';
+        }
+
+        $body = self::stripStrictTypesDeclare(self::stripOpenTag($entryRaw));
+        // Drop entry requires that duplicate prelude units (autoload.php, etc.).
+        $stripped = self::stripResolvedRequires("<?php\n".$body, $includePaths);
+        $body = self::stripStrictTypesDeclare(self::stripOpenTag($stripped));
+        $lines[] = $body;
+
+        return implode("\n", $lines)."\n";
+    }
+
+    /**
      * @param list<string> $includePaths absolute paths, compiled before entry
      *
      * @return array{0: string, 1: string} bundled source and logical filename (entry)

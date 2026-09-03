@@ -545,7 +545,18 @@ function run(string $filename, string $code, array $options): void
     }
     if ([] !== $includes && !$skipBundle) {
         $projectRoot = DeployRoot::findProjectRootForPath($filename);
-        [$code, $filename] = SourceBundler::bundleForAot($filename, $includes, $projectRoot);
+        // Large Composer graphs (Slim ~99 units): mega-concat OOMs on 8g hosts. Emit
+        // require_once literals and let IncludeHelper fold one file at a time (#36382).
+        if (SourceBundler::shouldUseIncrementalRequires($includes)) {
+            $code = SourceBundler::entryWithIncrementalRequires($filename, $includes);
+            fwrite(
+                STDERR,
+                'phpc build: incremental IncludeHelper requires for '.\count($includes)
+                ." units (skip SourceBundler mega-concat, #36382)\n"
+            );
+        } else {
+            [$code, $filename] = SourceBundler::bundleForAot($filename, $includes, $projectRoot);
+        }
     } elseif ('' === $code && '-' !== $filename && is_file($filename)) {
         $code = (string) file_get_contents($filename);
     }
