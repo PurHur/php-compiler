@@ -531,20 +531,13 @@ final class JitValueBox
                 return;
         }
         if (ArrayBuiltinHelper::isNativeArray($value->type)) {
-            // materializeNativeArrayForCall returns an owned HT (rc=1). writeHashtable
-            // addrefs again — release the materialize claim so the box is sole owner
-            // (#36388 list/packed `$a = [$i]; unset($a)` under {main}).
+            // materializeNativeArrayForCall returns rc=0; writeHashtable → rc=1 (sole owner).
+            // No delref — the prior delref freed the HT at rc=0 (#36484 / re-#36388).
             $ht = ArrayBuiltinHelper::loadHashTable($context, $value);
             $context->builder->call(
                 $context->lookupFunction('__value__writeHashtable'),
                 $destPtr,
                 $ht
-            );
-            $context->refcount->delref(
-                $context->builder->pointerCast(
-                    $ht,
-                    $context->getTypeFromString('__ref__virtual*')
-                )
             );
 
             return;
