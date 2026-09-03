@@ -10299,6 +10299,7 @@ class Compiler {
             $newOps = \array_slice($block->opCodes, $beforeCount);
             $block->opCodes = \array_slice($block->opCodes, 0, $beforeCount);
             $block->nOpCodes = \count($block->opCodes);
+            $block->invalidateOpcodeDerivedIndexes();
             $block->paramRuntimeDefaultInitBlocks[$paramIdx] = $block->fragmentForOpcodes($newOps);
             $block->paramRuntimeDefaultResultSlots[$paramIdx] = $resultSlot;
 
@@ -16081,6 +16082,7 @@ class Compiler {
         $tailOps = \array_slice($merge->opCodes, $splitAt);
         $merge->opCodes = \array_slice($merge->opCodes, 0, $splitAt);
         $merge->nOpCodes = \count($merge->opCodes);
+        $merge->invalidateOpcodeDerivedIndexes();
         $tail = $merge->fragmentForOpcodes($tailOps);
         $tail->orig = $merge->orig;
         $tail->inheritUndefinedLocals = $merge->inheritUndefinedLocals;
@@ -19901,6 +19903,11 @@ class Compiler {
         $mapped = $block->lvalueSlotForAssignResult($resultSlot);
         if (null !== $mapped) {
             return $mapped;
+        }
+        // Nested call blocks have no ASSIGN / flagged ITER_VALUE — skip O(opcodes)
+        // full scans on every operand read (#36387).
+        if (!$block->hasAssignResultScanCandidates()) {
+            return null;
         }
         foreach ($block->opCodes as $op) {
             if (
@@ -27019,14 +27026,9 @@ class Compiler {
         if (!\is_int($callIndex)) {
             return null;
         }
-        $found = false;
-        for ($i = $callIndex - 1; $i >= 0; --$i) {
-            if (($block->orig->children[$i] ?? null) === $producer) {
-                $found = true;
-                break;
-            }
-        }
-        if (!$found) {
+        // Indexed lookup — walking back to 0 re-scanned every prior statement (#36387).
+        $producerIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $producer, $block->orig);
+        if (!\is_int($producerIndex) || $producerIndex >= $callIndex) {
             return null;
         }
         $slot = $block->slotForOperand($producer->result);
@@ -29661,7 +29663,10 @@ class Compiler {
         ?int $consumerIndex = null
     ): int {
         if (null === $consumerIndex) {
-            for ($k = $producerIndex + 1, $n = \count($cfgChildren); $k < $n; ++$k) {
+            // Bound: ordinal consumer sits near the producer (#36387).
+            $n = \count($cfgChildren);
+            $scanEnd = min($n, $producerIndex + 1 + 32);
+            for ($k = $producerIndex + 1; $k < $scanEnd; ++$k) {
                 $cand = $cfgChildren[$k] ?? null;
                 if (!$this->isSiblingMultiArgInlineCallConsumer($cand)) {
                     continue;
@@ -33848,12 +33853,7 @@ class Compiler {
         if ($producerOrdinal < 0) {
             return null;
         }
-        $execReturnSlots = [];
-        foreach ($block->opCodes as $op) {
-            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
-                $execReturnSlots[] = (int) $op->arg1;
-            }
-        }
+        $execReturnSlots = $block->funccallExecReturnSlots();
         if ($producerOrdinal >= \count($execReturnSlots)) {
             return null;
         }
@@ -33872,15 +33872,12 @@ class Compiler {
         if ($producerOrdinal < 0) {
             return null;
         }
-        $execReturnSlots = [];
-        foreach ($block->opCodes as $op) {
-            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
-                $execReturnSlots[] = (int) $op->arg1;
-            }
-        }
-        foreach ($pendingNestedProducerOps as $op) {
-            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
-                $execReturnSlots[] = (int) $op->arg1;
+        $execReturnSlots = $block->funccallExecReturnSlots();
+        if ([] !== $pendingNestedProducerOps) {
+            foreach ($pendingNestedProducerOps as $op) {
+                if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
+                    $execReturnSlots[] = (int) $op->arg1;
+                }
             }
         }
         if ($producerOrdinal >= \count($execReturnSlots)) {
@@ -34123,12 +34120,7 @@ class Compiler {
                 $consumerIndex,
                 $cfgChildren
             );
-            $execReturnCount = 0;
-            foreach ($block->opCodes as $op) {
-                if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
-                    ++$execReturnCount;
-                }
-            }
+            $execReturnCount = $block->funccallExecReturnCount();
             if ($this->forceDeferredSiblingCallReturnSlot) {
                 // Deferred chain compile emits the next EXEC_RETURN in order (#16254).
                 $execOrdinal = $execReturnCount;
@@ -36631,6 +36623,7 @@ class Compiler {
         }
         $block->opCodes = array_slice($block->opCodes, 0, $sinceIndex);
         $block->nOpCodes = $sinceIndex;
+        $block->invalidateOpcodeDerivedIndexes();
 
         return $drained;
     }
@@ -44655,13 +44648,7 @@ class Compiler {
      */
     private function slotForLastEmittedInlineCallResultBeforePendingFuncCall(Block $block): ?int
     {
-        for ($i = \count($block->opCodes) - 1; $i >= 0; --$i) {
-            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $block->opCodes[$i]->type) {
-                return (int) $block->opCodes[$i]->arg1;
-            }
-        }
-
-        return null;
+        return $block->lastFunccallExecReturnSlot();
     }
 
     /**
@@ -46237,6 +46224,7 @@ class Compiler {
         }
         array_splice($block->opCodes, $insertAt, 0, [$init]);
         $block->nOpCodes = \count($block->opCodes);
+        $block->invalidateOpcodeDerivedIndexes();
 
         return true;
     }
@@ -47148,6 +47136,50 @@ class Compiler {
             }
             $nameSlot = $this->callArgNameSlot($arg, $block);
             $unpackFlag = $this->callArgUnpack($arg) ? 1 : null;
+            // Fast path: dead-temp arg whose sole writer is a hoisted FuncCall — exact php-cfg
+            // link (#23354). Skip the heuristic gauntlet for nested call stmts (#36387).
+            // Restricted to FuncCall/NsFuncCall producers so Array_/ternary/spread overrides
+            // that run after exactHoisted at the bottom of this loop still apply.
+            if (
+                null === $unpackFlag
+                && null !== $cfgCallOp
+                && (
+                    $cfgCallOp instanceof Op\Expr\FuncCall
+                    || $cfgCallOp instanceof Op\Expr\NsFuncCall
+                )
+            ) {
+                $exactFastSlot = $this->exactHoistedCallArgProducerSlot(
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex,
+                    $sends
+                );
+                if (null !== $exactFastSlot) {
+                    $exactFastArg = $cfgCallOp->args[(int) $argIndex] ?? null;
+                    $exactFastProducer = (
+                        $exactFastArg instanceof Operand
+                        && \is_array($exactFastArg->ops ?? null)
+                        && 1 === \count($exactFastArg->ops)
+                    ) ? $exactFastArg->ops[0] : null;
+                    if (
+                        $exactFastProducer instanceof Op\Expr\FuncCall
+                        || $exactFastProducer instanceof Op\Expr\NsFuncCall
+                        || $exactFastProducer instanceof Op\Expr\MethodCall
+                        || $exactFastProducer instanceof Op\Expr\StaticCall
+                        || $exactFastProducer instanceof Op\Expr\ConstFetch
+                        || $exactFastProducer instanceof Op\Expr\ClassConstFetch
+                        || $exactFastProducer instanceof Op\Expr\Array_
+                    ) {
+                        $sends[] = new OpCode(
+                            OpCode::TYPE_ARG_SEND,
+                            $exactFastSlot,
+                            $nameSlot,
+                            $unpackFlag
+                        );
+                        continue;
+                    }
+                }
+            }
             // #31720: `fn() => new C($x, null)` — named CV / Phi auto-captures must not be
             // consumed by trailing ConstFetch null/true/false folding (tryFold / prelude matchers).
             if (
@@ -48749,12 +48781,8 @@ class Compiler {
                     continue;
                 }
             }
-            $callOrdinal = 0;
-            foreach ($block->opCodes as $op) {
-                if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
-                    ++$callOrdinal;
-                }
-            }
+            // O(1) via Block cache — was a full opCodes scan per arg (#36387).
+            $callOrdinal = $block->funccallInitCount();
             $dimFetchSlot = $this->resolvePrecedingArrayDimFetchCallArgSlot(
                 $arg,
                 $block,
@@ -53979,14 +54007,18 @@ class Compiler {
         if ($producerOrdinal < 0) {
             return null;
         }
-        $execReturnSlots = [];
-        foreach (array_merge($block->opCodes, $pendingOps) as $op) {
-            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
-                $execReturnSlots[] = (string) $op->arg1;
+        $execReturnSlots = $block->funccallExecReturnSlots();
+        if ([] !== $pendingOps) {
+            foreach ($pendingOps as $op) {
+                if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
+                    $execReturnSlots[] = (int) $op->arg1;
+                }
             }
         }
 
-        return $execReturnSlots[$producerOrdinal] ?? null;
+        return isset($execReturnSlots[$producerOrdinal])
+            ? (string) $execReturnSlots[$producerOrdinal]
+            : null;
     }
 
     /**
@@ -55704,7 +55736,9 @@ class Compiler {
             return false;
         }
         $opCount = \count($ops);
-        for ($j = $producerIndex + 1; $j < $opCount; ++$j) {
+        // Bound: create* factory + property/const preludes + multi-arg MethodCall stay near (#36387).
+        $scanEnd = min($opCount, $producerIndex + 1 + 32);
+        for ($j = $producerIndex + 1; $j < $scanEnd; ++$j) {
             $next = $ops[$j] ?? null;
             if ($next instanceof Op\Expr\MethodCall || $next instanceof Op\Expr\StaticCall) {
                 if (!\is_array($next->args ?? null) || \count($next->args) < 2) {
@@ -55793,7 +55827,11 @@ class Compiler {
         if (!\is_int($producerIndex)) {
             return false;
         }
-        for ($consumerIndex = $producerIndex + 1, $n = \count($cfgChildren); $consumerIndex < $n; ++$consumerIndex) {
+        // Only consumers in the near sibling window — scanning every later multi-arg call made
+        // nested stmt blocks O(n²) isSibling rejects (#36387).
+        $n = \count($cfgChildren);
+        $scanEnd = min($n, $producerIndex + 1 + 32);
+        for ($consumerIndex = $producerIndex + 1; $consumerIndex < $scanEnd; ++$consumerIndex) {
             $consumer = $cfgChildren[$consumerIndex] ?? null;
             if (!$this->isSiblingMultiArgInlineCallConsumer($consumer)) {
                 continue;
@@ -55834,7 +55872,10 @@ class Compiler {
         if (!\is_int($producerIndex)) {
             return false;
         }
-        for ($consumerIndex = $producerIndex + 1, $n = \count($cfgChildren); $consumerIndex < $n; ++$consumerIndex) {
+        // Bound: haystack + callback + consumer sit in a near window (#36387).
+        $n = \count($cfgChildren);
+        $scanEnd = min($n, $producerIndex + 1 + 32);
+        for ($consumerIndex = $producerIndex + 1; $consumerIndex < $scanEnd; ++$consumerIndex) {
             $consumer = $cfgChildren[$consumerIndex] ?? null;
             if (!$this->isSiblingMultiArgInlineCallConsumer($consumer)) {
                 continue;
@@ -55897,7 +55938,10 @@ class Compiler {
         if (!$this->isAdjacentNestedFuncCallProducer($inner, $cfgCallOp, $producerIndex - 1, $producerIndex)) {
             return false;
         }
-        for ($consumerIndex = $producerIndex + 1, $n = \count($cfgChildren); $consumerIndex < $n; ++$consumerIndex) {
+        // Bound: multi-arg consumer for f(g()) sits near the outer producer (#36387).
+        $n = \count($cfgChildren);
+        $scanEnd = min($n, $producerIndex + 1 + 32);
+        for ($consumerIndex = $producerIndex + 1; $consumerIndex < $scanEnd; ++$consumerIndex) {
             $consumer = $cfgChildren[$consumerIndex] ?? null;
             if (!$this->isSiblingMultiArgInlineCallConsumer($consumer)) {
                 continue;
@@ -55922,17 +55966,14 @@ class Compiler {
             return false;
         }
         $cfgChildren = $block->orig->children;
-        $producerIndex = null;
-        foreach ($cfgChildren as $i => $child) {
-            if ($child === $cfgCallOp) {
-                $producerIndex = $i;
-                break;
-            }
-        }
-        if (null === $producerIndex) {
+        $producerIndex = $this->cfgCallOpIndexInChildren($cfgChildren, $cfgCallOp, $block->orig);
+        if (!\is_int($producerIndex)) {
             return false;
         }
-        for ($i = $producerIndex + 1, $n = \count($cfgChildren); $i < $n; ++$i) {
+        // Bound: literal preludes + consumer stay in a near window (#36387).
+        $n = \count($cfgChildren);
+        $scanEnd = min($n, $producerIndex + 1 + 32);
+        for ($i = $producerIndex + 1; $i < $scanEnd; ++$i) {
             $consumer = $cfgChildren[$i];
             if (
                 $consumer instanceof Op\Expr\ConstFetch
@@ -56082,7 +56123,10 @@ class Compiler {
         if (null === $producerIndex) {
             return false;
         }
-        for ($i = $producerIndex + 1, $n = \count($cfgChildren); $i < $n; ++$i) {
+        // Bound: literal/property gap + consumer stay near the producer (#36387).
+        $n = \count($cfgChildren);
+        $scanEnd = min($n, $producerIndex + 1 + 32);
+        for ($i = $producerIndex + 1; $i < $scanEnd; ++$i) {
             $child = $cfgChildren[$i];
             if (
                 $child instanceof Op\Expr\ConstFetch
@@ -56135,7 +56179,10 @@ class Compiler {
             return false;
         }
         $cfgChildren = $block->orig->children;
-        for ($i = $producerIndex + 1, $n = \count($cfgChildren); $i < $n; ++$i) {
+        // Bound: ConstFetch true + var_export sit near the producer (#36387).
+        $n = \count($cfgChildren);
+        $scanEnd = min($n, $producerIndex + 1 + 32);
+        for ($i = $producerIndex + 1; $i < $scanEnd; ++$i) {
             $child = $cfgChildren[$i];
             if (
                 $child instanceof Op\Expr\ConstFetch
@@ -56170,7 +56217,10 @@ class Compiler {
             return false;
         }
         $cfgChildren = $block->orig->children;
-        for ($i = $producerIndex + 1, $n = \count($cfgChildren); $i < $n; ++$i) {
+        // Bound: ConstFetch true + var_export sit near the producer (#36387).
+        $n = \count($cfgChildren);
+        $scanEnd = min($n, $producerIndex + 1 + 32);
+        for ($i = $producerIndex + 1; $i < $scanEnd; ++$i) {
             $child = $cfgChildren[$i];
             if (
                 $child instanceof Op\Expr\ConstFetch
