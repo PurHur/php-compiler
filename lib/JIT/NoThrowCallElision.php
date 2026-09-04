@@ -274,8 +274,17 @@ final class NoThrowCallElision
             return self::scalarCastArgsCannotThrow($name, $callArgs);
         }
         if (self::isPureBaseConvertBuiltin($name)) {
-            // math.c decbin/hexdec/… — typed numeric or string; soft-null stays out.
+            // math.c decbin/hexdec/base_convert — typed numeric or string; soft-null
+            // stays out; base_convert bases must be compile-time [2,36].
             return self::baseConvertArgsCannotThrow($name, $callArgs);
+        }
+        if (self::isPureInetBuiltin($name)) {
+            // basic_functions.c ip2long/long2ip — typed string or numeric.
+            return self::inetArgsCannotThrow($name, $callArgs);
+        }
+        if (self::isPureVersionCompareBuiltin($name)) {
+            // versioning.c — typed strings; optional operator must be proven valid.
+            return self::versionCompareArgsCannotThrow($callArgs);
         }
         if ('chr' === $name) {
             // Z_PARAM_LONG family — object→int does not call __toString; still
@@ -776,9 +785,9 @@ final class NoThrowCallElision
     /**
      * php-src {@code ext/standard/math.c} base / radix converts — int→string
      * ({@code decbin}/{@code dechex}/{@code decoct}) or string→number
-     * ({@code bindec}/{@code hexdec}/{@code octdec}). Soft-null / object
-     * {@code __toString} stay out. Public for {@see DiscardedPureCallElision}
-     * (#36386).
+     * ({@code bindec}/{@code hexdec}/{@code octdec}) or {@code base_convert}.
+     * Soft-null / object {@code __toString} stay out. Public for
+     * {@see DiscardedPureCallElision} (#36386).
      */
     public static function isPureBaseConvertBuiltin(string $nameLc): bool
     {
@@ -789,7 +798,74 @@ final class NoThrowCallElision
             case 'bindec':
             case 'hexdec':
             case 'octdec':
+            case 'base_convert':
                 return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * php-src {@code ext/standard/basic_functions.c} {@code ip2long}/
+     * {@code long2ip} — typed string or long; soft-null stays out. Public for
+     * {@see DiscardedPureCallElision} (#36386).
+     */
+    public static function isPureInetBuiltin(string $nameLc): bool
+    {
+        switch ($nameLc) {
+            case 'ip2long':
+            case 'long2ip':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * php-src {@code ext/standard/versioning.c} {@code version_compare}. Public
+     * for {@see DiscardedPureCallElision} (#36386).
+     */
+    public static function isPureVersionCompareBuiltin(string $nameLc): bool
+    {
+        return 'version_compare' === $nameLc;
+    }
+
+    /**
+     * @param array<int, Variable> $callArgs
+     */
+    public static function baseConvertArgsCannotThrow(string $nameLc, array $callArgs): bool
+    {
+        if (!isset($callArgs[0]) || !$callArgs[0] instanceof Variable) {
+            return false;
+        }
+        switch ($nameLc) {
+            case 'decbin':
+            case 'dechex':
+            case 'decoct':
+                // Z_PARAM_LONG — soft-null deprecates (stay live).
+                return !isset($callArgs[1])
+                    && self::numericParamBuiltinArgCannotThrow($callArgs[0]);
+            case 'bindec':
+            case 'hexdec':
+            case 'octdec':
+                // Z_PARAM_STR — soft-null / __toString stay live.
+                return !isset($callArgs[1])
+                    && self::stringParamBuiltinArgCannotThrow($callArgs[0]);
+            case 'base_convert':
+                // string, long from_base, long to_base — ValueError when bases
+                // outside [2,36]; only compile-time bases in range prove.
+                if (
+                    !isset($callArgs[1], $callArgs[2])
+                    || isset($callArgs[3])
+                    || !self::stringParamBuiltinArgCannotThrow($callArgs[0])
+                    || !$callArgs[1] instanceof Variable
+                    || !$callArgs[2] instanceof Variable
+                ) {
+                    return false;
+                }
+
+                return self::compileTimeRadixBaseInRange($callArgs[1])
+                    && self::compileTimeRadixBaseInRange($callArgs[2]);
             default:
                 return false;
         }
@@ -798,25 +874,88 @@ final class NoThrowCallElision
     /**
      * @param array<int, Variable> $callArgs
      */
-    public static function baseConvertArgsCannotThrow(string $nameLc, array $callArgs): bool
+    public static function inetArgsCannotThrow(string $nameLc, array $callArgs): bool
     {
         if (!isset($callArgs[0]) || !$callArgs[0] instanceof Variable || isset($callArgs[1])) {
             return false;
         }
         switch ($nameLc) {
-            case 'decbin':
-            case 'dechex':
-            case 'decoct':
-                // Z_PARAM_LONG — soft-null deprecates (stay live).
-                return self::numericParamBuiltinArgCannotThrow($callArgs[0]);
-            case 'bindec':
-            case 'hexdec':
-            case 'octdec':
+            case 'ip2long':
                 // Z_PARAM_STR — soft-null / __toString stay live.
                 return self::stringParamBuiltinArgCannotThrow($callArgs[0]);
+            case 'long2ip':
+                // Z_PARAM_LONG — soft-null deprecates (stay live).
+                return self::numericParamBuiltinArgCannotThrow($callArgs[0]);
             default:
                 return false;
         }
+    }
+
+    /**
+     * @param array<int, Variable> $callArgs
+     */
+    public static function versionCompareArgsCannotThrow(array $callArgs): bool
+    {
+        if (
+            !isset($callArgs[0], $callArgs[1])
+            || !$callArgs[0] instanceof Variable
+            || !$callArgs[1] instanceof Variable
+            || !self::stringParamBuiltinArgCannotThrow($callArgs[0])
+            || !self::stringParamBuiltinArgCannotThrow($callArgs[1])
+        ) {
+            return false;
+        }
+        if (!isset($callArgs[2])) {
+            return true;
+        }
+        if (!$callArgs[2] instanceof Variable || isset($callArgs[3])) {
+            return false;
+        }
+        // Null operator → two-arg form (no ValueError).
+        if ($callArgs[2]->isNullConstant || Variable::TYPE_NULL === $callArgs[2]->type) {
+            return true;
+        }
+        $op = JitStringArg::compileTimeLiteral($callArgs[2]);
+        if (null === $op) {
+            // Unknown typed string may be an invalid operator (ValueError).
+            return false;
+        }
+
+        return self::isValidVersionCompareOperatorLiteral($op);
+    }
+
+    /**
+     * php-src {@code versioning.c} operator set (lt/le/gt/ge/eq/ne + symbols).
+     */
+    public static function isValidVersionCompareOperatorLiteral(string $operator): bool
+    {
+        switch ($operator) {
+            case '<':
+            case 'lt':
+            case '<=':
+            case 'le':
+            case '>':
+            case 'gt':
+            case '>=':
+            case 'ge':
+            case '==':
+            case '=':
+            case 'eq':
+            case '!=':
+            case '<>':
+            case 'ne':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /** Compile-time long in [2, 36] — {@code base_convert} radix (math.c). */
+    public static function compileTimeRadixBaseInRange(Variable $arg): bool
+    {
+        return null !== $arg->compileTimeLong
+            && $arg->compileTimeLong >= 2
+            && $arg->compileTimeLong <= 36;
     }
 
     /**

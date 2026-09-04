@@ -44114,9 +44114,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/substr_replace.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 243)
-- new HashTable (line 360)
-- new Variable (line 404)
+- new Variable (line 249)
+- new HashTable (line 366)
+- new Variable (line 410)
 - 12 class method(s)
 
 ### `ext/standard/symlink_.php`
@@ -58210,7 +58210,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/DiscardedPureCallElision.php`
 
 **Warnings** (review for bootstrap subset):
-- 29 class method(s)
+- 35 class method(s)
 
 ### `lib/JIT/DnfParamCheck.php`
 
@@ -59343,8 +59343,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/NoThrowCallElision.php`
 
 **Warnings** (review for bootstrap subset):
-- new Operand\Literal (line 1597)
-- 37 class method(s)
+- new Operand\Literal (line 1795)
+- 45 class method(s)
 
 ### `lib/JIT/NonObjectPropertyFetchHelper.php`
 
