@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * sinh() for compiled JIT/AOT modules (#15156, #27125, #28418, php-in-PHP).
+ * sinh() NestedJIT-safe fdlibm reference (#15156, #27125, #28418, php-in-PHP).
  *
- * NestedJIT-safe fdlibm e_sinh.c shape with inlined exp (#28418 /
- * peer MathAtanh #28377 / MathExp #28241).
+ * AOT/JIT hot path uses libm {@code sinh(3)} via {@see \PHPCompiler\JIT\Builtin\MathSinh}
+ * (#36386 / peer MathTan). This helper remains for NestedJIT-safe fdlibm e_sinh.c
+ * shape with inlined exp when NestedJIT cannot call libc.
  * Avoid `\sinh` / {@see VmMath::sinh} — NestedJIT re-enters MathSinh bridge under thin AOT.
  * Avoid cross-class Exp helper call — NestedJIT stubs to 0 (#27017 / Hypot shape).
  * Avoid pack/unpack (#27496). Avoid unbounded while-loops (#27838).

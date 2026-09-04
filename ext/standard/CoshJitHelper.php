@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * cosh() for compiled JIT/AOT modules (#15156, #27005, #28446, php-in-PHP).
+ * cosh() NestedJIT-safe fdlibm reference (#15156, #27005, #28446, php-in-PHP).
  *
- * NestedJIT-safe fdlibm e_cosh.c shape with inlined exp (#28446 /
- * peer MathSinh #28418 / MathAtanh #28377 / MathExp #28241).
+ * AOT/JIT hot path uses libm {@code cosh(3)} via {@see \PHPCompiler\JIT\Builtin\MathCosh}
+ * (#36386 / peer MathSinh). This helper remains for NestedJIT-safe fdlibm e_cosh.c
+ * shape with inlined exp when NestedJIT cannot call libc.
  * Avoid `\cosh` / {@see VmMath::cosh} — NestedJIT re-enters MathCosh bridge under thin AOT.
  * Avoid cross-class Exp helper call — NestedJIT stubs to 0 (#27017 / Hypot shape).
  * Avoid pack/unpack (#27496). Avoid unbounded while-loops (#27838).
