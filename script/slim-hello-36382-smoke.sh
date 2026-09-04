@@ -6,9 +6,12 @@
 #   ./script/docker-exec.sh -- ./script/slim-hello-36382-smoke.sh --skip-setup
 #
 # Measured peak RSS during IncludeHelper for the 103-unit Slim graph is ~350 MiB;
-# prior ~27 GiB climbs were NestedJIT wiping include-once dedupe and re-inlining every
-# unit (#36382). Default Docker 8–10g is enough after that fix. Keep LLVM memory floor
-# at PHP_COMPILER_LLVM_MEMORY_LIMIT (default 8192M) — do not force 16384M.
+# prior ~27 GiB climbs were NestedJIT wiping include-once dedupe (#36382). A later
+# OOM under 8g was SprintfJitHelper::readPackedDoubleAtOffset calling unpack() while
+# sprintf is force-NestedJIT'd into every user-script AOT — that pulled UnpackEngine
+# into the user module. Fixed via Ieee754::decodeFloat64Le. Default Docker 8–10g is
+# enough past that point; next Slim blocker is preg_replace_callback array callables.
+# Keep LLVM memory floor at PHP_COMPILER_LLVM_MEMORY_LIMIT (default 8192M).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

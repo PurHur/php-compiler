@@ -27,6 +27,12 @@ final class StringFormat
 {
     private const HELPER_PATH = '/ext/standard/SprintfJitHelper.php';
 
+    /** Ieee754 before Sprintf — sprintfArgv float path must not call unpack() (#36382). */
+    private const HELPER_BUNDLE = [
+        '/ext/standard/Ieee754.php',
+        self::HELPER_PATH,
+    ];
+
     private const SPRINTF_HELPER = 'PHPCompiler\\ext\\standard\\SprintfJitHelper::sprintfArgv';
 
     private const SPRINTF_BRIDGE_ENTRY = 'sprintf_bridge_entry';
@@ -317,9 +323,9 @@ final class StringFormat
 
     public static function ensureSprintfJitHelperCompiled(Context $context): void
     {
-        JitVmHelperLink::ensureCompiled(
+        JitVmHelperLink::ensureCompiledBundle(
             $context,
-            self::HELPER_PATH,
+            self::HELPER_BUNDLE,
             self::COMPILED_HELPERS,
             '#20841'
         );

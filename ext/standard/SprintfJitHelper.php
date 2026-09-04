@@ -649,9 +649,10 @@ final class SprintfJitHelper
             ++$i;
         }
 
-        $decoded = unpack('d', $bytes);
-
-        return false === $decoded ? null : (float) $decoded[1];
+        // Never call the unpack builtin here — NestedJIT of SprintfJitHelper (forced for every
+        // user-script AOT via HelperRuntimeCache::USER_SCRIPT_INLINE_ONLY) would pull
+        // UnpackEngine into the user module and OOM Slim-sized graphs (#36382).
+        return Ieee754::decodeFloat64Le($bytes);
     }
 
     private static function packedArgByteSizeAtOffset(string $packed, int $packLen, int $offset): ?int
