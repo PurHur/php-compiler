@@ -304,6 +304,14 @@ final class NoThrowCallElision
             // url.c parse_url — typed string + optional component long.
             return self::parseUrlArgsCannotThrow($callArgs);
         }
+        if (self::isPureFunctionExistsBuiltin($name)) {
+            // zend_builtin_functions.c function_exists — typed string; no autoload.
+            return self::functionExistsArgsCannotThrow($callArgs);
+        }
+        if (self::isPureExtensionLoadedBuiltin($name)) {
+            // info.c extension_loaded — typed string; table lookup only.
+            return self::extensionLoadedArgsCannotThrow($callArgs);
+        }
         if (self::isPureVersionCompareBuiltin($name)) {
             // versioning.c — typed strings; optional operator must be proven valid.
             return self::versionCompareArgsCannotThrow($callArgs);
@@ -907,6 +915,26 @@ final class NoThrowCallElision
     }
 
     /**
+     * php-src {@code Zend/zend_builtin_functions.c} {@code function_exists} —
+     * Z_PARAM_STR name; function table lookup only (no autoload). Soft-null
+     * deprecates. Public for {@see DiscardedPureCallElision} (#36386).
+     */
+    public static function isPureFunctionExistsBuiltin(string $nameLc): bool
+    {
+        return 'function_exists' === $nameLc;
+    }
+
+    /**
+     * php-src {@code ext/standard/info.c} {@code extension_loaded} — Z_PARAM_STR
+     * extension; registered-module table lookup. Soft-null deprecates. Public
+     * for {@see DiscardedPureCallElision} (#36386).
+     */
+    public static function isPureExtensionLoadedBuiltin(string $nameLc): bool
+    {
+        return 'extension_loaded' === $nameLc;
+    }
+
+    /**
      * php-src {@code ext/standard/versioning.c} {@code version_compare}. Public
      * for {@see DiscardedPureCallElision} (#36386).
      */
@@ -1115,6 +1143,34 @@ final class NoThrowCallElision
         }
 
         return true;
+    }
+
+    /**
+     * Exactly one typed / literal string — soft-null / {@code __toString} stay out.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    public static function functionExistsArgsCannotThrow(array $callArgs): bool
+    {
+        if (
+            !isset($callArgs[0])
+            || !$callArgs[0] instanceof Variable
+            || isset($callArgs[1])
+        ) {
+            return false;
+        }
+
+        return self::stringParamBuiltinArgCannotThrow($callArgs[0]);
+    }
+
+    /**
+     * Exactly one typed / literal string — soft-null / {@code __toString} stay out.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    public static function extensionLoadedArgsCannotThrow(array $callArgs): bool
+    {
+        return self::functionExistsArgsCannotThrow($callArgs);
     }
 
     /**
