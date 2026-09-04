@@ -79,12 +79,9 @@ final class VmEmptyDimension
                 return null;
             }
             // SimpleXMLElement: empty($sxe[$dim]) uses string emptiness, not object truthiness (#25338).
-            if (
-                \PHPCompiler\ext\simplexml\VmSimpleXml::CLASS_LC === strtolower($object->class->name)
-                && \PHPCompiler\ext\simplexml\SimpleXmlRegistry::has($object)
-            ) {
+            if (SimpleXmlVmRuntimeSupport::isDimensionSubject($object)) {
                 try {
-                    $dst->bool(\PHPCompiler\ext\simplexml\VmSimpleXml::dimensionIsEmpty($object, $dim));
+                    $dst->bool(SimpleXmlVmRuntimeSupport::dimensionIsEmpty($object, $dim));
                 } catch (\TypeError $e) {
                     return $vm->propagateEmptyDimensionTypeError($e, $frame);
                 }

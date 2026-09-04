@@ -604,7 +604,7 @@ final class Variable {
                     }
                 }
                 // SimpleXMLElement: sxe_object_cast_ex(IS_LONG) via element text (#22715).
-                $sxeInt = \PHPCompiler\ext\simplexml\VmSimpleXml::tryCastObjectToInt($this->toObject());
+                $sxeInt = SimpleXmlVmRuntimeSupport::tryCastObjectToInt($this->toObject());
                 if (null !== $sxeInt) {
                     return $sxeInt;
                 }
@@ -663,7 +663,7 @@ final class Variable {
                     }
                 }
                 // SimpleXMLElement: sxe_object_cast_ex(IS_DOUBLE) via element text (#22715).
-                $sxeFloat = \PHPCompiler\ext\simplexml\VmSimpleXml::tryCastObjectToFloat($this->toObject());
+                $sxeFloat = SimpleXmlVmRuntimeSupport::tryCastObjectToFloat($this->toObject());
                 if (null !== $sxeFloat) {
                     return $sxeFloat;
                 }
@@ -949,8 +949,8 @@ final class Variable {
             case self::TYPE_OBJECT:
                 $object = $this->resolveIndirect()->toObject();
                 // SimpleXMLElement: sxe_object_cast_ex(_IS_BOOL), not zend_std (always true) (#22714).
-                if (\PHPCompiler\ext\simplexml\VmSimpleXml::handlesObjectCast($object)) {
-                    return \PHPCompiler\ext\simplexml\VmSimpleXml::objectIsTruthy($object);
+                if (SimpleXmlVmRuntimeSupport::handlesObjectCast($object)) {
+                    return SimpleXmlVmRuntimeSupport::objectIsTruthy($object);
                 }
                 // zend_std_cast_object_to_type(_IS_BOOL) → 1; __toString is not consulted (#26409).
                 return true;

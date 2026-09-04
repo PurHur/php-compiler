@@ -19,12 +19,25 @@ final class SimpleXmlPharVmHooks36204Test extends TestCase
 {
     public function testLibSourcesHaveNoDirectExtImports(): void
     {
-        $cast = (string) file_get_contents(dirname(__DIR__, 2).'/lib/VM/CastSupport.php');
-        $phar = (string) file_get_contents(dirname(__DIR__, 2).'/lib/VM/Builtin/PharRunning.php');
-        self::assertStringNotContainsString('PHPCompiler\\ext\\simplexml', $cast);
-        self::assertStringNotContainsString('PHPCompiler\\ext\\phar', $phar);
-        self::assertStringContainsString('SimpleXmlVmRuntimeSupport', $cast);
-        self::assertStringContainsString('PharVmRuntimeSupport', $phar);
+        $root = dirname(__DIR__, 2);
+        foreach ([
+            'lib/VM/CastSupport.php',
+            'lib/VM/Variable.php',
+            'lib/VM/VmEmptyDimension.php',
+            'lib/VM/Builtin/PharRunning.php',
+        ] as $rel) {
+            $src = (string) file_get_contents($root.'/'.$rel);
+            self::assertStringNotContainsString('PHPCompiler\\ext\\simplexml', $src, $rel);
+            self::assertStringNotContainsString('PHPCompiler\\ext\\phar', $src, $rel);
+        }
+        self::assertStringContainsString(
+            'SimpleXmlVmRuntimeSupport',
+            (string) file_get_contents($root.'/lib/VM/CastSupport.php')
+        );
+        self::assertStringContainsString(
+            'PharVmRuntimeSupport',
+            (string) file_get_contents($root.'/lib/VM/Builtin/PharRunning.php')
+        );
     }
 
     public function testPharRunningPathHook(): void
