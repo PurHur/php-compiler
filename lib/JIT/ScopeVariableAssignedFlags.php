@@ -25,6 +25,13 @@ final class ScopeVariableAssignedFlags
     private static array $flags = [];
 
     /**
+     * Canonical owner tokens → a Function_ wrapper for sameLlvmFunction matching (#36386).
+     *
+     * @var array<string, Function_>
+     */
+    private static array $ownerCanonical = [];
+
+    /**
      * Scope keys marked assigned while the insert block was still the function entry
      * (unconditional prologue). Entry dominates every later read (#36386).
      *
@@ -64,7 +71,11 @@ final class ScopeVariableAssignedFlags
         }
 
         $owner = self::ownerFunctionForScopeFlags($context);
-        $cacheKey = spl_object_id($owner)."\0".$key;
+        // PHPLLVM Function_ wrappers are not pointer-stable (see TryCatchHelper::sameLlvmFunction).
+        // Keying by spl_object_id($owner) minted a fresh entry alloca per wrapper, so markAssigned
+        // flipped one flag while undef guards loaded another — false "Undefined variable $i/$r/$j"
+        // on fannkuch-redux after `$i = 0` (#36386 / benchmarks/v2/fannkuch-redux.php).
+        $cacheKey = self::userFlagCacheKey($context, $owner, $key);
         if (!isset(self::$flags[$cacheKey])) {
             $i8 = $context->getTypeFromString('int8');
             $flag = BasicBlockHelper::entryAllocaForFunction($context, $owner, $i8);
@@ -363,7 +374,41 @@ final class ScopeVariableAssignedFlags
             return $moduleId."\0".$key;
         }
 
-        return $moduleId."\0".spl_object_id(self::ownerFunctionForScopeFlags($context))."\0".$key;
+        return self::userFlagCacheKey($context, self::ownerFunctionForScopeFlags($context), $key);
+    }
+
+    /**
+     * Stable cache key for per-activation assigned flags (#36386).
+     *
+     * Must not use spl_object_id(Function_) — wrappers around the same LLVM value are distinct
+     * (TryCatchHelper::sameLlvmFunction). LLVMValueGetName is also unavailable on this binding.
+     */
+    private static function userFlagCacheKey(Context $context, Function_ $owner, string $key): string
+    {
+        return self::stableOwnerToken($context, $owner)."\0".$key;
+    }
+
+    private static function stableOwnerToken(Context $context, Function_ $owner): string
+    {
+        $moduleId = spl_object_id($context->module);
+        foreach ($context->functions as $scoped => $fn) {
+            if ($fn instanceof Function_ && TryCatchHelper::sameLlvmFunction($fn, $owner)) {
+                return $moduleId."\0fn:".$scoped;
+            }
+        }
+        $prefix = $moduleId."\0anon:";
+        foreach (self::$ownerCanonical as $token => $canonical) {
+            if (!str_starts_with($token, $prefix)) {
+                continue;
+            }
+            if (TryCatchHelper::sameLlvmFunction($canonical, $owner)) {
+                return $token;
+            }
+        }
+        $token = $prefix.(string) \count(self::$ownerCanonical);
+        self::$ownerCanonical[$token] = $owner;
+
+        return $token;
     }
 
     private static function isInsertInOwningEntryBlock(Context $context, string $key): bool
