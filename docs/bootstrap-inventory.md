@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8193 |
-| Phase A inventory files (M2 ratio SSOT) | 8193 |
+| PHP files on vm.php path | 8194 |
+| Phase A inventory files (M2 ratio SSOT) | 8194 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 25961 |
+| Source constructs flagged (warnings) | 25963 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5547,7 +5547,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Cli/PhpcRun.php` | 0 | 1 |
 | `lib/Cli/ProcPipeReader.php` | 0 | 1 |
 | `lib/CloneWithSyntaxRejector.php` | 0 | 3 |
-| `lib/Compiler.php` | 0 | 67 |
+| `lib/Compiler.php` | 0 | 65 |
 | `lib/Compiler/AbstractMethodBodyCheck.php` | 0 | 3 |
 | `lib/Compiler/AbstractMethodVisibilityCheck.php` | 0 | 3 |
 | `lib/Compiler/AbstractPromotedPropertyCompileCheck.php` | 0 | 3 |
@@ -5605,6 +5605,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/SiblingInlineFuncCallProducers.php` | 0 | 2 |
 | `lib/Compiler/Concern/SlotForCallArgResolvers.php` | 0 | 5 |
 | `lib/Compiler/Concern/TernaryAndLogicalShortCircuit.php` | 0 | 5 |
+| `lib/Compiler/Concern/TryFinallyCatchAndOperandLookup.php` | 0 | 4 |
 | `lib/Compiler/Concern/WriteContextRejects.php` | 0 | 2 |
 | `lib/Compiler/DeprecatedMetadata.php` | 0 | 6 |
 | `lib/Compiler/DuplicateUnionMemberCompileCheck.php` | 0 | 1 |
@@ -48985,72 +48986,70 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 787)
-- new CompileFatal (line 821)
-- new CompileError (line 824)
-- new ClassCompileRegistry (line 865)
-- new AttributeClassRegistry (line 866)
-- new ClassCompileRegistry (line 974)
-- new AttributeClassRegistry (line 975)
-- new ClassCompileRegistry (line 1017)
-- new AttributeClassRegistry (line 1018)
-- new Func\PHP (line 1023)
-- new Op\Type\Literal (line 1195)
-- new Block (line 1271)
-- new ArrayObject (line 1279)
-- new Block (line 1327)
-- new Block (line 1339)
-- new OpCode (line 1352)
-- new ArrayObject (line 1405)
-- new OpCode (line 1439)
-- new OpCode (line 1484)
-- new OpCode (line 1506)
-- new OpCode (line 2128)
-- new OpCode (line 2140)
-- new Block (line 2268)
-- new OpCode (line 2275)
-- new Operand\Literal (line 2294)
-- new Operand\Variable (line 2296)
-- new OpCode (line 2409)
-- new Literal (line 2961)
-- new Operand\Literal (line 2995)
-- new Variable (line 3013)
-- new Operand\Variable (line 3090)
-- new Operand\Literal (line 3090)
-- new Operand\Temporary (line 3096)
-- new OpCode (line 3103)
-- new Variable (line 3185)
-- new OpCode (line 3214)
-- new OpCode (line 3257)
-- new OpCode (line 3276)
-- new OpCode (line 3285)
-- new OpCode (line 3293)
-- new OpCode (line 3300)
-- new OpCode (line 3312)
-- new OpCode (line 3329)
-- new OpCode (line 3336)
-- new OpCode (line 3345)
-- new OpCode (line 3350)
-- new OpCode (line 3370)
-- new OpCode (line 3397)
-- new OpCode (line 3412)
-- new Variable (line 3428)
-- new Operand\Literal (line 3430)
-- new OpCode (line 3433)
-- new OpCode (line 3466)
-- new OpCode (line 3470)
-- new OpCode (line 3487)
-- new Block (line 3496)
-- new OpCode (line 3499)
-- new OpCode (line 3500)
-- new OpCode (line 3587)
-- new Operand\Temporary (line 3621)
-- new Operand\Temporary (line 3627)
-- new Operand\Temporary (line 3633)
-- new Operand\Temporary (line 3639)
-- new Operand\Temporary (line 3656)
-- new Operand\Temporary (line 3665)
-- 92 class method(s)
+- new CompileFatal (line 790)
+- new CompileFatal (line 824)
+- new CompileError (line 827)
+- new ClassCompileRegistry (line 868)
+- new AttributeClassRegistry (line 869)
+- new ClassCompileRegistry (line 977)
+- new AttributeClassRegistry (line 978)
+- new ClassCompileRegistry (line 1020)
+- new AttributeClassRegistry (line 1021)
+- new Func\PHP (line 1026)
+- new Op\Type\Literal (line 1198)
+- new Block (line 1274)
+- new ArrayObject (line 1282)
+- new Block (line 1330)
+- new Block (line 1342)
+- new OpCode (line 1355)
+- new ArrayObject (line 1408)
+- new OpCode (line 1442)
+- new OpCode (line 1487)
+- new OpCode (line 1509)
+- new OpCode (line 2131)
+- new OpCode (line 2143)
+- new Block (line 2271)
+- new OpCode (line 2278)
+- new Operand\Literal (line 2297)
+- new Operand\Variable (line 2299)
+- new Operand\Literal (line 2345)
+- new Variable (line 2363)
+- new Operand\Variable (line 2440)
+- new Operand\Literal (line 2440)
+- new Operand\Temporary (line 2446)
+- new OpCode (line 2453)
+- new Variable (line 2535)
+- new OpCode (line 2564)
+- new OpCode (line 2607)
+- new OpCode (line 2626)
+- new OpCode (line 2635)
+- new OpCode (line 2643)
+- new OpCode (line 2650)
+- new OpCode (line 2662)
+- new OpCode (line 2679)
+- new OpCode (line 2686)
+- new OpCode (line 2695)
+- new OpCode (line 2700)
+- new OpCode (line 2720)
+- new OpCode (line 2747)
+- new OpCode (line 2762)
+- new Variable (line 2778)
+- new Operand\Literal (line 2780)
+- new OpCode (line 2783)
+- new OpCode (line 2816)
+- new OpCode (line 2820)
+- new OpCode (line 2837)
+- new Block (line 2846)
+- new OpCode (line 2849)
+- new OpCode (line 2850)
+- new OpCode (line 2937)
+- new Operand\Temporary (line 2971)
+- new Operand\Temporary (line 2977)
+- new Operand\Temporary (line 2983)
+- new Operand\Temporary (line 2989)
+- new Operand\Temporary (line 3006)
+- new Operand\Temporary (line 3015)
+- 64 class method(s)
 - 4 closure(s)
 
 ### `lib/Compiler/AbstractMethodBodyCheck.php`
@@ -49886,6 +49885,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Op\Expr\BinaryOp\Coalesce (line 440)
 - new OpCode (line 442)
 - 51 class method(s)
+
+### `lib/Compiler/Concern/TryFinallyCatchAndOperandLookup.php`
+
+**Warnings** (review for bootstrap subset):
+- trait TryFinallyCatchAndOperandLookup (line 26)
+- new OpCode (line 109)
+- new Literal (line 662)
+- 28 class method(s)
 
 ### `lib/Compiler/Concern/WriteContextRejects.php`
 
