@@ -8,18 +8,24 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for round() via RoundJitHelper PHP (#15211, #26800, #28913).
+ * JIT/AOT link for round() (#15211, #26800, #28913, #36386).
  *
- * Helper compile: {@see JitVmHelperLink::ensureBridge} (MathNextafter #28716 / deg2rad #27400 shape).
- * NestedJIT no longer skips the bridge — RoundJitHelper is NestedJIT-safe (no \floor/\ceil/\abs).
- * Replaces ~477 LOC inline LLVM formerly in ext/standard/JitRoundLowering.php.
- * SSOT: {@see \PHPCompiler\ext\standard\RoundJitHelper::roundArgv}.
- * php-src: ext/standard/math.c — _php_math_round
+ * Default {@code round($num)} / places=0 + {@code PHP_ROUND_HALF_UP} uses
+ * {@code llvm.round.f64} (C {@code round(3)} — half away from zero), matching
+ * php-src {@code ext/standard/math.c} {@code _php_math_round} for that mode.
+ * Peer of {@see MathFloor} / {@see MathCeil}.
+ *
+ * Non-zero places / other {@code PHP_ROUND_*} modes keep the NestedJIT
+ * {@see \PHPCompiler\ext\standard\RoundJitHelper} bridge.
+ * SSOT for those paths: {@see \PHPCompiler\ext\standard\RoundJitHelper::roundArgv}.
  */
 final class MathRound
 {
+    private const LLVM_ROUND = 'llvm.round.f64';
+
     private const ABI_ROUND = 'phpc_round';
 
     private const HELPER_PATH = '/ext/standard/RoundJitHelper.php';
@@ -35,12 +41,21 @@ final class MathRound
 
     public static function ensureLinked(Context $context): void
     {
+        self::llvmRoundIntrinsic($context);
         self::implement($context);
     }
 
     public static function ensureStandaloneBodies(Context $context): void
     {
         self::ensureLinked($context);
+    }
+
+    /**
+     * places=0 + PHP_ROUND_HALF_UP — {@code llvm.round.f64} (no NestedJIT helper).
+     */
+    public static function invokeHalfUpPlacesZero(Context $context, Value $num): Value
+    {
+        return $context->builder->call(self::llvmRoundIntrinsic($context), $num);
     }
 
     public static function invoke(Context $context, Value $num, Value $places, Value $mode): Value
@@ -52,6 +67,20 @@ final class MathRound
             $num,
             $places,
             $mode
+        );
+    }
+
+    private static function llvmRoundIntrinsic(Context $context): LlvmFunction
+    {
+        $func = $context->module->getNamedFunction(self::LLVM_ROUND);
+        if (null !== $func) {
+            return $func;
+        }
+        $double = $context->getTypeFromString('double');
+
+        return $context->module->addFunction(
+            self::LLVM_ROUND,
+            $context->context->functionType($double, false, $double)
         );
     }
 

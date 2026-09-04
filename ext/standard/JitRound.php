@@ -15,13 +15,18 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT helper for round() (int/float, precision, PHP_ROUND_* mode) via RoundJitHelper (#15211).
+ * JIT/AOT helper for round() (int/float, precision, PHP_ROUND_* mode) (#15211).
  *
  * When num/precision/mode are compile-time scalars, evaluate on the host and emit a float
  * constant — NestedJIT RoundJitHelper mis-handles places>0 on cold AOT calls (#27249 / #26800).
  *
- * Runtime num with compile-time precision + default HALF_UP uses user-TU sprintf+strtod
+ * Runtime num with compile-time places=0 + HALF_UP uses {@code llvm.round.f64}
+ * ({@see MathRound::invokeHalfUpPlacesZero}, #36386) — php-src {@code _php_math_round}
+ * half-away-from-zero matches C {@code round(3)}.
+ *
+ * Runtime num with compile-time precision≠0 + default HALF_UP uses user-TU sprintf+strtod
  * so Zend parity survives thin AOT fmul drift (#35741).
+ * Other modes / runtime places keep the RoundJitHelper NestedJIT bridge.
  */
 final class JitRound
 {
@@ -33,28 +38,33 @@ final class JitRound
             return $folded;
         }
 
-        // Link before lowering args so NestedJIT of RoundJitHelper cannot orphan the
-        // first call site's operand IR (#27248 peer strpos/strtok).
-        MathRound::ensureLinked($context);
-
-        $number = self::coerceDouble($context, $args[0]);
         $precisionArg = isset($args[1]) && !NamedOptionalCallArgs::isOmittedOptional($args[1])
             ? $args[1]
             : null;
-        $precision = null !== $precisionArg
-            ? self::lowerPrecisionArg($context, $precisionArg)
-            : $context->getTypeFromString('int64')->constInt(0, false);
         $modeArg = isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2])
             ? $args[2]
             : null;
+        $knownPlaces = self::compileTimePlaces($precisionArg);
+        $halfUp = self::isCompileTimeHalfUp($context, $modeArg);
+
+        $number = self::coerceDouble($context, $args[0]);
+        // places=0 + HALF_UP: llvm.round.f64 — no NestedJIT helper link (#36386).
+        if (null !== $knownPlaces && 0 === $knownPlaces && $halfUp) {
+            return MathRound::invokeHalfUpPlacesZero($context, $number);
+        }
+        if (null !== $knownPlaces && 0 !== $knownPlaces && $halfUp) {
+            return self::lowerRuntimeRoundHalfUpSprintf($context, $number, $knownPlaces);
+        }
+
+        // Link before lowering remaining args so NestedJIT of RoundJitHelper cannot
+        // orphan the first call site's operand IR (#27248 peer strpos/strtok).
+        MathRound::ensureLinked($context);
+        $precision = null !== $precisionArg
+            ? self::lowerPrecisionArg($context, $precisionArg)
+            : $context->getTypeFromString('int64')->constInt(0, false);
         $mode = null !== $modeArg
             ? JitRoundModeArg::lower($context, $modeArg, 'round')
             : $context->getTypeFromString('int64')->constInt(StdlibConstants::PHP_ROUND_HALF_UP, false);
-
-        $knownPlaces = self::compileTimePlaces($precisionArg);
-        if (null !== $knownPlaces && 0 !== $knownPlaces && self::isCompileTimeHalfUp($context, $modeArg)) {
-            return self::lowerRuntimeRoundHalfUpSprintf($context, $number, $knownPlaces);
-        }
 
         return MathRound::invoke($context, $number, $precision, $mode);
     }
@@ -83,18 +93,20 @@ final class JitRound
             return $folded;
         }
 
-        MathRound::ensureLinked($context);
-
+        $knownPlaces = self::compileTimePlaces($precision);
         $number = self::coerceDouble($context, $num);
+        if (null !== $knownPlaces && 0 === $knownPlaces && $mode === StdlibConstants::PHP_ROUND_HALF_UP) {
+            return MathRound::invokeHalfUpPlacesZero($context, $number);
+        }
+        if (null !== $knownPlaces && 0 !== $knownPlaces && $mode === StdlibConstants::PHP_ROUND_HALF_UP) {
+            return self::lowerRuntimeRoundHalfUpSprintf($context, $number, $knownPlaces);
+        }
+
+        MathRound::ensureLinked($context);
         $prec = null !== $precision
             ? self::lowerPrecisionArg($context, $precision)
             : $context->getTypeFromString('int64')->constInt(0, false);
         $modeVal = $context->getTypeFromString('int64')->constInt($mode, false);
-
-        $knownPlaces = self::compileTimePlaces($precision);
-        if (null !== $knownPlaces && 0 !== $knownPlaces && $mode === StdlibConstants::PHP_ROUND_HALF_UP) {
-            return self::lowerRuntimeRoundHalfUpSprintf($context, $number, $knownPlaces);
-        }
 
         return MathRound::invoke($context, $number, $prec, $modeVal);
     }
