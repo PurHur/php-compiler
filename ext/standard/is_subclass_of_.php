@@ -6,7 +6,6 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\Builtin\StringClassExists;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitStringArg;
@@ -110,35 +109,46 @@ final class is_subclass_of_ extends Internal
         if (JITVariable::TYPE_STRING === $args[0]->type || JITVariable::TYPE_VALUE === $args[0]->type) {
             $this->jitString($context, $args[0], 'is_subclass_of() subject');
         }
-        $parentName = ReflectionBuiltinHelper::requireCompileTimeClassName(
-            $context,
-            $args[1],
-            'is_subclass_of() parent class'
-        );
-        if (JITVariable::TYPE_OBJECT === $args[0]->type) {
-            return $context->helper->loadValue(
-                ReflectionBuiltinHelper::emitSubclassOf($context, $args[0], $parentName)
-            );
-        }
         $i1 = $context->getTypeFromString('int1');
         $falseVal = $i1->constInt(0, false);
+
+        // Parent may be a foreach key (Slim ErrorMiddleware::getErrorHandler, #36382) —
+        // php-src zend_is_class_or_interface accepts runtime strings (zend_builtin_functions.c).
+        $parentLit = JitStringArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        $parentIsLiteral = \is_string($parentLit) && '' !== $parentLit;
+
+        if (JITVariable::TYPE_OBJECT === $args[0]->type) {
+            if ($parentIsLiteral) {
+                return $context->helper->loadValue(
+                    ReflectionBuiltinHelper::emitSubclassOf($context, $args[0], $parentLit)
+                );
+            }
+            $childStr = ReflectionBuiltinHelper::getClassName($context, $args[0]);
+            $parentStr = self::jitClassArg($context, $args[1]);
+
+            return ReflectionBuiltinHelper::emitRuntimeStringIsSubclassOf($context, $childStr, $parentStr);
+        }
+
         if ($allowStringKnownFalse) {
             return $falseVal;
         }
+
         $childLit = JitStringArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString;
-        if (\is_string($childLit) && '' !== $childLit) {
+        if ($parentIsLiteral && \is_string($childLit) && '' !== $childLit) {
             $folded = ReflectionBuiltinHelper::classIsSubclassOfLiteral(
                 $context,
                 $childLit,
-                $parentName
+                $parentLit
             );
 
             return $context->builder->select($allowString, $folded, $falseVal);
         }
-        // Runtime helper — autoloads like zend_lookup_class (#26406).
+        // Runtime names — bake known extends edges (thin AOT has no VM ClassExistsJitHelper, #36382).
         $childStr = JitStringArg::lower($context, $args[0], 'is_subclass_of() child class');
-        $parentStr = $context->builder->load($context->constantStringFromString($parentName));
-        $match = StringClassExists::invokeIsSubclassOfString($context, $childStr, $parentStr);
+        $parentStr = $parentIsLiteral
+            ? $context->builder->load($context->constantStringFromString($parentLit))
+            : self::jitClassArg($context, $args[1]);
+        $match = ReflectionBuiltinHelper::emitRuntimeStringIsSubclassOf($context, $childStr, $parentStr);
 
         return $context->builder->select(
             $allowString,
