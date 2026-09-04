@@ -1124,6 +1124,16 @@ final class PropertyHooks
                 return null;
             } elseif ('{' === $ch) {
                 if (0 === $depthParen && 0 === $depthBrace && 0 === $depthBracket) {
+                    // `$obj->{"meth$x"}()` / `$obj->{$var}` — dynamic member name, not a
+                    // property-hook block. Treating `->`/`?->` `{` as a hook open rewrote
+                    // Parsedown's `$this->{"inline$inlineType"}` into `$this->;` under
+                    // SourceBundler AOT (#36380). Skip the brace group and keep scanning
+                    // so a later real hook `{` after a default expr can still match.
+                    if ($this->isDynamicMemberNameOpenBrace($body, $i)) {
+                        ++$depthBrace;
+                        continue;
+                    }
+
                     return $i;
                 }
                 ++$depthBrace;
@@ -1137,6 +1147,29 @@ final class PropertyHooks
         }
 
         return null;
+    }
+
+    /**
+     * True when `{` opens a dynamic property/method name after `->` or `?->` (zend_language_parser.y).
+     *
+     * Property hooks are `$prop { get … }` after a declaration — never `$recv->{…}`.
+     */
+    private function isDynamicMemberNameOpenBrace(string $body, int $bracePos): bool
+    {
+        if ($bracePos <= 0 || '{' !== $body[$bracePos]) {
+            return false;
+        }
+        $i = $bracePos - 1;
+        while ($i >= 0 && ctype_space($body[$i])) {
+            --$i;
+        }
+        if ($i < 0 || '>' !== $body[$i]) {
+            return false;
+        }
+        --$i;
+
+        // `->` or `?->` (nullsafe still has `-` immediately before `>`).
+        return $i >= 0 && '-' === $body[$i];
     }
 
     /** Body whose function-body intervals are cached in $functionBodyIntervals (#23056). */

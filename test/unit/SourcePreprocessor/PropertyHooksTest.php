@@ -2044,4 +2044,33 @@ PHP;
         self::assertNotNull($block);
     }
 
+    /**
+     * `$this->{"meth$x"}()` is a dynamic method name, not a property-hook block (#36380).
+     * SourceBundler AOT was rewriting it to `$this->;` + a stray call (Parsedown).
+     */
+    public function testDynamicCurlyMethodNameIsNotPropertyHook(): void
+    {
+        $src = <<<'PHP'
+<?php
+namespace {
+class ParsedownLike {
+    public function lineElements($Excerpt) {
+        $inlineType = 'Url';
+        return $this->{"inline$inlineType"}($Excerpt);
+    }
+    protected function inlineUrl($Excerpt) {
+        return $Excerpt;
+    }
+}
+}
+PHP;
+        [$out] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString('$this->{"inline$inlineType"}($Excerpt)', $out);
+        self::assertStringNotContainsString('$this->;', $out);
+
+        $runtime = new Runtime(Runtime::MODE_AOT);
+        $block = $runtime->parseAndCompile($src, 'curly_method_hooks.php');
+        self::assertNotNull($block);
+    }
+
 }
