@@ -5366,6 +5366,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/CoalesceLeftAndEchoConcatPr
 require_once __DIR__.'/../../../lib/Compiler/Concern/InstanceOfInAndClassConstCompile.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/OuterSiblingAndBuiltinWireCallArgSlots.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CallAndArrayLiteralCompile.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/SiblingInlineFuncCallAndDeadArrayProducers.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileBlockInternal.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AssignOperand.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AdaptByRefCallArgs.php';
