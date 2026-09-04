@@ -20,8 +20,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  *
  * Thin standalone AOT: NestedJIT MemoryAccounting observes 0 (#27238). Native `__mm__*`
  * (#36388) maintains {@see self::G_EMALLOC_CURRENT}/{@see self::G_EMALLOC_PEAK} from the
- * size header; memory_get_* report max(floor, counter) so the Zend "non-zero" contract
- * holds and short-lived allocations are visible after free.
+ * bump-arena size prefix (request-active) or `malloc_usable_size` (inactive); memory_get_*
+ * report max(floor, counter). {@see self::REQUEST_END} frees arena chunks after shutdown.
  */
 final class MemoryRuntime
 {
@@ -46,8 +46,8 @@ final class MemoryRuntime
      * Public request-boundary ABI for long-lived workers (`phpc fcgi`) (#36388).
      *
      * php-src: `main/main.c` `php_request_startup` / `php_request_shutdown` —
-     * Zend tears down the per-request emalloc heap; we reset Native `__mm__*`
-     * counters (bump-arena chunk release lands in a follow-up).
+     * Zend tears down the per-request emalloc heap; Native frees bump-arena chunks
+     * then zeroes emalloc counters ({@see MemoryManager\Native}).
      */
     public const REQUEST_BEGIN = 'phpc_request_begin';
 
