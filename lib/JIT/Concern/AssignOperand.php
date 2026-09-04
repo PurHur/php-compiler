@@ -1124,8 +1124,15 @@ trait AssignOperand
             // result temp would leave a root past ZEND_ASSIGN + return (#36245 scope_exit).
             // {main} script-globals use the value-box path and still need the addref.
             // INIT_ARRAY native temps already hold rc=1 — move into the CV (#36388).
+            // Owning `__string__*` FUNCCALL temps (str_repeat / typed `:string` returns)
+            // likewise — addref+keep-temp left rc≥2 so unset never destroyed (#36388).
             $skipAddrefForHashtableMove = $value->ephemeralArrayTemp
                 && Variable::TYPE_HASHTABLE === $value->type
+                && Variable::KIND_VARIABLE === $value->kind
+                && $value !== $result
+                && null !== $value->value;
+            $skipAddrefForStringMove = $value->ephemeralStringTemp
+                && Variable::TYPE_STRING === $value->type
                 && Variable::KIND_VARIABLE === $value->kind
                 && $value !== $result
                 && null !== $value->value;
@@ -1133,7 +1140,12 @@ trait AssignOperand
                 && null !== $this->context->jitEnclosingBlock
                 && null !== $this->context->jitEnclosingBlock->func
                 && '{main}' !== $this->context->jitEnclosingBlock->func->name;
-            if (null === $result->objectPropertySlot && !$skipAddrefForNewRvalue && !$skipAddrefForHashtableMove) {
+            if (
+                null === $result->objectPropertySlot
+                && !$skipAddrefForNewRvalue
+                && !$skipAddrefForHashtableMove
+                && !$skipAddrefForStringMove
+            ) {
                 $result->addref();
             }
             if ($skipAddrefForHashtableMove) {
@@ -1143,6 +1155,14 @@ trait AssignOperand
                 );
                 $value->ephemeralArrayTemp = false;
                 $result->ephemeralArrayTemp = false;
+            }
+            if ($skipAddrefForStringMove) {
+                $this->context->builder->store(
+                    $this->context->getTypeFromString('__string__*')->constNull(),
+                    $value->value
+                );
+                $value->ephemeralStringTemp = false;
+                $result->ephemeralStringTemp = false;
             }
             $this->copyValueBoxJitFlags($result, $value, $force);
             $result->compileTimeConstantName = $value->compileTimeConstantName;
@@ -1286,10 +1306,20 @@ trait AssignOperand
                     return;
                 case Variable::TYPE_STRING:
                     $str = \PHPCompiler\JIT\JitStringArg::lowerDominating($this->context, $value, 'value box write');
-                    $owned = $this->context->builder->call(
-                        $this->context->lookupFunction('__string__separate'),
-                        $str
-                    );
+                    // Owning `__string__*` FUNCCALL temps: move into the value box without
+                    // `__string__separate` (always-copy) which would leave the temp's string
+                    // alive at rc≥1 after freeDeadVariables — unset never frees (#36388).
+                    $moveEphemeralString = $value->ephemeralStringTemp
+                        && Variable::TYPE_STRING === $value->type
+                        && Variable::KIND_VARIABLE === $value->kind
+                        && $value !== $result
+                        && null !== $value->value;
+                    $owned = $moveEphemeralString
+                        ? $str
+                        : $this->context->builder->call(
+                            $this->context->lookupFunction('__string__separate'),
+                            $str
+                        );
                     if (null !== $result->writableHt && null !== $result->writableIndex) {
                         \PHPCompiler\JIT\HashTableHelper::setAtIndex(
                             $this->context,
@@ -1315,6 +1345,13 @@ trait AssignOperand
                         $valueRef,
                         $owned
                     );
+                    if ($moveEphemeralString) {
+                        $this->context->builder->store(
+                            $this->context->getTypeFromString('__string__*')->constNull(),
+                            $value->value
+                        );
+                        $value->ephemeralStringTemp = false;
+                    }
                     $this->syncCompileTimeString($result, $value, $force);
                     // Nullsafe/?? null arms set isNullConstant on the shared merge Variable at
                     // compile time; a later fetch-arm string write must clear it or echo/?? see

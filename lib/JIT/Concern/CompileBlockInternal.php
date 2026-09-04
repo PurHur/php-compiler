@@ -5023,6 +5023,33 @@ trait CompileBlockInternal
                         }
                         $retval = $this->context->helper->loadValue($return);
                         $expected = $this->effectiveReturnCallbackType($block->func);
+                        // Zend ZEND_RETURN: ZVAL_COPY (addref) then destroys the CV
+                        // (zend_execute.c). freeDeadVariables skips the return operand after
+                        // our addref. TYPE_STRING addref works; TYPE_VALUE addref is a no-op
+                        // so the skip alone leaks the boxed string under thin AOT (#36388).
+                        if ('__string__*' === $expected) {
+                            if (Variable::TYPE_STRING === $return->type) {
+                                if (Variable::KIND_VARIABLE === $return->kind) {
+                                    $return->free();
+                                } else {
+                                    $this->context->refcount->delref($retval);
+                                }
+                            } elseif (Variable::TYPE_VALUE === $return->type) {
+                                $str = \PHPCompiler\JIT\JitValueBox::readStringOrNull(
+                                    $this->context,
+                                    $return
+                                );
+                                // Keep the string across valueDelref of the return CV.
+                                $this->context->refcount->addref($str);
+                                $return->free();
+                                $retval = $str;
+                                $this->context->builder->returnValue(
+                                    $this->alignRetvalToLlvmFnReturn($retval, $func)
+                                );
+
+                                return $origBasicBlock;
+                            }
+                        }
                         $retval = $this->coerceReturnValue($return, $retval, $expected);
                         $retval = $this->alignRetvalToLlvmFnReturn($retval, $func);
                         $this->context->builder->returnValue($retval);
