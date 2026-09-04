@@ -89,6 +89,10 @@ final class SpineChunkRuntimeMethodDemoteTest extends TestCase
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\InitJitMethodCall'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::isDemoteTarget('PHPCompiler\\CompileBlockInternal'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('lib/JIT/Concern/CompileBlockInternal.php'));
+        // Doctor.php — NestedJIT OOM without demote; hollow + demote emits (#36387).
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\Doctor'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::isDemoteTarget('PHPCompiler\\Doctor'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('lib/Doctor.php'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('lib/CompilerVersion.php'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('ext/dom/VmDom.php'));
         $this->assertFalse(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('lib/Compiler.php'));

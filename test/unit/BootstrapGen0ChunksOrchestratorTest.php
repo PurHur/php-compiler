@@ -254,14 +254,13 @@ final class BootstrapGen0ChunksOrchestratorTest extends TestCase
                 ++$spine;
                 $this->assertSame(2, (int) $chunk['wave']);
                 $this->assertLessThanOrEqual(200, (int) $chunk['file_count']);
-                // bin/vm.php NestedJIT OOMs; Compiler.php / JIT.php / Doctor.php host-CFG
-                // OOM / null-Op — excluded (#36387).
+                // bin/vm.php NestedJIT OOMs; Compiler.php / JIT.php host-CFG OOM even after
+                // demote — excluded (#36387). Doctor.php emits after hollow demote.
                 $this->assertStringNotContainsString('spine-bin', (string) $chunk['chunk_id']);
                 $body = (string) file_get_contents($chunk['entry']);
                 $this->assertStringNotContainsString('bin/vm.php', $body);
                 $this->assertStringNotContainsString('lib/Compiler.php', $body);
                 $this->assertStringNotContainsString('lib/JIT.php', $body);
-                $this->assertStringNotContainsString('lib/Doctor.php', $body);
             }
         }
         $this->assertGreaterThan(20, $spine);

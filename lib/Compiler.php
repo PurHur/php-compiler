@@ -13468,7 +13468,11 @@ class Compiler {
         $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $callOp, $block->orig);
         if (null !== $callIndex) {
             for ($i = $callIndex - 1; $i >= 0; --$i) {
-                $prev = $block->orig->children[$i];
+                // php-cfg children can be sparse (undefined keys) — skip holes (#36387 Doctor).
+                $prev = $block->orig->children[$i] ?? null;
+                if (!$prev instanceof Op) {
+                    continue;
+                }
                 if ($prev instanceof Op\Expr\FirstClassCallable) {
                     $leadingFcc = $prev;
                     break;
@@ -13482,7 +13486,7 @@ class Compiler {
                 if ($prev instanceof Op\Expr\FuncCall || $prev instanceof Op\Expr\NsFuncCall) {
                     continue;
                 }
-                if (!$this->isInlineExprCallArgProducer($prev)) {
+                if (!$prev instanceof Op\Expr || !$this->isInlineExprCallArgProducer($prev)) {
                     break;
                 }
             }
@@ -13631,7 +13635,10 @@ class Compiler {
             $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
             if (null !== $callIndex) {
                 for ($i = $callIndex - 1; $i >= 0; --$i) {
-                    $prev = $block->orig->children[$i];
+                    $prev = $block->orig->children[$i] ?? null;
+                    if (!$prev instanceof Op) {
+                        continue;
+                    }
                     if ($prev instanceof Op\Expr\ArrowFunction
                         || $prev instanceof Op\Expr\Closure
                         || $prev instanceof Op\Expr\FirstClassCallable) {
@@ -13647,7 +13654,7 @@ class Compiler {
                     if ($prev instanceof Op\Expr\FuncCall || $prev instanceof Op\Expr\NsFuncCall) {
                         continue;
                     }
-                    if (!$this->isInlineExprCallArgProducer($prev)) {
+                    if (!$prev instanceof Op\Expr || !$this->isInlineExprCallArgProducer($prev)) {
                         break;
                     }
                 }
@@ -20788,7 +20795,10 @@ class Compiler {
             return null;
         }
         for ($i = $callIndex - 1; $i >= 0; --$i) {
-            $prev = $block->orig->children[$i];
+            $prev = $block->orig->children[$i] ?? null;
+            if (!$prev instanceof Op) {
+                continue;
+            }
             if ($prev instanceof Op\Expr\ArrowFunction
                 || $prev instanceof Op\Expr\Closure
                 || $prev instanceof Op\Expr\FirstClassCallable) {
@@ -20803,7 +20813,7 @@ class Compiler {
             if ($prev instanceof Op\Expr\FuncCall || $prev instanceof Op\Expr\NsFuncCall) {
                 continue;
             }
-            if (!$this->isInlineExprCallArgProducer($prev)) {
+            if (!$prev instanceof Op\Expr || !$this->isInlineExprCallArgProducer($prev)) {
                 return null;
             }
         }
@@ -20862,7 +20872,10 @@ class Compiler {
         }
         $skippedCallback = false;
         for ($i = $callIndex - 1; $i >= 0; --$i) {
-            $prev = $block->orig->children[$i];
+            $prev = $block->orig->children[$i] ?? null;
+            if (!$prev instanceof Op) {
+                continue;
+            }
             if (
                 !$skippedCallback
                 && ($prev instanceof Op\Expr\ArrowFunction
@@ -20881,7 +20894,7 @@ class Compiler {
                 }
                 continue;
             }
-            if (!$this->isInlineExprCallArgProducer($prev)) {
+            if (!$prev instanceof Op\Expr || !$this->isInlineExprCallArgProducer($prev)) {
                 return null;
             }
         }
@@ -43467,7 +43480,10 @@ class Compiler {
                             }
                             $callArg = $cfgCallOp->args[0] ?? null;
                             for ($j = $i - 1; $j >= 0; --$j) {
-                                $prev = $block->orig->children[$j];
+                                $prev = $block->orig->children[$j] ?? null;
+                                if (!$prev instanceof Op) {
+                                    continue;
+                                }
                                 if ($prev instanceof Op\Expr\ConstFetch) {
                                     if (
                                         null !== $callArg
@@ -43486,7 +43502,7 @@ class Compiler {
                                     }
                                     continue;
                                 }
-                                if (!$this->isInlineExprCallArgProducer($prev)) {
+                                if (!$prev instanceof Op\Expr || !$this->isInlineExprCallArgProducer($prev)) {
                                     break;
                                 }
                             }

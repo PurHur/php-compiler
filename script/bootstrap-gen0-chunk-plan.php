@@ -62,13 +62,11 @@ const SPINE_SUBSPLIT = [
  * method demote (#36387). Combined with the bin/ prefix skip in the spine loop. These stay
  * out of object chunks until the sources are split; peer TUs cover the rest of the spine.
  *
- * Doctor.php: host Compiler hits isInlineExprCallArgProducer(null) before JIT demote can
- * empty method bodies (measured 2026-09-04 under SPINE_CHUNK object-only).
+ * Doctor.php: NestedJIT OOM without demote; hollow + demote emits (removed from this list).
  */
 const SPINE_SKIP_HOST_CFG_OOM = [
     'lib/Compiler.php' => true,
     'lib/JIT.php' => true,
-    'lib/Doctor.php' => true,
 ];
 
 foreach (array_slice($argv, 1) as $arg) {
@@ -640,8 +638,9 @@ $plan = [
         .'manifests can bind consumers (#36387 / #36155 Phase C). Hub/requires respect '
         .'--max-files/--max-bytes so Runtime.php-sized TUs fit under 8g. --max-bytes alone '
         .'also applies max-files='.DEFAULT_MAX_FILES_WITH_BYTES.' for tiny-file packs. '
-        .'Spine --strategy skips bin/ + lib/Compiler.php + lib/JIT.php + lib/Doctor.php '
-        .'(host CFG OOM / null-Op under 8g). Oversize singletons deferred only when not '
+        .'Spine --strategy skips bin/ + lib/Compiler.php + lib/JIT.php '
+        .'(host CFG OOM under 8g even after demote). Doctor.php emits after hollow demote. '
+        .'Oversize singletons deferred only when not '
         .'demote-eligible (or measured emit-fail after demote).',
 ];
 
