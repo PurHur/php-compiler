@@ -9319,6 +9319,38 @@ class JIT {
 
             return $this->context->builder->load($slot);
         }
+        // NestedJIT sprintf → number_format: a return site may still hold i64 while the
+        // LLVM signature is `__string__*` (Slim/Nyholm Uri throw path, #36382).
+        if ('__string__*' === $wantStr && ('int64' === $haveStr || 'long long' === $haveStr || 'int32' === $haveStr)) {
+            $asI64 = $retval;
+            if ('int32' === $haveStr || 'int1' === $haveStr) {
+                $asI64 = $this->context->builder->zext(
+                    $retval,
+                    $this->context->getTypeFromString('int64')
+                );
+            }
+
+            return $this->context->builder->call(
+                $this->context->lookupFunction('__string__fromLong'),
+                $asI64
+            );
+        }
+        if ('__string__*' === $wantStr && ('__value__*' === $haveStr || '__value__' === $haveStr)) {
+            if ('__value__' === $haveStr) {
+                $tmp = $this->context->builder->alloca($have);
+                $this->context->builder->store($retval, $tmp);
+
+                return $this->context->builder->call(
+                    $this->context->lookupFunction('__value__readString'),
+                    $tmp
+                );
+            }
+
+            return $this->context->builder->call(
+                $this->context->lookupFunction('__value__readString'),
+                $retval
+            );
+        }
         if (\PHPLLVM\Type::KIND_INTEGER === $want->getKind() && \PHPLLVM\Type::KIND_INTEGER === $have->getKind()) {
             return $this->context->builder->truncOrBitCast($retval, $want);
         }
