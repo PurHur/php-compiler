@@ -30,11 +30,13 @@ use PHPCompiler\JIT\Call\Vararg;
  * {@code ord('A')} on a native {@code TYPE_STRING}, {@code chr(65)} on a native
  * long, pure type predicates ({@code is_int} / {@code is_string} / …), string
  * transforms ({@code strtolower} / {@code ucwords} / {@code bin2hex} /
- * {@code urlencode} / {@code str_rot13} / {@code quotemeta} / …), and
+ * {@code urlencode} / {@code str_rot13} / {@code quotemeta} / {@code md5} /
+ * {@code crc32} / {@code base64_encode} / {@code soundex} / …), and
  * pure math ({@code sqrt} / {@code abs} / {@code pow} / {@code fdiv} / …) on
  * native numeric scalars (php-src {@code ext/standard/string.c}
  * {@code PHP_FUNCTION(strlen)} / {@code ord} / {@code chr} / {@code ucwords};
- * {@code ext/standard/url.c} {@code urlencode}; {@code ext/standard/type.c}
+ * {@code ext/standard/url.c} {@code urlencode}; {@code ext/standard/crc32.c} /
+ * {@code md5.c} / {@code base64.c}; {@code ext/standard/type.c}
  * {@code is_*}; {@code ext/standard/math.c} {@code PHP_FUNCTION(sqrt)} /
  * {@code pow} etc.; throwing {@code __toString} needs an object/value box).
  * Discarded calls with the same arg proofs are dropped entirely by
@@ -330,6 +332,19 @@ final class NoThrowCallElision
             case 'rawurldecode':
             case 'str_rot13':
             case 'quotemeta':
+            // Hash / encode family — Z_PARAM_STR (+ optional typed bool/int that
+            // fails stringArgAllowsDiscardedElision when present). Soft null /
+            // hex2bin invalid-input warnings stay live (not listed).
+            case 'md5':
+            case 'sha1':
+            case 'crc32':
+            case 'crc32c':
+            case 'base64_encode':
+            case 'soundex':
+            case 'metaphone':
+            case 'convert_uuencode':
+            case 'hebrev':
+            case 'hebrevc':
                 return true;
             default:
                 return false;

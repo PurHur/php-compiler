@@ -9,15 +9,23 @@ use PHPCompiler\Block;
 use PHPCompiler\ext\standard\abs;
 use PHPCompiler\ext\standard\addslashes;
 use PHPCompiler\ext\standard\array_count;
+use PHPCompiler\ext\standard\base64_encode;
 use PHPCompiler\ext\standard\bin2hex;
 use PHPCompiler\ext\standard\chr;
+use PHPCompiler\ext\standard\convert_uuencode;
+use PHPCompiler\ext\standard\crc32;
 use PHPCompiler\ext\standard\fdiv;
 use PHPCompiler\ext\standard\gettype;
+use PHPCompiler\ext\standard\hebrev;
+use PHPCompiler\ext\standard\md5;
+use PHPCompiler\ext\standard\metaphone;
 use PHPCompiler\ext\standard\ord;
 use PHPCompiler\ext\standard\pow;
 use PHPCompiler\ext\standard\quotemeta;
 use PHPCompiler\ext\standard\rawurldecode;
 use PHPCompiler\ext\standard\rawurlencode;
+use PHPCompiler\ext\standard\sha1;
+use PHPCompiler\ext\standard\soundex;
 use PHPCompiler\ext\standard\sqrt;
 use PHPCompiler\ext\standard\str_rot13;
 use PHPCompiler\ext\standard\string_trim;
@@ -354,6 +362,98 @@ final class DiscardedPureCallElisionTest extends TestCase
         $this->assertFalse(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
     }
 
+    public function testElidesDiscardedCrc32OnTypedString(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new crc32();
+        $arg = $this->makeStringVar(null);
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testElidesDiscardedMd5OnTypedString(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new md5();
+        $arg = $this->makeStringVar('ab');
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testElidesDiscardedSha1OnLiteral(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new sha1();
+        $arg = $this->makeStringVar('xy');
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testElidesDiscardedBase64EncodeOnTypedString(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new base64_encode();
+        $arg = $this->makeStringVar(null);
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testElidesDiscardedSoundexOnTypedString(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new soundex();
+        $arg = $this->makeStringVar('Euler');
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testElidesDiscardedMetaphoneOnTypedString(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new metaphone();
+        $arg = $this->makeStringVar('programming');
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testElidesDiscardedConvertUuencodeOnTypedString(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new convert_uuencode();
+        $arg = $this->makeStringVar('hi');
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testElidesDiscardedHebrevOnTypedString(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new hebrev();
+        $arg = $this->makeStringVar(null);
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testDoesNotElideMd5WithBoolBinaryArg(): void
+    {
+        // Optional $binary is not a string slot — keep the call (#36386).
+        $context = $this->makeContext();
+        $builtin = new md5();
+        $str = $this->makeStringVar('ab');
+        $raw = $this->makeNativeBoolVar();
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide($context, $builtin, [$str, $raw]));
+    }
+
+    public function testDoesNotElideCrc32OnNull(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new crc32();
+        $arg = $this->makeNullVar();
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
     public function testElidesDiscardedSqrtOnNativeDouble(): void
     {
         $context = $this->makeContext();
@@ -498,6 +598,21 @@ final class DiscardedPureCallElisionTest extends TestCase
         $typeProp = $ref->getProperty('type');
         $typeProp->setAccessible(true);
         $typeProp->setValue($var, Variable::TYPE_NATIVE_DOUBLE);
+        $kindProp = $ref->getProperty('kind');
+        $kindProp->setAccessible(true);
+        $kindProp->setValue($var, Variable::KIND_VARIABLE);
+
+        return $var;
+    }
+
+    private function makeNativeBoolVar(): Variable
+    {
+        $ref = new \ReflectionClass(Variable::class);
+        /** @var Variable $var */
+        $var = $ref->newInstanceWithoutConstructor();
+        $typeProp = $ref->getProperty('type');
+        $typeProp->setAccessible(true);
+        $typeProp->setValue($var, Variable::TYPE_NATIVE_BOOL);
         $kindProp = $ref->getProperty('kind');
         $kindProp->setAccessible(true);
         $kindProp->setValue($var, Variable::KIND_VARIABLE);
