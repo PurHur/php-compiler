@@ -20114,8 +20114,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/libxml/libxml_disable_entity_loader.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
-- 1 class method(s)
+- new ArgumentCountError (line 35)
+- 2 class method(s)
 
 ### `ext/libxml/libxml_get_errors.php`
 
@@ -26488,8 +26488,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/simplexml/JitSimpleXmlLoadString.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 22)
-- 1 class method(s)
+- new ArgumentCountError (line 32)
+- 2 class method(s)
 
 ### `ext/simplexml/JitSimpleXmlOffsetGet.php`
 
