@@ -578,12 +578,29 @@ function run(string $filename, string $code, array $options): void
                     $prevSemantic = $idxReload['semantic_members'];
                 }
                 $currSemantic = \PHPCompiler\JIT\CompileCache::memberSemanticHashes($memberPaths);
-                \PHPCompiler\JIT\CompileCache::setEditChangedMembers(
-                    \PHPCompiler\JIT\CompileCache::diffMembersForStrip(
-                        $prevMembers,
-                        $hashes,
-                        is_array($prevSemantic) ? $prevSemantic : null,
-                        $currSemantic
+                $stripMembers = \PHPCompiler\JIT\CompileCache::diffMembersForStrip(
+                    $prevMembers,
+                    $hashes,
+                    is_array($prevSemantic) ? $prevSemantic : null,
+                    $currSemantic
+                );
+                \PHPCompiler\JIT\CompileCache::setEditChangedMembers($stripMembers);
+                $prevParts = null;
+                if (isset($idx) && is_array($idx) && is_array($idx['semantic_parts'] ?? null)) {
+                    $prevParts = $idx['semantic_parts'];
+                } elseif (is_array($idxReload) && is_array($idxReload['semantic_parts'] ?? null)) {
+                    $prevParts = $idxReload['semantic_parts'];
+                }
+                $currParts = \PHPCompiler\JIT\CompileCache::memberSemanticParts($memberPaths);
+                $prevFuncs = is_array($prevParts['functions'] ?? null) ? $prevParts['functions'] : null;
+                $prevGlue = is_array($prevParts['glue'] ?? null) ? $prevParts['glue'] : null;
+                \PHPCompiler\JIT\CompileCache::setEditChangedFunctions(
+                    \PHPCompiler\JIT\CompileCache::diffFunctionsForStrip(
+                        $prevFuncs,
+                        $currParts['functions'],
+                        $prevGlue,
+                        $currParts['glue'],
+                        $stripMembers
                     )
                 );
                 \PHPCompiler\JIT\CompileCache::armEditScaffold($scaffoldKey);

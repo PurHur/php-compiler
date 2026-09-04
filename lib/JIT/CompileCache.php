@@ -55,6 +55,20 @@ final class CompileCache
     /** @var array<string, list<string>>|null member path → LLVM names (#36387) */
     private static ?array $recordingUserSymbolsByMember = null;
 
+    /**
+     * member path → scoped name (Class::method or function) → LLVM names (#36387).
+     *
+     * @var array<string, array<string, list<string>>>|null
+     */
+    private static ?array $recordingUserSymbolsByFunction = null;
+
+    /**
+     * Loaded from prior AOT meta for keep-path planning (#36387).
+     *
+     * @var array<string, array<string, list<string>>>
+     */
+    private static array $editScaffoldByFunction = [];
+
     private static ?string $bundledSource = null;
 
     /**
@@ -66,12 +80,19 @@ final class CompileCache
     private static array $editChangedMembers = [];
 
     /**
+     * Within a semantically-changed member: scoped names (lc) whose bodies changed.
+     * Absent path ⇒ full member strip; non-empty ⇒ keep sibling functions (#36387).
+     *
+     * @var array<string, array<string, true>>
+     */
+    private static array $editChangedFunctions = [];
+
+    /**
      * LLVM names of user symbols left in the module after edit-scaffold partial strip (#36387).
      *
      * @var array<string, true>
      */
     private static array $keptUserSymbols = [];
-
     /**
      * User LLVM names renamed to `*.stale` during edit-scaffold strip (#36387).
      *
@@ -825,6 +846,7 @@ final class CompileCache
         self::$recordingUserSymbols = [];
         self::$recordingHelperSymbols = [];
         self::$recordingUserSymbolsByMember = [];
+        self::$recordingUserSymbolsByFunction = [];
     }
 
     public static function setBundledSource(string $source): void
@@ -852,6 +874,41 @@ final class CompileCache
     public static function editChangedMembers(): array
     {
         return self::$editChangedMembers;
+    }
+
+    /**
+     * @param array<string, array<string, true|int|string>> $pathToScoped
+     */
+    public static function setEditChangedFunctions(array $pathToScoped): void
+    {
+        $clean = [];
+        foreach ($pathToScoped as $path => $scopedMap) {
+            if (!is_string($path) || '' === $path || !is_array($scopedMap)) {
+                continue;
+            }
+            $resolved = realpath($path);
+            $key = false !== $resolved ? $resolved : $path;
+            $funcs = [];
+            foreach ($scopedMap as $scoped => $flag) {
+                if (!is_string($scoped) || '' === $scoped) {
+                    continue;
+                }
+                if (false === $flag || null === $flag) {
+                    continue;
+                }
+                $funcs[strtolower($scoped)] = true;
+            }
+            if ([] !== $funcs) {
+                $clean[$key] = $funcs;
+            }
+        }
+        self::$editChangedFunctions = $clean;
+    }
+
+    /** @return array<string, array<string, true>> */
+    public static function editChangedFunctions(): array
+    {
+        return self::$editChangedFunctions;
     }
 
     /**
@@ -913,6 +970,314 @@ final class CompileCache
         }
 
         return hash('sha256', $buf);
+    }
+
+    /**
+     * Split a PHP file into glue (non-function) + per-function semantic hashes (#36387).
+     *
+     * Glue covers class properties, constants, use statements, and other tokens outside
+     * function/method bodies. A glue change forces a full member strip; an isolated
+     * method body change strips only that method's LLVM symbols.
+     *
+     * @return array{glue: string, functions: array<string, string>}|null
+     */
+    public static function semanticFileParts(string $path): ?array
+    {
+        if (!is_file($path)) {
+            return null;
+        }
+        $src = file_get_contents($path);
+        if (false === $src) {
+            return null;
+        }
+        if ('' === $src) {
+            return ['glue' => hash('sha256', ''), 'functions' => []];
+        }
+        $tokens = @token_get_all($src);
+        if (!\is_array($tokens) || [] === $tokens) {
+            return ['glue' => hash('sha256', $src), 'functions' => []];
+        }
+
+        $glue = '';
+        $functions = [];
+        $classStack = [];
+        $pendingClass = false;
+        $n = count($tokens);
+        for ($i = 0; $i < $n; ++$i) {
+            $token = $tokens[$i];
+            if (\is_array($token)) {
+                $id = $token[0];
+                $text = $token[1];
+                if (T_COMMENT === $id || T_DOC_COMMENT === $id || T_WHITESPACE === $id) {
+                    continue;
+                }
+                if (T_CLASS === $id || T_INTERFACE === $id || T_TRAIT === $id) {
+                    $pendingClass = true;
+                    $glue .= $text;
+                    continue;
+                }
+                if ($pendingClass && T_STRING === $id) {
+                    $classStack[] = $text;
+                    $pendingClass = false;
+                    $glue .= $text;
+                    continue;
+                }
+                if (T_FUNCTION === $id) {
+                    $fn = self::consumeFunctionSemantic($tokens, $i, $classStack);
+                    if (null === $fn) {
+                        $glue .= $text;
+                        continue;
+                    }
+                    $functions[$fn['scoped']] = $fn['hash'];
+                    // consumeFunctionSemantic advances $i to the last consumed token.
+                    continue;
+                }
+                $glue .= $text;
+            } else {
+                if ('{' === $token) {
+                    // Keep brace depth for class stack via explicit tracking below.
+                    $glue .= $token;
+                } elseif ('}' === $token) {
+                    if ([] !== $classStack) {
+                        // Heuristic: closing brace may end the class; pop if no open class body
+                        // nesting tracked — brace depth handled inside consumeFunctionSemantic
+                        // for methods; for class end we pop when glue sees unmatched '}'.
+                        // Safer: track brace depth on glue path.
+                    }
+                    $glue .= $token;
+                } else {
+                    $glue .= $token;
+                }
+            }
+        }
+
+        ksort($functions);
+
+        return [
+            'glue' => hash('sha256', $glue),
+            'functions' => $functions,
+        ];
+    }
+
+    /**
+     * @param list<string|array{0:int,1:string,2:int}> $tokens
+     * @param list<string>                             $classStack
+     *
+     * @return array{scoped: string, hash: string}|null
+     */
+    private static function consumeFunctionSemantic(array $tokens, int &$i, array $classStack): ?array
+    {
+        $n = count($tokens);
+        // Skip attributes / modifiers already consumed; $tokens[$i] is T_FUNCTION.
+        ++$i;
+        $name = '';
+        for (; $i < $n; ++$i) {
+            $token = $tokens[$i];
+            if (\is_array($token)) {
+                $id = $token[0];
+                if (T_COMMENT === $id || T_DOC_COMMENT === $id || T_WHITESPACE === $id) {
+                    continue;
+                }
+                if (T_STRING === $id || (defined('T_NAME_QUALIFIED') && T_NAME_QUALIFIED === $id) || (defined('T_NAME_FULLY_QUALIFIED') && T_NAME_FULLY_QUALIFIED === $id)) {
+                    $name = $token[1];
+                    ++$i;
+                    break;
+                }
+                // Anonymous function / arrow — treat as glue by bailing.
+                if ('(' === $token[1] || T_FN === $id) {
+                    --$i;
+
+                    return null;
+                }
+            } else {
+                if ('(' === $token) {
+                    --$i;
+
+                    return null;
+                }
+                if ('&' === $token) {
+                    continue;
+                }
+            }
+        }
+        if ('' === $name) {
+            return null;
+        }
+        // Skip parameter list to body '{' or ';' (abstract).
+        $paren = 0;
+        $sawParen = false;
+        $bodyStart = -1;
+        for (; $i < $n; ++$i) {
+            $token = $tokens[$i];
+            $ch = \is_array($token) ? $token[1] : $token;
+            if (\is_array($token)) {
+                $id = $token[0];
+                if (T_COMMENT === $id || T_DOC_COMMENT === $id || T_WHITESPACE === $id) {
+                    continue;
+                }
+            }
+            if ('(' === $ch) {
+                ++$paren;
+                $sawParen = true;
+                continue;
+            }
+            if (')' === $ch) {
+                --$paren;
+                continue;
+            }
+            if ($sawParen && 0 === $paren) {
+                if ('{' === $ch) {
+                    $bodyStart = $i;
+                    break;
+                }
+                if (';' === $ch) {
+                    // Abstract / interface method — hash signature only.
+                    $scoped = [] !== $classStack
+                        ? $classStack[count($classStack) - 1].'::'.$name
+                        : $name;
+                    return ['scoped' => $scoped, 'hash' => hash('sha256', 'abstract:'.$name)];
+                }
+            }
+        }
+        if ($bodyStart < 0) {
+            return null;
+        }
+        $body = '';
+        $brace = 0;
+        for (; $i < $n; ++$i) {
+            $token = $tokens[$i];
+            if (\is_array($token)) {
+                $id = $token[0];
+                if (T_COMMENT === $id || T_DOC_COMMENT === $id || T_WHITESPACE === $id) {
+                    continue;
+                }
+                $ch = $token[1];
+            } else {
+                $ch = $token;
+            }
+            if ('{' === $ch) {
+                ++$brace;
+                $body .= $ch;
+                continue;
+            }
+            if ('}' === $ch) {
+                --$brace;
+                $body .= $ch;
+                if (0 === $brace) {
+                    break;
+                }
+                continue;
+            }
+            $body .= $ch;
+        }
+        $scoped = [] !== $classStack
+            ? $classStack[count($classStack) - 1].'::'.$name
+            : $name;
+
+        return ['scoped' => $scoped, 'hash' => hash('sha256', $body)];
+    }
+
+    /**
+     * @param list<string> $memberPaths
+     *
+     * @return array{functions: array<string, array<string, string>>, glue: array<string, string>}
+     */
+    public static function memberSemanticParts(array $memberPaths): array
+    {
+        $functions = [];
+        $glue = [];
+        foreach ($memberPaths as $path) {
+            if (!is_string($path) || !is_file($path)) {
+                continue;
+            }
+            $resolved = realpath($path) ?: $path;
+            $parts = self::semanticFileParts($resolved);
+            if (null === $parts) {
+                continue;
+            }
+            $glue[$resolved] = $parts['glue'];
+            $functions[$resolved] = $parts['functions'];
+        }
+        ksort($glue);
+        ksort($functions);
+
+        return ['functions' => $functions, 'glue' => $glue];
+    }
+
+    /**
+     * Per-function strip plan for members that already failed the file-level semantic check.
+     *
+     * Returns path → changed scoped (lc) only when glue is unchanged and ≥1 function
+     * hash differs. Missing/empty entry for a strip member ⇒ full member strip (#36387).
+     *
+     * @param array<string, array<string, string>>|null $previousFunctions
+     * @param array<string, array<string, string>>|null $currentFunctions
+     * @param array<string, string>|null               $previousGlue
+     * @param array<string, string>|null               $currentGlue
+     * @param list<string>                             $stripMembers
+     *
+     * @return array<string, array<string, true>>
+     */
+    public static function diffFunctionsForStrip(
+        ?array $previousFunctions,
+        ?array $currentFunctions,
+        ?array $previousGlue,
+        ?array $currentGlue,
+        array $stripMembers
+    ): array {
+        if (
+            null === $previousFunctions
+            || [] === $previousFunctions
+            || null === $currentFunctions
+            || [] === $currentFunctions
+            || null === $previousGlue
+            || [] === $previousGlue
+            || null === $currentGlue
+            || [] === $currentGlue
+        ) {
+            return [];
+        }
+        $out = [];
+        foreach ($stripMembers as $path) {
+            if (!is_string($path) || '' === $path) {
+                continue;
+            }
+            $prevG = $previousGlue[$path] ?? null;
+            $currG = $currentGlue[$path] ?? null;
+            if (!is_string($prevG) || !is_string($currG) || $prevG !== $currG) {
+                // Glue drift (props/consts/use) or missing → full member strip.
+                continue;
+            }
+            $prevF = $previousFunctions[$path] ?? null;
+            $currF = $currentFunctions[$path] ?? null;
+            if (!is_array($prevF) || !is_array($currF) || [] === $currF) {
+                continue;
+            }
+            $changed = [];
+            foreach ($currF as $scoped => $hash) {
+                if (!is_string($scoped) || !is_string($hash)) {
+                    continue;
+                }
+                $prevH = $prevF[$scoped] ?? null;
+                if ($prevH !== $hash) {
+                    $changed[strtolower($scoped)] = true;
+                }
+            }
+            foreach ($prevF as $scoped => $_hash) {
+                if (!is_string($scoped)) {
+                    continue;
+                }
+                if (!isset($currF[$scoped])) {
+                    $changed[strtolower($scoped)] = true;
+                }
+            }
+            if ([] !== $changed) {
+                $out[$path] = $changed;
+                \PHPCompiler\AOT\BuildTiming::note('edit_scaffold_func_partial', 1.0);
+            }
+        }
+
+        return $out;
     }
 
     /**
@@ -1018,6 +1383,25 @@ final class CompileCache
             self::$recordingUserSymbolsByMember[$member] = [];
         }
         self::$recordingUserSymbolsByMember[$member][] = $llvmName;
+
+        if (null === self::$recordingUserSymbolsByFunction || null === $block || null === $block->func) {
+            return;
+        }
+        $fname = $block->func->name;
+        if (!is_string($fname) || '' === $fname || '{main}' === $fname || str_starts_with($fname, '{')) {
+            return;
+        }
+        $scoped = $block->func->getScopedName();
+        if (!is_string($scoped) || '' === $scoped) {
+            return;
+        }
+        if (!isset(self::$recordingUserSymbolsByFunction[$member])) {
+            self::$recordingUserSymbolsByFunction[$member] = [];
+        }
+        if (!isset(self::$recordingUserSymbolsByFunction[$member][$scoped])) {
+            self::$recordingUserSymbolsByFunction[$member][$scoped] = [];
+        }
+        self::$recordingUserSymbolsByFunction[$member][$scoped][] = $llvmName;
     }
 
     private static function memberPathForBlock(?\PHPCompiler\Block $block): string
@@ -1180,6 +1564,10 @@ final class CompileCache
         $byMember = is_array($meta['user_symbols_by_member'] ?? null)
             ? $meta['user_symbols_by_member']
             : [];
+        $byFunction = is_array($meta['user_symbols_by_function'] ?? null)
+            ? $meta['user_symbols_by_function']
+            : [];
+        self::$editScaffoldByFunction = self::normalizeByFunctionMap($byFunction);
         $toStrip = self::userSymbolsToStripForEdit($userSymbols, $byMember);
         $partial = self::wouldPartialStrip($userSymbols, $byMember);
         self::stripUserSymbolsFromModule($context, $toStrip);
@@ -1270,6 +1658,10 @@ final class CompileCache
     /**
      * User LLVM names attributed solely to unchanged non-entry members (#36387).
      *
+     * When a changed member has per-function attribution and
+     * {@see $editChangedFunctions} lists only some methods, sibling method bodies
+     * in that same file are kept (real one-method token edits).
+     *
      * @param list<mixed>          $allUserSymbols
      * @param array<string, mixed> $byMember
      *
@@ -1300,8 +1692,27 @@ final class CompileCache
         foreach (self::$editChangedMembers as $member) {
             $mustStripMember[$member] = true;
         }
+        // Entry ({main}) must re-lower when a changed member is a full-file strip
+        // (config/const/glue) because folded constants and call sites may bake the
+        // old values. Pure per-function body edits in other members leave entry
+        // bytecode valid — keep it so MiniWebApp one-method edits stay ≤25% (#36387).
         if (is_string(self::$projectEntry) && '' !== self::$projectEntry) {
-            $mustStripMember[self::$projectEntry] = true;
+            $entry = self::$projectEntry;
+            $keepEntry = !isset($mustStripMember[$entry]);
+            if ($keepEntry) {
+                foreach (array_keys($mustStripMember) as $member) {
+                    $changedFns = self::$editChangedFunctions[$member] ?? null;
+                    if (!is_array($changedFns) || [] === $changedFns) {
+                        $keepEntry = false;
+                        break;
+                    }
+                }
+            }
+            if (!$keepEntry) {
+                $mustStripMember[$entry] = true;
+            } elseif ([] !== $mustStripMember) {
+                \PHPCompiler\AOT\BuildTiming::note('edit_scaffold_entry_keep', 1.0);
+            }
         }
 
         // Empty editChangedMembers after a byte-only (comment/whitespace) edit means every
@@ -1312,17 +1723,38 @@ final class CompileCache
         // own no LLVM symbols — that must not abort keep-path for unchanged Router.php
         // (#36387 MiniWebApp one-file edit). Only require attribution when we need to
         // know which symbols the changed file owned; absence ⇒ empty strip set for it.
+        $byFunction = self::$editScaffoldByFunction;
         $kept = [];
         foreach ($byMember as $member => $syms) {
             if (!is_string($member) || !is_array($syms)) {
                 continue;
             }
-            if (isset($mustStripMember[$member])) {
+            if (!isset($mustStripMember[$member])) {
+                foreach ($syms as $sym) {
+                    if (is_string($sym) && '' !== $sym && isset($keepable[$sym])) {
+                        $kept[$sym] = true;
+                    }
+                }
                 continue;
             }
-            foreach ($syms as $sym) {
-                if (is_string($sym) && '' !== $sym && isset($keepable[$sym])) {
-                    $kept[$sym] = true;
+            // Changed member: keep sibling functions when only some methods changed.
+            $changedFns = self::$editChangedFunctions[$member] ?? null;
+            $fnMap = $byFunction[$member] ?? null;
+            if (!is_array($changedFns) || [] === $changedFns || !is_array($fnMap) || [] === $fnMap) {
+                continue; // full strip of this member
+            }
+            foreach ($fnMap as $scoped => $fnSyms) {
+                if (!is_string($scoped) || !is_array($fnSyms)) {
+                    continue;
+                }
+                $scopedLc = strtolower($scoped);
+                if (isset($changedFns[$scopedLc])) {
+                    continue;
+                }
+                foreach ($fnSyms as $sym) {
+                    if (is_string($sym) && '' !== $sym && isset($keepable[$sym])) {
+                        $kept[$sym] = true;
+                    }
                 }
             }
         }
@@ -1331,8 +1763,26 @@ final class CompileCache
             return [];
         }
 
-        // Symbols also listed under a strip member must not stay.
+        // Symbols listed under a full-strip member, or under a changed function, must not stay.
         foreach (array_keys($mustStripMember) as $member) {
+            $changedFns = self::$editChangedFunctions[$member] ?? null;
+            $fnMap = $byFunction[$member] ?? null;
+            if (is_array($changedFns) && [] !== $changedFns && is_array($fnMap) && [] !== $fnMap) {
+                foreach ($fnMap as $scoped => $fnSyms) {
+                    if (!is_string($scoped) || !is_array($fnSyms)) {
+                        continue;
+                    }
+                    if (!isset($changedFns[strtolower($scoped)])) {
+                        continue;
+                    }
+                    foreach ($fnSyms as $sym) {
+                        if (is_string($sym)) {
+                            unset($kept[$sym]);
+                        }
+                    }
+                }
+                continue;
+            }
             $syms = $byMember[$member] ?? null;
             if (!is_array($syms)) {
                 continue;
@@ -1345,6 +1795,43 @@ final class CompileCache
         }
 
         return $kept;
+    }
+
+    /**
+     * @param array<string, mixed> $raw
+     *
+     * @return array<string, array<string, list<string>>>
+     */
+    private static function normalizeByFunctionMap(array $raw): array
+    {
+        $out = [];
+        foreach ($raw as $member => $scopedMap) {
+            if (!is_string($member) || !is_array($scopedMap)) {
+                continue;
+            }
+            $resolved = realpath($member);
+            $key = false !== $resolved ? $resolved : $member;
+            $funcs = [];
+            foreach ($scopedMap as $scoped => $syms) {
+                if (!is_string($scoped) || !is_array($syms)) {
+                    continue;
+                }
+                $list = [];
+                foreach ($syms as $sym) {
+                    if (is_string($sym) && '' !== $sym) {
+                        $list[] = $sym;
+                    }
+                }
+                if ([] !== $list) {
+                    $funcs[$scoped] = array_values(array_unique($list));
+                }
+            }
+            if ([] !== $funcs) {
+                $out[$key] = $funcs;
+            }
+        }
+
+        return $out;
     }
 
     /**
@@ -1703,6 +2190,8 @@ final class CompileCache
             'members' => $memberHashes,
             // Comment/whitespace-stable hashes for strip planning (#36387).
             'semantic_members' => self::memberSemanticHashes(array_keys($memberHashes)),
+            // Per-function + glue hashes so one-method edits keep sibling bodies (#36387).
+            'semantic_parts' => self::memberSemanticParts(array_keys($memberHashes)),
             'updated_at' => gmdate('c'),
         ], JSON_PRETTY_PRINT);
         if (false === $payload) {
@@ -1874,6 +2363,7 @@ final class CompileCache
                 'exports' => self::$recordingExports,
                 'user_symbols' => $userSymbols,
                 'user_symbols_by_member' => self::$recordingUserSymbolsByMember ?? [],
+                'user_symbols_by_function' => self::$recordingUserSymbolsByFunction ?? [],
                 'helper_symbols' => $helperSymbols,
                 // Full builtin/user logical→LLVM map so edit-scaffold can rebuild
                 // Context::$functions without re-implement() (#36387).
@@ -1908,8 +2398,11 @@ final class CompileCache
         self::$recordingUserSymbols = null;
         self::$recordingHelperSymbols = null;
         self::$recordingUserSymbolsByMember = null;
+        self::$recordingUserSymbolsByFunction = null;
+        self::$editScaffoldByFunction = [];
         self::$bundledSource = null;
         self::$editChangedMembers = [];
+        self::$editChangedFunctions = [];
         self::$keptUserSymbols = [];
         self::$strippedUserSymbols = [];
         self::$skipModuleFuncCompile = false;

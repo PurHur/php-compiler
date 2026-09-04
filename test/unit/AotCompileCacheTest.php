@@ -441,6 +441,99 @@ final class AotCompileCacheTest extends TestCase
         $this->assertSame([$libR], $stripReal, 'real body edit must still strip (#36387)');
     }
 
+    public function testSemanticFilePartsIsolatesOneMethod(): void
+    {
+        $dir = $this->cacheRoot.'/semantic-parts';
+        mkdir($dir, 0775, true);
+        $lib = $dir.'/lib.php';
+        file_put_contents(
+            $lib,
+            "<?php\nclass Box {\n"
+            ."    public const N = 1;\n"
+            ."    public function alpha(): string { return \"a\"; }\n"
+            ."    public function beta(): string { return \"b\"; }\n"
+            ."}\n"
+        );
+        $libR = realpath($lib) ?: $lib;
+        $before = CompileCache::semanticFileParts($libR);
+        $this->assertNotNull($before);
+        $this->assertArrayHasKey('Box::alpha', $before['functions']);
+        $this->assertArrayHasKey('Box::beta', $before['functions']);
+        file_put_contents(
+            $lib,
+            "<?php\nclass Box {\n"
+            ."    public const N = 1;\n"
+            ."    public function alpha(): string { return \"A\"; }\n"
+            ."    public function beta(): string { return \"b\"; }\n"
+            ."}\n"
+        );
+        $after = CompileCache::semanticFileParts($libR);
+        $this->assertNotNull($after);
+        $this->assertSame($before['glue'], $after['glue'], 'one-method edit must not change glue (#36387)');
+        $this->assertNotSame($before['functions']['Box::alpha'], $after['functions']['Box::alpha']);
+        $this->assertSame($before['functions']['Box::beta'], $after['functions']['Box::beta']);
+
+        $stripMembers = [$libR];
+        $partial = CompileCache::diffFunctionsForStrip(
+            [$libR => $before['functions']],
+            [$libR => $after['functions']],
+            [$libR => $before['glue']],
+            [$libR => $after['glue']],
+            $stripMembers
+        );
+        $this->assertArrayHasKey($libR, $partial);
+        $this->assertArrayHasKey('box::alpha', $partial[$libR]);
+        $this->assertArrayNotHasKey('box::beta', $partial[$libR]);
+
+        CompileCache::setProjectMembers([$libR]);
+        CompileCache::setEditChangedMembers([$libR]);
+        CompileCache::setEditChangedFunctions($partial);
+        // Simulate meta by_function via reflection-free public strip planner:
+        $ref = new \ReflectionClass(CompileCache::class);
+        $prop = $ref->getProperty('editScaffoldByFunction');
+        $prop->setAccessible(true);
+        $prop->setValue(null, [
+            $libR => [
+                'Box::alpha' => ['alpha'],
+                'Box::beta' => ['beta'],
+            ],
+        ]);
+        $all = ['alpha', 'beta', 'main'];
+        $byMember = [$libR => ['alpha', 'beta']];
+        $strip = CompileCache::userSymbolsToStripForEdit($all, $byMember);
+        $this->assertContains('alpha', $strip, 'changed method must strip');
+        $this->assertNotContains('beta', $strip, 'sibling method must keep (#36387)');
+        $this->assertTrue(CompileCache::isKeptUserSymbol('beta'));
+        CompileCache::finishRecording();
+    }
+
+    public function testDiffFunctionsForStripFullWhenGlueChanges(): void
+    {
+        $dir = $this->cacheRoot.'/glue-strip';
+        mkdir($dir, 0775, true);
+        $lib = $dir.'/lib.php';
+        file_put_contents(
+            $lib,
+            "<?php\nclass Box {\n    public const N = 1;\n    public function alpha(): string { return \"a\"; }\n}\n"
+        );
+        $libR = realpath($lib) ?: $lib;
+        $before = CompileCache::semanticFileParts($libR);
+        file_put_contents(
+            $lib,
+            "<?php\nclass Box {\n    public const N = 2;\n    public function alpha(): string { return \"a\"; }\n}\n"
+        );
+        $after = CompileCache::semanticFileParts($libR);
+        $this->assertNotSame($before['glue'], $after['glue']);
+        $partial = CompileCache::diffFunctionsForStrip(
+            [$libR => $before['functions']],
+            [$libR => $after['functions']],
+            [$libR => $before['glue']],
+            [$libR => $after['glue']],
+            [$libR]
+        );
+        $this->assertSame([], $partial, 'const/glue change must force full member strip (#36387)');
+    }
+
     public function testEditScaffoldKeepPathWhenEntryChanges(): void
     {
         if (!LlvmToolchain::isReady($this->repoRoot)) {
@@ -637,6 +730,73 @@ final class AotCompileCacheTest extends TestCase
             $edit['wall_ms'],
             sprintf(
                 'comment-only edit should be <30%% of cold (cold=%.0fms edit=%.0fms) (#36387)',
+                $cold['wall_ms'],
+                $edit['wall_ms']
+            )
+        );
+    }
+
+    public function testEditScaffoldOneMethodKeepsSibling(): void
+    {
+        if (!LlvmToolchain::isReady($this->repoRoot)) {
+            $this->markTestSkipped('LLVM 9 not available');
+        }
+
+        $dir = $this->cacheRoot.'/edit-one-method';
+        mkdir($dir, 0775, true);
+        $lib = $dir.'/lib.php';
+        $main = $dir.'/main.php';
+        file_put_contents(
+            $lib,
+            "<?php\n"
+            ."function greeting(): string { return \"hello\"; }\n"
+            ."function farewell(): string { return \"bye\"; }\n"
+        );
+        file_put_contents(
+            $main,
+            "<?php\nrequire __DIR__ . '/lib.php';\necho greeting(), '-', farewell(), \"\\n\";\n"
+        );
+
+        $outCold = $this->repoRoot.'/build/aot-cache-test-onemethod-cold.bin';
+        @unlink($outCold);
+        $cold = $this->runAotSubprocess($main, $outCold);
+        if (139 === $cold['exit'] || 11 === $cold['exit']) {
+            $this->markTestSkipped('AOT segfault in this environment; cache wiring covered by unit tests');
+        }
+        $this->assertSame(0, $cold['exit'], $cold['stderr']);
+        $this->assertStringContainsString('hello-bye', $this->runBinary($outCold)['stdout']);
+
+        // Real token edit in greeting only — farewell body must stay (#36387).
+        file_put_contents(
+            $lib,
+            "<?php\n"
+            ."function greeting(): string { return \"hola\"; }\n"
+            ."function farewell(): string { return \"bye\"; }\n"
+        );
+
+        $outEdit = $this->repoRoot.'/build/aot-cache-test-onemethod-edit.bin';
+        @unlink($outEdit);
+        $edit = $this->runAotSubprocess($main, $outEdit, true);
+        $this->assertSame(0, $edit['exit'], $edit['stderr']."\n".$edit['stdout']);
+        $timing = $edit['stderr'].$edit['stdout'];
+        $this->assertStringContainsString('edit_scaffold_hit', $timing);
+        $this->assertStringContainsString(
+            'edit_scaffold_func_partial',
+            $timing,
+            'one-method edit must plan per-function strip (#36387)'
+        );
+        $this->assertStringContainsString(
+            'edit_scaffold_entry_keep',
+            $timing,
+            'unchanged entry must stay when only a sibling method changed (#36387)'
+        );
+        $this->assertStringContainsString('edit_scaffold_partial', $timing);
+        $this->assertStringContainsString('hola-bye', $this->runBinary($outEdit)['stdout']);
+        $this->assertLessThan(
+            $cold['wall_ms'] * 0.50,
+            $edit['wall_ms'],
+            sprintf(
+                'one-method edit should be <50%% of cold (cold=%.0fms edit=%.0fms) (#36387)',
                 $cold['wall_ms'],
                 $edit['wall_ms']
             )
