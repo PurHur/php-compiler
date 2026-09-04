@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * hypot() for compiled JIT/AOT modules (#15074, #20664, #27909, php-in-PHP).
+ * hypot() NestedJIT-safe scale + Newton sqrt reference (#15074, #20664, #27909, php-in-PHP).
  *
- * NestedJIT-safe scale + inlined Newton sqrt (peer MathSqrt #27888 / floor #27650).
+ * AOT/JIT hot path uses libm {@code hypot(3)} via {@see \PHPCompiler\JIT\Builtin\MathHypot}
+ * (#36386 / peer MathFmod). This helper remains for NestedJIT-safe scale +
+ * inlined Newton sqrt when NestedJIT cannot call libc.
  * Avoid `\hypot` / {@see VmMath::hypot} / {@see SqrtJitHelper} — NestedJIT stubs
  * cross-class calls to 0 under thin AOT (#27017 / #27888 shape).
  * Avoid pack/unpack — wrong 0 under thin AOT (#27496). Avoid unbounded float while-loops (#27838).

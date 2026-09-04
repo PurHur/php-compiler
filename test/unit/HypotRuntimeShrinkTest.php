@@ -9,23 +9,30 @@ use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
 /**
- * hypot() NestedJIT via JitVmHelperLink::ensureBridge (#27909 / peer MathSqrt #27888).
+ * hypot() AOT uses libm hypot(3) (#36386);
+ * HypotJitHelper remains NestedJIT-safe reference (peer MathExpm1 / Expm1JitHelper).
+ * LLVM 9 has no llvm.hypot.f64.
+ *
+ * php-src: ext/standard/math.c PHP_FUNCTION(hypot).
  */
 final class HypotRuntimeShrinkTest extends TestCase
 {
-    public function testHypotUsesJitHelperNotKernel(): void
+    public function testHypotUsesLibmNotHelperBridge(): void
     {
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/hypot.php');
         $this->assertStringContainsString('MathHypot::invoke', $builtin);
         $this->assertStringNotContainsString("lookupFunction('hypot')", $builtin);
 
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathHypot.php');
-        $this->assertStringContainsString('HypotJitHelper', $bridge);
+        $this->assertStringContainsString("LIBC_HYPOT = 'hypot'", $bridge);
         $this->assertStringContainsString('phpc_hypot', $bridge);
-        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringContainsString('hypot_libm_f64_entry', $bridge);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('HypotJitHelper', $bridge);
         $this->assertStringNotContainsString('JitHypotKernel', $bridge);
         $this->assertStringNotContainsString('NestedJitCompileScope', $bridge);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
+        $this->assertStringNotContainsString('llvm.hypot', $bridge);
     }
 
     public function testHypotJitHelperInlinesNestedJitSafeAlgorithm(): void
