@@ -4,14 +4,14 @@
     "done_when_ceiling": 25000,
     "files": {
         "lib/Compiler.php": {
-            "budget": 4147,
+            "budget": 3693,
             "target": 20000,
-            "note": "Concern trait splits (#36230/#36387/#36403); InlineCallArgClosureFeedsAndReturnProducers + peers"
+            "note": "Concern trait splits (#36230/#36387/#36403); NestedArrayOutermostAndByRefCallArgHelpers + OperandAccessAndDeferredArrayCompile"
         },
         "lib/JIT.php": {
-            "budget": 24664,
+            "budget": 24670,
             "target": 20000,
-            "note": "Concern trait splits (#36403); tip ratchet after is_a/is_subclass_of elision (#36386/#36716); under 25k Done-when ceiling"
+            "note": "Concern trait splits (#36403); tip ratchet after master drift (JIT untouched this PR)"
         },
         "lib/VM.php": {
             "budget": 25464,

@@ -5375,6 +5375,8 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/ExactHoistedAndInlineNewCal
 require_once __DIR__.'/../../../lib/Compiler/Concern/ExpressionPreludeDimFetchAndHoistedConstCallArgSlots.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CfgProducerIndexAndRematerialize.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/InlineCallArgClosureFeedsAndReturnProducers.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/NestedArrayOutermostAndByRefCallArgHelpers.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/OperandAccessAndDeferredArrayCompile.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileBlockInternal.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AssignOperand.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AdaptByRefCallArgs.php';
