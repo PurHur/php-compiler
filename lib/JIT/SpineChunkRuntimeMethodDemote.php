@@ -125,10 +125,19 @@ final class SpineChunkRuntimeMethodDemote
     /**
      * Repo-relative path → true when oversize singleton emit is safe under SPINE_CHUNK (#36387).
      * Demote-covered trees + measured live CompilerVersion; Compiler.php / JIT.php stay plan-skipped.
+     * Measured emit fails after demote stay false so the plan defers them honestly (orchestrator
+     * must not treat them as emit-eligible — 2026-09-04 sample).
      */
     public static function oversizeSingletonCanEmit(string $rel): bool
     {
         $rel = str_replace('\\', '/', ltrim($rel, '/'));
+        // Host CFG / property-default failures after demote (#36387).
+        if (
+            'ext/soap/VmSoapClient.php' === $rel
+            || 'ext/standard/VmDateTimeNative.php' === $rel
+        ) {
+            return false;
+        }
         if ('lib/CompilerVersion.php' === $rel) {
             return true;
         }
