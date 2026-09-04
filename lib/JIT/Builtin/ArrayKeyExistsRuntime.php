@@ -145,6 +145,8 @@ final class ArrayKeyExistsRuntime
             $keyStr
         );
 
+        // Non-null slot ⇒ key exists (including TYPE_NULL values). Unset must
+        // unlink the DJB strHashSlots chain so peek cannot see zombies (#36732).
         return $context->builder->icmp(
             Builder::INT_NE,
             $valPtr,

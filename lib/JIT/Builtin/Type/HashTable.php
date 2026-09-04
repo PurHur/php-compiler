@@ -151,6 +151,9 @@ class HashTable extends Type
         $this->registerFn('__hashtable__hashStringKey', 'int64', ['__string__*']);
         $this->registerFn('__hashtable__ensureStrHashIndex', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__prependStrKeyHashChain', 'void', ['__hashtable__*', '__strkey_node__*', 'int64']);
+        // Peer of prepend: unset must drop the DJB bucket link or peekStringKeyValue
+        // still finds a null-typed zombie and array_key_exists stays true (#36732 / #36191).
+        $this->registerFn('__hashtable__unlinkStrKeyHashChain', 'void', ['__hashtable__*', '__strkey_node__*']);
         $this->registerFn('__hashtable__offsetIsSet', 'int1', ['__hashtable__*', 'size_t']);
         $this->registerFn('__hashtable__unsetLongAt', 'void', ['__hashtable__*', 'size_t']);
         $this->registerFn('__hashtable__unsetStringKey', 'void', ['__hashtable__*', '__string__*']);
@@ -328,6 +331,7 @@ class HashTable extends Type
         $this->implementHashStringKey();
         $this->implementEnsureStrHashIndex();
         $this->implementPrependStrKeyHashChain();
+        $this->implementUnlinkStrKeyHashChain();
         $this->implementOffsetIsSet();
         $this->implementUnsetLongAt();
         $this->implementUnsetStringKey();
@@ -4034,6 +4038,26 @@ class HashTable extends Type
         $this->context->builder->branch($afterUnlink);
 
         $this->context->builder->positionAtEnd($afterUnlink);
+        // Keep strKeysTail honest when removing the insertion-order tail (#36191).
+        $tailSlot = $this->context->builder->structGep($ht, $htMap['strKeysTail']);
+        $wasTail = $this->context->builder->icmp(
+            Builder::INT_EQ,
+            $this->context->builder->load($tailSlot),
+            $node
+        );
+        $fixTail = $fn->appendBasicBlock('strkey_unset_fix_tail');
+        $afterTail = $fn->appendBasicBlock('strkey_unset_after_tail');
+        $this->context->builder->branchIf($wasTail, $fixTail, $afterTail);
+        $this->context->builder->positionAtEnd($fixTail);
+        $this->context->builder->store($prev, $tailSlot);
+        $this->context->builder->branch($afterTail);
+        $this->context->builder->positionAtEnd($afterTail);
+        // Drop DJB bucket link — list unlink alone leaves peek/array_key_exists green (#36732).
+        $this->context->builder->call(
+            $this->context->lookupFunction('__hashtable__unlinkStrKeyHashChain'),
+            $ht,
+            $node
+        );
         $valField = $this->context->builder->structGep($node, $nodeMap['value']);
         $this->context->builder->call($this->context->lookupFunction('__value__writeNull'), $valField);
         $this->decrementNumElements($ht);
@@ -4402,6 +4426,102 @@ class HashTable extends Type
             $oldHead,
             $this->context->builder->structGep($node, $nodeMap['hashNext'])
         );
+        $this->context->builder->returnVoid();
+    }
+
+    /**
+     * Remove a node from its DJB bucket chain (#36732).
+     *
+     * {@see implementUnsetStringKey()} used to unlink only the insertion-order list;
+     * peek/array_key_exists still walked strHashSlots and saw a null-typed zombie.
+     * php-src: zend_hash_del / zend_hash_str_del remove the bucket entry entirely.
+     */
+    private function implementUnlinkStrKeyHashChain(): void
+    {
+        $fn = $this->context->lookupFunction('__hashtable__unlinkStrKeyHashChain');
+        $entry = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($entry);
+        $ht = $fn->getParam(0);
+        $target = $fn->getParam(1);
+        $htMap = $this->context->structFieldMap['__hashtable__'];
+        $nodeMap = $this->context->structFieldMap['__strkey_node__'];
+        $sizeT = $this->context->getTypeFromString('size_t');
+        $nodePtrType = $this->context->getTypeFromString('__strkey_node__*');
+        $nullNode = $nodePtrType->constNull();
+        $done = $fn->appendBasicBlock('strhash_unlink_done');
+        $walk = $fn->appendBasicBlock('strhash_unlink_walk');
+
+        $mask = $this->context->builder->load(
+            $this->context->builder->structGep($ht, $htMap['strHashMask'])
+        );
+        $hasIndex = $this->context->builder->icmp(
+            Builder::INT_UGT,
+            $mask,
+            $sizeT->constInt(0, false)
+        );
+        $this->context->builder->branchIf($hasIndex, $walk, $done);
+
+        $this->context->builder->positionAtEnd($walk);
+        $hash = $this->context->builder->load(
+            $this->context->builder->structGep($target, $nodeMap['hash'])
+        );
+        $hashU = $this->context->builder->truncOrBitCast($hash, $sizeT);
+        $maskU = $this->context->builder->truncOrBitCast($mask, $sizeT);
+        $bucket = $this->context->builder->and($hashU, $maskU);
+        $slots = $this->context->builder->load(
+            $this->context->builder->structGep($ht, $htMap['strHashSlots'])
+        );
+        $slotPtr = $this->context->builder->inBoundsGep($slots, $bucket);
+        $prevSlot = $this->context->builder->alloca($nodePtrType, 1, 'strhash_unlink_prev');
+        $curSlot = $this->context->builder->alloca($nodePtrType, 1, 'strhash_unlink_cur');
+        $this->context->builder->store($nullNode, $prevSlot);
+        $this->context->builder->store($this->context->builder->load($slotPtr), $curSlot);
+
+        $loopHead = $fn->appendBasicBlock('strhash_unlink_head');
+        $loopBody = $fn->appendBasicBlock('strhash_unlink_body');
+        $this->context->builder->branch($loopHead);
+
+        $this->context->builder->positionAtEnd($loopHead);
+        $cur = $this->context->builder->load($curSlot);
+        $curNull = $this->context->builder->icmp(Builder::INT_EQ, $cur, $nullNode);
+        $this->context->builder->branchIf($curNull, $done, $loopBody);
+
+        $this->context->builder->positionAtEnd($loopBody);
+        $isTarget = $this->context->builder->icmp(Builder::INT_EQ, $cur, $target);
+        $found = $fn->appendBasicBlock('strhash_unlink_found');
+        $advance = $fn->appendBasicBlock('strhash_unlink_next');
+        $this->context->builder->branchIf($isTarget, $found, $advance);
+
+        $this->context->builder->positionAtEnd($found);
+        $nextHash = $this->context->builder->load(
+            $this->context->builder->structGep($cur, $nodeMap['hashNext'])
+        );
+        $prev = $this->context->builder->load($prevSlot);
+        $hasPrev = $this->context->builder->icmp(Builder::INT_NE, $prev, $nullNode);
+        $updateBucket = $fn->appendBasicBlock('strhash_unlink_bucket');
+        $updatePrev = $fn->appendBasicBlock('strhash_unlink_prev_next');
+        $this->context->builder->branchIf($hasPrev, $updatePrev, $updateBucket);
+        $this->context->builder->positionAtEnd($updateBucket);
+        $this->context->builder->store($nextHash, $slotPtr);
+        $this->context->builder->branch($done);
+        $this->context->builder->positionAtEnd($updatePrev);
+        $this->context->builder->store(
+            $nextHash,
+            $this->context->builder->structGep($prev, $nodeMap['hashNext'])
+        );
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($advance);
+        $this->context->builder->store($cur, $prevSlot);
+        $this->context->builder->store(
+            $this->context->builder->load(
+                $this->context->builder->structGep($cur, $nodeMap['hashNext'])
+            ),
+            $curSlot
+        );
+        $this->context->builder->branch($loopHead);
+
+        $this->context->builder->positionAtEnd($done);
         $this->context->builder->returnVoid();
     }
 

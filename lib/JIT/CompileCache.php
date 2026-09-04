@@ -2608,6 +2608,9 @@ final class CompileCache
         $parts[] = HelperRuntimeCache::llvmIdentityToken();
         $parts[] = hash_file('sha256', __DIR__.'/../JIT/Context.php') ?: '';
         $parts[] = hash_file('sha256', __DIR__.'/../JIT.php') ?: '';
+        // Hashtable string-key DJB index / unset (#36191 / #36732) — artifact restore
+        // must not keep pre-fix binaries when only Type/HashTable.php changed.
+        $parts[] = hash_file('sha256', __DIR__.'/Builtin/Type/HashTable.php') ?: '';
         $parts[] = hash_file('sha256', __DIR__.'/Builtin/AttributeRegistryLowering.php') ?: '';
         $parts[] = hash_file('sha256', __DIR__.'/../Runtime.php') ?: '';
         $parts[] = LazyBuiltins::fingerprintSegment();
