@@ -11,7 +11,7 @@
         "lib/JIT.php": {
             "budget": 23648,
             "target": 20000,
-            "note": "Concern trait splits (#36387/#36403); TernaryJumpIfEchoMergeAndReturnPhi + peers"
+            "note": "Concern trait splits (#36387/#36403); TernaryJumpIfEchoMerge + emitCfgReturnOperand"
         },
         "lib/VM.php": {
             "budget": 25586,

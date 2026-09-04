@@ -7059,7 +7059,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/CompileBlockInternal.php` | 0 | 51 |
 | `lib/JIT/Concern/EmitJitReturn.php` | 0 | 2 |
 | `lib/JIT/Concern/InitJitMethodCall.php` | 0 | 3 |
-| `lib/JIT/Concern/TernaryJumpIfEchoMergeAndReturnPhi.php` | 0 | 2 |
+| `lib/JIT/Concern/TernaryJumpIfEchoMerge.php` | 0 | 2 |
 | `lib/JIT/Context.php` | 0 | 334 |
 | `lib/JIT/DatePeriodForeachSnapshot.php` | 0 | 3 |
 | `lib/JIT/DeprecatedCallGuard.php` | 0 | 1 |
@@ -58123,10 +58123,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 - 1 closure(s)
 
-### `lib/JIT/Concern/TernaryJumpIfEchoMergeAndReturnPhi.php`
+### `lib/JIT/Concern/TernaryJumpIfEchoMerge.php`
 
 **Warnings** (review for bootstrap subset):
-- trait TernaryJumpIfEchoMergeAndReturnPhi (line 18)
+- trait TernaryJumpIfEchoMerge (line 17)
 - 42 class method(s)
 
 ### `lib/JIT/Context.php`

@@ -18,7 +18,7 @@ require_once __DIR__.'/JIT/Concern/InitJitMethodCall.php';
 require_once __DIR__.'/JIT/Concern/AssignOperand.php';
 require_once __DIR__.'/JIT/Concern/AdaptByRefCallArgs.php';
 require_once __DIR__.'/JIT/Concern/EmitJitReturn.php';
-require_once __DIR__.'/JIT/Concern/TernaryJumpIfEchoMergeAndReturnPhi.php';
+require_once __DIR__.'/JIT/Concern/TernaryJumpIfEchoMerge.php';
 require_once __DIR__.'/JIT/RuntimeInitVmContext.php';
 require_once __DIR__.'/JIT/RuntimeInitCompiler.php';
 require_once __DIR__.'/JIT/RuntimeInitParsePipeline.php';
@@ -54,7 +54,7 @@ class JIT {
     use AssignOperand;
     use AdaptByRefCallArgs;
     use EmitJitReturn;
-    use TernaryJumpIfEchoMergeAndReturnPhi;
+    use TernaryJumpIfEchoMerge;
 
     private static int $functionNumber = 0;
     private static int $blockNumber = 0;

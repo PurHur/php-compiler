@@ -5,17 +5,18 @@ declare(strict_types=1);
 namespace PHPCompiler;
 
 use PHPCfg\Operand;
-use PHPTypes\Type;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM;
 
 /**
- * Ternary / JUMPIF echo-merge and ?: return-phi helpers for JIT/AOT.
+ * Ternary / JUMPIF echo-merge, ?: return-phi, and arm-tail CFG RETURN helpers
+ * (#36387 / #36403).
  *
- * Branch-merge detection, literal echo merge, stack phi, and arm-tail CFG RETURN
- * lowering. Extracted from {@see \PHPCompiler\JIT} (#36387 / #36403).
+ * Extracted from {@see \PHPCompiler\JIT} so the hub keeps shrinking toward
+ * the 20k size-budget target (Concern trait; same namespace as parent).
+ * Includes {@see emitCfgReturnOperand} (#8555) after #36751 left it in the hub.
  */
-trait TernaryJumpIfEchoMergeAndReturnPhi
+trait TernaryJumpIfEchoMerge
 {
     /**
      * php-cfg dead operands before branchIf run before any successor; skip inside inlined
@@ -992,6 +993,7 @@ trait TernaryJumpIfEchoMergeAndReturnPhi
 
         return $this->context->getVariableFromOp($source);
     }
+
 
     /**
      * Lower CFG RETURN for a shared ?: phi at an arm tail (issue #8555).

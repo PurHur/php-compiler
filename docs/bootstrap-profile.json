@@ -7146,7 +7146,7 @@
         "lib/JIT/Concern/CompileBlockInternal.php",
         "lib/JIT/Concern/EmitJitReturn.php",
         "lib/JIT/Concern/InitJitMethodCall.php",
-        "lib/JIT/Concern/TernaryJumpIfEchoMergeAndReturnPhi.php",
+        "lib/JIT/Concern/TernaryJumpIfEchoMerge.php",
         "lib/JIT/Context.php",
         "lib/JIT/DatePeriodForeachSnapshot.php",
         "lib/JIT/DeprecatedCallGuard.php",
