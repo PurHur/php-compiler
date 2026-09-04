@@ -27,9 +27,14 @@ use PHPCompiler\ext\standard\rawurlencode;
 use PHPCompiler\ext\standard\sha1;
 use PHPCompiler\ext\standard\soundex;
 use PHPCompiler\ext\standard\sqrt;
+use PHPCompiler\ext\standard\str_repeat;
 use PHPCompiler\ext\standard\str_rot13;
+use PHPCompiler\ext\standard\strcasecmp;
+use PHPCompiler\ext\standard\strcmp;
 use PHPCompiler\ext\standard\string_trim;
+use PHPCompiler\ext\standard\strpos;
 use PHPCompiler\ext\standard\strtolower;
+use PHPCompiler\ext\standard\substr;
 use PHPCompiler\ext\standard\ucwords;
 use PHPCompiler\ext\standard\urldecode;
 use PHPCompiler\ext\standard\urlencode;
@@ -516,6 +521,71 @@ final class DiscardedPureCallElisionTest extends TestCase
         $block->addOpCode(new OpCode(OpCode::TYPE_ECHO));
 
         $this->assertFalse(Block::isEffectFreeVoidCalleeBody($block));
+    }
+
+    public function testElidesDiscardedSubstrOnTypedStringAndLong(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new substr();
+        $s = $this->makeStringVar(null);
+        $i = $this->makeNativeLongVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$s, $i]));
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$s, $i, $i]));
+    }
+
+    public function testDoesNotElideSubstrOnNullOffset(): void
+    {
+        // PHP 8.1+ deprecates substr($s, null) — keep live (#36386).
+        $context = $this->makeContext();
+        $builtin = new substr();
+        $s = $this->makeStringVar('hi');
+        $null = $this->makeNullVar();
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide($context, $builtin, [$s, $null]));
+    }
+
+    public function testElidesDiscardedStrRepeatOnTypedArgs(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new str_repeat();
+        $s = $this->makeStringVar('x');
+        $n = $this->makeNativeLongVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$s, $n]));
+    }
+
+    public function testElidesDiscardedStrcmpOnTypedStrings(): void
+    {
+        $context = $this->makeContext();
+        $a = $this->makeStringVar(null);
+        $b = $this->makeStringVar('y');
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, new strcmp(), [$a, $b]));
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, new strcasecmp(), [$a, $b]));
+    }
+
+    public function testElidesDiscardedStrposOnTypedStrings(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new strpos();
+        $hay = $this->makeStringVar(null);
+        $needle = $this->makeStringVar('e');
+        $off = $this->makeNativeLongVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$hay, $needle]));
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$hay, $needle, $off]));
+    }
+
+    public function testDoesNotElideStrposWithIntNeedle(): void
+    {
+        // PHP 8 deprecates int needles — must keep the call (#36386).
+        $context = $this->makeContext();
+        $builtin = new strpos();
+        $hay = $this->makeStringVar('abc');
+        $needle = $this->makeNativeLongVar();
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide($context, $builtin, [$hay, $needle]));
     }
 
     public function testJitWiresElisionBeforeInvoke(): void
