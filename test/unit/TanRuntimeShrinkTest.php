@@ -9,23 +9,29 @@ use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
 /**
- * tan() NestedJIT via JitVmHelperLink::ensureBridge (#28226 / peer MathCos #28042).
+ * tan() AOT uses libm tan(3) (#36386); TanJitHelper remains NestedJIT-safe
+ * reference (peer MathSin / SinJitHelper). LLVM 9 has no llvm.tan.f64.
+ *
+ * php-src: ext/standard/math.c PHP_FUNCTION(tan).
  */
 final class TanRuntimeShrinkTest extends TestCase
 {
-    public function testTanUsesJitHelperNotKernel(): void
+    public function testTanUsesLibmNotHelperBridge(): void
     {
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/tan.php');
         $this->assertStringContainsString('MathTan::invoke', $builtin);
         $this->assertStringNotContainsString("lookupFunction('tan')", $builtin);
 
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathTan.php');
-        $this->assertStringContainsString('TanJitHelper', $bridge);
+        $this->assertStringContainsString("LIBC_TAN = 'tan'", $bridge);
         $this->assertStringContainsString('phpc_tan', $bridge);
-        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringContainsString('tan_libm_f64_entry', $bridge);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('TanJitHelper', $bridge);
         $this->assertStringNotContainsString('JitTanKernel', $bridge);
         $this->assertStringNotContainsString('NestedJitCompileScope', $bridge);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
+        $this->assertStringNotContainsString('llvm.tan', $bridge);
     }
 
     public function testTanJitHelperInlinesNestedJitSafeAlgorithm(): void

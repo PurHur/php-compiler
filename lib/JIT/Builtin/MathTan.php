@@ -4,35 +4,35 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for tan() via TanJitHelper PHP (#15088, #27048, #28226).
+ * JIT/AOT link for tan() via libm {@code tan(3)} (#36386).
  *
- * Helper compile: {@see JitVmHelperLink::ensureBridge} (MathCos #28042 / MathSin #28016 shape).
- * NestedJIT no longer needs a libc tan(3) kernel — helper uses NestedJIT-safe sin/cos Horner.
- * php-src: ext/standard/math.c — PHP_FUNCTION(tan)
+ * Peer of {@see MathSin} / {@see MathCos}: avoid NestedJIT helper objects on
+ * the AOT hot path. php-src {@code ext/standard/math.c} {@code PHP_FUNCTION(tan)}
+ * → C {@code tan}. LLVM 9 has no tan intrinsic (unlike sin/cos/exp/log),
+ * so declare the libc symbol the linker already pulls via {@code -lm}
+ * ({@see NumberFormatRuntime} {@code floor} shape).
+ * The PHP Cody–Waite / Horner helper remains for NestedJIT-safe reference only.
  */
 final class MathTan
 {
+    /** Libc tan(3) — no LLVM 9 intrinsic peer of sin/cos. */
+    private const LIBC_TAN = 'tan';
+
+    /** Legacy ABI kept as a thin libm wrapper for any external callers. */
     private const ABI_TAN = 'phpc_tan';
 
-    private const HELPER_PATH = '/ext/standard/TanJitHelper.php';
-
-    private const TAN_HELPER = 'PHPCompiler\\ext\\standard\\TanJitHelper::tanArgv';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::TAN_HELPER,
-    ];
-
-    private const BRIDGE_ENTRY = 'tan_bridge_entry';
+    private const BRIDGE_ENTRY = 'tan_libm_f64_entry';
 
     public static function ensureLinked(Context $context): void
     {
-        self::implement($context);
+        self::libcTanDecl($context);
+        self::ensurePhpcTanBridge($context);
     }
 
     public static function ensureStandaloneBodies(Context $context): void
@@ -42,34 +42,60 @@ final class MathTan
 
     public static function invoke(Context $context, Value $num): Value
     {
-        self::ensureLinked($context);
-
-        return $context->builder->call(
-            $context->lookupFunction(self::ABI_TAN),
-            $num
-        );
+        return $context->builder->call(self::libcTanDecl($context), $num);
     }
 
-    private static function implement(Context $context): void
+    private static function libcTanDecl(Context $context): LlvmFunction
+    {
+        $func = $context->module->getNamedFunction(self::LIBC_TAN);
+        if (null !== $func) {
+            $context->registerFunction(self::LIBC_TAN, $func);
+
+            return $func;
+        }
+        $double = $context->getTypeFromString('double');
+        $fn = $context->module->addFunction(
+            self::LIBC_TAN,
+            $context->context->functionType($double, false, $double)
+        );
+        $context->registerFunction(self::LIBC_TAN, $fn);
+
+        return $fn;
+    }
+
+    /**
+     * Define {@code phpc_tan} → libm {@code tan} when missing. Skip if a prior
+     * NestedJIT bridge already filled the symbol (cannot replace LLVM bodies);
+     * {@see invoke} never calls that stale path.
+     */
+    private static function ensurePhpcTanBridge(Context $context): void
     {
         $probe = $context->module->getNamedFunction(self::ABI_TAN);
-        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction(self::ABI_TAN, $probe);
 
             return;
         }
 
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         $double = $context->getTypeFromString('double');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_TAN,
-            self::BRIDGE_ENTRY,
-            [$double],
-            $double,
-            self::TAN_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#28226'
+        $fn = $probe;
+        if (null === $fn) {
+            $fn = $context->module->addFunction(
+                self::ABI_TAN,
+                $context->context->functionType($double, false, $double)
+            );
+        }
+        $entry = $fn->appendBasicBlock(self::BRIDGE_ENTRY);
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue(
+            $context->builder->call(self::libcTanDecl($context), $fn->getParam(0))
         );
+        $context->registerFunction(self::ABI_TAN, $fn);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 }
