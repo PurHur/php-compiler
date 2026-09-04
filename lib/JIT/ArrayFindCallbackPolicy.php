@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\Lint\UnsupportedFeature;
+use PHPCompiler\Lint\UnsupportedRegistry;
 use PHPCompiler\VM\Variable as VMVariable;
 
 /**
@@ -80,13 +82,25 @@ final class ArrayFindCallbackPolicy
 
     public static function jitRejectionMessage(): string
     {
-        return 'array_find() callback must be '.self::JIT_SUBSET
-            .' for JIT/AOT in this compiler build; '.self::DEFERRED_KINDS.' are deferred (#3073)';
+        $row = UnsupportedRegistry::feature('array-callback-deferred');
+
+        return UnsupportedFeature::format(
+            $row['feature'],
+            $row['matrixRow'],
+            $row['issue'],
+            $row['alternative']
+        );
     }
 
     public static function vmRejectionMessage(): string
     {
-        return 'array callback must be a string builtin, user function, or closure in this compiler build; '
-            .self::DEFERRED_KINDS.' are deferred';
+        $row = UnsupportedRegistry::feature('array-callback-deferred');
+
+        return UnsupportedFeature::format(
+            $row['feature'],
+            $row['matrixRow'],
+            $row['issue'],
+            $row['alternative']
+        );
     }
 }

@@ -12,6 +12,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -98,9 +99,9 @@ final class ScriptExit
 
                     return;
                 }
-                throw new \LogicException('exit() only supports string or integer status in this compiler build');
+                UnsupportedFeature::raise('exit-status-type');
             default:
-                throw new \LogicException('exit() only supports string or integer status in this compiler build');
+                UnsupportedFeature::raise('exit-status-type');
         }
     }
 
@@ -135,7 +136,7 @@ final class ScriptExit
                 self::emitBoxedMessage($context, $context->helper->loadValue($arg));
                 return;
             default:
-                throw new \LogicException('exit() message must be string-coercible in this compiler build');
+                UnsupportedFeature::raise('exit-status-type');
         }
     }
 

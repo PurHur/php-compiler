@@ -128,6 +128,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/Lint/LintCompiler.php',
             'lib/Lint/Linter.php',
             'lib/Lint/UnsupportedRegistry.php',
+            'lib/Lint/UnsupportedFeature.php',
             'lib/MethodVisibility.php',
             'lib/Module.php',
             'lib/ModuleAbstract.php',

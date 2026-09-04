@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCfg\Operand\Literal;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPTypes\Type;
 
@@ -56,7 +57,10 @@ final class VmConstantJit
             case VmVariable::TYPE_ENUM_CASE:
                 return self::enumCaseVariable($context, $vm);
             default:
-                throw new \LogicException('Unsupported compile-time constant for JIT (vm type '.$vm->type.')');
+                UnsupportedFeature::raise(
+                    'jit-unsupported-vm-constant',
+                    'Unsupported compile-time constant for JIT (vm type '.$vm->type.')'
+                );
         }
     }
 

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\Lint\UnsupportedFeature;
+use PHPCompiler\Lint\UnsupportedRegistry;
 use PHPCompiler\VM\Variable as VMVariable;
 
 /**
@@ -26,8 +28,14 @@ final class ErrorHandlerCallbackPolicy
 
     public static function vmRejectionMessage(): string
     {
-        return 'set_error_handler() callback must be null or a string user-function name in this compiler build; '
-            .self::DEFERRED_KINDS.' are deferred (#1379, #142)';
+        $row = UnsupportedRegistry::feature('set-error-handler-callback');
+
+        return UnsupportedFeature::format(
+            $row['feature'],
+            $row['matrixRow'],
+            $row['issue'],
+            $row['alternative']
+        );
     }
 
     public static function isJitLowerable(Variable $callback): bool
@@ -54,8 +62,14 @@ final class ErrorHandlerCallbackPolicy
 
     public static function jitRejectionMessage(): string
     {
-        return 'set_error_handler() callback must be a compile-time string function name or closure in this compiler build; '
-            .self::DEFERRED_KINDS.' are deferred (#1379, #36382)';
+        $row = UnsupportedRegistry::feature('set-error-handler-callback');
+
+        return UnsupportedFeature::format(
+            $row['feature'],
+            $row['matrixRow'],
+            $row['issue'],
+            $row['alternative']
+        );
     }
 
     /**
