@@ -62,6 +62,23 @@ final class EnvironMirrorRuntime
             return;
         }
 
+        // common.o / helper-runtime already define the ABI; NestedJIT EnvironMirrorNative
+        // costs ~1.5s on every user-script cold compile (#36387). Peer MultipartRuntime.
+        if ($context->isUserScriptAot()
+            && \PHPCompiler\AOT\HelperRuntimeCache::enabled()) {
+            $htPtr = $context->getTypeFromString('__hashtable__*');
+            $void = $context->getTypeFromString('void');
+            $fn = null !== $probe
+                ? $probe
+                : $context->module->addFunction(
+                    self::ABI,
+                    $context->context->functionType($void, false, $htPtr)
+                );
+            $context->registerFunction(self::ABI, $fn);
+
+            return;
+        }
+
         self::implementEmbedBridge($context, $probe);
     }
 

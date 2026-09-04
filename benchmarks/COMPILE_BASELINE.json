@@ -1,62 +1,62 @@
 {
   "version": 2,
-  "generated_at": "2026-09-04T01:15:27Z",
+  "generated_at": "2026-09-04T09:23:30Z",
   "arch": "x86_64-linux",
   "wall_tolerance_percent": 20,
   "scaling_tolerance_percent": 20,
   "regeneration": "PHP_8_2=$(command -v php) ./script/bench-gate.sh --compile --update",
-  "note": "Compile-time gate for hello cold/warm/lint, MiniWebApp cold/warm/edit, and Compiler::compile scaling 50/100/200/400 (#36387). miniwebapp-edit mutates one Router method body token (not comment-only). Target \u226415 ms/stmt @ 400; one-file-edit Done-when \u226425% of cold (NestedJIT demote via rename+declaration).",
+  "note": "Compile-time gate for hello cold/warm/lint, MiniWebApp cold/warm/edit, and Compiler::compile scaling 50/100/200/400 (#36387). NestedJIT demote: HashTable sort ABIs lazy via ensureSortAbi; Multipart/Environ declare-only under helper-runtime. PendingHeaders still NestedJIT (common.o link needs phpc_base_convert). Target \u226415 ms/stmt @ 400; one-file-edit \u226425% of cold.",
   "cases": {
     "hello-cold": {
       "ok": true,
-      "wall_s": 3.495869,
-      "peak_rss_kb": 1596
+      "wall_s": 3.185144,
+      "peak_rss_kb": 1540
     },
     "hello-warm": {
       "ok": true,
-      "wall_s": 0.416612,
-      "peak_rss_kb": 1664
+      "wall_s": 0.103181,
+      "peak_rss_kb": 1700
     },
     "miniwebapp-cold": {
       "ok": true,
-      "wall_s": 8.429898,
-      "peak_rss_kb": 1608
+      "wall_s": 10.153764,
+      "peak_rss_kb": 1544
     },
     "miniwebapp-warm": {
       "ok": true,
-      "wall_s": 0.104177,
-      "peak_rss_kb": 1608
+      "wall_s": 0.102886,
+      "peak_rss_kb": 1488
     },
     "miniwebapp-edit": {
       "ok": true,
-      "wall_s": 1.94541,
-      "peak_rss_kb": 1456,
-      "pct_of_cold": 23.1
+      "wall_s": 1.951177,
+      "peak_rss_kb": 1692,
+      "pct_of_cold": 19.2
     },
     "hello-lint": {
       "ok": true,
-      "wall_s": 0.30716,
-      "peak_rss_kb": 1692
+      "wall_s": 0.309551,
+      "peak_rss_kb": 1540
     },
     "scale-50": {
       "ok": true,
-      "wall_s": 0.081233,
-      "ms_per_statement": 1.625
+      "wall_s": 0.089447,
+      "ms_per_statement": 1.789
     },
     "scale-100": {
       "ok": true,
-      "wall_s": 0.203007,
-      "ms_per_statement": 2.03
+      "wall_s": 0.216335,
+      "ms_per_statement": 2.163
     },
     "scale-200": {
       "ok": true,
-      "wall_s": 0.689031,
-      "ms_per_statement": 3.445
+      "wall_s": 0.728395,
+      "ms_per_statement": 3.642
     },
     "scale-400": {
       "ok": true,
-      "wall_s": 2.668172,
-      "ms_per_statement": 6.67
+      "wall_s": 3.07556,
+      "ms_per_statement": 7.689
     }
   }
 }

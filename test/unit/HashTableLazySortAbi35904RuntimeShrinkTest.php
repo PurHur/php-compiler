@@ -27,27 +27,31 @@ final class HashTableLazySortAbi35904RuntimeShrinkTest extends TestCase
             'sortStringKeysLocale',
             'sortStringKeyValuesLocale',
             'sortPackedNatural',
+            "registerFn('__hashtable__sortStringKeys'",
+            "registerFn('__hashtable__sortPacked'",
         ] as $forbidden) {
             $this->assertStringNotContainsString(
                 $forbidden,
                 $body,
-                'HashTable::register must not declare '.$forbidden.' (#35904)'
+                'HashTable::register must not declare '.$forbidden.' (#35904/#36387)'
             );
         }
         $this->assertStringNotContainsString("registerFn('__multisort__packed'", $body);
-        $this->assertStringContainsString('ensureSortAbi', $body);
-        $this->assertStringContainsString('sortStringKeyValuesNatural', $body);
+        $this->assertStringContainsString('ensureSortAbi', $source);
+        $this->assertStringContainsString("case '__hashtable__sortStringKeyValuesNatural':", $source);
+        $this->assertStringContainsString("case '__hashtable__sortStringKeys':", $source);
     }
 
     public function testRuntimesEnsureSortAbiForUsedAbiOnly(): void
     {
         $key = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/KeySortRuntime.php');
+        $this->assertStringContainsString('ensureSortAbi(self::ABI_KSORT)', $key);
         $this->assertStringContainsString('ensureSortAbi(self::ABI_KSORT_LOCALE)', $key);
         $ensurePos = strpos($key, 'public static function ensureLinked');
         $this->assertNotFalse($ensurePos);
-        $ensureNext = strpos($key, 'private static function assertAbi', $ensurePos);
-        $this->assertNotFalse($ensureNext);
-        $ensureBody = substr($key, $ensurePos, $ensureNext - $ensurePos);
+        $ensureEnd = strpos($key, "\n}", $ensurePos);
+        $this->assertNotFalse($ensureEnd);
+        $ensureBody = substr($key, $ensurePos, $ensureEnd - $ensurePos);
         $this->assertStringNotContainsString('ABI_KSORT_LOCALE', $ensureBody);
 
         $value = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ValueSortRuntime.php');

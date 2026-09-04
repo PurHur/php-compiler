@@ -238,6 +238,15 @@ class Refcount extends Builtin {
      */
     private function ensureDelrefHelperAbis(): void
     {
+        // User-script AOT: declare phpc_weakref_*/phpc_gc_* (resolved from helper-runtime /
+        // common.o at link) — skip NestedJIT WeakRefRegistry on every cold hello (#36387).
+        if ($this->context->isUserScriptAot()
+            && \PHPCompiler\AOT\HelperRuntimeCache::enabled()) {
+            \PHPCompiler\JIT\Builtin\WeakRefNative::registerDeclarations($this->context);
+            \PHPCompiler\JIT\Builtin\GcCollectCyclesRuntime::ensureDeclarations($this->context);
+
+            return;
+        }
         \PHPCompiler\JIT\Builtin\WeakRefRuntime::ensureLinked($this->context);
         \PHPCompiler\JIT\Builtin\WeakRefNative::registerDeclarations($this->context);
         \PHPCompiler\JIT\Builtin\GcCollectCyclesRuntime::ensureDeclarations($this->context);
