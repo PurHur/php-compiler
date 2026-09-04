@@ -24,6 +24,18 @@ Enable M1 in IR:
 
 Injected double-delref (unit test only): `PHP_COMPILER_RUNTIME_ASSERT_INJECT_DOUBLE_DELREF=1` calls `phpc_runtime_assert_inject_double_delref` (malloc counted header at rc 0, one delref) before `{main}`.
 
+### ASan / valgrind smoke (#36397)
+
+`PHP_COMPILER_ASAN=1` must link through a **host clang/gcc** driver (never raw `/opt/llvm9/ld` — ld rejects `-fsanitize=*`). Local gates:
+
+```bash
+./script/runtime-assert-asan-smoke.sh          # compile+run hello with ASan/UBSan
+./script/runtime-assert-valgrind-smoke.sh      # valgrind --error-exitcode=1 (skip if missing)
+make runtime-assert-asan-smoke
+```
+
+The 7-day ASan/valgrind streak Done-when is a scheduled host job; these scripts are the implementer proof that the link path works.
+
 ## Undefined array keys ([#273](https://github.com/PurHur/php-compiler/issues/273))
 
 When `error_reporting` includes `E_WARNING` (default in VM: full `E_ALL`):

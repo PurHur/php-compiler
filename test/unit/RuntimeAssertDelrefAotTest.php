@@ -22,6 +22,21 @@ final class RuntimeAssertDelrefAotTest extends TestCase
         $this->assertStringContainsString('**M1**', $doc);
         $this->assertStringContainsString('zend_gc.c', $doc);
         $this->assertStringContainsString('PHP_COMPILER_RUNTIME_ASSERT', $doc);
+        $this->assertStringContainsString('runtime-assert-asan-smoke.sh', $doc);
+        $this->assertStringContainsString('never raw `/opt/llvm9/ld`', $doc);
+    }
+
+    public function testAsanLinkSkipsRawLdDriver(): void
+    {
+        $src = (string) file_get_contents(dirname(__DIR__, 2).'/lib/AOT/Linker.php');
+        $this->assertStringContainsString('sanitizerRequested', $src);
+        $this->assertStringContainsString('Prefer clang/gcc (#36397)', $src);
+        $this->assertMatchesRegularExpression(
+            '/if \\(self::sanitizerRequested\\(\\)\\) \\{[^}]*linkWithSystemCompiler/s',
+            $src
+        );
+        $this->assertFileExists(dirname(__DIR__, 2).'/script/runtime-assert-asan-smoke.sh');
+        $this->assertFileExists(dirname(__DIR__, 2).'/script/runtime-assert-valgrind-smoke.sh');
     }
 
     public function testRefcountPhpEmitsM1Guard(): void
