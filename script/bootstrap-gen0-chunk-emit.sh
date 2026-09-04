@@ -15,8 +15,11 @@
 #   CHUNK_OUT_DIR          default build/chunks
 #   CHUNK_FORCE=1          ignore fresh receipt
 #   CHUNK_LINK_BINARY=1    also link a runnable .bin (slow; probe-only)
+#   CHUNK_PEER_MANIFESTS   colon-separated peer manifests (else auto from OUT_DIR/*.manifest.json)
+#   CHUNK_NO_PEER_MANIFESTS=1  skip auto peer-manifest join
 #   PHP_COMPILER_SPINE_CHUNK=1  default 1
 #   PHP_COMPILER_HELPER_RUNTIME_O=1  default 1 for chunk emit
+#   PHP_COMPILER_EXTERNAL_METHOD_MANIFEST  explicit override (wins over auto peers)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -91,6 +94,36 @@ if [[ "${LINK_BINARY}" == "1" ]]; then
   out_path="${BIN}"
 fi
 
+# Peer manifests (#36155 Phase C / #36387): bind cross-chunk symbols from earlier waves.
+# Explicit PHP_COMPILER_EXTERNAL_METHOD_MANIFEST wins; else CHUNK_PEER_MANIFESTS; else
+# every *.manifest.json already in OUT_DIR except this chunk's own export path.
+peer_manifests="${PHP_COMPILER_EXTERNAL_METHOD_MANIFEST:-}"
+if [[ -z "${peer_manifests}" && "${CHUNK_NO_PEER_MANIFESTS:-0}" != "1" ]]; then
+  if [[ -n "${CHUNK_PEER_MANIFESTS:-}" ]]; then
+    peer_manifests="${CHUNK_PEER_MANIFESTS}"
+  else
+    peer_manifests="$(php -r '
+$out = rtrim($argv[1], "/");
+$self = $argv[2];
+$paths = [];
+foreach (glob($out . "/*.manifest.json") ?: [] as $p) {
+    if (realpath($p) === realpath($self)) {
+        continue;
+    }
+    if (is_file($p) && filesize($p) > 0) {
+        $paths[] = $p;
+    }
+}
+sort($paths, SORT_STRING);
+echo implode(":", $paths);
+' "${OUT_DIR}" "${MANIFEST}" 2>/dev/null || true)"
+  fi
+fi
+if [[ -n "${peer_manifests}" ]]; then
+  peer_n="$(php -r 'echo substr_count($argv[1], ":") + (trim($argv[1]) === "" ? 0 : 1);' "${peer_manifests}" 2>/dev/null || echo 0)"
+  echo "bootstrap-gen0-chunk-emit: peer manifests=${peer_n}"
+fi
+
 set +e
 env PHP_COMPILER_SPINE_CHUNK="${PHP_COMPILER_SPINE_CHUNK:-1}" \
   PHP_COMPILER_HELPER_RUNTIME_O="${PHP_COMPILER_HELPER_RUNTIME_O:-1}" \
@@ -99,6 +132,7 @@ env PHP_COMPILER_SPINE_CHUNK="${PHP_COMPILER_SPINE_CHUNK:-1}" \
   PHP_COMPILER_EXTERNAL_STUBS_JSON="${STUBS}" \
   PHP_COMPILER_EMIT_BITCODE="${BITCODE}" \
   PHP_COMPILER_EXTERNAL_METHOD_MANIFEST_EXPORT="${MANIFEST}" \
+  PHP_COMPILER_EXTERNAL_METHOD_MANIFEST="${peer_manifests}" \
   php bin/compile.php -o "${out_path}" "${CHUNK_ENTRY}" >"${LOG}" 2>&1
 rc=$?
 set -e

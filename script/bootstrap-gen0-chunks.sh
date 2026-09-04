@@ -6,9 +6,14 @@
 # no-op when lowering fingerprints match; wall clock is process elapsed, not
 # the sum of serial chunk times.
 #
+# Waves: hub/requires (wave 0) finish before lib/ext/spine consumers so peer
+# manifests in CHUNK_OUT_DIR can bind cross-chunk symbols (#36155 Phase C).
+#
 # Usage:
 #   ./script/bootstrap-gen0-chunks.sh --micro=4
 #   ./script/bootstrap-gen0-chunks.sh --plan=build/chunks/plan.json
+#   ./script/bootstrap-gen0-chunks.sh --lib=AOT,Lint --ext=types
+#   ./script/bootstrap-gen0-chunks.sh --spine --strategy=sub --max-files=80
 #   CHUNK_JOBS=4 CHUNK_FORCE=1 ./script/bootstrap-gen0-chunks.sh --micro=4
 #
 # Env:
@@ -17,6 +22,7 @@
 #   CHUNK_FORCE=1       ignore fresh receipts
 #   CHUNK_LINK_BINARY=1 pass through (full link; slow)
 #   CHUNK_KEEP_GOING=1  finish the queue even after a failure
+#   CHUNK_WAVE_BARRIER=0  disable wave barriers (parallel across waves; peer manifests race)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -28,18 +34,29 @@ source "${ROOT}/script/php-env.sh"
 PLAN=""
 MICRO=""
 EXTS=""
+LIBS=""
+REQUIRES=""
+SPINE=0
+STRATEGY=""
+MAX_FILES=""
 OUT_DIR="${CHUNK_OUT_DIR:-${ROOT}/build/chunks}"
 JOBS="${CHUNK_JOBS:-0}"
 FORCE="${CHUNK_FORCE:-0}"
 LINK_BINARY="${CHUNK_LINK_BINARY:-0}"
 KEEP_GOING="${CHUNK_KEEP_GOING:-0}"
+WAVE_BARRIER="${CHUNK_WAVE_BARRIER:-1}"
 
 usage() {
   cat <<'EOF' >&2
-Usage: bootstrap-gen0-chunks.sh [--micro[=N]|--plan=PATH] [--ext=a,b]
-  --micro[=N]   generate + emit N micro fixtures (default 4)
-  --plan=PATH   emit chunks listed in an existing plan JSON
-  --ext=a,b     include extension chunks in a fresh plan (with --micro or alone)
+Usage: bootstrap-gen0-chunks.sh [plan opts | --plan=PATH]
+  --micro[=N]          generate + emit N micro fixtures (default 4)
+  --plan=PATH          emit chunks listed in an existing plan JSON
+  --ext=a,b            extension directory chunks
+  --lib=AOT,Lint       lib/<name> directory chunks
+  --requires=PATH      hub chunk from a requires list
+  --spine              partition compiler_lib_spine_smoke/main.php
+  --strategy=dir|sub|hub  spine partition strategy (with --spine)
+  --max-files=N        further split buckets larger than N files
 EOF
 }
 
@@ -49,12 +66,17 @@ for arg in "$@"; do
     --micro=*) MICRO="${arg#*=}" ;;
     --plan=*) PLAN="${arg#*=}" ;;
     --ext=*) EXTS="${arg#*=}" ;;
+    --lib=*) LIBS="${arg#*=}" ;;
+    --requires=*) REQUIRES="${arg#*=}" ;;
+    --spine) SPINE=1 ;;
+    --strategy=*) STRATEGY="${arg#*=}" ;;
+    --max-files=*) MAX_FILES="${arg#*=}" ;;
     -h|--help) usage; exit 0 ;;
     *) echo "bootstrap-gen0-chunks: unknown argument ${arg}" >&2; usage; exit 2 ;;
   esac
 done
 
-if [[ -z "${PLAN}" && -z "${MICRO}" && -z "${EXTS}" ]]; then
+if [[ -z "${PLAN}" && -z "${MICRO}" && -z "${EXTS}" && -z "${LIBS}" && -z "${REQUIRES}" && "${SPINE}" -eq 0 ]]; then
   MICRO=4
 fi
 
@@ -73,6 +95,21 @@ if [[ -z "${PLAN}" ]]; then
   fi
   if [[ -n "${EXTS}" ]]; then
     plan_args+=(--ext="${EXTS}")
+  fi
+  if [[ -n "${LIBS}" ]]; then
+    plan_args+=(--lib="${LIBS}")
+  fi
+  if [[ -n "${REQUIRES}" ]]; then
+    plan_args+=(--requires="${REQUIRES}")
+  fi
+  if [[ "${SPINE}" -eq 1 ]]; then
+    plan_args+=(--spine)
+  fi
+  if [[ -n "${STRATEGY}" ]]; then
+    plan_args+=(--strategy="${STRATEGY}")
+  fi
+  if [[ -n "${MAX_FILES}" ]]; then
+    plan_args+=(--max-files="${MAX_FILES}")
   fi
   php "${ROOT}/script/bootstrap-gen0-chunk-plan.php" "${plan_args[@]}"
 fi
@@ -94,36 +131,51 @@ if [[ "${JOBS}" -lt 1 ]]; then
   JOBS=1
 fi
 
-# TSV: chunk_id<TAB>entry
-CHUNK_TSV="$(php -r '
+# Wave TSV files: one per wave, lines chunk_id<TAB>entry
+WAVE_DIR="$(mktemp -d)"
+trap 'rm -rf "${WAVE_DIR}"' EXIT
+
+php -r '
 $p = json_decode(file_get_contents($argv[1]), true);
 if (!is_array($p) || !isset($p["chunks"]) || !is_array($p["chunks"]) || $p["chunks"] === []) {
     fwrite(STDERR, "bootstrap-gen0-chunks: invalid or empty plan\n");
     exit(1);
 }
+$dir = $argv[2];
+$waves = [];
 foreach ($p["chunks"] as $c) {
     if (!is_array($c) || empty($c["chunk_id"]) || empty($c["entry"])) {
         fwrite(STDERR, "bootstrap-gen0-chunks: plan chunk missing chunk_id/entry\n");
         exit(1);
     }
-    echo $c["chunk_id"], "\t", $c["entry"], "\n";
+    $w = (int) ($c["wave"] ?? 0);
+    $waves[$w][] = $c["chunk_id"] . "\t" . $c["entry"];
 }
+ksort($waves, SORT_NUMERIC);
+$names = [];
+foreach ($waves as $w => $lines) {
+    $path = $dir . "/wave-" . $w . ".tsv";
+    file_put_contents($path, implode("\n", $lines) . "\n");
+    $names[] = (string) $w;
+}
+echo implode(" ", $names), "\n";
+' "${PLAN}" "${WAVE_DIR}" >"${WAVE_DIR}/waves.txt"
+
+WAVE_LIST="$(tr -d '\n' <"${WAVE_DIR}/waves.txt")"
+total="$(php -r '
+$p = json_decode(file_get_contents($argv[1]), true);
+echo (int) ($p["chunk_count"] ?? count($p["chunks"] ?? []));
 ' "${PLAN}")"
 
-total="$(printf '%s\n' "${CHUNK_TSV}" | grep -c . || true)"
 if [[ "${total}" -eq 0 ]]; then
   echo "bootstrap-gen0-chunks: plan has zero chunks" >&2
   exit 1
 fi
 
-echo "bootstrap-gen0-chunks: ${total} chunk(s), ${JOBS} job(s), out=${OUT_DIR}"
+echo "bootstrap-gen0-chunks: ${total} chunk(s), ${JOBS} job(s), waves=[${WAVE_LIST}], barrier=${WAVE_BARRIER}, out=${OUT_DIR}"
 
 wall_start=$(date +%s)
-running=0
 fail_seen=0
-queue_file="$(mktemp)"
-printf '%s\n' "${CHUNK_TSV}" >"${queue_file}"
-exec 3<"${queue_file}"
 
 start_one() {
   local id="$1"
@@ -149,40 +201,62 @@ start_one() {
   ) &
 }
 
-queue_done=0
-while true; do
-  while [[ "${queue_done}" -eq 0 && "${running}" -lt "${JOBS}" ]]; do
+run_queue_file() {
+  local queue_file="$1"
+  local jobs_cap="$2"
+  local running=0
+  local queue_done=0
+  exec 3<"${queue_file}"
+  while true; do
+    while [[ "${queue_done}" -eq 0 && "${running}" -lt "${jobs_cap}" ]]; do
+      if [[ "${fail_seen}" -ne 0 && "${KEEP_GOING}" != "1" ]]; then
+        break
+      fi
+      if ! IFS=$'\t' read -r cid entry <&3; then
+        queue_done=1
+        break
+      fi
+      [[ -z "${cid}" ]] && continue
+      start_one "${cid}" "${entry}"
+      running=$((running + 1))
+    done
+    if [[ "${running}" -eq 0 ]]; then
+      break
+    fi
+    set +e
+    wait -n
+    wr=$?
+    set -e
+    running=$((running - 1))
+    if [[ "${wr}" -ne 0 ]]; then
+      fail_seen=1
+    fi
+  done
+  set +e
+  wait
+  set -e
+  exec 3<&-
+}
+
+if [[ "${WAVE_BARRIER}" == "0" ]]; then
+  # Flatten all waves into one parallel queue (peer manifests race).
+  flat="$(mktemp)"
+  for w in ${WAVE_LIST}; do
+    cat "${WAVE_DIR}/wave-${w}.tsv" >>"${flat}"
+  done
+  run_queue_file "${flat}" "${JOBS}"
+  rm -f "${flat}"
+else
+  for w in ${WAVE_LIST}; do
     if [[ "${fail_seen}" -ne 0 && "${KEEP_GOING}" != "1" ]]; then
       break
     fi
-    if ! IFS=$'\t' read -r cid entry <&3; then
-      queue_done=1
-      break
-    fi
-    [[ -z "${cid}" ]] && continue
-    start_one "${cid}" "${entry}"
-    running=$((running + 1))
+    wave_file="${WAVE_DIR}/wave-${w}.tsv"
+    wave_n="$(grep -c . "${wave_file}" || true)"
+    echo "bootstrap-gen0-chunks: wave ${w} — ${wave_n} chunk(s)"
+    run_queue_file "${wave_file}" "${JOBS}"
   done
-  if [[ "${running}" -eq 0 ]]; then
-    break
-  fi
-  set +e
-  wait -n
-  wr=$?
-  set -e
-  running=$((running - 1))
-  if [[ "${wr}" -ne 0 ]]; then
-    fail_seen=1
-  fi
-done
-
-# Drain remaining children after stop-on-fail or queue EOF
-set +e
-wait
-set -e
-running=0
-exec 3<&-
-rm -f "${queue_file}"
+fi
 
 wall=$(( $(date +%s) - wall_start ))
 
@@ -232,7 +306,7 @@ fi
 
 php -r '
 $summary = [
-    "version" => 1,
+    "version" => 2,
     "generated_at" => gmdate("c"),
     "plan" => $argv[1],
     "out_dir" => $argv[2],
@@ -242,12 +316,13 @@ $summary = [
     "ok" => (int) $argv[6],
     "skip" => (int) $argv[7],
     "fail" => (int) $argv[8],
-    "results" => json_decode($argv[9], true) ?: new stdClass(),
-    "note" => "Parallel object-only gen-0 chunk emit with receipt resume (#36387).",
+    "wave_barrier" => $argv[9] === "1",
+    "results" => json_decode($argv[10], true) ?: new stdClass(),
+    "note" => "Wave-barrier object-only gen-0 chunk emit with peer-manifest bind + receipt resume (#36387).",
 ];
-file_put_contents($argv[10], json_encode($summary, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
+file_put_contents($argv[11], json_encode($summary, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
 ' "${PLAN}" "${OUT_DIR}" "${JOBS}" "${wall}" "${total}" "${ok}" "${skip}" "${fail}" \
-  "${RESULTS_JSON}" "${SUMMARY}"
+  "${WAVE_BARRIER}" "${RESULTS_JSON}" "${SUMMARY}"
 
 echo "bootstrap-gen0-chunks: wall=${wall}s total=${total} ok=${ok} skip=${skip} fail=${fail} summary=${SUMMARY}"
 
