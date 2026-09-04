@@ -907,6 +907,19 @@ H;
 PROBE,
         ],
         [
+            'id' => 'override_attribute',
+            'construct' => 'PHP 8.3 `#[\\Override]` on methods',
+            'opcodes' => [],
+            'issue' => 36384,
+            'profile' => '8.3',
+            'notes' => [
+                'php-src Zend/zend_compile.c zend_compile_override_attribute; lib/Compiler/OverrideValidator.php',
+                'Enabled on PROFILE≥8.3 / stable 8.4+ (CompilerVersion::supportsOverrideAttribute); reference 8.2 phantom gate withholds',
+                'Language baseline ADR: docs/adr/36384-php-83-baseline.md',
+            ],
+            'probe' => 'class A { public function f(): int { return 1; } } class B extends A { #[\\Override] public function f(): int { return 2; } } echo (new B())->f();',
+        ],
+        [
             'id' => 'datetime_oop',
             'construct' => 'DateTime / DateTimeZone OOP',
             'opcodes' => ['TYPE_NEW'],
@@ -982,14 +995,244 @@ function probeAotCompile(string $code): bool
     return probeCompile($code, PHPCompiler\Runtime::MODE_AOT);
 }
 
+/** Committed execute-probe cache path (#36384). */
+function syntaxProbeCachePath(string $root): string
+{
+    return $root . '/script/capability-syntax-probe-cache.json';
+}
+
+/**
+ * Lowering fingerprint for probe-cache invalidation (#36384).
+ * Prefer bootstrap lowering fingerprint; fall back to probe-definition hash.
+ */
+function syntaxProbeLoweringFingerprint(string $root): string
+{
+    $fpScript = $root . '/script/bootstrap-lowering-source-fingerprint.php';
+    if (is_readable($fpScript)) {
+        require_once $fpScript;
+        if (function_exists('bootstrap_lowering_source_fingerprint')) {
+            return bootstrap_lowering_source_fingerprint($root);
+        }
+    }
+
+    return hash('sha256', 'capability-syntax-probe-defs');
+}
+
+/**
+ * @param list<array{id: string, probe?: ?string}> $definitions
+ */
+function syntaxProbeDefinitionsHash(array $definitions): string
+{
+    $payload = [];
+    foreach ($definitions as $def) {
+        $payload[] = [
+            'id' => $def['id'],
+            'probe' => $def['probe'] ?? null,
+            'profile' => $def['profile'] ?? null,
+        ];
+    }
+
+    return hash('sha256', json_encode($payload, JSON_UNESCAPED_SLASHES));
+}
+
+/**
+ * @return array{lowering_fingerprint: string, definitions_hash: string, rows: array<string, array{vm: string, aot: string}>}|null
+ */
+function loadSyntaxProbeCache(string $root): ?array
+{
+    $path = syntaxProbeCachePath($root);
+    if (!is_readable($path)) {
+        return null;
+    }
+    $decoded = json_decode((string) file_get_contents($path), true);
+    if (!is_array($decoded) || !isset($decoded['rows']) || !is_array($decoded['rows'])) {
+        return null;
+    }
+
+    return $decoded;
+}
+
+/**
+ * Run a short probe in a subprocess so exit()/fatal cannot kill the generator (#36384).
+ *
+ * @return array{ok: bool, stdout: string, stderr: string, exit: int}
+ */
+function syntaxProbeSubprocess(string $phpBin, array $phpArgs, string $code, ?string $profile = null): array
+{
+    $dir = sys_get_temp_dir() . '/phpc-syntax-probe-' . getmypid() . '-' . bin2hex(random_bytes(4));
+    if (!is_dir($dir) && !mkdir($dir, 0700, true) && !is_dir($dir)) {
+        return ['ok' => false, 'stdout' => '', 'stderr' => 'mkdir failed', 'exit' => 127];
+    }
+    $file = $dir . '/probe.php';
+    file_put_contents($file, "<?php\n" . $code . "\n");
+
+    $cmd = array_merge([$phpBin], $phpArgs, [$file]);
+    if (null !== $profile && '' !== $profile) {
+        $cmd = array_merge(['env', 'PHP_COMPILER_PROFILE=' . $profile], $cmd);
+    }
+    $desc = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+    $proc = proc_open($cmd, $desc, $pipes, $dir, null);
+    if (!is_resource($proc)) {
+        @unlink($file);
+        @rmdir($dir);
+
+        return ['ok' => false, 'stdout' => '', 'stderr' => 'proc_open failed', 'exit' => 127];
+    }
+    fclose($pipes[0]);
+    stream_set_timeout($pipes[1], 30);
+    stream_set_timeout($pipes[2], 30);
+    $stdout = stream_get_contents($pipes[1]) ?: '';
+    $stderr = stream_get_contents($pipes[2]) ?: '';
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+    $exit = proc_close($proc);
+    @unlink($file);
+    @rmdir($dir);
+
+    return [
+        'ok' => 0 === $exit,
+        'stdout' => $stdout,
+        'stderr' => $stderr,
+        'exit' => $exit,
+    ];
+}
+
+/**
+ * Observed VM status vs Zend for one probe (#36384).
+ *
+ * @return 'yes'|'compile-error'|'runtime-error'|'wrong-output'
+ */
+function probeVmExecuteObserved(string $root, string $code, ?string $profile = null): string
+{
+    $phpBin = PHP_BINARY !== '' ? PHP_BINARY : 'php';
+    $zend = syntaxProbeSubprocess($phpBin, ['-d', 'display_errors=0'], $code, null);
+    $vmBin = $root . '/bin/vm.php';
+    if (!is_readable($vmBin)) {
+        return probeVmCompile($code) ? 'yes' : 'compile-error';
+    }
+    $vm = syntaxProbeSubprocess($phpBin, [$vmBin], $code, $profile);
+    $zendCompileFail = !$zend['ok'] && (
+        str_contains($zend['stderr'] . $zend['stdout'], 'Parse error')
+        || str_contains($zend['stderr'] . $zend['stdout'], 'syntax error')
+    );
+    $vmCompileFail = !$vm['ok'] && (
+        str_contains($vm['stderr'] . $vm['stdout'], 'Parse error')
+        || str_contains($vm['stderr'] . $vm['stdout'], 'syntax error')
+        || str_contains($vm['stderr'], 'parseAndCompile')
+    );
+
+    // Shared reject / shared expected-error → honest observed labels (#36384).
+    if (!$zend['ok'] && !$vm['ok']) {
+        if ($zendCompileFail && $vmCompileFail) {
+            return 'compile-error';
+        }
+        if (!$zendCompileFail && !$vmCompileFail) {
+            // Both threw at runtime (e.g. readonly write Error) — feature parity.
+            return 'yes';
+        }
+
+        return 'runtime-error';
+    }
+    if ($zend['ok'] && !$vm['ok']) {
+        return $vmCompileFail ? 'compile-error' : 'runtime-error';
+    }
+    if (!$zend['ok'] && $vm['ok']) {
+        return 'wrong-output';
+    }
+    if ($vm['stdout'] !== $zend['stdout']) {
+        return 'wrong-output';
+    }
+
+    return 'yes';
+}
+
+/**
+ * Observed AOT compile status for one probe (#36384). Full AOT link+execute stays in differential.
+ *
+ * @return 'yes'|'compile-error'
+ */
+function probeAotCompileObserved(string $code, ?string $profile = null): string
+{
+    $prev = getenv('PHP_COMPILER_PROFILE');
+    if (null !== $profile && '' !== $profile) {
+        putenv('PHP_COMPILER_PROFILE=' . $profile);
+    }
+    try {
+        return probeAotCompile($code) ? 'yes' : 'compile-error';
+    } finally {
+        putenv(false === $prev || '' === $prev
+            ? 'PHP_COMPILER_PROFILE'
+            : 'PHP_COMPILER_PROFILE=' . $prev);
+    }
+}
+
+/**
+ * Refresh committed probe cache (VM execute vs Zend + AOT compile) (#36384).
+ *
+ * @param list<array{id: string, construct: string, opcodes: list<string>, issue: int, notes: list<string>, probe: ?string, aot?: bool, profile?: string}> $definitions
+ * @return array{lowering_fingerprint: string, definitions_hash: string, rows: array<string, array{vm: string, aot: string}>}
+ */
+function refreshSyntaxProbeCache(string $root, array $definitions): array
+{
+    $rows = [];
+    foreach ($definitions as $def) {
+        $probe = $def['probe'] ?? null;
+        if (!is_string($probe) || '' === $probe) {
+            continue;
+        }
+        $profile = isset($def['profile']) && is_string($def['profile']) ? $def['profile'] : null;
+        $rows[$def['id']] = [
+            'vm' => probeVmExecuteObserved($root, $probe, $profile),
+            'aot' => probeAotCompileObserved($probe, $profile),
+        ];
+    }
+    $cache = [
+        'issue' => 36384,
+        'generated_at' => gmdate('c'),
+        'lowering_fingerprint' => syntaxProbeLoweringFingerprint($root),
+        'definitions_hash' => syntaxProbeDefinitionsHash($definitions),
+        'rows' => $rows,
+    ];
+    $path = syntaxProbeCachePath($root);
+    file_put_contents(
+        $path,
+        json_encode($cache, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n"
+    );
+
+    return $cache;
+}
+
+/**
+ * Map observed status to table cell: keep rich labels for errors, yes stays yes (#36384).
+ *
+ * @param bool|string $value
+ * @return bool|string
+ */
+function syntaxStatusFromObserved($legacyBool, ?string $observed)
+{
+    if (null === $observed || '' === $observed) {
+        return $legacyBool;
+    }
+    if ('yes' === $observed) {
+        return true;
+    }
+
+    return $observed;
+}
+
 /**
  * @param list<array{id: string, construct: string, opcodes: list<string>, issue: int, notes: list<string>, probe: ?string, aot?: bool}> $definitions
- * @return list<array{construct: string, vm: bool, jit: bool, aot: bool, issue: int, notes: list<string>}>
+ * @param array{lowering_fingerprint?: string, definitions_hash?: string, rows?: array<string, array{vm?: string, aot?: string}>}|null $probeCache
+ * @return list<array{construct: string, vm: bool|string, jit: bool|string, aot: bool|string, issue: int, notes: list<string>}>
  */
-function collectSyntaxCapabilities(string $root, array $definitions, array $handlers): array
+function collectSyntaxCapabilities(string $root, array $definitions, array $handlers, ?array $probeCache = null): array
 {
     $phpt = collectSyntaxPhptCoverage($root, $definitions);
     $rows = [];
+    $cacheRows = is_array($probeCache['rows'] ?? null) ? $probeCache['rows'] : [];
+    $defsHash = syntaxProbeDefinitionsHash($definitions);
+    $cacheUsable = $cacheRows !== []
+        && ($probeCache['definitions_hash'] ?? '') === $defsHash;
 
     foreach ($definitions as $def) {
         // Profile-gated features (typed statics 8.3+, asymmetric visibility
@@ -1029,7 +1272,22 @@ function collectSyntaxCapabilities(string $root, array $definitions, array $hand
         foreach ($phpt[$def['id']] ?? [] as $tag) {
             $notes[] = $tag;
         }
-        if (!$jit && $vm) {
+        $observed = $cacheUsable ? ($cacheRows[$def['id']] ?? null) : null;
+        if (is_array($observed)) {
+            $vmObs = isset($observed['vm']) && is_string($observed['vm']) ? $observed['vm'] : null;
+            $aotObs = isset($observed['aot']) && is_string($observed['aot']) ? $observed['aot'] : null;
+            $vm = syntaxStatusFromObserved($vm, $vmObs);
+            $aot = syntaxStatusFromObserved($aot, $aotObs);
+            if (null !== $vmObs && 'yes' !== $vmObs) {
+                $notes[] = 'VM probe: ' . $vmObs . ' (#36384)';
+            }
+            if (null !== $aotObs && 'yes' !== $aotObs) {
+                $notes[] = 'AOT probe: ' . $aotObs . ' (#36384)';
+            }
+        }
+        $vmYes = $vm === true || $vm === 'yes';
+        $jitYes = $jit === true || $jit === 'yes';
+        if (!$jitYes && $vmYes) {
             $notes[] = 'VM-only lowering';
         }
         $rows[] = [
@@ -1136,7 +1394,7 @@ function collectSyntaxPhptCoverage(string $root, array $definitions): array
 }
 
 /**
- * @param list<array{construct: string, vm: bool, jit: bool, aot: bool, issue: int, notes: list<string>}> $syntax
+ * @param list<array{construct: string, vm: bool|string, jit: bool|string, aot: bool|string, issue: int, notes: list<string>}> $syntax
  */
 function renderSyntaxMarkdown(array $syntax): string
 {
@@ -1145,6 +1403,9 @@ function renderSyntaxMarkdown(array $syntax): string
         '',
         'Auto-generated by `script/capability-syntax.php`. Do not edit by hand.',
         '',
+        '**Language baseline (v2.0):** PHP **8.3** semantics — see [ADR #36384](adr/36384-php-83-baseline.md).',
+        '`PHP_COMPILER_PROFILE=8.4`+ remains an opt-in forward profile. Host/tooling PHP may stay 8.2.x.',
+        '',
         'User-defined classes, methods, visibility, `instanceof`, `match`, and arrow functions.',
         'Builtin functions are in [capabilities.md](capabilities.md).',
         '',
@@ -1152,7 +1413,7 @@ function renderSyntaxMarkdown(array $syntax): string
         . '145), [#138](' . CAPABILITY_ISSUE_URL_BASE . '138), [#568](' . CAPABILITY_ISSUE_URL_BASE
         . '568) (link closed), [#764](' . CAPABILITY_ISSUE_URL_BASE . '764) (execute closed), [#143]('
         . CAPABILITY_ISSUE_URL_BASE . '143), [#142](' . CAPABILITY_ISSUE_URL_BASE . '142), [#199]('
-        . CAPABILITY_ISSUE_URL_BASE . '199).',
+        . CAPABILITY_ISSUE_URL_BASE . '199), [#36384](' . CAPABILITY_ISSUE_URL_BASE . '36384).',
         '',
         '| Construct | VM | JIT | AOT | Issue | Notes |',
         '|-----------|:--:|:---:|:---:|-------|-------|',
@@ -1162,9 +1423,9 @@ function renderSyntaxMarkdown(array $syntax): string
         $lines[] = sprintf(
             '| %s | %s | %s | %s | [#%d](%s%d) | %s |',
             $row['construct'],
-            capabilityYesNo($row['vm']),
-            capabilityYesNo($row['jit']),
-            capabilityYesNo($row['aot']),
+            capabilityCell($row['vm']),
+            capabilityCell($row['jit']),
+            capabilityCell($row['aot']),
             $row['issue'],
             CAPABILITY_ISSUE_URL_BASE,
             $row['issue'],
@@ -1173,7 +1434,7 @@ function renderSyntaxMarkdown(array $syntax): string
     }
 
     $lines[] = '';
-    $lines[] = '_Syntax AOT column reflects `Runtime::MODE_AOT` compile probes unless a row pins AOT (e.g. native user-class link)._';
+    $lines[] = '_VM cells prefer fingerprint-cached execute-vs-Zend probes (`script/capability-syntax-probe-cache.json`); refresh with `php script/capability-syntax.php --refresh-probes` (#36384). AOT cells use `Runtime::MODE_AOT` compile probes unless a row pins AOT. JIT remains opcode-handler coverage (MCJIT execute still flaky — #98)._';
     $lines[] = '';
 
     return implode("\n", $lines);
