@@ -607,6 +607,7 @@ function run(string $filename, string $code, array $options): void
             }
         }
     }
+    $eagerThinPregHelpers = false;
     if ([] !== $includes && !$skipBundle) {
         $projectRoot = DeployRoot::findProjectRootForPath($filename);
         // Large Composer graphs (Slim ~99 units): mega-concat OOMs on 8g hosts. Emit
@@ -614,6 +615,8 @@ function run(string $filename, string $code, array $options): void
         if (SourceBundler::shouldUseIncrementalRequires($includes)) {
             $unitCount = \count($includes);
             $code = SourceBundler::entryWithIncrementalRequires($filename, $includes);
+            // NestedJIT preg into a fat Slim module stalls Uri.php for minutes — do it early (#36382).
+            $eagerThinPregHelpers = true;
             fwrite(
                 STDERR,
                 'phpc build: incremental IncludeHelper requires for '.$unitCount
@@ -650,6 +653,10 @@ function run(string $filename, string $code, array $options): void
     // Reuse discovery Runtime when present — avoid a second MODE_AOT construct (#36387).
     if (!$runtime instanceof Runtime) {
         $runtime = new Runtime(Runtime::MODE_AOT);
+    }
+    if ($eagerThinPregHelpers) {
+        $runtime->eagerThinPregHelpers = true;
+        fwrite(STDERR, "phpc build: eager thin preg NestedJIT before IncludeHelper graph (#36382)\n");
     }
     \PHPCompiler\AOT\BuildTiming::end('boot_runtime');
     $allowlistEnv = getenv('PHP_COMPILER_AOT_INCLUDE_ALLOWLIST');
