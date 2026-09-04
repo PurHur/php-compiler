@@ -51736,7 +51736,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/KeySortRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 10 class method(s)
+- 9 class method(s)
 
 ### `lib/JIT/Builtin/LastErrorRuntime.php`
 
@@ -52225,11 +52225,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/MultipartRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new phpc_native_ht_alloc (line 295)
-- new phpc_native_ht_set_string_key (line 296)
-- new phpc_native_ht_set_string_key_ht (line 297)
-- new phpc_native_ht_set_string_at (line 298)
-- new phpc_native_ht_set_hashtable_at (line 299)
+- new phpc_native_ht_alloc (line 316)
+- new phpc_native_ht_set_string_key (line 317)
+- new phpc_native_ht_set_string_key_ht (line 318)
+- new phpc_native_ht_set_string_at (line 319)
+- new phpc_native_ht_set_hashtable_at (line 320)
 - 14 class method(s)
 
 ### `lib/JIT/Builtin/MultisortRuntime.php`
@@ -55140,7 +55140,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ValueSortRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 8 class method(s)
 
 ### `lib/JIT/Builtin/VarArg.php`
 
@@ -65190,8 +65190,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new JITVariable (line 35)
 - new JITVariable (line 50)
-- new JITVariable (line 380)
-- new JITVariable (line 440)
+- new JITVariable (line 384)
+- new JITVariable (line 444)
 - 21 class method(s)
 
 ### `lib/VM/SplHtPosIteratorJitHelper.php`

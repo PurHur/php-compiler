@@ -38,6 +38,27 @@ final class MultipartRuntime
 
     public static function ensureUserScriptLinked(Context $context): void
     {
+        // Helper-runtime common.o already defines __compiler_multipart_populate_post_body.
+        // NestedJIT JitMultipartKernel costs ~2.5s on every hello-world cold compile (#36387).
+        if ($context->isUserScriptAot()
+            && \PHPCompiler\AOT\HelperRuntimeCache::enabled()) {
+            LibcExtern::register($context);
+            LibcExtern::ensureStrlenDecl($context);
+            LibcExtern::ensureStrncmp($context);
+            ParseStrRuntime::ensureUserScriptLinked($context);
+            $htPtr = $context->getTypeFromString('__hashtable__*');
+            if (null === $context->module->getNamedGlobal('sg_FILES')) {
+                $g = $context->module->addGlobal($htPtr, 'sg_FILES');
+                $g->setInitializer($htPtr->constNull());
+            }
+            $probe = $context->module->getNamedFunction(self::LEGACY_RUNTIME_FUNCTION);
+            if (null === $probe) {
+                $probe = self::declareLegacyFunction($context);
+            }
+            $context->registerFunction(self::LEGACY_RUNTIME_FUNCTION, $probe);
+
+            return;
+        }
         self::implementUserScript($context);
     }
 

@@ -180,19 +180,11 @@ final class KeySortRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        self::assertAbi($context, self::ABI_KSORT);
-        self::assertAbi($context, self::ABI_KSORT_CASE);
-        self::assertAbi($context, self::ABI_KRSORT);
-        self::assertAbi($context, self::ABI_KRSORT_CASE);
+        $ht = $context->type->hashtable;
+        $ht->ensureSortAbi(self::ABI_KSORT);
+        $ht->ensureSortAbi(self::ABI_KSORT_CASE);
+        $ht->ensureSortAbi(self::ABI_KRSORT);
+        $ht->ensureSortAbi(self::ABI_KRSORT_CASE);
         // locale ABI is ensureSortAbi on ksortByKeyLocale only (#35904).
-    }
-
-    private static function assertAbi(Context $context, string $name): void
-    {
-        $fn = $context->module->getNamedFunction($name);
-        if (null === $fn || 0 === $fn->countBasicBlocks()) {
-            throw new \LogicException($name.' missing after HashTable type init (#27227)');
-        }
-        $context->registerFunction($name, $fn);
     }
 }

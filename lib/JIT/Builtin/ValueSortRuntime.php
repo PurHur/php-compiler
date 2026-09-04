@@ -101,17 +101,7 @@ final class ValueSortRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        self::assertAbi($context, self::ABI_ASORT);
-        self::assertAbi($context, self::ABI_ARSORT);
-        // locale ABI is ensureSortAbi on asortByValueLocale only (#35904).
-    }
-
-    private static function assertAbi(Context $context, string $name): void
-    {
-        $fn = $context->module->getNamedFunction($name);
-        if (null === $fn || 0 === $fn->countBasicBlocks()) {
-            throw new \LogicException($name.' missing after HashTable type init (#27227)');
-        }
-        $context->registerFunction($name, $fn);
+        // Regular/case asort/arsort use ValueSortKeyedLlvm — no HT sort ABI (#33620).
+        // Locale still ensureSortAbi on asortByValueLocale (#35904).
     }
 }

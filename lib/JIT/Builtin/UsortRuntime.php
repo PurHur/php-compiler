@@ -193,6 +193,7 @@ final class UsortRuntime
         }
 
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        $context->type->hashtable->ensureSortAbi('__hashtable__sortStringKeyValues');
         $context->builder->call($context->lookupFunction('__hashtable__sortStringKeyValues'), $ht);
     }
 
