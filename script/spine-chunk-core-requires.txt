@@ -2,6 +2,11 @@
 # Prepended before ext/<name> requires so Zend + compiler see ModuleAbstract, Func\Internal, VM.
 # lib/Block.php: findVariableInParentFrames forward refs fixed (#36155); full isolated
 # TU still blocked on ObjectInstancePropertyLlvm — omit until that slice lands.
+#
+# Capacity under 8g (#36387): do NOT emit this list as one TU. Plan with
+#   ./script/bootstrap-gen0-chunks.sh --requires=script/spine-chunk-core-requires.txt --max-bytes=120000
+# Largest-first packing isolates Runtime.php / CompilerVersion.php / Variable.php as
+# singleton hubs; packed small hubs emit in ~25s. Monolithic hub-core OOMs at 10g.
 lib/OpCode.php
 lib/Frame.php
 lib/Func.php

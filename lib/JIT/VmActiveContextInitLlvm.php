@@ -29,6 +29,11 @@ final class VmActiveContextInitLlvm
         if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
             return;
         }
+        // Spine split-TU hubs are object-only link inputs — not runnable thin AOT mains.
+        // Runtime/vmContext property init needs ClassEntry layouts that partial TUs omit (#36387).
+        if (\PHPCompiler\AOT\ExternalMethodBind::spineChunkMode()) {
+            return;
+        }
         if (!$context->isThinStandaloneAotMain()) {
             return;
         }
@@ -42,6 +47,9 @@ final class VmActiveContextInitLlvm
             return;
         }
         if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
+            return;
+        }
+        if (\PHPCompiler\AOT\ExternalMethodBind::spineChunkMode()) {
             return;
         }
         if (!$context->isThinStandaloneAotMain()) {

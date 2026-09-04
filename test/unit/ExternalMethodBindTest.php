@@ -241,6 +241,47 @@ final class ExternalMethodBindTest extends TestCase
     }
 
     /**
+     * SPINE_CHUNK + AOT_USER_SCRIPT (compile.php -o latch) must still stub unlowered methods
+     * so capacity-split hubs can emit under 8g (#36387 / #36202).
+     */
+    public function testSpineChunkUserScriptKeepsUnloweredExternalMethod(): void
+    {
+        putenv(ExternalMethodBind::ENV_SPINE_CHUNK.'=1');
+        $_ENV[ExternalMethodBind::ENV_SPINE_CHUNK] = '1';
+        putenv('PHP_COMPILER_AOT_USER_SCRIPT=1');
+        $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
+        UserScriptAotEnv::latchUserScript();
+        $runtime = new Runtime(Runtime::MODE_AOT);
+        $ctx = new JIT\Context($runtime, JIT\Builtin::LOAD_TYPE_STANDALONE);
+        $this->assertTrue($ctx->isUserScriptAot());
+        $this->assertTrue(ExternalMethodBind::spineChunkMode());
+        $proxy = $ctx->resolveFunctionProxy('ffi::new');
+        $this->assertInstanceOf(ExternalMethod::class, $proxy);
+        $dt = $ctx->resolveFunctionProxy('datetime::__serialize');
+        $this->assertInstanceOf(ExternalMethod::class, $dt);
+    }
+
+    /**
+     * Object-only spine hubs must not schedule thin Runtime/vmContext __init__ — ClassEntry
+     * layouts for Context props are often in a peer TU (#36387).
+     */
+    public function testSpineChunkSkipsThinStandaloneVmContextInit(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $src = (string) file_get_contents($root.'/lib/JIT/VmActiveContextInitLlvm.php');
+        $this->assertStringContainsString('spineChunkMode()', $src);
+        $this->assertStringContainsString('object-only link inputs', $src);
+        $this->assertMatchesRegularExpression(
+            '/requestThinStandaloneInit.*spineChunkMode\(\).*return/s',
+            $src
+        );
+        $this->assertMatchesRegularExpression(
+            '/emitPendingBeforeSeal.*spineChunkMode\(\).*return/s',
+            $src
+        );
+    }
+
+    /**
      * SPINE_CHUNK binds object::method static proxies to NestedVm Variable/HashTable helpers
      * (#36147 / #36155 follow-up).
      */

@@ -14,6 +14,9 @@ declare(strict_types=1);
  *   --spine              partition test/selfhost/compiler_lib_spine_smoke/main.php
  *   --strategy=dir|sub|hub   spine partition strategy (default dir; see spine-split-probe.php)
  *   --max-files=N        further split any bucket larger than N files (capacity under 8g)
+ *   --max-bytes=N        further split when cumulative .php source bytes exceed N
+ *                        (hubs with Runtime.php / Variable.php need this — file count alone
+ *                        understates NestedJIT peak RSS; hub-core@33 files OOMs at 8g)
  *   --plan-out=PATH      write JSON (default stdout)
  *   --entries-dir=D      where generated entry .php files go (default build/chunks/entries)
  *
@@ -29,6 +32,7 @@ $requiresFiles = [];
 $spine = false;
 $strategy = 'dir';
 $maxFiles = 0;
+$maxBytes = 0;
 $planOut = null;
 $entriesDir = $root.'/build/chunks/entries';
 
@@ -58,6 +62,10 @@ foreach (array_slice($argv, 1) as $arg) {
     }
     if (str_starts_with($arg, '--max-files=')) {
         $maxFiles = max(0, (int) substr($arg, 12));
+        continue;
+    }
+    if (str_starts_with($arg, '--max-bytes=')) {
+        $maxBytes = max(0, (int) substr($arg, 12));
         continue;
     }
     if (str_starts_with($arg, '--ext=')) {
@@ -201,21 +209,85 @@ $collectDirRels = static function (string $srcDir) use ($root): array {
 };
 
 /**
- * Split a list into batches of at most $max files (0 = no split).
+ * Split a list into batches bounded by file count and/or cumulative source bytes.
+ * A single oversized file always gets its own batch (cannot shrink further here).
+ * When $preferLargeAlone is true (hubs), sort largest-first so Runtime.php /
+ * CompilerVersion.php become singleton TUs instead of poisoning a pack of smalls
+ * (#36387: hub-core@33 files / Runtime-in-pack OOMs or hangs under 8g).
  *
  * @param list<string> $rels
  * @return list<list<string>>
  */
-$batchRels = static function (array $rels, int $max): array {
-    if ($max < 1 || count($rels) <= $max) {
+$batchRels = static function (
+    array $rels,
+    int $maxFilesBound,
+    int $maxBytesBound,
+    bool $preferLargeAlone = false
+) use ($root): array {
+    if (($maxFilesBound < 1 && $maxBytesBound < 1) || $rels === []) {
         return [$rels];
     }
+    if ($preferLargeAlone) {
+        usort($rels, static function (string $a, string $b) use ($root): int {
+            $sa = is_file($root.'/'.$a) ? (int) filesize($root.'/'.$a) : 0;
+            $sb = is_file($root.'/'.$b) ? (int) filesize($root.'/'.$b) : 0;
+            if ($sa !== $sb) {
+                return $sb <=> $sa;
+            }
+
+            return strcmp($a, $b);
+        });
+    }
     $batches = [];
-    for ($i = 0, $n = count($rels); $i < $n; $i += $max) {
-        $batches[] = array_slice($rels, $i, $max);
+    $cur = [];
+    $curBytes = 0;
+    foreach ($rels as $rel) {
+        $abs = $root.'/'.$rel;
+        $sz = is_file($abs) ? (int) filesize($abs) : 0;
+        // Heavy leaf: isolate files that would dominate NestedJIT peak RSS.
+        // Runtime.php is ~59KB — just under maxBytes/2 at the 120KB budget — so use
+        // max(40KB, maxBytes/3) rather than half (#36387 hub-core OOM).
+        $heavyThreshold = $maxBytesBound >= 1
+            ? max(40000, (int) ($maxBytesBound / 3))
+            : 0;
+        $heavyAlone = $preferLargeAlone
+            && $heavyThreshold > 0
+            && $sz > $heavyThreshold
+            && $cur !== [];
+        $wouldExceedFiles = $maxFilesBound >= 1 && $cur !== [] && count($cur) >= $maxFilesBound;
+        $wouldExceedBytes = $maxBytesBound >= 1 && $cur !== [] && ($curBytes + $sz) > $maxBytesBound;
+        if ($heavyAlone || $wouldExceedFiles || $wouldExceedBytes) {
+            $batches[] = $cur;
+            $cur = [];
+            $curBytes = 0;
+        }
+        $cur[] = $rel;
+        $curBytes += $sz;
+        // After placing a heavy singleton, flush so subsequent smalls start fresh.
+        if ($preferLargeAlone && $heavyThreshold > 0 && $sz > $heavyThreshold) {
+            $batches[] = $cur;
+            $cur = [];
+            $curBytes = 0;
+        }
+    }
+    if ($cur !== []) {
+        $batches[] = $cur;
     }
 
-    return $batches;
+    return $batches !== [] ? $batches : [$rels];
+};
+
+/** Sum source bytes for repo-relative paths. */
+$bytesOf = static function (array $rels) use ($root): int {
+    $n = 0;
+    foreach ($rels as $rel) {
+        $abs = $root.'/'.$rel;
+        if (is_file($abs)) {
+            $n += (int) filesize($abs);
+        }
+    }
+
+    return $n;
 };
 
 /**
@@ -270,7 +342,7 @@ foreach ($requiresFiles as $reqPath) {
     }
     $base = pathinfo($reqPath, PATHINFO_FILENAME);
     $base = preg_replace('/^spine-chunk-|-requires$/', '', $base) ?? $base;
-    $id = 'hub-'.($chunkIdOf($base !== '' ? $base : 'requires'));
+    $idBase = 'hub-'.($chunkIdOf($base !== '' ? $base : 'requires'));
     $rels = [];
     foreach (file($reqPath, FILE_IGNORE_NEW_LINES) ?: [] as $line) {
         $rel = trim(preg_replace('/#.*/', '', $line) ?? '');
@@ -283,20 +355,30 @@ foreach ($requiresFiles as $reqPath) {
         fwrite(STDERR, "bootstrap-gen0-chunk-plan: empty requires file {$reqPath}\n");
         exit(1);
     }
-    $entry = $entriesDir.'/'.$id.'.php';
-    $writeAutoloadEntry(
-        $entry,
-        'Generated by bootstrap-gen0-chunk-plan.php — hub from '.substr($reqPath, strlen($root) + 1).' (#36387).',
-        $rels
-    );
-    $chunks[] = [
-        'chunk_id' => $id,
-        'entry' => $entry,
-        'kind' => 'hub',
-        'wave' => 0,
-        'file_count' => count($rels),
-        'requires' => $reqPath,
-    ];
+    // Hubs: largest-first so Runtime.php / CompilerVersion.php are singleton TUs (#36387).
+    $batches = $batchRels($rels, $maxFiles, $maxBytes, true);
+    foreach ($batches as $bi => $batch) {
+        $id = $idBase;
+        if (count($batches) > 1) {
+            $id .= sprintf('-%02d', $bi);
+        }
+        $entry = $entriesDir.'/'.$id.'.php';
+        $writeAutoloadEntry(
+            $entry,
+            'Generated by bootstrap-gen0-chunk-plan.php — hub from '.substr($reqPath, strlen($root) + 1)
+                .' batch '.($bi + 1).'/'.count($batches).' (#36387).',
+            $batch
+        );
+        $chunks[] = [
+            'chunk_id' => $id,
+            'entry' => $entry,
+            'kind' => 'hub',
+            'wave' => 0,
+            'file_count' => count($batch),
+            'byte_count' => $bytesOf($batch),
+            'requires' => $reqPath,
+        ];
+    }
 }
 
 foreach ($libs as $lib) {
@@ -314,7 +396,7 @@ foreach ($libs as $lib) {
         fwrite(STDERR, "bootstrap-gen0-chunk-plan: no .php files under lib/{$lib}\n");
         exit(1);
     }
-    $batches = $batchRels($rels, $maxFiles);
+    $batches = $batchRels($rels, $maxFiles, $maxBytes);
     foreach ($batches as $bi => $batch) {
         $id = 'lib-'.$chunkIdOf($lib);
         if (count($batches) > 1) {
@@ -332,6 +414,7 @@ foreach ($libs as $lib) {
             'kind' => 'lib',
             'wave' => 1,
             'file_count' => count($batch),
+            'byte_count' => $bytesOf($batch),
         ];
     }
 }
@@ -347,7 +430,7 @@ foreach ($exts as $ext) {
         fwrite(STDERR, "bootstrap-gen0-chunk-plan: no .php files under ext/{$ext}\n");
         exit(1);
     }
-    $batches = $batchRels($rels, $maxFiles);
+    $batches = $batchRels($rels, $maxFiles, $maxBytes);
     foreach ($batches as $bi => $batch) {
         $id = 'ext-'.$chunkIdOf($ext);
         if (count($batches) > 1) {
@@ -365,6 +448,7 @@ foreach ($exts as $ext) {
             'kind' => 'ext',
             'wave' => 2,
             'file_count' => count($batch),
+            'byte_count' => $bytesOf($batch),
         ];
     }
 }
@@ -397,7 +481,7 @@ if ($spine) {
     }
     ksort($buckets, SORT_STRING);
     foreach ($buckets as $key => $rels) {
-        $batches = $batchRels($rels, $maxFiles);
+        $batches = $batchRels($rels, $maxFiles, $maxBytes);
         foreach ($batches as $bi => $batch) {
             $id = 'spine-'.$chunkIdOf($key);
             if (count($batches) > 1) {
@@ -416,6 +500,7 @@ if ($spine) {
                 'kind' => 'spine',
                 'wave' => 2,
                 'file_count' => count($batch),
+                'byte_count' => $bytesOf($batch),
                 'partition' => $key,
                 'strategy' => $strategy,
             ];
@@ -441,10 +526,12 @@ $plan = [
     'entries_dir' => $entriesDir,
     'strategy' => $spine ? $strategy : null,
     'max_files' => $maxFiles > 0 ? $maxFiles : null,
+    'max_bytes' => $maxBytes > 0 ? $maxBytes : null,
     'chunk_count' => count($chunks),
     'chunks' => $chunks,
     'note' => 'Consumed by script/bootstrap-gen0-chunks.sh. Wave 0 hubs emit first so peer '
-        .'manifests can bind consumers (#36387 / #36155 Phase C).',
+        .'manifests can bind consumers (#36387 / #36155 Phase C). Hub/requires respect '
+        .'--max-files/--max-bytes so Runtime.php-sized TUs fit under 8g.',
 ];
 
 $json = json_encode($plan, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n";
