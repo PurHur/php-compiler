@@ -3440,10 +3440,6 @@ class Context {
                 $emitInStandaloneMain(fn () => $this->builder->call($this->main));
             }
             $emitInStandaloneMain(fn () => Progress::emitNativeNote($this, 'c:main_after_php'));
-            // Request boundary: reset counters after user script (php_request_shutdown half) (#36388).
-            if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
-                $emitInStandaloneMain(fn () => Builtin\MemoryRuntime::emitRequestEndForStandaloneMain($this));
-            }
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
                 // Always abort pending Errors after user script — thin AOT previously skipped this
                 // and silently no-op'd final/readonly writes (#23665, readonly_property_write AOT).
@@ -3465,6 +3461,11 @@ class Context {
                 $emitInStandaloneMain(fn () => $this->type->object->emitShutdownDestructorsCall());
             }
             $emitInStandaloneMain(fn () => $this->builder->call($this->shutdownFunc));
+            // Bump-arena release AFTER shutdown/dtors — php_request_shutdown frees the request
+            // heap only once request zvals are gone (zend_alloc). Earlier free → UAF (#36388).
+            if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
+                $emitInStandaloneMain(fn () => Builtin\MemoryRuntime::emitRequestEndForStandaloneMain($this));
+            }
             $emitInStandaloneMain(fn () => $this->builder->returnValue($i32->constInt(0, false)));
         }
         Progress::noteFunction('jit_context_compile_common_begin');
