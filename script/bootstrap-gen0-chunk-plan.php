@@ -48,6 +48,16 @@ const SPINE_SUBSPLIT = [
     'lib/VM' => true,
 ];
 
+/**
+ * Spine leaves whose host CFG construction OOMs at 1536M even with SPINE_CHUNK method
+ * demote (#36387). Combined with the bin/ prefix skip in the spine loop. These stay out
+ * of object chunks until the sources are split; peer TUs cover the rest of the spine.
+ */
+const SPINE_SKIP_HOST_CFG_OOM = [
+    'lib/Compiler.php' => true,
+    'lib/JIT.php' => true,
+];
+
 foreach (array_slice($argv, 1) as $arg) {
     if ($arg === '--micro' || str_starts_with($arg, '--micro=')) {
         $micro = $arg === '--micro' ? 4 : max(1, (int) substr($arg, 8));
@@ -488,6 +498,11 @@ if ($spine) {
         if (!str_ends_with($rel, '.php')) {
             continue;
         }
+        // CLI entrypoints NestedJIT the whole compiler; mega hubs OOM host CFG at 1536M
+        // even with empty method bodies — exclude until split (#36387).
+        if (str_starts_with($rel, 'bin/') || isset(SPINE_SKIP_HOST_CFG_OOM[$rel])) {
+            continue;
+        }
         $key = $chunkOf($rel);
         $buckets[$key][] = $rel;
     }
@@ -544,7 +559,8 @@ $plan = [
     'note' => 'Consumed by script/bootstrap-gen0-chunks.sh. Wave 0 hubs emit first so peer '
         .'manifests can bind consumers (#36387 / #36155 Phase C). Hub/requires respect '
         .'--max-files/--max-bytes so Runtime.php-sized TUs fit under 8g. --max-bytes alone '
-        .'also applies max-files='.DEFAULT_MAX_FILES_WITH_BYTES.' for tiny-file packs.',
+        .'also applies max-files='.DEFAULT_MAX_FILES_WITH_BYTES.' for tiny-file packs. '
+        .'Spine --strategy skips bin/ + lib/Compiler.php + lib/JIT.php (host CFG OOM under 8g).',
 ];
 
 $json = json_encode($plan, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n";
