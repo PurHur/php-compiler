@@ -3610,16 +3610,8 @@ class Context {
         $target->applyToModule($this->module);
         try {
             $llvmTarget = $this->llvm->getTargetFromName($target->llvmTargetName());
-            $optEnv = Config::getenv('PHP_COMPILER_AOT_CODEGEN_OPT');
-            $optLevel = PHPLLVM\Target::OPT_LEVEL_NONE;
-            if (is_string($optEnv) && '' !== $optEnv) {
-                $optLevel = match (strtolower($optEnv)) {
-                    'less' => PHPLLVM\Target::OPT_LEVEL_LESS,
-                    'default' => PHPLLVM\Target::OPT_LEVEL_DEFAULT,
-                    'aggressive' => PHPLLVM\Target::OPT_LEVEL_AGGRESSIVE,
-                    default => PHPLLVM\Target::OPT_LEVEL_NONE,
-                };
-            }
+            // Explicit AOT_CODEGEN_OPT wins; else OPT_LEVEL 0–3; else OptNone (#36399 / #36387).
+            $optLevel = \PHPCompiler\AOT\AotReproducibleBuild::targetMachineOptLevel();
 
             return $llvmTarget->createTargetMachine(
                 $target->llvmTriple(),

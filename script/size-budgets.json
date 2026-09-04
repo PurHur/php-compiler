@@ -24,9 +24,9 @@
       "note": "prefer patches/ + short idempotent guards"
     },
     "lib/AOT/Linker.php": {
-      "budget": 918,
+      "budget": 1043,
       "target": 8000,
-      "note": "already under target"
+      "note": "already under target; ratchet for --build-id=sha1 / SOURCE_DATE_EPOCH (#36399)"
     },
     "lib/AOT/HelperRuntimeCache.php": {
       "budget": 1530,
@@ -35,9 +35,9 @@
     }
   },
   "script_file_count": {
-    "budget": 269,
+    "budget": 279,
     "target": 150,
-    "note": "script/ top-level *.sh/*.php"
+    "note": "script/ top-level *.sh/*.php; +verify-reproducible.sh (#36399)"
   },
   "ci_defaults_exports": {
     "budget": 141,

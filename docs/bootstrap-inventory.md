@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8147 |
-| Phase A inventory files (M2 ratio SSOT) | 8147 |
+| PHP files on vm.php path | 8148 |
+| Phase A inventory files (M2 ratio SSOT) | 8148 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 25829 |
+| Source constructs flagged (warnings) | 25830 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5467,6 +5467,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/zstd/zstd_uncompress_dict.php` | 0 | 2 |
 | `ext/zstd/zstd_uncompress_init.php` | 0 | 2 |
 | `lib/AOT/AotEmitFastExit.php` | 0 | 1 |
+| `lib/AOT/AotReproducibleBuild.php` | 0 | 1 |
 | `lib/AOT/AutoloadDiscovery.php` | 0 | 2 |
 | `lib/AOT/BuildTiming.php` | 0 | 1 |
 | `lib/AOT/CompileTarget.php` | 0 | 3 |
@@ -11301,21 +11302,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomLiveMutationKernel.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 605)
 - new Variable (line 606)
-- new Variable (line 624)
-- new Variable (line 648)
-- new Variable (line 718)
-- new Variable (line 725)
-- new Variable (line 731)
-- new Variable (line 823)
+- new Variable (line 607)
+- new Variable (line 625)
+- new Variable (line 649)
+- new Variable (line 719)
+- new Variable (line 726)
+- new Variable (line 732)
 - new Variable (line 824)
-- new Variable (line 835)
-- new Variable (line 876)
-- new Variable (line 887)
-- new Variable (line 1029)
-- new Variable (line 1068)
-- new Variable (line 1407)
+- new Variable (line 825)
+- new Variable (line 836)
+- new Variable (line 877)
+- new Variable (line 888)
+- new Variable (line 1030)
+- new Variable (line 1069)
+- new Variable (line 1408)
 - 55 class method(s)
 
 ### `ext/dom/JitDomLoad.php`
@@ -48431,6 +48432,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `lib/AOT/AotReproducibleBuild.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
+
 ### `lib/AOT/AutoloadDiscovery.php`
 
 **Warnings** (review for bootstrap subset):
@@ -58079,20 +58085,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\PdoConstruct (line 2988)
 - new Call\PdoGetAvailableDrivers (line 2989)
 - new Call\PdoQuote (line 2990)
-- new Result (line 3663)
-- new Result (line 3684)
-- new Variable (line 4857)
-- new Variable (line 5192)
-- new Variable (line 5485)
-- new Variable (line 5612)
-- new VMVariable (line 5830)
-- new VMVariable (line 5846)
-- new VMVariable (line 5852)
-- new VMVariable (line 5858)
-- new VMVariable (line 5869)
-- new Variable (line 5933)
-- new Variable (line 5953)
-- new Variable (line 5998)
+- new Result (line 3655)
+- new Result (line 3676)
+- new Variable (line 4849)
+- new Variable (line 5184)
+- new Variable (line 5477)
+- new Variable (line 5604)
+- new VMVariable (line 5822)
+- new VMVariable (line 5838)
+- new VMVariable (line 5844)
+- new VMVariable (line 5850)
+- new VMVariable (line 5861)
+- new Variable (line 5925)
+- new Variable (line 5945)
+- new Variable (line 5990)
 - 144 class method(s)
 - 36 closure(s)
 
