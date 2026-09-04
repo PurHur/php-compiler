@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
-use PHPCompiler\ext\xmlwriter\JitXmlWriterMethod;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
@@ -30,6 +29,6 @@ final class XmlWriterToStream implements Call
 
     public function call(Context $context, Variable ...$args): Value
     {
-        return JitXmlWriterMethod::invoke($context, 'tostream', ...$args);
+        return $context->extensionLowering->requireXmlWriter()->invoke($context, 'tostream', ...$args);
     }
 }

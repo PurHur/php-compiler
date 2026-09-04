@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
-use PHPCompiler\ext\xmlreader\JitXmlReaderMethod;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
@@ -13,6 +12,7 @@ use PHPLLVM\Value;
 /** XMLReader::fromUri() — user-script AOT (#35900 leftover of #27299). */
 final class XmlReaderFromUri implements Call
 {
+    // Dispatch via Context::$extensionLowering (#36204).
     /** Qualified name for BuiltinParamNames / named-arg resolve. */
     public string $name = 'XMLReader::fromUri';
 
@@ -24,6 +24,6 @@ final class XmlReaderFromUri implements Call
 
     public function call(Context $context, Variable ...$args): Value
     {
-        return JitXmlReaderMethod::invoke($context, 'fromuri', ...$args);
+        return $context->extensionLowering->requireXmlReader()->invoke($context, 'fromuri', ...$args);
     }
 }

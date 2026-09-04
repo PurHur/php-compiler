@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8128 |
-| Phase A inventory files (M2 ratio SSOT) | 8128 |
+| PHP files on vm.php path | 8132 |
+| Phase A inventory files (M2 ratio SSOT) | 8132 |
 | Phase A ratio-deferred paths | 0 |
-| Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 25796 |
+| Source constructs flagged (blockers) | 1 |
+| Source constructs flagged (warnings) | 25801 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5192,9 +5192,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xml/xml_set_start_namespace_decl_handler.php` | 0 | 2 |
 | `ext/xml/xml_set_unparsed_entity_decl_handler.php` | 0 | 2 |
 | `ext/xmlreader/BuiltinClasses.php` | 0 | 1 |
+| `ext/xmlreader/JitXmlReaderExtensionHooksFacade.php` | 0 | 1 |
 | `ext/xmlreader/JitXmlReaderMethod.php` | 0 | 1 |
 | `ext/xmlreader/JitXmlReaderUserScript.php` | 0 | 17 |
-| `ext/xmlreader/Module.php` | 0 | 2 |
+| `ext/xmlreader/Module.php` | 0 | 3 |
 | `ext/xmlreader/VmXmlReader.php` | 0 | 46 |
 | `ext/xmlreader/XmlReaderClassMethod.php` | 0 | 5 |
 | `ext/xmlreader/XmlReaderClose.php` | 0 | 2 |
@@ -5256,9 +5257,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xmlrpc/xmlrpc_server_register_method.php` | 0 | 1 |
 | `ext/xmlrpc/xmlrpc_set_type.php` | 0 | 1 |
 | `ext/xmlwriter/BuiltinClasses.php` | 0 | 1 |
+| `ext/xmlwriter/JitXmlWriterExtensionHooksFacade.php` | 0 | 1 |
 | `ext/xmlwriter/JitXmlWriterMethod.php` | 0 | 1 |
 | `ext/xmlwriter/JitXmlWriterUserScript.php` | 0 | 11 |
-| `ext/xmlwriter/Module.php` | 0 | 44 |
+| `ext/xmlwriter/Module.php` | 0 | 45 |
 | `ext/xmlwriter/VmXmlWriter.php` | 0 | 53 |
 | `ext/xmlwriter/XmlWriterClassMethod.php` | 0 | 5 |
 | `ext/xmlwriter/XmlWriterEndAttribute.php` | 0 | 2 |
@@ -7026,7 +7028,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/EvalHelper.php` | 0 | 1 |
 | `lib/JIT/ExceptionBridge.php` | 0 | 1 |
 | `lib/JIT/ExceptionHandlerCallbackPolicy.php` | 0 | 1 |
-| `lib/JIT/ExtensionLoweringHooks.php` | 0 | 1 |
+| `lib/JIT/ExtensionLoweringHooks.php` | 1 | 0 |
 | `lib/JIT/FiberHelper.php` | 0 | 12 |
 | `lib/JIT/FiberHelperLlvm.php` | 0 | 8 |
 | `lib/JIT/FilterExtensionHooks.php` | 0 | 1 |
@@ -7248,7 +7250,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/VmDriverExecuteNative.php` | 0 | 2 |
 | `lib/JIT/VmSpineSmokeNative.php` | 0 | 2 |
 | `lib/JIT/VmUnitProbeExecuteNative.php` | 0 | 2 |
+| `lib/JIT/XmlReaderExtensionHooks.php` | 0 | 1 |
 | `lib/JIT/XmlReaderInstanceMethodJit.php` | 0 | 7 |
+| `lib/JIT/XmlWriterExtensionHooks.php` | 0 | 1 |
 | `lib/JIT/XmlWriterInstanceMethodJit.php` | 0 | 5 |
 | `lib/JIT/XsltInstanceMethodJit.php` | 0 | 2 |
 | `lib/JIT/ZipExtensionHooks.php` | 0 | 1 |
@@ -46352,6 +46356,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/xmlreader/JitXmlReaderExtensionHooksFacade.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/xmlreader/JitXmlReaderMethod.php`
 
 **Warnings** (review for bootstrap subset):
@@ -46381,6 +46390,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xmlreader/Module.php`
 
 **Warnings** (review for bootstrap subset):
+- new JitXmlReaderExtensionHooksFacade (line 35)
 - 3 class method(s)
 - 4 closure(s)
 
@@ -46805,6 +46815,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/xmlwriter/JitXmlWriterExtensionHooksFacade.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/xmlwriter/JitXmlWriterMethod.php`
 
 **Warnings** (review for bootstrap subset):
@@ -46828,48 +46843,49 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xmlwriter/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new xmlwriter_open_memory (line 49)
-- new xmlwriter_open_uri (line 50)
-- new xmlwriter_set_indent (line 51)
-- new xmlwriter_set_indent_string (line 52)
-- new xmlwriter_start_document (line 53)
-- new xmlwriter_end_document (line 54)
-- new xmlwriter_start_element (line 55)
-- new xmlwriter_start_element_ns (line 56)
-- new xmlwriter_end_element (line 57)
-- new xmlwriter_full_end_element (line 58)
-- new xmlwriter_write_attribute (line 59)
-- new xmlwriter_write_attribute_ns (line 60)
-- new xmlwriter_start_attribute (line 61)
-- new xmlwriter_start_attribute_ns (line 62)
-- new xmlwriter_end_attribute (line 63)
-- new xmlwriter_write_element (line 64)
-- new xmlwriter_write_element_ns (line 65)
-- new xmlwriter_write_cdata (line 66)
-- new xmlwriter_start_cdata (line 67)
-- new xmlwriter_end_cdata (line 68)
-- new xmlwriter_write_comment (line 69)
-- new xmlwriter_start_comment (line 70)
-- new xmlwriter_end_comment (line 71)
-- new xmlwriter_write_raw (line 72)
-- new xmlwriter_write_pi (line 73)
-- new xmlwriter_start_pi (line 74)
-- new xmlwriter_end_pi (line 75)
-- new xmlwriter_write_dtd (line 76)
-- new xmlwriter_start_dtd (line 77)
-- new xmlwriter_end_dtd (line 78)
-- new xmlwriter_write_dtd_element (line 79)
-- new xmlwriter_write_dtd_attlist (line 80)
-- new xmlwriter_start_dtd_entity (line 81)
-- new xmlwriter_end_dtd_entity (line 82)
-- new xmlwriter_write_dtd_entity (line 83)
-- new xmlwriter_text (line 84)
-- new xmlwriter_start_dtd_attlist (line 85)
-- new xmlwriter_end_dtd_attlist (line 86)
-- new xmlwriter_start_dtd_element (line 87)
-- new xmlwriter_end_dtd_element (line 88)
-- new xmlwriter_output_memory (line 89)
-- new xmlwriter_flush (line 90)
+- new JitXmlWriterExtensionHooksFacade (line 23)
+- new xmlwriter_open_memory (line 50)
+- new xmlwriter_open_uri (line 51)
+- new xmlwriter_set_indent (line 52)
+- new xmlwriter_set_indent_string (line 53)
+- new xmlwriter_start_document (line 54)
+- new xmlwriter_end_document (line 55)
+- new xmlwriter_start_element (line 56)
+- new xmlwriter_start_element_ns (line 57)
+- new xmlwriter_end_element (line 58)
+- new xmlwriter_full_end_element (line 59)
+- new xmlwriter_write_attribute (line 60)
+- new xmlwriter_write_attribute_ns (line 61)
+- new xmlwriter_start_attribute (line 62)
+- new xmlwriter_start_attribute_ns (line 63)
+- new xmlwriter_end_attribute (line 64)
+- new xmlwriter_write_element (line 65)
+- new xmlwriter_write_element_ns (line 66)
+- new xmlwriter_write_cdata (line 67)
+- new xmlwriter_start_cdata (line 68)
+- new xmlwriter_end_cdata (line 69)
+- new xmlwriter_write_comment (line 70)
+- new xmlwriter_start_comment (line 71)
+- new xmlwriter_end_comment (line 72)
+- new xmlwriter_write_raw (line 73)
+- new xmlwriter_write_pi (line 74)
+- new xmlwriter_start_pi (line 75)
+- new xmlwriter_end_pi (line 76)
+- new xmlwriter_write_dtd (line 77)
+- new xmlwriter_start_dtd (line 78)
+- new xmlwriter_end_dtd (line 79)
+- new xmlwriter_write_dtd_element (line 80)
+- new xmlwriter_write_dtd_attlist (line 81)
+- new xmlwriter_start_dtd_entity (line 82)
+- new xmlwriter_end_dtd_entity (line 83)
+- new xmlwriter_write_dtd_entity (line 84)
+- new xmlwriter_text (line 85)
+- new xmlwriter_start_dtd_attlist (line 86)
+- new xmlwriter_end_dtd_attlist (line 87)
+- new xmlwriter_start_dtd_element (line 88)
+- new xmlwriter_end_dtd_element (line 89)
+- new xmlwriter_output_memory (line 90)
+- new xmlwriter_flush (line 91)
 - 3 class method(s)
 - 2 closure(s)
 
@@ -58282,8 +58298,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 ### `lib/JIT/ExtensionLoweringHooks.php`
 
-**Warnings** (review for bootstrap subset):
-- 73 class method(s)
+**Blockers** (likely prevent AOT bootstrap compile):
+- parse error: Syntax error, unexpected T_STRING on line 108
 
 ### `lib/JIT/FiberHelper.php`
 
@@ -59152,8 +59168,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/NoThrowCallElision.php`
 
 **Warnings** (review for bootstrap subset):
-- new Operand\Literal (line 313)
-- 12 class method(s)
+- new Operand\Literal (line 380)
+- 14 class method(s)
 
 ### `lib/JIT/NonObjectPropertyFetchHelper.php`
 
@@ -59804,6 +59820,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\Native (line 59)
 - 2 class method(s)
 
+### `lib/JIT/XmlReaderExtensionHooks.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/XmlReaderInstanceMethodJit.php`
 
 **Warnings** (review for bootstrap subset):
@@ -59814,6 +59835,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\XmlReaderOpen (line 118)
 - new Call\XmlReaderMethod (line 123)
 - 3 class method(s)
+
+### `lib/JIT/XmlWriterExtensionHooks.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `lib/JIT/XmlWriterInstanceMethodJit.php`
 

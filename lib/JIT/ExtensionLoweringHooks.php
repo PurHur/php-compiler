@@ -104,8 +104,8 @@ interface DomCompileTimeHooks
  *
  * {@see \PHPCompiler\JIT} must not import {@code ext\simplexml} / {@code ext\dom} /
  * {@code ext\xmlreader} / {@code ext\xmlwriter} / {@code ext\xsl} / {@code ext\mbstring}
- * / {@code ext\posix} / {@code ext\bcmath} / {@code ext\intl} for these paths;
- * Modules register from jitInit.
+ * / {@code ext\posix} / {@code ext\bcmath} / {@code ext\intl} / {@code ext\zip} for these paths;
+ * Modules register from jitInit. Call XmlReader* and XmlWriter* also go through hooks (#36204).
  */
 final class ExtensionLoweringHooks
 {
@@ -225,6 +225,12 @@ final class ExtensionLoweringHooks
     /** simplexml JIT Call surfaces — registered from ext/simplexml Module::jitInit (#36204). */
     public ?SimpleXmlExtensionHooks $simplexml = null;
 
+    /** xmlreader JIT Call surfaces — registered from ext/xmlreader Module::jitInit (#36204). */
+    public ?XmlReaderExtensionHooks $xmlreader = null;
+
+    /** xmlwriter JIT Call surfaces — registered from ext/xmlwriter Module::jitInit (#36204). */
+    public ?XmlWriterExtensionHooks $xmlwriter = null;
+
     public function requirePosixNested(): PosixNestedJitKernels
     {
         if (null === $this->posixNested) {
@@ -322,6 +328,28 @@ final class ExtensionLoweringHooks
         }
 
         return $this->simplexml;
+    }
+
+    public function requireXmlReader(): XmlReaderExtensionHooks
+    {
+        if (null === $this->xmlreader) {
+            throw new \RuntimeException(
+                'xmlreader extension hooks not registered — ext/xmlreader Module::jitInit missing (#36204)'
+            );
+        }
+
+        return $this->xmlreader;
+    }
+
+    public function requireXmlWriter(): XmlWriterExtensionHooks
+    {
+        if (null === $this->xmlwriter) {
+            throw new \RuntimeException(
+                'xmlwriter extension hooks not registered — ext/xmlwriter Module::jitInit missing (#36204)'
+            );
+        }
+
+        return $this->xmlwriter;
     }
 
     public function tryPrepareDimWrite(Context $context, Variable $container, Variable $dim): ?Variable

@@ -20,6 +20,7 @@ class Module extends ModuleAbstract
     {
         // Factory result bind — lib/JIT.php must not import JitXmlWriterUserScript (#36204).
         $hooks = $context->extensionLowering;
+        $hooks->xmlwriter = new JitXmlWriterExtensionHooksFacade();
         $hooks->bindXmlWriterResultHook = static function ($var): void {
             JitXmlWriterUserScript::bindResultVariable($var);
         };
