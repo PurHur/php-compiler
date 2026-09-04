@@ -5357,6 +5357,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/DimAndPropertyWriteContext.
 require_once __DIR__.'/../../../lib/Compiler/Concern/IssetEmptyUnsetAndDimFetchCompile.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/InlineCallArgCompileTimeFold.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/EchoCoalesceCallArgCompile.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/FirstClassCallableAndClosure.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileBlockInternal.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AssignOperand.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AdaptByRefCallArgs.php';
