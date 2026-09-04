@@ -19,4 +19,10 @@ echo "$df" | grep -q 'keep=x86_64-linux'
 
 test -f docs/adr/36391-aarch64-darwin-deferred.md
 
+# Cross-target object-emit smoke must stay wired (#36391 — x86 CI cannot link arm64).
+test -x script/aot-smoke-cross-emit.sh
+grep -q 'PHP_COMPILER_KEEP_OBJECT_FILE=1' script/aot-smoke-cross-emit.sh
+grep -q 'readElfMachine' script/aot-smoke-cross-emit.sh
+grep -q 'empty result set is not a pass' script/aot-smoke-cross-emit.sh
+
 echo "check-release-multiarch-helpers: OK"
