@@ -24,5 +24,7 @@ final class BootstrapGen0ChunkEmitScriptTest extends TestCase
             $script
         );
         $this->assertStringContainsString('keep_object=1', $script);
+        $this->assertStringContainsString('peer manifests', $script);
+        $this->assertStringContainsString('PHP_COMPILER_EXTERNAL_METHOD_MANIFEST', $script);
     }
 }

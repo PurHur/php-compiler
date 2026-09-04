@@ -34,9 +34,107 @@ final class BootstrapGen0ChunksOrchestratorTest extends TestCase
         foreach ($plan['chunks'] as $chunk) {
             $this->assertArrayHasKey('chunk_id', $chunk);
             $this->assertArrayHasKey('entry', $chunk);
+            $this->assertArrayHasKey('wave', $chunk);
             $this->assertFileExists($chunk['entry']);
             $this->assertStringContainsString('chunk-'.$chunk['chunk_id'], (string) file_get_contents($chunk['entry']));
         }
+        $this->removeTree($tmp);
+    }
+
+    public function testChunkPlanLibAndExtCarryWavesAndAutoload(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $script = $root.'/script/bootstrap-gen0-chunk-plan.php';
+        $tmp = sys_get_temp_dir().'/phpc-chunk-plan-lib-'.bin2hex(random_bytes(4));
+        mkdir($tmp.'/entries', 0755, true);
+        $planPath = $tmp.'/plan.json';
+        $cmd = escapeshellarg(PHP_BINARY).' '.escapeshellarg($script)
+            .' --lib=Lint,Func'
+            .' --ext=types'
+            .' --entries-dir='.escapeshellarg($tmp.'/entries')
+            .' --plan-out='.escapeshellarg($planPath);
+        exec($cmd.' 2>&1', $out, $rc);
+        $this->assertSame(0, $rc, implode("\n", $out));
+        $plan = json_decode((string) file_get_contents($planPath), true);
+        $this->assertIsArray($plan);
+        $this->assertGreaterThanOrEqual(3, $plan['chunk_count']);
+        $kinds = [];
+        $waves = [];
+        foreach ($plan['chunks'] as $chunk) {
+            $kinds[$chunk['kind']] = true;
+            $waves[] = (int) $chunk['wave'];
+            $body = (string) file_get_contents($chunk['entry']);
+            $this->assertStringContainsString('vendor/autoload.php', $body);
+            // Depth-correct __DIR__ relative (not hardcoded ../../../) so nested OUT_DIR works.
+            $this->assertMatchesRegularExpression(
+                "#require_once __DIR__ \\. '/(\\.\\./)+vendor/autoload\\.php';#",
+                $body
+            );
+            $this->assertGreaterThan(0, (int) $chunk['file_count']);
+        }
+        $this->assertArrayHasKey('lib', $kinds);
+        $this->assertArrayHasKey('ext', $kinds);
+        // lib wave 1 before ext wave 2
+        $this->assertContains(1, $waves);
+        $this->assertContains(2, $waves);
+        $this->assertLessThanOrEqual($waves[array_key_last($waves)], 2);
+        // Sorted by wave ascending
+        $sorted = $waves;
+        sort($sorted, SORT_NUMERIC);
+        $this->assertSame($sorted, $waves);
+        $this->removeTree($tmp);
+    }
+
+    public function testChunkPlanMaxFilesSplitsOversizedBuckets(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $script = $root.'/script/bootstrap-gen0-chunk-plan.php';
+        $tmp = sys_get_temp_dir().'/phpc-chunk-plan-max-'.bin2hex(random_bytes(4));
+        mkdir($tmp.'/entries', 0755, true);
+        $planPath = $tmp.'/plan.json';
+        $cmd = escapeshellarg(PHP_BINARY).' '.escapeshellarg($script)
+            .' --lib=JIT/Builtin'
+            .' --max-files=5'
+            .' --entries-dir='.escapeshellarg($tmp.'/entries')
+            .' --plan-out='.escapeshellarg($planPath);
+        exec($cmd.' 2>&1', $out, $rc);
+        $this->assertSame(0, $rc, implode("\n", $out));
+        $plan = json_decode((string) file_get_contents($planPath), true);
+        $this->assertIsArray($plan);
+        $this->assertSame(5, $plan['max_files']);
+        $this->assertGreaterThan(1, $plan['chunk_count']);
+        foreach ($plan['chunks'] as $chunk) {
+            $this->assertLessThanOrEqual(5, (int) $chunk['file_count']);
+        }
+        $this->removeTree($tmp);
+    }
+
+    public function testChunkPlanSpineStrategyProducesPartitions(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $script = $root.'/script/bootstrap-gen0-chunk-plan.php';
+        $tmp = sys_get_temp_dir().'/phpc-chunk-plan-spine-'.bin2hex(random_bytes(4));
+        mkdir($tmp.'/entries', 0755, true);
+        $planPath = $tmp.'/plan.json';
+        $cmd = escapeshellarg(PHP_BINARY).' '.escapeshellarg($script)
+            .' --spine --strategy=dir --max-files=200'
+            .' --entries-dir='.escapeshellarg($tmp.'/entries')
+            .' --plan-out='.escapeshellarg($planPath);
+        exec($cmd.' 2>&1', $out, $rc);
+        $this->assertSame(0, $rc, implode("\n", $out));
+        $plan = json_decode((string) file_get_contents($planPath), true);
+        $this->assertIsArray($plan);
+        $this->assertSame('dir', $plan['strategy']);
+        $this->assertGreaterThan(20, $plan['chunk_count']);
+        $spine = 0;
+        foreach ($plan['chunks'] as $chunk) {
+            if (($chunk['kind'] ?? '') === 'spine') {
+                ++$spine;
+                $this->assertSame(2, (int) $chunk['wave']);
+                $this->assertLessThanOrEqual(200, (int) $chunk['file_count']);
+            }
+        }
+        $this->assertGreaterThan(20, $spine);
         $this->removeTree($tmp);
     }
 
@@ -51,6 +149,10 @@ final class BootstrapGen0ChunksOrchestratorTest extends TestCase
         $this->assertStringContainsString('wall_seconds', $script);
         $this->assertStringContainsString('fresh receipt — skip', $script);
         $this->assertStringContainsString('--micro', $script);
+        $this->assertStringContainsString('--lib=', $script);
+        $this->assertStringContainsString('--spine', $script);
+        $this->assertStringContainsString('wave_barrier', $script);
+        $this->assertStringContainsString('CHUNK_WAVE_BARRIER', $script);
         $this->assertMatchesRegularExpression('/nproc - 2|nproc_n - 2/', $script);
     }
 
@@ -60,6 +162,10 @@ final class BootstrapGen0ChunksOrchestratorTest extends TestCase
         $script = (string) file_get_contents($root.'/script/bootstrap-gen0-chunk-emit.sh');
         $this->assertStringContainsString('object_only', $script);
         $this->assertStringContainsString('lowering_source_fingerprint', $script);
+        $this->assertStringContainsString('peer manifests', $script);
+        $this->assertStringContainsString('PHP_COMPILER_EXTERNAL_METHOD_MANIFEST', $script);
+        $this->assertStringContainsString('CHUNK_PEER_MANIFESTS', $script);
+        $this->assertStringContainsString('*.manifest.json', $script);
     }
 
     private function removeTree(string $dir): void
