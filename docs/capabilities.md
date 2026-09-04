@@ -1758,9 +1758,9 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `BadMethodCallException::getPrevious` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `BadMethodCallException::getTrace` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `BadMethodCallException::getTraceAsString` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `BcMath\Number::__construct` | yes | yes | yes | standard |  |
+| `BcMath\Number::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `BcMath\Number::__serialize` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `BcMath\Number::__tostring` | yes | yes | yes | standard |  |
+| `BcMath\Number::__tostring` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `BcMath\Number::__unserialize` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `BcMath\Number::add` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `BcMath\Number::ceil` | yes | no | no | standard | not implemented for JIT in this compiler build |
