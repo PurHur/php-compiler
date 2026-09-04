@@ -35,6 +35,8 @@ use PHPCompiler\VM\Variable as VmVariable;
  * key_exists (typed array + non-null scalar key), typed
  * class_exists / interface_exists / trait_exists / enum_exists
  * (string + compile-time-false {@code $autoload}),
+ * typed-object get_class / get_parent_class / spl_object_id /
+ * spl_object_hash (string get_parent_class / zero-arg stay live),
  * zero-arg pi, type.c predicates + gettype/get_debug_type, ctype.c
  * classifiers on typed/literal strings, typed-array count/sizeof, math.c
  * incl. pow/fpow/fdiv on already-numeric args, empty void user functions).
@@ -69,7 +71,10 @@ use PHPCompiler\VM\Variable as VmVariable;
  * autoload). Soft-null {@code array_key_exists}/{@code key_exists} keys
  * stay live (null-key deprecation); object / value-box keys stay live
  * ({@code TypeError} / unknown). Non-array haystacks stay live
- * ({@code TypeError}).
+ * ({@code TypeError}). Soft-null / non-object {@code get_class}/
+ * {@code get_parent_class}/{@code spl_object_*} stay live ({@code TypeError});
+ * string {@code get_parent_class} stays live (autoload); zero-arg
+ * {@code get_class}/{@code get_parent_class} stay live (deprecation / scope).
  */
 final class DiscardedPureCallElision
 {
@@ -154,6 +159,9 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureClassExistsFamilyNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureObjectIntrospectNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureVersionCompareNoSideEffect($toCall, $callArgs)) {
@@ -1323,6 +1331,27 @@ final class DiscardedPureCallElision
     }
 
     /**
+     * Discarded {@code get_class}/{@code get_parent_class}/{@code spl_object_id}/
+     * {@code spl_object_hash} on a typed object — php-src
+     * {@code Zend/zend_builtin_functions.c} / {@code ext/spl/php_spl.c}. String
+     * {@code get_parent_class} stays live (autoload). Soft-null / non-object
+     * stay live ({@code TypeError}). Zero-arg stay live (deprecation / scope).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureObjectIntrospectNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if (!NoThrowCallElision::isPureObjectIntrospectBuiltin(strtolower($toCall->getName()))) {
+            return false;
+        }
+
+        return self::objectIntrospectArgsAllowDiscardedElision($callArgs);
+    }
+
+    /**
      * Discarded {@code version_compare} on typed / literal strings — php-src
      * {@code versioning.c}. Optional operator must be null or a compile-time
      * valid comparison op ({@code ValueError} otherwise).
@@ -1632,6 +1661,16 @@ final class DiscardedPureCallElision
         }
 
         return NoThrowCallElision::isCompileTimeFalseAutoloadArg($callArgs[1]);
+    }
+
+    /**
+     * Exactly one typed object — peer {@see NoThrowCallElision::objectIntrospectArgsCannotThrow}.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function objectIntrospectArgsAllowDiscardedElision(array $callArgs): bool
+    {
+        return NoThrowCallElision::objectIntrospectArgsCannotThrow($callArgs);
     }
 
     /**
