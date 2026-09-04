@@ -64,9 +64,11 @@ final class SplHeapJitHelper
         $done = BasicBlockHelper::append($context, 'splheap_insert_sortdone');
         $context->builder->branchIf($isMin, $minBb, $maxBb);
         $context->builder->positionAtEnd($minBb);
+        $context->type->hashtable->ensureSortAbi('__hashtable__sortPacked');
         $context->builder->call($context->lookupFunction('__hashtable__sortPacked'), $ht);
         $context->builder->branch($done);
         $context->builder->positionAtEnd($maxBb);
+        $context->type->hashtable->ensureSortAbi('__hashtable__sortPackedReverse');
         $context->builder->call($context->lookupFunction('__hashtable__sortPackedReverse'), $ht);
         $context->builder->branch($done);
         $context->builder->positionAtEnd($done);
@@ -364,9 +366,11 @@ final class SplHeapJitHelper
         $maxBb = BasicBlockHelper::append($context, 'splheap_extract_maxsort');
         $context->builder->branchIf($isMin, $minBb, $maxBb);
         $context->builder->positionAtEnd($minBb);
+        $context->type->hashtable->ensureSortAbi('__hashtable__sortPacked');
         $context->builder->call($context->lookupFunction('__hashtable__sortPacked'), $ht);
         $context->builder->branch($doneBb);
         $context->builder->positionAtEnd($maxBb);
+        $context->type->hashtable->ensureSortAbi('__hashtable__sortPackedReverse');
         $context->builder->call($context->lookupFunction('__hashtable__sortPackedReverse'), $ht);
         $context->builder->branch($doneBb);
 

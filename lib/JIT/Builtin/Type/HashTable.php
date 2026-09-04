@@ -177,25 +177,10 @@ class HashTable extends Type
         $this->registerFn('__value__readHashtable', '__hashtable__*', ['__value__*']);
         $this->registerFn('__value__writeHashtable', 'void', ['__value__*', '__hashtable__*']);
         $this->registerFn('__hashtable__ptrIsNonEmpty', 'int1', ['__hashtable__*']);
-        // ksort()/krsort() string-key maps — NestedJIT KeySortJitHelper aborts under thin AOT (#27227 / peer #26975).
-        $this->registerFn('__hashtable__sortStringKeys', 'void', ['__hashtable__*']);
-        $this->registerFn('__hashtable__sortStringKeysCase', 'void', ['__hashtable__*']);
-        $this->registerFn('__hashtable__sortStringKeysReverse', 'void', ['__hashtable__*']);
-        $this->registerFn('__hashtable__sortStringKeysReverseCase', 'void', ['__hashtable__*']);
-        $this->registerFn('__hashtable__sortStringKeyValues', 'void', ['__hashtable__*']);
-        $this->registerFn('__hashtable__sortStringKeyValuesReverse', 'void', ['__hashtable__*']);
-        // natsort strKey ABIs stay eager — lazy first-link during user lowering plants
-        // ret void into {main} (empty stdout; leftover valueToString #35904).
-        $this->registerFn('__hashtable__sortStringKeyValuesNatural', 'void', ['__hashtable__*']);
-        $this->registerFn('__hashtable__sortStringKeyValuesNaturalCase', 'void', ['__hashtable__*']);
-        // Packed-list sort()/rsort() — NestedJIT SortJitHelper stubs were no-ops (#24010).
-        $this->registerFn('__hashtable__sortPacked', 'void', ['__hashtable__*']);
-        $this->registerFn('__hashtable__sortPackedReverse', 'void', ['__hashtable__*']);
-        // SORT_STRING|SORT_FLAG_CASE — length-aware ASCII strcasecmp (#34702).
-        $this->registerFn('__hashtable__sortPackedStringCase', 'void', ['__hashtable__*']);
-        $this->registerFn('__hashtable__sortPackedReverseStringCase', 'void', ['__hashtable__*']);
-        // locale / packed-natural decls deferred to ensureSortAbi (#35904).
-        // __multisort__packed deferred to ensureMultisortPacked (#35904).
+        // All sort*/ksort*/asort*/natsort ABIs deferred to ensureSortAbi (#36387):
+        // eager implement cost ~1s on every hello-world cold compile. NestedJitCompileScope
+        // in ensureSortAbi restores the caller insert block (natsort empty-stdout #35904).
+        // locale / packed-natural / multisort already deferred (#35904).
         HashTableDtorLlvm::register($this);
         $this->pointer = $this->context->getTypeFromString('__hashtable__*');
     }
@@ -250,6 +235,24 @@ class HashTable extends Type
                     $this->context->registerFunction($name, $probe);
                 }
                 switch ($name) {
+                    case '__hashtable__sortStringKeys':
+                        $this->implementSortStringKeys(false);
+                        break;
+                    case '__hashtable__sortStringKeysCase':
+                        $this->implementSortStringKeys(true);
+                        break;
+                    case '__hashtable__sortStringKeysReverse':
+                        $this->implementSortStringKeysReverse(false);
+                        break;
+                    case '__hashtable__sortStringKeysReverseCase':
+                        $this->implementSortStringKeysReverse(true);
+                        break;
+                    case '__hashtable__sortStringKeyValues':
+                        $this->implementSortStringKeyValues();
+                        break;
+                    case '__hashtable__sortStringKeyValuesReverse':
+                        $this->implementSortStringKeyValuesReverse();
+                        break;
                     case '__hashtable__sortStringKeysLocale':
                         $this->implementSortStringKeysLocale();
                         break;
@@ -262,6 +265,18 @@ class HashTable extends Type
                     case '__hashtable__sortStringKeyValuesNaturalCase':
                         $this->implementSortStringKeyValuesNaturalCase();
                         break;
+                    case '__hashtable__sortPacked':
+                        $this->implementSortPacked(false, false);
+                        break;
+                    case '__hashtable__sortPackedReverse':
+                        $this->implementSortPacked(true, false);
+                        break;
+                    case '__hashtable__sortPackedStringCase':
+                        $this->implementSortPacked(false, true);
+                        break;
+                    case '__hashtable__sortPackedReverseStringCase':
+                        $this->implementSortPacked(true, true);
+                        break;
                     case '__hashtable__sortPackedNatural':
                         $this->implementSortPackedNatural(false);
                         break;
@@ -269,7 +284,7 @@ class HashTable extends Type
                         $this->implementSortPackedNatural(true);
                         break;
                     default:
-                        throw new \LogicException('unknown lazy HashTable sort ABI '.$name.' (#35904)');
+                        throw new \LogicException('unknown lazy HashTable sort ABI '.$name.' (#35904/#36387)');
                 }
             });
         } finally {
@@ -336,21 +351,7 @@ class HashTable extends Type
         $this->implementValueReadHashtable();
         $this->implementValueWriteHashtable();
         $this->implementHashtablePtrIsNonEmpty();
-        $this->implementSortStringKeys(false);
-        $this->implementSortStringKeys(true);
-        $this->implementSortStringKeysReverse(false);
-        $this->implementSortStringKeysReverse(true);
-        $this->implementSortStringKeyValues();
-        $this->implementSortStringKeyValuesReverse();
-        $this->implementSortStringKeyValuesNatural();
-        $this->implementSortStringKeyValuesNaturalCase();
-        $this->implementSortPacked(false, false);
-        $this->implementSortPacked(true, false);
-        $this->implementSortPacked(false, true);
-        $this->implementSortPacked(true, true);
-        // locale / packed-natural: ensureSortAbi on first lookup (#35904).
-        // strKey natsort stays eager so valueToString/strnatcmp first-link cannot plant
-        // ret void into user main (empty stdout after natsort).
+        // sort*/ksort*/asort*/natsort: ensureSortAbi on first lookup (#36387 / #35904).
         // implementMultisortPacked deferred to ensureMultisortPacked (#35904).
         HashTableDtorLlvm::implement($this);
         $this->context->builder->clearInsertionPosition();

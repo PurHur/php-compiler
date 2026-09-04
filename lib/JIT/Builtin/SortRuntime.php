@@ -93,6 +93,7 @@ final class SortRuntime
 
     private static function invokeLlvmPackedSort(Context $context, JITVariable $array, string $abi): void
     {
+        $context->type->hashtable->ensureSortAbi($abi);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
         $context->builder->call($context->lookupFunction($abi), $ht);
         // In-place LLVM sort — only rebind native int[] into a value box. Writing the same
