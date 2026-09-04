@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
-use PHPCompiler\ext\xmlreader\JitXmlReaderMethod;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
@@ -13,6 +12,7 @@ use PHPLLVM\Value;
 /** XMLReader::XML() — user-script AOT in-memory open (#28670, re-#27299). */
 final class XmlReaderXML implements Call
 {
+    // Dispatch via Context::$extensionLowering (#36204).
     /** Qualified name for BuiltinParamNames / named-arg resolve. */
     public string $name = 'XMLReader::XML';
 
@@ -24,6 +24,6 @@ final class XmlReaderXML implements Call
 
     public function call(Context $context, Variable ...$args): Value
     {
-        return JitXmlReaderMethod::invoke($context, 'xml', ...$args);
+        return $context->extensionLowering->requireXmlReader()->invoke($context, 'xml', ...$args);
     }
 }

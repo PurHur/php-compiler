@@ -435,6 +435,82 @@ final class JitPhpExtensionLoweringHooksTest extends TestCase
         }
     }
 
+    public function testXmlReaderCallProxiesDoNotImportXmlreaderExtension(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $module = (string) file_get_contents($root.'/ext/xmlreader/Module.php');
+        $this->assertStringContainsString(
+            'xmlreader = new JitXmlReaderExtensionHooksFacade()',
+            $module,
+            'ext/xmlreader Module::jitInit must register JitXmlReaderExtensionHooksFacade'
+        );
+        $this->assertStringContainsString(
+            'requireXmlReader',
+            (string) file_get_contents($root.'/lib/JIT/ExtensionLoweringHooks.php'),
+            'ExtensionLoweringHooks must expose requireXmlReader()'
+        );
+        $files = [
+            'lib/JIT/Call/XmlReaderFromStream.php',
+            'lib/JIT/Call/XmlReaderFromString.php',
+            'lib/JIT/Call/XmlReaderFromUri.php',
+            'lib/JIT/Call/XmlReaderMethod.php',
+            'lib/JIT/Call/XmlReaderOpen.php',
+            'lib/JIT/Call/XmlReaderXML.php',
+        ];
+        foreach ($files as $rel) {
+            $src = (string) file_get_contents($root.'/'.$rel);
+            $stripped = (string) preg_replace('~/\*.*?\*/~s', '', $src);
+            $stripped = (string) preg_replace('~//.*$~m', '', $stripped);
+            $this->assertDoesNotMatchRegularExpression(
+                '/PHPCompiler\\\\ext\\\\xmlreader\\\\/',
+                $stripped,
+                $rel.' still imports ext\\xmlreader — use XmlReaderExtensionHooks'
+            );
+            $this->assertStringContainsString(
+                'requireXmlReader()',
+                $src,
+                $rel.' must dispatch via requireXmlReader()'
+            );
+        }
+    }
+
+    public function testXmlWriterCallProxiesDoNotImportXmlwriterExtension(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $module = (string) file_get_contents($root.'/ext/xmlwriter/Module.php');
+        $this->assertStringContainsString(
+            'xmlwriter = new JitXmlWriterExtensionHooksFacade()',
+            $module,
+            'ext/xmlwriter Module::jitInit must register JitXmlWriterExtensionHooksFacade'
+        );
+        $this->assertStringContainsString(
+            'requireXmlWriter',
+            (string) file_get_contents($root.'/lib/JIT/ExtensionLoweringHooks.php'),
+            'ExtensionLoweringHooks must expose requireXmlWriter()'
+        );
+        $files = [
+            'lib/JIT/Call/XmlWriterMethod.php',
+            'lib/JIT/Call/XmlWriterToMemory.php',
+            'lib/JIT/Call/XmlWriterToStream.php',
+            'lib/JIT/Call/XmlWriterToUri.php',
+        ];
+        foreach ($files as $rel) {
+            $src = (string) file_get_contents($root.'/'.$rel);
+            $stripped = (string) preg_replace('~/\*.*?\*/~s', '', $src);
+            $stripped = (string) preg_replace('~//.*$~m', '', $stripped);
+            $this->assertDoesNotMatchRegularExpression(
+                '/PHPCompiler\\\\ext\\\\xmlwriter\\\\/',
+                $stripped,
+                $rel.' still imports ext\\xmlwriter — use XmlWriterExtensionHooks'
+            );
+            $this->assertStringContainsString(
+                'requireXmlWriter()',
+                $src,
+                $rel.' must dispatch via requireXmlWriter()'
+            );
+        }
+    }
+
     /**
      * @dataProvider coreJitHelperFilesWithoutNonStandardExtImports
      */

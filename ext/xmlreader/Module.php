@@ -32,6 +32,7 @@ class Module extends ModuleAbstract
      */
     public function jitInit(JIT\Context $context): void
     {
+        $context->extensionLowering->xmlreader = new JitXmlReaderExtensionHooksFacade();
         $context->type->object->registerExternalClassSeeder('xmlreader', static function ($obj, int $id): void {
             $obj->defineProperty($id, JitXmlReaderUserScript::PROP_POS, Variable::TYPE_NATIVE_LONG);
             $obj->defineProperty($id, 'nodeType', Variable::TYPE_NATIVE_LONG);
