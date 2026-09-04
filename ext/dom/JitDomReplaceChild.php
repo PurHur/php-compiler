@@ -6,7 +6,6 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
-use PHPCompiler\JIT\Builtin\DomNodeLiveMutationRuntime;
 use PHPCompiler\JIT\Builtin\DomNodeTreeMutationRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
@@ -264,7 +263,7 @@ final class JitDomReplaceChild
         $context->builder->branch($bbEnd);
 
         $context->builder->positionAtEnd($bbDiff);
-        DomNodeLiveMutationRuntime::assertTreeMutationChildBeforeLiveSlots(
+        JitDomLiveMutationKernel::assertTreeMutationChildBeforeLiveSlots(
             $context,
             $document,
             $newChild
@@ -435,7 +434,7 @@ final class JitDomReplaceChild
         self::rejectAttrAsContentBeforeLiveSlots($context, $newChild);
 
         // Wrong Document / Hierarchy Request before LiveSlots (#30274).
-        DomNodeLiveMutationRuntime::assertTreeMutationChildBeforeLiveSlots(
+        JitDomLiveMutationKernel::assertTreeMutationChildBeforeLiveSlots(
             $context,
             $parent,
             $newChild
@@ -579,7 +578,7 @@ final class JitDomReplaceChild
         $newInner = $newChildVar->compileTimeDomInnerXml ?? '';
         // Include setAttribute / importNode open-tag attrs — bare <tag/> overwrote LiveSlots
         // rebuild and dropped attrs from saveXML after loadXML replaceChild (#34291 / peer
-        // #33509 / DomNodeLiveMutationRuntime::compileTimeChildElementMarkup).
+        // #33509 / JitDomLiveMutationKernel::compileTimeChildElementMarkup).
         $attrs = $newChildVar->compileTimeDomAttributes;
         if (null === $attrs || [] === $attrs) {
             $id = $newChildVar->compileTimeDomElementId ?? JitDomCreateElementAttrs::lastId();

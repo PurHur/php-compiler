@@ -112,6 +112,9 @@ final class JitDomExtensionHooksFacade implements DomExtensionHooks
             'node.before' => $this->invokeNodeBefore($context, ...$args),
             'node.replaceWith' => $this->invokeNodeReplaceWith($context, ...$args),
             'node.remove' => $this->invokeNodeRemove($context, ...$args),
+            'node.append' => $this->invokeNodeAppend($context, ...$args),
+            'node.prepend' => $this->invokeNodePrepend($context, ...$args),
+            'node.replaceChildren' => $this->invokeNodeReplaceChildren($context, ...$args),
 
             'xpath.registerPhpFunctions' => $this->invokeXpathRegisterPhpFunctions($context, ...$args),
             'xpath.registerNamespace' => $this->invokeXpathRegisterNamespace($context, ...$args),
@@ -471,6 +474,54 @@ final class JitDomExtensionHooksFacade implements DomExtensionHooks
         return JitValueBox::normalizeValuePtr($context, $slot);
     }
 
+    /** DOMNode::append() — user-script AOT ParentNode (#18951, #19208). */
+    private function invokeNodeAppend(Context $context, JITVariable ...$args): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_append_invoke_cont');
+        if ([] === $args) {
+            throw new \LogicException('DOMNode::append() called without $this');
+        }
+
+        return JitDomLiveMutationKernel::invokeAppend(
+            $context,
+            \count($args) - 1,
+            $args[0],
+            ...\array_slice($args, 1)
+        );
+    }
+
+    /** DOMNode::prepend() — user-script AOT ParentNode (#18951). */
+    private function invokeNodePrepend(Context $context, JITVariable ...$args): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_prepend_invoke_cont');
+        if ([] === $args) {
+            throw new \LogicException('DOMNode::prepend() called without $this');
+        }
+
+        return JitDomLiveMutationKernel::invokePrepend(
+            $context,
+            \count($args) - 1,
+            $args[0],
+            ...\array_slice($args, 1)
+        );
+    }
+
+    /** DOMNode::replaceChildren() — user-script AOT ParentNode (#18951). */
+    private function invokeNodeReplaceChildren(Context $context, JITVariable ...$args): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_replacechildren_invoke_cont');
+        if ([] === $args) {
+            throw new \LogicException('DOMNode::replaceChildren() called without $this');
+        }
+
+        return JitDomLiveMutationKernel::invokeReplaceChildren(
+            $context,
+            \count($args) - 1,
+            $args[0],
+            ...\array_slice($args, 1)
+        );
+    }
+
     /** DOMNode::after() — user-script AOT ChildNode (#26752). */
     private function invokeNodeAfter(Context $context, JITVariable ...$args): Value
     {
@@ -710,7 +761,7 @@ final class JitDomExtensionHooksFacade implements DomExtensionHooks
         if (!$objectType->hasProperty($classId, VmDom::PROP_DOCUMENT_ELEMENT)) {
             $objectType->defineProperty($classId, VmDom::PROP_DOCUMENT_ELEMENT, JITVariable::TYPE_OBJECT);
         }
-        $nullEl = new Variable(
+        $nullEl = new JITVariable(
             $context,
             JITVariable::TYPE_OBJECT,
             JITVariable::KIND_VALUE,
@@ -768,7 +819,7 @@ final class JitDomExtensionHooksFacade implements DomExtensionHooks
                 $context->lookupFunction('__string__separate'),
                 $str
             );
-            $propVar = new Variable(
+            $propVar = new JITVariable(
                 $context,
                 JITVariable::TYPE_STRING,
                 JITVariable::KIND_VALUE,
@@ -795,7 +846,7 @@ final class JitDomExtensionHooksFacade implements DomExtensionHooks
             $context->lookupFunction('__value__writeNull'),
             JitValueBox::pointer($context, $box)
         );
-        $propVar = new Variable(
+        $propVar = new JITVariable(
             $context,
             JITVariable::TYPE_VALUE,
             JITVariable::KIND_VARIABLE,
@@ -821,7 +872,7 @@ final class JitDomExtensionHooksFacade implements DomExtensionHooks
             $context->lookupFunction('__value__writeNull'),
             JitValueBox::pointer($context, $box)
         );
-        $propVar = new Variable(
+        $propVar = new JITVariable(
             $context,
             JITVariable::TYPE_VALUE,
             JITVariable::KIND_VARIABLE,
@@ -849,7 +900,7 @@ final class JitDomExtensionHooksFacade implements DomExtensionHooks
             $box,
             $context->builder->zext($i1->constInt($value ? 1 : 0, false), $i32)
         );
-        $propVar = new Variable(
+        $propVar = new JITVariable(
             $context,
             JITVariable::TYPE_VALUE,
             JITVariable::KIND_VARIABLE,
@@ -875,7 +926,7 @@ final class JitDomExtensionHooksFacade implements DomExtensionHooks
             $context->lookupFunction('__string__separate'),
             $str
         );
-        $propVar = new Variable(
+        $propVar = new JITVariable(
             $context,
             JITVariable::TYPE_STRING,
             JITVariable::KIND_VALUE,
@@ -901,7 +952,7 @@ final class JitDomExtensionHooksFacade implements DomExtensionHooks
             $context->lookupFunction('__string__separate'),
             $str
         );
-        $propVar = new Variable(
+        $propVar = new JITVariable(
             $context,
             JITVariable::TYPE_STRING,
             JITVariable::KIND_VALUE,
@@ -930,7 +981,7 @@ final class JitDomExtensionHooksFacade implements DomExtensionHooks
             $context->lookupFunction('__value__writeNull'),
             JitValueBox::pointer($context, $box)
         );
-        $propVar = new Variable(
+        $propVar = new JITVariable(
             $context,
             JITVariable::TYPE_VALUE,
             JITVariable::KIND_VARIABLE,

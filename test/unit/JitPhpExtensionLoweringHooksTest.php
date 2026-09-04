@@ -711,6 +711,9 @@ final class JitPhpExtensionLoweringHooksTest extends TestCase
             'lib/JIT/Call/DomNodeAfter.php',
             'lib/JIT/Call/DomNodeBefore.php',
             'lib/JIT/Call/DomNodeReplaceWith.php',
+            'lib/JIT/Call/DomNodeAppend.php',
+            'lib/JIT/Call/DomNodePrepend.php',
+            'lib/JIT/Call/DomNodeReplaceChildren.php',
         ];
         foreach ($files as $rel) {
             $src = (string) file_get_contents($root.'/'.$rel);
@@ -735,6 +738,14 @@ final class JitPhpExtensionLoweringHooksTest extends TestCase
             $root.'/lib/JIT/Builtin/DomNodeChildNodeMutationRuntime.php',
             'ChildNode mutation must not remain as a lib Builtin importing ext\\dom'
         );
+        $this->assertFileExists(
+            $root.'/ext/dom/JitDomLiveMutationKernel.php',
+            'ParentNode live mutation kernel must live in ext/dom (#36204)'
+        );
+        $this->assertFileDoesNotExist(
+            $root.'/lib/JIT/Builtin/DomNodeLiveMutationRuntime.php',
+            'ParentNode live mutation must not remain as a lib Builtin importing ext\\dom'
+        );
         $thinCount = 0;
         foreach (glob($root.'/lib/JIT/Call/Dom*.php') ?: [] as $path) {
             $src = (string) file_get_contents($path);
@@ -751,9 +762,9 @@ final class JitPhpExtensionLoweringHooksTest extends TestCase
             );
         }
         $this->assertSame(
-            93,
+            96,
             $thinCount,
-            'expected 93 thin Dom Call proxies routed via requireDom()'
+            'expected 96 thin Dom Call proxies routed via requireDom()'
         );
     }
 

@@ -2,31 +2,8 @@
 
 declare(strict_types=1);
 
-namespace PHPCompiler\JIT\Builtin;
+namespace PHPCompiler\ext\dom;
 
-use PHPCompiler\ext\dom\DomUserScriptLiveTagListLlvm;
-use PHPCompiler\ext\dom\VmDom;
-use PHPCompiler\ext\dom\DomExceptionConstants;
-use PHPCompiler\ext\dom\DomParseSimpleXmlJitHelper;
-use PHPCompiler\ext\dom\JitDomAppendChildLiveSlots;
-use PHPCompiler\ext\dom\JitDomAppendChildUserScript;
-use PHPCompiler\ext\dom\JitDomCreateElement;
-use PHPCompiler\ext\dom\JitDomCreateElementAttrs;
-use PHPCompiler\ext\dom\JitDomCreateCDATASection;
-use PHPCompiler\ext\dom\JitDomCreateComment;
-use PHPCompiler\ext\dom\JitDomCreateDocumentFragment;
-use PHPCompiler\ext\dom\JitDomCreateProcessingInstruction;
-use PHPCompiler\ext\dom\JitDomCreateTextNode;
-use PHPCompiler\ext\dom\JitDomCloneNode;
-use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
-use PHPCompiler\ext\dom\JitDomImportNode;
-use PHPCompiler\ext\dom\JitDomInsertBeforeLiveSlots;
-use PHPCompiler\ext\dom\JitDomLoadXMLUserScript;
-use PHPCompiler\ext\dom\JitDomNodeChildProperty;
-use PHPCompiler\ext\dom\JitDomNodeListItem;
-use PHPCompiler\ext\dom\JitDomParentChildLinkLayout;
-use PHPCompiler\ext\dom\JitDomReplaceChildLiveSlots;
-use PHPCompiler\ext\dom\JitDomRequireDomNodeArg;
 use PHPCompiler\ext\standard\JitStringConcat;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
@@ -44,9 +21,11 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for DOMNode::{append,prepend,replaceChildren} via PHP helpers (#18951).
+ * JIT/AOT kernel for DOM ParentNode::{append,prepend,replaceChildren} (#18951).
+ *
+ * Lives in ext/dom so lib/JIT Call proxies do not import ext\dom (#36204).
  */
-final class DomNodeLiveMutationRuntime
+final class JitDomLiveMutationKernel
 {
     public const MAX_EXTRA_ARGS = 4;
 
@@ -192,14 +171,14 @@ final class DomNodeLiveMutationRuntime
         Variable ...$extraArgs
     ): Value {
         if ($extraArgCount !== \count($extraArgs)) {
-            throw new \LogicException('DomNodeLiveMutationRuntime arity mismatch');
+            throw new \LogicException('JitDomLiveMutationKernel arity mismatch');
         }
         if ($extraArgCount < 0 || $extraArgCount > self::MAX_EXTRA_ARGS) {
-            throw new \LogicException('DomNodeLiveMutationRuntime unsupported arity');
+            throw new \LogicException('JitDomLiveMutationKernel unsupported arity');
         }
         $minArity = 'replacechildren' === $kind ? 0 : 1;
         if ($extraArgCount < $minArity) {
-            throw new \LogicException('DomNodeLiveMutationRuntime unsupported arity');
+            throw new \LogicException('JitDomLiveMutationKernel unsupported arity');
         }
         // php-src ParentNode nodes: DOMNode|string — null must TypeError before LiveSlots (#33741).
         $method = match ($kind) {
@@ -409,6 +388,7 @@ final class DomNodeLiveMutationRuntime
             // append #29048 / insertBefore #32801). NestedJIT + syncChildLinkSlots
             // set first=last=newChild and collapsed refetch_len; multi-arg left held
             // lists stale (#32838).
+            // #33637 — rebuild INNER_XML on prepend; do not concat onto loadXML seed.
             if ('prepend' === $kind && self::canUseObjectMutationBridge($extraArgs)) {
                 $parentObj = self::receiverObject($context, $receiver);
                 $isDoc = JitDomParentChildLinkLayout::isDocumentObject($context, $parentObj, 'dom_prepend_recv');
