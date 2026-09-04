@@ -371,10 +371,17 @@ final class NoThrowCallElision
             return self::definedTableRuntimeInfoArgsCannotThrow($callArgs);
         }
         if (self::isPureProcessIdentityBuiltin($name)) {
-            // phpversion / php_uname / getmypid / getmyuid / getmygid —
-            // info.c / basic_functions.c process identity reads; excess argc
+            // phpversion / php_uname / getmypid / getmyuid / getmygid /
+            // getmyinode / getlastmod / get_current_user — info.c /
+            // basic_functions.c process / script identity reads; excess argc
             // is ArgumentCountError.
             return self::processIdentityArgsCannotThrow($name, $callArgs);
+        }
+        if (self::isPureMemoryIniRuntimeInfoBuiltin($name)) {
+            // memory_get_usage / memory_get_peak_usage / php_ini_loaded_file /
+            // php_ini_scanned_files / gc_enabled — introspection reads; soft-null
+            // bool deprecates / TypeErrors; excess argc is ArgumentCountError.
+            return self::memoryIniRuntimeInfoArgsCannotThrow($name, $callArgs);
         }
         if (self::isPureVersionCompareBuiltin($name)) {
             // versioning.c — typed strings; optional operator must be proven valid.
@@ -1178,9 +1185,10 @@ final class NoThrowCallElision
     }
 
     /**
-     * Process / runtime identity reads — php-src {@code ext/standard/info.c}
+     * Process / script identity reads — php-src {@code ext/standard/info.c}
      * ({@code phpversion}/{@code php_uname}), {@code ext/standard/basic_functions.c}
-     * ({@code getmypid}/{@code getmyuid}/{@code getmygid}). Excess argc is
+     * ({@code getmypid}/{@code getmyuid}/{@code getmygid}/{@code getmyinode}/
+     * {@code getlastmod}/{@code get_current_user}). Excess argc is
      * {@code ArgumentCountError}. Public for {@see DiscardedPureCallElision}
      * (#36386).
      */
@@ -1192,6 +1200,31 @@ final class NoThrowCallElision
             case 'getmypid':
             case 'getmyuid':
             case 'getmygid':
+            case 'getmyinode':
+            case 'getlastmod':
+            case 'get_current_user':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Memory / ini / GC introspection reads — php-src {@code Zend/zend_alloc.c}
+     * ({@code memory_get_usage}/{@code memory_get_peak_usage}),
+     * {@code ext/standard/basic_functions.c} ({@code php_ini_loaded_file}/
+     * {@code php_ini_scanned_files}/{@code gc_enabled}). Soft-null bool
+     * deprecates / TypeErrors; excess argc is {@code ArgumentCountError}.
+     * Public for {@see DiscardedPureCallElision} (#36386).
+     */
+    public static function isPureMemoryIniRuntimeInfoBuiltin(string $nameLc): bool
+    {
+        switch ($nameLc) {
+            case 'memory_get_usage':
+            case 'memory_get_peak_usage':
+            case 'php_ini_loaded_file':
+            case 'php_ini_scanned_files':
+            case 'gc_enabled':
                 return true;
             default:
                 return false;
@@ -1660,7 +1693,8 @@ final class NoThrowCallElision
     }
 
     /**
-     * {@code getmypid}/{@code getmyuid}/{@code getmygid}: arity 0.
+     * {@code getmypid}/{@code getmyuid}/{@code getmygid}/{@code getmyinode}/
+     * {@code getlastmod}/{@code get_current_user}: arity 0.
      * {@code phpversion}/{@code php_uname}: arity 0 or one string-coercible
      * arg (soft-null / scalars do not leave throw-pending; objects /
      * value-box stay out). Excess argc is {@code ArgumentCountError}.
@@ -1673,6 +1707,9 @@ final class NoThrowCallElision
             case 'getmypid':
             case 'getmyuid':
             case 'getmygid':
+            case 'getmyinode':
+            case 'getlastmod':
+            case 'get_current_user':
                 return [] === $callArgs;
             case 'phpversion':
             case 'php_uname':
@@ -1684,6 +1721,29 @@ final class NoThrowCallElision
                 }
 
                 return self::stringParamBuiltinArgCannotThrow($callArgs[0]);
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * {@code php_ini_loaded_file}/{@code php_ini_scanned_files}/{@code gc_enabled}:
+     * arity 0. {@code memory_get_usage}/{@code memory_get_peak_usage}: arity 0
+     * or one non-null bool/long (soft-null deprecates / TypeError under
+     * strict_types). Excess argc is {@code ArgumentCountError}.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    public static function memoryIniRuntimeInfoArgsCannotThrow(string $nameLc, array $callArgs): bool
+    {
+        switch ($nameLc) {
+            case 'php_ini_loaded_file':
+            case 'php_ini_scanned_files':
+            case 'gc_enabled':
+                return [] === $callArgs;
+            case 'memory_get_usage':
+            case 'memory_get_peak_usage':
+                return self::definedTableRuntimeInfoArgsCannotThrow($callArgs);
             default:
                 return false;
         }
