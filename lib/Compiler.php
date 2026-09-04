@@ -27186,15 +27186,14 @@ class Compiler {
         );
         $fromCallable->fromCallableApi = true;
         $this->assignSourceMetadata($fromCallable, $expr);
-
         return [$fromCallable];
     }
-
     /**
      * Closure::fromCallable([$obj, 'method']) → INIT_ARRAY + TYPE_FROM_CALLABLE (#27137, #27143).
      *
      * Same shape as {@see compileBoundMethodFirstClassCallable}; keeps the object receiver
      * instead of folding Variable(`this`) to the string class name `"this"`.
+     * Runtime method names (Slim `[$this->creator, $this->method]`) stay as operands (#36382).
      *
      * @return OpCode[]|null
      */
@@ -27212,19 +27211,13 @@ class Compiler {
         if (null !== $this->literalCallableArrayElementString($values[0], $block)) {
             return null;
         }
-        // Method name must be a compile-time string (literal or ::class-style).
-        $methodLiteral = $this->literalCallableArrayElementString($values[1], $block);
-        if (null === $methodLiteral) {
-            // php-cfg often wraps `'priv'` as Temporary — resolve Assign of string literal.
-            $methodLiteral = $this->literalStringAssignedToOperand($values[1], $block);
-        }
-        if (null === $methodLiteral) {
-            return null;
-        }
-
+        $methodLiteral = $this->literalCallableArrayElementString($values[1], $block)
+            ?? $this->literalStringAssignedToOperand($values[1], $block);
         $result = $this->compileOperand($expr->result, $block, false);
         $receiverSlot = $this->compileOperand($values[0], $block, true);
-        $methodSlot = $this->compileOperand(new Operand\Literal($methodLiteral), $block, true);
+        $methodSlot = null !== $methodLiteral
+            ? $this->compileOperand(new Operand\Literal($methodLiteral), $block, true)
+            : $this->compileOperand($values[1], $block, true);
         $fromCallable = new OpCode(
             OpCode::TYPE_FROM_CALLABLE,
             $result,
@@ -27232,7 +27225,6 @@ class Compiler {
         );
         $fromCallable->fromCallableApi = true;
         $this->assignSourceMetadata($fromCallable, $expr);
-
         return [
             new OpCode(
                 OpCode::TYPE_INIT_ARRAY,
@@ -27249,7 +27241,6 @@ class Compiler {
             $fromCallable,
         ];
     }
-
     private function findFromCallableArrayExpr(Operand $arg, Block $block, Op\Expr\StaticCall $callOp): ?Op\Expr\Array_
     {
         if (null === $block->orig) {
@@ -27263,6 +27254,23 @@ class Compiler {
             ) {
                 return $child;
             }
+            // `$c = [$obj, $m]; Closure::fromCallable($c)` — Slim ServerRequestCreator (#36382).
+            if (
+                $child instanceof Op\Expr\Assign
+                && null !== $child->var
+                && $this->operandsReferToSameVariable($child->var, $arg)
+                && ($child->expr ?? null) instanceof Operand
+            ) {
+                foreach ($block->orig->children as $inner) {
+                    if (
+                        $inner instanceof Op\Expr\Array_
+                        && null !== $inner->result
+                        && $this->operandsReferToSameVariable($inner->result, $child->expr)
+                    ) {
+                        return $inner;
+                    }
+                }
+            }
         }
         $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $callOp, $block->orig);
         if (\is_int($callIndex) && $callIndex > 0) {
@@ -27271,10 +27279,8 @@ class Compiler {
                 return $prev;
             }
         }
-
         return null;
     }
-
     /** Resolve Temporary holding a string literal Assign (php-cfg array element shape). */
     private function literalStringAssignedToOperand(Operand $op, Block $block): ?string
     {
@@ -27296,10 +27302,8 @@ class Compiler {
                 }
             }
         }
-
         return null;
     }
-
     private function literalCallableNameForFromCallable(Operand $arg, Block $block, Op\Expr\StaticCall $callOp): ?string
     {
         $direct = $this->staticNameFromOperand($arg);
@@ -27320,10 +27324,8 @@ class Compiler {
         if (null === $classPart || null === $methodPart) {
             return null;
         }
-
         return $classPart.'::'.$methodPart;
     }
-
     private function literalCallableArrayElementString(Operand $op, Block $block): ?string
     {
         // Only true string literals — Variable(name) may be `$this` / `$obj` and must not
@@ -27347,10 +27349,8 @@ class Compiler {
                 }
             }
         }
-
         return null;
     }
-
     /**
      * Lower PHP 8.1 first-class callables to Closure objects via TYPE_FROM_CALLABLE (#1230, #4810).
      *
