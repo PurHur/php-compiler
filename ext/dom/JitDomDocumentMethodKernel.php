@@ -26,7 +26,6 @@ use PHPCompiler\JIT\Builtin\DomLoadXMLRuntime;
 use PHPCompiler\JIT\Builtin\DomNodeChildPropertyRuntime;
 use PHPCompiler\JIT\Builtin\DomNodeIsConnectedRuntime;
 use PHPCompiler\JIT\Builtin\DomNodeListItemRuntime;
-use PHPCompiler\JIT\Builtin\DomNodeLiveMutationRuntime;
 use PHPCompiler\JIT\Builtin\DomNodeTreeMutationRuntime;
 use PHPCompiler\JIT\Builtin\DomNormalizeRuntime;
 use PHPCompiler\JIT\Builtin\DomSaveHTMLFileRuntime;
@@ -714,7 +713,7 @@ final class JitDomDocumentMethodKernel
     {
         self::ensureLiveMutationBridge(
             $context,
-            DomNodeLiveMutationRuntime::appendAbi($arity),
+            JitDomLiveMutationKernel::appendAbi($arity),
             'dom_append_user_script_'.$arity,
             $arity,
             'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::appendArgv'.$arity
@@ -725,7 +724,7 @@ final class JitDomDocumentMethodKernel
     {
         self::ensureObjectLiveMutationBridge(
             $context,
-            DomNodeLiveMutationRuntime::appendObjectAbi($arity),
+            JitDomLiveMutationKernel::appendObjectAbi($arity),
             'dom_append_object_user_script_'.$arity,
             $arity,
             'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::appendObjectArgv'.$arity
@@ -736,7 +735,7 @@ final class JitDomDocumentMethodKernel
     {
         self::ensureLiveMutationBridge(
             $context,
-            DomNodeLiveMutationRuntime::prependAbi($arity),
+            JitDomLiveMutationKernel::prependAbi($arity),
             'dom_prepend_user_script_'.$arity,
             $arity,
             'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::prependArgv'.$arity
@@ -747,7 +746,7 @@ final class JitDomDocumentMethodKernel
     {
         self::ensureObjectLiveMutationBridge(
             $context,
-            DomNodeLiveMutationRuntime::prependObjectAbi($arity),
+            JitDomLiveMutationKernel::prependObjectAbi($arity),
             'dom_prepend_object_user_script_'.$arity,
             $arity,
             'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::prependObjectArgv'.$arity
@@ -758,7 +757,7 @@ final class JitDomDocumentMethodKernel
     {
         self::ensureBridge(
             $context,
-            DomNodeLiveMutationRuntime::appendStringAbi(),
+            JitDomLiveMutationKernel::appendStringAbi(),
             'dom_append_string_user_script',
             [
                 $context->getTypeFromString('__object__*'),
@@ -774,7 +773,7 @@ final class JitDomDocumentMethodKernel
     {
         self::ensureBridge(
             $context,
-            DomNodeLiveMutationRuntime::prependStringAbi(),
+            JitDomLiveMutationKernel::prependStringAbi(),
             'dom_prepend_string_user_script',
             [
                 $context->getTypeFromString('__object__*'),
@@ -796,7 +795,7 @@ final class JitDomDocumentMethodKernel
         }
         self::ensureBridge(
             $context,
-            DomNodeLiveMutationRuntime::replaceChildrenAbi($arity),
+            JitDomLiveMutationKernel::replaceChildrenAbi($arity),
             'dom_replace_children_user_script_'.$arity,
             $paramTypes,
             $context->context->voidType(),
@@ -809,7 +808,7 @@ final class JitDomDocumentMethodKernel
     {
         self::ensureObjectLiveMutationBridge(
             $context,
-            DomNodeLiveMutationRuntime::replaceChildrenObjectAbi($arity),
+            JitDomLiveMutationKernel::replaceChildrenObjectAbi($arity),
             'dom_replace_children_object_user_script_'.$arity,
             $arity,
             'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::replaceChildrenObjectArgv'.$arity,
@@ -821,7 +820,7 @@ final class JitDomDocumentMethodKernel
     {
         self::ensureBridge(
             $context,
-            DomNodeLiveMutationRuntime::replaceChildrenStringAbi(),
+            JitDomLiveMutationKernel::replaceChildrenStringAbi(),
             'dom_replace_children_string_user_script',
             [
                 $context->getTypeFromString('__object__*'),
@@ -1364,7 +1363,7 @@ final class JitDomDocumentMethodKernel
     {
         self::ensureContextBridge(
             $context,
-            DomNodeLiveMutationRuntime::ABI_CREATE_FRAGMENT,
+            JitDomLiveMutationKernel::ABI_CREATE_FRAGMENT,
             'dom_create_document_fragment_user_script',
             [
                 $context->getTypeFromString('__object__*'),
@@ -1379,7 +1378,7 @@ final class JitDomDocumentMethodKernel
     {
         self::ensureBridge(
             $context,
-            DomNodeLiveMutationRuntime::ABI_CREATE_FRAGMENT_OBJECT,
+            JitDomLiveMutationKernel::ABI_CREATE_FRAGMENT_OBJECT,
             'dom_create_document_fragment_object_user_script',
             [
                 $context->getTypeFromString('__object__*'),

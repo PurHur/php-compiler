@@ -572,7 +572,7 @@ final class JitDomCreateElement
             // createElementNS nsDef on node-scoped saveXML (#32302).
             VmDom::PROP_USER_SCRIPT_XMLNS_ATTR => JITVariable::TYPE_STRING,
             VmDom::PROP_NODE_PATH => JITVariable::TYPE_STRING,
-            // DomNodeLiveMutationRuntime::syncElementNavSlots (appendChild path).
+            // JitDomLiveMutationKernel::syncElementNavSlots (appendChild path).
             VmDom::PROP_FIRST_ELEMENT_CHILD => JITVariable::TYPE_VALUE,
             VmDom::PROP_LAST_ELEMENT_CHILD => JITVariable::TYPE_VALUE,
             VmDom::PROP_CHILD_ELEMENT_COUNT => JITVariable::TYPE_NATIVE_LONG,

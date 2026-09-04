@@ -6,7 +6,6 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\DomInstanceMethodRuntime;
-use PHPCompiler\JIT\Builtin\DomNodeLiveMutationRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
@@ -73,7 +72,7 @@ final class JitDomChildNodeMutationKernel
         if ($extraArgCount !== \count($extraArgs)) {
             throw new \LogicException('JitDomChildNodeMutationKernel arity mismatch');
         }
-        if ($extraArgCount < 1 || $extraArgCount > DomNodeLiveMutationRuntime::MAX_EXTRA_ARGS) {
+        if ($extraArgCount < 1 || $extraArgCount > JitDomLiveMutationKernel::MAX_EXTRA_ARGS) {
             throw new \LogicException('JitDomChildNodeMutationKernel unsupported arity');
         }
 

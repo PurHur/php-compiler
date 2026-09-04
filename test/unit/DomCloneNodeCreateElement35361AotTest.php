@@ -23,7 +23,7 @@ final class DomCloneNodeCreateElement35361AotTest extends TestCase
     public function testAppendKeepsCompileTimeInnerXmlForClone(): void
     {
         $src = (string) file_get_contents(
-            __DIR__.'/../../lib/JIT/Builtin/DomNodeLiveMutationRuntime.php'
+            __DIR__.'/../../ext/dom/JitDomLiveMutationKernel.php'
         );
         $this->assertStringContainsString('createElement trees can cloneNode', $src);
         $this->assertStringContainsString('#35361', $src);

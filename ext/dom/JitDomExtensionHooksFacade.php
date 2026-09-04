@@ -112,6 +112,9 @@ final class JitDomExtensionHooksFacade implements DomExtensionHooks
             'node.before' => $this->invokeNodeBefore($context, ...$args),
             'node.replaceWith' => $this->invokeNodeReplaceWith($context, ...$args),
             'node.remove' => $this->invokeNodeRemove($context, ...$args),
+            'node.append' => $this->invokeNodeAppend($context, ...$args),
+            'node.prepend' => $this->invokeNodePrepend($context, ...$args),
+            'node.replaceChildren' => $this->invokeNodeReplaceChildren($context, ...$args),
 
             'xpath.registerPhpFunctions' => $this->invokeXpathRegisterPhpFunctions($context, ...$args),
             'xpath.registerNamespace' => $this->invokeXpathRegisterNamespace($context, ...$args),
@@ -469,6 +472,54 @@ final class JitDomExtensionHooksFacade implements DomExtensionHooks
         JitValueBox::writeBool($context, $slot, $i1->constInt($present ? 1 : 0, false));
 
         return JitValueBox::normalizeValuePtr($context, $slot);
+    }
+
+    /** DOMNode::append() — user-script AOT ParentNode (#18951). */
+    private function invokeNodeAppend(Context $context, JITVariable ...$args): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_append_invoke_cont');
+        if ([] === $args) {
+            throw new \LogicException('DOMNode::append() called without $this');
+        }
+
+        return JitDomLiveMutationKernel::invokeAppend(
+            $context,
+            \count($args) - 1,
+            $args[0],
+            ...\array_slice($args, 1)
+        );
+    }
+
+    /** DOMNode::prepend() — user-script AOT ParentNode (#18951). */
+    private function invokeNodePrepend(Context $context, JITVariable ...$args): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_prepend_invoke_cont');
+        if ([] === $args) {
+            throw new \LogicException('DOMNode::prepend() called without $this');
+        }
+
+        return JitDomLiveMutationKernel::invokePrepend(
+            $context,
+            \count($args) - 1,
+            $args[0],
+            ...\array_slice($args, 1)
+        );
+    }
+
+    /** DOMNode::replaceChildren() — user-script AOT ParentNode (#18951). */
+    private function invokeNodeReplaceChildren(Context $context, JITVariable ...$args): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_replace_children_invoke_cont');
+        if ([] === $args) {
+            throw new \LogicException('DOMNode::replaceChildren() called without $this');
+        }
+
+        return JitDomLiveMutationKernel::invokeReplaceChildren(
+            $context,
+            \count($args) - 1,
+            $args[0],
+            ...\array_slice($args, 1)
+        );
     }
 
     /** DOMNode::after() — user-script AOT ChildNode (#26752). */
@@ -1501,8 +1552,12 @@ final class JitDomExtensionHooksFacade implements DomExtensionHooks
         ) {
             // Pin object identity before ParentNode::append mutates slots (#27480).
             $childObj = self::loadChildObject($context, $args[1]);
-            $append = new \PHPCompiler\JIT\Call\DomNodeAppend();
-            $append->call($context, ...$args);
+            JitDomLiveMutationKernel::invokeAppend(
+                $context,
+                \count($args) - 1,
+                $args[0],
+                ...\array_slice($args, 1)
+            );
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_ac_ret_cont');
 
             return self::boxObjectResult($context, $childObj);

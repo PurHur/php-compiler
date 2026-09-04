@@ -565,7 +565,7 @@ final class JitDomDocumentElement
     /**
      * ParentNode / NonDocumentTypeChildNode element-nav on loadXML (#19431, #34352).
      *
-     * Peer {@see DomNodeLiveMutationRuntime::syncElementNavSlots} (appendChild path).
+     * Peer {@see JitDomLiveMutationKernel::syncElementNavSlots} (appendChild path).
      */
     private static function storeElementNav(
         \PHPCompiler\JIT\Context $context,

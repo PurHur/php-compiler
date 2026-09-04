@@ -10615,7 +10615,7 @@ class JIT {
                 }
             }
         }
-        // Parent compileTimeDomInnerXml is stamped by DomNodeLiveMutationRuntime::
+        // Parent compileTimeDomInnerXml is stamped by JitDomLiveMutationKernel::
         // syncUserScriptInnerXmlFromArgs during appendChild/insertBefore invoke — a second
         // concat here duplicated children on cloneNode (#35386 re-open).
         if (!$this->context->hasVariableOp($result)) {
@@ -10645,7 +10645,7 @@ class JIT {
      *
      * Used when there is no loadXML SSOT and LiveMutation left the receiver inner empty
      * (DocumentFragment). Element appendChild already updates inner via
-     * {@see DomNodeLiveMutationRuntime::syncUserScriptInnerXmlFromArgs}.
+     * {@see JitDomLiveMutationKernel::syncUserScriptInnerXmlFromArgs}.
      */
     private function appendCompileTimeDomInnerXmlChild(Variable $parent, Variable $child): void
     {
