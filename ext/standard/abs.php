@@ -61,6 +61,7 @@ final class abs extends Internal
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
         if (JITVariable::TYPE_NATIVE_DOUBLE === $args[0]->type) {
+            // Hot path: llvm.fabs.f64 (php-src fabs) — not NestedJIT AbsJitHelper (#36386).
             $v = $context->helper->loadValue($args[0]);
 
             return MathAbs::invokeDouble($context, $v);
