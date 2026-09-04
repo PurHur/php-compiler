@@ -44,7 +44,7 @@ final class SpineChunkHubSourceDemoteTest extends TestCase
         $src = <<<'PHP'
 <?php
 namespace PHPCompiler;
-final class Compiler {
+final class Block {
     public function foo(int $x): int {
         return $x + 1;
     }
@@ -58,7 +58,7 @@ final class Compiler {
 PHP;
         putenv(ExternalMethodBind::ENV_SPINE_CHUNK.'=1');
         $_ENV[ExternalMethodBind::ENV_SPINE_CHUNK] = '1';
-        $out = SpineChunkRuntimeMethodDemote::hollowClassMethodBodies($src, 'Compiler');
+        $out = SpineChunkRuntimeMethodDemote::hollowClassMethodBodies($src, 'Block');
         $this->assertStringContainsString('function foo(int $x): int {}', preg_replace('/\s+/', ' ', $out) ?? $out);
         $this->assertStringContainsString('abstract public function bar();', $out);
         $this->assertStringContainsString('function baz() {}', preg_replace('/\s+/', ' ', $out) ?? $out);
@@ -71,10 +71,11 @@ PHP;
         putenv(ExternalMethodBind::ENV_SPINE_CHUNK.'=1');
         $_ENV[ExternalMethodBind::ENV_SPINE_CHUNK] = '1';
         // SourceBundler shape: braced namespace, logical filename is the entry path.
+        // Block is demoted; Compiler/JIT stay live (host CFG still OOMs).
         $src = <<<'PHP'
 <?php
 namespace PHPCompiler {
-final class Compiler {
+final class Block {
     public function f() { return 1; }
 }
 }
@@ -86,18 +87,21 @@ PHP;
 
     public function testRewriteOnlyUnderSpineChunkForDemotedHub(): void
     {
-        $src = "<?php\nnamespace PHPCompiler;\nclass Compiler { public function f() { return 1; } }\n";
-        $unchanged = SpineChunkRuntimeMethodDemote::rewriteSource($src, '/compiler/lib/Compiler.php');
+        $src = "<?php\nnamespace PHPCompiler;\nclass Block { public function f() { return 1; } }\n";
+        $unchanged = SpineChunkRuntimeMethodDemote::rewriteSource($src, '/compiler/lib/Block.php');
         $this->assertSame($src, $unchanged);
 
         putenv(ExternalMethodBind::ENV_SPINE_CHUNK.'=1');
         $_ENV[ExternalMethodBind::ENV_SPINE_CHUNK] = '1';
-        $hollowed = SpineChunkRuntimeMethodDemote::rewriteSource($src, '/compiler/lib/Compiler.php');
+        $hollowed = SpineChunkRuntimeMethodDemote::rewriteSource($src, '/compiler/lib/Block.php');
         $this->assertStringNotContainsString('return 1', $hollowed);
         $this->assertStringContainsString('function f() {}', preg_replace('/\s+/', ' ', $hollowed) ?? $hollowed);
 
         // CompilerVersion stays live — no hollow.
         $cv = "<?php\nnamespace PHPCompiler;\nclass CompilerVersion { public function f() { return 1; } }\n";
         $this->assertSame($cv, SpineChunkRuntimeMethodDemote::rewriteSource($cv, '/compiler/lib/CompilerVersion.php'));
+        // Compiler stays live (file-split needed) — no hollow.
+        $compiler = "<?php\nnamespace PHPCompiler;\nclass Compiler { public function f() { return 1; } }\n";
+        $this->assertSame($compiler, SpineChunkRuntimeMethodDemote::rewriteSource($compiler, '/compiler/lib/Compiler.php'));
     }
 }
