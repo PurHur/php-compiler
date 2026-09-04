@@ -13,9 +13,11 @@ use PHPCompiler\VM\Variable as VmVariable;
  * Elide discarded calls to compile-time-pure builtins (#23483 / #36386 call-overhead).
  *
  * php-src: ZPP may still run user-visible coercions; here we only fold cases that are
- * side-effect-free (literal / typed-string strlen/ord, typed-numeric chr, type.c
- * predicates, math.c on already-numeric args, empty void user functions). Soft-null
- * strlen / ord / chr / math coercions are NOT elided — they emit deprecations (PHP 8.1+).
+ * side-effect-free (literal / typed-string strlen/ord/strtolower/…, typed-numeric chr,
+ * type.c predicates + gettype, typed-array count/sizeof, math.c on already-numeric
+ * args, empty void user functions). Soft-null strlen / ord / chr / math / string
+ * coercions are NOT elided — they emit deprecations (PHP 8.1+). Countable objects
+ * stay live (user {@code count()} handlers).
  */
 final class DiscardedPureCallElision
 {
@@ -36,6 +38,12 @@ final class DiscardedPureCallElision
         if (self::tryElideChrNoSideEffect($toCall, $callArgs)) {
             return true;
         }
+        if (self::tryElidePureStringTransformNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElideCountOnTypedArray($toCall, $callArgs)) {
+            return true;
+        }
         if (self::tryElidePureMathNoSideEffect($toCall, $callArgs)) {
             return true;
         }
@@ -44,8 +52,9 @@ final class DiscardedPureCallElision
     }
 
     /**
-     * Discarded {@code is_int}/{@code is_string}/… — php-src {@code type.c} only
-     * reads the zval type tag (peer {@see NoThrowCallElision}).
+     * Discarded {@code is_int}/{@code is_string}/…/{@code gettype} — php-src
+     * {@code type.c} / {@code basic_functions.c} only read the zval type tag
+     * (peer {@see NoThrowCallElision}).
      */
     private static function tryElidePureTypePredicate(?Call $toCall): bool
     {
@@ -126,6 +135,91 @@ final class DiscardedPureCallElision
         }
 
         return self::mathArgAllowsDiscardedElision($callArgs[0]);
+    }
+
+    /**
+     * Discarded {@code strtolower}/{@code trim}/… on typed / literal strings —
+     * php-src {@code string.c} Z_PARAM_STR family; soft null / object
+     * {@code __toString} stay live (peer {@see tryElideStrlenNoSideEffect}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureStringTransformNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if (!NoThrowCallElision::isPureStringTransformBuiltin(strtolower($toCall->getName()))) {
+            return false;
+        }
+        if ([] === $callArgs) {
+            return false;
+        }
+        foreach ($callArgs as $arg) {
+            if (!$arg instanceof Variable || !self::stringArgAllowsDiscardedElision($arg)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Discarded {@code count}/{@code sizeof} on a typed array — php-src
+     * {@code Zend/zend_builtin_functions.c} PHP_FUNCTION(count) only reads the
+     * HashTable when the value is an array. Countable objects invoke user
+     * {@code count()} and must stay live; null TypeErrors stay live.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElideCountOnTypedArray(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        $name = strtolower($toCall->getName());
+        if ('count' !== $name && 'sizeof' !== $name) {
+            return false;
+        }
+        if (!isset($callArgs[0]) || !$callArgs[0] instanceof Variable) {
+            return false;
+        }
+        if (!self::isTypedArrayArg($callArgs[0])) {
+            return false;
+        }
+        if (isset($callArgs[1])) {
+            // Optional $mode — null soft-deprecates (#31463); keep live.
+            if (!$callArgs[1] instanceof Variable || !self::mathArgAllowsDiscardedElision($callArgs[1])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Already a string slot or compile-time string literal — no Z_PARAM_STR
+     * coerce / null deprecate / {@code __toString}.
+     */
+    private static function stringArgAllowsDiscardedElision(Variable $arg): bool
+    {
+        if (null !== JitStringArg::compileTimeLiteral($arg)) {
+            return true;
+        }
+
+        return Variable::TYPE_STRING === $arg->type;
+    }
+
+    /**
+     * Typed hashtable or packed native array — not Countable / value-box.
+     */
+    private static function isTypedArrayArg(Variable $arg): bool
+    {
+        if (0 !== ($arg->type & Variable::IS_NATIVE_ARRAY)) {
+            return true;
+        }
+
+        return Variable::TYPE_HASHTABLE === $arg->type;
     }
 
     /**
