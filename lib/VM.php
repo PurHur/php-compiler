@@ -18344,8 +18344,7 @@ restart:
         if (null === $classLc) {
             return null;
         }
-        // Trait methods: resolve to composing class for protected/public (#24732),
-        // keep trait scope only for private (#4834).
+        // Trait methods: resolve to composing class (zend_traits.c scope copy; #24732 / #36382).
         if (isset($this->context->classes[$classLc]) && $this->context->classes[$classLc]->isTrait) {
             $composing = $this->resolveTraitComposingClassLc($frame, $classLc);
             if (null !== $composing) {
@@ -18413,30 +18412,16 @@ restart:
     }
 
     /**
-     * Trait-sourced methods use trait scope for private member access (#4834, zend_compile.c).
-     * Protected/public trait methods use the composing class scope (#24732, Zend/zend_inheritance.c).
+     * After trait flatten, private methods use the composing class as scope (zend_traits.c
+     * copies fn->common.scope to the using class) — same as protected/public (#24732).
+     *
+     * Returning the trait name here made private trait→trait calls and private property
+     * writes fail with "from scope Trait" while Zend succeeds (Nyholm MessageTrait / #36382).
+     * Const self:: access still uses {@see isInTraitMethodScopeForTrait} via func->class.
      */
     private function traitScopeLcForFrameMethod(Frame $frame, string $classLc): ?string
     {
-        if (!isset($this->context->classes[$classLc])) {
-            return null;
-        }
-        $func = $frame->block->func;
-        if (null === $func || !isset($func->name)) {
-            return null;
-        }
-        $methodLc = strtolower((string) $func->name);
-        $classEntry = $this->context->classes[$classLc];
-        $traitName = $classEntry->traitMethodSources[$methodLc] ?? null;
-        if (null === $traitName) {
-            return null;
-        }
-        $vis = $classEntry->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
-        if (($vis & \PHPCfg\Func::FLAG_PRIVATE) === 0) {
-            return null;
-        }
-
-        return strtolower(ltrim($traitName, '\\'));
+        return null;
     }
 
     /**
