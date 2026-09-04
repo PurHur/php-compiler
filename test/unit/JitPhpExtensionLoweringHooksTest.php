@@ -740,9 +740,9 @@ final class JitPhpExtensionLoweringHooksTest extends TestCase
             );
         }
         $this->assertSame(
-            60,
+            79,
             $thinCount,
-            'expected 60 thin Dom Call proxies routed via requireDom()'
+            'expected 79 thin Dom Call proxies routed via requireDom()'
         );
     }
 

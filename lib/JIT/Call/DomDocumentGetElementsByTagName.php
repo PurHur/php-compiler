@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
-use PHPCompiler\ext\dom\JitDomGetElementsByTagName;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
-use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPLLVM\Value;
 
 /** DOMDocument::getElementsByTagName() — user-script AOT (#18461, #18478). */
@@ -16,15 +14,10 @@ final class DomDocumentGetElementsByTagName implements Call
 {
     public function call(Context $context, Variable ...$args): Value
     {
-        if (!VmClassMethod::requireExactJitUserArgCount(
+        return $context->extensionLowering->requireDom()->invokeCall(
             $context,
-            $args,
-            'DOMDocument::getElementsByTagName',
-            1
-        )) {
-            return VmClassMethod::jitArgcDummyReturn($context);
-        }
-
-        return JitDomGetElementsByTagName::invoke($context, ...$args);
+            'document.getElementsByTagName',
+            ...$args
+        );
     }
 }
