@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\dom\JitDomInstanceMethodKernel;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -17,6 +16,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT bridge for ext/dom instance methods via VmDomInstanceInvoke (#17130, #17391).
  *
+ * Thin-AOT kernel links via {@see \PHPCompiler\JIT\DomExtensionHooks} (#36204).
  * php-src: ext/dom/php_dom.c — DOM*::method handlers
  */
 final class DomInstanceMethodRuntime
@@ -88,8 +88,8 @@ final class DomInstanceMethodRuntime
     {
         self::assertValidArity($extraArgCount);
         VmActiveContextInitLlvm::requestThinStandaloneInit($context);
-        if (JitDomInstanceMethodKernel::shouldUse($context)) {
-            JitDomInstanceMethodKernel::ensureBridge($context, $extraArgCount);
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
+            $context->extensionLowering->requireDom()->ensureInstanceMethodBridge($context, $extraArgCount);
 
             return;
         }

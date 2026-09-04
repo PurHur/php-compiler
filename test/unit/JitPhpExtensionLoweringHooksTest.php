@@ -759,6 +759,16 @@ final class JitPhpExtensionLoweringHooksTest extends TestCase
             (string) file_get_contents($root.'/ext/dom/JitDomExtensionHooksFacade.php'),
             'JitDomExtensionHooksFacade must implement ensureDocumentMethodBridge()'
         );
+        $this->assertStringContainsString(
+            'ensureInstanceMethodBridge',
+            (string) file_get_contents($root.'/lib/JIT/DomExtensionHooks.php'),
+            'DomExtensionHooks must expose ensureInstanceMethodBridge()'
+        );
+        $this->assertStringContainsString(
+            'ensureStandaloneAotInit',
+            (string) file_get_contents($root.'/lib/JIT/DomExtensionHooks.php'),
+            'DomExtensionHooks must expose ensureStandaloneAotInit()'
+        );
         $files = [
             'lib/JIT/Builtin/DomSaveXMLRuntime.php',
             'lib/JIT/Builtin/DomLoadRuntime.php',
@@ -768,6 +778,7 @@ final class JitPhpExtensionLoweringHooksTest extends TestCase
             'lib/JIT/Builtin/DomXPathEvaluateRuntime.php',
             'lib/JIT/Builtin/DomSetIdAttributeRuntime.php',
             'lib/JIT/Builtin/DomImportNodeRuntime.php',
+            'lib/JIT/Builtin/DomLivingApiRuntime.php',
         ];
         $hooked = 0;
         foreach (glob($root.'/lib/JIT/Builtin/Dom*Runtime.php') ?: [] as $path) {
@@ -790,9 +801,9 @@ final class JitPhpExtensionLoweringHooksTest extends TestCase
             );
         }
         $this->assertSame(
-            32,
+            33,
             $hooked,
-            'expected 32 Dom*Runtime files routed via ensureDocumentMethodBridge()'
+            'expected 33 Dom*Runtime files routed via ensureDocumentMethodBridge()'
         );
         foreach ($files as $rel) {
             $src = (string) file_get_contents($root.'/'.$rel);
@@ -800,6 +811,21 @@ final class JitPhpExtensionLoweringHooksTest extends TestCase
                 'ensureDocumentMethodBridge',
                 $src,
                 $rel.' must dispatch via ensureDocumentMethodBridge()'
+            );
+        }
+
+        foreach ([
+            'lib/JIT/Builtin/DomInstanceMethodRuntime.php' => 'ensureInstanceMethodBridge',
+            'lib/JIT/Builtin/DomStandaloneAotInitRuntime.php' => 'ensureStandaloneAotInit',
+        ] as $rel => $hook) {
+            $src = (string) file_get_contents($root.'/'.$rel);
+            $stripped = (string) preg_replace('~/\*.*?\*/~s', '', $src);
+            $stripped = (string) preg_replace('~//.*$~m', '', $stripped);
+            $this->assertStringContainsString($hook, $src, $rel.' must dispatch via '.$hook);
+            $this->assertDoesNotMatchRegularExpression(
+                '/use PHPCompiler\\\\ext\\\\dom\\\\/',
+                $stripped,
+                basename($rel).' still imports ext\\dom — use DomExtensionHooks'
             );
         }
     }
