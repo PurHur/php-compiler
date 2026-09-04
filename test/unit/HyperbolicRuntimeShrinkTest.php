@@ -10,49 +10,67 @@ use PHPCompiler\ext\standard\TanhJitHelper;
 use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
-/** cosh()/sinh()/tanh() JIT routes through JitHelper PHP (#15156, #27005, #28446, #28459). */
+/**
+ * sinh()/cosh()/tanh() AOT uses libm sinh(3)/cosh(3)/tanh(3) (#36386);
+ * *JitHelper remain NestedJIT-safe reference (peer MathTan / TanJitHelper).
+ * LLVM 9 has no llvm.sinh.f64 / llvm.cosh.f64 / llvm.tanh.f64.
+ *
+ * php-src: ext/standard/math.c PHP_FUNCTION(sinh|cosh|tanh).
+ */
 final class HyperbolicRuntimeShrinkTest extends TestCase
 {
-    public function testCoshUsesJitHelperNotLibcLookup(): void
+    public function testCoshUsesLibmNotHelperBridge(): void
     {
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/cosh.php');
         $this->assertStringContainsString('MathCosh::invoke', $builtin);
         $this->assertStringNotContainsString("lookupFunction('cosh')", $builtin);
 
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathCosh.php');
-        $this->assertStringContainsString('CoshJitHelper', $bridge);
+        $this->assertStringContainsString("LIBC_COSH = 'cosh'", $bridge);
         $this->assertStringContainsString('phpc_cosh', $bridge);
-        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringContainsString('cosh_libm_f64_entry', $bridge);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('CoshJitHelper', $bridge);
         $this->assertStringNotContainsString('JitCoshKernel', $bridge);
         $this->assertStringNotContainsString('NestedJitCompileScope', $bridge);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
+        $this->assertStringNotContainsString('llvm.cosh', $bridge);
     }
 
-    public function testSinhUsesJitHelperNotLibcLookup(): void
+    public function testSinhUsesLibmNotHelperBridge(): void
     {
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/sinh.php');
         $this->assertStringContainsString('MathSinh::invoke', $builtin);
         $this->assertStringNotContainsString("lookupFunction('sinh')", $builtin);
 
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathSinh.php');
-        $this->assertStringContainsString('SinhJitHelper', $bridge);
+        $this->assertStringContainsString("LIBC_SINH = 'sinh'", $bridge);
         $this->assertStringContainsString('phpc_sinh', $bridge);
-        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringContainsString('sinh_libm_f64_entry', $bridge);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('SinhJitHelper', $bridge);
         $this->assertStringNotContainsString('JitSinhKernel', $bridge);
         $this->assertStringNotContainsString('NestedJitCompileScope', $bridge);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
+        $this->assertStringNotContainsString('llvm.sinh', $bridge);
     }
 
-    public function testTanhUsesJitHelperNotLibcLookup(): void
+    public function testTanhUsesLibmNotHelperBridge(): void
     {
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/tanh.php');
         $this->assertStringContainsString('MathTanh::invoke', $builtin);
         $this->assertStringNotContainsString("lookupFunction('tanh')", $builtin);
 
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathTanh.php');
-        $this->assertStringContainsString('TanhJitHelper', $bridge);
+        $this->assertStringContainsString("LIBC_TANH = 'tanh'", $bridge);
         $this->assertStringContainsString('phpc_tanh', $bridge);
-        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringContainsString('tanh_libm_f64_entry', $bridge);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('TanhJitHelper', $bridge);
         $this->assertStringNotContainsString('JitTanhKernel', $bridge);
         $this->assertStringNotContainsString('NestedJitCompileScope', $bridge);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
+        $this->assertStringNotContainsString('llvm.tanh', $bridge);
     }
 
     public function testCoshJitHelperInlinesNestedJitSafeAlgorithm(): void

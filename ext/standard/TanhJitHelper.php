@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * tanh() for compiled JIT/AOT modules (#15156, #27126, #28459, php-in-PHP).
+ * tanh() NestedJIT-safe fdlibm reference (#15156, #27126, #28459, php-in-PHP).
  *
- * NestedJIT-safe fdlibm e_tanh.c shape with inlined exp (#28459 /
- * peer MathCosh #28446 / MathSinh #28418 / MathExp #28241).
+ * AOT/JIT hot path uses libm {@code tanh(3)} via {@see \PHPCompiler\JIT\Builtin\MathTanh}
+ * (#36386 / peer MathSinh). This helper remains for NestedJIT-safe fdlibm e_tanh.c
+ * shape with inlined exp when NestedJIT cannot call libc.
  * Avoid `\tanh` / {@see VmMath::tanh} — NestedJIT re-enters MathTanh bridge under thin AOT.
  * Avoid cross-class Exp/Sinh/Cosh helper call — NestedJIT stubs to 0 (#27017 / Hypot shape).
  * Avoid pack/unpack (#27496). Avoid unbounded while-loops (#27838).
