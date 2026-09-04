@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 8164 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 25875 |
+| Source constructs flagged (warnings) | 25877 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3957,7 +3957,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmPopenPure.php` | 0 | 1 |
 | `ext/standard/VmPreg.php` | 0 | 9 |
 | `ext/standard/VmPregCompileWarn.php` | 0 | 1 |
-| `ext/standard/VmPregEngine.php` | 0 | 76 |
+| `ext/standard/VmPregEngine.php` | 0 | 78 |
 | `ext/standard/VmPregFailure.php` | 0 | 1 |
 | `ext/standard/VmPregLimits.php` | 0 | 1 |
 | `ext/standard/VmPregMatches.php` | 0 | 12 |
@@ -38345,37 +38345,39 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new VmPregAstEmptyNode (line 829)
 - new VmPregAstClassNode (line 833)
 - new VmPregAstEmptyNode (line 877)
-- new VmPregAstCharNode (line 891)
-- new VmPregAstEmptyNode (line 899)
-- new VmPregAstCharNode (line 902)
-- new VmPregAstUnicodePropNode (line 913)
-- new VmPregAstUnicodePropNode (line 914)
-- new VmPregAstUnicodePropNode (line 915)
-- new VmPregAstUnicodePropNode (line 916)
-- new VmPregAstUnicodePropNode (line 917)
-- new VmPregAstUnicodePropNode (line 918)
-- new VmPregAstBolNode (line 919)
-- new VmPregAstKeepOutNode (line 920)
-- new VmPregAstEolNode (line 921)
-- new VmPregAstEolNode (line 922)
-- new VmPregAstCharNode (line 923)
-- new VmPregAstClassNode (line 928)
-- new VmPregAstClassNode (line 929)
-- new VmPregAstClassNode (line 930)
-- new VmPregAstClassNode (line 931)
-- new VmPregAstClassNode (line 932)
-- new VmPregAstClassNode (line 933)
-- new VmPregAstBolNode (line 934)
-- new VmPregAstKeepOutNode (line 935)
-- new VmPregAstEolNode (line 936)
-- new VmPregAstEolNode (line 937)
-- new VmPregAstCharNode (line 938)
-- new VmPregAstEmptyNode (line 997)
-- new VmPregAstEmptyNode (line 1009)
-- new VmPregAstEmptyNode (line 1019)
-- new VmPregAstEmptyNode (line 1027)
-- new VmPregAstUnicodePropNode (line 1030)
-- 92 class method(s)
+- new VmPregAstBackrefNode (line 902)
+- new VmPregAstCharNode (line 915)
+- new VmPregAstEmptyNode (line 923)
+- new VmPregAstCharNode (line 926)
+- new VmPregAstCharNode (line 947)
+- new VmPregAstUnicodePropNode (line 952)
+- new VmPregAstUnicodePropNode (line 953)
+- new VmPregAstUnicodePropNode (line 954)
+- new VmPregAstUnicodePropNode (line 955)
+- new VmPregAstUnicodePropNode (line 956)
+- new VmPregAstUnicodePropNode (line 957)
+- new VmPregAstBolNode (line 958)
+- new VmPregAstKeepOutNode (line 959)
+- new VmPregAstEolNode (line 960)
+- new VmPregAstEolNode (line 961)
+- new VmPregAstCharNode (line 962)
+- new VmPregAstClassNode (line 967)
+- new VmPregAstClassNode (line 968)
+- new VmPregAstClassNode (line 969)
+- new VmPregAstClassNode (line 970)
+- new VmPregAstClassNode (line 971)
+- new VmPregAstClassNode (line 972)
+- new VmPregAstBolNode (line 973)
+- new VmPregAstKeepOutNode (line 974)
+- new VmPregAstEolNode (line 975)
+- new VmPregAstEolNode (line 976)
+- new VmPregAstCharNode (line 977)
+- new VmPregAstEmptyNode (line 1036)
+- new VmPregAstEmptyNode (line 1048)
+- new VmPregAstEmptyNode (line 1058)
+- new VmPregAstEmptyNode (line 1066)
+- new VmPregAstUnicodePropNode (line 1069)
+- 94 class method(s)
 - 8 closure(s)
 
 ### `ext/standard/VmPregFailure.php`
