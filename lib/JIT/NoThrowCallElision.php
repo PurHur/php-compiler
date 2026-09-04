@@ -336,6 +336,12 @@ final class NoThrowCallElision
             // triggers spl_autoload / can throw).
             return self::classExistsFamilyArgsCannotThrow($callArgs);
         }
+        if (self::isPureObjectIntrospectBuiltin($name)) {
+            // get_class / get_parent_class / spl_object_id / spl_object_hash —
+            // typed object only; string get_parent_class autoloads; soft-null
+            // TypeErrors stay out.
+            return self::objectIntrospectArgsCannotThrow($callArgs);
+        }
         if (self::isPureVersionCompareBuiltin($name)) {
             // versioning.c — typed strings; optional operator must be proven valid.
             return self::versionCompareArgsCannotThrow($callArgs);
@@ -1021,6 +1027,26 @@ final class NoThrowCallElision
     }
 
     /**
+     * php-src {@code Zend/zend_builtin_functions.c} {@code get_class}/
+     * {@code get_parent_class} and {@code ext/spl/php_spl.c}
+     * {@code spl_object_id}/{@code spl_object_hash} — typed object operand
+     * only (no autoload / no handlers). Public for
+     * {@see DiscardedPureCallElision} (#36386).
+     */
+    public static function isPureObjectIntrospectBuiltin(string $nameLc): bool
+    {
+        switch ($nameLc) {
+            case 'get_class':
+            case 'get_parent_class':
+            case 'spl_object_id':
+            case 'spl_object_hash':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
      * php-src {@code ext/standard/versioning.c} {@code version_compare}. Public
      * for {@see DiscardedPureCallElision} (#36386).
      */
@@ -1323,6 +1349,26 @@ final class NoThrowCallElision
         }
 
         return self::isCompileTimeFalseAutoloadArg($callArgs[1]);
+    }
+
+    /**
+     * Exactly one typed object — zero-arg {@code get_class}/{@code get_parent_class}
+     * deprecate / need scope; string {@code get_parent_class} autoloads; soft-null
+     * / value-box stay out ({@code TypeError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    public static function objectIntrospectArgsCannotThrow(array $callArgs): bool
+    {
+        if (
+            !isset($callArgs[0])
+            || isset($callArgs[1])
+            || !$callArgs[0] instanceof Variable
+        ) {
+            return false;
+        }
+
+        return Variable::TYPE_OBJECT === $callArgs[0]->type;
     }
 
     /**

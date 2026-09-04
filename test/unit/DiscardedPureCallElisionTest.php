@@ -37,7 +37,9 @@ use PHPCompiler\ext\standard\fmax;
 use PHPCompiler\ext\standard\fmin;
 use PHPCompiler\ext\standard\floatval;
 use PHPCompiler\ext\standard\function_exists;
+use PHPCompiler\ext\standard\get_class_;
 use PHPCompiler\ext\standard\get_debug_type;
+use PHPCompiler\ext\standard\get_parent_class_;
 use PHPCompiler\ext\standard\gettype;
 use PHPCompiler\ext\standard\hash_equals;
 use PHPCompiler\ext\standard\hebrev;
@@ -76,6 +78,8 @@ use PHPCompiler\ext\standard\rawurlencode;
 use PHPCompiler\ext\standard\sha1;
 use PHPCompiler\ext\standard\similar_text;
 use PHPCompiler\ext\standard\soundex;
+use PHPCompiler\ext\standard\spl_object_hash;
+use PHPCompiler\ext\standard\spl_object_id;
 use PHPCompiler\ext\standard\sqrt;
 use PHPCompiler\ext\standard\str_contains;
 use PHPCompiler\ext\standard\str_ends_with;
@@ -2042,6 +2046,85 @@ final class DiscardedPureCallElisionTest extends TestCase
             $context,
             new class_exists_(),
             [$name, $false, $lit]
+        ));
+    }
+
+    public function testDiscardedObjectIntrospectElidesOnTypedObject(): void
+    {
+        // php-src zend_builtin_functions.c / ext/spl/php_spl.c — typed object only (#36386).
+        $context = $this->makeContext();
+        $obj = $this->makeObjectVar();
+        $str = $this->makeStringVar('stdClass');
+        $null = $this->makeNullVar();
+        $box = $this->makeValueBoxVar();
+        $long = $this->makeNativeLongVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_class_(),
+            [$obj]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_parent_class_(),
+            [$obj]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new spl_object_id(),
+            [$obj]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new spl_object_hash(),
+            [$obj]
+        ));
+
+        // Zero-arg / string / soft-null / value-box stay live.
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_class_(),
+            []
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_parent_class_(),
+            []
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_parent_class_(),
+            [$str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_class_(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_class_(),
+            [$box]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new spl_object_id(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new spl_object_id(),
+            [$long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new spl_object_hash(),
+            [$box]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_class_(),
+            [$obj, $str]
         ));
     }
 
