@@ -4,9 +4,9 @@
     "done_when_ceiling": 25000,
     "files": {
         "lib/Compiler.php": {
-            "budget": 28899,
+            "budget": 28709,
             "target": 20000,
-            "note": "Concern trait splits (#36230/#36387/#36403); ratchet down after each extract"
+            "note": "Concern trait splits (#36230/#36387/#36403); InlineCallArgSlotResolvers + dim-fetch helpers \u2192 PrecedingInlineCallArgProducers"
         },
         "lib/JIT.php": {
             "budget": 24655,
@@ -29,15 +29,15 @@
             "note": "already under target; ratchet for --build-id=sha1 / SOURCE_DATE_EPOCH (#36399)"
         },
         "lib/AOT/HelperRuntimeCache.php": {
-            "budget": 1550,
+            "budget": 1548,
             "target": 1200,
             "note": "helper-cache granularity; sorted linkObjects (#36399)"
         }
     },
     "script_file_count": {
-        "budget": 281,
+        "budget": 278,
         "target": 150,
-        "note": "script/ top-level *.sh/*.php; +Slim fixture helpers (#36382) after write-release-checksums (#36399)"
+        "note": "script/ top-level *.sh/*.php; Slim #36382 helpers live under script/composer/ (#36403)"
     },
     "ci_defaults_exports": {
         "budget": 141,

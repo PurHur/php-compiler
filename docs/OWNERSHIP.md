@@ -74,7 +74,7 @@ Patch source of truth is moving toward forks (#36229); until then every patch ne
 
 ## Size ratchet
 
-After a Concern extract that shrinks a budgeted file, lower `budget` in `script/size-budgets.json` to the new line count (never raise it). Targets: Compiler/JIT ≤ 25k (then 20k), VM ≤ 15k, `script/` ≤ 150 files, `ci-defaults.env` ≤ 60 exports.
+After a Concern extract that shrinks a budgeted file, lower `budget` in `script/size-budgets.json` to the new line count (never raise it). Targets: Compiler/JIT ≤ 25k (then 20k), VM ≤ 15k, `script/` ≤ 150 top-level files (issue-specific helpers go under `script/composer/`, `script/fuzz/`, `script/lib/`, …), `ci-defaults.env` ≤ 60 exports.
 
 ## Related ADRs / docs
 
