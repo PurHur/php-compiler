@@ -899,4 +899,40 @@ final class JitPhpExtensionLoweringHooksTest extends TestCase
 
         return $files;
     }
+
+    public function testDomLibSurfacesDoNotImportDomExtension(): void
+    {
+        $root = dirname(__DIR__, 2);
+        foreach ([
+            'lib/JIT/ReflectionBuiltinHelper.php',
+            'lib/VM/VmIteratorForeach.php',
+            'lib/VM/VmEmptyDimension.php',
+            'lib/JIT/DomNodeListForeachSnapshot.php',
+        ] as $rel) {
+            $src = (string) file_get_contents($root.'/'.$rel);
+            $stripped = (string) preg_replace('~/\*.*?\*/~s', '', $src);
+            $stripped = (string) preg_replace('~//.*$~m', '', $stripped);
+            $this->assertDoesNotMatchRegularExpression(
+                '/PHPCompiler\\\\ext\\\\dom\\\\/',
+                $stripped,
+                $rel.' still imports ext\\dom — use DomExtensionHooks / DomVmRuntimeSupport'
+            );
+        }
+        $this->assertStringContainsString(
+            'ensureClassicAttrMethods',
+            (string) file_get_contents($root.'/lib/JIT/DomExtensionHooks.php')
+        );
+        $this->assertStringContainsString(
+            'function ensureClassicAttrMethods',
+            (string) file_get_contents($root.'/ext/dom/JitDomExtensionHooksFacade.php')
+        );
+        $this->assertStringContainsString(
+            'setIsCollection',
+            (string) file_get_contents($root.'/lib/VM/DomVmRuntimeSupport.php')
+        );
+        $this->assertStringContainsString(
+            'setIsCollection',
+            (string) file_get_contents($root.'/ext/dom/Module.php')
+        );
+    }
 }

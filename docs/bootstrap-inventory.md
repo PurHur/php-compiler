@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8146 |
-| Phase A inventory files (M2 ratio SSOT) | 8146 |
+| PHP files on vm.php path | 8147 |
+| Phase A inventory files (M2 ratio SSOT) | 8147 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 25828 |
+| Source constructs flagged (warnings) | 25829 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7020,6 +7020,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/DnfParamCheck.php` | 0 | 28 |
 | `lib/JIT/DomExtensionHooks.php` | 0 | 1 |
 | `lib/JIT/DomInstanceMethodJit.php` | 0 | 114 |
+| `lib/JIT/DomNodeListForeachSnapshot.php` | 0 | 1 |
 | `lib/JIT/DynamicObjectReadonlyGuard.php` | 0 | 1 |
 | `lib/JIT/DynamicPropertyDeprecationGuard.php` | 0 | 1 |
 | `lib/JIT/EmitTuMode.php` | 0 | 1 |
@@ -11148,15 +11149,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomExtensionHooksFacade.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 764)
-- new Variable (line 822)
-- new Variable (line 849)
-- new Variable (line 875)
-- new Variable (line 903)
-- new Variable (line 929)
-- new Variable (line 955)
-- new Variable (line 984)
-- 58 class method(s)
+- new JITVariable (line 764)
+- new JITVariable (line 822)
+- new JITVariable (line 849)
+- new JITVariable (line 875)
+- new JITVariable (line 903)
+- new JITVariable (line 929)
+- new JITVariable (line 955)
+- new JITVariable (line 984)
+- 62 class method(s)
 
 ### `ext/dom/JitDomGetElementById.php`
 
@@ -11710,10 +11711,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new VM\ObjectComputedPropertyHandler (line 365)
 - new VM\ObjectComputedPropertyHandler (line 380)
 - new VM\ObjectComputedPropertyHandler (line 395)
-- new dom_import_simplexml (line 423)
-- new ns_import_simplexml (line 428)
+- new dom_import_simplexml (line 443)
+- new ns_import_simplexml (line 448)
 - 40 class method(s)
-- 37 closure(s)
+- 41 closure(s)
 
 ### `ext/dom/NamedNodeMapCount.php`
 
@@ -51896,7 +51897,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/MathExpm1.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/MathFloor.php`
 
@@ -51956,7 +51957,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/MathLog1p.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/MathModf.php`
 
@@ -58147,7 +58148,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/DomExtensionHooks.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 10 class method(s)
 
 ### `lib/JIT/DomInstanceMethodJit.php`
 
@@ -58266,6 +58267,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\DomInstanceMethod (line 1253)
 - new Call\DomInstanceMethod (line 1274)
 - 7 class method(s)
+
+### `lib/JIT/DomNodeListForeachSnapshot.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
 
 ### `lib/JIT/DynamicObjectReadonlyGuard.php`
 
@@ -64242,7 +64248,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/DomVmRuntimeSupport.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 13 class method(s)
 
 ### `lib/VM/EngineConstantDeprecation.php`
 
@@ -65421,9 +65427,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/VmEmptyDimension.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 111)
-- new Variable (line 121)
-- new Variable (line 163)
+- new Variable (line 109)
+- new Variable (line 119)
+- new Variable (line 161)
 - 2 class method(s)
 
 ### `lib/VM/VmEnumNumericOperandGuard.php`
@@ -65503,24 +65509,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/VmIteratorForeach.php`
 
 **Warnings** (review for bootstrap subset):
-- new JitVariable (line 270)
-- new JitVariable (line 295)
-- new JitVariable (line 341)
-- new JitVariable (line 377)
-- new JitVariable (line 421)
-- new JitVariable (line 471)
-- new JitVariable (line 1178)
-- new JitVariable (line 1200)
-- new JitVariable (line 1223)
-- new JitVariable (line 1248)
-- new JitVariable (line 1373)
-- new JitVariable (line 1400)
-- new JitVariable (line 1472)
-- new JitVariable (line 1516)
-- new JitVariable (line 1539)
-- new JitVariable (line 1548)
-- new JitVariable (line 1582)
-- new JitVariable (line 1617)
+- new JitVariable (line 271)
+- new JitVariable (line 296)
+- new JitVariable (line 342)
+- new JitVariable (line 378)
+- new JitVariable (line 422)
+- new JitVariable (line 472)
+- new JitVariable (line 1179)
+- new JitVariable (line 1201)
+- new JitVariable (line 1224)
+- new JitVariable (line 1249)
+- new JitVariable (line 1374)
+- new JitVariable (line 1401)
+- new JitVariable (line 1473)
+- new JitVariable (line 1517)
+- new JitVariable (line 1540)
+- new JitVariable (line 1549)
+- new JitVariable (line 1583)
+- new JitVariable (line 1618)
 - 55 class method(s)
 
 ### `lib/VM/VmIteratorProtocol.php`

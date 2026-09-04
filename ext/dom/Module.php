@@ -415,6 +415,26 @@ class Module extends ModuleAbstract
                 return VmDom::fetchableNodeErrorMessage($node);
             }
         );
+        VM\DomVmRuntimeSupport::setIsCollection(
+            static function (VM\ObjectEntry $object): bool {
+                return VmDomCollectionDimension::isCollection($object);
+            }
+        );
+        VM\DomVmRuntimeSupport::setIsTokenList(
+            static function (VM\ObjectEntry $object): bool {
+                return VmDom::isTokenList($object);
+            }
+        );
+        VM\DomVmRuntimeSupport::setTokenListDimensionIsEmpty(
+            static function (VM\ObjectEntry $object, VM\Variable $dim): bool {
+                return VmDomCollectionDimension::tokenListDimensionIsEmpty($object, $dim);
+            }
+        );
+        VM\DomVmRuntimeSupport::setHasDimension(
+            static function (VM\ObjectEntry $object, VM\Variable $dim): bool {
+                return VmDomCollectionDimension::hasDimension($object, $dim);
+            }
+        );
     }
 
     public function getFunctions(): array

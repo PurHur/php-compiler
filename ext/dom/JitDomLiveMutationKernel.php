@@ -389,6 +389,7 @@ final class JitDomLiveMutationKernel
             // append #29048 / insertBefore #32801). NestedJIT + syncChildLinkSlots
             // set first=last=newChild and collapsed refetch_len; multi-arg left held
             // lists stale (#32838).
+            // #33637 — rebuild INNER_XML on prepend; do not concat onto loadXML seed.
             if ('prepend' === $kind && self::canUseObjectMutationBridge($extraArgs)) {
                 $parentObj = self::receiverObject($context, $receiver);
                 $isDoc = JitDomParentChildLinkLayout::isDocumentObject($context, $parentObj, 'dom_prepend_recv');

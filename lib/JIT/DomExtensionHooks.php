@@ -63,4 +63,23 @@ interface DomExtensionHooks
         string $nameLit,
         string $mode
     ): Value;
+
+    /**
+     * Ensure classic DOMAttr method table (isId / …) for method_exists folding.
+     */
+    public function ensureClassicAttrMethods(Context $context): void;
+
+    /** DOMNodeList / DOMNamedNodeMap foreach container type check. */
+    public function isDomNodeListForeach(?string $containerUserType): bool;
+
+    /** Whether thin-AOT NodeList foreach snapshot can lower. */
+    public function canLowerNodeListForeach(Context $context, Variable $array, ?string $containerUserType): bool;
+
+    /** Emit NodeList foreach Iterator_Reset via snapshot. */
+    public function compileNodeListForeachReset(
+        Context $context,
+        Variable $array,
+        Variable $slotKey,
+        ?string $containerUserType
+    ): void;
 }
