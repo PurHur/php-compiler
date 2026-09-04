@@ -7101,32 +7101,44 @@ trait CompileBlockInternal
                                 $this->context,
                                 $this->loadPropertyFetchReceiver($obj)
                             );
-                            $fetched = $this->context->type->object->propertyFetchByRuntimeReceiverClass(
+                            // Prefer an in-TU declared owner via __object__.class_id (#36386 / #36532).
+                            // When none exists (SPINE_CHUNK partial TU — ClassEntry not in the chunk),
+                            // fall through to object/stdClass dynamic defineProperty instead of aborting
+                            // ("Property isInternal not found…") — restores ext/ds chunk emit (#36387).
+                            // php-src: Zend/zend_object_handlers.c zend_std_write_property.
+                            $fetched = $this->context->type->object->tryPropertyFetchByRuntimeReceiverClass(
                                 $receiver,
                                 $name->value,
                                 $propFetchForWrite
                             );
                             if (null === $fetched) {
-                                throw new \LogicException(
-                                    'PROPERTY_FETCH_WRITE could not resolve runtime class for property '
-                                    .$name->value
-                                );
-                            }
-                            $this->stampPropertyFetchReceiverOp($fetched, $obj);
-                            \PHPCompiler\JIT\BasicBlockHelper::repositionToLastOpenIfInsertLost($this->context);
-                            if ($forDimWrite) {
-                                if ($this->varFetchDestUsedAsDimRwContainer($block, $i, (int) $op->arg1)) {
-                                    \PHPCompiler\JIT\TypedPropertyUninitGuard::emitBeforeRead($this->context, $fetched);
-                                } else {
-                                    \PHPCompiler\JIT\TypedPropertyUninitGuard::emitBeforeDimWrite($this->context, $fetched);
+                                if (
+                                    'static' === $declLcForRuntime
+                                    || $this->receiverIsFromUnserializeObject($obj)
+                                ) {
+                                    throw new \LogicException(
+                                        'PROPERTY_FETCH_WRITE could not resolve runtime class for property '
+                                        .$name->value
+                                    );
                                 }
-                            }
-                            if ($forceBranchMerge) {
-                                $this->assignOperand($result, $fetched, true);
+                                // object/stdclass/mixed write: continue to ordinary path below.
                             } else {
-                                $this->bindPropertyFetchResult($result, $fetched, $bindPropAsWrite);
+                                $this->stampPropertyFetchReceiverOp($fetched, $obj);
+                                \PHPCompiler\JIT\BasicBlockHelper::repositionToLastOpenIfInsertLost($this->context);
+                                if ($forDimWrite) {
+                                    if ($this->varFetchDestUsedAsDimRwContainer($block, $i, (int) $op->arg1)) {
+                                        \PHPCompiler\JIT\TypedPropertyUninitGuard::emitBeforeRead($this->context, $fetched);
+                                    } else {
+                                        \PHPCompiler\JIT\TypedPropertyUninitGuard::emitBeforeDimWrite($this->context, $fetched);
+                                    }
+                                }
+                                if ($forceBranchMerge) {
+                                    $this->assignOperand($result, $fetched, true);
+                                } else {
+                                    $this->bindPropertyFetchResult($result, $fetched, $bindPropAsWrite);
+                                }
+                                break;
                             }
-                            break;
                         }
                         $classId = $this->context->type->object->lookup($declaringClass);
                         // SimpleXMLElement FETCH_OBJ_W: host-fold at ASSIGN via tryPropSet (#35820).
