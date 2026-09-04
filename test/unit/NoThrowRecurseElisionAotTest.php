@@ -88,4 +88,52 @@ final class NoThrowRecurseElisionAotTest extends TestCase
             @unlink($bin);
         }
     }
+
+    public function testLeafMethodCallOmitsExceptionStackWhenEnqueuedBeforeMain(): void
+    {
+        $src = <<<'PHP'
+        <?php
+        declare(strict_types=1);
+        final class Node {
+            public int $value;
+            public function __construct(int $v) { $this->value = $v; }
+            public function bump(): int { return ++$this->value; }
+        }
+        $sum = 0;
+        $n = new Node(0);
+        for ($i = 0; $i < 10; ++$i) {
+            $sum += $n->bump();
+        }
+        echo $sum, "\n";
+        PHP;
+        $path = sys_get_temp_dir().'/phpc_nothrow_bump_'.getmypid().'.php';
+        $bin = sys_get_temp_dir().'/phpc_nothrow_bump_'.getmypid().'.bin';
+        file_put_contents($path, $src);
+        try {
+            putenv('PHP_COMPILER_DUMP_IR=1');
+            putenv('PHP_COMPILER_CACHE=0');
+            $cmd = escapeshellarg(PHP_BINARY).' '
+                .escapeshellarg(__DIR__.'/../../bin/compile.php').' -o '
+                .escapeshellarg($bin).' '.escapeshellarg($path).' 2>&1';
+            exec($cmd, $out, $rc);
+            $this->assertSame(0, $rc, implode("\n", $out));
+            $this->assertFileExists('/tmp/phpc-last.ll');
+            $ll = (string) file_get_contents('/tmp/phpc-last.ll');
+            $callPos = strpos($ll, 'call i64 @Node__bump');
+            $this->assertNotFalse($callPos, 'missing call to @Node__bump');
+            // Window around the call site in {main} / internal_* — not the method body.
+            $window = substr($ll, max(0, $callPos - 400), 800);
+            $this->assertStringNotContainsString('phpc_ex_stack_push', $window);
+            $this->assertStringNotContainsString('phpc_ex_stack_pop', $window);
+            $this->assertStringNotContainsString('phpc_jit_has_throw_pending', $window);
+            exec(escapeshellarg($bin), $runOut, $runRc);
+            $this->assertSame(0, $runRc);
+            $this->assertSame(['55'], $runOut);
+        } finally {
+            putenv('PHP_COMPILER_DUMP_IR');
+            putenv('PHP_COMPILER_CACHE');
+            @unlink($path);
+            @unlink($bin);
+        }
+    }
 }
