@@ -8,6 +8,8 @@ Guide for **app authors** (install and build) and **aligned collaborators**. For
 
 The supported user path is a single Docker image: PHP 8.2 + LLVM 9 + prelinked helper cache, entrypoint `phpc` ([#36390](https://github.com/PurHur/php-compiler/issues/36390)). No clone, Composer, or LLVM build on the host.
 
+**Language baseline (v2.0):** compiled programs target **PHP 8.3 semantics** ([ADR #36384](adr/36384-php-83-baseline.md)). The image’s host PHP 8.2.x is the *compiler process* runtime; set `PHP_COMPILER_PROFILE=8.4` for opt-in 8.4+ syntax.
+
 ```bash
 # After a release publishes ghcr.io/purhur/phpc:v1.1.0 (maintainers: make docker-build-phpc-release):
 docker pull ghcr.io/purhur/phpc:v1.1.0   # or build locally: make docker-build-phpc-release

@@ -7,8 +7,9 @@ declare(strict_types=1);
  * Generate docs/capabilities-syntax.md (language constructs: OOP, match, arrow fn).
  *
  * Usage:
- *   php script/capability-syntax.php          # write docs/capabilities-syntax.md
- *   php script/capability-syntax.php --check  # exit 1 if committed file is stale
+ *   php script/capability-syntax.php                 # write docs/capabilities-syntax.md
+ *   php script/capability-syntax.php --check         # exit 1 if committed file is stale
+ *   php script/capability-syntax.php --refresh-probes # re-run VM execute probes + write cache (#36384)
  */
 
 $root = dirname(__DIR__);
@@ -16,10 +17,18 @@ require $root . '/vendor/autoload.php';
 require __DIR__ . '/capability-syntax-lib.php';
 
 $check = in_array('--check', $argv, true);
+$refreshProbes = in_array('--refresh-probes', $argv, true);
 $outFile = $root . '/docs/capabilities-syntax.md';
 
+$definitions = syntaxRowDefinitions();
+if ($refreshProbes) {
+    $cache = refreshSyntaxProbeCache($root, $definitions);
+    fwrite(STDOUT, 'capability-syntax: refreshed probe cache (' . count($cache['rows'] ?? []) . " rows, fp="
+        . substr((string) ($cache['lowering_fingerprint'] ?? ''), 0, 12) . "…)\n");
+}
+
 $handlers = collectOpcodeHandlers($root);
-$syntax = collectSyntaxCapabilities($root, syntaxRowDefinitions(), $handlers);
+$syntax = collectSyntaxCapabilities($root, $definitions, $handlers, loadSyntaxProbeCache($root));
 $markdown = renderSyntaxMarkdown($syntax)
     . renderStdlibArrayBuiltinNorthStarMarkdown(stdlibArrayBuiltinNorthStarDefinitions())
     . renderWebNorthStarMarkdown(webNorthStarDefinitions())

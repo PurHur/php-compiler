@@ -1,0 +1,312 @@
+{
+    "issue": 36384,
+    "generated_at": "2026-09-04T09:20:50+00:00",
+    "lowering_fingerprint": "eb8caf7dfd1cf63619b2c834699bcde4fb3e2d777a9b6647a3bf3eb05276109f",
+    "definitions_hash": "06cd8eecedfdd91f75a9082a7acf445b6218ef9747a4b9f7169aee1d895910af",
+    "rows": {
+        "class_new": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "anonymous_class": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "enum_declarations": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "abstract_enum_declarations": {
+            "vm": "compile-error",
+            "aot": "compile-error"
+        },
+        "instance_methods": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "static_methods": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "construct_method": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "clone_magic": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "clone_with": {
+            "vm": "wrong-output",
+            "aot": "yes"
+        },
+        "magic_methods": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "private_methods": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "property_fetch": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "ctor_promotion": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "method_return_types": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "dynamic_property_fetch": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "variable_function_call": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "instanceof": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "instanceof_union": {
+            "vm": "wrong-output",
+            "aot": "yes"
+        },
+        "in_operator": {
+            "vm": "compile-error",
+            "aot": "compile-error"
+        },
+        "match_expr": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "closures": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "arrow_functions": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "generator_yield": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "fiber_suspend": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "class_name_const": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "class_member_const": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "typed_class_const": {
+            "vm": "compile-error",
+            "aot": "compile-error"
+        },
+        "global_typed_constant": {
+            "vm": "compile-error",
+            "aot": "compile-error"
+        },
+        "typed_interface_const": {
+            "vm": "compile-error",
+            "aot": "compile-error"
+        },
+        "class_const_object": {
+            "vm": "runtime-error",
+            "aot": "compile-error"
+        },
+        "late_static_binding": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "new_static_return_type": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "magic_const_class_method": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "foreach_by_ref": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "foreach_iterator": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "ref_param": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "return_by_ref": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "static_property_fetch": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "error_control_operator": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "unset": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "function_static_local": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "typed_function_static": {
+            "vm": "wrong-output",
+            "aot": "yes"
+        },
+        "keyed_list_destruct": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "goto": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "strict_types": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "array_type_list": {
+            "vm": "runtime-error",
+            "aot": "yes"
+        },
+        "variable_variables": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "variable_function_calls": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "invoke_object": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "first_class_callable": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "pipe_operator": {
+            "vm": "compile-error",
+            "aot": "compile-error"
+        },
+        "use_function_const_import": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "use_group_import": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "heredoc_flexible_indent": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "never_return": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "intersection_types": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "dnf_types": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "trait_decl": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "trait_use_simple": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "trait_use_adaptation": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "lazy_ghost_trait": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "array_argument_unpack": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "serialize_magic": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "multi_catch": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "try_catch_throw": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "throw_expression": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "readonly_class": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "readonly_property": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "property_hooks": {
+            "vm": "compile-error",
+            "aot": "compile-error"
+        },
+        "asymmetric_visibility": {
+            "vm": "wrong-output",
+            "aot": "yes"
+        },
+        "class_destruct": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "php8_attribute_reflection": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "weak_reference_weak_map": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "heredoc_nowdoc": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "override_attribute": {
+            "vm": "yes",
+            "aot": "yes"
+        },
+        "datetime_oop": {
+            "vm": "yes",
+            "aot": "yes"
+        }
+    }
+}

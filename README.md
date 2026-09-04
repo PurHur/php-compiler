@@ -27,7 +27,7 @@
 
 ### What you can rely on today
 
-- **`phpc` CLI** — `run`, `serve`, `build`, `deploy`, `lint`, `test`, `init`, `doctor` on the **web-capable PHP 8 subset** documented in [`docs/capabilities-syntax.md`](docs/capabilities-syntax.md).
+- **`phpc` CLI** — `run`, `serve`, `build`, `deploy`, `lint`, `test`, `init`, `doctor` on the **web-capable PHP 8.3 subset** (v2.0 language baseline — [ADR #36384](docs/adr/36384-php-83-baseline.md); matrix in [`docs/capabilities-syntax.md`](docs/capabilities-syntax.md)).
 - **Examples 000–009** — VM smoke green via `./phpc test --fast`; AOT link/execute when LLVM 9 is present (`make examples-aot-smoke`).
 - **003-MiniWebApp** — router, templates, forms, JSON API; native AOT execute on supported routes.
 - **009-FastCGIWeb** — FastCGI record codec + VM listener ([#3261](https://github.com/PurHur/php-compiler/pull/3261)).
