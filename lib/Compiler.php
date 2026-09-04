@@ -180,6 +180,7 @@ use PHPCompiler\Compiler\Concern\SiblingInlineFuncCallAndDeadArrayProducers;
 use PHPCompiler\Compiler\Concern\NestedArrayAndLeadingConstCallArgProducers;
 use PHPCompiler\Compiler\Concern\DeferredSiblingAndArrayMapNullCallArgProducers;
 use PHPCompiler\Compiler\Concern\HoistedEnumAndChainedInlineCallArgProducers;
+use PHPCompiler\Compiler\Concern\ExactHoistedAndInlineNewCallArgProducers;
 use PHPCompiler\Compiler\OverrideValidator;
 use PHPCompiler\Web\ConstStringFolder;
 use PHPCompiler\Web\IncludePathResolver;

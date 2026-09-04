@@ -4,7 +4,7 @@
     "done_when_ceiling": 25000,
     "files": {
         "lib/Compiler.php": {
-            "budget": 5969,
+            "budget": 5970,
             "target": 20000,
             "note": "Concern trait splits (#36230/#36387/#36403); ExactHoistedAndInlineNewCallArgProducers + peers"
         },
