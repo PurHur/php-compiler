@@ -4,10 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\dom\DomConstants;
-use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
-use PHPCompiler\ext\dom\JitDomRequireDomNodeArg;
-use PHPCompiler\ext\dom\VmDom;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
 use PHPCompiler\JIT\Context;
@@ -22,6 +18,8 @@ use PHPLLVM\Value;
 /**
  * User-script AOT link for DOM Living Standard methods (#19507, #21687, #25878).
  *
+ * Thin-AOT kernels via {@see \PHPCompiler\JIT\DomExtensionHooks} (#36204).
+ *
  * Bool ABI is int1 (DomLoadXML pattern). Lower call args before ensureBridge.
  * toggleAttribute uses omit / force-true / force-false ABIs (null force collapses in nested TUs).
  *
@@ -31,6 +29,18 @@ use PHPLLVM\Value;
  */
 final class DomLivingApiRuntime
 {
+    /** php-src DOCUMENT_POSITION_* (ext/dom/php_dom.stub.php) — lib-local so we do not import DomConstants (#36204). */
+    private const DOCUMENT_POSITION_DISCONNECTED = 0x01;
+    private const DOCUMENT_POSITION_PRECEDING = 0x02;
+    private const DOCUMENT_POSITION_FOLLOWING = 0x04;
+    private const DOCUMENT_POSITION_CONTAINS = 0x08;
+    private const DOCUMENT_POSITION_CONTAINED_BY = 0x10;
+    private const DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC = 0x20;
+
+    /** DOMNode slot names — peer VmDom::PROP_* without importing ext\dom (#36204). */
+    private const PROP_PARENT_NODE = 'parentNode';
+    private const PROP_NEXT_SIBLING = 'nextSibling';
+
     public const ABI_CONTAINS = '__phpc_dom_living_contains';
 
     public const ABI_CONTAINS_NULL = '__phpc_dom_living_contains_null';
@@ -57,12 +67,12 @@ final class DomLivingApiRuntime
 
             return $context->getTypeFromString('int1')->constInt(0, false);
         }
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
             return self::containsViaParentSlots($context, $receiver, $other);
         }
         $receiverLlvm = self::loadObject($context, $receiver);
         $otherLlvm = self::loadObject($context, $other);
-        JitDomDocumentMethodKernel::ensureContainsBridge($context);
+        $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'Contains');
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_CONTAINS),
@@ -109,8 +119,8 @@ final class DomLivingApiRuntime
         $objectType = $context->type->object;
         $elementClassId = $objectType->lookup('DOMElement');
         $docClassId = $objectType->lookup('DOMDocument');
-        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_PARENT_NODE)) {
-            $objectType->defineProperty($elementClassId, VmDom::PROP_PARENT_NODE, Variable::TYPE_VALUE);
+        if (!$objectType->hasProperty($elementClassId, self::PROP_PARENT_NODE)) {
+            $objectType->defineProperty($elementClassId, self::PROP_PARENT_NODE, Variable::TYPE_VALUE);
         }
         $objMap = $context->structFieldMap['__object__'];
         $i64 = $context->getTypeFromString('int64');
@@ -133,7 +143,7 @@ final class DomLivingApiRuntime
                 $objectType,
                 $current,
                 'DOMElement',
-                VmDom::PROP_PARENT_NODE,
+                self::PROP_PARENT_NODE,
                 $elementClassId
             );
             $parentRaw = JitValueBox::valuePtrFromVariable($context, $parentVar);
@@ -183,7 +193,7 @@ final class DomLivingApiRuntime
         Variable $other
     ): Value {
         // php-src: compareDocumentPosition(DOMNode $other) — not nullable (#33733).
-        if (JitDomRequireDomNodeArg::guardOrAbort(
+        if ($context->extensionLowering->requireDom()->requireDomNodeArgGuardOrAbort(
             $context,
             $other,
             'DOMNode::compareDocumentPosition',
@@ -192,12 +202,12 @@ final class DomLivingApiRuntime
         )) {
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
             return self::compareDocumentPositionViaParentSlots($context, $receiver, $other);
         }
         $receiverLlvm = self::loadObject($context, $receiver);
         $otherLlvm = self::loadObject($context, $other);
-        JitDomDocumentMethodKernel::ensureCompareDocumentPositionBridge($context);
+        $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'CompareDocumentPosition');
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_COMPARE_DOCUMENT_POSITION),
@@ -264,7 +274,7 @@ final class DomLivingApiRuntime
         $isFollow = $context->builder->icmp(
             Builder::INT_EQ,
             $sibOrder,
-            $i64->constInt(DomConstants::DOCUMENT_POSITION_FOLLOWING, false)
+            $i64->constInt(self::DOCUMENT_POSITION_FOLLOWING, false)
         );
         $afterFollow = $fn->appendBasicBlock('dom_cdp_af_'.$id);
         $context->builder->branchIf($isFollow, $following, $afterFollow);
@@ -272,7 +282,7 @@ final class DomLivingApiRuntime
         $isPrecede = $context->builder->icmp(
             Builder::INT_EQ,
             $sibOrder,
-            $i64->constInt(DomConstants::DOCUMENT_POSITION_PRECEDING, false)
+            $i64->constInt(self::DOCUMENT_POSITION_PRECEDING, false)
         );
         $context->builder->branchIf($isPrecede, $preceding, $disconnected);
 
@@ -288,25 +298,25 @@ final class DomLivingApiRuntime
         $phi->addIncoming($i64->constInt(0, false), $sameBb);
         $phi->addIncoming(
             $i64->constInt(
-                DomConstants::DOCUMENT_POSITION_CONTAINED_BY | DomConstants::DOCUMENT_POSITION_FOLLOWING,
+                self::DOCUMENT_POSITION_CONTAINED_BY | self::DOCUMENT_POSITION_FOLLOWING,
                 false
             ),
             $containedBy
         );
         $phi->addIncoming(
             $i64->constInt(
-                DomConstants::DOCUMENT_POSITION_CONTAINS | DomConstants::DOCUMENT_POSITION_PRECEDING,
+                self::DOCUMENT_POSITION_CONTAINS | self::DOCUMENT_POSITION_PRECEDING,
                 false
             ),
             $contains
         );
-        $phi->addIncoming($i64->constInt(DomConstants::DOCUMENT_POSITION_FOLLOWING, false), $following);
-        $phi->addIncoming($i64->constInt(DomConstants::DOCUMENT_POSITION_PRECEDING, false), $preceding);
+        $phi->addIncoming($i64->constInt(self::DOCUMENT_POSITION_FOLLOWING, false), $following);
+        $phi->addIncoming($i64->constInt(self::DOCUMENT_POSITION_PRECEDING, false), $preceding);
         $phi->addIncoming(
             $i64->constInt(
-                DomConstants::DOCUMENT_POSITION_DISCONNECTED
-                | DomConstants::DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC
-                | DomConstants::DOCUMENT_POSITION_PRECEDING,
+                self::DOCUMENT_POSITION_DISCONNECTED
+                | self::DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC
+                | self::DOCUMENT_POSITION_PRECEDING,
                 false
             ),
             $disconnected
@@ -339,8 +349,8 @@ final class DomLivingApiRuntime
         $objectType = $context->type->object;
         $elementClassId = $objectType->lookup('DOMElement');
         $docClassId = $objectType->lookup('DOMDocument');
-        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_PARENT_NODE)) {
-            $objectType->defineProperty($elementClassId, VmDom::PROP_PARENT_NODE, Variable::TYPE_VALUE);
+        if (!$objectType->hasProperty($elementClassId, self::PROP_PARENT_NODE)) {
+            $objectType->defineProperty($elementClassId, self::PROP_PARENT_NODE, Variable::TYPE_VALUE);
         }
         $objMap = $context->structFieldMap['__object__'];
         $i64 = $context->getTypeFromString('int64');
@@ -359,7 +369,7 @@ final class DomLivingApiRuntime
             $context->builder->branchIf($isDoc, $miss, $afterDoc);
             $context->builder->positionAtEnd($afterDoc);
 
-            $parentObj = self::loadLinkedObject($context, $current, $elementClassId, VmDom::PROP_PARENT_NODE, 'lpo_'.$tag.'_'.$hop);
+            $parentObj = self::loadLinkedObject($context, $current, $elementClassId, self::PROP_PARENT_NODE, 'lpo_'.$tag.'_'.$hop);
             $parentObjNull = $context->builder->icmp(Builder::INT_EQ, $parentObj, $objPtr->constNull());
             $afterObj = $fn->appendBasicBlock('dom_cw_o_'.$tag.'_'.$hop);
             $context->builder->branchIf($parentObjNull, $miss, $afterObj);
@@ -401,7 +411,7 @@ final class DomLivingApiRuntime
         $elementClassId = $objectType->lookup('DOMElement');
         // Document-order sibling axis is nextSibling (php-src dom_node_compare_document_position).
         // nextElementSibling is often unset after loadXML under thin AOT — declared-slot GEP SIGSEGVs (#34345).
-        foreach ([VmDom::PROP_PARENT_NODE, VmDom::PROP_NEXT_SIBLING] as $prop) {
+        foreach ([self::PROP_PARENT_NODE, self::PROP_NEXT_SIBLING] as $prop) {
             if (!$objectType->hasProperty($elementClassId, $prop)) {
                 $objectType->defineProperty($elementClassId, $prop, Variable::TYPE_VALUE);
             }
@@ -425,8 +435,8 @@ final class DomLivingApiRuntime
             $context->builder->branchIf($foundPrecede, $precedeBb, $afterP);
             $context->builder->positionAtEnd($afterP);
 
-            $parentA = self::loadLinkedObject($context, $curA, $elementClassId, VmDom::PROP_PARENT_NODE, 'sdo_pa_'.$tag.'_'.$level);
-            $parentB = self::loadLinkedObject($context, $curB, $elementClassId, VmDom::PROP_PARENT_NODE, 'sdo_pb_'.$tag.'_'.$level);
+            $parentA = self::loadLinkedObject($context, $curA, $elementClassId, self::PROP_PARENT_NODE, 'sdo_pa_'.$tag.'_'.$level);
+            $parentB = self::loadLinkedObject($context, $curB, $elementClassId, self::PROP_PARENT_NODE, 'sdo_pb_'.$tag.'_'.$level);
             $aNull = $context->builder->icmp(Builder::INT_EQ, $parentA, $objPtr->constNull());
             $bNull = $context->builder->icmp(Builder::INT_EQ, $parentB, $objPtr->constNull());
             $eitherNull = $context->builder->or($aNull, $bNull);
@@ -446,8 +456,8 @@ final class DomLivingApiRuntime
         $context->builder->branch($done);
         $context->builder->positionAtEnd($done);
         $phi = $context->builder->phi($i64);
-        $phi->addIncoming($i64->constInt(DomConstants::DOCUMENT_POSITION_FOLLOWING, false), $followBb);
-        $phi->addIncoming($i64->constInt(DomConstants::DOCUMENT_POSITION_PRECEDING, false), $precedeBb);
+        $phi->addIncoming($i64->constInt(self::DOCUMENT_POSITION_FOLLOWING, false), $followBb);
+        $phi->addIncoming($i64->constInt(self::DOCUMENT_POSITION_PRECEDING, false), $precedeBb);
         $phi->addIncoming($i64->constInt(0, false), $unknownBb);
 
         return $phi;
@@ -466,8 +476,8 @@ final class DomLivingApiRuntime
         $objectType = $context->type->object;
         $elementClassId = $objectType->lookup('DOMElement');
         // Must be nextSibling — nextElementSibling is unset on loadXML elements under thin AOT (#34345).
-        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_NEXT_SIBLING)) {
-            $objectType->defineProperty($elementClassId, VmDom::PROP_NEXT_SIBLING, Variable::TYPE_VALUE);
+        if (!$objectType->hasProperty($elementClassId, self::PROP_NEXT_SIBLING)) {
+            $objectType->defineProperty($elementClassId, self::PROP_NEXT_SIBLING, Variable::TYPE_VALUE);
         }
 
         $hit = $fn->appendBasicBlock('dom_nsf_hit_'.$tag);
@@ -476,7 +486,7 @@ final class DomLivingApiRuntime
 
         $current = $start;
         for ($hop = 0; $hop < 16; ++$hop) {
-            $next = self::loadLinkedObject($context, $current, $elementClassId, VmDom::PROP_NEXT_SIBLING, 'nsf_'.$tag.'_'.$hop);
+            $next = self::loadLinkedObject($context, $current, $elementClassId, self::PROP_NEXT_SIBLING, 'nsf_'.$tag.'_'.$hop);
             $isNull = $context->builder->icmp(Builder::INT_EQ, $next, $objPtr->constNull());
             $afterNull = $fn->appendBasicBlock('dom_nsf_n_'.$tag.'_'.$hop);
             $context->builder->branchIf($isNull, $miss, $afterNull);
@@ -543,13 +553,13 @@ final class DomLivingApiRuntime
 
     public static function invokeGetRootNode(Context $context, Variable $receiver): Value
     {
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
             // Return raw __object__* (same ABI as createElement materialize). Boxing into
             // __value__* makes `$root === $doc` compile as string-vs-value and abort (#21687).
             return self::getRootNodeViaParentSlots($context, $receiver);
         }
         $receiverLlvm = self::loadObject($context, $receiver);
-        JitDomDocumentMethodKernel::ensureGetRootNodeBridge($context);
+        $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'GetRootNode');
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_GET_ROOT_NODE),
@@ -568,8 +578,8 @@ final class DomLivingApiRuntime
         $current = self::loadObject($context, $receiver);
         $objectType = $context->type->object;
         $elementClassId = $objectType->lookup('DOMElement');
-        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_PARENT_NODE)) {
-            $objectType->defineProperty($elementClassId, VmDom::PROP_PARENT_NODE, Variable::TYPE_VALUE);
+        if (!$objectType->hasProperty($elementClassId, self::PROP_PARENT_NODE)) {
+            $objectType->defineProperty($elementClassId, self::PROP_PARENT_NODE, Variable::TYPE_VALUE);
         }
 
         $fn = $context->builder->getInsertBlock()->getParent();
@@ -600,7 +610,7 @@ final class DomLivingApiRuntime
                 $objectType,
                 $current,
                 'DOMElement',
-                VmDom::PROP_PARENT_NODE,
+                self::PROP_PARENT_NODE,
                 $elementClassId
             );
             $parentRaw = JitValueBox::valuePtrFromVariable($context, $parentVar);
@@ -650,7 +660,7 @@ final class DomLivingApiRuntime
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_issame_slots');
         // php-src: isSameNode(DOMNode $otherNode) — not nullable (#33775; peer CDP #33733).
         // Variable null was loadObject→null ptr then icmp EQ → false (silent wrong).
-        if (JitDomRequireDomNodeArg::guardOrAbort(
+        if ($context->extensionLowering->requireDom()->requireDomNodeArgGuardOrAbort(
             $context,
             $other,
             'DOMNode::isSameNode',
@@ -673,12 +683,12 @@ final class DomLivingApiRuntime
 
             return $context->getTypeFromString('int1')->constInt(0, false);
         }
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
             return self::isEqualNodeViaTagName($context, $receiver, $other);
         }
         $receiverLlvm = self::loadObject($context, $receiver);
         $otherLlvm = self::loadObject($context, $other);
-        JitDomDocumentMethodKernel::ensureIsEqualNodeBridge($context);
+        $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'IsEqualNode');
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_IS_EQUAL_NODE),
@@ -778,7 +788,7 @@ final class DomLivingApiRuntime
         Variable $name,
         ?Variable $force
     ): Value {
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_toggle_attribute_user_script');
             $nameLit = Variable::TYPE_STRING === $name->type ? ($name->compileTimeString ?? null) : null;
             if (null === $nameLit) {
@@ -801,7 +811,7 @@ final class DomLivingApiRuntime
             // Pass receiver so Attr cache + NamedNodeMap pins stay live (#33230 / peer #33143).
             $element = self::loadObject($context, $receiver);
 
-            return \PHPCompiler\ext\dom\JitDomAttributeNodeNS::emitToggleAttributeInt1(
+            return $context->extensionLowering->requireDom()->emitToggleAttributeInt1(
                 $context,
                 $element,
                 $nameLit,
@@ -827,11 +837,11 @@ final class DomLivingApiRuntime
             }
         }
         if (self::ABI_TOGGLE_ATTRIBUTE_FORCE_TRUE === $abi) {
-            JitDomDocumentMethodKernel::ensureToggleAttributeForceTrueBridge($context);
+            $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'ToggleAttributeForceTrue');
         } elseif (self::ABI_TOGGLE_ATTRIBUTE_FORCE_FALSE === $abi) {
-            JitDomDocumentMethodKernel::ensureToggleAttributeForceFalseBridge($context);
+            $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'ToggleAttributeForceFalse');
         } else {
-            JitDomDocumentMethodKernel::ensureToggleAttributeOmitBridge($context);
+            $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'ToggleAttributeOmit');
         }
 
         return $context->builder->call(

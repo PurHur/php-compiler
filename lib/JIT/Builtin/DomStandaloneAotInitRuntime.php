@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\dom\JitDomStandaloneAotInitKernel;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 
 /**
  * Thin standalone AOT: register ext/dom classes on the allocated vmContext (#17391).
+ *
+ * Thin-AOT kernel links via {@see \PHPCompiler\JIT\DomExtensionHooks} (#36204).
  */
 final class DomStandaloneAotInitRuntime
 {
@@ -33,8 +34,8 @@ final class DomStandaloneAotInitRuntime
             return;
         }
 
-        if (JitDomStandaloneAotInitKernel::shouldUse($context)) {
-            JitDomStandaloneAotInitKernel::ensureLinked($context);
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
+            $context->extensionLowering->requireDom()->ensureStandaloneAotInit($context);
 
             return;
         }

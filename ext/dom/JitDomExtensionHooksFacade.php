@@ -1577,10 +1577,59 @@ final class JitDomExtensionHooksFacade implements DomExtensionHooks
             'XPathQuery' => JitDomDocumentMethodKernel::ensureXPathQueryBridge($context),
             'XmlDocumentCreateFromFile' => JitDomDocumentMethodKernel::ensureXmlDocumentCreateFromFileBridge($context),
             'XmlDocumentCreateFromString' => JitDomDocumentMethodKernel::ensureXmlDocumentCreateFromStringBridge($context),
+            'Contains' => JitDomDocumentMethodKernel::ensureContainsBridge($context),
+            'CompareDocumentPosition' => JitDomDocumentMethodKernel::ensureCompareDocumentPositionBridge($context),
+            'GetRootNode' => JitDomDocumentMethodKernel::ensureGetRootNodeBridge($context),
+            'IsEqualNode' => JitDomDocumentMethodKernel::ensureIsEqualNodeBridge($context),
+            'ToggleAttributeOmit' => JitDomDocumentMethodKernel::ensureToggleAttributeOmitBridge($context),
+            'ToggleAttributeForceTrue' => JitDomDocumentMethodKernel::ensureToggleAttributeForceTrueBridge($context),
+            'ToggleAttributeForceFalse' => JitDomDocumentMethodKernel::ensureToggleAttributeForceFalseBridge($context),
             default => throw new \InvalidArgumentException(
                 'Unknown DOM document method bridge: '.$bridgeId
             ),
         };
+    }
+
+    public function ensureInstanceMethodBridge(Context $context, int $extraArgCount): void
+    {
+        JitDomInstanceMethodKernel::ensureBridge($context, $extraArgCount);
+    }
+
+    public function ensureStandaloneAotInit(Context $context): void
+    {
+        JitDomStandaloneAotInitKernel::ensureLinked($context);
+    }
+
+    public function requireDomNodeArgGuardOrAbort(
+        Context $context,
+        JITVariable $arg,
+        string $function,
+        int $userArgIndex,
+        string $paramName,
+        string $expectedClass = 'DOMNode'
+    ): bool {
+        return JitDomRequireDomNodeArg::guardOrAbort(
+            $context,
+            $arg,
+            $function,
+            $userArgIndex,
+            $paramName,
+            $expectedClass
+        );
+    }
+
+    public function emitToggleAttributeInt1(
+        Context $context,
+        Value $element,
+        string $nameLit,
+        string $mode
+    ): Value {
+        return JitDomAttributeNodeNS::emitToggleAttributeInt1(
+            $context,
+            $element,
+            $nameLit,
+            $mode
+        );
     }
 
 }
