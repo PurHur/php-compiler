@@ -324,11 +324,12 @@ final class PhpcBuild
         }
         $needles = [
             'Unsupported native type __object__',
-            '__object__',
             'user-class',
             'user class',
             'router::',
-            '::render',
+            // Match MiniWebApp router methods (router::renderhome), not every `::render` substring
+            // in verbose class graphs (HtmlErrorRenderer::renderExceptionFragment) (#36382).
+            'Basic Block in function \'router::',
             'Other class body types are not jittable',
             'JIT opcode',
             'LogicException',
@@ -336,6 +337,15 @@ final class PhpcBuild
             'Function return type does not match operand type of return inst',
             'LLVMAbstract\\Module->verify',
         ];
+        // Never treat module-verify dumps as "user-class blocked" — IR contains `%__object__*`
+        // and would hide the real failure (#36382 Slim / Nyholm Response).
+        if (
+            str_contains($stderr, 'Module verification failed')
+            || str_contains($stderr, 'Instruction does not dominate')
+            || str_contains($stderr, 'parentless instruction')
+        ) {
+            return false;
+        }
         foreach ($needles as $needle) {
             if (str_contains($stderr, $needle)) {
                 return true;

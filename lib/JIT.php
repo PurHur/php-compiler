@@ -21939,6 +21939,15 @@ class JIT {
         return $promoted;
     }
 
+    /**
+     * Optional-param defaults as {@see VM\Variable} recipes — not lowered LLVM Values.
+     *
+     * Call sites rematerialize via {@see JIT\Call\Native::materializeDefaultArg()} so empty
+     * array / null / string defaults are not reused across functions (Nyholm Response::__construct
+     * `[]`/`null` → parentless `__hashtable__alloc` / dominate-fail under Slim AOT, #36382).
+     *
+     * @return array<int, VM\Variable>
+     */
     private function collectParamDefaults(Block $block): array {
         $defaults = [];
         foreach ($block->opCodes as $op) {
@@ -21958,7 +21967,7 @@ class JIT {
             if ($this->instanceMethodUsesThis($block)) {
                 ++$defaultIdx;
             }
-            $defaults[$defaultIdx] = $this->jitVariableFromVmConstant($block->constants[$op->arg3]);
+            $defaults[$defaultIdx] = $block->constants[$op->arg3];
         }
         return $defaults;
     }

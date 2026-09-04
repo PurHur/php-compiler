@@ -28,6 +28,14 @@ ERR;
         $this->assertTrue(PhpcBuild::isUserClassAotBlocked($stderr));
     }
 
+    public function testModuleVerifyIrDumpIsNotUserClassBlocked(): void
+    {
+        $stderr = "Module verification failed:\n"
+            ."  call void @Foo____construct(%__object__* %1)\n"
+            ."Instruction does not dominate all uses!\n";
+        $this->assertFalse(PhpcBuild::isUserClassAotBlocked($stderr));
+    }
+
     public function testTrailerContainsUserClassGuidance(): void
     {
         $trailer = PhpcBuild::formatUserClassTrailer();
