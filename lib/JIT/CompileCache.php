@@ -176,8 +176,12 @@ final class CompileCache
     /**
      * Before TargetMachine emit on partial keep: drop bodies that already exist in the
      * prior `aot.o`, leaving declarations. Rebuild set (stripped user symbols + main +
-     * init/shutdown) and any symbol absent from the base object keep their bodies so
-     * NestedJIT during the thin re-lower still lands in the delta `.o` (#36387).
+     * init/shutdown) keep their bodies (#36387).
+     *
+     * After demote, unused `string_const_*` / `array_const_*` / `object_const_*` globals
+     * are pruned so sibling-member literals do not inflate the delta object (one-method
+     * edit ≤25% of cold headroom). NestedJIT (`PHPCompiler_*`) is not demoted — those
+     * bodies can close over delta-local layout and crash under emit/link.
      *
      * @return int number of functions demoted to declarations
      */
@@ -200,20 +204,12 @@ final class CompileCache
         }
         foreach ([$context->initFunc, $context->shutdownFunc] as $lifecycle) {
             if ($lifecycle instanceof \PHPLLVM\Value\Function_) {
-                try {
-                    $n = (string) $lifecycle->getName();
-                } catch (\Throwable $e) {
-                    $n = '';
-                }
+                $n = self::llvmFunctionName($context, $lifecycle);
                 if ('' !== $n) {
                     $mustKeepBody[$n] = true;
                 }
             }
         }
-        // Candidates: unchanged user bodies (kept) plus shared runtime symbols already
-        // defined in the prior aot.o. Do not demote arbitrary prevDefs — NestedJIT /
-        // helper exports can share names while closing over delta-local sp_* layout
-        // and muldefs would bind base bodies to delta globals (#36387).
         $candidates = [];
         foreach (array_keys(self::$keptUserSymbols) as $name) {
             if (is_string($name) && '' !== $name) {
@@ -221,10 +217,7 @@ final class CompileCache
             }
         }
         foreach (array_keys($prevDefs) as $name) {
-            if (!is_string($name) || '' === $name) {
-                continue;
-            }
-            if (self::isSharedRuntimeDemoteCandidate($name)) {
+            if (is_string($name) && '' !== $name && self::isSharedRuntimeDemoteCandidate($name)) {
                 $candidates[$name] = true;
             }
         }
@@ -232,9 +225,6 @@ final class CompileCache
         $demoted = 0;
         foreach (array_keys($candidates) as $name) {
             if (isset($mustKeepBody[$name]) || str_ends_with($name, '.stale') || str_starts_with($name, 'llvm.')) {
-                continue;
-            }
-            if (!isset($prevDefs[$name])) {
                 continue;
             }
             $fn = null;
@@ -264,14 +254,21 @@ final class CompileCache
             \PHPCompiler\AOT\BuildTiming::note('edit_scaffold_demoted', (float) $demoted);
         }
 
+        $pruned = 0;
+        // Skip prune on small deltas — 4k×named-global probes dominate tiny scaffolds
+        // (comment-only <30% gate). MiniWebApp-scale demotes benefit (#36387).
+        if ($demoted >= 100) {
+            $pruned = self::pruneUnusedGlobalsAfterDemote($context);
+            if ($pruned > 0) {
+                \PHPCompiler\AOT\BuildTiming::note('edit_scaffold_globals_pruned', (float) $pruned);
+            }
+        }
+
         return $demoted;
     }
 
     /**
      * Runtime prologue symbols safe to take from prior aot.o on partial edit (#36387).
-     *
-     * Matches {@see \PHPCompiler\AOT\HelperRuntimeCommon::isSharedRuntimeSymbol()} plus
-     * typed-box helpers that are always present in user-script modules.
      */
     private static function isSharedRuntimeDemoteCandidate(string $name): bool
     {
@@ -287,7 +284,101 @@ final class CompileCache
             || str_starts_with($name, 'phpc_')
             || str_starts_with($name, '__compiler_')
             || str_starts_with($name, '__phpc_')
-            || str_starts_with($name, '__superglobals__');
+            || str_starts_with($name, '__superglobals__')
+            || str_starts_with($name, 'internal_');
+    }
+
+    private static function llvmFunctionName(Context $context, object $fn): string
+    {
+        if (!isset($fn->value)) {
+            return '';
+        }
+        try {
+            $raw = $context->llvm->lib->LLVMGetValueName($fn->value);
+        } catch (\Throwable $e) {
+            return '';
+        }
+        if (null === $raw) {
+            return '';
+        }
+        if (is_object($raw) && method_exists($raw, 'toString')) {
+            return (string) $raw->toString();
+        }
+
+        return is_string($raw) ? $raw : '';
+    }
+
+    /**
+     * After demoting unchanged bodies, drop unused user const globals so
+     * sibling-member string/array consts do not inflate the delta `.o` (#36387).
+     *
+     * Dense named lookup only (no full-module global walk) — walking every
+     * NestedJIT global dominates tiny edit scaffolds and erased the emit win.
+     */
+    private static function pruneUnusedGlobalsAfterDemote(Context $context): int
+    {
+        $prefixes = ['string_const_', 'array_const_', 'object_const_'];
+        $suffixes = ['_main', ''];
+        $pruned = 0;
+        for ($pass = 0; $pass < 3; ++$pass) {
+            $batch = [];
+            $misses = 0;
+            for ($i = 0; $i < 4096; ++$i) {
+                $hit = false;
+                foreach ($prefixes as $prefix) {
+                    foreach ($suffixes as $suffix) {
+                        $name = $prefix.$i.$suffix;
+                        $g = null;
+                        try {
+                            $g = $context->module->getNamedGlobal($name);
+                        } catch (\Throwable $e) {
+                            $g = null;
+                        }
+                        if (!$g instanceof \PHPLLVM\Value) {
+                            continue;
+                        }
+                        $hit = true;
+                        if (self::llvmValueHasNoUses($context, $g)) {
+                            $batch[] = $g;
+                        }
+                    }
+                }
+                if ($hit) {
+                    $misses = 0;
+                } elseif (++$misses >= 64) {
+                    break;
+                }
+            }
+            if ([] === $batch) {
+                break;
+            }
+            foreach ($batch as $g) {
+                if (!is_object($g) || !method_exists($g, 'delete')) {
+                    continue;
+                }
+                try {
+                    $g->delete();
+                    ++$pruned;
+                } catch (\Throwable $e) {
+                }
+            }
+        }
+
+        return $pruned;
+    }
+
+    private static function llvmValueHasNoUses(Context $context, object $value): bool
+    {
+        if (!isset($value->value)) {
+            return false;
+        }
+        try {
+            $use = $context->llvm->lib->LLVMGetFirstUse($value->value);
+        } catch (\Throwable $e) {
+            return false;
+        }
+
+        return null === $use;
     }
 
     /**

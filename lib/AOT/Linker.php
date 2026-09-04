@@ -211,7 +211,9 @@ final class Linker
         $ld = null;
         $llvmDir = Config::getenv('PHP_COMPILER_LLVM_PATH');
         if (is_string($llvmDir) && '' !== $llvmDir) {
-            foreach ([$llvmDir.'/ld', $llvmDir.'/bin/ld.lld', $llvmDir.'/bin/ld'] as $cand) {
+            // Prefer LLD for delta+base combine — BFD ld -r on ~12 MB aot.o dominates
+            // one-method edit wall time (#36387 ≤25% of cold).
+            foreach ([$llvmDir.'/bin/ld.lld', $llvmDir.'/ld.lld', $llvmDir.'/bin/ld', $llvmDir.'/ld'] as $cand) {
                 if (is_executable($cand)) {
                     $ld = $cand;
                     break;
@@ -219,7 +221,12 @@ final class Linker
             }
         }
         if (null === $ld) {
-            $ld = self::which('ld');
+            foreach (['ld.lld', 'ld'] as $name) {
+                $ld = self::which($name);
+                if (null !== $ld) {
+                    break;
+                }
+            }
         }
         if (null === $ld) {
             return false;
