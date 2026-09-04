@@ -5557,7 +5557,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/DomXmlDocumentCreateFromStringRu
 require_once __DIR__.'/../../../lib/JIT/Builtin/DomHtmlDocumentCreateFromStringRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/DomXmlDocumentCreateFromFileRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/DomHtmlDocumentCreateFromFileRuntime.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/DomNodeChildNodeMutationRuntime.php';
+require_once __DIR__.'/../../../ext/dom/JitDomChildNodeMutationKernel.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/DomNodeChildPropertyRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/DomNodeIsConnectedRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/DomNodeListItemRuntime.php';

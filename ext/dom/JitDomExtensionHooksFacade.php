@@ -12,7 +12,6 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\DomC14NRuntime;
 use PHPCompiler\JIT\Builtin\DomC14NFileRuntime;
 use PHPCompiler\JIT\Builtin\DomInstanceMethodRuntime;
-use PHPCompiler\JIT\Builtin\DomNodeChildNodeMutationRuntime;
 use PHPCompiler\JIT\Builtin\DomLoadRuntime;
 use PHPCompiler\JIT\Builtin\DomLoadHTMLRuntime;
 use PHPCompiler\JIT\Builtin\DomAttrIsIdRuntime;
@@ -109,7 +108,11 @@ final class JitDomExtensionHooksFacade implements DomExtensionHooks
             'document.appendChild' => $this->invokeDocumentAppendChild($context, ...$args),
             'element.hasAttribute' => $this->invokeElementHasAttribute($context, ...$args),
             'element.hasAttributeNS' => $this->invokeElementHasAttributeNS($context, ...$args),
+            'node.after' => $this->invokeNodeAfter($context, ...$args),
+            'node.before' => $this->invokeNodeBefore($context, ...$args),
+            'node.replaceWith' => $this->invokeNodeReplaceWith($context, ...$args),
             'node.remove' => $this->invokeNodeRemove($context, ...$args),
+
             'xpath.registerPhpFunctions' => $this->invokeXpathRegisterPhpFunctions($context, ...$args),
             'xpath.registerNamespace' => $this->invokeXpathRegisterNamespace($context, ...$args),
             'attr.isId' => $this->invokeAttrIsId($context, ...$args),
@@ -468,6 +471,54 @@ final class JitDomExtensionHooksFacade implements DomExtensionHooks
         return JitValueBox::normalizeValuePtr($context, $slot);
     }
 
+    /** DOMNode::after() — user-script AOT ChildNode (#26752). */
+    private function invokeNodeAfter(Context $context, JITVariable ...$args): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_after_invoke_cont');
+        if ([] === $args) {
+            throw new \LogicException('DOMNode::after() called without $this');
+        }
+
+        return JitDomChildNodeMutationKernel::invokeAfter(
+            $context,
+            \count($args) - 1,
+            $args[0],
+            ...\array_slice($args, 1)
+        );
+    }
+
+    /** DOMNode::before() — user-script AOT ChildNode (#26752). */
+    private function invokeNodeBefore(Context $context, JITVariable ...$args): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_before_invoke_cont');
+        if ([] === $args) {
+            throw new \LogicException('DOMNode::before() called without $this');
+        }
+
+        return JitDomChildNodeMutationKernel::invokeBefore(
+            $context,
+            \count($args) - 1,
+            $args[0],
+            ...\array_slice($args, 1)
+        );
+    }
+
+    /** DOMNode::replaceWith() — user-script AOT ChildNode (#26752). */
+    private function invokeNodeReplaceWith(Context $context, JITVariable ...$args): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_replacewith_invoke_cont');
+        if ([] === $args) {
+            throw new \LogicException('DOMNode::replaceWith() called without $this');
+        }
+
+        return JitDomChildNodeMutationKernel::invokeReplaceWith(
+            $context,
+            \count($args) - 1,
+            $args[0],
+            ...\array_slice($args, 1)
+        );
+    }
+
     /** DOMNode::remove() — user-script AOT ChildNode (#26752). */
     private function invokeNodeRemove(Context $context, JITVariable ...$args): Value
     {
@@ -488,7 +539,7 @@ final class JitDomExtensionHooksFacade implements DomExtensionHooks
             return VmClassMethod::jitArgcDummyReturn($context);
         }
 
-        return DomNodeChildNodeMutationRuntime::invokeRemove($context, $args[0]);
+        return JitDomChildNodeMutationKernel::invokeRemove($context, $args[0]);
     }
 
     /** DOMXPath::registerPhpFunctions() — user-script AOT (#27575). */

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\CompilerVersion;
-use PHPCompiler\ext\dom\VmDom;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
@@ -14,6 +13,15 @@ use PHPCompiler\JIT\VmActiveContextInitLlvm;
 /** Lazy registration for ext/dom JIT instance-method proxies (#17130). */
 final class DomInstanceMethodJit
 {
+    /** Peer VmDom::PROP_* without importing ext\\dom (#36204). */
+    private const PROP_FIRST_CHILD = 'firstChild';
+    private const PROP_LAST_CHILD = 'lastChild';
+    private const PROP_PARENT_NODE = 'parentNode';
+    private const PROP_NEXT_SIBLING = 'nextSibling';
+    private const PROP_PREVIOUS_SIBLING = 'previousSibling';
+    private const PROP_REGISTRY_ID = '__phpcDomRegistryId';
+    private const PROP_ELEMENT_ID_MAP = '__phpcDomElementIdMap';
+
     public static function isDomInstanceMethodProxy(string $proxyName): bool
     {
         $lc = strtolower(ltrim($proxyName, '\\'));
@@ -1637,23 +1645,23 @@ final class DomInstanceMethodJit
         foreach (['DOMNode', 'DOMElement', 'DOMDocument'] as $nodeClass) {
             $nodeId = $object->lookup($nodeClass);
             foreach ([
-                VmDom::PROP_FIRST_CHILD,
-                VmDom::PROP_LAST_CHILD,
-                VmDom::PROP_PARENT_NODE,
-                VmDom::PROP_NEXT_SIBLING,
-                VmDom::PROP_PREVIOUS_SIBLING,
+                self::PROP_FIRST_CHILD,
+                self::PROP_LAST_CHILD,
+                self::PROP_PARENT_NODE,
+                self::PROP_NEXT_SIBLING,
+                self::PROP_PREVIOUS_SIBLING,
             ] as $prop) {
                 if (!$object->hasProperty($nodeId, $prop)) {
                     $object->defineProperty($nodeId, $prop, Variable::TYPE_VALUE);
                 }
             }
-            if (!$object->hasProperty($nodeId, VmDom::PROP_REGISTRY_ID)) {
-                $object->defineProperty($nodeId, VmDom::PROP_REGISTRY_ID, Variable::TYPE_VALUE);
+            if (!$object->hasProperty($nodeId, self::PROP_REGISTRY_ID)) {
+                $object->defineProperty($nodeId, self::PROP_REGISTRY_ID, Variable::TYPE_VALUE);
             }
         }
         $docId = $object->lookup('DOMDocument');
-        if (!$object->hasProperty($docId, VmDom::PROP_ELEMENT_ID_MAP)) {
-            $object->defineProperty($docId, VmDom::PROP_ELEMENT_ID_MAP, Variable::TYPE_VALUE);
+        if (!$object->hasProperty($docId, self::PROP_ELEMENT_ID_MAP)) {
+            $object->defineProperty($docId, self::PROP_ELEMENT_ID_MAP, Variable::TYPE_VALUE);
         }
     }
 }
