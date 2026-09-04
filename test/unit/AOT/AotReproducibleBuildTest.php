@@ -67,4 +67,10 @@ final class AotReproducibleBuildTest extends TestCase
         $this->assertArrayHasKey('SOURCE_DATE_EPOCH', $reg);
         $this->assertSame('#36399', $reg['SOURCE_DATE_EPOCH']['since']);
     }
+
+    public function testSortedStringsIsStable(): void
+    {
+        $this->assertSame(['a', 'b', 'c'], AotReproducibleBuild::sortedStrings(['c', 'a', 'b']));
+        $this->assertSame([], AotReproducibleBuild::sortedStrings([]));
+    }
 }

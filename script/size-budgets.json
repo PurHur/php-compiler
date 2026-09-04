@@ -29,15 +29,15 @@
       "note": "already under target; ratchet for --build-id=sha1 / SOURCE_DATE_EPOCH (#36399)"
     },
     "lib/AOT/HelperRuntimeCache.php": {
-      "budget": 1530,
+      "budget": 1550,
       "target": 1200,
-      "note": "helper-cache granularity"
+      "note": "helper-cache granularity; sorted linkObjects (#36399)"
     }
   },
   "script_file_count": {
-    "budget": 279,
+    "budget": 280,
     "target": 150,
-    "note": "script/ top-level *.sh/*.php; +verify-reproducible.sh (#36399)"
+    "note": "script/ top-level *.sh/*.php; +write-release-checksums.sh (#36399)"
   },
   "ci_defaults_exports": {
     "budget": 141,
