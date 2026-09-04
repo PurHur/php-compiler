@@ -150,6 +150,13 @@ final class Variable {
     public bool $propertyRefAcquisition = false;
 
     /**
+     * True when this INDIRECT is an explicit PHP reference (`$r =& …`, foreach-by-ref, by-ref
+     * param). ASSIGN must write through these. Cleared by {@see indirect()} / {@see reset()}.
+     * Distinguishes them from leftover FETCH_DIM (read) indirects after temp-slot reuse (#36380).
+     */
+    public bool $phpReference = false;
+
+    /**
      * Zend ZSTR_IS_INTERNED — compile-time string literals / interned table entries (#22716).
      * Used by debug_zval_dump(); cleared on fresh {@see string()} allocations.
      */
@@ -1107,10 +1114,18 @@ final class Variable {
         $this->typedPropertyByRef = false;
         $this->propertyAssignLvalue = false;
         $this->propertyRefAcquisition = false;
+        $this->phpReference = false;
         $this->skipPropertySetHook = false;
         $this->type = self::TYPE_INDIRECT;
         $this->indirect = $value;
         $value->sharedRefAliasCount++;
+    }
+
+    /** {@see indirect()} then mark as an explicit PHP reference (`$r =&`, foreach-by-ref). */
+    public function indirectAsPhpReference(Variable $value): void
+    {
+        $this->indirect($value);
+        $this->phpReference = true;
     }
 
     public function directIndirectTarget(): ?self
@@ -1536,13 +1551,20 @@ final class Variable {
 
     public function castFrom(int $type, self $var, ?\PHPCompiler\VM $vm = null, ?\PHPCompiler\Frame $frame = null) {
         if ($this->type === self::TYPE_INDIRECT) {
-            $result = new self();
-            $result->castFrom($type, $var, $vm, $frame);
-            $this->indirect->copyFrom($result);
+            // Explicit PHP refs / property lvalues: cast writes through (e.g. `$r = (bool) $x`).
+            // Stale FETCH_DIM (read) indirects after temp-slot reuse must not — that clobbered
+            // `$Block['data']['type']` to bool during Parsedown `=== 'ul' and preg_match` (#36380).
+            if ($this->phpReference || $this->propertyAssignLvalue) {
+                $result = new self();
+                $result->castFrom($type, $var, $vm, $frame);
+                $this->indirect->copyFrom($result);
 
-            return;
+                return;
+            }
+            $this->reset();
+        } else {
+            $this->reset();
         }
-        $this->reset();
         $this->type = $type;
         switch ($type) {
             case Variable::TYPE_BOOLEAN:

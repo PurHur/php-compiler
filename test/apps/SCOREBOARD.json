@@ -1,5 +1,5 @@
 {
-    "generated_at": "2026-09-04T22:57:32Z",
+    "generated_at": "2026-09-04T23:38:55Z",
     "issue": 36380,
     "packages": [
         {
@@ -16,11 +16,11 @@
                 "reason": null
             },
             "vm": {
-                "status": "fail",
-                "pass": 61,
-                "fail": 3,
+                "status": "ok",
+                "pass": 64,
+                "fail": 0,
                 "skip": 0,
-                "rc": 1,
+                "rc": 0,
                 "reason": null
             },
             "aot": {
@@ -33,7 +33,6 @@
             },
             "aot_pass_rate": 0,
             "blockers": [
-                "vm: 3 fixture failures",
                 "aot: phpc_build:_helper-runtime_cache_hit_(17_helpers,_core=1b996aa5c644fbf7d3a2)_(#15889)"
             ],
             "raw_rc": 0
