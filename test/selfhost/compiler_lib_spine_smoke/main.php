@@ -5349,6 +5349,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/SiblingInlineFuncCallProduc
 require_once __DIR__.'/../../../lib/Compiler/Concern/SiblingInlineCallArgProducerSlots.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/SlotForCallArgResolvers.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/InlineCallArgSlotResolvers.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/RewireInlineCallArgSendSlots.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileBlockInternal.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AssignOperand.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AdaptByRefCallArgs.php';
