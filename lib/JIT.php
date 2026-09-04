@@ -13504,7 +13504,9 @@ class JIT {
                 return null;
             }
             // Native scalar {main} counters live in stack allocas — do not redirect reads
-            // onto an empty heap box (#36408).
+            // onto an empty heap box (#36408). Boxed float/int results from property
+            // arithmetic also land in a local `__value__` alloca while the module
+            // script-global stays null (#36386 nbody / sqrt).
             $resolved = $this->context->resolveRefAliasName($name);
             if (isset($this->context->namedVariableBindings[$resolved])) {
                 $existing = $this->context->namedVariableBindings[$resolved];
@@ -13512,6 +13514,10 @@ class JIT {
                     Variable::TYPE_NATIVE_LONG === $existing->type
                     || Variable::TYPE_NATIVE_BOOL === $existing->type
                     || Variable::TYPE_NATIVE_DOUBLE === $existing->type
+                    || (
+                        Variable::TYPE_VALUE === $existing->type
+                        && Variable::KIND_VARIABLE === $existing->kind
+                    )
                 ) {
                     return null;
                 }

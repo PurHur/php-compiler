@@ -162,19 +162,27 @@ final class ScalarReturnCheck
         $failBb = $fn->appendBasicBlock('scalar_return_value_fail');
         $resumeBb = $fn->appendBasicBlock('scalar_return_value_resume');
 
-        $isMatch = $context->builder->icmp(
-            Builder::INT_EQ,
-            $kind,
-            $i8->constInt($expectedVm, false)
-        );
-        // int→float widening under strict_types (#28615) for boxed integers.
+        // Value boxes store JIT tags ({@see __value__writeDouble} → TYPE_NATIVE_DOUBLE=3).
+        // VmVariable::TYPE_FLOAT=2 collides with TYPE_NATIVE_BOOL and rejects doubles (#20651 / #36386).
         if (Variable::TYPE_NATIVE_DOUBLE === $expectedJit) {
+            $isFloat = $context->builder->icmp(
+                Builder::INT_EQ,
+                $kind,
+                $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+            );
+            // int→float widening under strict_types (#28615) for boxed integers.
             $isInt = $context->builder->icmp(
                 Builder::INT_EQ,
                 $kind,
-                $i8->constInt(VMVariable::TYPE_INTEGER, false)
+                $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
             );
-            $isMatch = $context->builder->or($isMatch, $isInt);
+            $isMatch = $context->builder->or($isFloat, $isInt);
+        } else {
+            $isMatch = $context->builder->icmp(
+                Builder::INT_EQ,
+                $kind,
+                $i8->constInt($expectedVm, false)
+            );
         }
         $context->builder->branchIf($isMatch, $okBb, $failBb);
 
