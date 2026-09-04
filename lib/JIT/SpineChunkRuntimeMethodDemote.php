@@ -29,6 +29,9 @@ use PHPCompiler\OpCode;
  * - Cli\* peer TU: NestedJIT OOM at 1536M on PhpcBuild/PhpcRun cluster — 0/1 OK.
  * - SourcePreprocessor\* (PropertyHooks): NestedJIT "argument must be a string" on
  *   locateHookSyntaxErrorInBody — 0/1 OK.
+ * - JIT\* peer TUs (lib/JIT + Builtin): isset-on-object-offset, goto-resume seal, and
+ *   segfault (rc=139) under NestedJIT — measured 9/12 OK on first 12 of 100 chunks
+ *   without demote (2026-09-04).
  *
  * Emptying those bodies (probe) emits .o files in seconds. Host-lowering Runtime::initParsePipeline
  * was already known to hang Zend rebuilds for hours ({@see RuntimeInitParsePipeline}).
@@ -36,12 +39,12 @@ use PHPCompiler\OpCode;
  * Under {@see ExternalMethodBind::spineChunkMode()}, replace Runtime + every
  * {@see \PHPCompiler\VM} / {@see \PHPCompiler\AOT} / {@see \PHPCompiler\Compiler} (sub-NS) /
  * {@see \PHPCompiler\Web} / {@see \PHPCompiler\Ast} / {@see \PHPCompiler\Cli} /
- * {@see \PHPCompiler\SourcePreprocessor} class method CFG with a void-return stub before
- * {@see \PHPCompiler\JIT::compileBlock} so hub ClassEntry + method symbols still land in
- * the .o / peer manifest. Real bodies stay on C-floor helpers
+ * {@see \PHPCompiler\SourcePreprocessor} / {@see \PHPCompiler\JIT} (sub-NS) class method CFG
+ * with a void-return stub before {@see \PHPCompiler\JIT::compileBlock} so hub ClassEntry +
+ * method symbols still land in the .o / peer manifest. Real bodies stay on C-floor helpers
  * (RuntimeInitParsePipeline / RuntimeParseM5Native), NestedVM object:: proxies, or later
  * peer-bound non-demoted TUs. Does not demote top-level {@see \PHPCompiler\Compiler} /
- * {@see \PHPCompiler\CompilerVersion} (no trailing `\`).
+ * {@see \PHPCompiler\CompilerVersion} / {@see \PHPCompiler\JIT} (no trailing `\`).
  */
 final class SpineChunkRuntimeMethodDemote
 {
@@ -56,14 +59,15 @@ final class SpineChunkRuntimeMethodDemote
             return true;
         }
 
-        // Packed hubs keep growing NestedJIT gaps across VM/AOT/Compiler/Web/Ast/Cli/…
+        // Packed hubs keep growing NestedJIT gaps across VM/AOT/Compiler/Web/Ast/Cli/JIT…
         return str_starts_with($lc, 'phpcompiler\\vm\\')
             || str_starts_with($lc, 'phpcompiler\\aot\\')
             || str_starts_with($lc, 'phpcompiler\\compiler\\')
             || str_starts_with($lc, 'phpcompiler\\web\\')
             || str_starts_with($lc, 'phpcompiler\\ast\\')
             || str_starts_with($lc, 'phpcompiler\\cli\\')
-            || str_starts_with($lc, 'phpcompiler\\sourcepreprocessor\\');
+            || str_starts_with($lc, 'phpcompiler\\sourcepreprocessor\\')
+            || str_starts_with($lc, 'phpcompiler\\jit\\');
     }
 
     /**
