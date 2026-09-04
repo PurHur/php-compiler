@@ -57,6 +57,9 @@ final class JitValueBox
         if ('__value__value' !== $elemName) {
             return $ptr;
         }
+        // NestedJIT / pend+ret can clear or seal insert; structGep with a null insert
+        // leaves a parentless GEP and fails module verify (#36382 Slim anonymous handle).
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'normalize_value_ptr');
         $wrapMap = $context->structFieldMap['__value__value'];
         $inner = $context->builder->structGep($ptr, $wrapMap['value']);
 
@@ -71,6 +74,9 @@ final class JitValueBox
      */
     public static function publishAfterWrite(Context $context, Value $valuePtr): void
     {
+        // JUMPIF/try arms and NestedJIT can clear insert before the post-assign
+        // publish load (#36382 Slim MiddlewareDispatcher anonymous handle).
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'publish_after_write');
         $valuePtr = self::normalizeValuePtr($context, $valuePtr);
         $map = $context->structFieldMap['__value__'];
         $context->builder->load(
