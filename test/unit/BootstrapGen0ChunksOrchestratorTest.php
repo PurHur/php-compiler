@@ -65,10 +65,16 @@ final class BootstrapGen0ChunksOrchestratorTest extends TestCase
             $waves[] = (int) $chunk['wave'];
             $body = (string) file_get_contents($chunk['entry']);
             $this->assertStringContainsString('vendor/autoload.php', $body);
-            // Depth-correct __DIR__ relative (not hardcoded ../../../) so nested OUT_DIR works.
-            $this->assertMatchesRegularExpression(
+            // In-tree entries: depth-correct __DIR__ relative. Out-of-tree (/tmp): absolute.
+            $relativeOk = (bool) preg_match(
                 "#require_once __DIR__ \\. '/(\\.\\./)+vendor/autoload\\.php';#",
                 $body
+            );
+            $absoluteOk = str_contains($body, "require_once '".$root.'/vendor/autoload.php'."';")
+                || str_contains($body, 'require_once '.var_export($root.'/vendor/autoload.php', true));
+            $this->assertTrue(
+                $relativeOk || $absoluteOk,
+                "autoload require must be relative-to-repo or absolute\n".$body
             );
             $this->assertGreaterThan(0, (int) $chunk['file_count']);
         }
@@ -193,34 +199,66 @@ final class BootstrapGen0ChunksOrchestratorTest extends TestCase
         $this->removeTree($tmp);
     }
 
-    public function testChunkPlanDefersSingletonOverMaxBytes(): void
+    public function testChunkPlanDefersOnlyMeasuredEmitFails(): void
     {
         $root = dirname(__DIR__, 2);
         $script = $root.'/script/bootstrap-gen0-chunk-plan.php';
         $tmp = sys_get_temp_dir().'/phpc-chunk-plan-defer-'.bin2hex(random_bytes(4));
         mkdir($tmp.'/entries', 0755, true);
         $planPath = $tmp.'/plan.json';
-        // Spine with max-bytes marks Compiler.php / JIT.php singletons as deferred (#36387).
+        // Oversized demoted hubs (VmDom, VM.php, …) stay emit-eligible; only the measured
+        // fail allowlist is deferred (#36387).
         $cmd = escapeshellarg(PHP_BINARY).' '.escapeshellarg($script)
-            .' --spine --strategy=sub --max-bytes=120000'
+            .' --spine --strategy=dir --max-bytes=120000'
             .' --entries-dir='.escapeshellarg($tmp.'/entries')
             .' --plan-out='.escapeshellarg($planPath);
         exec($cmd.' 2>&1', $out, $rc);
         $this->assertSame(0, $rc, implode("\n", $out));
         $plan = json_decode((string) file_get_contents($planPath), true);
         $this->assertIsArray($plan);
-        $this->assertGreaterThan(0, (int) ($plan['deferred_count'] ?? 0));
-        $deferred = [];
+        $this->assertSame(3, (int) ($plan['deferred_count'] ?? 0));
+        $deferredFiles = [];
+        $deferredReasons = [];
         foreach ($plan['chunks'] as $chunk) {
-            if (!empty($chunk['deferred'])) {
-                $this->assertSame(1, (int) $chunk['file_count']);
-                $this->assertGreaterThan(120000, (int) $chunk['byte_count']);
-                $this->assertSame('singleton_over_max_bytes', $chunk['defer_reason'] ?? '');
-                $deferred[] = $chunk['chunk_id'];
+            if (empty($chunk['deferred'])) {
+                // Unlocked: former max-bytes deferrals that emit after demote.
+                $files = $chunk['files'] ?? [];
+                if (is_array($files) && $files === ['ext/dom/VmDom.php']) {
+                    $this->assertArrayNotHasKey('deferred', $chunk);
+                }
+                if (is_array($files) && $files === ['lib/VM.php']) {
+                    $this->assertArrayNotHasKey('deferred', $chunk);
+                }
+                continue;
+            }
+            $this->assertSame(1, (int) $chunk['file_count']);
+            $this->assertIsArray($chunk['files'] ?? null);
+            $this->assertCount(1, $chunk['files']);
+            $rel = (string) $chunk['files'][0];
+            $deferredFiles[] = $rel;
+            $deferredReasons[] = (string) ($chunk['defer_reason'] ?? '');
+        }
+        sort($deferredFiles);
+        $this->assertSame([
+            'ext/soap/VmSoapClient.php',
+            'ext/standard/VmDateTimeNative.php',
+            'lib/JIT/Concern/CompileBlockInternal.php',
+        ], $deferredFiles);
+        $this->assertContains('property_default_non_const', $deferredReasons);
+        $this->assertContains('host_cfg_null_op', $deferredReasons);
+        $this->assertContains('host_cfg_oom_1536m', $deferredReasons);
+
+        // Out-of-tree entries-dir must use absolute requires (not ../../../vendor).
+        $entryBody = '';
+        foreach ($plan['chunks'] as $chunk) {
+            if (is_file((string) $chunk['entry'])) {
+                $entryBody = (string) file_get_contents((string) $chunk['entry']);
+                break;
             }
         }
-        $this->assertSame((int) $plan['deferred_count'], count($deferred));
-        $this->assertNotEmpty($deferred);
+        $this->assertNotSame('', $entryBody);
+        $this->assertStringContainsString($root.'/vendor/autoload.php', $entryBody);
+        $this->assertStringNotContainsString("__DIR__ . '/../../../vendor/autoload.php'", $entryBody);
         $this->removeTree($tmp);
     }
 

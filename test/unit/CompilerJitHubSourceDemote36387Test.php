@@ -11,9 +11,10 @@ use PHPUnit\Framework\TestCase;
 /**
  * Capacity proof: demoted megabyte hubs hollow under SPINE_CHUNK (#36387).
  *
- * Compiler.php / JIT.php stay live (host CFG still OOMs) and are plan-deferred /
- * spine-skipped. This locks pre-CFG hollow for demoted hubs (e.g. VM.php) when
- * SourceBundler keeps the entry filename.
+ * Compiler.php / JIT.php stay live (host CFG still OOMs) and are spine-skipped.
+ * Oversized demoted hubs (e.g. VM.php) stay emit-eligible after demote; only the
+ * measured-fail allowlist is plan-deferred. This locks pre-CFG hollow for demoted
+ * hubs when SourceBundler keeps the entry filename.
  *
  * @group aot-lint
  */

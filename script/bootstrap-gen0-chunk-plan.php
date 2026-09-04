@@ -41,13 +41,6 @@ $entriesDir = $root.'/build/chunks/entries';
 /** Default file-count cap when only --max-bytes is set (tiny-file packs under 8g). */
 const DEFAULT_MAX_FILES_WITH_BYTES = 24;
 
-/**
- * Singleton files larger than --max-bytes cannot be split further and NestedJIT OOMs
- * under 8g even after SPINE_CHUNK method demote (Compiler.php ~2.1 MB, JIT.php ~1.0 MB).
- * Mark them deferred so the orchestrator can finish the rest of the spine honestly (#36387).
- */
-const DEFER_SINGLETON_OVER_MAX_BYTES = true;
-
 /** Directories oversized enough to need letter/hub sub-splits (mirrors spine-split-probe). */
 const SPINE_SUBSPLIT = [
     'ext/standard' => true,
@@ -67,6 +60,23 @@ const SPINE_SKIP_HOST_CFG_OOM = [
     'lib/Compiler.php' => true,
     'lib/JIT.php' => true,
     'lib/Doctor.php' => true,
+];
+
+/**
+ * Singleton TUs measured to fail under SPINE_CHUNK object-only at 1536M even after method
+ * demote (2026-09-04 sample: 28/31 previously blanket-deferred hubs emit OK). Values are
+ * short defer_reason tags. Do not blanket-defer on --max-bytes alone — VmDom / VM.php /
+ * Block / CompilerVersion / HashTable / … all emit after demote (#36387).
+ *
+ * @var array<string, string>
+ */
+const SPINE_DEFER_MEASURED_EMIT_FAIL = [
+    // Property default non-const (#3803): SoapClient::$cacheWsdl = SOAP_1_1-shaped expression.
+    'ext/soap/VmSoapClient.php' => 'property_default_non_const',
+    // Host CFG: isInlineExprCallArgProducer(null) while compiling method bodies.
+    'ext/standard/VmDateTimeNative.php' => 'host_cfg_null_op',
+    // Host CFG OOM at 1536M (~470 KB concern trait; demote hollow does not shrink enough).
+    'lib/JIT/Concern/CompileBlockInternal.php' => 'host_cfg_oom_1536m',
 ];
 
 foreach (array_slice($argv, 1) as $arg) {
@@ -153,9 +163,10 @@ if (!is_dir($entriesDir) && !mkdir($entriesDir, 0755, true) && !is_dir($entriesD
 }
 
 /**
- * Relative path prefix from $fromDir up to $root (always ends with /).
+ * Relative path prefix from $fromDir up to $root (always ends with /), or null when
+ * $fromDir is outside the repo (caller must use absolute requires).
  */
-$relPrefixToRoot = static function (string $fromDir, string $rootPath): string {
+$relPrefixToRoot = static function (string $fromDir, string $rootPath): ?string {
     $from = realpath($fromDir) ?: $fromDir;
     $to = realpath($rootPath) ?: $rootPath;
     $from = str_replace('\\', '/', $from);
@@ -180,7 +191,7 @@ $relPrefixToRoot = static function (string $fromDir, string $rootPath): string {
         $cur = $parent;
     }
 
-    return '../../../';
+    return null;
 };
 
 $entriesRelPrefix = $relPrefixToRoot($entriesDir, $root);
@@ -195,15 +206,24 @@ $writeAutoloadEntry = static function (string $entry, string $comment, array $re
         '// '.$comment,
         '// Autoloader first so Zend can load ModuleAbstract / Func\\Internal (spine-chunk-probe trap #1).',
         '',
-        "require_once __DIR__ . '/{$entriesRelPrefix}vendor/autoload.php';",
     ];
+    if ($entriesRelPrefix !== null) {
+        $lines[] = "require_once __DIR__ . '/{$entriesRelPrefix}vendor/autoload.php';";
+    } else {
+        // entries-dir outside the repo (e.g. /tmp/…) — relative ../../../vendor is wrong.
+        $lines[] = 'require_once '.var_export($root.'/vendor/autoload.php', true).';';
+    }
     foreach ($rels as $rel) {
         $abs = $root.'/'.$rel;
         if (!is_file($abs)) {
             fwrite(STDERR, "bootstrap-gen0-chunk-plan: missing require {$rel}\n");
             exit(1);
         }
-        $lines[] = "require_once __DIR__ . '/{$entriesRelPrefix}{$rel}';";
+        if ($entriesRelPrefix !== null) {
+            $lines[] = "require_once __DIR__ . '/{$entriesRelPrefix}{$rel}';";
+        } else {
+            $lines[] = 'require_once '.var_export($abs, true).';';
+        }
     }
     $lines[] = '';
     if (file_put_contents($entry, implode("\n", $lines)."\n") === false) {
@@ -211,7 +231,6 @@ $writeAutoloadEntry = static function (string $entry, string $comment, array $re
         exit(1);
     }
 };
-
 /** Sanitize a chunk key into a filesystem-safe id. */
 $chunkIdOf = static function (string $key): string {
     $id = preg_replace('/[^A-Za-z0-9]+/', '-', $key) ?? $key;
@@ -409,6 +428,7 @@ foreach ($requiresFiles as $reqPath) {
             'wave' => 0,
             'file_count' => count($batch),
             'byte_count' => $bytesOf($batch),
+            'files' => array_values($batch),
             'requires' => $reqPath,
         ];
     }
@@ -448,6 +468,7 @@ foreach ($libs as $lib) {
             'wave' => 1,
             'file_count' => count($batch),
             'byte_count' => $bytesOf($batch),
+            'files' => array_values($batch),
         ];
     }
 }
@@ -482,6 +503,7 @@ foreach ($exts as $ext) {
             'wave' => 2,
             'file_count' => count($batch),
             'byte_count' => $bytesOf($batch),
+            'files' => array_values($batch),
         ];
     }
 }
@@ -539,6 +561,7 @@ if ($spine) {
                 'wave' => 2,
                 'file_count' => count($batch),
                 'byte_count' => $bytesOf($batch),
+                'files' => array_values($batch),
                 'partition' => $key,
                 'strategy' => $strategy,
             ];
@@ -557,20 +580,27 @@ usort($chunks, static function (array $a, array $b): int {
     return strcmp((string) $a['chunk_id'], (string) $b['chunk_id']);
 });
 
-// Honest capacity gate: singleton TUs larger than --max-bytes cannot be split and
-// NestedJIT OOMs under 8g (Compiler.php / JIT.php / VmDom.php, #36387). Defer them so
-// the rest of the plan can emit; do not pretend they succeeded.
+// Honest capacity gate: only defer singletons measured to fail under SPINE_CHUNK after
+// demote (2026-09-04: 28/31 former max-bytes deferrals emit OK). Do not blanket-defer
+// oversized demoted hubs — that was a cheap green that hid emit capacity (#36387).
 $deferred = 0;
-if (DEFER_SINGLETON_OVER_MAX_BYTES && $maxBytes >= 1) {
-    foreach ($chunks as &$chunk) {
-        if ((int) ($chunk['file_count'] ?? 0) === 1 && (int) ($chunk['byte_count'] ?? 0) > $maxBytes) {
-            $chunk['deferred'] = true;
-            $chunk['defer_reason'] = 'singleton_over_max_bytes';
-            ++$deferred;
-        }
+foreach ($chunks as &$chunk) {
+    if ((int) ($chunk['file_count'] ?? 0) !== 1) {
+        continue;
     }
-    unset($chunk);
+    $files = $chunk['files'] ?? null;
+    if (!is_array($files) || count($files) !== 1) {
+        continue;
+    }
+    $rel = (string) $files[0];
+    if (!isset(SPINE_DEFER_MEASURED_EMIT_FAIL[$rel])) {
+        continue;
+    }
+    $chunk['deferred'] = true;
+    $chunk['defer_reason'] = SPINE_DEFER_MEASURED_EMIT_FAIL[$rel];
+    ++$deferred;
 }
+unset($chunk);
 
 $plan = [
     'version' => 2,
@@ -588,8 +618,8 @@ $plan = [
         .'--max-files/--max-bytes so Runtime.php-sized TUs fit under 8g. --max-bytes alone '
         .'also applies max-files='.DEFAULT_MAX_FILES_WITH_BYTES.' for tiny-file packs. '
         .'Spine --strategy skips bin/ + lib/Compiler.php + lib/JIT.php + lib/Doctor.php '
-        .'(host CFG OOM / null-Op under 8g). Singleton chunks over max-bytes are marked '
-        .'deferred (NestedJIT OOM under 8g).',
+        .'(host CFG OOM / null-Op under 8g). Only SPINE_DEFER_MEASURED_EMIT_FAIL singletons '
+        .'are marked deferred (measured emit fail after demote — not blanket max-bytes).',
 ];
 
 $json = json_encode($plan, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n";
