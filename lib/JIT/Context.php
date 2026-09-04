@@ -2557,14 +2557,7 @@ class Context {
         $this->functionProxies['phptoken::tokenize'] = new Call\PhpTokenTokenize();
         $this->functionProxies['phptoken::gettokenname'] = new Call\PhpTokenGetTokenName();
 
-        if (CompilerVersion::supportsBcmath()) {
-            $this->functionProxies['bcmath\number::__construct'] = new Call\BcMathNumberConstruct();
-            $this->functionProxies['bcmath\number::__tostring'] = new Call\BcMathNumberToString();
-            // User-script AOT: unbound methods were silent null (#579 / #26803).
-            foreach (['add', 'mul', 'compare'] as $bcMethod) {
-                $this->functionProxies['bcmath\number::'.$bcMethod] = new Call\BcMathNumberMethod($bcMethod);
-            }
-        }
+        // BcMath\Number thin-AOT Call proxies: registered by ext/bcmath Module::jitInit (#36204).
 
         $this->functionProxies['reflectionclass::__construct'] = new Call\ReflectionClassConstruct();
         $this->functionProxies['reflectionobject::__construct'] = new Call\ReflectionObjectConstruct();

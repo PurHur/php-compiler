@@ -42,6 +42,14 @@ class Module extends ModuleAbstract
             return;
         }
 
+        // BcMath\Number Call proxies — core must not import ext\bcmath (#36204 / #24683 / #26803).
+        $context->extensionLowering->bcmath = new JitBcMathExtensionHooksFacade();
+        $context->functionProxies['bcmath\number::__construct'] = new JIT\Call\BcMathNumberConstruct();
+        $context->functionProxies['bcmath\number::__tostring'] = new JIT\Call\BcMathNumberToString();
+        foreach (['add', 'mul', 'compare'] as $bcMethod) {
+            $context->functionProxies['bcmath\number::'.$bcMethod] = new JIT\Call\BcMathNumberMethod($bcMethod);
+        }
+
         // VALUE⊙VALUE / OBJECT⊙OBJECT do_operation — core must not import ext\bcmath (#36204 / #24683).
         $context->arithBinaryValueValueHook = static function (
             JIT\Context $ctx,
