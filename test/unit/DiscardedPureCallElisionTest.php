@@ -15,6 +15,7 @@ use PHPCompiler\ext\standard\base_convert_;
 use PHPCompiler\ext\standard\basename;
 use PHPCompiler\ext\standard\bin2hex;
 use PHPCompiler\ext\standard\bindec;
+use PHPCompiler\ext\standard\checkdate;
 use PHPCompiler\ext\standard\chr;
 use PHPCompiler\ext\standard\chunk_split;
 use PHPCompiler\ext\standard\convert_uuencode;
@@ -32,6 +33,7 @@ use PHPCompiler\ext\standard\fmin;
 use PHPCompiler\ext\standard\floatval;
 use PHPCompiler\ext\standard\get_debug_type;
 use PHPCompiler\ext\standard\gettype;
+use PHPCompiler\ext\standard\hash_equals;
 use PHPCompiler\ext\standard\hebrev;
 use PHPCompiler\ext\standard\hexdec;
 use PHPCompiler\ext\standard\html_entity_decode;
@@ -52,6 +54,8 @@ use PHPCompiler\ext\standard\nl2br;
 use PHPCompiler\ext\standard\number_format;
 use PHPCompiler\ext\standard\octdec;
 use PHPCompiler\ext\standard\ord;
+use PHPCompiler\ext\standard\parse_url;
+use PHPCompiler\ext\standard\pathinfo;
 use PHPCompiler\ext\standard\pi;
 use PHPCompiler\ext\standard\pow;
 use PHPCompiler\ext\standard\preg_quote;
@@ -1545,6 +1549,183 @@ final class DiscardedPureCallElisionTest extends TestCase
             $context,
             new fmax(),
             [$null, $dbl]
+        ));
+    }
+
+    public function testDiscardedCheckdateAndHashEqualsElideOnTypedArgs(): void
+    {
+        $context = $this->makeContext();
+        $long = $this->makeNativeLongVar();
+        $str = $this->makeStringVar('abc');
+        $lit = $this->makeStringVar('xyz');
+        $null = $this->makeNullVar();
+        $box = $this->makeValueBoxVar();
+        $ht = $this->makeHashtableVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new checkdate(),
+            [$long, $long, $long]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new checkdate(),
+            [
+                $this->makeCompileTimeLongVar(2),
+                $this->makeCompileTimeLongVar(29),
+                $this->makeCompileTimeLongVar(2024),
+            ]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new hash_equals(),
+            [$str, $lit]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new hash_equals(),
+            [$this->makeStringVar('k'), $this->makeStringVar('u')]
+        ));
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new checkdate(),
+            [$long, $long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new checkdate(),
+            [$null, $long, $long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new checkdate(),
+            [$box, $long, $long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new hash_equals(),
+            [$str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new hash_equals(),
+            [$null, $str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new hash_equals(),
+            [$box, $str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new hash_equals(),
+            [$ht, $str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new hash_equals(),
+            [$long, $str]
+        ));
+    }
+
+    public function testDiscardedPathinfoAndParseUrlElideOnTypedArgs(): void
+    {
+        $context = $this->makeContext();
+        $str = $this->makeStringVar('/a/b.txt');
+        $lit = $this->makeStringVar('http://example.com/x');
+        $long = $this->makeNativeLongVar();
+        $flags = $this->makeCompileTimeLongVar(PATHINFO_EXTENSION);
+        $comp = $this->makeCompileTimeLongVar(PHP_URL_HOST);
+        $null = $this->makeNullVar();
+        $box = $this->makeValueBoxVar();
+        $ht = $this->makeHashtableVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new pathinfo(),
+            [$str]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new pathinfo(),
+            [$str, $flags]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new pathinfo(),
+            [$this->makeStringVar('/x/y.z'), $long]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new parse_url(),
+            [$lit]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new parse_url(),
+            [$lit, $comp]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new parse_url(),
+            [$str, $long]
+        ));
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new pathinfo(),
+            []
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new pathinfo(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new pathinfo(),
+            [$box]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new pathinfo(),
+            [$str, $null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new pathinfo(),
+            [$str, $flags, $long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new parse_url(),
+            []
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new parse_url(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new parse_url(),
+            [$box]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new parse_url(),
+            [$ht]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new parse_url(),
+            [$lit, $null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new parse_url(),
+            [$lit, $comp, $long]
         ));
     }
 

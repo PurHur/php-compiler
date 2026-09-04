@@ -142,6 +142,12 @@ final class PregAotFastPath
         if (1 === self::isSlashXBraceFfUtfPatternInt($pattern)) {
             return self::matchUtf8FfBytes($subject, $offset);
         }
+        // Nyholm MessageTrait header token / value patterns (#36382) — `@…@` + `D` and
+        // character-class bodies are kind=0 under NestedJIT; exact matchers keep Zend semantics.
+        $nyholm = self::matchNyholmHeaderPattern($pattern, $subject, $offset);
+        if (null !== $nyholm) {
+            return $nyholm;
+        }
         $kind = self::patternKind($pattern);
         if (0 === $kind) {
             // Unsupported / invalid under thin AOT — surface as Internal error (Zend compile fail).
@@ -546,6 +552,95 @@ final class PregAotFastPath
         self::storeCaps(\substr($subject, $offset), false);
 
         return 1;
+    }
+
+    /**
+     * Nyholm/psr7 MessageTrait header validation (#36382).
+     *
+     * php-src: PCRE `@^[!#$%&'*+.^_`|~0-9A-Za-z-]+$@D` and
+     * `@^[ \t\x21-\x7E\x80-\xFF]*$@` / `$@D` (RFC 7230 token / field-value).
+     *
+     * @return int|null null = not a Nyholm pattern; else 0/1/-1 like {@see matchCount}
+     */
+    private static function matchNyholmHeaderPattern(string $pattern, string $subject, int $offset): ?int
+    {
+        // Exact full-string compares — NestedJIT-safe (peer #34724 / #26888).
+        $isName = ("@^[!#$%&'*+.^_`|~0-9A-Za-z-]+$@D" === $pattern
+            || "@^[!#$%&'*+.^_`|~0-9A-Za-z-]+$@" === $pattern
+            || "/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/D" === $pattern
+            || "/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/" === $pattern
+            || "#^[!#$%&'*+.^_`|~0-9A-Za-z-]+$#D" === $pattern
+            || "#^[!#$%&'*+.^_`|~0-9A-Za-z-]+$#" === $pattern);
+        $isValue = ("@^[ \t\x21-\x7E\x80-\xFF]*$@D" === $pattern
+            || "@^[ \t\x21-\x7E\x80-\xFF]*$@" === $pattern
+            || "/^[ \t\x21-\x7E\x80-\xFF]*$/D" === $pattern
+            || "/^[ \t\x21-\x7E\x80-\xFF]*$/" === $pattern
+            || "#^[ \t\x21-\x7E\x80-\xFF]*$#D" === $pattern
+            || "#^[ \t\x21-\x7E\x80-\xFF]*$#" === $pattern);
+        if (!$isName && !$isValue) {
+            return null;
+        }
+        $subLen = \strlen($subject);
+        if ($offset < 0 || $offset > $subLen) {
+            self::$lastError = 1;
+
+            return -1;
+        }
+        // Caret anchors at subject start.
+        if (0 !== $offset) {
+            return 0;
+        }
+        if ($isName) {
+            if (0 === $subLen) {
+                return 0;
+            }
+            $i = 0;
+            while ($i < $subLen) {
+                if (!self::isNyholmHeaderNameByte(\ord(\substr($subject, $i, 1)))) {
+                    return 0;
+                }
+                ++$i;
+            }
+            self::storeCaps($subject, false);
+
+            return 1;
+        }
+        // Value: * of SP/HTAB / \x21-\x7E / \x80-\xFF (empty OK).
+        $i = 0;
+        while ($i < $subLen) {
+            if (!self::isNyholmHeaderValueByte(\ord(\substr($subject, $i, 1)))) {
+                return 0;
+            }
+            ++$i;
+        }
+        self::storeCaps($subject, false);
+
+        return 1;
+    }
+
+    private static function isNyholmHeaderNameByte(int $c): bool
+    {
+        // [!#$%&'*+.^_`|~0-9A-Za-z-]
+        if (($c >= 48 && $c <= 57) || ($c >= 65 && $c <= 90) || ($c >= 97 && $c <= 122)) {
+            return true;
+        }
+
+        return 33 === $c || 35 === $c || 36 === $c || 37 === $c || 38 === $c
+            || 39 === $c || 42 === $c || 43 === $c || 45 === $c || 46 === $c
+            || 94 === $c || 95 === $c || 96 === $c || 124 === $c || 126 === $c;
+    }
+
+    private static function isNyholmHeaderValueByte(int $c): bool
+    {
+        // [ \t\x21-\x7E\x80-\xFF]
+        if (32 === $c || 9 === $c) {
+            return true;
+        }
+        if ($c >= 0x21 && $c <= 0x7E) {
+            return true;
+        }
+
+        return $c >= 0x80 && $c <= 0xFF;
     }
 
     // Anchored lowercase hex32 (spl_object_hash checks, #34724).

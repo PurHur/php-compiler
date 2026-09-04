@@ -288,6 +288,22 @@ final class NoThrowCallElision
             // array-form min/max stays out (element compare / object handlers).
             return self::minMaxArgsCannotThrow($name, $callArgs);
         }
+        if (self::isPureCheckdateBuiltin($name)) {
+            // datetime.c checkdate — three Z_PARAM_LONG; soft-null deprecates.
+            return self::checkdateArgsCannotThrow($callArgs);
+        }
+        if (self::isPureHashEqualsBuiltin($name)) {
+            // hash.c hash_equals — two typed strings; TypeError on non-string.
+            return self::hashEqualsArgsCannotThrow($callArgs);
+        }
+        if (self::isPurePathinfoBuiltin($name)) {
+            // basic_functions.c / file.c pathinfo — typed string + optional flags.
+            return self::pathinfoArgsCannotThrow($callArgs);
+        }
+        if (self::isPureParseUrlBuiltin($name)) {
+            // url.c parse_url — typed string + optional component long.
+            return self::parseUrlArgsCannotThrow($callArgs);
+        }
         if (self::isPureVersionCompareBuiltin($name)) {
             // versioning.c — typed strings; optional operator must be proven valid.
             return self::versionCompareArgsCannotThrow($callArgs);
@@ -850,6 +866,47 @@ final class NoThrowCallElision
     }
 
     /**
+     * php-src {@code ext/standard/datetime.c} {@code checkdate} — three longs;
+     * invalid calendar dates return false (no throw). Soft-null deprecates.
+     * Public for {@see DiscardedPureCallElision} (#36386).
+     */
+    public static function isPureCheckdateBuiltin(string $nameLc): bool
+    {
+        return 'checkdate' === $nameLc;
+    }
+
+    /**
+     * php-src {@code ext/hash/hash.c} {@code hash_equals} — two strings;
+     * TypeError on non-string / soft-null stays out. Public for
+     * {@see DiscardedPureCallElision} (#36386).
+     */
+    public static function isPureHashEqualsBuiltin(string $nameLc): bool
+    {
+        return 'hash_equals' === $nameLc;
+    }
+
+    /**
+     * php-src {@code ext/standard/basic_functions.c} / {@code file.c}
+     * {@code pathinfo} — Z_PARAM_STR path + optional Z_PARAM_LONG flags.
+     * Soft-null path/flags deprecate. Public for {@see DiscardedPureCallElision}
+     * (#36386).
+     */
+    public static function isPurePathinfoBuiltin(string $nameLc): bool
+    {
+        return 'pathinfo' === $nameLc;
+    }
+
+    /**
+     * php-src {@code ext/standard/url.c} {@code parse_url} — Z_PARAM_STR url +
+     * optional Z_PARAM_LONG component. Soft-null url/component deprecate.
+     * Public for {@see DiscardedPureCallElision} (#36386).
+     */
+    public static function isPureParseUrlBuiltin(string $nameLc): bool
+    {
+        return 'parse_url' === $nameLc;
+    }
+
+    /**
      * php-src {@code ext/standard/versioning.c} {@code version_compare}. Public
      * for {@see DiscardedPureCallElision} (#36386).
      */
@@ -948,6 +1005,113 @@ final class NoThrowCallElision
             if ($arg->isNullConstant || Variable::TYPE_NULL === $arg->type) {
                 return false;
             }
+        }
+
+        return true;
+    }
+
+    /**
+     * Exactly three typed numeric args — soft-null / value-box stay out.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    public static function checkdateArgsCannotThrow(array $callArgs): bool
+    {
+        if (
+            !isset($callArgs[0], $callArgs[1], $callArgs[2])
+            || isset($callArgs[3])
+        ) {
+            return false;
+        }
+        foreach ($callArgs as $arg) {
+            if (!$arg instanceof Variable || !self::numericParamBuiltinArgCannotThrow($arg)) {
+                return false;
+            }
+            if ($arg->isNullConstant || Variable::TYPE_NULL === $arg->type) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Exactly two typed / literal strings — TypeError / soft-null stay out.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    public static function hashEqualsArgsCannotThrow(array $callArgs): bool
+    {
+        if (
+            !isset($callArgs[0], $callArgs[1])
+            || isset($callArgs[2])
+            || !$callArgs[0] instanceof Variable
+            || !$callArgs[1] instanceof Variable
+        ) {
+            return false;
+        }
+
+        return self::stringParamBuiltinArgCannotThrow($callArgs[0])
+            && self::stringParamBuiltinArgCannotThrow($callArgs[1]);
+    }
+
+    /**
+     * Typed / literal string path + optional typed numeric flags — soft-null
+     * path/flags stay out (deprecate).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    public static function pathinfoArgsCannotThrow(array $callArgs): bool
+    {
+        if (
+            !isset($callArgs[0])
+            || !$callArgs[0] instanceof Variable
+            || !self::stringParamBuiltinArgCannotThrow($callArgs[0])
+        ) {
+            return false;
+        }
+        if (!isset($callArgs[1])) {
+            return true;
+        }
+        if (
+            !$callArgs[1] instanceof Variable
+            || !self::numericParamBuiltinArgCannotThrow($callArgs[1])
+            || $callArgs[1]->isNullConstant
+            || Variable::TYPE_NULL === $callArgs[1]->type
+            || isset($callArgs[2])
+        ) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Typed / literal string url + optional typed numeric component — soft-null
+     * url/component stay out (deprecate).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    public static function parseUrlArgsCannotThrow(array $callArgs): bool
+    {
+        if (
+            !isset($callArgs[0])
+            || !$callArgs[0] instanceof Variable
+            || !self::stringParamBuiltinArgCannotThrow($callArgs[0])
+        ) {
+            return false;
+        }
+        if (!isset($callArgs[1])) {
+            return true;
+        }
+        if (
+            !$callArgs[1] instanceof Variable
+            || !self::numericParamBuiltinArgCannotThrow($callArgs[1])
+            || $callArgs[1]->isNullConstant
+            || Variable::TYPE_NULL === $callArgs[1]->type
+            || isset($callArgs[2])
+        ) {
+            return false;
         }
 
         return true;
