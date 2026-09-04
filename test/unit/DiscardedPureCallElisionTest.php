@@ -27,10 +27,12 @@ use PHPCompiler\ext\standard\dirname;
 use PHPCompiler\ext\standard\escapeshellarg;
 use PHPCompiler\ext\standard\escapeshellcmd;
 use PHPCompiler\ext\standard\explode;
+use PHPCompiler\ext\standard\extension_loaded;
 use PHPCompiler\ext\standard\fdiv;
 use PHPCompiler\ext\standard\fmax;
 use PHPCompiler\ext\standard\fmin;
 use PHPCompiler\ext\standard\floatval;
+use PHPCompiler\ext\standard\function_exists;
 use PHPCompiler\ext\standard\get_debug_type;
 use PHPCompiler\ext\standard\gettype;
 use PHPCompiler\ext\standard\hash_equals;
@@ -1726,6 +1728,94 @@ final class DiscardedPureCallElisionTest extends TestCase
             $context,
             new parse_url(),
             [$lit, $comp, $long]
+        ));
+    }
+
+    public function testDiscardedFunctionExistsAndExtensionLoadedElideOnTypedArgs(): void
+    {
+        $context = $this->makeContext();
+        $str = $this->makeStringVar('strlen');
+        $lit = $this->makeStringVar('standard');
+        $null = $this->makeNullVar();
+        $box = $this->makeValueBoxVar();
+        $ht = $this->makeHashtableVar();
+        $long = $this->makeNativeLongVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new function_exists(),
+            [$str]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new function_exists(),
+            [$this->makeStringVar('array_map')]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new extension_loaded(),
+            [$lit]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new extension_loaded(),
+            [$this->makeStringVar('core')]
+        ));
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new function_exists(),
+            []
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new function_exists(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new function_exists(),
+            [$box]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new function_exists(),
+            [$ht]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new function_exists(),
+            [$long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new function_exists(),
+            [$str, $lit]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new extension_loaded(),
+            []
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new extension_loaded(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new extension_loaded(),
+            [$box]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new extension_loaded(),
+            [$long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new extension_loaded(),
+            [$lit, $str]
         ));
     }
 

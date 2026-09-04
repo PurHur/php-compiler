@@ -28,7 +28,8 @@ use PHPCompiler\VM\Variable as VmVariable;
  * typed min/max/fmin/fmax (≥1 numeric; array-form min/max stays live),
  * typed checkdate (3 longs), typed hash_equals (2 strings),
  * typed pathinfo (string + optional flags), typed parse_url
- * (string + optional component),
+ * (string + optional component), typed function_exists /
+ * extension_loaded (single string; no autoload),
  * zero-arg pi, type.c predicates + gettype/get_debug_type, ctype.c
  * classifiers on typed/literal strings, typed-array count/sizeof, math.c
  * incl. pow/fpow/fdiv on already-numeric args, empty void user functions).
@@ -53,7 +54,9 @@ use PHPCompiler\VM\Variable as VmVariable;
  * NAN). Soft-null {@code checkdate} stays live (deprecate). Non-string
  * {@code hash_equals} stays live ({@code TypeError}). Soft-null
  * {@code pathinfo}/{@code parse_url} path/url/flags/component stay live
- * (deprecate).
+ * (deprecate). Soft-null {@code function_exists}/{@code extension_loaded}
+ * stay live (deprecate). {@code class_exists} stays live (autoload side
+ * effects when {@code $autoload} defaults true).
  */
 final class DiscardedPureCallElision
 {
@@ -117,6 +120,12 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureParseUrlNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureFunctionExistsNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureExtensionLoadedNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureVersionCompareNoSideEffect($toCall, $callArgs)) {
@@ -1149,6 +1158,43 @@ final class DiscardedPureCallElision
     }
 
     /**
+     * Discarded {@code function_exists} on typed / literal string — php-src
+     * {@code Zend/zend_builtin_functions.c}. Soft-null stays live (deprecate).
+     * No autoload side effects (unlike {@code class_exists}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureFunctionExistsNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if (!NoThrowCallElision::isPureFunctionExistsBuiltin(strtolower($toCall->getName()))) {
+            return false;
+        }
+
+        return self::functionExistsArgsAllowDiscardedElision($callArgs);
+    }
+
+    /**
+     * Discarded {@code extension_loaded} on typed / literal string — php-src
+     * {@code ext/standard/info.c}. Soft-null stays live (deprecate).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureExtensionLoadedNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if (!NoThrowCallElision::isPureExtensionLoadedBuiltin(strtolower($toCall->getName()))) {
+            return false;
+        }
+
+        return self::extensionLoadedArgsAllowDiscardedElision($callArgs);
+    }
+
+    /**
      * Discarded {@code version_compare} on typed / literal strings — php-src
      * {@code versioning.c}. Optional operator must be null or a compile-time
      * valid comparison op ({@code ValueError} otherwise).
@@ -1339,6 +1385,30 @@ final class DiscardedPureCallElision
         }
 
         return true;
+    }
+
+    /**
+     * @param array<int, Variable> $callArgs
+     */
+    private static function functionExistsArgsAllowDiscardedElision(array $callArgs): bool
+    {
+        if (
+            !isset($callArgs[0])
+            || !$callArgs[0] instanceof Variable
+            || isset($callArgs[1])
+        ) {
+            return false;
+        }
+
+        return self::stringArgAllowsDiscardedElision($callArgs[0]);
+    }
+
+    /**
+     * @param array<int, Variable> $callArgs
+     */
+    private static function extensionLoadedArgsAllowDiscardedElision(array $callArgs): bool
+    {
+        return self::functionExistsArgsAllowDiscardedElision($callArgs);
     }
 
     /**
