@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
-use PHPCompiler\ext\spl\SplHeapBuiltin;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
@@ -17,12 +16,15 @@ use PHPLLVM\Value;
 
 /**
  * SplHeap / SplMaxHeap / SplMinHeap thin-AOT methods (#26784, ext/spl/spl_heap.c).
+ *
+ * Kind values match {@see \PHPCompiler\ext\spl\SplHeapBuiltin} KIND_* (MAX=1);
+ * Module::jitInit always passes kind so lib/JIT does not import ext\spl (#36204).
  */
 final class SplHeapMethod implements Call
 {
     public function __construct(
         private readonly string $method,
-        private readonly int $kind = SplHeapBuiltin::KIND_MAX,
+        private readonly int $kind = 1,
     ) {
     }
 

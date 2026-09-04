@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8138 |
-| Phase A inventory files (M2 ratio SSOT) | 8138 |
+| PHP files on vm.php path | 8142 |
+| Phase A inventory files (M2 ratio SSOT) | 8142 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 25811 |
+| Source constructs flagged (warnings) | 25823 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2005,7 +2005,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pcntl/pcntl_wstopsig.php` | 0 | 4 |
 | `ext/pcntl/pcntl_wtermsig.php` | 0 | 4 |
 | `ext/pdo/BuiltinClasses.php` | 0 | 3 |
-| `ext/pdo/Module.php` | 0 | 2 |
+| `ext/pdo/JitPdoExtensionHooksFacade.php` | 0 | 2 |
+| `ext/pdo/Module.php` | 0 | 3 |
 | `ext/pdo/PdoClassMethod.php` | 0 | 1 |
 | `ext/pdo/PdoExtensionPolicy.php` | 0 | 1 |
 | `ext/pdo/PdoSerializeDeny.php` | 0 | 3 |
@@ -3028,7 +3029,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitEnv.php` | 0 | 1 |
 | `ext/standard/JitEnvLocalKernel.php` | 0 | 1 |
 | `ext/standard/JitErrorGetLast.php` | 0 | 1 |
-| `ext/standard/JitErrorHandler.php` | 0 | 1 |
+| `ext/standard/JitErrorHandler.php` | 0 | 7 |
 | `ext/standard/JitErrorLog.php` | 0 | 1 |
 | `ext/standard/JitErrorReporting.php` | 0 | 1 |
 | `ext/standard/JitEscapeshellarg.php` | 0 | 1 |
@@ -5100,8 +5101,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/tokenizer/BuiltinClasses.php` | 0 | 1 |
 | `ext/tokenizer/JitTokenGetAll.php` | 0 | 2 |
 | `ext/tokenizer/JitTokenName.php` | 0 | 1 |
+| `ext/tokenizer/JitTokenizerExtensionHooksFacade.php` | 0 | 7 |
 | `ext/tokenizer/LanguageScanner.php` | 0 | 6 |
-| `ext/tokenizer/Module.php` | 0 | 5 |
+| `ext/tokenizer/Module.php` | 0 | 6 |
 | `ext/tokenizer/PhpTokenConstruct.php` | 0 | 2 |
 | `ext/tokenizer/PhpTokenGetTokenName.php` | 0 | 2 |
 | `ext/tokenizer/PhpTokenIs.php` | 0 | 2 |
@@ -6787,12 +6789,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/ObjectCompareSpaceship.php` | 0 | 1 |
 | `lib/JIT/Call/ObjectNestedReceiver.php` | 0 | 1 |
 | `lib/JIT/Call/ParentIteratorConstruct.php` | 0 | 4 |
-| `lib/JIT/Call/PdoConstruct.php` | 0 | 2 |
+| `lib/JIT/Call/PdoConstruct.php` | 0 | 1 |
 | `lib/JIT/Call/PdoGetAvailableDrivers.php` | 0 | 1 |
 | `lib/JIT/Call/PdoQuote.php` | 0 | 2 |
-| `lib/JIT/Call/PhpTokenConstruct.php` | 0 | 5 |
+| `lib/JIT/Call/PhpTokenConstruct.php` | 0 | 1 |
 | `lib/JIT/Call/PhpTokenGetTokenName.php` | 0 | 1 |
-| `lib/JIT/Call/PhpTokenTokenize.php` | 0 | 3 |
+| `lib/JIT/Call/PhpTokenTokenize.php` | 0 | 1 |
 | `lib/JIT/Call/RandomizerConstruct.php` | 0 | 1 |
 | `lib/JIT/Call/RandomizerGetBytesFromString.php` | 0 | 1 |
 | `lib/JIT/Call/RandomizerMt19937Construct.php` | 0 | 1 |
@@ -7167,6 +7169,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/OpensslHostProbe.php` | 0 | 1 |
 | `lib/JIT/OperandName.php` | 0 | 1 |
 | `lib/JIT/OperandNameNative.php` | 0 | 2 |
+| `lib/JIT/PdoExtensionHooks.php` | 0 | 1 |
 | `lib/JIT/PosixNestedJitKernels.php` | 0 | 1 |
 | `lib/JIT/PregReplaceCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/PrintRArrayLlvm.php` | 0 | 1 |
@@ -7220,6 +7223,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/StaticPropertyVisibilityJitGuard.php` | 0 | 2 |
 | `lib/JIT/StringOffsetHelper.php` | 0 | 1 |
 | `lib/JIT/SuperglobalInit.php` | 0 | 5 |
+| `lib/JIT/TokenizerExtensionHooks.php` | 0 | 1 |
 | `lib/JIT/TryCatchHelper.php` | 0 | 21 |
 | `lib/JIT/TryCatchState.php` | 0 | 2 |
 | `lib/JIT/TypeCheck.php` | 0 | 5 |
@@ -12724,71 +12728,71 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/ds/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 40)
-- new DsVectorConstruct (line 44)
-- new DsVectorCount (line 47)
-- new ClassEntry (line 59)
-- new DsMapConstruct (line 63)
-- new DsMapCount (line 66)
-- new DsMapGet (line 68)
-- new ClassEntry (line 80)
-- new DsSetConstruct (line 84)
-- new DsSetCount (line 87)
-- new DsSetAdd (line 89)
-- new DsSetContains (line 91)
-- new HashTable (line 107)
-- new HashTable (line 147)
-- new ArgumentCountError (line 189)
-- new HashTable (line 212)
-- new ArgumentCountError (line 254)
-- new ArgumentCountError (line 276)
+- new ClassEntry (line 36)
+- new DsVectorConstruct (line 40)
+- new DsVectorCount (line 43)
+- new ClassEntry (line 60)
+- new DsMapConstruct (line 64)
+- new DsMapCount (line 67)
+- new DsMapGet (line 69)
+- new ClassEntry (line 82)
+- new DsSetConstruct (line 86)
+- new DsSetCount (line 89)
+- new DsSetAdd (line 91)
+- new DsSetContains (line 93)
+- new HashTable (line 110)
+- new HashTable (line 150)
+- new ArgumentCountError (line 192)
+- new HashTable (line 215)
+- new ArgumentCountError (line 257)
+- new ArgumentCountError (line 279)
 - 13 class method(s)
 
 ### `ext/ds/DsDepthClasses.php`
 
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 49)
-- new ClassEntry (line 54)
-- new ClassEntry (line 65)
-- new ClassEntry (line 78)
-- new DsPairConstruct (line 79)
-- new DsPairToArray (line 82)
-- new ClassEntry (line 94)
-- new DsDequeConstruct (line 98)
-- new DsDequeCount (line 101)
-- new DsDequePush (line 104)
-- new ClassEntry (line 116)
-- new DsStackConstruct (line 120)
-- new DsStackCount (line 123)
-- new DsStackPush (line 125)
-- new DsStackPop (line 127)
-- new ClassEntry (line 138)
-- new DsQueueConstruct (line 142)
-- new DsQueueCount (line 145)
-- new DsQueuePush (line 147)
-- new DsQueuePop (line 149)
-- new ClassEntry (line 160)
-- new DsHeapConstruct (line 164)
-- new DsHeapCount (line 167)
-- new DsHeapPush (line 169)
-- new DsHeapPop (line 171)
-- new ClassEntry (line 182)
-- new DsPriorityQueueConstruct (line 186)
-- new DsPriorityQueueCount (line 189)
-- new DsPriorityQueuePush (line 191)
-- new DsPriorityQueuePop (line 193)
-- new ArgumentCountError (line 211)
-- new HashTable (line 232)
-- new HashTable (line 249)
-- new ArgumentCountError (line 286)
-- new Variable (line 290)
-- new HashTable (line 307)
-- new ArgumentCountError (line 344)
-- new HashTable (line 379)
-- new ArgumentCountError (line 416)
-- new HashTable (line 451)
-- new ArgumentCountError (line 488)
-- new ArgumentCountError (line 556)
+- new ClassEntry (line 55)
+- new ClassEntry (line 67)
+- new ClassEntry (line 81)
+- new DsPairConstruct (line 82)
+- new DsPairToArray (line 85)
+- new ClassEntry (line 98)
+- new DsDequeConstruct (line 102)
+- new DsDequeCount (line 105)
+- new DsDequePush (line 108)
+- new ClassEntry (line 121)
+- new DsStackConstruct (line 125)
+- new DsStackCount (line 128)
+- new DsStackPush (line 130)
+- new DsStackPop (line 132)
+- new ClassEntry (line 144)
+- new DsQueueConstruct (line 148)
+- new DsQueueCount (line 151)
+- new DsQueuePush (line 153)
+- new DsQueuePop (line 155)
+- new ClassEntry (line 167)
+- new DsHeapConstruct (line 171)
+- new DsHeapCount (line 174)
+- new DsHeapPush (line 176)
+- new DsHeapPop (line 178)
+- new ClassEntry (line 190)
+- new DsPriorityQueueConstruct (line 194)
+- new DsPriorityQueueCount (line 197)
+- new DsPriorityQueuePush (line 199)
+- new DsPriorityQueuePop (line 201)
+- new ArgumentCountError (line 220)
+- new HashTable (line 241)
+- new HashTable (line 258)
+- new ArgumentCountError (line 295)
+- new Variable (line 299)
+- new HashTable (line 316)
+- new ArgumentCountError (line 353)
+- new HashTable (line 388)
+- new ArgumentCountError (line 425)
+- new HashTable (line 460)
+- new ArgumentCountError (line 497)
+- new ArgumentCountError (line 565)
 - 29 class method(s)
 
 ### `ext/ds/DsExtensionPolicy.php`
@@ -23816,11 +23820,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassProperty (line 71)
 - 3 class method(s)
 
+### `ext/pdo/JitPdoExtensionHooksFacade.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 32)
+- 6 class method(s)
+
 ### `ext/pdo/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new pdo_drivers (line 76)
-- 5 class method(s)
+- new JitPdoExtensionHooksFacade (line 29)
+- new pdo_drivers (line 85)
+- 6 class method(s)
 
 ### `ext/pdo/PdoClassMethod.php`
 
@@ -31974,7 +31985,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitErrorHandler.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- new JITVariable (line 261)
+- new JITVariable (line 267)
+- new JITVariable (line 268)
+- new JITVariable (line 269)
+- new JITVariable (line 270)
+- new NestedClosureInvoke (line 272)
+- 10 class method(s)
 
 ### `ext/standard/JitErrorLog.php`
 
@@ -45510,6 +45527,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
+### `ext/tokenizer/JitTokenizerExtensionHooksFacade.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 32)
+- new ArgumentCountError (line 68)
+- new JITVariable (line 76)
+- new JITVariable (line 99)
+- new JITVariable (line 114)
+- new JITVariable (line 259)
+- 5 class method(s)
+
 ### `ext/tokenizer/LanguageScanner.php`
 
 **Warnings** (review for bootstrap subset):
@@ -45523,9 +45551,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/tokenizer/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new VM\Variable (line 49)
-- new token_get_all (line 58)
-- new token_name (line 59)
+- new JitTokenizerExtensionHooksFacade (line 27)
+- new VM\Variable (line 50)
+- new token_get_all (line 59)
+- new token_name (line 60)
 - 3 class method(s)
 - 1 closure(s)
 
@@ -50077,116 +50106,116 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT\Call\Native (line 8396)
 - new JIT\Call\Native (line 8468)
 - new Operand\Literal (line 9739)
-- new Type (line 11138)
-- new Type (line 11173)
-- new Type (line 11228)
-- new Type (line 11403)
-- new Type (line 11449)
-- new Variable (line 11700)
-- new Variable (line 11721)
-- new Variable (line 11747)
-- new Variable (line 11772)
-- new Variable (line 11817)
-- new Type (line 11825)
-- new Variable (line 11845)
-- new Type (line 11854)
-- new Variable (line 11873)
-- new Type (line 11881)
-- new Variable (line 11907)
-- new Type (line 11915)
-- new Variable (line 11938)
-- new Variable (line 11962)
-- new Operand\Literal (line 12096)
-- new CompileError (line 12978)
-- new CompileError (line 13121)
-- new Variable (line 13186)
-- new Variable (line 13230)
-- new Variable (line 13290)
-- new Variable (line 13980)
-- new Variable (line 14000)
-- new Variable (line 14021)
-- new Variable (line 14073)
-- new JIT\Call\ForeachIndexedClosureCall (line 14555)
-- new Variable (line 14645)
-- new Variable (line 14675)
-- new Variable (line 14694)
-- new Variable (line 14724)
-- new Variable (line 14761)
-- new Variable (line 14781)
-- new Variable (line 14794)
-- new Variable (line 14837)
-- new JIT\Variable (line 16670)
-- new JIT\Variable (line 16733)
-- new OpCode (line 16784)
-- new Variable (line 16785)
-- new VM\Variable (line 16808)
-- new Variable (line 16839)
-- new Variable (line 16874)
-- new Variable (line 16943)
-- new Variable (line 16987)
-- new Variable (line 17032)
-- new Variable (line 17045)
-- new Variable (line 17059)
-- new OpCode (line 17081)
-- new Variable (line 17082)
-- new Variable (line 17378)
-- new Variable (line 17488)
-- new Variable (line 17897)
-- new Variable (line 17941)
-- new Variable (line 17993)
-- new Variable (line 18004)
-- new Variable (line 18015)
-- new Variable (line 18035)
-- new Variable (line 18098)
-- new Variable (line 18161)
-- new Variable (line 18194)
-- new OpCode (line 18222)
-- new Variable (line 18223)
-- new Variable (line 18282)
-- new OpCode (line 18290)
-- new Variable (line 18291)
-- new Variable (line 18320)
-- new Variable (line 18355)
-- new Variable (line 18395)
-- new OpCode (line 18410)
-- new Variable (line 18411)
-- new Variable (line 18479)
-- new Variable (line 18496)
-- new Variable (line 18503)
-- new OpCode (line 18513)
-- new Variable (line 18514)
-- new Variable (line 18632)
-- new Variable (line 18663)
-- new Variable (line 18731)
-- new Operand\Literal (line 18740)
-- new Variable (line 18755)
-- new Variable (line 19090)
-- new JIT\Call\VmCoerceVariableToString (line 19240)
-- new JIT\Call\NoOpConstruct (line 19415)
-- new JIT\Call\IncludePathResolverResolve (line 19586)
-- new Operand\Literal (line 19702)
-- new Operand\Literal (line 19704)
-- new Operand\Literal (line 19715)
-- new Operand\Literal (line 19722)
-- new JIT\Call\RuntimeVariableStaticMethodCall (line 19763)
-- new JIT\Call\RuntimeVariableStaticMethodCall (line 19795)
-- new JIT\Call\RuntimeIndirectStaticMethodCall (line 19838)
-- new JIT\Call\NestedJitCompileScopeIsActiveTrue (line 19866)
-- new JIT\Call\EmitCatchableError (line 19907)
-- new JIT\Call\RuntimeIndirectStaticMethodCall (line 20090)
-- new JIT\Call\RuntimeIndirectStaticMethodCall (line 20257)
-- new Operand\Literal (line 21069)
-- new VM (line 22091)
-- new VM\Variable (line 22100)
-- new VM\ClassEntry (line 22205)
-- new Func\PHP (line 22224)
-- new VM\ClassEntry (line 22270)
-- new Variable (line 22287)
-- new Variable (line 22400)
-- new Variable (line 22441)
-- new Variable (line 22501)
-- new Variable (line 22720)
-- new Variable (line 24612)
+- new Type (line 11146)
+- new Type (line 11181)
+- new Type (line 11236)
+- new Type (line 11411)
+- new Type (line 11457)
+- new Variable (line 11708)
+- new Variable (line 11729)
+- new Variable (line 11755)
+- new Variable (line 11780)
+- new Variable (line 11825)
+- new Type (line 11833)
+- new Variable (line 11853)
+- new Type (line 11862)
+- new Variable (line 11881)
+- new Type (line 11889)
+- new Variable (line 11915)
+- new Type (line 11923)
+- new Variable (line 11946)
+- new Variable (line 11970)
+- new Operand\Literal (line 12104)
+- new CompileError (line 12986)
+- new CompileError (line 13129)
+- new Variable (line 13194)
+- new Variable (line 13238)
+- new Variable (line 13298)
+- new Variable (line 13988)
+- new Variable (line 14008)
+- new Variable (line 14029)
+- new Variable (line 14081)
+- new JIT\Call\ForeachIndexedClosureCall (line 14563)
+- new Variable (line 14653)
+- new Variable (line 14683)
+- new Variable (line 14702)
+- new Variable (line 14732)
+- new Variable (line 14769)
+- new Variable (line 14789)
+- new Variable (line 14802)
+- new Variable (line 14845)
+- new JIT\Variable (line 16678)
+- new JIT\Variable (line 16741)
+- new OpCode (line 16792)
+- new Variable (line 16793)
+- new VM\Variable (line 16816)
+- new Variable (line 16847)
+- new Variable (line 16882)
+- new Variable (line 16951)
+- new Variable (line 16995)
+- new Variable (line 17040)
+- new Variable (line 17053)
+- new Variable (line 17067)
+- new OpCode (line 17089)
+- new Variable (line 17090)
+- new Variable (line 17386)
+- new Variable (line 17496)
+- new Variable (line 17905)
+- new Variable (line 17949)
+- new Variable (line 18001)
+- new Variable (line 18012)
+- new Variable (line 18023)
+- new Variable (line 18043)
+- new Variable (line 18106)
+- new Variable (line 18169)
+- new Variable (line 18202)
+- new OpCode (line 18230)
+- new Variable (line 18231)
+- new Variable (line 18290)
+- new OpCode (line 18298)
+- new Variable (line 18299)
+- new Variable (line 18328)
+- new Variable (line 18363)
+- new Variable (line 18403)
+- new OpCode (line 18418)
+- new Variable (line 18419)
+- new Variable (line 18487)
+- new Variable (line 18504)
+- new Variable (line 18511)
+- new OpCode (line 18521)
+- new Variable (line 18522)
+- new Variable (line 18640)
+- new Variable (line 18671)
+- new Variable (line 18739)
+- new Operand\Literal (line 18748)
+- new Variable (line 18763)
+- new Variable (line 19098)
+- new JIT\Call\VmCoerceVariableToString (line 19248)
+- new JIT\Call\NoOpConstruct (line 19423)
+- new JIT\Call\IncludePathResolverResolve (line 19594)
+- new Operand\Literal (line 19710)
+- new Operand\Literal (line 19712)
+- new Operand\Literal (line 19723)
+- new Operand\Literal (line 19730)
+- new JIT\Call\RuntimeVariableStaticMethodCall (line 19771)
+- new JIT\Call\RuntimeVariableStaticMethodCall (line 19803)
+- new JIT\Call\RuntimeIndirectStaticMethodCall (line 19846)
+- new JIT\Call\NestedJitCompileScopeIsActiveTrue (line 19874)
+- new JIT\Call\EmitCatchableError (line 19915)
+- new JIT\Call\RuntimeIndirectStaticMethodCall (line 20098)
+- new JIT\Call\RuntimeIndirectStaticMethodCall (line 20265)
+- new Operand\Literal (line 21077)
+- new VM (line 22099)
+- new VM\Variable (line 22108)
+- new VM\ClassEntry (line 22213)
+- new Func\PHP (line 22232)
+- new VM\ClassEntry (line 22278)
+- new Variable (line 22295)
+- new Variable (line 22408)
+- new Variable (line 22449)
+- new Variable (line 22509)
+- new Variable (line 22728)
+- new Variable (line 24620)
 - 625 class method(s)
 - 25 closure(s)
 
@@ -51944,7 +51973,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/MathSqrt.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/MathTan.php`
 
@@ -54966,8 +54995,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 8543)
 - new Variable (line 8576)
 - new Variable (line 8599)
-- new Variable (line 9137)
-- 353 class method(s)
+- new Variable (line 9149)
+- 354 class method(s)
 - 8 closure(s)
 
 ### `lib/JIT/Builtin/Type/String_.php`
@@ -56418,8 +56447,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/PdoConstruct.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 37)
-- 5 class method(s)
+- 1 class method(s)
 
 ### `lib/JIT/Call/PdoGetAvailableDrivers.php`
 
@@ -56435,23 +56463,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/PhpTokenConstruct.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 27)
-- new Variable (line 35)
-- new Variable (line 58)
-- new Variable (line 73)
 - 1 class method(s)
 
 ### `lib/JIT/Call/PhpTokenGetTokenName.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 1 class method(s)
 
 ### `lib/JIT/Call/PhpTokenTokenize.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 34)
-- new Variable (line 122)
-- 2 class method(s)
+- 1 class method(s)
 
 ### `lib/JIT/Call/RandomizerConstruct.php`
 
@@ -57697,22 +57719,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 5721)
 - new Variable (line 5735)
 - new Variable (line 5759)
-- new VM (line 6220)
-- new Variable (line 6499)
-- new Type (line 6507)
-- new Variable (line 6535)
-- new Type (line 6543)
-- new Variable (line 6583)
-- new Type (line 6594)
-- new Operand\Literal (line 6726)
-- new Operand\Literal (line 6781)
-- new Type (line 6859)
-- new Variable (line 7052)
-- new Variable (line 7139)
-- new Variable (line 7180)
-- new Variable (line 7212)
-- new Operand\Literal (line 7358)
-- 1 class method(s)
+- new VM (line 6225)
+- new Variable (line 6504)
+- new Type (line 6512)
+- new Variable (line 6540)
+- new Type (line 6548)
+- new Variable (line 6588)
+- new Type (line 6599)
+- new Operand\Literal (line 6731)
+- new Operand\Literal (line 6786)
+- new Type (line 6864)
+- new Variable (line 7057)
+- new Variable (line 7156)
+- new Variable (line 7197)
+- new Variable (line 7229)
+- new Operand\Literal (line 7375)
+- 2 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/Concern/InitJitMethodCall.php`
@@ -58323,7 +58345,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ExtensionLoweringHooks.php`
 
 **Warnings** (review for bootstrap subset):
-- 78 class method(s)
+- 80 class method(s)
 
 ### `lib/JIT/FiberHelper.php`
 
@@ -59197,8 +59219,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/NoThrowCallElision.php`
 
 **Warnings** (review for bootstrap subset):
-- new Operand\Literal (line 448)
-- 16 class method(s)
+- new Operand\Literal (line 571)
+- 20 class method(s)
 
 ### `lib/JIT/NonObjectPropertyFetchHelper.php`
 
@@ -59237,6 +59259,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Call\Native (line 51)
+- 2 class method(s)
+
+### `lib/JIT/PdoExtensionHooks.php`
+
+**Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
 ### `lib/JIT/PosixNestedJitKernels.php`
@@ -59446,7 +59473,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ScopeVariableAssignedFlags.php`
 
 **Warnings** (review for bootstrap subset):
-- 15 class method(s)
+- 17 class method(s)
 
 ### `lib/JIT/ScriptMagic.php`
 
@@ -59590,6 +59617,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 335)
 - new VMVariable (line 389)
 - 13 class method(s)
+
+### `lib/JIT/TokenizerExtensionHooks.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
 
 ### `lib/JIT/TryCatchHelper.php`
 
@@ -59763,40 +59795,40 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 697)
-- new Variable (line 767)
-- new Variable (line 792)
-- new Variable (line 815)
-- new Variable (line 880)
-- new Variable (line 926)
-- new Variable (line 957)
-- new Variable (line 1004)
-- new Variable (line 1026)
-- new Variable (line 1046)
-- new self (line 1064)
-- new self (line 1075)
-- new self (line 1087)
-- new self (line 1103)
-- new self (line 1110)
-- new self (line 1117)
-- new self (line 1127)
-- new self (line 1143)
-- new self (line 1153)
-- new self (line 1175)
-- new Variable (line 1356)
-- new Variable (line 1372)
-- new Variable (line 1381)
-- new Variable (line 1415)
-- new Variable (line 1485)
-- new Variable (line 1499)
-- new Variable (line 1538)
-- new Variable (line 1562)
-- new Variable (line 1590)
-- new Variable (line 1619)
-- new Variable (line 1688)
+- new Variable (line 775)
+- new Variable (line 800)
+- new Variable (line 823)
+- new Variable (line 931)
+- new Variable (line 977)
+- new Variable (line 1008)
+- new Variable (line 1055)
+- new Variable (line 1077)
+- new Variable (line 1097)
+- new self (line 1115)
+- new self (line 1126)
+- new self (line 1138)
+- new self (line 1154)
+- new self (line 1161)
+- new self (line 1168)
+- new self (line 1178)
+- new self (line 1194)
+- new self (line 1204)
+- new self (line 1226)
+- new Variable (line 1407)
+- new Variable (line 1423)
+- new Variable (line 1432)
+- new Variable (line 1466)
+- new Variable (line 1536)
+- new Variable (line 1550)
+- new Variable (line 1589)
+- new Variable (line 1613)
+- new Variable (line 1641)
+- new Variable (line 1670)
 - new Variable (line 1739)
-- new Variable (line 1752)
-- new self (line 1826)
-- 25 class method(s)
+- new Variable (line 1790)
+- new Variable (line 1803)
+- new self (line 1877)
+- 26 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/VariableFunctionCallHelper.php`
@@ -60131,8 +60163,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new State (line 614)
 - new ReflectionProperty (line 672)
 - new ReflectionProperty (line 674)
-- new LintCompiler (line 1246)
-- new Variable (line 1380)
+- new LintCompiler (line 1257)
+- new Variable (line 1391)
 - 54 class method(s)
 
 ### `lib/RuntimeStrictness.php`

@@ -612,6 +612,89 @@ final class JitPhpExtensionLoweringHooksTest extends TestCase
         }
     }
 
+    public function testTokenizerCallProxiesDoNotImportTokenizerExtension(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $module = (string) file_get_contents($root.'/ext/tokenizer/Module.php');
+        $this->assertStringContainsString(
+            'tokenizer = new JitTokenizerExtensionHooksFacade()',
+            $module,
+            'ext/tokenizer Module::jitInit must register JitTokenizerExtensionHooksFacade'
+        );
+        $this->assertStringContainsString(
+            'requireTokenizer',
+            (string) file_get_contents($root.'/lib/JIT/ExtensionLoweringHooks.php'),
+            'ExtensionLoweringHooks must expose requireTokenizer()'
+        );
+        $files = [
+            'lib/JIT/Call/PhpTokenTokenize.php',
+            'lib/JIT/Call/PhpTokenConstruct.php',
+            'lib/JIT/Call/PhpTokenGetTokenName.php',
+        ];
+        foreach ($files as $rel) {
+            $src = (string) file_get_contents($root.'/'.$rel);
+            $stripped = (string) preg_replace('~/\*.*?\*/~s', '', $src);
+            $stripped = (string) preg_replace('~//.*$~m', '', $stripped);
+            $this->assertDoesNotMatchRegularExpression(
+                '/PHPCompiler\\\\ext\\\\tokenizer\\\\/',
+                $stripped,
+                $rel.' still imports ext\\tokenizer — use TokenizerExtensionHooks'
+            );
+            $this->assertStringContainsString(
+                'requireTokenizer()',
+                $src,
+                $rel.' must dispatch via requireTokenizer()'
+            );
+        }
+    }
+
+    public function testPdoCallProxiesDoNotImportPdoExtension(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $module = (string) file_get_contents($root.'/ext/pdo/Module.php');
+        $this->assertStringContainsString(
+            'pdo = new JitPdoExtensionHooksFacade()',
+            $module,
+            'ext/pdo Module::jitInit must register JitPdoExtensionHooksFacade'
+        );
+        $this->assertStringContainsString(
+            'requirePdo',
+            (string) file_get_contents($root.'/lib/JIT/ExtensionLoweringHooks.php'),
+            'ExtensionLoweringHooks must expose requirePdo()'
+        );
+        $files = [
+            'lib/JIT/Call/PdoConstruct.php',
+            'lib/JIT/Call/PdoGetAvailableDrivers.php',
+        ];
+        foreach ($files as $rel) {
+            $src = (string) file_get_contents($root.'/'.$rel);
+            $stripped = (string) preg_replace('~/\*.*?\*/~s', '', $src);
+            $stripped = (string) preg_replace('~//.*$~m', '', $stripped);
+            $this->assertDoesNotMatchRegularExpression(
+                '/PHPCompiler\\\\ext\\\\pdo\\\\/',
+                $stripped,
+                $rel.' still imports ext\\pdo — use PdoExtensionHooks'
+            );
+            $this->assertStringContainsString(
+                'requirePdo()',
+                $src,
+                $rel.' must dispatch via requirePdo()'
+            );
+        }
+    }
+
+    public function testSplHeapCallProxyDoesNotImportSplExtension(): void
+    {
+        $src = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Call/SplHeapMethod.php');
+        $stripped = (string) preg_replace('~/\*.*?\*/~s', '', $src);
+        $stripped = (string) preg_replace('~//.*$~m', '', $stripped);
+        $this->assertDoesNotMatchRegularExpression(
+            '/PHPCompiler\\\\ext\\\\spl\\\\/',
+            $stripped,
+            'lib/JIT/Call/SplHeapMethod.php still imports ext\\spl — pass KIND from Module::jitInit'
+        );
+    }
+
     /**
      * @dataProvider coreJitHelperFilesWithoutNonStandardExtImports
      */

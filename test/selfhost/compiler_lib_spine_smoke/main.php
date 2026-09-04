@@ -101,6 +101,7 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
+
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
@@ -8240,6 +8241,10 @@ require_once __DIR__.'/../../../lib/AOT/HelperRuntimeCommon.php';
 require_once __DIR__.'/../../../lib/Cli/ProcPipeReader.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ValueBoxWriteDoubleJit.php';
 require_once __DIR__.'/../../../lib/VM/VmValueBoxWriteDouble.php';
+require_once __DIR__.'/../../../ext/pdo/JitPdoExtensionHooksFacade.php';
+require_once __DIR__.'/../../../ext/tokenizer/JitTokenizerExtensionHooksFacade.php';
+require_once __DIR__.'/../../../lib/JIT/PdoExtensionHooks.php';
+require_once __DIR__.'/../../../lib/JIT/TokenizerExtensionHooks.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 
