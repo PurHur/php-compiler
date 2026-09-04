@@ -105,9 +105,9 @@ interface DomCompileTimeHooks
  * {@see \PHPCompiler\JIT} must not import {@code ext\simplexml} / {@code ext\dom} /
  * {@code ext\xmlreader} / {@code ext\xmlwriter} / {@code ext\xsl} / {@code ext\mbstring}
  * / {@code ext\posix} / {@code ext\bcmath} / {@code ext\intl} / {@code ext\zip}
- * / {@code ext\fileinfo} / {@code ext\sqlite3} for these paths;
- * Modules register from jitInit. Call XmlReader* / XmlWriter* / Finfo* / Sqlite3* / XsltMethod
- * also go through hooks (#36204).
+ * / {@code ext\fileinfo} / {@code ext\sqlite3} / {@code ext\tokenizer} / {@code ext\pdo}
+ * for these paths; Modules register from jitInit. Call XmlReader* / XmlWriter* / Finfo* /
+ * Sqlite3* / XsltMethod / PhpToken* / Pdo* also go through hooks (#36204).
  */
 final class ExtensionLoweringHooks
 {
@@ -241,6 +241,12 @@ final class ExtensionLoweringHooks
 
     /** sqlite3 JIT Call surfaces — registered from ext/sqlite3 Module::jitInit (#36204). */
     public ?Sqlite3ExtensionHooks $sqlite3 = null;
+
+    /** tokenizer JIT Call surfaces — registered from ext/tokenizer Module::jitInit (#36204). */
+    public ?TokenizerExtensionHooks $tokenizer = null;
+
+    /** pdo JIT Call surfaces — registered from ext/pdo Module::jitInit (#36204). */
+    public ?PdoExtensionHooks $pdo = null;
 
     public function requirePosixNested(): PosixNestedJitKernels
     {
@@ -394,6 +400,28 @@ final class ExtensionLoweringHooks
         }
 
         return $this->sqlite3;
+    }
+
+    public function requireTokenizer(): TokenizerExtensionHooks
+    {
+        if (null === $this->tokenizer) {
+            throw new \RuntimeException(
+                'tokenizer extension hooks not registered — ext/tokenizer Module::jitInit missing (#36204)'
+            );
+        }
+
+        return $this->tokenizer;
+    }
+
+    public function requirePdo(): PdoExtensionHooks
+    {
+        if (null === $this->pdo) {
+            throw new \RuntimeException(
+                'pdo extension hooks not registered — ext/pdo Module::jitInit missing (#36204)'
+            );
+        }
+
+        return $this->pdo;
     }
 
     public function tryPrepareDimWrite(Context $context, Variable $container, Variable $dim): ?Variable

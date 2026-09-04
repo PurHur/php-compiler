@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\pdo;
 
+use PHPCompiler\JIT;
 use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
 
@@ -20,6 +21,14 @@ use PHPCompiler\Runtime;
  */
 class Module extends ModuleAbstract
 {
+    /**
+     * PDO Call proxies — owned by ext/pdo so lib/JIT does not import this tree (#36204).
+     */
+    public function jitInit(JIT\Context $context): void
+    {
+        $context->extensionLowering->pdo = new JitPdoExtensionHooksFacade();
+    }
+
     public function init(Runtime $runtime): void
     {
         if (PdoExtensionPolicy::advertisesExceptionClass()) {

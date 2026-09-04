@@ -24,6 +24,7 @@ class Module extends ModuleAbstract
      */
     public function jitInit(JIT\Context $context): void
     {
+        $context->extensionLowering->tokenizer = new JitTokenizerExtensionHooksFacade();
         $context->type->object->registerExternalClassSeeder('phptoken', static function ($obj, int $id): void {
             $obj->defineProperty($id, VmPhpToken::PROP_ID, Variable::TYPE_NATIVE_LONG);
             $obj->defineProperty($id, VmPhpToken::PROP_TEXT, Variable::TYPE_VALUE);
