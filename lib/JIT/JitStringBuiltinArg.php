@@ -642,7 +642,15 @@ final class JitStringBuiltinArg
     ): Value {
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
+        // Pend+ret for TypeError allocates on prop_value_done then seals with ret
+        // (#36382 Slim MiddlewareDispatcher anonymous handle). Starting the type-byte
+        // load while insert is still on that sealed BB appends GEPs after the
+        // terminator (parentless / mid-block terminator at module verify).
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'str_req_boxed');
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        // valuePtrFromVariable / NestedJIT ensureLinked can clear insert — re-seat
+        // before structGep or the type-byte GEP is parentless (#36382).
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'str_req_boxed_gep');
         $map = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
             $context->builder->structGep($valuePtr, $map['type'])
@@ -740,7 +748,11 @@ final class JitStringBuiltinArg
     ): Value {
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
+        // Peer {@see lowerRequiredBoxed}: do not append after a sealed prop_value_done
+        // from emitPendTypeErrorForCaller + emitPropagateReturn (#36382).
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'str_builtin_boxed');
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'str_builtin_boxed_gep');
         $map = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
             $context->builder->structGep($valuePtr, $map['type'])
