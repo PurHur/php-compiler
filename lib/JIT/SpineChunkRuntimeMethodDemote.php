@@ -41,16 +41,23 @@ use PHPCompiler\OpCode;
  * - Top-level VM.php (1.1 MB): NestedJIT OOM without demote; emits under 1536M after.
  * - Top-level Compiler.php (2.1 MB) / JIT.php (1.0 MB): host CFG construction OOMs at
  *   1536M even with empty method bodies — skipped from spine plans (see chunk-plan).
+ * - Top-level Builtin* / OpCode / ModuleAbstract / Frame / Config: NestedJIT SEGV (rc=139)
+ *   or LLVM Type OOM under 1536M — measured 2026-09-04 (BuiltinParamNames 33s SEGV;
+ *   Config 168s then Allowed memory exhausted). Doctor.php fails host CFG
+ *   (isInlineExprCallArgProducer null Op) before JIT demote — skipped in chunk-plan.
+ * - Func\* / Cfg\* / Lint\* / Visitor\*: NestedJIT SEGV on Internal/PHP/Linter/
+ *   OpSubBlockAccess/VoidCastResolver — measured 2026-09-04.
  *
  * Emptying those bodies (probe) emits .o files in seconds. Host-lowering Runtime::initParsePipeline
  * was already known to hang Zend rebuilds for hours ({@see RuntimeInitParsePipeline}).
  *
  * Under {@see ExternalMethodBind::spineChunkMode()}, replace Runtime + Block + top-level VM +
- * every
+ * Builtin* / OpCode / ModuleAbstract / Frame / Config + every
  * {@see \PHPCompiler\VM} / {@see \PHPCompiler\AOT} / {@see \PHPCompiler\Compiler} (sub-NS) /
  * {@see \PHPCompiler\Web} / {@see \PHPCompiler\Ast} / {@see \PHPCompiler\Cli} /
  * {@see \PHPCompiler\SourcePreprocessor} / {@see \PHPCompiler\JIT} (sub-NS) /
- * {@see \PHPCompiler\ext} class method CFG
+ * {@see \PHPCompiler\ext} / {@see \PHPCompiler\Func} / {@see \PHPCompiler\Cfg} /
+ * {@see \PHPCompiler\Lint} / {@see \PHPCompiler\Visitor} class method CFG
  * with a void-return stub before {@see \PHPCompiler\JIT::compileBlock} so hub ClassEntry +
  * method symbols still land in the .o / peer manifest. Real bodies stay on C-floor helpers
  * (RuntimeInitParsePipeline / RuntimeParseM5Native), NestedVM object:: proxies, or later
@@ -71,6 +78,11 @@ final class SpineChunkRuntimeMethodDemote
             'phpcompiler\\runtime' === $lc
             || 'phpcompiler\\block' === $lc
             || 'phpcompiler\\vm' === $lc
+            || 'phpcompiler\\opcode' === $lc
+            || 'phpcompiler\\moduleabstract' === $lc
+            || 'phpcompiler\\frame' === $lc
+            || 'phpcompiler\\config' === $lc
+            || str_starts_with($lc, 'phpcompiler\\builtin')
         ) {
             return true;
         }
@@ -84,7 +96,11 @@ final class SpineChunkRuntimeMethodDemote
             || str_starts_with($lc, 'phpcompiler\\cli\\')
             || str_starts_with($lc, 'phpcompiler\\sourcepreprocessor\\')
             || str_starts_with($lc, 'phpcompiler\\jit\\')
-            || str_starts_with($lc, 'phpcompiler\\ext\\');
+            || str_starts_with($lc, 'phpcompiler\\ext\\')
+            || str_starts_with($lc, 'phpcompiler\\func\\')
+            || str_starts_with($lc, 'phpcompiler\\cfg\\')
+            || str_starts_with($lc, 'phpcompiler\\lint\\')
+            || str_starts_with($lc, 'phpcompiler\\visitor\\');
     }
 
     /**

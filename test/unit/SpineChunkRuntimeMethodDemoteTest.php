@@ -69,12 +69,26 @@ final class SpineChunkRuntimeMethodDemoteTest extends TestCase
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\ext\\bcmath\\NumberAdd'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('phpcompiler\\ext\\bcmath\\jitbcmath'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\ext\\standard\\Strlen'));
+        // Builtin*/OpCode/ModuleAbstract/Frame/Config — NestedJIT SEGV / LLVM OOM (#36387).
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\BuiltinParamNames'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\BuiltinInternalArgInfo'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('phpcompiler\\builtinbyrefparams'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\OpCode'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\ModuleAbstract'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\Frame'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\Config'));
+        // Func*/Cfg*/Lint*/Visitor* — NestedJIT SEGV under SPINE_CHUNK (#36387).
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\Func\\Internal'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('phpcompiler\\func\\php'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\Cfg\\OpSubBlockAccess'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\Lint\\Linter'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\Visitor\\VoidCastResolver'));
         // Compiler / CompilerVersion / JIT stay live — Compiler/JIT need file splits for host CFG.
         $this->assertFalse(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\Compiler'));
         $this->assertFalse(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\CompilerVersion'));
         $this->assertFalse(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\JIT'));
-        $this->assertFalse(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\Func\\Internal'));
-        $this->assertFalse(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\Visitor\\VoidCastResolver'));
+        $this->assertFalse(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\ExtensionRegistry'));
+        $this->assertFalse(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\PHPTypes\\CompilerTypeReconstructor'));
     }
 
     public function testDemoteMethodBlockLeavesOnlyReturnVoid(): void

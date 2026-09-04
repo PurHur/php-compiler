@@ -12602,7 +12602,8 @@ class JIT {
                                 $methodBlock
                             );
                         }
-                        // SPINE_CHUNK hub capacity: demote Runtime/Block/VM/AOT/Compiler/Web/Ast/Cli/JIT (#36387).
+                        // SPINE_CHUNK hub capacity: demote Runtime/Block/VM/Builtin* / OpCode /
+                        // ModuleAbstract/Frame/Config + AOT/Compiler/Web/Ast/Cli/JIT/ext/Func/Cfg/Lint/Visitor (#36387).
                         if (JIT\SpineChunkRuntimeMethodDemote::shouldDemote((string) $displayClass)) {
                             JIT\SpineChunkRuntimeMethodDemote::demoteMethodBlock($methodBlock, $methodLc);
                         }
