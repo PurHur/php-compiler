@@ -4,9 +4,9 @@
     "done_when_ceiling": 25000,
     "files": {
         "lib/Compiler.php": {
-            "budget": 14491,
+            "budget": 13780,
             "target": 20000,
-            "note": "Concern trait splits (#36230/#36387/#36403); FunctionStaticAndCompileTimeLiterals"
+            "note": "Concern trait splits (#36230/#36387/#36403); IssetEmptyCallArgAndMultiCompile"
         },
         "lib/JIT.php": {
             "budget": 24664,
