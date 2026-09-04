@@ -3531,6 +3531,28 @@ class Context {
         Progress::noteFunction('jit_context_emit_object_done');
         if ($keepingObjectOnly) {
             Linker::assertNonEmptyOutputFile($objectFile);
+            // Object-only / split-TU chunk emit: persist helper unit slugs so a later
+            // combine+link can adoptUnitSlugsForLink without re-lowering (#36387).
+            $slugsExport = Config::getenv('PHP_COMPILER_HELPER_SLUGS_EXPORT');
+            if (is_string($slugsExport) && '' !== $slugsExport) {
+                $slugs = \PHPCompiler\AOT\HelperRuntimeCache::usedUnitSlugs();
+                $payload = json_encode(
+                    [
+                        'version' => 1,
+                        'helper_slugs' => array_values($slugs),
+                        'object' => $objectFile,
+                        'generated_at' => gmdate('c'),
+                    ],
+                    JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES
+                );
+                if (false !== $payload) {
+                    $dir = dirname($slugsExport);
+                    if ('.' !== $dir && '' !== $dir && !is_dir($dir)) {
+                        @mkdir($dir, 0755, true);
+                    }
+                    file_put_contents($slugsExport, $payload."\n");
+                }
+            }
 
             return;
         }

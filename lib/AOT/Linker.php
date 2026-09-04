@@ -100,6 +100,12 @@ final class Linker
             $scriptObjects[] = $partialBase;
             \PHPCompiler\AOT\BuildTiming::note('edit_scaffold_base_link', 1.0);
         }
+        // Split-TU chunk link: additional peer `.o` files (colon-separated) (#36387).
+        foreach (self::resolveExtraScriptObjects() as $extra) {
+            if ($extra !== $objectFile && !in_array($extra, $scriptObjects, true)) {
+                $scriptObjects[] = $extra;
+            }
+        }
         $linkObjectFiles = array_merge($runtimeObjects, $scriptObjects, $vendorObjects);
         $helperGcLinkPaths = $helperObjects;
         $llvmDir = Config::getenv('PHP_COMPILER_LLVM_PATH');
@@ -196,6 +202,30 @@ final class Linker
         }
 
         self::linkWithSystemCompiler($objectFile, $executable, $runtimeObjects, $vendorObjects, $linkObjectFiles, $helperGcLinkPaths, $scriptObjects);
+    }
+
+    /**
+     * Extra user `.o` paths from PHP_COMPILER_EXTRA_SCRIPT_OBJECTS (colon-separated) (#36387).
+     *
+     * @return list<string>
+     */
+    public static function resolveExtraScriptObjects(): array
+    {
+        $raw = Config::getenv('PHP_COMPILER_EXTRA_SCRIPT_OBJECTS');
+        if (!is_string($raw) || '' === trim($raw)) {
+            return [];
+        }
+        $out = [];
+        foreach (explode(':', $raw) as $part) {
+            $path = trim($part);
+            if ('' === $path || !is_file($path) || filesize($path) < 1) {
+                continue;
+            }
+            $real = realpath($path);
+            $out[] = false !== $real ? $real : $path;
+        }
+
+        return array_values(array_unique($out));
     }
 
     /**

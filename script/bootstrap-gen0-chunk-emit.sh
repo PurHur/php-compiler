@@ -20,6 +20,7 @@
 #   PHP_COMPILER_SPINE_CHUNK=1  default 1
 #   PHP_COMPILER_HELPER_RUNTIME_O=1  default 1 for chunk emit
 #   PHP_COMPILER_EXTERNAL_METHOD_MANIFEST  explicit override (wins over auto peers)
+#   PHP_COMPILER_HELPER_SLUGS_EXPORT  written on object-only emit (default OUT_DIR/CHUNK_ID.helpers.json)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -58,6 +59,7 @@ RECEIPT="${OUT_DIR}/${CHUNK_ID}.receipt.json"
 STUBS="${OUT_DIR}/${CHUNK_ID}.stubs.json"
 BITCODE="${OUT_DIR}/${CHUNK_ID}.bc"
 MANIFEST="${OUT_DIR}/${CHUNK_ID}.manifest.json"
+HELPERS="${OUT_DIR}/${CHUNK_ID}.helpers.json"
 
 want_fp="$(bootstrap_lowering_source_fingerprint)"
 have_fp=""
@@ -94,6 +96,12 @@ if [[ "${LINK_BINARY}" == "1" ]]; then
   out_path="${BIN}"
 fi
 
+# Object-only emits must record helper unit slugs for a later chunk-link (#36387).
+helpers_export=""
+if [[ "${keep_object}" == "1" ]]; then
+  helpers_export="${PHP_COMPILER_HELPER_SLUGS_EXPORT:-${HELPERS}}"
+fi
+
 # Peer manifests (#36155 Phase C / #36387): bind cross-chunk symbols from earlier waves.
 # Explicit PHP_COMPILER_EXTERNAL_METHOD_MANIFEST wins; else CHUNK_PEER_MANIFESTS; else
 # every *.manifest.json already in OUT_DIR except this chunk's own export path.
@@ -128,6 +136,7 @@ set +e
 env PHP_COMPILER_SPINE_CHUNK="${PHP_COMPILER_SPINE_CHUNK:-1}" \
   PHP_COMPILER_HELPER_RUNTIME_O="${PHP_COMPILER_HELPER_RUNTIME_O:-1}" \
   PHP_COMPILER_KEEP_OBJECT_FILE="${keep_object}" \
+  PHP_COMPILER_HELPER_SLUGS_EXPORT="${helpers_export}" \
   PHP_COMPILER_REPORT_EXTERNAL_STUBS=1 \
   PHP_COMPILER_EXTERNAL_STUBS_JSON="${STUBS}" \
   PHP_COMPILER_EMIT_BITCODE="${BITCODE}" \
@@ -140,13 +149,20 @@ set -e
 elapsed=$(( $(date +%s) - start ))
 
 # KEEP_OBJECT with -o ending in .o writes that path; with -o .bin writes .bin.o.
+# Never rename a successful LINK_BINARY executable onto the .o path (#36387).
 effective="${out_path}"
 if [[ "${keep_object}" == "1" && "${out_path}" != *.o ]]; then
   effective="${out_path}.o"
 fi
-if [[ -f "${effective}" && "${effective}" != "${OBJ}" ]]; then
+if [[ "${keep_object}" == "1" && -f "${effective}" && "${effective}" != "${OBJ}" ]]; then
   mv -f "${effective}" "${OBJ}"
   effective="${OBJ}"
+fi
+# Object-only success always lands on OBJ; binary success stays on BIN.
+if [[ "${keep_object}" == "1" ]]; then
+  effective="${OBJ}"
+elif [[ -f "${BIN}" ]]; then
+  effective="${BIN}"
 fi
 
 size=0
@@ -160,29 +176,37 @@ elif grep -q 'external method stubs' "${LOG}" 2>/dev/null; then
   stub_count="$(php -r 'echo (int)(json_decode(file_get_contents($argv[1]), true)["stub_count"] ?? 0);' "${STUBS}" 2>/dev/null || echo 0)"
 fi
 
+helper_slug_count=0
+if [[ -f "${HELPERS}" ]]; then
+  helper_slug_count="$(php -r 'echo (int) count(json_decode(file_get_contents($argv[1]), true)["helper_slugs"] ?? []);' "${HELPERS}" 2>/dev/null || echo 0)"
+fi
+
 php -r '
 $receipt = [
     "chunk_id" => $argv[1],
     "entry" => $argv[2],
     "object" => $argv[3],
     "bin" => $argv[4],
-    "lowering_source_fingerprint" => $argv[5],
-    "exit_code" => (int) $argv[6],
-    "size_bytes" => (int) $argv[7],
-    "wall_seconds" => (int) $argv[8],
-    "stub_count" => (int) $argv[9],
-    "object_only" => $argv[10] === "1",
+    "helpers" => $argv[5],
+    "lowering_source_fingerprint" => $argv[6],
+    "exit_code" => (int) $argv[7],
+    "size_bytes" => (int) $argv[8],
+    "wall_seconds" => (int) $argv[9],
+    "stub_count" => (int) $argv[10],
+    "helper_slug_count" => (int) $argv[11],
+    "object_only" => $argv[12] === "1",
     "generated_at" => gmdate("c"),
 ];
-file_put_contents($argv[11], json_encode($receipt, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
-' "${CHUNK_ID}" "${CHUNK_ENTRY}" "${OBJ}" "${BIN}" "${want_fp}" "${rc}" "${size}" "${elapsed}" "${stub_count}" "${keep_object}" "${RECEIPT}"
+file_put_contents($argv[13], json_encode($receipt, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
+' "${CHUNK_ID}" "${CHUNK_ENTRY}" "${OBJ}" "${BIN}" "${HELPERS}" "${want_fp}" "${rc}" "${size}" "${elapsed}" \
+  "${stub_count}" "${helper_slug_count}" "${keep_object}" "${RECEIPT}"
 
 if [[ "${rc}" -ne 0 || ! -f "${effective}" || "${size}" -le 0 ]]; then
   echo "bootstrap-gen0-chunk-emit: FAILED ${CHUNK_ID} rc=${rc} (${elapsed}s) — see ${LOG}" >&2
   exit 1
 fi
 
-echo "bootstrap-gen0-chunk-emit: OK ${CHUNK_ID} ${size} bytes ${elapsed}s stubs=${stub_count} artifact=${effective}"
+echo "bootstrap-gen0-chunk-emit: OK ${CHUNK_ID} ${size} bytes ${elapsed}s stubs=${stub_count} helpers=${helper_slug_count} artifact=${effective}"
 if [[ "${stub_count}" -gt 0 ]]; then
   echo "bootstrap-gen0-chunk-emit: ${STUBS} — bind before linking this chunk into gen-0" >&2
 fi
