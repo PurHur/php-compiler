@@ -1640,6 +1640,23 @@ trait InitJitMethodCall
 
                         return;
                     }
+                    // Abstract composer (Psr\Log\AbstractLogger + LoggerTrait): `$this->log()`
+                    // lives on concrete subclasses — RuntimeIndirect among them
+                    // (zend_std_get_method). Unblocks Slim (#36382).
+                    $composerSubtypes = $this->buildRuntimeInstanceMethodCandidatesForDeclaredType(
+                        $compLc,
+                        $methodLc
+                    );
+                    if ([] !== $composerSubtypes) {
+                        $this->context->scope->toCall = new \PHPCompiler\JIT\Call\RuntimeIndirectInstanceMethodCall(
+                            $receiverVar,
+                            $methodLc,
+                            $composerSubtypes
+                        );
+                        $this->context->scope->args = [$receiverVar];
+
+                        return;
+                    }
                 }
             }
             // Interface / abstract (or other) typed receivers: no lowered body on the
