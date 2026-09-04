@@ -8345,6 +8345,9 @@ class Object_ extends Type {
         }
 
         if (Variable::TYPE_VALUE === $expr->type) {
+            // Non-object value boxes (arrays, scalars) → false. Must not load class_id
+            // from a null __object__* (Analyzer marks instanceof as escaping → TYPE_VALUE
+            // subjects; php-src zend_is_instanceof / instanceof_function) (#36382).
             $valuePtr = JitValueBox::valuePtrFromVariable($this->context, $expr);
             $obj = $this->context->builder->call(
                 $this->context->lookupFunction('__value__readObject'),
@@ -8356,6 +8359,12 @@ class Object_ extends Type {
                 $obj,
                 $objType->constNull()
             );
+            $objectBlock = BasicBlockHelper::append($this->context, 'instanceof_vb_obj');
+            $falseBlock = BasicBlockHelper::append($this->context, 'instanceof_vb_nonobj');
+            $mergeBlock = BasicBlockHelper::append($this->context, 'instanceof_vb_merge');
+            $this->context->builder->branchIf($isObject, $objectBlock, $falseBlock);
+
+            $this->context->builder->positionAtEnd($objectBlock);
             $objVar = new Variable(
                 $this->context,
                 Variable::TYPE_OBJECT,
@@ -8364,27 +8373,30 @@ class Object_ extends Type {
             );
             $standin = $this->tryExternalInstanceOf($objVar, $className);
             if (null !== $standin) {
-                $match = $this->context->helper->loadValue($standin);
-                $match = $this->context->builder->and($isObject, $match);
-
-                return new Variable(
-                    $this->context,
-                    Variable::TYPE_NATIVE_BOOL,
-                    Variable::KIND_VALUE,
-                    $match
+                $matchObj = $this->context->helper->loadValue($standin);
+            } else {
+                $classId = $this->context->builder->load(
+                    $this->context->builder->structGep($obj, $objMap['class_id'])
                 );
+                $matchObj = $this->emitClassIdInstanceOf($classId, $className);
             }
-            $classId = $this->context->builder->load(
-                $this->context->builder->structGep($obj, $objMap['class_id'])
-            );
-            $matches = $this->emitClassIdInstanceOf($classId, $className);
-            $match = $this->context->builder->and($isObject, $matches);
+            $objectEnd = $this->context->builder->getInsertBlock();
+            $this->context->builder->branch($mergeBlock);
+
+            $this->context->builder->positionAtEnd($falseBlock);
+            $this->context->builder->branch($mergeBlock);
+
+            $this->context->builder->positionAtEnd($mergeBlock);
+            $i1 = $this->context->getTypeFromString('int1');
+            $phi = $this->context->builder->phi($i1, 'instanceof_vb_phi');
+            $phi->addIncoming($matchObj, $objectEnd);
+            $phi->addIncoming($falseVal, $falseBlock);
 
             return new Variable(
                 $this->context,
                 Variable::TYPE_NATIVE_BOOL,
                 Variable::KIND_VALUE,
-                $match
+                $phi
             );
         }
 
