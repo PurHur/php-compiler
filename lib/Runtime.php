@@ -1076,6 +1076,11 @@ class Runtime {
                 $context->compileToFile($outfile);
                 \PHPCompiler\AOT\BuildTiming::end('link');
                 \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_compiletofile_done');
+                // Spine chunk / self-host: _exit before cache copy + CFG detach — both walk
+                // multi-GiB graphs and spin after -o is already on disk (#31726 / #36387).
+                if (\PHPCompiler\AOT\ExternalMethodBind::spineChunkMode()) {
+                    \PHPCompiler\AOT\AotEmitFastExit::exitAfterSuccessfulSelfhostEmit($sourceFilename, $outfile);
+                }
                 JIT\CompileCache::finishRecording();
                 if (null !== $this->jitCompileCacheKey && !$skipDebugArtifact) {
                     JIT\CompileCache::saveArtifact($this->jitCompileCacheKey, $outfile);
@@ -1130,11 +1135,17 @@ class Runtime {
         $context->compileToFile($outfile);
         \PHPCompiler\AOT\BuildTiming::end('link');
         \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_compiletofile_done');
+        // Spine split-TU chunks: -o (or KEEP_OBJECT .o) is already on disk — skip
+        // CompileCache copy + detachCfgTree before _exit (#31726 hang / #36387 OOM).
+        if (\PHPCompiler\AOT\ExternalMethodBind::spineChunkMode()) {
+            \PHPCompiler\AOT\AotEmitFastExit::exitAfterSuccessfulSelfhostEmit($sourceFilename, $outfile);
+        }
         JIT\CompileCache::finishRecording();
         if (null !== $this->jitCompileCacheKey && !$skipDebugArtifact) {
             JIT\CompileCache::saveArtifact($this->jitCompileCacheKey, $outfile);
         }
         // AOT emit complete — release php-cfg pins before process teardown (#36231).
+        // Self-host fast-exit still runs after this; SPINE_CHUNK already exited above.
         Block::detachCfgTree($block, true);
         // Self-host AOT: returning destroys $context / LLVM EE and can spin 15+ min
         // after -o is linked (#31726, #21925). Exit before that teardown.

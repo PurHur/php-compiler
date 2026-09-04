@@ -60,6 +60,20 @@ final class SelfhostAotFastExitTest extends TestCase
         );
     }
 
+    /**
+     * Spine chunk emit must _exit before CompileCache/detachCfgTree (#36387).
+     * Those post-emit walks were spinning at ~100% CPU / multi-GiB after -o was done.
+     */
+    public function testRuntimeSpineChunkFastExitsBeforeDetachCfgTree(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $runtime = (string) file_get_contents($root.'/lib/Runtime.php');
+        $this->assertMatchesRegularExpression(
+            '/compiletofile_done.*spineChunkMode\(\).*exitAfterSuccessfulSelfhostEmit.*detachCfgTree/s',
+            $runtime
+        );
+    }
+
     public function testBuilderDisposeIsIdempotent(): void
     {
         $root = dirname(__DIR__, 2);
