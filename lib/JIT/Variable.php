@@ -314,6 +314,12 @@ final class Variable {
     public bool $ephemeralArrayTemp = false;
 
     /**
+     * Owning `__string__*` FUNCCALL temp (str_repeat / typed :string) at rc=1 (#36388).
+     * ASSIGN must move (no addref / no `__string__separate`) and null this slot.
+     */
+    public bool $ephemeralStringTemp = false;
+
+    /**
      * By-ref actual is a call/method return temp — notice already emitted; mutator may use it (#25815).
      */
     public bool $nonVariableByRefTempAllowed = false;

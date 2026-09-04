@@ -11650,6 +11650,56 @@ class JIT {
         return $this->context->builder->load($slot);
     }
 
+    /**
+     * True when the current call returns a freshly allocated `__string__*` the caller owns
+     * (str_repeat / NestedJIT StrRepeat helper / user `: string` returns). Borrowed
+     * `__string__*` results must stay KIND_VALUE so freeDeadVariables is a no-op (#36388).
+     */
+    private function callResultOwnsFreshString(): bool
+    {
+        $toCall = $this->context->scope->toCall;
+        if ($toCall instanceof CoreFunc\Internal) {
+            return $this->isOwningStringInternalName($toCall->getName());
+        }
+        if ($toCall instanceof JIT\Call\Native) {
+            $name = strtolower($toCall->name);
+            if ($this->isOwningStringInternalName($name)) {
+                return true;
+            }
+            if (str_contains($name, 'strrepeat')) {
+                return true;
+            }
+            // User / NestedJIT PHP with declared string return — ZEND_RETURN transfers ownership.
+            $ret = $this->context->functionReturnType[$name] ?? null;
+            if ('__string__*' !== $ret) {
+                return false;
+            }
+            // Builtin/reflection proxies also advertise __string__*; only treat names that
+            // were compiled as user funcs (present in functionReturnType from analyzeFunc).
+            // Heuristic: exclude dotted LLVM mangles and Reflection* / known runtime helpers.
+            if (str_contains($name, 'reflection') || str_starts_with($name, '__')) {
+                return false;
+            }
+            if (str_contains($name, '.') && !str_contains($name, '\\')) {
+                return false;
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private function isOwningStringInternalName(string $name): bool
+    {
+        static $owning = [
+            'str_repeat' => true,
+            'str_pad' => true,
+        ];
+
+        return isset($owning[strtolower($name)]);
+    }
+
     private function assignCallResultOperand(Operand $result, PHPLLVM\Value $llvmResult, bool $returnsByRef): void
     {
         if ('void' === $this->context->getStringFromType($llvmResult->typeOf())) {
@@ -11770,6 +11820,37 @@ class JIT {
                         $i1Slot
                     )
                 );
+
+                return;
+            }
+            // Owning `__string__*` from known allocators / typed :string returns only.
+            // Promoting every `__string__*` call (borrowed getters, shared returns) made
+            // freeDeadVariables delref live strings — MiniWebApp SIGSEGV (#36388).
+            // php-src: Zend/zend_execute.c ZEND_ASSIGN of IS_STRING return values.
+            if ('__string__*' === $llvmTy && $this->callResultOwnsFreshString()) {
+                if ($this->context->hasVariableOp($result)) {
+                    $this->context->getVariableFromOp($result)->free();
+                }
+                $strSlot = JIT\BasicBlockHelper::entryAlloca(
+                    $this->context,
+                    $this->context->getTypeFromString('__string__*')
+                );
+                $this->context->builder->store($llvmResult, $strSlot);
+                $strVar = new Variable(
+                    $this->context,
+                    Variable::TYPE_STRING,
+                    Variable::KIND_VARIABLE,
+                    $strSlot
+                );
+                // Unnamed FUNCCALL result temps must still delref on freeDeadVariables /
+                // ASSIGN move — mark ephemeral so Variable::free() always delrefs (#36388).
+                $strVar->ephemeralStringTemp = true;
+                $this->context->setVariableOp($result, $strVar);
+                $name = JIT\OperandName::resolve($result);
+                if (null !== $name && '' !== $name) {
+                    $resolved = $this->context->resolveRefAliasName($name);
+                    $this->context->bindVariableByName($resolved, $strVar);
+                }
 
                 return;
             }
