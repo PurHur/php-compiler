@@ -224,6 +224,12 @@ final class NoThrowCallElision
         if (!isset($callArgs[0]) || !$callArgs[0] instanceof Variable) {
             return false;
         }
+        if (self::isPureCtypeBuiltin($name)) {
+            // php-src ext/ctype/ctype.c — string args only inspect bytes; int/null
+            // deprecate but never leave user throw-pending; object/value-box may
+            // __toString (peer strlen / string transforms).
+            return self::stringParamBuiltinArgCannotThrow($callArgs[0]);
+        }
         if ('strlen' === $name || 'ord' === $name || self::isPureStringTransformBuiltin($name)) {
             // Z_PARAM_STR family — __toString only on object / value-box.
             // trim/ltrim/rtrim optional $characters must also be throw-free.
@@ -305,6 +311,33 @@ final class NoThrowCallElision
             case 'is_nan':
             // basic_functions.c gettype — type-tag → string label only (peer is_*).
             case 'gettype':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * php-src {@code ext/ctype/ctype.c} classifiers — byte-class checks on an
+     * already-string value (no user handlers). Public for
+     * {@see DiscardedPureCallElision}: discarded statements on typed / literal
+     * strings are side-effect-free (#36386). Int / null args still deprecate
+     * (ctype_fallback) and must stay live when discarded.
+     */
+    public static function isPureCtypeBuiltin(string $nameLc): bool
+    {
+        switch ($nameLc) {
+            case 'ctype_alnum':
+            case 'ctype_alpha':
+            case 'ctype_cntrl':
+            case 'ctype_digit':
+            case 'ctype_graph':
+            case 'ctype_lower':
+            case 'ctype_print':
+            case 'ctype_punct':
+            case 'ctype_space':
+            case 'ctype_upper':
+            case 'ctype_xdigit':
                 return true;
             default:
                 return false;

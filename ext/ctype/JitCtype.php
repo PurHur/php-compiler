@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\ctype;
 
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin\CtypeRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -14,7 +13,12 @@ use PHPCompiler\VM\ErrorReporter;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM JIT helper for ctype_* (php-src ext/ctype/ctype.c; #7253, #9234, #19717, #20611). */
+/**
+ * LLVM JIT helper for ctype_* (php-src ext/ctype/ctype.c; #7253, #9234, #19717, #20611, #36386).
+ *
+ * Typed string / native-long paths use call-site {@see CtypeCheckLlvm} (NestedJIT
+ * {@see CtypeJitHelper} ABI is {@code __string__*}-declared / {@code __value__*}-bodied).
+ */
 final class JitCtype
 {
     public static function invoke(Context $context, JITVariable $arg, string $function): Value
@@ -48,45 +52,24 @@ final class JitCtype
             );
         }
 
-        CtypeRuntime::ensureLinked($context);
-        $i8 = $context->getTypeFromString('int8');
-        $i32 = $context->getTypeFromString('int32');
-        $zero = $i32->constInt(0, false);
-        $kindConst = $i8->constInt($spec['kind'], false);
-        $allowDigits = $i8->constInt($spec['allow_digits'] ? 1 : 0, false);
-        $allowMinus = $i8->constInt($spec['allow_minus'] ? 1 : 0, false);
-
         if (JITVariable::TYPE_STRING === $arg->type) {
-            $result = $context->builder->call(
-                $context->lookupFunction('__phpc_ctype_check_string'),
-                $arg->value,
-                $kindConst
-            );
+            $strPtr = JitStringArg::stringPtrFromVariable($context, $arg);
 
-            return $context->builder->icmp(Builder::INT_NE, $result, $zero);
+            return CtypeCheckLlvm::checkString($context, $strPtr, $spec['kind']);
         }
         if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
             self::emitFallbackDeprecation($context, $function, 'int');
-            $result = $context->builder->call(
-                $context->lookupFunction('__phpc_ctype_check_long'),
-                $arg->value,
-                $kindConst,
-                $allowDigits,
-                $allowMinus
-            );
 
-            return $context->builder->icmp(Builder::INT_NE, $result, $zero);
+            return CtypeCheckLlvm::checkInt(
+                $context,
+                $context->helper->loadValue($arg),
+                $spec['kind'],
+                $spec['allow_digits'],
+                $spec['allow_minus']
+            );
         }
         if (JITVariable::TYPE_VALUE === $arg->type) {
-            return self::lowerFromValue(
-                $context,
-                $arg,
-                $function,
-                $kindConst,
-                $allowDigits,
-                $allowMinus,
-                $zero
-            );
+            return self::lowerFromValue($context, $arg, $function, $spec);
         }
 
         self::emitFallbackDeprecation($context, $function, 'mixed');
@@ -122,14 +105,14 @@ final class JitCtype
         return $context->getTypeFromString('int1')->constInt($value ? 1 : 0, false);
     }
 
+    /**
+     * @param array{kind: int, allow_digits: bool, allow_minus: bool} $spec
+     */
     private static function lowerFromValue(
         Context $context,
         JITVariable $arg,
         string $function,
-        Value $kindConst,
-        Value $allowDigits,
-        Value $allowMinus,
-        Value $zero
+        array $spec
     ): Value {
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
         $map = $context->structFieldMap['__value__'];
@@ -137,7 +120,7 @@ final class JitCtype
             $context->builder->structGep($valuePtr, $map['type'])
         );
         $i8 = $context->getTypeFromString('int8');
-        $i32 = $context->getTypeFromString('int32');
+        $i1 = $context->getTypeFromString('int1');
 
         $stringBlock = BasicBlockHelper::append($context, 'ctype_value_string');
         $longBlock = BasicBlockHelper::append($context, 'ctype_value_long');
@@ -159,11 +142,7 @@ final class JitCtype
 
         $context->builder->positionAtEnd($stringBlock);
         $strPtr = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
-        $stringResult = $context->builder->call(
-            $context->lookupFunction('__phpc_ctype_check_string'),
-            $strPtr,
-            $kindConst
-        );
+        $stringResult = CtypeCheckLlvm::checkString($context, $strPtr, $spec['kind']);
         $stringEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
@@ -181,12 +160,12 @@ final class JitCtype
         $context->builder->positionAtEnd($longBlock);
         self::emitFallbackDeprecation($context, $function, 'int');
         $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr);
-        $longResult = $context->builder->call(
-            $context->lookupFunction('__phpc_ctype_check_long'),
+        $longResult = CtypeCheckLlvm::checkInt(
+            $context,
             $longVal,
-            $kindConst,
-            $allowDigits,
-            $allowMinus
+            $spec['kind'],
+            $spec['allow_digits'],
+            $spec['allow_minus']
         );
         $longEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
@@ -203,24 +182,22 @@ final class JitCtype
         );
 
         $context->builder->positionAtEnd($nullBlock);
-        // mixed $text — ctype_fallback for null (never TypeError; #20611 / #19717).
         self::emitFallbackDeprecation($context, $function, 'null');
         $nullEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($falseBlock);
-        // Non-string/non-int fallback (bool/float/object/array/…) — php-src ctype_fallback (#19717).
         self::emitFallbackDeprecation($context, $function, 'mixed');
         $falseEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
-        $phi = $context->builder->phi($i32, 'ctype_value_result');
+        $phi = $context->builder->phi($i1, 'ctype_value_result');
         $phi->addIncoming($stringResult, $stringEnd);
         $phi->addIncoming($longResult, $longEnd);
-        $phi->addIncoming($zero, $nullEnd);
-        $phi->addIncoming($zero, $falseEnd);
+        $phi->addIncoming($i1->constInt(0, false), $nullEnd);
+        $phi->addIncoming($i1->constInt(0, false), $falseEnd);
 
-        return $context->builder->icmp(Builder::INT_NE, $phi, $zero);
+        return $phi;
     }
 }

@@ -47,7 +47,6 @@ final class TypeStringImplementLazyQuotemetaCtypeSodiumRuntimeShrinkTest extends
     {
         $checks = [
             'ext/standard/quotemeta.php' => 'StringQuotemeta::ensureLinked',
-            'ext/ctype/JitCtype.php' => 'CtypeRuntime::ensureLinked',
             'ext/sodium/JitSodium.php' => 'StringSodium::ensureLinked',
         ];
         foreach ($checks as $rel => $needle) {
@@ -56,6 +55,11 @@ final class TypeStringImplementLazyQuotemetaCtypeSodiumRuntimeShrinkTest extends
             $file = (string) file_get_contents($path);
             $this->assertStringContainsString($needle, $file, $rel.' must link before use (#35609)');
         }
+        // ctype_* uses call-site CtypeCheckLlvm (avoids NestedJIT ABI trap, #36386) —
+        // no CtypeRuntime::ensureLinked at the JitCtype call site.
+        $ctype = (string) file_get_contents(__DIR__.'/../../ext/ctype/JitCtype.php');
+        $this->assertStringContainsString('CtypeCheckLlvm::checkString', $ctype);
+        $this->assertStringNotContainsString('CtypeRuntime::ensureLinked', $ctype);
     }
 
     public function testNoNewRuntimeCForLazyQuotemetaCtypeSodiumAbis(): void

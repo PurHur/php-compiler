@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -12,6 +13,9 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * JIT/AOT link for __phpc_ctype_* via CtypeJitHelper + VmCtype PHP (#9234, #9496, #22626).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer MathFrexp #22575).
+ * Call-site {@see ensureLinked} restores the caller insert block after bridge emit
+ * (peer #26884). Typed string/long paths prefer {@see \PHPCompiler\ext\ctype\CtypeCheckLlvm}
+ * (#36386 NestedJIT ABI trap).
  * php-src: ext/ctype/ctype.c
  */
 final class CtypeRuntime
@@ -48,11 +52,18 @@ final class CtypeRuntime
             return;
         }
 
+        // Preserve caller insert block — clearInsertionPosition alone orphans mid-emit
+        // (ctype_* on typed string formals: i1 <badref>, #36386 / peer #26884).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureJitHelperCompiled($context);
         self::implementStringBridge($context);
         self::implementLongBridge($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function ensureJitHelperCompiled(Context $context): void

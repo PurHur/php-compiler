@@ -18,11 +18,13 @@ final class CtypeJitRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmCtype::checkInt', $source);
     }
 
-    public function testJitCtypeRoutesThroughCtypeRuntime(): void
+    public function testJitCtypeRoutesThroughCtypeCheckLlvm(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../ext/ctype/JitCtype.php');
-        $this->assertStringContainsString('CtypeRuntime::ensureLinked', $source);
-        $this->assertStringNotContainsString('CtypeJit', $source);
+        $this->assertStringContainsString('CtypeCheckLlvm::checkString', $source);
+        $this->assertStringContainsString('CtypeCheckLlvm::checkInt', $source);
+        // NestedJIT helper ABI is __string__*-declared / __value__*-bodied (#36386).
+        $this->assertStringNotContainsString('CtypeRuntime::ensureLinked', $source);
     }
 
     public function testCtypeRuntimeRoutesThroughCtypeJitHelper(): void
