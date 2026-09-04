@@ -26,7 +26,8 @@ if ! { [[ -f /.dockerenv ]] && [[ -f /opt/llvm9/libLLVM-9.so.1 ]]; } \
 fi
 
 if ! command -v valgrind >/dev/null 2>&1; then
-  echo "runtime-assert-valgrind-smoke: valgrind not installed — skip (exit 0)"
+  # Marker for streak.sh: skip ≠ pass — must not append valgrind_ok_days (#36397).
+  echo "runtime-assert-valgrind-smoke: SKIP_NO_VALGRIND — valgrind not installed (exit 0 for CI; streak refuses this day)"
   exit 0
 fi
 
@@ -54,15 +55,19 @@ ALL_CASES=(
 
 if [[ "${RUNTIME_ASSERT_VALGRIND_FULL:-0}" == "1" ]]; then
   CASES=("${ALL_CASES[@]}")
+  expect_n=8
+  mode="full"
 else
   CASES=("${ALL_CASES[0]}")
+  expect_n=1
+  mode="echo"
 fi
 
 pass=0
 fail=0
 failed_names=()
 
-echo "runtime-assert-valgrind-smoke: ${#CASES[@]} case(s)…"
+echo "runtime-assert-valgrind-smoke: ${#CASES[@]} case(s) mode=${mode}…"
 
 for entry in "${CASES[@]}"; do
     name="${entry%%@@@*}"
@@ -97,9 +102,13 @@ for entry in "${CASES[@]}"; do
 done
 
 echo
-echo "runtime-assert-valgrind-smoke: ${pass} passed, ${fail} failed"
+echo "runtime-assert-valgrind-smoke: ${pass} passed, ${fail} failed (mode=${mode})"
 if [[ "$fail" -ne 0 ]]; then
   echo "FAILED: ${failed_names[*]}" >&2
   exit 1
 fi
-echo "runtime-assert-valgrind-smoke: OK (${pass}/${#CASES[@]})"
+if [[ "$pass" -ne "$expect_n" ]]; then
+  echo "runtime-assert-valgrind-smoke: FAIL — expected ${expect_n} case(s), got ${pass}" >&2
+  exit 1
+fi
+echo "runtime-assert-valgrind-smoke: OK (${pass}/${expect_n}; mode=${mode})"
