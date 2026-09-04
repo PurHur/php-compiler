@@ -26,6 +26,18 @@ final class ExtAndMegaHubSpineChunkEmit36387Test extends TestCase
             ['ext/bcmath/VmBcmath.php'],
             // Top-level VM.php — OOM without demote; emits after.
             ['lib/VM.php'],
+            // Builtin*/OpCode/Func hubs — NestedJIT SEGV without demote (#36387).
+            ['lib/BuiltinParamNames.php'],
+            ['lib/BuiltinInternalArgInfo.php'],
+            ['lib/OpCode.php'],
+            ['lib/ModuleAbstract.php'],
+            ['lib/Frame.php'],
+            ['lib/Func/Internal.php'],
+            ['lib/Func/PHP.php'],
+            ['lib/Cfg/OpSubBlockAccess.php'],
+            ['lib/Lint/Linter.php'],
+            ['lib/Visitor/VoidCastResolver.php'],
+            ['lib/Config.php'],
         ];
     }
 
