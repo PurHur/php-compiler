@@ -877,6 +877,30 @@ final class VmPregEngine
             $this->abortCompile(); return new VmPregAstEmptyNode();
         }
         $ch = $this->peek();
+        // PCRE2: `\1`–`\9` are always backreferences; `\10`+ is a backref when that many
+        // capturing groups have already opened, otherwise an octal escape (pcre2pattern).
+        // Previously every `\d` was treated as octal, so `\1` became chr(1) and Parsedown
+        // inlineCode / emphasis backrefs never matched (#36380).
+        if ($ch >= '1' && $ch <= '9') {
+            $numStr = '';
+            while (!$this->atEnd()) {
+                $digit = $this->peek();
+                if ($digit < '0' || $digit > '9') {
+                    break;
+                }
+                $candidate = $numStr . $digit;
+                $n = (int) $candidate;
+                // Single-digit 1–9 always OK; multi-digit only while ≤ groups opened so far.
+                if ($n <= 9 || $n < $this->nextGroup) {
+                    $numStr = $candidate;
+                    $this->advance(1);
+                    continue;
+                }
+                break;
+            }
+
+            return new VmPregAstBackrefNode((int) $numStr, $this->caseless);
+        }
         if ($ch >= '0' && $ch <= '7') {
             $octal = '';
             for ($i = 0; $i < 3 && !$this->atEnd(); ++$i) {
@@ -907,6 +931,21 @@ final class VmPregEngine
             return $this->parseUnicodePropertyEscape('P' === $ch);
         }
         $this->advance(1);
+        // Common character escapes (pcre2pattern) — `\n` must be LF, not literal `n`
+        // (Parsedown inlineCode `preg_replace('/[ ]*+\n/', ' ', …)` #36380).
+        $ctrl = match ($ch) {
+            'n' => "\n",
+            'r' => "\r",
+            't' => "\t",
+            'f' => "\f",
+            'v' => "\v",
+            'e' => "\x1B",
+            'a' => "\x07",
+            default => null,
+        };
+        if (null !== $ctrl) {
+            return new VmPregAstCharNode($ctrl, $this->caseless);
+        }
         if ($this->utf) {
             // PCRE2_UTF|PCRE2_UCP: \w/\d/\s use Unicode properties (#22003).
             return match ($ch) {
@@ -2242,6 +2281,63 @@ final class VmPregAstGroupNode implements VmPregAstNode
         $end = $captures[0][1] ?? $pos;
         $captures[$this->index] = [$start, $end];
         $captures[0] = [$engine->matchStartPos(), $end];
+
+        return true;
+    }
+}
+
+/**
+ * PCRE numeric backreference `\1`…`\n` — replay captured text at the current position
+ * (ext/pcre/php_pcre.c / pcre2pattern; #36380 Parsedown code_span).
+ */
+final class VmPregAstBackrefNode implements VmPregAstNode
+{
+    public function __construct(
+        private readonly int $index,
+        private readonly bool $caseless
+    ) {
+    }
+
+    public function groupIndex(): int
+    {
+        return $this->index;
+    }
+
+    public function match(
+        VmPregEngine $engine,
+        string $subject,
+        int $pos,
+        int $len,
+        array &$captures
+    ): bool {
+        unset($engine);
+        if (!isset($captures[$this->index])) {
+            return false;
+        }
+        [$start, $end] = $captures[$this->index];
+        if ($end < $start) {
+            return false;
+        }
+        $wantLen = $end - $start;
+        if (0 === $wantLen) {
+            // Empty capture matches empty string (zero-width).
+            $captures[0] = [$pos, $pos];
+
+            return true;
+        }
+        if ($pos + $wantLen > $len) {
+            return false;
+        }
+        $want = \substr($subject, $start, $wantLen);
+        $got = \substr($subject, $pos, $wantLen);
+        if ($this->caseless) {
+            if (\strtolower($got) !== \strtolower($want)) {
+                return false;
+            }
+        } elseif ($got !== $want) {
+            return false;
+        }
+        $captures[0] = [$pos, $pos + $wantLen];
 
         return true;
     }

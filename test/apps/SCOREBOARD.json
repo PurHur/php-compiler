@@ -1,5 +1,5 @@
 {
-    "generated_at": "2026-09-04T15:29:01Z",
+    "generated_at": "2026-09-04T16:28:38Z",
     "issue": 36380,
     "packages": [
         {
@@ -21,7 +21,7 @@
                 "fail": 0,
                 "skip": 0,
                 "rc": 255,
-                "reason": "FAIL_block-level_html_FAIL_code_block_FAIL_code_span_PHP_Fatal_error:_Allowed_memory_size_of_3221225472_bytes_exhausted_(tried_to_allocate_4096_bytes)_in_/compiler/lib/VM/HashTable.php_on_line_2691"
+                "reason": "FAIL_block-level_html_FAIL_code_block_PHP_Fatal_error:_Allowed_memory_size_of_1610612736_bytes_exhausted_(tried_to_allocate_8192_bytes)_in_/compiler/lib/VM/HashTable.php_on_line_2691"
             },
             "aot": {
                 "status": "block",
@@ -33,7 +33,7 @@
             },
             "aot_pass_rate": 0,
             "blockers": [
-                "vm: FAIL_block-level_html_FAIL_code_block_FAIL_code_span_PHP_Fatal_error:_Allowed_memory_size_of_3221225472_bytes_exhausted_(tried_to_allocate_4096_bytes)_in_/compiler/lib/VM/HashTable.php_on_line_2691",
+                "vm: FAIL_block-level_html_FAIL_code_block_PHP_Fatal_error:_Allowed_memory_size_of_1610612736_bytes_exhausted_(tried_to_allocate_8192_bytes)_in_/compiler/lib/VM/HashTable.php_on_line_2691",
                 "aot: phpc_build:_helper-runtime_cache_hit_(17_helpers,_core=1b996aa5c644fbf7d3a2)_(#15889)"
             ],
             "raw_rc": 0
