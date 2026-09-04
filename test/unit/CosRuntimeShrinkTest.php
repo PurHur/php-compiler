@@ -9,20 +9,24 @@ use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
 /**
- * cos() NestedJIT via JitVmHelperLink::ensureBridge (#28042 / peer MathSin #28016).
+ * cos() AOT uses llvm.cos.f64 (#36386); CosJitHelper remains NestedJIT-safe
+ * reference (peer MathSin / SinJitHelper).
+ *
+ * php-src: ext/standard/math.c PHP_FUNCTION(cos).
  */
 final class CosRuntimeShrinkTest extends TestCase
 {
-    public function testCosUsesJitHelperNotKernel(): void
+    public function testCosUsesLlvmIntrinsicNotHelperBridge(): void
     {
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/cos.php');
         $this->assertStringContainsString('MathCos::invoke', $builtin);
         $this->assertStringNotContainsString("lookupFunction('cos')", $builtin);
 
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathCos.php');
-        $this->assertStringContainsString('CosJitHelper', $bridge);
+        $this->assertStringContainsString('llvm.cos.f64', $bridge);
         $this->assertStringContainsString('phpc_cos', $bridge);
-        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('CosJitHelper', $bridge);
         $this->assertStringNotContainsString('JitCosKernel', $bridge);
         $this->assertStringNotContainsString('NestedJitCompileScope', $bridge);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);

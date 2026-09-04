@@ -4,35 +4,32 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for sin() via SinJitHelper PHP (#15086, #27048, #28016).
+ * JIT/AOT link for sin() via {@code llvm.sin.f64} (#36386).
  *
- * Helper compile: {@see JitVmHelperLink::ensureBridge} (MathHypot #27909 / MathSqrt #27888 shape).
- * NestedJIT no longer needs a libc sin(3) kernel — helper uses NestedJIT-safe Cody–Waite + polynomial.
- * php-src: ext/standard/math.c — PHP_FUNCTION(sin)
+ * Peer of {@see MathSqrt} / {@see MathFloor}: avoid NestedJIT helper objects on
+ * the AOT hot path. php-src {@code ext/standard/math.c} {@code PHP_FUNCTION(sin)}
+ * → C {@code sin}; the LLVM intrinsic matches IEEE libm behaviour.
+ * The PHP Cody–Waite helper remains for NestedJIT-safe reference only.
  */
 final class MathSin
 {
+    private const LLVM_SIN = 'llvm.sin.f64';
+
+    /** Legacy ABI kept as a thin intrinsic wrapper for any external callers. */
     private const ABI_SIN = 'phpc_sin';
 
-    private const HELPER_PATH = '/ext/standard/SinJitHelper.php';
-
-    private const SIN_HELPER = 'PHPCompiler\\ext\\standard\\SinJitHelper::sinArgv';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::SIN_HELPER,
-    ];
-
-    private const BRIDGE_ENTRY = 'sin_bridge_entry';
+    private const BRIDGE_ENTRY = 'sin_llvm_f64_entry';
 
     public static function ensureLinked(Context $context): void
     {
-        self::implement($context);
+        self::llvmSinIntrinsic($context);
+        self::ensurePhpcSinBridge($context);
     }
 
     public static function ensureStandaloneBodies(Context $context): void
@@ -42,34 +39,56 @@ final class MathSin
 
     public static function invoke(Context $context, Value $num): Value
     {
-        self::ensureLinked($context);
+        return $context->builder->call(self::llvmSinIntrinsic($context), $num);
+    }
 
-        return $context->builder->call(
-            $context->lookupFunction(self::ABI_SIN),
-            $num
+    private static function llvmSinIntrinsic(Context $context): LlvmFunction
+    {
+        $func = $context->module->getNamedFunction(self::LLVM_SIN);
+        if (null !== $func) {
+            return $func;
+        }
+        $double = $context->getTypeFromString('double');
+
+        return $context->module->addFunction(
+            self::LLVM_SIN,
+            $context->context->functionType($double, false, $double)
         );
     }
 
-    private static function implement(Context $context): void
+    /**
+     * Define {@code phpc_sin} → {@code llvm.sin.f64} when missing. Skip if a
+     * prior NestedJIT bridge already filled the symbol (cannot replace LLVM
+     * bodies); {@see invoke} never calls that stale path.
+     */
+    private static function ensurePhpcSinBridge(Context $context): void
     {
         $probe = $context->module->getNamedFunction(self::ABI_SIN);
-        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction(self::ABI_SIN, $probe);
 
             return;
         }
 
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         $double = $context->getTypeFromString('double');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_SIN,
-            self::BRIDGE_ENTRY,
-            [$double],
-            $double,
-            self::SIN_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#28016'
+        $fn = $probe;
+        if (null === $fn) {
+            $fn = $context->module->addFunction(
+                self::ABI_SIN,
+                $context->context->functionType($double, false, $double)
+            );
+        }
+        $entry = $fn->appendBasicBlock(self::BRIDGE_ENTRY);
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue(
+            $context->builder->call(self::llvmSinIntrinsic($context), $fn->getParam(0))
         );
+        $context->registerFunction(self::ABI_SIN, $fn);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 }

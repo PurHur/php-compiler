@@ -9,20 +9,24 @@ use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
 /**
- * sin() NestedJIT via JitVmHelperLink::ensureBridge (#28016 / peer MathHypot #27909).
+ * sin() AOT uses llvm.sin.f64 (#36386); SinJitHelper remains NestedJIT-safe
+ * reference (peer MathFloor / FloorJitHelper).
+ *
+ * php-src: ext/standard/math.c PHP_FUNCTION(sin).
  */
 final class SinRuntimeShrinkTest extends TestCase
 {
-    public function testSinUsesJitHelperNotKernel(): void
+    public function testSinUsesLlvmIntrinsicNotHelperBridge(): void
     {
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/sin.php');
         $this->assertStringContainsString('MathSin::invoke', $builtin);
         $this->assertStringNotContainsString("lookupFunction('sin')", $builtin);
 
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathSin.php');
-        $this->assertStringContainsString('SinJitHelper', $bridge);
+        $this->assertStringContainsString('llvm.sin.f64', $bridge);
         $this->assertStringContainsString('phpc_sin', $bridge);
-        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('SinJitHelper', $bridge);
         $this->assertStringNotContainsString('JitSinKernel', $bridge);
         $this->assertStringNotContainsString('NestedJitCompileScope', $bridge);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
