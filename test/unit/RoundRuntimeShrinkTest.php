@@ -10,19 +10,25 @@ use PHPCompiler\ext\standard\VmRound;
 use PHPUnit\Framework\TestCase;
 
 /**
- * round() NestedJIT via JitVmHelperLink::ensureBridge (#28913 / peer Floor #27650).
+ * round() places=0 HALF_UP AOT uses llvm.round.f64 (#36386);
+ * RoundJitHelper remains for other modes/places (peer MathFloor / FloorJitHelper).
+ *
+ * php-src: ext/standard/math.c _php_math_round / PHP_FUNCTION(round).
  */
 final class RoundRuntimeShrinkTest extends TestCase
 {
-    public function testRoundUsesJitHelperNotLoweringMonolith(): void
+    public function testRoundHalfUpPlacesZeroUsesLlvmIntrinsic(): void
     {
         $jitRound = (string) file_get_contents(__DIR__.'/../../ext/standard/JitRound.php');
+        $this->assertStringContainsString('MathRound::invokeHalfUpPlacesZero', $jitRound);
         $this->assertStringContainsString('MathRound::invoke', $jitRound);
         $this->assertStringContainsString('tryFoldCompileTime', $jitRound);
         $this->assertStringContainsString('RoundingModeJit::compileTimeRoundMode', $jitRound);
         $this->assertStringNotContainsString('JitRoundLowering', $jitRound);
 
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathRound.php');
+        $this->assertStringContainsString('llvm.round.f64', $bridge);
+        $this->assertStringContainsString('invokeHalfUpPlacesZero', $bridge);
         $this->assertStringContainsString('RoundJitHelper', $bridge);
         $this->assertStringContainsString('phpc_round', $bridge);
         $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
@@ -32,7 +38,7 @@ final class RoundRuntimeShrinkTest extends TestCase
         $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitRoundLowering.php');
     }
 
-    public function testRoundJitHelperDelegatesToVmRound(): void
+    public function testRoundJitHelperKeepsNestedJitSafeAlgorithm(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/RoundJitHelper.php');
         $this->assertStringContainsString('roundPlacesZero', $source);
@@ -40,6 +46,7 @@ final class RoundRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('1.0e+308', $source);
         $this->assertStringContainsString('26800', $source);
         $this->assertStringContainsString('27248', $source);
+        $this->assertStringContainsString('invokeHalfUpPlacesZero', $source);
         $this->assertEqualsWithDelta(
             3.14159,
             RoundJitHelper::roundArgv(3.1415926535898, 5, StdlibConstants::PHP_ROUND_HALF_UP),
