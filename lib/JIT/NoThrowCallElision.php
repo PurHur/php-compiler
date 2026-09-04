@@ -342,6 +342,12 @@ final class NoThrowCallElision
             // TypeErrors stay out.
             return self::objectIntrospectArgsCannotThrow($callArgs);
         }
+        if (self::isPureIsAFamilyBuiltin($name)) {
+            // is_a / is_subclass_of — typed object + string class; string
+            // subjects stay out (autoload when allow_string). Soft-null
+            // class / allow_string deprecate.
+            return self::isAFamilyArgsCannotThrow($callArgs);
+        }
         if (self::isPureVersionCompareBuiltin($name)) {
             // versioning.c — typed strings; optional operator must be proven valid.
             return self::versionCompareArgsCannotThrow($callArgs);
@@ -1047,6 +1053,18 @@ final class NoThrowCallElision
     }
 
     /**
+     * php-src {@code Zend/zend_builtin_functions.c} {@code is_a}/
+     * {@code is_subclass_of} — typed object subject + Z_PARAM_STR class (+
+     * optional Z_PARAM_BOOL allow_string). Object subjects never autoload;
+     * string subjects stay out. Public for {@see DiscardedPureCallElision}
+     * (#36386).
+     */
+    public static function isPureIsAFamilyBuiltin(string $nameLc): bool
+    {
+        return 'is_a' === $nameLc || 'is_subclass_of' === $nameLc;
+    }
+
+    /**
      * php-src {@code ext/standard/versioning.c} {@code version_compare}. Public
      * for {@see DiscardedPureCallElision} (#36386).
      */
@@ -1369,6 +1387,54 @@ final class NoThrowCallElision
         }
 
         return Variable::TYPE_OBJECT === $callArgs[0]->type;
+    }
+
+    /**
+     * Typed object + typed / literal class string + optional non-null bool-ish
+     * {@code $allow_string}. Soft-null class / allow_string deprecate; string /
+     * value-box subjects stay out (autoload / handlers).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    public static function isAFamilyArgsCannotThrow(array $callArgs): bool
+    {
+        if (
+            !isset($callArgs[0], $callArgs[1])
+            || !$callArgs[0] instanceof Variable
+            || !$callArgs[1] instanceof Variable
+            || Variable::TYPE_OBJECT !== $callArgs[0]->type
+        ) {
+            return false;
+        }
+        // Z_PARAM_STR class — soft-null deprecates (#29817); require typed /
+        // literal string (not int/bool/null soft-coercion).
+        $class = $callArgs[1];
+        if ($class->isNullConstant || Variable::TYPE_NULL === $class->type) {
+            return false;
+        }
+        if (
+            null === JitStringArg::compileTimeLiteral($class)
+            && Variable::TYPE_STRING !== $class->type
+        ) {
+            return false;
+        }
+        if (!isset($callArgs[2])) {
+            return !isset($callArgs[3]);
+        }
+        if (!$callArgs[2] instanceof Variable || isset($callArgs[3])) {
+            return false;
+        }
+        // Z_PARAM_BOOL — soft-null deprecates (#31339); objects/value-box may
+        // __toString / handlers. Typed bool / long / compile-time 0|1 only.
+        $allow = $callArgs[2];
+        if ($allow->isNullConstant || Variable::TYPE_NULL === $allow->type) {
+            return false;
+        }
+        if (Variable::TYPE_NATIVE_BOOL === $allow->type || Variable::TYPE_NATIVE_LONG === $allow->type) {
+            return true;
+        }
+
+        return null !== $allow->compileTimeLong;
     }
 
     /**

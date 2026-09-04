@@ -55,6 +55,8 @@ use PHPCompiler\ext\standard\inet_ntop;
 use PHPCompiler\ext\standard\inet_pton;
 use PHPCompiler\ext\standard\interface_exists_;
 use PHPCompiler\ext\standard\ip2long;
+use PHPCompiler\ext\standard\is_a_;
+use PHPCompiler\ext\standard\is_subclass_of_;
 use PHPCompiler\ext\standard\levenshtein;
 use PHPCompiler\ext\standard\long2ip;
 use PHPCompiler\ext\standard\method_exists_;
@@ -2125,6 +2127,83 @@ final class DiscardedPureCallElisionTest extends TestCase
             $context,
             new get_class_(),
             [$obj, $str]
+        ));
+    }
+
+    public function testDiscardedIsAFamilyElidesOnTypedObject(): void
+    {
+        // php-src zend_builtin_functions.c — typed object subject; string subjects
+        // autoload when allow_string (#36386).
+        $context = $this->makeContext();
+        $obj = $this->makeObjectVar();
+        $str = $this->makeStringVar('stdClass');
+        $bool = $this->makeNativeBoolVar();
+        $long = $this->makeNativeLongVar();
+        $null = $this->makeNullVar();
+        $box = $this->makeValueBoxVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new is_a_(),
+            [$obj, $str]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new is_subclass_of_(),
+            [$obj, $str]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new is_a_(),
+            [$obj, $str, $bool]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new is_subclass_of_(),
+            [$obj, $str, $long]
+        ));
+
+        // String / soft-null / value-box subjects stay live; soft-null class /
+        // allow_string stay live (deprecate / autoload).
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new is_a_(),
+            [$str, $str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new is_subclass_of_(),
+            [$str, $str, $bool]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new is_a_(),
+            [$null, $str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new is_a_(),
+            [$box, $str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new is_a_(),
+            [$obj, $null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new is_a_(),
+            [$obj, $str, $null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new is_a_(),
+            [$obj, $str, $box]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new is_a_(),
+            [$obj]
         ));
     }
 
