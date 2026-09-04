@@ -59,6 +59,9 @@ step "generate-configuration-docs --check" "$PHP_BIN" script/generate-configurat
 # 11. Size budgets + ratchet — load-bearing file line ceilings (#36403)
 step "check-size-budgets" ./script/check-size-budgets.sh
 
+# 12. Real-world apps scoreboard ratchet (#36380) — empty list is not a pass
+step "apps-scoreboard --check" "$PHP_BIN" script/apps/scoreboard.php --check
+
 if [[ "$fail" -ne 0 ]]; then
   echo "check-generated-docs: drift detected — regenerate in the pinned env (see CONTRIBUTING 'Generated docs')" >&2
   exit 1

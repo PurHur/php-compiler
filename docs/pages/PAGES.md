@@ -10,6 +10,7 @@ Only **`docs/pages/`** is published. Contributor docs stay in the repo root `doc
 | **Status** (short) | https://purhur.github.io/php-compiler/development-status.html |
 | **Missing implementation** (gap tables) | https://purhur.github.io/php-compiler/docs/pages/missing-implementation.html |
 | **PHP capability comparison** | https://purhur.github.io/php-compiler/docs/pages/capability-comparison.html |
+| **Apps scoreboard** | https://purhur.github.io/php-compiler/docs/pages/apps.html |
 | **Repository** | https://github.com/PurHur/php-compiler |
 
 ## Site map
@@ -20,6 +21,7 @@ Only **`docs/pages/`** is published. Contributor docs stay in the repo root `doc
 | `development-status.md` | Short status narrative (Jekyll) |
 | `missing-implementation.html` | Tables of real open implementation gaps |
 | `capability-comparison.html` | PHP language/stdlib vs VM / JIT / AOT (generated) |
+| `apps.html` | Real-world OSS package scoreboard (generated from `test/apps/SCOREBOARD.json`, #36380) |
 | `css/style.css`, `js/main.js` | Theme |
 | `_layouts/status.html` | Jekyll layout for status markdown |
 

@@ -1,0 +1,113 @@
+{
+  "issue": 36380,
+  "packages": [
+    {
+      "slug": "erusev-parsedown",
+      "composer": "erusev/parsedown",
+      "repo": "https://github.com/erusev/parsedown",
+      "sha": "4e433a8d57078645b55d21fd12c887d3ba6ca01e",
+      "difficulty": 1,
+      "status": "ready",
+      "notes": "Markdown fixtures under test/data; blocked on runtime $obj->$name() (#34084 follow-up)"
+    },
+    {
+      "slug": "symfony-yaml",
+      "composer": "symfony/yaml",
+      "repo": "https://github.com/symfony/yaml",
+      "sha": null,
+      "difficulty": 2,
+      "status": "pending",
+      "notes": "Needs vendor pin + PHPUnit-free runner"
+    },
+    {
+      "slug": "brick-math",
+      "composer": "brick/math",
+      "repo": "https://github.com/brick/math",
+      "sha": null,
+      "difficulty": 3,
+      "status": "pending",
+      "notes": "Needs literal require graph or Composer project map (#36382)"
+    },
+    {
+      "slug": "ramsey-uuid",
+      "composer": "ramsey/uuid",
+      "repo": "https://github.com/ramsey/uuid",
+      "sha": null,
+      "difficulty": 4,
+      "status": "pending",
+      "notes": null
+    },
+    {
+      "slug": "league-commonmark",
+      "composer": "league/commonmark",
+      "repo": "https://github.com/thephpleague/commonmark",
+      "sha": null,
+      "difficulty": 5,
+      "status": "pending",
+      "notes": null
+    },
+    {
+      "slug": "monolog-monolog",
+      "composer": "monolog/monolog",
+      "repo": "https://github.com/Seldaek/monolog",
+      "sha": null,
+      "difficulty": 6,
+      "status": "pending",
+      "notes": null
+    },
+    {
+      "slug": "vlucas-phpdotenv",
+      "composer": "vlucas/phpdotenv",
+      "repo": "https://github.com/vlucas/phpdotenv",
+      "sha": null,
+      "difficulty": 7,
+      "status": "pending",
+      "notes": null
+    },
+    {
+      "slug": "nikic-php-parser",
+      "composer": "nikic/php-parser",
+      "repo": "https://github.com/nikic/PHP-Parser",
+      "sha": null,
+      "difficulty": 8,
+      "status": "pending",
+      "notes": "Already vendored for self-host; must also *run*"
+    },
+    {
+      "slug": "twig-twig",
+      "composer": "twig/twig",
+      "repo": "https://github.com/twigphp/Twig",
+      "sha": null,
+      "difficulty": 9,
+      "status": "pending",
+      "notes": null
+    },
+    {
+      "slug": "slim-slim",
+      "composer": "slim/slim",
+      "repo": "https://github.com/slimphp/Slim",
+      "sha": null,
+      "difficulty": 10,
+      "status": "pending",
+      "notes": "Pair with nyholm/psr7"
+    },
+    {
+      "slug": "phpunit-phpunit",
+      "composer": "phpunit/phpunit",
+      "repo": "https://github.com/sebastianbergmann/phpunit",
+      "sha": null,
+      "difficulty": 11,
+      "status": "pending",
+      "notes": "Running the runner under AOT unlocks the rest"
+    },
+    {
+      "slug": "illuminate-support",
+      "composer": "illuminate/support",
+      "repo": "https://github.com/illuminate/support",
+      "sha": null,
+      "difficulty": 12,
+      "status": "pending",
+      "notes": "Illuminate\\Support only"
+    }
+  ]
+}
