@@ -348,6 +348,12 @@ final class NoThrowCallElision
             // class / allow_string deprecate.
             return self::isAFamilyArgsCannotThrow($callArgs);
         }
+        if (self::isPureClassHierarchyBuiltin($name)) {
+            // class_parents / class_implements / class_uses — typed object
+            // subject only; string subjects stay out (autoload). Soft-null
+            // $autoload deprecates.
+            return self::classHierarchyArgsCannotThrow($callArgs);
+        }
         if (self::isPureVersionCompareBuiltin($name)) {
             // versioning.c — typed strings; optional operator must be proven valid.
             return self::versionCompareArgsCannotThrow($callArgs);
@@ -1065,6 +1071,25 @@ final class NoThrowCallElision
     }
 
     /**
+     * php-src {@code ext/standard/class.c} {@code class_parents},
+     * {@code basic_functions.c} {@code class_implements},
+     * {@code spl_functions.c} {@code class_uses} — typed object subject (+
+     * optional Z_PARAM_BOOL autoload). Object subjects never autoload; string
+     * subjects stay out. Public for {@see DiscardedPureCallElision} (#36386).
+     */
+    public static function isPureClassHierarchyBuiltin(string $nameLc): bool
+    {
+        switch ($nameLc) {
+            case 'class_parents':
+            case 'class_implements':
+            case 'class_uses':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
      * php-src {@code ext/standard/versioning.c} {@code version_compare}. Public
      * for {@see DiscardedPureCallElision} (#36386).
      */
@@ -1435,6 +1460,44 @@ final class NoThrowCallElision
         }
 
         return null !== $allow->compileTimeLong;
+    }
+
+    /**
+     * Typed object (+ optional non-null bool-ish {@code $autoload}). Soft-null
+     * autoload deprecates; string / value-box subjects stay out (autoload /
+     * handlers). Object subjects never autoload — the class is already loaded.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    public static function classHierarchyArgsCannotThrow(array $callArgs): bool
+    {
+        if (
+            !isset($callArgs[0])
+            || !$callArgs[0] instanceof Variable
+            || Variable::TYPE_OBJECT !== $callArgs[0]->type
+        ) {
+            return false;
+        }
+        if (!isset($callArgs[1])) {
+            return !isset($callArgs[2]);
+        }
+        if (!$callArgs[1] instanceof Variable || isset($callArgs[2])) {
+            return false;
+        }
+        // Z_PARAM_BOOL autoload — soft-null deprecates; objects/value-box may
+        // __toString / handlers. Typed bool / long / compile-time 0|1 only.
+        $autoload = $callArgs[1];
+        if ($autoload->isNullConstant || Variable::TYPE_NULL === $autoload->type) {
+            return false;
+        }
+        if (
+            Variable::TYPE_NATIVE_BOOL === $autoload->type
+            || Variable::TYPE_NATIVE_LONG === $autoload->type
+        ) {
+            return true;
+        }
+
+        return null !== $autoload->compileTimeLong;
     }
 
     /**

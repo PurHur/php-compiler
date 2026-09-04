@@ -39,6 +39,8 @@ use PHPCompiler\VM\Variable as VmVariable;
  * spl_object_hash (string get_parent_class / zero-arg stay live),
  * typed-object is_a / is_subclass_of (string subjects stay live for
  * autoload; soft-null class / allow_string stay live),
+ * typed-object class_parents / class_implements / class_uses (string
+ * subjects stay live for autoload; soft-null autoload stays live),
  * zero-arg pi, type.c predicates + gettype/get_debug_type, ctype.c
  * classifiers on typed/literal strings, typed-array count/sizeof, math.c
  * incl. pow/fpow/fdiv on already-numeric args, empty void user functions).
@@ -79,7 +81,10 @@ use PHPCompiler\VM\Variable as VmVariable;
  * {@code get_class}/{@code get_parent_class} stay live (deprecation / scope).
  * Soft-null / non-object {@code is_a}/{@code is_subclass_of} subjects and
  * soft-null class / allow_string stay live; string subjects stay live
- * (autoload when allow_string).
+ * (autoload when allow_string). Soft-null / non-object
+ * {@code class_parents}/{@code class_implements}/{@code class_uses}
+ * subjects and soft-null {@code $autoload} stay live; string subjects
+ * stay live (autoload).
  */
 final class DiscardedPureCallElision
 {
@@ -170,6 +175,9 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureIsAFamilyNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureClassHierarchyNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureVersionCompareNoSideEffect($toCall, $callArgs)) {
@@ -1380,6 +1388,27 @@ final class DiscardedPureCallElision
     }
 
     /**
+     * Discarded {@code class_parents}/{@code class_implements}/{@code class_uses}
+     * on a typed object (+ optional typed bool {@code $autoload}) — php-src
+     * {@code ext/standard/class.c}/{@code basic_functions.c}/{@code spl_functions.c}.
+     * Object subjects never autoload; string subjects stay live. Soft-null
+     * {@code $autoload} stays live (deprecate).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureClassHierarchyNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if (!NoThrowCallElision::isPureClassHierarchyBuiltin(strtolower($toCall->getName()))) {
+            return false;
+        }
+
+        return self::classHierarchyArgsAllowDiscardedElision($callArgs);
+    }
+
+    /**
      * Discarded {@code version_compare} on typed / literal strings — php-src
      * {@code versioning.c}. Optional operator must be null or a compile-time
      * valid comparison op ({@code ValueError} otherwise).
@@ -1710,6 +1739,17 @@ final class DiscardedPureCallElision
     private static function isAFamilyArgsAllowDiscardedElision(array $callArgs): bool
     {
         return NoThrowCallElision::isAFamilyArgsCannotThrow($callArgs);
+    }
+
+    /**
+     * Typed object (+ optional non-null bool-ish {@code $autoload}) — peer
+     * {@see NoThrowCallElision::classHierarchyArgsCannotThrow}.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function classHierarchyArgsAllowDiscardedElision(array $callArgs): bool
+    {
+        return NoThrowCallElision::classHierarchyArgsCannotThrow($callArgs);
     }
 
     /**

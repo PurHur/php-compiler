@@ -20,6 +20,9 @@ use PHPCompiler\ext\standard\checkdate;
 use PHPCompiler\ext\standard\chr;
 use PHPCompiler\ext\standard\chunk_split;
 use PHPCompiler\ext\standard\class_exists_;
+use PHPCompiler\ext\standard\class_implements_;
+use PHPCompiler\ext\standard\class_parents_;
+use PHPCompiler\ext\standard\class_uses_;
 use PHPCompiler\ext\standard\convert_uuencode;
 use PHPCompiler\ext\standard\crc32;
 use PHPCompiler\ext\standard\decbin;
@@ -2204,6 +2207,88 @@ final class DiscardedPureCallElisionTest extends TestCase
             $context,
             new is_a_(),
             [$obj]
+        ));
+    }
+
+    public function testDiscardedClassHierarchyElidesOnTypedObject(): void
+    {
+        // php-src class.c / basic_functions.c / spl_functions.c — typed object
+        // subject; string subjects autoload (#36386).
+        $context = $this->makeContext();
+        $obj = $this->makeObjectVar();
+        $str = $this->makeStringVar('stdClass');
+        $bool = $this->makeNativeBoolVar();
+        $long = $this->makeNativeLongVar();
+        $null = $this->makeNullVar();
+        $box = $this->makeValueBoxVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new class_parents_(),
+            [$obj]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new class_implements_(),
+            [$obj]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new class_uses_(),
+            [$obj]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new class_parents_(),
+            [$obj, $bool]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new class_implements_(),
+            [$obj, $long]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new class_uses_(),
+            [$obj, $this->makeCompileTimeLongVar(0)]
+        ));
+
+        // String / soft-null / value-box subjects stay live; soft-null
+        // $autoload stays live (deprecate / autoload).
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new class_parents_(),
+            [$str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new class_implements_(),
+            [$str, $bool]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new class_uses_(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new class_parents_(),
+            [$box]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new class_parents_(),
+            [$obj, $null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new class_implements_(),
+            [$obj, $box]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new class_uses_(),
+            []
         ));
     }
 
