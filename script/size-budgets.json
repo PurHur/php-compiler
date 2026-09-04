@@ -4,9 +4,9 @@
     "done_when_ceiling": 25000,
     "files": {
         "lib/Compiler.php": {
-            "budget": 11538,
+            "budget": 10825,
             "target": 20000,
-            "note": "Concern trait splits (#36230/#36387/#36403); InstanceOfInAndClassConstCompile + WriteContextRejects"
+            "note": "Concern trait splits (#36230/#36387/#36403); OuterSiblingAndBuiltinWireCallArgSlots + InstanceOfInAndClassConstCompile"
         },
         "lib/JIT.php": {
             "budget": 24664,
