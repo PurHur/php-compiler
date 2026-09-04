@@ -893,4 +893,42 @@ trait ExactHoistedAndInlineNewCallArgProducers
     }
 
     /** True when $producer supplies the specific $callArg operand (#9456, #9904). */
+    private function inlineCallArgProducerFeedsCallArgOp(Op\Expr $producer, Op $consumer, Operand $callArg): bool
+    {
+        if (!property_exists($producer, 'result') || !property_exists($consumer, 'args') || !is_array($consumer->args)) {
+            return false;
+        }
+        $producerRoot = Block::cfgVarRoot($producer->result);
+        if ($callArg === $producer->result) {
+            return true;
+        }
+        if ($this->operandsReferToSameVariable($callArg, $producer->result)) {
+            return true;
+        }
+        if (null !== $producerRoot && Block::cfgVarRoot($callArg) === $producerRoot) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * @param ?Operand $argRoot from Block::cfgVarRoot($arg)
+     */
+    private function inlineExprCallArgUsesOperand(Op $consumer, Operand $arg, ?Operand $argRoot): bool
+    {
+        if (!property_exists($consumer, 'args') || !is_array($consumer->args)) {
+            return false;
+        }
+        foreach ($consumer->args as $callArg) {
+            if ($callArg === $arg) {
+                return true;
+            }
+            if (null !== $argRoot && Block::cfgVarRoot($callArg) === $argRoot) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }
