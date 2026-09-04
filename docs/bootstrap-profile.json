@@ -7147,6 +7147,7 @@
         "lib/JIT/Concern/CompileClassAndTraitUses.php",
         "lib/JIT/Concern/EmitJitReturn.php",
         "lib/JIT/Concern/InitJitMethodCall.php",
+        "lib/JIT/Concern/InitJitStaticCall.php",
         "lib/JIT/Concern/M3EmitTuSidecarLinktime.php",
         "lib/JIT/Concern/TernaryJumpIfEchoMerge.php",
         "lib/JIT/Context.php",
@@ -8434,9 +8435,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8200,
+        "inventory_files": 8201,
         "excluded": 0,
-        "eligible": 8200,
+        "eligible": 8201,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
