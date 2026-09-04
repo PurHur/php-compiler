@@ -4,9 +4,9 @@
     "done_when_ceiling": 25000,
     "files": {
         "lib/Compiler.php": {
-            "budget": 26408,
+            "budget": 25098,
             "target": 20000,
-            "note": "Concern trait splits (#36230/#36387/#36403); SlotForCallArgResolvers + InlineCallArgSlotResolvers + RewireInlineCallArgSendSlots"
+            "note": "Concern trait splits (#36230/#36387/#36403); CompileInlineSpecializedCallArgSends"
         },
         "lib/JIT.php": {
             "budget": 24655,
