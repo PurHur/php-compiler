@@ -5371,6 +5371,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/SiblingInlineFuncCallAndDea
 require_once __DIR__.'/../../../lib/Compiler/Concern/NestedArrayAndLeadingConstCallArgProducers.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/DeferredSiblingAndArrayMapNullCallArgProducers.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/HoistedEnumAndChainedInlineCallArgProducers.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/InlineNewClosureAndComparatorCallArgProducers.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileBlockInternal.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AssignOperand.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AdaptByRefCallArgs.php';
