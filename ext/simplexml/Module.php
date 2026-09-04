@@ -26,6 +26,9 @@ class Module extends ModuleAbstract
      */
     public function jitInit(JIT\Context $context): void
     {
+        // Call SimpleXMLElement* proxies — lib/JIT must not import ext\simplexml (#36204).
+        $context->extensionLowering->simplexml = new JitSimpleXmlExtensionHooksFacade();
+
         // Thin AOT instanceof Traversable / method visibility (#35831 / #36204).
         $seed = static function ($obj, int $id, string $lcname): void {
             $obj->seedSimpleXmlElementAotInterfaces($id, $lcname);

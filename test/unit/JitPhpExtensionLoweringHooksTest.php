@@ -388,6 +388,53 @@ final class JitPhpExtensionLoweringHooksTest extends TestCase
         }
     }
 
+    public function testSimpleXmlCallProxiesDoNotImportSimplexmlExtension(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $module = (string) file_get_contents($root.'/ext/simplexml/Module.php');
+        $this->assertStringContainsString(
+            'simplexml = new JitSimpleXmlExtensionHooksFacade()',
+            $module,
+            'ext/simplexml Module::jitInit must register JitSimpleXmlExtensionHooksFacade'
+        );
+        $this->assertStringContainsString(
+            'requireSimpleXml',
+            (string) file_get_contents($root.'/lib/JIT/ExtensionLoweringHooks.php'),
+            'ExtensionLoweringHooks must expose requireSimpleXml()'
+        );
+        $files = [
+            'lib/JIT/Call/SimpleXMLElementAddChild.php',
+            'lib/JIT/Call/SimpleXMLElementAsXml.php',
+            'lib/JIT/Call/SimpleXMLElementAttributes.php',
+            'lib/JIT/Call/SimpleXMLElementChildren.php',
+            'lib/JIT/Call/SimpleXMLElementConstruct.php',
+            'lib/JIT/Call/SimpleXMLElementCount.php',
+            'lib/JIT/Call/SimpleXMLElementGet.php',
+            'lib/JIT/Call/SimpleXMLElementGetDocNamespaces.php',
+            'lib/JIT/Call/SimpleXMLElementGetName.php',
+            'lib/JIT/Call/SimpleXMLElementGetNamespaces.php',
+            'lib/JIT/Call/SimpleXMLElementOffsetGet.php',
+            'lib/JIT/Call/SimpleXMLElementRegisterXPathNamespace.php',
+            'lib/JIT/Call/SimpleXMLElementToString.php',
+            'lib/JIT/Call/SimpleXMLElementXpath.php',
+        ];
+        foreach ($files as $rel) {
+            $src = (string) file_get_contents($root.'/'.$rel);
+            $stripped = (string) preg_replace('~/\*.*?\*/~s', '', $src);
+            $stripped = (string) preg_replace('~//.*$~m', '', $stripped);
+            $this->assertDoesNotMatchRegularExpression(
+                '/PHPCompiler\\\\ext\\\\simplexml\\\\/',
+                $stripped,
+                $rel.' still imports ext\\simplexml — use SimpleXmlExtensionHooks'
+            );
+            $this->assertStringContainsString(
+                'requireSimpleXml()',
+                $src,
+                $rel.' must dispatch via requireSimpleXml()'
+            );
+        }
+    }
+
     /**
      * @dataProvider coreJitHelperFilesWithoutNonStandardExtImports
      */

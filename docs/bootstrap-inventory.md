@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8126 |
-| Phase A inventory files (M2 ratio SSOT) | 8126 |
+| PHP files on vm.php path | 8128 |
+| Phase A inventory files (M2 ratio SSOT) | 8128 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 25793 |
+| Source constructs flagged (warnings) | 25796 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2256,6 +2256,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/simplexml/JitSimpleXmlChildren.php` | 0 | 1 |
 | `ext/simplexml/JitSimpleXmlConstruct.php` | 0 | 2 |
 | `ext/simplexml/JitSimpleXmlCount.php` | 0 | 1 |
+| `ext/simplexml/JitSimpleXmlExtensionHooksFacade.php` | 0 | 1 |
 | `ext/simplexml/JitSimpleXmlGet.php` | 0 | 1 |
 | `ext/simplexml/JitSimpleXmlGetDocNamespaces.php` | 0 | 1 |
 | `ext/simplexml/JitSimpleXmlGetName.php` | 0 | 1 |
@@ -2267,7 +2268,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/simplexml/JitSimpleXmlToString.php` | 0 | 1 |
 | `ext/simplexml/JitSimpleXmlUserScript.php` | 0 | 15 |
 | `ext/simplexml/JitSimpleXmlXpath.php` | 0 | 1 |
-| `ext/simplexml/Module.php` | 0 | 5 |
+| `ext/simplexml/Module.php` | 0 | 6 |
 | `ext/simplexml/SimpleXmlElementAddAttribute.php` | 0 | 1 |
 | `ext/simplexml/SimpleXmlElementAddChild.php` | 0 | 1 |
 | `ext/simplexml/SimpleXmlElementAsXml.php` | 0 | 1 |
@@ -7199,6 +7200,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/SerializeObjectPropsLlvm.php` | 0 | 1 |
 | `lib/JIT/ShutdownCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/SidecarPathRemap.php` | 0 | 1 |
+| `lib/JIT/SimpleXmlExtensionHooks.php` | 0 | 1 |
 | `lib/JIT/SimpleXmlForeachSnapshot.php` | 0 | 3 |
 | `lib/JIT/SimpleXmlInstanceMethodJit.php` | 0 | 27 |
 | `lib/JIT/SpineChunkIntrinsicCallBind.php` | 0 | 1 |
@@ -26359,6 +26361,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
+### `ext/simplexml/JitSimpleXmlExtensionHooksFacade.php`
+
+**Warnings** (review for bootstrap subset):
+- 20 class method(s)
+
 ### `ext/simplexml/JitSimpleXmlGet.php`
 
 **Warnings** (review for bootstrap subset):
@@ -26434,9 +26441,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/simplexml/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new simplexml_load_string (line 137)
-- new simplexml_load_file (line 138)
-- new simplexml_import_dom (line 139)
+- new JitSimpleXmlExtensionHooksFacade (line 30)
+- new simplexml_load_string (line 140)
+- new simplexml_load_file (line 141)
+- new simplexml_import_dom (line 142)
 - 3 class method(s)
 - 25 closure(s)
 
@@ -57575,7 +57583,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/CompileCache.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\Native (line 2111)
+- new Call\Native (line 2147)
 - 91 class method(s)
 
 ### `lib/JIT/CompilerOperandChainNative.php`
@@ -58275,7 +58283,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ExtensionLoweringHooks.php`
 
 **Warnings** (review for bootstrap subset):
-- 72 class method(s)
+- 73 class method(s)
 
 ### `lib/JIT/FiberHelper.php`
 
@@ -59144,8 +59152,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/NoThrowCallElision.php`
 
 **Warnings** (review for bootstrap subset):
-- new Operand\Literal (line 246)
-- 9 class method(s)
+- new Operand\Literal (line 313)
+- 12 class method(s)
 
 ### `lib/JIT/NonObjectPropertyFetchHelper.php`
 
@@ -59429,6 +59437,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `lib/JIT/SimpleXmlExtensionHooks.php`
+
+**Warnings** (review for bootstrap subset):
+- 20 class method(s)
 
 ### `lib/JIT/SimpleXmlForeachSnapshot.php`
 
