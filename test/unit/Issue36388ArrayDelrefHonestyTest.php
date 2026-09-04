@@ -44,10 +44,11 @@ final class Issue36388ArrayDelrefHonestyTest extends TestCase
     {
         $var = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Variable.php');
         $ht = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/HashTableWriteLlvm.php');
-        $jit = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT.php');
+        // Trait-split from lib/JIT.php — AssignOperand owns the move (#36388 / #36230).
+        $assign = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Concern/AssignOperand.php');
         $this->assertStringContainsString('ephemeralArrayTemp', $var);
         $this->assertStringContainsString('ephemeralArrayTemp = true', $ht);
-        $this->assertStringContainsString('skipAddrefForHashtableMove', $jit);
+        $this->assertStringContainsString('skipAddrefForHashtableMove', $assign);
     }
 
     public function testStringKeyInsertOwnsHeapCopyNotImmortalShare(): void

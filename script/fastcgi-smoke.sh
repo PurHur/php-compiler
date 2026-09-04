@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 # FastCGI record + TCP adapter PHPUnit smoke (issues #173, #1899).
 # Optional --soak N: RSS flatness gate for long-lived VM worker (#36388).
+# Optional --soak-project PATH: project for soak (default examples/009-FastCGIWeb).
 #
 # Same as: FASTCGI_SMOKE_GATE=1 ./script/ci-local.sh --filter 'FastCgiRecordTest|FastCgiTest'
 #
 # Usage:
 #   ./script/fastcgi-smoke.sh
 #   ./script/fastcgi-smoke.sh --soak 100
+#   ./script/fastcgi-smoke.sh --soak 1000 --soak-project examples/003-MiniWebApp
 #   make fastcgi-smoke
 #
 # Docker:
@@ -17,6 +19,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 SOAK_N=0
+SOAK_PROJECT=""
 PHPUNIT_ARGS=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -32,6 +35,22 @@ while [[ $# -gt 0 ]]; do
       SOAK_N="${1#--soak=}"
       if [[ -z "$SOAK_N" || ! "$SOAK_N" =~ ^[0-9]+$ || "$SOAK_N" -lt 1 ]]; then
         echo "fastcgi-smoke: --soak requires a positive integer" >&2
+        exit 2
+      fi
+      shift
+      ;;
+    --soak-project)
+      SOAK_PROJECT="${2:-}"
+      if [[ -z "$SOAK_PROJECT" ]]; then
+        echo "fastcgi-smoke: --soak-project requires a path" >&2
+        exit 2
+      fi
+      shift 2
+      ;;
+    --soak-project=*)
+      SOAK_PROJECT="${1#--soak-project=}"
+      if [[ -z "$SOAK_PROJECT" ]]; then
+        echo "fastcgi-smoke: --soak-project requires a path" >&2
         exit 2
       fi
       shift
@@ -62,6 +81,10 @@ echo "fastcgi-smoke: PHPUnit FastCgiRecordTest|FastCgiTest (FASTCGI_SMOKE_GATE=1
 vendor/bin/phpunit --filter 'FastCgiRecordTest|FastCgiTest' "${PHPUNIT_ARGS[@]+"${PHPUNIT_ARGS[@]}"}"
 
 if [[ "$SOAK_N" -gt 0 ]]; then
-  echo "fastcgi-smoke: soak ${SOAK_N} VM FastCGI requests (RSS flatness, #36388)..."
-  php "$ROOT/script/fastcgi-soak.php" --requests="$SOAK_N"
+  SOAK_ARGS=(--requests="$SOAK_N")
+  if [[ -n "$SOAK_PROJECT" ]]; then
+    SOAK_ARGS+=(--project="$SOAK_PROJECT")
+  fi
+  echo "fastcgi-smoke: soak ${SOAK_N} VM FastCGI requests (RSS flatness, #36388${SOAK_PROJECT:+ project=$SOAK_PROJECT})..."
+  php "$ROOT/script/fastcgi-soak.php" "${SOAK_ARGS[@]}"
 fi

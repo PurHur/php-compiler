@@ -38,6 +38,8 @@ final class VmMemoryTest extends TestCase
 
     public function testUsageAfterPeakQueryToleratesInterpreterSlop(): void
     {
+        // Isolate from prior suite pollution — pairing assumes a fresh request (#36388).
+        MemoryAccounting::beginRequest();
         MemoryAccounting::resetPeakToCurrent();
         MemoryAccounting::markPeakQuery(MemoryAccounting::peakBytes());
         MemoryAccounting::noteBytes(6);
