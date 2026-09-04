@@ -2362,9 +2362,13 @@ final class VmString
 
         // php-src url.c php_url_parse_ex2: scheme = 1*[ alpha | digit | "+" | "-" | "." ]
         // (not RFC 3986 ALPHA-only). Digit-leading schemes such as 0://host are valid (#32086).
-        if (preg_match('#^([a-z0-9+.-]+):#i', $rest, $m)) {
-            $scheme = strtolower($m[1]);
-            $rest = substr($rest, strlen($m[0]));
+        // Hand-rolled (no preg_match): ParseUrlJitHelper helper-runtime units must not NestedJIT
+        // the Preg engine — missing preg in the TU made runtime parse_url() return [] and
+        // mid-graph NestedJIT of Preg into Slim Composer modules stalled Uri lowering (#36382).
+        $schemeLen = self::parseUrlSchemePrefixLength($rest);
+        if ($schemeLen > 0) {
+            $scheme = strtolower(substr($rest, 0, $schemeLen - 1));
+            $rest = substr($rest, $schemeLen);
             // php-src url.c php_url_parse_ex2: file:/// skips host parse (empty
             // authority) and may drop the extra slash before a Windows drive
             // (file:///c:/...). Other schemes still reject empty host (#32085).
@@ -2385,7 +2389,7 @@ final class VmString
             // php-src: leading colon (e == s) goes to parse_port. Lone ':' and
             // ':80' fail (empty host after an optional port). '://host' is just_path.
             $afterColon = substr($rest, 1);
-            if ('' === $afterColon || 1 === preg_match('#^\d{1,5}(/|$)#', $afterColon)) {
+            if ('' === $afterColon || self::parseUrlLeadingPortOnly($afterColon)) {
                 return false;
             }
         } elseif (str_starts_with($rest, '//')) {
@@ -2506,6 +2510,59 @@ final class VmString
      *
      * @return bool|null true=authority ok, false=no //authority, null=invalid (whole URL false)
      */
+    /**
+     * Length of a leading "scheme:" prefix, or 0 if absent.
+     *
+     * php-src url.c: scheme = 1*[ alpha | digit | "+" | "-" | "." ] then ':'.
+     * Replaces preg_match('#^([a-z0-9+.-]+):#i') so ParseUrlJitHelper stays Preg-free (#36382).
+     */
+    private static function parseUrlSchemePrefixLength(string $url): int
+    {
+        $len = self::byteLength($url);
+        if ($len < 2) {
+            return 0;
+        }
+        $i = 0;
+        while ($i < $len) {
+            $ord = self::byteOrd($url[$i]);
+            $isAlpha = ($ord >= 65 && $ord <= 90) || ($ord >= 97 && $ord <= 122);
+            $isDigit = $ord >= 48 && $ord <= 57;
+            if (!$isAlpha && !$isDigit && 43 !== $ord && 45 !== $ord && 46 !== $ord) {
+                break;
+            }
+            ++$i;
+        }
+        if ($i < 1 || $i >= $len || ':' !== $url[$i]) {
+            return 0;
+        }
+
+        return $i + 1;
+    }
+
+    /**
+     * True when $s matches /^\d{1,5}(\/|$)/ (leading-colon port-only reject path).
+     */
+    private static function parseUrlLeadingPortOnly(string $s): bool
+    {
+        $len = self::byteLength($s);
+        if ($len < 1) {
+            return false;
+        }
+        $i = 0;
+        while ($i < $len && $i < 5) {
+            $ord = self::byteOrd($s[$i]);
+            if ($ord < 48 || $ord > 57) {
+                break;
+            }
+            ++$i;
+        }
+        if ($i < 1) {
+            return false;
+        }
+
+        return $i === $len || '/' === $s[$i];
+    }
+
     private static function parseUrlAuthority(
         string &$rest,
         ?string &$host,

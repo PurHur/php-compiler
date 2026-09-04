@@ -43,23 +43,23 @@ final class ParseUrlRuntimeShrinkTest extends TestCase
         $this->assertLessThan(300, \substr_count($source, "\n") + 1);
         $assoc = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ParseUrlAssocLlvm.php');
         $this->assertStringContainsString('setStringKeyString', $assoc);
-        $this->assertStringContainsString('lastString', $assoc);
+        $this->assertStringContainsString('componentString', $assoc);
+        $this->assertStringContainsString('componentInt', $assoc);
+        $this->assertStringNotContainsString('lastString', $assoc);
         $this->assertLessThan(220, \substr_count($assoc, "\n") + 1);
     }
 
     public function testParseUrlJitHelperMatchesVmString(): void
     {
-        ParseUrlJitHelper::resetForTest();
         $url = 'http://u:p@host:8080/path?q=1#frag';
 
         $tag = ParseUrlJitHelper::parseUrlComponent($url, \PHP_URL_USER);
         $this->assertSame(2, $tag);
-        $this->assertSame(VmString::parseUrl($url, \PHP_URL_USER), ParseUrlJitHelper::lastString());
+        $this->assertSame(VmString::parseUrl($url, \PHP_URL_USER), ParseUrlJitHelper::componentString($url, \PHP_URL_USER));
 
-        ParseUrlJitHelper::resetForTest();
         $tag = ParseUrlJitHelper::parseUrlComponent($url, \PHP_URL_PORT);
         $this->assertSame(3, $tag);
-        $this->assertSame(VmString::parseUrl($url, \PHP_URL_PORT), ParseUrlJitHelper::lastInt());
+        $this->assertSame(VmString::parseUrl($url, \PHP_URL_PORT), ParseUrlJitHelper::componentInt($url, \PHP_URL_PORT));
 
         $assoc = ParseUrlJitHelper::parseUrlAssoc($url);
         $expected = VmString::parseUrl($url, -1);
@@ -73,10 +73,14 @@ final class ParseUrlRuntimeShrinkTest extends TestCase
         $this->assertIsArray($emptyPass);
         $this->assertSame('', $emptyPass['pass']);
         $this->assertSame($emptyPass, ParseUrlJitHelper::parseUrlAssoc('http://user:@h/'));
+        $this->assertSame(2, ParseUrlJitHelper::parseUrlComponent('http://user:@h/', \PHP_URL_PASS));
+        $this->assertSame('', ParseUrlJitHelper::componentString('http://user:@h/', \PHP_URL_PASS));
         $emptyUser = VmString::parseUrl('http://:pass@h/');
         $this->assertIsArray($emptyUser);
         $this->assertSame('', $emptyUser['user']);
         $this->assertSame($emptyUser, ParseUrlJitHelper::parseUrlAssoc('http://:pass@h/'));
+        $this->assertSame(2, ParseUrlJitHelper::parseUrlComponent('http://:pass@h/', \PHP_URL_USER));
+        $this->assertSame('', ParseUrlJitHelper::componentString('http://:pass@h/', \PHP_URL_USER));
     }
 
     /** php-src url.c file:/// empty host is valid; http:/// is not (#32085). */
