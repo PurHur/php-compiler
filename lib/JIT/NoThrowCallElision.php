@@ -364,6 +364,12 @@ final class NoThrowCallElision
             // arity 0 only; excess args are ArgumentCountError.
             return self::zeroArgRuntimeInfoArgsCannotThrow($callArgs);
         }
+        if (self::isPureDefinedTableRuntimeInfoBuiltin($name)) {
+            // get_loaded_extensions / get_defined_constants / get_defined_functions —
+            // arity 0 or one non-null bool; soft-null deprecates; excess argc
+            // is ArgumentCountError.
+            return self::definedTableRuntimeInfoArgsCannotThrow($callArgs);
+        }
         if (self::isPureVersionCompareBuiltin($name)) {
             // versioning.c — typed strings; optional operator must be proven valid.
             return self::versionCompareArgsCannotThrow($callArgs);
@@ -1146,6 +1152,26 @@ final class NoThrowCallElision
     }
 
     /**
+     * Declaration / extension table materializers with optional Z_PARAM_BOOL —
+     * php-src {@code ext/standard/basic_functions.c} ({@code get_defined_constants}/
+     * {@code get_defined_functions}), {@code ext/standard/info.c}
+     * ({@code get_loaded_extensions}). Soft-null bool deprecates; excess argc is
+     * {@code ArgumentCountError}. Public for {@see DiscardedPureCallElision}
+     * (#36386).
+     */
+    public static function isPureDefinedTableRuntimeInfoBuiltin(string $nameLc): bool
+    {
+        switch ($nameLc) {
+            case 'get_loaded_extensions':
+            case 'get_defined_constants':
+            case 'get_defined_functions':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
      * php-src {@code ext/standard/versioning.c} {@code version_compare}. Public
      * for {@see DiscardedPureCallElision} (#36386).
      */
@@ -1575,6 +1601,35 @@ final class NoThrowCallElision
     public static function zeroArgRuntimeInfoArgsCannotThrow(array $callArgs): bool
     {
         return [] === $callArgs;
+    }
+
+    /**
+     * Zero args, or one typed bool / long / compile-time 0|1. Soft-null bool
+     * deprecates; objects / value-box / strings stay out (coerce / handlers).
+     * Excess argc is {@code ArgumentCountError}.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    public static function definedTableRuntimeInfoArgsCannotThrow(array $callArgs): bool
+    {
+        if ([] === $callArgs) {
+            return true;
+        }
+        if (!isset($callArgs[0]) || !$callArgs[0] instanceof Variable || isset($callArgs[1])) {
+            return false;
+        }
+        $flag = $callArgs[0];
+        if ($flag->isNullConstant || Variable::TYPE_NULL === $flag->type) {
+            return false;
+        }
+        if (
+            Variable::TYPE_NATIVE_BOOL === $flag->type
+            || Variable::TYPE_NATIVE_LONG === $flag->type
+        ) {
+            return true;
+        }
+
+        return null !== $flag->compileTimeLong;
     }
 
     /**
