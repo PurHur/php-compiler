@@ -395,8 +395,12 @@ final class VmPregEngine
         }
         $ch = $this->peek();
         if ('*' === $ch || '+' === $ch || '?' === $ch || '{' === $ch) {
-            [$min, $max, $greedy] = $this->parseQuantifier();
+            [$min, $max, $greedy, $possessive] = $this->parseQuantifier();
             $base = new VmPregAstQuantNode($base, $min, $max, $greedy);
+            // Possessive ++ / *+ / ?+ / {n,m}+ wraps as atomic group (PCRE2 php_pcre.c, #36380).
+            if ($possessive) {
+                $base = new VmPregAstAtomicNode($base);
+            }
 
             return $base;
         }
@@ -405,7 +409,7 @@ final class VmPregEngine
     }
 
     /**
-     * @return array{0: int, 1: int, 2: bool}
+     * @return array{0: int, 1: int, 2: bool, 3: bool} min, max, greedy, possessive
      */
     private function parseQuantifier(): array
     {
@@ -413,30 +417,18 @@ final class VmPregEngine
         $ch = $this->peek();
         if ('*' === $ch) {
             $this->advance(1);
-            if ($this->peek() === '?') {
-                $greedy = !$greedy;
-                $this->advance(1);
-            }
 
-            return [0, \PHP_INT_MAX, $greedy];
+            return $this->finishQuantifier(0, \PHP_INT_MAX, $greedy);
         }
         if ('+' === $ch) {
             $this->advance(1);
-            if ($this->peek() === '?') {
-                $greedy = !$greedy;
-                $this->advance(1);
-            }
 
-            return [1, \PHP_INT_MAX, $greedy];
+            return $this->finishQuantifier(1, \PHP_INT_MAX, $greedy);
         }
         if ('?' === $ch) {
             $this->advance(1);
-            if ($this->peek() === '?') {
-                $greedy = !$greedy;
-                $this->advance(1);
-            }
 
-            return [0, 1, $greedy];
+            return $this->finishQuantifier(0, 1, $greedy);
         }
         if ('{' === $ch) {
             $this->advance(1);
@@ -453,20 +445,37 @@ final class VmPregEngine
             if ($this->peek() !== '}') {
                 $this->abortCompile();
 
-                return [0, 0, $greedy];
+                return [0, 0, $greedy, false];
             }
             $this->advance(1);
-            if ($this->peek() === '?') {
-                $greedy = !$greedy;
-                $this->advance(1);
-            }
 
-            return [$min, $max, $greedy];
+            return $this->finishQuantifier($min, $max, $greedy);
         }
 
         $this->abortCompile();
 
-        return [0, 0, $greedy];
+        return [0, 0, $greedy, false];
+    }
+
+    /**
+     * Consume optional lazy `?` or possessive `+` after a quantifier body.
+     *
+     * @return array{0: int, 1: int, 2: bool, 3: bool}
+     */
+    private function finishQuantifier(int $min, int $max, bool $greedy): array
+    {
+        $possessive = false;
+        if ($this->peek() === '?') {
+            $greedy = !$greedy;
+            $this->advance(1);
+        } elseif ($this->peek() === '+') {
+            // Possessive: take the greedy maximum and never give back (#36380).
+            $possessive = true;
+            $greedy = true;
+            $this->advance(1);
+        }
+
+        return [$min, $max, $greedy, $possessive];
     }
 
     private function parseDigits(): int

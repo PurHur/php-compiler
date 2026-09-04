@@ -140,7 +140,15 @@ final class VmPregPure
                 break;
             }
             ++$count;
-            $one = self::ovectorToMatches($ovector, $subject, $compiled['groupNameToIndex'], $regex, $offsetCapture, false);
+            $one = self::ovectorToMatches(
+                $ovector,
+                $subject,
+                $compiled['groupNameToIndex'],
+                $regex,
+                $offsetCapture,
+                false,
+                $compiled['captureGroupCount']
+            );
             if ($setOrder) {
                 $allMatches[] = $one;
             } else {
@@ -156,10 +164,42 @@ final class VmPregPure
             $fixedStart = false;
         }
 
-        $matches = $allMatches;
+        if (0 === $count && !$setOrder) {
+            // php-src php_pcre.c — PATTERN_ORDER always materializes group arrays (#36380).
+            $matches = self::emptyMatchAllPatternOrder(
+                $compiled['captureGroupCount'],
+                $compiled['groupNameToIndex']
+            );
+        } else {
+            $matches = $allMatches;
+        }
         self::$lastError = 0;
 
         return $count;
+    }
+
+    /**
+     * Empty preg_match_all PATTERN_ORDER shape — group 0..N as [] (php_pcre.c).
+     *
+     * @param array<string, int> $groupNameToIndex
+     *
+     * @return array<int|string, list<never>>
+     */
+    private static function emptyMatchAllPatternOrder(int $captureGroupCount, array $groupNameToIndex): array
+    {
+        $out = [];
+        for ($i = 0; $i <= $captureGroupCount; ++$i) {
+            if ($i > 0) {
+                foreach ($groupNameToIndex as $name => $groupNum) {
+                    if ($groupNum === $i) {
+                        $out[$name] = [];
+                    }
+                }
+            }
+            $out[$i] = [];
+        }
+
+        return $out;
     }
 
     /**
