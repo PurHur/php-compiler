@@ -2,30 +2,40 @@
 
 **Project north star (living tracker):** [#1492](https://github.com/PurHur/php-compiler/issues/1492) (was [#1056](https://github.com/PurHur/php-compiler/issues/1056))  
 **Public status:** [development-status § North star](https://purhur.github.io/php-compiler/development-status.html#north-star-self-host)  
-**M2 batch tracker:** [#1419](https://github.com/PurHur/php-compiler/issues/1419) (closed — work landed in PRs)
+**M2 batch tracker:** [#1419](https://github.com/PurHur/php-compiler/issues/1419) (closed — work landed in PRs)  
+**Release scope (Sep 2026):** [ADR #36393](adr/36393-selfhost-user-payoff.md) — user-payoff M5, not full-revision fixpoint
 
 ---
 
 ## The target (one sentence)
 
-**A native binary built from this repo’s PHP (`lib/` + `ext/`) can compile PHP—including the next revision of the compiler—without Zend PHP in the loop.**
+**A static `phpc` binary built from this repo’s PHP (`lib/` + `ext/`) compiles real user projects (including Composer apps) without host PHP, Composer, or vendor patches at cold boot.**
 
-That is **M5**. Everything below is the honest path from today’s bootstrap to that outcome.
+Research stretch (not a release gate): that same binary can compile the next revision of the compiler without Zend in the loop. See [ADR #36393](adr/36393-selfhost-user-payoff.md).
 
 ---
 
-## Definition of done (M5)
+## Definition of done (release-scoped M5)
 
 | Requirement | Meaning |
 |-------------|---------|
-| **Compiler in PHP** | Front/middle/back end stay in `lib/`, `ext/` — not rewritten in C |
+| **Static `phpc`** | Gen-0 / prelinked cold boot produces a distributable `phpc` ([#36390](https://github.com/PurHur/php-compiler/issues/36390)) |
+| **User project** | That binary builds a Composer app from the corpus ([#36380](https://github.com/PurHur/php-compiler/issues/36380) / [#36382](https://github.com/PurHur/php-compiler/issues/36382)) to a working native binary |
 | **No `vendor/` at cold boot** | Parser/types/LLVM FFI prelinked once ([#1416](https://github.com/PurHur/php-compiler/issues/1416)); see [`bootstrap-vendor-inventory.md`](bootstrap-vendor-inventory.md) |
-| **No Zend bootstrap** | `bin/compile.php` / `bin/vm.php` run as **compiled** code, not `php bin/compile.php` |
-| **Full inventory** | Honest bundle covers the `bin/vm.php` path (~**611** files; [`bootstrap-inventory.md`](bootstrap-inventory.md)) |
-| **Stub surface minimal** | `PHP_COMPILER_SELFHOST_AOT` stubs shrink; compiler behavior is real, not link-only |
-| **Small native floor OK** | `lib/AOT/runtime/*.c` + external `clang` via `lib/AOT/Linker.php` (in spine smoke native link since [#2267](https://github.com/PurHur/php-compiler/issues/2267)) — **not** required to disappear |
+| **Honest native emit** | `BOOTSTRAP_M4_REQUIRE_NATIVE_EMIT=1` refuses sidecar COPY ([#36146](https://github.com/PurHur/php-compiler/issues/36146)); no gen-0 fingerprint restamps ([#36145](https://github.com/PurHur/php-compiler/issues/36145)) |
+| **Daily gate** | `make north-star5-verify-fast` green; `--strict` only for bootstrap/gen-0/vendor-prelink merges |
+| **Compiler in PHP** | Front/middle/back end stay in `lib/`, `ext/` — not rewritten in C |
+| **Small native floor OK** | `lib/AOT/runtime/*.c` + external `clang` via `lib/AOT/Linker.php` — **not** required to disappear |
 
-**Not required for M5:** 100% Zend parity · in-process linker · production web-app polish (examples stay as regression fixtures).
+**Not required for release M5:** gen-2 == gen-3 byte fixpoint · 100% Zend parity · in-process linker · production web polish (examples stay as regression fixtures). Fleet capacity for self-host / spine work stays ≤ ~25 % until corpus + perf targets move ([ADR #36393](adr/36393-selfhost-user-payoff.md)).
+
+### Research ladder (tracked, not release-blocking)
+
+| Requirement | Meaning |
+|-------------|---------|
+| **No Zend bootstrap** | `bin/compile.php` / `bin/vm.php` run as **compiled** code |
+| **Full inventory / stub shrink** | Honest `bin/vm.php` closure; `PHP_COMPILER_SELFHOST_AOT` stubs minimal |
+| **`--strict` ladder** | `make north-star5-verify ARGS=--strict` green (standalone AOT emit, prior [#21417](https://github.com/PurHur/php-compiler/issues/21417) / [#36144](https://github.com/PurHur/php-compiler/issues/36144)) |
 
 ---
 
@@ -72,9 +82,10 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | **M2** | Spine grows toward full `bin/vm.php` inventory | ✅ **8151** / **8151** | **100%** |
 | **M3** | Self-host binary **compiles external PHP** (HelloWorld) without Zend emit | ✅ `emit_path=native` via gen-0 argv helper ([#22178](https://github.com/PurHur/php-compiler/issues/22178)) | **~90%** |
 | **M4** | Self-host binary **rebuilds** the next compiler tree | 🚧 ladder runs but gen-1→gen-2 is a COPY ([#21860](https://github.com/PurHur/php-compiler/issues/21860)) | **~60%** |
-| **M5** | Full self-host; Zend retired from loop | 🚧 `north-star5-verify-fast` daily ✅; **`--strict` red at step 4a2** ([#21417](https://github.com/PurHur/php-compiler/issues/21417)); `BOOTSTRAP_M5_NO_ZEND=1` empty `build/` ([#3053](https://github.com/PurHur/php-compiler/issues/3053)) | **~75%** |
+| **M5 (release)** | Static `phpc` builds user/Composer projects | 🚧 fast gate ✅; corpus app smoke open ([#36380](https://github.com/PurHur/php-compiler/issues/36380)); see [ADR #36393](adr/36393-selfhost-user-payoff.md) | **payoff** |
+| **M5 (research)** | Full self-host; Zend retired from loop | 🚧 **`--strict` red at step 4a2** ([#21417](https://github.com/PurHur/php-compiler/issues/21417) / [#36144](https://github.com/PurHur/php-compiler/issues/36144)); `BOOTSTRAP_M5_NO_ZEND=1` empty `build/` ([#3053](https://github.com/PurHur/php-compiler/issues/3053)) | **~75%** |
 
-**Indicative north star composite:** **~65%** (weighted across M0–M5; see formula below). M5 is gated on `--strict` ([#21417](https://github.com/PurHur/php-compiler/issues/21417)), not on spine coverage.
+**Indicative research composite:** **~65%** (weighted across M0–M5; see formula below). **Release** keys off user-payoff gates ([ADR #36393](adr/36393-selfhost-user-payoff.md)), not `--strict` / gen-2==gen-3.
 
 ### North star % (single formula)
 
@@ -219,6 +230,7 @@ make north-star4-verify
 
 ## Related docs
 
+- [`adr/36393-selfhost-user-payoff.md`](adr/36393-selfhost-user-payoff.md) — release-scoped M5 decision
 - [`bootstrap-generations.md`](bootstrap-generations.md) — gen-0…gen-3 ladder and artifacts
 - [`bootstrap-selfhost.md`](bootstrap-selfhost.md) — gates, waves, stub policy
 - [`bootstrap-m5-fast-path.md`](bootstrap-m5-fast-path.md) — M3 incremental lowering playbook

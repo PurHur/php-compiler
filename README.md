@@ -22,7 +22,7 @@
 | **VM (`phpc run`)** | ✅ Production-shaped for dev/CI | Broadest language coverage; reference executor and JIT/AOT fallback |
 | **AOT (`phpc build`)** | ✅ For curated subset | Standalone binaries for examples **000–009** and small CGI apps; Composer stacks tracked in [#36382](https://github.com/PurHur/php-compiler/issues/36382) / [#36380](https://github.com/PurHur/php-compiler/issues/36380) |
 | **JIT (`bin/jit.php`)** | 🚧 Partial | LLVM IR for many constructs; **MCJIT execute** still flaky ([#98](https://github.com/PurHur/php-compiler/issues/98)) |
-| **Self-host north star** | 🚧 | Spine **8162** / **8162** ✅ · M3 HelloWorld `emit_path=native` via gen-0 argv helper ([#22178](https://github.com/PurHur/php-compiler/issues/22178)) · `BOOTSTRAP_M4_REQUIRE_NATIVE_EMIT=1` refuses sidecar COPY ([#36146](https://github.com/PurHur/php-compiler/issues/36146)) · daily `make north-star5-verify-fast` · `--strict` only before bootstrap merges |
+| **Self-host north star** | 🚧 | **Release scope:** static `phpc` builds user/Composer projects ([ADR #36393](docs/adr/36393-selfhost-user-payoff.md)) · spine **8162** / **8162** ✅ · M3 HelloWorld `emit_path=native` · `BOOTSTRAP_M4_REQUIRE_NATIVE_EMIT=1` refuses COPY ([#36146](https://github.com/PurHur/php-compiler/issues/36146)) · daily `north-star5-verify-fast` · `--strict` / gen-2==gen-3 are research, not release gates |
 
 ### What you can rely on today
 
