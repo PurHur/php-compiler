@@ -9,30 +9,40 @@ use PHPCompiler\Block;
 use PHPCompiler\OpCode;
 
 /**
- * Capacity gate for spine split-TU hubs that NestedJIT {@see \PHPCompiler\Runtime} (#36387).
+ * Capacity gate for spine split-TU hubs that NestedJIT OOMs or traps under 8g (#36387).
  *
- * Measured on master: CompilerVersion.php (181 KB / 355 methods) emits under 8g in ~26s, but
- * Runtime.php (60 KB / 57 methods) grows ~200 MiB/10s and OOMs — NestedJIT of method bodies
- * (initParsePipeline visitor ctors, parse/compile/standalone) is the sink, not source size.
- * Emptying those bodies (probe) emits a 2.2 MB .o in 5s. Host-lowering Runtime::initParsePipeline
+ * Measured on master:
+ * - CompilerVersion.php (181 KB / 355 methods) emits under 8g in ~26s.
+ * - Runtime.php (60 KB / 57 methods) grew ~200 MiB/10s and OOMed — NestedJIT of method
+ *   bodies (initParsePipeline visitor ctors, parse/compile/standalone) was the sink.
+ * - VM\Variable / HashTable / TypeCheck / Context / ErrorReporter hit NestedJIT traps
+ *   (ARG_SEND, string-offset TYPE_VALUE, try/catch null insert block, int1←__string__*).
+ *
+ * Emptying those bodies (probe) emits .o files in seconds. Host-lowering Runtime::initParsePipeline
  * was already known to hang Zend rebuilds for hours ({@see RuntimeInitParsePipeline}).
  *
- * Under {@see ExternalMethodBind::spineChunkMode()}, replace Runtime method CFGs with a
- * void-return stub before {@see \PHPCompiler\JIT::compileBlock} so the hub ClassEntry + method
- * symbols still land in the .o / peer manifest. Real bodies stay on C-floor helpers
- * (RuntimeInitParsePipeline / RuntimeParseM5Native) or later peer-bound TUs.
+ * Under {@see ExternalMethodBind::spineChunkMode()}, replace Runtime + every
+ * {@see \PHPCompiler\VM} class method CFG with a void-return stub before
+ * {@see \PHPCompiler\JIT::compileBlock} so hub ClassEntry + method symbols still land in
+ * the .o / peer manifest. Real bodies stay on C-floor helpers
+ * (RuntimeInitParsePipeline / RuntimeParseM5Native), NestedVM object:: proxies, or later
+ * peer-bound non-demoted TUs.
  */
 final class SpineChunkRuntimeMethodDemote
 {
-    private const RUNTIME_CLASS_LC = 'phpcompiler\\runtime';
-
     public static function shouldDemote(string $displayClassLc): bool
     {
         if (!ExternalMethodBind::spineChunkMode()) {
             return false;
         }
 
-        return self::RUNTIME_CLASS_LC === strtolower(ltrim($displayClassLc, '\\'));
+        $lc = strtolower(ltrim($displayClassLc, '\\'));
+        if ('phpcompiler\\runtime' === $lc) {
+            return true;
+        }
+
+        // Packed hubs keep growing NestedJIT gaps across VM\*; demote the whole namespace.
+        return str_starts_with($lc, 'phpcompiler\\vm\\');
     }
 
     /**
