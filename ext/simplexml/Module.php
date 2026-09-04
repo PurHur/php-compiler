@@ -132,6 +132,17 @@ class Module extends ModuleAbstract
                 }
             )
         );
+        // (array) cast — lib/VM/CastSupport must not import SimpleXmlJsonExport (#36204).
+        \PHPCompiler\VM\SimpleXmlVmRuntimeSupport::setHandles(
+            static function (\PHPCompiler\VM\ObjectEntry $object): bool {
+                return SimpleXmlJsonExport::handles($object);
+            }
+        );
+        \PHPCompiler\VM\SimpleXmlVmRuntimeSupport::setExportZendArrayCast(
+            static function (\PHPCompiler\VM\ObjectEntry $object): \PHPCompiler\VM\Variable {
+                return SimpleXmlJsonExport::exportZendArrayCast($object);
+            }
+        );
     }
 
     public function getFunctions(): array

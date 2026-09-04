@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
-use PHPCompiler\ext\simplexml\SimpleXmlJsonExport;
-
 /**
  * (array)/(object) cast lowering for VM (issue #3328, #30098, Zend cast_object / convert_to_array).
+ *
+ * SimpleXMLElement (array) cast routes through {@see SimpleXmlVmRuntimeSupport} (#36204).
  */
 final class CastSupport
 {
@@ -55,8 +55,11 @@ final class CastSupport
                 return $result;
             }
             // SimpleXMLElement: @attributes + children (php-src sxe_object_cast_ex; #21666).
-            if (SimpleXmlJsonExport::handles($obj)) {
-                return SimpleXmlJsonExport::exportZendArrayCast($obj);
+            if (SimpleXmlVmRuntimeSupport::handles($obj)) {
+                $sxeCast = SimpleXmlVmRuntimeSupport::exportZendArrayCast($obj);
+                if (null !== $sxeCast) {
+                    return $sxeCast;
+                }
             }
             // DateTime*/DateTimeZone/DateInterval/DatePeriod: Zend date wire (#22424, #22425, #22435).
             $dateCast = self::tryDateObjectArrayCast($obj);
