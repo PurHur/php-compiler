@@ -32,11 +32,14 @@ use PHPCompiler\OpCode;
  * - JIT\* peer TUs (lib/JIT + Builtin): isset-on-object-offset, goto-resume seal, and
  *   segfault (rc=139) under NestedJIT — measured 9/12 OK on first 12 of 100 chunks
  *   without demote (2026-09-04).
+ * - Top-level Block.php (159 KB): NestedJIT assign trap hashtable→native-long
+ *   ("Cannot assign operands of different types (yet): 135, 1") — omitted from
+ *   spine-chunk-core-requires until demoted (2026-09-04).
  *
  * Emptying those bodies (probe) emits .o files in seconds. Host-lowering Runtime::initParsePipeline
  * was already known to hang Zend rebuilds for hours ({@see RuntimeInitParsePipeline}).
  *
- * Under {@see ExternalMethodBind::spineChunkMode()}, replace Runtime + every
+ * Under {@see ExternalMethodBind::spineChunkMode()}, replace Runtime + Block + every
  * {@see \PHPCompiler\VM} / {@see \PHPCompiler\AOT} / {@see \PHPCompiler\Compiler} (sub-NS) /
  * {@see \PHPCompiler\Web} / {@see \PHPCompiler\Ast} / {@see \PHPCompiler\Cli} /
  * {@see \PHPCompiler\SourcePreprocessor} / {@see \PHPCompiler\JIT} (sub-NS) class method CFG
@@ -55,7 +58,7 @@ final class SpineChunkRuntimeMethodDemote
         }
 
         $lc = strtolower(ltrim($displayClassLc, '\\'));
-        if ('phpcompiler\\runtime' === $lc) {
+        if ('phpcompiler\\runtime' === $lc || 'phpcompiler\\block' === $lc) {
             return true;
         }
 
@@ -72,6 +75,10 @@ final class SpineChunkRuntimeMethodDemote
 
     /**
      * Replace method CFG with a single TYPE_RETURN_VOID so NestedJIT does not walk visitors.
+     *
+     * Callers still declare the LLVM function with the original arity; {@see self::isDemotedStub()}
+     * skips compileBlockInternal's arg prologue so `int ...$types` packing cannot assign a
+     * hashtable into a NATIVE_LONG param slot (Block.php under SPINE_CHUNK, #36387).
      */
     public static function demoteMethodBlock(Block $methodBlock, string $methodLc): void
     {
@@ -80,5 +87,15 @@ final class SpineChunkRuntimeMethodDemote
         $methodBlock->addOpCode(new OpCode(OpCode::TYPE_RETURN_VOID));
         // Breadcrumb for capacity probes / chunk logs (#36387).
         Progress::noteFunction('spine_chunk_runtime_demote:'.$methodLc);
+    }
+
+    /**
+     * True when {@see demoteMethodBlock()} replaced the body (single void return).
+     */
+    public static function isDemotedStub(Block $methodBlock): bool
+    {
+        return 1 === \count($methodBlock->opCodes)
+            && OpCode::TYPE_RETURN_VOID === $methodBlock->opCodes[0]->type
+            && [] === $methodBlock->blocks;
     }
 }

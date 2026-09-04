@@ -194,9 +194,17 @@ trait CompileBlockInternal
                 ?? \PHPCompiler\SourcePreprocessor\PropertyHooks::propertyNameFromGetHookMethod($methodLc);
         }
         if ([] !== $args) {
-            if (0 === $thisParamOffset && $this->llvmThisParamOffset($block) > 0) {
+            // SPINE_CHUNK demoted stubs: keep LLVM arity, skip prologue assigns that NestedJIT
+            // would still attempt (int ...$types → hashtable into NATIVE_LONG, #36387 Block).
+            if (\PHPCompiler\AOT\ExternalMethodBind::spineChunkMode()
+                && \PHPCompiler\JIT\SpineChunkRuntimeMethodDemote::isDemotedStub($block)
+            ) {
+                $this->context->implicitThisArgument = null;
+            } elseif (0 === $thisParamOffset && $this->llvmThisParamOffset($block) > 0) {
                 $thisParamOffset = 1;
             }
+            if (!(\PHPCompiler\AOT\ExternalMethodBind::spineChunkMode()
+                && \PHPCompiler\JIT\SpineChunkRuntimeMethodDemote::isDemotedStub($block))) {
             foreach ($block->orig->hoistedOperands as $hoisted) {
                 if ('this' === \PHPCompiler\JIT\OperandName::resolve($hoisted)) {
                     if (!$this->context->hasVariableOp($hoisted)) {
@@ -329,6 +337,7 @@ trait CompileBlockInternal
                     }
                 }
             }
+            } // !isDemotedStub — keep LLVM arity, skip NestedJIT prologue assigns (#36387)
         }
 
         for ($i = $startIndex, $length = null !== $limit ? $limit : count($block->opCodes); $i < $length; ++$i) {
