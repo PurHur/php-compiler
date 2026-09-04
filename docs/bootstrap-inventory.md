@@ -38906,8 +38906,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmStdStreamConstants.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 36)
-- 1 class method(s)
+- new Variable (line 38)
+- 4 class method(s)
 
 ### `ext/standard/VmStreamArg.php`
 

@@ -96,7 +96,8 @@ if ($emallocFinal > 4096) {
 }
 
 if ($rssAtBaseline > 0 && $rssFinal > 0) {
-    $limit = (int) ceil($rssAtBaseline * 1.25) + 1024; // 25% + 1 MiB slack for allocator noise
+    // Done-when (#36388): RSS after N within 5% of baseline (+1 MiB slack for allocator noise).
+    $limit = (int) ceil($rssAtBaseline * 1.05) + 1024;
     if ($rssFinal > $limit) {
         fwrite(STDERR, "fastcgi-soak: FAIL rss final={$rssFinal} kb > limit={$limit} kb (baseline={$rssAtBaseline})\n");
         exit(1);
