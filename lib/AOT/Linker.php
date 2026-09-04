@@ -115,6 +115,14 @@ final class Linker
             return;
         }
 
+        // -fsanitize=* is a compiler-driver flag; raw ld rejects it
+        // ("-f may not be used without -shared"). Prefer clang/gcc (#36397).
+        if (self::sanitizerRequested()) {
+            self::linkWithSystemCompiler($objectFile, $executable, $runtimeObjects, $vendorObjects, $linkObjectFiles, $helperGcLinkPaths, $scriptObjects);
+
+            return;
+        }
+
         $ld = $llvmDir . '/ld';
         $gccDir = $llvmDir . '/gcc/9';
         $crtbegin = $gccDir . '/crtbegin.o';
@@ -152,7 +160,7 @@ final class Linker
             $cmd = implode(' ', [
                 escapeshellarg($ld),
                 AotDebugSymbols::linkFlag(),
-                self::sanitizerLinkFlags(),
+                // No sanitizerLinkFlags here — raw ld rejects -fsanitize=* (#36397).
                 AotGcSections::linkStripFlag(),
                 AotGcSections::linkGcSectionsFlagForHelperLink(false, $helperGcLinkPaths),
                 self::helperMuldefsFlag('-z muldefs'),
@@ -286,11 +294,18 @@ final class Linker
         return is_file($outFile) && filesize($outFile) > 0;
     }
 
+    /** True when PHP_COMPILER_ASAN=1 — link via clang/gcc, never raw ld (#36397). */
+    private static function sanitizerRequested(): bool
+    {
+        $flag = Config::getenv('PHP_COMPILER_ASAN');
+
+        return '1' === $flag || 'true' === strtolower((string) $flag);
+    }
+
     /** -fsanitize=address,undefined when PHP_COMPILER_ASAN=1 (#36397). */
     private static function sanitizerLinkFlags(): string
     {
-        $flag = Config::getenv('PHP_COMPILER_ASAN');
-        if ('1' !== $flag && 'true' !== strtolower((string) $flag)) {
+        if (!self::sanitizerRequested()) {
             return '';
         }
 
@@ -850,9 +865,10 @@ final class Linker
         if ([] === $linkObjectFiles) {
             $linkObjectFiles = array_merge($runtimeObjects, $scriptObjects, $vendorObjects);
         }
-        $linkers = [
-            'clang-9', 'clang', 'clang-17', 'clang-14', 'gcc', 'cc',
-        ];
+        // Host clang/gcc carry matching ASan/UBSan runtimes; bundled clang-9 often does not (#36397).
+        $linkers = self::sanitizerRequested()
+            ? ['clang', 'clang-14', 'clang-17', 'gcc', 'cc', 'clang-9']
+            : ['clang-9', 'clang', 'clang-17', 'clang-14', 'gcc', 'cc'];
         $objects = '';
         foreach ($runtimeObjects as $runtimeObject) {
             $objects .= ' '.escapeshellarg($runtimeObject);
@@ -863,6 +879,7 @@ final class Linker
         foreach ($vendorObjects as $vendorObject) {
             $objects .= ' '.escapeshellarg($vendorObject);
         }
+        $lastErr = '';
         foreach ($linkers as $linker) {
             $path = self::which($linker);
             if (null === $path) {
@@ -876,10 +893,15 @@ final class Linker
 
                 return;
             }
+            $lastErr = trim((string) ($captured['stderr'] ?? ''));
         }
         self::unlinkIfTemp($runtimeObjects);
+        $hint = self::sanitizerRequested()
+            ? ' (PHP_COMPILER_ASAN=1 needs a host clang/gcc with libasan; raw ld cannot take -fsanitize)'
+            : '';
         throw new \LogicException(
-            'No supported linker found. Run script/install-llvm9.sh or install clang/gcc.'
+            'No supported linker found'.$hint.'. Run script/install-llvm9.sh or install clang/gcc.'
+            .( '' !== $lastErr ? ' Last error: '.$lastErr : '')
         );
     }
 
