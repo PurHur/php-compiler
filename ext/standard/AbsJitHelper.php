@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * abs() for compiled JIT/AOT modules (#15175, php-in-PHP).
+ * abs() for VM / NestedJIT modules (#15175, php-in-PHP).
  *
+ * AOT hot path uses {@see \PHPCompiler\JIT\Builtin\MathAbs} → llvm.fabs.f64 (#36386).
  * SSOT mirrors {@see abs::execute()} int/float paths.
  * php-src: ext/standard/math.c — PHP_FUNCTION(abs) / fabs (clears sign bit)
  */

@@ -7,20 +7,29 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\AbsJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** abs() JIT routes through AbsJitHelper PHP not inline LLVM (#15175). */
+/**
+ * abs() AOT uses llvm.fabs.f64 + inline i64 select (#36386); AbsJitHelper remains
+ * for VM / NestedJIT (peer MathSqrt / SqrtJitHelper).
+ *
+ * php-src: ext/standard/math.c PHP_FUNCTION(abs) → fabs / long negate.
+ */
 final class AbsRuntimeShrinkTest extends TestCase
 {
-    public function testAbsUsesJitHelperNotInlineLlvm(): void
+    public function testAbsUsesLlvmIntrinsicNotHelperBridge(): void
     {
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/abs.php');
         $this->assertStringContainsString('MathAbs::invokeDouble', $builtin);
         $this->assertStringContainsString('MathAbs::invokeLong', $builtin);
-        $this->assertStringNotContainsString('fNegate', $builtin);
-        $this->assertStringNotContainsString('->negate(', $builtin);
 
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathAbs.php');
-        $this->assertStringContainsString('AbsJitHelper', $bridge);
+        $this->assertStringContainsString('llvm.fabs.f64', $bridge);
         $this->assertStringContainsString('phpc_abs_double', $bridge);
+        $this->assertStringContainsString('phpc_abs_long', $bridge);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('abs_double_bridge_entry', $bridge);
+        $this->assertStringNotContainsString('abs_long_bridge_entry', $bridge);
+        $this->assertStringNotContainsString('AbsJitHelper::', $bridge);
+        $this->assertStringNotContainsString('absDoubleArgv', $bridge);
     }
 
     public function testAbsJitHelperDelegatesToVmSemantics(): void
