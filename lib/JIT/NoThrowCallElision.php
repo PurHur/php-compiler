@@ -296,6 +296,14 @@ final class NoThrowCallElision
             // hash.c hash_equals — two typed strings; TypeError on non-string.
             return self::hashEqualsArgsCannotThrow($callArgs);
         }
+        if (self::isPurePathinfoBuiltin($name)) {
+            // basic_functions.c / file.c pathinfo — typed string + optional flags.
+            return self::pathinfoArgsCannotThrow($callArgs);
+        }
+        if (self::isPureParseUrlBuiltin($name)) {
+            // url.c parse_url — typed string + optional component long.
+            return self::parseUrlArgsCannotThrow($callArgs);
+        }
         if (self::isPureVersionCompareBuiltin($name)) {
             // versioning.c — typed strings; optional operator must be proven valid.
             return self::versionCompareArgsCannotThrow($callArgs);
@@ -878,6 +886,27 @@ final class NoThrowCallElision
     }
 
     /**
+     * php-src {@code ext/standard/basic_functions.c} / {@code file.c}
+     * {@code pathinfo} — Z_PARAM_STR path + optional Z_PARAM_LONG flags.
+     * Soft-null path/flags deprecate. Public for {@see DiscardedPureCallElision}
+     * (#36386).
+     */
+    public static function isPurePathinfoBuiltin(string $nameLc): bool
+    {
+        return 'pathinfo' === $nameLc;
+    }
+
+    /**
+     * php-src {@code ext/standard/url.c} {@code parse_url} — Z_PARAM_STR url +
+     * optional Z_PARAM_LONG component. Soft-null url/component deprecate.
+     * Public for {@see DiscardedPureCallElision} (#36386).
+     */
+    public static function isPureParseUrlBuiltin(string $nameLc): bool
+    {
+        return 'parse_url' === $nameLc;
+    }
+
+    /**
      * php-src {@code ext/standard/versioning.c} {@code version_compare}. Public
      * for {@see DiscardedPureCallElision} (#36386).
      */
@@ -1024,6 +1053,68 @@ final class NoThrowCallElision
 
         return self::stringParamBuiltinArgCannotThrow($callArgs[0])
             && self::stringParamBuiltinArgCannotThrow($callArgs[1]);
+    }
+
+    /**
+     * Typed / literal string path + optional typed numeric flags — soft-null
+     * path/flags stay out (deprecate).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    public static function pathinfoArgsCannotThrow(array $callArgs): bool
+    {
+        if (
+            !isset($callArgs[0])
+            || !$callArgs[0] instanceof Variable
+            || !self::stringParamBuiltinArgCannotThrow($callArgs[0])
+        ) {
+            return false;
+        }
+        if (!isset($callArgs[1])) {
+            return true;
+        }
+        if (
+            !$callArgs[1] instanceof Variable
+            || !self::numericParamBuiltinArgCannotThrow($callArgs[1])
+            || $callArgs[1]->isNullConstant
+            || Variable::TYPE_NULL === $callArgs[1]->type
+            || isset($callArgs[2])
+        ) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Typed / literal string url + optional typed numeric component — soft-null
+     * url/component stay out (deprecate).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    public static function parseUrlArgsCannotThrow(array $callArgs): bool
+    {
+        if (
+            !isset($callArgs[0])
+            || !$callArgs[0] instanceof Variable
+            || !self::stringParamBuiltinArgCannotThrow($callArgs[0])
+        ) {
+            return false;
+        }
+        if (!isset($callArgs[1])) {
+            return true;
+        }
+        if (
+            !$callArgs[1] instanceof Variable
+            || !self::numericParamBuiltinArgCannotThrow($callArgs[1])
+            || $callArgs[1]->isNullConstant
+            || Variable::TYPE_NULL === $callArgs[1]->type
+            || isset($callArgs[2])
+        ) {
+            return false;
+        }
+
+        return true;
     }
 
     /**

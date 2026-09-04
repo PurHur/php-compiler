@@ -27,6 +27,8 @@ use PHPCompiler\VM\Variable as VmVariable;
  * [2,36]), typed ip2long/long2ip/inet_pton/inet_ntop, typed version_compare,
  * typed min/max/fmin/fmax (≥1 numeric; array-form min/max stays live),
  * typed checkdate (3 longs), typed hash_equals (2 strings),
+ * typed pathinfo (string + optional flags), typed parse_url
+ * (string + optional component),
  * zero-arg pi, type.c predicates + gettype/get_debug_type, ctype.c
  * classifiers on typed/literal strings, typed-array count/sizeof, math.c
  * incl. pow/fpow/fdiv on already-numeric args, empty void user functions).
@@ -49,7 +51,9 @@ use PHPCompiler\VM\Variable as VmVariable;
  * Single-array {@code min}/{@code max} stays live (element compare / object
  * handlers). {@code clamp} stays live ({@code ValueError} when min > max /
  * NAN). Soft-null {@code checkdate} stays live (deprecate). Non-string
- * {@code hash_equals} stays live ({@code TypeError}).
+ * {@code hash_equals} stays live ({@code TypeError}). Soft-null
+ * {@code pathinfo}/{@code parse_url} path/url/flags/component stay live
+ * (deprecate).
  */
 final class DiscardedPureCallElision
 {
@@ -107,6 +111,12 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureHashEqualsNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePurePathinfoNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureParseUrlNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureVersionCompareNoSideEffect($toCall, $callArgs)) {
@@ -1101,6 +1111,44 @@ final class DiscardedPureCallElision
     }
 
     /**
+     * Discarded {@code pathinfo} on typed / literal string (+ optional typed
+     * flags) — php-src {@code basic_functions.c}/{@code file.c}. Soft-null
+     * path/flags stay live (deprecate).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePurePathinfoNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if (!NoThrowCallElision::isPurePathinfoBuiltin(strtolower($toCall->getName()))) {
+            return false;
+        }
+
+        return self::pathinfoArgsAllowDiscardedElision($callArgs);
+    }
+
+    /**
+     * Discarded {@code parse_url} on typed / literal string (+ optional typed
+     * component) — php-src {@code url.c}. Soft-null url/component stay live
+     * (deprecate).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureParseUrlNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if (!NoThrowCallElision::isPureParseUrlBuiltin(strtolower($toCall->getName()))) {
+            return false;
+        }
+
+        return self::parseUrlArgsAllowDiscardedElision($callArgs);
+    }
+
+    /**
      * Discarded {@code version_compare} on typed / literal strings — php-src
      * {@code versioning.c}. Optional operator must be null or a compile-time
      * valid comparison op ({@code ValueError} otherwise).
@@ -1239,6 +1287,58 @@ final class DiscardedPureCallElision
 
         return self::stringArgAllowsDiscardedElision($callArgs[0])
             && self::stringArgAllowsDiscardedElision($callArgs[1]);
+    }
+
+    /**
+     * @param array<int, Variable> $callArgs
+     */
+    private static function pathinfoArgsAllowDiscardedElision(array $callArgs): bool
+    {
+        if (
+            !isset($callArgs[0])
+            || !$callArgs[0] instanceof Variable
+            || !self::stringArgAllowsDiscardedElision($callArgs[0])
+        ) {
+            return false;
+        }
+        if (!isset($callArgs[1])) {
+            return true;
+        }
+        if (
+            !$callArgs[1] instanceof Variable
+            || !self::mathArgAllowsDiscardedElision($callArgs[1])
+            || isset($callArgs[2])
+        ) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * @param array<int, Variable> $callArgs
+     */
+    private static function parseUrlArgsAllowDiscardedElision(array $callArgs): bool
+    {
+        if (
+            !isset($callArgs[0])
+            || !$callArgs[0] instanceof Variable
+            || !self::stringArgAllowsDiscardedElision($callArgs[0])
+        ) {
+            return false;
+        }
+        if (!isset($callArgs[1])) {
+            return true;
+        }
+        if (
+            !$callArgs[1] instanceof Variable
+            || !self::mathArgAllowsDiscardedElision($callArgs[1])
+            || isset($callArgs[2])
+        ) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
