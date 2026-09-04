@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 8163 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 25874 |
+| Source constructs flagged (warnings) | 25873 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -6531,7 +6531,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/Type/ObjectInstancePropertyLlvm.php` | 0 | 6 |
 | `lib/JIT/Builtin/Type/ObjectStaticPropertyInitLlvm.php` | 0 | 2 |
 | `lib/JIT/Builtin/Type/ObjectStaticPropertyLlvm.php` | 0 | 10 |
-| `lib/JIT/Builtin/Type/Object_.php` | 0 | 36 |
+| `lib/JIT/Builtin/Type/Object_.php` | 0 | 35 |
 | `lib/JIT/Builtin/Type/String_.php` | 0 | 1 |
 | `lib/JIT/Builtin/Type/Value.php` | 0 | 4 |
 | `lib/JIT/Builtin/TypeErrorRaise.php` | 0 | 3 |
@@ -55098,21 +55098,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new VMVariable (line 7153)
 - new ReflectionClassConstant (line 7895)
 - new Variable (line 8339)
-- new Variable (line 8359)
-- new Variable (line 8370)
-- new Variable (line 8383)
-- new Variable (line 8391)
-- new Variable (line 8414)
-- new Variable (line 8440)
-- new Variable (line 8448)
-- new Variable (line 8522)
-- new Literal (line 8539)
-- new Literal (line 8544)
-- new Literal (line 8549)
-- new Variable (line 8560)
-- new Variable (line 8593)
-- new Variable (line 8616)
-- new Variable (line 9166)
+- new Variable (line 8368)
+- new Variable (line 8395)
+- new Variable (line 8403)
+- new Variable (line 8426)
+- new Variable (line 8452)
+- new Variable (line 8460)
+- new Variable (line 8534)
+- new Literal (line 8551)
+- new Literal (line 8556)
+- new Literal (line 8561)
+- new Variable (line 8572)
+- new Variable (line 8605)
+- new Variable (line 8628)
+- new Variable (line 9178)
 - 354 class method(s)
 - 9 closure(s)
 
@@ -58217,7 +58216,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/DiscardedPureCallElision.php`
 
 **Warnings** (review for bootstrap subset):
-- 31 class method(s)
+- 35 class method(s)
 
 ### `lib/JIT/DnfParamCheck.php`
 
@@ -59350,8 +59349,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/NoThrowCallElision.php`
 
 **Warnings** (review for bootstrap subset):
-- new Operand\Literal (line 1656)
-- 39 class method(s)
+- new Operand\Literal (line 1795)
+- 45 class method(s)
 
 ### `lib/JIT/NonObjectPropertyFetchHelper.php`
 
