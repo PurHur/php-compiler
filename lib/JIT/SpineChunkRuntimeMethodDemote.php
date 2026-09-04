@@ -43,8 +43,9 @@ use PHPCompiler\OpCode;
  *   1536M even with empty method bodies — skipped from spine plans (see chunk-plan).
  * - Top-level Builtin* / OpCode / ModuleAbstract / Frame / Config: NestedJIT SEGV (rc=139)
  *   or LLVM Type OOM under 1536M — measured 2026-09-04 (BuiltinParamNames 33s SEGV;
- *   Config 168s then Allowed memory exhausted). Doctor.php fails host CFG
- *   (isInlineExprCallArgProducer null Op) before JIT demote — skipped in chunk-plan.
+ *   Config 168s then Allowed memory exhausted). Doctor.php (103 KB): host CFG hit
+ *   isInlineExprCallArgProducer(null) on sparse children (fixed in Compiler) then NestedJIT
+ *   OOM at 1536M without demote (~148s) — hollow + demote emits under SPINE_CHUNK (#36387).
  * - Func\* / Cfg\* / Lint\* / Visitor\*: NestedJIT SEGV on Internal/PHP/Linter/
  *   OpSubBlockAccess/VoidCastResolver — measured 2026-09-04.
  * - Top-level JIT Concern traits ({@see CompileBlockInternal}, AssignOperand, InitJitMethodCall)
@@ -65,9 +66,9 @@ use PHPCompiler\OpCode;
  * with a void-return stub before {@see \PHPCompiler\JIT::compileBlock} so hub ClassEntry +
  * method symbols still land in the .o / peer manifest. Real bodies stay on C-floor helpers
  * (RuntimeInitParsePipeline / RuntimeParseM5Native), NestedVM object:: proxies, or later
- * peer-bound non-demoted TUs. Does not demote top-level {@see \PHPCompiler\Compiler} /
- * {@see \PHPCompiler\CompilerVersion} / {@see \PHPCompiler\JIT} — Compiler/JIT need file
- * splits before host CFG fits under 8g; CompilerVersion already emits live.
+ * peer-bound non-demoted TUs. Demotes top-level {@see \PHPCompiler\Doctor}. Does not demote
+ * {@see \PHPCompiler\Compiler} / {@see \PHPCompiler\CompilerVersion} / {@see \PHPCompiler\JIT}
+ * — Compiler/JIT need file splits before host CFG fits under 8g; CompilerVersion already emits live.
  * {@see self::rewriteSource()} hollows demoted class **and trait** bodies before CFG when
  * SourceBundler keeps the entry filename.
  */
@@ -88,6 +89,7 @@ final class SpineChunkRuntimeMethodDemote
             || 'phpcompiler\\moduleabstract' === $lc
             || 'phpcompiler\\frame' === $lc
             || 'phpcompiler\\config' === $lc
+            || 'phpcompiler\\doctor' === $lc
             // JIT Concern traits extracted into namespace PHPCompiler (#36403 / #36387).
             || 'phpcompiler\\compileblockinternal' === $lc
             || 'phpcompiler\\assignoperand' === $lc
@@ -143,6 +145,7 @@ final class SpineChunkRuntimeMethodDemote
             || 'lib/ModuleAbstract.php' === $rel
             || 'lib/Frame.php' === $rel
             || 'lib/Config.php' === $rel
+            || 'lib/Doctor.php' === $rel
             || str_starts_with($rel, 'lib/Builtin')
         ) {
             return true;

@@ -141,6 +141,12 @@ PHP;
         $this->assertStringNotContainsString('return 1', $hollowed);
         $this->assertStringContainsString('function f() {}', preg_replace('/\s+/', ' ', $hollowed) ?? $hollowed);
 
+        // Doctor hollows under SPINE_CHUNK (#36387).
+        $doctor = "<?php\nnamespace PHPCompiler;\nclass Doctor { public function f() { return 1; } }\n";
+        $doctorHollow = SpineChunkRuntimeMethodDemote::rewriteSource($doctor, '/compiler/lib/Doctor.php');
+        $this->assertStringNotContainsString('return 1', $doctorHollow);
+        $this->assertStringContainsString('function f() {}', preg_replace('/\s+/', ' ', $doctorHollow) ?? $doctorHollow);
+
         // CompilerVersion stays live — no hollow.
         $cv = "<?php\nnamespace PHPCompiler;\nclass CompilerVersion { public function f() { return 1; } }\n";
         $this->assertSame($cv, SpineChunkRuntimeMethodDemote::rewriteSource($cv, '/compiler/lib/CompilerVersion.php'));
