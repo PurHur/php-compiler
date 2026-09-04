@@ -22,9 +22,11 @@ use PHPCompiler\VM\Variable as VmVariable;
  * typed quoted_printable_encode/decode, basename/dirname,
  * typed htmlspecialchars/htmlentities/nl2br/preg_quote/
  * escapeshell*, typed-numeric chr/number_format, typed similar_text
- * (2-arg), typed intval/floatval/boolval/strval, type.c predicates + gettype,
- * ctype.c classifiers on typed/literal strings, typed-array count/sizeof,
- * math.c incl. pow/fpow/fdiv on already-numeric args, empty void user functions).
+ * (2-arg), typed intval/floatval/boolval/strval, typed decbin/dechex/
+ * decoct / bindec/hexdec/octdec, zero-arg pi, type.c predicates +
+ * gettype/get_debug_type, ctype.c classifiers on typed/literal strings,
+ * typed-array count/sizeof, math.c incl. pow/fpow/fdiv on already-numeric
+ * args, empty void user functions).
  * Soft-null strlen / ord / chr / math / string / ctype coercions are NOT
  * elided — they emit deprecations (PHP 8.1+). Countable objects stay live
  * (user {@code count()} handlers). {@code intdiv} is never discarded here
@@ -81,6 +83,9 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureScalarCastNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureBaseConvertNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElideCountOnTypedArray($toCall, $callArgs)) {
@@ -973,6 +978,49 @@ final class DiscardedPureCallElision
     }
 
     /**
+     * Discarded {@code decbin}/{@code dechex}/{@code decoct} on typed numerics and
+     * {@code bindec}/{@code hexdec}/{@code octdec} on typed / literal strings —
+     * php-src {@code math.c}. Soft-null coerce deprecates so null stays live
+     * (peer {@see tryElideChrNoSideEffect} / {@see tryElideStrlenNoSideEffect}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureBaseConvertNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        $name = strtolower($toCall->getName());
+        if (!NoThrowCallElision::isPureBaseConvertBuiltin($name)) {
+            return false;
+        }
+
+        return self::baseConvertArgsAllowDiscardedElision($name, $callArgs);
+    }
+
+    /**
+     * @param array<int, Variable> $callArgs
+     */
+    private static function baseConvertArgsAllowDiscardedElision(string $nameLc, array $callArgs): bool
+    {
+        if (!isset($callArgs[0]) || !$callArgs[0] instanceof Variable || isset($callArgs[1])) {
+            return false;
+        }
+        switch ($nameLc) {
+            case 'decbin':
+            case 'dechex':
+            case 'decoct':
+                return self::mathArgAllowsDiscardedElision($callArgs[0]);
+            case 'bindec':
+            case 'hexdec':
+            case 'octdec':
+                return self::stringArgAllowsDiscardedElision($callArgs[0]);
+            default:
+                return false;
+        }
+    }
+
+    /**
      * @param array<int, Variable> $callArgs
      */
     private static function scalarCastArgsAllowDiscardedElision(string $nameLc, array $callArgs): bool
@@ -1090,9 +1138,9 @@ final class DiscardedPureCallElision
     }
 
     /**
-     * Discarded {@code abs}/{@code sqrt}/{@code floor}/… on already-numeric args —
-     * php-src {@code math.c} has no user handlers; null soft-coercion deprecates
-     * so TYPE_NULL is excluded (peer strlen null).
+     * Discarded {@code abs}/{@code sqrt}/{@code floor}/…/{@code pi} on already-numeric
+     * args (or zero-arg {@code pi}) — php-src {@code math.c} has no user handlers;
+     * null soft-coercion deprecates so TYPE_NULL is excluded (peer strlen null).
      *
      * @param array<int, Variable> $callArgs
      */
@@ -1101,10 +1149,16 @@ final class DiscardedPureCallElision
         if (!$toCall instanceof CoreFuncInternal) {
             return false;
         }
-        if (!NoThrowCallElision::isPureMathBuiltin(strtolower($toCall->getName()))) {
+        $name = strtolower($toCall->getName());
+        if (!NoThrowCallElision::isPureMathBuiltin($name)) {
             return false;
         }
         if ([] === $callArgs) {
+            // pi() only — other math.c entries require at least one numeric arg.
+            return 'pi' === $name;
+        }
+        if ('pi' === $name) {
+            // Extra args stay live (ArgumentCountError).
             return false;
         }
         foreach ($callArgs as $arg) {

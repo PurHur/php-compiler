@@ -217,10 +217,14 @@ final class NoThrowCallElision
         }
         $name = strtolower($toCall->getName());
         if (self::isPureTypePredicateBuiltin($name)) {
-            // is_int / is_string / gettype / … never invoke user handlers
-            // (php-src type.c / basic_functions.c). Exclude is_callable / is_a
-            // (autoload / __invoke).
+            // is_int / is_string / gettype / get_debug_type / … never invoke
+            // user handlers (php-src type.c / basic_functions.c). Exclude
+            // is_callable / is_a (autoload / __invoke).
             return true;
+        }
+        if ('pi' === $name) {
+            // math.c pi() — no args, constant only.
+            return [] === $callArgs;
         }
         if (!isset($callArgs[0]) || !$callArgs[0] instanceof Variable) {
             return false;
@@ -268,6 +272,10 @@ final class NoThrowCallElision
             // type.c / basic_functions.c intval/floatval/boolval/strval — typed
             // scalars only; objects stay out (__toString / cast handlers).
             return self::scalarCastArgsCannotThrow($name, $callArgs);
+        }
+        if (self::isPureBaseConvertBuiltin($name)) {
+            // math.c decbin/hexdec/… — typed numeric or string; soft-null stays out.
+            return self::baseConvertArgsCannotThrow($name, $callArgs);
         }
         if ('chr' === $name) {
             // Z_PARAM_LONG family — object→int does not call __toString; still
@@ -333,6 +341,9 @@ final class NoThrowCallElision
             case 'is_nan':
             // basic_functions.c gettype — type-tag → string label only (peer is_*).
             case 'gettype':
+            // type.c get_debug_type — precise type name / class name only (no
+            // __toString); peer gettype for discarded elision (#36386).
+            case 'get_debug_type':
                 return true;
             default:
                 return false;
@@ -757,6 +768,52 @@ final class NoThrowCallElision
             case 'boolval':
             case 'strval':
                 return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * php-src {@code ext/standard/math.c} base / radix converts — int→string
+     * ({@code decbin}/{@code dechex}/{@code decoct}) or string→number
+     * ({@code bindec}/{@code hexdec}/{@code octdec}). Soft-null / object
+     * {@code __toString} stay out. Public for {@see DiscardedPureCallElision}
+     * (#36386).
+     */
+    public static function isPureBaseConvertBuiltin(string $nameLc): bool
+    {
+        switch ($nameLc) {
+            case 'decbin':
+            case 'dechex':
+            case 'decoct':
+            case 'bindec':
+            case 'hexdec':
+            case 'octdec':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * @param array<int, Variable> $callArgs
+     */
+    public static function baseConvertArgsCannotThrow(string $nameLc, array $callArgs): bool
+    {
+        if (!isset($callArgs[0]) || !$callArgs[0] instanceof Variable || isset($callArgs[1])) {
+            return false;
+        }
+        switch ($nameLc) {
+            case 'decbin':
+            case 'dechex':
+            case 'decoct':
+                // Z_PARAM_LONG — soft-null deprecates (stay live).
+                return self::numericParamBuiltinArgCannotThrow($callArgs[0]);
+            case 'bindec':
+            case 'hexdec':
+            case 'octdec':
+                // Z_PARAM_STR — soft-null / __toString stay live.
+                return self::stringParamBuiltinArgCannotThrow($callArgs[0]);
             default:
                 return false;
         }
@@ -1305,6 +1362,8 @@ final class NoThrowCallElision
             case 'pow':
             case 'fpow':
             case 'fdiv':
+            // math.c pi() — zero-arg constant (M_PI); no user handlers.
+            case 'pi':
                 return true;
             default:
                 return false;
