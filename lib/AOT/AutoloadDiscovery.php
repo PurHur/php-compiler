@@ -236,6 +236,13 @@ final class StaticClassReferenceScanner
                 foreach ($child->implements as $iface) {
                     self::collectOperand($iface, $names);
                 }
+            } elseif ($child instanceof Op\Stmt\Property) {
+                // Property types (e.g. Slim CallableResolver::$container : ?ContainerInterface)
+                // are not new/static/extends refs — without this, reachable Composer graphs omit
+                // PSR interfaces and AOT dies on $container->has() (#36382).
+                self::collectDeclaredType($child->declaredType ?? null, $names);
+            } elseif ($child instanceof Op\Expr\Param) {
+                self::collectDeclaredType($child->declaredType ?? null, $names);
             } elseif ($child instanceof Op\Stmt\TraitUse) {
                 // Nyholm Request uses MessageTrait/RequestTrait — without this, reachable
                 // Composer graphs omit traits and AOT dies with "Trait not found" (#36382).
@@ -259,6 +266,39 @@ final class StaticClassReferenceScanner
             OpSubBlockAccess::walkSubBlocks($child, static function (CfgBlock $sub) use (&$names, $seen): void {
                 self::walkBlock($sub, $names, $seen);
             });
+        }
+    }
+
+    /**
+     * @param list<string> $names
+     */
+    private static function collectDeclaredType(mixed $type, array &$names): void
+    {
+        if (null === $type) {
+            return;
+        }
+        if ($type instanceof Op\Type\Literal) {
+            $normalized = self::normalizeClassName((string) $type->name);
+            if (null !== $normalized) {
+                $names[] = $normalized;
+            }
+
+            return;
+        }
+        if ($type instanceof Op\Type\Nullable) {
+            self::collectDeclaredType($type->subtype ?? null, $names);
+
+            return;
+        }
+        if ($type instanceof Op\Type\Reference) {
+            self::collectOperand($type->declaration ?? null, $names);
+
+            return;
+        }
+        if ($type instanceof Op\Type\Intersection) {
+            foreach (($type->types ?? []) as $part) {
+                self::collectDeclaredType($part, $names);
+            }
         }
     }
 

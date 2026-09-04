@@ -19455,6 +19455,34 @@ class JIT {
     }
 
     /**
+     * Subtype-filtered instance dispatch when the declared receiver type has no body
+     * (interface / abstract method). Mirrors Zend `zend_std_get_method` (#36382).
+     *
+     * @return array<int, JIT\Call> class id => invoke proxy
+     */
+    private function buildRuntimeInstanceMethodCandidatesForDeclaredType(
+        string $declaredLc,
+        string $methodLc
+    ): array {
+        $declaredLc = strtolower(ltrim($declaredLc, '\\'));
+        if ('' === $declaredLc || 'object' === $declaredLc) {
+            return $this->buildRuntimeInstanceMethodCandidatesByClassId($methodLc);
+        }
+        $allowed = array_flip($this->context->type->object->classIdsInstanceOf($declaredLc));
+        if ([] === $allowed) {
+            return [];
+        }
+        $candidates = [];
+        foreach ($this->buildRuntimeInstanceMethodCandidatesByClassId($methodLc) as $classId => $call) {
+            if (isset($allowed[$classId])) {
+                $candidates[$classId] = $call;
+            }
+        }
+
+        return $candidates;
+    }
+
+    /**
      * Safe `__construct` candidates for `new $class` (#27156).
      *
      * Custom Call proxies (LimitIteratorConstruct, …) validate PHP arg counts while
