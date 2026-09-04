@@ -5362,6 +5362,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/ErrorSuppressCallArgProduce
 require_once __DIR__.'/../../../lib/Compiler/Concern/FinalizeArrayFamilyCallArgSlots.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/FunctionStaticAndCompileTimeLiterals.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/IssetEmptyCallArgAndMultiCompile.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/CoalesceLeftAndEchoConcatPreludes.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileBlockInternal.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AssignOperand.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AdaptByRefCallArgs.php';
