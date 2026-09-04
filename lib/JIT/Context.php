@@ -3531,7 +3531,10 @@ class Context {
             // restore stays valid after a partial edit (#36387).
             if (is_string($partialBase) && is_file($partialBase) && filesize($partialBase) > 0) {
                 $combinedTmp = $objectFile.'.full.'.getmypid();
-                if (Linker::combineRelocatableObjects([$objectFile, $partialBase], $combinedTmp)) {
+                \PHPCompiler\AOT\BuildTiming::mark('object_combine');
+                $combined = Linker::combineRelocatableObjects([$objectFile, $partialBase], $combinedTmp);
+                \PHPCompiler\AOT\BuildTiming::end('object_combine');
+                if ($combined) {
                     $objectToCache = $combinedTmp;
                     \PHPCompiler\AOT\BuildTiming::note('edit_scaffold_object_combine', 1.0);
                 }
