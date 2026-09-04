@@ -759,6 +759,10 @@ final class Variable {
             $type = self::TYPE_NATIVE_LONG;
         } elseif (self::TYPE_VALUE === $type && $context->analyzer->canStayNativeLong($op)) {
             $type = self::TYPE_NATIVE_LONG;
+        } elseif (self::TYPE_VALUE === $type && self::isDeclaredStringParamOperand($block, $op)) {
+            // Same UNKNOWN→VALUE trap for `string $s` read inside a loop: keep the
+            // native `__string__*` Variable so strlen/ord see TYPE_STRING (#36386).
+            $type = self::TYPE_STRING;
         }
         if ($type === self::TYPE_NULL) {
             // Match fromLiteral TYPE_NULL — keep isNullConstant so builtins can treat
@@ -825,7 +829,6 @@ final class Variable {
 
     private static function isVariadicParamOperand(Block $block, Operand $op): bool
     {
-        // NOTE: original isVariadicParamOperand follows — placeholder removed below
         if (null === $block->variadicParamIndex) {
             return false;
         }
@@ -840,6 +843,39 @@ final class Variable {
             if ((int) $recv->arg1 === $slot && (int) $recv->arg2 === $block->variadicParamIndex) {
                 return true;
             }
+        }
+
+        return false;
+    }
+
+    /**
+     * True when {@code $op} is a non-nullable {@code string} function formal.
+     * Used to keep TYPE_STRING when PHPTypes leaves the param result UNKNOWN (#36386).
+     */
+    private static function isDeclaredStringParamOperand(Block $block, Operand $op): bool
+    {
+        $cfgFunc = $block->func ?? null;
+        if (null === $cfgFunc || !isset($cfgFunc->params) || !\is_array($cfgFunc->params)) {
+            return false;
+        }
+        foreach ($cfgFunc->params as $param) {
+            if (!$param instanceof \PHPCfg\Op\Expr\Param) {
+                continue;
+            }
+            if ($param->result !== $op) {
+                continue;
+            }
+            if ($param->byRef || $param->variadic) {
+                return false;
+            }
+            $declared = $param->declaredType;
+            if ($declared instanceof \PHPCfg\Op\Type\Literal
+                && 'string' === strtolower($declared->name)
+            ) {
+                return true;
+            }
+
+            return false;
         }
 
         return false;

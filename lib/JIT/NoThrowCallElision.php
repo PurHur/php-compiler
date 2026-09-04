@@ -26,9 +26,11 @@ use PHPCompiler\JIT\Call\Vararg;
  * {@code phpc_jit_has_throw_pending} on every edge is pure overhead.
  *
  * Also skips the after-call check for pure builtins when arguments prove they
- * cannot invoke user code or set throw-pending — e.g. {@code strlen('x')} and
- * {@code strlen} on a native {@code TYPE_STRING} (php-src
- * {@code ext/standard/string.c} {@code PHP_FUNCTION(strlen)} / Z_PARAM_STR;
+ * cannot invoke user code or set throw-pending — e.g. {@code strlen('x')} /
+ * {@code ord('A')} on a native {@code TYPE_STRING}, {@code chr(65)} on a native
+ * long, and pure type predicates ({@code is_int} / {@code is_string} / …)
+ * (php-src {@code ext/standard/string.c} {@code PHP_FUNCTION(strlen)} /
+ * {@code ord} / {@code chr}; {@code ext/standard/type.c} {@code is_*};
  * throwing {@code __toString} needs an object/value box).
  *
  * Single-param identity bodies ({@code function id($x){return $x;}}) are also
@@ -201,21 +203,64 @@ final class NoThrowCallElision
             return false;
         }
         $name = strtolower($toCall->getName());
-        if ('strlen' !== $name) {
-            return false;
+        if (self::isPureTypePredicateBuiltin($name)) {
+            // is_int / is_string / … never invoke user handlers (php-src type.c).
+            // Exclude is_callable / is_a (autoload / __invoke).
+            return true;
         }
         if (!isset($callArgs[0]) || !$callArgs[0] instanceof Variable) {
             return false;
         }
+        if ('strlen' === $name || 'ord' === $name) {
+            // Z_PARAM_STR family — __toString only on object / value-box.
+            return self::stringParamBuiltinArgCannotThrow($callArgs[0]);
+        }
+        if ('chr' === $name) {
+            // Z_PARAM_LONG family — object→int does not call __toString; still
+            // keep value-box / object conservative (coercion paths vary).
+            return self::intParamBuiltinArgCannotThrow($callArgs[0]);
+        }
 
-        return self::strlenArgCannotThrow($callArgs[0]);
+        return false;
     }
 
     /**
-     * True when strlen($arg) cannot invoke {@code __toString} or leave user
+     * php-src {@code ext/standard/type.c} predicates that only inspect zval type
+     * tags (no autoload, no {@code __invoke}, no user handlers).
+     */
+    private static function isPureTypePredicateBuiltin(string $nameLc): bool
+    {
+        switch ($nameLc) {
+            case 'is_int':
+            case 'is_integer':
+            case 'is_long':
+            case 'is_float':
+            case 'is_double':
+            case 'is_real':
+            case 'is_string':
+            case 'is_bool':
+            case 'is_null':
+            case 'is_array':
+            case 'is_object':
+            case 'is_resource':
+            case 'is_scalar':
+            case 'is_numeric':
+            case 'is_iterable':
+            case 'is_countable':
+            case 'is_finite':
+            case 'is_infinite':
+            case 'is_nan':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * True when strlen/ord($arg) cannot invoke {@code __toString} or leave user
      * throw-pending for the caller to observe.
      */
-    private static function strlenArgCannotThrow(Variable $arg): bool
+    private static function stringParamBuiltinArgCannotThrow(Variable $arg): bool
     {
         if (null !== JitStringArg::compileTimeLiteral($arg)) {
             return true;
@@ -233,6 +278,33 @@ final class NoThrowCallElision
             || Variable::TYPE_NULL === $arg->type
             || $arg->isNullConstant
         ) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * True when chr($arg) cannot leave user throw-pending (native / compile-time
+     * numeric scalars only).
+     */
+    private static function intParamBuiltinArgCannotThrow(Variable $arg): bool
+    {
+        if (null !== $arg->compileTimeLong || null !== $arg->compileTimeFloat) {
+            return true;
+        }
+        if (
+            Variable::TYPE_NATIVE_LONG === $arg->type
+            || Variable::TYPE_NATIVE_DOUBLE === $arg->type
+            || Variable::TYPE_NATIVE_BOOL === $arg->type
+            || Variable::TYPE_NULL === $arg->type
+            || $arg->isNullConstant
+        ) {
+            return true;
+        }
+        // Numeric string literals coerce without user code.
+        $lit = JitStringArg::compileTimeLiteral($arg);
+        if (null !== $lit && is_numeric($lit)) {
             return true;
         }
 

@@ -9997,7 +9997,15 @@ class JIT {
         if (null !== $declared && Type::TYPE_UNION === $declared->type) {
             return $declared;
         }
-        if (null !== $param->result->type && Type::TYPE_NULL !== $param->result->type->type) {
+        // Prefer a resolved SSA result type, but never TYPE_UNKNOWN — PHPTypes leaves
+        // `string $s` as UNKNOWN when the formal is read inside a loop, and treating
+        // that as authoritative forced a boxed `__value__` ABI (and killed strlen/ord
+        // native-string elision) (#36386).
+        if (
+            null !== $param->result->type
+            && Type::TYPE_NULL !== $param->result->type->type
+            && Type::TYPE_UNKNOWN !== $param->result->type->type
+        ) {
             return $param->result->type;
         }
         if (null !== $declared) {
