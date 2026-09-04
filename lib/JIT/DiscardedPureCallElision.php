@@ -52,8 +52,14 @@ use PHPCompiler\VM\Variable as VmVariable;
  * excess argc stays live — ArgumentCountError),
  * phpversion / php_uname (zero-arg or typed string; soft-null stays
  * live — deprecate; excess argc stays live — ArgumentCountError),
- * getmypid / getmyuid / getmygid (zero-arg; excess argc stays live —
+ * getmypid / getmyuid / getmygid / getmyinode / getlastmod /
+ * get_current_user (zero-arg; excess argc stays live —
  * ArgumentCountError),
+ * memory_get_usage / memory_get_peak_usage (zero-arg or typed bool;
+ * soft-null bool stays live — deprecate / TypeError; excess argc stays
+ * live — ArgumentCountError),
+ * php_ini_loaded_file / php_ini_scanned_files / gc_enabled (zero-arg;
+ * excess argc stays live — ArgumentCountError),
  * zero-arg pi, type.c predicates + gettype/get_debug_type, ctype.c
  * classifiers on typed/literal strings, typed-array count/sizeof, math.c
  * incl. pow/fpow/fdiv on already-numeric args, empty void user functions).
@@ -109,7 +115,12 @@ use PHPCompiler\VM\Variable as VmVariable;
  * argc stays live ({@code ArgumentCountError}). Soft-null
  * {@code phpversion}/{@code php_uname} stay live (deprecate); excess argc
  * and non-string modes stay live; non-zero-arg {@code getmypid}/
- * {@code getmyuid}/{@code getmygid} stay live ({@code ArgumentCountError}).
+ * {@code getmyuid}/{@code getmygid}/{@code getmyinode}/{@code getlastmod}/
+ * {@code get_current_user} stay live ({@code ArgumentCountError}). Soft-null
+ * {@code memory_get_usage}/{@code memory_get_peak_usage} bool stays live
+ * (deprecate / TypeError); excess argc stays live; non-zero-arg
+ * {@code php_ini_loaded_file}/{@code php_ini_scanned_files}/
+ * {@code gc_enabled} stay live ({@code ArgumentCountError}).
  */
 final class DiscardedPureCallElision
 {
@@ -215,6 +226,9 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureProcessIdentityNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureMemoryIniRuntimeInfoNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureVersionCompareNoSideEffect($toCall, $callArgs)) {
@@ -1512,8 +1526,9 @@ final class DiscardedPureCallElision
 
     /**
      * Discarded {@code phpversion}/{@code php_uname}/{@code getmypid}/
-     * {@code getmyuid}/{@code getmygid} — php-src {@code info.c}/
-     * {@code basic_functions.c}. Pure process / runtime identity reads.
+     * {@code getmyuid}/{@code getmygid}/{@code getmyinode}/{@code getlastmod}/
+     * {@code get_current_user} — php-src {@code info.c}/
+     * {@code basic_functions.c}. Pure process / script identity reads.
      * Soft-null optional string stays live (deprecate). Excess argc stays
      * live ({@code ArgumentCountError}).
      *
@@ -1530,6 +1545,28 @@ final class DiscardedPureCallElision
         }
 
         return self::processIdentityArgsAllowDiscardedElision($nameLc, $callArgs);
+    }
+
+    /**
+     * Discarded {@code memory_get_usage}/{@code memory_get_peak_usage}/
+     * {@code php_ini_loaded_file}/{@code php_ini_scanned_files}/
+     * {@code gc_enabled} — php-src alloc / ini / GC introspection. Soft-null
+     * bool stays live (deprecate / TypeError). Excess argc stays live
+     * ({@code ArgumentCountError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureMemoryIniRuntimeInfoNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        $nameLc = strtolower($toCall->getName());
+        if (!NoThrowCallElision::isPureMemoryIniRuntimeInfoBuiltin($nameLc)) {
+            return false;
+        }
+
+        return self::memoryIniRuntimeInfoArgsAllowDiscardedElision($nameLc, $callArgs);
     }
 
     /**
@@ -1908,7 +1945,8 @@ final class DiscardedPureCallElision
     }
 
     /**
-     * {@code getmypid}/{@code getmyuid}/{@code getmygid}: arity 0.
+     * {@code getmypid}/{@code getmyuid}/{@code getmygid}/{@code getmyinode}/
+     * {@code getlastmod}/{@code get_current_user}: arity 0.
      * {@code phpversion}/{@code php_uname}: arity 0 or one typed / literal
      * string (soft-null / non-string stay live — deprecate / coerce).
      *
@@ -1920,6 +1958,9 @@ final class DiscardedPureCallElision
             case 'getmypid':
             case 'getmyuid':
             case 'getmygid':
+            case 'getmyinode':
+            case 'getlastmod':
+            case 'get_current_user':
                 return [] === $callArgs;
             case 'phpversion':
             case 'php_uname':
@@ -1935,6 +1976,28 @@ final class DiscardedPureCallElision
                 }
 
                 return self::stringArgAllowsDiscardedElision($callArgs[0]);
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * {@code php_ini_loaded_file}/{@code php_ini_scanned_files}/{@code gc_enabled}:
+     * arity 0. {@code memory_get_usage}/{@code memory_get_peak_usage}: arity 0
+     * or typed bool (soft-null stays live — deprecate / TypeError).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function memoryIniRuntimeInfoArgsAllowDiscardedElision(string $nameLc, array $callArgs): bool
+    {
+        switch ($nameLc) {
+            case 'php_ini_loaded_file':
+            case 'php_ini_scanned_files':
+            case 'gc_enabled':
+                return [] === $callArgs;
+            case 'memory_get_usage':
+            case 'memory_get_peak_usage':
+                return self::definedTableRuntimeInfoArgsAllowDiscardedElision($callArgs);
             default:
                 return false;
         }

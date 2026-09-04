@@ -44,6 +44,7 @@ use PHPCompiler\ext\standard\get_mangled_object_vars_;
 use PHPCompiler\ext\standard\get_object_vars_;
 use PHPCompiler\ext\standard\get_class_methods_;
 use PHPCompiler\ext\standard\get_class_;
+use PHPCompiler\ext\standard\get_current_user;
 use PHPCompiler\ext\standard\get_debug_type;
 use PHPCompiler\ext\standard\get_declared_classes_;
 use PHPCompiler\ext\standard\get_declared_interfaces_;
@@ -53,9 +54,12 @@ use PHPCompiler\ext\standard\get_defined_functions_;
 use PHPCompiler\ext\standard\get_included_files_;
 use PHPCompiler\ext\standard\get_loaded_extensions;
 use PHPCompiler\ext\standard\get_parent_class_;
+use PHPCompiler\ext\standard\getlastmod;
 use PHPCompiler\ext\standard\getmygid;
+use PHPCompiler\ext\standard\getmyinode;
 use PHPCompiler\ext\standard\getmypid;
 use PHPCompiler\ext\standard\getmyuid;
+use PHPCompiler\ext\standard\gc_enabled;
 use PHPCompiler\ext\standard\gettype;
 use PHPCompiler\ext\standard\hash_equals;
 use PHPCompiler\ext\standard\hebrev;
@@ -75,6 +79,8 @@ use PHPCompiler\ext\standard\is_a_;
 use PHPCompiler\ext\standard\is_subclass_of_;
 use PHPCompiler\ext\standard\levenshtein;
 use PHPCompiler\ext\standard\long2ip;
+use PHPCompiler\ext\standard\memory_get_peak_usage;
+use PHPCompiler\ext\standard\memory_get_usage;
 use PHPCompiler\ext\standard\method_exists_;
 use PHPCompiler\ext\standard\md5;
 use PHPCompiler\ext\standard\metaphone;
@@ -84,6 +90,8 @@ use PHPCompiler\ext\standard\octdec;
 use PHPCompiler\ext\standard\ord;
 use PHPCompiler\ext\standard\parse_url;
 use PHPCompiler\ext\standard\pathinfo;
+use PHPCompiler\ext\standard\php_ini_loaded_file;
+use PHPCompiler\ext\standard\php_ini_scanned_files;
 use PHPCompiler\ext\standard\php_sapi_name;
 use PHPCompiler\ext\standard\php_uname;
 use PHPCompiler\ext\standard\phpversion;
@@ -2561,6 +2569,21 @@ final class DiscardedPureCallElisionTest extends TestCase
             new getmygid(),
             []
         ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new getmyinode(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new getlastmod(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_current_user(),
+            []
+        ));
 
         // Soft-null optional string stays live (deprecate).
         $this->assertFalse(DiscardedPureCallElision::tryElide(
@@ -2602,6 +2625,111 @@ final class DiscardedPureCallElisionTest extends TestCase
         $this->assertFalse(DiscardedPureCallElision::tryElide(
             $context,
             new getmygid(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new getmyinode(),
+            [$long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new getlastmod(),
+            [$str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_current_user(),
+            [$null]
+        ));
+    }
+
+    public function testDiscardedMemoryIniRuntimeInfoElides(): void
+    {
+        // php-src alloc / ini / GC introspection (#36386).
+        $context = $this->makeContext();
+        $bool = $this->makeNativeBoolVar();
+        $long = $this->makeNativeLongVar();
+        $null = $this->makeNullVar();
+        $str = $this->makeStringVar('s');
+        $box = $this->makeValueBoxVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new memory_get_usage(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new memory_get_usage(),
+            [$bool]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new memory_get_peak_usage(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new memory_get_peak_usage(),
+            [$bool]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new php_ini_loaded_file(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new php_ini_scanned_files(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new gc_enabled(),
+            []
+        ));
+
+        // Soft-null bool stays live (deprecate / TypeError).
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new memory_get_usage(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new memory_get_peak_usage(),
+            [$null]
+        ));
+        // Non-bool / excess argc / zero-arg with args stay live.
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new memory_get_usage(),
+            [$str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new memory_get_peak_usage(),
+            [$box]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new memory_get_usage(),
+            [$bool, $long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new php_ini_loaded_file(),
+            [$long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new php_ini_scanned_files(),
+            [$str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new gc_enabled(),
             [$null]
         ));
     }
