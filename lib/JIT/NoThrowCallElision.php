@@ -312,6 +312,16 @@ final class NoThrowCallElision
             // info.c extension_loaded — typed string; table lookup only.
             return self::extensionLoadedArgsCannotThrow($callArgs);
         }
+        if (self::isPureMethodExistsBuiltin($name)) {
+            // zend_builtin_functions.c method_exists — typed object + string method;
+            // string class names stay out (autoload can throw).
+            return self::methodExistsArgsCannotThrow($callArgs);
+        }
+        if (self::isPurePropertyExistsBuiltin($name)) {
+            // zend_builtin_functions.c property_exists — typed object + string
+            // property; string class names stay out (autoload can throw).
+            return self::propertyExistsArgsCannotThrow($callArgs);
+        }
         if (self::isPureVersionCompareBuiltin($name)) {
             // versioning.c — typed strings; optional operator must be proven valid.
             return self::versionCompareArgsCannotThrow($callArgs);
@@ -935,6 +945,27 @@ final class NoThrowCallElision
     }
 
     /**
+     * php-src {@code Zend/zend_builtin_functions.c} {@code method_exists} —
+     * object|string + Z_PARAM_STR method. Only the typed-object receiver is
+     * proven no-throw / discardable (string class names autoload). Public for
+     * {@see DiscardedPureCallElision} (#36386).
+     */
+    public static function isPureMethodExistsBuiltin(string $nameLc): bool
+    {
+        return 'method_exists' === $nameLc;
+    }
+
+    /**
+     * php-src {@code Zend/zend_builtin_functions.c} {@code property_exists} —
+     * object|string + Z_PARAM_STR property. Typed-object receiver only (string
+     * class names autoload). Public for {@see DiscardedPureCallElision} (#36386).
+     */
+    public static function isPurePropertyExistsBuiltin(string $nameLc): bool
+    {
+        return 'property_exists' === $nameLc;
+    }
+
+    /**
      * php-src {@code ext/standard/versioning.c} {@code version_compare}. Public
      * for {@see DiscardedPureCallElision} (#36386).
      */
@@ -1171,6 +1202,40 @@ final class NoThrowCallElision
     public static function extensionLoadedArgsCannotThrow(array $callArgs): bool
     {
         return self::functionExistsArgsCannotThrow($callArgs);
+    }
+
+    /**
+     * Typed object + typed / literal method string — soft-null method deprecates;
+     * string class names / value-box receivers stay out (autoload / TypeError).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    public static function methodExistsArgsCannotThrow(array $callArgs): bool
+    {
+        if (
+            !isset($callArgs[0], $callArgs[1])
+            || isset($callArgs[2])
+            || !$callArgs[0] instanceof Variable
+            || !$callArgs[1] instanceof Variable
+        ) {
+            return false;
+        }
+        if (Variable::TYPE_OBJECT !== $callArgs[0]->type) {
+            return false;
+        }
+
+        return self::stringParamBuiltinArgCannotThrow($callArgs[1]);
+    }
+
+    /**
+     * Typed object + typed / literal property string — peer
+     * {@see methodExistsArgsCannotThrow}.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    public static function propertyExistsArgsCannotThrow(array $callArgs): bool
+    {
+        return self::methodExistsArgsCannotThrow($callArgs);
     }
 
     /**
