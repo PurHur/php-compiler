@@ -14,6 +14,7 @@ final class SpineChunkRequiresSyncTest extends TestCase
         $root = dirname(__DIR__, 2);
         $requires = $this->readRequires($root.'/script/spine-chunk-core-requires.txt');
         foreach ([
+            'lib/Block.php',
             'lib/CompilerVersion.php',
             'lib/VM/SapiOutput.php',
             'lib/VM/ValueEchoSupport.php',

@@ -25,10 +25,14 @@ final class SpineChunkRuntimeMethodDemoteTest extends TestCase
     public function testShouldDemoteHubCapacityClassesUnderSpineChunk(): void
     {
         $this->assertFalse(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\Runtime'));
+        $this->assertFalse(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\Block'));
         putenv(ExternalMethodBind::ENV_SPINE_CHUNK.'=1');
         $_ENV[ExternalMethodBind::ENV_SPINE_CHUNK] = '1';
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\Runtime'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('phpcompiler\\runtime'));
+        // Top-level Block — NestedJIT hashtable→native-long assign trap under SPINE_CHUNK (#36387).
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\Block'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('phpcompiler\\block'));
         // Entire PHPCompiler\VM\* namespace — NestedJIT traps as hub singletons / packed hubs (#36387).
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\VM\\Variable'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\VM\\HashTable'));
@@ -77,5 +81,17 @@ final class SpineChunkRuntimeMethodDemoteTest extends TestCase
         $this->assertCount(1, $block->opCodes);
         $this->assertSame(OpCode::TYPE_RETURN_VOID, $block->opCodes[0]->type);
         $this->assertSame([], $block->blocks);
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::isDemotedStub($block));
+    }
+
+    public function testIsDemotedStubRejectsNonEmptyBodies(): void
+    {
+        $block = new Block(null);
+        $block->addOpCode(new OpCode(OpCode::TYPE_ECHO, 0));
+        $this->assertFalse(SpineChunkRuntimeMethodDemote::isDemotedStub($block));
+        $block->opCodes = [];
+        $block->addOpCode(new OpCode(OpCode::TYPE_RETURN_VOID));
+        $block->blocks[] = new Block(null);
+        $this->assertFalse(SpineChunkRuntimeMethodDemote::isDemotedStub($block));
     }
 }
