@@ -135,6 +135,14 @@ class Context {
     public array $noThrowUserFunctions = [];
 
     /**
+     * lc user-function names that are a single-param identity (ARG_RECV + RETURN)
+     * and may be replaced by their argument at the call site (#36386).
+     *
+     * @var array<string, bool>
+     */
+    public array $trivialIdentityUserFunctions = [];
+
+    /**
      * CFG entry blocks for {@see NoThrowCallElision::refineFixpoint} (#36386).
      *
      * @var array<string, \PHPCompiler\Block>

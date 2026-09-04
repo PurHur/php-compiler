@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\OpCode;
-use PHPLLVM\Builder;
 use PHPLLVM\Value as LlvmValue;
 
 /**
@@ -64,6 +63,10 @@ final class JitLongArithOverflow
      *
      * Hot path stays {@see Variable::TYPE_NATIVE_LONG} (no __value__ box) per #36189;
      * overflow promotes to a cold {@see Variable::TYPE_VALUE} double box.
+     *
+     * Uses {@code llvm.s{add,sub,mul}.with.overflow.i64} (php-src
+     * {@code ZEND_SIGNED_*_OVERFLOW} / {@code __builtin_*_overflow} shape) so the
+     * hot path is one intrinsic + extract instead of a multi-icmp dance (#36386).
      */
     public static function binaryNativeLong(
         Context $context,
@@ -77,7 +80,7 @@ final class JitLongArithOverflow
         $a = $context->builder->intCast($left, $i64);
         $b = $context->builder->intCast($right, $i64);
 
-        $overflow = self::signedOverflow($context, $opType, $a, $b);
+        [$lres, $overflow] = self::emitWithOverflow($context, $opType, $a, $b);
 
         $i1 = $context->getTypeFromString('int1');
         $overflowFlag = BasicBlockHelper::entryAlloca($context, $i1);
@@ -106,7 +109,6 @@ final class JitLongArithOverflow
 
         $context->builder->positionAtEnd($okBlock);
         $context->builder->store($i1->constInt(0, false), $overflowFlag);
-        $lres = self::emitIntOp($context, $opType, $a, $b);
         $context->builder->store($lres, $longSlot);
         $context->builder->branch($doneBlock);
 
@@ -176,7 +178,7 @@ final class JitLongArithOverflow
         $a = $context->builder->intCast($left, $i64);
         $b = $context->builder->intCast($right, $i64);
 
-        $overflow = self::signedOverflow($context, $opType, $a, $b);
+        [$lres, $overflow] = self::emitWithOverflow($context, $opType, $a, $b);
 
         $ovBlock = BasicBlockHelper::append($context, 'vbox_arith_overflow');
         $okBlock = BasicBlockHelper::append($context, 'vbox_arith_ok');
@@ -195,7 +197,6 @@ final class JitLongArithOverflow
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($okBlock);
-        $lres = self::emitIntOp($context, $opType, $a, $b);
         $context->builder->call(
             $context->lookupFunction('__value__writeLong'),
             $slotPtr,
@@ -208,93 +209,49 @@ final class JitLongArithOverflow
     }
 
     /**
-     * @see php-src Zend/zend_operators.h ZEND_SIGNED_ADD_OVERFLOW
+     * @return array{0: LlvmValue, 1: LlvmValue} [result i64, overflow i1]
      */
-    private static function signedAddOverflow(Context $context, LlvmValue $a, LlvmValue $b): LlvmValue
-    {
-        $i64 = $context->getTypeFromString('int64');
-        $zero = $i64->constInt(0, true);
-        $intMax = $i64->constInt(\PHP_INT_MAX, true);
-        $intMin = $i64->constInt(\PHP_INT_MIN, true);
-
-        $bPos = $context->builder->icmp(Builder::INT_SGT, $b, $zero);
-        $maxMinusB = $context->builder->sub($intMax, $b);
-        $aGtMaxMinusB = $context->builder->icmp(Builder::INT_SGT, $a, $maxMinusB);
-        $minMinusB = $context->builder->sub($intMin, $b);
-        $aLtMinMinusB = $context->builder->icmp(Builder::INT_SLT, $a, $minMinusB);
-        $ovIfBPos = $context->builder->and($bPos, $aGtMaxMinusB);
-        $bNonPos = $context->builder->icmp(Builder::INT_SLE, $b, $zero);
-        $ovIfBNonPos = $context->builder->and($bNonPos, $aLtMinMinusB);
-
-        return $context->builder->or($ovIfBPos, $ovIfBNonPos);
-    }
-
-    /**
-     * @see php-src Zend/zend_operators.h fast_long_sub_function
-     *
-     * Portable overflow: operand signs differ **and** the wrapping result's
-     * sign differs from op1 (`ZEND_SIGNED_SUB_OVERFLOW` without ssubl).
-     */
-    private static function signedSubOverflow(Context $context, LlvmValue $a, LlvmValue $b): LlvmValue
-    {
-        $i64 = $context->getTypeFromString('int64');
-        $zero = $i64->constInt(0, true);
-        $diff = $context->builder->sub($a, $b);
-        $aNeg = $context->builder->icmp(Builder::INT_SLT, $a, $zero);
-        $bNeg = $context->builder->icmp(Builder::INT_SLT, $b, $zero);
-        $diffNeg = $context->builder->icmp(Builder::INT_SLT, $diff, $zero);
-        $signsDiffer = $context->builder->xor($aNeg, $bNeg);
-        $resultSignDiffersFromOp1 = $context->builder->xor($aNeg, $diffNeg);
-
-        return $context->builder->and($signsDiffer, $resultSignDiffersFromOp1);
-    }
-
-    /**
-     * @see php-src Zend/zend_operators.h ZEND_LONG_MUL_OVERFLOW
-     *
-     * `sdiv` is eager: `(a*b)/a` SIGFPEs when `a==0` (false* int after #32337 zext).
-     * php-src skips the quotient when `op1==0`.
-     */
-    private static function signedMulOverflow(Context $context, LlvmValue $a, LlvmValue $b): LlvmValue
-    {
-        $i64 = $context->getTypeFromString('int64');
-        $i1 = $context->getTypeFromString('int1');
-        $zero = $i64->constInt(0, true);
-        $falseVal = $i1->constInt(0, false);
-        $aZero = $context->builder->icmp(Builder::INT_EQ, $a, $zero);
-
-        $resultSlot = BasicBlockHelper::entryAlloca($context, $i1);
-        $checkBb = BasicBlockHelper::append($context, 'mul_ov_sdiv');
-        $doneBb = BasicBlockHelper::append($context, 'mul_ov_done');
-        $context->builder->store($falseVal, $resultSlot);
-        $context->builder->branchIf($aZero, $doneBb, $checkBb);
-
-        $context->builder->positionAtEnd($checkBb);
-        $product = $context->builder->mul($a, $b);
-        $quot = $context->builder->signedDiv($product, $a);
-        $neq = $context->builder->icmp(Builder::INT_NE, $quot, $b);
-        $context->builder->store($neq, $resultSlot);
-        $context->builder->branch($doneBb);
-
-        $context->builder->positionAtEnd($doneBb);
-
-        return $context->builder->load($resultSlot);
-    }
-
-    private static function signedOverflow(
+    private static function emitWithOverflow(
         Context $context,
         int $opType,
         LlvmValue $a,
         LlvmValue $b
-    ): LlvmValue {
+    ): array {
         if (OpCode::TYPE_PLUS === $opType) {
-            return self::signedAddOverflow($context, $a, $b);
+            return self::intrinsicWithOverflow($context, 'llvm.sadd.with.overflow.i64', $a, $b);
         }
         if (OpCode::TYPE_MUL === $opType) {
-            return self::signedMulOverflow($context, $a, $b);
+            return self::intrinsicWithOverflow($context, 'llvm.smul.with.overflow.i64', $a, $b);
         }
 
-        return self::signedSubOverflow($context, $a, $b);
+        return self::intrinsicWithOverflow($context, 'llvm.ssub.with.overflow.i64', $a, $b);
+    }
+
+    /**
+     * @return array{0: LlvmValue, 1: LlvmValue} [result i64, overflow i1]
+     */
+    private static function intrinsicWithOverflow(
+        Context $context,
+        string $name,
+        LlvmValue $a,
+        LlvmValue $b
+    ): array {
+        $i64 = $context->getTypeFromString('int64');
+        $i1 = $context->getTypeFromString('int1');
+        $aggTy = $context->context->structType(true, $i64, $i1);
+        $func = $context->module->getNamedFunction($name);
+        if (null === $func) {
+            $func = $context->module->addFunction(
+                $name,
+                $context->context->functionType($aggTy, false, $i64, $i64)
+            );
+        }
+        $pair = $context->builder->call($func, $a, $b);
+
+        return [
+            $context->builder->extractValue($pair, 0),
+            $context->builder->extractValue($pair, 1),
+        ];
     }
 
     private static function emitFloatOp(
@@ -311,22 +268,6 @@ final class JitLongArithOverflow
         }
 
         return $context->builder->fsub($a, $b);
-    }
-
-    private static function emitIntOp(
-        Context $context,
-        int $opType,
-        LlvmValue $a,
-        LlvmValue $b
-    ): LlvmValue {
-        if (OpCode::TYPE_PLUS === $opType) {
-            return $context->builder->add($a, $b);
-        }
-        if (OpCode::TYPE_MUL === $opType) {
-            return $context->builder->mul($a, $b);
-        }
-
-        return $context->builder->sub($a, $b);
     }
 
     /** @return int|float */

@@ -3881,6 +3881,59 @@ class Block {
         return true;
     }
 
+    /**
+     * True when the body is a single-param identity: ARG_RECV + RETURN of that slot (#36386).
+     *
+     * php-src still builds a frame for {@code function id($x){return $x;}}; under AOT the
+     * call is pure overhead when the formal is not by-ref / variadic. Shape matches
+     * {@code bin/print.php} for {@code function id(int $x): int { return $x; }}.
+     */
+    public static function isTrivialIdentityCalleeBody(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $recvSlot = null;
+        $returnSlot = null;
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_ARG_RECV === $op->type) {
+                    if (null !== $recvSlot) {
+                        return false;
+                    }
+                    $recvSlot = $op->arg1;
+                } elseif (OpCode::TYPE_RETURN === $op->type) {
+                    if (null !== $returnSlot) {
+                        return false;
+                    }
+                    $returnSlot = $op->arg1;
+                } else {
+                    // Anything else (ASSIGN, calls, NEW, …) is not a pure identity.
+                    return false;
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+            foreach ($block->blocks as $sub) {
+                if ($sub instanceof self) {
+                    $stack[] = $sub;
+                }
+            }
+        }
+
+        return null !== $recvSlot && $recvSlot === $returnSlot;
+    }
+
     public static function containsReflectionAttributeNewInstanceOpcodes(?self $root): bool
     {
         if (null === $root) {
