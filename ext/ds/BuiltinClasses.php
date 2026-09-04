@@ -19,16 +19,12 @@ final class BuiltinClasses
 {
     public static function register(Context $ctx): void
     {
-        $before = \array_keys($ctx->classes);
         self::registerVector($ctx);
         self::registerMap($ctx);
         self::registerSet($ctx);
         require_once __DIR__.'/VmDsDepth.php';
         require_once __DIR__.'/DsDepthClasses.php';
         DsDepthClasses::register($ctx);
-        foreach (\array_diff(\array_keys($ctx->classes), $before) as $lc) {
-            $ctx->classes[$lc]->isInternal = true;
-        }
     }
 
     private static function registerVector(Context $ctx): void
@@ -47,6 +43,11 @@ final class BuiltinClasses
         $entry->methods['count'] = new DsVectorCount();
         $entry->methodVisibility['count'] = $pub;
         $entry->methodNames['count'] = 'count';
+        // Mark on the typed ClassEntry local — not `$ctx->classes[$lc]->isInternal`
+        // after a hashtable fetch (CFG type "object"). Untyped prop stores need an
+        // in-TU declared owner via class_id (#36532); SPINE_CHUNK TUs omit ClassEntry
+        // and used to abort with "Property isInternal not found" (#36387 / #36147).
+        $entry->isInternal = true;
         $ctx->classes[VmDsStorage::VECTOR_LC] = $entry;
     }
 
@@ -68,6 +69,7 @@ final class BuiltinClasses
         $entry->methods['get'] = new DsMapGet();
         $entry->methodVisibility['get'] = $pub;
         $entry->methodNames['get'] = 'get';
+        $entry->isInternal = true;
         $ctx->classes[VmDsStorage::MAP_LC] = $entry;
     }
 
@@ -90,6 +92,7 @@ final class BuiltinClasses
         $entry->methodVisibility['add'] = $pub;
         $entry->methods['contains'] = new DsSetContains();
         $entry->methodVisibility['contains'] = $pub;
+        $entry->isInternal = true;
         $ctx->classes[VmDsStorage::SET_LC] = $entry;
     }
 }

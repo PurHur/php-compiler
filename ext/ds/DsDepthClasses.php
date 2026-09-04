@@ -48,6 +48,7 @@ final class DsDepthClasses
         if (!isset($ctx->classes[VmDsDepth::HASHABLE_LC])) {
             $entry = new ClassEntry('Ds\\Hashable');
             $entry->isInterface = true;
+            $entry->isInternal = true;
             $ctx->classes[VmDsDepth::HASHABLE_LC] = $entry;
         }
         if (!isset($ctx->classes[VmDsDepth::COLLECTION_LC])) {
@@ -59,12 +60,14 @@ final class DsDepthClasses
             if (isset($ctx->classes['traversable'])) {
                 $entry->interfaces[] = 'traversable';
             }
+            $entry->isInternal = true;
             $ctx->classes[VmDsDepth::COLLECTION_LC] = $entry;
         }
         if (!isset($ctx->classes[VmDsDepth::SEQUENCE_LC])) {
             $entry = new ClassEntry('Ds\\Sequence');
             $entry->isInterface = true;
             $entry->interfaces[] = VmDsDepth::COLLECTION_LC;
+            $entry->isInternal = true;
             $ctx->classes[VmDsDepth::SEQUENCE_LC] = $entry;
         }
     }
@@ -82,6 +85,7 @@ final class DsDepthClasses
         $entry->methods['toarray'] = new DsPairToArray();
         $entry->methodVisibility['toarray'] = $pub;
         $entry->methodNames['toarray'] = 'toArray';
+        $entry->isInternal = true;
         $ctx->classes[VmDsDepth::PAIR_LC] = $entry;
     }
 
@@ -104,6 +108,7 @@ final class DsDepthClasses
         $entry->methods['push'] = new DsDequePush();
         $entry->methodVisibility['push'] = $pub;
         $entry->methodNames['push'] = 'push';
+        $entry->isInternal = true;
         $ctx->classes[VmDsDepth::DEQUE_LC] = $entry;
     }
 
@@ -126,6 +131,7 @@ final class DsDepthClasses
         $entry->methodVisibility['push'] = $pub;
         $entry->methods['pop'] = new DsStackPop();
         $entry->methodVisibility['pop'] = $pub;
+        $entry->isInternal = true;
         $ctx->classes[VmDsDepth::STACK_LC] = $entry;
     }
 
@@ -148,6 +154,7 @@ final class DsDepthClasses
         $entry->methodVisibility['push'] = $pub;
         $entry->methods['pop'] = new DsQueuePop();
         $entry->methodVisibility['pop'] = $pub;
+        $entry->isInternal = true;
         $ctx->classes[VmDsDepth::QUEUE_LC] = $entry;
     }
 
@@ -170,6 +177,7 @@ final class DsDepthClasses
         $entry->methodVisibility['push'] = $pub;
         $entry->methods['pop'] = new DsHeapPop();
         $entry->methodVisibility['pop'] = $pub;
+        $entry->isInternal = true;
         $ctx->classes[VmDsDepth::HEAP_LC] = $entry;
     }
 
@@ -192,6 +200,7 @@ final class DsDepthClasses
         $entry->methodVisibility['push'] = $pub;
         $entry->methods['pop'] = new DsPriorityQueuePop();
         $entry->methodVisibility['pop'] = $pub;
+        $entry->isInternal = true;
         $ctx->classes[VmDsDepth::PRIORITY_QUEUE_LC] = $entry;
     }
 }

@@ -8803,17 +8803,29 @@ class Object_ extends Type {
         ObjectExitStatusLlvm::emitExitStatusObjectGuard($this, $context, $objPtr, $typeErrorGiven);
     }
 
-    public function propertyFetchByRuntimeReceiverClass(
+    /**
+     * Runtime class_id property fetch — null when no declared class in this TU owns `$name`
+     * (partial spine chunks under {@see \PHPCompiler\AOT\ExternalMethodBind::spineChunkMode}).
+     */
+    public function tryPropertyFetchByRuntimeReceiverClass(
         PHPLLVM\Value $obj,
         string $name,
         bool $forWrite = false
-    ): Variable {
-        $fetched = ObjectInstancePropertyLlvm::propertyFetchByRuntimeReceiverClass(
+    ): ?Variable {
+        return ObjectInstancePropertyLlvm::propertyFetchByRuntimeReceiverClass(
             $this,
             $obj,
             $name,
             $forWrite
         );
+    }
+
+    public function propertyFetchByRuntimeReceiverClass(
+        PHPLLVM\Value $obj,
+        string $name,
+        bool $forWrite = false
+    ): Variable {
+        $fetched = $this->tryPropertyFetchByRuntimeReceiverClass($obj, $name, $forWrite);
         if (null === $fetched) {
             throw new \LogicException("Property {$name} not found on any declared class");
         }
