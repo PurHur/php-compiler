@@ -25348,6 +25348,21 @@ class Compiler {
         if ($this->isEmbeddedCallLiteralArg($arg)) {
             return null;
         }
+        // Named CVs / by-ref out-params are never dim-fetch results. Without this guard,
+        // preg_match('/x/', $ex['t'], $matches) maps &$matches onto the subject dim — writeback
+        // clobbers $ex['t'] and $matches stays unset (Parsedown automatic_link hang, #36380;
+        // same #23354 operand-steal class as f($x+1, $r['k'])).
+        $callArgAtIndex = (
+            \is_array($cfgCallOp->args ?? null)
+            && \array_key_exists($argIndex, $cfgCallOp->args)
+            && $cfgCallOp->args[$argIndex] instanceof Operand
+        ) ? $cfgCallOp->args[$argIndex] : $arg;
+        if (
+            !$this->callArgIsDeadInlineTemporary($callArgAtIndex)
+            && !$this->isCallArgDirectArrayDimFetch($callArgAtIndex)
+        ) {
+            return null;
+        }
         $inlineLiteralFetchSlot = $this->resolveInlineArrayLiteralDimFetchCallArgSlot(
             $block,
             $cfgCallOp,
@@ -25424,9 +25439,18 @@ class Compiler {
             : [];
         $dimIndex = $argIndex;
         if (\count($dimFetches) < \count($callArgs)) {
+            // Only args that can be dim-fetch results (dead temps / direct dims). Including a
+            // trailing named &$matches made the last-alignment steal the subject dim (#36380).
             $nonEmbeddedArgIndices = [];
             foreach ($callArgs as $i => $callArg) {
-                if (null !== $callArg && !$this->isEmbeddedCallLiteralArg($callArg)) {
+                if (
+                    null !== $callArg
+                    && !$this->isEmbeddedCallLiteralArg($callArg)
+                    && (
+                        $this->callArgIsDeadInlineTemporary($callArg)
+                        || $this->isCallArgDirectArrayDimFetch($callArg)
+                    )
+                ) {
                     $nonEmbeddedArgIndices[] = $i;
                 }
             }
