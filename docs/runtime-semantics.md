@@ -26,15 +26,16 @@ Injected double-delref (unit test only): `PHP_COMPILER_RUNTIME_ASSERT_INJECT_DOU
 
 ### ASan / valgrind smoke (#36397)
 
-`PHP_COMPILER_ASAN=1` must link through a **host clang/gcc** driver (never raw `/opt/llvm9/ld` — ld rejects `-fsanitize=*`). Local gates:
+`PHP_COMPILER_ASAN=1` must link through a **host clang/gcc** driver (never raw `/opt/llvm9/ld` — ld rejects `-fsanitize=*`). Scripts live under `script/runtime-assert/` (repo root = `dirname/../..`). Local gates:
 
 ```bash
-./script/runtime-assert/asan-smoke.sh          # compile+run hello with ASan/UBSan
-./script/runtime-assert/valgrind-smoke.sh      # valgrind --error-exitcode=1 (skip if missing)
+./script/runtime-assert/asan-smoke.sh          # echo under ASan/UBSan (link-path proof)
+RUNTIME_ASSERT_ASAN_FULL=1 ./script/runtime-assert/asan-smoke.sh  # 8 inline aot-smoke cases
+./script/runtime-assert/valgrind-smoke.sh      # echo under valgrind (skip if missing)
 make runtime-assert-asan-smoke
 ```
 
-The 7-day ASan/valgrind streak Done-when is a scheduled host job; these scripts are the implementer proof that the link path works.
+Do **not** wrap ASan binaries in GNU `timeout(1)` — it races ASan signal handling and reports false "dumped core". Link with `PHP_COMPILER_ASAN=1` also suppresses `-s` strip (`AotGcSections::stripAtLink`) so ASan metadata survives. Full 8-case ASan under Docker `--memory=8g` can still SIGSEGV intermittently (shadow/quarantine pressure) — that is tracked here, not silenced by restamping. Streak ledger: `test/runtime-assert/STREAK.json` (append UTC days from a scheduled host). An empty ledger is not a pass.
 
 ## Undefined array keys ([#273](https://github.com/PurHur/php-compiler/issues/273))
 
