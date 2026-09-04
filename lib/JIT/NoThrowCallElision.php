@@ -302,6 +302,7 @@ final class NoThrowCallElision
             case 'log1p':
             case 'hypot':
             case 'fmod':
+            case 'atan2':
             case 'deg2rad':
             case 'rad2deg':
                 return true;
