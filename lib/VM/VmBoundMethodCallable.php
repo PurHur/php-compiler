@@ -85,6 +85,25 @@ final class VmBoundMethodCallable
     }
 
     /**
+     * Method-name operand for `[object, $method]` when the name is not a block constant (#36382).
+     *
+     * Used by {@see VmFromCallable} runtime bound-method Closure::fromCallable.
+     */
+    public static function resolveBoundMethodMethodOperand(Block $block, int $calleeSlot): ?Operand
+    {
+        $arraySlot = self::resolveBoundMethodArrayRootSlot($block, $calleeSlot);
+        if (null === $arraySlot) {
+            return null;
+        }
+        $methodValueSlot = self::arrayElementValueSlot($block, $arraySlot, 1);
+        if (null === $methodValueSlot) {
+            return null;
+        }
+
+        return $block->getOperand($methodValueSlot);
+    }
+
+    /**
      * Enum case FCC receivers (`E::A->f(...)`) use TYPE_CLASS_CONST_FETCH; infer enum FQCN (#6845).
      */
     public static function resolveBoundMethodReceiverClassName(Block $block, int $calleeSlot): ?string

@@ -8,6 +8,8 @@ use PHPCompiler\Block;
 use PHPCompiler\VM\VmBoundMethodCallable;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Call\ClosureWithBinding;
+use PHPCompiler\JIT\Call\Native;
+use PHPCompiler\JIT\Call\RuntimeVariableStaticMethodCall;
 use PHPCompiler\JIT\ClosureBindHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\MethodVisibility;
@@ -77,6 +79,21 @@ final class VmFromCallable
                     null !== $scope
                 );
             }
+        }
+
+        // Runtime method name: [$obj, $this->methodProp] — Slim ServerRequestCreator (#36382 / #26788).
+        $receiverOp = VmBoundMethodCallable::resolveBoundMethodReceiverOperand($block, $callableSlot);
+        $methodOp = VmBoundMethodCallable::resolveBoundMethodMethodOperand($block, $callableSlot);
+        if (null !== $receiverOp && null !== $methodOp) {
+            $classHint = VmBoundMethodCallable::resolveBoundMethodReceiverClassName($block, $callableSlot);
+
+            return self::fromRuntimeBoundMethodCallable(
+                $context,
+                $block,
+                $receiverOp,
+                $methodOp,
+                $classHint
+            );
         }
 
         $receiverOp = VmBoundMethodCallable::resolveInvokableObjectReceiverOperand($block, $callableSlot);
@@ -412,6 +429,120 @@ final class VmFromCallable
         return $closureVar;
     }
 
+    /**
+     * Closure::fromCallable([$obj, $runtimeMethod]) — method name not a compile-time constant (#36382).
+     *
+     * php-src: Zend/zend_closures.c — zim_Closure_fromCallable array path.
+     * Dispatches via {@see RuntimeVariableStaticMethodCall} over instance-method proxies
+     * (ClosureWithBinding supplies `$this`), same shape as `$obj->$method()` static peers (#34937).
+     */
+    private static function fromRuntimeBoundMethodCallable(
+        Context $context,
+        Block $block,
+        \PHPCfg\Operand $receiverOp,
+        \PHPCfg\Operand $methodOp,
+        ?string $classHint = null
+    ): JitVariable {
+        // Do NOT fall back to $context->scope->className — that is the enclosing method's
+        // class (e.g. Slim ServerRequestCreator / Wrapper), not the array receiver's class
+        // (`$this->serverRequestCreator`). Unknown → scan all instance methods (#36382).
+        $className = self::nonEmptyString($receiverOp->type?->userType)
+            ?? self::nonEmptyString($classHint);
+        $declaredLc = null !== $className
+            ? strtolower(ltrim($className, '\\'))
+            : 'object';
+        $scopeName = $className ?? 'object';
+        $receiverVar = $context->getVariableFromOp($receiverOp);
+        $methodVar = $context->getVariableFromOp($methodOp);
+        $boundThis = \PHPCompiler\JIT\ClosureHelper::snapshotCapture($context, $receiverVar);
+        $boundScope = new JitVariable(
+            $context,
+            JitVariable::TYPE_STRING,
+            JitVariable::KIND_VALUE,
+            $context->builder->load($context->constantStringFromString((string) $scopeName))
+        );
+        $boundScope->compileTimeString = (string) $scopeName;
+
+        $candidates = self::buildRuntimeBoundMethodCandidatesByMethodName(
+            $context,
+            $declaredLc
+        );
+        if ([] === $candidates) {
+            throw new \LogicException(
+                'TYPE_FROM_CALLABLE: no instance method candidates for runtime array callable (#36382)'
+            );
+        }
+        $inner = new RuntimeVariableStaticMethodCall($methodVar, $candidates);
+        $closureCall = new ClosureWithBinding($inner, $boundThis, $boundScope);
+        $closureVar = self::wrapCallableProxy($context, $closureCall, 'runtime_bound_method');
+        $closureVar->closureIsMethodFake = true;
+        $closureObj = $context->helper->loadValue($closureVar);
+        ClosureBindHelper::storeFccBoundThisAndScope($context, $closureObj, $boundThis, $boundScope);
+        ClosureBindHelper::storeMethodFakeClosureFlag($context, $closureObj);
+
+        return $closureVar;
+    }
+
+    /**
+     * @return array<string, Call> lowercase method => Native invoke proxy
+     */
+    private static function buildRuntimeBoundMethodCandidatesByMethodName(
+        Context $context,
+        string $declaredLc
+    ): array {
+        $declaredLc = strtolower(ltrim($declaredLc, '\\'));
+        $allowed = null;
+        if ('' !== $declaredLc && 'object' !== $declaredLc) {
+            $allowed = array_flip($context->type->object->classIdsInstanceOf($declaredLc));
+            if ([] === $allowed) {
+                $allowed = null;
+            }
+        }
+
+        /** @var array<string, array<int, Call>> $byMethod */
+        $byMethod = [];
+        foreach ($context->type->object->allClassNamesById() as $classId => $className) {
+            if (null !== $allowed && !isset($allowed[$classId])) {
+                continue;
+            }
+            $classLc = strtolower(ltrim($className, '\\'));
+            foreach ($context->type->object->declaredMethodNames($classId) as $methodLc) {
+                $methodLc = strtolower($methodLc);
+                // fromCallable invoke sites emit every candidate branch with the same argc;
+                // arity-strict __construct stubs (LimitIterator, …) throw at JIT emit (#36382).
+                if ('__construct' === $methodLc || '__destruct' === $methodLc) {
+                    continue;
+                }
+                if ($context->type->object->hasMethod($classId, $methodLc)) {
+                    $vis = $context->type->object->methodVisibility($classId, $methodLc);
+                    if (0 !== ($vis & \PHPCfg\Func::FLAG_STATIC)) {
+                        continue;
+                    }
+                }
+                // Soft resolve — resolveInstanceProxyName throws on missing bodies (SPL stubs).
+                $proxyName = self::softInstanceProxyName($context, $classLc, $methodLc);
+                if (null === $proxyName || !$context->functionIsRegistered($proxyName)) {
+                    continue;
+                }
+                $proxy = $context->resolveFunctionProxy($proxyName);
+                // User-compiled methods are Native; special Call stubs validate argc at emit time.
+                if (!($proxy instanceof Native)) {
+                    continue;
+                }
+                $byMethod[$methodLc][$classId] = $proxy;
+            }
+        }
+
+        $out = [];
+        foreach ($byMethod as $methodLc => $byClassId) {
+            // Multi-class: prefer a single Native proxy (first wins). RuntimeIndirect would emit
+            // every candidate with this site's argc and break arity-strict stubs (#36382).
+            $out[$methodLc] = $byClassId[array_key_first($byClassId)];
+        }
+
+        return $out;
+    }
+
     private static function resolveParentScopeClassName(Context $context, Block $block): ?string
     {
         $callerLc = self::resolveCallerScopeClassLc($context, $block);
@@ -581,38 +712,57 @@ final class VmFromCallable
         string $methodLc,
         string $className
     ): string {
+        $soft = self::softInstanceProxyName($context, $declaringClassLc, $methodLc);
+        if (null !== $soft) {
+            return $soft;
+        }
+        // Catchable Error for missing instance-method FCC (#28003, zend_execute_API.c).
+        throw new \Error("Call to undefined method {$className}::{$methodLc}()");
+    }
+
+    /**
+     * Walk class/parent/trait for a registered instance-method proxy without throwing (#36382).
+     */
+    private static function softInstanceProxyName(
+        Context $context,
+        string $declaringClassLc,
+        string $methodLc
+    ): ?string {
+        $declaringClassLc = strtolower(ltrim($declaringClassLc, '\\'));
+        $methodLc = strtolower($methodLc);
         if ('object' === $declaringClassLc) {
             if ('getname' === $methodLc && $context->functionIsRegistered('reflectionattribute::getname')) {
                 $declaringClassLc = 'reflectionattribute';
-                $className = 'ReflectionAttribute';
             } elseif ('getattributes' === $methodLc && $context->functionIsRegistered('reflectionmethod::getattributes')) {
                 $declaringClassLc = 'reflectionmethod';
-                $className = 'ReflectionMethod';
             }
         }
-        $proxyName = strtolower($className.'::'.$methodLc);
-        if ($context->functionIsRegistered($proxyName)) {
-            return $proxyName;
-        }
-        // Inherited instance methods: receiver class may be a subclass (#27143 AOT FCC/fromCallable).
         $current = $declaringClassLc;
         $visited = [];
         while (!isset($visited[$current])) {
             $visited[$current] = true;
+            $proxyName = $current.'::'.$methodLc;
+            if ($context->functionIsRegistered($proxyName)) {
+                return $proxyName;
+            }
+            if ($context->type->object->hasDeclaredClass($current)) {
+                $classId = $context->type->object->lookup($current);
+                $traitLc = $context->type->object->traitMethodSource($classId, $methodLc);
+                if (null !== $traitLc) {
+                    $traitProxy = strtolower($traitLc).'::'.$methodLc;
+                    if ($context->functionIsRegistered($traitProxy)) {
+                        return $traitProxy;
+                    }
+                }
+            }
             $parentLc = $context->type->object->parentClassLc($current);
             if (null === $parentLc || '' === $parentLc) {
                 break;
             }
-            $parentDisplay = $context->type->object->parentClassDisplayName($current) ?? $parentLc;
-            $proxyName = strtolower($parentDisplay.'::'.$methodLc);
-            if ($context->functionIsRegistered($proxyName)) {
-                return $proxyName;
-            }
             $current = $parentLc;
         }
 
-        // Catchable Error for missing instance-method FCC (#28003, zend_execute_API.c).
-        throw new \Error("Call to undefined method {$className}::{$methodLc}()");
+        return null;
     }
 
     private static function nonEmptyString(?string $value): ?string
