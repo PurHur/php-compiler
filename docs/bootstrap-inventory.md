@@ -58155,7 +58155,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/DiscardedPureCallElision.php`
 
 **Warnings** (review for bootstrap subset):
-- 21 class method(s)
+- 23 class method(s)
 
 ### `lib/JIT/DnfParamCheck.php`
 
@@ -59288,8 +59288,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/NoThrowCallElision.php`
 
 **Warnings** (review for bootstrap subset):
-- new Operand\Literal (line 1218)
-- 29 class method(s)
+- new Operand\Literal (line 1304)
+- 31 class method(s)
 
 ### `lib/JIT/NonObjectPropertyFetchHelper.php`
 

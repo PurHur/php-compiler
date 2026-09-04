@@ -39,8 +39,10 @@ use PHPCompiler\ext\standard\soundex;
 use PHPCompiler\ext\standard\sqrt;
 use PHPCompiler\ext\standard\str_contains;
 use PHPCompiler\ext\standard\str_ends_with;
+use PHPCompiler\ext\standard\str_ireplace;
 use PHPCompiler\ext\standard\str_pad;
 use PHPCompiler\ext\standard\str_repeat;
+use PHPCompiler\ext\standard\str_replace;
 use PHPCompiler\ext\standard\str_rot13;
 use PHPCompiler\ext\standard\str_split;
 use PHPCompiler\ext\standard\str_starts_with;
@@ -49,7 +51,9 @@ use PHPCompiler\ext\standard\strcmp;
 use PHPCompiler\ext\standard\string_trim;
 use PHPCompiler\ext\standard\strpos;
 use PHPCompiler\ext\standard\strtolower;
+use PHPCompiler\ext\standard\strtr;
 use PHPCompiler\ext\standard\substr;
+use PHPCompiler\ext\standard\substr_replace;
 use PHPCompiler\ext\standard\ucwords;
 use PHPCompiler\ext\standard\urldecode;
 use PHPCompiler\ext\standard\urlencode;
@@ -832,6 +836,82 @@ final class DiscardedPureCallElisionTest extends TestCase
         $this->assertFalse(DiscardedPureCallElision::tryElide($context, new str_pad(), [$null, $len]));
         $this->assertFalse(DiscardedPureCallElision::tryElide($context, new chunk_split(), [$null]));
         $this->assertFalse(DiscardedPureCallElision::tryElide($context, new explode(), [$null, $this->makeStringVar('a')]));
+    }
+
+    public function testElidesDiscardedStrReplaceFamilyOnTypedStrings(): void
+    {
+        // php-src string.c PHP_FUNCTION(str_replace|str_ireplace|substr_replace|strtr)
+        // — string forms only; &$count / array operands / two-arg strtr stay live (#36386).
+        $context = $this->makeContext();
+        $search = $this->makeStringVar('a');
+        $replace = $this->makeStringVar('b');
+        $subject = $this->makeStringVar(null);
+        $offset = $this->makeNativeLongVar();
+        $from = $this->makeStringVar('abc');
+        $to = $this->makeStringVar('xyz');
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new str_replace(),
+            [$search, $replace, $subject]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new str_ireplace(),
+            [$search, $replace, $subject]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new substr_replace(),
+            [$subject, $replace, $offset]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new substr_replace(),
+            [$subject, $replace, $offset, $offset]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new strtr(),
+            [$subject, $from, $to]
+        ));
+    }
+
+    public function testDoesNotElideStrReplaceWithCountOrNull(): void
+    {
+        $context = $this->makeContext();
+        $search = $this->makeStringVar('a');
+        $replace = $this->makeStringVar('b');
+        $subject = $this->makeStringVar('aa');
+        $count = $this->makeNativeLongVar();
+        $null = $this->makeNullVar();
+        $pairs = $this->makeHashtableVar();
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new str_replace(),
+            [$search, $replace, $subject, $count]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new str_ireplace(),
+            [$search, $replace, $null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new str_replace(),
+            [$search, $replace, $pairs]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new strtr(),
+            [$subject, $pairs]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new substr_replace(),
+            [$null, $replace, $this->makeNativeLongVar()]
+        ));
     }
 
     public function testJitWiresElisionBeforeInvoke(): void
