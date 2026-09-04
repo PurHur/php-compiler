@@ -338,11 +338,21 @@ trait CompileBlockInternal
             if (null !== $op->sourceLocation && $op->sourceLocation->startLine > 0) {
                 $this->context->callSiteLine = $op->sourceLocation->startLine;
             }
-            if (
-                null !== $block->func
-                && '{main}' === $block->func->name
-            ) {
-                \PHPCompiler\JIT\Progress::noteFunction('{main}:op='.$i.':type='.$op->type);
+            if (null !== $block->func) {
+                // {main} always; methods when PHP_COMPILER_JIT_OP_PROGRESS=1 (Slim Uri::withUserInfo
+                // stalls for minutes before preg_replace_callback — need opcode breadcrumbs, #36382).
+                $opProgress = '{main}' === $block->func->name;
+                if (!$opProgress) {
+                    $opEnv = \PHPCompiler\Config::getenv('PHP_COMPILER_JIT_OP_PROGRESS');
+                    if (is_string($opEnv) && '' !== $opEnv) {
+                        $v = strtolower($opEnv);
+                        $opProgress = in_array($v, ['1', 'true', 'yes', 'on'], true);
+                    }
+                }
+                if ($opProgress) {
+                    $scoped = $block->func->getScopedName();
+                    \PHPCompiler\JIT\Progress::noteFunction($scoped.':op='.$i.':type='.$op->type);
+                }
             }
             // Folded TYPE_ENUM_CASE slots (script CLASS_CONST_FETCH is often eliminated)
             // hoist as null value-boxes before DECLARE_ENUM. Rebind now that enums exist (#31967).

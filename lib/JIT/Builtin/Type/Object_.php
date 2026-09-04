@@ -2877,10 +2877,19 @@ class Object_ extends Type {
 
     /**
      * Shallow clone: allocate a new object with the same class and copy property slots.
+     *
+     * @param list<int>|null $restrictToClassIds When set (e.g. class + subclasses of a known
+     *        `$this` type), only emit those cases. Unrestricted clone walks every registered
+     *        class and stalls for minutes on Slim-sized graphs (#36382 Nyholm Uri::withUserInfo).
      */
-    public function cloneObject(PHPLLVM\Value $src): PHPLLVM\Value
+    public function cloneObject(PHPLLVM\Value $src, ?array $restrictToClassIds = null): PHPLLVM\Value
     {
-        $classIds = array_keys($this->classIdToName);
+        $classIds = null === $restrictToClassIds
+            ? array_keys($this->classIdToName)
+            : array_values(array_unique(array_filter(
+                $restrictToClassIds,
+                fn (int $id): bool => isset($this->classIdToName[$id])
+            )));
         if (1 === count($classIds)) {
             $id = $classIds[0];
             $dest = $this->allocate($id);
@@ -2905,7 +2914,6 @@ class Object_ extends Type {
         $done = $fn->appendBasicBlock('clone_done');
         $exit = $fn->appendBasicBlock('clone_exit');
         $incomings = [];
-        $classIds = array_keys($this->classIdToName);
         if ([] === $classIds) {
             $nullObj = $this->pointer->constNull();
             $this->context->builder->branch($done);
@@ -2960,12 +2968,17 @@ class Object_ extends Type {
 
     /**
      * After shallow clone, invoke user __clone() when the class defines it (Zend #3170).
+     *
+     * @param list<int>|null $restrictToClassIds Same restriction as {@see cloneObject} (#36382).
      */
-    public function invokeCloneMagicIfPresent(Block $block, PHPLLVM\Value $cloned): void
+    public function invokeCloneMagicIfPresent(Block $block, PHPLLVM\Value $cloned, ?array $restrictToClassIds = null): void
     {
         $cloneClassIds = [];
         foreach ($this->methodVisibility as $classId => $methods) {
             if (isset($methods['__clone'])) {
+                if (null !== $restrictToClassIds && !in_array($classId, $restrictToClassIds, true)) {
+                    continue;
+                }
                 $cloneClassIds[] = $classId;
             }
         }
@@ -3416,12 +3429,16 @@ class Object_ extends Type {
     /**
      * Registered class ids that must reject clone, with display names for the Error message (#25962).
      *
+     * @param list<int>|null $restrictToClassIds When set, only consider these ids (#36382).
      * @return list<array{0: int, 1: string}>
      */
-    public function uncloneableClassIdsForGuard(): array
+    public function uncloneableClassIdsForGuard(?array $restrictToClassIds = null): array
     {
         $out = [];
         foreach ($this->classIdToName as $id => $name) {
+            if (null !== $restrictToClassIds && !in_array($id, $restrictToClassIds, true)) {
+                continue;
+            }
             if ($this->classOrAncestorDeniesClone($id)) {
                 $out[] = [$id, $name];
             }
