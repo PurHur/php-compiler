@@ -354,6 +354,11 @@ final class NoThrowCallElision
             // $autoload deprecates.
             return self::classHierarchyArgsCannotThrow($callArgs);
         }
+        if (self::isPureObjectVarsMethodsBuiltin($name)) {
+            // get_object_vars / get_mangled_object_vars / get_class_methods —
+            // typed object only; string get_class_methods stays out (autoload).
+            return self::objectVarsMethodsArgsCannotThrow($callArgs);
+        }
         if (self::isPureVersionCompareBuiltin($name)) {
             // versioning.c — typed strings; optional operator must be proven valid.
             return self::versionCompareArgsCannotThrow($callArgs);
@@ -1090,6 +1095,26 @@ final class NoThrowCallElision
     }
 
     /**
+     * php-src {@code Zend/zend_builtin_functions.c} {@code get_object_vars}/
+     * {@code get_class_methods} and {@code ext/standard/var.c}
+     * {@code get_mangled_object_vars} — typed object operand only (property /
+     * method table read; no autoload / no user handlers). String
+     * {@code get_class_methods} stays out (autoload). Public for
+     * {@see DiscardedPureCallElision} (#36386).
+     */
+    public static function isPureObjectVarsMethodsBuiltin(string $nameLc): bool
+    {
+        switch ($nameLc) {
+            case 'get_object_vars':
+            case 'get_mangled_object_vars':
+            case 'get_class_methods':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
      * php-src {@code ext/standard/versioning.c} {@code version_compare}. Public
      * for {@see DiscardedPureCallElision} (#36386).
      */
@@ -1498,6 +1523,17 @@ final class NoThrowCallElision
         }
 
         return null !== $autoload->compileTimeLong;
+    }
+
+    /**
+     * Exactly one typed object — peer {@see objectIntrospectArgsCannotThrow}.
+     * Soft-null / string / value-box stay out ({@code TypeError} / autoload).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    public static function objectVarsMethodsArgsCannotThrow(array $callArgs): bool
+    {
+        return self::objectIntrospectArgsCannotThrow($callArgs);
     }
 
     /**
