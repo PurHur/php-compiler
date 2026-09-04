@@ -138,6 +138,11 @@ north-star5-verify-fast:
 dev-verify-fast:
 	./script/dev-verify-fast.sh
 
+# Bit-identical AOT hello across TMPDIR (+ GNU build-id) (#36399).
+.PHONY: verify-reproducible
+verify-reproducible:
+	./script/verify-reproducible.sh $(ARGS)
+
 # Cross-target AOT object emit (default PHP_COMPILER_TARGET=aarch64-linux) — no link on x86 (#36391).
 aot-smoke-cross-emit:
 	./script/aot-smoke-cross-emit.sh $(ARGS)

@@ -96,6 +96,7 @@ defaults — `doctor --env` exits non-zero when they drift.
 | `PHP_COMPILER_RELEASE_CFG_AFTER_COMPILE` | bool | compile | — | Release CFG after compile | — |
 | `PHP_COMPILER_REPORT_EXTERNAL_STUBS` | bool | debug | — | Report unbound external method stubs | — |
 | `PHP_COMPILER_REPO_ROOT` | string | runtime | — | Override repository root detection | — |
+| `PHP_COMPILER_REPRODUCIBLE` | bool | compile | — | Force deterministic AOT link (build-id=sha1 + default SOURCE_DATE_EPOCH) | #36399 |
 | `PHP_COMPILER_RUNTIME_ASSERT` | bool | debug | — | Emit __ref__ delref underflow (M1) checks; alias PHPC_RUNTIME_ASSERT | #36397 |
 | `PHP_COMPILER_RUNTIME_ASSERT_INJECT_DOUBLE_DELREF` | bool | debug | — | Call rc=0 delref probe at standalone main (unit test) | #36397 |
 | `PHP_COMPILER_SELFHOST_AOT` | bool | compile | — | Self-host AOT emit mode | — |
@@ -107,5 +108,6 @@ defaults — `doctor --env` exits non-zero when they drift.
 | `PHP_COMPILER_VM_RSS_GUARD` | bool | runtime | `1` | Enable VM RSS guard | #497 |
 | `PHP_COMPILER_VM_SPINE_SMOKE` | bool | gate | — | VM spine smoke mode | — |
 | `PHP_COMPILER_WARN_EXTERNAL_STUBS` | bool | debug | — | Warn on external stubs | — |
+| `SOURCE_DATE_EPOCH` | string | compile | — | Unix epoch for reproducible AOT link timestamps (Debian/repro builds) | #36399 |
 
 Dynamic: `PHP_COMPILER_ENABLE_<ext>` toggles individual extensions (`lib/ReleaseUnsupportedExtensions.php`).
