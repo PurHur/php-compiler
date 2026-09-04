@@ -35,7 +35,7 @@ final class BootstrapGen0ChunkLinkScriptTest extends TestCase
         $this->assertStringContainsString('helper_slug_count', $script);
         // LINK_BINARY must not rename the executable onto the .o path.
         $this->assertStringContainsString('Never rename a successful LINK_BINARY', $script);
-        $this->assertStringContainsString('keep_object" == "1" && -f "${effective}"', $script);
+        $this->assertStringContainsString('keep_object}" == "1" && -f "${effective}"', $script);
     }
 
     public function testChunksOrchestratorOptionalLinkAfter(): void
