@@ -13,6 +13,9 @@ use PHPCompiler\JIT\Builtin\DomC14NRuntime;
 use PHPCompiler\JIT\Builtin\DomC14NFileRuntime;
 use PHPCompiler\JIT\Builtin\DomInstanceMethodRuntime;
 use PHPCompiler\JIT\Builtin\DomNodeChildNodeMutationRuntime;
+use PHPCompiler\JIT\Builtin\DomLoadRuntime;
+use PHPCompiler\JIT\Builtin\DomLoadHTMLRuntime;
+use PHPCompiler\JIT\Builtin\DomAttrIsIdRuntime;
 use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -109,6 +112,17 @@ final class JitDomExtensionHooksFacade implements DomExtensionHooks
             'node.remove' => $this->invokeNodeRemove($context, ...$args),
             'xpath.registerPhpFunctions' => $this->invokeXpathRegisterPhpFunctions($context, ...$args),
             'xpath.registerNamespace' => $this->invokeXpathRegisterNamespace($context, ...$args),
+            'attr.isId' => $this->invokeAttrIsId($context, ...$args),
+            'document.construct' => $this->invokeDocumentConstruct($context, ...$args),
+            'document.load' => $this->invokeDocumentLoad($context, ...$args),
+            'document.loadHTML' => $this->invokeDocumentLoadHTML($context, ...$args),
+            'element.getAttribute' => $this->invokeElementGetAttribute($context, ...$args),
+            'element.getAttributeNS' => $this->invokeElementGetAttributeNS($context, ...$args),
+            'element.removeAttribute' => $this->invokeElementRemoveAttribute($context, ...$args),
+            'element.removeAttributeNS' => $this->invokeElementRemoveAttributeNS($context, ...$args),
+            'element.setAttribute' => $this->invokeElementSetAttribute($context, ...$args),
+            'element.setAttributeNS' => $this->invokeElementSetAttributeNS($context, ...$args),
+            'node.appendChild' => $this->invokeNodeAppendChild($context, ...$args),
             default => throw new \LogicException(
                 'Unknown DOM Call kernel id: '.$callId.' (#36204)'
             ),
@@ -570,6 +584,926 @@ final class JitDomExtensionHooksFacade implements DomExtensionHooks
         $context->builder->call($context->lookupFunction('__value__writeNull'), $ptr);
 
         return JitValueBox::normalizeValuePtr($context, $ptr);
+    }
+
+
+    /**
+ * DOMAttr::isId() — user-script AOT (#29884).
+ *
+ * Always runtime via NestedJIT — compile-time idBearing stamps mis-fold when CFG
+ * lowering order differs from source order (maintainer_gap #29884).
+ */
+
+    private function invokeAttrIsId(Context $context, JITVariable ...$args): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_attr_isid_invoke_cont');
+        JitDomAttributeNodeNS::ensureClassicAttrMethods($context);
+        if ([] === $args) {
+            throw new \LogicException('DOMAttr::isId() expects receiver');
+        }
+
+        if (JitDomAttrRename::lastAttrIsOrphan()) {
+            return $context->getTypeFromString('int1')->constInt(0, false);
+        }
+        $key = JitDomAttrRename::lastFetchedKey();
+        if (null !== $key) {
+            $active = strtolower($context->activeFunction);
+            $inUserDeclaredFunction = '' !== $active
+                && !str_starts_with($active, '__')
+                && in_array($active, $context->userFunctionNames(), true);
+            // loadXML DTD ATTLIST ID / xml:id / setIdAttribute* stamp compile-time flags (#34821).
+            // Module-wide idBearing stamps pollute user-function CFG paths (#23514 importNode).
+            if (!$inUserDeclaredFunction
+                && DomUserScriptAttributeCacheLlvm::isIdBearingLiteral($key[0], $key[1])
+            ) {
+                return $context->getTypeFromString('int1')->constInt(1, false);
+            }
+            if ($inUserDeclaredFunction && '' === $key[0] && 'id' === $key[1]) {
+                // createElement id= toggles via module global — runtime stores from setIdAttribute (#29884).
+                return DomUserScriptAttributeCacheLlvm::loadIdBearingGlobal($context);
+            }
+
+            return DomAttrIsIdRuntime::invoke($context, $args[0]);
+        }
+
+        return DomAttrIsIdRuntime::invoke($context, $args[0]);
+    }
+
+
+    /**
+ * DOMDocument::__construct — seed thin-AOT DOMNode::$nodeType (#33607).
+ *
+ * php-src: ext/dom/document.c / node.c — XML_DOCUMENT_NODE.
+ * Must be listed in JIT::isVoidJitConstructCall so markObjectConstructed runs.
+ */
+
+    private function invokeDocumentConstruct(Context $context, JITVariable ...$args): Value
+    {
+        if ([] === $args) {
+            throw new \LogicException('DOMDocument::__construct() called without $this');
+        }
+        $obj = self::objectPtr($context, $args[0]);
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup('DOMDocument');
+        if (!$objectType->hasProperty($classId, VmDom::PROP_NODE_TYPE)) {
+            $objectType->defineProperty($classId, VmDom::PROP_NODE_TYPE, JITVariable::TYPE_NATIVE_LONG);
+        }
+        JitDomCreateElement::storeNodeType(
+            $context,
+            $obj,
+            'DOMDocument',
+            DomConstants::XML_DOCUMENT_NODE
+        );
+
+        // Empty document: documentElement is null (php-src ext/dom/document.c; #32736).
+        if (!$objectType->hasProperty($classId, VmDom::PROP_DOCUMENT_ELEMENT)) {
+            $objectType->defineProperty($classId, VmDom::PROP_DOCUMENT_ELEMENT, JITVariable::TYPE_OBJECT);
+        }
+        $nullEl = new Variable(
+            $context,
+            JITVariable::TYPE_OBJECT,
+            JITVariable::KIND_VALUE,
+            $context->getTypeFromString('__object__*')->constNull()
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, 'DOMDocument', VmDom::PROP_DOCUMENT_ELEMENT),
+            $nullEl,
+            JITVariable::TYPE_OBJECT
+        );
+
+        // Seed libxml option bools so reads work and writes stick (#34908).
+        // php-src DOMDocument::__construct defaults — ext/dom/php_dom.c / document.c.
+        self::seedOptionBool($context, $obj, VmDom::PROP_FORMAT_OUTPUT, false);
+        self::seedOptionBool($context, $obj, VmDom::PROP_VALIDATE_ON_PARSE, false);
+        self::seedOptionBool($context, $obj, VmDom::PROP_RESOLVE_EXTERNALS, false);
+        self::seedOptionBool($context, $obj, VmDom::PROP_SUBSTITUTE_ENTITIES, false);
+        self::seedOptionBool($context, $obj, VmDom::PROP_PRESERVE_WHITE_SPACE, true);
+        self::seedOptionBool($context, $obj, VmDom::PROP_RECOVER, false);
+        self::seedOptionBool($context, $obj, VmDom::PROP_STRICT_ERROR_CHECKING, true);
+        // xmlVersion / xmlStandalone (+ Level-3 aliases) — same MetaProps leftover (#34916).
+        self::seedOptionBool($context, $obj, VmDom::PROP_XML_STANDALONE, false);
+        self::seedOptionBool($context, $obj, VmDom::PROP_STANDALONE, false);
+        self::seedXmlVersion($context, $obj, '1.0');
+        // encoding null — writable slot; xmlEncoding/actualEncoding alias via MetaProps (#34919).
+        self::seedEncodingNull($context, $obj);
+        // documentURI null — writable; baseURI read-only alias via MetaProps (#34925).
+        self::seedDocumentUriNull($context, $obj);
+        // DOMNode identity on Document (php-src ext/dom/node.c; #34992 leftover of #34899).
+        self::seedNodeName($context, $obj, '#document');
+        self::seedPrefixEmpty($context, $obj);
+        self::seedNullValueProp($context, $obj, VmDom::PROP_NAMESPACE_URI);
+        self::seedNullValueProp($context, $obj, VmDom::PROP_LOCAL_NAME);
+        self::seedNullValueProp($context, $obj, VmDom::PROP_ATTRIBUTES);
+
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $slot)
+        );
+
+        return $slot;
+    }
+
+    private static function seedXmlVersion(Context $context, Value $obj, string $version): void
+    {
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup('DOMDocument');
+        $str = $context->builder->load($context->constantStringFromString($version));
+        foreach ([VmDom::PROP_XML_VERSION, VmDom::PROP_VERSION] as $prop) {
+            if (!$objectType->hasProperty($classId, $prop)) {
+                $objectType->defineProperty($classId, $prop, JITVariable::TYPE_STRING);
+            }
+            $owned = $context->builder->call(
+                $context->lookupFunction('__string__separate'),
+                $str
+            );
+            $propVar = new Variable(
+                $context,
+                JITVariable::TYPE_STRING,
+                JITVariable::KIND_VALUE,
+                $owned
+            );
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($obj, 'DOMDocument', $prop),
+                $propVar,
+                JITVariable::TYPE_STRING
+            );
+        }
+    }
+
+    /** php-src DOMDocument::$encoding default null (ext/dom/php_dom.c; #34919). */
+    private static function seedEncodingNull(Context $context, Value $obj): void
+    {
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup('DOMDocument');
+        if (!$objectType->hasProperty($classId, VmDom::PROP_ENCODING)) {
+            $objectType->defineProperty($classId, VmDom::PROP_ENCODING, JITVariable::TYPE_VALUE);
+        }
+        $box = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $box)
+        );
+        $propVar = new Variable(
+            $context,
+            JITVariable::TYPE_VALUE,
+            JITVariable::KIND_VARIABLE,
+            $box
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, 'DOMDocument', VmDom::PROP_ENCODING),
+            $propVar,
+            JITVariable::TYPE_VALUE
+        );
+    }
+
+    /** php-src DOMDocument::$documentURI default null (ext/dom/document.c; #34925). */
+    private static function seedDocumentUriNull(Context $context, Value $obj): void
+    {
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup('DOMDocument');
+        if (!$objectType->hasProperty($classId, VmDom::PROP_DOCUMENT_URI)) {
+            $objectType->defineProperty($classId, VmDom::PROP_DOCUMENT_URI, JITVariable::TYPE_VALUE);
+        }
+        $box = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $box)
+        );
+        $propVar = new Variable(
+            $context,
+            JITVariable::TYPE_VALUE,
+            JITVariable::KIND_VARIABLE,
+            $box
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, 'DOMDocument', VmDom::PROP_DOCUMENT_URI),
+            $propVar,
+            JITVariable::TYPE_VALUE
+        );
+    }
+
+    private static function seedOptionBool(Context $context, Value $obj, string $prop, bool $value): void
+    {
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup('DOMDocument');
+        if (!$objectType->hasProperty($classId, $prop)) {
+            $objectType->defineProperty($classId, $prop, JITVariable::TYPE_VALUE);
+        }
+        $box = JitValueBox::alloc($context);
+        $i1 = $context->getTypeFromString('int1');
+        $i32 = $context->getTypeFromString('int32');
+        JitValueBox::writeBool(
+            $context,
+            $box,
+            $context->builder->zext($i1->constInt($value ? 1 : 0, false), $i32)
+        );
+        $propVar = new Variable(
+            $context,
+            JITVariable::TYPE_VALUE,
+            JITVariable::KIND_VARIABLE,
+            $box
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, 'DOMDocument', $prop),
+            $propVar,
+            JITVariable::TYPE_VALUE
+        );
+    }
+
+    /** php-src DOMNode::$nodeName for XML_DOCUMENT_NODE — "#document" (#34992). */
+    private static function seedNodeName(Context $context, Value $obj, string $name): void
+    {
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup('DOMDocument');
+        if (!$objectType->hasProperty($classId, VmDom::PROP_NODE_NAME)) {
+            $objectType->defineProperty($classId, VmDom::PROP_NODE_NAME, JITVariable::TYPE_STRING);
+        }
+        $str = $context->builder->load($context->constantStringFromString($name));
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $str
+        );
+        $propVar = new Variable(
+            $context,
+            JITVariable::TYPE_STRING,
+            JITVariable::KIND_VALUE,
+            $owned
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, 'DOMDocument', VmDom::PROP_NODE_NAME),
+            $propVar,
+            JITVariable::TYPE_STRING
+        );
+    }
+
+    /** php-src DOMNode::$prefix for documents — empty string (#34992). */
+    private static function seedPrefixEmpty(Context $context, Value $obj): void
+    {
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup('DOMDocument');
+        if (!$objectType->hasProperty($classId, VmDom::PROP_PREFIX)) {
+            $objectType->defineProperty($classId, VmDom::PROP_PREFIX, JITVariable::TYPE_STRING);
+        }
+        $str = $context->builder->load($context->constantStringFromString(''));
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $str
+        );
+        $propVar = new Variable(
+            $context,
+            JITVariable::TYPE_STRING,
+            JITVariable::KIND_VALUE,
+            $owned
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, 'DOMDocument', VmDom::PROP_PREFIX),
+            $propVar,
+            JITVariable::TYPE_STRING
+        );
+    }
+
+    /**
+     * Seed a nullable DOMNode VALUE prop to null (namespaceURI / localName / attributes
+     * on Document — #34992).
+     */
+    private static function seedNullValueProp(Context $context, Value $obj, string $prop): void
+    {
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup('DOMDocument');
+        if (!$objectType->hasProperty($classId, $prop)) {
+            $objectType->defineProperty($classId, $prop, JITVariable::TYPE_VALUE);
+        }
+        $box = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $box)
+        );
+        $propVar = new Variable(
+            $context,
+            JITVariable::TYPE_VALUE,
+            JITVariable::KIND_VARIABLE,
+            $box
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, 'DOMDocument', $prop),
+            $propVar,
+            JITVariable::TYPE_VALUE
+        );
+    }
+
+    private static function objectPtr(Context $context, JITVariable $receiver): Value
+    {
+        if (JITVariable::TYPE_OBJECT === $receiver->type) {
+            return $context->helper->loadValue($receiver);
+        }
+        if (JITVariable::TYPE_VALUE === $receiver->type) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                JitValueBox::valuePtrFromVariable($context, $receiver)
+            );
+        }
+
+        throw new \LogicException(
+            'DOMDocument::__construct() expects an object, got '
+            .JITVariable::getStringType($receiver->type)
+        );
+    }
+
+
+    /** DOMDocument::load() — user-script AOT (#18897). */
+
+    private function invokeDocumentLoad(Context $context, JITVariable ...$args): Value
+    {
+        if (JitDomDocumentMethodKernel::shouldUse($context) && isset($args[1])) {
+            $path = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+            if (null !== $path && '' !== trim($path)) {
+                $xml = @\file_get_contents($path);
+                if (false !== $xml && '' !== trim($xml)) {
+                    JitDomLoadXMLUserScript::rememberCompileTimeXml($xml);
+                }
+            }
+        }
+
+        if (!JitDomDocumentMethodKernel::shouldUse($context)) {
+            DomLoadRuntime::ensureLinked($context);
+        }
+
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+            BasicBlockHelper::branchToFreshContinue($context, 'dom_load_invoke');
+        }
+
+        $result = JitDomLoad::invoke($context, ...$args);
+
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+            $mainCont = BasicBlockHelper::append($context, 'main_cont_after_dom_load');
+            $context->builder->branch($mainCont);
+            $context->builder->positionAtEnd($mainCont);
+        }
+
+        return $result;
+    }
+
+
+    /** DOMDocument::loadHTML() — user-script AOT (#17954). */
+
+    private function invokeDocumentLoadHTML(Context $context, JITVariable ...$args): Value
+    {
+        $source = $args[1] ?? null;
+        $isNullOrEmpty = null !== $source && (
+            JITVariable::TYPE_NULL === $source->type
+            || $source->isNullConstant
+            || '' === (JitStringBuiltinArg::compileTimeLiteral($source) ?? $source->compileTimeString ?? null)
+        );
+
+        if (JitDomDocumentMethodKernel::shouldUse($context) && isset($args[1]) && !$isNullOrEmpty) {
+            JitDomLoadHTMLUserScript::rememberCompileTimeOptions($context, $args[2] ?? null);
+            $lit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+            if (null !== $lit) {
+                $parsed = DomParseSimpleHtmlJitHelper::parseArgv($lit);
+                if (null !== $parsed) {
+                    JitDomLoadHTMLUserScript::rememberCompileTimeParsed($parsed);
+                }
+            }
+        }
+
+        // Skip ABI link / fresh-continue for compile-time null/empty — ValueError IR only (#22680).
+        if (!$isNullOrEmpty && !JitDomDocumentMethodKernel::shouldUse($context)) {
+            DomLoadHTMLRuntime::ensureLinked($context);
+        }
+
+        if (!$isNullOrEmpty && JitDomDocumentMethodKernel::shouldUse($context)) {
+            BasicBlockHelper::branchToFreshContinue($context, 'dom_lh_invoke');
+        }
+
+        $result = JitDomLoadHTML::invoke($context, ...$args);
+
+        // Catchable ValueError leaves the insert block terminated (branch to try dispatch).
+        // Do not stitch a reachable main_cont — that would run post-call try-body code (#22680).
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+            $insert = BasicBlockHelper::tryGetInsertBlock($context);
+            if (null !== $insert && null === $insert->getTerminator()) {
+                $mainCont = BasicBlockHelper::append($context, 'main_cont_after_dom_lh');
+                $context->builder->branch($mainCont);
+                $context->builder->positionAtEnd($mainCont);
+            }
+        }
+
+        return $result;
+    }
+
+
+    /**
+ * DOMElement::getAttribute() — user-script AOT (#19212, live Attr #19281, #27108, #34863).
+ *
+ * Prefer the receiver's compile-time open-tag stamp, then the element's own
+ * attributes NamedNodeMap pins (php-src xmlGetProp). Never fall back to
+ * process-global lastFetchedAttributes / name→value Attr cache — those collapse
+ * sibling id= values after lastChild or getElementById (#34863 / re-#34050).
+ */
+
+    private function invokeElementGetAttribute(Context $context, JITVariable ...$args): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_getattr_invoke_cont');
+        $nameLit = null;
+        if (isset($args[1])) {
+            $nameLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        }
+
+        // Per-element open-tag stamp from firstChild/nextSibling only when still on
+        // this Variable (#34050). Do not use lastFetchedAttributes — ARG_SEND /
+        // getElementById receivers would inherit the last sibling's attrs (#34863).
+        if (null !== $nameLit && isset($args[0])) {
+            $attrs = $args[0]->compileTimeDomAttributes;
+            if (null !== $attrs && [] !== $attrs) {
+                $val = $attrs[$nameLit] ?? null;
+                if (null === $val || '' === $val) {
+                    $pos = strpos($nameLit, ':');
+                    if (false !== $pos) {
+                        $val = $attrs[substr($nameLit, $pos + 1)] ?? null;
+                    }
+                }
+                if (null !== $val && '' !== $val) {
+                    return self::boxConstantString($context, $val);
+                }
+            }
+            // replaceChild clears the attrs bag on the return; read CreateElementAttrs (#35386).
+            $id = $args[0]->compileTimeDomElementId ?? null;
+            if (null !== $id) {
+                $fromSide = JitDomCreateElementAttrs::get($id);
+                if ([] !== $fromSide) {
+                    $val = $fromSide[$nameLit] ?? null;
+                    if (null === $val || '' === $val) {
+                        $pos = strpos($nameLit, ':');
+                        if (false !== $pos) {
+                            $val = $fromSide[substr($nameLit, $pos + 1)] ?? null;
+                        }
+                    }
+                    if (null !== $val && '' !== $val) {
+                        return self::boxConstantString($context, $val);
+                    }
+                }
+            }
+        }
+
+        // Per-element NamedNodeMap pins — correct after importNode / lastChild /
+        // getElementById and for Attr::$value writes on attached attributes (#34863 / #19281).
+        // Must run before the process-global Attr cache: a second loadHTML on another
+        // document overwrites cache keys so importNode getAttribute('id') read 'other'
+        // instead of the imported node's pinned id (#29487 / re-#19212).
+        if (isset($args[0], $args[1])) {
+            return JitDomNamedNodeMap::invokeElementGetAttribute($context, $args[0], $args[1]);
+        }
+
+        // User-script cache from createFromString / getAttributeNode — NamedNodeMap may
+        // lack pins until appendChild/setAttribute; read live Attr::$value (#21083).
+        if (null !== $nameLit && isset($args[0]) && self::cacheHasPresentLiteralName($nameLit)) {
+            return JitDomAttributeNodeNS::invokeGetAttributeLive($context, ...$args);
+        }
+
+        // Otherwise fall back to importNode/getElementById HTML-id stub (#19212).
+        return JitDomImportNode::invokeGetAttribute($context, ...$args);
+    }
+
+    private static function cacheHasPresentLiteralName(string $nameLit): bool
+    {
+        if (DomUserScriptAttributeCacheLlvm::hasPresentLiteral('', $nameLit)) {
+            return true;
+        }
+        $pos = strpos($nameLit, ':');
+
+        return false !== $pos
+            && DomUserScriptAttributeCacheLlvm::hasPresentLiteral('', substr($nameLit, $pos + 1));
+    }
+
+
+    /**
+ * Dom\Element::getAttributeNS() — thin user-script AOT live Attr cache (#27108).
+ * Null namespace prefers isNullConstant over stale compileTimeString (#33532).
+ */
+
+    private function invokeElementGetAttributeNS(Context $context, JITVariable ...$args): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_getattrns_invoke_cont');
+        // Legacy DOMElement + living Dom\Element share this Call (#31011).
+        if (!VmClassMethod::requireExactJitUserArgCount(
+            $context,
+            $args,
+            'DOMElement::getAttributeNS',
+            2
+        )) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        // Prefer isNullConstant over compileTimeString — null args can carry a stale
+        // string stamp (observed cts='k' with nullConst=1), which keyed the lookup as
+        // namespace "k" instead of "" (#33532 / peer SetAttributeNS #33528).
+        $nsLit = self::compileTimeNamespace($args[1]);
+        $localLit = JitStringBuiltinArg::compileTimeLiteral($args[2]) ?? $args[2]->compileTimeString;
+        if (null === $nsLit || null === $localLit
+            || !DomUserScriptAttributeCacheLlvm::hasPresentLiteral($nsLit, $localLit)
+        ) {
+            return self::boxConstantString($context, '');
+        }
+
+        return self::boxConstantString(
+            $context,
+            DomUserScriptAttributeCacheLlvm::literalValue($nsLit, $localLit) ?? ''
+        );
+    }
+
+
+    /** DOMElement::removeAttribute() — user-script AOT (#19870). */
+
+    private function invokeElementRemoveAttribute(Context $context, JITVariable ...$args): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_removeattr_invoke_cont');
+        $id = null;
+        $hadLoadXml = null !== JitDomLoadXMLUserScript::lastCompileTimeXml();
+        $didRefreshRootXml = false;
+        // Keep createElement attr bag + loadXML C14N fold in sync (#32981 / #34257).
+        if (\count($args) >= 2) {
+            $name = $args[1]->compileTimeString;
+            if (null !== $name && 'xmlns' !== $name) {
+                $id = $args[0]->compileTimeDomElementId ?? JitDomCreateElementAttrs::lastId();
+                if (null !== $id) {
+                    JitDomCreateElementAttrs::remove($id, $name);
+                }
+                $attrs = $args[0]->compileTimeDomAttributes ?? [];
+                if (isset($attrs[$name])) {
+                    unset($attrs[$name]);
+                    $args[0]->compileTimeDomAttributes = $attrs;
+                }
+                $path = $args[0]->compileTimeDomNodePath ?? null;
+                $nested = null !== $path && '' !== $path
+                    && substr_count(trim($path, '/'), '/') >= 1;
+                if ($nested) {
+                    JitDomLoadXMLUserScript::markTreeMutatedSinceLoad();
+                } else {
+                    JitDomLoadXMLUserScript::refreshCompileTimeXmlRootAttributeRemove($name);
+                    $didRefreshRootXml = $hadLoadXml;
+                }
+            }
+        }
+
+        $result = JitDomAttributeNodeNS::invokeRemoveAttribute($context, ...$args);
+
+        // Drop attr from saveXML open-tag suffix (#33509 / loadXML #34257).
+        if (\count($args) >= 2) {
+            $name = $args[1]->compileTimeString;
+            if (null !== $name && 'xmlns' !== $name) {
+                if ($didRefreshRootXml) {
+                    JitDomLoadXMLUserScript::syncElementXmlnsAttrFromCompileTimeXml($context, $args[0]);
+                } else {
+                    $attrs = $args[0]->compileTimeDomAttributes;
+                    if (null === $attrs && null !== $id) {
+                        $attrs = JitDomCreateElementAttrs::get($id);
+                    }
+                    if (null !== $attrs) {
+                        JitDomAttributeNodeNS::syncSaveXmlAttrSuffix($context, $args[0], $attrs);
+                    }
+                }
+            }
+        }
+
+        return $result;
+    }
+
+
+    /**
+ * DOMElement::removeAttributeNS() — user-script AOT (#32398, php-src returns null).
+ *
+ * Drops NS attrs from the saveXML open-tag bag (#33526 / peer #33509).
+ * loadXML roots: also refresh compile-time XML + PROP_USER_SCRIPT_XMLNS_ATTR (#34257).
+ */
+
+    private function invokeElementRemoveAttributeNS(Context $context, JITVariable ...$args): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_removeattrns_invoke_cont');
+        $id = null;
+        $removed = [];
+        $local = null;
+        $hadLoadXml = null !== JitDomLoadXMLUserScript::lastCompileTimeXml();
+        $didRefreshRootXml = false;
+        if (\count($args) >= 3) {
+            $local = $args[2]->compileTimeString;
+            $nsKnown = $args[1]->isNullConstant || null !== $args[1]->compileTimeString;
+            if (null !== $local && $nsKnown && 'xmlns' !== $local) {
+                $ns = $args[1]->isNullConstant ? null : $args[1]->compileTimeString;
+                $id = $args[0]->compileTimeDomElementId ?? JitDomCreateElementAttrs::lastId();
+                $attrs = $args[0]->compileTimeDomAttributes ?? [];
+                if (null !== $id) {
+                    foreach (JitDomCreateElementAttrs::get($id) as $name => $value) {
+                        if (!isset($attrs[$name])) {
+                            $attrs[$name] = $value;
+                        }
+                    }
+                }
+                $removed = self::removeLocalFromBag($attrs, $local);
+                if (null !== $id) {
+                    foreach ($removed as $name) {
+                        JitDomCreateElementAttrs::remove($id, $name);
+                    }
+                }
+                $args[0]->compileTimeDomAttributes = $attrs;
+
+                $path = $args[0]->compileTimeDomNodePath ?? null;
+                $nested = null !== $path && '' !== $path
+                    && substr_count(trim($path, '/'), '/') >= 1;
+                if ($nested) {
+                    JitDomLoadXMLUserScript::markTreeMutatedSinceLoad();
+                } elseif ($hadLoadXml) {
+                    // Always mutate host XML — bag is empty for loadXML-seeded attrs (#34257).
+                    JitDomLoadXMLUserScript::refreshCompileTimeXmlRootAttributeRemoveNS($ns, $local);
+                    $didRefreshRootXml = true;
+                } else {
+                    foreach ($removed as $name) {
+                        JitDomLoadXMLUserScript::refreshCompileTimeXmlRootAttributeRemove($name);
+                    }
+                }
+            }
+        }
+
+        $result = JitDomAttributeNodeNS::invokeRemoveAttributeNS($context, ...$args);
+
+        if (null !== $local && 'xmlns' !== $local) {
+            $nsKnown = isset($args[1]) && ($args[1]->isNullConstant || null !== $args[1]->compileTimeString);
+            if ($nsKnown) {
+                if ($didRefreshRootXml) {
+                    JitDomLoadXMLUserScript::syncElementXmlnsAttrFromCompileTimeXml($context, $args[0]);
+                } else {
+                    $attrs = $args[0]->compileTimeDomAttributes;
+                    if (null === $attrs && null !== $id) {
+                        $attrs = JitDomCreateElementAttrs::get($id);
+                    }
+                    if (null !== $attrs) {
+                        JitDomAttributeNodeNS::syncSaveXmlAttrSuffix($context, $args[0], $attrs);
+                    }
+                }
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param array<string, string> $attrs
+     *
+     * @return list<string> removed open-tag keys (qName only — keep xmlns:prefix like Zend)
+     */
+    private static function removeLocalFromBag(array &$attrs, string $localName): array
+    {
+        $removed = [];
+        foreach (array_keys($attrs) as $name) {
+            if (str_starts_with($name, 'xmlns')) {
+                continue;
+            }
+            $local = str_contains($name, ':') ? substr($name, (int) strrpos($name, ':') + 1) : $name;
+            if ($local !== $localName) {
+                continue;
+            }
+            unset($attrs[$name]);
+            $removed[] = $name;
+        }
+
+        return $removed;
+    }
+
+
+    /** DOMElement::setAttribute() — user-script AOT live Attr (#19281). */
+
+    private function invokeElementSetAttribute(Context $context, JITVariable ...$args): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_setattr_invoke_cont');
+        $id = null;
+        // Side-table: assign/box can drop createElement stamps on the local (#32973).
+        if (\count($args) >= 3) {
+            $name = $args[1]->compileTimeString;
+            $value = $args[2]->compileTimeString;
+            $id = $args[0]->compileTimeDomElementId ?? JitDomCreateElementAttrs::lastId();
+            if (null !== $name && null !== $value && 'xmlns' !== $name) {
+                // Side-table only before invoke — merging compileTimeDomAttributes here runs
+                // before invokeSetAttribute reads prior id for htmlSetProp / isId (#23514).
+                if (null !== $id) {
+                    JitDomCreateElementAttrs::set($id, $name, $value);
+                }
+            }
+            // loadXML documentElement C14N fold (#32981). Nested paths invalidate.
+            if (null !== $name && null !== $value && 'xmlns' !== $name) {
+                $path = $args[0]->compileTimeDomNodePath ?? null;
+                $nested = null !== $path && '' !== $path
+                    && substr_count(trim($path, '/'), '/') >= 1;
+                if ($nested) {
+                    JitDomLoadXMLUserScript::markTreeMutatedSinceLoad();
+                } else {
+                    JitDomLoadXMLUserScript::refreshCompileTimeXmlRootAttributeSet($name, $value);
+                }
+            }
+        }
+
+        $result = JitDomAttributeNodeNS::invokeSetAttribute($context, ...$args);
+
+        // saveXML / INNER_XML rebuild read PROP_USER_SCRIPT_XMLNS_ATTR (#33509 / peer #33362).
+        if (\count($args) >= 3) {
+            $name = $args[1]->compileTimeString;
+            $value = $args[2]->compileTimeString;
+            if (null !== $name && null !== $value && 'xmlns' !== $name) {
+                // Merge after invoke so compileTimePriorIdLiteral sees removeAttribute clears (#23514).
+                $attrs = $args[0]->compileTimeDomAttributes ?? [];
+                if ([] === $attrs && null !== $id) {
+                    $attrs = JitDomCreateElementAttrs::get($id);
+                }
+                $attrs[$name] = $value;
+                $args[0]->compileTimeDomAttributes = $attrs;
+                if (null === $args[0]->compileTimeDomElementId && null !== $id) {
+                    $args[0]->compileTimeDomElementId = $id;
+                }
+                if (null !== $attrs) {
+                    JitDomAttributeNodeNS::syncSaveXmlAttrSuffix($context, $args[0], $attrs);
+                }
+            }
+        }
+
+        return $result;
+    }
+
+
+    /**
+ * DOMElement::setAttributeNS() — user-script AOT (#32398, php-src xmlSetNsProp).
+ *
+ * Syncs PROP_USER_SCRIPT_XMLNS_ATTR like {@see DomElementSetAttribute} (#33526 / peer #33509).
+ */
+
+    private function invokeElementSetAttributeNS(Context $context, JITVariable ...$args): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_setattrns_invoke_cont');
+        $id = null;
+        if (\count($args) >= 4) {
+            $qname = $args[2]->compileTimeString;
+            $value = $args[3]->compileTimeString;
+            $nsKnown = $args[1]->isNullConstant || null !== $args[1]->compileTimeString;
+            if (null !== $qname && null !== $value && $nsKnown
+                && 'xmlns' !== $qname && !str_starts_with($qname, 'xmlns:')) {
+                $ns = $args[1]->isNullConstant ? null : $args[1]->compileTimeString;
+                $id = $args[0]->compileTimeDomElementId ?? JitDomCreateElementAttrs::lastId();
+                $bagUpdates = self::openTagAttrUpdates($ns, $qname, $value);
+                $attrs = $args[0]->compileTimeDomAttributes ?? [];
+                if ([] === $attrs && null !== $id) {
+                    $attrs = JitDomCreateElementAttrs::get($id);
+                }
+                // Rebuild so xmlns:prefix stays before the prefixed Attr (Zend serialize order).
+                foreach ($bagUpdates as $name => $val) {
+                    unset($attrs[$name]);
+                }
+                $attrs = $bagUpdates + $attrs;
+                if (null !== $id) {
+                    foreach ($bagUpdates as $name => $val) {
+                        // Numeric-looking qnames become int keys in PHP arrays; cast (#35234).
+                        JitDomCreateElementAttrs::set($id, (string) $name, (string) $val);
+                    }
+                    if (null === $args[0]->compileTimeDomElementId) {
+                        $args[0]->compileTimeDomElementId = $id;
+                    }
+                }
+                $args[0]->compileTimeDomAttributes = $attrs;
+
+                $path = $args[0]->compileTimeDomNodePath ?? null;
+                $nested = null !== $path && '' !== $path
+                    && substr_count(trim($path, '/'), '/') >= 1;
+                if ($nested) {
+                    JitDomLoadXMLUserScript::markTreeMutatedSinceLoad();
+                } else {
+                    foreach ($bagUpdates as $name => $val) {
+                        JitDomLoadXMLUserScript::refreshCompileTimeXmlRootAttributeSet($name, $val);
+                    }
+                }
+            }
+        }
+
+        $result = JitDomAttributeNodeNS::invokeSetAttributeNS($context, ...$args);
+
+        if (\count($args) >= 4) {
+            $qname = $args[2]->compileTimeString;
+            $value = $args[3]->compileTimeString;
+            $nsKnown = $args[1]->isNullConstant || null !== $args[1]->compileTimeString;
+            if (null !== $qname && null !== $value && $nsKnown
+                && 'xmlns' !== $qname && !str_starts_with($qname, 'xmlns:')) {
+                $attrs = $args[0]->compileTimeDomAttributes;
+                if (null === $attrs && null !== $id) {
+                    $attrs = JitDomCreateElementAttrs::get($id);
+                }
+                if (null !== $attrs) {
+                    JitDomAttributeNodeNS::syncSaveXmlAttrSuffix($context, $args[0], $attrs);
+                }
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Open-tag keys for saveXML: qName=value plus xmlns:prefix when prefixed (php-src xmlSetNsProp).
+     *
+     * @return array<string, string>
+     */
+    private static function openTagAttrUpdates(?string $namespace, string $qname, string $value): array
+    {
+        // php-src emits xmlns:prefix before the prefixed Attr in serialization.
+        $updates = [];
+        $colon = strpos($qname, ':');
+        if (false !== $colon && null !== $namespace && '' !== $namespace) {
+            $prefix = substr($qname, 0, $colon);
+            if ('' !== $prefix && 'xmlns' !== $prefix) {
+                $updates['xmlns:'.$prefix] = $namespace;
+            }
+        }
+        $updates[$qname] = $value;
+
+        return $updates;
+    }
+
+
+    /**
+ * DOMNode::appendChild() — user-script AOT (#18478, #18927, #27044, #27480).
+ *
+ * Prefer ParentNode::append lowering (live mutation + childNodes length). The
+ * historic JitDomAppendChild stub only wrote parentNode; RuntimeIndirect on
+ * Element class_ids aborts when Document/Node are the only candidates (#19208).
+ *
+ * Capture the child {@see __object__*} before live-slot sync and re-box it for
+ * the return value (peer insertBefore). Re-reading `$args[1]` after sync via
+ * {@see JitValueBox::valuePtrFromVariable} observes a null box — appendChild
+ * then returns NULL and `$a->parentNode` after replaceChild segfaults (#27480).
+ */
+
+    private function invokeNodeAppendChild(Context $context, JITVariable ...$args): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_ac_invoke_cont');
+        if (
+            isset($args[1])
+            && JitDomRequireDomNodeArg::guardOrAbort($context, $args[1], 'DOMNode::appendChild', 1, 'node')
+        ) {
+            return JitDomRequireDomNodeArg::boxNullResult($context);
+        }
+        if (
+            JitDomDocumentMethodKernel::shouldUse($context)
+            && \count($args) >= 2
+        ) {
+            // Pin object identity before ParentNode::append mutates slots (#27480).
+            $childObj = self::loadChildObject($context, $args[1]);
+            $append = new \PHPCompiler\JIT\Call\DomNodeAppend();
+            $append->call($context, ...$args);
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_ac_ret_cont');
+
+            return self::boxObjectResult($context, $childObj);
+        }
+
+        return JitDomAppendChild::invoke($context, ...$args);
+    }
+
+    private static function loadChildObject(Context $context, JITVariable $child): Value
+    {
+        if (JITVariable::TYPE_OBJECT === $child->type) {
+            return $context->helper->loadValue($child);
+        }
+        if (JITVariable::TYPE_VALUE === $child->type) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                JitValueBox::valuePtrFromVariable($context, $child)
+            );
+        }
+
+        throw new \LogicException('DOMNode::appendChild() child must be object or value box');
+    }
+
+    private static function boxObjectResult(Context $context, Value $object): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            $ptr,
+            $object
+        );
+
+        return JitValueBox::normalizeValuePtr($context, $ptr);
+    }
+
+
+    private static function boxConstantString(Context $context, string $lit): Value
+    {
+        $str = $context->builder->load($context->constantStringFromString($lit));
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $str
+        );
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            JitValueBox::pointer($context, $slot),
+            $owned
+        );
+
+        return JitValueBox::normalizeValuePtr($context, $slot);
     }
 
 }
