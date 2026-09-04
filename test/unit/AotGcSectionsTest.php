@@ -15,6 +15,7 @@ final class AotGcSectionsTest extends TestCase
         putenv(AotGcSections::ENV);
         putenv(AotGcSections::STRIP_SUPPRESS_ENV);
         putenv(AotDebugSymbols::ENV);
+        putenv('PHP_COMPILER_ASAN');
         unset(
             $_ENV[AotGcSections::ENV],
             $_SERVER[AotGcSections::ENV],
@@ -22,6 +23,8 @@ final class AotGcSectionsTest extends TestCase
             $_SERVER[AotGcSections::STRIP_SUPPRESS_ENV],
             $_ENV[AotDebugSymbols::ENV],
             $_SERVER[AotDebugSymbols::ENV],
+            $_ENV['PHP_COMPILER_ASAN'],
+            $_SERVER['PHP_COMPILER_ASAN'],
         );
     }
 
@@ -53,6 +56,14 @@ final class AotGcSectionsTest extends TestCase
     {
         putenv(AotGcSections::STRIP_SUPPRESS_ENV.'=1');
         $this->assertFalse(AotGcSections::stripAtLink());
+    }
+
+    public function testStripSuppressedForAsan(): void
+    {
+        putenv('PHP_COMPILER_ASAN=1');
+        $_ENV['PHP_COMPILER_ASAN'] = '1';
+        $this->assertFalse(AotGcSections::stripAtLink());
+        $this->assertSame('', AotGcSections::linkStripFlag());
     }
 
     public function testLinkGcSectionsFlags(): void

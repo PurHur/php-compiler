@@ -37,6 +37,27 @@ final class RuntimeAssertDelrefAotTest extends TestCase
         );
         $this->assertFileExists(dirname(__DIR__, 2).'/script/runtime-assert/asan-smoke.sh');
         $this->assertFileExists(dirname(__DIR__, 2).'/script/runtime-assert/valgrind-smoke.sh');
+        $this->assertFileExists(dirname(__DIR__, 2).'/test/runtime-assert/STREAK.json');
+    }
+
+    public function testAsanSmokeResolvesRepoRootTwoLevelsUp(): void
+    {
+        $asan = (string) file_get_contents(dirname(__DIR__, 2).'/script/runtime-assert/asan-smoke.sh');
+        $vg = (string) file_get_contents(dirname(__DIR__, 2).'/script/runtime-assert/valgrind-smoke.sh');
+        // #36719 moved smokes under script/runtime-assert/; dirname/.. is script/ and breaks.
+        $this->assertMatchesRegularExpression(
+            '#ROOT="\$\(cd "\$\(dirname "\$0"\)/\.\./\.\." && pwd\)"#',
+            $asan
+        );
+        $this->assertMatchesRegularExpression(
+            '#ROOT="\$\(cd "\$\(dirname "\$0"\)/\.\./\.\." && pwd\)"#',
+            $vg
+        );
+        $this->assertStringContainsString('bin/compile.php', $asan);
+        $this->assertStringContainsString('missing bin/compile.php', $asan);
+        $this->assertStringContainsString('Do not wrap ASan binaries in GNU timeout', $asan);
+        $this->assertStringContainsString('RUNTIME_ASSERT_ASAN_FULL', $asan);
+        $this->assertStringContainsString('mode=${mode}', $asan);
     }
 
     public function testRefcountPhpEmitsM1Guard(): void

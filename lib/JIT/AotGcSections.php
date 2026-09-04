@@ -36,6 +36,12 @@ final class AotGcSections
         if (AotDebugSymbols::isEnabled()) {
             return false;
         }
+        // ASan/UBSan need unstripped metadata sections; bare `-s` causes intermittent
+        // SIGSEGV (rc=139) on otherwise-correct AOT binaries (#36397).
+        $asan = \PHPCompiler\Config::getenv('PHP_COMPILER_ASAN');
+        if ('1' === $asan || 'true' === strtolower((string) $asan)) {
+            return false;
+        }
         $env = getenv(self::STRIP_SUPPRESS_ENV);
 
         return '1' !== $env && 'true' !== strtolower((string) $env);
