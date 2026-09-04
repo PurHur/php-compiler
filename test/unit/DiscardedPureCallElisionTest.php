@@ -6,6 +6,7 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 use PHPCompiler\Block;
+use PHPCompiler\ext\types\is_type;
 use PHPCompiler\ext\types\strlen;
 use PHPCompiler\JIT\Call\Native;
 use PHPCompiler\JIT\Context;
@@ -27,13 +28,41 @@ final class DiscardedPureCallElisionTest extends TestCase
         $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
     }
 
-    public function testDoesNotElideStrlenWithoutCompileTimeOperand(): void
+    public function testElidesDiscardedStrlenWithTypedStringSlot(): void
     {
         $context = $this->makeContext();
         $builtin = new strlen();
         $arg = $this->makeStringVar(null);
 
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testDoesNotElideStrlenOnNativeLong(): void
+    {
+        // Soft strlen(int) emits deprecate / coercion — must not drop (#36386).
+        $context = $this->makeContext();
+        $builtin = new strlen();
+        $arg = $this->makeNativeLongVar();
+
         $this->assertFalse(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testElidesDiscardedIsIntPredicate(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new is_type('is_int', VmVariable::TYPE_INTEGER);
+        $arg = $this->makeNativeLongVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testElidesDiscardedIsStringPredicateOnValueBox(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new is_type('is_string', VmVariable::TYPE_STRING);
+        $arg = $this->makeValueBoxVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
     }
 
     public function testElidesRegisteredVoidNativeWithCompileTimeStringArg(): void
@@ -74,14 +103,17 @@ final class DiscardedPureCallElisionTest extends TestCase
 
     public function testJitWiresElisionBeforeInvoke(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT.php');
+        $compile = (string) file_get_contents(
+            __DIR__.'/../../lib/JIT/Concern/CompileBlockInternal.php'
+        );
+        $this->assertStringContainsString('DiscardedPureCallElision::tryElide', $compile);
+        $this->assertStringContainsString('TYPE_FUNCCALL_EXEC_NORETURN', $compile);
 
-        $this->assertStringContainsString('DiscardedPureCallElision::tryElide', $source);
-        $this->assertStringContainsString('TYPE_FUNCCALL_EXEC_NORETURN', $source);
-        $this->assertStringContainsString('discardedCallElisionVoidNatives', $source);
+        $jit = (string) file_get_contents(__DIR__.'/../../lib/JIT.php');
+        $this->assertStringContainsString('discardedCallElisionVoidNatives', $jit);
         // void(*)(…) formals must still register (#36386 simpleucall hallo(string)).
-        $this->assertStringContainsString('$isVoidReturn', $source);
-        $this->assertStringContainsString('Capture before appending', $source);
+        $this->assertStringContainsString('$isVoidReturn', $jit);
+        $this->assertStringContainsString('Capture before appending', $jit);
     }
 
     private function makeContext(): Context
@@ -122,6 +154,36 @@ final class DiscardedPureCallElisionTest extends TestCase
         $kindProp->setAccessible(true);
         $kindProp->setValue($var, Variable::KIND_VARIABLE);
         $var->compileTimeString = $literal;
+
+        return $var;
+    }
+
+    private function makeNativeLongVar(): Variable
+    {
+        $ref = new \ReflectionClass(Variable::class);
+        /** @var Variable $var */
+        $var = $ref->newInstanceWithoutConstructor();
+        $typeProp = $ref->getProperty('type');
+        $typeProp->setAccessible(true);
+        $typeProp->setValue($var, Variable::TYPE_NATIVE_LONG);
+        $kindProp = $ref->getProperty('kind');
+        $kindProp->setAccessible(true);
+        $kindProp->setValue($var, Variable::KIND_VARIABLE);
+
+        return $var;
+    }
+
+    private function makeValueBoxVar(): Variable
+    {
+        $ref = new \ReflectionClass(Variable::class);
+        /** @var Variable $var */
+        $var = $ref->newInstanceWithoutConstructor();
+        $typeProp = $ref->getProperty('type');
+        $typeProp->setAccessible(true);
+        $typeProp->setValue($var, Variable::TYPE_VALUE);
+        $kindProp = $ref->getProperty('kind');
+        $kindProp->setAccessible(true);
+        $kindProp->setValue($var, Variable::KIND_VARIABLE);
 
         return $var;
     }

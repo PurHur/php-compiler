@@ -10,10 +10,11 @@ use PHPCompiler\JIT\Call\Native;
 use PHPCompiler\VM\Variable as VmVariable;
 
 /**
- * Elide discarded calls to compile-time-pure builtins (#23483 call-overhead slice).
+ * Elide discarded calls to compile-time-pure builtins (#23483 / #36386 call-overhead).
  *
  * php-src: ZPP may still run user-visible coercions; here we only fold cases that are
- * side-effect-free at compile time (literal strlen operand, empty void user functions).
+ * side-effect-free (literal / typed-string strlen, type.c predicates, empty void
+ * user functions). Soft-null strlen coercions are NOT elided — they emit deprecations.
  */
 final class DiscardedPureCallElision
 {
@@ -22,7 +23,10 @@ final class DiscardedPureCallElision
      */
     public static function tryElide(Context $context, ?Call $toCall, array $callArgs): bool
     {
-        if (self::tryElideStrlenLiteral($toCall, $callArgs)) {
+        if (self::tryElidePureTypePredicate($toCall)) {
+            return true;
+        }
+        if (self::tryElideStrlenNoSideEffect($toCall, $callArgs)) {
             return true;
         }
 
@@ -30,9 +34,22 @@ final class DiscardedPureCallElision
     }
 
     /**
+     * Discarded {@code is_int}/{@code is_string}/… — php-src {@code type.c} only
+     * reads the zval type tag (peer {@see NoThrowCallElision}).
+     */
+    private static function tryElidePureTypePredicate(?Call $toCall): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+
+        return NoThrowCallElision::isPureTypePredicateBuiltin(strtolower($toCall->getName()));
+    }
+
+    /**
      * @param array<int, Variable> $callArgs
      */
-    private static function tryElideStrlenLiteral(?Call $toCall, array $callArgs): bool
+    private static function tryElideStrlenNoSideEffect(?Call $toCall, array $callArgs): bool
     {
         if (!$toCall instanceof CoreFuncInternal) {
             return false;
@@ -43,8 +60,13 @@ final class DiscardedPureCallElision
         if (!isset($callArgs[0]) || !$callArgs[0] instanceof Variable) {
             return false;
         }
+        $arg = $callArgs[0];
+        // Literal or already-a-string slot — no Z_PARAM_STR coercion / deprecate.
+        if (null !== JitStringArg::compileTimeLiteral($arg)) {
+            return true;
+        }
 
-        return null !== JitStringArg::compileTimeLiteral($callArgs[0]);
+        return Variable::TYPE_STRING === $arg->type;
     }
 
     /**
