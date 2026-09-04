@@ -18768,6 +18768,25 @@ restart:
         $live->separateArrayForWrite();
         $frame->iterators[$slot] = $live;
         $this->context->foreachIterators[$slot] = $live;
+        // ITER_RESET stores the by-value snapshot on the header frame; CFG edges copy
+        // frame->iterators to children (#36354). Rebind must replace that snapshot on
+        // every ancestor in this activation — otherwise ITER_VALID on the reused header
+        // restores context->foreachIterators to the snapshot and the next FE_FETCH_RW
+        // delRefs it again (rc 1→0), destroying the live HT mid-foreach (i11 / #24010).
+        $func = $frame->block->func ?? null;
+        for ($ancestor = $frame->parent; null !== $ancestor; $ancestor = $ancestor->parent) {
+            if (
+                null !== $func
+                && null !== $ancestor->block
+                && null !== $ancestor->block->func
+                && $ancestor->block->func !== $func
+            ) {
+                break;
+            }
+            if (isset($ancestor->iterators[$slot])) {
+                $ancestor->iterators[$slot] = $live;
+            }
+        }
     }
 
     private function resolveForeachContainer(Frame $frame, int $slot): Variable
