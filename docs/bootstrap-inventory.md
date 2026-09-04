@@ -50261,18 +50261,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT\Call\EmitCatchableError (line 19975)
 - new JIT\Call\RuntimeIndirectStaticMethodCall (line 20158)
 - new JIT\Call\RuntimeIndirectStaticMethodCall (line 20325)
-- new Operand\Literal (line 21137)
-- new VM (line 22159)
-- new VM\Variable (line 22168)
-- new VM\ClassEntry (line 22273)
-- new Func\PHP (line 22292)
-- new VM\ClassEntry (line 22338)
-- new Variable (line 22355)
-- new Variable (line 22468)
-- new Variable (line 22509)
-- new Variable (line 22569)
-- new Variable (line 22788)
-- new Variable (line 24680)
+- new Operand\Literal (line 21139)
+- new VM (line 22161)
+- new VM\Variable (line 22170)
+- new VM\ClassEntry (line 22275)
+- new Func\PHP (line 22294)
+- new VM\ClassEntry (line 22340)
+- new Variable (line 22357)
+- new Variable (line 22470)
+- new Variable (line 22511)
+- new Variable (line 22571)
+- new Variable (line 22790)
+- new Variable (line 24682)
 - 627 class method(s)
 - 25 closure(s)
 
@@ -56408,10 +56408,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/Native.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 1038)
-- new Variable (line 1046)
-- new Variable (line 1055)
-- 18 class method(s)
+- new Variable (line 1063)
+- new Variable (line 1071)
+- new Variable (line 1080)
+- 19 class method(s)
 
 ### `lib/JIT/Call/NestedClosureInvoke.php`
 
