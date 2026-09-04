@@ -9,9 +9,9 @@
             "note": "Concern trait splits (#36230/#36387/#36403); CompileFuncCfgReturnAndGlobalImport + peers"
         },
         "lib/JIT.php": {
-            "budget": 23648,
+            "budget": 22666,
             "target": 20000,
-            "note": "Concern trait splits (#36387/#36403); TernaryJumpIfEchoMerge + emitCfgReturnOperand"
+            "note": "Concern trait splits (#36387/#36403); M3EmitTuSidecarLinktime extract"
         },
         "lib/VM.php": {
             "budget": 25586,
