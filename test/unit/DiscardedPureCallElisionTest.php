@@ -45,6 +45,10 @@ use PHPCompiler\ext\standard\get_object_vars_;
 use PHPCompiler\ext\standard\get_class_methods_;
 use PHPCompiler\ext\standard\get_class_;
 use PHPCompiler\ext\standard\get_debug_type;
+use PHPCompiler\ext\standard\get_declared_classes_;
+use PHPCompiler\ext\standard\get_declared_interfaces_;
+use PHPCompiler\ext\standard\get_declared_traits_;
+use PHPCompiler\ext\standard\get_included_files_;
 use PHPCompiler\ext\standard\get_parent_class_;
 use PHPCompiler\ext\standard\gettype;
 use PHPCompiler\ext\standard\hash_equals;
@@ -74,6 +78,7 @@ use PHPCompiler\ext\standard\octdec;
 use PHPCompiler\ext\standard\ord;
 use PHPCompiler\ext\standard\parse_url;
 use PHPCompiler\ext\standard\pathinfo;
+use PHPCompiler\ext\standard\php_sapi_name;
 use PHPCompiler\ext\standard\property_exists_;
 use PHPCompiler\ext\standard\pi;
 use PHPCompiler\ext\standard\pow;
@@ -116,6 +121,7 @@ use PHPCompiler\ext\standard\urldecode;
 use PHPCompiler\ext\standard\urlencode;
 use PHPCompiler\ext\standard\version_compare;
 use PHPCompiler\ext\standard\wordwrap;
+use PHPCompiler\ext\standard\zend_version;
 use PHPCompiler\ext\standard\boolval;
 use PHPCompiler\ext\types\is_type;
 use PHPCompiler\ext\types\strlen;
@@ -2352,6 +2358,71 @@ final class DiscardedPureCallElisionTest extends TestCase
             $context,
             new get_object_vars_(),
             []
+        ));
+    }
+
+    public function testDiscardedZeroArgRuntimeInfoElides(): void
+    {
+        // php-src basic_functions.c / info.c / Zend/zend.c — arity 0 only (#36386).
+        $context = $this->makeContext();
+        $long = $this->makeNativeLongVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_declared_classes_(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_declared_interfaces_(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_declared_traits_(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_included_files_(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_included_files_('get_required_files'),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new php_sapi_name(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new zend_version(),
+            []
+        ));
+
+        // Excess argc stays live (ArgumentCountError).
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_declared_classes_(),
+            [$long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_included_files_(),
+            [$long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new php_sapi_name(),
+            [$long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new zend_version(),
+            [$long]
         ));
     }
 

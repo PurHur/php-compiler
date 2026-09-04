@@ -43,6 +43,10 @@ use PHPCompiler\VM\Variable as VmVariable;
  * subjects stay live for autoload; soft-null autoload stays live),
  * typed-object get_object_vars / get_mangled_object_vars /
  * get_class_methods (string get_class_methods stays live for autoload),
+ * zero-arg get_declared_classes / get_declared_interfaces /
+ * get_declared_traits / get_included_files / get_required_files /
+ * php_sapi_name / zend_version (excess argc stays live —
+ * ArgumentCountError),
  * zero-arg pi, type.c predicates + gettype/get_debug_type, ctype.c
  * classifiers on typed/literal strings, typed-array count/sizeof, math.c
  * incl. pow/fpow/fdiv on already-numeric args, empty void user functions).
@@ -89,7 +93,10 @@ use PHPCompiler\VM\Variable as VmVariable;
  * stay live (autoload). Soft-null / non-object
  * {@code get_object_vars}/{@code get_mangled_object_vars}/
  * {@code get_class_methods} stay live ({@code TypeError}); string
- * {@code get_class_methods} stays live (autoload).
+ * {@code get_class_methods} stays live (autoload). Non-zero-arg
+ * {@code get_declared_*}/{@code get_included_files}/{@code get_required_files}/
+ * {@code php_sapi_name}/{@code zend_version} stay live
+ * ({@code ArgumentCountError}).
  */
 final class DiscardedPureCallElision
 {
@@ -186,6 +193,9 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureObjectVarsMethodsNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureZeroArgRuntimeInfoNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureVersionCompareNoSideEffect($toCall, $callArgs)) {
@@ -1438,6 +1448,29 @@ final class DiscardedPureCallElision
     }
 
     /**
+     * Discarded zero-arg {@code get_declared_classes}/
+     * {@code get_declared_interfaces}/{@code get_declared_traits}/
+     * {@code get_included_files}/{@code get_required_files}/
+     * {@code php_sapi_name}/{@code zend_version} — php-src
+     * {@code basic_functions.c}/{@code info.c}/{@code Zend/zend.c}. Table /
+     * SAPI reads with no user handlers. Excess argc stays live
+     * ({@code ArgumentCountError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureZeroArgRuntimeInfoNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if (!NoThrowCallElision::isPureZeroArgRuntimeInfoBuiltin(strtolower($toCall->getName()))) {
+            return false;
+        }
+
+        return self::zeroArgRuntimeInfoArgsAllowDiscardedElision($callArgs);
+    }
+
+    /**
      * Discarded {@code version_compare} on typed / literal strings — php-src
      * {@code versioning.c}. Optional operator must be null or a compile-time
      * valid comparison op ({@code ValueError} otherwise).
@@ -1789,6 +1822,16 @@ final class DiscardedPureCallElision
     private static function objectVarsMethodsArgsAllowDiscardedElision(array $callArgs): bool
     {
         return NoThrowCallElision::objectVarsMethodsArgsCannotThrow($callArgs);
+    }
+
+    /**
+     * Exactly zero arguments — peer {@see NoThrowCallElision::zeroArgRuntimeInfoArgsCannotThrow}.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function zeroArgRuntimeInfoArgsAllowDiscardedElision(array $callArgs): bool
+    {
+        return NoThrowCallElision::zeroArgRuntimeInfoArgsCannotThrow($callArgs);
     }
 
     /**

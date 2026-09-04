@@ -359,6 +359,11 @@ final class NoThrowCallElision
             // typed object only; string get_class_methods stays out (autoload).
             return self::objectVarsMethodsArgsCannotThrow($callArgs);
         }
+        if (self::isPureZeroArgRuntimeInfoBuiltin($name)) {
+            // get_declared_* / get_included_files / php_sapi_name / zend_version —
+            // arity 0 only; excess args are ArgumentCountError.
+            return self::zeroArgRuntimeInfoArgsCannotThrow($callArgs);
+        }
         if (self::isPureVersionCompareBuiltin($name)) {
             // versioning.c — typed strings; optional operator must be proven valid.
             return self::versionCompareArgsCannotThrow($callArgs);
@@ -1115,6 +1120,32 @@ final class NoThrowCallElision
     }
 
     /**
+     * Zero-arg declaration-table / SAPI identity reads — php-src
+     * {@code ext/standard/basic_functions.c} ({@code get_declared_classes}/
+     * {@code get_declared_interfaces}/{@code get_declared_traits}/
+     * {@code get_included_files}/{@code get_required_files}),
+     * {@code ext/standard/info.c} ({@code php_sapi_name}),
+     * {@code Zend/zend.c} ({@code zend_version}). Excess argc is
+     * {@code ArgumentCountError}. Public for {@see DiscardedPureCallElision}
+     * (#36386).
+     */
+    public static function isPureZeroArgRuntimeInfoBuiltin(string $nameLc): bool
+    {
+        switch ($nameLc) {
+            case 'get_declared_classes':
+            case 'get_declared_interfaces':
+            case 'get_declared_traits':
+            case 'get_included_files':
+            case 'get_required_files':
+            case 'php_sapi_name':
+            case 'zend_version':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
      * php-src {@code ext/standard/versioning.c} {@code version_compare}. Public
      * for {@see DiscardedPureCallElision} (#36386).
      */
@@ -1534,6 +1565,16 @@ final class NoThrowCallElision
     public static function objectVarsMethodsArgsCannotThrow(array $callArgs): bool
     {
         return self::objectIntrospectArgsCannotThrow($callArgs);
+    }
+
+    /**
+     * Exactly zero arguments — any argc stays live ({@code ArgumentCountError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    public static function zeroArgRuntimeInfoArgsCannotThrow(array $callArgs): bool
+    {
+        return [] === $callArgs;
     }
 
     /**
