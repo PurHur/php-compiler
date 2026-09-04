@@ -11,6 +11,7 @@ use PHPCompiler\ext\standard\addcslashes;
 use PHPCompiler\ext\standard\addslashes;
 use PHPCompiler\ext\standard\array_count;
 use PHPCompiler\ext\standard\base64_encode;
+use PHPCompiler\ext\standard\base_convert_;
 use PHPCompiler\ext\standard\basename;
 use PHPCompiler\ext\standard\bin2hex;
 use PHPCompiler\ext\standard\bindec;
@@ -36,7 +37,9 @@ use PHPCompiler\ext\standard\htmlentities;
 use PHPCompiler\ext\standard\htmlspecialchars;
 use PHPCompiler\ext\standard\htmlspecialchars_decode;
 use PHPCompiler\ext\standard\intval;
+use PHPCompiler\ext\standard\ip2long;
 use PHPCompiler\ext\standard\levenshtein;
+use PHPCompiler\ext\standard\long2ip;
 use PHPCompiler\ext\standard\md5;
 use PHPCompiler\ext\standard\metaphone;
 use PHPCompiler\ext\standard\nl2br;
@@ -79,6 +82,7 @@ use PHPCompiler\ext\standard\substr_replace;
 use PHPCompiler\ext\standard\ucwords;
 use PHPCompiler\ext\standard\urldecode;
 use PHPCompiler\ext\standard\urlencode;
+use PHPCompiler\ext\standard\version_compare;
 use PHPCompiler\ext\standard\wordwrap;
 use PHPCompiler\ext\standard\boolval;
 use PHPCompiler\ext\types\is_type;
@@ -1359,6 +1363,96 @@ final class DiscardedPureCallElisionTest extends TestCase
             $context,
             new pi(),
             [$long]
+        ));
+    }
+
+    public function testElidesDiscardedBaseConvertInetAndVersionCompare(): void
+    {
+        // php-src math.c base_convert + basic_functions.c ip2long/long2ip +
+        // versioning.c version_compare (#36386).
+        $context = $this->makeContext();
+        $str = $this->makeStringVar('ff');
+        $ip = $this->makeStringVar('127.0.0.1');
+        $ver = $this->makeStringVar('8.2.0');
+        $long = $this->makeNativeLongVar();
+        $from = $this->makeCompileTimeLongVar(16);
+        $to = $this->makeCompileTimeLongVar(10);
+        $badBase = $this->makeCompileTimeLongVar(1);
+        $null = $this->makeNullVar();
+        $box = $this->makeValueBoxVar();
+        $opLt = $this->makeStringVar('<');
+        $opBad = $this->makeStringVar('nope');
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new base_convert_(),
+            [$str, $from, $to]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new ip2long(),
+            [$ip]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new long2ip(),
+            [$long]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new version_compare(),
+            [$ver, $ver]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new version_compare(),
+            [$ver, $ver, $opLt]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new version_compare(),
+            [$ver, $ver, $null]
+        ));
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new base_convert_(),
+            [$str, $long, $to]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new base_convert_(),
+            [$str, $badBase, $to]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new base_convert_(),
+            [$null, $from, $to]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new ip2long(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new ip2long(),
+            [$box]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new long2ip(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new version_compare(),
+            [$ver, $ver, $opBad]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new version_compare(),
+            [$ver, $box]
         ));
     }
 

@@ -23,10 +23,11 @@ use PHPCompiler\VM\Variable as VmVariable;
  * typed htmlspecialchars/htmlentities/nl2br/preg_quote/
  * escapeshell*, typed-numeric chr/number_format, typed similar_text
  * (2-arg), typed intval/floatval/boolval/strval, typed decbin/dechex/
- * decoct / bindec/hexdec/octdec, zero-arg pi, type.c predicates +
- * gettype/get_debug_type, ctype.c classifiers on typed/literal strings,
- * typed-array count/sizeof, math.c incl. pow/fpow/fdiv on already-numeric
- * args, empty void user functions).
+ * decoct / bindec/hexdec/octdec / base_convert (compile-time bases in
+ * [2,36]), typed ip2long/long2ip, typed version_compare, zero-arg pi,
+ * type.c predicates + gettype/get_debug_type, ctype.c classifiers on
+ * typed/literal strings, typed-array count/sizeof, math.c incl. pow/
+ * fpow/fdiv on already-numeric args, empty void user functions).
  * Soft-null strlen / ord / chr / math / string / ctype coercions are NOT
  * elided — they emit deprecations (PHP 8.1+). Countable objects stay live
  * (user {@code count()} handlers). {@code intdiv} is never discarded here
@@ -40,7 +41,9 @@ use PHPCompiler\VM\Variable as VmVariable;
  * without an explicit {@code $escape} stays live (PHP 8.4+ omitted-escape DEP).
  * {@code similar_text} with {@code &$percent} stays live (by-ref write).
  * {@code strval} on arrays/objects stays live (array-to-string warning /
- * {@code __toString}).
+ * {@code __toString}). {@code base_convert} with non-constant bases stays
+ * live ({@code ValueError} outside [2,36]). {@code version_compare} with an
+ * unknown typed operator stays live ({@code ValueError} on invalid ops).
  */
 final class DiscardedPureCallElision
 {
@@ -86,6 +89,12 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureBaseConvertNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureInetNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureVersionCompareNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElideCountOnTypedArray($toCall, $callArgs)) {
@@ -978,9 +987,10 @@ final class DiscardedPureCallElision
     }
 
     /**
-     * Discarded {@code decbin}/{@code dechex}/{@code decoct} on typed numerics and
-     * {@code bindec}/{@code hexdec}/{@code octdec} on typed / literal strings —
-     * php-src {@code math.c}. Soft-null coerce deprecates so null stays live
+     * Discarded {@code decbin}/{@code dechex}/{@code decoct} on typed numerics,
+     * {@code bindec}/{@code hexdec}/{@code octdec} on typed / literal strings, and
+     * {@code base_convert} with compile-time bases in [2,36] — php-src
+     * {@code math.c}. Soft-null coerce deprecates so null stays live
      * (peer {@see tryElideChrNoSideEffect} / {@see tryElideStrlenNoSideEffect}).
      *
      * @param array<int, Variable> $callArgs
@@ -999,25 +1009,128 @@ final class DiscardedPureCallElision
     }
 
     /**
+     * Discarded {@code ip2long} on typed / literal strings and {@code long2ip}
+     * on typed numerics — php-src {@code basic_functions.c}. Soft-null stays live.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureInetNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        $name = strtolower($toCall->getName());
+        if (!NoThrowCallElision::isPureInetBuiltin($name)) {
+            return false;
+        }
+
+        return self::inetArgsAllowDiscardedElision($name, $callArgs);
+    }
+
+    /**
+     * Discarded {@code version_compare} on typed / literal strings — php-src
+     * {@code versioning.c}. Optional operator must be null or a compile-time
+     * valid comparison op ({@code ValueError} otherwise).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureVersionCompareNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if (!NoThrowCallElision::isPureVersionCompareBuiltin(strtolower($toCall->getName()))) {
+            return false;
+        }
+
+        return self::versionCompareArgsAllowDiscardedElision($callArgs);
+    }
+
+    /**
      * @param array<int, Variable> $callArgs
      */
     private static function baseConvertArgsAllowDiscardedElision(string $nameLc, array $callArgs): bool
     {
-        if (!isset($callArgs[0]) || !$callArgs[0] instanceof Variable || isset($callArgs[1])) {
+        if (!isset($callArgs[0]) || !$callArgs[0] instanceof Variable) {
             return false;
         }
         switch ($nameLc) {
             case 'decbin':
             case 'dechex':
             case 'decoct':
-                return self::mathArgAllowsDiscardedElision($callArgs[0]);
+                return !isset($callArgs[1])
+                    && self::mathArgAllowsDiscardedElision($callArgs[0]);
             case 'bindec':
             case 'hexdec':
             case 'octdec':
-                return self::stringArgAllowsDiscardedElision($callArgs[0]);
+                return !isset($callArgs[1])
+                    && self::stringArgAllowsDiscardedElision($callArgs[0]);
+            case 'base_convert':
+                // string, long from_base∈[2,36], long to_base∈[2,36]
+                if (
+                    !isset($callArgs[1], $callArgs[2])
+                    || isset($callArgs[3])
+                    || !self::stringArgAllowsDiscardedElision($callArgs[0])
+                    || !$callArgs[1] instanceof Variable
+                    || !$callArgs[2] instanceof Variable
+                ) {
+                    return false;
+                }
+
+                return NoThrowCallElision::compileTimeRadixBaseInRange($callArgs[1])
+                    && NoThrowCallElision::compileTimeRadixBaseInRange($callArgs[2]);
             default:
                 return false;
         }
+    }
+
+    /**
+     * @param array<int, Variable> $callArgs
+     */
+    private static function inetArgsAllowDiscardedElision(string $nameLc, array $callArgs): bool
+    {
+        if (!isset($callArgs[0]) || !$callArgs[0] instanceof Variable || isset($callArgs[1])) {
+            return false;
+        }
+        switch ($nameLc) {
+            case 'ip2long':
+                return self::stringArgAllowsDiscardedElision($callArgs[0]);
+            case 'long2ip':
+                return self::mathArgAllowsDiscardedElision($callArgs[0]);
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * @param array<int, Variable> $callArgs
+     */
+    private static function versionCompareArgsAllowDiscardedElision(array $callArgs): bool
+    {
+        if (
+            !isset($callArgs[0], $callArgs[1])
+            || !$callArgs[0] instanceof Variable
+            || !$callArgs[1] instanceof Variable
+            || !self::stringArgAllowsDiscardedElision($callArgs[0])
+            || !self::stringArgAllowsDiscardedElision($callArgs[1])
+        ) {
+            return false;
+        }
+        if (!isset($callArgs[2])) {
+            return true;
+        }
+        if (!$callArgs[2] instanceof Variable || isset($callArgs[3])) {
+            return false;
+        }
+        if ($callArgs[2]->isNullConstant || Variable::TYPE_NULL === $callArgs[2]->type) {
+            return true;
+        }
+        $op = JitStringArg::compileTimeLiteral($callArgs[2]);
+        if (null === $op) {
+            return false;
+        }
+
+        return NoThrowCallElision::isValidVersionCompareOperatorLiteral($op);
     }
 
     /**
