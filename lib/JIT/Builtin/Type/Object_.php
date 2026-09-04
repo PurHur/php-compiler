@@ -8349,10 +8349,17 @@ class Object_ extends Type {
             // from a null __object__* (Analyzer marks instanceof as escaping → TYPE_VALUE
             // subjects; php-src zend_is_instanceof / instanceof_function) (#36382).
             $valuePtr = JitValueBox::valuePtrFromVariable($this->context, $expr);
-            $obj = $this->context->builder->call(
-                $this->context->lookupFunction('__value__readObject'),
-                $valuePtr
-            );
+            $ptrTy = $this->context->getStringFromType($valuePtr->typeOf());
+            if ('__object__*' === $ptrTy) {
+                $obj = $valuePtr;
+            } elseif ('__string__*' === $ptrTy || 'int8*' === $ptrTy) {
+                $obj = $this->context->getTypeFromString('__object__*')->constNull();
+            } else {
+                $obj = $this->context->builder->call(
+                    $this->context->lookupFunction('__value__readObject'),
+                    $valuePtr
+                );
+            }
             $objType = $this->context->getTypeFromString('__object__*');
             $isObject = $this->context->builder->icmp(
                 PHPLLVM\Builder::INT_NE,

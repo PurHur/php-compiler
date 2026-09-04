@@ -2569,6 +2569,26 @@ return_bool:
                 );
             }
             if (Variable::TYPE_VALUE === $variable->objectPropertyType) {
+                $loadedTy = $this->context->getStringFromType($loaded->typeOf());
+                // Slot may still be a typed __string__*/__object__* despite VALUE analysis
+                // (Nyholm MessageTrait docblock props under IncludeHelper, #36382).
+                // Do NOT treat i8*/void* loads as strings — VALUE prop slots are void**.
+                if ('__object__*' === $loadedTy) {
+                    return $loaded;
+                }
+                if ('__string__*' === $loadedTy) {
+                    if (Variable::TYPE_OBJECT === $variable->type) {
+                        return $this->context->getTypeFromString('__object__*')->constNull();
+                    }
+                    $slot = JitValueBox::alloc($this->context);
+                    $this->context->builder->call(
+                        $this->context->lookupFunction('__value__writeString'),
+                        JitValueBox::pointer($this->context, $slot),
+                        $loaded
+                    );
+
+                    return JitValueBox::pointer($this->context, $slot);
+                }
                 $valuePtr = $this->context->builder->pointerCast(
                     $loaded,
                     $this->context->getTypeFromString('__value__*')

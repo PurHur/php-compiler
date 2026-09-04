@@ -1294,6 +1294,17 @@ final class Variable {
                         );
                     }
                 }
+                // NestedJIT / mid-emit ensureLinked can clear insert. Parking on
+                // lastOpenBasicBlock can place delref where a mid-fn alloca does not
+                // dominate (#36382 Slim verify). Only emit when insert is already open;
+                // sealed → fresh cont; cleared → skip (leak beats invalid IR).
+                $insert = BasicBlockHelper::tryGetInsertBlock($this->context);
+                if (null === $insert) {
+                    return;
+                }
+                if (null !== $insert->getTerminator()) {
+                    BasicBlockHelper::ensureOpenInsertBlock($this->context, 'value_free_delref_cont');
+                }
                 $this->context->builder->call(
                     $this->context->lookupFunction('__value__valueDelref'),
                     $this->value
@@ -1317,6 +1328,13 @@ final class Variable {
             // (never reused within one call), so free() emits the final delref
             // at function exit. Without this, the last string in each temp leaks
             // and heap-corrupts on repeated calls (#24024 re-fix).
+            $insert = BasicBlockHelper::tryGetInsertBlock($this->context);
+            if (null === $insert) {
+                return;
+            }
+            if (null !== $insert->getTerminator()) {
+                BasicBlockHelper::ensureOpenInsertBlock($this->context, 'refcounted_free_delref_cont');
+            }
             $ptr = self::KIND_VALUE === $this->kind
                 ? $this->value
                 : $this->context->helper->loadValue($this);
