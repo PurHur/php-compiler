@@ -5370,6 +5370,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/CallAndArrayLiteralCompile.
 require_once __DIR__.'/../../../lib/Compiler/Concern/SiblingInlineFuncCallAndDeadArrayProducers.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/NestedArrayAndLeadingConstCallArgProducers.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/DeferredSiblingAndArrayMapNullCallArgProducers.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/HoistedEnumAndChainedInlineCallArgProducers.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileBlockInternal.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AssignOperand.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AdaptByRefCallArgs.php';
@@ -6939,6 +6940,7 @@ require_once __DIR__.'/../../../lib/Lint/Issue.php';
 require_once __DIR__.'/../../../lib/Lint/LintCompiler.php';
 require_once __DIR__.'/../../../lib/Lint/Linter.php';
 require_once __DIR__.'/../../../lib/Lint/SwitchDetector.php';
+require_once __DIR__.'/../../../lib/Lint/UnsupportedFeature.php';
 require_once __DIR__.'/../../../lib/Lint/UnsupportedRegistry.php';
 require_once __DIR__.'/../../../lib/ListSpreadAssignSyntaxRejector.php';
 require_once __DIR__.'/../../../lib/MethodVisibility.php';

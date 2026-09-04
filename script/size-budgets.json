@@ -4,17 +4,17 @@
     "done_when_ceiling": 25000,
     "files": {
         "lib/Compiler.php": {
-            "budget": 7588,
+            "budget": 6838,
             "target": 20000,
-            "note": "Concern trait splits (#36230/#36387/#36403); DeferredSiblingAndArrayMapNullCallArgProducers + NestedArrayAndLeadingConstCallArgProducers + peers"
+            "note": "Concern trait splits (#36230/#36387/#36403); HoistedEnumAndChainedInlineCallArgProducers + peers"
         },
         "lib/JIT.php": {
-            "budget": 24674,
+            "budget": 24664,
             "target": 20000,
             "note": "Concern trait splits (#36403); tip ratchet after is_a/is_subclass_of elision (#36386/#36716); under 25k Done-when ceiling"
         },
         "lib/VM.php": {
-            "budget": 25479,
+            "budget": 25464,
             "target": 15000,
             "note": "VM hot-loop / boot decomposition"
         },
