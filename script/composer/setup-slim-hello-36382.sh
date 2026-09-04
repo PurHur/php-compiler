@@ -4,7 +4,7 @@
 # instead of dumping every PSR-4 path (~134). Full AOT uses incremental IncludeHelper requires
 # when unit count >= 32 (SourceBundler mega-concat OOMs on 8g hosts — #36382).
 set -euo pipefail
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 DEST="${1:-$ROOT/test/fixtures/aot/projects/slim_hello_36382}"
 rm -rf "$DEST"
 mkdir -p "$DEST/public"
@@ -74,7 +74,7 @@ fi
 
 STREAM="$DEST/vendor/nyholm/psr7/src/Stream.php"
 if [[ -f "$STREAM" ]]; then
-  php "$ROOT/script/patch-nyholm-stream-36382.php" "$STREAM"
+  php "$ROOT/script/composer/patch-nyholm-stream-36382.php" "$STREAM"
 fi
 
 echo "Created $DEST ($(find "$DEST" -name '*.php' | wc -l) php files)"

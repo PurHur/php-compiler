@@ -2,8 +2,8 @@
 # Slim + nyholm Composer project AOT build + phpc fcgi /hello smoke (#36382 Done-when).
 #
 # Usage (Docker / RunForge):
-#   ./script/docker-exec.sh -- ./script/slim-hello-36382-smoke.sh
-#   ./script/docker-exec.sh -- ./script/slim-hello-36382-smoke.sh --skip-setup
+#   ./script/docker-exec.sh -- ./script/composer/slim-hello-36382-smoke.sh
+#   ./script/docker-exec.sh -- ./script/composer/slim-hello-36382-smoke.sh --skip-setup
 #
 # Measured peak RSS during IncludeHelper for the 103-unit Slim graph is ~350 MiB;
 # prior ~27 GiB climbs were NestedJIT wiping include-once dedupe (#36382). A later
@@ -17,7 +17,7 @@
 # Keep LLVM memory floor at PHP_COMPILER_LLVM_MEMORY_LIMIT (default 8192M).
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
 # Slim-sized incremental graphs: use the configured LLVM budget (#36382).
@@ -43,7 +43,7 @@ done
 
 if [[ "$SKIP_SETUP" -eq 0 ]] || [[ ! -f "$DEST/vendor/autoload.php" ]]; then
   echo "slim-hello-36382-smoke: ensuring fixture at $DEST"
-  "$ROOT/script/setup-slim-hello-36382.sh" "$DEST"
+  "$ROOT/script/composer/setup-slim-hello-36382.sh" "$DEST"
 fi
 
 BIN="$DEST/.phpc/bin/slim-hello"

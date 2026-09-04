@@ -10,7 +10,7 @@ declare(strict_types=1);
  */
 $stream = $argv[1] ?? '';
 if ('' === $stream || !is_file($stream)) {
-    fwrite(STDERR, "usage: php script/patch-nyholm-stream-36382.php <Stream.php>\n");
+    fwrite(STDERR, "usage: php script/composer/patch-nyholm-stream-36382.php <Stream.php>\n");
     exit(1);
 }
 $t = file_get_contents($stream);
