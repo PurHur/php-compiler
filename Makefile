@@ -159,9 +159,9 @@ aot-smoke-cross-emit:
 # Memory-safety link smokes (#36397) — ASan requires host clang/gcc, not raw ld.
 .PHONY: runtime-assert-asan-smoke runtime-assert-valgrind-smoke
 runtime-assert-asan-smoke:
-	./script/runtime-assert-asan-smoke.sh
+	./script/runtime-assert/asan-smoke.sh
 runtime-assert-valgrind-smoke:
-	./script/runtime-assert-valgrind-smoke.sh
+	./script/runtime-assert/valgrind-smoke.sh
 
 # Default pre-PR gate (~90s): trust preflight + gen-0 smoke + aot-smoke + VM differential tier-0 (#36211).
 check: dev-verify-fast
