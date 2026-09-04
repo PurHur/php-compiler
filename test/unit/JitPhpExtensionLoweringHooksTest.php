@@ -309,6 +309,42 @@ final class JitPhpExtensionLoweringHooksTest extends TestCase
         }
     }
 
+    public function testBcMathCallProxiesDoNotImportBcmathExtension(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $module = (string) file_get_contents($root.'/ext/bcmath/Module.php');
+        $this->assertStringContainsString(
+            'bcmath = new JitBcMathExtensionHooksFacade()',
+            $module,
+            'ext/bcmath Module::jitInit must register JitBcMathExtensionHooksFacade'
+        );
+        $this->assertStringContainsString(
+            'requireBcMath',
+            (string) file_get_contents($root.'/lib/JIT/ExtensionLoweringHooks.php'),
+            'ExtensionLoweringHooks must expose requireBcMath()'
+        );
+        $files = [
+            'lib/JIT/Call/BcMathNumberConstruct.php',
+            'lib/JIT/Call/BcMathNumberMethod.php',
+            'lib/JIT/Call/BcMathNumberToString.php',
+        ];
+        foreach ($files as $rel) {
+            $src = (string) file_get_contents($root.'/'.$rel);
+            $stripped = (string) preg_replace('~/\*.*?\*/~s', '', $src);
+            $stripped = (string) preg_replace('~//.*$~m', '', $stripped);
+            $this->assertDoesNotMatchRegularExpression(
+                '/PHPCompiler\\\\ext\\\\bcmath\\\\/',
+                $stripped,
+                $rel.' still imports ext\\bcmath — use BcMathExtensionHooks'
+            );
+            $this->assertStringContainsString(
+                'requireBcMath()',
+                $src,
+                $rel.' must dispatch via requireBcMath()'
+            );
+        }
+    }
+
     /**
      * @dataProvider coreJitHelperFilesWithoutNonStandardExtImports
      */
