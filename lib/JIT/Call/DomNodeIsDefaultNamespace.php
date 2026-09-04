@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
-use PHPCompiler\ext\dom\JitDomLookupNamespaceURI;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
@@ -17,6 +16,10 @@ final class DomNodeIsDefaultNamespace implements Call
 {
     public function call(Context $context, Variable ...$args): Value
     {
-        return JitDomLookupNamespaceURI::invokeIsDefaultNamespace($context, ...$args);
+        return $context->extensionLowering->requireDom()->invokeCall(
+            $context,
+            'node.isDefaultNamespace',
+            ...$args
+        );
     }
 }

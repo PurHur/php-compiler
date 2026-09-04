@@ -185,6 +185,7 @@ class Module extends ModuleAbstract
             JitDomLoadXMLUserScript::setPendingLoadXmlReceiverVarName($name);
         };
         $hooks->domCompileTime = new JitDomCompileTimeFacade();
+        $hooks->dom = new JitDomExtensionHooksFacade();
     }
 
     /**

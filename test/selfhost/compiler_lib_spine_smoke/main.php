@@ -8245,6 +8245,8 @@ require_once __DIR__.'/../../../ext/pdo/JitPdoExtensionHooksFacade.php';
 require_once __DIR__.'/../../../ext/tokenizer/JitTokenizerExtensionHooksFacade.php';
 require_once __DIR__.'/../../../lib/JIT/PdoExtensionHooks.php';
 require_once __DIR__.'/../../../lib/JIT/TokenizerExtensionHooks.php';
+require_once __DIR__.'/../../../ext/dom/JitDomExtensionHooksFacade.php';
+require_once __DIR__.'/../../../lib/JIT/DomExtensionHooks.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 

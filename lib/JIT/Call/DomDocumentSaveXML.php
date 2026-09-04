@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
-use PHPCompiler\ext\dom\JitDomSaveXML;
 use PHPCompiler\JIT\Builtin\DomSaveXMLRuntime;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
@@ -21,6 +20,10 @@ final class DomDocumentSaveXML implements Call
     {
         DomSaveXMLRuntime::ensureLinked($context);
 
-        return JitDomSaveXML::invoke($context, ...$args);
+        return $context->extensionLowering->requireDom()->invokeCall(
+            $context,
+            'document.saveXML',
+            ...$args
+        );
     }
 }

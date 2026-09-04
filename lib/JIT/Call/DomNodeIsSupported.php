@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
-use PHPCompiler\ext\dom\JitDomIsSupported;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
@@ -17,6 +16,10 @@ final class DomNodeIsSupported implements Call
 {
     public function call(Context $context, Variable ...$args): Value
     {
-        return JitDomIsSupported::invoke($context, ...$args);
+        return $context->extensionLowering->requireDom()->invokeCall(
+            $context,
+            'node.isSupported',
+            ...$args
+        );
     }
 }

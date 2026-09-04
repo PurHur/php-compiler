@@ -107,7 +107,7 @@ interface DomCompileTimeHooks
  * / {@code ext\posix} / {@code ext\bcmath} / {@code ext\intl} / {@code ext\zip}
  * / {@code ext\fileinfo} / {@code ext\sqlite3} / {@code ext\tokenizer} / {@code ext\pdo}
  * for these paths; Modules register from jitInit. Call XmlReader* / XmlWriter* / Finfo* /
- * Sqlite3* / XsltMethod / PhpToken* / Pdo* also go through hooks (#36204).
+ * Sqlite3* / XsltMethod / PhpToken* / Pdo* / Dom* (thin) also go through hooks (#36204).
  */
 final class ExtensionLoweringHooks
 {
@@ -247,6 +247,9 @@ final class ExtensionLoweringHooks
 
     /** pdo JIT Call surfaces — registered from ext/pdo Module::jitInit (#36204). */
     public ?PdoExtensionHooks $pdo = null;
+
+    /** dom JIT Call surfaces — registered from ext/dom Module::jitInit (#36204). */
+    public ?DomExtensionHooks $dom = null;
 
     public function requirePosixNested(): PosixNestedJitKernels
     {
@@ -422,6 +425,17 @@ final class ExtensionLoweringHooks
         }
 
         return $this->pdo;
+    }
+
+    public function requireDom(): DomExtensionHooks
+    {
+        if (null === $this->dom) {
+            throw new \RuntimeException(
+                'dom extension hooks not registered — ext/dom Module::jitInit missing (#36204)'
+            );
+        }
+
+        return $this->dom;
     }
 
     public function tryPrepareDimWrite(Context $context, Variable $container, Variable $dim): ?Variable
