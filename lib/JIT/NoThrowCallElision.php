@@ -28,13 +28,15 @@ use PHPCompiler\JIT\Call\Vararg;
  * Also skips the after-call check for pure builtins when arguments prove they
  * cannot invoke user code or set throw-pending — e.g. {@code strlen('x')} /
  * {@code ord('A')} on a native {@code TYPE_STRING}, {@code chr(65)} on a native
- * long, pure type predicates ({@code is_int} / {@code is_string} / …), and
- * pure math ({@code sqrt} / {@code abs} / {@code floor} / …) on native numeric
- * scalars (php-src {@code ext/standard/string.c} {@code PHP_FUNCTION(strlen)} /
- * {@code ord} / {@code chr}; {@code ext/standard/type.c} {@code is_*};
- * {@code ext/standard/math.c} {@code PHP_FUNCTION(sqrt)} etc.; throwing
- * {@code __toString} needs an object/value box). Discarded {@code ord}/{@code chr}
- * with the same arg proofs are dropped entirely by {@see DiscardedPureCallElision}.
+ * long, pure type predicates ({@code is_int} / {@code is_string} / …), string
+ * transforms ({@code strtolower} / {@code ucwords} / {@code bin2hex} / …), and
+ * pure math ({@code sqrt} / {@code abs} / {@code pow} / {@code fdiv} / …) on
+ * native numeric scalars (php-src {@code ext/standard/string.c}
+ * {@code PHP_FUNCTION(strlen)} / {@code ord} / {@code chr} / {@code ucwords};
+ * {@code ext/standard/type.c} {@code is_*}; {@code ext/standard/math.c}
+ * {@code PHP_FUNCTION(sqrt)} / {@code pow} etc.; throwing {@code __toString}
+ * needs an object/value box). Discarded calls with the same arg proofs are
+ * dropped entirely by {@see DiscardedPureCallElision}.
  *
  * Single-param identity bodies ({@code function id($x){return $x;}}) are also
  * recorded so call sites can replace the call with the compiled argument
@@ -311,10 +313,14 @@ final class NoThrowCallElision
             case 'strtoupper':
             case 'lcfirst':
             case 'ucfirst':
+            case 'ucwords':
             case 'strrev':
             case 'trim':
             case 'ltrim':
             case 'rtrim':
+            case 'addslashes':
+            case 'stripslashes':
+            case 'bin2hex':
                 return true;
             default:
                 return false;
@@ -359,6 +365,11 @@ final class NoThrowCallElision
             case 'atan2':
             case 'deg2rad':
             case 'rad2deg':
+            // math.c pow / fpow / fdiv — no user handlers; domain errors are
+            // NAN/INF (fdiv ÷0 → INF). intdiv stays out (DivisionByZeroError).
+            case 'pow':
+            case 'fpow':
+            case 'fdiv':
                 return true;
             default:
                 return false;

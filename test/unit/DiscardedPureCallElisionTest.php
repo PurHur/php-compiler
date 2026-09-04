@@ -7,13 +7,18 @@ namespace PHPCompiler\Test\Unit;
 use PHPUnit\Framework\TestCase;
 use PHPCompiler\Block;
 use PHPCompiler\ext\standard\abs;
+use PHPCompiler\ext\standard\addslashes;
 use PHPCompiler\ext\standard\array_count;
+use PHPCompiler\ext\standard\bin2hex;
 use PHPCompiler\ext\standard\chr;
+use PHPCompiler\ext\standard\fdiv;
 use PHPCompiler\ext\standard\gettype;
 use PHPCompiler\ext\standard\ord;
+use PHPCompiler\ext\standard\pow;
 use PHPCompiler\ext\standard\sqrt;
 use PHPCompiler\ext\standard\string_trim;
 use PHPCompiler\ext\standard\strtolower;
+use PHPCompiler\ext\standard\ucwords;
 use PHPCompiler\ext\types\is_type;
 use PHPCompiler\ext\types\strlen;
 use PHPCompiler\JIT\Call\Native;
@@ -201,6 +206,73 @@ final class DiscardedPureCallElisionTest extends TestCase
         $arg = $this->makeNativeLongVar();
 
         $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testElidesDiscardedPowOnNativeDoubles(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new pow();
+        $base = $this->makeNativeDoubleVar();
+        $exp = $this->makeNativeDoubleVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$base, $exp]));
+    }
+
+    public function testElidesDiscardedFdivOnNativeDoubles(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new fdiv();
+        $num = $this->makeNativeDoubleVar();
+        $den = $this->makeNativeDoubleVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$num, $den]));
+    }
+
+    public function testDoesNotElidePowOnNull(): void
+    {
+        // Match abs/sqrt: soft-null numeric path stays live for discarded math (#36386).
+        $context = $this->makeContext();
+        $builtin = new pow();
+        $base = $this->makeNullVar();
+        $exp = $this->makeNativeLongVar();
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide($context, $builtin, [$base, $exp]));
+    }
+
+    public function testElidesDiscardedUcwordsOnTypedString(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new ucwords();
+        $arg = $this->makeStringVar(null);
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testElidesDiscardedBin2hexOnTypedString(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new bin2hex();
+        $arg = $this->makeStringVar('ab');
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testElidesDiscardedAddslashesOnTypedString(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new addslashes();
+        $arg = $this->makeStringVar(null);
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testDoesNotElideUcwordsOnNull(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new ucwords();
+        $arg = $this->makeNullVar();
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
     }
 
     public function testElidesDiscardedSqrtOnNativeDouble(): void

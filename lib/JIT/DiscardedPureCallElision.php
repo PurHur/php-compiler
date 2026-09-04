@@ -13,11 +13,12 @@ use PHPCompiler\VM\Variable as VmVariable;
  * Elide discarded calls to compile-time-pure builtins (#23483 / #36386 call-overhead).
  *
  * php-src: ZPP may still run user-visible coercions; here we only fold cases that are
- * side-effect-free (literal / typed-string strlen/ord/strtolower/…, typed-numeric chr,
- * type.c predicates + gettype, typed-array count/sizeof, math.c on already-numeric
- * args, empty void user functions). Soft-null strlen / ord / chr / math / string
- * coercions are NOT elided — they emit deprecations (PHP 8.1+). Countable objects
- * stay live (user {@code count()} handlers).
+ * side-effect-free (literal / typed-string strlen/ord/strtolower/ucwords/bin2hex/…,
+ * typed-numeric chr, type.c predicates + gettype, typed-array count/sizeof, math.c
+ * incl. pow/fpow/fdiv on already-numeric args, empty void user functions). Soft-null
+ * strlen / ord / chr / math / string coercions are NOT elided — they emit
+ * deprecations (PHP 8.1+). Countable objects stay live (user {@code count()} handlers).
+ * {@code intdiv} is never discarded here (DivisionByZeroError must stay observable).
  */
 final class DiscardedPureCallElision
 {
@@ -138,9 +139,9 @@ final class DiscardedPureCallElision
     }
 
     /**
-     * Discarded {@code strtolower}/{@code trim}/… on typed / literal strings —
-     * php-src {@code string.c} Z_PARAM_STR family; soft null / object
-     * {@code __toString} stay live (peer {@see tryElideStrlenNoSideEffect}).
+     * Discarded {@code strtolower}/{@code ucwords}/{@code bin2hex}/… on typed /
+     * literal strings — php-src {@code string.c} Z_PARAM_STR family; soft null /
+     * object {@code __toString} stay live (peer {@see tryElideStrlenNoSideEffect}).
      *
      * @param array<int, Variable> $callArgs
      */
