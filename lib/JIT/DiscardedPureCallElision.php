@@ -21,7 +21,8 @@ use PHPCompiler\VM\Variable as VmVariable;
  * (string forms), typed addcslashes/stripcslashes/strpbrk,
  * typed quoted_printable_encode/decode, basename/dirname,
  * typed htmlspecialchars/htmlentities/nl2br/preg_quote/
- * escapeshell*, typed-numeric chr/number_format, type.c predicates + gettype,
+ * escapeshell*, typed-numeric chr/number_format, typed similar_text
+ * (2-arg), typed intval/floatval/boolval/strval, type.c predicates + gettype,
  * ctype.c classifiers on typed/literal strings, typed-array count/sizeof,
  * math.c incl. pow/fpow/fdiv on already-numeric args, empty void user functions).
  * Soft-null strlen / ord / chr / math / string / ctype coercions are NOT
@@ -35,6 +36,9 @@ use PHPCompiler\VM\Variable as VmVariable;
  * stays live (by-ref write). {@code dirname} with a non-constant {@code $levels}
  * stays live ({@code ValueError} when {@code $levels < 1}). {@code str_getcsv}
  * without an explicit {@code $escape} stays live (PHP 8.4+ omitted-escape DEP).
+ * {@code similar_text} with {@code &$percent} stays live (by-ref write).
+ * {@code strval} on arrays/objects stays live (array-to-string warning /
+ * {@code __toString}).
  */
 final class DiscardedPureCallElision
 {
@@ -74,6 +78,9 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureNumberFormatNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureScalarCastNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElideCountOnTypedArray($toCall, $callArgs)) {
@@ -464,10 +471,11 @@ final class DiscardedPureCallElision
     /**
      * Discarded {@code substr}/{@code str_repeat}/{@code strcmp}/{@code strpos}/
      * {@code strstr}/{@code strpbrk}/{@code str_contains}/{@code str_starts_with}/
-     * {@code str_ends_with}/{@code levenshtein}/… on typed string (+ numeric) args —
-     * php-src {@code string.c}/{@code levenshtein.c} Z_PARAM_STR / Z_PARAM_LONG
-     * family; soft null / int-needle deprecations / {@code __toString} stay live
-     * (peer {@see tryElidePureStringTransformNoSideEffect}).
+     * {@code str_ends_with}/{@code levenshtein}/{@code similar_text}/… on typed
+     * string (+ numeric) args — php-src {@code string.c}/{@code levenshtein.c}
+     * Z_PARAM_STR / Z_PARAM_LONG family; soft null / int-needle deprecations /
+     * {@code __toString} stay live (peer {@see tryElidePureStringTransformNoSideEffect}).
+     * {@code similar_text} with {@code &$percent} stays live (by-ref write).
      *
      * @param array<int, Variable> $callArgs
      */
@@ -545,6 +553,16 @@ final class DiscardedPureCallElision
                 }
 
                 return true;
+            case 'similar_text':
+                // Two strings only — &$percent is a by-ref write.
+                if (!isset($callArgs[0], $callArgs[1]) || isset($callArgs[2])) {
+                    return false;
+                }
+
+                return $callArgs[0] instanceof Variable
+                    && self::stringArgAllowsDiscardedElision($callArgs[0])
+                    && $callArgs[1] instanceof Variable
+                    && self::stringArgAllowsDiscardedElision($callArgs[1]);
             case 'strncmp':
             case 'strncasecmp':
                 if (!isset($callArgs[0], $callArgs[1], $callArgs[2])) {
@@ -930,6 +948,87 @@ final class DiscardedPureCallElision
         }
 
         return !isset($callArgs[4]);
+    }
+
+    /**
+     * Discarded {@code intval}/{@code floatval}/{@code boolval}/{@code strval} on
+     * typed scalars — php-src {@code type.c}/{@code basic_functions.c}. Objects
+     * stay live ({@code __toString} / cast handlers); arrays stay live for
+     * {@code strval} (array-to-string warning). Soft-null {@code intval} base
+     * stays live (deprecate).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureScalarCastNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        $name = strtolower($toCall->getName());
+        if (!NoThrowCallElision::isPureScalarCastBuiltin($name)) {
+            return false;
+        }
+
+        return self::scalarCastArgsAllowDiscardedElision($name, $callArgs);
+    }
+
+    /**
+     * @param array<int, Variable> $callArgs
+     */
+    private static function scalarCastArgsAllowDiscardedElision(string $nameLc, array $callArgs): bool
+    {
+        if (!isset($callArgs[0]) || !$callArgs[0] instanceof Variable) {
+            return false;
+        }
+        switch ($nameLc) {
+            case 'intval':
+                if (!self::scalarCastValueArgAllowsDiscardedElision($callArgs[0])) {
+                    return false;
+                }
+                if (!isset($callArgs[1])) {
+                    return true;
+                }
+                if (
+                    !$callArgs[1] instanceof Variable
+                    || !self::mathArgAllowsDiscardedElision($callArgs[1])
+                ) {
+                    return false;
+                }
+
+                return !isset($callArgs[2]);
+            case 'floatval':
+            case 'doubleval':
+            case 'boolval':
+                if (isset($callArgs[1])) {
+                    return false;
+                }
+                if ('boolval' === $nameLc && self::isTypedArrayArg($callArgs[0])) {
+                    return true;
+                }
+
+                return self::scalarCastValueArgAllowsDiscardedElision($callArgs[0]);
+            case 'strval':
+                // Arrays warn; objects invoke __toString — scalars / null only.
+                return !isset($callArgs[1])
+                    && self::scalarCastValueArgAllowsDiscardedElision($callArgs[0]);
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Typed string / numeric / bool / null — no object / value-box / hashtable.
+     */
+    private static function scalarCastValueArgAllowsDiscardedElision(Variable $arg): bool
+    {
+        if ($arg->isNullConstant || Variable::TYPE_NULL === $arg->type) {
+            return true;
+        }
+        if (self::stringArgAllowsDiscardedElision($arg)) {
+            return true;
+        }
+
+        return self::mathArgAllowsDiscardedElision($arg);
     }
 
     /**

@@ -264,6 +264,11 @@ final class NoThrowCallElision
             // number_format.c — numeric + optional decimals + nullable separators.
             return self::numberFormatArgsCannotThrow($callArgs);
         }
+        if (self::isPureScalarCastBuiltin($name)) {
+            // type.c / basic_functions.c intval/floatval/boolval/strval — typed
+            // scalars only; objects stay out (__toString / cast handlers).
+            return self::scalarCastArgsCannotThrow($name, $callArgs);
+        }
         if ('chr' === $name) {
             // Z_PARAM_LONG family — object→int does not call __toString; still
             // keep value-box / object conservative (coercion paths vary).
@@ -697,6 +702,8 @@ final class NoThrowCallElision
             case 'str_ends_with':
             // levenshtein.c — two strings + optional insertion/replacement/deletion costs.
             case 'levenshtein':
+            // string.c similar_text — two strings only; &$percent form stays out.
+            case 'similar_text':
                 return true;
             default:
                 return false;
@@ -734,6 +741,86 @@ final class NoThrowCallElision
     public static function isPureNumberFormatBuiltin(string $nameLc): bool
     {
         return 'number_format' === $nameLc;
+    }
+
+    /**
+     * php-src {@code ext/standard/type.c} / {@code basic_functions.c} scalar casts
+     * that only read typed scalars (no {@code __toString} / array-to-string
+     * warning). Public for {@see DiscardedPureCallElision} (#36386).
+     */
+    public static function isPureScalarCastBuiltin(string $nameLc): bool
+    {
+        switch ($nameLc) {
+            case 'intval':
+            case 'floatval':
+            case 'doubleval':
+            case 'boolval':
+            case 'strval':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * @param array<int, Variable> $callArgs
+     */
+    public static function scalarCastArgsCannotThrow(string $nameLc, array $callArgs): bool
+    {
+        if (!isset($callArgs[0]) || !$callArgs[0] instanceof Variable) {
+            return false;
+        }
+        switch ($nameLc) {
+            case 'intval':
+                // value [, long base] — soft-null base deprecates (stay live).
+                if (!self::scalarCastValueArgCannotThrow($callArgs[0], true)) {
+                    return false;
+                }
+                if (!isset($callArgs[1])) {
+                    return true;
+                }
+                if (
+                    !$callArgs[1] instanceof Variable
+                    || !self::numericParamBuiltinArgCannotThrow($callArgs[1])
+                ) {
+                    return false;
+                }
+
+                return !isset($callArgs[2]);
+            case 'floatval':
+            case 'doubleval':
+            case 'boolval':
+                // Single scalar (boolval also accepts typed arrays — no user handler).
+                if (isset($callArgs[1])) {
+                    return false;
+                }
+                if ('boolval' === $nameLc && self::typedArrayArgCannotThrow($callArgs[0])) {
+                    return true;
+                }
+
+                return self::scalarCastValueArgCannotThrow($callArgs[0], true);
+            case 'strval':
+                // Objects invoke __toString; arrays warn — typed scalars / null only.
+                return !isset($callArgs[1])
+                    && self::scalarCastValueArgCannotThrow($callArgs[0], true);
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Typed string / numeric / bool / null — no object / value-box / hashtable.
+     */
+    private static function scalarCastValueArgCannotThrow(Variable $arg, bool $allowNull): bool
+    {
+        if ($allowNull && ($arg->isNullConstant || Variable::TYPE_NULL === $arg->type)) {
+            return true;
+        }
+        if (self::stringParamBuiltinArgCannotThrow($arg)) {
+            return true;
+        }
+
+        return self::numericParamBuiltinArgCannotThrow($arg);
     }
 
     /**
@@ -1078,6 +1165,16 @@ final class NoThrowCallElision
                 }
 
                 return true;
+            case 'similar_text':
+                // Two strings only — &$percent is a by-ref write (php-src string.c).
+                if (!isset($callArgs[0], $callArgs[1]) || isset($callArgs[2])) {
+                    return false;
+                }
+
+                return $callArgs[0] instanceof Variable
+                    && self::stringParamBuiltinArgCannotThrow($callArgs[0])
+                    && $callArgs[1] instanceof Variable
+                    && self::stringParamBuiltinArgCannotThrow($callArgs[1]);
             case 'strncmp':
             case 'strncasecmp':
                 // string, string, long len
