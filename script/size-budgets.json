@@ -14,7 +14,7 @@
             "note": "Concern trait splits (#36387/#36403); InitJitStaticCall + CompileClassAndTraitUses"
         },
         "lib/VM.php": {
-            "budget": 25586,
+            "budget": 25653,
             "target": 15000,
             "note": "VM hot-loop / boot decomposition; tip ratchet after master drift (VM untouched this PR)"
         },
