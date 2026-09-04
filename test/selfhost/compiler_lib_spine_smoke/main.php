@@ -5372,6 +5372,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/NestedArrayAndLeadingConstC
 require_once __DIR__.'/../../../lib/Compiler/Concern/DeferredSiblingAndArrayMapNullCallArgProducers.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/HoistedEnumAndChainedInlineCallArgProducers.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/ExactHoistedAndInlineNewCallArgProducers.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/ExpressionPreludeDimFetchAndHoistedConstCallArgSlots.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileBlockInternal.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AssignOperand.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AdaptByRefCallArgs.php';
