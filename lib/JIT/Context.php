@@ -5684,6 +5684,22 @@ class Context {
         Block $block,
         ?Operand $skipOperand = null
     ): void {
+        // Callers pass the BB that owns the frees. NestedJIT may have cleared insert —
+        // re-park on that BB when it is still open. Do not jump to an unrelated lastOpen
+        // (dominate failures on mid-fn value boxes, #36382).
+        $insert = BasicBlockHelper::tryGetInsertBlock($this);
+        if (null === $insert) {
+            if (null !== $basicBlock->getTerminator()) {
+                return;
+            }
+            $this->builder->positionAtEnd($basicBlock);
+        } elseif (null !== $insert->getTerminator()) {
+            if (null === $basicBlock->getTerminator()) {
+                $this->builder->positionAtEnd($basicBlock);
+            } else {
+                BasicBlockHelper::ensureOpenInsertBlock($this, 'free_dead_vars_cont');
+            }
+        }
         $coalesceResults = new \SplObjectStorage();
         foreach ($block->opCodes as $blockOp) {
             if (OpCode::TYPE_COALESCE === $blockOp->type && null !== $blockOp->block3) {
