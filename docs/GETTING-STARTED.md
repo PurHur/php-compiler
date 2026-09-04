@@ -1,10 +1,35 @@
 # Getting started
 
-Guide for **aligned collaborators** and **demo presenters**. For the public narrative, see the [status site](https://purhur.github.io/php-compiler/docs/pages/index.html) and [development status](https://purhur.github.io/php-compiler/development-status.html).
+Guide for **app authors** (install and build) and **aligned collaborators**. For the public narrative, see the [status site](https://purhur.github.io/php-compiler/docs/pages/index.html) and [development status](https://purhur.github.io/php-compiler/development-status.html).
 
 **Contributing policy:** We do not accept GitHub issues or pull requests without prior coordination — contact maintainers on other channels first and align with the AI-agent workflow. See [CONTRIBUTING.md](../CONTRIBUTING.md).
 
-## Prerequisites
+## Install (app authors — Docker only)
+
+The supported user path is a single Docker image: PHP 8.2 + LLVM 9 + prelinked helper cache, entrypoint `phpc` ([#36390](https://github.com/PurHur/php-compiler/issues/36390)). No clone, Composer, or LLVM build on the host.
+
+```bash
+# After a release publishes ghcr.io/purhur/phpc:v1.1.0 (maintainers: make docker-build-phpc-release):
+docker pull ghcr.io/purhur/phpc:v1.1.0   # or build locally: make docker-build-phpc-release
+
+printf '%s\n' '<?php echo "hello\\n";' > hello.php
+docker run --rm -v "$PWD:/app" -w /app ghcr.io/purhur/phpc:v1.1.0 build -o hello hello.php
+./hello
+# → hello
+```
+
+Local tag while iterating on the image: `phpc:local` (same `make docker-build-phpc-release`). Cold-install gate:
+
+```bash
+make docker-build-phpc-release
+make cold-build-check-image    # ≤ 300 s; script/cold-build-check.sh --image
+```
+
+**Tarball SDK** (host PHP 8.2+ only — no Docker at run time): `make pack-phpc-sdk` → `build/phpc-<tag>-x86_64-linux.tar.zst`. Extract, then `./phpc-host doctor` / `./phpc-host build -o hello hello.php`.
+
+The **clone + composer + patches + LLVM** path below is for **contributors** working on the compiler itself.
+
+## Prerequisites (contributors)
 
 | Requirement | Notes |
 |-------------|--------|
@@ -17,7 +42,7 @@ Guide for **aligned collaborators** and **demo presenters**. For the public narr
 
 ## Bootstrap contributors (default onboarding)
 
-**Audience:** Compiler / self-host contributors working on bootstrap, spine inventory, or gen-1+ compile loops ([#1492](https://github.com/PurHur/php-compiler/issues/1492)). **App authors** on the User SDK (`phpc run` / `phpc build` for examples 000–009) can skip to [Five-minute demo script](#five-minute-demo-script).
+**Audience:** Compiler / self-host contributors working on bootstrap, spine inventory, or gen-1+ compile loops ([#1492](https://github.com/PurHur/php-compiler/issues/1492)). **App authors** on the User SDK (`phpc run` / `phpc build` for examples 000–009) can skip to [Five-minute demo script](#five-minute-demo-script) (or use the Docker install above).
 
 The **tiered workflow** keeps Zend on the **test harness** (Tier 0) while the **native gen-2 driver** owns day-to-day compile work (Tier 1). Full ladder: [bootstrap-dev-workflow.md](bootstrap-dev-workflow.md) · platform contract: [bootstrap-sdk-platform.md](bootstrap-sdk-platform.md).
 
