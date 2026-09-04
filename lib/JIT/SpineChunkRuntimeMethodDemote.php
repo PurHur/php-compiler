@@ -94,6 +94,7 @@ final class SpineChunkRuntimeMethodDemote
             || 'phpcompiler\\compileblockinternal' === $lc
             || 'phpcompiler\\assignoperand' === $lc
             || 'phpcompiler\\initjitmethodcall' === $lc
+            || 'phpcompiler\\compileclassandtraituses' === $lc
             || str_starts_with($lc, 'phpcompiler\\builtin')
         ) {
             return true;
