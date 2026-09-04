@@ -49603,7 +49603,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/FindInlineCallArgProducerSlot.php`
 
 **Warnings** (review for bootstrap subset):
-- trait FindInlineCallArgProducerSlot (line 28)
+- trait FindInlineCallArgProducerSlot (line 29)
 - 27 class method(s)
 - 4 closure(s)
 
@@ -49632,7 +49632,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/SiblingInlineCallArgProducerSlots.php`
 
 **Warnings** (review for bootstrap subset):
-- trait SiblingInlineCallArgProducerSlots (line 27)
+- trait SiblingInlineCallArgProducerSlots (line 26)
 - 37 class method(s)
 - 2 closure(s)
 

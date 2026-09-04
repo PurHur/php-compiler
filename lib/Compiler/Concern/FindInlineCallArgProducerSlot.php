@@ -4,6 +4,7 @@ namespace PHPCompiler\Compiler\Concern;
 
 use PHPCompiler\Block;
 use PHPCompiler\OpCode;
+use PHPCompiler\VM\Variable;
 
 use PHPCfg\Op;
 use PHPCfg\Block as CfgBlock;
