@@ -309,7 +309,7 @@ final class JitDomInsertBefore
      * Peer {@see JitDomReplaceChild::syncUserScriptInnerXml}: item($N) ARG_SEND
      * temps often drop compileTimeDomChildIndex — use lastFetched* fallbacks.
      * Only called from {@see invoke} (not ChildNode::before, which owns its own
-     * InnerXml path via DomNodeChildNodeMutationRuntime).
+     * InnerXml path via JitDomChildNodeMutationKernel).
      */
     /**
      * @return bool true when compile-time XML was rewritten to include the new child

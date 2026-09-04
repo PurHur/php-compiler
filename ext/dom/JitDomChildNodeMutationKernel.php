@@ -2,23 +2,11 @@
 
 declare(strict_types=1);
 
-namespace PHPCompiler\JIT\Builtin;
+namespace PHPCompiler\ext\dom;
 
-use PHPCompiler\ext\dom\DomParseSimpleXmlJitHelper;
-use PHPCompiler\ext\dom\JitDomAppendChildLiveSlots;
-use PHPCompiler\ext\dom\JitDomChildNodeSiblingInsert;
-use PHPCompiler\ext\dom\JitDomCreateElement;
-use PHPCompiler\ext\dom\JitDomCreateTextNode;
-use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
-use PHPCompiler\ext\dom\JitDomGetNodePath;
-use PHPCompiler\ext\dom\JitDomLoadXMLUserScript;
-use PHPCompiler\ext\dom\JitDomNodeChildProperty;
-use PHPCompiler\ext\dom\JitDomParentChildLinkLayout;
-use PHPCompiler\ext\dom\JitDomRemoveChild;
-use PHPCompiler\ext\dom\JitDomReplaceChild;
-use PHPCompiler\ext\dom\JitDomRequireDomNodeArg;
-use PHPCompiler\ext\dom\VmDom;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\DomInstanceMethodRuntime;
+use PHPCompiler\JIT\Builtin\DomNodeLiveMutationRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
@@ -26,13 +14,17 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for DOM ChildNode::{after,before,replaceWith,remove} (#26752).
+ * JIT/AOT kernel for DOM ChildNode::{after,before,replaceWith,remove} (#26752).
  *
+ * Lives in ext/dom so lib/JIT Call proxies do not import ext\dom (#36204).
  * User-script AOT updates the parent's {@see VmDom::PROP_USER_SCRIPT_INNER_XML}
  * (same saveXML path as ParentNode append, #26757 / #26765).
  */
-final class DomNodeChildNodeMutationRuntime
+final class JitDomChildNodeMutationKernel
 {
+    /** Peer self::PROP_PARENT_NODE without cross-file import noise. */
+    private const PROP_PARENT_NODE = 'parentNode';
+
     public static function invokeAfter(Context $context, int $extraArgCount, Variable $receiver, Variable ...$extraArgs): Value
     {
         return self::invokeSiblingMutation($context, 'after', $extraArgCount, $receiver, ...$extraArgs);
@@ -79,10 +71,10 @@ final class DomNodeChildNodeMutationRuntime
         Variable ...$extraArgs
     ): Value {
         if ($extraArgCount !== \count($extraArgs)) {
-            throw new \LogicException('DomNodeChildNodeMutationRuntime arity mismatch');
+            throw new \LogicException('JitDomChildNodeMutationKernel arity mismatch');
         }
         if ($extraArgCount < 1 || $extraArgCount > DomNodeLiveMutationRuntime::MAX_EXTRA_ARGS) {
-            throw new \LogicException('DomNodeChildNodeMutationRuntime unsupported arity');
+            throw new \LogicException('JitDomChildNodeMutationKernel unsupported arity');
         }
 
         // php-src ChildNode nodes: DOMNode|string — null must TypeError before LiveSlots (#33746 / peer #33741).
@@ -515,10 +507,10 @@ final class DomNodeChildNodeMutationRuntime
         $receiverObj = self::receiverObject($context, $receiver);
         $objectType = $context->type->object;
         $elementClassId = $objectType->lookup('DOMElement');
-        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_PARENT_NODE)) {
-            $objectType->defineProperty($elementClassId, VmDom::PROP_PARENT_NODE, Variable::TYPE_VALUE);
+        if (!$objectType->hasProperty($elementClassId, self::PROP_PARENT_NODE)) {
+            $objectType->defineProperty($elementClassId, self::PROP_PARENT_NODE, Variable::TYPE_VALUE);
         }
-        $slot = $objectType->propertySlotFor($receiverObj, 'DOMElement', VmDom::PROP_PARENT_NODE);
+        $slot = $objectType->propertySlotFor($receiverObj, 'DOMElement', self::PROP_PARENT_NODE);
         $slotPtr = $context->builder->load($slot);
         $voidPtr = $context->getTypeFromString('void*');
         $objPtrTy = $context->getTypeFromString('__object__*');
