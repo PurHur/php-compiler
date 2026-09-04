@@ -53,6 +53,9 @@ use PHPCompiler\ext\standard\get_defined_functions_;
 use PHPCompiler\ext\standard\get_included_files_;
 use PHPCompiler\ext\standard\get_loaded_extensions;
 use PHPCompiler\ext\standard\get_parent_class_;
+use PHPCompiler\ext\standard\getmygid;
+use PHPCompiler\ext\standard\getmypid;
+use PHPCompiler\ext\standard\getmyuid;
 use PHPCompiler\ext\standard\gettype;
 use PHPCompiler\ext\standard\hash_equals;
 use PHPCompiler\ext\standard\hebrev;
@@ -82,6 +85,8 @@ use PHPCompiler\ext\standard\ord;
 use PHPCompiler\ext\standard\parse_url;
 use PHPCompiler\ext\standard\pathinfo;
 use PHPCompiler\ext\standard\php_sapi_name;
+use PHPCompiler\ext\standard\php_uname;
+use PHPCompiler\ext\standard\phpversion;
 use PHPCompiler\ext\standard\property_exists_;
 use PHPCompiler\ext\standard\pi;
 use PHPCompiler\ext\standard\pow;
@@ -2508,6 +2513,96 @@ final class DiscardedPureCallElisionTest extends TestCase
             $context,
             new get_defined_functions_(),
             [$bool, $long]
+        ));
+    }
+
+    public function testDiscardedProcessIdentityElides(): void
+    {
+        // php-src info.c / basic_functions.c — identity reads (#36386).
+        $context = $this->makeContext();
+        $str = $this->makeStringVar('s');
+        $ext = $this->makeStringVar('standard');
+        $null = $this->makeNullVar();
+        $long = $this->makeNativeLongVar();
+        $box = $this->makeValueBoxVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new phpversion(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new phpversion(),
+            [$ext]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new php_uname(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new php_uname(),
+            [$str]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new getmypid(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new getmyuid(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new getmygid(),
+            []
+        ));
+
+        // Soft-null optional string stays live (deprecate).
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new phpversion(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new php_uname(),
+            [$null]
+        ));
+        // Non-string / excess argc stay live.
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new phpversion(),
+            [$long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new php_uname(),
+            [$box]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new phpversion(),
+            [$ext, $str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new getmypid(),
+            [$long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new getmyuid(),
+            [$str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new getmygid(),
+            [$null]
         ));
     }
 

@@ -50,6 +50,10 @@ use PHPCompiler\VM\Variable as VmVariable;
  * get_loaded_extensions / get_defined_constants / get_defined_functions
  * (zero-arg or typed bool; soft-null bool stays live — deprecate;
  * excess argc stays live — ArgumentCountError),
+ * phpversion / php_uname (zero-arg or typed string; soft-null stays
+ * live — deprecate; excess argc stays live — ArgumentCountError),
+ * getmypid / getmyuid / getmygid (zero-arg; excess argc stays live —
+ * ArgumentCountError),
  * zero-arg pi, type.c predicates + gettype/get_debug_type, ctype.c
  * classifiers on typed/literal strings, typed-array count/sizeof, math.c
  * incl. pow/fpow/fdiv on already-numeric args, empty void user functions).
@@ -102,7 +106,10 @@ use PHPCompiler\VM\Variable as VmVariable;
  * ({@code ArgumentCountError}). Soft-null
  * {@code get_loaded_extensions}/{@code get_defined_constants}/
  * {@code get_defined_functions} bool flags stay live (deprecate); excess
- * argc stays live ({@code ArgumentCountError}).
+ * argc stays live ({@code ArgumentCountError}). Soft-null
+ * {@code phpversion}/{@code php_uname} stay live (deprecate); excess argc
+ * and non-string modes stay live; non-zero-arg {@code getmypid}/
+ * {@code getmyuid}/{@code getmygid} stay live ({@code ArgumentCountError}).
  */
 final class DiscardedPureCallElision
 {
@@ -205,6 +212,9 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureDefinedTableRuntimeInfoNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureProcessIdentityNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureVersionCompareNoSideEffect($toCall, $callArgs)) {
@@ -1501,6 +1511,28 @@ final class DiscardedPureCallElision
     }
 
     /**
+     * Discarded {@code phpversion}/{@code php_uname}/{@code getmypid}/
+     * {@code getmyuid}/{@code getmygid} — php-src {@code info.c}/
+     * {@code basic_functions.c}. Pure process / runtime identity reads.
+     * Soft-null optional string stays live (deprecate). Excess argc stays
+     * live ({@code ArgumentCountError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureProcessIdentityNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        $nameLc = strtolower($toCall->getName());
+        if (!NoThrowCallElision::isPureProcessIdentityBuiltin($nameLc)) {
+            return false;
+        }
+
+        return self::processIdentityArgsAllowDiscardedElision($nameLc, $callArgs);
+    }
+
+    /**
      * Discarded {@code version_compare} on typed / literal strings — php-src
      * {@code versioning.c}. Optional operator must be null or a compile-time
      * valid comparison op ({@code ValueError} otherwise).
@@ -1873,6 +1905,39 @@ final class DiscardedPureCallElision
     private static function definedTableRuntimeInfoArgsAllowDiscardedElision(array $callArgs): bool
     {
         return NoThrowCallElision::definedTableRuntimeInfoArgsCannotThrow($callArgs);
+    }
+
+    /**
+     * {@code getmypid}/{@code getmyuid}/{@code getmygid}: arity 0.
+     * {@code phpversion}/{@code php_uname}: arity 0 or one typed / literal
+     * string (soft-null / non-string stay live — deprecate / coerce).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function processIdentityArgsAllowDiscardedElision(string $nameLc, array $callArgs): bool
+    {
+        switch ($nameLc) {
+            case 'getmypid':
+            case 'getmyuid':
+            case 'getmygid':
+                return [] === $callArgs;
+            case 'phpversion':
+            case 'php_uname':
+                if ([] === $callArgs) {
+                    return true;
+                }
+                if (
+                    !isset($callArgs[0])
+                    || !$callArgs[0] instanceof Variable
+                    || isset($callArgs[1])
+                ) {
+                    return false;
+                }
+
+                return self::stringArgAllowsDiscardedElision($callArgs[0]);
+            default:
+                return false;
+        }
     }
 
     /**
