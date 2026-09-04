@@ -591,10 +591,27 @@ class Native implements Call {
                     null !== $arg->objectPropertySlot
                     && Variable::TYPE_VALUE === $arg->objectPropertyType
                 ) {
-                    return $context->builder->call(
-                        $context->lookupFunction('__value__readObject'),
-                        $value
-                    );
+                    // loadValue may still be __string__*/__object__* after prop analysis
+                    // (Slim typed props / IncludeHelper) — only readObject on value boxes (#36382).
+                    $slotTy = $context->getStringFromType($value->typeOf());
+                    if (
+                        '__value__*' === $slotTy
+                        || (
+                            \PHPLLVM\Type::KIND_POINTER === $value->typeOf()->getKind()
+                            && '__value__' === $context->getStringFromType($value->typeOf()->getElementType())
+                        )
+                    ) {
+                        return $context->builder->call(
+                            $context->lookupFunction('__value__readObject'),
+                            $value
+                        );
+                    }
+                    if ('__object__*' === $slotTy) {
+                        return $value;
+                    }
+                    if ('__string__*' === $slotTy || 'int8*' === $slotTy) {
+                        return $context->getTypeFromString('__object__*')->constNull();
+                    }
                 }
                 $valueTy = $value->typeOf();
                 $valueTyName = $context->getStringFromType($valueTy);

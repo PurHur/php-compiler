@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value;
@@ -41,31 +42,41 @@ final class ClosureBindRuntime
             return;
         }
 
+        // Mid-emit ensureLinked (bindTo guards): do not clearInsertionPosition — that orphans
+        // the following trunc/call into parentless IR (#36382 / peer CtypeRuntime).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         $i8 = $context->getTypeFromString('int8');
         $i32 = $context->getTypeFromString('int32');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            '__closure_bind__valueBoxKindForNullableObject',
-            'closure_bind_nullable_object_kind_entry',
-            [$i8],
-            $i32,
-            self::VALUE_BOX_NULLABLE_OBJECT_KIND,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#10109'
-        );
-        JitVmHelperLink::ensureBridge(
-            $context,
-            '__closure_bind__valueBoxKindForNullableObjectOrString',
-            'closure_bind_nullable_object_or_string_kind_entry',
-            [$i8],
-            $i32,
-            self::VALUE_BOX_NULLABLE_OBJECT_OR_STRING_KIND,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#10109'
-        );
-        $context->builder->clearInsertionPosition();
+        try {
+            JitVmHelperLink::ensureBridge(
+                $context,
+                '__closure_bind__valueBoxKindForNullableObject',
+                'closure_bind_nullable_object_kind_entry',
+                [$i8],
+                $i32,
+                self::VALUE_BOX_NULLABLE_OBJECT_KIND,
+                self::HELPER_PATH,
+                self::COMPILED_HELPERS,
+                '#10109'
+            );
+            JitVmHelperLink::ensureBridge(
+                $context,
+                '__closure_bind__valueBoxKindForNullableObjectOrString',
+                'closure_bind_nullable_object_or_string_kind_entry',
+                [$i8],
+                $i32,
+                self::VALUE_BOX_NULLABLE_OBJECT_OR_STRING_KIND,
+                self::HELPER_PATH,
+                self::COMPILED_HELPERS,
+                '#10109'
+            );
+        } finally {
+            if (null !== $savedInsert) {
+                BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+            } else {
+                $context->builder->clearInsertionPosition();
+            }
+        }
     }
 
     public static function callValueBoxKindForNullableObject(Context $context, Value $typeByte): Value

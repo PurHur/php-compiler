@@ -94,7 +94,12 @@ final class FsDirRuntime
         }
 
         $fn = self::declareFunction($context, $name);
-        $emit($context, $fn);
+        // Mid-invoke ensureLinked: loweringLlvmFunction is the user/IncludeHelper fn.
+        // Without this, BasicBlockHelper::append after NestedJIT steals fdr_tempnam_*
+        // blocks into that owner → cross-function br / void ret string (#36382 / #27211).
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, $name, static function () use ($context, $fn, $emit): void {
+            $emit($context, $fn);
+        });
         $context->registerFunction($name, $fn);
         $context->builder->clearInsertionPosition();
     }
@@ -178,9 +183,13 @@ final class FsDirRuntime
     {
         StringTriggerError::ensureLinked($context);
 
+        // All BBs on $fn — do not BasicBlockHelper::append after NestedJIT (#36382).
         $entry = $fn->appendBasicBlock('fdr_tempnam_entry');
         $fail = $fn->appendBasicBlock('fdr_tempnam_fail');
         $body = $fn->appendBasicBlock('fdr_tempnam_body');
+        $noticeDo = $fn->appendBasicBlock('fdr_tempnam_notice_do');
+        $afterNotice = $fn->appendBasicBlock('fdr_tempnam_after_notice');
+        $retBb = $fn->appendBasicBlock('fdr_tempnam_ret');
         $context->builder->positionAtEnd($entry);
 
         $strPtr = $context->getTypeFromString('__string__*');
@@ -210,8 +219,6 @@ final class FsDirRuntime
             JitNestedHelperCoerce::coerceHelperScalarResult($context, $pending, $i32),
             $i32->constInt(0, false)
         );
-        $noticeDo = BasicBlockHelper::append($context, 'fdr_tempnam_notice_do');
-        $afterNotice = BasicBlockHelper::append($context, 'fdr_tempnam_after_notice');
         $context->builder->branchIf($emitNotice, $noticeDo, $afterNotice);
 
         $context->builder->positionAtEnd($noticeDo);
@@ -233,7 +240,6 @@ final class FsDirRuntime
 
         $context->builder->positionAtEnd($afterNotice);
         $pathNull = JitNestedHelperCoerce::isHelperResultNull($context, $pathRaw);
-        $retBb = BasicBlockHelper::append($context, 'fdr_tempnam_ret');
         $context->builder->branchIf($pathNull, $fail, $retBb);
 
         $context->builder->positionAtEnd($retBb);
