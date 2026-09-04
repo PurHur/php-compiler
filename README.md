@@ -255,7 +255,7 @@ Full matrices (auto-generated): [`docs/capabilities.md`](docs/capabilities.md) (
 
 **Self-host (experimental, not “stable app” scope)**
 
-See [Current implementation status](#current-implementation-status-july-2026) for the full M0–M5 ladder. Summary: M0–M5 bootstrap gates ✅; spine **8200** / **8200**; M3 strict native + inventory argv ✅; M4 full `bootstrap-loop-probe` ✅; M5 **`north-star5-verify-fast`** (daily) ✅ — **`--strict` red at step 4a2** ([#21417](https://github.com/PurHur/php-compiler/issues/21417)) ([#1492](https://github.com/PurHur/php-compiler/issues/1492), [#8559](https://github.com/PurHur/php-compiler/issues/8559)). Recent: native spine bundle probe, fast VM execute smoke ([#2201](https://github.com/PurHur/php-compiler/issues/2201)), `GeneratorYieldSourceMarker` spine unit ([#10356](https://github.com/PurHur/php-compiler/pull/10356)).
+See [Current implementation status](#current-implementation-status-july-2026) for the full M0–M5 ladder. Summary: M0–M5 bootstrap gates ✅; spine **8201** / **8201**; M3 strict native + inventory argv ✅; M4 full `bootstrap-loop-probe` ✅; M5 **`north-star5-verify-fast`** (daily) ✅ — **`--strict` red at step 4a2** ([#21417](https://github.com/PurHur/php-compiler/issues/21417)) ([#1492](https://github.com/PurHur/php-compiler/issues/1492), [#8559](https://github.com/PurHur/php-compiler/issues/8559)). Recent: native spine bundle probe, fast VM execute smoke ([#2201](https://github.com/PurHur/php-compiler/issues/2201)), `GeneratorYieldSourceMarker` spine unit ([#10356](https://github.com/PurHur/php-compiler/pull/10356)).
 
 **What we do not target in v1.x**
 
