@@ -282,6 +282,16 @@ class Block {
     /** @var array<int, true> */
     private array $namedAssignDestSlotIndexes = [];
 
+    /**
+     * Function-wide `$name => CV slot` shared by every CFG block of one op_array (#36380).
+     *
+     * Sibling if/elseif arms use distinct php-cfg Var operands; without a shared map the
+     * elseif arm allocates a fresh slot while merge reads keep the if-arm index.
+     *
+     * @var ?\ArrayObject<string, int>
+     */
+    public ?\ArrayObject $functionNamedCvSlots = null;
+
     /** @var array<int, Operand|null> lazy {@see getOperand} results — cleared when scope slots change (#36226). */
     private array $operandBySlotCache = [];
 
@@ -462,6 +472,26 @@ class Block {
         $this->namedAssignDestSlots[$varRoot] = $slot;
         $this->namedAssignDestSlotIndexes[$slot] = true;
         $this->refreshOperandSlotCache($slot);
+        $name = self::resolveVariableName($varRoot);
+        if (null !== $name && '' !== $name) {
+            if (null === $this->functionNamedCvSlots) {
+                $this->functionNamedCvSlots = new \ArrayObject();
+            }
+            // First writer wins — later arms must reuse (#36380).
+            if (!$this->functionNamedCvSlots->offsetExists($name)) {
+                $this->functionNamedCvSlots[$name] = $slot;
+            }
+        }
+    }
+
+    /** Function-wide CV slot for `$name`, if any arm already assigned it (#36380). */
+    public function functionNamedCvSlot(string $name): ?int
+    {
+        if (null === $this->functionNamedCvSlots || !$this->functionNamedCvSlots->offsetExists($name)) {
+            return null;
+        }
+
+        return (int) $this->functionNamedCvSlots[$name];
     }
 
     /** True when $slot is a registered `$local = …` assign destination (#16040, #24017). */
@@ -496,8 +526,8 @@ class Block {
                 return $this->namedAssignDestSlots[$storedRoot];
             }
         }
-
-        return null;
+        // Sibling if/elseif arm may have published the CV before this block compiled (#36380).
+        return $this->functionNamedCvSlot($name);
     }
 
     public function setScriptPath(string $path): void
@@ -837,6 +867,17 @@ class Block {
                 }
             }
         }
+        // Writes: reuse sibling/earlier `$local = …` CV by name before allocating a fresh slot
+        // (Parsedown `$text` if/elseif arms, #36380). Read path already does this above.
+        if (!$isRead) {
+            $namedDest = $this->slotForNamedAssignDest($operand);
+            if (null !== $namedDest && !isset($this->constants[$namedDest])) {
+                $this->bindScopeOperandSlot($operand, $namedDest);
+                $this->markLocallyWritten($operand);
+
+                return $namedDest;
+            }
+        }
         if ($this->scope->contains($operand)) {
             $existing = $this->scope[$operand];
             if ($isRead || $this->closureCaptureSlotWritableForOperand($existing, $operand)) {
@@ -1076,9 +1117,32 @@ class Block {
         if (isset($this->constants[$slot]) && !$this->compileTimeConstantsMatch($this->constants[$slot], $const)) {
             $slot = $this->forceFreshVarSlot($operand);
         }
+        // Dim-key / bool literals must not claim a named CV index (sibling `$text` vs `'rawHtml'`, #36380).
+        if (
+            $this->isNamedAssignDestSlot($slot)
+            || $this->isNamedVariableSlot($slot)
+            || $this->functionNamedCvSlotOccupies($slot)
+        ) {
+            $slot = $this->forceFreshVarSlot($operand);
+        }
         $this->constants[$slot] = $const;
 
         return $slot;
+    }
+
+    /** True when `$slot` is reserved as a function-wide named CV (#36380). */
+    private function functionNamedCvSlotOccupies(int $slot): bool
+    {
+        if (null === $this->functionNamedCvSlots) {
+            return false;
+        }
+        foreach ($this->functionNamedCvSlots as $cvSlot) {
+            if ((int) $cvSlot === $slot) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** True when two compile-time slot constants are the same value (#15902). */
@@ -1133,6 +1197,44 @@ class Block {
             if ($sibling->args->contains($root) || $sibling->isArgSlot($slot)) {
                 $this->args[$root] = $slot;
             }
+        }
+    }
+
+    /**
+     * Adopt sibling-branch `$local = …` CV slots by name before this branch compiles (#36380).
+     *
+     * php-cfg uses distinct Var operands per branch for the same local. Without this, the
+     * elseif arm allocates a fresh slot while merge/reads keep the if-arm CV — and a dim-key
+     * literal can claim the numeric index of that CV (`$text` vs `'rawHtml'`, Parsedown).
+     * Distinct from {@see inheritCfgVarSlotsFrom}: that skips named locals so &&/|| phis
+     * cannot steal them (#15183); same-name CVs must still unify across if/elseif arms.
+     */
+    public function inheritNamedAssignDestsFrom(Block $sibling): void
+    {
+        foreach ($sibling->namedAssignDestSlots as $root) {
+            $name = self::resolveVariableName($root);
+            if (null === $name || '' === $name) {
+                continue;
+            }
+            foreach ($this->namedAssignDestSlots as $ours) {
+                if (self::resolveVariableName($ours) === $name) {
+                    continue 2;
+                }
+            }
+            $slot = (int) $sibling->namedAssignDestSlots[$root];
+            // Dim-key / ConstFetch literals must not occupy a CV index we are about to adopt.
+            if (isset($this->constants[$slot])) {
+                continue;
+            }
+            $this->namedAssignDestSlots[$root] = $slot;
+            $this->namedAssignDestSlotIndexes[$slot] = true;
+            if (!$this->scope->contains($root)) {
+                $this->bindScopeOperandSlot($root, $slot);
+            }
+            $this->refreshOperandSlotCache($slot);
+        }
+        foreach ($sibling->namedAssignDestSlotIndexes as $slot => $_) {
+            $this->namedAssignDestSlotIndexes[(int) $slot] = true;
         }
     }
 
@@ -1289,6 +1391,9 @@ class Block {
             if (isset($parent->constants[$parentSlot]) && !isset($this->constants[$slot])) {
                 $this->constants[$slot] = $parent->constants[$parentSlot];
             }
+        }
+        if (null !== $parent->functionNamedCvSlots) {
+            $this->functionNamedCvSlots = $parent->functionNamedCvSlots;
         }
         foreach ($parent->namedAssignDestSlotIndexes as $slot => $_) {
             $this->namedAssignDestSlotIndexes[$slot] = true;

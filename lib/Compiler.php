@@ -1219,6 +1219,7 @@ class Compiler {
                 $new->func = $func;
                 $new->strictTypes = isset($func->strictTypes) ? (bool) $func->strictTypes : false;
                 $this->applyReturnTypeFromFunc($new, $func);
+                $new->functionNamedCvSlots = new \ArrayObject();
             }
             if ([] !== $params) {
                 $this->assertNoDuplicateParameterNames($params);
@@ -1338,6 +1339,16 @@ class Compiler {
             $child->returnDeclaredType = $parent->returnDeclaredType;
             $child->returnLiteralBoolType = $parent->returnLiteralBoolType;
         }
+        // Share function-wide CV map across CFG arms (Parsedown `$text` if/elseif, #36380).
+        if (null !== $parent->functionNamedCvSlots) {
+            $child->functionNamedCvSlots = $parent->functionNamedCvSlots;
+        } elseif (null !== $child->functionNamedCvSlots) {
+            $parent->functionNamedCvSlots = $child->functionNamedCvSlots;
+        } else {
+            $shared = new \ArrayObject();
+            $child->functionNamedCvSlots = $shared;
+            $parent->functionNamedCvSlots = $shared;
+        }
     }
 
     /**
@@ -1357,7 +1368,10 @@ class Compiler {
                 if ($siblingCfg === $cfgBlock || !$this->seen->contains($siblingCfg)) {
                     continue;
                 }
-                $compiled->inheritCfgVarSlotsFrom($this->seen[$siblingCfg]);
+                $sibling = $this->seen[$siblingCfg];
+                $compiled->inheritCfgVarSlotsFrom($sibling);
+                // Same-name CVs (`$text` in if/elseif) must share one slot (#36380).
+                $compiled->inheritNamedAssignDestsFrom($sibling);
             }
         }
     }
@@ -9499,9 +9513,32 @@ class Compiler {
                 $this->throwCompileLogic('Unknown Literal Operand Type: ' . ($fresh->type ?? 'untyped'));
         }
         $slot = $block->forceFreshVarSlot($fresh);
+        // Same guard as {@see Block::registerConstant}: never alias a named CV (#36380).
+        if (
+            $block->isNamedAssignDestSlot($slot)
+            || $block->isNamedVariableSlot($slot)
+            || (null !== $block->functionNamedCvSlots && $this->blockFunctionNamedCvOccupies($block, $slot))
+        ) {
+            $slot = $block->forceFreshVarSlot($fresh, $slot);
+        }
         $block->constants[$slot] = $const;
 
         return $slot;
+    }
+
+    /** @param \ArrayObject<string, int> $_unused */
+    private function blockFunctionNamedCvOccupies(Block $block, int $slot): bool
+    {
+        if (null === $block->functionNamedCvSlots) {
+            return false;
+        }
+        foreach ($block->functionNamedCvSlots as $cvSlot) {
+            if ((int) $cvSlot === $slot) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** @var int Synthetic echo-materialize locals for {main} FuncCall→echo (#23472). */
