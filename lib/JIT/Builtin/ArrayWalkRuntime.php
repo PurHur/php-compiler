@@ -64,7 +64,11 @@ final class ArrayWalkRuntime
         JITVariable $array,
         JITVariable $callback
     ): Value {
-        if (!ArrayMapCallbackPolicy::isJitLowerable($callback)) {
+        if (!ArrayMapCallbackPolicy::isJitLowerableScalar(
+            $callback->type,
+            $callback->isNullConstant,
+            $callback->compileTimeString
+        ) || null === $callback->compileTimeString) {
             throw new \LogicException(ArrayMapCallbackPolicy::jitRejectionMessage());
         }
         if (ArrayBuiltinHelper::isNativeArray($array->type)) {
@@ -73,9 +77,6 @@ final class ArrayWalkRuntime
             );
         }
         $name = $callback->compileTimeString;
-        if (null === $name) {
-            throw new \LogicException(ArrayMapCallbackPolicy::jitRejectionMessage());
-        }
 
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
         self::dispatchStringCallback($context, $ht, $name, false);
@@ -88,7 +89,11 @@ final class ArrayWalkRuntime
         JITVariable $array,
         JITVariable $callback
     ): Value {
-        if (!ArrayMapCallbackPolicy::isJitLowerable($callback)) {
+        if (!ArrayMapCallbackPolicy::isJitLowerableScalar(
+            $callback->type,
+            $callback->isNullConstant,
+            $callback->compileTimeString
+        ) || null === $callback->compileTimeString) {
             throw new \LogicException(ArrayMapCallbackPolicy::jitRejectionMessage());
         }
         if (ArrayBuiltinHelper::isNativeArray($array->type)) {
@@ -97,9 +102,6 @@ final class ArrayWalkRuntime
             );
         }
         $name = $callback->compileTimeString;
-        if (null === $name) {
-            throw new \LogicException(ArrayMapCallbackPolicy::jitRejectionMessage());
-        }
 
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
         self::dispatchStringCallback($context, $ht, $name, true);

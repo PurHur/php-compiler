@@ -5431,6 +5431,7 @@ require_once __DIR__.'/../../../lib/JIT/ArrayUserSetOpsValueLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/ArrayCountValuesLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/ArrayColumnLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/ArrayMapCallbackPolicy.php';
+require_once __DIR__.'/../../../lib/JIT/ArrayMapArrayCallableHelper.php';
 require_once __DIR__.'/../../../lib/JIT/ArrayReduceCallbackPolicy.php';
 require_once __DIR__.'/../../../lib/JIT/AsymmetricVisibilityGuard.php';
 require_once __DIR__.'/../../../lib/JIT/BackedEnumDuplicateJitGuard.php';

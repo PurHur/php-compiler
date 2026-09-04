@@ -30,8 +30,8 @@ use PHPLLVM\Value;
 /**
  * array_map() — null zip, string builtins, closure/invokable/array callables (ext/standard/array.c; #4539, #25711).
  *
- * JIT/AOT: null, compile-time string builtins, and closure/arrow callbacks with native int/double
- * returns are lowered (issue #142). [class, method] callables remain JIT-deferred (#1154) but work on VM.
+ * JIT/AOT: null, compile-time string builtins, closure/arrow, and compile-time static/bound
+ * array callables are lowered (issue #142, #36382). Invokable objects remain JIT-deferred (#16228).
  *
  * php-src: ext/standard/array.c — PHP_FUNCTION(array_map) / Z_PARAM_ARRAY for $array
  */
@@ -116,13 +116,31 @@ final class array_map extends Internal
         if (ArrayMapCallbackPolicy::isClosureJitLowerable($callback)) {
             return ArrayMapRuntime::mapSingle($context, $callback, $array);
         }
+        // Array callables (HASHTABLE / value-box HT) before scalar TypeError (#36382 / #25711).
+        $isArrayShaped = JITVariable::TYPE_HASHTABLE === ($callback->type & ~JITVariable::IS_NATIVE_ARRAY)
+            || (JITVariable::TYPE_VALUE === $callback->type && $callback->valueBoxHashtable)
+            || null !== ArrayMapCallbackPolicy::compileTimeStaticArrayCallableNames($callback);
+        if ($isArrayShaped) {
+            return ArrayMapRuntime::mapSingle($context, $callback, $array);
+        }
         if (ArrayMapCallbackPolicy::isJitPhpSrcInvalidCallbackType($callback->type)) {
             TypeErrorRaise::ensureLinked($context);
             TypeErrorRaise::emitRaise($context, ArrayMapCallbackPolicy::invalidCallbackTypeError());
 
             return JitValueBox::pointer($context, JitValueBox::alloc($context));
         }
-        if (JITVariable::TYPE_STRING === $callback->type || JITVariable::TYPE_VALUE === $callback->type) {
+        // TYPE_VALUE may still be a bound-method array callable without valueBoxHashtable set
+        // (FastRoute [$this,'processChunk'] under IncludeHelper, #36382) — try mapSingle first.
+        if (JITVariable::TYPE_VALUE === $callback->type) {
+            try {
+                return ArrayMapRuntime::mapSingle($context, $callback, $array);
+            } catch (\LogicException) {
+                (new self())->jitString($context, $callback, 'array_map() callback');
+
+                return ArrayMapRuntime::mapSingle($context, $callback, $array);
+            }
+        }
+        if (JITVariable::TYPE_STRING === $callback->type) {
             (new self())->jitString($context, $callback, 'array_map() callback');
         }
 

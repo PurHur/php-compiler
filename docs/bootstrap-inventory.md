@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8149 |
-| Phase A inventory files (M2 ratio SSOT) | 8149 |
+| PHP files on vm.php path | 8150 |
+| Phase A inventory files (M2 ratio SSOT) | 8150 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 25833 |
+| Source constructs flagged (warnings) | 25838 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4137,7 +4137,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/array_key_last.php` | 0 | 3 |
 | `ext/standard/array_keys.php` | 0 | 1 |
 | `ext/standard/array_last.php` | 0 | 1 |
-| `ext/standard/array_map.php` | 0 | 11 |
+| `ext/standard/array_map.php` | 0 | 12 |
 | `ext/standard/array_merge.php` | 0 | 2 |
 | `ext/standard/array_merge_recursive.php` | 0 | 2 |
 | `ext/standard/array_multisort.php` | 0 | 9 |
@@ -5652,8 +5652,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/ArrayFindHelper.php` | 0 | 1 |
 | `lib/JIT/ArrayFindLlvm.php` | 0 | 6 |
 | `lib/JIT/ArrayFlipLlvm.php` | 0 | 4 |
+| `lib/JIT/ArrayMapArrayCallableHelper.php` | 0 | 2 |
 | `lib/JIT/ArrayMapCallbackPolicy.php` | 0 | 1 |
-| `lib/JIT/ArrayMapLlvm.php` | 0 | 8 |
+| `lib/JIT/ArrayMapLlvm.php` | 0 | 10 |
 | `lib/JIT/ArrayProductLlvm.php` | 0 | 1 |
 | `lib/JIT/ArrayRandLlvm.php` | 0 | 2 |
 | `lib/JIT/ArrayReduceCallbackPolicy.php` | 0 | 1 |
@@ -39747,15 +39748,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 44)
-- new self (line 126)
-- new HashTable (line 134)
-- new HashTable (line 176)
-- new Variable (line 193)
-- new HashTable (line 232)
-- new Variable (line 235)
-- new Variable (line 251)
-- new Variable (line 312)
-- new Variable (line 320)
+- new self (line 138)
+- new self (line 144)
+- new HashTable (line 152)
+- new HashTable (line 194)
+- new Variable (line 211)
+- new HashTable (line 250)
+- new Variable (line 253)
+- new Variable (line 269)
+- new Variable (line 330)
+- new Variable (line 338)
 - 13 class method(s)
 
 ### `ext/standard/array_merge.php`
@@ -50366,10 +50368,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 204)
 - 7 class method(s)
 
+### `lib/JIT/ArrayMapArrayCallableHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- new RuntimeIndirectInstanceMethodCall (line 81)
+- 7 class method(s)
+
 ### `lib/JIT/ArrayMapCallbackPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 10 class method(s)
 
 ### `lib/JIT/ArrayMapLlvm.php`
 
@@ -50379,9 +50387,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 199)
 - new Call\NestedClosureInvoke (line 215)
 - new Variable (line 220)
-- new Variable (line 288)
-- 6 class method(s)
-- 2 closure(s)
+- new Variable (line 241)
+- new Variable (line 268)
+- new Variable (line 336)
+- 8 class method(s)
+- 4 closure(s)
 
 ### `lib/JIT/ArrayProductLlvm.php`
 
@@ -50626,7 +50636,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ArrayMapRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 377)
+- new JITVariable (line 405)
 - 26 class method(s)
 
 ### `lib/JIT/Builtin/ArrayMergeRecursiveRuntime.php`
