@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 8162 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 25872 |
+| Source constructs flagged (warnings) | 25871 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -6530,7 +6530,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/Type/ObjectInstancePropertyLlvm.php` | 0 | 6 |
 | `lib/JIT/Builtin/Type/ObjectStaticPropertyInitLlvm.php` | 0 | 2 |
 | `lib/JIT/Builtin/Type/ObjectStaticPropertyLlvm.php` | 0 | 10 |
-| `lib/JIT/Builtin/Type/Object_.php` | 0 | 36 |
+| `lib/JIT/Builtin/Type/Object_.php` | 0 | 35 |
 | `lib/JIT/Builtin/Type/String_.php` | 0 | 1 |
 | `lib/JIT/Builtin/Type/Value.php` | 0 | 4 |
 | `lib/JIT/Builtin/TypeErrorRaise.php` | 0 | 3 |
@@ -49100,47 +49100,47 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Operand\Temporary (line 22132)
 - new Operand\Temporary (line 22149)
 - new Operand\Temporary (line 22158)
-- new Operand\Temporary (line 24705)
-- new Variable (line 25247)
-- new Variable (line 25251)
-- new Variable (line 25259)
-- new Variable (line 25263)
-- new Variable (line 25547)
-- new Operand\Temporary (line 26013)
-- new OpCode (line 26637)
-- new Operand\Literal (line 27018)
-- new Variable (line 27020)
-- new OpCode (line 27064)
-- new OpCode (line 27282)
-- new CompileFatal (line 27296)
-- new OpCode (line 27303)
-- new OpCode (line 27306)
-- new Operand\Temporary (line 27333)
-- new Operand\Temporary (line 27370)
-- new OpCode (line 27372)
-- new OpCode (line 27385)
-- new Operand\Temporary (line 27388)
-- new OpCode (line 27390)
-- new OpCode (line 27398)
-- new OpCode (line 27408)
-- new OpCode (line 27416)
-- new OpCode (line 27419)
-- new OpCode (line 27546)
-- new OpCode (line 27583)
-- new OpCode (line 27609)
-- new OpCode (line 27628)
-- new OpCode (line 27635)
-- new Operand\Literal (line 28576)
-- new OpCode (line 30212)
-- new Literal (line 30386)
-- new OpCode (line 30491)
-- new Variable (line 30502)
-- new Temporary (line 30504)
-- new OpCode (line 30507)
-- new CompileFatal (line 30825)
-- new CompileFatal (line 31081)
-- 801 class method(s)
-- 23 closure(s)
+- new Operand\Temporary (line 24539)
+- new Variable (line 25081)
+- new Variable (line 25085)
+- new Variable (line 25093)
+- new Variable (line 25097)
+- new Variable (line 25381)
+- new Operand\Temporary (line 25847)
+- new OpCode (line 26471)
+- new Operand\Literal (line 26852)
+- new Variable (line 26854)
+- new OpCode (line 26898)
+- new OpCode (line 27116)
+- new CompileFatal (line 27130)
+- new OpCode (line 27137)
+- new OpCode (line 27140)
+- new Operand\Temporary (line 27167)
+- new Operand\Temporary (line 27204)
+- new OpCode (line 27206)
+- new OpCode (line 27219)
+- new Operand\Temporary (line 27222)
+- new OpCode (line 27224)
+- new OpCode (line 27232)
+- new OpCode (line 27242)
+- new OpCode (line 27250)
+- new OpCode (line 27253)
+- new OpCode (line 27380)
+- new OpCode (line 27417)
+- new OpCode (line 27443)
+- new OpCode (line 27462)
+- new OpCode (line 27469)
+- new Operand\Literal (line 28410)
+- new OpCode (line 30046)
+- new Literal (line 30220)
+- new OpCode (line 30325)
+- new Variable (line 30336)
+- new Temporary (line 30338)
+- new OpCode (line 30341)
+- new CompileFatal (line 30659)
+- new CompileFatal (line 30915)
+- 797 class method(s)
+- 22 closure(s)
 
 ### `lib/Compiler/AbstractMethodBodyCheck.php`
 
@@ -49605,7 +49605,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/FindInlineCallArgProducerSlot.php`
 
 **Warnings** (review for bootstrap subset):
-- trait FindInlineCallArgProducerSlot (line 28)
+- trait FindInlineCallArgProducerSlot (line 29)
 - 27 class method(s)
 - 4 closure(s)
 
@@ -49628,13 +49628,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - trait PrecedingInlineCallArgProducers (line 28)
-- 24 class method(s)
-- 2 closure(s)
+- 28 class method(s)
+- 3 closure(s)
 
 ### `lib/Compiler/Concern/SiblingInlineCallArgProducerSlots.php`
 
 **Warnings** (review for bootstrap subset):
-- trait SiblingInlineCallArgProducerSlots (line 24)
+- trait SiblingInlineCallArgProducerSlots (line 26)
 - 37 class method(s)
 - 2 closure(s)
 
@@ -55091,21 +55091,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new VMVariable (line 7153)
 - new ReflectionClassConstant (line 7895)
 - new Variable (line 8339)
-- new Variable (line 8359)
-- new Variable (line 8370)
-- new Variable (line 8383)
-- new Variable (line 8391)
-- new Variable (line 8414)
-- new Variable (line 8440)
-- new Variable (line 8448)
-- new Variable (line 8522)
-- new Literal (line 8539)
-- new Literal (line 8544)
-- new Literal (line 8549)
-- new Variable (line 8560)
-- new Variable (line 8593)
-- new Variable (line 8616)
-- new Variable (line 9166)
+- new Variable (line 8368)
+- new Variable (line 8395)
+- new Variable (line 8403)
+- new Variable (line 8426)
+- new Variable (line 8452)
+- new Variable (line 8460)
+- new Variable (line 8534)
+- new Literal (line 8551)
+- new Literal (line 8556)
+- new Literal (line 8561)
+- new Variable (line 8572)
+- new Variable (line 8605)
+- new Variable (line 8628)
+- new Variable (line 9178)
 - 354 class method(s)
 - 9 closure(s)
 
