@@ -8,7 +8,7 @@
 # implementer gate that proves the link path works.
 #
 # Usage:
-#   ./script/runtime-assert-asan-smoke.sh
+#   ./script/runtime-assert/asan-smoke.sh
 #   make runtime-assert-asan-smoke
 #
 set -euo pipefail
@@ -17,7 +17,7 @@ cd "$ROOT"
 
 if ! { [[ -f /.dockerenv ]] && [[ -f /opt/llvm9/libLLVM-9.so.1 ]]; } \
     && [[ "${PHP_COMPILER_IN_DOCKER:-0}" != "1" ]]; then
-    exec ./script/docker-exec.sh -- bash -lc "source script/php-env.sh && ./script/runtime-assert-asan-smoke.sh"
+    exec ./script/docker-exec.sh -- bash -lc "source script/php-env.sh && ./script/runtime-assert/asan-smoke.sh"
 fi
 
 : "${PHP_BIN:=php}"

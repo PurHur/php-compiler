@@ -29,8 +29,8 @@ Injected double-delref (unit test only): `PHP_COMPILER_RUNTIME_ASSERT_INJECT_DOU
 `PHP_COMPILER_ASAN=1` must link through a **host clang/gcc** driver (never raw `/opt/llvm9/ld` — ld rejects `-fsanitize=*`). Local gates:
 
 ```bash
-./script/runtime-assert-asan-smoke.sh          # compile+run hello with ASan/UBSan
-./script/runtime-assert-valgrind-smoke.sh      # valgrind --error-exitcode=1 (skip if missing)
+./script/runtime-assert/asan-smoke.sh          # compile+run hello with ASan/UBSan
+./script/runtime-assert/valgrind-smoke.sh      # valgrind --error-exitcode=1 (skip if missing)
 make runtime-assert-asan-smoke
 ```
 

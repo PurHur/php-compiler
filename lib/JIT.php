@@ -43,9 +43,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\IssetHelper;
 use PHPCompiler\JIT\SelfHostBuiltinPolicy;
 use PHPCompiler\JIT\Variable;
-
 use PHPCompiler\Func as CoreFunc;
-
 use PHPLLVM;
 
 class JIT {
@@ -56,14 +54,12 @@ class JIT {
     use AdaptByRefCallArgs;
     use EmitJitReturn;
 
-
     private static int $functionNumber = 0;
     private static int $blockNumber = 0;
     /** Nested php-in-PHP helper compiles during an outer JIT::compile() (#10528). */
     private static int $compileDepth = 0;
 
     public int $optimizationLevel = 3;
-
 
     private array $stringConstant = [];
     private array $intConstant = [];
@@ -4884,7 +4880,6 @@ class JIT {
                 && !str_ends_with($lower, '::issuperglobalname'));
     }
 
-
     /** Stub M2 lib spine smoke units (Doctor, Cli, Web drivers, ext/standard JIT leaves) for self-host AOT (#1056). */
     private function isSkippedLibSpineSmokeHotPathName(string $name): bool
     {
@@ -8911,7 +8906,6 @@ class JIT {
 
         return $targets;
     }
-
 
     /** `return $c ? $a : $b` nullable arm — direct return avoids AOT merge-slot segfault (#8555). */
 
@@ -14741,7 +14735,6 @@ class JIT {
         }
     }
 
-
     private function valueBoxPointer(Variable $value): PHPLLVM\Value
     {
         return JIT\JitValueBox::valuePtrFromVariable($this->context, $value);
@@ -19128,7 +19121,6 @@ class JIT {
         return ($this->instanceMethodUsesThis($block) || $this->closureBodyUsesThis($block)) ? 1 : 0;
     }
 
-
     private function instanceMethodUsesThis(Block $block): bool
     {
         if (null === $block->func) {
@@ -19311,7 +19303,6 @@ class JIT {
 
         return $receiverVar;
     }
-
 
     /** Nested JIT: VM HashTable/Variable helpers for php-in-PHP ext helpers (#12910). */
     private function tryInitNestedVmHelperMethodCall(
@@ -22785,7 +22776,6 @@ class JIT {
 
         return null;
     }
-
 
     /**
      * Propagate compile-time callable names through TYPE_ASSIGN (first-class callables, #1363).
