@@ -257,6 +257,11 @@ final class NoThrowCallElision
             // LONG/BOOL slots; object/value-box string args stay conservative.
             return self::stringPadOrSplitArgsCannotThrow($name, $callArgs);
         }
+        if (self::isPureStringReplaceOrJoinBuiltin($name)) {
+            // str_replace / str_ireplace / substr_replace / strtr (3-string) —
+            // typed string (+ numeric offset) only; array forms / &$count stay out.
+            return self::stringReplaceOrJoinArgsCannotThrow($name, $callArgs);
+        }
         if ('chr' === $name) {
             // Z_PARAM_LONG family — object→int does not call __toString; still
             // keep value-box / object conservative (coercion paths vary).
@@ -617,6 +622,87 @@ final class NoThrowCallElision
             case 'str_split':
             case 'explode':
                 return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * php-src {@code ext/standard/string.c} replace builtins that only read typed
+     * string (+ optional numeric) args — no user handlers and no by-ref count
+     * write. Array subject/search/replace and {@code strtr} replace_pairs stay
+     * out (element {@code __toString} / empty-replacement warnings). Public for
+     * {@see DiscardedPureCallElision} (#36386).
+     */
+    public static function isPureStringReplaceOrJoinBuiltin(string $nameLc): bool
+    {
+        switch ($nameLc) {
+            case 'str_replace':
+            case 'str_ireplace':
+            case 'substr_replace':
+            case 'strtr':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * @param array<int, Variable> $callArgs
+     */
+    public static function stringReplaceOrJoinArgsCannotThrow(string $nameLc, array $callArgs): bool
+    {
+        if ([] === $callArgs) {
+            return false;
+        }
+        switch ($nameLc) {
+            case 'str_replace':
+            case 'str_ireplace':
+                // search, replace, subject — strings only; &$count is a write.
+                if (!isset($callArgs[0], $callArgs[1], $callArgs[2]) || isset($callArgs[3])) {
+                    return false;
+                }
+
+                return $callArgs[0] instanceof Variable
+                    && self::stringParamBuiltinArgCannotThrow($callArgs[0])
+                    && $callArgs[1] instanceof Variable
+                    && self::stringParamBuiltinArgCannotThrow($callArgs[1])
+                    && $callArgs[2] instanceof Variable
+                    && self::stringParamBuiltinArgCannotThrow($callArgs[2]);
+            case 'substr_replace':
+                // string, replace, long offset [, long length] — string subject only.
+                if (!isset($callArgs[0], $callArgs[1], $callArgs[2])) {
+                    return false;
+                }
+                if (
+                    !$callArgs[0] instanceof Variable
+                    || !self::stringParamBuiltinArgCannotThrow($callArgs[0])
+                    || !$callArgs[1] instanceof Variable
+                    || !self::stringParamBuiltinArgCannotThrow($callArgs[1])
+                    || !$callArgs[2] instanceof Variable
+                    || !self::numericParamBuiltinArgCannotThrow($callArgs[2])
+                ) {
+                    return false;
+                }
+                if (!isset($callArgs[3])) {
+                    return true;
+                }
+
+                return $callArgs[3] instanceof Variable
+                    && self::numericParamBuiltinArgCannotThrow($callArgs[3]);
+            case 'strtr':
+                // Three-string form only (from/to spans). Two-arg replace_pairs
+                // may warn on empty replacements and stringify pair values.
+                if (!isset($callArgs[0], $callArgs[1], $callArgs[2]) || isset($callArgs[3])) {
+                    return false;
+                }
+
+                return $callArgs[0] instanceof Variable
+                    && self::stringParamBuiltinArgCannotThrow($callArgs[0])
+                    && $callArgs[1] instanceof Variable
+                    && self::stringParamBuiltinArgCannotThrow($callArgs[1])
+                    && $callArgs[2] instanceof Variable
+                    && self::stringParamBuiltinArgCannotThrow($callArgs[2]);
             default:
                 return false;
         }
