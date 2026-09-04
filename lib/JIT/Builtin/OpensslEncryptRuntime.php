@@ -7,14 +7,14 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPCompiler\ext\openssl\VmOpensslCipherNative;
+use PHPCompiler\JIT\OpensslHostProbe;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
  * JIT/AOT link for openssl_encrypt()/openssl_decrypt() via OpensslEncryptJitHelper PHP (#21065, AEAD #21135, #22683, #32859).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer OpensslDigest #22554).
- * Peer of {@see OpensslSignRuntime}. SSOT: {@see \PHPCompiler\ext\openssl\VmOpensslCipherNative}
+ * Peer of {@see OpensslSignRuntime}. SSOT: hooks → {@see \PHPCompiler\ext\openssl\VmOpensslCipherNative}
  *
  * Module-local ABI owner (getNamedFunction first): Builtin\Type no longer always-declares
  * empty shells (#32859 / peer #32855) — leftover Type decls mint openssl_encrypt.1
@@ -52,7 +52,7 @@ final class OpensslEncryptRuntime
 
     public static function opensslCipherRuntimeAvailable(): bool
     {
-        return VmOpensslCipherNative::available();
+        return OpensslHostProbe::cipherAvailable();
     }
 
     public static function ensureLinked(Context $context): void
@@ -75,13 +75,14 @@ final class OpensslEncryptRuntime
         } catch (\Throwable) {
         }
 
-        if (!self::opensslCipherRuntimeAvailable()) {
+        $hooks = $context->extensionLowering->openssl;
+        if (null === $hooks || !$hooks->cipherRuntimeAvailable()) {
             self::implementStubBridges($context);
         } else {
             // Helper uses base64_encode/decode; those ABIs no-op while NestedJIT is active (#21065).
             StringBase64Encode::ensureLinked($context);
             StringBase64Decode::ensureLinked($context);
-            \PHPCompiler\ext\openssl\JitOpensslCipherKernel::ensureEvpLeaves($context);
+            $hooks->ensureCipherEvpLeaves($context);
             self::ensureJitHelperCompiled($context);
             self::implementIfMissing($context, '__compiler_openssl_encrypt', self::implementEncryptBridge(...));
             self::implementIfMissing($context, '__compiler_openssl_decrypt', self::implementDecryptBridge(...));

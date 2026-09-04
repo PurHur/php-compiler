@@ -7,14 +7,14 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPCompiler\ext\openssl\VmOpensslSignNative;
+use PHPCompiler\JIT\OpensslHostProbe;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
  * JIT/AOT link for openssl_sign()/openssl_verify() via OpensslSignJitHelper PHP (#3324, #16454, #22911, #32866).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer OpensslEncrypt #22683).
- * Thin LLVM bridges forward the ABI. SSOT: {@see \PHPCompiler\ext\openssl\VmOpensslSignNative}
+ * Thin LLVM bridges forward the ABI. SSOT: hooks → {@see \PHPCompiler\ext\openssl\VmOpensslSignNative}
  *
  * Module-local ABI owner (getNamedFunction first): Builtin\Type no longer always-declares
  * empty shells (#32866 / peer #32859) — leftover Type decls mint openssl_sign.1
@@ -30,6 +30,12 @@ final class OpensslSignRuntime
 
     private const VERIFY_HELPER = 'PHPCompiler\\ext\\openssl\\OpensslSignJitHelper::verifyArgv';
 
+    /** NestedJIT leaf ABI — peer {@see \PHPCompiler\ext\openssl\JitOpensslSignKernel::EVP_SIGN}. */
+    private const EVP_SIGN = '__phpc_ossl_evp_sign';
+
+    /** NestedJIT leaf ABI — peer {@see \PHPCompiler\ext\openssl\JitOpensslSignKernel::EVP_VERIFY}. */
+    private const EVP_VERIFY = '__phpc_ossl_evp_verify';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::SIGN_HELPER,
@@ -44,7 +50,7 @@ final class OpensslSignRuntime
 
     public static function opensslEvRuntimeAvailable(): bool
     {
-        return VmOpensslSignNative::available();
+        return OpensslHostProbe::signAvailable();
     }
 
     public static function ensureLinked(Context $context): void
@@ -67,10 +73,11 @@ final class OpensslSignRuntime
         } catch (\Throwable) {
         }
 
-        if (!self::opensslEvRuntimeAvailable()) {
+        $hooks = $context->extensionLowering->openssl;
+        if (null === $hooks || !$hooks->signRuntimeAvailable()) {
             self::implementStubBridges($context);
         } else {
-            \PHPCompiler\ext\openssl\JitOpensslSignKernel::ensureEvpLeaves($context);
+            $hooks->ensureSignEvpLeaves($context);
             self::implementIfMissing($context, '__compiler_openssl_sign', self::implementSignBridge(...));
             self::implementIfMissing($context, '__compiler_openssl_verify', self::implementVerifyBridge(...));
         }
@@ -140,7 +147,7 @@ final class OpensslSignRuntime
         $entry = $fn->appendBasicBlock('ossl_sign_bridge_entry');
         $context->builder->positionAtEnd($entry);
         $result = $context->builder->call(
-            $context->lookupFunction(\PHPCompiler\ext\openssl\JitOpensslSignKernel::EVP_SIGN),
+            $context->lookupFunction(self::EVP_SIGN),
             $fn->getParam(0),
             $fn->getParam(1),
             $fn->getParam(2)
@@ -153,7 +160,7 @@ final class OpensslSignRuntime
         $entry = $fn->appendBasicBlock('ossl_verify_bridge_entry');
         $context->builder->positionAtEnd($entry);
         $result = $context->builder->call(
-            $context->lookupFunction(\PHPCompiler\ext\openssl\JitOpensslSignKernel::EVP_VERIFY),
+            $context->lookupFunction(self::EVP_VERIFY),
             $fn->getParam(0),
             $fn->getParam(1),
             $fn->getParam(2),

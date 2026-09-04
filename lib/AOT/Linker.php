@@ -7,6 +7,7 @@ namespace PHPCompiler\AOT;
 use PHPCompiler\JIT\AotDebugSymbols;
 use PHPCompiler\JIT\AotGcSections;
 use PHPCompiler\JIT\Builtin\OpensslSignRuntime;
+use PHPCompiler\JIT\OpensslHostProbe;
 use PHPCompiler\Config;
 
 /**
@@ -420,7 +421,7 @@ final class Linker
         ]);
         if (
             OpensslSignRuntime::opensslEvRuntimeAvailable()
-            || \PHPCompiler\ext\openssl\VmOpensslPkeyNative::available()
+            || OpensslHostProbe::pkeyAvailable()
         ) {
             $libs .= ' '.self::OPENSSL_LINK_LIB;
         }

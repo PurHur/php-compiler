@@ -229,6 +229,51 @@ final class JitPhpExtensionLoweringHooksTest extends TestCase
         }
     }
 
+    public function testOpensslBuiltinsDoNotImportOpensslExtension(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $module = (string) file_get_contents($root.'/ext/openssl/Module.php');
+        $this->assertStringContainsString(
+            'openssl = new JitOpensslExtensionHooksFacade()',
+            $module,
+            'ext/openssl Module::jitInit must register JitOpensslExtensionHooksFacade'
+        );
+        $this->assertStringContainsString(
+            'requireOpenssl',
+            (string) file_get_contents($root.'/lib/JIT/ExtensionLoweringHooks.php'),
+            'ExtensionLoweringHooks must expose requireOpenssl()'
+        );
+        $this->assertStringContainsString(
+            'OpensslHostProbe',
+            (string) file_get_contents($root.'/lib/AOT/Linker.php'),
+            'Linker must probe openssl via OpensslHostProbe, not ext\\openssl'
+        );
+        $files = [
+            'lib/JIT/Builtin/OpensslEncryptRuntime.php',
+            'lib/JIT/Builtin/OpensslSignRuntime.php',
+            'lib/AOT/Linker.php',
+        ];
+        foreach ($files as $rel) {
+            $src = (string) file_get_contents($root.'/'.$rel);
+            $stripped = (string) preg_replace('~/\*.*?\*/~s', '', $src);
+            $stripped = (string) preg_replace('~//.*$~m', '', $stripped);
+            // NestedJIT helper FQCN strings use doubled backslashes; ban single-\ use/imports.
+            $this->assertDoesNotMatchRegularExpression(
+                '/PHPCompiler\\\\ext\\\\openssl\\\\/',
+                $stripped,
+                $rel.' still imports ext\\openssl — use OpensslExtensionHooks / OpensslHostProbe'
+            );
+        }
+        foreach (['lib/JIT/Builtin/OpensslEncryptRuntime.php', 'lib/JIT/Builtin/OpensslSignRuntime.php'] as $rel) {
+            $src = (string) file_get_contents($root.'/'.$rel);
+            $this->assertStringContainsString(
+                'extensionLowering->openssl',
+                $src,
+                $rel.' must dispatch EVP leaves via extensionLowering->openssl'
+            );
+        }
+    }
+
     /**
      * @dataProvider coreJitHelperFilesWithoutNonStandardExtImports
      */

@@ -209,6 +209,9 @@ final class ExtensionLoweringHooks
     /** random JIT Call surfaces — registered from ext/random Module::jitInit (#36204). */
     public ?RandomExtensionHooks $random = null;
 
+    /** openssl JIT Builtin surfaces — registered from ext/openssl Module::jitInit (#36204). */
+    public ?OpensslExtensionHooks $openssl = null;
+
     public function requirePosixNested(): PosixNestedJitKernels
     {
         if (null === $this->posixNested) {
@@ -251,6 +254,17 @@ final class ExtensionLoweringHooks
         }
 
         return $this->random;
+    }
+
+    public function requireOpenssl(): OpensslExtensionHooks
+    {
+        if (null === $this->openssl) {
+            throw new \RuntimeException(
+                'openssl extension hooks not registered — ext/openssl Module::jitInit missing (#36204)'
+            );
+        }
+
+        return $this->openssl;
     }
 
     public function tryPrepareDimWrite(Context $context, Variable $container, Variable $dim): ?Variable
