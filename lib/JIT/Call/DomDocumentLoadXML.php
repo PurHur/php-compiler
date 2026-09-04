@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
-use PHPCompiler\ext\dom\JitDomLoadXML;
-use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\JIT\Builtin\DomLoadXMLRuntime;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
@@ -25,10 +23,14 @@ final class DomDocumentLoadXML implements Call
             || $source->isNullConstant
             || '' === (JitStringBuiltinArg::compileTimeLiteral($source) ?? $source->compileTimeString ?? null)
         );
-        if (!$isNullOrEmpty && !JitDomDocumentMethodKernel::shouldUse($context)) {
+        if (!$isNullOrEmpty && !$context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
             DomLoadXMLRuntime::ensureLinked($context);
         }
 
-        return JitDomLoadXML::invoke($context, ...$args);
+        return $context->extensionLowering->requireDom()->invokeCall(
+            $context,
+            'document.loadXML',
+            ...$args
+        );
     }
 }

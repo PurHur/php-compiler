@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
-use PHPCompiler\ext\dom\JitDomImportNode;
-use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
@@ -16,8 +14,10 @@ final class DomDocumentImportNode implements Call
 {
     public function call(Context $context, Variable ...$args): Value
     {
-        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_import_invoke_cont');
-
-        return JitDomImportNode::invoke($context, ...$args);
+        return $context->extensionLowering->requireDom()->invokeCall(
+            $context,
+            'document.importNode',
+            ...$args
+        );
     }
 }

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
-use PHPCompiler\ext\dom\JitDomLoadHTMLFile;
 use PHPCompiler\JIT\Builtin\DomLoadHTMLFileRuntime;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
@@ -18,6 +17,10 @@ final class DomDocumentLoadHTMLFile implements Call
     {
         DomLoadHTMLFileRuntime::ensureLinked($context);
 
-        return JitDomLoadHTMLFile::invoke($context, ...$args);
+        return $context->extensionLowering->requireDom()->invokeCall(
+            $context,
+            'document.loadHTMLFile',
+            ...$args
+        );
     }
 }

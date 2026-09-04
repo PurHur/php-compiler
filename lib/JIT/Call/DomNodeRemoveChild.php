@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
-use PHPCompiler\ext\dom\JitDomRemoveChild;
-use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
@@ -16,8 +14,10 @@ final class DomNodeRemoveChild implements Call
 {
     public function call(Context $context, Variable ...$args): Value
     {
-        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_rm_invoke_cont');
-
-        return JitDomRemoveChild::invoke($context, ...$args);
+        return $context->extensionLowering->requireDom()->invokeCall(
+            $context,
+            'node.removeChild',
+            ...$args
+        );
     }
 }

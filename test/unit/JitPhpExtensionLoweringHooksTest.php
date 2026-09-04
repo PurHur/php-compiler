@@ -683,6 +683,69 @@ final class JitPhpExtensionLoweringHooksTest extends TestCase
         }
     }
 
+    public function testDomThinCallProxiesDoNotImportDomExtension(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $module = (string) file_get_contents($root.'/ext/dom/Module.php');
+        $this->assertStringContainsString(
+            'dom = new JitDomExtensionHooksFacade()',
+            $module,
+            'ext/dom Module::jitInit must register JitDomExtensionHooksFacade'
+        );
+        $this->assertStringContainsString(
+            'requireDom',
+            (string) file_get_contents($root.'/lib/JIT/ExtensionLoweringHooks.php'),
+            'ExtensionLoweringHooks must expose requireDom()'
+        );
+        $files = [
+            'lib/JIT/Call/DomDocumentCreateElement.php',
+            'lib/JIT/Call/DomCharacterDataAppendData.php',
+            'lib/JIT/Call/DomNamedNodeMapItem.php',
+            'lib/JIT/Call/DomNodeCloneNode.php',
+            'lib/JIT/Call/DomTextSplitText.php',
+            'lib/JIT/Call/DomXPathQuery.php',
+            'lib/JIT/Call/DomDocumentLoadXML.php',
+            'lib/JIT/Call/DomDocumentSaveHTML.php',
+            'lib/JIT/Call/DomHtmlDocumentCreateFromString.php',
+            'lib/JIT/Call/DomImplementationCreateDocument.php',
+        ];
+        foreach ($files as $rel) {
+            $src = (string) file_get_contents($root.'/'.$rel);
+            $stripped = (string) preg_replace('~/\*.*?\*/~s', '', $src);
+            $stripped = (string) preg_replace('~//.*$~m', '', $stripped);
+            $this->assertDoesNotMatchRegularExpression(
+                '/PHPCompiler\\\\ext\\\\dom\\\\/',
+                $stripped,
+                $rel.' still imports ext\\dom — use DomExtensionHooks'
+            );
+            $this->assertStringContainsString(
+                'requireDom()',
+                $src,
+                $rel.' must dispatch via requireDom()'
+            );
+        }
+        $thinCount = 0;
+        foreach (glob($root.'/lib/JIT/Call/Dom*.php') ?: [] as $path) {
+            $src = (string) file_get_contents($path);
+            if (!str_contains($src, 'requireDom()')) {
+                continue;
+            }
+            ++$thinCount;
+            $stripped = (string) preg_replace('~/\*.*?\*/~s', '', $src);
+            $stripped = (string) preg_replace('~//.*$~m', '', $stripped);
+            $this->assertDoesNotMatchRegularExpression(
+                '/PHPCompiler\\\\ext\\\\dom\\\\/',
+                $stripped,
+                basename($path).' still imports ext\\dom — use DomExtensionHooks'
+            );
+        }
+        $this->assertSame(
+            60,
+            $thinCount,
+            'expected 60 thin Dom Call proxies routed via requireDom()'
+        );
+    }
+
     public function testSplHeapCallProxyDoesNotImportSplExtension(): void
     {
         $src = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Call/SplHeapMethod.php');

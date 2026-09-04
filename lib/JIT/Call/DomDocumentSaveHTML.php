@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
-use PHPCompiler\ext\dom\JitDomSaveHTML;
 use PHPCompiler\JIT\Builtin\DomSaveHTMLRuntime;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
@@ -21,6 +20,10 @@ final class DomDocumentSaveHTML implements Call
     {
         DomSaveHTMLRuntime::ensureLinked($context);
 
-        return JitDomSaveHTML::invoke($context, ...$args);
+        return $context->extensionLowering->requireDom()->invokeCall(
+            $context,
+            'document.saveHTML',
+            ...$args
+        );
     }
 }

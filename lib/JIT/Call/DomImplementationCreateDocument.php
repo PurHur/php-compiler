@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
-use PHPCompiler\ext\dom\JitDomCreateDocument;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
@@ -19,6 +18,10 @@ final class DomImplementationCreateDocument implements Call
 {
     public function call(Context $context, Variable ...$args): Value
     {
-        return JitDomCreateDocument::invoke($context, ...$args);
+        return $context->extensionLowering->requireDom()->invokeCall(
+            $context,
+            'implementation.createDocument',
+            ...$args
+        );
     }
 }
