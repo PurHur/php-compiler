@@ -370,6 +370,12 @@ final class NoThrowCallElision
             // is ArgumentCountError.
             return self::definedTableRuntimeInfoArgsCannotThrow($callArgs);
         }
+        if (self::isPureProcessIdentityBuiltin($name)) {
+            // phpversion / php_uname / getmypid / getmyuid / getmygid —
+            // info.c / basic_functions.c process identity reads; excess argc
+            // is ArgumentCountError.
+            return self::processIdentityArgsCannotThrow($name, $callArgs);
+        }
         if (self::isPureVersionCompareBuiltin($name)) {
             // versioning.c — typed strings; optional operator must be proven valid.
             return self::versionCompareArgsCannotThrow($callArgs);
@@ -1172,6 +1178,27 @@ final class NoThrowCallElision
     }
 
     /**
+     * Process / runtime identity reads — php-src {@code ext/standard/info.c}
+     * ({@code phpversion}/{@code php_uname}), {@code ext/standard/basic_functions.c}
+     * ({@code getmypid}/{@code getmyuid}/{@code getmygid}). Excess argc is
+     * {@code ArgumentCountError}. Public for {@see DiscardedPureCallElision}
+     * (#36386).
+     */
+    public static function isPureProcessIdentityBuiltin(string $nameLc): bool
+    {
+        switch ($nameLc) {
+            case 'phpversion':
+            case 'php_uname':
+            case 'getmypid':
+            case 'getmyuid':
+            case 'getmygid':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
      * php-src {@code ext/standard/versioning.c} {@code version_compare}. Public
      * for {@see DiscardedPureCallElision} (#36386).
      */
@@ -1630,6 +1657,36 @@ final class NoThrowCallElision
         }
 
         return null !== $flag->compileTimeLong;
+    }
+
+    /**
+     * {@code getmypid}/{@code getmyuid}/{@code getmygid}: arity 0.
+     * {@code phpversion}/{@code php_uname}: arity 0 or one string-coercible
+     * arg (soft-null / scalars do not leave throw-pending; objects /
+     * value-box stay out). Excess argc is {@code ArgumentCountError}.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    public static function processIdentityArgsCannotThrow(string $nameLc, array $callArgs): bool
+    {
+        switch ($nameLc) {
+            case 'getmypid':
+            case 'getmyuid':
+            case 'getmygid':
+                return [] === $callArgs;
+            case 'phpversion':
+            case 'php_uname':
+                if ([] === $callArgs) {
+                    return true;
+                }
+                if (!isset($callArgs[0]) || !$callArgs[0] instanceof Variable || isset($callArgs[1])) {
+                    return false;
+                }
+
+                return self::stringParamBuiltinArgCannotThrow($callArgs[0]);
+            default:
+                return false;
+        }
     }
 
     /**
