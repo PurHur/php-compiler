@@ -902,11 +902,15 @@ final class ObjectStaticPropertyLlvm
 
             return;
         }
+        // fetch() returns KIND_VALUE with the already-loaded scalar for reads.
+        // builder->load($fetched->value) then emits `load void, i1` / i64 and fails
+        // module verify when LSB has multiple same-named statics (#36382 Slim).
+        // Helper::loadValue respects KIND_VALUE / staticPropertyGlobal.
         if (Variable::TYPE_NATIVE_LONG === $propertyType) {
             $context->builder->call(
                 $context->lookupFunction('__value__writeLong'),
                 $destPtr,
-                $context->builder->load($fetched->value)
+                $context->helper->loadValue($fetched)
             );
 
             return;
@@ -915,7 +919,7 @@ final class ObjectStaticPropertyLlvm
             JitValueBox::writeBool(
                 $context,
                 $destSlot,
-                $context->builder->load($fetched->value)
+                $context->helper->loadValue($fetched)
             );
 
             return;
@@ -924,7 +928,7 @@ final class ObjectStaticPropertyLlvm
             $context->builder->call(
                 $context->lookupFunction('__value__writeDouble'),
                 $destPtr,
-                $context->builder->load($fetched->value)
+                $context->helper->loadValue($fetched)
             );
 
             return;
