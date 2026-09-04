@@ -285,6 +285,9 @@ final class NoThrowCallElision
             case 'sinh':
             case 'cosh':
             case 'tanh':
+            case 'asinh':
+            case 'acosh':
+            case 'atanh':
             case 'exp':
             case 'expm1':
             case 'log':

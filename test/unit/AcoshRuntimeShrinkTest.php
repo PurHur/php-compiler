@@ -9,23 +9,29 @@ use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
 /**
- * acosh() NestedJIT via JitVmHelperLink::ensureBridge (#28331 / peer MathAcos #28276).
+ * acosh() AOT uses libm acosh(3) (#36386); AcoshJitHelper remains NestedJIT-safe
+ * reference (peer MathAsinh / AsinhJitHelper). LLVM 9 has no llvm.acosh.f64.
+ *
+ * php-src: ext/standard/math.c PHP_FUNCTION(acosh).
  */
 final class AcoshRuntimeShrinkTest extends TestCase
 {
-    public function testAcoshUsesJitHelperNotKernel(): void
+    public function testAcoshUsesLibmNotHelperBridge(): void
     {
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/acosh.php');
         $this->assertStringContainsString('MathAcosh::invoke', $builtin);
         $this->assertStringNotContainsString("lookupFunction('acosh')", $builtin);
 
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathAcosh.php');
-        $this->assertStringContainsString('AcoshJitHelper', $bridge);
+        $this->assertStringContainsString("LIBC_ACOSH = 'acosh'", $bridge);
         $this->assertStringContainsString('phpc_acosh', $bridge);
-        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringContainsString('acosh_libm_f64_entry', $bridge);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('AcoshJitHelper', $bridge);
         $this->assertStringNotContainsString('JitAcoshKernel', $bridge);
         $this->assertStringNotContainsString('NestedJitCompileScope', $bridge);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
+        $this->assertStringNotContainsString('llvm.acosh', $bridge);
     }
 
     public function testAcoshJitHelperInlinesNestedJitSafeAlgorithm(): void
