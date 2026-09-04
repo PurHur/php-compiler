@@ -9,23 +9,29 @@ use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
 /**
- * atan() NestedJIT via JitVmHelperLink::ensureBridge (#28470 / peer MathAsin #28263).
+ * atan() AOT uses libm atan(3) (#36386); AtanJitHelper remains NestedJIT-safe
+ * reference (peer MathTan / TanJitHelper). LLVM 9 has no llvm.atan.f64.
+ *
+ * php-src: ext/standard/math.c PHP_FUNCTION(atan).
  */
 final class AtanRuntimeShrinkTest extends TestCase
 {
-    public function testAtanUsesJitHelperNotKernel(): void
+    public function testAtanUsesLibmNotHelperBridge(): void
     {
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/atan.php');
         $this->assertStringContainsString('MathAtan::invoke', $builtin);
         $this->assertStringNotContainsString("lookupFunction('atan')", $builtin);
 
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathAtan.php');
-        $this->assertStringContainsString('AtanJitHelper', $bridge);
+        $this->assertStringContainsString("LIBC_ATAN = 'atan'", $bridge);
         $this->assertStringContainsString('phpc_atan', $bridge);
-        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringContainsString('atan_libm_f64_entry', $bridge);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('AtanJitHelper', $bridge);
         $this->assertStringNotContainsString('JitAtanKernel', $bridge);
         $this->assertStringNotContainsString('NestedJitCompileScope', $bridge);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
+        $this->assertStringNotContainsString('llvm.atan', $bridge);
     }
 
     public function testAtanJitHelperInlinesNestedJitSafeAlgorithm(): void

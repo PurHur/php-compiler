@@ -4,35 +4,35 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for atan() via AtanJitHelper PHP (#15142, #27017, #28470).
+ * JIT/AOT link for atan() via libm {@code atan(3)} (#36386).
  *
- * Helper compile: {@see JitVmHelperLink::ensureBridge} (MathAsin #28263 / MathTanh #28459 shape).
- * NestedJIT no longer needs a libc atan(3) kernel — helper uses NestedJIT-safe fdlibm poly.
- * php-src: ext/standard/math.c — PHP_FUNCTION(atan)
+ * Peer of {@see MathTan}: avoid NestedJIT helper objects on the AOT hot path.
+ * php-src {@code ext/standard/math.c} {@code PHP_FUNCTION(atan)} → C {@code atan}.
+ * LLVM 9 has no atan intrinsic (unlike sin/cos/exp/log), so declare the libc
+ * symbol the linker already pulls via {@code -lm}
+ * ({@see NumberFormatRuntime} {@code floor} shape / {@see MathTan}).
+ * The PHP fdlibm helper remains for NestedJIT-safe reference only.
  */
 final class MathAtan
 {
+    /** Libc atan(3) — no LLVM 9 intrinsic peer of sin/cos. */
+    private const LIBC_ATAN = 'atan';
+
+    /** Legacy ABI kept as a thin libm wrapper for any external callers. */
     private const ABI_ATAN = 'phpc_atan';
 
-    private const HELPER_PATH = '/ext/standard/AtanJitHelper.php';
-
-    private const ATAN_HELPER = 'PHPCompiler\\ext\\standard\\AtanJitHelper::atanArgv';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::ATAN_HELPER,
-    ];
-
-    private const BRIDGE_ENTRY = 'atan_bridge_entry';
+    private const BRIDGE_ENTRY = 'atan_libm_f64_entry';
 
     public static function ensureLinked(Context $context): void
     {
-        self::implement($context);
+        self::libcAtanDecl($context);
+        self::ensurePhpcAtanBridge($context);
     }
 
     public static function ensureStandaloneBodies(Context $context): void
@@ -42,34 +42,60 @@ final class MathAtan
 
     public static function invoke(Context $context, Value $num): Value
     {
-        self::ensureLinked($context);
-
-        return $context->builder->call(
-            $context->lookupFunction(self::ABI_ATAN),
-            $num
-        );
+        return $context->builder->call(self::libcAtanDecl($context), $num);
     }
 
-    private static function implement(Context $context): void
+    private static function libcAtanDecl(Context $context): LlvmFunction
+    {
+        $func = $context->module->getNamedFunction(self::LIBC_ATAN);
+        if (null !== $func) {
+            $context->registerFunction(self::LIBC_ATAN, $func);
+
+            return $func;
+        }
+        $double = $context->getTypeFromString('double');
+        $fn = $context->module->addFunction(
+            self::LIBC_ATAN,
+            $context->context->functionType($double, false, $double)
+        );
+        $context->registerFunction(self::LIBC_ATAN, $fn);
+
+        return $fn;
+    }
+
+    /**
+     * Define {@code phpc_atan} → libm {@code atan} when missing. Skip if a prior
+     * NestedJIT bridge already filled the symbol (cannot replace LLVM bodies);
+     * {@see invoke} never calls that stale path.
+     */
+    private static function ensurePhpcAtanBridge(Context $context): void
     {
         $probe = $context->module->getNamedFunction(self::ABI_ATAN);
-        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction(self::ABI_ATAN, $probe);
 
             return;
         }
 
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         $double = $context->getTypeFromString('double');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_ATAN,
-            self::BRIDGE_ENTRY,
-            [$double],
-            $double,
-            self::ATAN_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#28470'
+        $fn = $probe;
+        if (null === $fn) {
+            $fn = $context->module->addFunction(
+                self::ABI_ATAN,
+                $context->context->functionType($double, false, $double)
+            );
+        }
+        $entry = $fn->appendBasicBlock(self::BRIDGE_ENTRY);
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue(
+            $context->builder->call(self::libcAtanDecl($context), $fn->getParam(0))
         );
+        $context->registerFunction(self::ABI_ATAN, $fn);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 }

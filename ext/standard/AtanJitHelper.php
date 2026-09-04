@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * atan() for compiled JIT/AOT modules (#15142, #27017, #28470, php-in-PHP).
+ * NestedJIT-safe atan() reference (#15142, #27017, #28470, php-in-PHP).
  *
- * NestedJIT-safe fdlibm s_atan.c shape (#28470 / peer MathAsin #28263 / MathTanh #28459).
- * Avoid `\atan` / {@see VmMath::atan} — NestedJIT re-enters MathAtan bridge under thin AOT.
- * Avoid the former libc atan(3) NestedJIT leaf (deleted with this shrink).
+ * AOT/JIT hot path uses libm {@code atan(3)} via {@see \PHPCompiler\JIT\Builtin\MathAtan}
+ * (#36386 / peer MathTan). This helper remains for NestedJIT-safe fdlibm s_atan.c shape
+ * (#28470 / peer MathAsin #28263) when NestedJIT cannot call libc.
+ * Avoid `\atan` / {@see VmMath::atan} — NestedJIT would re-enter the MathAtan bridge.
  * Avoid pack/unpack (#27496). Avoid unbounded while-loops (#27838).
  * Avoid ternary abs — use sqrtPositive(num*num) (asin #28263).
  * php-src: ext/standard/math.c — PHP_FUNCTION(atan)
