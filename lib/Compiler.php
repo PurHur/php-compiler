@@ -18095,7 +18095,11 @@ class Compiler {
         }
         $producers = [];
         for ($i = $callIndex - 1; $i >= 0; --$i) {
-            $child = $block->orig->children[$i];
+            // Sparse / stale cfgChildren indices — sibling walkers use ?? null (#36387 FinalClassConstCheck).
+            $child = $block->orig->children[$i] ?? null;
+            if (null === $child) {
+                continue;
+            }
             if (
                 $child instanceof Op\Expr\ConstFetch
                 || $child instanceof Op\Expr\ClassConstFetch
@@ -18147,7 +18151,10 @@ class Compiler {
         }
         $producers = [];
         for ($i = $walkFrom; $i >= 0; --$i) {
-            $child = $block->orig->children[$i];
+            $child = $block->orig->children[$i] ?? null;
+            if (null === $child) {
+                continue;
+            }
             if ($child instanceof Op\Expr\ConstFetch || $child instanceof Op\Expr\ClassConstFetch) {
                 array_unshift($producers, $child);
                 continue;
@@ -20588,6 +20595,10 @@ class Compiler {
      * One O(n) pass over cfg block children indexes every op — avoids ~80 independent
      * O(n) linear scans per compileCallArgSends (#36224).
      *
+     * Indexes by real array keys so sparse php-cfg children lists (holes after stmt
+     * rewrites) do not poison {@see cfgCallOpIndexCache} with dense 0..count-1 slots
+     * that later TypeError on `$children[$i]` (#36387 FinalClassConstCheck).
+     *
      * @param list<Op> $cfgChildren
      */
     private function ensureCfgChildrenOpIndicesBuilt(array $cfgChildren, ?CfgBlock $cfgBlock = null): void
@@ -20595,19 +20606,16 @@ class Compiler {
         if ([] === $cfgChildren) {
             return;
         }
+        $first = $cfgChildren[array_key_first($cfgChildren)];
         $mapKey = null !== $cfgBlock
             ? (string) spl_object_id($cfgBlock)
-            : 'c_' . spl_object_id($cfgChildren[0]);
+            : 'c_' . spl_object_id($first);
         $count = \count($cfgChildren);
         $prev = $this->cfgChildrenOpIndexBuiltCount[$mapKey] ?? 0;
         if ($prev === $count) {
             return;
         }
-        if ($prev > $count) {
-            $prev = 0;
-        }
-        for ($i = $prev; $i < $count; ++$i) {
-            $child = $cfgChildren[$i];
+        foreach ($cfgChildren as $i => $child) {
             if ($child instanceof Op) {
                 $this->cfgCallOpIndexCache[spl_object_id($child)] = $i;
             }
@@ -22983,12 +22991,13 @@ class Compiler {
     }
 
     /** Hoisted FuncCall / MethodCall / StaticCall sibling inline call-arg producers (#9463, #9351, #12421). */
-    private function isSiblingInlineCallProducerExpr(Op $op): bool
+    private function isSiblingInlineCallProducerExpr(?Op $op): bool
     {
-        return $op instanceof Op\Expr\FuncCall
+        return null !== $op
+            && ($op instanceof Op\Expr\FuncCall
             || $op instanceof Op\Expr\NsFuncCall
             || $op instanceof Op\Expr\MethodCall
-            || $op instanceof Op\Expr\StaticCall;
+            || $op instanceof Op\Expr\StaticCall);
     }
 
     /**

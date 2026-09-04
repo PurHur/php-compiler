@@ -41,6 +41,14 @@ final class SpineChunkRuntimeMethodDemoteTest extends TestCase
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\AOT\\ProjectGraph'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\AOT\\AotEmitFastExit'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('phpcompiler\\aot\\composervendormap'));
+        // Compiler\* / Web\* peer TUs — NestedJIT gaps + OOM under SPINE_CHUNK (#36387).
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\Compiler\\InheritanceVariance'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\Compiler\\TraitClassConstConflictCheck'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('phpcompiler\\compiler\\overridevalidator'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\Web\\MultipartParser'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('phpcompiler\\web\\responsecontext'));
+        // Top-level Compiler / CompilerVersion stay live (no trailing \).
+        $this->assertFalse(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\Compiler'));
         $this->assertFalse(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\CompilerVersion'));
         $this->assertFalse(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\JIT\\Variable'));
     }

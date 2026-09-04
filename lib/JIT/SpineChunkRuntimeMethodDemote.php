@@ -20,16 +20,22 @@ use PHPCompiler\OpCode;
  * - AOT\AotEmitFastExit traps on try/catch null insert; BuildTiming / HelperRuntimeCache /
  *   ProjectGraph OOM under 1536M; ComposerVendorMap dies on computed include (#36382).
  *   Single-file bisect 2026-09-04: 9/14 AOT units OK without demote; 5 need this gate.
+ * - Compiler\* peer TUs (lib/Compiler/): BITWISE_AND NestedJIT gap, InheritanceVariance /
+ *   TraitClassConstConflictCheck "argument must be a string", host isInlineExprCallArgProducer
+ *   null Op, and OOM under 1536M — measured 3/8 OK without demote (2026-09-04).
+ * - Web\* peer TUs: OOM + preg_replace_callback closure deferral under SPINE_CHUNK — 0/2 OK.
  *
  * Emptying those bodies (probe) emits .o files in seconds. Host-lowering Runtime::initParsePipeline
  * was already known to hang Zend rebuilds for hours ({@see RuntimeInitParsePipeline}).
  *
  * Under {@see ExternalMethodBind::spineChunkMode()}, replace Runtime + every
- * {@see \PHPCompiler\VM} / {@see \PHPCompiler\AOT} class method CFG with a void-return stub before
+ * {@see \PHPCompiler\VM} / {@see \PHPCompiler\AOT} / {@see \PHPCompiler\Compiler} (sub-NS) /
+ * {@see \PHPCompiler\Web} class method CFG with a void-return stub before
  * {@see \PHPCompiler\JIT::compileBlock} so hub ClassEntry + method symbols still land in
  * the .o / peer manifest. Real bodies stay on C-floor helpers
  * (RuntimeInitParsePipeline / RuntimeParseM5Native), NestedVM object:: proxies, or later
- * peer-bound non-demoted TUs.
+ * peer-bound non-demoted TUs. Does not demote top-level {@see \PHPCompiler\Compiler} /
+ * {@see \PHPCompiler\CompilerVersion} (no trailing `\`).
  */
 final class SpineChunkRuntimeMethodDemote
 {
@@ -44,9 +50,11 @@ final class SpineChunkRuntimeMethodDemote
             return true;
         }
 
-        // Packed hubs keep growing NestedJIT gaps across VM\* / AOT\*; demote both namespaces.
+        // Packed hubs keep growing NestedJIT gaps across VM\* / AOT\* / Compiler\* / Web\*.
         return str_starts_with($lc, 'phpcompiler\\vm\\')
-            || str_starts_with($lc, 'phpcompiler\\aot\\');
+            || str_starts_with($lc, 'phpcompiler\\aot\\')
+            || str_starts_with($lc, 'phpcompiler\\compiler\\')
+            || str_starts_with($lc, 'phpcompiler\\web\\');
     }
 
     /**
