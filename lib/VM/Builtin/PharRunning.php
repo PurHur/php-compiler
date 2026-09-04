@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM\Builtin;
 
-use PHPCompiler\ext\phar\VmPhar;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\BuiltinExecute;
+use PHPCompiler\VM\PharVmRuntimeSupport;
 use PHPCompiler\VM\Variable;
 
-/** Phar::running() — VM (#3436, ext/phar/phar_object.c). */
+/** Phar::running() — VM (#3436, ext/phar/phar_object.c) via {@see PharVmRuntimeSupport} (#36204). */
 final class PharRunning extends VmClassMethod
 {
     public function __construct()
@@ -25,7 +25,7 @@ final class PharRunning extends VmClassMethod
                 $retPhar = $frame->calledArgs[0]->resolveIndirect()->toBool();
             }
             $scriptPath = self::resolveScriptPath($frame);
-            $result = VmPhar::runningPath($scriptPath, $retPhar);
+            $result = PharVmRuntimeSupport::runningPath($scriptPath, $retPhar);
             BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($result): void {
                 $ret->string($result);
             });

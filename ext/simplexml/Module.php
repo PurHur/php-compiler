@@ -132,6 +132,48 @@ class Module extends ModuleAbstract
                 }
             )
         );
+        // (array) cast + scalar casts + empty($sxe[$dim]) — lib/VM must not import VmSimpleXml (#36204).
+        \PHPCompiler\VM\SimpleXmlVmRuntimeSupport::setHandles(
+            static function (\PHPCompiler\VM\ObjectEntry $object): bool {
+                return SimpleXmlJsonExport::handles($object);
+            }
+        );
+        \PHPCompiler\VM\SimpleXmlVmRuntimeSupport::setExportZendArrayCast(
+            static function (\PHPCompiler\VM\ObjectEntry $object): \PHPCompiler\VM\Variable {
+                return SimpleXmlJsonExport::exportZendArrayCast($object);
+            }
+        );
+        \PHPCompiler\VM\SimpleXmlVmRuntimeSupport::setTryCastObjectToInt(
+            static function (\PHPCompiler\VM\ObjectEntry $object): ?int {
+                return VmSimpleXml::tryCastObjectToInt($object);
+            }
+        );
+        \PHPCompiler\VM\SimpleXmlVmRuntimeSupport::setTryCastObjectToFloat(
+            static function (\PHPCompiler\VM\ObjectEntry $object): ?float {
+                return VmSimpleXml::tryCastObjectToFloat($object);
+            }
+        );
+        \PHPCompiler\VM\SimpleXmlVmRuntimeSupport::setHandlesObjectCast(
+            static function (\PHPCompiler\VM\ObjectEntry $object): bool {
+                return VmSimpleXml::handlesObjectCast($object);
+            }
+        );
+        \PHPCompiler\VM\SimpleXmlVmRuntimeSupport::setObjectIsTruthy(
+            static function (\PHPCompiler\VM\ObjectEntry $object): bool {
+                return VmSimpleXml::objectIsTruthy($object);
+            }
+        );
+        \PHPCompiler\VM\SimpleXmlVmRuntimeSupport::setIsDimensionSubject(
+            static function (\PHPCompiler\VM\ObjectEntry $object): bool {
+                return VmSimpleXml::CLASS_LC === strtolower($object->class->name)
+                    && SimpleXmlRegistry::has($object);
+            }
+        );
+        \PHPCompiler\VM\SimpleXmlVmRuntimeSupport::setDimensionIsEmpty(
+            static function (\PHPCompiler\VM\ObjectEntry $object, \PHPCompiler\VM\Variable $dim): bool {
+                return VmSimpleXml::dimensionIsEmpty($object, $dim);
+            }
+        );
     }
 
     public function getFunctions(): array

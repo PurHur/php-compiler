@@ -7438,6 +7438,8 @@ require_once __DIR__.'/../../../lib/VM/RegexIteratorFilterJitHelper.php';
 require_once __DIR__.'/../../../lib/VM/DatePeriodIteratorState.php';
 require_once __DIR__.'/../../../lib/VM/DatePeriodSupport.php';
 require_once __DIR__.'/../../../lib/VM/DomVmRuntimeSupport.php';
+require_once __DIR__.'/../../../lib/VM/SimpleXmlVmRuntimeSupport.php';
+require_once __DIR__.'/../../../lib/VM/PharVmRuntimeSupport.php';
 require_once __DIR__.'/../../../lib/VM/DateTimeFormatJitHelper.php';
 require_once __DIR__.'/../../../lib/VM/DateTimeInterfaceSupport.php';
 require_once __DIR__.'/../../../lib/VM/DateTimeSupport.php';

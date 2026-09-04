@@ -309,6 +309,8 @@ class Context {
         // Fresh Runtime → fresh Module registrations (#36204).
         ObjectComputedPropertySupport::clear();
         DomVmRuntimeSupport::clear();
+        SimpleXmlVmRuntimeSupport::clear();
+        PharVmRuntimeSupport::clear();
         $this->errors = new ErrorReporter();
         $this->exceptionHandlers = new ExceptionHandlerStack();
         $this->scriptStack = new ScriptStack();

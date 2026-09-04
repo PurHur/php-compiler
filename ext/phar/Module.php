@@ -21,6 +21,12 @@ class Module extends ModuleAbstract
         }
         require_once __DIR__.'/bootstrap_pharexception.php';
         BuiltinClasses::register($runtime->vmContext);
+        // Phar::running() — lib/VM/Builtin/PharRunning must not import VmPhar (#36204).
+        \PHPCompiler\VM\PharVmRuntimeSupport::setRunningPath(
+            static function (string $scriptPath, bool $retPhar): string {
+                return VmPhar::runningPath($scriptPath, $retPhar);
+            }
+        );
         parent::init($runtime);
     }
 }
