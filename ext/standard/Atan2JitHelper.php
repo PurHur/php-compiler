@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * atan2() for compiled JIT/AOT modules (#15102, #27017, #28497, php-in-PHP).
+ * atan2() NestedJIT-safe Taylor + quadrant reference (#15102, #27017, #28497, php-in-PHP).
  *
- * NestedJIT-safe: atan(y/x) via Taylor + π/2 complement (#28497).
- * Avoid `\atan2` / {@see VmMath::atan2} / libc atan2 NestedJIT leaf.
+ * AOT/JIT hot path uses libm {@code atan2(3)} via {@see \PHPCompiler\JIT\Builtin\MathAtan2}
+ * (#36386 / peer MathHypot). This helper remains for NestedJIT-safe atan(y/x)
+ * via Taylor + π/2 complement when NestedJIT cannot call libc.
+ * Avoid `\atan2` / {@see VmMath::atan2} — NestedJIT re-enters MathAtan2 bridge under thin AOT.
  * Avoid Newton |·| peels — NestedJIT AOT of scale loops is flaky (wrong/NaN).
  * Taylor needs no abs-sqrt.
  * php-src: ext/standard/math.c — PHP_FUNCTION(atan2)

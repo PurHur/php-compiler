@@ -51844,7 +51844,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/MathAtan2.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/MathAtanh.php`
 
@@ -51907,7 +51907,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/MathFmod.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/MathFpow.php`
 
@@ -51922,7 +51922,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/MathHypot.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/MathIsFinite.php`
 
@@ -57691,9 +57691,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 933)
 - new Type (line 1361)
 - new Variable (line 1508)
-- new Variable (line 1613)
-- new Type (line 1625)
-- new Type (line 1932)
+- new Variable (line 1664)
+- new Type (line 1676)
+- new Type (line 1983)
 - 1 class method(s)
 - 1 closure(s)
 
@@ -58609,30 +58609,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/HashTableWriteLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 945)
-- new Variable (line 1825)
-- new Variable (line 1871)
-- new Variable (line 2160)
-- new Variable (line 2167)
-- new Variable (line 2227)
-- new Variable (line 2243)
-- new Variable (line 2259)
-- new Variable (line 2566)
-- new Variable (line 2629)
-- new Variable (line 2672)
-- new Variable (line 2674)
-- new Variable (line 2813)
-- new Variable (line 2837)
-- new Variable (line 2950)
-- new Variable (line 2968)
-- new Variable (line 2995)
-- new Variable (line 3009)
-- new Variable (line 3022)
-- new Variable (line 3032)
-- new Variable (line 3059)
-- new Variable (line 3084)
-- new Variable (line 3139)
-- new Variable (line 3160)
+- new Variable (line 958)
+- new Variable (line 1851)
+- new Variable (line 1897)
+- new Variable (line 2186)
+- new Variable (line 2193)
+- new Variable (line 2253)
+- new Variable (line 2269)
+- new Variable (line 2285)
+- new Variable (line 2592)
+- new Variable (line 2655)
+- new Variable (line 2698)
+- new Variable (line 2700)
+- new Variable (line 2839)
+- new Variable (line 2863)
+- new Variable (line 2976)
+- new Variable (line 2994)
+- new Variable (line 3021)
+- new Variable (line 3035)
+- new Variable (line 3048)
+- new Variable (line 3058)
+- new Variable (line 3085)
+- new Variable (line 3110)
+- new Variable (line 3165)
+- new Variable (line 3186)
 - 65 class method(s)
 - 3 closure(s)
 
@@ -59244,7 +59244,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/NoThrowCallElision.php`
 
 **Warnings** (review for bootstrap subset):
-- new Operand\Literal (line 574)
+- new Operand\Literal (line 584)
 - 20 class method(s)
 
 ### `lib/JIT/NonObjectPropertyFetchHelper.php`
