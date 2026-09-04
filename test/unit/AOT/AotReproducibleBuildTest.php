@@ -7,7 +7,7 @@ namespace PHPCompiler\AOT;
 use PHPUnit\Framework\TestCase;
 
 /**
- * #36399: deterministic AOT link / TargetMachine opt mapping.
+ * #36399: deterministic AOT link / TargetMachine opt mapping (on CompileTarget).
  */
 final class AotReproducibleBuildTest extends TestCase
 {
@@ -26,16 +26,16 @@ final class AotReproducibleBuildTest extends TestCase
 
     public function testLinkBuildIdFlagWlAndRaw(): void
     {
-        $this->assertStringContainsString('--build-id=sha1', AotReproducibleBuild::linkBuildIdFlag(false));
-        $this->assertStringContainsString('-Wl,--build-id=sha1', AotReproducibleBuild::linkBuildIdFlag(true));
+        $this->assertStringContainsString('--build-id=sha1', CompileTarget::linkBuildIdFlag(false));
+        $this->assertStringContainsString('-Wl,--build-id=sha1', CompileTarget::linkBuildIdFlag(true));
     }
 
     public function testSourceDateEpochFromEnv(): void
     {
         putenv('SOURCE_DATE_EPOCH=1700000000');
         $_ENV['SOURCE_DATE_EPOCH'] = '1700000000';
-        $this->assertSame('1700000000', AotReproducibleBuild::sourceDateEpoch());
-        $env = AotReproducibleBuild::applySourceDateEpochToEnv(['PATH' => '/bin']);
+        $this->assertSame('1700000000', CompileTarget::sourceDateEpoch());
+        $env = CompileTarget::applySourceDateEpochToEnv(['PATH' => '/bin']);
         $this->assertSame('1700000000', $env['SOURCE_DATE_EPOCH']);
         $this->assertSame('/bin', $env['PATH']);
     }
@@ -44,19 +44,25 @@ final class AotReproducibleBuildTest extends TestCase
     {
         putenv('PHP_COMPILER_REPRODUCIBLE=1');
         $_ENV['PHP_COMPILER_REPRODUCIBLE'] = '1';
-        $this->assertTrue(AotReproducibleBuild::isReproducibleMode());
-        $this->assertSame('1700000000', AotReproducibleBuild::sourceDateEpoch());
+        $this->assertTrue(CompileTarget::isReproducibleMode());
+        $this->assertSame('1700000000', CompileTarget::sourceDateEpoch());
     }
 
     public function testTargetMachineOptMapsOptLevel(): void
     {
         putenv('PHP_COMPILER_OPT_LEVEL=2');
         $_ENV['PHP_COMPILER_OPT_LEVEL'] = '2';
-        $this->assertSame(\PHPLLVM\Target::OPT_LEVEL_DEFAULT, AotReproducibleBuild::targetMachineOptLevel());
+        $this->assertSame(\PHPLLVM\Target::OPT_LEVEL_DEFAULT, CompileTarget::targetMachineOptLevel());
 
         putenv('PHP_COMPILER_AOT_CODEGEN_OPT=aggressive');
         $_ENV['PHP_COMPILER_AOT_CODEGEN_OPT'] = 'aggressive';
-        $this->assertSame(\PHPLLVM\Target::OPT_LEVEL_AGGRESSIVE, AotReproducibleBuild::targetMachineOptLevel());
+        $this->assertSame(\PHPLLVM\Target::OPT_LEVEL_AGGRESSIVE, CompileTarget::targetMachineOptLevel());
+    }
+
+    public function testSortedStrings(): void
+    {
+        $this->assertSame(['a', 'b', 'c'], CompileTarget::sortedStrings(['c', 'a', 'b']));
+        $this->assertSame([], CompileTarget::sortedStrings([]));
     }
 
     public function testConfigRegistryListsReproKnobs(): void
@@ -66,11 +72,5 @@ final class AotReproducibleBuildTest extends TestCase
         $this->assertSame('#36399', $reg['PHP_COMPILER_REPRODUCIBLE']['since']);
         $this->assertArrayHasKey('SOURCE_DATE_EPOCH', $reg);
         $this->assertSame('#36399', $reg['SOURCE_DATE_EPOCH']['since']);
-    }
-
-    public function testSortedStringsIsStable(): void
-    {
-        $this->assertSame(['a', 'b', 'c'], AotReproducibleBuild::sortedStrings(['c', 'a', 'b']));
-        $this->assertSame([], AotReproducibleBuild::sortedStrings([]));
     }
 }

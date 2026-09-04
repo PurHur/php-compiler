@@ -291,6 +291,109 @@ final class CompileTarget
         };
     }
 
+    /**
+     * TargetMachine codegen opt: explicit PHP_COMPILER_AOT_CODEGEN_OPT wins; else map
+     * PHP_COMPILER_OPT_LEVEL 0–3; else OptNone (matches prior #36387 default) (#36399).
+     */
+    public static function targetMachineOptLevel(): int
+    {
+        $optEnv = Config::getenv('PHP_COMPILER_AOT_CODEGEN_OPT');
+        if (is_string($optEnv) && '' !== $optEnv) {
+            return match (strtolower($optEnv)) {
+                'less' => \PHPLLVM\Target::OPT_LEVEL_LESS,
+                'default' => \PHPLLVM\Target::OPT_LEVEL_DEFAULT,
+                'aggressive' => \PHPLLVM\Target::OPT_LEVEL_AGGRESSIVE,
+                default => \PHPLLVM\Target::OPT_LEVEL_NONE,
+            };
+        }
+
+        $raw = Config::getenv('PHP_COMPILER_OPT_LEVEL');
+        if (false === $raw || null === $raw || '' === $raw) {
+            return \PHPLLVM\Target::OPT_LEVEL_NONE;
+        }
+        if (!is_numeric($raw)) {
+            return \PHPLLVM\Target::OPT_LEVEL_NONE;
+        }
+
+        return match ((int) $raw) {
+            1 => \PHPLLVM\Target::OPT_LEVEL_LESS,
+            2 => \PHPLLVM\Target::OPT_LEVEL_DEFAULT,
+            3 => \PHPLLVM\Target::OPT_LEVEL_AGGRESSIVE,
+            default => \PHPLLVM\Target::OPT_LEVEL_NONE,
+        };
+    }
+
+    /**
+     * Always emit a content-hashed GNU build-id so two identical inputs produce the same note
+     * (#36399). $asWlPrefix true when the driver is clang/gcc (needs -Wl,).
+     */
+    public static function linkBuildIdFlag(bool $asWlPrefix): string
+    {
+        $arg = '--build-id=sha1';
+
+        return $asWlPrefix ? ' -Wl,'.$arg.' ' : ' '.$arg.' ';
+    }
+
+    /**
+     * When SOURCE_DATE_EPOCH is set (or PHP_COMPILER_REPRODUCIBLE=1 without an epoch),
+     * export a stable epoch into the link environment (#36399).
+     *
+     * @param array<string, string>|null $env
+     *
+     * @return array<string, string>|null
+     */
+    public static function applySourceDateEpochToEnv(?array $env): ?array
+    {
+        $epoch = self::sourceDateEpoch();
+        if (null === $epoch) {
+            return $env;
+        }
+        $out = $env ?? [];
+        $out['SOURCE_DATE_EPOCH'] = $epoch;
+
+        return $out;
+    }
+
+    /** Digits-only SOURCE_DATE_EPOCH, or null when unset / invalid (#36399). */
+    public static function sourceDateEpoch(): ?string
+    {
+        $raw = getenv('SOURCE_DATE_EPOCH');
+        if (false === $raw || '' === $raw) {
+            $cfg = Config::getenv('SOURCE_DATE_EPOCH');
+            $raw = is_string($cfg) ? $cfg : '';
+        }
+        if ('' === $raw && self::isReproducibleMode()) {
+            $raw = '1700000000';
+        }
+        if ('' === $raw || !ctype_digit($raw)) {
+            return null;
+        }
+
+        return $raw;
+    }
+
+    public static function isReproducibleMode(): bool
+    {
+        $flag = Config::getenv('PHP_COMPILER_REPRODUCIBLE');
+
+        return '1' === $flag || 'true' === strtolower((string) $flag);
+    }
+
+    /**
+     * Sort string list for deterministic manifests / link argument lists (#36399).
+     *
+     * @param list<string> $items
+     *
+     * @return list<string>
+     */
+    public static function sortedStrings(array $items): array
+    {
+        $out = array_values($items);
+        sort($out, SORT_STRING);
+
+        return $out;
+    }
+
     /** Reloc model name for LLVMCreateTargetMachine (pic|static|default). */
     public function relocMode(): string
     {

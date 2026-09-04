@@ -3544,7 +3544,7 @@ class Context {
             if (is_string($slugsExport) && '' !== $slugsExport) {
                 $slugs = \PHPCompiler\AOT\HelperRuntimeCache::usedUnitSlugs();
                 // Stable timestamp when SOURCE_DATE_EPOCH / REPRODUCIBLE is set (#36399).
-                $epoch = \PHPCompiler\AOT\AotReproducibleBuild::sourceDateEpoch();
+                $epoch = CompileTarget::sourceDateEpoch();
                 $generatedAt = null !== $epoch
                     ? gmdate('c', (int) $epoch)
                     : gmdate('c');
@@ -3616,7 +3616,7 @@ class Context {
         try {
             $llvmTarget = $this->llvm->getTargetFromName($target->llvmTargetName());
             // Explicit AOT_CODEGEN_OPT wins; else OPT_LEVEL 0–3; else OptNone (#36399 / #36387).
-            $optLevel = \PHPCompiler\AOT\AotReproducibleBuild::targetMachineOptLevel();
+            $optLevel = CompileTarget::targetMachineOptLevel();
 
             return $llvmTarget->createTargetMachine(
                 $target->llvmTriple(),
