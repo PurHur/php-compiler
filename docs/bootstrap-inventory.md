@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8118 |
-| Phase A inventory files (M2 ratio SSOT) | 8118 |
+| PHP files on vm.php path | 8122 |
+| Phase A inventory files (M2 ratio SSOT) | 8122 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 25781 |
+| Source constructs flagged (warnings) | 25786 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5384,7 +5384,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/yaml/yaml_parse_url.php` | 0 | 1 |
 | `ext/zip/BuiltinClasses.php` | 0 | 1 |
 | `ext/zip/JitZipArchive.php` | 0 | 2 |
-| `ext/zip/Module.php` | 0 | 14 |
+| `ext/zip/JitZipArchiveConstruct.php` | 0 | 1 |
+| `ext/zip/JitZipArchiveMethodDispatch.php` | 0 | 1 |
+| `ext/zip/JitZipExtensionHooksFacade.php` | 0 | 1 |
+| `ext/zip/Module.php` | 0 | 15 |
 | `ext/zip/VmZipArchive.php` | 0 | 71 |
 | `ext/zip/VmZipProcedural.php` | 0 | 1 |
 | `ext/zip/VmZipResourceArg.php` | 0 | 1 |
@@ -7242,6 +7245,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/XmlReaderInstanceMethodJit.php` | 0 | 7 |
 | `lib/JIT/XmlWriterInstanceMethodJit.php` | 0 | 5 |
 | `lib/JIT/XsltInstanceMethodJit.php` | 0 | 2 |
+| `lib/JIT/ZipExtensionHooks.php` | 0 | 1 |
 | `lib/JitMcjitEmbed.php` | 0 | 1 |
 | `lib/JitVmLoweringPolicy.php` | 0 | 1 |
 | `lib/LanguageProfileScope.php` | 0 | 2 |
@@ -47705,21 +47709,37 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JITVariable (line 3138)
 - 79 class method(s)
 
+### `ext/zip/JitZipArchiveConstruct.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
+### `ext/zip/JitZipArchiveMethodDispatch.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/zip/JitZipExtensionHooksFacade.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/zip/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT\Call\ZipArchiveConstruct (line 26)
-- new JIT\Call\ZipArchiveMethod (line 83)
-- new zip_open (line 135)
-- new zip_close (line 136)
-- new zip_read (line 137)
-- new zip_entry_open (line 138)
-- new zip_entry_close (line 139)
-- new zip_entry_read (line 140)
-- new zip_entry_name (line 141)
-- new zip_entry_filesize (line 142)
-- new zip_entry_compressedsize (line 143)
-- new zip_entry_compressionmethod (line 144)
+- new JitZipExtensionHooksFacade (line 26)
+- new JIT\Call\ZipArchiveConstruct (line 27)
+- new JIT\Call\ZipArchiveMethod (line 84)
+- new zip_open (line 136)
+- new zip_close (line 137)
+- new zip_read (line 138)
+- new zip_entry_open (line 139)
+- new zip_entry_close (line 140)
+- new zip_entry_read (line 141)
+- new zip_entry_name (line 142)
+- new zip_entry_filesize (line 143)
+- new zip_entry_compressedsize (line 144)
+- new zip_entry_compressionmethod (line 145)
 - 5 class method(s)
 - 1 closure(s)
 
@@ -57385,7 +57405,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/ZipArchiveConstruct.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 1 class method(s)
 
 ### `lib/JIT/Call/ZipArchiveMethod.php`
 
@@ -57616,10 +57636,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Operand\Literal (line 6781)
 - new Type (line 6859)
 - new Variable (line 7052)
-- new Variable (line 7133)
-- new Variable (line 7174)
-- new Variable (line 7206)
-- new Operand\Literal (line 7352)
+- new Variable (line 7139)
+- new Variable (line 7180)
+- new Variable (line 7212)
+- new Operand\Literal (line 7358)
 - 1 class method(s)
 - 1 closure(s)
 
@@ -58234,7 +58254,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ExtensionLoweringHooks.php`
 
 **Warnings** (review for bootstrap subset):
-- 69 class method(s)
+- 70 class method(s)
 
 ### `lib/JIT/FiberHelper.php`
 
@@ -59769,6 +59789,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Call\XsltMethod (line 45)
 - 3 class method(s)
+
+### `lib/JIT/ZipExtensionHooks.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `lib/JitMcjitEmbed.php`
 
