@@ -263,6 +263,7 @@ require_once __DIR__.'/../../../ext/calendar/juliantojd.php';
 require_once __DIR__.'/../../../ext/calendar/unixtojd.php';
 require_once __DIR__.'/../../../ext/ctype/CtypeFunction.php';
 require_once __DIR__.'/../../../ext/ctype/CtypeJitHelper.php';
+require_once __DIR__.'/../../../ext/ctype/CtypeCheckLlvm.php';
 require_once __DIR__.'/../../../ext/ctype/JitCtype.php';
 require_once __DIR__.'/../../../ext/ctype/Module.php';
 require_once __DIR__.'/../../../ext/ctype/VmCtype.php';

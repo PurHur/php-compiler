@@ -153,6 +153,44 @@ final class DiscardedPureCallElisionTest extends TestCase
         $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
     }
 
+    public function testElidesDiscardedCtypeDigitOnTypedString(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new \PHPCompiler\ext\ctype\ctype_digit();
+        $arg = $this->makeStringVar(null);
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testElidesDiscardedCtypeAlnumOnLiteralString(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new \PHPCompiler\ext\ctype\ctype_alnum();
+        $arg = $this->makeStringVar('Ab9');
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testDoesNotElideCtypeOnNativeLong(): void
+    {
+        // ctype_fallback deprecates int args (#19717) — must keep live (#36386).
+        $context = $this->makeContext();
+        $builtin = new \PHPCompiler\ext\ctype\ctype_digit();
+        $arg = $this->makeNativeLongVar();
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testDoesNotElideCtypeOnNull(): void
+    {
+        // ctype_fallback deprecates null (#20611) — must keep live (#36386).
+        $context = $this->makeContext();
+        $builtin = new \PHPCompiler\ext\ctype\ctype_space();
+        $arg = $this->makeNullVar();
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
     public function testElidesDiscardedStrtolowerOnTypedString(): void
     {
         $context = $this->makeContext();

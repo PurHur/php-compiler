@@ -16,13 +16,14 @@ use PHPCompiler\VM\Variable as VmVariable;
  * side-effect-free (literal / typed-string strlen/ord/strtolower/ucwords/bin2hex/
  * urlencode/str_rot13/quotemeta/md5/crc32/base64_encode/soundex/…, typed
  * substr/str_repeat/strcmp/strpos/strstr/…, typed-numeric chr, type.c
- * predicates + gettype, typed-array count/sizeof, math.c incl.
- * pow/fpow/fdiv on already-numeric args, empty void user functions). Soft-null
- * strlen / ord / chr / math / string coercions are NOT elided — they emit
- * deprecations (PHP 8.1+). Countable objects stay live (user {@code count()}
- * handlers). {@code intdiv} is never discarded here (DivisionByZeroError must
- * stay observable). {@code hex2bin}/{@code base64_decode}/{@code convert_uudecode}
- * stay live (invalid-input warnings / false returns). Int needles for
+ * predicates + gettype, ctype.c classifiers on typed/literal strings,
+ * typed-array count/sizeof, math.c incl. pow/fpow/fdiv on already-numeric
+ * args, empty void user functions). Soft-null strlen / ord / chr / math /
+ * string / ctype coercions are NOT elided — they emit deprecations (PHP 8.1+).
+ * Countable objects stay live (user {@code count()} handlers). {@code intdiv}
+ * is never discarded here (DivisionByZeroError must stay observable).
+ * {@code hex2bin}/{@code base64_decode}/{@code convert_uudecode} stay live
+ * (invalid-input warnings / false returns). Int needles for
  * {@code strpos}/{@code strchr}/… stay live (PHP 8 deprecations).
  */
 final class DiscardedPureCallElision
@@ -33,6 +34,9 @@ final class DiscardedPureCallElision
     public static function tryElide(Context $context, ?Call $toCall, array $callArgs): bool
     {
         if (self::tryElidePureTypePredicate($toCall)) {
+            return true;
+        }
+        if (self::tryElidePureCtypeNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElideStrlenNoSideEffect($toCall, $callArgs)) {
@@ -72,6 +76,29 @@ final class DiscardedPureCallElision
         }
 
         return NoThrowCallElision::isPureTypePredicateBuiltin(strtolower($toCall->getName()));
+    }
+
+    /**
+     * Discarded {@code ctype_*} on a typed / literal string — php-src
+     * {@code ext/ctype/ctype.c} only reads bytes when the arg is already a
+     * string. Int / null still emit ctype_fallback deprecations (#19717 /
+     * #20611) so those stay live (peer {@see tryElideStrlenNoSideEffect}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureCtypeNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if (!NoThrowCallElision::isPureCtypeBuiltin(strtolower($toCall->getName()))) {
+            return false;
+        }
+        if (!isset($callArgs[0]) || !$callArgs[0] instanceof Variable) {
+            return false;
+        }
+
+        return self::stringArgAllowsDiscardedElision($callArgs[0]);
     }
 
     /**
