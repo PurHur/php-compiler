@@ -9,20 +9,24 @@ use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
 /**
- * floor() NestedJIT via JitVmHelperLink::ensureBridge (#27650 / peer deg2rad #27400).
+ * floor() AOT uses llvm.floor.f64 (#36386); FloorJitHelper remains NestedJIT-safe
+ * reference (peer MathSqrt / SqrtJitHelper).
+ *
+ * php-src: ext/standard/math.c PHP_FUNCTION(floor).
  */
 final class FloorRuntimeShrinkTest extends TestCase
 {
-    public function testFloorUsesJitHelperNotKernel(): void
+    public function testFloorUsesLlvmIntrinsicNotHelperBridge(): void
     {
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/floor.php');
         $this->assertStringContainsString('MathFloor::invoke', $builtin);
         $this->assertStringNotContainsString("lookupFunction('floor')", $builtin);
 
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathFloor.php');
-        $this->assertStringContainsString('FloorJitHelper', $bridge);
+        $this->assertStringContainsString('llvm.floor.f64', $bridge);
         $this->assertStringContainsString('phpc_floor', $bridge);
-        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('FloorJitHelper', $bridge);
         $this->assertStringNotContainsString('JitFloorKernel', $bridge);
         $this->assertStringNotContainsString('NestedJitCompileScope', $bridge);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
