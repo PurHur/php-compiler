@@ -18,6 +18,7 @@ use PHPCompiler\VM\Variable as VmVariable;
  * substr/str_repeat/strcmp/strpos/strstr/str_contains/str_starts_with/
  * str_ends_with/…, typed str_pad/chunk_split/wordwrap/str_split/explode,
  * typed str_replace/str_ireplace/substr_replace/strtr (string forms),
+ * typed addcslashes/stripcslashes/strpbrk,
  * typed htmlspecialchars/htmlentities/nl2br/preg_quote/
  * escapeshell*, typed-numeric chr, type.c predicates + gettype, ctype.c
  * classifiers on typed/literal strings, typed-array count/sizeof, math.c
@@ -191,10 +192,11 @@ final class DiscardedPureCallElision
     /**
      * Discarded {@code strtolower}/{@code ucwords}/{@code bin2hex}/
      * {@code urlencode}/{@code str_rot13}/{@code quotemeta}/{@code md5}/
-     * {@code crc32}/{@code base64_encode}/{@code soundex}/… on typed /
-     * literal strings — php-src {@code string.c}/{@code url.c}/{@code md5.c}/
-     * {@code crc32.c}/{@code base64.c} Z_PARAM_STR family; soft null / object
-     * {@code __toString} stay live (peer {@see tryElideStrlenNoSideEffect}).
+     * {@code crc32}/{@code base64_encode}/{@code soundex}/
+     * {@code addcslashes}/{@code stripcslashes}/… on typed / literal strings —
+     * php-src {@code string.c}/{@code url.c}/{@code md5.c}/{@code crc32.c}/
+     * {@code base64.c} Z_PARAM_STR family; soft null / object {@code __toString}
+     * stay live (peer {@see tryElideStrlenNoSideEffect}).
      *
      * @param array<int, Variable> $callArgs
      */
@@ -372,7 +374,7 @@ final class DiscardedPureCallElision
 
     /**
      * Discarded {@code substr}/{@code str_repeat}/{@code strcmp}/{@code strpos}/
-     * {@code strstr}/{@code str_contains}/{@code str_starts_with}/
+     * {@code strstr}/{@code strpbrk}/{@code str_contains}/{@code str_starts_with}/
      * {@code str_ends_with}/… on typed string (+ numeric) args — php-src
      * {@code string.c} Z_PARAM_STR / Z_PARAM_LONG family; soft null / int-needle
      * deprecations / {@code __toString} stay live (peer
@@ -447,6 +449,7 @@ final class DiscardedPureCallElision
             case 'strnatcasecmp':
             case 'strchr':
             case 'strrchr':
+            case 'strpbrk':
             case 'str_contains':
             case 'str_starts_with':
             case 'str_ends_with':

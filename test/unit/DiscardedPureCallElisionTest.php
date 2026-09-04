@@ -7,6 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPUnit\Framework\TestCase;
 use PHPCompiler\Block;
 use PHPCompiler\ext\standard\abs;
+use PHPCompiler\ext\standard\addcslashes;
 use PHPCompiler\ext\standard\addslashes;
 use PHPCompiler\ext\standard\array_count;
 use PHPCompiler\ext\standard\base64_encode;
@@ -49,6 +50,8 @@ use PHPCompiler\ext\standard\str_starts_with;
 use PHPCompiler\ext\standard\strcasecmp;
 use PHPCompiler\ext\standard\strcmp;
 use PHPCompiler\ext\standard\string_trim;
+use PHPCompiler\ext\standard\stripcslashes;
+use PHPCompiler\ext\standard\strpbrk;
 use PHPCompiler\ext\standard\strpos;
 use PHPCompiler\ext\standard\strtolower;
 use PHPCompiler\ext\standard\strtr;
@@ -911,6 +914,71 @@ final class DiscardedPureCallElisionTest extends TestCase
             $context,
             new substr_replace(),
             [$null, $replace, $this->makeNativeLongVar()]
+        ));
+    }
+
+    public function testElidesDiscardedAddcslashesStripcslashesStrpbrkOnTypedStrings(): void
+    {
+        // php-src string.c PHP_FUNCTION(addcslashes|stripcslashes|strpbrk) —
+        // Z_PARAM_STR family; soft-null stays live (#36386).
+        $context = $this->makeContext();
+        $s = $this->makeStringVar(null);
+        $chars = $this->makeStringVar('A..z');
+        $lit = $this->makeStringVar('hello');
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new addcslashes(),
+            [$s, $chars]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new addcslashes(),
+            [$lit, $chars]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new stripcslashes(),
+            [$s]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new strpbrk(),
+            [$s, $chars]
+        ));
+    }
+
+    public function testDoesNotElideAddcslashesStripcslashesStrpbrkOnNull(): void
+    {
+        $context = $this->makeContext();
+        $null = $this->makeNullVar();
+        $s = $this->makeStringVar('x');
+        $chars = $this->makeStringVar('a');
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new addcslashes(),
+            [$null, $chars]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new addcslashes(),
+            [$s, $null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new stripcslashes(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new strpbrk(),
+            [$null, $chars]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new strpbrk(),
+            [$s, $null]
         ));
     }
 

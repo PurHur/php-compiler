@@ -381,6 +381,8 @@ final class NoThrowCallElision
             case 'rtrim':
             case 'addslashes':
             case 'stripslashes':
+            case 'addcslashes':
+            case 'stripcslashes':
             case 'bin2hex':
             // url.c / string.c — Z_PARAM_STR only; soft null deprecate stays live.
             case 'urlencode':
@@ -592,6 +594,7 @@ final class NoThrowCallElision
             case 'stristr':
             case 'strchr':
             case 'strrchr':
+            case 'strpbrk':
             case 'strcspn':
             case 'strspn':
             case 'substr_count':
@@ -902,10 +905,11 @@ final class NoThrowCallElision
             case 'strnatcasecmp':
             case 'strchr':
             case 'strrchr':
+            case 'strpbrk':
             case 'str_contains':
             case 'str_starts_with':
             case 'str_ends_with':
-                // two strings
+                // two strings (strpbrk char_list empty → ValueError like explode '')
                 if (!isset($callArgs[0], $callArgs[1]) || isset($callArgs[2])) {
                     return false;
                 }
