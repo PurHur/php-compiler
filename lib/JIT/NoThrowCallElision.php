@@ -33,7 +33,8 @@ use PHPCompiler\JIT\Call\Vararg;
  * scalars (php-src {@code ext/standard/string.c} {@code PHP_FUNCTION(strlen)} /
  * {@code ord} / {@code chr}; {@code ext/standard/type.c} {@code is_*};
  * {@code ext/standard/math.c} {@code PHP_FUNCTION(sqrt)} etc.; throwing
- * {@code __toString} needs an object/value box).
+ * {@code __toString} needs an object/value box). Discarded {@code ord}/{@code chr}
+ * with the same arg proofs are dropped entirely by {@see DiscardedPureCallElision}.
  *
  * Single-param identity bodies ({@code function id($x){return $x;}}) are also
  * recorded so call sites can replace the call with the compiled argument

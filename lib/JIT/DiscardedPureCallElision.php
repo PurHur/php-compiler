@@ -13,9 +13,9 @@ use PHPCompiler\VM\Variable as VmVariable;
  * Elide discarded calls to compile-time-pure builtins (#23483 / #36386 call-overhead).
  *
  * php-src: ZPP may still run user-visible coercions; here we only fold cases that are
- * side-effect-free (literal / typed-string strlen, type.c predicates, math.c on
- * already-numeric args, empty void user functions). Soft-null strlen / math
- * coercions are NOT elided — they emit deprecations (PHP 8.1+).
+ * side-effect-free (literal / typed-string strlen/ord, typed-numeric chr, type.c
+ * predicates, math.c on already-numeric args, empty void user functions). Soft-null
+ * strlen / ord / chr / math coercions are NOT elided — they emit deprecations (PHP 8.1+).
  */
 final class DiscardedPureCallElision
 {
@@ -28,6 +28,12 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElideStrlenNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElideOrdNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElideChrNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureMathNoSideEffect($toCall, $callArgs)) {
@@ -71,6 +77,55 @@ final class DiscardedPureCallElision
         }
 
         return Variable::TYPE_STRING === $arg->type;
+    }
+
+    /**
+     * Discarded {@code ord()} on a typed / literal string — php-src
+     * {@code string.c} {@code PHP_FUNCTION(ord)} only reads the first byte;
+     * soft int→string / null coerce deprecates (PHP 8.1+) so those stay live
+     * (peer {@see tryElideStrlenNoSideEffect}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElideOrdNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if ('ord' !== strtolower($toCall->getName())) {
+            return false;
+        }
+        if (!isset($callArgs[0]) || !$callArgs[0] instanceof Variable) {
+            return false;
+        }
+        $arg = $callArgs[0];
+        if (null !== JitStringArg::compileTimeLiteral($arg)) {
+            return true;
+        }
+
+        return Variable::TYPE_STRING === $arg->type;
+    }
+
+    /**
+     * Discarded {@code chr()} on already-numeric args — php-src
+     * {@code string.c} {@code PHP_FUNCTION(chr)} is Z_PARAM_LONG; null soft
+     * coerce deprecates so TYPE_NULL is excluded (peer math discarded elision).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElideChrNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if ('chr' !== strtolower($toCall->getName())) {
+            return false;
+        }
+        if (!isset($callArgs[0]) || !$callArgs[0] instanceof Variable) {
+            return false;
+        }
+
+        return self::mathArgAllowsDiscardedElision($callArgs[0]);
     }
 
     /**
