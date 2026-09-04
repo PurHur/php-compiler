@@ -8638,7 +8638,7 @@ class Compiler {
                 );
                 $snapshotOperand = new Operand\Temporary();
                 $snapshotSlot = $block->getVarSlot($snapshotOperand, false);
-                $ops[] = new OpCode(OpCode::TYPE_ASSIGN, $snapshotSlot, $valueSlot);
+                $ops[] = new OpCode(OpCode::TYPE_ASSIGN, $snapshotSlot, $snapshotSlot, $valueSlot);
 
                 return [$ops, $snapshotSlot];
             }
@@ -11322,6 +11322,16 @@ class Compiler {
                         $return = array_merge($return, $rematerializeOps);
                     }
                 }
+                // Copy into a fresh temp before packing. php-cfg may emit a nested ?: JUMPIF
+                // for a later element in the same CFG block; that JUMPIF's dead-temp release
+                // reused the live element slot, so INIT_ARRAY packed a Variable that the
+                // ternary later mutated — Parsedown blockList OOMed on the next dim write
+                // (`$Block['data']['markerTypeRegex'] = …`, #36380 / Zend zend_compile_array).
+                $snapshotOperand = new Operand\Temporary();
+                $snapshotSlot = $block->getVarSlot($snapshotOperand, false);
+                $return[] = new OpCode(OpCode::TYPE_ASSIGN, $snapshotSlot, $snapshotSlot, $valueSlot);
+                $valueSlot = $snapshotSlot;
+                $block->markDeferredArrayLiteralKeepSlot($snapshotSlot);
             }
             $keyOperand = $expr->keys[$i];
             $keyFetch = $this->findEnumCaseClassConstFetchForArrayElement(

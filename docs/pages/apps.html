@@ -19,7 +19,7 @@
   <p>Child of <a href="https://github.com/PurHur/php-compiler/issues/36380">#36380</a>.
   Each package runs its own fixtures under Zend, VM, and AOT. Failures become
   differential reductions — never app-specific patches.</p>
-  <p><strong>12</strong> packages · generated <code>2026-09-04T16:28:38Z</code> ·
+  <p><strong>12</strong> packages · generated <code>2026-09-04T18:28:32Z</code> ·
   refresh with <code>make apps-scoreboard</code>.</p>
   <table class="apps">
     <thead>
@@ -29,7 +29,7 @@
       </tr>
     </thead>
     <tbody>
-<tr><td>erusev/parsedown</td><td><code>4e433a8d57078645b55d21fd12c887d3ba6ca01e</code></td><td>ready</td><td>ok 64/64</td><td>block 0/0</td><td>block 0/0</td><td>0.0%</td><td class="blockers">vm: FAIL_block-level_html_FAIL_code_block_PHP_Fatal_error:_Allowed_memory_size_of_1610612736_bytes_exhausted_(tried_to_allocate_8192_bytes)_in_/compiler/lib/VM/HashTable.php_on_line_2691; aot: phpc_build:_helper-runtime_cache_hit_(17_helpers,_core=1b996aa5c644fbf7d3a2)_(#15889)</td></tr>
+<tr><td>erusev/parsedown</td><td><code>4e433a8d57078645b55d21fd12c887d3ba6ca01e</code></td><td>ready</td><td>ok 64/64</td><td>fail 29/64</td><td>block 0/0</td><td>0.0%</td><td class="blockers">vm: 35 fixture failures; aot: phpc_build:_helper-runtime_cache_hit_(17_helpers,_core=1b996aa5c644fbf7d3a2)_(#15889)</td></tr>
 <tr><td>symfony/yaml</td><td><code>—</code></td><td>pending</td><td>—</td><td>—</td><td>—</td><td>—</td><td class="blockers">pending pin</td></tr>
 <tr><td>brick/math</td><td><code>—</code></td><td>pending</td><td>—</td><td>—</td><td>—</td><td>—</td><td class="blockers">pending pin</td></tr>
 <tr><td>ramsey/uuid</td><td><code>—</code></td><td>pending</td><td>—</td><td>—</td><td>—</td><td>—</td><td class="blockers">pending pin</td></tr>
