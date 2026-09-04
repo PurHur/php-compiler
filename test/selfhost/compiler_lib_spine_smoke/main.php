@@ -5379,6 +5379,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/NestedArrayOutermostAndByRe
 require_once __DIR__.'/../../../lib/Compiler/Concern/OperandAccessAndDeferredArrayCompile.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/TryFinallyCatchAndOperandLookup.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/EchoCompileOperandTerminalAndGlobalConst.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/CompileOpsTicksAndCfgSplit.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileBlockInternal.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AssignOperand.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AdaptByRefCallArgs.php';
