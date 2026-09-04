@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCfg\Operand;
+use PHPCompiler\Block;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringPregMatch;
 use PHPCompiler\JIT\Call\ExternalMethod;
@@ -12,11 +14,17 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\PregReplaceCallbackPolicy;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\VmBoundMethodCallable;
 use PHPLLVM\Builder;
 use PHPLLVM\Type as LlvmType;
 use PHPLLVM\Value;
 
-/** LLVM lowering for preg_replace_callback() via __compiler_preg_replace_callback (issue #1177). */
+/**
+ * LLVM lowering for preg_replace_callback() via __compiler_preg_replace_callback (issue #1177).
+ *
+ * Static array callables `['Class','method']` (Nyholm Uri.php / #36382) fold to the same
+ * shim path as string user-function names. php-src: ext/pcre/php_pcre.c.
+ */
 final class JitPregReplaceCallback
 {
     private static int $blockSerial = 0;
@@ -34,24 +42,7 @@ final class JitPregReplaceCallback
     ): Value {
         StringPregMatch::ensureLinked($context);
 
-        if (!PregReplaceCallbackPolicy::isJitLowerable($callback)) {
-            throw new \LogicException(PregReplaceCallbackPolicy::jitRejectionMessage());
-        }
-        $name = $callback->compileTimeString ?? null;
-        if (null === $name) {
-            throw new \LogicException(PregReplaceCallbackPolicy::jitRejectionMessage());
-        }
-        if (!$context->functionIsRegistered($name)) {
-            throw new \LogicException(
-                "preg_replace_callback() callback '{$name}' is not a defined function in this compile unit"
-            );
-        }
-        $proxy = $context->resolveFunctionProxy($name);
-        if ($proxy instanceof ExternalMethod || !($proxy instanceof Native)) {
-            throw new \LogicException(
-                "preg_replace_callback() callback '{$name}' must be a user-defined function in this compile unit"
-            );
-        }
+        [$proxy, $shimKey] = self::resolveCallbackNative($context, $callback);
 
         $strPtrTy = $context->getTypeFromString('__string__*');
         $replaceCallbackFn = $context->lookupFunction('__compiler_preg_replace_callback_thin');
@@ -59,7 +50,7 @@ final class JitPregReplaceCallback
             $replaceCallbackFn = $context->lookupFunction('__compiler_preg_replace_callback');
         }
         $callbackPtrTy = $replaceCallbackFn->getParam(2)->typeOf();
-        $shimFn = self::callbackShim($context, $proxy, $name, $callbackPtrTy);
+        $shimFn = self::callbackShim($context, $proxy, $shimKey, $callbackPtrTy);
         $callbackPtr = $context->builder->pointerCast($shimFn, $callbackPtrTy);
         $raw = $context->builder->call(
             $replaceCallbackFn,
@@ -90,6 +81,128 @@ final class JitPregReplaceCallback
         $context->builder->positionAtEnd($doneBlock);
 
         return $ptr;
+    }
+
+    /** @return array{0:Native,1:string} proxy + stable shim cache key */
+    private static function resolveCallbackNative(Context $context, JITVariable $callback): array
+    {
+        $name = $callback->compileTimeString ?? null;
+        if (null !== $name && PregReplaceCallbackPolicy::isJitLowerableScalar(
+            $callback->type,
+            $callback->isNullConstant,
+            $name
+        )) {
+            return [self::requireUserFunctionNative($context, $name), $name];
+        }
+
+        $staticNames = PregReplaceCallbackPolicy::compileTimeStaticArrayCallableNames($callback)
+            ?? self::resolveStaticArrayCallableNamesFromBlock($context);
+        if (null !== $staticNames) {
+            $proxy = self::requireStaticMethodNative($context, $staticNames[0], $staticNames[1]);
+            $classLc = strtolower(ltrim($staticNames[0], '\\'));
+            $methodLc = strtolower($staticNames[1]);
+            $proxyName = self::resolveStaticProxyForClass($context, $classLc, $methodLc) ?? ($classLc.'::'.$methodLc);
+
+            return [$proxy, $proxyName];
+        }
+
+        throw new \LogicException(PregReplaceCallbackPolicy::jitRejectionMessage());
+    }
+
+    /**
+     * @return array{0:string,1:string}|null
+     */
+    private static function resolveStaticArrayCallableNamesFromBlock(Context $context): ?array
+    {
+        $block = $context->jitCurrentBlock ?? $context->jitEnclosingBlock;
+        $callbackOp = $context->scope->argOperands[1] ?? null;
+        if (!$block instanceof Block || !($callbackOp instanceof Operand)) {
+            return null;
+        }
+        $slot = $block->slotForOperand($callbackOp);
+        if (null === $slot) {
+            return null;
+        }
+        $slots = VmBoundMethodCallable::resolveStaticArrayCallableSlots($block, $slot);
+        if (null === $slots) {
+            return null;
+        }
+        $constBlock = $slots[2];
+        if (!isset($constBlock->constants[$slots[0]], $constBlock->constants[$slots[1]])) {
+            return null;
+        }
+        $className = $constBlock->constants[$slots[0]]->toString();
+        $methodName = $constBlock->constants[$slots[1]]->toString();
+        if ('' === $className || '' === $methodName) {
+            return null;
+        }
+
+        return [$className, $methodName];
+    }
+
+    private static function requireUserFunctionNative(Context $context, string $name): Native
+    {
+        if (!$context->functionIsRegistered($name)) {
+            throw new \LogicException(
+                "preg_replace_callback() callback '{$name}' is not a defined function in this compile unit"
+            );
+        }
+        $proxy = $context->resolveFunctionProxy($name);
+        if ($proxy instanceof ExternalMethod || !($proxy instanceof Native)) {
+            throw new \LogicException(
+                "preg_replace_callback() callback '{$name}' must be a user-defined function in this compile unit"
+            );
+        }
+
+        return $proxy;
+    }
+
+    private static function requireStaticMethodNative(
+        Context $context,
+        string $className,
+        string $methodName
+    ): Native {
+        $classLc = strtolower(ltrim($className, '\\'));
+        $methodLc = strtolower($methodName);
+        $proxyName = self::resolveStaticProxyForClass($context, $classLc, $methodLc);
+        if (null === $proxyName || !$context->functionIsRegistered($proxyName)) {
+            throw new \LogicException(
+                "preg_replace_callback() callback [{$className}, {$methodName}] is not a defined static method "
+                .'in this compile unit (#36382)'
+            );
+        }
+        $proxy = $context->resolveFunctionProxy($proxyName);
+        if ($proxy instanceof ExternalMethod || !($proxy instanceof Native)) {
+            throw new \LogicException(
+                "preg_replace_callback() callback [{$className}, {$methodName}] must be a user-defined static "
+                .'method in this compile unit (#36382)'
+            );
+        }
+
+        return $proxy;
+    }
+
+    private static function resolveStaticProxyForClass(
+        Context $context,
+        string $classLc,
+        string $methodLc
+    ): ?string {
+        $visited = [];
+        $current = $classLc;
+        while (!isset($visited[$current])) {
+            $visited[$current] = true;
+            $proxy = $current.'::'.$methodLc;
+            if ($context->functionIsRegistered($proxy)) {
+                return $proxy;
+            }
+            $parent = $context->type->object->parentClassLc($current);
+            if (null === $parent) {
+                break;
+            }
+            $current = $parent;
+        }
+
+        return null;
     }
 
     private static function callbackShim(

@@ -185,6 +185,29 @@ final class PregAotFastPathTest extends TestCase
         $this->assertSame(3, PregAotFastPath::takeLastReplaceBodyLen());
     }
 
+    /** Issue #36382 — custom `[…]` / Nyholm encode classes for thin replace_callback. */
+    public function testBracketClassReplaceFindNext(): void
+    {
+        $this->assertSame(1, PregAotFastPath::replaceFindNext('/[ :]/', 'a b:c', 0));
+        $this->assertSame(1, PregAotFastPath::takeLastReplacePos());
+        $this->assertSame(1, PregAotFastPath::takeLastReplaceBodyLen());
+        $this->assertSame(1, PregAotFastPath::replaceFindNext('/[a-z]+/', '12ab34', 0));
+        $this->assertSame(2, PregAotFastPath::takeLastReplacePos());
+        $this->assertSame(2, PregAotFastPath::takeLastReplaceBodyLen());
+        $this->assertSame(0, PregAotFastPath::replaceFindNext('/[a-z]+/', '12', 0));
+        $this->assertSame(1, PregAotFastPath::replaceFindNext('/[ :]++/', 'a  :b', 0));
+        $this->assertSame(1, PregAotFastPath::takeLastReplacePos());
+        $this->assertSame(3, PregAotFastPath::takeLastReplaceBodyLen());
+        // Nyholm filterPath shape.
+        $ny = '/(?:[^a-zA-Z0-9_\\-\\.~!\\$&\'\\(\\)\\*\\+,;=%:@\\/]++|%(?![A-Fa-f0-9]{2}))/';
+        $this->assertSame(1, PregAotFastPath::replaceFindNext($ny, '/hello world', 0));
+        $this->assertSame(6, PregAotFastPath::takeLastReplacePos()); // space
+        $this->assertSame(1, PregAotFastPath::takeLastReplaceBodyLen());
+        $this->assertSame(0, PregAotFastPath::replaceFindNext($ny, '/hello', 0));
+        $this->assertSame(1, PregAotFastPath::replaceFindNext($ny, 'a%ZZb', 0));
+        $this->assertSame(1, PregAotFastPath::takeLastReplacePos()); // %
+    }
+
     public function testLiteralCaptureGroups(): void
     {
         $this->assertSame(8, PregAotFastPath::patternKind('/(a)(b)/'));
