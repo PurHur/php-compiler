@@ -4674,6 +4674,18 @@ restart:
                     }
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
+                    // Stale FETCH_DIM (read) indirect after temp-slot reuse: writing `$cond = $bool`
+                    // must not punch through into `$Block['data']['type']` (#36380 Parsedown lists).
+                    // Keep write-through for FETCH_DIM_W lvalues, property lvalues, and explicit
+                    // PHP references (`$r =& …` / foreach-by-ref — {@see Variable::$phpReference}).
+                    if (
+                        $arg2->isIndirect()
+                        && !$arg2->phpReference
+                        && !$arg2->propertyAssignLvalue
+                        && !$this->assignDestKeptAsWriteThrough($frame, (int) $op->arg2)
+                    ) {
+                        $arg2->reset();
+                    }
                     if (null !== $op->arg3) {
                         $arg3 = isset($frame->block->constants[$op->arg3])
                             ? $frame->block->constants[$op->arg3]
@@ -5073,16 +5085,26 @@ restart:
                     // HashTable bucket cells are destroyed with the array: promote to a shared
                     // IS_REFERENCE-style cell so `$b =& $a[$k]; unset($a);` keeps the residual (#22027).
                     if (null !== $rhs->objectPropertyOwner) {
-                        $writeTarget->indirect($rhs);
+                        $writeTarget->indirectAsPhpReference($rhs);
                         $this->markTypedPropertyByRefAlias($writeTarget, $rhs);
+                        if ($writeTarget !== $lhs) {
+                            $lhs->indirectAsPhpReference($writeTarget->resolveIndirect());
+                        } else {
+                            $lhs->phpReference = true;
+                        }
                         break;
                     }
                     if (
                         null !== $rhs->staticPropertyClassLc
                         && null !== $rhs->objectPropertyName
                     ) {
-                        $writeTarget->indirect($rhs);
+                        $writeTarget->indirectAsPhpReference($rhs);
                         $this->markTypedPropertyByRefAlias($writeTarget, $rhs);
+                        if ($writeTarget !== $lhs) {
+                            $lhs->indirectAsPhpReference($writeTarget->resolveIndirect());
+                        } else {
+                            $lhs->phpReference = true;
+                        }
                         break;
                     }
                     if (
@@ -5090,8 +5112,13 @@ restart:
                         && !$this->context->isGlobalStorage($rhs)
                         && !$rhs->hashTableBucketCell
                     ) {
-                        $writeTarget->indirect($rhs);
+                        $writeTarget->indirectAsPhpReference($rhs);
                         $this->markTypedPropertyByRefAlias($writeTarget, $rhs);
+                        if ($writeTarget !== $lhs) {
+                            $lhs->indirectAsPhpReference($writeTarget->resolveIndirect());
+                        } else {
+                            $lhs->phpReference = true;
+                        }
                         break;
                     }
                     if (Variable::TYPE_INDIRECT !== $rhs->type) {
@@ -5099,8 +5126,15 @@ restart:
                         $ref->copyFrom($rhs);
                         $rhs->indirect($ref);
                     }
-                    $writeTarget->indirect($rhs->resolveIndirect());
+                    $writeTarget->indirectAsPhpReference($rhs->resolveIndirect());
                     $this->markTypedPropertyByRefAlias($writeTarget, $rhs->resolveIndirect());
+                    // Named CV may have held a stale dim-read indirect (slot reuse); ensure the
+                    // CV slot itself is the phpReference wrapper (#36380).
+                    if ($writeTarget !== $lhs) {
+                        $lhs->indirectAsPhpReference($writeTarget->resolveIndirect());
+                    } else {
+                        $lhs->phpReference = true;
+                    }
                     break;
                 case OpCode::TYPE_VAR_FETCH:
                     $dest = $frame->scope[$op->arg1];
@@ -10436,7 +10470,7 @@ restart:
                                 }
                                 break;
                             }
-                            $frame->scope[$op->arg1]->indirect(
+                            $frame->scope[$op->arg1]->indirectAsPhpReference(
                                 $genState->currentValue->byRefTarget()
                             );
                             $this->markScopeSlotInitialized($frame, (int) $op->arg1);
@@ -10452,7 +10486,7 @@ restart:
                         if ($this->isWeakMapForeachSlot((int) $op->arg2)) {
                             $iter = $this->weakMapForeachIterator($op->arg2);
                             if ($byRef) {
-                                $frame->scope[$op->arg1]->indirect($iter->currentValue(true));
+                                $frame->scope[$op->arg1]->indirectAsPhpReference($iter->currentValue(true));
                                 $this->markScopeSlotInitialized($frame, (int) $op->arg1);
                             } else {
                                 $frame->scope[$op->arg1]->assignForeachByValue($iter->currentValue(false));
@@ -10461,7 +10495,7 @@ restart:
                         }
                         if ($byRef) {
                             try {
-                                $frame->scope[$op->arg1]->indirect(
+                                $frame->scope[$op->arg1]->indirectAsPhpReference(
                                     $this->objectForeachIterator($op->arg2)->currentValue(true)
                                 );
                             } catch (VM\PropertyHookRefWriteSignal $signal) {
@@ -10489,7 +10523,7 @@ restart:
                     if ($byRef) {
                         $this->rebindArrayForeachToLiveContainer($frame, (int) $op->arg2);
                         $container = $this->resolveForeachContainer($frame, (int) $op->arg2);
-                        $frame->scope[$op->arg1]->indirect(
+                        $frame->scope[$op->arg1]->indirectAsPhpReference(
                             $container->toArray()->iterCurrentValue(true)
                         );
                         $this->markScopeSlotInitialized($frame, (int) $op->arg1);
@@ -12364,6 +12398,39 @@ restart:
         }
 
         return $this->readScopeOperandForRuntimeRead($frame, $slot);
+    }
+
+    /**
+     * True when the current block produced a FETCH_DIM_W into $destSlot before the ASSIGN
+     * now executing (pos already advanced past the ASSIGN). Used to keep real dim writes
+     * while clearing stale FETCH_DIM (read) indirects after temp-slot reuse (#36380).
+     */
+    private function assignDestKeptAsWriteThrough(Frame $frame, int $destSlot): bool
+    {
+        $ops = $frame->block->opCodes;
+        for ($i = $frame->pos - 2; $i >= 0; --$i) {
+            $prev = $ops[$i] ?? null;
+            if (null === $prev) {
+                break;
+            }
+            if (OpCode::TYPE_ARRAY_DIM_FETCH_WRITE === $prev->type && (int) $prev->arg1 === $destSlot) {
+                return true;
+            }
+            if (OpCode::TYPE_ASSIGN_REF === $prev->type && (int) $prev->arg1 === $destSlot) {
+                return true;
+            }
+            if (
+                (OpCode::TYPE_JUMP === $prev->type || OpCode::TYPE_JUMPIF === $prev->type)
+            ) {
+                break;
+            }
+            if (OpCode::TYPE_ARRAY_DIM_FETCH === $prev->type && (int) $prev->arg1 === $destSlot) {
+                // Read fetch — not a write lvalue for this ASSIGN.
+                return false;
+            }
+        }
+
+        return false;
     }
 
     /**
