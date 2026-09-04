@@ -7446,7 +7446,12 @@ PY
       echo "Applied php-types-class-generics-fallback.patch"
       return 0
     fi
-    python3 - "$target" <<'PY'
+    # Warm end-state after generics-fallback + iterable-generic + anonymous-class-type:
+    # list|array|iterable, then $pseudo (non-empty-string…), then positive-int, then
+    # @anonymous / AnonymousClass, then $regex. Older candidates assumed iterable sat
+    # immediately before @anonymous or positive-int before $regex — both false on a
+    # fully patched tree (#36389 / north-star5-fast red).
+    if ! python3 - "$target" <<'PY'
 import sys
 from pathlib import Path
 
@@ -7455,10 +7460,38 @@ text = path.read_text()
 if "Class generics from PHPStan/Psalm docblocks: App<T>" in text:
     sys.exit(0)
 
-# Prefer end-state (after iterable-generic + anonymous-class-type). Also accept
-# list|array without iterable, and mid-stack after generics-fallback only
-# (positive-int → $regex) so a mis-ordered apply still lands the insert.
+insert_block = """        // Class generics from PHPStan/Psalm docblocks: App<T> (#36382 Slim).
+        if (preg_match('/^(.+?)\\s*<.*>\\s*$/s', trim($decl), $genericClass)) {
+            return self::fromDecl(trim($genericClass[1]));
+        }
+"""
+
 candidates = [
+    # Preferred: after pseudo ints, before @anonymous (current warm vendor tree).
+    (
+        """        if (preg_match('/^(positive|negative|non-zero)-int$/', $pseudo)) {
+            return new self(self::TYPE_LONG);
+        }
+        if (preg_match('/@anonymous\\x00/', $decl)) {
+""",
+        """        if (preg_match('/^(positive|negative|non-zero)-int$/', $pseudo)) {
+            return new self(self::TYPE_LONG);
+        }
+""" + insert_block + """        if (preg_match('/@anonymous\\x00/', $decl)) {
+""",
+    ),
+    # Mid-stack: generics-fallback applied, anonymous-class-type not yet.
+    (
+        """        if (preg_match('/^(positive|negative|non-zero)-int$/', $pseudo)) {
+            return new self(self::TYPE_LONG);
+        }
+        $regex = """,
+        """        if (preg_match('/^(positive|negative|non-zero)-int$/', $pseudo)) {
+            return new self(self::TYPE_LONG);
+        }
+""" + insert_block + """        $regex = """,
+    ),
+    # Cold-ish: iterable immediately before @anonymous (no intervening $pseudo).
     (
         """        if (preg_match('/^(list|array|iterable)\\s*</i', trim($decl))) {
             return new self(self::TYPE_ARRAY);
@@ -7468,11 +7501,7 @@ candidates = [
         """        if (preg_match('/^(list|array|iterable)\\s*</i', trim($decl))) {
             return new self(self::TYPE_ARRAY);
         }
-        // Class generics from PHPStan/Psalm docblocks: App<T> (#36382 Slim).
-        if (preg_match('/^(.+?)\\s*<.*>\\s*$/s', trim($decl), $genericClass)) {
-            return self::fromDecl(trim($genericClass[1]));
-        }
-        if (preg_match('/@anonymous\\x00/', $decl)) {
+""" + insert_block + """        if (preg_match('/@anonymous\\x00/', $decl)) {
 """,
     ),
     (
@@ -7484,26 +7513,8 @@ candidates = [
         """        if (preg_match('/^(list|array)\\s*</i', trim($decl))) {
             return new self(self::TYPE_ARRAY);
         }
-        // Class generics from PHPStan/Psalm docblocks: App<T> (#36382 Slim).
-        if (preg_match('/^(.+?)\\s*<.*>\\s*$/s', trim($decl), $genericClass)) {
-            return self::fromDecl(trim($genericClass[1]));
-        }
-        if (preg_match('/@anonymous\\x00/', $decl)) {
+""" + insert_block + """        if (preg_match('/@anonymous\\x00/', $decl)) {
 """,
-    ),
-    (
-        """        if (preg_match('/^(positive|negative|non-zero)-int$/', $pseudo)) {
-            return new self(self::TYPE_LONG);
-        }
-        $regex = """,
-        """        if (preg_match('/^(positive|negative|non-zero)-int$/', $pseudo)) {
-            return new self(self::TYPE_LONG);
-        }
-        // Class generics from PHPStan/Psalm docblocks: App<T> (#36382 Slim).
-        if (preg_match('/^(.+?)\\s*<.*>\\s*$/s', trim($decl), $genericClass)) {
-            return self::fromDecl(trim($genericClass[1]));
-        }
-        $regex = """,
     ),
 ]
 for anchor, insert in candidates:
@@ -7514,6 +7525,10 @@ else:
     sys.stderr.write("php-types-class-generics-fallback: anchor not found in Type.php\n")
     sys.exit(1)
 PY
+    then
+      record_patch_failure "php-types-class-generics-fallback.patch" "overlay anchor not found in Type.php"
+      return 1
+    fi
     echo "Applied php-types-class-generics-fallback.patch (overlay)"
     return 0
   fi
