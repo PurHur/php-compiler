@@ -62,6 +62,7 @@ Usage: bootstrap-gen0-chunks.sh [plan opts | --plan=PATH]
   --strategy=dir|sub|hub  spine partition strategy (with --spine)
   --max-files=N        further split buckets larger than N files
   --max-bytes=N        further split when cumulative .php bytes exceed N
+                       (also defaults max-files=24 when max-files unset — tiny-file packs)
 EOF
 }
 

@@ -133,6 +133,8 @@ final class BootstrapGen0ChunksOrchestratorTest extends TestCase
         $plan = json_decode((string) file_get_contents($planPath), true);
         $this->assertIsArray($plan);
         $this->assertSame(120000, $plan['max_bytes']);
+        // --max-bytes alone applies the tiny-file pack default (#36387).
+        $this->assertSame(24, $plan['max_files']);
         $this->assertGreaterThan(1, $plan['chunk_count']);
         $hubs = 0;
         $runtimeAlone = false;
@@ -142,6 +144,7 @@ final class BootstrapGen0ChunksOrchestratorTest extends TestCase
             // Single oversized files (CompilerVersion.php ~181KB) keep their own batch.
             if ((int) $chunk['file_count'] > 1) {
                 $this->assertLessThanOrEqual(120000, (int) $chunk['byte_count']);
+                $this->assertLessThanOrEqual(24, (int) $chunk['file_count']);
             }
             $body = (string) file_get_contents($chunk['entry']);
             if (str_contains($body, 'lib/Runtime.php')) {
@@ -156,6 +159,37 @@ final class BootstrapGen0ChunksOrchestratorTest extends TestCase
         }
         $this->assertGreaterThan(3, $hubs);
         $this->assertTrue($runtimeAlone, 'expected a Runtime.php singleton hub');
+        $this->removeTree($tmp);
+    }
+
+    public function testChunkPlanMaxBytesDefaultsMaxFilesForTinyVmPacks(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $script = $root.'/script/bootstrap-gen0-chunk-plan.php';
+        $tmp = sys_get_temp_dir().'/phpc-chunk-plan-vm-'.bin2hex(random_bytes(4));
+        mkdir($tmp.'/entries', 0755, true);
+        $planPath = $tmp.'/plan.json';
+        // lib/VM Builtin files are ~1–2KB; --max-bytes=120000 alone previously packed
+        // 70–100 into one TU and OOM-killed under 8g (rc=137) even with SPINE_CHUNK demote.
+        $cmd = escapeshellarg(PHP_BINARY).' '.escapeshellarg($script)
+            .' --lib=VM'
+            .' --max-bytes=120000'
+            .' --entries-dir='.escapeshellarg($tmp.'/entries')
+            .' --plan-out='.escapeshellarg($planPath);
+        exec($cmd.' 2>&1', $out, $rc);
+        $this->assertSame(0, $rc, implode("\n", $out));
+        $plan = json_decode((string) file_get_contents($planPath), true);
+        $this->assertIsArray($plan);
+        $this->assertSame(120000, $plan['max_bytes']);
+        $this->assertSame(24, $plan['max_files']);
+        $this->assertGreaterThan(30, $plan['chunk_count']);
+        foreach ($plan['chunks'] as $chunk) {
+            $this->assertSame('lib', $chunk['kind']);
+            if ((int) $chunk['file_count'] > 1) {
+                $this->assertLessThanOrEqual(24, (int) $chunk['file_count']);
+                $this->assertLessThanOrEqual(120000, (int) $chunk['byte_count']);
+            }
+        }
         $this->removeTree($tmp);
     }
 
