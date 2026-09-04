@@ -31,6 +31,10 @@ use PHPCompiler\JIT\Call\Vararg;
  * {@code ext/standard/string.c} {@code PHP_FUNCTION(strlen)} / Z_PARAM_STR;
  * throwing {@code __toString} needs an object/value box).
  *
+ * Single-param identity bodies ({@code function id($x){return $x;}}) are also
+ * recorded so call sites can replace the call with the compiled argument
+ * (user-script AOT skips IR inlining — {@see Context::runModuleOptimizationPasses}).
+ *
  * Analyze at enqueue time (before {@see \PHPCompiler\JIT::runQueue}), not only when
  * the body is lowered: `{main}` resolves method calls while callees are still
  * queued, so a body-time record is too late for call-site elision.
@@ -51,6 +55,13 @@ final class NoThrowCallElision
             return;
         }
         $context->noThrowAnalyzeBlocks[$funcLc] = $entry;
+        if (Block::isTrivialIdentityCalleeBody($entry)) {
+            $context->trivialIdentityUserFunctions[$funcLc] = true;
+            // Identity bodies cannot throw and call nothing.
+            $context->noThrowUserFunctions[$funcLc] = true;
+
+            return;
+        }
         if (!empty($context->noThrowUserFunctions[$funcLc])) {
             return;
         }
@@ -115,6 +126,63 @@ final class NoThrowCallElision
         }
 
         return !empty($context->noThrowUserFunctions[$name]);
+    }
+
+    /**
+     * True when {@code $toCall} is a recorded single-param identity user function.
+     */
+    public static function calleeIsTrivialIdentity(Context $context, Call $toCall): bool
+    {
+        if (!($toCall instanceof Native)) {
+            return false;
+        }
+        $name = strtolower((string) $toCall->name);
+        if ('' === $name) {
+            return false;
+        }
+        if (!empty($context->trivialIdentityUserFunctions[$name])) {
+            return true;
+        }
+        if ([] !== $context->noThrowAnalyzeBlocks) {
+            self::refineFixpoint($context);
+        }
+
+        return !empty($context->trivialIdentityUserFunctions[$name]);
+    }
+
+    /**
+     * Replace {@code id($x)} with the compiled argument when the callee is a
+     * single-param identity. Returns null when the call must be emitted.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    public static function tryEmitTrivialIdentity(
+        Context $context,
+        Call $toCall,
+        array $callArgs
+    ): ?\PHPLLVM\Value {
+        if (!self::calleeIsTrivialIdentity($context, $toCall)) {
+            return null;
+        }
+        if (!($toCall instanceof Native)) {
+            return null;
+        }
+        // One formal only — methods (`$this` + args) and multi-arg stay as calls.
+        if (1 !== \count($toCall->argTypes)) {
+            return null;
+        }
+        if ([] !== $toCall->paramByRefByArg || null !== $toCall->variadicArgIndex) {
+            return null;
+        }
+        if (isset($callArgs[0]) && $callArgs[0] instanceof Variable) {
+            $arg = $callArgs[0];
+        } elseif (isset($toCall->defaultArgs[0]) && $toCall->defaultArgs[0] instanceof Variable) {
+            $arg = $toCall->defaultArgs[0];
+        } else {
+            return null;
+        }
+
+        return $toCall->compileArgForCall($context, $arg, 0);
     }
 
     /**

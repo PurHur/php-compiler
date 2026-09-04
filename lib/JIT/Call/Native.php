@@ -109,6 +109,13 @@ class Native implements Call {
     }
 
     /**
+     * Expose {@see compileArg} for call-site identity elision (#36386).
+     */
+    public function compileArgForCall(Context $context, Variable $arg, int $argNum): Value {
+        return $this->compileArg($context, $arg, $argNum);
+    }
+
+    /**
      * Invoke with a parameter-index map so named-arg holes survive.
      *
      * PHP's `...$sparse` unpack renumbers integer keys, which turns `n(b: 7)` into
