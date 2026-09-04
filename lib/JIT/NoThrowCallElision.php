@@ -279,8 +279,14 @@ final class NoThrowCallElision
             return self::baseConvertArgsCannotThrow($name, $callArgs);
         }
         if (self::isPureInetBuiltin($name)) {
-            // basic_functions.c ip2long/long2ip — typed string or numeric.
+            // basic_functions.c ip2long/long2ip/inet_pton/inet_ntop — typed
+            // string or numeric.
             return self::inetArgsCannotThrow($name, $callArgs);
+        }
+        if (self::isPureMinMaxBuiltin($name)) {
+            // array.c min/max + math.c fmin/fmax — typed numerics only; single
+            // array-form min/max stays out (element compare / object handlers).
+            return self::minMaxArgsCannotThrow($name, $callArgs);
         }
         if (self::isPureVersionCompareBuiltin($name)) {
             // versioning.c — typed strings; optional operator must be proven valid.
@@ -807,14 +813,36 @@ final class NoThrowCallElision
 
     /**
      * php-src {@code ext/standard/basic_functions.c} {@code ip2long}/
-     * {@code long2ip} — typed string or long; soft-null stays out. Public for
-     * {@see DiscardedPureCallElision} (#36386).
+     * {@code long2ip}/{@code inet_pton}/{@code inet_ntop} — typed string or
+     * long; soft-null stays out. Public for {@see DiscardedPureCallElision}
+     * (#36386).
      */
     public static function isPureInetBuiltin(string $nameLc): bool
     {
         switch ($nameLc) {
             case 'ip2long':
             case 'long2ip':
+            case 'inet_pton':
+            case 'inet_ntop':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * php-src {@code ext/standard/array.c} {@code min}/{@code max} and
+     * {@code math.c} {@code fmin}/{@code fmax} on typed numeric scalars —
+     * no user handlers. Single-array {@code min}/{@code max} stays out.
+     * Public for {@see DiscardedPureCallElision} (#36386).
+     */
+    public static function isPureMinMaxBuiltin(string $nameLc): bool
+    {
+        switch ($nameLc) {
+            case 'min':
+            case 'max':
+            case 'fmin':
+            case 'fmax':
                 return true;
             default:
                 return false;
@@ -881,6 +909,8 @@ final class NoThrowCallElision
         }
         switch ($nameLc) {
             case 'ip2long':
+            case 'inet_pton':
+            case 'inet_ntop':
                 // Z_PARAM_STR — soft-null / __toString stay live.
                 return self::stringParamBuiltinArgCannotThrow($callArgs[0]);
             case 'long2ip':
@@ -889,6 +919,38 @@ final class NoThrowCallElision
             default:
                 return false;
         }
+    }
+
+    /**
+     * Typed numeric scalars only (≥1 for min/max, ≥2 for fmin/fmax). Array-form
+     * {@code min}/{@code max} (single hashtable / native array) stays out.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    public static function minMaxArgsCannotThrow(string $nameLc, array $callArgs): bool
+    {
+        if ([] === $callArgs) {
+            return false;
+        }
+        if (('fmin' === $nameLc || 'fmax' === $nameLc) && \count($callArgs) < 2) {
+            return false;
+        }
+        // Single array argument → php_min_max over elements (object handlers).
+        if (1 === \count($callArgs) && self::typedArrayArgCannotThrow($callArgs[0])) {
+            return false;
+        }
+        foreach ($callArgs as $arg) {
+            if (!$arg instanceof Variable || !self::numericParamBuiltinArgCannotThrow($arg)) {
+                return false;
+            }
+            // Soft-null numeric params deprecate — stay conservative for no-throw
+            // (peer math discarded elision excludes TYPE_NULL).
+            if ($arg->isNullConstant || Variable::TYPE_NULL === $arg->type) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

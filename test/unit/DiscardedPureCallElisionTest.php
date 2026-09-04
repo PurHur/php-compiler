@@ -27,6 +27,8 @@ use PHPCompiler\ext\standard\escapeshellarg;
 use PHPCompiler\ext\standard\escapeshellcmd;
 use PHPCompiler\ext\standard\explode;
 use PHPCompiler\ext\standard\fdiv;
+use PHPCompiler\ext\standard\fmax;
+use PHPCompiler\ext\standard\fmin;
 use PHPCompiler\ext\standard\floatval;
 use PHPCompiler\ext\standard\get_debug_type;
 use PHPCompiler\ext\standard\gettype;
@@ -36,7 +38,11 @@ use PHPCompiler\ext\standard\html_entity_decode;
 use PHPCompiler\ext\standard\htmlentities;
 use PHPCompiler\ext\standard\htmlspecialchars;
 use PHPCompiler\ext\standard\htmlspecialchars_decode;
+use PHPCompiler\ext\standard\int_max;
+use PHPCompiler\ext\standard\int_min;
 use PHPCompiler\ext\standard\intval;
+use PHPCompiler\ext\standard\inet_ntop;
+use PHPCompiler\ext\standard\inet_pton;
 use PHPCompiler\ext\standard\ip2long;
 use PHPCompiler\ext\standard\levenshtein;
 use PHPCompiler\ext\standard\long2ip;
@@ -1453,6 +1459,92 @@ final class DiscardedPureCallElisionTest extends TestCase
             $context,
             new version_compare(),
             [$ver, $box]
+        ));
+    }
+
+    public function testElidesDiscardedInetPtonNtopAndMinMax(): void
+    {
+        // php-src basic_functions.c inet_pton/inet_ntop + array.c min/max +
+        // math.c fmin/fmax (#36386).
+        $context = $this->makeContext();
+        $ip = $this->makeStringVar('127.0.0.1');
+        $bin = $this->makeStringVar("\x7f\x00\x00\x01");
+        $long = $this->makeNativeLongVar();
+        $dbl = $this->makeNativeDoubleVar();
+        $null = $this->makeNullVar();
+        $box = $this->makeValueBoxVar();
+        $ht = $this->makeHashtableVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new inet_pton(),
+            [$ip]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new inet_ntop(),
+            [$bin]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new int_min(),
+            [$long, $long]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new int_max(),
+            [$long]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new fmin(),
+            [$dbl, $dbl]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new fmax(),
+            [$dbl, $long]
+        ));
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new inet_pton(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new inet_pton(),
+            [$box]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new inet_ntop(),
+            [$long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new int_min(),
+            [$ht]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new int_min(),
+            [$null, $long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new int_max(),
+            [$box, $long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new fmin(),
+            [$dbl]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new fmax(),
+            [$null, $dbl]
         ));
     }
 
