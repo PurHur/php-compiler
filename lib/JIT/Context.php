@@ -3895,14 +3895,73 @@ class Context {
             }
         }
         $dumpPath = Config::getenv('PHP_COMPILER_LLVM_VERIFY_DUMP');
+        $failingFns = [];
         if (\is_string($dumpPath) && '' !== $dumpPath) {
-            @file_put_contents($dumpPath, $message);
+            // Module verify's first @name is often a *callee* (e.g. valueDelref), not the
+            // broken function. Per-fn LLVMVerifyFunction names the actual offenders (#36382).
+            $fn = $this->module->getFirstFunction();
+            while (null !== $fn) {
+                if ($fn instanceof PHPLLVM\Value\Function_) {
+                    $name = '?';
+                    try {
+                        // Value::getName() calls mistyped LLVMValueGetName; use LLVMGetValueName.
+                        $raw = $fn->llvm->lib->LLVMGetValueName($fn->value);
+                        $name = \is_object($raw) && method_exists($raw, 'toString')
+                            ? (string) $raw->toString()
+                            : (string) $raw;
+                        if ('' === $name) {
+                            $name = '?';
+                        }
+                    } catch (\Throwable) {
+                    }
+                    $ok = true;
+                    try {
+                        // LLVMVerifyFunction: 0 = ok; fromBool inverts LLVMBool.
+                        // LLVMReturnStatusAction = 2.
+                        $ok = $fn->llvm->fromBool(
+                            $fn->llvm->lib->LLVMVerifyFunction($fn->value, 2)
+                        );
+                    } catch (\Throwable) {
+                        $ok = false;
+                    }
+                    if (!$ok) {
+                        $failingFns[] = $name;
+                        if (\count($failingFns) <= 2 && '?' !== $name && '' !== $name) {
+                            try {
+                                $printed = $fn->llvm->lib->LLVMPrintValueToString($fn->value);
+                                $ir = \is_object($printed) && method_exists($printed, 'toString')
+                                    ? (string) $printed->toString()
+                                    : (string) $printed;
+                                @file_put_contents($dumpPath.'.'.$name.'.ll', $ir);
+                            } catch (\Throwable) {
+                            }
+                        }
+                    }
+                }
+                $next = $fn->getNext();
+                if (null === $next) {
+                    break;
+                }
+                $fn = $next;
+            }
+            $dump = $message;
+            if ([] !== $failingFns) {
+                $dump = "Failing functions (".\count($failingFns)."):\n"
+                    .implode("\n", $failingFns)
+                    ."\n\n".$message;
+                $funcName = $failingFns[0];
+            }
+            @file_put_contents($dumpPath, $dump);
         }
         $head = implode("\n", $uniqueLines);
         $totalLines = substr_count($message, "\n") + ('' !== $message && !str_ends_with($message, "\n") ? 1 : 0);
         $suffix = $totalLines > \count($uniqueLines)
             ? "\n… (".($totalLines - \count($uniqueLines)).' more lines truncated)'
             : '';
+        if ([] !== $failingFns) {
+            $suffix .= "\nFailing functions: ".implode(', ', \array_slice($failingFns, 0, 12))
+                .(\count($failingFns) > 12 ? ' …(+'.(\count($failingFns) - 12).')' : '');
+        }
         throw new \RuntimeException(
             "Module verification failed in function {$funcName}:\n{$head}{$suffix}"
         );

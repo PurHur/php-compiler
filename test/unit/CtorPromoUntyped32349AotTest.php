@@ -61,8 +61,10 @@ final class CtorPromoUntyped32349AotTest extends TestCase
             __DIR__.'/../../lib/JIT/Builtin/Type/ObjectInstancePropertyLlvm.php'
         );
         $this->assertStringContainsString('#32349', $slot);
+        $this->assertStringContainsString('#36382', $slot);
         $this->assertStringContainsString('bool $forWrite = false', $slot);
         $this->assertStringContainsString('if ($forWrite)', $slot);
+        $this->assertStringContainsString('borrowedValueEntry', $slot);
         $helper = (string) file_get_contents(__DIR__.'/../../lib/JIT/BasicBlockHelper.php');
         $this->assertStringContainsString('unsealAndContinue', $helper);
         $this->assertStringContainsString('continueAfterDefiningValue', $helper);

@@ -184,6 +184,12 @@ final class ObjectInstancePropertyLlvm
                         Variable::KIND_VARIABLE,
                         $storage,
                     );
+                    // Mid-block write box: free()/delref at return may not be dominated by
+                    // this alloca (Nyholm Uri::__construct → module verify, #36382). Skip
+                    // valueDelref — propertyStore already owns the payload.
+                    if ($forWrite) {
+                        $var->borrowedValueEntry = true;
+                    }
                     $var->objectPropertySlot = $slot;
                     $var->objectPropertyType = $propset[2];
                     $var->objectPropertyReceiver = $obj;

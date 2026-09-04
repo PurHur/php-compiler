@@ -587,7 +587,9 @@ final class TryCatchHelper
             if (null !== $context->generatorStateParam) {
                 self::emitGeneratorResumeComplete($context);
             } else {
-                $builder->returnValue($context->getTypeFromString('int64')->constInt(0, false));
+                // Match LLVM signature — hard-coded i64 breaks `: string` helpers NestedJIT'd
+                // into the same module (SprintfJitHelper::numberFormat, #36382 / peer #34524).
+                self::emitPropagateReturn($context, $func);
             }
             $builder->positionAtEnd($mergeBb);
             if (null === $mergeBb->getTerminator()) {
