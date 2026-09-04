@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
-use PHPCompiler\ext\sqlite3\JitSqlite3Stmt;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
 
-/** SQLite3Stmt NestedJIT (#36010 leftover of #36001). php-src: ext/sqlite3/sqlite3.c */
+/**
+ * SQLite3Stmt NestedJIT (#36010 leftover of #36001).
+ *
+ * Dispatch via {@see Context::$extensionLowering} so lib/JIT does not import
+ * {@code ext\sqlite3} (#36204). php-src: ext/sqlite3/sqlite3.c
+ */
 final class Sqlite3StmtMethod implements Call
 {
     public string $name;
@@ -47,16 +51,10 @@ final class Sqlite3StmtMethod implements Call
 
     public function call(Context $context, Variable ...$args): Value
     {
-        return match (strtolower($this->method)) {
-            'getsql' => JitSqlite3Stmt::getSQL($context, ...$args),
-            'paramcount' => JitSqlite3Stmt::paramCount($context, ...$args),
-            'bindvalue' => JitSqlite3Stmt::bindValue($context, ...$args),
-            'bindparam' => JitSqlite3Stmt::bindParam($context, ...$args),
-            'execute' => JitSqlite3Stmt::execute($context, ...$args),
-            'readonly' => JitSqlite3Stmt::readOnly($context, ...$args),
-            default => throw new \LogicException(
-                'SQLite3Stmt::'.$this->method.'() JIT dispatch missing (#36010)'
-            ),
-        };
+        return $context->extensionLowering->requireSqlite3()->stmtMethod(
+            $context,
+            $this->method,
+            ...$args
+        );
     }
 }

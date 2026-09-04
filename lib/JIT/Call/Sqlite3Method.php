@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
-use PHPCompiler\ext\sqlite3\JitSqlite3;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
@@ -18,7 +17,8 @@ use PHPLLVM\Value;
  * enableExceptions leftover #35975; escapeString leftover #35977;
  * version leftover #35991; open leftover #36001; prepare/query leftover #36010).
  *
- * php-src: ext/sqlite3/sqlite3.c
+ * Dispatch via {@see Context::$extensionLowering} so lib/JIT does not import
+ * {@code ext\sqlite3} (#36204). php-src: ext/sqlite3/sqlite3.c
  */
 final class Sqlite3Method implements Call
 {
@@ -69,25 +69,10 @@ final class Sqlite3Method implements Call
 
     public function call(Context $context, Variable ...$args): Value
     {
-        return match (strtolower($this->method)) {
-            '__construct' => JitSqlite3::construct($context, ...$args),
-            'exec' => JitSqlite3::exec($context, ...$args),
-            'querysingle' => JitSqlite3::querySingle($context, ...$args),
-            'close' => JitSqlite3::close($context, ...$args),
-            'lastinsertrowid' => JitSqlite3::lastInsertRowID($context, ...$args),
-            'changes' => JitSqlite3::changes($context, ...$args),
-            'lasterrorcode' => JitSqlite3::lastErrorCode($context, ...$args),
-            'lasterrormsg' => JitSqlite3::lastErrorMsg($context, ...$args),
-            'busytimeout' => JitSqlite3::busyTimeout($context, ...$args),
-            'enableexceptions' => JitSqlite3::enableExceptions($context, ...$args),
-            'escapestring' => JitSqlite3::escapeString($context, ...$args),
-            'version' => JitSqlite3::version($context, ...$args),
-            'open' => JitSqlite3::open($context, ...$args),
-            'prepare' => JitSqlite3::prepare($context, ...$args),
-            'query' => JitSqlite3::query($context, ...$args),
-            default => throw new \LogicException(
-                'SQLite3::'.$this->method.'() JIT dispatch missing (#35931 / #35991 / #36001 / #36010)'
-            ),
-        };
+        return $context->extensionLowering->requireSqlite3()->sqlite3Method(
+            $context,
+            $this->method,
+            ...$args
+        );
     }
 }

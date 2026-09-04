@@ -23,6 +23,8 @@ class Module extends ModuleAbstract
      */
     public function jitInit(JIT\Context $context): void
     {
+        $context->extensionLowering->sqlite3 = new JitSqlite3ExtensionHooksFacade();
+
         if (!CompilerVersion::supportsSqlite3()) {
             return;
         }
