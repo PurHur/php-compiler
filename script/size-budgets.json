@@ -9,9 +9,9 @@
             "note": "Concern trait splits (#36230/#36387/#36403); CompileFuncCfgReturnAndGlobalImport + peers"
         },
         "lib/JIT.php": {
-            "budget": 24702,
+            "budget": 23648,
             "target": 20000,
-            "note": "Concern trait splits (#36403); tip ratchet after master drift (JIT untouched this PR)"
+            "note": "Concern trait splits (#36387/#36403); TernaryJumpIfEchoMergeAndReturnPhi + peers"
         },
         "lib/VM.php": {
             "budget": 25586,
