@@ -18,8 +18,9 @@ use PHPCompiler\JIT\Call\Vararg;
  * has no {@see OpCode::TYPE_THROW}, no {@see OpCode::TYPE_NEW}, no includes, and
  * only calls to itself or other proven no-throw user functions (leaf recursion
  * like {@code fibo_r}, call chains like {@code top→mid→leaf}, leaf methods
- * like {@code Node::bump}, or same-class method chains like
- * {@code A::top→A::mid→A::leaf}) — the AOT frames would never appear on an
+ * like {@code Node::bump}, same-class instance chains like
+ * {@code A::top→A::mid→A::leaf}, or same-class static chains like
+ * {@code A::top→self::mid→self::leaf}) — the AOT frames would never appear on an
  * uncaught trace — paying {@code phpc_ex_stack_push/pop} +
  * {@code phpc_jit_has_throw_pending} on every edge is pure overhead.
  *
@@ -133,7 +134,6 @@ final class NoThrowCallElision
                 if (OpCode::TYPE_THROW === $type
                     || OpCode::TYPE_NEW === $type
                     || OpCode::TYPE_INCLUDE === $type
-                    || OpCode::TYPE_STATICCALL_INIT === $type
                     || OpCode::TYPE_FROM_CALLABLE === $type
                 ) {
                     return false;
@@ -159,6 +159,18 @@ final class NoThrowCallElision
                     $methodLc = self::literalMethodNameLc($block, $op->arg2);
                     if (null === $methodLc
                         || !self::isAllowedNoThrowMethodCallee($context, $selfLc, $methodLc)
+                    ) {
+                        return false;
+                    }
+                }
+                if (OpCode::TYPE_STATICCALL_INIT === $type) {
+                    // Same-class `self::leaf()` / `A::leaf()` chains — same fixpoint
+                    // as METHODCALL. `parent::` stays conservative (needs inheritance).
+                    $classLc = self::literalClassNameLc($block, $op->arg1);
+                    $methodLc = self::literalMethodNameLc($block, $op->arg2);
+                    if (null === $classLc
+                        || null === $methodLc
+                        || !self::isAllowedNoThrowStaticCallee($context, $selfLc, $classLc, $methodLc)
                     ) {
                         return false;
                     }
@@ -236,14 +248,69 @@ final class NoThrowCallElision
         return false;
     }
 
+    /**
+     * Resolve {@code self::}/{@code static::}/{@code Class::} static callees.
+     * Prefer the explicit class::method key so {@code B::leaf} throwing does not
+     * unlock {@code A::mid}'s {@code self::leaf()} when only {@code A::leaf} is safe.
+     */
+    private static function isAllowedNoThrowStaticCallee(
+        Context $context,
+        string $selfLc,
+        string $classLitLc,
+        string $methodLc
+    ): bool {
+        if ('parent' === $classLitLc) {
+            return false;
+        }
+        $callerClass = self::classPrefix($selfLc);
+        $targetClass = $classLitLc;
+        if ('self' === $targetClass || 'static' === $targetClass) {
+            if ('' === $callerClass) {
+                return false;
+            }
+            $targetClass = $callerClass;
+        }
+        $targetClass = ltrim($targetClass, '\\');
+        if ('' === $targetClass || '' === $methodLc) {
+            return false;
+        }
+        // Recursing into the same static method (rare) — bare or scoped.
+        if ($methodLc === self::bareName($selfLc)
+            && ('' === $callerClass || $targetClass === $callerClass)
+        ) {
+            return true;
+        }
+        $scoped = $targetClass.'::'.$methodLc;
+        if (!empty($context->noThrowUserFunctions[$scoped])) {
+            return true;
+        }
+        if (!empty($context->noThrowUserFunctions[$methodLc])
+            && ('' === $callerClass || $targetClass === $callerClass)
+        ) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static function literalClassNameLc(Block $block, ?int $classSlot): ?string
+    {
+        return self::literalOperandStringLc($block, $classSlot);
+    }
+
     private static function literalMethodNameLc(Block $block, ?int $nameSlot): ?string
     {
-        if (null === $nameSlot) {
+        return self::literalOperandStringLc($block, $nameSlot);
+    }
+
+    private static function literalOperandStringLc(Block $block, ?int $slot): ?string
+    {
+        if (null === $slot) {
             return null;
         }
-        $nameOp = $block->getOperand($nameSlot);
-        if (!$nameOp instanceof Operand\Literal && isset($block->constants[$nameSlot])) {
-            $nameOp = new Operand\Literal($block->constants[$nameSlot]->toString());
+        $nameOp = $block->getOperand($slot);
+        if (!$nameOp instanceof Operand\Literal && isset($block->constants[$slot])) {
+            $nameOp = new Operand\Literal($block->constants[$slot]->toString());
         }
         if (!$nameOp instanceof Operand\Literal) {
             return null;
