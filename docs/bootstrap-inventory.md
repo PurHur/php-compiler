@@ -49070,7 +49070,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 12160)
 - new Temporary (line 12162)
 - new OpCode (line 12165)
-- 356 class method(s)
+- 331 class method(s)
 - 8 closure(s)
 
 ### `lib/Compiler/AbstractMethodBodyCheck.php`
@@ -49781,8 +49781,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/WriteContextRejects.php`
 
 **Warnings** (review for bootstrap subset):
-- trait WriteContextRejects (line 13)
-- 3 class method(s)
+- trait WriteContextRejects (line 18)
+- 28 class method(s)
 
 ### `lib/Compiler/DeprecatedMetadata.php`
 
