@@ -47,6 +47,13 @@ final class SpineChunkRuntimeMethodDemoteTest extends TestCase
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('phpcompiler\\compiler\\overridevalidator'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\Web\\MultipartParser'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('phpcompiler\\web\\responsecontext'));
+        // Ast\* / Cli\* / SourcePreprocessor\* — preg_replace_callback / OOM / string-arg (#36387).
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\Ast\\PipeOperatorDesugar'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('phpcompiler\\ast\\clonewithdesugar'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\Cli\\PhpcBuild'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('phpcompiler\\cli\\phpcrun'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\SourcePreprocessor\\PropertyHooks'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('phpcompiler\\sourcepreprocessor\\propertyhooks'));
         // Top-level Compiler / CompilerVersion stay live (no trailing \).
         $this->assertFalse(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\Compiler'));
         $this->assertFalse(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\CompilerVersion'));
