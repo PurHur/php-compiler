@@ -2693,26 +2693,66 @@ final class HashTable {
             }
             return;
         }
+        // zend_hash_rehash packs out IS_UNDEF holes before rebuilding chains. Without
+        // compaction, resize()'s rehash-only path leaves numUsed==tableSize so the next
+        // insert does numUsed++ and MaskedArray masks the index onto bucket 0 — which
+        // overwrote sibling keys after unset($a['li']) on an 8-element referenced HT
+        // (Parsedown blockListContinue #36380).
+        if (!$this->isWithoutHoles()) {
+            $this->compactHoles();
+        }
         $this->reset();
         $bucketIndex = 0;
-        if ($this->isWithoutHoles()) {
-            do {
-                $bucket = $this->buckets->read($bucketIndex);
-                $hash = $bucket->hash;
-                $bucket->value->next = $this->indexes->read($hash);
-                $this->indexes->write($hash, $bucketIndex);
-            } while (++$bucketIndex < $this->numUsed);
-
-            return;
-        }
-        for ($bucketIndex = 0; $bucketIndex < $this->numUsed; ++$bucketIndex) {
+        do {
             $bucket = $this->buckets->read($bucketIndex);
-            if ($bucket->value->isUndefined()) {
-                continue;
-            }
             $hash = $bucket->hash;
             $bucket->value->next = $this->indexes->read($hash);
             $this->indexes->write($hash, $bucketIndex);
+        } while (++$bucketIndex < $this->numUsed);
+    }
+
+    /**
+     * Pack live buckets to the front and shrink nNumUsed (php-src zend_hash_rehash).
+     */
+    private function compactHoles(): void
+    {
+        $write = 0;
+        $oldInternal = $this->internalPointer;
+        $oldForeach = $this->foreachPointer;
+        $newInternal = self::INVALID_INDEX;
+        $newForeach = self::INVALID_INDEX;
+        for ($read = 0; $read < $this->numUsed; ++$read) {
+            $bucket = $this->buckets->read($read);
+            if ($bucket->value->isUndefined()) {
+                continue;
+            }
+            if ($read !== $write) {
+                $this->buckets->write($write, $bucket);
+                $this->buckets->write(
+                    $read,
+                    new HashTableBucket(new Variable(Variable::TYPE_UNDEFINED), 0, null)
+                );
+            }
+            if ($oldInternal === $read) {
+                $newInternal = $write;
+            }
+            if ($oldForeach === $read) {
+                $newForeach = $write;
+            }
+            ++$write;
+        }
+        for ($i = $write; $i < $this->numUsed; ++$i) {
+            $this->buckets->write(
+                $i,
+                new HashTableBucket(new Variable(Variable::TYPE_UNDEFINED), 0, null)
+            );
+        }
+        $this->numUsed = $write;
+        if ($oldInternal !== self::INVALID_INDEX) {
+            $this->internalPointer = $newInternal;
+        }
+        if ($oldForeach !== self::INVALID_INDEX) {
+            $this->foreachPointer = $newForeach;
         }
     }
 

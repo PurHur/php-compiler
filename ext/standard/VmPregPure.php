@@ -548,8 +548,17 @@ final class VmPregPure
             );
             $offset = $end;
             ++$replacements;
+            // php-src ext/pcre/php_pcre.c — after a zero-width match, bump by one
+            // subject unit but keep that unit in the output (Parsedown list continue
+            // `preg_replace('/^[ ]{0,N}+/', '', $body)` #36380).
             if ($end === $start) {
-                $offset = $end + 1;
+                $unit = self::splitAdvanceUnit($subject, $end, $opts);
+                if ($unit > 0) {
+                    $out .= \substr($subject, $end, $unit);
+                    $offset = $end + $unit;
+                } else {
+                    $offset = $end + 1;
+                }
             }
             if ($offset > $subjectLen) {
                 break;

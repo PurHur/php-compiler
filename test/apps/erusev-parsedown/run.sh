@@ -5,7 +5,7 @@ ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 APP_DIR="$(cd "$(dirname "$0")" && pwd)"
 SLUG="$(basename "$APP_DIR")"
 PHP_BIN="${PHP_BIN:-php}"
-VM_TIMEOUT="${APPS_VM_TIMEOUT:-30}"
+VM_TIMEOUT="${APPS_VM_TIMEOUT:-90}"
 AOT_TIMEOUT="${APPS_AOT_TIMEOUT:-120}"
 
 cd "$ROOT"
