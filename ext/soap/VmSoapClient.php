@@ -4262,8 +4262,8 @@ final class SoapClientState
 {
     public ?string $wsdl = null;
 
-    /** php-src cache_wsdl bitmask (WSDL_CACHE_*) (#26511). */
-    public int $cacheWsdl = SoapConstants::WSDL_CACHE_DISK;
+    /** php-src cache_wsdl bitmask (WSDL_CACHE_*) (#26511). Literals avoid class-const property defaults (#3803 / #36387). */
+    public int $cacheWsdl = 0x1; // SoapConstants::WSDL_CACHE_DISK
 
     /** Owning VM context — Soap\Url / Soap\Sdl factories (#23246). */
     public ?Context $vmContext = null;
@@ -4285,7 +4285,7 @@ final class SoapClientState
 
     public ?string $password = null;
 
-    public int $authentication = SoapConstants::SOAP_AUTHENTICATION_BASIC;
+    public int $authentication = 0; // SoapConstants::SOAP_AUTHENTICATION_BASIC
 
     /**
      * Parsed WWW-Authenticate Digest params (php-src _digest) (#20340).
@@ -4354,11 +4354,11 @@ final class SoapClientState
      */
     public array $typemap = [];
 
-    public int $soapVersion = SoapConstants::SOAP_1_1;
+    public int $soapVersion = 1; // SoapConstants::SOAP_1_1
 
-    public int $style = SoapConstants::SOAP_RPC;
+    public int $style = 2; // SoapConstants::SOAP_RPC
 
-    public int $use = SoapConstants::SOAP_ENCODED;
+    public int $use = 1; // SoapConstants::SOAP_ENCODED
 
     /** True when ctor options supplied style (#21132). */
     public bool $styleFromOptions = false;

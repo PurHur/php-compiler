@@ -214,7 +214,7 @@ final class BootstrapGen0ChunksOrchestratorTest extends TestCase
         $this->assertSame(0, $rc, implode("\n", $out));
         $plan = json_decode((string) file_get_contents($planPath), true);
         $this->assertIsArray($plan);
-        $this->assertSame(2, (int) ($plan['deferred_count'] ?? -1));
+        $this->assertSame(1, (int) ($plan['deferred_count'] ?? -1));
         $deferredFiles = [];
         foreach ($plan['chunks'] as $chunk) {
             $body = (string) file_get_contents($chunk['entry']);
@@ -228,9 +228,7 @@ final class BootstrapGen0ChunksOrchestratorTest extends TestCase
             $this->assertSame('measured_emit_fail', $chunk['defer_reason'] ?? '');
             $deferredFiles[] = (string) ($chunk['defer_file'] ?? '');
         }
-        sort($deferredFiles);
         $this->assertSame([
-            'ext/soap/VmSoapClient.php',
             'ext/standard/VmDateTimeNative.php',
         ], $deferredFiles);
         $this->removeTree($tmp);

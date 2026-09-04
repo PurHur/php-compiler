@@ -131,11 +131,9 @@ final class SpineChunkRuntimeMethodDemote
     public static function oversizeSingletonCanEmit(string $rel): bool
     {
         $rel = str_replace('\\', '/', ltrim($rel, '/'));
-        // Host CFG / property-default failures after demote (#36387).
-        if (
-            'ext/soap/VmSoapClient.php' === $rel
-            || 'ext/standard/VmDateTimeNative.php' === $rel
-        ) {
+        // Host CFG null-Op after demote (#36387). SoapClientState property defaults are
+        // literals (not SoapConstants::…) so VmSoapClient emits under SPINE_CHUNK.
+        if ('ext/standard/VmDateTimeNative.php' === $rel) {
             return false;
         }
         if ('lib/CompilerVersion.php' === $rel) {

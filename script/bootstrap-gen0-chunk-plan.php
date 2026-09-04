@@ -572,8 +572,8 @@ usort($chunks, static function (array $a, array $b): int {
 // Honest capacity gate: oversize singletons that are *not* demote-eligible still NestedJIT /
 // host-CFG OOM under 8g. Demote-covered paths + CompilerVersion emit — do not defer those
 // (#36387; measured Block/VM/VmDom/CompileBlockInternal after T_TRAIT demote). Measured
-// post-demote fails (VmSoapClient / VmDateTimeNative) return false from
-// oversizeSingletonCanEmit so they stay deferred.
+// post-demote fail VmDateTimeNative returns false from oversizeSingletonCanEmit (soap
+// property defaults are literals so VmSoapClient emits).
 $deferred = 0;
 if (DEFER_SINGLETON_OVER_MAX_BYTES && $maxBytes >= 1) {
     // Autoload for oversizeSingletonCanEmit (mirrors SpineChunkRuntimeMethodDemote coverage).
