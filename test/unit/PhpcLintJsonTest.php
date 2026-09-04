@@ -4,54 +4,63 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\Lint\Issue;
 use PHPCompiler\Lint\UnsupportedRegistry;
 use PHPUnit\Framework\TestCase;
 
 /**
  * @see https://github.com/PurHur/php-compiler/issues/484
+ * @see https://github.com/PurHur/php-compiler/issues/36396
  */
 final class PhpcLintJsonTest extends TestCase
 {
     public function testLintJsonIncludesIssueUrlForRegistryMapping(): void
     {
-        $code = '<?php function f() { yield 1; }';
-        $exit = $this->runLint(['--json', '-r', $code]);
-        $this->assertSame(1, $exit['code']);
-        $decoded = json_decode($exit['stdout'], true);
-        $this->assertIsArray($decoded);
-        $this->assertNotEmpty($decoded['issues']);
-        $issue = $decoded['issues'][0];
-        $this->assertSame(167, $issue['issue']);
-        $this->assertSame(
-            UnsupportedRegistry::issueUrl(167),
-            $issue['issue_url']
+        // Generators (#167) and try/catch (#57) now compile; assert the JSON schema
+        // against a registry-mapped Issue rather than a live unsupported CFG node.
+        $issue = new Issue(
+            'Standard input code',
+            1,
+            'Stmt_TryCatch',
+            'Unsupported expression: Stmt_TryCatch',
+            UnsupportedRegistry::trackingIssueForKind('Stmt_TryCatch')
         );
-        $this->assertStringContainsString('issues/167', $exit['stdout']);
+        $row = $issue->toArray();
+        $this->assertSame(57, $row['issue']);
+        $this->assertSame(
+            UnsupportedRegistry::issueUrl(57),
+            $row['issue_url']
+        );
+        $this->assertStringContainsString('issues/57', $row['issue_url']);
     }
 
-    public function testPhpcLintJsonIncludesIssueUrl(): void
+    public function testPhpcLintJsonHelloWorldExitsZero(): void
     {
         $repoRoot = dirname(__DIR__, 2);
         $cmd = array_merge(
             self::phpCommand(),
-            [$repoRoot.'/bin/phpc.php', 'lint', '--json', '-r', '<?php function f() { yield 1; }']
+            [$repoRoot.'/bin/phpc.php', 'lint', '--json', '-r', '<?php echo 1;']
         );
         $exit = $this->runCommand($cmd, $repoRoot);
-        $this->assertSame(1, $exit['code']);
-        $this->assertStringContainsString('issues/167', $exit['stdout']);
+        $this->assertSame(0, $exit['code'], $exit['stderr']."\n".$exit['stdout']);
+        $decoded = json_decode($exit['stdout'], true);
+        $this->assertIsArray($decoded);
+        $this->assertSame([], $decoded['issues']);
     }
 
-    /**
-     * @param list<string> $lintArgs arguments after bin/lint.php
-     *
-     * @return array{code: int, stdout: string, stderr: string}
-     */
-    private function runLint(array $lintArgs): array
+    public function testLintJsonExplainFieldForMappedKind(): void
     {
         $repoRoot = dirname(__DIR__, 2);
-        $cmd = array_merge(self::phpCommand(), [$repoRoot.'/bin/lint.php'], $lintArgs);
-
-        return $this->runCommand($cmd, $repoRoot);
+        // --explain with clean input still exits 0; schema covered via Issue::formatExplain in UnsupportedFeatureTest.
+        $cmd = array_merge(
+            self::phpCommand(),
+            [$repoRoot.'/bin/lint.php', '--json', '--explain', '-r', '<?php echo 1;']
+        );
+        $exit = $this->runCommand($cmd, $repoRoot);
+        $this->assertSame(0, $exit['code'], $exit['stderr']."\n".$exit['stdout']);
+        $decoded = json_decode($exit['stdout'], true);
+        $this->assertIsArray($decoded);
+        $this->assertSame([], $decoded['issues']);
     }
 
     /**

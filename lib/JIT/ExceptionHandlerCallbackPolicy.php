@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\Lint\UnsupportedFeature;
+use PHPCompiler\Lint\UnsupportedRegistry;
 use PHPCompiler\VM\Variable as VMVariable;
 
 /**
@@ -62,7 +64,13 @@ final class ExceptionHandlerCallbackPolicy
 
     public static function jitRejectionMessage(): string
     {
-        return 'set_exception_handler() callback must be null or a compile-time string function name in this compiler build; '
-            .self::DEFERRED_KINDS.' are deferred (#4311)';
+        $row = UnsupportedRegistry::feature('set-exception-handler-callback');
+
+        return UnsupportedFeature::format(
+            $row['feature'],
+            $row['matrixRow'],
+            $row['issue'],
+            $row['alternative']
+        );
     }
 }

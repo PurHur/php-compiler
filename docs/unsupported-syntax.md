@@ -8,9 +8,16 @@
 ./phpc lint path/to/entry.php
 ./phpc lint -r 'for ($i = 0; $i < 3; $i++) echo $i;'
 ./phpc lint --json path/to/entry.php
+./phpc lint --project path/to/entry.php --explain
 ```
 
 With `--json`, each issue includes `issue` (GitHub issue number from `UnsupportedRegistry`) and `issue_url` (stable tracker URL, e.g. `https://github.com/PurHur/php-compiler/issues/115`) when mapped.
+
+With `--explain` (#36396), human output appends a catalogued line:
+
+`phpc: unsupported: {feature} ({matrixRow}, #{issue}) — {alternative}`
+
+JSON mode adds an `explain` field when a catalogued feature matches the kind.
 
 Exit code `0` when the entry (and best-effort `include`/`require` targets with string literals) compiles; `1` when any unsupported construct is found.
 
@@ -31,10 +38,13 @@ Some constructs (for example `break`/`continue`, `goto`/`label`, `list()` / shor
 |----------|----------|
 | `Stmt_Try`, `Stmt_TryCatch`, `Stmt_Catch`, `Stmt_Finally` | [#57](https://github.com/PurHur/php-compiler/issues/57) (AOT lint lowering; VM unwind follow-up) |
 
-The mapping lives in `lib/Lint/UnsupportedRegistry.php`. Compiler gaps are also listed in `docs/bootstrap-inventory.md` (self-host bootstrap).
+<a id="try-catch"></a>
+
+The mapping lives in `lib/Lint/UnsupportedRegistry.php`. Compile-time and JIT known limitations throw `PHPCompiler\Lint\UnsupportedFeature` with the same message shape (`UnsupportedRegistry::knownFeatures()`). Compiler gaps are also listed in `docs/bootstrap-inventory.md` (self-host bootstrap).
 
 ## Related
 
+- [#36396](https://github.com/PurHur/php-compiler/issues/36396) — UnsupportedFeature + lint `--explain`
 - [#236](https://github.com/PurHur/php-compiler/issues/236) — structured lint CLI
 - [#48](https://github.com/PurHur/php-compiler/issues/48) — README capability list
 - [#176](https://github.com/PurHur/php-compiler/issues/176) — capability matrix

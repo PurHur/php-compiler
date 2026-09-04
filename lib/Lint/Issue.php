@@ -102,4 +102,18 @@ final class Issue
 
         return "{$this->file}: {$where}: unsupported {$this->kind}{$suffix}";
     }
+
+    /**
+     * Human line plus catalogued matrix/issue/alternative when known (#36396).
+     */
+    public function formatExplain(): string
+    {
+        $base = $this->formatHuman();
+        $explain = UnsupportedRegistry::explainForKind($this->kind);
+        if (null === $explain) {
+            return $base;
+        }
+
+        return $base."\n  ".$explain;
+    }
 }

@@ -22,6 +22,7 @@ use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
@@ -78,7 +79,7 @@ final class range extends Internal
         }
 
         if (!self::jitIntEndpointOk($args[0]) || !self::jitIntEndpointOk($args[1])) {
-            throw new \LogicException('range() start and end must be integers in this compiler build');
+            UnsupportedFeature::raise('range-non-int-endpoints');
         }
         $i64 = $context->getTypeFromString('int64');
         $start = self::lowerIntEndpointArg($context, $args[0], 1, 'start');
@@ -115,7 +116,7 @@ final class range extends Internal
                 && JITVariable::TYPE_NATIVE_DOUBLE !== $arg->type
                 && !JitValueBox::isValueOperand($arg)
                 && JITVariable::TYPE_STRING !== $arg->type) {
-                throw new \LogicException('range() float path requires native numeric operands in this compiler build');
+                UnsupportedFeature::raise('range-float-path-operands');
             }
         }
         $double = $context->getTypeFromString('double');

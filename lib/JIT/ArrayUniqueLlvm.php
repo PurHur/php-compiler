@@ -8,6 +8,7 @@ use PHPCompiler\ext\standard\StdlibConstants;
 use PHPCompiler\ext\standard\lcfirst;
 use PHPCompiler\ext\standard\strval;
 use PHPCompiler\JIT\Builtin\ZendDoubleStringRuntime;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -33,7 +34,7 @@ final class ArrayUniqueLlvm
             && StdlibConstants::SORT_NUMERIC !== $sortType
             && StdlibConstants::SORT_REGULAR !== $sortType
         ) {
-            throw new \LogicException('array_unique() flags are not supported in this compiler build');
+            UnsupportedFeature::raise('array-unique-flags');
         }
         $dest = HashTableHelper::alloc($context);
         if (StdlibConstants::SORT_REGULAR === $sortType) {

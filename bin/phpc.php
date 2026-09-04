@@ -21,10 +21,10 @@ declare(strict_types=1);
  *   phpc deploy [dir] -o <dist> [--from-build]  Bundle binary, public/, assets/, phpc.json
  *   phpc cgi [binary]                           CGI wrapper for AOT binary (issue #665)
  *   phpc fcgi [--listen host:port] [--project dir] [docroot]  FastCGI worker (#2427, #173)
- *   phpc lint [-r 'code'] [--json] entry.php
+ *   phpc lint [-r 'code'] [--json] [--explain] entry.php
  *   phpc lint --native <file.php>                 Gen-2 driver compile lint (#15601)
- *   phpc lint --project <entry.php> [--json]
- *   phpc lint --all <dir-or-file> [--json]
+ *   phpc lint --project <entry.php> [--json] [--explain]
+ *   phpc lint --all <dir-or-file> [--json] [--explain]
  *   phpc lint --bootstrap-inventory [--check] [--json]
  *   phpc init [--profile default|miniwebapp|sessionsweb|apijson|fileupload|throwsweb|selfhostprobe|fastcgiweb] [--force] [target-dir]
  *   phpc test [--fast] [--bootstrap] [--bootstrap-strict] [--native] [-- phpunit/ci-local args...]
@@ -76,10 +76,10 @@ php-compiler CLI
       --project [dir]                           phpc.json public/ + optional AOT binary
       --binary path                             Force AOT binary path
       phpc fcgi --help                          Full flags and examples
-  phpc lint [-r 'code'] [--json] <entry.php>    Report unsupported syntax (line-accurate)
+  phpc lint [-r 'code'] [--json] [--explain] <entry.php>    Report unsupported syntax (line-accurate)
   phpc lint --native <file.php>                 Parse/compile lint via gen-2 driver -l (#15601)
-  phpc lint --project <entry.php> [--json]    Entry + literal include/require chain
-  phpc lint --all <dir-or-file> [--json]      All .php under a tree (aggregated)
+  phpc lint --project <entry.php> [--json] [--explain]    Entry + literal include/require chain
+  phpc lint --all <dir-or-file> [--json] [--explain]      All .php under a tree (aggregated)
   phpc lint --bootstrap-inventory [--check]   Lint all bin/vm.php-path files (#2208)
       --check                                   Exit 1 when any file has unsupported syntax
       --json fields: file, line, kind, message, issue, issue_url (when tracked)

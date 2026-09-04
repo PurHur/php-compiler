@@ -7,15 +7,16 @@ declare(strict_types=1);
  * Lint PHP sources for constructs the static compiler cannot lower yet.
  *
  * Usage:
- *   bin/lint.php [-r 'code'] [--json] <file.php>
- *   bin/lint.php --project <entry.php> [--json]
- *   bin/lint.php --all <dir-or-file> [--json]
+ *   bin/lint.php [-r 'code'] [--json] [--explain] <file.php>
+ *   bin/lint.php --project <entry.php> [--json] [--explain]
+ *   bin/lint.php --all <dir-or-file> [--json] [--explain]
  *   bin/lint.php --bootstrap-inventory [--check] [--json]
  *   phpc lint ...
  */
 
 use PHPCompiler\Lint\Issue;
 use PHPCompiler\Lint\Linter;
+use PHPCompiler\Lint\UnsupportedRegistry;
 
 require __DIR__.'/../src/tokenizer-compat.php';
 require __DIR__.'/../src/yay-php8-compat.php';
@@ -34,6 +35,7 @@ if ('0' !== \PHPCompiler\Config::getenv('PHP_COMPILER_LINT_FRONTEND_FAST')) {
 }
 
 $json = false;
+$explain = false;
 $check = false;
 $code = null;
 $filename = null;
@@ -44,6 +46,10 @@ while ([] !== $args) {
     $arg = array_shift($args);
     if ('--json' === $arg) {
         $json = true;
+        continue;
+    }
+    if ('--explain' === $arg) {
+        $explain = true;
         continue;
     }
     if ('--check' === $arg) {
@@ -104,9 +110,9 @@ while ([] !== $args) {
 }
 
 if ('bootstrap-inventory' !== $mode && 'worker-stdin' !== $mode && null === $filename) {
-    fwrite(STDERR, "Usage: lint.php [-r 'code'] [--json] <file.php>\n");
-    fwrite(STDERR, "       lint.php --project <entry.php> [--json]\n");
-    fwrite(STDERR, "       lint.php --all <dir-or-file> [--json]\n");
+    fwrite(STDERR, "Usage: lint.php [-r 'code'] [--json] [--explain] <file.php>\n");
+    fwrite(STDERR, "       lint.php --project <entry.php> [--json] [--explain]\n");
+    fwrite(STDERR, "       lint.php --all <dir-or-file> [--json] [--explain]\n");
     fwrite(STDERR, "       lint.php --bootstrap-inventory [--check] [--json]\n");
     exit(1);
 }
@@ -294,11 +300,18 @@ foreach ($linter->consumeDynamicIncludeWarnings() as $warning) {
 }
 
 if ($json) {
-    $payload = array_map(static fn (Issue $i) => $i->toArray(), $issues);
+    $payload = array_map(static function (Issue $i) use ($explain): array {
+        $row = $i->toArray();
+        if ($explain) {
+            $row['explain'] = UnsupportedRegistry::explainForKind($i->kind);
+        }
+
+        return $row;
+    }, $issues);
     fwrite(STDOUT, json_encode(['issues' => $payload], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n");
 } else {
     foreach ($issues as $issue) {
-        fwrite(STDOUT, $issue->formatHuman()."\n");
+        fwrite(STDOUT, ($explain ? $issue->formatExplain() : $issue->formatHuman())."\n");
     }
 }
 
