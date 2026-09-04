@@ -15,10 +15,16 @@ use PHPCompiler\ext\standard\fdiv;
 use PHPCompiler\ext\standard\gettype;
 use PHPCompiler\ext\standard\ord;
 use PHPCompiler\ext\standard\pow;
+use PHPCompiler\ext\standard\quotemeta;
+use PHPCompiler\ext\standard\rawurldecode;
+use PHPCompiler\ext\standard\rawurlencode;
 use PHPCompiler\ext\standard\sqrt;
+use PHPCompiler\ext\standard\str_rot13;
 use PHPCompiler\ext\standard\string_trim;
 use PHPCompiler\ext\standard\strtolower;
 use PHPCompiler\ext\standard\ucwords;
+use PHPCompiler\ext\standard\urldecode;
+use PHPCompiler\ext\standard\urlencode;
 use PHPCompiler\ext\types\is_type;
 use PHPCompiler\ext\types\strlen;
 use PHPCompiler\JIT\Call\Native;
@@ -271,6 +277,79 @@ final class DiscardedPureCallElisionTest extends TestCase
         $context = $this->makeContext();
         $builtin = new ucwords();
         $arg = $this->makeNullVar();
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testElidesDiscardedUrlencodeOnTypedString(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new urlencode();
+        $arg = $this->makeStringVar(null);
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testElidesDiscardedRawurlencodeOnLiteral(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new rawurlencode();
+        $arg = $this->makeStringVar('a b');
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testElidesDiscardedUrldecodeOnTypedString(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new urldecode();
+        $arg = $this->makeStringVar(null);
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testElidesDiscardedRawurldecodeOnTypedString(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new rawurldecode();
+        $arg = $this->makeStringVar(null);
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testElidesDiscardedStrRot13OnTypedString(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new str_rot13();
+        $arg = $this->makeStringVar('Hello');
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testElidesDiscardedQuotemetaOnTypedString(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new quotemeta();
+        $arg = $this->makeStringVar('a.b');
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testDoesNotElideUrlencodeOnNull(): void
+    {
+        // Soft-null urlencode deprecate — must keep the call (#36386).
+        $context = $this->makeContext();
+        $builtin = new urlencode();
+        $arg = $this->makeNullVar();
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testDoesNotElideStrRot13OnNativeLong(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new str_rot13();
+        $arg = $this->makeNativeLongVar();
 
         $this->assertFalse(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
     }
