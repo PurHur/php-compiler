@@ -186,11 +186,13 @@ trait OuterSiblingAndBuiltinWireCallArgSlots
     }
 
     /**
-     * Map dead inline ?: call-arg temps to the innermost ?: merge phi slots for this call (#15816, #22732).
+     * Map dead inline ?: call-arg temps to the innermost ?: merge phi slots for this call (#15816, #22732, #36380).
      *
      * php-cfg writes Phi into Temporary->ops for ?: args and ConstFetch for trailing true/false/null.
      * Only Phi-written args consume ternary merge phi slots — counting all dead temps made
      * `f(cond ? a : b, true)` fail the phiSlots>=deadTempCount guard (#22732).
+     * Lone `f(…, cond ? a : b)` must also remap: the ARG_SEND Dead temp is not the arm ASSIGN
+     * target, so compileOperand leaves null (#36380).
      */
     private function resolveNestedTernaryMergeCallArgSlot(
         Block $block,
@@ -217,24 +219,11 @@ trait OuterSiblingAndBuiltinWireCallArgSlots
         if ([] === $phiArgIndexes) {
             return null;
         }
-        // Multi-?: call args (#15816) or mixed ?: + scalar ConstFetch (#22732) both need remapping.
-        // Lone single-arg ?: already wires via compileOperand — only engage when a sibling dead temp
-        // (ConstFetch / another Phi) shares the call, matching the historic deadTempCount>=2 gate.
-        if (1 === \count($phiArgIndexes)) {
-            $siblingDeadTemp = false;
-            foreach ($cfgCallOp->args as $i => $callArg) {
-                if ((int) $i === $phiArgIndexes[0]) {
-                    continue;
-                }
-                if ($callArg instanceof Operand && $this->callArgIsDeadInlineTemporary($callArg)) {
-                    $siblingDeadTemp = true;
-                    break;
-                }
-            }
-            if (!$siblingDeadTemp) {
-                return null;
-            }
-        }
+        // Multi-?: call args (#15816), mixed ?: + scalar ConstFetch (#22732), AND lone ?: as a
+        // call argument (#36380 Parsedown htmlspecialchars / show($c?0:3)) all need remapping.
+        // php-cfg leaves the ARG_SEND operand as a Dead Phi temp distinct from the arm ASSIGN
+        // targets; compileOperand does not bridge that gap (historic "deadTempCount>=2" /
+        // sibling-dead-temp gate left lone ?: as null → ENT_NOQUOTES / empty args).
         $phiSlots = [];
         foreach ($this->ternaryMergePhiRhsSlots as $mergeCfg) {
             $phi = $this->ternaryMergePhiRhsSlots[$mergeCfg];
