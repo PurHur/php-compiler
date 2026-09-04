@@ -834,6 +834,18 @@ final class PregAotFastPath
 
     private static int $lastReplaceBodyLen = 0;
 
+    /** Expanded charset bytes for {@see tryParseBracketClassPattern} (#36382). */
+    private static string $bracketClassChars = '';
+
+    /** 1 = negated class, 0 = positive (#36382). */
+    private static int $bracketClassNegated = 0;
+
+    /** 1 = single char, 2 = + / ++ run (#36382). */
+    private static int $bracketClassQuant = 1;
+
+    /** 1 = Nyholm encode shape `(?:[^class]++|%(?![A-Fa-f0-9]{2}))` (#36382). */
+    private static int $bracketClassNyholmEncode = 0;
+
     public static function replaceOrEmpty(string $pattern, string $replacement, string $subject, int $limit): string
     {
         $kind = self::patternKind($pattern);
@@ -863,6 +875,10 @@ final class PregAotFastPath
         $litPlus = self::literalCharPlusChar($pattern);
         if (null !== $litPlus) {
             return self::findLiteralCharPlus($litPlus, $subject, $offset);
+        }
+        // Custom `[…]` / Nyholm encode classes before kind=0 bail (#36382).
+        if (1 === self::tryParseBracketClassPattern($pattern)) {
+            return self::findParsedBracketClass($subject, $offset);
         }
         $hexLit = self::exactHexEscapeLiteral($pattern);
         if (null !== $hexLit) {
@@ -953,6 +969,214 @@ final class PregAotFastPath
     public static function takeLastReplaceBodyLen(): int
     {
         return self::$lastReplaceBodyLen;
+    }
+
+    /**
+     * Parse `/[…]++?/`, `/[^…]++?/`, or Nyholm `/(?:[^…]++|%(?![A-Fa-f0-9]{2}))/`.
+     * NestedJIT-safe — no host preg, int/string only (#36382).
+     *
+     * @return int 1 parsed into {@see $bracketClassChars}, 0 not a bracket class
+     */
+    private static function tryParseBracketClassPattern(string $pattern): int
+    {
+        self::$bracketClassChars = '';
+        self::$bracketClassNegated = 0;
+        self::$bracketClassQuant = 1;
+        self::$bracketClassNyholmEncode = 0;
+        $close = self::delimitedBodyCloseAllowUtf($pattern);
+        if ($close < 2) {
+            return 0;
+        }
+        $body = \substr($pattern, 1, $close - 1);
+        $blen = \strlen($body);
+        // Nyholm filterPath / filterQuery: (?:[^CLASS]++|%(?![A-Fa-f0-9]{2}))
+        if ($blen > 28 && '(?:[^' === \substr($body, 0, 5)) {
+            $classEnd = self::findBracketClassClose($body, 5);
+            if ($classEnd > 5) {
+                $suffix = \substr($body, $classEnd);
+                if (']++|%(?![A-Fa-f0-9]{2}))' === $suffix) {
+                    $inner = \substr($body, 5, $classEnd - 5);
+                    if (1 === self::expandBracketClassBody($inner)) {
+                        self::$bracketClassNegated = 1;
+                        self::$bracketClassQuant = 2;
+                        self::$bracketClassNyholmEncode = 1;
+
+                        return 1;
+                    }
+                }
+            }
+        }
+        if ($blen < 2 || '[' !== \substr($body, 0, 1)) {
+            return 0;
+        }
+        $pos = 1;
+        if ('^' === \substr($body, 1, 1)) {
+            self::$bracketClassNegated = 1;
+            $pos = 2;
+        }
+        $classEnd = self::findBracketClassClose($body, $pos);
+        if ($classEnd < $pos) {
+            return 0;
+        }
+        $inner = \substr($body, $pos, $classEnd - $pos);
+        $after = \substr($body, $classEnd + 1);
+        if ('' === $after) {
+            self::$bracketClassQuant = 1;
+        } elseif ('+' === $after || '++' === $after) {
+            self::$bracketClassQuant = 2;
+        } else {
+            return 0;
+        }
+        if (1 !== self::expandBracketClassBody($inner)) {
+            return 0;
+        }
+
+        return 1;
+    }
+
+    /** Index of unescaped `]` closing a class body that started at $pos. */
+    private static function findBracketClassClose(string $body, int $pos): int
+    {
+        $blen = \strlen($body);
+        $i = $pos;
+        // First char of class may be literal ] (PCRE).
+        if ($i < $blen && ']' === \substr($body, $i, 1)) {
+            ++$i;
+        }
+        while ($i < $blen) {
+            $ch = \substr($body, $i, 1);
+            if ('\\' === $ch) {
+                $i += 2;
+                continue;
+            }
+            if (']' === $ch) {
+                return $i;
+            }
+            ++$i;
+        }
+
+        return -1;
+    }
+
+    /**
+     * Expand class body into {@see $bracketClassChars} (ranges + escapes).
+     *
+     * @return int 1 ok, 0 unsupported metachar
+     */
+    private static function expandBracketClassBody(string $inner): int
+    {
+        self::$bracketClassChars = '';
+        $len = \strlen($inner);
+        $i = 0;
+        while ($i < $len) {
+            $ch = \substr($inner, $i, 1);
+            if ('\\' === $ch) {
+                if ($i + 1 >= $len) {
+                    return 0;
+                }
+                $esc = \substr($inner, $i + 1, 1);
+                // Common PCRE escapes inside classes used by Nyholm Uri.php.
+                if ('d' === $esc || 'D' === $esc || 's' === $esc || 'S' === $esc
+                    || 'w' === $esc || 'W' === $esc) {
+                    return 0;
+                }
+                self::$bracketClassChars .= $esc;
+                $i += 2;
+                continue;
+            }
+            // Range a-z when both ends are literals.
+            if ($i + 2 < $len && '-' === \substr($inner, $i + 1, 1)) {
+                $right = \substr($inner, $i + 2, 1);
+                if ('\\' !== $right && ']' !== $right && '-' !== $ch) {
+                    $from = \ord($ch);
+                    $to = \ord($right);
+                    if ($from <= $to && ($to - $from) <= 128) {
+                        $o = $from;
+                        while ($o <= $to) {
+                            self::$bracketClassChars .= \chr($o);
+                            ++$o;
+                        }
+                        $i += 3;
+                        continue;
+                    }
+                }
+            }
+            self::$bracketClassChars .= $ch;
+            ++$i;
+        }
+
+        return '' === self::$bracketClassChars ? 0 : 1;
+    }
+
+    private static function charInBracketClass(string $ch): bool
+    {
+        if (1 !== \strlen($ch)) {
+            return false;
+        }
+        $chars = self::$bracketClassChars;
+        $n = \strlen($chars);
+        $i = 0;
+        while ($i < $n) {
+            if ($ch === \substr($chars, $i, 1)) {
+                return 0 === self::$bracketClassNegated;
+            }
+            ++$i;
+        }
+
+        return 1 === self::$bracketClassNegated;
+    }
+
+    /** @return int 1 matched, 0 no match */
+    private static function findParsedBracketClass(string $subject, int $offset): int
+    {
+        $subLen = \strlen($subject);
+        $i = $offset;
+        if ($i < 0) {
+            $i = 0;
+        }
+        while ($i < $subLen) {
+            $ch = \substr($subject, $i, 1);
+            if (1 === self::$bracketClassNyholmEncode && '%' === $ch) {
+                // % not followed by two hex digits.
+                $h1 = $i + 1 < $subLen ? \substr($subject, $i + 1, 1) : '';
+                $h2 = $i + 2 < $subLen ? \substr($subject, $i + 2, 1) : '';
+                if (!self::isHexDigitChar($h1) || !self::isHexDigitChar($h2)) {
+                    self::$lastReplacePos = $i;
+                    self::$lastReplaceBodyLen = 1;
+
+                    return 1;
+                }
+            }
+            if (self::charInBracketClass($ch)) {
+                if (1 === self::$bracketClassQuant) {
+                    self::$lastReplacePos = $i;
+                    self::$lastReplaceBodyLen = 1;
+
+                    return 1;
+                }
+                $j = $i + 1;
+                while ($j < $subLen && self::charInBracketClass(\substr($subject, $j, 1))) {
+                    ++$j;
+                }
+                self::$lastReplacePos = $i;
+                self::$lastReplaceBodyLen = $j - $i;
+
+                return 1;
+            }
+            ++$i;
+        }
+
+        return 0;
+    }
+
+    private static function isHexDigitChar(string $ch): bool
+    {
+        if (1 !== \strlen($ch)) {
+            return false;
+        }
+        $o = \ord($ch);
+
+        return ($o >= 48 && $o <= 57) || ($o >= 65 && $o <= 70) || ($o >= 97 && $o <= 102);
     }
 
     private static function findClassPlus(int $kind, string $subject, int $offset): int

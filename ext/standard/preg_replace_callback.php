@@ -14,7 +14,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * preg_replace_callback() — VM with any callable; JIT/AOT string user-function names (#1177, #4442).
+ * preg_replace_callback() — VM any callable; JIT/AOT string names + static [Class, method] (#1177, #36382).
  */
 final class preg_replace_callback extends Internal
 {

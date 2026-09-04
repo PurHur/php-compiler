@@ -10,7 +10,7 @@
 # OOM under 8g was SprintfJitHelper::readPackedDoubleAtOffset calling unpack() while
 # sprintf is force-NestedJIT'd into every user-script AOT — that pulled UnpackEngine
 # into the user module. Fixed via Ieee754::decodeFloat64Le. Default Docker 8–10g is
-# enough past that point; next Slim blocker is preg_replace_callback array callables.
+# next Slim blocker after array-callable + charclass find (#36382): full Slim+fcgi /hello.
 # Keep LLVM memory floor at PHP_COMPILER_LLVM_MEMORY_LIMIT (default 8192M).
 set -euo pipefail
 

@@ -1020,7 +1020,6 @@ final class PregMatchRuntime
         $initBb = $fn->appendBasicBlock('preg_replace_cb_thin_init');
         $headBb = $fn->appendBasicBlock('preg_replace_cb_thin_head');
         $findBb = $fn->appendBasicBlock('preg_replace_cb_thin_find');
-        $failBb = $fn->appendBasicBlock('preg_replace_cb_thin_fail');
         $matchBb = $fn->appendBasicBlock('preg_replace_cb_thin_match');
         $restBb = $fn->appendBasicBlock('preg_replace_cb_thin_rest');
         $doneBb = $fn->appendBasicBlock('preg_replace_cb_thin_done');
@@ -1049,14 +1048,11 @@ final class PregMatchRuntime
             $off
         );
         $rc = JitNestedHelperCoerce::coerceBridgeResult($context, $rcRaw, $i64);
-        $isErr = $context->builder->icmp(Builder::INT_SLT, $rc, $zero);
+        // Unsupported (-1) and no-match (0) both finish with the remaining subject.
+        // Never fall back to an in-module digit scan: that rewrote /a/ on "x1y" → "xZy" (#36382).
         $isMatch = $context->builder->icmp(Builder::INT_EQ, $rc, $one);
-        $afterErr = $fn->appendBasicBlock('preg_replace_cb_thin_after_err');
         $helperMatchBb = $fn->appendBasicBlock('preg_replace_cb_thin_helper_match');
-        $digitScanBb = $fn->appendBasicBlock('preg_replace_cb_thin_digit_scan');
-        $context->builder->branchIf($isErr, $failBb, $afterErr);
-        $context->builder->positionAtEnd($afterErr);
-        $context->builder->branchIf($isMatch, $helperMatchBb, $digitScanBb);
+        $context->builder->branchIf($isMatch, $helperMatchBb, $restBb);
 
         $context->builder->positionAtEnd($helperMatchBb);
         $posRaw = $context->builder->call(self::helperFunction($context, self::TAKE_LAST_REPLACE_POS));
@@ -1070,41 +1066,6 @@ final class PregMatchRuntime
             $blenSlot
         );
         $context->builder->branch($matchBb);
-
-        // Stale helper-runtime may lack \d/\s/\w find — scan ASCII digit in-module (#26820).
-        $context->builder->positionAtEnd($digitScanBb);
-        $subj = $fn->getParam(1);
-        $subjLen = $context->builder->load($context->builder->structGep($subj, $map['length']));
-        $scanIdxSlot = $context->builder->alloca($i64, 1, 'preg_replace_cb_scan');
-        $context->builder->store($off, $scanIdxSlot);
-        $digitHeadBb = $fn->appendBasicBlock('preg_replace_cb_thin_digit_head');
-        $digitBodyBb = $fn->appendBasicBlock('preg_replace_cb_thin_digit_body');
-        $digitFoundBb = $fn->appendBasicBlock('preg_replace_cb_thin_digit_found');
-        $context->builder->branch($digitHeadBb);
-        $context->builder->positionAtEnd($digitHeadBb);
-        $scanIdx = $context->builder->load($scanIdxSlot);
-        $scanDone = $context->builder->icmp(Builder::INT_SGE, $scanIdx, $subjLen);
-        $context->builder->branchIf($scanDone, $restBb, $digitBodyBb);
-        $context->builder->positionAtEnd($digitBodyBb);
-        $subjChar = $context->builder->structGep($subj, $map['value']);
-        $chPtr = $context->builder->gep($subjChar, $scanIdx);
-        $ch = $context->builder->load($chPtr);
-        $chI64 = $context->builder->sext($ch, $i64);
-        $geZero = $context->builder->icmp(Builder::INT_SGE, $chI64, $i64->constInt(0x30, false));
-        $leNine = $context->builder->icmp(Builder::INT_SLE, $chI64, $i64->constInt(0x39, false));
-        $isDigit = $context->builder->and($geZero, $leNine);
-        $digitNextBb = $fn->appendBasicBlock('preg_replace_cb_thin_digit_next');
-        $context->builder->branchIf($isDigit, $digitFoundBb, $digitNextBb);
-        $context->builder->positionAtEnd($digitNextBb);
-        $context->builder->store($context->builder->add($scanIdx, $one), $scanIdxSlot);
-        $context->builder->branch($digitHeadBb);
-        $context->builder->positionAtEnd($digitFoundBb);
-        $context->builder->store($scanIdx, $posSlot);
-        $context->builder->store($one, $blenSlot);
-        $context->builder->branch($matchBb);
-
-        $context->builder->positionAtEnd($failBb);
-        $context->builder->returnValue($strPtr->constNull());
 
         $context->builder->positionAtEnd($matchBb);
         $pos = $context->builder->load($posSlot);
