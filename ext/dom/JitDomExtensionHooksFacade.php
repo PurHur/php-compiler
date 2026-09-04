@@ -23,10 +23,10 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 
 /**
- * dom surfaces for lib/JIT Call Dom* thin proxies (#36204).
+ * dom surfaces for lib/JIT Call Dom* thin proxies + Dom*Runtime kernels (#36204).
  *
  * php-src: ext/dom/*.c — DOM* method thin-AOT kernels.
- * Registered from {@see Module::jitInit} so Call files do not import ext/dom.
+ * Registered from {@see Module::jitInit} so Call/Runtime files do not import ext/dom.
  */
 final class JitDomExtensionHooksFacade implements DomExtensionHooks
 {
@@ -1504,6 +1504,83 @@ final class JitDomExtensionHooksFacade implements DomExtensionHooks
         );
 
         return JitValueBox::normalizeValuePtr($context, $slot);
+    }
+
+
+    public function ensureDocumentMethodBridge(Context $context, string $bridgeId): void
+    {
+        match ($bridgeId) {
+            'AdoptNode' => JitDomDocumentMethodKernel::ensureAdoptNodeBridge($context),
+            'AttrIsId' => JitDomDocumentMethodKernel::ensureAttrIsIdBridge($context),
+            'C14N' => JitDomDocumentMethodKernel::ensureC14NBridge($context),
+            'C14NFile' => JitDomDocumentMethodKernel::ensureC14NFileBridge($context),
+            'ChildElementCount' => JitDomDocumentMethodKernel::ensureChildElementCountBridge($context),
+            'CreateAttribute' => JitDomDocumentMethodKernel::ensureCreateAttributeBridge($context),
+            'CreateAttributeNS' => JitDomDocumentMethodKernel::ensureCreateAttributeNSBridge($context),
+            'CreateElement' => JitDomDocumentMethodKernel::ensureCreateElementBridge($context),
+            'CreateElementNS' => JitDomDocumentMethodKernel::ensureCreateElementNSBridge($context),
+            'DocumentRegisterNodeClass' => JitDomDocumentMethodKernel::ensureDocumentRegisterNodeClassBridge($context),
+            'DocumentRelaxNGValidate' => JitDomDocumentMethodKernel::ensureDocumentRelaxNGValidateBridge($context),
+            'DocumentRelaxNGValidateSource' => JitDomDocumentMethodKernel::ensureDocumentRelaxNGValidateSourceBridge($context),
+            'DocumentSchemaValidate' => JitDomDocumentMethodKernel::ensureDocumentSchemaValidateBridge($context),
+            'DocumentSchemaValidateSource' => JitDomDocumentMethodKernel::ensureDocumentSchemaValidateSourceBridge($context),
+            'DocumentValidate' => JitDomDocumentMethodKernel::ensureDocumentValidateBridge($context),
+            'DocumentXInclude' => JitDomDocumentMethodKernel::ensureDocumentXIncludeBridge($context),
+            'ElementNodeValueWrite' => JitDomDocumentMethodKernel::ensureElementNodeValueWriteBridge($context),
+            'ElementTextContent' => JitDomDocumentMethodKernel::ensureElementTextContentBridge($context),
+            'ElementTextContentWrite' => JitDomDocumentMethodKernel::ensureElementTextContentWriteBridge($context),
+            'FirstChild' => JitDomDocumentMethodKernel::ensureFirstChildBridge($context),
+            'FirstElementChild' => JitDomDocumentMethodKernel::ensureFirstElementChildBridge($context),
+            'GetAttribute' => JitDomDocumentMethodKernel::ensureGetAttributeBridge($context),
+            'GetAttributeNodeNS' => JitDomDocumentMethodKernel::ensureGetAttributeNodeNSBridge($context),
+            'GetElementById' => JitDomDocumentMethodKernel::ensureGetElementByIdBridge($context),
+            'GetElementsByTagName' => JitDomDocumentMethodKernel::ensureGetElementsByTagNameBridge($context),
+            'HtmlDocumentCreateFromFile' => JitDomDocumentMethodKernel::ensureHtmlDocumentCreateFromFileBridge($context),
+            'HtmlDocumentCreateFromString' => JitDomDocumentMethodKernel::ensureHtmlDocumentCreateFromStringBridge($context),
+            'ImportNode' => JitDomDocumentMethodKernel::ensureImportNodeBridge($context),
+            'InsertAdjacentElement' => JitDomDocumentMethodKernel::ensureInsertAdjacentElementBridge($context),
+            'InsertAdjacentText' => JitDomDocumentMethodKernel::ensureInsertAdjacentTextBridge($context),
+            'InsertBefore' => JitDomDocumentMethodKernel::ensureInsertBeforeBridge($context),
+            'IsConnected' => JitDomDocumentMethodKernel::ensureIsConnectedBridge($context),
+            'LastChild' => JitDomDocumentMethodKernel::ensureLastChildBridge($context),
+            'LastElementChild' => JitDomDocumentMethodKernel::ensureLastElementChildBridge($context),
+            'Load' => JitDomDocumentMethodKernel::ensureLoadBridge($context),
+            'LoadHTML' => JitDomDocumentMethodKernel::ensureLoadHTMLBridge($context),
+            'LoadHTMLFile' => JitDomDocumentMethodKernel::ensureLoadHTMLFileBridge($context),
+            'LoadXML' => JitDomDocumentMethodKernel::ensureLoadXMLBridge($context),
+            'NextElementSibling' => JitDomDocumentMethodKernel::ensureNextElementSiblingBridge($context),
+            'NextSibling' => JitDomDocumentMethodKernel::ensureNextSiblingBridge($context),
+            'NodeListItem' => JitDomDocumentMethodKernel::ensureNodeListItemBridge($context),
+            'Normalize' => JitDomDocumentMethodKernel::ensureNormalizeBridge($context),
+            'NormalizeDocument' => JitDomDocumentMethodKernel::ensureNormalizeDocumentBridge($context),
+            'ParentNode' => JitDomDocumentMethodKernel::ensureParentNodeBridge($context),
+            'PreviousElementSibling' => JitDomDocumentMethodKernel::ensurePreviousElementSiblingBridge($context),
+            'PreviousSibling' => JitDomDocumentMethodKernel::ensurePreviousSiblingBridge($context),
+            'RemoveAttributeNode' => JitDomDocumentMethodKernel::ensureRemoveAttributeNodeBridge($context),
+            'RemoveChild' => JitDomDocumentMethodKernel::ensureRemoveChildBridge($context),
+            'ReplaceChild' => JitDomDocumentMethodKernel::ensureReplaceChildBridge($context),
+            'SaveHTML' => JitDomDocumentMethodKernel::ensureSaveHTMLBridge($context),
+            'SaveHTMLFile' => JitDomDocumentMethodKernel::ensureSaveHTMLFileBridge($context),
+            'SaveXML' => JitDomDocumentMethodKernel::ensureSaveXMLBridge($context),
+            'SetAttributeNode' => JitDomDocumentMethodKernel::ensureSetAttributeNodeBridge($context),
+            'SetAttributeNodeNS' => JitDomDocumentMethodKernel::ensureSetAttributeNodeNSBridge($context),
+            'SetIdAttributeFalse' => JitDomDocumentMethodKernel::ensureSetIdAttributeFalseBridge($context),
+            'SetIdAttributeNodeFalse' => JitDomDocumentMethodKernel::ensureSetIdAttributeNodeFalseBridge($context),
+            'SetIdAttributeNodeTrue' => JitDomDocumentMethodKernel::ensureSetIdAttributeNodeTrueBridge($context),
+            'SetIdAttributeNsFalse' => JitDomDocumentMethodKernel::ensureSetIdAttributeNsFalseBridge($context),
+            'SetIdAttributeNsTrue' => JitDomDocumentMethodKernel::ensureSetIdAttributeNsTrueBridge($context),
+            'SetIdAttributeTrue' => JitDomDocumentMethodKernel::ensureSetIdAttributeTrueBridge($context),
+            'SyncElementIdMap' => JitDomDocumentMethodKernel::ensureSyncElementIdMapBridge($context),
+            'XPathEvaluateBool' => JitDomDocumentMethodKernel::ensureXPathEvaluateBoolBridge($context),
+            'XPathEvaluateDouble' => JitDomDocumentMethodKernel::ensureXPathEvaluateDoubleBridge($context),
+            'XPathEvaluateString' => JitDomDocumentMethodKernel::ensureXPathEvaluateStringBridge($context),
+            'XPathQuery' => JitDomDocumentMethodKernel::ensureXPathQueryBridge($context),
+            'XmlDocumentCreateFromFile' => JitDomDocumentMethodKernel::ensureXmlDocumentCreateFromFileBridge($context),
+            'XmlDocumentCreateFromString' => JitDomDocumentMethodKernel::ensureXmlDocumentCreateFromStringBridge($context),
+            default => throw new \InvalidArgumentException(
+                'Unknown DOM document method bridge: '.$bridgeId
+            ),
+        };
     }
 
 }

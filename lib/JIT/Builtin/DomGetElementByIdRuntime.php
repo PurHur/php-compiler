@@ -4,14 +4,13 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
 
-/** JIT/AOT link for DOMDocument::getElementById() via DomGetElementByIdJitHelper (#17954). */
+/** JIT/AOT link for DOMDocument::getElementById() (DomGetElementByIdJitHelper (#17954)) — DomExtensionHooks (#36204). */
 final class DomGetElementByIdRuntime
 {
     public const ABI_NAME = '__phpc_dom_get_element_by_id';
@@ -27,8 +26,8 @@ final class DomGetElementByIdRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            JitDomDocumentMethodKernel::ensureGetElementByIdBridge($context);
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
+            $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'GetElementById');
 
             return;
         }

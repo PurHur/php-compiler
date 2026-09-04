@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -14,7 +13,7 @@ use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\VmActiveContextInitLlvm;
 use PHPCompiler\JIT\VmActiveContextLlvm;
 
-/** JIT/AOT link for DOMDocument::getElementsByTagName() via DomGetElementsByTagNameJitHelper (#18461). */
+/** JIT/AOT link for DOMDocument::getElementsByTagName() (DomGetElementsByTagNameJitHelper (#18461)) — DomExtensionHooks (#36204). */
 final class DomGetElementsByTagNameRuntime
 {
     public const ABI_NAME = '__phpc_dom_get_elements_by_tag_name';
@@ -30,8 +29,8 @@ final class DomGetElementsByTagNameRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            JitDomDocumentMethodKernel::ensureGetElementsByTagNameBridge($context);
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
+            $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'GetElementsByTagName');
 
             return;
         }

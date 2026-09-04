@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -35,8 +34,8 @@ final class DomElementTextContentRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            JitDomDocumentMethodKernel::ensureElementTextContentBridge($context);
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
+            $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'ElementTextContent');
 
             return;
         }
@@ -65,9 +64,9 @@ final class DomElementTextContentRuntime
 
     public static function ensureWriteLinked(Context $context): void
     {
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            JitDomDocumentMethodKernel::ensureElementTextContentWriteBridge($context);
-            JitDomDocumentMethodKernel::ensureElementNodeValueWriteBridge($context);
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
+            $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'ElementTextContentWrite');
+            $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'ElementNodeValueWrite');
 
             return;
         }

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
@@ -42,7 +41,7 @@ final class DomDocumentValidateRuntime
         if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'DOMDocument::validate', 0)) {
             return VmClassMethod::jitArgcDummyReturn($context);
         }
-        JitDomDocumentMethodKernel::ensureDocumentValidateBridge($context);
+        $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'DocumentValidate');
         $i1 = $context->builder->call(
             $context->lookupFunction(self::ABI_VALIDATE),
             self::loadObject($context, $args[0])
@@ -82,7 +81,7 @@ final class DomDocumentValidateRuntime
                 $flags = $context->builder->sext($flags, $i64);
             }
         }
-        JitDomDocumentMethodKernel::ensureDocumentSchemaValidateBridge($context);
+        $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'DocumentSchemaValidate');
         $i1 = $context->builder->call(
             $context->lookupFunction(self::ABI_SCHEMA_VALIDATE),
             self::loadObject($context, $args[0]),
@@ -124,7 +123,7 @@ final class DomDocumentValidateRuntime
                 $flags = $context->builder->sext($flags, $i64);
             }
         }
-        JitDomDocumentMethodKernel::ensureDocumentSchemaValidateSourceBridge($context);
+        $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'DocumentSchemaValidateSource');
         $i1 = $context->builder->call(
             $context->lookupFunction(self::ABI_SCHEMA_VALIDATE_SOURCE),
             self::loadObject($context, $args[0]),
@@ -153,7 +152,7 @@ final class DomDocumentValidateRuntime
             0,
             'filename'
         );
-        JitDomDocumentMethodKernel::ensureDocumentRelaxNGValidateBridge($context);
+        $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'DocumentRelaxNGValidate');
         $i1 = $context->builder->call(
             $context->lookupFunction(self::ABI_RELAXNG_VALIDATE),
             self::loadObject($context, $args[0]),
@@ -181,7 +180,7 @@ final class DomDocumentValidateRuntime
             0,
             'source'
         );
-        JitDomDocumentMethodKernel::ensureDocumentRelaxNGValidateSourceBridge($context);
+        $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'DocumentRelaxNGValidateSource');
         $i1 = $context->builder->call(
             $context->lookupFunction(self::ABI_RELAXNG_VALIDATE_SOURCE),
             self::loadObject($context, $args[0]),
@@ -215,7 +214,7 @@ final class DomDocumentValidateRuntime
                 $options = $context->builder->sext($options, $i64);
             }
         }
-        JitDomDocumentMethodKernel::ensureDocumentXIncludeBridge($context);
+        $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'DocumentXInclude');
         $count = $context->builder->call(
             $context->lookupFunction(self::ABI_XINCLUDE),
             self::loadObject($context, $args[0]),
@@ -271,7 +270,7 @@ final class DomDocumentValidateRuntime
             1,
             'extendedClass'
         );
-        JitDomDocumentMethodKernel::ensureDocumentRegisterNodeClassBridge($context);
+        $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'DocumentRegisterNodeClass');
         $i1 = $context->builder->call(
             $context->lookupFunction(self::ABI_REGISTER_NODE_CLASS),
             self::loadObject($context, $args[0]),

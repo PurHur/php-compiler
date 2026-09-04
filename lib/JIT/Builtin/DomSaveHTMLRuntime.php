@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 
-/** JIT/AOT link for DOMDocument::saveHTML() via DomSaveHTMLJitHelper (#18268). */
+/** JIT/AOT link for DOMDocument::saveHTML() (DomSaveHTMLJitHelper (#18268)) — DomExtensionHooks (#36204). */
 final class DomSaveHTMLRuntime
 {
     public const ABI_NAME = '__phpc_dom_save_html';
@@ -24,8 +23,8 @@ final class DomSaveHTMLRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            JitDomDocumentMethodKernel::ensureSaveHTMLBridge($context);
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
+            $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'SaveHTML');
 
             return;
         }

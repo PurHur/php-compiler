@@ -4,12 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 
-/** JIT/AOT link for DOMDocument::loadXML() via DomLoadXMLJitHelper (#18268). */
+/** JIT/AOT link for DOMDocument::loadXML() (DomLoadXMLJitHelper (#18268)) — DomExtensionHooks (#36204). */
 final class DomLoadXMLRuntime
 {
     public const ABI_NAME = '__phpc_dom_load_xml';
@@ -25,8 +24,8 @@ final class DomLoadXMLRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            JitDomDocumentMethodKernel::ensureLoadXMLBridge($context);
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
+            $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'LoadXML');
 
             return;
         }

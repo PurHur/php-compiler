@@ -4,12 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 
-/** JIT/AOT link for DOMDocument::createElementNS() via DomCreateElementNSJitHelper (#18938). */
+/** JIT/AOT link for DOMDocument::createElementNS() (DomCreateElementNSJitHelper (#18938)) — DomExtensionHooks (#36204). */
 final class DomCreateElementNSRuntime
 {
     public const ABI_NAME = '__phpc_dom_create_element_ns';
@@ -25,8 +24,8 @@ final class DomCreateElementNSRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            JitDomDocumentMethodKernel::ensureCreateElementNSBridge($context);
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
+            $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'CreateElementNS');
 
             return;
         }

@@ -4,12 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 
-/** JIT/AOT link for DOMDocument::importNode() via DomImportNodeJitHelper (#19212). */
+/** JIT/AOT link for DOMDocument::importNode() (DomImportNodeJitHelper (#19212)) — DomExtensionHooks (#36204). */
 final class DomImportNodeRuntime
 {
     public const ABI_NAME = '__phpc_dom_import_node';
@@ -60,8 +59,8 @@ final class DomImportNodeRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            JitDomDocumentMethodKernel::ensureImportNodeBridge($context);
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
+            $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'ImportNode');
 
             return;
         }
@@ -83,8 +82,8 @@ final class DomImportNodeRuntime
 
     public static function ensureGetAttributeLinked(Context $context): void
     {
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            JitDomDocumentMethodKernel::ensureGetAttributeBridge($context);
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
+            $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'GetAttribute');
 
             return;
         }
@@ -106,8 +105,8 @@ final class DomImportNodeRuntime
 
     public static function ensureGetAttributeNodeNSLinked(Context $context): void
     {
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            JitDomDocumentMethodKernel::ensureGetAttributeNodeNSBridge($context);
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
+            $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'GetAttributeNodeNS');
 
             return;
         }
@@ -129,8 +128,8 @@ final class DomImportNodeRuntime
 
     public static function ensureSetAttributeNodeNSLinked(Context $context): void
     {
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            JitDomDocumentMethodKernel::ensureSetAttributeNodeNSBridge($context);
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
+            $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'SetAttributeNodeNS');
 
             return;
         }
@@ -151,8 +150,8 @@ final class DomImportNodeRuntime
 
     public static function ensureCreateAttributeNSLinked(Context $context): void
     {
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            JitDomDocumentMethodKernel::ensureCreateAttributeNSBridge($context);
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
+            $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'CreateAttributeNS');
 
             return;
         }
@@ -174,8 +173,8 @@ final class DomImportNodeRuntime
 
     public static function ensureCreateAttributeLinked(Context $context): void
     {
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            JitDomDocumentMethodKernel::ensureCreateAttributeBridge($context);
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
+            $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'CreateAttribute');
 
             return;
         }
@@ -197,8 +196,8 @@ final class DomImportNodeRuntime
 
     public static function ensureSetAttributeNodeLinked(Context $context): void
     {
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            JitDomDocumentMethodKernel::ensureSetAttributeNodeBridge($context);
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
+            $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'SetAttributeNode');
 
             return;
         }
@@ -219,8 +218,8 @@ final class DomImportNodeRuntime
 
     public static function ensureRemoveAttributeNodeLinked(Context $context): void
     {
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            JitDomDocumentMethodKernel::ensureRemoveAttributeNodeBridge($context);
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
+            $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'RemoveAttributeNode');
 
             return;
         }

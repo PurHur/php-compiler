@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 
@@ -49,8 +48,8 @@ final class DomSetIdAttributeRuntime
 
     public static function ensureTrueLinked(Context $context): void
     {
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            JitDomDocumentMethodKernel::ensureSetIdAttributeTrueBridge($context);
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
+            $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'SetIdAttributeTrue');
 
             return;
         }
@@ -59,8 +58,8 @@ final class DomSetIdAttributeRuntime
 
     public static function ensureFalseLinked(Context $context): void
     {
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            JitDomDocumentMethodKernel::ensureSetIdAttributeFalseBridge($context);
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
+            $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'SetIdAttributeFalse');
 
             return;
         }
@@ -69,8 +68,8 @@ final class DomSetIdAttributeRuntime
 
     public static function ensureNsTrueLinked(Context $context): void
     {
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            JitDomDocumentMethodKernel::ensureSetIdAttributeNsTrueBridge($context);
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
+            $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'SetIdAttributeNsTrue');
 
             return;
         }
@@ -79,8 +78,8 @@ final class DomSetIdAttributeRuntime
 
     public static function ensureNsFalseLinked(Context $context): void
     {
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            JitDomDocumentMethodKernel::ensureSetIdAttributeNsFalseBridge($context);
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
+            $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'SetIdAttributeNsFalse');
 
             return;
         }
@@ -89,8 +88,8 @@ final class DomSetIdAttributeRuntime
 
     public static function ensureNodeTrueLinked(Context $context): void
     {
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            JitDomDocumentMethodKernel::ensureSetIdAttributeNodeTrueBridge($context);
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
+            $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'SetIdAttributeNodeTrue');
 
             return;
         }
@@ -99,8 +98,8 @@ final class DomSetIdAttributeRuntime
 
     public static function ensureNodeFalseLinked(Context $context): void
     {
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            JitDomDocumentMethodKernel::ensureSetIdAttributeNodeFalseBridge($context);
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
+            $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'SetIdAttributeNodeFalse');
 
             return;
         }

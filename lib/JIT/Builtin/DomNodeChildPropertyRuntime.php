@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -130,18 +129,18 @@ final class DomNodeChildPropertyRuntime
     public static function ensureLinked(Context $context, string $propName): void
     {
         $propLc = strtolower($propName);
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
             match ($propLc) {
-                'lastchild' => JitDomDocumentMethodKernel::ensureLastChildBridge($context),
-                'parentnode' => JitDomDocumentMethodKernel::ensureParentNodeBridge($context),
-                'nextsibling' => JitDomDocumentMethodKernel::ensureNextSiblingBridge($context),
-                'previoussibling' => JitDomDocumentMethodKernel::ensurePreviousSiblingBridge($context),
-                'firstelementchild' => JitDomDocumentMethodKernel::ensureFirstElementChildBridge($context),
-                'lastelementchild' => JitDomDocumentMethodKernel::ensureLastElementChildBridge($context),
-                'childelementcount' => JitDomDocumentMethodKernel::ensureChildElementCountBridge($context),
-                'nextelementsibling' => JitDomDocumentMethodKernel::ensureNextElementSiblingBridge($context),
-                'previouselementsibling' => JitDomDocumentMethodKernel::ensurePreviousElementSiblingBridge($context),
-                default => JitDomDocumentMethodKernel::ensureFirstChildBridge($context),
+                'lastchild' => $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'LastChild'),
+                'parentnode' => $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'ParentNode'),
+                'nextsibling' => $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'NextSibling'),
+                'previoussibling' => $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'PreviousSibling'),
+                'firstelementchild' => $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'FirstElementChild'),
+                'lastelementchild' => $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'LastElementChild'),
+                'childelementcount' => $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'ChildElementCount'),
+                'nextelementsibling' => $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'NextElementSibling'),
+                'previouselementsibling' => $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'PreviousElementSibling'),
+                default => $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'FirstChild'),
             };
 
             return;
