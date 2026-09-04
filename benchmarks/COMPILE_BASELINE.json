@@ -1,62 +1,62 @@
 {
-    "version": 2,
-    "generated_at": "2026-09-04T00:13:32Z",
-    "arch": "x86_64-linux",
-    "wall_tolerance_percent": 20,
-    "scaling_tolerance_percent": 20,
-    "regeneration": "PHP_8_2=$(command -v php) ./script/bench-gate.sh --compile --update",
-    "note": "Compile-time gate for hello cold/warm/lint, MiniWebApp cold/warm/edit, and Compiler::compile scaling 50/100/200/400 (#36387). miniwebapp-edit mutates one Router method body token (not comment-only). Target \u226415 ms/stmt @ 400; one-file-edit Done-when \u226425% of cold (link/emit headroom remains).",
-    "cases": {
-        "hello-cold": {
-            "ok": true,
-            "wall_s": 3.59787,
-            "peak_rss_kb": 1592
-        },
-        "hello-warm": {
-            "ok": true,
-            "wall_s": 0.10363,
-            "peak_rss_kb": 1692
-        },
-        "miniwebapp-cold": {
-            "ok": true,
-            "wall_s": 9.252027,
-            "peak_rss_kb": 1736
-        },
-        "miniwebapp-warm": {
-            "ok": true,
-            "wall_s": 0.103035,
-            "peak_rss_kb": 1740
-        },
-        "miniwebapp-edit": {
-            "ok": true,
-            "wall_s": 2.770046,
-            "peak_rss_kb": 1740,
-            "pct_of_cold": 29.9
-        },
-        "hello-lint": {
-            "ok": true,
-            "wall_s": 0.309319,
-            "peak_rss_kb": 1736
-        },
-        "scale-50": {
-            "ok": true,
-            "wall_s": 0.087318,
-            "ms_per_statement": 1.746
-        },
-        "scale-100": {
-            "ok": true,
-            "wall_s": 0.210466,
-            "ms_per_statement": 2.105
-        },
-        "scale-200": {
-            "ok": true,
-            "wall_s": 0.699916,
-            "ms_per_statement": 3.5
-        },
-        "scale-400": {
-            "ok": true,
-            "wall_s": 2.668892,
-            "ms_per_statement": 6.672
-        }
+  "version": 2,
+  "generated_at": "2026-09-04T01:15:27Z",
+  "arch": "x86_64-linux",
+  "wall_tolerance_percent": 20,
+  "scaling_tolerance_percent": 20,
+  "regeneration": "PHP_8_2=$(command -v php) ./script/bench-gate.sh --compile --update",
+  "note": "Compile-time gate for hello cold/warm/lint, MiniWebApp cold/warm/edit, and Compiler::compile scaling 50/100/200/400 (#36387). miniwebapp-edit mutates one Router method body token (not comment-only). Target \u226415 ms/stmt @ 400; one-file-edit Done-when \u226425% of cold (NestedJIT demote via rename+declaration).",
+  "cases": {
+    "hello-cold": {
+      "ok": true,
+      "wall_s": 3.495869,
+      "peak_rss_kb": 1596
+    },
+    "hello-warm": {
+      "ok": true,
+      "wall_s": 0.416612,
+      "peak_rss_kb": 1664
+    },
+    "miniwebapp-cold": {
+      "ok": true,
+      "wall_s": 8.429898,
+      "peak_rss_kb": 1608
+    },
+    "miniwebapp-warm": {
+      "ok": true,
+      "wall_s": 0.104177,
+      "peak_rss_kb": 1608
+    },
+    "miniwebapp-edit": {
+      "ok": true,
+      "wall_s": 1.94541,
+      "peak_rss_kb": 1456,
+      "pct_of_cold": 23.1
+    },
+    "hello-lint": {
+      "ok": true,
+      "wall_s": 0.30716,
+      "peak_rss_kb": 1692
+    },
+    "scale-50": {
+      "ok": true,
+      "wall_s": 0.081233,
+      "ms_per_statement": 1.625
+    },
+    "scale-100": {
+      "ok": true,
+      "wall_s": 0.203007,
+      "ms_per_statement": 2.03
+    },
+    "scale-200": {
+      "ok": true,
+      "wall_s": 0.689031,
+      "ms_per_statement": 3.445
+    },
+    "scale-400": {
+      "ok": true,
+      "wall_s": 2.668172,
+      "ms_per_statement": 6.67
     }
+  }
 }

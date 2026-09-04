@@ -180,8 +180,9 @@ final class CompileCache
      *
      * After demote, unused `string_const_*` / `array_const_*` / `object_const_*` globals
      * are pruned so sibling-member literals do not inflate the delta object (one-method
-     * edit ≤25% of cold headroom). NestedJIT (`PHPCompiler_*`) is not demoted — those
-     * bodies can close over delta-local layout and crash under emit/link.
+     * edit ≤25% of cold headroom). NestedJIT (`PHPCompiler_*`) already present in the
+     * prior `aot.o` is demoted via rename+declaration+delete (BB-walk demote SIGSEGVs on
+     * some IniJitHelper bodies).
      *
      * @return int number of functions demoted to declarations
      */
@@ -223,6 +224,7 @@ final class CompileCache
         }
 
         $demoted = 0;
+        $nestedjitDemoted = 0;
         foreach (array_keys($candidates) as $name) {
             if (isset($mustKeepBody[$name]) || str_ends_with($name, '.stale') || str_starts_with($name, 'llvm.')) {
                 continue;
@@ -245,13 +247,19 @@ final class CompileCache
             if ($blocks < 1) {
                 continue;
             }
-            if (self::demoteFunctionBodyToDeclaration($fn)) {
+            if (self::demoteFunctionBodyToDeclaration($context, $fn)) {
                 ++$demoted;
+                if (str_starts_with($name, 'PHPCompiler_')) {
+                    ++$nestedjitDemoted;
+                }
             }
         }
 
         if ($demoted > 0) {
             \PHPCompiler\AOT\BuildTiming::note('edit_scaffold_demoted', (float) $demoted);
+        }
+        if ($nestedjitDemoted > 0) {
+            \PHPCompiler\AOT\BuildTiming::note('edit_scaffold_nestedjit_demoted', (float) $nestedjitDemoted);
         }
 
         $pruned = 0;
@@ -268,12 +276,16 @@ final class CompileCache
     }
 
     /**
-     * Runtime prologue symbols safe to take from prior aot.o on partial edit (#36387).
+     * Runtime / NestedJIT symbols safe to take from prior aot.o on partial edit (#36387).
      */
     private static function isSharedRuntimeDemoteCandidate(string $name): bool
     {
-        if ('' === $name || str_starts_with($name, 'PHPCompiler_')) {
+        if ('' === $name) {
             return false;
+        }
+        // NestedJIT helpers already linked into prior aot.o — demote via safe rename+delete.
+        if (str_starts_with($name, 'PHPCompiler_')) {
+            return true;
         }
 
         return str_starts_with($name, '__value__')
@@ -382,34 +394,58 @@ final class CompileCache
     }
 
     /**
-     * Delete every basic block so the function becomes an extern declaration (#36387).
+     * Turn a defined function into an extern declaration without walking BBs (#36387).
+     *
+     * BB-delete demote SIGSEGVs on some NestedJIT bodies (e.g. IniJitHelper::__iniget).
+     * Rename the definition, mint a same-typed declaration under the original name,
+     * RAUW call sites, then delete the old body entirely.
      */
-    private static function demoteFunctionBodyToDeclaration(\PHPLLVM\Value\Function_ $fn): bool
+    private static function demoteFunctionBodyToDeclaration(Context $context, \PHPLLVM\Value\Function_ $fn): bool
     {
+        $name = self::llvmFunctionName($context, $fn);
+        if ('' === $name) {
+            return false;
+        }
         try {
-            $blocks = $fn->getBasicBlocks();
-        } catch (\Throwable $e) {
-            return false;
-        }
-        if ([] === $blocks) {
-            return false;
-        }
-        // Delete in reverse so predecessors vanish after successors.
-        for ($i = count($blocks) - 1; $i >= 0; --$i) {
-            $bb = $blocks[$i];
-            try {
-                if (method_exists($bb, 'delete')) {
-                    $bb->delete();
-                }
-            } catch (\Throwable $e) {
+            $ptrTy = $fn->typeOf();
+            $funcTy = $ptrTy;
+            if ($ptrTy instanceof \PHPLLVM\Type\Pointer) {
+                $funcTy = $ptrTy->getElementType();
+            }
+            if (!$funcTy instanceof \PHPLLVM\Type\Function_) {
                 return false;
             }
-        }
+            $deadName = $name.'.demote_dead';
+            $suffix = 0;
+            while (true) {
+                $existing = null;
+                try {
+                    $existing = $context->module->getNamedFunction($deadName);
+                } catch (\Throwable $e) {
+                    $existing = null;
+                }
+                if (null === $existing) {
+                    break;
+                }
+                $deadName = $name.'.demote_dead.'.$suffix;
+                ++$suffix;
+                if ($suffix > 64) {
+                    return false;
+                }
+            }
+            $fn->setName($deadName);
+            $decl = $context->module->addFunction($name, $funcTy);
+            if (!$decl instanceof \PHPLLVM\Value\Function_) {
+                $fn->setName($name);
 
-        try {
-            return 0 === (int) $fn->countBasicBlocks();
-        } catch (\Throwable $e) {
+                return false;
+            }
+            $fn->replaceAllUsesWith($decl);
+            $fn->delete();
+
             return true;
+        } catch (\Throwable $e) {
+            return false;
         }
     }
 
