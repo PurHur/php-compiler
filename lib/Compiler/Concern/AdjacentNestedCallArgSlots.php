@@ -3,6 +3,7 @@
 namespace PHPCompiler\Compiler\Concern;
 
 use PHPCompiler\Block;
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\OpCode;
 
 use PHPCfg\Op;
