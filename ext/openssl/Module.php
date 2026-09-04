@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\openssl;
 
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\OpensslHostProbe;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
@@ -25,6 +26,11 @@ class Module extends ModuleAbstract
      */
     public function jitInit(JIT\Context $context): void
     {
+        $context->extensionLowering->openssl = new JitOpensslExtensionHooksFacade();
+        // Same probes as init() — AOT Context may jitInit before/without a second init pass.
+        OpensslHostProbe::$cipherAvailable = static fn (): bool => VmOpensslCipherNative::available();
+        OpensslHostProbe::$signAvailable = static fn (): bool => VmOpensslSignNative::available();
+        OpensslHostProbe::$pkeyAvailable = static fn (): bool => VmOpensslPkeyNative::available();
         $context->type->object->registerExternalClassSeeder(
             'opensslasymmetrickey',
             static function ($obj, int $id): void {
@@ -48,6 +54,10 @@ class Module extends ModuleAbstract
     public function init(Runtime $runtime): void
     {
         parent::init($runtime);
+        // Link/tests probe without importing ext from lib (#36204).
+        OpensslHostProbe::$cipherAvailable = static fn (): bool => VmOpensslCipherNative::available();
+        OpensslHostProbe::$signAvailable = static fn (): bool => VmOpensslSignNative::available();
+        OpensslHostProbe::$pkeyAvailable = static fn (): bool => VmOpensslPkeyNative::available();
         BuiltinClasses::register($runtime->vmContext);
         // Use registeredConstants() so PKCS1/OAEP/NO padding + identity trio + TLSEXT reach defineConstant (#24071, #24070, #24084).
         foreach (OpensslConstants::registeredConstants() as $name => $value) {

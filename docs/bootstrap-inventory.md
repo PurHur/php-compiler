@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8115 |
-| Phase A inventory files (M2 ratio SSOT) | 8115 |
+| PHP files on vm.php path | 8118 |
+| Phase A inventory files (M2 ratio SSOT) | 8118 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 25777 |
+| Source constructs flagged (warnings) | 25781 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1858,6 +1858,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/JitOpensslDigest.php` | 0 | 1 |
 | `ext/openssl/JitOpensslEncrypt.php` | 0 | 1 |
 | `ext/openssl/JitOpensslError.php` | 0 | 1 |
+| `ext/openssl/JitOpensslExtensionHooksFacade.php` | 0 | 1 |
 | `ext/openssl/JitOpensslMethods.php` | 0 | 1 |
 | `ext/openssl/JitOpensslPbkdf2.php` | 0 | 1 |
 | `ext/openssl/JitOpensslPkeyCryptKernel.php` | 0 | 2 |
@@ -1872,7 +1873,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/JitOpensslSignKernel.php` | 0 | 1 |
 | `ext/openssl/JitOpensslX509.php` | 0 | 2 |
 | `ext/openssl/JitOpensslX509Read.php` | 0 | 2 |
-| `ext/openssl/Module.php` | 0 | 68 |
+| `ext/openssl/Module.php` | 0 | 69 |
 | `ext/openssl/OpensslCipherRegistry.php` | 0 | 1 |
 | `ext/openssl/OpensslConstants.php` | 0 | 1 |
 | `ext/openssl/OpensslDigestJitHelper.php` | 0 | 1 |
@@ -7148,6 +7149,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/NonObjectPropertyFetchHelper.php` | 0 | 4 |
 | `lib/JIT/NullsafeHelper.php` | 0 | 1 |
 | `lib/JIT/ObjectPropertyForeachHelper.php` | 0 | 1 |
+| `lib/JIT/OpensslExtensionHooks.php` | 0 | 1 |
+| `lib/JIT/OpensslHostProbe.php` | 0 | 1 |
 | `lib/JIT/OperandName.php` | 0 | 1 |
 | `lib/JIT/OperandNameNative.php` | 0 | 2 |
 | `lib/JIT/PosixNestedJitKernels.php` | 0 | 1 |
@@ -22679,6 +22682,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/openssl/JitOpensslExtensionHooksFacade.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
 ### `ext/openssl/JitOpensslMethods.php`
 
 **Warnings** (review for bootstrap subset):
@@ -22758,74 +22766,75 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/openssl/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new VM\Variable (line 54)
-- new openssl_encrypt (line 67)
-- new openssl_decrypt (line 68)
-- new phpc_openssl_cipher_encrypt (line 69)
-- new phpc_openssl_cipher_decrypt (line 70)
-- new openssl_sign (line 71)
-- new openssl_verify (line 72)
-- new openssl_public_encrypt (line 73)
-- new openssl_private_decrypt (line 74)
-- new openssl_private_encrypt (line 75)
-- new openssl_public_decrypt (line 76)
-- new openssl_get_cipher_methods (line 77)
-- new openssl_get_md_methods (line 78)
-- new openssl_get_cert_locations (line 79)
-- new openssl_get_curve_names (line 80)
-- new openssl_pkey_new (line 81)
-- new openssl_pkey_get_private (line 82)
-- new openssl_get_privatekey (line 83)
-- new openssl_pkey_get_public (line 84)
-- new openssl_get_publickey (line 85)
-- new openssl_pkey_get_details (line 86)
-- new openssl_pkey_export (line 87)
-- new openssl_pkey_export_to_file (line 88)
-- new openssl_pkey_derive (line 89)
-- new openssl_dh_compute_key (line 90)
-- new openssl_cipher_iv_length (line 91)
-- new openssl_cipher_key_length (line 92)
-- new openssl_digest (line 93)
-- new openssl_pbkdf2 (line 94)
-- new openssl_x509_read (line 95)
-- new openssl_x509_parse (line 96)
-- new openssl_x509_fingerprint (line 97)
-- new openssl_x509_export (line 98)
-- new openssl_x509_export_to_file (line 99)
-- new openssl_pkcs12_read (line 100)
-- new openssl_pkcs12_export (line 101)
-- new openssl_pkcs12_export_to_file (line 102)
-- new openssl_pkcs7_sign (line 103)
-- new openssl_pkcs7_verify (line 104)
-- new openssl_pkcs7_encrypt (line 105)
-- new openssl_pkcs7_decrypt (line 106)
-- new openssl_pkcs7_read (line 107)
-- new openssl_cms_sign (line 108)
-- new openssl_cms_verify (line 109)
-- new openssl_cms_encrypt (line 110)
-- new openssl_cms_decrypt (line 111)
-- new openssl_cms_read (line 112)
-- new openssl_x509_verify (line 113)
-- new openssl_x509_check_private_key (line 114)
-- new openssl_x509_checkpurpose (line 115)
-- new openssl_x509_free (line 116)
-- new openssl_csr_new (line 117)
-- new openssl_csr_export (line 118)
-- new openssl_csr_export_to_file (line 119)
-- new openssl_csr_sign (line 120)
-- new openssl_csr_get_subject (line 121)
-- new openssl_csr_get_public_key (line 122)
-- new openssl_free_key (line 123)
-- new openssl_pkey_free (line 124)
-- new openssl_spki_new (line 125)
-- new openssl_spki_verify (line 126)
-- new openssl_spki_export (line 127)
-- new openssl_spki_export_challenge (line 128)
-- new openssl_seal (line 129)
-- new openssl_open (line 130)
-- new openssl_error_string (line 131)
+- new JitOpensslExtensionHooksFacade (line 29)
+- new VM\Variable (line 64)
+- new openssl_encrypt (line 77)
+- new openssl_decrypt (line 78)
+- new phpc_openssl_cipher_encrypt (line 79)
+- new phpc_openssl_cipher_decrypt (line 80)
+- new openssl_sign (line 81)
+- new openssl_verify (line 82)
+- new openssl_public_encrypt (line 83)
+- new openssl_private_decrypt (line 84)
+- new openssl_private_encrypt (line 85)
+- new openssl_public_decrypt (line 86)
+- new openssl_get_cipher_methods (line 87)
+- new openssl_get_md_methods (line 88)
+- new openssl_get_cert_locations (line 89)
+- new openssl_get_curve_names (line 90)
+- new openssl_pkey_new (line 91)
+- new openssl_pkey_get_private (line 92)
+- new openssl_get_privatekey (line 93)
+- new openssl_pkey_get_public (line 94)
+- new openssl_get_publickey (line 95)
+- new openssl_pkey_get_details (line 96)
+- new openssl_pkey_export (line 97)
+- new openssl_pkey_export_to_file (line 98)
+- new openssl_pkey_derive (line 99)
+- new openssl_dh_compute_key (line 100)
+- new openssl_cipher_iv_length (line 101)
+- new openssl_cipher_key_length (line 102)
+- new openssl_digest (line 103)
+- new openssl_pbkdf2 (line 104)
+- new openssl_x509_read (line 105)
+- new openssl_x509_parse (line 106)
+- new openssl_x509_fingerprint (line 107)
+- new openssl_x509_export (line 108)
+- new openssl_x509_export_to_file (line 109)
+- new openssl_pkcs12_read (line 110)
+- new openssl_pkcs12_export (line 111)
+- new openssl_pkcs12_export_to_file (line 112)
+- new openssl_pkcs7_sign (line 113)
+- new openssl_pkcs7_verify (line 114)
+- new openssl_pkcs7_encrypt (line 115)
+- new openssl_pkcs7_decrypt (line 116)
+- new openssl_pkcs7_read (line 117)
+- new openssl_cms_sign (line 118)
+- new openssl_cms_verify (line 119)
+- new openssl_cms_encrypt (line 120)
+- new openssl_cms_decrypt (line 121)
+- new openssl_cms_read (line 122)
+- new openssl_x509_verify (line 123)
+- new openssl_x509_check_private_key (line 124)
+- new openssl_x509_checkpurpose (line 125)
+- new openssl_x509_free (line 126)
+- new openssl_csr_new (line 127)
+- new openssl_csr_export (line 128)
+- new openssl_csr_export_to_file (line 129)
+- new openssl_csr_sign (line 130)
+- new openssl_csr_get_subject (line 131)
+- new openssl_csr_get_public_key (line 132)
+- new openssl_free_key (line 133)
+- new openssl_pkey_free (line 134)
+- new openssl_spki_new (line 135)
+- new openssl_spki_verify (line 136)
+- new openssl_spki_export (line 137)
+- new openssl_spki_export_challenge (line 138)
+- new openssl_seal (line 139)
+- new openssl_open (line 140)
+- new openssl_error_string (line 141)
 - 3 class method(s)
-- 3 closure(s)
+- 9 closure(s)
 
 ### `ext/openssl/OpensslCipherRegistry.php`
 
@@ -56260,9 +56269,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/Native.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 1015)
 - new Variable (line 1023)
-- new Variable (line 1032)
+- new Variable (line 1031)
+- new Variable (line 1040)
 - 17 class method(s)
 
 ### `lib/JIT/Call/NestedClosureInvoke.php`
@@ -57522,8 +57531,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/CompileCache.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\Native (line 1416)
-- 78 class method(s)
+- new Call\Native (line 1533)
+- 81 class method(s)
 
 ### `lib/JIT/CompilerOperandChainNative.php`
 
@@ -57563,54 +57572,54 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - trait CompileBlockInternal (line 27)
-- new Type (line 525)
-- new Type (line 544)
-- new Variable (line 604)
-- new Variable (line 641)
-- new Type (line 1082)
-- new Variable (line 1308)
-- new Variable (line 1408)
-- new Variable (line 1433)
-- new Variable (line 1470)
-- new Variable (line 1654)
-- new Error (line 1888)
-- new Variable (line 1925)
-- new Variable (line 1933)
-- new Operand\Literal (line 2149)
-- new Variable (line 2451)
-- new Variable (line 2534)
-- new Variable (line 2569)
-- new Variable (line 2642)
-- new Variable (line 2693)
-- new Operand\Literal (line 2853)
-- new Operand\Literal (line 2933)
-- new Operand\Literal (line 3026)
-- new Variable (line 3666)
-- new Variable (line 3745)
-- new Variable (line 3825)
-- new Variable (line 3936)
-- new OpCode (line 4094)
-- new Variable (line 5003)
-- new Variable (line 5091)
-- new Variable (line 5121)
-- new Variable (line 5705)
-- new Variable (line 5719)
-- new Variable (line 5743)
-- new VM (line 6204)
-- new Variable (line 6483)
-- new Type (line 6491)
-- new Variable (line 6519)
-- new Type (line 6527)
-- new Variable (line 6567)
-- new Type (line 6578)
-- new Operand\Literal (line 6710)
-- new Operand\Literal (line 6765)
-- new Type (line 6843)
-- new Variable (line 7036)
-- new Variable (line 7117)
-- new Variable (line 7158)
-- new Variable (line 7190)
-- new Operand\Literal (line 7336)
+- new Type (line 541)
+- new Type (line 560)
+- new Variable (line 620)
+- new Variable (line 657)
+- new Type (line 1098)
+- new Variable (line 1324)
+- new Variable (line 1424)
+- new Variable (line 1449)
+- new Variable (line 1486)
+- new Variable (line 1670)
+- new Error (line 1904)
+- new Variable (line 1941)
+- new Variable (line 1949)
+- new Operand\Literal (line 2165)
+- new Variable (line 2467)
+- new Variable (line 2550)
+- new Variable (line 2585)
+- new Variable (line 2658)
+- new Variable (line 2709)
+- new Operand\Literal (line 2869)
+- new Operand\Literal (line 2949)
+- new Operand\Literal (line 3042)
+- new Variable (line 3682)
+- new Variable (line 3761)
+- new Variable (line 3841)
+- new Variable (line 3952)
+- new OpCode (line 4110)
+- new Variable (line 5019)
+- new Variable (line 5107)
+- new Variable (line 5137)
+- new Variable (line 5721)
+- new Variable (line 5735)
+- new Variable (line 5759)
+- new VM (line 6220)
+- new Variable (line 6499)
+- new Type (line 6507)
+- new Variable (line 6535)
+- new Type (line 6543)
+- new Variable (line 6583)
+- new Type (line 6594)
+- new Operand\Literal (line 6726)
+- new Operand\Literal (line 6781)
+- new Type (line 6859)
+- new Variable (line 7052)
+- new Variable (line 7133)
+- new Variable (line 7174)
+- new Variable (line 7206)
+- new Operand\Literal (line 7352)
 - 1 class method(s)
 - 1 closure(s)
 
@@ -58225,7 +58234,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ExtensionLoweringHooks.php`
 
 **Warnings** (review for bootstrap subset):
-- 68 class method(s)
+- 69 class method(s)
 
 ### `lib/JIT/FiberHelper.php`
 
@@ -59108,6 +59117,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 6 class method(s)
+
+### `lib/JIT/OpensslExtensionHooks.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
+### `lib/JIT/OpensslHostProbe.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
 
 ### `lib/JIT/OperandName.php`
 
