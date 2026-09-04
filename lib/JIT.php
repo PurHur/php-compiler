@@ -2284,6 +2284,29 @@ class JIT {
         return $this->shouldUseSelfHostJitStubs();
     }
 
+    /**
+     * Large Composer IncludeHelper graphs: NestedJIT PregJitHelperThinAot while the LLVM
+     * module is still small. Mid-graph first use (Nyholm Uri::withUserInfo) stalls for
+     * minutes as NestedJIT walks a fat module (#36382).
+     *
+     * Prefer {@see Runtime::standalone} eager link (flag {@see Runtime::$eagerThinPregHelpers});
+     * this helper remains for call sites that set the flag after Context load.
+     */
+    private function maybeEagerLinkThinPregHelpers(): void
+    {
+        if (!$this->context->runtime->eagerThinPregHelpers) {
+            return;
+        }
+        // Consume once — NestedJIT of the preg bundle re-enters compile() and must not loop.
+        $this->context->runtime->eagerThinPregHelpers = false;
+        if (JIT\NestedJitCompileScope::isActive()) {
+            return;
+        }
+        JIT\Progress::noteFunction('eager_thin_preg_begin');
+        JIT\Builtin\PregMatchRuntime::ensureLinked($this->context);
+        JIT\Progress::noteFunction('eager_thin_preg_done');
+    }
+
     /** Emit native entry TU only — not compile_driver bundles that include compile_smoke_m3_emit (#1937). */
     private function shouldUseM3EmitTuNativeBridge(): bool
     {

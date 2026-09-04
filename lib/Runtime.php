@@ -104,6 +104,13 @@ class Runtime {
      */
     public ?array $aotIncludeAllowlist = null;
     /**
+     * Large IncludeHelper graphs (Slim ≥32 units): NestedJIT PregJitHelperThinAot into an
+     * already-fat user module stalls for minutes on Uri::withUserInfo. When set, thin AOT
+     * NestedJITs the preg thin bundle once at the start of {@see JIT::compile} while the
+     * module is still small (#36382).
+     */
+    public bool $eagerThinPregHelpers = false;
+    /**
      * M5 argv / gen-0 seed: C-floor initParsePipeline sets this so parse() skips
      * prepareSourceForParser list-unpack (SEGV in __string__separate after identity
      * stub setStringAt round-trip — #26756 / re-#23468).
@@ -1046,6 +1053,14 @@ class Runtime {
         if ($needsPregPrelink) {
             // User-script AOT NestedJITs PregJitHelper via PregMatchRuntime (#21212 / #21200 shape).
             \PHPCompiler\JIT\Builtin\StringPregMatch::ensureLinked($context);
+        }
+        // Incremental Composer graphs: entry CFG is only require_once — containsPregPrelink
+        // misses Uri.php. NestedJIT thin preg now, before IncludeHelper fattens the module (#36382).
+        if ($this->eagerThinPregHelpers) {
+            $this->eagerThinPregHelpers = false;
+            \PHPCompiler\JIT\Progress::noteFunction('eager_thin_preg_begin');
+            \PHPCompiler\JIT\Builtin\PregMatchRuntime::ensureLinked($context);
+            \PHPCompiler\JIT\Progress::noteFunction('eager_thin_preg_done');
         }
 
         $this->jitLoadedFromDiskCache = false;
