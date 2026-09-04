@@ -2,21 +2,20 @@
 # Slim + nyholm Composer project AOT build + phpc fcgi /hello smoke (#36382 Done-when).
 #
 # Usage (Docker / RunForge):
-#   PHP_COMPILER_DOCKER_MEM=24g PHP_COMPILER_DOCKER_MEM_SWAP=24g \
-#     HARNESS_DOCKER_RUN_OPTS='--memory=24g --memory-swap=24g' \
-#     ./script/docker-exec.sh -- ./script/slim-hello-36382-smoke.sh
+#   ./script/docker-exec.sh -- ./script/slim-hello-36382-smoke.sh
 #   ./script/docker-exec.sh -- ./script/slim-hello-36382-smoke.sh --skip-setup
 #
-# Measured peak RSS for the 103-unit incremental IncludeHelper emit is ~16.7 GiB
-# (SIGKILL under 16g cgroups; 8192M PHP fatals later). Keep Docker ≥24g and raise
-# PHP_COMPILER_LLVM_MEMORY_LIMIT to 16384M for this smoke (#36382).
+# Measured peak RSS during IncludeHelper for the 103-unit Slim graph is ~350 MiB;
+# prior ~27 GiB climbs were NestedJIT wiping include-once dedupe and re-inlining every
+# unit (#36382). Default Docker 8–10g is enough after that fix. Keep LLVM memory floor
+# at PHP_COMPILER_LLVM_MEMORY_LIMIT (default 8192M) — do not force 16384M.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-# Slim-sized incremental graphs need >8G PHP heap inside php-llvm (#36382).
-export PHP_COMPILER_LLVM_MEMORY_LIMIT="${PHP_COMPILER_LLVM_MEMORY_LIMIT:-16384M}"
+# Slim-sized incremental graphs: use the configured LLVM budget (#36382).
+export PHP_COMPILER_LLVM_MEMORY_LIMIT="${PHP_COMPILER_LLVM_MEMORY_LIMIT:-8192M}"
 
 # shellcheck source=script/php-env.sh
 source "$ROOT/script/php-env.sh"
@@ -42,7 +41,7 @@ if [[ "$SKIP_SETUP" -eq 0 ]] || [[ ! -f "$DEST/vendor/autoload.php" ]]; then
 fi
 
 BIN="$DEST/.phpc/bin/slim-hello"
-echo "slim-hello-36382-smoke: phpc build --project (LLVM mem=${PHP_COMPILER_MEMORY_LIMIT}; need Docker ≥24g)"
+echo "slim-hello-36382-smoke: phpc build --project (LLVM mem=${PHP_COMPILER_MEMORY_LIMIT})"
 php -d "memory_limit=${PHP_COMPILER_MEMORY_LIMIT}" bin/phpc.php build --project "$DEST"
 test -x "$BIN"
 

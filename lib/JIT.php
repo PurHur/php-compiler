@@ -12135,6 +12135,8 @@ class JIT {
         $traitMethodSources = [];
         /** @var list<string> */
         $pendingTraitNames = [];
+        /** @var list<array<string, mixed>> */
+        $pendingTraitAdaptations = [];
         /** @var list<OpCode> */
         $pendingPropertyNewDefaultOps = [];
         $pendingPropertyNewClassName = null;
@@ -12160,30 +12162,18 @@ class JIT {
             if (OpCode::TYPE_TRAIT_USE_ADAPTATION === $op->type) {
                 if ($this->shouldSkipExternalClassBodyLowering($classId)) {
                     $pendingTraitNames = [];
+                    $pendingTraitAdaptations = [];
 
                     continue;
                 }
-                $this->applyJitTraitUsesWithAdaptations(
-                    $block,
-                    $pendingTraitNames,
-                    $op->traitAdaptations,
-                    $classId,
-                    $ownMethods,
-                    $traitMethodSources
-                );
-                $pendingTraitNames = [];
+                // Keep names + adaptations; compose after all own methods are declared (#36382).
+                $pendingTraitAdaptations = $op->traitAdaptations;
 
                 continue;
             }
-            if (OpCode::TYPE_USE_TRAIT !== $op->type) {
-                $this->flushPendingJitTraitUses(
-                    $block,
-                    $pendingTraitNames,
-                    $classId,
-                    $ownMethods,
-                    $traitMethodSources
-                );
-            }
+            // Do not flushPendingJitTraitUses on every non-USE_TRAIT opcode — that composed
+            // trait bodies before later DECLARE_METHOD names existed (StreamTrait::__toString
+            // calling Stream::isSeekable, #36382). End-of-class flush below is enough.
             switch ($op->type) {
                 case OpCode::TYPE_DECLARE_STATIC_PROPERTY:
                     $name = $block->getOperand($op->arg1);
@@ -12712,13 +12702,16 @@ class JIT {
                     );
             }
         }
-        $this->flushPendingJitTraitUses(
-            $block,
-            $pendingTraitNames,
-            $classId,
-            $ownMethods,
-            $traitMethodSources
-        );
+        if ([] !== $pendingTraitNames) {
+            $this->applyJitTraitUsesWithAdaptations(
+                $block,
+                $pendingTraitNames,
+                $pendingTraitAdaptations,
+                $classId,
+                $ownMethods,
+                $traitMethodSources
+            );
+        }
         $this->context->type->object->definePendingUndeclaredInstanceProperties(
             $classId,
             $this->context->scope->className ?? ''

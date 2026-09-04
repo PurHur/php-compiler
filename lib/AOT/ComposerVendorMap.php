@@ -298,6 +298,28 @@ final class ComposerVendorMap
             }
         }
 
+        return self::withoutAutoloadRuntimeUnits($out);
+    }
+
+    /**
+     * Drop Composer loader TUs from compile-unit lists (keep on allowlist separately).
+     *
+     * @param list<string> $paths
+     *
+     * @return list<string>
+     */
+    public static function withoutAutoloadRuntimeUnits(array $paths): array
+    {
+        $out = [];
+        foreach ($paths as $path) {
+            // Keep vendor/autoload.php so SourceBundler / IncludeHelper can stub it as a unit;
+            // drop ClassLoader/autoload_real/… which NestedJIT into multi-minute sinks (#36382).
+            if (self::isComposerAutoloadRuntimePhp($path) && !self::isComposerAutoloadPhp($path)) {
+                continue;
+            }
+            $out[] = $path;
+        }
+
         return $out;
     }
 
@@ -336,6 +358,35 @@ final class ComposerVendorMap
         $norm = str_replace('\\', '/', $path);
 
         return str_ends_with($norm, '/vendor/autoload.php');
+    }
+
+    /**
+     * Composer runtime loader / map files that must not be NestedJIT'd under AOT project
+     * builds — class files come from {@see ProjectGraph}; compiling ClassLoader.php alone
+     * can exceed a minute and re-enter the loader (#36382 Slim).
+     *
+     * Keeps {@see \Composer\InstalledVersions} (apps call it).
+     */
+    public static function isComposerAutoloadRuntimePhp(string $path): bool
+    {
+        $norm = str_replace('\\', '/', $path);
+        if (self::isComposerAutoloadPhp($norm)) {
+            return true;
+        }
+        if (!str_contains($norm, '/vendor/composer/')) {
+            return false;
+        }
+        $base = basename($norm);
+        // InstalledVersions uses call_user_func_array('array_merge', $packages) which is still
+        // VM-shaped under AOT (#3132); Slim/hello graphs never call it — stub with the loader (#36382).
+        if ('InstalledVersions.php' === $base) {
+            return true;
+        }
+
+        return 1 === preg_match(
+            '/^(autoload_real|autoload_static|ClassLoader|platform_check|autoload_(?:classmap|psr4|namespaces|files|psr0))\.php$/',
+            $base
+        );
     }
 
     /**

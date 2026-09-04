@@ -170,4 +170,25 @@ final class NestedJitCompileScopeRestoreTest extends TestCase
             'Sealed insert must prefer last open BB over orphan append (#26756)'
         );
     }
+
+    public function testNestedJitRestoresIncludeOnceTracking(): void
+    {
+        $root = \dirname(__DIR__, 3);
+        $source = (string) \file_get_contents($root.'/lib/JIT/NestedJitCompileScope.php');
+        $this->assertStringContainsString(
+            '$savedJitAotIncludedCompileDone = $context->jitAotIncludedCompileDone',
+            $source,
+            'NestedJIT must save outer include-once dedupe before helper compile (#36382)'
+        );
+        $this->assertStringContainsString(
+            '$context->jitAotIncludedCompileDone = $savedJitAotIncludedCompileDone',
+            $source,
+            'NestedJIT must restore outer include-once dedupe after helper compile (#36382)'
+        );
+        $this->assertStringContainsString(
+            '$context->jitIncludedFiles = $savedJitIncludedFiles',
+            $source,
+            'NestedJIT must restore outer jitIncludedFiles after helper compile (#36382)'
+        );
+    }
 }
