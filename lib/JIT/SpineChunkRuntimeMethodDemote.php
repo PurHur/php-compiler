@@ -17,12 +17,15 @@ use PHPCompiler\OpCode;
  *   bodies (initParsePipeline visitor ctors, parse/compile/standalone) was the sink.
  * - VM\Variable / HashTable / TypeCheck / Context / ErrorReporter hit NestedJIT traps
  *   (ARG_SEND, string-offset TYPE_VALUE, try/catch null insert block, int1←__string__*).
+ * - AOT\AotEmitFastExit traps on try/catch null insert; BuildTiming / HelperRuntimeCache /
+ *   ProjectGraph OOM under 1536M; ComposerVendorMap dies on computed include (#36382).
+ *   Single-file bisect 2026-09-04: 9/14 AOT units OK without demote; 5 need this gate.
  *
  * Emptying those bodies (probe) emits .o files in seconds. Host-lowering Runtime::initParsePipeline
  * was already known to hang Zend rebuilds for hours ({@see RuntimeInitParsePipeline}).
  *
  * Under {@see ExternalMethodBind::spineChunkMode()}, replace Runtime + every
- * {@see \PHPCompiler\VM} class method CFG with a void-return stub before
+ * {@see \PHPCompiler\VM} / {@see \PHPCompiler\AOT} class method CFG with a void-return stub before
  * {@see \PHPCompiler\JIT::compileBlock} so hub ClassEntry + method symbols still land in
  * the .o / peer manifest. Real bodies stay on C-floor helpers
  * (RuntimeInitParsePipeline / RuntimeParseM5Native), NestedVM object:: proxies, or later
@@ -41,8 +44,9 @@ final class SpineChunkRuntimeMethodDemote
             return true;
         }
 
-        // Packed hubs keep growing NestedJIT gaps across VM\*; demote the whole namespace.
-        return str_starts_with($lc, 'phpcompiler\\vm\\');
+        // Packed hubs keep growing NestedJIT gaps across VM\* / AOT\*; demote both namespaces.
+        return str_starts_with($lc, 'phpcompiler\\vm\\')
+            || str_starts_with($lc, 'phpcompiler\\aot\\');
     }
 
     /**

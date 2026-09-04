@@ -1535,7 +1535,9 @@ final class TryCatchHelper
             $catchTail = $jit->compileCatchArmAtEntry($func, $catchOp->block1, $catchBodyBb, ...$args);
             // Prefer an open insert block — the return value may be a mid-block that already
             // branches to the arm's real tail (#23641 AFTER).
-            $openTail = $builder->getInsertBlock();
+            // probeInsertBlock: NestedJitCompileScope / demoted peers can clear the insert
+            // position so getInsertBlock() throws TypeError (null LLVMBasicBlockRef) (#36387).
+            $openTail = self::probeInsertBlock($builder);
             if (null !== $openTail && null === $openTail->getTerminator()) {
                 $catchTail = $openTail;
             }
@@ -1866,7 +1868,8 @@ final class TryCatchHelper
         // branch whenever that entry already had a terminator; sealFunction emitted
         // `ret void` on the open tail, so post-try/catch/finally code never ran (#32371).
         // Same open-insert preference as catch-arm tails (#23641 / #24105).
-        $openTail = $builder->getInsertBlock();
+        // probeInsertBlock avoids TypeError when insert position was cleared (#36387 / #8559).
+        $openTail = self::probeInsertBlock($builder);
         if (null !== $openTail && null === $openTail->getTerminator()) {
             $compiledTail = $openTail;
         } elseif (null === $compiledTail || null !== $compiledTail->getTerminator()) {
