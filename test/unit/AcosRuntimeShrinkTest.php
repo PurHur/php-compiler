@@ -9,23 +9,29 @@ use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
 /**
- * acos() NestedJIT via JitVmHelperLink::ensureBridge (#28276 / peer MathAsin #28263).
+ * acos() AOT uses libm acos(3) (#36386); AcosJitHelper remains NestedJIT-safe
+ * reference (peer MathAsin / AsinJitHelper). LLVM 9 has no llvm.acos.f64.
+ *
+ * php-src: ext/standard/math.c PHP_FUNCTION(acos).
  */
 final class AcosRuntimeShrinkTest extends TestCase
 {
-    public function testAcosUsesJitHelperNotKernel(): void
+    public function testAcosUsesLibmNotHelperBridge(): void
     {
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/acos.php');
         $this->assertStringContainsString('MathAcos::invoke', $builtin);
         $this->assertStringNotContainsString("lookupFunction('acos')", $builtin);
 
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathAcos.php');
-        $this->assertStringContainsString('AcosJitHelper', $bridge);
+        $this->assertStringContainsString("LIBC_ACOS = 'acos'", $bridge);
         $this->assertStringContainsString('phpc_acos', $bridge);
-        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringContainsString('acos_libm_f64_entry', $bridge);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('AcosJitHelper', $bridge);
         $this->assertStringNotContainsString('JitAcosKernel', $bridge);
         $this->assertStringNotContainsString('NestedJitCompileScope', $bridge);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
+        $this->assertStringNotContainsString('llvm.acos', $bridge);
     }
 
     public function testAcosJitHelperInlinesNestedJitSafeAlgorithm(): void

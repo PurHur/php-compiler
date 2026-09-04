@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * acos() for compiled JIT/AOT modules (#15141, #27048, #28276, php-in-PHP).
+ * NestedJIT-safe acos() reference (#15141, #27048, #28276, php-in-PHP).
  *
- * NestedJIT-safe identity acos(x)=π/2−asin(x) with inlined fdlibm asin poly
- * (#28276 / peer MathAsin #28263 / MathSin #28016).
- * Avoid `\acos` / {@see VmMath::acos} — NestedJIT re-enters MathAcos bridge under thin AOT.
+ * AOT/JIT hot path uses libm {@code acos(3)} via {@see \PHPCompiler\JIT\Builtin\MathAcos}
+ * (#36386 / peer MathAsin). This helper remains for NestedJIT-safe acos(x)=π/2−asin(x)
+ * with inlined fdlibm asin poly when NestedJIT cannot call libc.
+ * Avoid `\acos` / {@see VmMath::acos} — NestedJIT would re-enter the MathAcos bridge.
  * Avoid cross-class asin helper call — NestedJIT stubs to 0 (#27017 / Hypot shape).
  * Avoid ternary abs and `$num < 0.0` sign flips — NestedJIT helper unit.o zeros/skips those
  * branches. Abs via √(x²); sign via `a * (num/ax)`.
