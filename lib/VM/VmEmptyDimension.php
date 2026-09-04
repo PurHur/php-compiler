@@ -4,10 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
-use PHPCompiler\ext\dom\VmDom;
-use PHPCompiler\ext\dom\VmDomCollectionDimension;
-use PHPCompiler\ext\simplexml\SimpleXmlRegistry;
-use PHPCompiler\ext\simplexml\VmSimpleXml;
 use PHPCompiler\ext\standard\boolval;
 use PHPCompiler\Frame;
 
@@ -16,6 +12,8 @@ use PHPCompiler\Frame;
  *
  * php-src: Zend/zend_operators.c — ArrayAccess uses offsetExists then value truthiness;
  * native arrays use key presence then value truthiness (not isset() semantics).
+ *
+ * Dom collection empty() routes through {@see DomVmRuntimeSupport} (#36204).
  */
 final class VmEmptyDimension
 {
@@ -64,16 +62,16 @@ final class VmEmptyDimension
             if (EnumCaseSupport::isEnumCase($object)) {
                 throw new \TypeError('Illegal offset type in isset or empty');
             }
-            if (VmDomCollectionDimension::isCollection($object)) {
+            if (DomVmRuntimeSupport::isCollection($object)) {
                 try {
-                    if (VmDom::isTokenList($object)) {
+                    if (DomVmRuntimeSupport::isTokenList($object)) {
                         // empty($tl[$i]) — has_dimension(check_empty) / zend_is_true (token_list.c; #23006).
-                        $dst->bool(VmDomCollectionDimension::tokenListDimensionIsEmpty($object, $dim));
+                        $dst->bool(DomVmRuntimeSupport::tokenListDimensionIsEmpty($object, $dim));
 
                         return null;
                     }
                     // empty($list[$i]) — has_dimension; nodes are never empty (php-src php_dom.c; #20311).
-                    $dst->bool(!VmDomCollectionDimension::hasDimension($object, $dim));
+                    $dst->bool(!DomVmRuntimeSupport::hasDimension($object, $dim));
                 } catch (\TypeError $e) {
                     return $vm->propagateEmptyDimensionTypeError($e, $frame);
                 }
@@ -82,11 +80,11 @@ final class VmEmptyDimension
             }
             // SimpleXMLElement: empty($sxe[$dim]) uses string emptiness, not object truthiness (#25338).
             if (
-                VmSimpleXml::CLASS_LC === strtolower($object->class->name)
-                && SimpleXmlRegistry::has($object)
+                \PHPCompiler\ext\simplexml\VmSimpleXml::CLASS_LC === strtolower($object->class->name)
+                && \PHPCompiler\ext\simplexml\SimpleXmlRegistry::has($object)
             ) {
                 try {
-                    $dst->bool(VmSimpleXml::dimensionIsEmpty($object, $dim));
+                    $dst->bool(\PHPCompiler\ext\simplexml\VmSimpleXml::dimensionIsEmpty($object, $dim));
                 } catch (\TypeError $e) {
                     return $vm->propagateEmptyDimensionTypeError($e, $frame);
                 }

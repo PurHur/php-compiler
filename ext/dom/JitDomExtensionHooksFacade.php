@@ -761,7 +761,7 @@ final class JitDomExtensionHooksFacade implements DomExtensionHooks
         if (!$objectType->hasProperty($classId, VmDom::PROP_DOCUMENT_ELEMENT)) {
             $objectType->defineProperty($classId, VmDom::PROP_DOCUMENT_ELEMENT, JITVariable::TYPE_OBJECT);
         }
-        $nullEl = new Variable(
+        $nullEl = new JITVariable(
             $context,
             JITVariable::TYPE_OBJECT,
             JITVariable::KIND_VALUE,
@@ -819,7 +819,7 @@ final class JitDomExtensionHooksFacade implements DomExtensionHooks
                 $context->lookupFunction('__string__separate'),
                 $str
             );
-            $propVar = new Variable(
+            $propVar = new JITVariable(
                 $context,
                 JITVariable::TYPE_STRING,
                 JITVariable::KIND_VALUE,
@@ -846,7 +846,7 @@ final class JitDomExtensionHooksFacade implements DomExtensionHooks
             $context->lookupFunction('__value__writeNull'),
             JitValueBox::pointer($context, $box)
         );
-        $propVar = new Variable(
+        $propVar = new JITVariable(
             $context,
             JITVariable::TYPE_VALUE,
             JITVariable::KIND_VARIABLE,
@@ -872,7 +872,7 @@ final class JitDomExtensionHooksFacade implements DomExtensionHooks
             $context->lookupFunction('__value__writeNull'),
             JitValueBox::pointer($context, $box)
         );
-        $propVar = new Variable(
+        $propVar = new JITVariable(
             $context,
             JITVariable::TYPE_VALUE,
             JITVariable::KIND_VARIABLE,
@@ -900,7 +900,7 @@ final class JitDomExtensionHooksFacade implements DomExtensionHooks
             $box,
             $context->builder->zext($i1->constInt($value ? 1 : 0, false), $i32)
         );
-        $propVar = new Variable(
+        $propVar = new JITVariable(
             $context,
             JITVariable::TYPE_VALUE,
             JITVariable::KIND_VARIABLE,
@@ -926,7 +926,7 @@ final class JitDomExtensionHooksFacade implements DomExtensionHooks
             $context->lookupFunction('__string__separate'),
             $str
         );
-        $propVar = new Variable(
+        $propVar = new JITVariable(
             $context,
             JITVariable::TYPE_STRING,
             JITVariable::KIND_VALUE,
@@ -952,7 +952,7 @@ final class JitDomExtensionHooksFacade implements DomExtensionHooks
             $context->lookupFunction('__string__separate'),
             $str
         );
-        $propVar = new Variable(
+        $propVar = new JITVariable(
             $context,
             JITVariable::TYPE_STRING,
             JITVariable::KIND_VALUE,
@@ -981,7 +981,7 @@ final class JitDomExtensionHooksFacade implements DomExtensionHooks
             $context->lookupFunction('__value__writeNull'),
             JitValueBox::pointer($context, $box)
         );
-        $propVar = new Variable(
+        $propVar = new JITVariable(
             $context,
             JITVariable::TYPE_VALUE,
             JITVariable::KIND_VARIABLE,
@@ -1736,6 +1736,30 @@ final class JitDomExtensionHooksFacade implements DomExtensionHooks
             $nameLit,
             $mode
         );
+    }
+
+    public function ensureClassicAttrMethods(Context $context): void
+    {
+        JitDomAttributeNodeNS::ensureClassicAttrMethods($context);
+    }
+
+    public function isDomNodeListForeach(?string $containerUserType): bool
+    {
+        return JitDomNodeListForeachSnapshot::isDomNodeListForeach($containerUserType);
+    }
+
+    public function canLowerNodeListForeach(Context $context, JITVariable $array, ?string $containerUserType): bool
+    {
+        return JitDomNodeListForeachSnapshot::canLower($context, $array, $containerUserType);
+    }
+
+    public function compileNodeListForeachReset(
+        Context $context,
+        JITVariable $array,
+        JITVariable $slotKey,
+        ?string $containerUserType
+    ): void {
+        JitDomNodeListForeachSnapshot::compileReset($context, $array, $slotKey, $containerUserType);
     }
 
 }

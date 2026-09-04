@@ -12,6 +12,7 @@ use PHPCompiler\JIT\Builtin\WeakRefRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\DatePeriodForeachSnapshot;
+use PHPCompiler\JIT\DomNodeListForeachSnapshot;
 use PHPCompiler\JIT\IteratorProtocolHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\ObjectPropertyForeachHelper;
@@ -93,7 +94,7 @@ final class VmIteratorForeach
         }
         // DOM IteratorAggregate classes return InternalIterator, not ArrayIterator —
         // no __spl_ht on the inner object (php-src ext/dom/php_dom.stub.php; #32707).
-        if (self::isDomIteratorAggregate($classLc)) {
+        if (self::isDomIteratorAggregate($context, $classLc)) {
             return false;
         }
         // User getIterator() that yields returns a Generator — no `__spl_ht` either.
@@ -107,9 +108,9 @@ final class VmIteratorForeach
     }
 
     /** DOM IteratorAggregate classes whose getIterator() returns InternalIterator, not ArrayIterator. */
-    private static function isDomIteratorAggregate(string $classLc): bool
+    private static function isDomIteratorAggregate(Context $context, string $classLc): bool
     {
-        return \PHPCompiler\ext\dom\JitDomNodeListForeachSnapshot::isDomNodeListForeach($classLc);
+        return DomNodeListForeachSnapshot::isDomNodeListForeach($context, $classLc);
     }
 
     /**
@@ -515,9 +516,9 @@ final class VmIteratorForeach
     {
         $slotKey = $array;
         // DOMNodeList / DOMNamedNodeMap: compile-time snapshot when available (#32707, #33082).
-        if (\PHPCompiler\ext\dom\JitDomNodeListForeachSnapshot::isDomNodeListForeach($containerUserType)) {
-            if (\PHPCompiler\ext\dom\JitDomNodeListForeachSnapshot::canLower($context, $array, $containerUserType)) {
-                \PHPCompiler\ext\dom\JitDomNodeListForeachSnapshot::compileReset(
+        if (DomNodeListForeachSnapshot::isDomNodeListForeach($context, $containerUserType)) {
+            if (DomNodeListForeachSnapshot::canLower($context, $array, $containerUserType)) {
+                DomNodeListForeachSnapshot::compileReset(
                     $context,
                     $array,
                     $slotKey,

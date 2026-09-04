@@ -128,7 +128,7 @@ final class ReflectionBuiltinHelper
         $object = self::objectBuiltin($context);
         $lc = strtolower(ltrim($className, '\\'));
         if ('isid' === strtolower($method) && 'domattr' === $lc) {
-            \PHPCompiler\ext\dom\JitDomAttributeNodeNS::ensureClassicAttrMethods($context);
+            $context->extensionLowering->dom?->ensureClassicAttrMethods($context);
         }
         $exists = false;
         if ($object->hasUserDeclaredClass($className) || $object->isInterfaceClassLc($lc)) {
