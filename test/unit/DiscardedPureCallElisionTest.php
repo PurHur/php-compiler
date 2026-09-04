@@ -7,6 +7,8 @@ namespace PHPCompiler\Test\Unit;
 use PHPUnit\Framework\TestCase;
 use PHPCompiler\Block;
 use PHPCompiler\ext\standard\abs;
+use PHPCompiler\ext\standard\chr;
+use PHPCompiler\ext\standard\ord;
 use PHPCompiler\ext\standard\sqrt;
 use PHPCompiler\ext\types\is_type;
 use PHPCompiler\ext\types\strlen;
@@ -45,6 +47,53 @@ final class DiscardedPureCallElisionTest extends TestCase
         $context = $this->makeContext();
         $builtin = new strlen();
         $arg = $this->makeNativeLongVar();
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testElidesDiscardedOrdWithCompileTimeString(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new ord();
+        $arg = $this->makeStringVar('A');
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testElidesDiscardedOrdWithTypedStringSlot(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new ord();
+        $arg = $this->makeStringVar(null);
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testDoesNotElideOrdOnNativeLong(): void
+    {
+        // Soft ord(int) → string deprecate/coerce — must not drop (#36386).
+        $context = $this->makeContext();
+        $builtin = new ord();
+        $arg = $this->makeNativeLongVar();
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testElidesDiscardedChrOnNativeLong(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new chr();
+        $arg = $this->makeNativeLongVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testDoesNotElideChrOnNull(): void
+    {
+        // PHP 8.1+ deprecates chr(null) — must keep the call (#36386).
+        $context = $this->makeContext();
+        $builtin = new chr();
+        $arg = $this->makeNullVar();
 
         $this->assertFalse(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
     }

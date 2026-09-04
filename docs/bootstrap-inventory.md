@@ -26521,11 +26521,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new JitSimpleXmlExtensionHooksFacade (line 30)
-- new simplexml_load_string (line 151)
-- new simplexml_load_file (line 152)
-- new simplexml_import_dom (line 153)
+- new simplexml_load_string (line 182)
+- new simplexml_load_file (line 183)
+- new simplexml_import_dom (line 184)
 - 3 class method(s)
-- 27 closure(s)
+- 33 closure(s)
 
 ### `ext/simplexml/SimpleXmlElementAddAttribute.php`
 
@@ -58114,7 +58114,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/DiscardedPureCallElision.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 10 class method(s)
 
 ### `lib/JIT/DnfParamCheck.php`
 
@@ -59247,7 +59247,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/NoThrowCallElision.php`
 
 **Warnings** (review for bootstrap subset):
-- new Operand\Literal (line 590)
+- new Operand\Literal (line 591)
 - 20 class method(s)
 
 ### `lib/JIT/NonObjectPropertyFetchHelper.php`
@@ -59602,7 +59602,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/SpineChunkRuntimeMethodDemote.php`
 
 **Warnings** (review for bootstrap subset):
-- new OpCode (line 76)
+- new OpCode (line 80)
 - 2 class method(s)
 
 ### `lib/JIT/SpineChunkStandardHelperBind.php`
@@ -65144,7 +65144,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/SimpleXmlVmRuntimeSupport.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 17 class method(s)
 
 ### `lib/VM/SplArrayCastJitHelper.php`
 
@@ -65440,9 +65440,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/VmEmptyDimension.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 109)
-- new Variable (line 119)
-- new Variable (line 161)
+- new Variable (line 106)
+- new Variable (line 116)
+- new Variable (line 158)
 - 2 class method(s)
 
 ### `lib/VM/VmEnumNumericOperandGuard.php`
