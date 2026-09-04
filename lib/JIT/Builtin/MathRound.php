@@ -12,7 +12,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for round() via RoundJitHelper PHP (#15211, #26800, #28913).
  *
- * Helper compile: {@see JitVmHelperLink::ensureBridge} (MathFloor #27650 / MathNextafter #28716 shape).
+ * Helper compile: {@see JitVmHelperLink::ensureBridge} (MathNextafter #28716 / deg2rad #27400 shape).
  * NestedJIT no longer skips the bridge — RoundJitHelper is NestedJIT-safe (no \floor/\ceil/\abs).
  * Replaces ~477 LOC inline LLVM formerly in ext/standard/JitRoundLowering.php.
  * SSOT: {@see \PHPCompiler\ext\standard\RoundJitHelper::roundArgv}.

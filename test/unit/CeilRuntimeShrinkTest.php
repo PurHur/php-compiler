@@ -9,20 +9,24 @@ use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
 /**
- * ceil() NestedJIT via JitVmHelperLink::ensureBridge (#27650 / peer deg2rad #27400).
+ * ceil() AOT uses llvm.ceil.f64 (#36386); CeilJitHelper remains NestedJIT-safe
+ * reference (peer MathFloor / FloorJitHelper).
+ *
+ * php-src: ext/standard/math.c PHP_FUNCTION(ceil).
  */
 final class CeilRuntimeShrinkTest extends TestCase
 {
-    public function testCeilUsesJitHelperNotKernel(): void
+    public function testCeilUsesLlvmIntrinsicNotHelperBridge(): void
     {
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/ceil.php');
         $this->assertStringContainsString('MathCeil::invoke', $builtin);
         $this->assertStringNotContainsString("lookupFunction('ceil')", $builtin);
 
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathCeil.php');
-        $this->assertStringContainsString('CeilJitHelper', $bridge);
+        $this->assertStringContainsString('llvm.ceil.f64', $bridge);
         $this->assertStringContainsString('phpc_ceil', $bridge);
-        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('CeilJitHelper', $bridge);
         $this->assertStringNotContainsString('JitCeilKernel', $bridge);
         $this->assertStringNotContainsString('NestedJitCompileScope', $bridge);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);

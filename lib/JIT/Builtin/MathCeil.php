@@ -4,35 +4,32 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for ceil() via CeilJitHelper PHP (#15129, #27003, #27650).
+ * JIT/AOT link for ceil() via {@code llvm.ceil.f64} (#36386).
  *
- * Helper compile: {@see JitVmHelperLink::ensureBridge} (deg2rad #27400 / Floor #27650 shape).
- * NestedJIT no longer needs a libc ceil(3) kernel — helper inlines NestedJIT-safe trunc.
- * php-src: ext/standard/math.c — PHP_FUNCTION(ceil)
+ * Peer of {@see MathFloor} / {@see MathSqrt}: avoid NestedJIT helper objects on
+ * the AOT hot path. php-src {@code ext/standard/math.c} {@code PHP_FUNCTION(ceil)}
+ * → C {@code ceil}; the LLVM intrinsic matches IEEE toward-+∞ rounding.
+ * The PHP trunc helper remains for NestedJIT-safe reference only.
  */
 final class MathCeil
 {
+    private const LLVM_CEIL = 'llvm.ceil.f64';
+
+    /** Legacy ABI kept as a thin intrinsic wrapper for any external callers. */
     private const ABI_CEIL = 'phpc_ceil';
 
-    private const HELPER_PATH = '/ext/standard/CeilJitHelper.php';
-
-    private const CEIL_HELPER = 'PHPCompiler\\ext\\standard\\CeilJitHelper::ceilArgv';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::CEIL_HELPER,
-    ];
-
-    private const BRIDGE_ENTRY = 'ceil_bridge_entry';
+    private const BRIDGE_ENTRY = 'ceil_llvm_f64_entry';
 
     public static function ensureLinked(Context $context): void
     {
-        self::implement($context);
+        self::llvmCeilIntrinsic($context);
+        self::ensurePhpcCeilBridge($context);
     }
 
     public static function ensureStandaloneBodies(Context $context): void
@@ -42,34 +39,56 @@ final class MathCeil
 
     public static function invoke(Context $context, Value $num): Value
     {
-        self::ensureLinked($context);
+        return $context->builder->call(self::llvmCeilIntrinsic($context), $num);
+    }
 
-        return $context->builder->call(
-            $context->lookupFunction(self::ABI_CEIL),
-            $num
+    private static function llvmCeilIntrinsic(Context $context): LlvmFunction
+    {
+        $func = $context->module->getNamedFunction(self::LLVM_CEIL);
+        if (null !== $func) {
+            return $func;
+        }
+        $double = $context->getTypeFromString('double');
+
+        return $context->module->addFunction(
+            self::LLVM_CEIL,
+            $context->context->functionType($double, false, $double)
         );
     }
 
-    private static function implement(Context $context): void
+    /**
+     * Define {@code phpc_ceil} → {@code llvm.ceil.f64} when missing. Skip if a
+     * prior NestedJIT bridge already filled the symbol (cannot replace LLVM
+     * bodies); {@see invoke} never calls that stale path.
+     */
+    private static function ensurePhpcCeilBridge(Context $context): void
     {
         $probe = $context->module->getNamedFunction(self::ABI_CEIL);
-        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction(self::ABI_CEIL, $probe);
 
             return;
         }
 
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         $double = $context->getTypeFromString('double');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_CEIL,
-            self::BRIDGE_ENTRY,
-            [$double],
-            $double,
-            self::CEIL_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#27650'
+        $fn = $probe;
+        if (null === $fn) {
+            $fn = $context->module->addFunction(
+                self::ABI_CEIL,
+                $context->context->functionType($double, false, $double)
+            );
+        }
+        $entry = $fn->appendBasicBlock(self::BRIDGE_ENTRY);
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue(
+            $context->builder->call(self::llvmCeilIntrinsic($context), $fn->getParam(0))
         );
+        $context->registerFunction(self::ABI_CEIL, $fn);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 }
