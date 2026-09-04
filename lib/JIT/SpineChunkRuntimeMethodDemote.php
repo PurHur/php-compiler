@@ -131,11 +131,8 @@ final class SpineChunkRuntimeMethodDemote
     public static function oversizeSingletonCanEmit(string $rel): bool
     {
         $rel = str_replace('\\', '/', ltrim($rel, '/'));
-        // Host CFG null-Op after demote (#36387). SoapClientState property defaults are
-        // literals (not SoapConstants::…) so VmSoapClient emits under SPINE_CHUNK.
-        if ('ext/standard/VmDateTimeNative.php' === $rel) {
-            return false;
-        }
+        // SoapClientState property defaults are literals (#3803); VmDateTimeNative hollows
+        // once T_NAME_QUALIFIED namespaces are recognized — both emit under SPINE_CHUNK.
         if ('lib/CompilerVersion.php' === $rel) {
             return true;
         }
@@ -312,8 +309,19 @@ final class SpineChunkRuntimeMethodDemote
                         $s2 = \is_array($t2) ? $t2[1] : $t2;
                         $out .= $s2;
                         ++$i;
+                        // PHP 8+: `namespace PHPCompiler\ext\standard` is one T_NAME_QUALIFIED
+                        // token — T_STRING-only collection left $namespace empty so every
+                        // multi-segment hub (ext/*, VM\*, …) skipped source hollow (#36387).
                         if (\is_array($t2) && T_STRING === $t2[0]) {
                             $nsParts[] = $t2[1];
+                            continue;
+                        }
+                        if (\is_array($t2) && \defined('T_NAME_QUALIFIED') && T_NAME_QUALIFIED === $t2[0]) {
+                            $nsParts = [$t2[1]];
+                            continue;
+                        }
+                        if (\is_array($t2) && \defined('T_NAME_FULLY_QUALIFIED') && T_NAME_FULLY_QUALIFIED === $t2[0]) {
+                            $nsParts = [ltrim($t2[1], '\\')];
                             continue;
                         }
                         if (\is_array($t2) && T_NS_SEPARATOR === $t2[0]) {

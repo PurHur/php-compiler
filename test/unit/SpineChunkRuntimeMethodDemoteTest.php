@@ -93,9 +93,9 @@ final class SpineChunkRuntimeMethodDemoteTest extends TestCase
         $this->assertTrue(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('ext/dom/VmDom.php'));
         $this->assertFalse(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('lib/Compiler.php'));
         $this->assertFalse(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('lib/JIT.php'));
-        // Measured emit fail after demote — plan must defer (#36387).
+        // Measured post-demote hubs now emit (soap literals + qualified-ns hollow, #36387).
         $this->assertTrue(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('ext/soap/VmSoapClient.php'));
-        $this->assertFalse(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('ext/standard/VmDateTimeNative.php'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('ext/standard/VmDateTimeNative.php'));
         // Compiler / CompilerVersion / JIT stay live — Compiler/JIT need file splits for host CFG.
         $this->assertFalse(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\Compiler'));
         $this->assertFalse(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\CompilerVersion'));
