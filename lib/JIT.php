@@ -23501,6 +23501,16 @@ class JIT {
 
             return;
         }
+        // Native packed arrays (e.g. `string[1]`) still have IS_REFCOUNTED on the
+        // element type. loadValue+delref would bitcast the array aggregate
+        // (`[1 x %__string__*]`) to `__ref__virtual*` / i8* and fail module verify
+        // (#36382 Slim/nyholm; php-src zend_array_destroy walks buckets).
+        if (0 !== ($var->type & Variable::IS_NATIVE_ARRAY)) {
+            $var->free();
+            $released[$name] = true;
+
+            return;
+        }
         if ($var->type & Variable::IS_REFCOUNTED) {
             if (null !== $var->objectPropertySlot) {
                 return;
