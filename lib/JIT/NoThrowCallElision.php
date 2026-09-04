@@ -250,14 +250,19 @@ final class NoThrowCallElision
             return self::stringSliceOrCompareArgsCannotThrow($name, $callArgs);
         }
         if (self::isPureStringPadOrSplitBuiltin($name)) {
-            // str_pad / chunk_split / wordwrap / str_split / explode — STR +
-            // LONG/BOOL slots; object/value-box string args stay conservative.
+            // str_pad / chunk_split / wordwrap / str_split / explode / str_getcsv —
+            // STR + LONG/BOOL slots; object/value-box string args stay conservative.
+            // str_getcsv requires all four strings (omitted $escape DEP stays live).
             return self::stringPadOrSplitArgsCannotThrow($name, $callArgs);
         }
         if (self::isPureStringReplaceOrJoinBuiltin($name)) {
             // str_replace / str_ireplace / substr_replace / strtr (3-string) —
             // typed string (+ numeric offset) only; array forms / &$count stay out.
             return self::stringReplaceOrJoinArgsCannotThrow($name, $callArgs);
+        }
+        if (self::isPureNumberFormatBuiltin($name)) {
+            // number_format.c — numeric + optional decimals + nullable separators.
+            return self::numberFormatArgsCannotThrow($callArgs);
         }
         if ('chr' === $name) {
             // Z_PARAM_LONG family — object→int does not call __toString; still
@@ -690,6 +695,8 @@ final class NoThrowCallElision
             case 'str_contains':
             case 'str_starts_with':
             case 'str_ends_with':
+            // levenshtein.c — two strings + optional insertion/replacement/deletion costs.
+            case 'levenshtein':
                 return true;
             default:
                 return false;
@@ -712,10 +719,21 @@ final class NoThrowCallElision
             case 'wordwrap':
             case 'str_split':
             case 'explode':
+            // file.c str_getcsv — four typed strings only; omitted $escape DEP stays live.
+            case 'str_getcsv':
                 return true;
             default:
                 return false;
         }
+    }
+
+    /**
+     * php-src {@code ext/standard/string.c} / {@code number_format.c} — formats a
+     * numeric into a string. Public for {@see DiscardedPureCallElision} (#36386).
+     */
+    public static function isPureNumberFormatBuiltin(string $nameLc): bool
+    {
+        return 'number_format' === $nameLc;
     }
 
     /**
@@ -927,9 +945,69 @@ final class NoThrowCallElision
 
                 return $callArgs[2] instanceof Variable
                     && self::numericParamBuiltinArgCannotThrow($callArgs[2]);
+            case 'str_getcsv':
+                // string [, separator, enclosure, escape] — omitted $escape emits
+                // E_DEPRECATED (php-src 8.4+ file.c); require all four typed strings.
+                if (
+                    !isset($callArgs[0], $callArgs[1], $callArgs[2], $callArgs[3])
+                    || isset($callArgs[4])
+                ) {
+                    return false;
+                }
+
+                return $callArgs[0] instanceof Variable
+                    && self::stringParamBuiltinArgCannotThrow($callArgs[0])
+                    && $callArgs[1] instanceof Variable
+                    && self::stringParamBuiltinArgCannotThrow($callArgs[1])
+                    && $callArgs[2] instanceof Variable
+                    && self::stringParamBuiltinArgCannotThrow($callArgs[2])
+                    && $callArgs[3] instanceof Variable
+                    && self::stringParamBuiltinArgCannotThrow($callArgs[3]);
             default:
                 return false;
         }
+    }
+
+    /**
+     * {@code number_format} — numeric num [, long decimals [, string|null sep…]].
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    public static function numberFormatArgsCannotThrow(array $callArgs): bool
+    {
+        if (
+            !isset($callArgs[0])
+            || !$callArgs[0] instanceof Variable
+            || !self::numericParamBuiltinArgCannotThrow($callArgs[0])
+        ) {
+            return false;
+        }
+        if (!isset($callArgs[1])) {
+            return true;
+        }
+        if (
+            !$callArgs[1] instanceof Variable
+            || !self::numericParamBuiltinArgCannotThrow($callArgs[1])
+        ) {
+            return false;
+        }
+        for ($i = 2; $i <= 3; ++$i) {
+            if (!isset($callArgs[$i])) {
+                return true;
+            }
+            if (
+                !$callArgs[$i] instanceof Variable
+                || !(
+                    self::stringParamBuiltinArgCannotThrow($callArgs[$i])
+                    || Variable::TYPE_NULL === $callArgs[$i]->type
+                    || $callArgs[$i]->isNullConstant
+                )
+            ) {
+                return false;
+            }
+        }
+
+        return !isset($callArgs[4]);
     }
 
     /**
@@ -974,6 +1052,32 @@ final class NoThrowCallElision
                     && self::stringParamBuiltinArgCannotThrow($callArgs[0])
                     && $callArgs[1] instanceof Variable
                     && self::numericParamBuiltinArgCannotThrow($callArgs[1]);
+            case 'levenshtein':
+                // string, string [, long insert [, long replace [, long delete]]]
+                if (!isset($callArgs[0], $callArgs[1])) {
+                    return false;
+                }
+                if (
+                    !$callArgs[0] instanceof Variable
+                    || !self::stringParamBuiltinArgCannotThrow($callArgs[0])
+                    || !$callArgs[1] instanceof Variable
+                    || !self::stringParamBuiltinArgCannotThrow($callArgs[1])
+                ) {
+                    return false;
+                }
+                for ($i = 2, $n = count($callArgs); $i < $n; ++$i) {
+                    if ($i > 4) {
+                        return false;
+                    }
+                    if (
+                        !$callArgs[$i] instanceof Variable
+                        || !self::numericParamBuiltinArgCannotThrow($callArgs[$i])
+                    ) {
+                        return false;
+                    }
+                }
+
+                return true;
             case 'strncmp':
             case 'strncasecmp':
                 // string, string, long len
