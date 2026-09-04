@@ -1629,13 +1629,30 @@ trait InitJitMethodCall
             }
             // Trait method bodies: `$this->m()` may resolve on the composing class only
             // (Nyholm StreamTrait::__toString → Stream::isSeekable, #36382).
+            // Abstract composers (Psr\Log\AbstractLogger + LoggerTrait::emergency → log) leave
+            // the abstract on subclasses — dispatch by runtime class_id among known subtypes
+            // (zend_std_get_method / zend_compile_traits, #36382).
             if ($this->context->type->object->isTraitClass($declaringClassLc)) {
                 $composing = $this->context->scope->traitComposingClassName;
                 if ('' !== $composing) {
                     $compLc = strtolower(ltrim($composing, '\\'));
-                    $compProxy = $compLc.'::'.$methodLc;
-                    if ($this->context->functionIsRegistered($compProxy)) {
-                        $this->context->scope->toCall = $this->context->resolveFunctionProxy($compProxy);
+                    $resolvedProxy = $this->resolveJitInstanceMethodProxyName($compLc, $methodLc);
+                    if ($this->context->functionIsRegistered($resolvedProxy)) {
+                        $this->context->scope->toCall = $this->context->resolveFunctionProxy($resolvedProxy);
+                        $this->context->scope->args = [$receiverVar];
+
+                        return;
+                    }
+                    $traitSubtypeCandidates = $this->buildRuntimeInstanceMethodCandidatesForDeclaredType(
+                        $compLc,
+                        $methodLc
+                    );
+                    if ([] !== $traitSubtypeCandidates) {
+                        $this->context->scope->toCall = new \PHPCompiler\JIT\Call\RuntimeIndirectInstanceMethodCall(
+                            $receiverVar,
+                            $methodLc,
+                            $traitSubtypeCandidates
+                        );
                         $this->context->scope->args = [$receiverVar];
 
                         return;

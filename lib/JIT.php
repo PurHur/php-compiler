@@ -74,6 +74,14 @@ class JIT {
      */
     private array $concatPendingLeaves = [];
 
+    /**
+     * Trait method bodies deferred on abstract composers until a concrete subclass exists
+     * so `$this->abstractMethod()` can subtype-dispatch (Psr\Log\LoggerTrait → AbstractLogger, #36382).
+     *
+     * @var array<string, list<array{block: Block, funcName: string, className: string, traitName: string}>>
+     */
+    private array $deferredAbstractTraitMethodBodies = [];
+
     /** @var \SplObjectStorage<OpCode, true> DECLARE_GLOBAL_CONST opcodes that registered (#4941). */
     private \SplObjectStorage $registeredGlobalConstDeclareOpcodes;
 
@@ -13169,6 +13177,27 @@ class JIT {
             );
         }
 
+        // Abstract composer + unimplemented trait abstracts (LoggerTrait::log on AbstractLogger):
+        // defer concrete trait bodies until a subclass exists so `$this->log()` subtype-dispatch
+        // sees NullLogger / Slim\Logger (IncludeHelper NestedJIT order, #36382).
+        $deferTraitBodies = false;
+        if ($object->isAbstractClassLc($classLc)) {
+            foreach ($merged as $checkLc => $checkData) {
+                if (isset($ownMethods[$checkLc]) || isset($excluded[$checkLc])) {
+                    continue;
+                }
+                $checkSrc = $checkData['sourceMethodLc'] ?? $checkData['methodLc'];
+                if (null !== $object->traitMethodBlock($checkData['traitId'], $checkSrc)) {
+                    continue;
+                }
+                $checkVis = $checkData['vis'] ?? $object->methodVisibility($checkData['traitId'], $checkLc);
+                if (0 !== ($checkVis & \PHPCfg\Func::FLAG_ABSTRACT)) {
+                    $deferTraitBodies = true;
+                    break;
+                }
+            }
+        }
+
         foreach ($merged as $methodLc => $data) {
             if (isset($excluded[$methodLc])) {
                 continue;
@@ -13209,20 +13238,77 @@ class JIT {
                 if ($this->context->scope->blockStorage->contains($methodBlock)) {
                     $this->context->scope->blockStorage->detach($methodBlock);
                 }
-                $savedTraitComposing = $this->context->scope->traitComposingClassName;
-                $savedScopeClassName = $this->context->scope->className;
-                $this->context->scope->traitComposingClassName = $className;
-                if ('' === $savedScopeClassName
-                    || $this->context->type->object->isTraitClass(strtolower(ltrim($savedScopeClassName, '\\')))) {
-                    $this->context->scope->className = strtolower(ltrim($className, '\\'));
+                if ($deferTraitBodies) {
+                    $this->deferredAbstractTraitMethodBodies[$classLc][] = [
+                        'block' => $methodBlock,
+                        'funcName' => $classLc.'::'.$methodLc,
+                        'className' => $className,
+                        'traitName' => $data['traitName'],
+                    ];
+                    continue;
                 }
-                try {
-                    $this->compileBlock($methodBlock, $classLc.'::'.$methodLc);
-                } finally {
-                    $this->context->scope->traitComposingClassName = $savedTraitComposing;
-                    $this->context->scope->className = $savedScopeClassName;
-                }
+                $this->compileTraitMethodBodyOntoClass($methodBlock, $className, $classLc.'::'.$methodLc);
             }
+        }
+    }
+
+    /**
+     * Lower a trait method body with traitComposingClassName bound (#18878 / #36382).
+     */
+    private function compileTraitMethodBodyOntoClass(Block $methodBlock, string $className, string $funcName): void
+    {
+        $savedTraitComposing = $this->context->scope->traitComposingClassName;
+        $savedScopeClassName = $this->context->scope->className;
+        $this->context->scope->traitComposingClassName = $className;
+        if ('' === $savedScopeClassName
+            || $this->context->type->object->isTraitClass(strtolower(ltrim($savedScopeClassName, '\\')))) {
+            $this->context->scope->className = strtolower(ltrim($className, '\\'));
+        }
+        try {
+            $this->compileBlock($methodBlock, $funcName);
+        } finally {
+            $this->context->scope->traitComposingClassName = $savedTraitComposing;
+            $this->context->scope->className = $savedScopeClassName;
+        }
+    }
+
+    /**
+     * Flush deferred abstract-composer trait bodies once a concrete subclass is declared (#36382).
+     */
+    private function flushDeferredAbstractTraitMethodBodiesForConcrete(string $className): void
+    {
+        $object = $this->context->type->object;
+        $current = strtolower(ltrim($className, '\\'));
+        if ('' === $current || $object->isAbstractClassLc($current)) {
+            return;
+        }
+        $visited = [];
+        while (!isset($visited[$current])) {
+            $visited[$current] = true;
+            $parent = $object->parentClassLc($current);
+            if (null === $parent || '' === $parent) {
+                break;
+            }
+            if (isset($this->deferredAbstractTraitMethodBodies[$parent])) {
+                $this->compileDeferredAbstractTraitMethodBodies($parent);
+            }
+            $current = $parent;
+        }
+    }
+
+    /**
+     * @param string $abstractLc lowercase abstract composing class
+     */
+    private function compileDeferredAbstractTraitMethodBodies(string $abstractLc): void
+    {
+        $pending = $this->deferredAbstractTraitMethodBodies[$abstractLc] ?? [];
+        unset($this->deferredAbstractTraitMethodBodies[$abstractLc]);
+        foreach ($pending as $item) {
+            $funcName = $item['funcName'];
+            if ($this->context->functionIsRegistered($funcName)) {
+                continue;
+            }
+            $this->compileTraitMethodBodyOntoClass($item['block'], $item['className'], $funcName);
         }
     }
 

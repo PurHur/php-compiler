@@ -6525,6 +6525,10 @@ trait CompileBlockInternal
                         $this->context->scope->classId,
                         $nameOp->value
                     );
+                    // Concrete subclass of AbstractLogger etc.: lower deferred LoggerTrait bodies (#36382).
+                    if (!$op->classIsAbstract) {
+                        $this->flushDeferredAbstractTraitMethodBodiesForConcrete($nameOp->value);
+                    }
                     $this->context->popScope();
                     break;
                 case OpCode::TYPE_NEW:

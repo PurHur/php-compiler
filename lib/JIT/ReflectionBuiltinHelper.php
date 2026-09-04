@@ -289,6 +289,44 @@ final class ReflectionBuiltinHelper
         return $i1->constInt($match ? 1 : 0, false);
     }
 
+    /**
+     * Thin-AOT is_subclass_of($child, $parent) when either name is a runtime string.
+     * Walks compile-unit class edges (no VM context / ClassExistsJitHelper, #36382).
+     * php-src: Zend/zend_builtin_functions.c zend_is_class_or_interface
+     */
+    public static function emitRuntimeStringIsSubclassOf(
+        Context $context,
+        Value $childStr,
+        Value $parentStr
+    ): Value {
+        $object = self::objectBuiltin($context);
+        $names = [];
+        foreach ($object->allClassNamesById() as $name) {
+            if (\is_string($name) && '' !== $name) {
+                $names[] = $name;
+            }
+        }
+        $i1 = $context->getTypeFromString('int1');
+        $falseVal = $i1->constInt(0, false);
+        $trueVal = $i1->constInt(1, false);
+        $acc = $falseVal;
+        foreach ($names as $childName) {
+            foreach ($names as $parentName) {
+                if (!$object->classIsSubclassOf($childName, $parentName)) {
+                    continue;
+                }
+                $childLit = $context->builder->load($context->constantStringFromString($childName));
+                $parentLit = $context->builder->load($context->constantStringFromString($parentName));
+                $childEq = JitStringCompare::asciiCaseInsensitiveIdentical($context, $childStr, $childLit);
+                $parentEq = JitStringCompare::asciiCaseInsensitiveIdentical($context, $parentStr, $parentLit);
+                $both = $context->builder->and($childEq, $parentEq);
+                $acc = $context->builder->or($acc, $both);
+            }
+        }
+
+        return $acc;
+    }
+
     public static function getClassName(Context $context, Variable $object): Value
     {
         if (Variable::TYPE_OBJECT !== $object->type && Variable::TYPE_VALUE !== $object->type) {
