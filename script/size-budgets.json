@@ -4,9 +4,9 @@
     "done_when_ceiling": 25000,
     "files": {
         "lib/Compiler.php": {
-            "budget": 4691,
+            "budget": 4147,
             "target": 20000,
-            "note": "Concern trait splits (#36230/#36387/#36403); CfgProducerIndexAndRematerialize + ExpressionPreludeDimFetchAndHoistedConstCallArgSlots + peers"
+            "note": "Concern trait splits (#36230/#36387/#36403); InlineCallArgClosureFeedsAndReturnProducers + peers"
         },
         "lib/JIT.php": {
             "budget": 24664,
