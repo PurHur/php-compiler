@@ -105,7 +105,56 @@ final class BootstrapGen0ChunksOrchestratorTest extends TestCase
         $this->assertGreaterThan(1, $plan['chunk_count']);
         foreach ($plan['chunks'] as $chunk) {
             $this->assertLessThanOrEqual(5, (int) $chunk['file_count']);
+            $this->assertArrayHasKey('byte_count', $chunk);
+            $this->assertGreaterThan(0, (int) $chunk['byte_count']);
         }
+        $this->removeTree($tmp);
+    }
+
+    public function testChunkPlanMaxBytesSplitsHubRequires(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $script = $root.'/script/bootstrap-gen0-chunk-plan.php';
+        $requires = $root.'/script/spine-chunk-core-requires.txt';
+        $this->assertFileExists($requires);
+        $tmp = sys_get_temp_dir().'/phpc-chunk-plan-hub-'.bin2hex(random_bytes(4));
+        mkdir($tmp.'/entries', 0755, true);
+        $planPath = $tmp.'/plan.json';
+        // hub-core is 33 files / ~850KB; 120KB budget + largest-first packing
+        // isolates Runtime.php / CompilerVersion.php as singleton hubs (#36387).
+        $cmd = escapeshellarg(PHP_BINARY).' '.escapeshellarg($script)
+            .' --requires='.escapeshellarg($requires)
+            .' --max-bytes=120000'
+            .' --entries-dir='.escapeshellarg($tmp.'/entries')
+            .' --plan-out='.escapeshellarg($planPath);
+        exec($cmd.' 2>&1', $out, $rc);
+        $this->assertSame(0, $rc, implode("\n", $out));
+        $plan = json_decode((string) file_get_contents($planPath), true);
+        $this->assertIsArray($plan);
+        $this->assertSame(120000, $plan['max_bytes']);
+        $this->assertGreaterThan(1, $plan['chunk_count']);
+        $hubs = 0;
+        $runtimeAlone = false;
+        foreach ($plan['chunks'] as $chunk) {
+            $this->assertSame('hub', $chunk['kind']);
+            $this->assertSame(0, (int) $chunk['wave']);
+            // Single oversized files (CompilerVersion.php ~181KB) keep their own batch.
+            if ((int) $chunk['file_count'] > 1) {
+                $this->assertLessThanOrEqual(120000, (int) $chunk['byte_count']);
+            }
+            $body = (string) file_get_contents($chunk['entry']);
+            if (str_contains($body, 'lib/Runtime.php')) {
+                $this->assertSame(
+                    1,
+                    (int) $chunk['file_count'],
+                    'Runtime.php must be a singleton hub under --max-bytes=120000'
+                );
+                $runtimeAlone = true;
+            }
+            ++$hubs;
+        }
+        $this->assertGreaterThan(3, $hubs);
+        $this->assertTrue($runtimeAlone, 'expected a Runtime.php singleton hub');
         $this->removeTree($tmp);
     }
 
@@ -150,7 +199,8 @@ final class BootstrapGen0ChunksOrchestratorTest extends TestCase
         $this->assertStringContainsString('fresh receipt — skip', $script);
         $this->assertStringContainsString('--micro', $script);
         $this->assertStringContainsString('--lib=', $script);
-        $this->assertStringContainsString('--spine', $script);
+        $this->assertStringContainsString('--max-files', $script);
+        $this->assertStringContainsString('--max-bytes', $script);
         $this->assertStringContainsString('wave_barrier', $script);
         $this->assertStringContainsString('CHUNK_WAVE_BARRIER', $script);
         $this->assertMatchesRegularExpression('/nproc - 2|nproc_n - 2/', $script);

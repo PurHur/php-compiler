@@ -14,6 +14,7 @@
 #   ./script/bootstrap-gen0-chunks.sh --plan=build/chunks/plan.json
 #   ./script/bootstrap-gen0-chunks.sh --lib=AOT,Lint --ext=types
 #   ./script/bootstrap-gen0-chunks.sh --spine --strategy=sub --max-files=80
+#   ./script/bootstrap-gen0-chunks.sh --requires=script/spine-chunk-core-requires.txt --max-bytes=120000
 #   CHUNK_JOBS=4 CHUNK_FORCE=1 ./script/bootstrap-gen0-chunks.sh --micro=4
 #
 # Env:
@@ -39,6 +40,7 @@ REQUIRES=""
 SPINE=0
 STRATEGY=""
 MAX_FILES=""
+MAX_BYTES=""
 OUT_DIR="${CHUNK_OUT_DIR:-${ROOT}/build/chunks}"
 JOBS="${CHUNK_JOBS:-0}"
 FORCE="${CHUNK_FORCE:-0}"
@@ -57,6 +59,7 @@ Usage: bootstrap-gen0-chunks.sh [plan opts | --plan=PATH]
   --spine              partition compiler_lib_spine_smoke/main.php
   --strategy=dir|sub|hub  spine partition strategy (with --spine)
   --max-files=N        further split buckets larger than N files
+  --max-bytes=N        further split when cumulative .php bytes exceed N
 EOF
 }
 
@@ -71,6 +74,7 @@ for arg in "$@"; do
     --spine) SPINE=1 ;;
     --strategy=*) STRATEGY="${arg#*=}" ;;
     --max-files=*) MAX_FILES="${arg#*=}" ;;
+    --max-bytes=*) MAX_BYTES="${arg#*=}" ;;
     -h|--help) usage; exit 0 ;;
     *) echo "bootstrap-gen0-chunks: unknown argument ${arg}" >&2; usage; exit 2 ;;
   esac
@@ -110,6 +114,9 @@ if [[ -z "${PLAN}" ]]; then
   fi
   if [[ -n "${MAX_FILES}" ]]; then
     plan_args+=(--max-files="${MAX_FILES}")
+  fi
+  if [[ -n "${MAX_BYTES}" ]]; then
+    plan_args+=(--max-bytes="${MAX_BYTES}")
   fi
   php "${ROOT}/script/bootstrap-gen0-chunk-plan.php" "${plan_args[@]}"
 fi

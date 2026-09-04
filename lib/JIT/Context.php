@@ -1482,7 +1482,15 @@ class Context {
         if (null !== $nestedObject) {
             return $nestedObject;
         }
-        if ($this->isUserScriptAot() && str_contains($lc, '::')) {
+        // User-script AOT rejects silent-null for registered-but-unlowered methods (#36202).
+        // SPINE_CHUNK TUs are partial hubs: cross-chunk / VM-only methods must stay on
+        // ExternalMethod stubs until peer-manifest bind (#24429 / #36387). compile.php always
+        // latches AOT_USER_SCRIPT for -o emits, so without this gate every slim hub that
+        // touches ffi::new (etc.) aborts before capacity-safe split-TU emit can finish.
+        if ($this->isUserScriptAot()
+            && !\PHPCompiler\AOT\ExternalMethodBind::spineChunkMode()
+            && str_contains($lc, '::')
+        ) {
             $vmOnly = self::findInternalClassMethodInVmRegistry($this, $lc);
             if (null !== $vmOnly && !self::internalBuiltinHasJitLowering($vmOnly)) {
                 throw new \LogicException(
