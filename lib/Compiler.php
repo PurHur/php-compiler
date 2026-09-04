@@ -23,6 +23,7 @@ require_once __DIR__.'/Compiler/Concern/FindInlineCallArgProducerSlot.php';
 require_once __DIR__.'/Compiler/Concern/PrecedingInlineCallArgProducers.php';
 require_once __DIR__.'/Compiler/Concern/SiblingInlineFuncCallProducers.php';
 require_once __DIR__.'/Compiler/Concern/SiblingInlineCallArgProducerSlots.php';
+require_once __DIR__.'/Compiler/Concern/SlotForCallArgResolvers.php';
 require_once __DIR__.'/Compiler/Concern/InlineCallArgSlotResolvers.php';
 
 use SplObjectStorage;
@@ -134,6 +135,7 @@ use PHPCompiler\Compiler\Concern\FindInlineCallArgProducerSlot;
 use PHPCompiler\Compiler\Concern\PrecedingInlineCallArgProducers;
 use PHPCompiler\Compiler\Concern\SiblingInlineFuncCallProducers;
 use PHPCompiler\Compiler\Concern\SiblingInlineCallArgProducerSlots;
+use PHPCompiler\Compiler\Concern\SlotForCallArgResolvers;
 use PHPCompiler\Compiler\Concern\InlineCallArgSlotResolvers;
 use PHPCompiler\Compiler\OverrideValidator;
 use PHPCompiler\Web\ConstStringFolder;
@@ -155,6 +157,7 @@ class Compiler {
     use PrecedingInlineCallArgProducers;
     use SiblingInlineFuncCallProducers;
     use SiblingInlineCallArgProducerSlots;
+    use SlotForCallArgResolvers;
     use InlineCallArgSlotResolvers;
 
     protected ?SplObjectStorage $seen = null;
