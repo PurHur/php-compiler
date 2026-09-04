@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -45,9 +46,18 @@ final class FunctionExistsRuntime
             return;
         }
 
-        self::ensureJitHelperCompiled($context);
-        self::implementBuiltinExistsBridge($context);
-        $context->builder->clearInsertionPosition();
+        // Mid-emit ensureLinked (Slim function_exists): preserve insert block (#36382 / peer CtypeRuntime).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        try {
+            self::ensureJitHelperCompiled($context);
+            self::implementBuiltinExistsBridge($context);
+        } finally {
+            if (null !== $savedInsert) {
+                BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+            } else {
+                $context->builder->clearInsertionPosition();
+            }
+        }
     }
 
     private static function implementBuiltinExistsBridge(Context $context): void

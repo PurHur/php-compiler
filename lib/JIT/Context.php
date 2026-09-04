@@ -3894,6 +3894,10 @@ class Context {
                 break;
             }
         }
+        $dumpPath = Config::getenv('PHP_COMPILER_LLVM_VERIFY_DUMP');
+        if (\is_string($dumpPath) && '' !== $dumpPath) {
+            @file_put_contents($dumpPath, $message);
+        }
         $head = implode("\n", $uniqueLines);
         $totalLines = substr_count($message, "\n") + ('' !== $message && !str_ends_with($message, "\n") ? 1 : 0);
         $suffix = $totalLines > \count($uniqueLines)

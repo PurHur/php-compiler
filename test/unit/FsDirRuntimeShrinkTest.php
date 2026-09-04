@@ -49,6 +49,7 @@ final class FsDirRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('FsDirJitHelper', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringContainsString('scopeLoweringToFunction', $source);
         $this->assertStringContainsString('TouchLibcRuntime::emit', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
