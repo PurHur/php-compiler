@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>php-compiler — real-world apps scoreboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="css/style.css">
+<style>
+  table.apps { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+  table.apps th, table.apps td { border: 1px solid #ccc; padding: 0.4rem 0.55rem; text-align: left; vertical-align: top; }
+  table.apps th { background: #f4f4f4; }
+  td.blockers { max-width: 28rem; word-break: break-word; color: #666; }
+  code { font-size: 0.85em; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Real-world application corpus</h1>
+  <p>Child of <a href="https://github.com/PurHur/php-compiler/issues/36380">#36380</a>.
+  Each package runs its own fixtures under Zend, VM, and AOT. Failures become
+  differential reductions — never app-specific patches.</p>
+  <p><strong>12</strong> packages · generated <code>2026-09-04T10:44:19Z</code> ·
+  refresh with <code>make apps-scoreboard</code>.</p>
+  <table class="apps">
+    <thead>
+      <tr>
+        <th>Package</th><th>SHA</th><th>Status</th>
+        <th>Zend</th><th>VM</th><th>AOT</th><th>AOT %</th><th>Blockers</th>
+      </tr>
+    </thead>
+    <tbody>
+<tr><td>erusev/parsedown</td><td><code>4e433a8d57078645b55d21fd12c887d3ba6ca01e</code></td><td>ready</td><td>ok 64/64</td><td>block 0/0</td><td>block 0/0</td><td>0.0%</td><td class="blockers">vm: PHP_Warning:_Undefined_array_key_0_in_/compiler/test/apps/erusev-parsedown/pinned/Parsedown.php_on_line_1038_PHP_Fatal_error:_Uncaught_TypeError:_array_slice():_Argument_#1_($array)_must_be_of_type_ar; aot: parse_error_curly_variable_method_$this-&gt;{...}</td></tr>
+<tr><td>symfony/yaml</td><td><code>—</code></td><td>pending</td><td>—</td><td>—</td><td>—</td><td>—</td><td class="blockers">pending pin</td></tr>
+<tr><td>brick/math</td><td><code>—</code></td><td>pending</td><td>—</td><td>—</td><td>—</td><td>—</td><td class="blockers">pending pin</td></tr>
+<tr><td>ramsey/uuid</td><td><code>—</code></td><td>pending</td><td>—</td><td>—</td><td>—</td><td>—</td><td class="blockers">pending pin</td></tr>
+<tr><td>league/commonmark</td><td><code>—</code></td><td>pending</td><td>—</td><td>—</td><td>—</td><td>—</td><td class="blockers">pending pin</td></tr>
+<tr><td>monolog/monolog</td><td><code>—</code></td><td>pending</td><td>—</td><td>—</td><td>—</td><td>—</td><td class="blockers">pending pin</td></tr>
+<tr><td>vlucas/phpdotenv</td><td><code>—</code></td><td>pending</td><td>—</td><td>—</td><td>—</td><td>—</td><td class="blockers">pending pin</td></tr>
+<tr><td>nikic/php-parser</td><td><code>—</code></td><td>pending</td><td>—</td><td>—</td><td>—</td><td>—</td><td class="blockers">pending pin</td></tr>
+<tr><td>twig/twig</td><td><code>—</code></td><td>pending</td><td>—</td><td>—</td><td>—</td><td>—</td><td class="blockers">pending pin</td></tr>
+<tr><td>slim/slim</td><td><code>—</code></td><td>pending</td><td>—</td><td>—</td><td>—</td><td>—</td><td class="blockers">pending pin</td></tr>
+<tr><td>phpunit/phpunit</td><td><code>—</code></td><td>pending</td><td>—</td><td>—</td><td>—</td><td>—</td><td class="blockers">pending pin</td></tr>
+<tr><td>illuminate/support</td><td><code>—</code></td><td>pending</td><td>—</td><td>—</td><td>—</td><td>—</td><td class="blockers">pending pin</td></tr>
+    </tbody>
+  </table>
+</main>
+</body>
+</html>

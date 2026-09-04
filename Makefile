@@ -111,9 +111,13 @@ test-docker-fast-jit-preflight: docker-build-22
 	JIT_PREFLIGHT_GATE=1 ./script/docker-ci-local.sh fast
 
 # VM smoke: examples/001-SimpleWeb with ?name=Test
-.PHONY: check web-smoke miniwebapp-gates miniwebapp-aot-bisect north-star1-verify north-star2-verify north-star3-verify north-star4-verify north-star5-verify north-star5-verify-fast dev-verify-fast aot-smoke-cross-emit bootstrap-trust-preflight release-readiness bootstrap-gen0-staleness bootstrap-gen0-driver-functional-smoke bootstrap-gen0-refresh-argv-driver bootstrap-vendor-native-rebuild-audit spine-chunk-probe bootstrap-gen0-chunk-emit bootstrap-gen0-chunks
+.PHONY: check web-smoke miniwebapp-gates miniwebapp-aot-bisect north-star1-verify north-star2-verify north-star3-verify north-star4-verify north-star5-verify north-star5-verify-fast dev-verify-fast aot-smoke-cross-emit bootstrap-trust-preflight release-readiness bootstrap-gen0-staleness bootstrap-gen0-driver-functional-smoke bootstrap-gen0-refresh-argv-driver bootstrap-vendor-native-rebuild-audit spine-chunk-probe bootstrap-gen0-chunk-emit bootstrap-gen0-chunks apps-scoreboard
 web-smoke:
 	./script/web-smoke.sh
+
+# Real-world OSS apps corpus scoreboard (#36380)
+apps-scoreboard:
+	./script/docker-exec.sh -- bash -lc 'php script/apps/scoreboard.php $(ARGS)'
 
 # MiniWebApp CI gate ladder status (issue #503; no full CI)
 miniwebapp-gates:

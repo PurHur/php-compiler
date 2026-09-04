@@ -1,0 +1,4 @@
+{
+    "entry": "runner.php",
+    "binary": ".phpc/bin/parsedown-runner"
+}

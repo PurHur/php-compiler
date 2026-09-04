@@ -1,0 +1,416 @@
+{
+    "generated_at": "2026-09-04T10:44:19Z",
+    "issue": 36380,
+    "packages": [
+        {
+            "slug": "erusev-parsedown",
+            "composer": "erusev/parsedown",
+            "sha": "4e433a8d57078645b55d21fd12c887d3ba6ca01e",
+            "status": "ready",
+            "zend": {
+                "status": "ok",
+                "pass": 64,
+                "fail": 0,
+                "skip": 0,
+                "rc": 0,
+                "reason": null
+            },
+            "vm": {
+                "status": "block",
+                "pass": 0,
+                "fail": 0,
+                "skip": 0,
+                "rc": 255,
+                "reason": "PHP_Warning:_Undefined_array_key_0_in_/compiler/test/apps/erusev-parsedown/pinned/Parsedown.php_on_line_1038_PHP_Fatal_error:_Uncaught_TypeError:_array_slice():_Argument_#1_($array)_must_be_of_type_ar"
+            },
+            "aot": {
+                "status": "block",
+                "pass": 0,
+                "fail": 0,
+                "skip": 0,
+                "rc": 255,
+                "reason": "parse_error_curly_variable_method_$this->{...}"
+            },
+            "aot_pass_rate": 0,
+            "blockers": [
+                "vm: PHP_Warning:_Undefined_array_key_0_in_/compiler/test/apps/erusev-parsedown/pinned/Parsedown.php_on_line_1038_PHP_Fatal_error:_Uncaught_TypeError:_array_slice():_Argument_#1_($array)_must_be_of_type_ar",
+                "aot: parse_error_curly_variable_method_$this->{...}"
+            ],
+            "raw_rc": 0
+        },
+        {
+            "slug": "symfony-yaml",
+            "composer": "symfony/yaml",
+            "sha": null,
+            "status": "pending",
+            "zend": {
+                "status": "pending",
+                "pass": 0,
+                "fail": 0,
+                "skip": 0,
+                "rc": null,
+                "reason": null
+            },
+            "vm": {
+                "status": "pending",
+                "pass": 0,
+                "fail": 0,
+                "skip": 0,
+                "rc": null,
+                "reason": null
+            },
+            "aot": {
+                "status": "pending",
+                "pass": 0,
+                "fail": 0,
+                "skip": 0,
+                "rc": null,
+                "reason": null
+            },
+            "aot_pass_rate": null,
+            "blockers": [
+                "pending pin"
+            ]
+        },
+        {
+            "slug": "brick-math",
+            "composer": "brick/math",
+            "sha": null,
+            "status": "pending",
+            "zend": {
+                "status": "pending",
+                "pass": 0,
+                "fail": 0,
+                "skip": 0,
+                "rc": null,
+                "reason": null
+            },
+            "vm": {
+                "status": "pending",
+                "pass": 0,
+                "fail": 0,
+                "skip": 0,
+                "rc": null,
+                "reason": null
+            },
+            "aot": {
+                "status": "pending",
+                "pass": 0,
+                "fail": 0,
+                "skip": 0,
+                "rc": null,
+                "reason": null
+            },
+            "aot_pass_rate": null,
+            "blockers": [
+                "pending pin"
+            ]
+        },
+        {
+            "slug": "ramsey-uuid",
+            "composer": "ramsey/uuid",
+            "sha": null,
+            "status": "pending",
+            "zend": {
+                "status": "pending",
+                "pass": 0,
+                "fail": 0,
+                "skip": 0,
+                "rc": null,
+                "reason": null
+            },
+            "vm": {
+                "status": "pending",
+                "pass": 0,
+                "fail": 0,
+                "skip": 0,
+                "rc": null,
+                "reason": null
+            },
+            "aot": {
+                "status": "pending",
+                "pass": 0,
+                "fail": 0,
+                "skip": 0,
+                "rc": null,
+                "reason": null
+            },
+            "aot_pass_rate": null,
+            "blockers": [
+                "pending pin"
+            ]
+        },
+        {
+            "slug": "league-commonmark",
+            "composer": "league/commonmark",
+            "sha": null,
+            "status": "pending",
+            "zend": {
+                "status": "pending",
+                "pass": 0,
+                "fail": 0,
+                "skip": 0,
+                "rc": null,
+                "reason": null
+            },
+            "vm": {
+                "status": "pending",
+                "pass": 0,
+                "fail": 0,
+                "skip": 0,
+                "rc": null,
+                "reason": null
+            },
+            "aot": {
+                "status": "pending",
+                "pass": 0,
+                "fail": 0,
+                "skip": 0,
+                "rc": null,
+                "reason": null
+            },
+            "aot_pass_rate": null,
+            "blockers": [
+                "pending pin"
+            ]
+        },
+        {
+            "slug": "monolog-monolog",
+            "composer": "monolog/monolog",
+            "sha": null,
+            "status": "pending",
+            "zend": {
+                "status": "pending",
+                "pass": 0,
+                "fail": 0,
+                "skip": 0,
+                "rc": null,
+                "reason": null
+            },
+            "vm": {
+                "status": "pending",
+                "pass": 0,
+                "fail": 0,
+                "skip": 0,
+                "rc": null,
+                "reason": null
+            },
+            "aot": {
+                "status": "pending",
+                "pass": 0,
+                "fail": 0,
+                "skip": 0,
+                "rc": null,
+                "reason": null
+            },
+            "aot_pass_rate": null,
+            "blockers": [
+                "pending pin"
+            ]
+        },
+        {
+            "slug": "vlucas-phpdotenv",
+            "composer": "vlucas/phpdotenv",
+            "sha": null,
+            "status": "pending",
+            "zend": {
+                "status": "pending",
+                "pass": 0,
+                "fail": 0,
+                "skip": 0,
+                "rc": null,
+                "reason": null
+            },
+            "vm": {
+                "status": "pending",
+                "pass": 0,
+                "fail": 0,
+                "skip": 0,
+                "rc": null,
+                "reason": null
+            },
+            "aot": {
+                "status": "pending",
+                "pass": 0,
+                "fail": 0,
+                "skip": 0,
+                "rc": null,
+                "reason": null
+            },
+            "aot_pass_rate": null,
+            "blockers": [
+                "pending pin"
+            ]
+        },
+        {
+            "slug": "nikic-php-parser",
+            "composer": "nikic/php-parser",
+            "sha": null,
+            "status": "pending",
+            "zend": {
+                "status": "pending",
+                "pass": 0,
+                "fail": 0,
+                "skip": 0,
+                "rc": null,
+                "reason": null
+            },
+            "vm": {
+                "status": "pending",
+                "pass": 0,
+                "fail": 0,
+                "skip": 0,
+                "rc": null,
+                "reason": null
+            },
+            "aot": {
+                "status": "pending",
+                "pass": 0,
+                "fail": 0,
+                "skip": 0,
+                "rc": null,
+                "reason": null
+            },
+            "aot_pass_rate": null,
+            "blockers": [
+                "pending pin"
+            ]
+        },
+        {
+            "slug": "twig-twig",
+            "composer": "twig/twig",
+            "sha": null,
+            "status": "pending",
+            "zend": {
+                "status": "pending",
+                "pass": 0,
+                "fail": 0,
+                "skip": 0,
+                "rc": null,
+                "reason": null
+            },
+            "vm": {
+                "status": "pending",
+                "pass": 0,
+                "fail": 0,
+                "skip": 0,
+                "rc": null,
+                "reason": null
+            },
+            "aot": {
+                "status": "pending",
+                "pass": 0,
+                "fail": 0,
+                "skip": 0,
+                "rc": null,
+                "reason": null
+            },
+            "aot_pass_rate": null,
+            "blockers": [
+                "pending pin"
+            ]
+        },
+        {
+            "slug": "slim-slim",
+            "composer": "slim/slim",
+            "sha": null,
+            "status": "pending",
+            "zend": {
+                "status": "pending",
+                "pass": 0,
+                "fail": 0,
+                "skip": 0,
+                "rc": null,
+                "reason": null
+            },
+            "vm": {
+                "status": "pending",
+                "pass": 0,
+                "fail": 0,
+                "skip": 0,
+                "rc": null,
+                "reason": null
+            },
+            "aot": {
+                "status": "pending",
+                "pass": 0,
+                "fail": 0,
+                "skip": 0,
+                "rc": null,
+                "reason": null
+            },
+            "aot_pass_rate": null,
+            "blockers": [
+                "pending pin"
+            ]
+        },
+        {
+            "slug": "phpunit-phpunit",
+            "composer": "phpunit/phpunit",
+            "sha": null,
+            "status": "pending",
+            "zend": {
+                "status": "pending",
+                "pass": 0,
+                "fail": 0,
+                "skip": 0,
+                "rc": null,
+                "reason": null
+            },
+            "vm": {
+                "status": "pending",
+                "pass": 0,
+                "fail": 0,
+                "skip": 0,
+                "rc": null,
+                "reason": null
+            },
+            "aot": {
+                "status": "pending",
+                "pass": 0,
+                "fail": 0,
+                "skip": 0,
+                "rc": null,
+                "reason": null
+            },
+            "aot_pass_rate": null,
+            "blockers": [
+                "pending pin"
+            ]
+        },
+        {
+            "slug": "illuminate-support",
+            "composer": "illuminate/support",
+            "sha": null,
+            "status": "pending",
+            "zend": {
+                "status": "pending",
+                "pass": 0,
+                "fail": 0,
+                "skip": 0,
+                "rc": null,
+                "reason": null
+            },
+            "vm": {
+                "status": "pending",
+                "pass": 0,
+                "fail": 0,
+                "skip": 0,
+                "rc": null,
+                "reason": null
+            },
+            "aot": {
+                "status": "pending",
+                "pass": 0,
+                "fail": 0,
+                "skip": 0,
+                "rc": null,
+                "reason": null
+            },
+            "aot_pass_rate": null,
+            "blockers": [
+                "pending pin"
+            ]
+        }
+    ]
+}
