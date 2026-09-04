@@ -495,6 +495,45 @@ final class SourceBundlerTest extends TestCase
             $_SERVER['PHP_COMPILER_AOT_INCREMENTAL_INCLUDES'] = $prev;
         }
 
+        // Below threshold: no memory bump (#36382).
+        $prevMem = getenv('PHP_COMPILER_MEMORY_LIMIT');
+        $prevLlvm = getenv('PHP_COMPILER_LLVM_MEMORY_LIMIT');
+        putenv('PHP_COMPILER_MEMORY_LIMIT=1536M');
+        $_ENV['PHP_COMPILER_MEMORY_LIMIT'] = '1536M';
+        putenv('PHP_COMPILER_LLVM_MEMORY_LIMIT=4096M');
+        $_ENV['PHP_COMPILER_LLVM_MEMORY_LIMIT'] = '4096M';
+        $this->assertNull(SourceBundler::ensureIncrementalProjectMemoryFloor(3));
+        $raised = SourceBundler::ensureIncrementalProjectMemoryFloor(
+            SourceBundler::INCREMENTAL_REQUIRES_UNIT_THRESHOLD
+        );
+        $this->assertSame('4096M', $raised);
+        $this->assertSame('4096M', getenv('PHP_COMPILER_MEMORY_LIMIT'));
+        // Already at/above floor: no second raise.
+        $this->assertNull(SourceBundler::ensureIncrementalProjectMemoryFloor(
+            SourceBundler::INCREMENTAL_REQUIRES_UNIT_THRESHOLD
+        ));
+        // ≥80 units: Slim-sized floor past default LLVM budget (#36382).
+        putenv('PHP_COMPILER_MEMORY_LIMIT=8192M');
+        $_ENV['PHP_COMPILER_MEMORY_LIMIT'] = '8192M';
+        putenv('PHP_COMPILER_LLVM_MEMORY_LIMIT=8192M');
+        $_ENV['PHP_COMPILER_LLVM_MEMORY_LIMIT'] = '8192M';
+        $this->assertSame('16384M', SourceBundler::ensureIncrementalProjectMemoryFloor(103));
+        $this->assertSame('16384M', getenv('PHP_COMPILER_MEMORY_LIMIT'));
+        if (false === $prevMem || null === $prevMem) {
+            putenv('PHP_COMPILER_MEMORY_LIMIT');
+            unset($_ENV['PHP_COMPILER_MEMORY_LIMIT'], $_SERVER['PHP_COMPILER_MEMORY_LIMIT']);
+        } else {
+            putenv('PHP_COMPILER_MEMORY_LIMIT='.$prevMem);
+            $_ENV['PHP_COMPILER_MEMORY_LIMIT'] = $prevMem;
+        }
+        if (false === $prevLlvm || null === $prevLlvm) {
+            putenv('PHP_COMPILER_LLVM_MEMORY_LIMIT');
+            unset($_ENV['PHP_COMPILER_LLVM_MEMORY_LIMIT'], $_SERVER['PHP_COMPILER_LLVM_MEMORY_LIMIT']);
+        } else {
+            putenv('PHP_COMPILER_LLVM_MEMORY_LIMIT='.$prevLlvm);
+            $_ENV['PHP_COMPILER_LLVM_MEMORY_LIMIT'] = $prevLlvm;
+        }
+
         $dir = sys_get_temp_dir().'/phpc_incr_'.bin2hex(random_bytes(4));
         $this->assertTrue(mkdir($dir));
         try {

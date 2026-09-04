@@ -687,6 +687,21 @@ function buildFromProject(
     }
     $compileArgv[] = $entry;
 
+    // Child cli_driver reads PHP_COMPILER_MEMORY_LIMIT before compile.php runs — raise
+    // early so Slim-sized incremental graphs do not start at the 1536M CI default (#36382).
+    if (\PHPCompiler\Web\SourceBundler::shouldUseIncrementalRequires($includes)) {
+        $raised = \PHPCompiler\Web\SourceBundler::ensureIncrementalProjectMemoryFloor(\count($includes));
+        if (is_string($raised)) {
+            $php[] = '-d';
+            $php[] = 'memory_limit='.$raised;
+            fwrite(
+                STDERR,
+                'phpc build --project: raised memory_limit to '.$raised
+                .' for '.\count($includes)."-unit incremental compile (#36382)\n"
+            );
+        }
+    }
+
     $result = \PHPCompiler\Cli\PhpcBuild::runCompile(
         $php,
         $repoRoot,

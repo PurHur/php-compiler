@@ -48240,7 +48240,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new self (line 127)
 - new self (line 140)
-- 28 class method(s)
+- 30 class method(s)
 
 ### `lib/AOT/ComposerVendorMap.php`
 
@@ -50069,7 +50069,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Analyzer.php`
 
 **Warnings** (review for bootstrap subset):
-- 13 class method(s)
+- 14 class method(s)
 
 ### `lib/JIT/AotDebugSymbols.php`
 
@@ -65610,8 +65610,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Web/SourceBundler.php`
 
 **Warnings** (review for bootstrap subset):
-- 34 class method(s)
-- 1 closure(s)
+- 35 class method(s)
+- 2 closure(s)
 
 ### `lib/Web/SuperglobalRefreshJitHelper.php`
 

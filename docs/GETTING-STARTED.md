@@ -111,6 +111,20 @@ When `vendor/composer/` exists, `phpc build --project` reads Composer’s genera
 
 `phpc.json` knobs: `"autoload": "composer"` (default when `vendor/composer` exists), `"autoload": "none"` to skip, and `"include_roots": ["lib/…"]` for extra trees. Literal includes outside the project file map fail at compile time with the path. Computed `include $path` / `require $path` resolve against the same map at runtime: in-map paths are accepted (units already linked via the graph); out-of-map paths raise `Error` with the path (never a silent no-op).
 
+Graphs with ≥32 `--include` units skip SourceBundler mega-concat and fold files via IncludeHelper; `phpc build` raises `memory_limit` to `PHP_COMPILER_LLVM_MEMORY_LIMIT` (default 8192M), and graphs with ≥80 units raise further to **16384M** ([#36382](https://github.com/PurHur/php-compiler/issues/36382)). Slim+nyholm (~100 units) still peaks past **27 GiB RSS** during a single-module IncludeHelper emit — full `phpc build --project` of that fixture needs split-TU (see [#36147](https://github.com/PurHur/php-compiler/issues/36147)) or a ≥32g host and a long wall clock; the smoke script documents the measured cgroup floors.
+
+```bash
+# Fixture: PSR-4 + classmap + files (green today)
+./phpc build --project test/fixtures/aot/projects/composer_mini
+./test/fixtures/aot/projects/composer_mini/.phpc/bin/app
+# expect: hello world|legacy|stamp
+
+# Slim+nyholm graph + memory-floor probe (full AOT emit still OOM/SIGKILL without split-TU)
+./script/setup-slim-hello-36382.sh
+./phpc build --project test/fixtures/aot/projects/slim_hello_36382 --dry-run   # ~103 units
+# full emit: PHP_COMPILER_DOCKER_MEM=32g … ./script/slim-hello-36382-smoke.sh  # experimental
+```
+
 ### 5. (Optional) SessionsWeb — two-request flash (VM)
 
 `session_start()` and `$_SESSION['flash']` across HTTP requests ([#1881](https://github.com/PurHur/php-compiler/issues/1881)). `./phpc run` shows the empty form only; use `phpc serve` and a cookie jar for the POST → redirect → GET story.
