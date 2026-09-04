@@ -4951,6 +4951,13 @@ trait CompileBlockInternal
                         return $origBasicBlock;
                     }
                     $returnOperand = $block->getOperand($op->arg1);
+                    // Keep the return value alive before dead-temp dtor: php-cfg may mark the
+                    // NEW/clone result (or an alias temp) dead while RETURN still names `$new`.
+                    // Delref-before-addref destroyed heap props so callers saw NULL / unset after
+                    // `return $new` / `return clone $this` under AOT (#36382 Nyholm Uri::withUserInfo).
+                    if (!$this->isVoidLlvmFunction($func) && !$this->cfgFunctionReturnsByRef($block->func)) {
+                        $return->addref();
+                    }
                     if ($this->shouldFreeDeadVariablesBeforeBranch()) {
                         // php-cfg may mark inline `new class` temps dead before return (#3098).
                         $this->context->freeDeadVariables($func, $returnBlock, $block, $returnOperand);
@@ -4967,7 +4974,7 @@ trait CompileBlockInternal
                             \PHPCompiler\JIT\JitValueBox::valuePtrForByRefReturn($this->context, $return)
                         );
                     } else {
-                        $return->addref();
+                        // addref already emitted above (before freeDeadVariables).
                         if ($block->returnTypeStatic) {
                             $objectType = $this->context->type->object;
                             assert($objectType instanceof \PHPCompiler\JIT\Builtin\Type\Object_);

@@ -35609,7 +35609,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/ParseUrlJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 20 class method(s)
 
 ### `ext/standard/PasswordJitHelper.php`
 
@@ -39151,8 +39151,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Error (line 1982)
 - new Error (line 1993)
-- new ArgumentCountError (line 3875)
-- 226 class method(s)
+- new ArgumentCountError (line 3932)
+- 228 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
 
@@ -52445,7 +52445,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ParseUrlAssocLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/ParseUrlComponentJit.php`
 
@@ -57727,27 +57727,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 3841)
 - new Variable (line 3952)
 - new OpCode (line 4110)
-- new Variable (line 5019)
-- new Variable (line 5107)
-- new Variable (line 5137)
-- new Variable (line 5729)
-- new Variable (line 5743)
-- new Variable (line 5767)
-- new VM (line 6233)
-- new Variable (line 6512)
-- new Type (line 6520)
-- new Variable (line 6548)
-- new Type (line 6556)
-- new Variable (line 6596)
-- new Type (line 6607)
-- new Operand\Literal (line 6739)
-- new Operand\Literal (line 6794)
-- new Type (line 6872)
-- new Variable (line 7065)
-- new Variable (line 7164)
-- new Variable (line 7205)
-- new Variable (line 7237)
-- new Operand\Literal (line 7383)
+- new Variable (line 5026)
+- new Variable (line 5114)
+- new Variable (line 5144)
+- new Variable (line 5736)
+- new Variable (line 5750)
+- new Variable (line 5774)
+- new VM (line 6240)
+- new Variable (line 6519)
+- new Type (line 6527)
+- new Variable (line 6555)
+- new Type (line 6563)
+- new Variable (line 6603)
+- new Type (line 6614)
+- new Operand\Literal (line 6746)
+- new Operand\Literal (line 6801)
+- new Type (line 6879)
+- new Variable (line 7072)
+- new Variable (line 7171)
+- new Variable (line 7212)
+- new Variable (line 7244)
+- new Operand\Literal (line 7390)
 - 2 class method(s)
 - 1 closure(s)
 

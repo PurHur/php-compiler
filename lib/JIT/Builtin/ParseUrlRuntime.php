@@ -14,11 +14,14 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for __phpc_parse_url_* via ParseUrlJitHelper PHP (#9358, #22861, #27078, #33226, #33236).
  *
- * Assoc HT: {@see ParseUrlAssocLlvm} (component + lastString/lastInt).
+ * Assoc HT: {@see ParseUrlAssocLlvm} (component + componentString/Int).
  * Thin AOT call-site {@see ensureLinked} must {@see BasicBlockHelper::scopeLoweringToFunction}
  * so bridge blocks are not appended to user main (#27211 / Module.php:180).
  * Do not re-add always-on empty decls in {@see Type} — leftover decls mint parse_url_component.1
  * (#31894 / #32122 / #33236). SSOT: {@see \PHPCompiler\ext\standard\VmString}. php-src: ext/standard/url.c
+ *
+ * NestedJIT helpers must stay small (ord-based public methods); a monolith NestedJIT abort (#36382).
+ * Force USER_SCRIPT_INLINE_ONLY — prelinked unit.o returned [] for runtime URL strings.
  */
 final class ParseUrlRuntime
 {
@@ -26,9 +29,9 @@ final class ParseUrlRuntime
 
     private const COMPONENT_HELPER = 'PHPCompiler\\ext\\standard\\ParseUrlJitHelper::parseUrlComponent';
 
-    private const LAST_STRING = 'PHPCompiler\\ext\\standard\\ParseUrlJitHelper::lastString';
+    private const COMPONENT_STRING = 'PHPCompiler\\ext\\standard\\ParseUrlJitHelper::componentString';
 
-    private const LAST_INT = 'PHPCompiler\\ext\\standard\\ParseUrlJitHelper::lastInt';
+    private const COMPONENT_INT = 'PHPCompiler\\ext\\standard\\ParseUrlJitHelper::componentInt';
 
     private const TAG_FALSE = 0;
 
@@ -39,8 +42,8 @@ final class ParseUrlRuntime
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::COMPONENT_HELPER,
-        self::LAST_STRING,
-        self::LAST_INT,
+        self::COMPONENT_STRING,
+        self::COMPONENT_INT,
     ];
 
     /** @var list<string> */
@@ -153,10 +156,14 @@ final class ParseUrlRuntime
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $tagI32 = $context->builder->trunc(
-            JitNestedHelperCoerce::callHelper(
+            JitNestedHelperCoerce::extractLongFromHelperResult(
                 $context,
-                self::helperFunction($context, self::COMPONENT_HELPER),
-                [$url, $context->builder->trunc($component, $i32)]
+                JitNestedHelperCoerce::callHelper(
+                    $context,
+                    self::helperFunction($context, self::COMPONENT_HELPER),
+                    [$url, $context->builder->trunc($component, $i32)]
+                ),
+                $i64
             ),
             $i32
         );
@@ -191,7 +198,11 @@ final class ParseUrlRuntime
             $intBb
         );
         $context->builder->positionAtEnd($stringBb);
-        $strRaw = JitNestedHelperCoerce::callHelper($context, self::helperFunction($context, self::LAST_STRING), []);
+        $strRaw = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::COMPONENT_STRING),
+            [$url, $context->builder->trunc($component, $i32)]
+        );
         $context->builder->call(
             $context->lookupFunction('__value__writeString'),
             $out,
@@ -199,11 +210,19 @@ final class ParseUrlRuntime
         );
         $context->builder->branch($doneBb);
         $context->builder->positionAtEnd($intBb);
-        $intResult = JitNestedHelperCoerce::callHelper($context, self::helperFunction($context, self::LAST_INT), []);
+        $intResult = JitNestedHelperCoerce::extractLongFromHelperResult(
+            $context,
+            JitNestedHelperCoerce::callHelper(
+                $context,
+                self::helperFunction($context, self::COMPONENT_INT),
+                [$url, $context->builder->trunc($component, $i32)]
+            ),
+            $i64
+        );
         $context->builder->call(
             $context->lookupFunction('__value__writeLong'),
             $out,
-            $context->builder->sext($context->builder->trunc($intResult, $i32), $i64)
+            $intResult
         );
         $context->builder->branch($doneBb);
         $context->builder->positionAtEnd($doneBb);

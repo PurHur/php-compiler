@@ -72,6 +72,14 @@ final class HelperRuntimeCache
         // Same TU as sprintfArgv — linking the prelinked unit.o would reintroduce the
         // NestedJIT `$packed[$i+1]` miscompile (#23871) alongside the inlined fix.
         'phpcompiler\\ext\\standard\\sprintfjithelper::numberformat' => true,
+        // #36382 — prelinked ParseUrlJitHelper unit.o returns [] for runtime URL strings
+        // under HELPER_RUNTIME_O=1 (string ABI / TU); NestedJIT of Preg-free VmString::parseUrl
+        // into the user module matches Zend. Slim Uri constructors need this (typed string param).
+        'phpcompiler\\ext\\standard\\parseurljithelper::parseurlcomponent' => true,
+        'phpcompiler\\ext\\standard\\parseurljithelper::componentstring' => true,
+        'phpcompiler\\ext\\standard\\parseurljithelper::componentint' => true,
+        'phpcompiler\\ext\\standard\\parseurljithelper::laststring' => true,
+        'phpcompiler\\ext\\standard\\parseurljithelper::lastint' => true,
         // #23912 — force NestedJIT of NestedJIT-safe StrReplaceJitHelper into user AOT
         // (stale/empty helper unit.o otherwise returns "" / wrong bytes for scalar replace).
         'phpcompiler\\ext\\standard\\strreplacejithelper::replaceargv' => true,
