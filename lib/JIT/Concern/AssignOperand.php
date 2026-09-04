@@ -1114,6 +1114,42 @@ trait AssignOperand
                         "assignOperand: refusing store {$srcTy} into {$destTy} (#36387)"
                     );
                 }
+                // Same PHP type can still be a native packed array whose loadValue is
+                // an LLVM array aggregate (`[N x %__string__*]`) while the destination
+                // slot was promoted to a `__value__*` box (IncludeHelper / branch merge).
+                // getStringFromType() maps arrays to "unknown" — key off KIND_ARRAY (#36382).
+                $srcKind = $toStore->typeOf()->getKind();
+                $destIsValueBox = '__value__*' === $destTy || '__value__' === $destTy;
+                if (\PHPLLVM\Type::KIND_ARRAY === $srcKind && $destIsValueBox) {
+                    if (0 === ($value->type & Variable::IS_NATIVE_ARRAY)) {
+                        throw new \LogicException(
+                            "assignOperand: refusing store LLVM array aggregate into {$destTy} (#36382)"
+                        );
+                    }
+                    $ht = \PHPCompiler\JIT\HashTableHelper::materializeNativeArrayForCall(
+                        $this->context,
+                        $value
+                    );
+                    $destPtr = \PHPCompiler\JIT\JitValueBox::valuePtrFromVariable(
+                        $this->context,
+                        $result
+                    );
+                    $this->context->builder->call(
+                        $this->context->lookupFunction('__value__writeHashtable'),
+                        $destPtr,
+                        $ht
+                    );
+                    $this->context->refcount->delref(
+                        $this->context->builder->pointerCast(
+                            $ht,
+                            $this->context->getTypeFromString('__ref__virtual*')
+                        )
+                    );
+                    $result->valueBoxHashtable = true;
+                    $this->markScopeVariableAssignedIfTracked($resultOp, $result);
+
+                    return;
+                }
             }
             $this->context->builder->store(
                 $toStore,
