@@ -811,6 +811,12 @@ final class VmPregEngine
             $this->advance(1);
         }
         $ranges = [];
+        // PCRE: `]` immediately after `[` / `[^` is a literal member, not the terminator
+        // (pcre2pattern; Parsedown inlineLink `[^][]` #36380).
+        if (!$this->atEnd() && ']' === $this->peek()) {
+            $ranges[] = [']', ']'];
+            $this->advance(1);
+        }
         while (!$this->atEnd() && ']' !== $this->peek()) {
             if ('\\' === $this->peek()) {
                 $ranges = \array_merge($ranges, $this->classEscape());
@@ -955,6 +961,8 @@ final class VmPregEngine
                 'W' => new VmPregAstUnicodePropNode('word', true),
                 's' => new VmPregAstUnicodePropNode('space', false),
                 'S' => new VmPregAstUnicodePropNode('space', true),
+                'b' => new VmPregAstWordBoundaryNode(false, true),
+                'B' => new VmPregAstWordBoundaryNode(true, true),
                 'A' => new VmPregAstBolNode(false),
                 'K' => new VmPregAstKeepOutNode(),
                 'Z' => new VmPregAstEolNode(false, true),
@@ -970,6 +978,9 @@ final class VmPregEngine
             'W' => new VmPregAstClassNode([['A', 'Z'], ['a', 'z'], ['0', '9'], ['_', '_']], true, false),
             's' => new VmPregAstClassNode([["\t", "\t"], ["\n", "\n"], ["\v", "\v"], ["\f", "\f"], ["\r", "\r"], [' ', ' ']], false, false),
             'S' => new VmPregAstClassNode([["\t", "\t"], ["\n", "\n"], ["\v", "\v"], ["\f", "\f"], ["\r", "\r"], [' ', ' ']], true, false),
+            // `\b` / `\B` were falling through to literal `b`/`B` (#36380 Parsedown EmRegex).
+            'b' => new VmPregAstWordBoundaryNode(false, false),
+            'B' => new VmPregAstWordBoundaryNode(true, false),
             'A' => new VmPregAstBolNode(false),
             'K' => new VmPregAstKeepOutNode(),
             'Z' => new VmPregAstEolNode(false, true),
@@ -1931,6 +1942,88 @@ final class VmPregAstRecursionNode implements VmPregAstNode
         array &$captures
     ): bool {
         return $engine->matchRecursion($subject, $pos, $len, $captures);
+    }
+}
+
+/**
+ * PCRE `\b` / `\B` word-boundary assertions (zero-width; pcre2pattern, #36380).
+ *
+ * ASCII `\w` = [A-Za-z0-9_]; with `/u` (PCRE2_UCP) uses the same word property as `\w`.
+ */
+final class VmPregAstWordBoundaryNode implements VmPregAstNode
+{
+    public function __construct(
+        private readonly bool $negated,
+        private readonly bool $utf
+    ) {
+    }
+
+    public function match(
+        VmPregEngine $engine,
+        string $subject,
+        int $pos,
+        int $len,
+        array &$captures
+    ): bool {
+        unset($engine);
+        $before = self::isWordBefore($subject, $pos, $len, $this->utf);
+        $after = self::isWordAt($subject, $pos, $len, $this->utf);
+        $atBoundary = $before !== $after;
+        if ($this->negated) {
+            $atBoundary = !$atBoundary;
+        }
+        if (!$atBoundary) {
+            return false;
+        }
+        $captures[0] = [$pos, $pos];
+
+        return true;
+    }
+
+    private static function isWordAt(string $subject, int $pos, int $len, bool $utf): bool
+    {
+        if ($pos < 0 || $pos >= $len) {
+            return false;
+        }
+        if (!$utf) {
+            return self::isAsciiWordByte($subject[$pos]);
+        }
+        $decoded = VmPregUtf8::codepointAt($subject, $pos, $len);
+        if (null === $decoded) {
+            return false;
+        }
+
+        return VmPregUtf8::codepointMatchesProp($decoded[0], 'word', false);
+    }
+
+    private static function isWordBefore(string $subject, int $pos, int $len, bool $utf): bool
+    {
+        if ($pos <= 0) {
+            return false;
+        }
+        if (!$utf) {
+            return self::isAsciiWordByte($subject[$pos - 1]);
+        }
+        $i = $pos - 1;
+        while ($i > 0 && (0x80 === (\ord($subject[$i]) & 0xC0))) {
+            --$i;
+        }
+        $decoded = VmPregUtf8::codepointAt($subject, $i, $len);
+        if (null === $decoded) {
+            return false;
+        }
+
+        return VmPregUtf8::codepointMatchesProp($decoded[0], 'word', false);
+    }
+
+    private static function isAsciiWordByte(string $ch): bool
+    {
+        $o = \ord($ch);
+
+        return ($o >= 0x30 && $o <= 0x39)
+            || ($o >= 0x41 && $o <= 0x5A)
+            || ($o >= 0x61 && $o <= 0x7A)
+            || 0x5F === $o;
     }
 }
 
