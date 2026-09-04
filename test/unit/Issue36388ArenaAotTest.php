@@ -47,4 +47,24 @@ final class Issue36388ArenaAotTest extends TestCase
         $this->assertStringContainsString('grew_ok', $text);
         $this->assertStringContainsString('freed_ok', $text);
     }
+
+    public function testMemoryGetPeakUsageAotStickyAndReset(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $src = $root.'/test/repro/issue_36388_peak_usage_aot.php';
+        $bin = sys_get_temp_dir().'/phpc_36388_peak_'.getmypid();
+        $cmd = 'php -d memory_limit=1536M '.escapeshellarg($root.'/bin/compile.php')
+            .' -o '.escapeshellarg($bin).' '.escapeshellarg($src).' 2>&1';
+        exec($cmd, $out, $rc);
+        $this->assertSame(0, $rc, implode("\n", $out));
+        $this->assertFileExists($bin);
+        exec(escapeshellarg($bin).' 2>&1', $runOut, $runRc);
+        @unlink($bin);
+        $this->assertSame(0, $runRc, implode("\n", $runOut));
+        $text = implode("\n", $runOut);
+        $this->assertStringContainsString('peak_ge_cur_ok', $text);
+        $this->assertStringContainsString('peak_sticky_ok', $text);
+        $this->assertStringContainsString('reset_ok', $text);
+        $this->assertStringContainsString('reset_le_old_ok', $text);
+    }
 }
