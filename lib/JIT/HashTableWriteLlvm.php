@@ -418,6 +418,19 @@ final class HashTableWriteLlvm
         Value $keyPtr,
         Variable $element
     ): void {
+        // Mirror setAtIndex: phpdoc list<string> / string[] RHS is a native array, not a
+        // scalar TYPE_STRING — store as nested hashtable (#36387 ComposerVendorMap / ProjectGraph).
+        if (0 !== ($element->type & Variable::IS_NATIVE_ARRAY)) {
+            $materialized = self::materializeNativeArrayForCall($context, $element);
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setStringKeyHashtable'),
+                $ht,
+                $keyPtr,
+                $materialized
+            );
+
+            return;
+        }
         switch ($element->type) {
             case Variable::TYPE_STRING:
                 $context->builder->call(
@@ -1358,6 +1371,19 @@ final class HashTableWriteLlvm
         Value $keyObj,
         Variable $element
     ): void {
+        // Peer setAtIndex / setAtStringKey: nested native-array RHS (#36387).
+        if (0 !== ($element->type & Variable::IS_NATIVE_ARRAY)) {
+            $materialized = self::materializeNativeArrayForCall($context, $element);
+            $writable = self::writableObjectKeyValueBox($context, $ht, $keyObj);
+            $dest = JitValueBox::valuePtrFromVariable($context, $writable);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeHashtable'),
+                $dest,
+                $materialized
+            );
+
+            return;
+        }
         switch ($element->type) {
             case Variable::TYPE_NATIVE_LONG:
                 $context->builder->call(

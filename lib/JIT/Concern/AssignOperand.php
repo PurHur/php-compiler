@@ -1550,6 +1550,57 @@ trait AssignOperand
             $result->addref();
 
             return;
+        } elseif (
+            0 !== ($result->type & Variable::IS_NATIVE_ARRAY)
+            && Variable::TYPE_VALUE === $value->type
+        ) {
+            // phpdoc list<string> / string[] locals are native __string__*[]; many call
+            // results (array_merge, glob, getenv parsing) arrive as TYPE_VALUE boxes.
+            // Demote the destination like HASHTABLE←VALUE (#36387 HelperRuntimeCache).
+            $slot = \PHPCompiler\JIT\JitValueBox::alloc($this->context);
+            \PHPCompiler\JIT\JitValueBox::copyFromPointer(
+                $this->context,
+                $slot,
+                $this->valueBoxPointer($value)
+            );
+            $result->free();
+            $result->type = Variable::TYPE_VALUE;
+            $result->value = $slot;
+            $this->copyValueBoxJitFlags($result, $value, $force);
+            $result->compileTimeConstantName = $value->compileTimeConstantName;
+            $result->compileTimeEnumCase = $value->compileTimeEnumCase;
+            $this->syncCompileTimeString($result, $value, $force);
+            $result->addref();
+
+            return;
+        } elseif (
+            0 !== ($result->type & Variable::IS_NATIVE_ARRAY)
+            && Variable::TYPE_HASHTABLE === $value->type
+        ) {
+            // Typed list<string> local ← INIT_ARRAY / hashtable temp (#36387).
+            // Do not promoteNativeArray on the destination — it may be uninitialized;
+            // demote the slot and move the hashtable like VALUE←HASHTABLE.
+            $slot = \PHPCompiler\JIT\JitValueBox::alloc($this->context);
+            $htPtr = $this->context->helper->loadValue($value);
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeHashtable'),
+                \PHPCompiler\JIT\JitValueBox::pointer($this->context, $slot),
+                $htPtr
+            );
+            if ($value->ephemeralArrayTemp) {
+                $this->context->builder->store(
+                    $this->context->getTypeFromString('__hashtable__*')->constNull(),
+                    $value->value
+                );
+                $value->ephemeralArrayTemp = false;
+            }
+            $result->free();
+            $result->type = Variable::TYPE_VALUE;
+            $result->value = $slot;
+            $result->valueBoxHashtable = true;
+            $this->markScopeVariableAssignedIfTracked($resultOp, $result);
+
+            return;
         } elseif (Variable::TYPE_VALUE === $result->type && Variable::TYPE_HASHTABLE === $value->type) {
             // INIT_ARRAY temps already hold rc=1. writeHashtable addrefs for the box's
             // sole-owner claim — without releasing the temp that leaves rc=2 so unset
