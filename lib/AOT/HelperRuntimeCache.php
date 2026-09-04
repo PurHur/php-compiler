@@ -1408,18 +1408,24 @@ final class HelperRuntimeCache
         if (null !== $common) {
             $objects[] = $common;
         }
+        // Discovery order follows first-use; sort unit paths so two builds with the same
+        // helper set produce identical ld argument lists (#36399 / build-id=sha1).
+        $unitObjects = [];
         foreach (array_keys(self::$usedUnits) as $unitDir) {
             $object = $unitDir.'/unit.o';
             if (self::unitObjectIsLinkable($unitDir)) {
-                $objects[] = $object;
+                $unitObjects[] = $object;
             }
         }
+        sort($unitObjects, SORT_STRING);
 
-        return $objects;
+        return array_merge($objects, $unitObjects);
     }
 
     /**
      * Basenames of helper units currently selected for link (#36387 object mid-tier).
+     *
+     * Sorted by slug so mid-tier restore / slugs JSON is byte-stable across runs (#36399).
      *
      * @return list<string>
      */
@@ -1432,6 +1438,7 @@ final class HelperRuntimeCache
                 $slugs[] = $slug;
             }
         }
+        sort($slugs, SORT_STRING);
 
         return $slugs;
     }

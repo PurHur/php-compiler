@@ -77,6 +77,21 @@ final class AotReproducibleBuild
     }
 
     /**
+     * Sort string list for deterministic manifests / link argument lists (#36399).
+     *
+     * @param list<string> $items
+     *
+     * @return list<string>
+     */
+    public static function sortedStrings(array $items): array
+    {
+        $out = array_values($items);
+        sort($out, SORT_STRING);
+
+        return $out;
+    }
+
+    /**
      * TargetMachine codegen opt: explicit PHP_COMPILER_AOT_CODEGEN_OPT wins; else map
      * PHP_COMPILER_OPT_LEVEL 0–3; else OptNone (matches prior #36387 default).
      */

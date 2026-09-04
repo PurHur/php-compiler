@@ -3543,12 +3543,17 @@ class Context {
             $slugsExport = Config::getenv('PHP_COMPILER_HELPER_SLUGS_EXPORT');
             if (is_string($slugsExport) && '' !== $slugsExport) {
                 $slugs = \PHPCompiler\AOT\HelperRuntimeCache::usedUnitSlugs();
+                // Stable timestamp when SOURCE_DATE_EPOCH / REPRODUCIBLE is set (#36399).
+                $epoch = \PHPCompiler\AOT\AotReproducibleBuild::sourceDateEpoch();
+                $generatedAt = null !== $epoch
+                    ? gmdate('c', (int) $epoch)
+                    : gmdate('c');
                 $payload = json_encode(
                     [
                         'version' => 1,
                         'helper_slugs' => array_values($slugs),
                         'object' => $objectFile,
-                        'generated_at' => gmdate('c'),
+                        'generated_at' => $generatedAt,
                     ],
                     JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES
                 );

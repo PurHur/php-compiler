@@ -143,6 +143,11 @@ dev-verify-fast:
 verify-reproducible:
 	./script/verify-reproducible.sh $(ARGS)
 
+# SHA256SUMS for release artifacts (#36399).
+.PHONY: release-checksums
+release-checksums:
+	./script/write-release-checksums.sh $(ARGS)
+
 # Cross-target AOT object emit (default PHP_COMPILER_TARGET=aarch64-linux) — no link on x86 (#36391).
 aot-smoke-cross-emit:
 	./script/aot-smoke-cross-emit.sh $(ARGS)

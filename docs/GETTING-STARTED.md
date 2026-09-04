@@ -27,7 +27,7 @@ make docker-build-phpc-release
 make cold-build-check-image    # ≤ 300 s; script/cold-build-check.sh --image
 ```
 
-**Tarball SDK** (host PHP 8.2+ only — no Docker at run time): `make pack-phpc-sdk` → `build/phpc-<tag>-x86_64-linux.tar.zst`. Extract, then `./phpc-host doctor` / `./phpc-host build -o hello hello.php`.
+**Tarball SDK** (host PHP 8.2+ only — no Docker at run time): `make pack-phpc-sdk` → `build/phpc-<tag>-x86_64-linux.tar.zst` plus `build/SHA256SUMS` (#36399). Extract, then `./phpc-host doctor` / `./phpc-host build -o hello hello.php`. Verify with `sha256sum -c SHA256SUMS` from `build/`.
 
 The **clone + composer + patches + LLVM** path below is for **contributors** working on the compiler itself.
 
