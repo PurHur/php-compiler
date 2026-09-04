@@ -615,8 +615,11 @@ function run(string $filename, string $code, array $options): void
         if (SourceBundler::shouldUseIncrementalRequires($includes)) {
             $unitCount = \count($includes);
             $code = SourceBundler::entryWithIncrementalRequires($filename, $includes);
-            // NestedJIT preg into a fat Slim module stalls Uri.php for minutes — do it early (#36382).
-            $eagerThinPregHelpers = true;
+            // Nyholm Uri::withUserInfo uses UriRawurlencodeReplaceJitHelper (no PregAotFastPath).
+            // Eager NestedJIT of thin preg here fattens the module before IncludeHelper, so every
+            // later method (and Uri itself after parse_url) stalls for minutes on LLVM (#36382).
+            // First preg_match (FastRoute) NestedJITs preg when the graph needs it.
+            $eagerThinPregHelpers = false;
             fwrite(
                 STDERR,
                 'phpc build: incremental IncludeHelper requires for '.$unitCount
