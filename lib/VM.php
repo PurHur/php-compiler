@@ -5450,7 +5450,10 @@ restart:
                         $this->tagHookedPropertyDimWriteLvalue($arg1, $containerSlot);
                         break;
                     }
-                    $arg3 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg3);
+                    // Literal dim keys live in block->constants; scope[slot] may be a CV that
+                    // aliased the same integer and was later assigned an array (#36380 /
+                    // Parsedown `$this->DefinitionData['Reference'][$id] = $Data`).
+                    $arg3 = $this->readDimKeyOperand($frame, (int) $op->arg3);
                     if (Variable::TYPE_STRING_OFFSET === $container->type) {
                         $catchFrame = $this->dispatchVmError(
                             'Cannot use string offset as an array',
@@ -12363,6 +12366,50 @@ restart:
         return $this->readScopeOperandForRuntimeRead($frame, $slot);
     }
 
+    /**
+     * Dim-key operand for FETCH_DIM / FETCH_DIM_W (#36380).
+     *
+     * Compile-time string/int keys are stored in {@see Block::$constants}. The same slot
+     * integer can later hold a CV that was assigned an array (Parsedown builds `$Data`
+     * then writes `$this->DefinitionData['Reference'][$id] = $Data`). Prefer the constant
+     * when scope is missing, unbound, or not a legal array offset — otherwise keep the
+     * initialized CV (#10430).
+     *
+     * php-src: Zend/zend_execute.c {@code zend_fetch_dimension_address} / IS_CONST keys.
+     */
+    private function readDimKeyOperand(Frame $frame, int $slot): Variable
+    {
+        if (!isset($frame->block->constants[$slot])) {
+            return $this->readScopeOperandForRuntimeRead($frame, $slot);
+        }
+        $const = $frame->block->constants[$slot];
+        if (isset($frame->scope[$slot])) {
+            $local = $frame->scope[$slot]->resolveIndirect();
+            if (
+                !$local->isUndefined()
+                && !$this->isUnboundLocalScopeRead($frame, $slot)
+                && self::variableIsLegalArrayDimKey($local)
+            ) {
+                return $this->readScopeOperandForRuntimeRead($frame, $slot);
+            }
+        }
+
+        return $const;
+    }
+
+    /** True when {@see $var} is a Zend-legal array offset type (not array/object). */
+    private static function variableIsLegalArrayDimKey(Variable $var): bool
+    {
+        return match ($var->type) {
+            Variable::TYPE_NULL,
+            Variable::TYPE_BOOLEAN,
+            Variable::TYPE_INTEGER,
+            Variable::TYPE_FLOAT,
+            Variable::TYPE_STRING => true,
+            default => false,
+        };
+    }
+
     /** TYPE_CONCAT operands may be literal constant slots colliding with assign dest (#9973, #9063). */
     private function readRuntimeOperandForConcat(Frame $frame, int $slot): Variable
     {
@@ -13041,8 +13088,83 @@ restart:
                 // unset of a different container; keep scanning for ours.
                 continue;
             }
+            // `$this->prop['lit'] = $arr`: INIT_ARRAY / JUMP / unrelated ASSIGN may sit
+            // between PROPERTY_FETCH and ARRAY_DIM_FETCH_WRITE in the same block (#36380).
+            // Only stop when this opcode redefines the property-fetch dest slot.
+            if (!$this->opcodeRedefinesScopeSlot($next, $destSlot)) {
+                continue;
+            }
 
             return false;
+        }
+
+        // Dim write may live in a JUMP / JUMPIF successor (same frame scope).
+        return $this->successorBlocksUseDestAsDimWriteContainer($frame->block, $destSlot, $frame->pos);
+    }
+
+    /**
+     * True when {@see $op} writes a new value into scope slot {@see $slot} (#36380).
+     */
+    private function opcodeRedefinesScopeSlot(OpCode $op, int $slot): bool
+    {
+        if (OpCode::TYPE_ASSIGN === $op->type || OpCode::TYPE_ASSIGN_REF === $op->type) {
+            return (int) $op->arg2 === $slot || (int) $op->arg1 === $slot;
+        }
+        if (
+            OpCode::TYPE_JUMP === $op->type
+            || OpCode::TYPE_JUMPIF === $op->type
+            || OpCode::TYPE_JUMPIF_FUNCTION_STATIC_INITIALIZED === $op->type
+            || OpCode::TYPE_RETURN === $op->type
+            || OpCode::TYPE_RETURN_VOID === $op->type
+            || OpCode::TYPE_ECHO === $op->type
+            || OpCode::TYPE_PRINT === $op->type
+        ) {
+            return false;
+        }
+        // Most expression opcodes deposit into arg1.
+        return null !== $op->arg1 && (int) $op->arg1 === $slot;
+    }
+
+    /**
+     * Follow JUMP / JUMPIF edges for dim-write container look-ahead (#36380).
+     */
+    private function successorBlocksUseDestAsDimWriteContainer(
+        \PHPCompiler\Block $start,
+        int $destSlot,
+        int $fromPos
+    ): bool {
+        $ops = $start->opCodes;
+        $n = \count($ops);
+        $queue = [];
+        for ($i = $fromPos; $i < $n; ++$i) {
+            $op = $ops[$i];
+            foreach ([$op->block1, $op->block2, $op->block3] as $edge) {
+                if ($edge instanceof \PHPCompiler\Block) {
+                    $queue[] = $edge;
+                }
+            }
+        }
+        $seen = [spl_object_id($start) => true];
+        while ([] !== $queue) {
+            $block = array_shift($queue);
+            $id = spl_object_id($block);
+            if (isset($seen[$id])) {
+                continue;
+            }
+            $seen[$id] = true;
+            foreach ($block->opCodes as $candidate) {
+                if (OpCode::destSlotUsedAsDimWriteContainer($candidate, $destSlot)) {
+                    return true;
+                }
+                if ($this->opcodeRedefinesScopeSlot($candidate, $destSlot)) {
+                    break;
+                }
+                foreach ([$candidate->block1, $candidate->block2, $candidate->block3] as $edge) {
+                    if ($edge instanceof \PHPCompiler\Block) {
+                        $queue[] = $edge;
+                    }
+                }
+            }
         }
 
         return false;
