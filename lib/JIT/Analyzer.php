@@ -102,6 +102,9 @@ class Analyzer
             } elseif ($usage instanceof Op\Stmt\JumpIf || $usage instanceof Op\Expr\BooleanNot) {
                 // if ($a) / !$a need zend_is_true; keep storage as hashtable (#32475 leftover of #32455).
                 return true;
+            } elseif ($usage instanceof Op\Expr\InstanceOf_) {
+                // instanceof needs a value/object box — packing then LLVM-emitting crashes (#36382).
+                return true;
             } elseif ($usage instanceof Op\Terminal\Const_) {
                 // Immutable global const arrays use module globals in __init__ (#4904, #4941).
                 continue;
@@ -155,6 +158,7 @@ class Analyzer
                 || $usage instanceof Op\Expr\Assertion
                 || $usage instanceof Op\Expr\Empty_
                 || $usage instanceof Op\Expr\Isset_
+                || $usage instanceof Op\Expr\InstanceOf_ // not an append (#36382)
                 || $usage instanceof Op\Expr\BooleanNot
                 || $usage instanceof Op\Expr\BitwiseNot
                 || $usage instanceof Op\Expr\UnaryPlus

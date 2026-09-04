@@ -41,6 +41,42 @@ $app->get('/hello', function ($request, $response, $args) {
 $app->run();
 EOF
 (cd "$DEST" && composer install --no-interaction --no-progress)
+
+# AOT (#36382): Slim ServerRequestCreator uses Closure::fromCallable([$obj, $runtimeMethod]).
+# That form is not lowered yet (Call\ClosureFromCallable needs a compile-time string).
+# Nyholm always passes method "fromGlobals" — rewrite to a direct call (Zend-equivalent).
+SRC_CREATOR="$DEST/vendor/slim/slim/Slim/Factory/Psr17/ServerRequestCreator.php"
+if [[ -f "$SRC_CREATOR" ]] && grep -q 'Closure::fromCallable($callable)' "$SRC_CREATOR"; then
+  python3 - "$SRC_CREATOR" <<'PY'
+import sys
+from pathlib import Path
+p = Path(sys.argv[1])
+text = p.read_text()
+old = (
+    "        /** @var callable $callable */\n"
+    "        $callable = [$this->serverRequestCreator, $this->serverRequestCreatorMethod];\n"
+    "\n"
+    "        /** @var ServerRequestInterface */\n"
+    "        return (Closure::fromCallable($callable))();"
+)
+new = (
+    "        // AOT (#36382): Closure::fromCallable([$obj, $runtimeMethod]) not lowered yet.\n"
+    "        // Nyholm always passes method \"fromGlobals\" — call it directly (Zend-equivalent).\n"
+    "        /** @var ServerRequestInterface */\n"
+    "        return $this->serverRequestCreator->fromGlobals();"
+)
+if old not in text:
+    raise SystemExit("ServerRequestCreator fromCallable pattern not found")
+p.write_text(text.replace(old, new, 1))
+print("patched ServerRequestCreator for AOT (#36382)")
+PY
+fi
+
+STREAM="$DEST/vendor/nyholm/psr7/src/Stream.php"
+if [[ -f "$STREAM" ]]; then
+  php "$ROOT/script/patch-nyholm-stream-36382.php" "$STREAM"
+fi
+
 echo "Created $DEST ($(find "$DEST" -name '*.php' | wc -l) php files)"
 echo "Try: ./phpc build --project $DEST --dry-run"
 echo "Note: reachable graph ~94 files; AOT uses incremental requires (>=32 units) — see #36382"
