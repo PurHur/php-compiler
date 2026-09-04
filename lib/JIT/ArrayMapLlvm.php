@@ -11,8 +11,8 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Pure LLVM for array_map(null|compile-time-string-builtin|Closure) under thin standalone AOT
- * (#23974 / #24156 / #33705 / #33977 / #34978).
+ * Pure LLVM for array_map(null|compile-time-string-builtin|Closure|static/bound array callable)
+ * under thin standalone AOT (#23974 / #24156 / #33705 / #33977 / #34978 / #36382).
  *
  * NestedJIT of {@see \PHPCompiler\ext\standard\ArrayMapJitHelper} still segfaults / returns
  * null on foreach + PHP-array collect for Closures (#24156). Multi-array null zip used the same
@@ -221,6 +221,54 @@ final class ArrayMapLlvm
             },
             Variable::TYPE_VALUE,
             'array_map_closure'
+        );
+    }
+
+    /**
+     * Map via a compile-time static method Native (no $this) (#36382 / #1154).
+     */
+    public static function mapStaticMethod(Context $context, Value $src, Call $method): Value
+    {
+        return self::mapPacked(
+            $context,
+            $src,
+            static function (Context $ctx, Variable $elem) use ($method): Variable {
+                $raw = $method->call($ctx, $elem);
+                $ptr = JitValueBox::coerceToValuePtrForStore($ctx, $raw);
+                $slot = JitValueBox::alloc($ctx);
+                JitValueBox::copyFromPointer($ctx, $slot, $ptr);
+
+                return new Variable($ctx, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
+            },
+            Variable::TYPE_VALUE,
+            'array_map_static'
+        );
+    }
+
+    /**
+     * Map via bound `[$this,'method']` — Call receives ($this, $elem) (#36382 FastRoute).
+     *
+     * {@see Call\RuntimeIndirectInstanceMethodCall} replaces args[0] with the loaded receiver.
+     */
+    public static function mapBoundMethod(
+        Context $context,
+        Value $src,
+        Variable $receiver,
+        Call $method
+    ): Value {
+        return self::mapPacked(
+            $context,
+            $src,
+            static function (Context $ctx, Variable $elem) use ($receiver, $method): Variable {
+                $raw = $method->call($ctx, $receiver, $elem);
+                $ptr = JitValueBox::coerceToValuePtrForStore($ctx, $raw);
+                $slot = JitValueBox::alloc($ctx);
+                JitValueBox::copyFromPointer($ctx, $slot, $ptr);
+
+                return new Variable($ctx, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
+            },
+            Variable::TYPE_VALUE,
+            'array_map_bound'
         );
     }
 

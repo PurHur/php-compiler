@@ -75,7 +75,22 @@ final class ArrayMapCallbackPolicyTest extends TestCase
     public function testRejectionMessagesMentionDeferredKinds(): void
     {
         $this->assertStringContainsString('closure', ArrayMapCallbackPolicy::jitRejectionMessage());
-        $this->assertStringContainsString('array callables', ArrayMapCallbackPolicy::vmRejectionMessage());
+        $this->assertStringContainsString('array callable', ArrayMapCallbackPolicy::vmRejectionMessage());
+        $this->assertStringContainsString('invokable', ArrayMapCallbackPolicy::jitRejectionMessage());
+    }
+
+    public function testCompileTimeStaticArrayCallableNames(): void
+    {
+        $callback = (new \ReflectionClass(JITVariable::class))->newInstanceWithoutConstructor();
+        $callback->compileTimeArray = ['C', 'dbl'];
+        $this->assertSame(['C', 'dbl'], ArrayMapCallbackPolicy::compileTimeStaticArrayCallableNames($callback));
+        $this->assertTrue(ArrayMapCallbackPolicy::isJitLowerable($callback));
+    }
+
+    public function testHashtableIsNotPhpSrcInvalidCallbackType(): void
+    {
+        $this->assertFalse(ArrayMapCallbackPolicy::isJitPhpSrcInvalidCallbackType(JITVariable::TYPE_HASHTABLE));
+        $this->assertFalse(ArrayMapCallbackPolicy::isJitPhpSrcInvalidCallbackType(JITVariable::TYPE_OBJECT));
     }
 
     public function testDeferredNoteDocumentsSubset(): void

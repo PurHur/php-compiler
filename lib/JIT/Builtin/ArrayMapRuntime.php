@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\ArrayMapArrayCallableHelper;
 use PHPCompiler\JIT\ArrayMapCallbackPolicy;
 use PHPCompiler\JIT\ArrayMapLlvm;
 use PHPCompiler\JIT\Context;
@@ -22,6 +23,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  *
  * Null / compile-time string builtins lower via {@see ArrayMapLlvm} (thin standalone AOT;
  * NestedJIT of the helper body segfaults — #23974). Closures still use NestedJIT bridges (#14977).
+ * Static/bound array callables via {@see ArrayMapArrayCallableHelper} (#36382 / #1154).
  * SSOT: {@see \PHPCompiler\ext\standard\array_map}
  * php-src: ext/standard/array.c — php_array_map()
  */
@@ -67,9 +69,6 @@ final class ArrayMapRuntime
 
     public static function mapSingle(Context $context, JITVariable $callback, JITVariable $array): Value
     {
-        if (!ArrayMapCallbackPolicy::isJitLowerable($callback)) {
-            throw new \LogicException(ArrayMapCallbackPolicy::jitRejectionMessage());
-        }
         if (ArrayMapCallbackPolicy::isClosureJitLowerable($callback)) {
             // Pure LLVM + caller closureCall — NestedJIT helper new HashTable() aborts under
             // thin AOT and snaps wrong multi-Closure candidates (#24156).
@@ -83,12 +82,41 @@ final class ArrayMapRuntime
         if (JITVariable::TYPE_NULL === $callback->type || $callback->isNullConstant) {
             return ArrayMapLlvm::mapNull($context, $ht);
         }
-        $name = $callback->compileTimeString;
-        if (null === $name) {
-            throw new \LogicException(ArrayMapCallbackPolicy::jitRejectionMessage());
+
+        $staticNames = ArrayMapArrayCallableHelper::resolveStaticNames($context, $callback);
+        if (null !== $staticNames) {
+            $resolved = ArrayMapArrayCallableHelper::resolveStaticMethodNative(
+                $context,
+                $staticNames[0],
+                $staticNames[1]
+            );
+            if (null === $resolved) {
+                throw new \LogicException(
+                    'array_map() callback ['.$staticNames[0].', '.$staticNames[1]
+                    .'] is not a defined static method in this compile unit (#36382)'
+                );
+            }
+
+            return ArrayMapLlvm::mapStaticMethod($context, $ht, $resolved[0]);
         }
 
-        return ArrayMapLlvm::mapBuiltin($context, $ht, $name);
+        $bound = ArrayMapArrayCallableHelper::resolveBoundMethodCall($context, $callback);
+        if (null !== $bound) {
+            return ArrayMapLlvm::mapBoundMethod($context, $ht, $bound[0], $bound[1]);
+        }
+
+        if (ArrayMapCallbackPolicy::isJitLowerableScalar(
+            $callback->type,
+            $callback->isNullConstant,
+            $callback->compileTimeString
+        )) {
+            $name = $callback->compileTimeString;
+            if (null !== $name) {
+                return ArrayMapLlvm::mapBuiltin($context, $ht, $name);
+            }
+        }
+
+        throw new \LogicException(ArrayMapCallbackPolicy::jitRejectionMessage());
     }
 
     /**
