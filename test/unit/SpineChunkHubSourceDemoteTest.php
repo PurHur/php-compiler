@@ -85,6 +85,29 @@ PHP;
         $this->assertStringContainsString('function f() {}', preg_replace('/\s+/', ' ', $hollowed) ?? $hollowed);
     }
 
+    public function testRewriteHollowsDemotedTraitBodies(): void
+    {
+        putenv(ExternalMethodBind::ENV_SPINE_CHUNK.'=1');
+        $_ENV[ExternalMethodBind::ENV_SPINE_CHUNK] = '1';
+        $src = <<<'PHP'
+<?php
+namespace PHPCompiler;
+trait CompileBlockInternal {
+    private function compileBlockInternal(): void {
+        $x = 1 + 2;
+        return;
+    }
+    abstract public function keepAbstract();
+}
+PHP;
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\CompileBlockInternal'));
+        $hollowed = SpineChunkRuntimeMethodDemote::rewriteSource($src, '/compiler/lib/JIT/Concern/CompileBlockInternal.php');
+        $flat = preg_replace('/\s+/', ' ', $hollowed) ?? $hollowed;
+        $this->assertStringContainsString('function compileBlockInternal(): void {}', $flat);
+        $this->assertStringContainsString('abstract public function keepAbstract();', $hollowed);
+        $this->assertStringNotContainsString('$x = 1 + 2', $hollowed);
+    }
+
     public function testRewriteOnlyUnderSpineChunkForDemotedHub(): void
     {
         $src = "<?php\nnamespace PHPCompiler;\nclass Block { public function f() { return 1; } }\n";

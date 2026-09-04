@@ -38,6 +38,8 @@ final class ExtAndMegaHubSpineChunkEmit36387Test extends TestCase
             ['lib/Lint/Linter.php'],
             ['lib/Visitor/VoidCastResolver.php'],
             ['lib/Config.php'],
+            // JIT Concern trait — host CFG OOM until T_TRAIT source demote (#36387).
+            ['lib/JIT/Concern/CompileBlockInternal.php'],
         ];
     }
 
