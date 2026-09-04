@@ -27,8 +27,11 @@ use PHPCompiler\ext\standard\rawurlencode;
 use PHPCompiler\ext\standard\sha1;
 use PHPCompiler\ext\standard\soundex;
 use PHPCompiler\ext\standard\sqrt;
+use PHPCompiler\ext\standard\str_contains;
+use PHPCompiler\ext\standard\str_ends_with;
 use PHPCompiler\ext\standard\str_repeat;
 use PHPCompiler\ext\standard\str_rot13;
+use PHPCompiler\ext\standard\str_starts_with;
 use PHPCompiler\ext\standard\strcasecmp;
 use PHPCompiler\ext\standard\strcmp;
 use PHPCompiler\ext\standard\string_trim;
@@ -624,6 +627,30 @@ final class DiscardedPureCallElisionTest extends TestCase
         $needle = $this->makeNativeLongVar();
 
         $this->assertFalse(DiscardedPureCallElision::tryElide($context, $builtin, [$hay, $needle]));
+    }
+
+    public function testElidesDiscardedStrContainsFamilyOnTypedStrings(): void
+    {
+        // php-src string.c PHP_FUNCTION(str_contains|str_starts_with|str_ends_with)
+        // — Z_PARAM_STR ×2; soft null stays live (#36386).
+        $context = $this->makeContext();
+        $hay = $this->makeStringVar(null);
+        $needle = $this->makeStringVar('e');
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, new str_contains(), [$hay, $needle]));
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, new str_starts_with(), [$hay, $needle]));
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, new str_ends_with(), [$hay, $needle]));
+    }
+
+    public function testDoesNotElideStrContainsOnNullHaystack(): void
+    {
+        $context = $this->makeContext();
+        $null = $this->makeNullVar();
+        $needle = $this->makeStringVar('x');
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide($context, new str_contains(), [$null, $needle]));
+        $this->assertFalse(DiscardedPureCallElision::tryElide($context, new str_starts_with(), [$null, $needle]));
+        $this->assertFalse(DiscardedPureCallElision::tryElide($context, new str_ends_with(), [$null, $needle]));
     }
 
     public function testJitWiresElisionBeforeInvoke(): void

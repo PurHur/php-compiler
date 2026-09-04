@@ -15,16 +15,17 @@ use PHPCompiler\VM\Variable as VmVariable;
  * php-src: ZPP may still run user-visible coercions; here we only fold cases that are
  * side-effect-free (literal / typed-string strlen/ord/strtolower/ucwords/bin2hex/
  * urlencode/str_rot13/quotemeta/md5/crc32/base64_encode/soundex/…, typed
- * substr/str_repeat/strcmp/strpos/strstr/…, typed-numeric chr, type.c
- * predicates + gettype, ctype.c classifiers on typed/literal strings,
- * typed-array count/sizeof, math.c incl. pow/fpow/fdiv on already-numeric
- * args, empty void user functions). Soft-null strlen / ord / chr / math /
- * string / ctype coercions are NOT elided — they emit deprecations (PHP 8.1+).
- * Countable objects stay live (user {@code count()} handlers). {@code intdiv}
- * is never discarded here (DivisionByZeroError must stay observable).
- * {@code hex2bin}/{@code base64_decode}/{@code convert_uudecode} stay live
- * (invalid-input warnings / false returns). Int needles for
- * {@code strpos}/{@code strchr}/… stay live (PHP 8 deprecations).
+ * substr/str_repeat/strcmp/strpos/strstr/str_contains/str_starts_with/
+ * str_ends_with/…, typed-numeric chr, type.c predicates + gettype, ctype.c
+ * classifiers on typed/literal strings, typed-array count/sizeof, math.c
+ * incl. pow/fpow/fdiv on already-numeric args, empty void user functions).
+ * Soft-null strlen / ord / chr / math / string / ctype coercions are NOT
+ * elided — they emit deprecations (PHP 8.1+). Countable objects stay live
+ * (user {@code count()} handlers). {@code intdiv} is never discarded here
+ * (DivisionByZeroError must stay observable). {@code hex2bin}/
+ * {@code base64_decode}/{@code convert_uudecode} stay live (invalid-input
+ * warnings / false returns). Int needles for {@code strpos}/{@code strchr}/…
+ * stay live (PHP 8 deprecations).
  */
 final class DiscardedPureCallElision
 {
@@ -205,7 +206,8 @@ final class DiscardedPureCallElision
 
     /**
      * Discarded {@code substr}/{@code str_repeat}/{@code strcmp}/{@code strpos}/
-     * {@code strstr}/… on typed string (+ numeric) args — php-src
+     * {@code strstr}/{@code str_contains}/{@code str_starts_with}/
+     * {@code str_ends_with}/… on typed string (+ numeric) args — php-src
      * {@code string.c} Z_PARAM_STR / Z_PARAM_LONG family; soft null / int-needle
      * deprecations / {@code __toString} stay live (peer
      * {@see tryElidePureStringTransformNoSideEffect}).
@@ -279,6 +281,9 @@ final class DiscardedPureCallElision
             case 'strnatcasecmp':
             case 'strchr':
             case 'strrchr':
+            case 'str_contains':
+            case 'str_starts_with':
+            case 'str_ends_with':
                 if (!isset($callArgs[0], $callArgs[1]) || isset($callArgs[2])) {
                     return false;
                 }

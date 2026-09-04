@@ -33,11 +33,12 @@ use PHPCompiler\JIT\Call\Vararg;
  * {@code urlencode} / {@code str_rot13} / {@code quotemeta} / {@code md5} /
  * {@code crc32} / {@code base64_encode} / {@code soundex} / …), string
  * slice/compare/search ({@code substr} / {@code str_repeat} / {@code strcmp} /
- * {@code strpos} / {@code strstr} / …), and pure math ({@code sqrt} /
- * {@code abs} / {@code pow} / {@code fdiv} / …) on native numeric scalars
- * (php-src {@code ext/standard/string.c}
+ * {@code strpos} / {@code strstr} / {@code str_contains} /
+ * {@code str_starts_with} / {@code str_ends_with} / …), and pure math
+ * ({@code sqrt} / {@code abs} / {@code pow} / {@code fdiv} / …) on native
+ * numeric scalars (php-src {@code ext/standard/string.c}
  * {@code PHP_FUNCTION(strlen)} / {@code ord} / {@code chr} / {@code ucwords} /
- * {@code substr} / {@code strcmp} / {@code strpos};
+ * {@code substr} / {@code strcmp} / {@code strpos} / {@code str_contains};
  * {@code ext/standard/url.c} {@code urlencode}; {@code ext/standard/crc32.c} /
  * {@code md5.c} / {@code base64.c}; {@code ext/standard/type.c}
  * {@code is_*}; {@code ext/standard/math.c} {@code PHP_FUNCTION(sqrt)} /
@@ -422,6 +423,10 @@ final class NoThrowCallElision
             case 'strcspn':
             case 'strspn':
             case 'substr_count':
+            // PHP 8.0+ string.c — haystack + needle strings only.
+            case 'str_contains':
+            case 'str_starts_with':
+            case 'str_ends_with':
                 return true;
             default:
                 return false;
@@ -489,6 +494,9 @@ final class NoThrowCallElision
             case 'strnatcasecmp':
             case 'strchr':
             case 'strrchr':
+            case 'str_contains':
+            case 'str_starts_with':
+            case 'str_ends_with':
                 // two strings
                 if (!isset($callArgs[0], $callArgs[1]) || isset($callArgs[2])) {
                     return false;
