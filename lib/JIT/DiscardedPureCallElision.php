@@ -29,7 +29,9 @@ use PHPCompiler\VM\Variable as VmVariable;
  * typed checkdate (3 longs), typed hash_equals (2 strings),
  * typed pathinfo (string + optional flags), typed parse_url
  * (string + optional component), typed function_exists /
- * extension_loaded (single string; no autoload),
+ * extension_loaded (single string; no autoload), typed
+ * method_exists / property_exists (object + string; string class
+ * names stay live for autoload),
  * zero-arg pi, type.c predicates + gettype/get_debug_type, ctype.c
  * classifiers on typed/literal strings, typed-array count/sizeof, math.c
  * incl. pow/fpow/fdiv on already-numeric args, empty void user functions).
@@ -56,7 +58,9 @@ use PHPCompiler\VM\Variable as VmVariable;
  * {@code pathinfo}/{@code parse_url} path/url/flags/component stay live
  * (deprecate). Soft-null {@code function_exists}/{@code extension_loaded}
  * stay live (deprecate). {@code class_exists} stays live (autoload side
- * effects when {@code $autoload} defaults true).
+ * effects when {@code $autoload} defaults true). Soft-null method/property
+ * names and string class-name receivers for {@code method_exists}/
+ * {@code property_exists} stay live (deprecate / autoload).
  */
 final class DiscardedPureCallElision
 {
@@ -126,6 +130,12 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureExtensionLoadedNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureMethodExistsNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePurePropertyExistsNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureVersionCompareNoSideEffect($toCall, $callArgs)) {
@@ -1195,6 +1205,45 @@ final class DiscardedPureCallElision
     }
 
     /**
+     * Discarded {@code method_exists} on typed object + typed / literal method
+     * string — php-src {@code Zend/zend_builtin_functions.c}. String class-name
+     * receivers stay live (autoload). Soft-null method stays live (deprecate).
+     * Null / non-object|string receivers stay live ({@code TypeError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureMethodExistsNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if (!NoThrowCallElision::isPureMethodExistsBuiltin(strtolower($toCall->getName()))) {
+            return false;
+        }
+
+        return self::methodExistsArgsAllowDiscardedElision($callArgs);
+    }
+
+    /**
+     * Discarded {@code property_exists} on typed object + typed / literal
+     * property string — php-src {@code Zend/zend_builtin_functions.c}. Peer
+     * {@see tryElidePureMethodExistsNoSideEffect}.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePurePropertyExistsNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if (!NoThrowCallElision::isPurePropertyExistsBuiltin(strtolower($toCall->getName()))) {
+            return false;
+        }
+
+        return self::propertyExistsArgsAllowDiscardedElision($callArgs);
+    }
+
+    /**
      * Discarded {@code version_compare} on typed / literal strings — php-src
      * {@code versioning.c}. Optional operator must be null or a compile-time
      * valid comparison op ({@code ValueError} otherwise).
@@ -1409,6 +1458,37 @@ final class DiscardedPureCallElision
     private static function extensionLoadedArgsAllowDiscardedElision(array $callArgs): bool
     {
         return self::functionExistsArgsAllowDiscardedElision($callArgs);
+    }
+
+    /**
+     * Typed object + typed / literal method string — string class names /
+     * soft-null / value-box stay live.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function methodExistsArgsAllowDiscardedElision(array $callArgs): bool
+    {
+        if (
+            !isset($callArgs[0], $callArgs[1])
+            || isset($callArgs[2])
+            || !$callArgs[0] instanceof Variable
+            || !$callArgs[1] instanceof Variable
+        ) {
+            return false;
+        }
+        if (Variable::TYPE_OBJECT !== $callArgs[0]->type) {
+            return false;
+        }
+
+        return self::stringArgAllowsDiscardedElision($callArgs[1]);
+    }
+
+    /**
+     * @param array<int, Variable> $callArgs
+     */
+    private static function propertyExistsArgsAllowDiscardedElision(array $callArgs): bool
+    {
+        return self::methodExistsArgsAllowDiscardedElision($callArgs);
     }
 
     /**

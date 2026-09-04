@@ -50,6 +50,7 @@ use PHPCompiler\ext\standard\inet_pton;
 use PHPCompiler\ext\standard\ip2long;
 use PHPCompiler\ext\standard\levenshtein;
 use PHPCompiler\ext\standard\long2ip;
+use PHPCompiler\ext\standard\method_exists_;
 use PHPCompiler\ext\standard\md5;
 use PHPCompiler\ext\standard\metaphone;
 use PHPCompiler\ext\standard\nl2br;
@@ -58,6 +59,7 @@ use PHPCompiler\ext\standard\octdec;
 use PHPCompiler\ext\standard\ord;
 use PHPCompiler\ext\standard\parse_url;
 use PHPCompiler\ext\standard\pathinfo;
+use PHPCompiler\ext\standard\property_exists_;
 use PHPCompiler\ext\standard\pi;
 use PHPCompiler\ext\standard\pow;
 use PHPCompiler\ext\standard\preg_quote;
@@ -1819,6 +1821,113 @@ final class DiscardedPureCallElisionTest extends TestCase
         ));
     }
 
+    public function testDiscardedMethodExistsAndPropertyExistsElideOnTypedObject(): void
+    {
+        $context = $this->makeContext();
+        $obj = $this->makeObjectVar();
+        $method = $this->makeStringVar('bump');
+        $prop = $this->makeStringVar('x');
+        $litMethod = $this->makeStringVar('__construct');
+        $className = $this->makeStringVar('stdClass');
+        $null = $this->makeNullVar();
+        $box = $this->makeValueBoxVar();
+        $ht = $this->makeHashtableVar();
+        $long = $this->makeNativeLongVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new method_exists_(),
+            [$obj, $method]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new method_exists_(),
+            [$obj, $litMethod]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new property_exists_(),
+            [$obj, $prop]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new property_exists_(),
+            [$obj, $this->makeStringVar('name')]
+        ));
+
+        // String class names autoload — stay live.
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new method_exists_(),
+            [$className, $method]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new property_exists_(),
+            [$className, $prop]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new method_exists_(),
+            []
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new method_exists_(),
+            [$obj]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new method_exists_(),
+            [$obj, $null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new method_exists_(),
+            [$null, $method]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new method_exists_(),
+            [$box, $method]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new method_exists_(),
+            [$ht, $method]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new method_exists_(),
+            [$long, $method]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new method_exists_(),
+            [$obj, $long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new method_exists_(),
+            [$obj, $method, $prop]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new property_exists_(),
+            [$obj, $null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new property_exists_(),
+            [$box, $prop]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new property_exists_(),
+            [$obj, $long]
+        ));
+    }
+
     public function testJitWiresElisionBeforeInvoke(): void
     {
         $compile = (string) file_get_contents(
@@ -1858,6 +1967,21 @@ final class DiscardedPureCallElisionTest extends TestCase
         $native->paramTypeConstraintsByArg = $constraints;
 
         return $native;
+    }
+
+    private function makeObjectVar(): Variable
+    {
+        $ref = new \ReflectionClass(Variable::class);
+        /** @var Variable $var */
+        $var = $ref->newInstanceWithoutConstructor();
+        $typeProp = $ref->getProperty('type');
+        $typeProp->setAccessible(true);
+        $typeProp->setValue($var, Variable::TYPE_OBJECT);
+        $kindProp = $ref->getProperty('kind');
+        $kindProp->setAccessible(true);
+        $kindProp->setValue($var, Variable::KIND_VARIABLE);
+
+        return $var;
     }
 
     private function makeStringVar(?string $literal): Variable
