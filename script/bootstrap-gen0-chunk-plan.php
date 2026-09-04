@@ -16,7 +16,9 @@ declare(strict_types=1);
  *   --max-files=N        further split any bucket larger than N files (capacity under 8g)
  *   --max-bytes=N        further split when cumulative .php source bytes exceed N
  *                        (hubs with Runtime.php / Variable.php need this — file count alone
- *                        understates NestedJIT peak RSS; hub-core@33 files OOMs at 8g)
+ *                        understates NestedJIT peak RSS; hub-core@33 files OOMs at 8g).
+ *                        When set without --max-files, a default max-files=24 also applies so
+ *                        tiny-file packs (VM Builtin ~1–2KB × 70+) stay under 8g (#36387).
  *   --plan-out=PATH      write JSON (default stdout)
  *   --entries-dir=D      where generated entry .php files go (default build/chunks/entries)
  *
@@ -35,6 +37,9 @@ $maxFiles = 0;
 $maxBytes = 0;
 $planOut = null;
 $entriesDir = $root.'/build/chunks/entries';
+
+/** Default file-count cap when only --max-bytes is set (tiny-file packs under 8g). */
+const DEFAULT_MAX_FILES_WITH_BYTES = 24;
 
 /** Directories oversized enough to need letter/hub sub-splits (mirrors spine-split-probe). */
 const SPINE_SUBSPLIT = [
@@ -112,6 +117,13 @@ foreach (array_slice($argv, 1) as $arg) {
 if ($micro === null && $exts === [] && $libs === [] && $requiresFiles === [] && !$spine) {
     fwrite(STDERR, "bootstrap-gen0-chunk-plan: pass --micro[=N], --ext=, --lib=, --requires=, and/or --spine\n");
     exit(2);
+}
+
+// Tiny-file packs (lib/VM/Builtin ~1–2KB each) stay under a 120KB byte budget at 70–100
+// files and still OOM NestedJIT/IncludeHelper under 8g (rc=137, #36387). Cap file count
+// whenever --max-bytes is the only bound the caller set.
+if ($maxBytes >= 1 && $maxFiles < 1) {
+    $maxFiles = DEFAULT_MAX_FILES_WITH_BYTES;
 }
 
 if (!is_dir($entriesDir) && !mkdir($entriesDir, 0755, true) && !is_dir($entriesDir)) {
@@ -531,7 +543,8 @@ $plan = [
     'chunks' => $chunks,
     'note' => 'Consumed by script/bootstrap-gen0-chunks.sh. Wave 0 hubs emit first so peer '
         .'manifests can bind consumers (#36387 / #36155 Phase C). Hub/requires respect '
-        .'--max-files/--max-bytes so Runtime.php-sized TUs fit under 8g.',
+        .'--max-files/--max-bytes so Runtime.php-sized TUs fit under 8g. --max-bytes alone '
+        .'also applies max-files='.DEFAULT_MAX_FILES_WITH_BYTES.' for tiny-file packs.',
 ];
 
 $json = json_encode($plan, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n";
