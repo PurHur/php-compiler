@@ -9,6 +9,7 @@ use PHPCfg\Op;
 use PHPCfg\Operand;
 
 use PHPCompiler\VM\ReferencableCheck;
+use PHPCompiler\VM\Variable;
 
 /**
  * Sibling inline call-arg producer slot wiring (#36387 / #36403).
