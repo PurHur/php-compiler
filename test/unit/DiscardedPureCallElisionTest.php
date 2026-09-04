@@ -13,18 +13,24 @@ use PHPCompiler\ext\standard\array_count;
 use PHPCompiler\ext\standard\base64_encode;
 use PHPCompiler\ext\standard\basename;
 use PHPCompiler\ext\standard\bin2hex;
+use PHPCompiler\ext\standard\bindec;
 use PHPCompiler\ext\standard\chr;
 use PHPCompiler\ext\standard\chunk_split;
 use PHPCompiler\ext\standard\convert_uuencode;
 use PHPCompiler\ext\standard\crc32;
+use PHPCompiler\ext\standard\decbin;
+use PHPCompiler\ext\standard\dechex;
+use PHPCompiler\ext\standard\decoct;
 use PHPCompiler\ext\standard\dirname;
 use PHPCompiler\ext\standard\escapeshellarg;
 use PHPCompiler\ext\standard\escapeshellcmd;
 use PHPCompiler\ext\standard\explode;
 use PHPCompiler\ext\standard\fdiv;
 use PHPCompiler\ext\standard\floatval;
+use PHPCompiler\ext\standard\get_debug_type;
 use PHPCompiler\ext\standard\gettype;
 use PHPCompiler\ext\standard\hebrev;
+use PHPCompiler\ext\standard\hexdec;
 use PHPCompiler\ext\standard\html_entity_decode;
 use PHPCompiler\ext\standard\htmlentities;
 use PHPCompiler\ext\standard\htmlspecialchars;
@@ -35,7 +41,9 @@ use PHPCompiler\ext\standard\md5;
 use PHPCompiler\ext\standard\metaphone;
 use PHPCompiler\ext\standard\nl2br;
 use PHPCompiler\ext\standard\number_format;
+use PHPCompiler\ext\standard\octdec;
 use PHPCompiler\ext\standard\ord;
+use PHPCompiler\ext\standard\pi;
 use PHPCompiler\ext\standard\pow;
 use PHPCompiler\ext\standard\preg_quote;
 use PHPCompiler\ext\standard\quoted_printable_decode;
@@ -1259,6 +1267,98 @@ final class DiscardedPureCallElisionTest extends TestCase
             $context,
             new boolval(),
             [$box]
+        ));
+    }
+
+    public function testElidesDiscardedBaseConvertPiAndGetDebugType(): void
+    {
+        // php-src math.c base converts / pi + type.c get_debug_type (#36386).
+        $context = $this->makeContext();
+        $str = $this->makeStringVar('ff');
+        $long = $this->makeNativeLongVar();
+        $null = $this->makeNullVar();
+        $box = $this->makeValueBoxVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new decbin(),
+            [$long]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new dechex(),
+            [$long]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new decoct(),
+            [$long]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new bindec(),
+            [$str]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new hexdec(),
+            [$str]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new octdec(),
+            [$this->makeStringVar('77')]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new pi(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_debug_type(),
+            [$long]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_debug_type(),
+            [$str]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_debug_type(),
+            [$box]
+        ));
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new decbin(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new decbin(),
+            [$box]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new hexdec(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new hexdec(),
+            [$long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new bindec(),
+            [$box]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new pi(),
+            [$long]
         ));
     }
 
