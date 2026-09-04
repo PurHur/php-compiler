@@ -10,35 +10,44 @@ use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
 /**
- * deg2rad()/rad2deg() NestedJIT via JitVmHelperLink::ensureBridge (#27400 / peer Frexp #22575).
+ * deg2rad()/rad2deg() AOT uses inline fmul (#36386);
+ * Deg2radJitHelper/Rad2degJitHelper remain NestedJIT-safe reference.
+ *
+ * php-src: ext/standard/math.c PHP_FUNCTION(deg2rad|rad2deg).
  */
 final class Deg2radRuntimeShrinkTest extends TestCase
 {
-    public function testDeg2radUsesJitHelperNotKernel(): void
+    public function testDeg2radUsesInlineFmulNotHelperBridge(): void
     {
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/deg2rad.php');
         $this->assertStringContainsString('MathDeg2rad::invoke', $builtin);
         $this->assertStringNotContainsString('fMul', $builtin);
 
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathDeg2rad.php');
-        $this->assertStringContainsString('Deg2radJitHelper', $bridge);
         $this->assertStringContainsString('phpc_deg2rad', $bridge);
-        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringContainsString('deg2rad_fmul_f64_entry', $bridge);
+        $this->assertStringContainsString('M_PI / 180.0', $bridge);
+        $this->assertStringContainsString('fmul', $bridge);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('Deg2radJitHelper', $bridge);
         $this->assertStringNotContainsString('JitDeg2radKernel', $bridge);
         $this->assertStringNotContainsString('NestedJitCompileScope', $bridge);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
     }
 
-    public function testRad2degUsesJitHelperNotKernel(): void
+    public function testRad2degUsesInlineFmulNotHelperBridge(): void
     {
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/rad2deg.php');
         $this->assertStringContainsString('MathRad2deg::invoke', $builtin);
         $this->assertStringNotContainsString('fMul', $builtin);
 
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathRad2deg.php');
-        $this->assertStringContainsString('Rad2degJitHelper', $bridge);
         $this->assertStringContainsString('phpc_rad2deg', $bridge);
-        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringContainsString('rad2deg_fmul_f64_entry', $bridge);
+        $this->assertStringContainsString('180.0 / \\M_PI', $bridge);
+        $this->assertStringContainsString('fmul', $bridge);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('Rad2degJitHelper', $bridge);
         $this->assertStringNotContainsString('JitRad2degKernel', $bridge);
         $this->assertStringNotContainsString('NestedJitCompileScope', $bridge);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
