@@ -5385,6 +5385,7 @@ require_once __DIR__.'/../../../lib/JIT/Concern/CompileBlockInternal.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AssignOperand.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AdaptByRefCallArgs.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/EmitJitReturn.php';
+require_once __DIR__.'/../../../lib/JIT/Concern/TernaryJumpIfEchoMerge.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/InitJitMethodCall.php';
 require_once __DIR__.'/../../../lib/Compiler/CompileTimeNew.php';
 require_once __DIR__.'/../../../lib/Compiler/DeprecatedMetadata.php';
