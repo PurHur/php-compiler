@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * log1p() for compiled JIT/AOT modules (#15157, #27057, #28495, php-in-PHP).
+ * log1p() NestedJIT-safe fdlibm reference (#15157, #27057, #28495, php-in-PHP).
  *
- * NestedJIT-safe fdlibm s_log1p.c shape: small-x `2·atanh(x/(2+x))` series,
- * else inlined log(1+x) (#28495 / peer MathExpm1 #28487 / Asinh #28355 logPositive).
+ * AOT/JIT hot path uses libm {@code log1p(3)} via {@see \PHPCompiler\JIT\Builtin\MathLog1p}
+ * (#36386 / peer MathExpm1). This helper remains for NestedJIT-safe fdlibm
+ * s_log1p.c shape (small-x `2·atanh(x/(2+x))` series, else inlined log(1+x))
+ * when NestedJIT cannot call libc.
  * Avoid `\log1p` / {@see VmMath::log1p} — NestedJIT re-enters MathLog1p bridge under thin AOT.
- * Avoid the former libc log1p(3) NestedJIT leaf (deleted with this shrink).
  * Avoid cross-helper NestedJIT calls into log() helper — inline the same peel.
  * Avoid pack/unpack (#27496). Avoid unbounded while-loops (#27838).
  * php-src: ext/standard/math.c — PHP_FUNCTION(log1p)

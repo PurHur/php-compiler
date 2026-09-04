@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * expm1() for compiled JIT/AOT modules (#15157, #27057, #28487, php-in-PHP).
+ * expm1() NestedJIT-safe Taylor/reduction reference (#15157, #27057, #28487, php-in-PHP).
  *
- * NestedJIT-safe ln2 range reduction + Taylor Horner (#28487 / peer MathExp #28241).
+ * AOT/JIT hot path uses libm {@code expm1(3)} via {@see \PHPCompiler\JIT\Builtin\MathExpm1}
+ * (#36386 / peer MathLog1p). This helper remains for NestedJIT-safe ln2 range
+ * reduction + Taylor Horner when NestedJIT cannot call libc.
  * Avoid `\expm1` / {@see VmMath::expm1} — NestedJIT re-enters MathExpm1 bridge under thin AOT.
- * Avoid the former libc expm1(3) NestedJIT leaf (deleted with this shrink).
  * Avoid cross-helper NestedJIT calls into exp() helper — inline the same peel.
  * Avoid pack/unpack (#27496). Avoid unbounded while-loops (#27838).
  * php-src: ext/standard/math.c — PHP_FUNCTION(expm1)
