@@ -337,6 +337,9 @@ class JIT {
     }
 
     private function runQueue(): void {
+        // Upgrade no-throw marks once callees from later enqueue order are proven
+        // (top→mid→leaf chains; declaration order must not matter) (#36386).
+        JIT\NoThrowCallElision::refineFixpoint($this->context);
         while (!empty($this->queue)) {
             $run = array_shift($this->queue);
             JIT\Progress::notePhase('jit_run_queue_item');

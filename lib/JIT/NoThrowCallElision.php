@@ -16,14 +16,18 @@ use PHPCompiler\JIT\Call\Vararg;
  *
  * php-src always records EG(current_execute_data) frames; when a function body
  * has no {@see OpCode::TYPE_THROW}, no {@see OpCode::TYPE_NEW}, no includes, and
- * only recursive self-calls (leaf recursion like {@code fibo_r}) — or no calls at
- * all (leaf methods like {@code Node::bump}) — the AOT frames would never appear
- * on an uncaught trace — paying {@code phpc_ex_stack_push/pop}
- * + {@code phpc_jit_has_throw_pending} on every edge is pure overhead.
+ * only calls to itself or other proven no-throw user functions (leaf recursion
+ * like {@code fibo_r}, call chains like {@code top→mid→leaf}, or leaf methods
+ * like {@code Node::bump}) — the AOT frames would never appear on an uncaught
+ * trace — paying {@code phpc_ex_stack_push/pop} + {@code phpc_jit_has_throw_pending}
+ * on every edge is pure overhead.
  *
  * Analyze at enqueue time (before {@see \PHPCompiler\JIT::runQueue}), not only when
  * the body is lowered: `{main}` resolves method calls while callees are still
  * queued, so a body-time record is too late for call-site elision.
+ *
+ * A fixpoint at the start of {@see refineFixpoint} upgrades callers once their
+ * callees become proven (declaration order must not matter).
  */
 final class NoThrowCallElision
 {
@@ -37,10 +41,43 @@ final class NoThrowCallElision
         if ('' === $funcLc || '{main}' === $funcLc) {
             return;
         }
-        if (isset($context->noThrowUserFunctions[$funcLc])) {
+        $context->noThrowAnalyzeBlocks[$funcLc] = $entry;
+        if (!empty($context->noThrowUserFunctions[$funcLc])) {
             return;
         }
-        $context->noThrowUserFunctions[$funcLc] = self::bodyIsSelfOnlyNoThrow($entry, $funcLc);
+        $context->noThrowUserFunctions[$funcLc] = self::bodyIsNoThrowCalleeGraph(
+            $entry,
+            $funcLc,
+            $context
+        );
+    }
+
+    /**
+     * Re-evaluate bodies that failed only because callees were not yet proven.
+     * Call once all user functions are enqueued, before lowering call sites.
+     */
+    public static function refineFixpoint(Context $context): void
+    {
+        $pending = $context->noThrowAnalyzeBlocks;
+        if ([] === $pending) {
+            return;
+        }
+        $limit = count($pending) + 2;
+        for ($pass = 0; $pass < $limit; ++$pass) {
+            $changed = false;
+            foreach ($pending as $funcLc => $entry) {
+                if (!empty($context->noThrowUserFunctions[$funcLc])) {
+                    continue;
+                }
+                if (self::bodyIsNoThrowCalleeGraph($entry, $funcLc, $context)) {
+                    $context->noThrowUserFunctions[$funcLc] = true;
+                    $changed = true;
+                }
+            }
+            if (!$changed) {
+                return;
+            }
+        }
     }
 
     public static function calleeIsNoThrow(Context $context, Call $toCall): bool
@@ -52,12 +89,28 @@ final class NoThrowCallElision
         if ('' === $name) {
             return false;
         }
+        if (!empty($context->noThrowUserFunctions[$name])) {
+            return true;
+        }
+        // `{main}` lowers call sites before runQueue; reverse declaration order
+        // (caller before callee) needs a lazy fixpoint so mid/top upgrade after
+        // leaf is proven (#36386 call chains).
+        if ([] !== $context->noThrowAnalyzeBlocks) {
+            self::refineFixpoint($context);
+        }
 
         return !empty($context->noThrowUserFunctions[$name]);
     }
 
-    private static function bodyIsSelfOnlyNoThrow(Block $entry, string $selfLc): bool
-    {
+    /**
+     * True when the body cannot throw and every FUNCCALL target is self or an
+     * already-proven no-throw user function.
+     */
+    private static function bodyIsNoThrowCalleeGraph(
+        Block $entry,
+        string $selfLc,
+        Context $context
+    ): bool {
         $seen = [];
         $stack = [$entry];
         while ([] !== $stack) {
@@ -94,9 +147,7 @@ final class NoThrowCallElision
                         return false;
                     }
                     $calleeLc = strtolower((string) $nameOp->value);
-                    // Self-recursion uses the bare method name in CFG; scoped
-                    // `Class::method` keys must still match (#36386 leaf methods).
-                    if ($calleeLc !== $selfLc && $calleeLc !== self::bareName($selfLc)) {
+                    if (!self::isAllowedNoThrowCallee($context, $selfLc, $calleeLc)) {
                         return false;
                     }
                 }
@@ -114,6 +165,36 @@ final class NoThrowCallElision
         }
 
         return true;
+    }
+
+    private static function isAllowedNoThrowCallee(
+        Context $context,
+        string $selfLc,
+        string $calleeLc
+    ): bool {
+        // Self-recursion uses the bare method name in CFG; scoped
+        // `Class::method` keys must still match (#36386 leaf methods).
+        if ($calleeLc === $selfLc || $calleeLc === self::bareName($selfLc)) {
+            return true;
+        }
+        if (!empty($context->noThrowUserFunctions[$calleeLc])) {
+            return true;
+        }
+        // Scoped key vs bare CFG name (Class::leaf ↔ leaf).
+        $bare = self::bareName($calleeLc);
+        if ($bare !== $calleeLc && !empty($context->noThrowUserFunctions[$bare])) {
+            return true;
+        }
+        foreach ($context->noThrowUserFunctions as $knownLc => $ok) {
+            if (!$ok) {
+                continue;
+            }
+            if (self::bareName($knownLc) === $calleeLc) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static function bareName(string $scopedLc): string
