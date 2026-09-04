@@ -759,10 +759,14 @@ final class Variable {
             $type = self::TYPE_NATIVE_LONG;
         } elseif (self::TYPE_VALUE === $type && $context->analyzer->canStayNativeLong($op)) {
             $type = self::TYPE_NATIVE_LONG;
-        } elseif (self::TYPE_VALUE === $type && self::isDeclaredStringParamOperand($block, $op)) {
-            // Same UNKNOWN→VALUE trap for `string $s` read inside a loop: keep the
-            // native `__string__*` Variable so strlen/ord see TYPE_STRING (#36386).
-            $type = self::TYPE_STRING;
+        } elseif (self::TYPE_VALUE === $type) {
+            // Same UNKNOWN→VALUE trap for typed formals read inside a loop: keep the
+            // native Variable so math/string builtins see TYPE_* instead of boxing
+            // into `__value__` (#36386 / peer of string formals).
+            $declaredNative = self::declaredScalarParamNativeType($block, $op);
+            if (null !== $declaredNative) {
+                $type = $declaredNative;
+            }
         }
         if ($type === self::TYPE_NULL) {
             // Match fromLiteral TYPE_NULL — keep isNullConstant so builtins can treat
@@ -849,14 +853,14 @@ final class Variable {
     }
 
     /**
-     * True when {@code $op} is a non-nullable {@code string} function formal.
-     * Used to keep TYPE_STRING when PHPTypes leaves the param result UNKNOWN (#36386).
+     * Native Variable type for a non-nullable scalar function formal, or null.
+     * Used when PHPTypes leaves the param result UNKNOWN inside a loop (#36386).
      */
-    private static function isDeclaredStringParamOperand(Block $block, Operand $op): bool
+    private static function declaredScalarParamNativeType(Block $block, Operand $op): ?int
     {
         $cfgFunc = $block->func ?? null;
         if (null === $cfgFunc || !isset($cfgFunc->params) || !\is_array($cfgFunc->params)) {
-            return false;
+            return null;
         }
         foreach ($cfgFunc->params as $param) {
             if (!$param instanceof \PHPCfg\Op\Expr\Param) {
@@ -866,19 +870,30 @@ final class Variable {
                 continue;
             }
             if ($param->byRef || $param->variadic) {
-                return false;
+                return null;
             }
             $declared = $param->declaredType;
-            if ($declared instanceof \PHPCfg\Op\Type\Literal
-                && 'string' === strtolower($declared->name)
-            ) {
-                return true;
+            if (!($declared instanceof \PHPCfg\Op\Type\Literal)) {
+                return null;
             }
-
-            return false;
+            switch (strtolower($declared->name)) {
+                case 'string':
+                    return self::TYPE_STRING;
+                case 'float':
+                case 'double':
+                    return self::TYPE_NATIVE_DOUBLE;
+                case 'int':
+                case 'integer':
+                    return self::TYPE_NATIVE_LONG;
+                case 'bool':
+                case 'boolean':
+                    return self::TYPE_NATIVE_BOOL;
+                default:
+                    return null;
+            }
         }
 
-        return false;
+        return null;
     }
 
     /**

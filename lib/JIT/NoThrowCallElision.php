@@ -28,10 +28,12 @@ use PHPCompiler\JIT\Call\Vararg;
  * Also skips the after-call check for pure builtins when arguments prove they
  * cannot invoke user code or set throw-pending — e.g. {@code strlen('x')} /
  * {@code ord('A')} on a native {@code TYPE_STRING}, {@code chr(65)} on a native
- * long, and pure type predicates ({@code is_int} / {@code is_string} / …)
- * (php-src {@code ext/standard/string.c} {@code PHP_FUNCTION(strlen)} /
+ * long, pure type predicates ({@code is_int} / {@code is_string} / …), and
+ * pure math ({@code sqrt} / {@code abs} / {@code floor} / …) on native numeric
+ * scalars (php-src {@code ext/standard/string.c} {@code PHP_FUNCTION(strlen)} /
  * {@code ord} / {@code chr}; {@code ext/standard/type.c} {@code is_*};
- * throwing {@code __toString} needs an object/value box).
+ * {@code ext/standard/math.c} {@code PHP_FUNCTION(sqrt)} etc.; throwing
+ * {@code __toString} needs an object/value box).
  *
  * Single-param identity bodies ({@code function id($x){return $x;}}) are also
  * recorded so call sites can replace the call with the compiled argument
@@ -220,6 +222,11 @@ final class NoThrowCallElision
             // keep value-box / object conservative (coercion paths vary).
             return self::intParamBuiltinArgCannotThrow($callArgs[0]);
         }
+        if (self::isPureMathBuiltin($name)) {
+            // Z_PARAM_DOUBLE / LONG family — domain errors yield NAN/INF, not user
+            // throw-pending (php-src math.c). Value-box / object stay conservative.
+            return self::numericParamBuiltinArgCannotThrow($callArgs[0]);
+        }
 
         return false;
     }
@@ -254,6 +261,50 @@ final class NoThrowCallElision
             default:
                 return false;
         }
+    }
+
+    /**
+     * php-src {@code ext/standard/math.c} builtins that only coerce a numeric
+     * scalar and never invoke user handlers (no {@code __toString} on object /
+     * value-box paths we already exclude via {@see numericParamBuiltinArgCannotThrow}).
+     */
+    private static function isPureMathBuiltin(string $nameLc): bool
+    {
+        switch ($nameLc) {
+            case 'sqrt':
+            case 'abs':
+            case 'floor':
+            case 'ceil':
+            case 'round':
+            case 'sin':
+            case 'cos':
+            case 'tan':
+            case 'asin':
+            case 'acos':
+            case 'atan':
+            case 'sinh':
+            case 'cosh':
+            case 'tanh':
+            case 'exp':
+            case 'expm1':
+            case 'log':
+            case 'log10':
+            case 'log1p':
+            case 'deg2rad':
+            case 'rad2deg':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * True when a math builtin arg cannot leave user throw-pending (native /
+     * compile-time numeric scalars only).
+     */
+    private static function numericParamBuiltinArgCannotThrow(Variable $arg): bool
+    {
+        return self::intParamBuiltinArgCannotThrow($arg);
     }
 
     /**
