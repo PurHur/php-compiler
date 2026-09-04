@@ -21,6 +21,8 @@ use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\JIT\VmConstantJit;
+use PHPCompiler\VM\Variable as VmVariable;
 
 use PHPLLVM\Value;
 
@@ -30,7 +32,12 @@ class Native implements Call {
     public string $name;
     public array $argTypes;
 
-    /** @var array<int, Variable> compile-time defaults for optional parameters */
+    /**
+     * Optional-param defaults: {@see VmVariable} recipes (preferred) or legacy JIT {@see Variable}.
+     * Always rematerialize at the call site — never reuse callee-lowered LLVM Values (#36382).
+     *
+     * @var array<int, Variable|VmVariable>
+     */
     public array $defaultArgs = [];
 
     /**
@@ -158,7 +165,7 @@ class Native implements Call {
             } elseif (isset($this->promotedRuntimeNewDefaultProps[$index])) {
                 $arg = $this->promotedRuntimeNewDefaultArg($context, $index, $args);
             } elseif (isset($this->defaultArgs[$index])) {
-                $arg = $this->defaultArgs[$index];
+                $arg = self::materializeDefaultArg($context, $this->defaultArgs[$index]);
             } else {
                 $arg = $this->missingCallArg($context, $this->argTypes[$index]);
             }
@@ -286,13 +293,50 @@ class Native implements Call {
             }
             $defaultIdx = $prefix + $i;
             if (isset($this->defaultArgs[$defaultIdx])) {
-                $out[] = $this->defaultArgs[$defaultIdx];
+                $out[] = self::materializeDefaultArg($context, $this->defaultArgs[$defaultIdx]);
             } elseif (isset($this->promotedRuntimeNewDefaultProps[$defaultIdx])) {
                 $out[] = $this->promotedRuntimeNewDefaultArg($context, $defaultIdx, $args);
             }
         }
 
         return $out;
+    }
+
+    /**
+     * Lower a stored optional-param default at the current insert point (#36382).
+     *
+     * {@see \PHPCompiler\JIT::collectParamDefaults()} stores {@see VmVariable} recipes so empty
+     * array / null defaults are not emitted into the callee and reused across callers (LLVM
+     * "Instruction does not dominate all uses" on `__hashtable__alloc` / null boxes).
+     */
+    public static function materializeDefaultArg(Context $context, Variable|VmVariable $default): Variable
+    {
+        if ($default instanceof VmVariable) {
+            return VmConstantJit::toVariable($context, $default);
+        }
+        // Legacy Variable path (hand-built Native proxies): rematerialize known constants.
+        if ($default->isNullConstant) {
+            $vm = new VmVariable(VmVariable::TYPE_NULL);
+
+            return VmConstantJit::toVariable($context, $vm);
+        }
+        if (null !== $default->compileTimeLong && Variable::TYPE_NATIVE_LONG === $default->type) {
+            return Variable::fromConstantInt($context, $default->compileTimeLong);
+        }
+        if (null !== $default->compileTimeString && Variable::TYPE_STRING === $default->type) {
+            $lit = new \PHPCfg\Operand\Literal($default->compileTimeString);
+            $lit->type = \PHPTypes\Type::string();
+
+            return Variable::fromLiteral($context, $lit);
+        }
+        if ($default->compileTimeEmptyArrayLiteral) {
+            $vm = new VmVariable();
+            $vm->newArray();
+
+            return VmConstantJit::toVariable($context, $vm);
+        }
+
+        return $default;
     }
 
     /**

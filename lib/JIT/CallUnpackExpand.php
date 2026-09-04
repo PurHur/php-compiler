@@ -65,6 +65,11 @@ final class CallUnpackExpand
         $out = [];
         for ($i = 0; $i < $fixedCount; ++$i) {
             $default = $toCall->defaultArgs[$prefix + $i] ?? null;
+            if ($default instanceof Variable || $default instanceof \PHPCompiler\VM\Variable) {
+                $default = Native::materializeDefaultArg($context, $default);
+            } else {
+                $default = null;
+            }
             $out[] = self::readIndexedOrMissing($context, $ht, $numSize, $i, $default);
         }
 

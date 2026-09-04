@@ -191,8 +191,8 @@ final class NoThrowCallElision
         }
         if (isset($callArgs[0]) && $callArgs[0] instanceof Variable) {
             $arg = $callArgs[0];
-        } elseif (isset($toCall->defaultArgs[0]) && $toCall->defaultArgs[0] instanceof Variable) {
-            $arg = $toCall->defaultArgs[0];
+        } elseif (isset($toCall->defaultArgs[0])) {
+            $arg = Native::materializeDefaultArg($context, $toCall->defaultArgs[0]);
         } else {
             return null;
         }
