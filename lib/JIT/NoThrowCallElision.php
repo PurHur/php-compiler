@@ -330,6 +330,12 @@ final class NoThrowCallElision
             // array.c array_key_exists/key_exists — typed array + non-null scalar key.
             return self::arrayKeyExistsArgsCannotThrow($callArgs);
         }
+        if (self::isPureClassExistsFamilyBuiltin($name)) {
+            // zend_builtin_functions.c class_exists / interface_exists / trait_exists /
+            // enum_exists — only with compile-time-false $autoload (default true
+            // triggers spl_autoload / can throw).
+            return self::classExistsFamilyArgsCannotThrow($callArgs);
+        }
         if (self::isPureVersionCompareBuiltin($name)) {
             // versioning.c — typed strings; optional operator must be proven valid.
             return self::versionCompareArgsCannotThrow($callArgs);
@@ -995,6 +1001,26 @@ final class NoThrowCallElision
     }
 
     /**
+     * php-src {@code Zend/zend_builtin_functions.c} {@code class_exists} /
+     * {@code interface_exists} / {@code trait_exists} / {@code enum_exists} —
+     * Z_PARAM_STR name + optional Z_PARAM_BOOL autoload. Only proven when
+     * {@code $autoload} is a compile-time false (default true runs autoload).
+     * Public for {@see DiscardedPureCallElision} (#36386).
+     */
+    public static function isPureClassExistsFamilyBuiltin(string $nameLc): bool
+    {
+        switch ($nameLc) {
+            case 'class_exists':
+            case 'interface_exists':
+            case 'trait_exists':
+            case 'enum_exists':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
      * php-src {@code ext/standard/versioning.c} {@code version_compare}. Public
      * for {@see DiscardedPureCallElision} (#36386).
      */
@@ -1275,6 +1301,41 @@ final class NoThrowCallElision
     public static function propertyExistsArgsCannotThrow(array $callArgs): bool
     {
         return self::methodExistsArgsCannotThrow($callArgs);
+    }
+
+    /**
+     * Typed / literal class name + compile-time-false {@code $autoload}.
+     * Soft-null name/autoload stay out (deprecate). Missing / true / dynamic
+     * autoload stay out (spl_autoload side effects).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    public static function classExistsFamilyArgsCannotThrow(array $callArgs): bool
+    {
+        if (
+            !isset($callArgs[0], $callArgs[1])
+            || isset($callArgs[2])
+            || !$callArgs[0] instanceof Variable
+            || !$callArgs[1] instanceof Variable
+            || !self::stringParamBuiltinArgCannotThrow($callArgs[0])
+        ) {
+            return false;
+        }
+
+        return self::isCompileTimeFalseAutoloadArg($callArgs[1]);
+    }
+
+    /**
+     * Bool/long literals stamp {@see Variable::$compileTimeLong} (0/1). Soft-null
+     * autoload deprecates and must stay live.
+     */
+    public static function isCompileTimeFalseAutoloadArg(Variable $arg): bool
+    {
+        if ($arg->isNullConstant || Variable::TYPE_NULL === $arg->type) {
+            return false;
+        }
+
+        return null !== $arg->compileTimeLong && 0 === $arg->compileTimeLong;
     }
 
     /**

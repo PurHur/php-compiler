@@ -32,7 +32,9 @@ use PHPCompiler\VM\Variable as VmVariable;
  * extension_loaded / defined (single string; no autoload), typed
  * method_exists / property_exists (object + string; string class
  * names stay live for autoload), typed array_key_exists /
- * key_exists (typed array + non-null scalar key),
+ * key_exists (typed array + non-null scalar key), typed
+ * class_exists / interface_exists / trait_exists / enum_exists
+ * (string + compile-time-false {@code $autoload}),
  * zero-arg pi, type.c predicates + gettype/get_debug_type, ctype.c
  * classifiers on typed/literal strings, typed-array count/sizeof, math.c
  * incl. pow/fpow/fdiv on already-numeric args, empty void user functions).
@@ -58,8 +60,10 @@ use PHPCompiler\VM\Variable as VmVariable;
  * {@code hash_equals} stays live ({@code TypeError}). Soft-null
  * {@code pathinfo}/{@code parse_url} path/url/flags/component stay live
  * (deprecate). Soft-null {@code function_exists}/{@code extension_loaded}/
- * {@code defined} stay live (deprecate). {@code class_exists} stays live
- * (autoload side effects when {@code $autoload} defaults true). Soft-null
+ * {@code defined} stay live (deprecate). {@code class_exists} /
+ * {@code interface_exists} / {@code trait_exists} / {@code enum_exists}
+ * without compile-time-false {@code $autoload} stay live (default true
+ * runs spl_autoload). Soft-null
  * method/property names and string class-name receivers for
  * {@code method_exists}/{@code property_exists} stay live (deprecate /
  * autoload). Soft-null {@code array_key_exists}/{@code key_exists} keys
@@ -147,6 +151,9 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureArrayKeyExistsNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureClassExistsFamilyNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureVersionCompareNoSideEffect($toCall, $callArgs)) {
@@ -1294,6 +1301,28 @@ final class DiscardedPureCallElision
     }
 
     /**
+     * Discarded {@code class_exists}/{@code interface_exists}/
+     * {@code trait_exists}/{@code enum_exists} on typed / literal string +
+     * compile-time-false {@code $autoload} — php-src
+     * {@code Zend/zend_builtin_functions.c}. Default / true / dynamic
+     * autoload stays live (spl_autoload). Soft-null name/autoload stay live
+     * (deprecate).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureClassExistsFamilyNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if (!NoThrowCallElision::isPureClassExistsFamilyBuiltin(strtolower($toCall->getName()))) {
+            return false;
+        }
+
+        return self::classExistsFamilyArgsAllowDiscardedElision($callArgs);
+    }
+
+    /**
      * Discarded {@code version_compare} on typed / literal strings — php-src
      * {@code versioning.c}. Optional operator must be null or a compile-time
      * valid comparison op ({@code ValueError} otherwise).
@@ -1583,6 +1612,26 @@ final class DiscardedPureCallElision
     private static function propertyExistsArgsAllowDiscardedElision(array $callArgs): bool
     {
         return self::methodExistsArgsAllowDiscardedElision($callArgs);
+    }
+
+    /**
+     * Typed / literal class name + compile-time-false {@code $autoload}.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function classExistsFamilyArgsAllowDiscardedElision(array $callArgs): bool
+    {
+        if (
+            !isset($callArgs[0], $callArgs[1])
+            || isset($callArgs[2])
+            || !$callArgs[0] instanceof Variable
+            || !$callArgs[1] instanceof Variable
+            || !self::stringArgAllowsDiscardedElision($callArgs[0])
+        ) {
+            return false;
+        }
+
+        return NoThrowCallElision::isCompileTimeFalseAutoloadArg($callArgs[1]);
     }
 
     /**
