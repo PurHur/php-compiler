@@ -12,10 +12,12 @@ use PHPCompiler\ext\standard\array_count;
 use PHPCompiler\ext\standard\base64_encode;
 use PHPCompiler\ext\standard\bin2hex;
 use PHPCompiler\ext\standard\chr;
+use PHPCompiler\ext\standard\chunk_split;
 use PHPCompiler\ext\standard\convert_uuencode;
 use PHPCompiler\ext\standard\crc32;
 use PHPCompiler\ext\standard\escapeshellarg;
 use PHPCompiler\ext\standard\escapeshellcmd;
+use PHPCompiler\ext\standard\explode;
 use PHPCompiler\ext\standard\fdiv;
 use PHPCompiler\ext\standard\gettype;
 use PHPCompiler\ext\standard\hebrev;
@@ -37,8 +39,10 @@ use PHPCompiler\ext\standard\soundex;
 use PHPCompiler\ext\standard\sqrt;
 use PHPCompiler\ext\standard\str_contains;
 use PHPCompiler\ext\standard\str_ends_with;
+use PHPCompiler\ext\standard\str_pad;
 use PHPCompiler\ext\standard\str_repeat;
 use PHPCompiler\ext\standard\str_rot13;
+use PHPCompiler\ext\standard\str_split;
 use PHPCompiler\ext\standard\str_starts_with;
 use PHPCompiler\ext\standard\strcasecmp;
 use PHPCompiler\ext\standard\strcmp;
@@ -49,6 +53,7 @@ use PHPCompiler\ext\standard\substr;
 use PHPCompiler\ext\standard\ucwords;
 use PHPCompiler\ext\standard\urldecode;
 use PHPCompiler\ext\standard\urlencode;
+use PHPCompiler\ext\standard\wordwrap;
 use PHPCompiler\ext\types\is_type;
 use PHPCompiler\ext\types\strlen;
 use PHPCompiler\JIT\Call\Native;
@@ -775,6 +780,58 @@ final class DiscardedPureCallElisionTest extends TestCase
         $this->assertFalse(DiscardedPureCallElision::tryElide($context, new str_contains(), [$null, $needle]));
         $this->assertFalse(DiscardedPureCallElision::tryElide($context, new str_starts_with(), [$null, $needle]));
         $this->assertFalse(DiscardedPureCallElision::tryElide($context, new str_ends_with(), [$null, $needle]));
+    }
+
+    public function testElidesDiscardedStrPadOnTypedArgs(): void
+    {
+        // php-src string.c PHP_FUNCTION(str_pad) — Z_PARAM_STR + LONG [+ STR + LONG]
+        $context = $this->makeContext();
+        $s = $this->makeStringVar(null);
+        $len = $this->makeNativeLongVar();
+        $pad = $this->makeStringVar(' ');
+        $type = $this->makeNativeLongVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, new str_pad(), [$s, $len]));
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, new str_pad(), [$s, $len, $pad]));
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, new str_pad(), [$s, $len, $pad, $type]));
+    }
+
+    public function testElidesDiscardedChunkSplitWordwrapStrSplit(): void
+    {
+        $context = $this->makeContext();
+        $s = $this->makeStringVar('abcdef');
+        $n = $this->makeNativeLongVar();
+        $sep = $this->makeStringVar("\n");
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, new chunk_split(), [$s]));
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, new chunk_split(), [$s, $n]));
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, new chunk_split(), [$s, $n, $sep]));
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, new wordwrap(), [$s]));
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, new wordwrap(), [$s, $n, $sep]));
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, new str_split(), [$s]));
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, new str_split(), [$s, $n]));
+    }
+
+    public function testElidesDiscardedExplodeOnTypedStrings(): void
+    {
+        $context = $this->makeContext();
+        $delim = $this->makeStringVar(',');
+        $s = $this->makeStringVar(null);
+        $limit = $this->makeNativeLongVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, new explode(), [$delim, $s]));
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, new explode(), [$delim, $s, $limit]));
+    }
+
+    public function testDoesNotElideStrPadOnNullString(): void
+    {
+        $context = $this->makeContext();
+        $null = $this->makeNullVar();
+        $len = $this->makeNativeLongVar();
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide($context, new str_pad(), [$null, $len]));
+        $this->assertFalse(DiscardedPureCallElision::tryElide($context, new chunk_split(), [$null]));
+        $this->assertFalse(DiscardedPureCallElision::tryElide($context, new explode(), [$null, $this->makeStringVar('a')]));
     }
 
     public function testJitWiresElisionBeforeInvoke(): void

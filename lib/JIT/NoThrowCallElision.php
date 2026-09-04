@@ -252,6 +252,11 @@ final class NoThrowCallElision
             // __toString; object/value-box string slots stay conservative.
             return self::stringSliceOrCompareArgsCannotThrow($name, $callArgs);
         }
+        if (self::isPureStringPadOrSplitBuiltin($name)) {
+            // str_pad / chunk_split / wordwrap / str_split / explode — STR +
+            // LONG/BOOL slots; object/value-box string args stay conservative.
+            return self::stringPadOrSplitArgsCannotThrow($name, $callArgs);
+        }
         if ('chr' === $name) {
             // Z_PARAM_LONG family — object→int does not call __toString; still
             // keep value-box / object conservative (coercion paths vary).
@@ -590,6 +595,161 @@ final class NoThrowCallElision
             case 'str_starts_with':
             case 'str_ends_with':
                 return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * php-src {@code ext/standard/string.c} pad / split / wrap builtins that only
+     * read typed string (+ optional numeric / pad string) args — no user handlers
+     * when every string slot is already a string. Domain ValueErrors (empty
+     * explode separator, non-positive chunk length, …) mirror {@code str_repeat}
+     * discarded elision: typed numeric/string slots stay elidable (#36386).
+     * Public for {@see DiscardedPureCallElision}.
+     */
+    public static function isPureStringPadOrSplitBuiltin(string $nameLc): bool
+    {
+        switch ($nameLc) {
+            case 'str_pad':
+            case 'chunk_split':
+            case 'wordwrap':
+            case 'str_split':
+            case 'explode':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * @param array<int, Variable> $callArgs
+     */
+    public static function stringPadOrSplitArgsCannotThrow(string $nameLc, array $callArgs): bool
+    {
+        if ([] === $callArgs) {
+            return false;
+        }
+        switch ($nameLc) {
+            case 'str_pad':
+                // string, long length [, string pad_string [, long pad_type]]
+                if (!isset($callArgs[0], $callArgs[1])) {
+                    return false;
+                }
+                if (
+                    !$callArgs[0] instanceof Variable
+                    || !self::stringParamBuiltinArgCannotThrow($callArgs[0])
+                    || !$callArgs[1] instanceof Variable
+                    || !self::numericParamBuiltinArgCannotThrow($callArgs[1])
+                ) {
+                    return false;
+                }
+                if (!isset($callArgs[2])) {
+                    return true;
+                }
+                if (
+                    !$callArgs[2] instanceof Variable
+                    || !self::stringParamBuiltinArgCannotThrow($callArgs[2])
+                ) {
+                    return false;
+                }
+                if (!isset($callArgs[3])) {
+                    return true;
+                }
+
+                return $callArgs[3] instanceof Variable
+                    && self::numericParamBuiltinArgCannotThrow($callArgs[3]);
+            case 'chunk_split':
+                // string [, long length [, string separator]]
+                if (
+                    !isset($callArgs[0])
+                    || !$callArgs[0] instanceof Variable
+                    || !self::stringParamBuiltinArgCannotThrow($callArgs[0])
+                ) {
+                    return false;
+                }
+                if (!isset($callArgs[1])) {
+                    return true;
+                }
+                if (
+                    !$callArgs[1] instanceof Variable
+                    || !self::numericParamBuiltinArgCannotThrow($callArgs[1])
+                ) {
+                    return false;
+                }
+                if (!isset($callArgs[2])) {
+                    return true;
+                }
+
+                return $callArgs[2] instanceof Variable
+                    && self::stringParamBuiltinArgCannotThrow($callArgs[2]);
+            case 'wordwrap':
+                // string [, long width [, string break [, bool cut]]]
+                if (
+                    !isset($callArgs[0])
+                    || !$callArgs[0] instanceof Variable
+                    || !self::stringParamBuiltinArgCannotThrow($callArgs[0])
+                ) {
+                    return false;
+                }
+                if (!isset($callArgs[1])) {
+                    return true;
+                }
+                if (
+                    !$callArgs[1] instanceof Variable
+                    || !self::numericParamBuiltinArgCannotThrow($callArgs[1])
+                ) {
+                    return false;
+                }
+                if (!isset($callArgs[2])) {
+                    return true;
+                }
+                if (
+                    !$callArgs[2] instanceof Variable
+                    || !self::stringParamBuiltinArgCannotThrow($callArgs[2])
+                ) {
+                    return false;
+                }
+                if (!isset($callArgs[3])) {
+                    return true;
+                }
+
+                return $callArgs[3] instanceof Variable
+                    && self::numericParamBuiltinArgCannotThrow($callArgs[3]);
+            case 'str_split':
+                // string [, long length]
+                if (
+                    !isset($callArgs[0])
+                    || !$callArgs[0] instanceof Variable
+                    || !self::stringParamBuiltinArgCannotThrow($callArgs[0])
+                ) {
+                    return false;
+                }
+                if (!isset($callArgs[1])) {
+                    return true;
+                }
+
+                return $callArgs[1] instanceof Variable
+                    && self::numericParamBuiltinArgCannotThrow($callArgs[1]);
+            case 'explode':
+                // string separator, string string [, long limit]
+                if (!isset($callArgs[0], $callArgs[1])) {
+                    return false;
+                }
+                if (
+                    !$callArgs[0] instanceof Variable
+                    || !self::stringParamBuiltinArgCannotThrow($callArgs[0])
+                    || !$callArgs[1] instanceof Variable
+                    || !self::stringParamBuiltinArgCannotThrow($callArgs[1])
+                ) {
+                    return false;
+                }
+                if (!isset($callArgs[2])) {
+                    return true;
+                }
+
+                return $callArgs[2] instanceof Variable
+                    && self::numericParamBuiltinArgCannotThrow($callArgs[2]);
             default:
                 return false;
         }
