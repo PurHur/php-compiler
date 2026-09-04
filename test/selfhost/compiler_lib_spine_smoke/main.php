@@ -5354,6 +5354,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/RewireInlineCallArgSendSlot
 require_once __DIR__.'/../../../lib/Compiler/Concern/AdjacentNestedCallArgSlots.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/ListDestructAndForeach.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/DimAndPropertyWriteContext.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/IssetEmptyUnsetAndDimFetchCompile.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileBlockInternal.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AssignOperand.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AdaptByRefCallArgs.php';

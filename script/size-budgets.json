@@ -4,9 +4,9 @@
     "done_when_ceiling": 25000,
     "files": {
         "lib/Compiler.php": {
-            "budget": 21602,
+            "budget": 20359,
             "target": 20000,
-            "note": "Concern trait splits (#36230/#36387/#36403); ListDestructAndForeach + DimAndPropertyWriteContext"
+            "note": "Concern trait splits (#36230/#36387/#36403); DimAndPropertyWriteContext + IssetEmptyUnsetAndDimFetchCompile"
         },
         "lib/JIT.php": {
             "budget": 24655,
