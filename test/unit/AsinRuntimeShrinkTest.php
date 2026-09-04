@@ -9,23 +9,29 @@ use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
 /**
- * asin() NestedJIT via JitVmHelperLink::ensureBridge (#28263 / peer MathSin #28016).
+ * asin() AOT uses libm asin(3) (#36386); AsinJitHelper remains NestedJIT-safe
+ * reference (peer MathAtan / AtanJitHelper). LLVM 9 has no llvm.asin.f64.
+ *
+ * php-src: ext/standard/math.c PHP_FUNCTION(asin).
  */
 final class AsinRuntimeShrinkTest extends TestCase
 {
-    public function testAsinUsesJitHelperNotKernel(): void
+    public function testAsinUsesLibmNotHelperBridge(): void
     {
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/asin.php');
         $this->assertStringContainsString('MathAsin::invoke', $builtin);
         $this->assertStringNotContainsString("lookupFunction('asin')", $builtin);
 
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathAsin.php');
-        $this->assertStringContainsString('AsinJitHelper', $bridge);
+        $this->assertStringContainsString("LIBC_ASIN = 'asin'", $bridge);
         $this->assertStringContainsString('phpc_asin', $bridge);
-        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringContainsString('asin_libm_f64_entry', $bridge);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('AsinJitHelper', $bridge);
         $this->assertStringNotContainsString('JitAsinKernel', $bridge);
         $this->assertStringNotContainsString('NestedJitCompileScope', $bridge);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
+        $this->assertStringNotContainsString('llvm.asin', $bridge);
     }
 
     public function testAsinJitHelperInlinesNestedJitSafeAlgorithm(): void

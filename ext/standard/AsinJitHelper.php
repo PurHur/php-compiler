@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * asin() for compiled JIT/AOT modules (#15130, #27016, #28263, php-in-PHP).
+ * NestedJIT-safe asin() reference (#15130, #27016, #28263, php-in-PHP).
  *
- * NestedJIT-safe fdlibm poly for |x|<0.5 + identity asin(x)=π/2−2·asin(√((1−|x|)/2))
- * for |x|≥0.5 (#28263 / peer MathSin #28016 / MathHypot #27909).
- * Avoid `\asin` / {@see VmMath::asin} — NestedJIT re-enters MathAsin bridge under thin AOT.
+ * AOT/JIT hot path uses libm {@code asin(3)} via {@see \PHPCompiler\JIT\Builtin\MathAsin}
+ * (#36386 / peer MathAtan). This helper remains for NestedJIT-safe fdlibm poly
+ * (|x|<0.5 + asin(x)=π/2−2·asin(√((1−|x|)/2)) for |x|≥0.5) when NestedJIT cannot call libc.
+ * Avoid `\asin` / {@see VmMath::asin} — NestedJIT would re-enter the MathAsin bridge.
  * Avoid {@see SqrtJitHelper} cross-class call — NestedJIT stubs to 0 (#27017 / Hypot shape).
  * Avoid ternary abs and `$num < 0.0` sign flips — NestedJIT helper unit.o zeros/skips those
  * branches (asin(−0.5)→0 / asin(−0.9)→−1). Abs via √(x²); sign via `a * (num/ax)`.
