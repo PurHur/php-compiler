@@ -11136,7 +11136,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomExtensionHooksFacade.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 22 class method(s)
 
 ### `ext/dom/JitDomGetElementById.php`
 
@@ -33317,7 +33317,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitPregReplaceCallback.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 7 class method(s)
 
 ### `ext/standard/JitPregReplaceCallbackArray.php`
 
@@ -35656,7 +35656,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/PregAotFastPath.php`
 
 **Warnings** (review for bootstrap subset):
-- 73 class method(s)
+- 79 class method(s)
 
 ### `ext/standard/PregCallbackInvokeJitHelper.php`
 
@@ -51876,7 +51876,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/MathExp.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/MathExpm1.php`
 
@@ -52582,11 +52582,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 643)
 - new Variable (line 737)
 - new Variable (line 747)
-- new Variable (line 1213)
-- new Variable (line 1448)
-- new Variable (line 1467)
-- new Variable (line 1485)
-- new Variable (line 1565)
+- new Variable (line 1174)
+- new Variable (line 1409)
+- new Variable (line 1428)
+- new Variable (line 1446)
+- new Variable (line 1526)
 - 27 class method(s)
 - 1 closure(s)
 
@@ -55669,7 +55669,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/DomElementHasAttributeNS.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 1 class method(s)
 
 ### `lib/JIT/Call/DomElementInsertAdjacentElement.php`
 
@@ -55965,7 +55965,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/DomXPathRegisterNamespace.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 1 class method(s)
 
 ### `lib/JIT/Call/DomXPathRegisterPhpFunctions.php`
 
@@ -59287,7 +59287,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/PregReplaceCallbackPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 6 class method(s)
 
 ### `lib/JIT/PrintRArrayLlvm.php`
 
