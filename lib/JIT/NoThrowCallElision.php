@@ -225,7 +225,14 @@ final class NoThrowCallElision
         if (self::isPureMathBuiltin($name)) {
             // Z_PARAM_DOUBLE / LONG family — domain errors yield NAN/INF, not user
             // throw-pending (php-src math.c). Value-box / object stay conservative.
-            return self::numericParamBuiltinArgCannotThrow($callArgs[0]);
+            // Multi-arg (hypot/fmod/…) must prove every numeric param (#36386).
+            foreach ($callArgs as $arg) {
+                if (!$arg instanceof Variable || !self::numericParamBuiltinArgCannotThrow($arg)) {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         return false;
@@ -293,6 +300,8 @@ final class NoThrowCallElision
             case 'log':
             case 'log10':
             case 'log1p':
+            case 'hypot':
+            case 'fmod':
             case 'deg2rad':
             case 'rad2deg':
                 return true;

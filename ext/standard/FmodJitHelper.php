@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * fmod() for compiled JIT/AOT modules (#15072, #26994, #27838, php-in-PHP).
+ * fmod() NestedJIT-safe trunc-via-(int) reference (#15072, #26994, #27838, php-in-PHP).
  *
- * NestedJIT-safe trunc-via-(int) quotient (peer {@see FloorJitHelper} / #27650).
+ * AOT/JIT hot path uses libm {@code fmod(3)} via {@see \PHPCompiler\JIT\Builtin\MathFmod}
+ * (#36386 / peer MathHypot). This helper remains for NestedJIT-safe trunc-via-(int)
+ * when NestedJIT cannot call libc (peer {@see FloorJitHelper} / #27650).
  * Avoid `\fmod` / {@see VmMath::fmod} — NestedJIT re-enters MathFmod bridge under thin AOT.
  * Avoid while-loops — NestedJIT miscompiles float reduction loops under thin AOT (#27838).
  * |q| ≥ 2^53 shares Floor's NestedJIT int64 saturation: peel via float `q` product

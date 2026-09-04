@@ -9,23 +9,30 @@ use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
 /**
- * fmod() NestedJIT via JitVmHelperLink::ensureBridge (#27838 / peer floor #27650).
+ * fmod() AOT uses libm fmod(3) (#36386);
+ * FmodJitHelper remains NestedJIT-safe reference (peer MathHypot / HypotJitHelper).
+ * LLVM 9 has no llvm.fmod.f64.
+ *
+ * php-src: ext/standard/math.c PHP_FUNCTION(fmod).
  */
 final class FmodRuntimeShrinkTest extends TestCase
 {
-    public function testFmodUsesJitHelperNotKernel(): void
+    public function testFmodUsesLibmNotHelperBridge(): void
     {
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/fmod.php');
         $this->assertStringContainsString('MathFmod::invoke', $builtin);
         $this->assertStringNotContainsString("lookupFunction('fmod')", $builtin);
 
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathFmod.php');
-        $this->assertStringContainsString('FmodJitHelper', $bridge);
+        $this->assertStringContainsString("LIBC_FMOD = 'fmod'", $bridge);
         $this->assertStringContainsString('phpc_fmod', $bridge);
-        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringContainsString('fmod_libm_f64_entry', $bridge);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('FmodJitHelper', $bridge);
         $this->assertStringNotContainsString('JitFmodKernel', $bridge);
         $this->assertStringNotContainsString('NestedJitCompileScope', $bridge);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
+        $this->assertStringNotContainsString('llvm.fmod', $bridge);
     }
 
     public function testFmodJitHelperInlinesNestedJitSafeAlgorithm(): void

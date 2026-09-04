@@ -4,35 +4,35 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for hypot() via HypotJitHelper PHP (#15074, #20664, #27909).
+ * JIT/AOT link for hypot() via libm {@code hypot(3)} (#36386).
  *
- * Helper compile: {@see JitVmHelperLink::ensureBridge} (MathSqrt #27888 shape).
- * NestedJIT no longer needs a libc hypot(3) kernel — helper uses NestedJIT-safe scale + sqrt.
- * php-src: ext/standard/math.c — PHP_FUNCTION(hypot)
+ * Peer of {@see MathFmod} / {@see MathExpm1}: avoid NestedJIT helper objects on
+ * the AOT hot path. php-src {@code ext/standard/math.c} {@code PHP_FUNCTION(hypot)}
+ * → C {@code hypot}. LLVM 9 has no hypot intrinsic, so declare the libc symbol
+ * the linker already pulls via {@code -lm}
+ * ({@see NumberFormatRuntime} {@code floor} shape / {@see MathFpow} two-arg).
+ * The PHP scale+sqrt helper remains for NestedJIT-safe reference only.
  */
 final class MathHypot
 {
+    /** Libc hypot(3) — no LLVM 9 intrinsic. */
+    private const LIBC_HYPOT = 'hypot';
+
+    /** Legacy ABI kept as a thin libm wrapper for any external callers. */
     private const ABI_HYPOT = 'phpc_hypot';
 
-    private const HELPER_PATH = '/ext/standard/HypotJitHelper.php';
-
-    private const HYPOT_HELPER = 'PHPCompiler\\ext\\standard\\HypotJitHelper::hypotArgv';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::HYPOT_HELPER,
-    ];
-
-    private const BRIDGE_ENTRY = 'hypot_bridge_entry';
+    private const BRIDGE_ENTRY = 'hypot_libm_f64_entry';
 
     public static function ensureLinked(Context $context): void
     {
-        self::implement($context);
+        self::libcHypotDecl($context);
+        self::ensurePhpcHypotBridge($context);
     }
 
     public static function ensureStandaloneBodies(Context $context): void
@@ -42,35 +42,64 @@ final class MathHypot
 
     public static function invoke(Context $context, Value $x, Value $y): Value
     {
-        self::ensureLinked($context);
-
-        return $context->builder->call(
-            $context->lookupFunction(self::ABI_HYPOT),
-            $x,
-            $y
-        );
+        return $context->builder->call(self::libcHypotDecl($context), $x, $y);
     }
 
-    private static function implement(Context $context): void
+    private static function libcHypotDecl(Context $context): LlvmFunction
+    {
+        $func = $context->module->getNamedFunction(self::LIBC_HYPOT);
+        if (null !== $func) {
+            $context->registerFunction(self::LIBC_HYPOT, $func);
+
+            return $func;
+        }
+        $double = $context->getTypeFromString('double');
+        $fn = $context->module->addFunction(
+            self::LIBC_HYPOT,
+            $context->context->functionType($double, false, $double, $double)
+        );
+        $context->registerFunction(self::LIBC_HYPOT, $fn);
+
+        return $fn;
+    }
+
+    /**
+     * Define {@code phpc_hypot} → libm {@code hypot} when missing. Skip if a prior
+     * NestedJIT bridge already filled the symbol (cannot replace LLVM bodies);
+     * {@see invoke} never calls that stale path.
+     */
+    private static function ensurePhpcHypotBridge(Context $context): void
     {
         $probe = $context->module->getNamedFunction(self::ABI_HYPOT);
-        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction(self::ABI_HYPOT, $probe);
 
             return;
         }
 
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         $double = $context->getTypeFromString('double');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_HYPOT,
-            self::BRIDGE_ENTRY,
-            [$double, $double],
-            $double,
-            self::HYPOT_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#27909'
+        $fn = $probe;
+        if (null === $fn) {
+            $fn = $context->module->addFunction(
+                self::ABI_HYPOT,
+                $context->context->functionType($double, false, $double, $double)
+            );
+        }
+        $entry = $fn->appendBasicBlock(self::BRIDGE_ENTRY);
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue(
+            $context->builder->call(
+                self::libcHypotDecl($context),
+                $fn->getParam(0),
+                $fn->getParam(1)
+            )
         );
+        $context->registerFunction(self::ABI_HYPOT, $fn);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 }
