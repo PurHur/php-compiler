@@ -39,10 +39,23 @@ if (false !== $gen0Json && '' !== $gen0Json) {
     }
 }
 
+$ciStreakDays = 0;
+$ciStreakSha = '';
+$streakJson = getenv('_RR_CI_STREAK_JSON');
+if (false !== $streakJson && '' !== $streakJson) {
+    $decoded = json_decode($streakJson, true);
+    if (is_array($decoded)) {
+        $ciStreakDays = max(0, (int) ($decoded['ci_green_streak_days'] ?? 0));
+        $ciStreakSha = (string) ($decoded['last_green_master_sha'] ?? '');
+    }
+}
+
 $payload = [
     'user_release_ready' => getenv('_RR_READY') ?: 'no',
     'mode' => getenv('_RR_MODE') ?: 'quick',
     'gates' => $gates,
+    'ci_green_streak_days' => $ciStreakDays,
+    'last_green_master_sha' => $ciStreakSha,
 ];
 if (null !== $honestCompile) {
     $payload['honest_compile'] = $honestCompile;

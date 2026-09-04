@@ -353,6 +353,17 @@ fi
 release_readiness_collect_honest_compile_metric
 release_readiness_collect_gen0_provenance
 
+# Committed local CI streak (#36401). Read-only here — advance with:
+#   php script/status/ci-streak.php --record-green --sha=$(git rev-parse HEAD) --day=$(date -u +%F) --write
+# after apply-patches + north-star5-verify-fast are green (never restamp).
+CI_STREAK_JSON='{"ci_green_streak_days":0,"last_green_master_sha":""}'
+if [[ -r "${_CI_REPO_ROOT}/docs/ci-streak.json" ]]; then
+  _streak_out="$("$PHP_BIN" "${PHP_OPTS[@]}" "${_CI_SCRIPT_DIR}/status/ci-streak.php" --json 2>/dev/null)" || true
+  if [[ -n "${_streak_out}" ]] && php -r 'exit(json_decode($argv[1], true) === null ? 1 : 0);' "${_streak_out}"; then
+    CI_STREAK_JSON="${_streak_out}"
+  fi
+fi
+
 USER_RELEASE_READY=no
 if [[ "${FAILED}" -eq 0 ]]; then
   USER_RELEASE_READY=yes
@@ -377,6 +388,7 @@ if [[ "${JSON_OUT}" -eq 1 ]]; then
   export _RR_READY="${USER_RELEASE_READY}"
   export _RR_HONEST_COMPILE_JSON="${HONEST_COMPILE_JSON}"
   export _RR_GEN0_PROVENANCE_JSON="${GEN0_PROVENANCE_JSON}"
+  export _RR_CI_STREAK_JSON="${CI_STREAK_JSON}"
   export _RR_GATE_COUNT="${#GATE_NAMES[@]}"
   for i in "${!GATE_NAMES[@]}"; do
     export "_RR_GATE_NAME_${i}=${GATE_NAMES[$i]}"
@@ -386,6 +398,7 @@ if [[ "${JSON_OUT}" -eq 1 ]]; then
   "$PHP_BIN" "${PHP_OPTS[@]}" "${_CI_SCRIPT_DIR}/release-readiness-json-emit.php"
 else
   log "mode=${MODE} user_release_ready=${USER_RELEASE_READY}"
+  log "ci_green_streak_days=$(php -r 'echo json_decode($argv[1], true)["ci_green_streak_days"] ?? 0;' "${CI_STREAK_JSON}") last_green_master_sha=$(php -r 'echo json_decode($argv[1], true)["last_green_master_sha"] ?? "";' "${CI_STREAK_JSON}")"
 fi
 
 if [[ "${FAILED}" -ne 0 ]]; then

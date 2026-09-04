@@ -504,6 +504,8 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('gen0-driver-functional', $body);
         $this->assertStringContainsString('bootstrap-honest-compile-metric.sh', $body);
         $this->assertStringContainsString('_RR_HONEST_COMPILE_JSON', $body);
+        $this->assertStringContainsString('_RR_CI_STREAK_JSON', $body);
+        $this->assertStringContainsString('status/ci-streak.php', $body);
         $this->assertStringContainsString('examples-aot-smoke.sh', $body);
         $this->assertStringContainsString('examples-web-smoke.sh', $body);
         $this->assertStringContainsString('(examples-aot-smoke|examples-web-smoke): ok$', $body);
@@ -541,6 +543,10 @@ final class CiScriptsTest extends TestCase
         $this->assertArrayHasKey('status', $payload['honest_compile']);
         $this->assertArrayHasKey('message', $payload['honest_compile']);
         $this->assertArrayHasKey('gate_available', $payload['honest_compile']);
+        $this->assertArrayHasKey('ci_green_streak_days', $payload);
+        $this->assertArrayHasKey('last_green_master_sha', $payload);
+        $this->assertIsInt($payload['ci_green_streak_days']);
+        $this->assertIsString($payload['last_green_master_sha']);
         foreach ($payload['gates'] as $gate) {
             $this->assertArrayHasKey('name', $gate);
             $this->assertArrayHasKey('status', $gate);
