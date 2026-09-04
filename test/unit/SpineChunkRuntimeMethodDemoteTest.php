@@ -47,10 +47,17 @@ final class SpineChunkRuntimeMethodDemoteTest extends TestCase
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('phpcompiler\\compiler\\overridevalidator'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\Web\\MultipartParser'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('phpcompiler\\web\\responsecontext'));
+        // Ast\* / Cli\* — preg_replace_callback deferral + NestedJIT OOM under SPINE_CHUNK (#36387).
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\Ast\\AsymmetricVisibilityRewriter'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\Ast\\LazyPropertyRewriter'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('phpcompiler\\ast\\readonlyfunctionrewriter'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\Cli\\PhpcBuild'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('phpcompiler\\cli\\phpcrun'));
         // Top-level Compiler / CompilerVersion stay live (no trailing \).
         $this->assertFalse(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\Compiler'));
         $this->assertFalse(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\CompilerVersion'));
         $this->assertFalse(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\JIT\\Variable'));
+        $this->assertFalse(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\Func\\Internal'));
     }
 
     public function testDemoteMethodBlockLeavesOnlyReturnVoid(): void
