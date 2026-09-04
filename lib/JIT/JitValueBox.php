@@ -240,6 +240,46 @@ final class JitValueBox
             if ('__object__*' === $llvmType) {
                 return self::valuePtrFromObjectParam($context, $var->value);
             }
+            // Typed list local: `__string__*[N]*` / uniquified → `unknown*` (#36382).
+            $slotTy = $var->value->typeOf();
+            if (
+                LlvmType::KIND_POINTER === $slotTy->getKind()
+                && LlvmType::KIND_ARRAY === $slotTy->getElementType()->getKind()
+            ) {
+                $elemTy = $slotTy->getElementType();
+                $elemName = $context->getStringFromType($elemTy->getElementType());
+                $elemType = Variable::TYPE_STRING;
+                if ('int64' === $elemName || 'i64' === $elemName) {
+                    $elemType = Variable::TYPE_NATIVE_LONG;
+                } elseif ('double' === $elemName) {
+                    $elemType = Variable::TYPE_NATIVE_DOUBLE;
+                } elseif ('int1' === $elemName || 'i1' === $elemName) {
+                    $elemType = Variable::TYPE_NATIVE_BOOL;
+                }
+                $length = method_exists($elemTy, 'getLength') ? (int) $elemTy->getLength() : 0;
+                $tmp = new Variable(
+                    $context,
+                    Variable::IS_NATIVE_ARRAY | $elemType,
+                    Variable::KIND_VARIABLE,
+                    $var->value
+                );
+                $tmp->nextFreeElement = $length > 0 ? $length : ($var->nextFreeElement ?: 0);
+                $ht = HashTableHelper::materializeNativeArrayForCall($context, $tmp);
+                $slot = self::alloc($context);
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeHashtable'),
+                    self::pointer($context, $slot),
+                    $ht
+                );
+                $context->refcount->delref(
+                    $context->builder->pointerCast(
+                        $ht,
+                        $context->getTypeFromString('__ref__virtual*')
+                    )
+                );
+
+                return self::normalizeValuePtr($context, self::pointer($context, $slot));
+            }
 
             return self::normalizeValuePtr($context, self::pointer($context, $var->value));
         }
@@ -258,6 +298,12 @@ final class JitValueBox
         if ('__object__*' === $context->getStringFromType($valueTy)) {
             return self::valuePtrFromObjectParam($context, $var->value);
         }
+        // KIND_VALUE holding a packed native array aggregate (`[N x %__string__*]`) — common
+        // after INIT_ARRAY temps are retyped to TYPE_VALUE for string-key HT writes (Slim
+        // Nyholm headers). Never store the aggregate into a `__value__*` alloca (#36382).
+        if (LlvmType::KIND_ARRAY === $valueTy->getKind()) {
+            return self::valuePtrFromNativeArrayAggregate($context, $var, $valueTy);
+        }
         // LLVM by-value __value__ formals (KIND_VALUE): store into a reachable alloca
         // before returning its pointer — sealed insert BBs left the slot null and by-ref
         // `$r = $v` copied TYPE_NULL into the caller lvalue (e06_byref, #32654).
@@ -267,6 +313,55 @@ final class JitValueBox
         }
         $slot = self::alloc($context);
         $context->builder->store($var->value, $slot);
+
+        return self::normalizeValuePtr($context, self::pointer($context, $slot));
+    }
+
+    /**
+     * Box a KIND_VALUE LLVM array aggregate as a hashtable-tagged `__value__*` (#36382).
+     */
+    private static function valuePtrFromNativeArrayAggregate(
+        Context $context,
+        Variable $var,
+        LlvmType $arrayTy
+    ): Value {
+        BasicBlockHelper::repositionToLastOpenIfInsertLost($context);
+        if (!BasicBlockHelper::unsealAndContinue($context)) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'value_ptr_native_arr');
+        }
+        $arrSlot = BasicBlockHelper::entryAlloca($context, $arrayTy);
+        $context->builder->store($var->value, $arrSlot);
+        $elemLlvm = $arrayTy->getElementType();
+        $elemName = $context->getStringFromType($elemLlvm);
+        $elemType = Variable::TYPE_STRING;
+        if ('int64' === $elemName || 'i64' === $elemName) {
+            $elemType = Variable::TYPE_NATIVE_LONG;
+        } elseif ('double' === $elemName) {
+            $elemType = Variable::TYPE_NATIVE_DOUBLE;
+        } elseif ('int1' === $elemName || 'i1' === $elemName) {
+            $elemType = Variable::TYPE_NATIVE_BOOL;
+        }
+        $length = method_exists($arrayTy, 'getLength') ? (int) $arrayTy->getLength() : 0;
+        $tmp = new Variable(
+            $context,
+            Variable::IS_NATIVE_ARRAY | $elemType,
+            Variable::KIND_VARIABLE,
+            $arrSlot
+        );
+        $tmp->nextFreeElement = $length > 0 ? $length : ($var->nextFreeElement ?: 0);
+        $ht = HashTableHelper::materializeNativeArrayForCall($context, $tmp);
+        $slot = self::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            self::pointer($context, $slot),
+            $ht
+        );
+        $context->refcount->delref(
+            $context->builder->pointerCast(
+                $ht,
+                $context->getTypeFromString('__ref__virtual*')
+            )
+        );
 
         return self::normalizeValuePtr($context, self::pointer($context, $slot));
     }

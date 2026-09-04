@@ -584,6 +584,16 @@ class Native implements Call {
         // Use the LLVM function's declared param type (argTypes can disagree for CFG Operand handles, #1056).
         $type = $this->function->getParam($argNum)->typeOf();
         $typeName = $context->getStringFromType($type);
+        // CreateNamed uniquify (`__object__.2*`) must still dispatch as `__object__*` (#36382).
+        if (self::llvmPointerTo($type, $context, '__object__')) {
+            $typeName = '__object__*';
+        } elseif (self::llvmPointerTo($type, $context, '__hashtable__')) {
+            $typeName = '__hashtable__*';
+        } elseif (self::llvmPointerTo($type, $context, '__string__')) {
+            $typeName = '__string__*';
+        } elseif (self::llvmPointerTo($type, $context, '__value__')) {
+            $typeName = '__value__*';
+        }
         $value = $context->helper->loadValue($arg);
         switch ($typeName) {
             case '__object__*':
@@ -592,18 +602,21 @@ class Native implements Call {
                 // (MessageTrait::$protocol etc.). Never pass non-boxes to readObject (#36382).
                 $valueTy = $value->typeOf();
                 $valueTyName = $context->getStringFromType($valueTy);
-                if ('__object__*' === $valueTyName) {
+                if ('__object__*' === $valueTyName || self::llvmPointerTo($valueTy, $context, '__object__')) {
                     return $value;
                 }
-                if ('__string__*' === $valueTyName || 'int8*' === $valueTyName) {
+                if (
+                    '__string__*' === $valueTyName
+                    || 'int8*' === $valueTyName
+                    || self::llvmPointerTo($valueTy, $context, '__string__')
+                    || self::llvmPointerTo($valueTy, $context, 'int8')
+                ) {
                     return $context->getTypeFromString('__object__*')->constNull();
                 }
+                // readObject requires `__value__*` — never a by-value `__value__` struct (#36382).
                 if (
                     '__value__*' === $valueTyName
-                    || (
-                        \PHPLLVM\Type::KIND_POINTER === $valueTy->getKind()
-                        && '__value__' === $context->getStringFromType($valueTy->getElementType())
-                    )
+                    || self::llvmPointerTo($valueTy, $context, '__value__')
                 ) {
                     return $context->builder->call(
                         $context->lookupFunction('__value__readObject'),
@@ -615,19 +628,22 @@ class Native implements Call {
                         return $value;
                     case Variable::TYPE_VALUE:
                         $boxPtr = \PHPCompiler\JIT\JitValueBox::valuePtrFromVariable($context, $arg);
-                        $boxTyName = $context->getStringFromType($boxPtr->typeOf());
-                        if ('__object__*' === $boxTyName) {
+                        $boxTy = $boxPtr->typeOf();
+                        $boxTyName = $context->getStringFromType($boxTy);
+                        if ('__object__*' === $boxTyName || self::llvmPointerTo($boxTy, $context, '__object__')) {
                             return $boxPtr;
                         }
-                        if ('__string__*' === $boxTyName || 'int8*' === $boxTyName) {
+                        if (
+                            '__string__*' === $boxTyName
+                            || 'int8*' === $boxTyName
+                            || self::llvmPointerTo($boxTy, $context, '__string__')
+                            || self::llvmPointerTo($boxTy, $context, 'int8')
+                        ) {
                             return $context->getTypeFromString('__object__*')->constNull();
                         }
                         if (
                             '__value__*' === $boxTyName
-                            || (
-                                \PHPLLVM\Type::KIND_POINTER === $boxPtr->typeOf()->getKind()
-                                && '__value__' === $context->getStringFromType($boxPtr->typeOf()->getElementType())
-                            )
+                            || self::llvmPointerTo($boxTy, $context, '__value__')
                         ) {
                             return $context->builder->call(
                                 $context->lookupFunction('__value__readObject'),
@@ -647,7 +663,8 @@ class Native implements Call {
                     case Variable::TYPE_STRING:
                         return $context->getTypeFromString('__object__*')->constNull();
                 }
-                break;
+                // Non-box LLVM types must not fall through to readObject (#36382 Slim).
+                return $context->getTypeFromString('__object__*')->constNull();
             case '__hashtable__*':
                 if (0 !== ($arg->type & Variable::IS_NATIVE_ARRAY)) {
                     HashTableHelper::promoteNativeArrayVariableToHashtable($context, $arg);
@@ -1139,6 +1156,54 @@ class Native implements Call {
                     $slot
                 );
         }
+    }
+
+    /**
+     * True when $ty is a pointer (or the named struct itself) to a core type, including
+     * CreateNamed uniquified siblings (`__string__.2` → `__string__`) (#36382).
+     */
+    private static function llvmTyNameIs(\PHPLLVM\Type $ty, Context $context, string $coreName): bool
+    {
+        $name = $context->getStringFromType($ty);
+        if ($coreName === $name || $coreName.'*' === $name) {
+            return true;
+        }
+        if (\PHPLLVM\Type::KIND_POINTER === $ty->getKind()) {
+            return self::llvmPointerTo($ty, $context, $coreName);
+        }
+        if (method_exists($ty, 'getName')) {
+            $llvmName = (string) $ty->getName();
+            if ('' !== $llvmName) {
+                $stripped = Context::stripLlvmUniquifySuffix($llvmName);
+
+                return $coreName === $stripped || $coreName === $llvmName;
+            }
+        }
+
+        return str_contains($ty->toString(), $coreName);
+    }
+
+    /** True when $ty is a pointer whose element resolves to $coreName (#36382). */
+    private static function llvmPointerTo(\PHPLLVM\Type $ty, Context $context, string $coreName): bool
+    {
+        if (\PHPLLVM\Type::KIND_POINTER !== $ty->getKind()) {
+            return false;
+        }
+        $elem = $ty->getElementType();
+        $elemName = $context->getStringFromType($elem);
+        if ($coreName === $elemName || $coreName.'*' === $elemName) {
+            return true;
+        }
+        if (method_exists($elem, 'getName')) {
+            $llvmName = (string) $elem->getName();
+            if ('' !== $llvmName) {
+                $stripped = Context::stripLlvmUniquifySuffix($llvmName);
+
+                return $coreName === $stripped || $coreName === $llvmName;
+            }
+        }
+
+        return str_contains($elem->toString(), $coreName);
     }
 
 }

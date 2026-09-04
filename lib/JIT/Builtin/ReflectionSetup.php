@@ -23,16 +23,59 @@ final class ReflectionSetup
         if ('__object__*' === $rawTy) {
             return $raw;
         }
+        // Docblock/string props and native string slots must not reach readObject (#36382 Slim).
+        if (
+            '__string__*' === $rawTy
+            || 'int8*' === $rawTy
+            || (
+                \PHPLLVM\Type::KIND_POINTER === $raw->typeOf()->getKind()
+                && (
+                    '__string__' === $context->getStringFromType($raw->typeOf()->getElementType())
+                    || str_contains($raw->typeOf()->getElementType()->toString(), '__string__')
+                )
+            )
+        ) {
+            return $context->getTypeFromString('__object__*')->constNull();
+        }
         if ('__value__' === $rawTy) {
             $slot = JitValueBox::alloc($context);
             $context->builder->store($raw, $slot);
             $raw = JitValueBox::pointer($context, $slot);
+            $rawTy = '__value__*';
+        }
+        if (
+            '__value__*' === $rawTy
+            || (
+                \PHPLLVM\Type::KIND_POINTER === $raw->typeOf()->getKind()
+                && '__value__' === $context->getStringFromType($raw->typeOf()->getElementType())
+            )
+        ) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                $raw
+            );
+        }
+        if (Variable::TYPE_VALUE === $arg->type || Variable::TYPE_OBJECT === $arg->type) {
+            $boxPtr = JitValueBox::valuePtrFromVariable($context, $arg);
+            $boxTy = $context->getStringFromType($boxPtr->typeOf());
+            if ('__object__*' === $boxTy) {
+                return $boxPtr;
+            }
+            if (
+                '__value__*' === $boxTy
+                || (
+                    \PHPLLVM\Type::KIND_POINTER === $boxPtr->typeOf()->getKind()
+                    && '__value__' === $context->getStringFromType($boxPtr->typeOf()->getElementType())
+                )
+            ) {
+                return $context->builder->call(
+                    $context->lookupFunction('__value__readObject'),
+                    $boxPtr
+                );
+            }
         }
 
-        return $context->builder->call(
-            $context->lookupFunction('__value__readObject'),
-            $raw
-        );
+        return $context->getTypeFromString('__object__*')->constNull();
     }
 
     public static function markConstructed(Context $context, Value $obj): void
