@@ -80,6 +80,9 @@ final class HelperRuntimeCache
         'phpcompiler\\ext\\standard\\parseurljithelper::componentint' => true,
         'phpcompiler\\ext\\standard\\parseurljithelper::laststring' => true,
         'phpcompiler\\ext\\standard\\parseurljithelper::lastint' => true,
+        // #36382 — NestedJIT UriRawurlencodeReplaceJitHelper into user AOT (not prelinked unit);
+        // IncludeHelper Nyholm Uri sites must not fall through to PregAotFastPath.
+        'phpcompiler\\ext\\standard\\urirawurlencodereplacejithelper::replaceargv' => true,
         // #23912 — force NestedJIT of NestedJIT-safe StrReplaceJitHelper into user AOT
         // (stale/empty helper unit.o otherwise returns "" / wrong bytes for scalar replace).
         'phpcompiler\\ext\\standard\\strreplacejithelper::replaceargv' => true,

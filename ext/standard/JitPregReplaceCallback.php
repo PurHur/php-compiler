@@ -131,11 +131,56 @@ final class JitPregReplaceCallback
     {
         $staticNames = PregReplaceCallbackPolicy::compileTimeStaticArrayCallableNames($callback)
             ?? self::resolveStaticArrayCallableNamesFromBlock($context);
-        if (null === $staticNames) {
-            return false;
+        if (null !== $staticNames && 'rawurlencodematchzero' === strtolower($staticNames[1])) {
+            return true;
         }
 
-        return 'rawurlencodematchzero' === strtolower($staticNames[1]);
+        // IncludeHelper-compiled Nyholm Uri.php often loses compileTimeArray / block-slot
+        // tracking for `[__CLASS__, 'rawurlencodeMatchZero']`, falling through to
+        // PregAotFastPath NestedJIT into a fat module for minutes (#36382).
+        return self::isNyholmUriRawurlencodeCallSite($context);
+    }
+
+    /**
+     * Nyholm\Psr7\Uri::{withUserInfo,filterPath,filterQueryAndFragment} — only sites that
+     * use preg_replace_callback + rawurlencodeMatchZero (#36382).
+     *
+     * During Internal::call, {@see Context::$jitCurrentBlock} may lack {@see Block::$func};
+     * fall back to the JIT progress breadcrumb (same string compileBlock notes).
+     */
+    private static function isNyholmUriRawurlencodeCallSite(Context $context): bool
+    {
+        $scoped = '';
+        if (is_string($context->jitLoweringScopedName) && '' !== $context->jitLoweringScopedName) {
+            $scoped = strtolower($context->jitLoweringScopedName);
+        }
+        if ('' === $scoped) {
+            $block = $context->jitCurrentBlock ?? $context->jitEnclosingBlock;
+            if ($block instanceof Block && null !== ($block->func ?? null)) {
+                $scoped = strtolower($block->func->getScopedName());
+            }
+        }
+        if ('' === $scoped) {
+            $last = \PHPCompiler\JIT\Progress::readLast();
+            $scoped = null !== $last ? strtolower($last) : '';
+        }
+        if ('' === $scoped) {
+            return false;
+        }
+        if (!str_contains($scoped, '\\uri::') && !str_starts_with($scoped, 'uri::')) {
+            return false;
+        }
+        // Ignore NestedJIT of compiler helpers that temporarily overwrite jitLoweringScopedName.
+        if (str_starts_with($scoped, 'phpcompiler\\')) {
+            return false;
+        }
+        foreach (['::withuserinfo', '::filterpath', '::filterqueryandfragment'] as $method) {
+            if (str_ends_with($scoped, $method)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** @return array{0:Native,1:string} proxy + stable shim cache key */

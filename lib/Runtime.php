@@ -107,9 +107,17 @@ class Runtime {
      * Large IncludeHelper graphs (Slim ≥32 units): NestedJIT PregJitHelperThinAot into an
      * already-fat user module stalls for minutes on Uri::withUserInfo. When set, thin AOT
      * NestedJITs the preg thin bundle once at the start of {@see JIT::compile} while the
-     * module is still small (#36382).
+     * module is still small (#36382). Prefer {@see $eagerUriComposerHelpers} for Nyholm —
+     * eager thin preg fattens the module and stalls Uri method lowering.
      */
     public bool $eagerThinPregHelpers = false;
+    /**
+     * Slim/Nyholm Composer graphs: NestedJIT {@see \PHPCompiler\ext\standard\UriRawurlencodeReplaceJitHelper}
+     * + ParseUrlJitHelper while the entry module is still only require_once (#36382). Mid-graph
+     * first use (Uri::withUserInfo / Uri constructor) otherwise NestedJITs into a fat module for
+     * minutes. Does not NestedJIT PregAotFastPath.
+     */
+    public bool $eagerUriComposerHelpers = false;
     /**
      * M5 argv / gen-0 seed: C-floor initParsePipeline sets this so parse() skips
      * prepareSourceForParser list-unpack (SEGV in __string__separate after identity
@@ -1061,6 +1069,20 @@ class Runtime {
             \PHPCompiler\JIT\Progress::noteFunction('eager_thin_preg_begin');
             \PHPCompiler\JIT\Builtin\PregMatchRuntime::ensureLinked($context);
             \PHPCompiler\JIT\Progress::noteFunction('eager_thin_preg_done');
+        }
+        // Nyholm Uri: NestedJIT UriRawurlencodeReplaceJitHelper + ParseUrl while module is small.
+        // Mid-graph NestedJIT of either helper into a 50+ file IncludeHelper module stalls (#36382).
+        if ($this->eagerUriComposerHelpers) {
+            $this->eagerUriComposerHelpers = false;
+            \PHPCompiler\JIT\Progress::noteFunction('eager_uri_composer_begin');
+            \PHPCompiler\JIT\JitVmHelperLink::ensureCompiled(
+                $context,
+                '/ext/standard/UriRawurlencodeReplaceJitHelper.php',
+                ['PHPCompiler\\ext\\standard\\UriRawurlencodeReplaceJitHelper::replaceArgv'],
+                '#36382'
+            );
+            \PHPCompiler\JIT\Builtin\ParseUrlRuntime::ensureLinked($context);
+            \PHPCompiler\JIT\Progress::noteFunction('eager_uri_composer_done');
         }
 
         $this->jitLoadedFromDiskCache = false;

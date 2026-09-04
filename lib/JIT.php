@@ -2291,6 +2291,8 @@ class JIT {
      *
      * Prefer {@see Runtime::standalone} eager link (flag {@see Runtime::$eagerThinPregHelpers});
      * this helper remains for call sites that set the flag after Context load.
+     * Nyholm graphs should use {@see Runtime::$eagerUriComposerHelpers} instead — eager thin
+     * preg fattens the module before Uri lowering.
      */
     private function maybeEagerLinkThinPregHelpers(): void
     {
@@ -2305,6 +2307,30 @@ class JIT {
         JIT\Progress::noteFunction('eager_thin_preg_begin');
         JIT\Builtin\PregMatchRuntime::ensureLinked($this->context);
         JIT\Progress::noteFunction('eager_thin_preg_done');
+    }
+
+    /**
+     * Eager NestedJIT UriRawurlencodeReplaceJitHelper + ParseUrl before IncludeHelper fattens
+     * the module (#36382). Peer of {@see maybeEagerLinkThinPregHelpers}.
+     */
+    private function maybeEagerLinkUriComposerHelpers(): void
+    {
+        if (!$this->context->runtime->eagerUriComposerHelpers) {
+            return;
+        }
+        $this->context->runtime->eagerUriComposerHelpers = false;
+        if (JIT\NestedJitCompileScope::isActive()) {
+            return;
+        }
+        JIT\Progress::noteFunction('eager_uri_composer_begin');
+        JIT\JitVmHelperLink::ensureCompiled(
+            $this->context,
+            '/ext/standard/UriRawurlencodeReplaceJitHelper.php',
+            ['PHPCompiler\\ext\\standard\\UriRawurlencodeReplaceJitHelper::replaceArgv'],
+            '#36382'
+        );
+        JIT\Builtin\ParseUrlRuntime::ensureLinked($this->context);
+        JIT\Progress::noteFunction('eager_uri_composer_done');
     }
 
     /** Emit native entry TU only — not compile_driver bundles that include compile_smoke_m3_emit (#1937). */
@@ -2562,6 +2588,7 @@ class JIT {
         $logicalName = $funcName;
         if (null !== $logicalName && null !== $block->func) {
             JIT\Progress::noteFunction($block->func->getScopedName());
+            $this->context->jitLoweringScopedName = $block->func->getScopedName();
         }
         if ([] !== $block->paramSensitive) {
             if (null !== $block->func && null !== $block->func->class) {
