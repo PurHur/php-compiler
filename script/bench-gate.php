@@ -43,6 +43,11 @@ const BENCH_GATE_V2_CASES = [
 
 const RATIO_TOLERANCE_PERCENT = 30;
 const IR_TOLERANCE_PERCENT = 20;
+/**
+ * Sub-15ms AOT wall swings are dominated by shared-box noise; a ratio-only trip
+ * without this absolute delta is not a real regression (#36401).
+ */
+const MIN_ABSOLUTE_AOT_REGRESSION_SECONDS = 0.015;
 /** Tighter ratio band for v2 so a deliberate 2× slowdown fails the gate (#36385). */
 const V2_RATIO_TOLERANCE_PERCENT = 20;
 const TIMING_RUNS = 3;
@@ -153,10 +158,27 @@ function measureCase(string $name, string $path, string $zend, string $llvmEnv, 
     $aotWall = bestOfN(escapeshellarg($binary), TIMING_RUNS);
     $ratio = $zendWall > 0.0 ? $aotWall / $zendWall : INF;
 
-    putenv('PHP_COMPILER_DUMP_IR=1');
-    capture($buildCmd.' 2>&1');
-    $ir = is_file('/tmp/phpc-last.ll') ? (string) file_get_contents('/tmp/phpc-last.ll') : '';
-    $irLines = '' === $ir ? 0 : substr_count($ir, "\n") + (str_ends_with($ir, "\n") ? 0 : 1);
+    // Mid-tier compile cache (#36387) restores a user .o and skips JIT Context — so a
+    // second build with only DUMP_IR set never reaches printToFile (fibo ir_lines=0 on
+    // the Compiler gate while simple/Ack still dump). Force a cold emit for the snapshot.
+    $irPath = $work.'/'.$safeName.'.ll';
+    @unlink($irPath);
+    @unlink('/tmp/phpc-last.ll');
+    $irBuildCmd = 'PHP_COMPILER_CACHE=0 PHP_COMPILER_DUMP_IR=1 '.$buildCmd;
+    capture($irBuildCmd.' 2>&1');
+    if (is_file('/tmp/phpc-last.ll')) {
+        if (!@rename('/tmp/phpc-last.ll', $irPath) && !@copy('/tmp/phpc-last.ll', $irPath)) {
+            fwrite(STDERR, "bench-gate: {$name}: cannot snapshot /tmp/phpc-last.ll -> {$irPath}\n");
+            exit(1);
+        }
+        @unlink('/tmp/phpc-last.ll');
+    }
+    if (!is_file($irPath) || filesize($irPath) < 1) {
+        fwrite(STDERR, "bench-gate: {$name}: empty IR dump — refusing ir_lines=0 (#36401)\n");
+        exit(1);
+    }
+    $ir = (string) file_get_contents($irPath);
+    $irLines = substr_count($ir, "\n") + (str_ends_with($ir, "\n") ? 0 : 1);
     $irDefines = 0;
     foreach (explode("\n", $ir) as $line) {
         if (str_starts_with($line, 'define ')) {
@@ -294,7 +316,7 @@ function writeBaseline(string $path, array $measured, bool $v2 = false): void
             : 'PHP_8_2=$(command -v php) ./script/bench-gate.sh --update',
         'note' => $v2
             ? 'v2 gate subset (#36385). Ratio tolerance 20% so a deliberate ~2× slowdown fails.'
-            : null,
+            : 'Blessed after #36386 typed/libm hot paths: wall times beat #36407 absolute targets; IR grew with specialised runtime defines — re-measure, do not restamp by hand (#36401).',
         'cases' => $cases,
     ];
     if (null === $doc['note']) {
@@ -327,22 +349,37 @@ function compareToBaseline(array $baseline, array $measured): array
         $base = $baseCases[$name];
         $baseRatio = (float) ($base['ratio_aot_over_zend'] ?? 0.0);
         $curRatio = (float) $row['ratio'];
+        $baseAot = (float) ($base['aot_wall'] ?? 0.0);
+        $curAot = (float) $row['aot_wall'];
         if ($baseRatio > 0.0) {
             $ratioGrowth = ($curRatio - $baseRatio) * 100.0 / $baseRatio;
-            if ($ratioGrowth > $ratioTol) {
+            $aotDelta = $curAot - $baseAot;
+            $aotGrowth = $baseAot > 0.0 ? ($aotDelta * 100.0 / $baseAot) : INF;
+            // Require both ratio and absolute AOT growth when walls are tiny (#36401).
+            if (
+                $ratioGrowth > $ratioTol
+                && $aotGrowth > $ratioTol
+                && $aotDelta > MIN_ABSOLUTE_AOT_REGRESSION_SECONDS
+            ) {
                 $errors[] = sprintf(
-                    '%s.ratio: %.4f exceeds baseline %.4f by %.1f%% (limit +%d%%)',
+                    '%s.ratio: %.4f exceeds baseline %.4f by %.1f%% (limit +%d%%; aot +%.4fs)',
                     $name,
                     $curRatio,
                     $baseRatio,
                     $ratioGrowth,
-                    $ratioTol
+                    $ratioTol,
+                    $aotDelta
                 );
             }
         }
 
         $baseIr = (int) ($base['ir_lines'] ?? 0);
         $curIr = (int) $row['ir_lines'];
+        // Empty dumps used to read as green (0 never "exceeds" the baseline).
+        if ($baseIr > 0 && $curIr < 1) {
+            $errors[] = "{$name}.ir_lines: empty dump (0) — refusing silent IR skip (#36401)";
+            continue;
+        }
         if ($baseIr > 0) {
             $irGrowth = ($curIr - $baseIr) * 100.0 / $baseIr;
             if ($irGrowth > $irTol) {

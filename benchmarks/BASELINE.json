@@ -1,39 +1,40 @@
 {
     "version": 1,
-    "generated_at": "2026-09-02T22:50:38Z",
+    "suite": "v1",
+    "generated_at": "2026-09-04T08:12:52Z",
     "arch": "x86_64-linux",
     "ratio_tolerance_percent": 30,
     "ir_tolerance_percent": 20,
     "regeneration": "PHP_8_2=$(command -v php) ./script/bench-gate.sh --update",
-    "note": "Blessed from master 2026-09-02 after wave-1 mandelbrot timeout fix (#36331 revert of broken delref dtor CFG). Absolute targets: mandelbrot ≤0.3s, simple ≤0.25s (#36407). Ratio/IR track regressions vs this snapshot.",
+    "note": "Blessed after #36386 typed/libm hot paths: wall times beat #36407 absolute targets; IR grew with specialised runtime defines \u2014 re-measure, do not restamp by hand (#36401).",
     "cases": {
         "fibo(30)": {
-            "ratio_aot_over_zend": 0.312172,
-            "zend_wall": 0.04675,
-            "aot_wall": 0.014594,
-            "ir_lines": 98165,
-            "ir_defines": 419
+            "ratio_aot_over_zend": 0.169257,
+            "zend_wall": 0.042415,
+            "aot_wall": 0.007179,
+            "ir_lines": 127472,
+            "ir_defines": 515
         },
         "simple": {
-            "ratio_aot_over_zend": 5.544432,
-            "zend_wall": 0.024646,
-            "aot_wall": 0.136647,
-            "ir_lines": 105320,
-            "ir_defines": 424
+            "ratio_aot_over_zend": 0.235985,
+            "zend_wall": 0.03009,
+            "aot_wall": 0.007101,
+            "ir_lines": 129667,
+            "ir_defines": 528
         },
         "mandelbrot": {
-            "ratio_aot_over_zend": 1.691168,
-            "zend_wall": 0.052598,
-            "aot_wall": 0.088952,
-            "ir_lines": 248707,
-            "ir_defines": 413
+            "ratio_aot_over_zend": 0.376451,
+            "zend_wall": 0.05096,
+            "aot_wall": 0.019184,
+            "ir_lines": 136914,
+            "ir_defines": 509
         },
         "Ack(3,8)": {
-            "ratio_aot_over_zend": 0.606491,
-            "zend_wall": 0.048246,
-            "aot_wall": 0.029261,
-            "ir_lines": 102112,
-            "ir_defines": 425
+            "ratio_aot_over_zend": 0.529468,
+            "zend_wall": 0.04873,
+            "aot_wall": 0.025801,
+            "ir_lines": 131315,
+            "ir_defines": 521
         }
     }
 }
