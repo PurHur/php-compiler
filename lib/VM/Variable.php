@@ -1972,7 +1972,17 @@ restart:
         ?\PHPCompiler\Frame $frame,
         ?Context $fallbackContext = null
     ): void {
-        $context = $vm?->context ?? $frame?->vmContext ?? $fallbackContext;
+        // Explicit null checks — avoid nullsafe/coalesce ARG_SEND holes under SPINE_CHUNK (#36387).
+        $context = null;
+        if (null !== $vm) {
+            $context = $vm->context;
+        }
+        if (null === $context && null !== $frame) {
+            $context = $frame->vmContext;
+        }
+        if (null === $context) {
+            $context = $fallbackContext;
+        }
         if (null === $context) {
             return;
         }
@@ -1990,10 +2000,18 @@ restart:
         if (null === $vm) {
             return;
         }
+        // Same ARG_SEND discipline as warnIncDecNoEffect (#36387 hub-core Variable emit).
+        $scriptPath = null;
+        if (null !== $frame) {
+            $path = $frame->scriptPath;
+            if (null !== $path && '' !== $path) {
+                $scriptPath = $path;
+            }
+        }
         $vm->context->errors->triggerError(
             'A non-numeric value encountered',
             ErrorReporter::E_WARNING,
-            '' !== ($frame->scriptPath ?? '') ? $frame->scriptPath : null,
+            $scriptPath,
             $vm->context,
             $frame
         );
@@ -3313,6 +3331,10 @@ restart:
 
     /**
      * Emit PHP 8.3+ no-effect ++/-- warning when profile-gated and a live ErrorReporter exists.
+     *
+     * NestedJIT under SPINE_CHUNK must not see nullsafe/coalesce or ternary expressions inside
+     * ARG_SEND operand slots — those left slot 42 empty while compiling this method as a hub
+     * singleton (`hub-core-01` / lib/VM/Variable.php, #36387). Materialize locals first.
      */
     private static function warnIncDecNoEffect(
         string $verb,
@@ -3323,14 +3345,28 @@ restart:
         if (!\PHPCompiler\CompilerVersion::supportsIncDecNoEffectWarning()) {
             return;
         }
-        $context = $vm?->context ?? $frame?->vmContext;
+        $context = null;
+        if (null !== $vm) {
+            $context = $vm->context;
+        }
+        if (null === $context && null !== $frame) {
+            $context = $frame->vmContext;
+        }
         if (null === $context) {
             return;
         }
+        $message = self::incDecNoEffectWarningMessage($verb, $typeName);
+        $scriptPath = null;
+        if (null !== $frame) {
+            $path = $frame->scriptPath;
+            if (null !== $path && '' !== $path) {
+                $scriptPath = $path;
+            }
+        }
         $context->errors->triggerError(
-            self::incDecNoEffectWarningMessage($verb, $typeName),
+            $message,
             ErrorReporter::E_WARNING,
-            '' !== ($frame->scriptPath ?? '') ? $frame->scriptPath : null,
+            $scriptPath,
             $context,
             $frame
         );

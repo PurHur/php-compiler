@@ -121,7 +121,8 @@ final class BootstrapGen0ChunksOrchestratorTest extends TestCase
         mkdir($tmp.'/entries', 0755, true);
         $planPath = $tmp.'/plan.json';
         // hub-core is 33 files / ~850KB; 120KB budget + largest-first packing
-        // isolates Runtime.php / CompilerVersion.php as singleton hubs (#36387).
+        // isolates Runtime.php / CompilerVersion.php / Variable.php as singleton hubs (#36387).
+        // SPINE_CHUNK demotes Runtime + PHPCompiler\VM\* method bodies so NestedJIT emits.
         $cmd = escapeshellarg(PHP_BINARY).' '.escapeshellarg($script)
             .' --requires='.escapeshellarg($requires)
             .' --max-bytes=120000'

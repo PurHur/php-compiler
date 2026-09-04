@@ -22,15 +22,22 @@ final class SpineChunkRuntimeMethodDemoteTest extends TestCase
         parent::tearDown();
     }
 
-    public function testShouldDemoteOnlyRuntimeUnderSpineChunk(): void
+    public function testShouldDemoteHubCapacityClassesUnderSpineChunk(): void
     {
         $this->assertFalse(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\Runtime'));
         putenv(ExternalMethodBind::ENV_SPINE_CHUNK.'=1');
         $_ENV[ExternalMethodBind::ENV_SPINE_CHUNK] = '1';
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\Runtime'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('phpcompiler\\runtime'));
+        // Entire PHPCompiler\VM\* namespace — NestedJIT traps as hub singletons / packed hubs (#36387).
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\VM\\Variable'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\VM\\HashTable'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\VM\\TypeCheck'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\VM\\Context'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\VM\\ErrorReporter'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\VM\\ClassEntry'));
         $this->assertFalse(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\CompilerVersion'));
-        $this->assertFalse(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\VM\\Variable'));
+        $this->assertFalse(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\JIT\\Variable'));
     }
 
     public function testDemoteMethodBlockLeavesOnlyReturnVoid(): void
