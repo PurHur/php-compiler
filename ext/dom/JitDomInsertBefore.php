@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin\DomNodeLiveMutationRuntime;
 use PHPCompiler\JIT\Builtin\DomNodeTreeMutationRuntime;
 use PHPCompiler\JIT\Call\DomNodeAppendChild;
 use PHPCompiler\JIT\Context;
@@ -268,7 +267,7 @@ final class JitDomInsertBefore
         // Must run before Element sibling walks (DOMAttr has no child layout → SIGSEGV).
         self::rejectAttrAsSiblingBeforeLiveSlots($context, $newChild);
         // Wrong Document / Hierarchy Request before LiveSlots (#30274).
-        DomNodeLiveMutationRuntime::assertTreeMutationChildBeforeLiveSlots(
+        JitDomLiveMutationKernel::assertTreeMutationChildBeforeLiveSlots(
             $context,
             $parent,
             $newChild

@@ -5561,7 +5561,7 @@ require_once __DIR__.'/../../../ext/dom/JitDomChildNodeMutationKernel.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/DomNodeChildPropertyRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/DomNodeIsConnectedRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/DomNodeListItemRuntime.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/DomNodeLiveMutationRuntime.php';
+require_once __DIR__.'/../../../ext/dom/JitDomLiveMutationKernel.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/DomNodeTreeMutationRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/DomNormalizeRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/DomSaveHTMLFileRuntime.php';

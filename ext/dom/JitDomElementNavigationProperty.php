@@ -17,7 +17,7 @@ use PHPLLVM\Value;
 /**
  * LLVM lowering for ParentNode / NonDocumentTypeChildNode element-navigation props (#19431).
  *
- * User-script AOT reads declared slots (kept in sync by DomNodeLiveMutationRuntime).
+ * User-script AOT reads declared slots (kept in sync by JitDomLiveMutationKernel).
  * Other modes call DomRegistry helpers for live truth.
  *
  * Document receivers must not use DOMElement property indices — that SIGSEGVs (#34910).

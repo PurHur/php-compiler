@@ -24,7 +24,7 @@ final class DomPrependSaveXml33637AotTest extends TestCase
     public function testPrependPathRebuildsInnerXmlNotConcat(): void
     {
         $root = dirname(__DIR__, 2);
-        $src = (string) file_get_contents($root.'/lib/JIT/Builtin/DomNodeLiveMutationRuntime.php');
+        $src = (string) file_get_contents($root.'/ext/dom/JitDomLiveMutationKernel.php');
         $this->assertStringContainsString('#33637', $src);
         $this->assertStringContainsString(
             "if ('prepend' === \$kind && self::canUseObjectMutationBridge(\$extraArgs))",

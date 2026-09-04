@@ -68,7 +68,7 @@ final class JitDomCreateElementAttrs
     /**
      * Open-tag attribute suffix (leading space) for {@see VmDom::PROP_USER_SCRIPT_XMLNS_ATTR}.
      *
-     * Matches {@see \PHPCompiler\JIT\Builtin\DomNodeLiveMutationRuntime} child markup
+     * Matches {@see \PHPCompiler\ext\dom\JitDomLiveMutationKernel} child markup
      * and importNode (#33362) so saveXML / INNER_XML rebuild keep setAttribute attrs.
      *
      * @param array<string, string> $attrs
