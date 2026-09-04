@@ -108,6 +108,27 @@ PHP;
         $this->assertStringNotContainsString('$x = 1 + 2', $hollowed);
     }
 
+    public function testRewriteHollowsMultiSegmentNamespaceViaNameQualified(): void
+    {
+        putenv(ExternalMethodBind::ENV_SPINE_CHUNK.'=1');
+        $_ENV[ExternalMethodBind::ENV_SPINE_CHUNK] = '1';
+        // PHP 8 tokenizes this as T_NAME_QUALIFIED — must still resolve shouldDemote (#36387).
+        $src = <<<'PHP'
+<?php
+namespace PHPCompiler\ext\standard;
+final class VmDateTimeNative {
+    public static function timezoneDbVersion(): string {
+        return '0.system';
+    }
+}
+PHP;
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\ext\\standard\\VmDateTimeNative'));
+        $hollowed = SpineChunkRuntimeMethodDemote::rewriteSource($src, '/compiler/ext/standard/VmDateTimeNative.php');
+        $flat = preg_replace('/\s+/', ' ', $hollowed) ?? $hollowed;
+        $this->assertStringContainsString('function timezoneDbVersion(): string {}', $flat);
+        $this->assertStringNotContainsString('0.system', $hollowed);
+    }
+
     public function testRewriteOnlyUnderSpineChunkForDemotedHub(): void
     {
         $src = "<?php\nnamespace PHPCompiler;\nclass Block { public function f() { return 1; } }\n";
