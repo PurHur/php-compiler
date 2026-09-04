@@ -134,8 +134,15 @@ final class Linker
                 $objects[] = escapeshellarg($vendorObject);
             }
             $target = CompileTarget::current();
-            $crtDir = $target->crtDir() ?? '/usr/lib/x86_64-linux-gnu';
-            $dynamicLinker = $target->dynamicLinker() ?? '/lib64/ld-linux-x86-64.so.2';
+            // Toolchain paths are CompileTarget SPECS data only — no host-arch fallback (#36391).
+            $crtDir = $target->crtDir();
+            $dynamicLinker = $target->dynamicLinker();
+            if (null === $crtDir || null === $dynamicLinker || '' === $crtDir || '' === $dynamicLinker) {
+                throw new \RuntimeException(
+                    'AOT ld link requires crt_dir + dynamic_linker in CompileTarget for '
+                    .$target->id().' (#36391)'
+                );
+            }
             $cmd = implode(' ', [
                 escapeshellarg($ld),
                 AotDebugSymbols::linkFlag(),

@@ -263,7 +263,7 @@ docker-publish-dev:
 # User-facing phpc image + SDK tarball (#36390). Local tag: phpc:local / ghcr.io/purhur/phpc:dev
 PHPC_RELEASE_TAG ?= dev
 docker-build-phpc-release:
-	PHPC_RELEASE_TAG=$(PHPC_RELEASE_TAG) ./script/build-phpc-release-image.sh
+	PHPC_RELEASE_TAG=$(PHPC_RELEASE_TAG) PLATFORMS="$(PLATFORMS)" ./script/build-phpc-release-image.sh
 pack-phpc-sdk: docker-build-phpc-release
 	PHPC_RELEASE_TAG=$(PHPC_RELEASE_TAG) ./script/pack-phpc-sdk.sh
 cold-build-check-image:
