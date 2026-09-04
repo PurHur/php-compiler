@@ -4,40 +4,36 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for log() via LogJitHelper PHP (#15117, #21980, #27047, #28574).
+ * JIT/AOT link for log() via {@code llvm.log.f64} (#36386).
  *
- * Helper compile: {@see JitVmHelperLink::ensureBridge} (MathLog1p #28495 / MathExpm1 #28487 shape).
- * NestedJIT no longer needs a libc log(3) kernel — helper uses NestedJIT-safe series.
- * Optional `$base` is pure LLVM on phpc_log / phpc_log10.
- * SSOT: {@see \PHPCompiler\ext\standard\VmMath}.
- * php-src: ext/standard/math.c — PHP_FUNCTION(log)
+ * Peer of {@see MathExp} / {@see MathSin}: avoid NestedJIT helper objects on
+ * the AOT hot path. php-src {@code ext/standard/math.c} {@code PHP_FUNCTION(log)}
+ * → C {@code log}; the LLVM intrinsic matches IEEE libm behaviour.
+ * The PHP series helper remains for NestedJIT-safe reference only.
+ * Optional {@code $base} stays pure LLVM on {@code phpc_log} / {@code phpc_log10}.
  */
 final class MathLog
 {
+    private const LLVM_LOG = 'llvm.log.f64';
+
+    /** Legacy ABI kept as a thin intrinsic wrapper for any external callers. */
     private const ABI_LOG = 'phpc_log';
 
-    private const HELPER_PATH = '/ext/standard/LogJitHelper.php';
-
-    private const LOG_HELPER = 'PHPCompiler\\ext\\standard\\LogJitHelper::logArgv';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::LOG_HELPER,
-    ];
-
-    private const BRIDGE_ENTRY = 'log_bridge_entry';
+    private const BRIDGE_ENTRY = 'log_llvm_f64_entry';
 
     private static int $seq = 0;
 
     public static function ensureLinked(Context $context): void
     {
-        self::implement($context);
+        self::llvmLogIntrinsic($context);
+        self::ensurePhpcLogBridge($context);
     }
 
     public static function ensureStandaloneBodies(Context $context): void
@@ -47,12 +43,7 @@ final class MathLog
 
     public static function invoke(Context $context, Value $num): Value
     {
-        self::ensureLinked($context);
-
-        return $context->builder->call(
-            $context->lookupFunction(self::ABI_LOG),
-            $num
-        );
+        return $context->builder->call(self::llvmLogIntrinsic($context), $num);
     }
 
     /**
@@ -98,26 +89,53 @@ final class MathLog
         return $context->builder->select($is2, $asLog2, $afterTen);
     }
 
-    private static function implement(Context $context): void
+    private static function llvmLogIntrinsic(Context $context): LlvmFunction
+    {
+        $func = $context->module->getNamedFunction(self::LLVM_LOG);
+        if (null !== $func) {
+            return $func;
+        }
+        $double = $context->getTypeFromString('double');
+
+        return $context->module->addFunction(
+            self::LLVM_LOG,
+            $context->context->functionType($double, false, $double)
+        );
+    }
+
+    /**
+     * Define {@code phpc_log} → {@code llvm.log.f64} when missing. Skip if a
+     * prior NestedJIT bridge already filled the symbol (cannot replace LLVM
+     * bodies); {@see invoke} never calls that stale path.
+     */
+    private static function ensurePhpcLogBridge(Context $context): void
     {
         $probe = $context->module->getNamedFunction(self::ABI_LOG);
-        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction(self::ABI_LOG, $probe);
 
             return;
         }
 
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         $double = $context->getTypeFromString('double');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_LOG,
-            self::BRIDGE_ENTRY,
-            [$double],
-            $double,
-            self::LOG_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#28574'
+        $fn = $probe;
+        if (null === $fn) {
+            $fn = $context->module->addFunction(
+                self::ABI_LOG,
+                $context->context->functionType($double, false, $double)
+            );
+        }
+        $entry = $fn->appendBasicBlock(self::BRIDGE_ENTRY);
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue(
+            $context->builder->call(self::llvmLogIntrinsic($context), $fn->getParam(0))
         );
+        $context->registerFunction(self::ABI_LOG, $fn);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 }

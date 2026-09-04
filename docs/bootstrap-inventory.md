@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 8144 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 25826 |
+| Source constructs flagged (warnings) | 25825 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -472,7 +472,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/JitDomDocumentMethodKernel.php` | 0 | 1 |
 | `ext/dom/JitDomElementNavigationProperty.php` | 0 | 4 |
 | `ext/dom/JitDomElementTextContent.php` | 0 | 11 |
-| `ext/dom/JitDomExtensionHooksFacade.php` | 0 | 1 |
+| `ext/dom/JitDomExtensionHooksFacade.php` | 0 | 9 |
 | `ext/dom/JitDomGetElementById.php` | 0 | 1 |
 | `ext/dom/JitDomGetElementsByTagName.php` | 0 | 1 |
 | `ext/dom/JitDomGetElementsByTagNameUserScript.php` | 0 | 4 |
@@ -6609,7 +6609,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/DomCharacterDataSubstringData.php` | 0 | 1 |
 | `lib/JIT/Call/DomDocumentAdoptNode.php` | 0 | 1 |
 | `lib/JIT/Call/DomDocumentAppendChild.php` | 0 | 1 |
-| `lib/JIT/Call/DomDocumentConstruct.php` | 0 | 9 |
+| `lib/JIT/Call/DomDocumentConstruct.php` | 0 | 1 |
 | `lib/JIT/Call/DomDocumentCreateAttribute.php` | 0 | 1 |
 | `lib/JIT/Call/DomDocumentCreateAttributeNS.php` | 0 | 1 |
 | `lib/JIT/Call/DomDocumentCreateCDATASection.php` | 0 | 1 |
@@ -6669,7 +6669,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/DomNamedNodeMapItem.php` | 0 | 1 |
 | `lib/JIT/Call/DomNodeAfter.php` | 0 | 1 |
 | `lib/JIT/Call/DomNodeAppend.php` | 0 | 1 |
-| `lib/JIT/Call/DomNodeAppendChild.php` | 0 | 2 |
+| `lib/JIT/Call/DomNodeAppendChild.php` | 0 | 1 |
 | `lib/JIT/Call/DomNodeBefore.php` | 0 | 1 |
 | `lib/JIT/Call/DomNodeC14N.php` | 0 | 1 |
 | `lib/JIT/Call/DomNodeC14NFile.php` | 0 | 1 |
@@ -11136,7 +11136,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomExtensionHooksFacade.php`
 
 **Warnings** (review for bootstrap subset):
-- 22 class method(s)
+- new Variable (line 662)
+- new Variable (line 720)
+- new Variable (line 747)
+- new Variable (line 773)
+- new Variable (line 801)
+- new Variable (line 827)
+- new Variable (line 853)
+- new Variable (line 882)
+- 48 class method(s)
 
 ### `ext/dom/JitDomGetElementById.php`
 
@@ -51931,12 +51939,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/MathLog.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 6 class method(s)
 
 ### `lib/JIT/Builtin/MathLog10.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/MathLog1p.php`
 
@@ -55501,15 +55509,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/DomDocumentConstruct.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 46)
-- new Variable (line 104)
-- new Variable (line 131)
-- new Variable (line 157)
-- new Variable (line 185)
-- new Variable (line 211)
-- new Variable (line 237)
-- new Variable (line 266)
-- 9 class method(s)
+- 1 class method(s)
 
 ### `lib/JIT/Call/DomDocumentCreateAttribute.php`
 
@@ -55634,12 +55634,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/DomElementGetAttribute.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 1 class method(s)
 
 ### `lib/JIT/Call/DomElementGetAttributeNS.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 1 class method(s)
 
 ### `lib/JIT/Call/DomElementGetAttributeNode.php`
 
@@ -55689,7 +55689,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/DomElementRemoveAttributeNS.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 1 class method(s)
 
 ### `lib/JIT/Call/DomElementRemoveAttributeNode.php`
 
@@ -55704,7 +55704,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/DomElementSetAttributeNS.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 1 class method(s)
 
 ### `lib/JIT/Call/DomElementSetAttributeNode.php`
 
@@ -55809,8 +55809,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/DomNodeAppendChild.php`
 
 **Warnings** (review for bootstrap subset):
-- new DomNodeAppend (line 46)
-- 3 class method(s)
+- 1 class method(s)
 
 ### `lib/JIT/Call/DomNodeBefore.php`
 
@@ -58141,7 +58140,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/DomExtensionHooks.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 2 class method(s)
 
 ### `lib/JIT/DomInstanceMethodJit.php`
 
