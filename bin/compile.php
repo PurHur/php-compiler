@@ -608,6 +608,7 @@ function run(string $filename, string $code, array $options): void
         }
     }
     $eagerThinPregHelpers = false;
+    $eagerUriComposerHelpers = false;
     if ([] !== $includes && !$skipBundle) {
         $projectRoot = DeployRoot::findProjectRootForPath($filename);
         // Large Composer graphs (Slim ~99 units): mega-concat OOMs on 8g hosts. Emit
@@ -618,8 +619,9 @@ function run(string $filename, string $code, array $options): void
             // Nyholm Uri::withUserInfo uses UriRawurlencodeReplaceJitHelper (no PregAotFastPath).
             // Eager NestedJIT of thin preg here fattens the module before IncludeHelper, so every
             // later method (and Uri itself after parse_url) stalls for minutes on LLVM (#36382).
-            // First preg_match (FastRoute) NestedJITs preg when the graph needs it.
+            // Instead NestedJIT Uri + ParseUrl helpers while the entry is still only require_once.
             $eagerThinPregHelpers = false;
+            $eagerUriComposerHelpers = true;
             fwrite(
                 STDERR,
                 'phpc build: incremental IncludeHelper requires for '.$unitCount
@@ -660,6 +662,10 @@ function run(string $filename, string $code, array $options): void
     if ($eagerThinPregHelpers) {
         $runtime->eagerThinPregHelpers = true;
         fwrite(STDERR, "phpc build: eager thin preg NestedJIT before IncludeHelper graph (#36382)\n");
+    }
+    if ($eagerUriComposerHelpers) {
+        $runtime->eagerUriComposerHelpers = true;
+        fwrite(STDERR, "phpc build: eager Uri/ParseUrl NestedJIT before IncludeHelper graph (#36382)\n");
     }
     \PHPCompiler\AOT\BuildTiming::end('boot_runtime');
     $allowlistEnv = getenv('PHP_COMPILER_AOT_INCLUDE_ALLOWLIST');

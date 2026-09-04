@@ -389,6 +389,12 @@ class Context {
     /** CFG block currently being lowered (get_defined_vars snapshot, #3135). */
     public ?Block $jitCurrentBlock = null;
 
+    /**
+     * Scoped name of the user function currently being lowered (set in JIT::compileBlock).
+     * Used when Internal builtins cannot see {@see Block::$func} on jitCurrentBlock (#36382).
+     */
+    public ?string $jitLoweringScopedName = null;
+
     /** Most recent closure call proxy from TYPE_CLOSURE (register_shutdown_function, #3120). */
     public ?Call $lastClosureCallProxy = null;
 
