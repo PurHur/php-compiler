@@ -156,7 +156,7 @@ final class Linker
                 AotGcSections::linkStripFlag(),
                 AotGcSections::linkGcSectionsFlagForHelperLink(false, $helperGcLinkPaths),
                 self::helperMuldefsFlag('-z muldefs'),
-                AotReproducibleBuild::linkBuildIdFlag(false),
+                CompileTarget::linkBuildIdFlag(false),
                 self::libcNameHideFlag(false),
                 '-dynamic-linker '.$dynamicLinker,
                 escapeshellarg($crtDir.'/crt1.o'),
@@ -195,7 +195,7 @@ final class Linker
             // When linking with the bundled clang, ensure we can still resolve host libraries
             // (libpcre2-8, libcrypt, ...). Some bootstrap envs only ship the runtime .so/.a under
             // the multiarch lib dir without a full sysroot lib tree (#36391).
-            $cmd = escapeshellarg($clang).' '.AotDebugSymbols::linkFlag().self::sanitizerLinkFlags().AotGcSections::linkStripFlag().AotGcSections::linkGcSectionsFlagForHelperLink(true, $helperGcLinkPaths).self::helperMuldefsFlag(' -Wl,-z,muldefs').AotReproducibleBuild::linkBuildIdFlag(true).self::libcNameHideFlag(true).$objects.' '.self::hostLibSearchFlag().' -lm '.self::runtimeLinkLibs($linkObjectFiles).' -o '.escapeshellarg($executable);
+            $cmd = escapeshellarg($clang).' '.AotDebugSymbols::linkFlag().self::sanitizerLinkFlags().AotGcSections::linkStripFlag().AotGcSections::linkGcSectionsFlagForHelperLink(true, $helperGcLinkPaths).self::helperMuldefsFlag(' -Wl,-z,muldefs').CompileTarget::linkBuildIdFlag(true).self::libcNameHideFlag(true).$objects.' '.self::hostLibSearchFlag().' -lm '.self::runtimeLinkLibs($linkObjectFiles).' -o '.escapeshellarg($executable);
             self::run($cmd, $env);
             self::unlinkIfTemp($runtimeObjects);
 
@@ -827,7 +827,7 @@ final class Linker
         $env['LD_LIBRARY_PATH'] = $llvmDir . (isset($env['LD_LIBRARY_PATH']) && '' !== $env['LD_LIBRARY_PATH']
             ? ':' . $env['LD_LIBRARY_PATH'] : '');
 
-        return AotReproducibleBuild::applySourceDateEpochToEnv($env) ?? $env;
+        return CompileTarget::applySourceDateEpochToEnv($env) ?? $env;
     }
 
     /**
@@ -869,7 +869,7 @@ final class Linker
                 continue;
             }
             $cmd = escapeshellarg($path) . ' '
-                . AotDebugSymbols::linkFlag() . self::sanitizerLinkFlags() . AotGcSections::linkStripFlag() . AotGcSections::linkGcSectionsFlagForHelperLink(true, $helperGcLinkPaths) . self::helperMuldefsFlag(' -Wl,-z,muldefs') . AotReproducibleBuild::linkBuildIdFlag(true) . self::libcNameHideFlag(true) . $objects . ' '.self::hostLibSearchFlag().' -lm '.self::runtimeLinkLibs($linkObjectFiles).' -o ' . escapeshellarg($executable);
+                . AotDebugSymbols::linkFlag() . self::sanitizerLinkFlags() . AotGcSections::linkStripFlag() . AotGcSections::linkGcSectionsFlagForHelperLink(true, $helperGcLinkPaths) . self::helperMuldefsFlag(' -Wl,-z,muldefs') . CompileTarget::linkBuildIdFlag(true) . self::libcNameHideFlag(true) . $objects . ' '.self::hostLibSearchFlag().' -lm '.self::runtimeLinkLibs($linkObjectFiles).' -o ' . escapeshellarg($executable);
             $captured = self::runCaptured($cmd, null);
             if (0 === $captured['code']) {
                 self::unlinkIfTemp($runtimeObjects);
@@ -936,13 +936,13 @@ final class Linker
     {
         // Host gcc/cc path passes null env — still honor SOURCE_DATE_EPOCH (#36399).
         if (null === $env) {
-            $epoch = AotReproducibleBuild::sourceDateEpoch();
+            $epoch = CompileTarget::sourceDateEpoch();
             if (null !== $epoch) {
                 putenv('SOURCE_DATE_EPOCH='.$epoch);
                 $_ENV['SOURCE_DATE_EPOCH'] = $epoch;
             }
         } else {
-            $env = AotReproducibleBuild::applySourceDateEpochToEnv($env) ?? $env;
+            $env = CompileTarget::applySourceDateEpochToEnv($env) ?? $env;
         }
         $raw = null === $env ? \phpc_run_command($command) : \phpc_run_command($command, $env);
         if (!\is_array($raw)) {
