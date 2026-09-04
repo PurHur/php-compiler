@@ -78,5 +78,6 @@ After a Concern extract that shrinks a budgeted file, lower `budget` in `script/
 
 ## Related ADRs / docs
 
+- [`docs/adr/README.md`](adr/README.md) — settled + DECISION index (#36402)
 - `docs/architecture-review-2026-07.md`, `docs/self-host-target.md`, `docs/bootstrap-m5-fast-path.md`
 - `AGENTS.md` (five things that bite), `.cursor/rules/artifact-honesty.mdc`
