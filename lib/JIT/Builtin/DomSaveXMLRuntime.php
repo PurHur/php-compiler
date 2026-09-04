@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 
-/** JIT/AOT link for DOMDocument::saveXML() via DomSaveXMLJitHelper (#18268). */
+/** JIT/AOT link for DOMDocument::saveXML() (DomSaveXMLJitHelper (#18268)) — DomExtensionHooks (#36204). */
 final class DomSaveXMLRuntime
 {
     public const ABI_NAME = '__phpc_dom_save_xml';
@@ -24,8 +23,8 @@ final class DomSaveXMLRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            JitDomDocumentMethodKernel::ensureSaveXMLBridge($context);
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
+            $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'SaveXML');
 
             return;
         }

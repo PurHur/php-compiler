@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 
-/** JIT/AOT link for DOMDocument::adoptNode() via DomAdoptNodeJitHelper (#29853). */
+/** JIT/AOT link for DOMDocument::adoptNode() (DomAdoptNodeJitHelper (#29853)) — DomExtensionHooks (#36204). */
 final class DomAdoptNodeRuntime
 {
     public const ABI_NAME = '__phpc_dom_adopt_node';
@@ -24,8 +23,8 @@ final class DomAdoptNodeRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            JitDomDocumentMethodKernel::ensureAdoptNodeBridge($context);
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
+            $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'AdoptNode');
 
             return;
         }

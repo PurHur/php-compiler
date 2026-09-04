@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 
@@ -28,8 +27,8 @@ final class DomXmlDocumentCreateFromFileRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            JitDomDocumentMethodKernel::ensureXmlDocumentCreateFromFileBridge($context);
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
+            $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'XmlDocumentCreateFromFile');
 
             return;
         }

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 
 use PHPCompiler\JIT\Context;
 
@@ -34,16 +33,16 @@ final class DomXPathEvaluateRuntime
 
     public static function ensureBoolLinked(Context $context): void
     {
-        JitDomDocumentMethodKernel::ensureXPathEvaluateBoolBridge($context);
+        $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'XPathEvaluateBool');
     }
 
     public static function ensureDoubleLinked(Context $context): void
     {
-        JitDomDocumentMethodKernel::ensureXPathEvaluateDoubleBridge($context);
+        $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'XPathEvaluateDouble');
     }
 
     public static function ensureStringLinked(Context $context): void
     {
-        JitDomDocumentMethodKernel::ensureXPathEvaluateStringBridge($context);
+        $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'XPathEvaluateString');
     }
 }

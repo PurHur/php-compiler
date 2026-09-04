@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -35,8 +34,8 @@ final class DomNodeTreeMutationRuntime
 
     public static function ensureRemoveChildLinked(Context $context): void
     {
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            JitDomDocumentMethodKernel::ensureRemoveChildBridge($context);
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
+            $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'RemoveChild');
 
             return;
         }
@@ -57,8 +56,8 @@ final class DomNodeTreeMutationRuntime
 
     public static function ensureReplaceChildLinked(Context $context): void
     {
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            JitDomDocumentMethodKernel::ensureReplaceChildBridge($context);
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
+            $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'ReplaceChild');
 
             return;
         }
@@ -79,8 +78,8 @@ final class DomNodeTreeMutationRuntime
 
     public static function ensureInsertBeforeLinked(Context $context): void
     {
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            JitDomDocumentMethodKernel::ensureInsertBeforeBridge($context);
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
+            $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'InsertBefore');
 
             return;
         }

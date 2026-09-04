@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -13,7 +12,7 @@ use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\VmActiveContextInitLlvm;
 use PHPCompiler\JIT\VmActiveContextLlvm;
 
-/** JIT/AOT link for DOMDocument::loadHTMLFile() via DomLoadHTMLFileJitHelper (#18734). */
+/** JIT/AOT link for DOMDocument::loadHTMLFile() (DomLoadHTMLFileJitHelper (#18734)) — DomExtensionHooks (#36204). */
 final class DomLoadHTMLFileRuntime
 {
     public const ABI_NAME = '__phpc_dom_load_html_file';
@@ -29,8 +28,8 @@ final class DomLoadHTMLFileRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            JitDomDocumentMethodKernel::ensureLoadHTMLFileBridge($context);
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
+            $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'LoadHTMLFile');
 
             return;
         }

@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 
-/** JIT/AOT link for DOMNode::$isConnected via DomIsConnectedJitHelper (#19653). */
+/** JIT/AOT link for DOMNode::$isConnected (DomIsConnectedJitHelper (#19653)) — DomExtensionHooks (#36204). */
 final class DomNodeIsConnectedRuntime
 {
     public const ABI_NAME = '__phpc_dom_node_is_connected';
@@ -24,8 +23,8 @@ final class DomNodeIsConnectedRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            JitDomDocumentMethodKernel::ensureIsConnectedBridge($context);
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
+            $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'IsConnected');
 
             return;
         }

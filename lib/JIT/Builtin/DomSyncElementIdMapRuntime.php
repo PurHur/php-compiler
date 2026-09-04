@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -25,7 +24,7 @@ final class DomSyncElementIdMapRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        if (!JitDomDocumentMethodKernel::shouldUse($context)) {
+        if (!$context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
             return;
         }
 
@@ -36,6 +35,6 @@ final class DomSyncElementIdMapRuntime
             return;
         }
 
-        JitDomDocumentMethodKernel::ensureSyncElementIdMapBridge($context);
+        $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'SyncElementIdMap');
     }
 }

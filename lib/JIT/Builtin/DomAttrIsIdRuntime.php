@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
@@ -27,7 +26,7 @@ final class DomAttrIsIdRuntime
             $context->lookupFunction('__value__readObject'),
             JitValueBox::valuePtrFromVariable($context, $receiver)
         );
-        JitDomDocumentMethodKernel::ensureAttrIsIdBridge($context);
+        $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'AttrIsId');
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_NAME),

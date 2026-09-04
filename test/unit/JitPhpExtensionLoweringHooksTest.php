@@ -746,6 +746,64 @@ final class JitPhpExtensionLoweringHooksTest extends TestCase
         );
     }
 
+    public function testDomRuntimeKernelsDoNotImportDomExtension(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $this->assertStringContainsString(
+            'ensureDocumentMethodBridge',
+            (string) file_get_contents($root.'/lib/JIT/DomExtensionHooks.php'),
+            'DomExtensionHooks must expose ensureDocumentMethodBridge()'
+        );
+        $this->assertStringContainsString(
+            'function ensureDocumentMethodBridge',
+            (string) file_get_contents($root.'/ext/dom/JitDomExtensionHooksFacade.php'),
+            'JitDomExtensionHooksFacade must implement ensureDocumentMethodBridge()'
+        );
+        $files = [
+            'lib/JIT/Builtin/DomSaveXMLRuntime.php',
+            'lib/JIT/Builtin/DomLoadRuntime.php',
+            'lib/JIT/Builtin/DomNormalizeRuntime.php',
+            'lib/JIT/Builtin/DomDocumentValidateRuntime.php',
+            'lib/JIT/Builtin/DomNodeChildPropertyRuntime.php',
+            'lib/JIT/Builtin/DomXPathEvaluateRuntime.php',
+            'lib/JIT/Builtin/DomSetIdAttributeRuntime.php',
+            'lib/JIT/Builtin/DomImportNodeRuntime.php',
+        ];
+        $hooked = 0;
+        foreach (glob($root.'/lib/JIT/Builtin/Dom*Runtime.php') ?: [] as $path) {
+            $src = (string) file_get_contents($path);
+            if (!str_contains($src, 'ensureDocumentMethodBridge')) {
+                continue;
+            }
+            ++$hooked;
+            $stripped = (string) preg_replace('~/\*.*?\*/~s', '', $src);
+            $stripped = (string) preg_replace('~//.*$~m', '', $stripped);
+            $this->assertDoesNotMatchRegularExpression(
+                '/use PHPCompiler\\\\ext\\\\dom\\\\/',
+                $stripped,
+                basename($path).' still imports ext\\dom — use DomExtensionHooks'
+            );
+            $this->assertStringNotContainsString(
+                'JitDomDocumentMethodKernel::',
+                $stripped,
+                basename($path).' still calls JitDomDocumentMethodKernel directly'
+            );
+        }
+        $this->assertSame(
+            32,
+            $hooked,
+            'expected 32 Dom*Runtime files routed via ensureDocumentMethodBridge()'
+        );
+        foreach ($files as $rel) {
+            $src = (string) file_get_contents($root.'/'.$rel);
+            $this->assertStringContainsString(
+                'ensureDocumentMethodBridge',
+                $src,
+                $rel.' must dispatch via ensureDocumentMethodBridge()'
+            );
+        }
+    }
+
     public function testSplHeapCallProxyDoesNotImportSplExtension(): void
     {
         $src = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Call/SplHeapMethod.php');

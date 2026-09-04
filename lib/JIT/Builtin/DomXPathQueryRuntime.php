@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 
 use PHPCompiler\JIT\Context;
 
-/** JIT/AOT link for DOMXPath::query() via DomXPathQueryJitHelper (#18493). */
+/** JIT/AOT link for DOMXPath::query() (DomXPathQueryJitHelper (#18493)) — DomExtensionHooks (#36204). */
 final class DomXPathQueryRuntime
 {
     public const ABI_NAME = '__phpc_dom_xpath_query';
@@ -24,8 +23,8 @@ final class DomXPathQueryRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            JitDomDocumentMethodKernel::ensureXPathQueryBridge($context);
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
+            $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'XPathQuery');
 
             return;
         }
@@ -37,6 +36,6 @@ final class DomXPathQueryRuntime
             return;
         }
 
-        JitDomDocumentMethodKernel::ensureXPathQueryBridge($context);
+        $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'XPathQuery');
     }
 }

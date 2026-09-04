@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 
@@ -29,9 +28,9 @@ final class DomInsertAdjacentRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            JitDomDocumentMethodKernel::ensureInsertAdjacentElementBridge($context);
-            JitDomDocumentMethodKernel::ensureInsertAdjacentTextBridge($context);
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
+            $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'InsertAdjacentElement');
+            $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'InsertAdjacentText');
 
             return;
         }

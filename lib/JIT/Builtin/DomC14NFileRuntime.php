@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 
-/** JIT/AOT link for DOMNode::C14NFile() via DomC14NJitHelper (#32964). */
+/** JIT/AOT link for DOMNode::C14NFile() (DomC14NJitHelper (#32964)) — DomExtensionHooks (#36204). */
 final class DomC14NFileRuntime
 {
     public const ABI_NAME = '__phpc_dom_c14n_file';
@@ -25,8 +24,8 @@ final class DomC14NFileRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            JitDomDocumentMethodKernel::ensureC14NFileBridge($context);
+        if ($context->extensionLowering->shouldUseDomDocumentMethodKernel($context)) {
+            $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'C14NFile');
 
             return;
         }

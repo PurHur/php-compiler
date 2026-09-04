@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\JIT\Context;
 
 /** JIT/AOT link for DOMNode::C14N() via DomC14NJitHelper (#19467, #22378, #32962). */
@@ -16,6 +15,6 @@ final class DomC14NRuntime
     {
         // Always use the Context + ?string→value bridge (null = relative-NS false).
         // Prelinked Variable-return unit.o bitcast to __value__* and echoed as Object (#32962).
-        JitDomDocumentMethodKernel::ensureC14NBridge($context);
+        $context->extensionLowering->requireDom()->ensureDocumentMethodBridge($context, 'C14N');
     }
 }
