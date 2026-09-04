@@ -241,8 +241,11 @@ final class NoThrowCallElision
     /**
      * php-src {@code ext/standard/type.c} predicates that only inspect zval type
      * tags (no autoload, no {@code __invoke}, no user handlers).
+     *
+     * Public for {@see DiscardedPureCallElision} — discarded statements of these
+     * builtins are side-effect-free (#36386 untyped call overhead).
      */
-    private static function isPureTypePredicateBuiltin(string $nameLc): bool
+    public static function isPureTypePredicateBuiltin(string $nameLc): bool
     {
         switch ($nameLc) {
             case 'is_int':
