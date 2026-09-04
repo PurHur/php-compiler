@@ -9,23 +9,24 @@ use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
 /**
- * sqrt() NestedJIT via JitVmHelperLink::ensureBridge (#27888 / peer fmod #27838).
+ * sqrt() AOT uses llvm.sqrt.f64 (#36386); SqrtJitHelper remains NestedJIT-safe
+ * reference / VM-adjacent PHP (peer floor/fmod shape, #27888).
  */
 final class SqrtRuntimeShrinkTest extends TestCase
 {
-    public function testSqrtUsesJitHelperNotKernel(): void
+    public function testSqrtUsesLlvmIntrinsicNotBrokenHelperObject(): void
     {
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/sqrt.php');
         $this->assertStringContainsString('MathSqrt::invoke', $builtin);
         $this->assertStringNotContainsString("lookupFunction('sqrt')", $builtin);
 
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathSqrt.php');
-        $this->assertStringContainsString('SqrtJitHelper', $bridge);
+        $this->assertStringContainsString('llvm.sqrt.f64', $bridge);
         $this->assertStringContainsString('phpc_sqrt', $bridge);
-        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('SqrtJitHelper', $bridge);
         $this->assertStringNotContainsString('JitSqrtKernel', $bridge);
-        $this->assertStringNotContainsString('NestedJitCompileScope', $bridge);
-        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
+        $this->assertStringNotContainsString('phpc_sqrt_kernel', $bridge);
     }
 
     public function testSqrtJitHelperInlinesNestedJitSafeAlgorithm(): void
@@ -49,6 +50,7 @@ final class SqrtRuntimeShrinkTest extends TestCase
         $this->assertSame(VmMath::sqrt(4.0), SqrtJitHelper::sqrtArgv(4.0));
         $this->assertSame(VmMath::sqrt(0.25), SqrtJitHelper::sqrtArgv(0.25));
         $this->assertEqualsWithDelta(VmMath::sqrt(2.0), SqrtJitHelper::sqrtArgv(2.0), 1e-15);
+        $this->assertEqualsWithDelta(VmMath::sqrt(2.5), SqrtJitHelper::sqrtArgv(2.5), 1e-15);
         $this->assertSame(
             \unpack('P', \pack('d', VmMath::sqrt(-0.0)))[1],
             \unpack('P', \pack('d', SqrtJitHelper::sqrtArgv(-0.0)))[1]
