@@ -104,8 +104,10 @@ interface DomCompileTimeHooks
  *
  * {@see \PHPCompiler\JIT} must not import {@code ext\simplexml} / {@code ext\dom} /
  * {@code ext\xmlreader} / {@code ext\xmlwriter} / {@code ext\xsl} / {@code ext\mbstring}
- * / {@code ext\posix} / {@code ext\bcmath} / {@code ext\intl} / {@code ext\zip} for these paths;
- * Modules register from jitInit. Call XmlReader* and XmlWriter* also go through hooks (#36204).
+ * / {@code ext\posix} / {@code ext\bcmath} / {@code ext\intl} / {@code ext\zip}
+ * / {@code ext\fileinfo} / {@code ext\sqlite3} for these paths;
+ * Modules register from jitInit. Call XmlReader* / XmlWriter* / Finfo* / Sqlite3* / XsltMethod
+ * also go through hooks (#36204).
  */
 final class ExtensionLoweringHooks
 {
@@ -231,6 +233,15 @@ final class ExtensionLoweringHooks
     /** xmlwriter JIT Call surfaces — registered from ext/xmlwriter Module::jitInit (#36204). */
     public ?XmlWriterExtensionHooks $xmlwriter = null;
 
+    /** fileinfo JIT Call surfaces — registered from ext/fileinfo Module::jitInit (#36204). */
+    public ?FileinfoExtensionHooks $fileinfo = null;
+
+    /** xsl JIT Call surfaces — registered from ext/xsl Module::jitInit (#36204). */
+    public ?XslExtensionHooks $xsl = null;
+
+    /** sqlite3 JIT Call surfaces — registered from ext/sqlite3 Module::jitInit (#36204). */
+    public ?Sqlite3ExtensionHooks $sqlite3 = null;
+
     public function requirePosixNested(): PosixNestedJitKernels
     {
         if (null === $this->posixNested) {
@@ -350,6 +361,39 @@ final class ExtensionLoweringHooks
         }
 
         return $this->xmlwriter;
+    }
+
+    public function requireFileinfo(): FileinfoExtensionHooks
+    {
+        if (null === $this->fileinfo) {
+            throw new \RuntimeException(
+                'fileinfo extension hooks not registered — ext/fileinfo Module::jitInit missing (#36204)'
+            );
+        }
+
+        return $this->fileinfo;
+    }
+
+    public function requireXsl(): XslExtensionHooks
+    {
+        if (null === $this->xsl) {
+            throw new \RuntimeException(
+                'xsl extension hooks not registered — ext/xsl Module::jitInit missing (#36204)'
+            );
+        }
+
+        return $this->xsl;
+    }
+
+    public function requireSqlite3(): Sqlite3ExtensionHooks
+    {
+        if (null === $this->sqlite3) {
+            throw new \RuntimeException(
+                'sqlite3 extension hooks not registered — ext/sqlite3 Module::jitInit missing (#36204)'
+            );
+        }
+
+        return $this->sqlite3;
     }
 
     public function tryPrepareDimWrite(Context $context, Variable $container, Variable $dim): ?Variable

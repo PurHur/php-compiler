@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\fileinfo;
 
+use PHPCompiler\JIT;
 use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
 use PHPCompiler\VM;
@@ -20,6 +21,11 @@ class Module extends ModuleAbstract
     public function getExtensionName(): string
     {
         return 'fileinfo';
+    }
+
+    public function jitInit(JIT\Context $context): void
+    {
+        $context->extensionLowering->fileinfo = new JitFileinfoExtensionHooksFacade();
     }
 
     public function init(Runtime $runtime): void

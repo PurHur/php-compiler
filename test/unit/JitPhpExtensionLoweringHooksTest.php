@@ -511,6 +511,107 @@ final class JitPhpExtensionLoweringHooksTest extends TestCase
         }
     }
 
+    public function testFileinfoCallProxiesDoNotImportFileinfoExtension(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $module = (string) file_get_contents($root.'/ext/fileinfo/Module.php');
+        $this->assertStringContainsString(
+            'fileinfo = new JitFileinfoExtensionHooksFacade()',
+            $module,
+            'ext/fileinfo Module::jitInit must register JitFileinfoExtensionHooksFacade'
+        );
+        $this->assertStringContainsString(
+            'requireFileinfo',
+            (string) file_get_contents($root.'/lib/JIT/ExtensionLoweringHooks.php'),
+            'ExtensionLoweringHooks must expose requireFileinfo()'
+        );
+        $files = [
+            'lib/JIT/Call/FinfoSetFlags.php',
+            'lib/JIT/Call/FinfoBuffer.php',
+            'lib/JIT/Call/FinfoFile.php',
+        ];
+        foreach ($files as $rel) {
+            $src = (string) file_get_contents($root.'/'.$rel);
+            $stripped = (string) preg_replace('~/\*.*?\*/~s', '', $src);
+            $stripped = (string) preg_replace('~//.*$~m', '', $stripped);
+            $this->assertDoesNotMatchRegularExpression(
+                '/PHPCompiler\\\\ext\\\\fileinfo\\\\/',
+                $stripped,
+                $rel.' still imports ext\\fileinfo — use FileinfoExtensionHooks'
+            );
+            $this->assertStringContainsString(
+                'requireFileinfo()',
+                $src,
+                $rel.' must dispatch via requireFileinfo()'
+            );
+        }
+    }
+
+    public function testXslCallProxiesDoNotImportXslExtension(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $module = (string) file_get_contents($root.'/ext/xsl/Module.php');
+        $this->assertStringContainsString(
+            'xsl = new JitXslExtensionHooksFacade()',
+            $module,
+            'ext/xsl Module::jitInit must register JitXslExtensionHooksFacade'
+        );
+        $this->assertStringContainsString(
+            'requireXsl',
+            (string) file_get_contents($root.'/lib/JIT/ExtensionLoweringHooks.php'),
+            'ExtensionLoweringHooks must expose requireXsl()'
+        );
+        $src = (string) file_get_contents($root.'/lib/JIT/Call/XsltMethod.php');
+        $stripped = (string) preg_replace('~/\*.*?\*/~s', '', $src);
+        $stripped = (string) preg_replace('~//.*$~m', '', $stripped);
+        $this->assertDoesNotMatchRegularExpression(
+            '/PHPCompiler\\\\ext\\\\xsl\\\\/',
+            $stripped,
+            'lib/JIT/Call/XsltMethod.php still imports ext\\xsl — use XslExtensionHooks'
+        );
+        $this->assertStringContainsString(
+            'requireXsl()',
+            $src,
+            'lib/JIT/Call/XsltMethod.php must dispatch via requireXsl()'
+        );
+    }
+
+    public function testSqlite3CallProxiesDoNotImportSqlite3Extension(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $module = (string) file_get_contents($root.'/ext/sqlite3/Module.php');
+        $this->assertStringContainsString(
+            'sqlite3 = new JitSqlite3ExtensionHooksFacade()',
+            $module,
+            'ext/sqlite3 Module::jitInit must register JitSqlite3ExtensionHooksFacade'
+        );
+        $this->assertStringContainsString(
+            'requireSqlite3',
+            (string) file_get_contents($root.'/lib/JIT/ExtensionLoweringHooks.php'),
+            'ExtensionLoweringHooks must expose requireSqlite3()'
+        );
+        $files = [
+            'lib/JIT/Call/Sqlite3Method.php',
+            'lib/JIT/Call/Sqlite3ResultMethod.php',
+            'lib/JIT/Call/Sqlite3StmtMethod.php',
+        ];
+        foreach ($files as $rel) {
+            $src = (string) file_get_contents($root.'/'.$rel);
+            $stripped = (string) preg_replace('~/\*.*?\*/~s', '', $src);
+            $stripped = (string) preg_replace('~//.*$~m', '', $stripped);
+            $this->assertDoesNotMatchRegularExpression(
+                '/PHPCompiler\\\\ext\\\\sqlite3\\\\/',
+                $stripped,
+                $rel.' still imports ext\\sqlite3 — use Sqlite3ExtensionHooks'
+            );
+            $this->assertStringContainsString(
+                'requireSqlite3()',
+                $src,
+                $rel.' must dispatch via requireSqlite3()'
+            );
+        }
+    }
+
     /**
      * @dataProvider coreJitHelperFilesWithoutNonStandardExtImports
      */

@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
-use PHPCompiler\ext\sqlite3\JitSqlite3Result;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
 
-/** SQLite3Result NestedJIT (#36010 leftover of #36001). php-src: ext/sqlite3/sqlite3.c */
+/**
+ * SQLite3Result NestedJIT (#36010 leftover of #36001).
+ *
+ * Dispatch via {@see Context::$extensionLowering} so lib/JIT does not import
+ * {@code ext\sqlite3} (#36204). php-src: ext/sqlite3/sqlite3.c
+ */
 final class Sqlite3ResultMethod implements Call
 {
     public string $name;
@@ -38,12 +42,10 @@ final class Sqlite3ResultMethod implements Call
 
     public function call(Context $context, Variable ...$args): Value
     {
-        return match (strtolower($this->method)) {
-            'fetcharray' => JitSqlite3Result::fetchArray($context, ...$args),
-            'columntype' => JitSqlite3Result::columnType($context, ...$args),
-            default => throw new \LogicException(
-                'SQLite3Result::'.$this->method.'() JIT dispatch missing (#36010)'
-            ),
-        };
+        return $context->extensionLowering->requireSqlite3()->resultMethod(
+            $context,
+            $this->method,
+            ...$args
+        );
     }
 }
