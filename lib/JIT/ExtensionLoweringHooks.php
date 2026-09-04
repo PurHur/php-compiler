@@ -212,6 +212,9 @@ final class ExtensionLoweringHooks
     /** openssl JIT Builtin surfaces — registered from ext/openssl Module::jitInit (#36204). */
     public ?OpensslExtensionHooks $openssl = null;
 
+    /** zip JIT Call surfaces — registered from ext/zip Module::jitInit (#36204). */
+    public ?ZipExtensionHooks $zip = null;
+
     public function requirePosixNested(): PosixNestedJitKernels
     {
         if (null === $this->posixNested) {
@@ -265,6 +268,17 @@ final class ExtensionLoweringHooks
         }
 
         return $this->openssl;
+    }
+
+    public function requireZip(): ZipExtensionHooks
+    {
+        if (null === $this->zip) {
+            throw new \RuntimeException(
+                'zip extension hooks not registered — ext/zip Module::jitInit missing (#36204)'
+            );
+        }
+
+        return $this->zip;
     }
 
     public function tryPrepareDimWrite(Context $context, Variable $container, Variable $dim): ?Variable

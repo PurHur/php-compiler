@@ -274,6 +274,41 @@ final class JitPhpExtensionLoweringHooksTest extends TestCase
         }
     }
 
+    public function testZipCallProxiesDoNotImportZipExtension(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $module = (string) file_get_contents($root.'/ext/zip/Module.php');
+        $this->assertStringContainsString(
+            'zip = new JitZipExtensionHooksFacade()',
+            $module,
+            'ext/zip Module::jitInit must register JitZipExtensionHooksFacade'
+        );
+        $this->assertStringContainsString(
+            'requireZip',
+            (string) file_get_contents($root.'/lib/JIT/ExtensionLoweringHooks.php'),
+            'ExtensionLoweringHooks must expose requireZip()'
+        );
+        $files = [
+            'lib/JIT/Call/ZipArchiveConstruct.php',
+            'lib/JIT/Call/ZipArchiveMethod.php',
+        ];
+        foreach ($files as $rel) {
+            $src = (string) file_get_contents($root.'/'.$rel);
+            $stripped = (string) preg_replace('~/\*.*?\*/~s', '', $src);
+            $stripped = (string) preg_replace('~//.*$~m', '', $stripped);
+            $this->assertDoesNotMatchRegularExpression(
+                '/PHPCompiler\\\\ext\\\\zip\\\\/',
+                $stripped,
+                $rel.' still imports ext\\zip — use ZipExtensionHooks'
+            );
+            $this->assertStringContainsString(
+                'requireZip()',
+                $src,
+                $rel.' must dispatch via requireZip()'
+            );
+        }
+    }
+
     /**
      * @dataProvider coreJitHelperFilesWithoutNonStandardExtImports
      */

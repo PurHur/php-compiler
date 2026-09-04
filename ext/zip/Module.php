@@ -23,6 +23,7 @@ class Module extends ModuleAbstract
      */
     public function jitInit(JIT\Context $context): void
     {
+        $context->extensionLowering->zip = new JitZipExtensionHooksFacade();
         $context->functionProxies['ziparchive::__construct'] = new JIT\Call\ZipArchiveConstruct();
         foreach ([
             'open',
