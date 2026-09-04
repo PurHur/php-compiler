@@ -13,8 +13,9 @@ use PHPCompiler\VM\Variable as VmVariable;
  * Elide discarded calls to compile-time-pure builtins (#23483 / #36386 call-overhead).
  *
  * php-src: ZPP may still run user-visible coercions; here we only fold cases that are
- * side-effect-free (literal / typed-string strlen, type.c predicates, empty void
- * user functions). Soft-null strlen coercions are NOT elided — they emit deprecations.
+ * side-effect-free (literal / typed-string strlen, type.c predicates, math.c on
+ * already-numeric args, empty void user functions). Soft-null strlen / math
+ * coercions are NOT elided — they emit deprecations (PHP 8.1+).
  */
 final class DiscardedPureCallElision
 {
@@ -27,6 +28,9 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElideStrlenNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureMathNoSideEffect($toCall, $callArgs)) {
             return true;
         }
 
@@ -67,6 +71,56 @@ final class DiscardedPureCallElision
         }
 
         return Variable::TYPE_STRING === $arg->type;
+    }
+
+    /**
+     * Discarded {@code abs}/{@code sqrt}/{@code floor}/… on already-numeric args —
+     * php-src {@code math.c} has no user handlers; null soft-coercion deprecates
+     * so TYPE_NULL is excluded (peer strlen null).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureMathNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if (!NoThrowCallElision::isPureMathBuiltin(strtolower($toCall->getName()))) {
+            return false;
+        }
+        if ([] === $callArgs) {
+            return false;
+        }
+        foreach ($callArgs as $arg) {
+            if (!$arg instanceof Variable || !self::mathArgAllowsDiscardedElision($arg)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Already a numeric scalar — no Z_PARAM_* coerce / null deprecate / __toString.
+     */
+    private static function mathArgAllowsDiscardedElision(Variable $arg): bool
+    {
+        if ($arg->isNullConstant || Variable::TYPE_NULL === $arg->type) {
+            return false;
+        }
+        if (null !== $arg->compileTimeLong || null !== $arg->compileTimeFloat) {
+            return true;
+        }
+        if (
+            Variable::TYPE_NATIVE_LONG === $arg->type
+            || Variable::TYPE_NATIVE_DOUBLE === $arg->type
+            || Variable::TYPE_NATIVE_BOOL === $arg->type
+        ) {
+            return true;
+        }
+        $lit = JitStringArg::compileTimeLiteral($arg);
+
+        return null !== $lit && is_numeric($lit);
     }
 
     /**

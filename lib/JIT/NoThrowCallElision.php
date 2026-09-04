@@ -277,8 +277,11 @@ final class NoThrowCallElision
      * php-src {@code ext/standard/math.c} builtins that only coerce a numeric
      * scalar and never invoke user handlers (no {@code __toString} on object /
      * value-box paths we already exclude via {@see numericParamBuiltinArgCannotThrow}).
+     *
+     * Public for {@see DiscardedPureCallElision} — discarded statements of these
+     * builtins are side-effect-free when args are already numeric (#36386).
      */
-    private static function isPureMathBuiltin(string $nameLc): bool
+    public static function isPureMathBuiltin(string $nameLc): bool
     {
         switch ($nameLc) {
             case 'sqrt':

@@ -6,6 +6,8 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 use PHPCompiler\Block;
+use PHPCompiler\ext\standard\abs;
+use PHPCompiler\ext\standard\sqrt;
 use PHPCompiler\ext\types\is_type;
 use PHPCompiler\ext\types\strlen;
 use PHPCompiler\JIT\Call\Native;
@@ -63,6 +65,43 @@ final class DiscardedPureCallElisionTest extends TestCase
         $arg = $this->makeValueBoxVar();
 
         $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testElidesDiscardedAbsOnNativeLong(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new abs();
+        $arg = $this->makeNativeLongVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testElidesDiscardedSqrtOnNativeDouble(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new sqrt();
+        $arg = $this->makeNativeDoubleVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testDoesNotElideAbsOnNull(): void
+    {
+        // PHP 8.1+ deprecates abs(null) — must keep the call (#36386).
+        $context = $this->makeContext();
+        $builtin = new abs();
+        $arg = $this->makeNullVar();
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testDoesNotElideSqrtOnValueBox(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new sqrt();
+        $arg = $this->makeValueBoxVar();
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
     }
 
     public function testElidesRegisteredVoidNativeWithCompileTimeStringArg(): void
@@ -169,6 +208,37 @@ final class DiscardedPureCallElisionTest extends TestCase
         $kindProp = $ref->getProperty('kind');
         $kindProp->setAccessible(true);
         $kindProp->setValue($var, Variable::KIND_VARIABLE);
+
+        return $var;
+    }
+
+    private function makeNativeDoubleVar(): Variable
+    {
+        $ref = new \ReflectionClass(Variable::class);
+        /** @var Variable $var */
+        $var = $ref->newInstanceWithoutConstructor();
+        $typeProp = $ref->getProperty('type');
+        $typeProp->setAccessible(true);
+        $typeProp->setValue($var, Variable::TYPE_NATIVE_DOUBLE);
+        $kindProp = $ref->getProperty('kind');
+        $kindProp->setAccessible(true);
+        $kindProp->setValue($var, Variable::KIND_VARIABLE);
+
+        return $var;
+    }
+
+    private function makeNullVar(): Variable
+    {
+        $ref = new \ReflectionClass(Variable::class);
+        /** @var Variable $var */
+        $var = $ref->newInstanceWithoutConstructor();
+        $typeProp = $ref->getProperty('type');
+        $typeProp->setAccessible(true);
+        $typeProp->setValue($var, Variable::TYPE_NULL);
+        $kindProp = $ref->getProperty('kind');
+        $kindProp->setAccessible(true);
+        $kindProp->setValue($var, Variable::KIND_VALUE);
+        $var->isNullConstant = true;
 
         return $var;
     }
