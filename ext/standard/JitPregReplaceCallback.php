@@ -11,7 +11,9 @@ use PHPCompiler\JIT\Builtin\StringPregMatch;
 use PHPCompiler\JIT\Call\ExternalMethod;
 use PHPCompiler\JIT\Call\Native;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\PregReplaceCallbackPolicy;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\VmBoundMethodCallable;
@@ -24,9 +26,15 @@ use PHPLLVM\Value;
  *
  * Static array callables `['Class','method']` (Nyholm Uri.php / #36382) fold to the same
  * shim path as string user-function names. php-src: ext/pcre/php_pcre.c.
+ *
+ * {@see rawurlencodeMatchZero} (Nyholm Uri) uses {@see UriRawurlencodeReplaceJitHelper} so
+ * Slim/Uri AOT does not NestedJIT PregAotFastPath into the user module for that shape (#36382).
  */
 final class JitPregReplaceCallback
 {
+    private const URI_RAWURLENCODE_HELPER =
+        'PHPCompiler\\ext\\standard\\UriRawurlencodeReplaceJitHelper::replaceArgv';
+
     private static int $blockSerial = 0;
 
     /** @var array<string, Value> per-module preg callback shims */
@@ -40,6 +48,13 @@ final class JitPregReplaceCallback
         JITVariable $callback,
         Value $subject
     ): Value {
+        if (self::isRawurlencodeMatchZeroCallback($context, $callback)) {
+            \PHPCompiler\JIT\Progress::noteFunction('uri_rawurlencode_replace_fast');
+
+            return self::invokeUriRawurlencodeReplace($context, $pattern, $subject);
+        }
+        \PHPCompiler\JIT\Progress::noteFunction('preg_replace_callback_full');
+
         StringPregMatch::ensureLinked($context);
 
         [$proxy, $shimKey] = self::resolveCallbackNative($context, $callback);
@@ -81,6 +96,46 @@ final class JitPregReplaceCallback
         $context->builder->positionAtEnd($doneBlock);
 
         return $ptr;
+    }
+
+    /**
+     * Nyholm Uri.php: preg_replace_callback(..., [__CLASS__, 'rawurlencodeMatchZero'], $s).
+     * Tiny NestedJIT helper — no PregAotFastPath / callback shim (#36382).
+     */
+    private static function invokeUriRawurlencodeReplace(
+        Context $context,
+        Value $pattern,
+        Value $subject
+    ): Value {
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            '/ext/standard/UriRawurlencodeReplaceJitHelper.php',
+            [self::URI_RAWURLENCODE_HELPER],
+            '#36382'
+        );
+        $lc = strtolower(self::URI_RAWURLENCODE_HELPER);
+        $helper = $context->functions[$lc] ?? null;
+        if (null === $helper) {
+            throw new \LogicException(self::URI_RAWURLENCODE_HELPER.' missing after NestedJIT (#36382)');
+        }
+        $raw = JitNestedHelperCoerce::callHelper($context, $helper, [$pattern, $subject]);
+        $strPtr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call($context->lookupFunction('__value__writeString'), $ptr, $strPtr);
+
+        return $ptr;
+    }
+
+    private static function isRawurlencodeMatchZeroCallback(Context $context, JITVariable $callback): bool
+    {
+        $staticNames = PregReplaceCallbackPolicy::compileTimeStaticArrayCallableNames($callback)
+            ?? self::resolveStaticArrayCallableNamesFromBlock($context);
+        if (null === $staticNames) {
+            return false;
+        }
+
+        return 'rawurlencodematchzero' === strtolower($staticNames[1]);
     }
 
     /** @return array{0:Native,1:string} proxy + stable shim cache key */

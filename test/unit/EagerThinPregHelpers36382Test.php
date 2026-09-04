@@ -9,7 +9,10 @@ use PHPCompiler\Web\SourceBundler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Large IncludeHelper graphs must NestedJIT thin preg helpers before user IR fattens the module (#36382).
+ * Large IncludeHelper graphs prefer deferred thin-preg NestedJIT (#36382).
+ *
+ * Nyholm Uri uses UriRawurlencodeReplaceJitHelper; eager PregAotFastPath NestedJIT fattened
+ * the module and stalled Uri method lowering. Flag remains available for opt-in.
  */
 final class EagerThinPregHelpers36382Test extends TestCase
 {
@@ -30,20 +33,23 @@ final class EagerThinPregHelpers36382Test extends TestCase
         $this->assertFalse(SourceBundler::shouldUseIncrementalRequires(array_slice($paths, 0, 31)));
     }
 
-    public function testCompilePhpSetsEagerFlagSourceGuard(): void
+    public function testCompilePhpDoesNotForceEagerThinPregForIncrementalGraphs(): void
     {
         $src = (string) file_get_contents(dirname(__DIR__, 2).'/bin/compile.php');
-        $this->assertStringContainsString('$eagerThinPregHelpers = true', $src);
-        $this->assertStringContainsString('eagerThinPregHelpers = true', $src);
-        $this->assertStringContainsString('eager thin preg NestedJIT', $src);
+        $this->assertStringContainsString('$eagerThinPregHelpers = false', $src);
+        $this->assertStringContainsString('UriRawurlencodeReplaceJitHelper', $src);
+        // Incremental path must not flip the flag on (Uri specialization #36382).
+        $this->assertDoesNotMatchRegularExpression(
+            '/shouldUseIncrementalRequires\(\$includes\)\s*\{[^}]*\$eagerThinPregHelpers\s*=\s*true/s',
+            $src
+        );
 
         $jit = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT.php');
         $this->assertStringContainsString('maybeEagerLinkThinPregHelpers', $jit);
         $this->assertStringContainsString('eager_thin_preg_begin', $jit);
-        $this->assertStringContainsString('PregMatchRuntime::ensureLinked', $jit);
 
-        $runtime = (string) file_get_contents(dirname(__DIR__, 2).'/lib/Runtime.php');
-        $this->assertStringContainsString('eager_thin_preg_begin', $runtime);
-        $this->assertStringContainsString('eagerThinPregHelpers', $runtime);
+        $callback = (string) file_get_contents(dirname(__DIR__, 2).'/ext/standard/JitPregReplaceCallback.php');
+        $this->assertStringContainsString('UriRawurlencodeReplaceJitHelper', $callback);
+        $this->assertStringContainsString('uri_rawurlencode_replace_fast', $callback);
     }
 }

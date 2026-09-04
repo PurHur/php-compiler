@@ -3106,6 +3106,7 @@ require_once __DIR__.'/../../../ext/standard/JitPregMatchEx.php';
 require_once __DIR__.'/../../../ext/standard/JitPregReplace.php';
 require_once __DIR__.'/../../../ext/standard/JitPregReplaceCompileTime.php';
 require_once __DIR__.'/../../../ext/standard/JitPregReplaceCallback.php';
+require_once __DIR__.'/../../../ext/standard/UriRawurlencodeReplaceJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/JitPregReplaceCallbackArray.php';
 require_once __DIR__.'/../../../ext/standard/JitPregSplit.php';
 require_once __DIR__.'/../../../ext/standard/JitPregSplitCompileTime.php';

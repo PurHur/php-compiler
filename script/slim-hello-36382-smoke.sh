@@ -11,8 +11,9 @@
 # sprintf is force-NestedJIT'd into every user-script AOT — that pulled UnpackEngine
 # into the user module. Fixed via Ieee754::decodeFloat64Le. Mid-graph first use of
 # preg_replace_callback (Nyholm Uri::withUserInfo) NestedJITed PregJitHelperThinAot
-# into the fat module for minutes — compile.php now eager-NestedJITs thin preg before
-# IncludeHelper when unit count ≥ 32. Default Docker 8–10g is enough for full
+# into the fat module for minutes — compile.php routes rawurlencodeMatchZero through
+# UriRawurlencodeReplaceJitHelper (no PregAotFastPath) and does not eager-NestedJIT
+# thin preg before IncludeHelper (#36382). Default Docker 8–10g is enough for full
 # Slim+fcgi /hello after array-callable + charclass find (#36382).
 # Keep LLVM memory floor at PHP_COMPILER_LLVM_MEMORY_LIMIT (default 8192M).
 set -euo pipefail
