@@ -432,15 +432,28 @@ function runCompileGate(string $root, string $baselinePath, bool $update): void
     }
     $measured['miniwebapp-warm'] = measureCompileCommand($mwCmd, $root);
 
-    // One-file edit: mutate Router.php content so the bundle fingerprint changes (#36387).
-    // Touch-only is not enough — CompileCache keys on sha256(bundled source), not include mtimes.
+    // One-file edit: mutate one Router method body token so the Done-when path
+    // (real one-method edit ≤25% of cold) is what the gate measures (#36387).
+    // Comment-only appends are covered by unit tests; they must not be the gate.
     $routerSrc = (string) file_get_contents($mwRouter);
     $routerBackup = $mwRouter.'.bench-gate.bak';
     if (!@copy($mwRouter, $routerBackup)) {
         fwrite(STDERR, "bench-gate --compile: cannot backup {$mwRouter}\n");
         exit(1);
     }
-    file_put_contents($mwRouter, $routerSrc."\n// bench-gate edit ".gmdate('c')."\n");
+    $routerEdited = preg_replace(
+        "/(\\\$title = ')Home(';)/",
+        '$1HomeBench$2',
+        $routerSrc,
+        1,
+        $routerEditCount
+    );
+    if (!is_string($routerEdited) || $routerEditCount < 1) {
+        @rename($routerBackup, $mwRouter);
+        fwrite(STDERR, "bench-gate --compile: failed to apply one-method Router.php edit\n");
+        exit(1);
+    }
+    file_put_contents($mwRouter, $routerEdited);
     try {
         $measured['miniwebapp-edit'] = measureCompileCommand($mwCmd, $root);
     } finally {
