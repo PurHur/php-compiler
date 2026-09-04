@@ -3500,6 +3500,33 @@ class Compiler {
                         $ops[] = $staticUnsetOp;
                         continue;
                     }
+                    // Nested unset($a[0]['k']): FETCH_DIM_W prefixes then UNSET_DIM (#36380).
+                    $dimFetch = $unsetExpr instanceof Op\Expr\ArrayDimFetch
+                        ? $unsetExpr
+                        : ($unsetExpr instanceof Operand
+                            ? $this->findCoalesceArrayDimFetch($unsetExpr, $block)
+                            : null);
+                    if (null !== $dimFetch) {
+                        $chain = $this->collectArrayDimFetchChain($dimFetch, $block);
+                        [$prefixOps, $containerSlot] = $this->emitUnsetDimWriteChainPrefix($chain, $block);
+                        $lastFetch = $chain[count($chain) - 1];
+                        $dimSlot = null !== $lastFetch->dim
+                            ? $this->compileOperand($lastFetch->dim, $block, true)
+                            : null;
+                        $unsetOp = new OpCode(
+                            OpCode::TYPE_UNSET,
+                            null,
+                            $containerSlot,
+                            $dimSlot
+                        );
+                        $unsetOp->unsetOnProperty = false;
+                        $this->assignSourceMetadata($unsetOp, $terminal);
+                        foreach ($prefixOps as $prefixOp) {
+                            $ops[] = $prefixOp;
+                        }
+                        $ops[] = $unsetOp;
+                        continue;
+                    }
                     [$containerSlot, $dimSlot, $unsetOnProperty] = $this->resolveUnsetTarget($unsetExpr, $block);
                     $unsetOp = new OpCode(
                         OpCode::TYPE_UNSET,

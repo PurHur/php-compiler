@@ -24338,10 +24338,13 @@ class JIT {
     }
 
     /**
-     * Expected type for dimFetch: force TYPE_ARRAY on nested FETCH_DIM_W intermediates (#24011 / #34745).
+     * Expected type for dimFetch: force TYPE_ARRAY on nested FETCH_DIM_W intermediates (#24011 / #34745)
+     * and on FETCH_DIM_W prefixes that feed unset($a[i][k]) (#36380).
      *
      * CFG often leaves `$a[0]` as mixed when `$a` is a by-ref formal; without TYPE_ARRAY the outer
-     * write returns a prepareIndexWrite orphan and the inner write mutates a detached HT.
+     * write returns a prepareIndexWrite orphan and the inner write/unset mutates a detached HT.
+     *
+     * php-src: Zend/zend_execute.c ZEND_FETCH_DIM_W (nested dimension address) + ZEND_UNSET_DIM.
      */
     private function dimFetchExpectedType(
         Block $block,
@@ -24352,7 +24355,10 @@ class JIT {
     ): ?\PHPTypes\Type {
         if (
             $forWrite
-            && $this->varFetchDestUsedAsNestedDimWriteContainer($block, $opIndex, $destSlot)
+            && (
+                $this->varFetchDestUsedAsNestedDimWriteContainer($block, $opIndex, $destSlot)
+                || $this->varFetchDestUsedAsDimWriteContainer($block, $opIndex, $destSlot)
+            )
         ) {
             return \PHPTypes\Type::fromDecl('array');
         }

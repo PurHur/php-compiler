@@ -260,6 +260,48 @@ trait IssetEmptyUnsetAndDimFetchCompile
     }
 
     /**
+     * FETCH_DIM_W for all but the last dim so {@code unset($a[0]['k'])} mutates the live element.
+     *
+     * php-cfg skips intermediate ArrayDimFetch stmts before Terminal_Unset; without a write
+     * prefix the container slot is an unpopulated temp (or a FETCH_DIM_R copy) and the unset
+     * is a no-op — Parsedown::li() then fails to strip {@code name=p} (#36380).
+     *
+     * php-src: Zend/zend_compile.c {@code ZEND_FETCH_DIM_W} + {@code ZEND_UNSET_DIM}.
+     *
+     * @param list<Op\Expr\ArrayDimFetch> $chain outermost first
+     * @return array{0: list<OpCode>, 1: int} prefix opcodes + container slot for the final dim
+     */
+    private function emitUnsetDimWriteChainPrefix(array $chain, Block $block): array
+    {
+        $first = $chain[0];
+        $containerSlot = $this->compileOperand($first->var, $block, true);
+        if (count($chain) < 2) {
+            return [[], $containerSlot];
+        }
+        $opcodes = [];
+        $prefixLen = count($chain) - 1;
+        for ($i = 0; $i < $prefixLen; ++$i) {
+            $fetch = $chain[$i];
+            $this->rejectGlobalsAppend($fetch, $block);
+            $resultSlot = $this->compileOperand($fetch->result, $block, false);
+            $dimSlot = null !== $fetch->dim
+                ? $this->compileOperand($fetch->dim, $block, true)
+                : null;
+            $op = new OpCode(
+                OpCode::TYPE_ARRAY_DIM_FETCH_WRITE,
+                $resultSlot,
+                $containerSlot,
+                $dimSlot
+            );
+            $this->assignSourceMetadata($op, $fetch);
+            $opcodes[] = $op;
+            $containerSlot = $resultSlot;
+        }
+
+        return [$opcodes, $containerSlot];
+    }
+
+    /**
      * php-cfg emits ArrayDimFetch as its own stmt before Terminal_Unset; skip duplicate lowering.
      */
     private function isArrayDimFetchOnlyUnsetVar(
