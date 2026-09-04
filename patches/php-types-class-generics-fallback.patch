@@ -1,8 +1,8 @@
 --- vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
 +++ vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
-@@ -456,6 +456,10 @@
-         if (preg_match('/^(list|array|iterable)\s*</i', trim($decl))) {
-             return new self(self::TYPE_ARRAY);
+@@ -450,6 +450,10 @@
+         if (preg_match('/^(positive|negative|non-zero)-int$/', $pseudo)) {
+             return new self(self::TYPE_LONG);
          }
 +        // Class generics from PHPStan/Psalm docblocks: App<T> (#36382 Slim).
 +        if (preg_match('/^(.+?)\s*<.*>\s*$/s', trim($decl), $genericClass)) {
