@@ -95,17 +95,18 @@ final class substr_replace extends Internal
         $lengthVal = $i64->constInt(0, false);
         $hasLength = $i32->constInt(0, false);
         if (4 === $argc) {
-            if (JITVariable::TYPE_NATIVE_LONG === $args[3]->type) {
-                $lengthVal = $this->jitLong($context, $args[3], 'substr_replace() length');
-                $hasLength = $i32->constInt(1, false);
-            } elseif (JITVariable::TYPE_VALUE === $args[3]->type) {
-                if (!$args[3]->isNullConstant) {
-                    throw new \LogicException('substr_replace() length must be an integer or literal null in this compiler build');
-                }
+            if (JITVariable::TYPE_NULL === $args[3]->type || $args[3]->isNullConstant) {
                 $lengthVal = $i64->constInt(0, false);
                 $hasLength = $i32->constInt(0, false);
             } else {
-                throw new \LogicException('substr_replace() length must be an integer or null in this compiler build');
+                $lengthVal = JitIntdiv::lowerIntBuiltinArg(
+                    $context,
+                    $args[3],
+                    'substr_replace',
+                    4,
+                    'length'
+                );
+                $hasLength = $i32->constInt(1, false);
             }
         }
 
@@ -130,10 +131,15 @@ final class substr_replace extends Internal
             }
             JitIntdiv::emitNullIntDeprecation($context, 'substr_replace', 3, 'offset', 'array|int');
             $offset = $i64->constInt(0, false);
-        } elseif (JITVariable::TYPE_NATIVE_LONG === $args[2]->type) {
-            $offset = $this->jitLong($context, $args[2], 'substr_replace() offset');
         } else {
-            throw new \LogicException('substr_replace() offset must be an integer in this compiler build');
+            // Runtime int (e.g. Nyholm Stream::$position TYPE_VALUE) — peer substr (#36382).
+            $offset = JitIntdiv::lowerIntBuiltinArg(
+                $context,
+                $args[2],
+                'substr_replace',
+                3,
+                'offset'
+            );
         }
         // php-src string.c: scalar $string + array $replace → first element via convert_to_string (#29309).
         $replace = self::jitScalarReplaceArg($context, $args[1]);
