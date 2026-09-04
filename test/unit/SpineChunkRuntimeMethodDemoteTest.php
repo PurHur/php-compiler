@@ -36,6 +36,11 @@ final class SpineChunkRuntimeMethodDemoteTest extends TestCase
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\VM\\Context'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\VM\\ErrorReporter'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\VM\\ClassEntry'));
+        // AOT\* NestedJIT OOM / try-catch null insert / computed include under SPINE_CHUNK (#36387).
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\AOT\\HelperRuntimeCache'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\AOT\\ProjectGraph'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\AOT\\AotEmitFastExit'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('phpcompiler\\aot\\composervendormap'));
         $this->assertFalse(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\CompilerVersion'));
         $this->assertFalse(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\JIT\\Variable'));
     }
