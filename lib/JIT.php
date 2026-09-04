@@ -20422,7 +20422,7 @@ class JIT {
         JIT\DeprecatedCallGuard::emitBeforeCall($this->context, $toCall);
         // Leaf-recursive no-throw callees (fibo_r): skip uncaught-trace frames + pending
         // throw checks — they cannot appear on an exception path (#36386).
-        $noThrowCallee = JIT\NoThrowCallElision::calleeIsNoThrow($this->context, $toCall);
+        $noThrowCallee = JIT\NoThrowCallElision::calleeIsNoThrow($this->context, $toCall, $callArgs);
         $trackUncaught = !$noThrowCallee
             && JIT\Builtin\UncaughtThrowPrinter::shouldTrackCall($this->context, $toCall);
         if ($trackUncaught) {

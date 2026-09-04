@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT;
 
 use PHPCfg\Operand;
 use PHPCompiler\Block;
+use PHPCompiler\Func\Internal as CoreFuncInternal;
 use PHPCompiler\OpCode;
 use PHPCompiler\JIT\Call\Native;
 use PHPCompiler\JIT\Call\Vararg;
@@ -23,6 +24,12 @@ use PHPCompiler\JIT\Call\Vararg;
  * {@code A::top→self::mid→self::leaf}) — the AOT frames would never appear on an
  * uncaught trace — paying {@code phpc_ex_stack_push/pop} +
  * {@code phpc_jit_has_throw_pending} on every edge is pure overhead.
+ *
+ * Also skips the after-call check for pure builtins when arguments prove they
+ * cannot invoke user code or set throw-pending — e.g. {@code strlen('x')} and
+ * {@code strlen} on a native {@code TYPE_STRING} (php-src
+ * {@code ext/standard/string.c} {@code PHP_FUNCTION(strlen)} / Z_PARAM_STR;
+ * throwing {@code __toString} needs an object/value box).
  *
  * Analyze at enqueue time (before {@see \PHPCompiler\JIT::runQueue}), not only when
  * the body is lowered: `{main}` resolves method calls while callees are still
@@ -82,8 +89,14 @@ final class NoThrowCallElision
         }
     }
 
-    public static function calleeIsNoThrow(Context $context, Call $toCall): bool
+    /**
+     * @param array<int, Variable> $callArgs
+     */
+    public static function calleeIsNoThrow(Context $context, Call $toCall, array $callArgs = []): bool
     {
+        if (self::pureBuiltinArgsAreNoThrow($toCall, $callArgs)) {
+            return true;
+        }
         if (!($toCall instanceof Native || $toCall instanceof Vararg)) {
             return false;
         }
@@ -102,6 +115,60 @@ final class NoThrowCallElision
         }
 
         return !empty($context->noThrowUserFunctions[$name]);
+    }
+
+    /**
+     * Builtins that never set user throw-pending when args cannot run user code.
+     *
+     * TypeError paths for known-bad compile-time types abort inside the builtin
+     * ({@see \PHPCompiler\JIT\ExceptionBridge::emitTypeErrorAndAbort}); the
+     * caller's {@code phpc_jit_has_throw_pending} check is only needed when
+     * {@code __toString} (or similar) may throw — i.e. object / value-box args.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function pureBuiltinArgsAreNoThrow(Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        $name = strtolower($toCall->getName());
+        if ('strlen' !== $name) {
+            return false;
+        }
+        if (!isset($callArgs[0]) || !$callArgs[0] instanceof Variable) {
+            return false;
+        }
+
+        return self::strlenArgCannotThrow($callArgs[0]);
+    }
+
+    /**
+     * True when strlen($arg) cannot invoke {@code __toString} or leave user
+     * throw-pending for the caller to observe.
+     */
+    private static function strlenArgCannotThrow(Variable $arg): bool
+    {
+        if (null !== JitStringArg::compileTimeLiteral($arg)) {
+            return true;
+        }
+        // Native __string__* — already a string; no coercion / __toString.
+        if (Variable::TYPE_STRING === $arg->type) {
+            return true;
+        }
+        // Scalar coercions (int/float/bool) never throw; null soft-coerces or
+        // TypeErrors via abort, not user throw-pending.
+        if (
+            Variable::TYPE_NATIVE_LONG === $arg->type
+            || Variable::TYPE_NATIVE_DOUBLE === $arg->type
+            || Variable::TYPE_NATIVE_BOOL === $arg->type
+            || Variable::TYPE_NULL === $arg->type
+            || $arg->isNullConstant
+        ) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
