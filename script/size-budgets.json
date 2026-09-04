@@ -4,9 +4,9 @@
     "done_when_ceiling": 25000,
     "files": {
         "lib/Compiler.php": {
-            "budget": 1489,
+            "budget": 1028,
             "target": 20000,
-            "note": "Concern trait splits (#36230/#36387/#36403); CompileOpsTicksAndCfgSplit + peers"
+            "note": "Concern trait splits (#36230/#36387/#36403); CompileFuncCfgReturnAndGlobalImport + peers"
         },
         "lib/JIT.php": {
             "budget": 24702,
@@ -14,9 +14,9 @@
             "note": "Concern trait splits (#36403); tip ratchet after master drift (JIT untouched this PR)"
         },
         "lib/VM.php": {
-            "budget": 25464,
+            "budget": 25586,
             "target": 15000,
-            "note": "VM hot-loop / boot decomposition"
+            "note": "VM hot-loop / boot decomposition; tip ratchet after master drift (VM untouched this PR)"
         },
         "script/apply-patches.sh": {
             "budget": 7637,
