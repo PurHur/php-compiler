@@ -48530,7 +48530,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/AOT/Linker.php`
 
 **Warnings** (review for bootstrap subset):
-- 38 class method(s)
+- 39 class method(s)
 
 ### `lib/AOT/LinkerProcessPolyfill.php`
 
@@ -49786,7 +49786,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/SiblingInlineFuncCallAndDeadArrayProducers.php`
 
 **Warnings** (review for bootstrap subset):
-- trait SiblingInlineFuncCallAndDeadArrayProducers (line 22)
+- trait SiblingInlineFuncCallAndDeadArrayProducers (line 23)
 - 17 class method(s)
 
 ### `lib/Compiler/Concern/SiblingInlineFuncCallProducers.php`
