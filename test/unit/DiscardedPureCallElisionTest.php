@@ -40,6 +40,9 @@ use PHPCompiler\ext\standard\fmax;
 use PHPCompiler\ext\standard\fmin;
 use PHPCompiler\ext\standard\floatval;
 use PHPCompiler\ext\standard\function_exists;
+use PHPCompiler\ext\standard\get_mangled_object_vars_;
+use PHPCompiler\ext\standard\get_object_vars_;
+use PHPCompiler\ext\standard\get_class_methods_;
 use PHPCompiler\ext\standard\get_class_;
 use PHPCompiler\ext\standard\get_debug_type;
 use PHPCompiler\ext\standard\get_parent_class_;
@@ -2288,6 +2291,66 @@ final class DiscardedPureCallElisionTest extends TestCase
         $this->assertFalse(DiscardedPureCallElision::tryElide(
             $context,
             new class_uses_(),
+            []
+        ));
+    }
+
+    public function testDiscardedObjectVarsMethodsElidesOnTypedObject(): void
+    {
+        // php-src zend_builtin_functions.c / var.c — typed object only; string
+        // get_class_methods autoloads (#36386).
+        $context = $this->makeContext();
+        $obj = $this->makeObjectVar();
+        $str = $this->makeStringVar('stdClass');
+        $null = $this->makeNullVar();
+        $box = $this->makeValueBoxVar();
+        $long = $this->makeNativeLongVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_object_vars_(),
+            [$obj]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_mangled_object_vars_(),
+            [$obj]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_class_methods_(),
+            [$obj]
+        ));
+
+        // Soft-null / string / value-box stay live (TypeError / autoload).
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_object_vars_(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_mangled_object_vars_(),
+            [$box]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_class_methods_(),
+            [$str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_object_vars_(),
+            [$long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_class_methods_(),
+            [$obj, $str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_object_vars_(),
             []
         ));
     }

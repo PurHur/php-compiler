@@ -41,6 +41,8 @@ use PHPCompiler\VM\Variable as VmVariable;
  * autoload; soft-null class / allow_string stay live),
  * typed-object class_parents / class_implements / class_uses (string
  * subjects stay live for autoload; soft-null autoload stays live),
+ * typed-object get_object_vars / get_mangled_object_vars /
+ * get_class_methods (string get_class_methods stays live for autoload),
  * zero-arg pi, type.c predicates + gettype/get_debug_type, ctype.c
  * classifiers on typed/literal strings, typed-array count/sizeof, math.c
  * incl. pow/fpow/fdiv on already-numeric args, empty void user functions).
@@ -84,7 +86,10 @@ use PHPCompiler\VM\Variable as VmVariable;
  * (autoload when allow_string). Soft-null / non-object
  * {@code class_parents}/{@code class_implements}/{@code class_uses}
  * subjects and soft-null {@code $autoload} stay live; string subjects
- * stay live (autoload).
+ * stay live (autoload). Soft-null / non-object
+ * {@code get_object_vars}/{@code get_mangled_object_vars}/
+ * {@code get_class_methods} stay live ({@code TypeError}); string
+ * {@code get_class_methods} stays live (autoload).
  */
 final class DiscardedPureCallElision
 {
@@ -178,6 +183,9 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureClassHierarchyNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureObjectVarsMethodsNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureVersionCompareNoSideEffect($toCall, $callArgs)) {
@@ -1409,6 +1417,27 @@ final class DiscardedPureCallElision
     }
 
     /**
+     * Discarded {@code get_object_vars}/{@code get_mangled_object_vars}/
+     * {@code get_class_methods} on a typed object — php-src
+     * {@code Zend/zend_builtin_functions.c}/{@code ext/standard/var.c}.
+     * Object operands never autoload; string {@code get_class_methods} stays
+     * live. Soft-null / non-object stay live ({@code TypeError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureObjectVarsMethodsNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if (!NoThrowCallElision::isPureObjectVarsMethodsBuiltin(strtolower($toCall->getName()))) {
+            return false;
+        }
+
+        return self::objectVarsMethodsArgsAllowDiscardedElision($callArgs);
+    }
+
+    /**
      * Discarded {@code version_compare} on typed / literal strings — php-src
      * {@code versioning.c}. Optional operator must be null or a compile-time
      * valid comparison op ({@code ValueError} otherwise).
@@ -1750,6 +1779,16 @@ final class DiscardedPureCallElision
     private static function classHierarchyArgsAllowDiscardedElision(array $callArgs): bool
     {
         return NoThrowCallElision::classHierarchyArgsCannotThrow($callArgs);
+    }
+
+    /**
+     * Typed object only — peer {@see NoThrowCallElision::objectVarsMethodsArgsCannotThrow}.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function objectVarsMethodsArgsAllowDiscardedElision(array $callArgs): bool
+    {
+        return NoThrowCallElision::objectVarsMethodsArgsCannotThrow($callArgs);
     }
 
     /**
