@@ -426,6 +426,12 @@ class Block {
         // still share locals across CFG edges — but must not alias caller CVs of the same
         // name. That alias made foreach-by-ref over &...$args bind the loop var to itself
         // via the packed indirect (#21932; Zend/zend_execute.c FE_FETCH_RW).
+        //
+        // Recursive re-entry shares the same Func object, so the func check alone is not
+        // enough: stop after the activation entry frame (orig === func->cfg). Crossing into
+        // the caller aliases `$markup` / `$Element` across frames — Parsedown::element with
+        // `if ($this->safeMode) { $Element = … }` then recurse clobbers the parent (#36380;
+        // Zend/zend_execute.c: each call has its own CV table).
         $startFunc = null !== $frame->block ? $frame->block->func : null;
         $blockScriptGlobals = null !== $frame->block && $frame->block->blocksScriptGlobalInheritance();
         for ($f = $frame; null !== $f; $f = $f->parent) {
@@ -461,6 +467,14 @@ class Block {
             }
             if (isset($f->dynamicLocals[$name])) {
                 return $f->dynamicLocals[$name];
+            }
+            // Do not walk past this activation's entry into the recursive caller.
+            if (
+                null !== $f->block->func
+                && null !== $f->block->orig
+                && $f->block->orig === $f->block->func->cfg
+            ) {
+                break;
             }
         }
 

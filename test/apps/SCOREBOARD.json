@@ -1,5 +1,5 @@
 {
-    "generated_at": "2026-09-04T19:03:20Z",
+    "generated_at": "2026-09-04T20:23:18Z",
     "issue": 36380,
     "packages": [
         {
@@ -17,8 +17,8 @@
             },
             "vm": {
                 "status": "fail",
-                "pass": 39,
-                "fail": 25,
+                "pass": 44,
+                "fail": 20,
                 "skip": 0,
                 "rc": 1,
                 "reason": null
@@ -33,7 +33,7 @@
             },
             "aot_pass_rate": 0,
             "blockers": [
-                "vm: 25 fixture failures",
+                "vm: 20 fixture failures",
                 "aot: phpc_build:_helper-runtime_cache_hit_(17_helpers,_core=1b996aa5c644fbf7d3a2)_(#15889)"
             ],
             "raw_rc": 0
