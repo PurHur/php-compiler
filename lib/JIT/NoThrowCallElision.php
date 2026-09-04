@@ -17,10 +17,11 @@ use PHPCompiler\JIT\Call\Vararg;
  * php-src always records EG(current_execute_data) frames; when a function body
  * has no {@see OpCode::TYPE_THROW}, no {@see OpCode::TYPE_NEW}, no includes, and
  * only calls to itself or other proven no-throw user functions (leaf recursion
- * like {@code fibo_r}, call chains like {@code top→mid→leaf}, or leaf methods
- * like {@code Node::bump}) — the AOT frames would never appear on an uncaught
- * trace — paying {@code phpc_ex_stack_push/pop} + {@code phpc_jit_has_throw_pending}
- * on every edge is pure overhead.
+ * like {@code fibo_r}, call chains like {@code top→mid→leaf}, leaf methods
+ * like {@code Node::bump}, or same-class method chains like
+ * {@code A::top→A::mid→A::leaf}) — the AOT frames would never appear on an
+ * uncaught trace — paying {@code phpc_ex_stack_push/pop} +
+ * {@code phpc_jit_has_throw_pending} on every edge is pure overhead.
  *
  * Analyze at enqueue time (before {@see \PHPCompiler\JIT::runQueue}), not only when
  * the body is lowered: `{main}` resolves method calls while callees are still
@@ -132,7 +133,6 @@ final class NoThrowCallElision
                 if (OpCode::TYPE_THROW === $type
                     || OpCode::TYPE_NEW === $type
                     || OpCode::TYPE_INCLUDE === $type
-                    || OpCode::TYPE_METHODCALL_INIT === $type
                     || OpCode::TYPE_STATICCALL_INIT === $type
                     || OpCode::TYPE_FROM_CALLABLE === $type
                 ) {
@@ -148,6 +148,18 @@ final class NoThrowCallElision
                     }
                     $calleeLc = strtolower((string) $nameOp->value);
                     if (!self::isAllowedNoThrowCallee($context, $selfLc, $calleeLc)) {
+                        return false;
+                    }
+                }
+                if (OpCode::TYPE_METHODCALL_INIT === $type) {
+                    // Same-class `$this->leaf()` chains: allow when the target method
+                    // is already proven no-throw (fixpoint upgrades mid after leaf).
+                    // Cross-class bare-name matches are rejected — two classes can
+                    // share a method name with different throw behaviour (#36386).
+                    $methodLc = self::literalMethodNameLc($block, $op->arg2);
+                    if (null === $methodLc
+                        || !self::isAllowedNoThrowMethodCallee($context, $selfLc, $methodLc)
+                    ) {
                         return false;
                     }
                 }
@@ -197,6 +209,53 @@ final class NoThrowCallElision
         return false;
     }
 
+    /**
+     * Instance method callees are keyed {@code class::method}. Prefer the
+     * caller's class scope so {@code B::leaf} throwing does not unlock
+     * {@code A::mid}'s {@code $this->leaf()} when only {@code A::leaf} is safe.
+     */
+    private static function isAllowedNoThrowMethodCallee(
+        Context $context,
+        string $selfLc,
+        string $methodLc
+    ): bool {
+        if ($methodLc === self::bareName($selfLc)) {
+            return true;
+        }
+        $class = self::classPrefix($selfLc);
+        if ('' !== $class) {
+            $scoped = $class.'::'.$methodLc;
+            if (!empty($context->noThrowUserFunctions[$scoped])) {
+                return true;
+            }
+        }
+        if (!empty($context->noThrowUserFunctions[$methodLc])) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static function literalMethodNameLc(Block $block, ?int $nameSlot): ?string
+    {
+        if (null === $nameSlot) {
+            return null;
+        }
+        $nameOp = $block->getOperand($nameSlot);
+        if (!$nameOp instanceof Operand\Literal && isset($block->constants[$nameSlot])) {
+            $nameOp = new Operand\Literal($block->constants[$nameSlot]->toString());
+        }
+        if (!$nameOp instanceof Operand\Literal) {
+            return null;
+        }
+        $raw = is_string($nameOp->value) ? $nameOp->value : (string) $nameOp->value;
+        if ('' === $raw) {
+            return null;
+        }
+
+        return strtolower($raw);
+    }
+
     private static function bareName(string $scopedLc): string
     {
         $pos = strrpos($scopedLc, '::');
@@ -205,5 +264,15 @@ final class NoThrowCallElision
         }
 
         return substr($scopedLc, $pos + 2);
+    }
+
+    private static function classPrefix(string $scopedLc): string
+    {
+        $pos = strrpos($scopedLc, '::');
+        if (false === $pos) {
+            return '';
+        }
+
+        return substr($scopedLc, 0, $pos);
     }
 }
