@@ -231,16 +231,13 @@ final class NoThrowCallElision
             // __toString (peer strlen / string transforms).
             return self::stringParamBuiltinArgCannotThrow($callArgs[0]);
         }
-        if ('strlen' === $name || 'ord' === $name || self::isPureStringTransformBuiltin($name)) {
+        if ('strlen' === $name || 'ord' === $name) {
             // Z_PARAM_STR family — __toString only on object / value-box.
-            // trim/ltrim/rtrim optional $characters must also be throw-free.
-            foreach ($callArgs as $arg) {
-                if (!$arg instanceof Variable || !self::stringParamBuiltinArgCannotThrow($arg)) {
-                    return false;
-                }
-            }
-
-            return true;
+            return self::stringParamBuiltinArgCannotThrow($callArgs[0]);
+        }
+        if (self::isPureStringTransformBuiltin($name)) {
+            // Mixed STR + optional LONG/BOOL (md5 binary, dirname levels, …).
+            return self::stringTransformArgsCannotThrow($name, $callArgs);
         }
         if (self::isPureHtmlEscapeBuiltin($name)) {
             // html.c / string.c / exec.c — mixed STR + LONG/BOOL; encoding may be null.
@@ -404,9 +401,100 @@ final class NoThrowCallElision
             case 'convert_uuencode':
             case 'hebrev':
             case 'hebrevc':
+            // quot_print.c / basename.c / file.c — Z_PARAM_STR (+ optional typed
+            // trailing args handled by stringTransformArgsCannotThrow).
+            case 'quoted_printable_encode':
+            case 'quoted_printable_decode':
+            case 'basename':
+            case 'dirname':
                 return true;
             default:
                 return false;
+        }
+    }
+
+    /**
+     * Arg proofs for {@see isPureStringTransformBuiltin} — mixed STR + optional
+     * LONG/BOOL trailing params. Public for symmetry with other string families.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    public static function stringTransformArgsCannotThrow(string $nameLc, array $callArgs): bool
+    {
+        if ([] === $callArgs) {
+            return false;
+        }
+        switch ($nameLc) {
+            case 'md5':
+            case 'sha1':
+            case 'metaphone':
+            case 'hebrev':
+            case 'hebrevc':
+                if (
+                    !isset($callArgs[0])
+                    || !$callArgs[0] instanceof Variable
+                    || !self::stringParamBuiltinArgCannotThrow($callArgs[0])
+                ) {
+                    return false;
+                }
+                if (!isset($callArgs[1])) {
+                    return true;
+                }
+                if (
+                    !$callArgs[1] instanceof Variable
+                    || !self::numericParamBuiltinArgCannotThrow($callArgs[1])
+                ) {
+                    return false;
+                }
+
+                return !isset($callArgs[2]);
+            case 'dirname':
+                // ValueError when levels < 1 — only compile-time levels≥1 prove.
+                if (
+                    !isset($callArgs[0])
+                    || !$callArgs[0] instanceof Variable
+                    || !self::stringParamBuiltinArgCannotThrow($callArgs[0])
+                ) {
+                    return false;
+                }
+                if (!isset($callArgs[1])) {
+                    return true;
+                }
+                if (!$callArgs[1] instanceof Variable || isset($callArgs[2])) {
+                    return false;
+                }
+
+                return null !== $callArgs[1]->compileTimeLong
+                    && $callArgs[1]->compileTimeLong >= 1;
+            case 'basename':
+                if (
+                    !isset($callArgs[0])
+                    || !$callArgs[0] instanceof Variable
+                    || !self::stringParamBuiltinArgCannotThrow($callArgs[0])
+                ) {
+                    return false;
+                }
+                if (!isset($callArgs[1])) {
+                    return true;
+                }
+
+                return $callArgs[1] instanceof Variable
+                    && self::stringParamBuiltinArgCannotThrow($callArgs[1])
+                    && !isset($callArgs[2]);
+            case 'quoted_printable_encode':
+            case 'quoted_printable_decode':
+                return isset($callArgs[0])
+                    && $callArgs[0] instanceof Variable
+                    && self::stringParamBuiltinArgCannotThrow($callArgs[0])
+                    && !isset($callArgs[1]);
+            default:
+                foreach ($callArgs as $arg) {
+                    if (!$arg instanceof Variable || !self::stringParamBuiltinArgCannotThrow($arg)) {
+                        return false;
+                    }
+                }
+
+                return true;
         }
     }
 

@@ -11,11 +11,13 @@ use PHPCompiler\ext\standard\addcslashes;
 use PHPCompiler\ext\standard\addslashes;
 use PHPCompiler\ext\standard\array_count;
 use PHPCompiler\ext\standard\base64_encode;
+use PHPCompiler\ext\standard\basename;
 use PHPCompiler\ext\standard\bin2hex;
 use PHPCompiler\ext\standard\chr;
 use PHPCompiler\ext\standard\chunk_split;
 use PHPCompiler\ext\standard\convert_uuencode;
 use PHPCompiler\ext\standard\crc32;
+use PHPCompiler\ext\standard\dirname;
 use PHPCompiler\ext\standard\escapeshellarg;
 use PHPCompiler\ext\standard\escapeshellcmd;
 use PHPCompiler\ext\standard\explode;
@@ -32,6 +34,8 @@ use PHPCompiler\ext\standard\nl2br;
 use PHPCompiler\ext\standard\ord;
 use PHPCompiler\ext\standard\pow;
 use PHPCompiler\ext\standard\preg_quote;
+use PHPCompiler\ext\standard\quoted_printable_decode;
+use PHPCompiler\ext\standard\quoted_printable_encode;
 use PHPCompiler\ext\standard\quotemeta;
 use PHPCompiler\ext\standard\rawurldecode;
 use PHPCompiler\ext\standard\rawurlencode;
@@ -500,15 +504,15 @@ final class DiscardedPureCallElisionTest extends TestCase
         $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
     }
 
-    public function testDoesNotElideMd5WithBoolBinaryArg(): void
+    public function testElidesDiscardedMd5WithBoolBinaryArg(): void
     {
-        // Optional $binary is not a string slot — keep the call (#36386).
+        // Optional $binary is Z_PARAM_BOOL — typed bool/long is side-effect-free (#36386).
         $context = $this->makeContext();
         $builtin = new md5();
         $str = $this->makeStringVar('ab');
         $raw = $this->makeNativeBoolVar();
 
-        $this->assertFalse(DiscardedPureCallElision::tryElide($context, $builtin, [$str, $raw]));
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$str, $raw]));
     }
 
     public function testDoesNotElideCrc32OnNull(): void
@@ -982,6 +986,103 @@ final class DiscardedPureCallElisionTest extends TestCase
         ));
     }
 
+    public function testElidesDiscardedQuotedPrintableBasenameDirname(): void
+    {
+        // php-src quot_print.c / basename.c / file.c — Z_PARAM_STR family;
+        // dirname levels must be compile-time ≥1 (ValueError otherwise) (#36386).
+        $context = $this->makeContext();
+        $s = $this->makeStringVar(null);
+        $lit = $this->makeStringVar('/a/b.php');
+        $suffix = $this->makeStringVar('.php');
+        $levelsOk = $this->makeCompileTimeLongVar(2);
+        $levelsBad = $this->makeCompileTimeLongVar(0);
+        $levelsUnknown = $this->makeNativeLongVar();
+        $binary = $this->makeNativeBoolVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new quoted_printable_encode(),
+            [$s]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new quoted_printable_decode(),
+            [$lit]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new basename(),
+            [$lit]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new basename(),
+            [$lit, $suffix]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new dirname(),
+            [$lit]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new dirname(),
+            [$lit, $levelsOk]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new md5(),
+            [$s, $binary]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new sha1(),
+            [$s, $binary]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new metaphone(),
+            [$s, $levelsOk]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new hebrev(),
+            [$s, $levelsOk]
+        ));
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new dirname(),
+            [$lit, $levelsBad]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new dirname(),
+            [$lit, $levelsUnknown]
+        ));
+        $null = $this->makeNullVar();
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new quoted_printable_encode(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new basename(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new dirname(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new md5(),
+            [$s, $null]
+        ));
+    }
+
     public function testJitWiresElisionBeforeInvoke(): void
     {
         $compile = (string) file_get_contents(
@@ -1050,6 +1151,14 @@ final class DiscardedPureCallElisionTest extends TestCase
         $kindProp = $ref->getProperty('kind');
         $kindProp->setAccessible(true);
         $kindProp->setValue($var, Variable::KIND_VARIABLE);
+
+        return $var;
+    }
+
+    private function makeCompileTimeLongVar(int $value): Variable
+    {
+        $var = $this->makeNativeLongVar();
+        $var->compileTimeLong = $value;
 
         return $var;
     }

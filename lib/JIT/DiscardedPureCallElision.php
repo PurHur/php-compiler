@@ -19,6 +19,7 @@ use PHPCompiler\VM\Variable as VmVariable;
  * str_ends_with/…, typed str_pad/chunk_split/wordwrap/str_split/explode,
  * typed str_replace/str_ireplace/substr_replace/strtr (string forms),
  * typed addcslashes/stripcslashes/strpbrk,
+ * typed quoted_printable_encode/decode, basename/dirname,
  * typed htmlspecialchars/htmlentities/nl2br/preg_quote/
  * escapeshell*, typed-numeric chr, type.c predicates + gettype, ctype.c
  * classifiers on typed/literal strings, typed-array count/sizeof, math.c
@@ -31,7 +32,8 @@ use PHPCompiler\VM\Variable as VmVariable;
  * warnings / false returns). Int needles for {@code strpos}/{@code strchr}/…
  * stay live (PHP 8 deprecations). Array {@code str_replace}/{@code implode}
  * stay live (element {@code __toString}); {@code str_replace} {@code &$count}
- * stays live (by-ref write).
+ * stays live (by-ref write). {@code dirname} with a non-constant {@code $levels}
+ * stays live ({@code ValueError} when {@code $levels < 1}).
  */
 final class DiscardedPureCallElision
 {
@@ -193,10 +195,13 @@ final class DiscardedPureCallElision
      * Discarded {@code strtolower}/{@code ucwords}/{@code bin2hex}/
      * {@code urlencode}/{@code str_rot13}/{@code quotemeta}/{@code md5}/
      * {@code crc32}/{@code base64_encode}/{@code soundex}/
-     * {@code addcslashes}/{@code stripcslashes}/… on typed / literal strings —
-     * php-src {@code string.c}/{@code url.c}/{@code md5.c}/{@code crc32.c}/
-     * {@code base64.c} Z_PARAM_STR family; soft null / object {@code __toString}
-     * stay live (peer {@see tryElideStrlenNoSideEffect}).
+     * {@code addcslashes}/{@code stripcslashes}/
+     * {@code quoted_printable_*}/{@code basename}/{@code dirname}/… on typed /
+     * literal strings (+ optional typed numeric/bool trailing args) — php-src
+     * {@code string.c}/{@code url.c}/{@code md5.c}/{@code crc32.c}/
+     * {@code base64.c}/{@code quot_print.c}/{@code basename.c}/{@code file.c}
+     * Z_PARAM_STR family; soft null / object {@code __toString} stay live
+     * (peer {@see tryElideStrlenNoSideEffect}).
      *
      * @param array<int, Variable> $callArgs
      */
@@ -205,19 +210,99 @@ final class DiscardedPureCallElision
         if (!$toCall instanceof CoreFuncInternal) {
             return false;
         }
-        if (!NoThrowCallElision::isPureStringTransformBuiltin(strtolower($toCall->getName()))) {
+        $name = strtolower($toCall->getName());
+        if (!NoThrowCallElision::isPureStringTransformBuiltin($name)) {
             return false;
         }
+
+        return self::stringTransformArgsAllowDiscardedElision($name, $callArgs);
+    }
+
+    /**
+     * @param array<int, Variable> $callArgs
+     */
+    private static function stringTransformArgsAllowDiscardedElision(string $nameLc, array $callArgs): bool
+    {
         if ([] === $callArgs) {
             return false;
         }
-        foreach ($callArgs as $arg) {
-            if (!$arg instanceof Variable || !self::stringArgAllowsDiscardedElision($arg)) {
-                return false;
-            }
-        }
+        switch ($nameLc) {
+            case 'md5':
+            case 'sha1':
+            case 'metaphone':
+            case 'hebrev':
+            case 'hebrevc':
+                // string [, long|bool trailing] — binary / phonemes / max_chars.
+                if (
+                    !isset($callArgs[0])
+                    || !$callArgs[0] instanceof Variable
+                    || !self::stringArgAllowsDiscardedElision($callArgs[0])
+                ) {
+                    return false;
+                }
+                if (!isset($callArgs[1])) {
+                    return true;
+                }
+                if (
+                    !$callArgs[1] instanceof Variable
+                    || !self::mathArgAllowsDiscardedElision($callArgs[1])
+                ) {
+                    return false;
+                }
 
-        return true;
+                return !isset($callArgs[2]);
+            case 'dirname':
+                // string [, long levels≥1] — ValueError when levels < 1 (php-src
+                // basename.c / file.c peer). Unknown typed ints stay live.
+                if (
+                    !isset($callArgs[0])
+                    || !$callArgs[0] instanceof Variable
+                    || !self::stringArgAllowsDiscardedElision($callArgs[0])
+                ) {
+                    return false;
+                }
+                if (!isset($callArgs[1])) {
+                    return true;
+                }
+                if (!$callArgs[1] instanceof Variable || isset($callArgs[2])) {
+                    return false;
+                }
+
+                return null !== $callArgs[1]->compileTimeLong
+                    && $callArgs[1]->compileTimeLong >= 1;
+            case 'basename':
+                // string [, string suffix]
+                if (
+                    !isset($callArgs[0])
+                    || !$callArgs[0] instanceof Variable
+                    || !self::stringArgAllowsDiscardedElision($callArgs[0])
+                ) {
+                    return false;
+                }
+                if (!isset($callArgs[1])) {
+                    return true;
+                }
+
+                return $callArgs[1] instanceof Variable
+                    && self::stringArgAllowsDiscardedElision($callArgs[1])
+                    && !isset($callArgs[2]);
+            case 'quoted_printable_encode':
+            case 'quoted_printable_decode':
+                // single Z_PARAM_STR
+                return isset($callArgs[0])
+                    && $callArgs[0] instanceof Variable
+                    && self::stringArgAllowsDiscardedElision($callArgs[0])
+                    && !isset($callArgs[1]);
+            default:
+                // strtolower / trim / urlencode / addcslashes / … — all string slots.
+                foreach ($callArgs as $arg) {
+                    if (!$arg instanceof Variable || !self::stringArgAllowsDiscardedElision($arg)) {
+                        return false;
+                    }
+                }
+
+                return true;
+        }
     }
 
     /**
