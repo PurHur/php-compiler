@@ -4,35 +4,32 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for exp() via ExpJitHelper PHP (#15116, #27047, #28241).
+ * JIT/AOT link for exp() via {@code llvm.exp.f64} (#36386).
  *
- * Helper compile: {@see JitVmHelperLink::ensureBridge} (MathTan #28226 / MathCos #28042 shape).
- * NestedJIT no longer needs a libc exp(3) kernel — helper uses NestedJIT-safe ln2 + Horner.
- * php-src: ext/standard/math.c — PHP_FUNCTION(exp)
+ * Peer of {@see MathSin} / {@see MathFloor}: avoid NestedJIT helper objects on
+ * the AOT hot path. php-src {@code ext/standard/math.c} {@code PHP_FUNCTION(exp)}
+ * → C {@code exp}; the LLVM intrinsic matches IEEE libm behaviour.
+ * The PHP Taylor/Horner helper remains for NestedJIT-safe reference only.
  */
 final class MathExp
 {
+    private const LLVM_EXP = 'llvm.exp.f64';
+
+    /** Legacy ABI kept as a thin intrinsic wrapper for any external callers. */
     private const ABI_EXP = 'phpc_exp';
 
-    private const HELPER_PATH = '/ext/standard/ExpJitHelper.php';
-
-    private const EXP_HELPER = 'PHPCompiler\\ext\\standard\\ExpJitHelper::expArgv';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::EXP_HELPER,
-    ];
-
-    private const BRIDGE_ENTRY = 'exp_bridge_entry';
+    private const BRIDGE_ENTRY = 'exp_llvm_f64_entry';
 
     public static function ensureLinked(Context $context): void
     {
-        self::implement($context);
+        self::llvmExpIntrinsic($context);
+        self::ensurePhpcExpBridge($context);
     }
 
     public static function ensureStandaloneBodies(Context $context): void
@@ -42,34 +39,56 @@ final class MathExp
 
     public static function invoke(Context $context, Value $num): Value
     {
-        self::ensureLinked($context);
+        return $context->builder->call(self::llvmExpIntrinsic($context), $num);
+    }
 
-        return $context->builder->call(
-            $context->lookupFunction(self::ABI_EXP),
-            $num
+    private static function llvmExpIntrinsic(Context $context): LlvmFunction
+    {
+        $func = $context->module->getNamedFunction(self::LLVM_EXP);
+        if (null !== $func) {
+            return $func;
+        }
+        $double = $context->getTypeFromString('double');
+
+        return $context->module->addFunction(
+            self::LLVM_EXP,
+            $context->context->functionType($double, false, $double)
         );
     }
 
-    private static function implement(Context $context): void
+    /**
+     * Define {@code phpc_exp} → {@code llvm.exp.f64} when missing. Skip if a
+     * prior NestedJIT bridge already filled the symbol (cannot replace LLVM
+     * bodies); {@see invoke} never calls that stale path.
+     */
+    private static function ensurePhpcExpBridge(Context $context): void
     {
         $probe = $context->module->getNamedFunction(self::ABI_EXP);
-        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction(self::ABI_EXP, $probe);
 
             return;
         }
 
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         $double = $context->getTypeFromString('double');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_EXP,
-            self::BRIDGE_ENTRY,
-            [$double],
-            $double,
-            self::EXP_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#28241'
+        $fn = $probe;
+        if (null === $fn) {
+            $fn = $context->module->addFunction(
+                self::ABI_EXP,
+                $context->context->functionType($double, false, $double)
+            );
+        }
+        $entry = $fn->appendBasicBlock(self::BRIDGE_ENTRY);
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue(
+            $context->builder->call(self::llvmExpIntrinsic($context), $fn->getParam(0))
         );
+        $context->registerFunction(self::ABI_EXP, $fn);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 }

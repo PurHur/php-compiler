@@ -9,20 +9,24 @@ use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
 /**
- * exp() NestedJIT via JitVmHelperLink::ensureBridge (#28241 / peer MathTan #28226).
+ * exp() AOT uses llvm.exp.f64 (#36386); ExpJitHelper remains NestedJIT-safe
+ * reference (peer MathSin / SinJitHelper).
+ *
+ * php-src: ext/standard/math.c PHP_FUNCTION(exp).
  */
 final class ExpRuntimeShrinkTest extends TestCase
 {
-    public function testExpUsesJitHelperNotKernel(): void
+    public function testExpUsesLlvmIntrinsicNotHelperBridge(): void
     {
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/exp.php');
         $this->assertStringContainsString('MathExp::invoke', $builtin);
         $this->assertStringNotContainsString("lookupFunction('exp')", $builtin);
 
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathExp.php');
-        $this->assertStringContainsString('ExpJitHelper', $bridge);
+        $this->assertStringContainsString('llvm.exp.f64', $bridge);
         $this->assertStringContainsString('phpc_exp', $bridge);
-        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('ExpJitHelper', $bridge);
         $this->assertStringNotContainsString('JitExpKernel', $bridge);
         $this->assertStringNotContainsString('NestedJitCompileScope', $bridge);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
