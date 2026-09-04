@@ -24,12 +24,13 @@ use PHPCompiler\VM\Variable as VmVariable;
  * escapeshell*, typed-numeric chr/number_format, typed similar_text
  * (2-arg), typed intval/floatval/boolval/strval, typed decbin/dechex/
  * decoct / bindec/hexdec/octdec / base_convert (compile-time bases in
- * [2,36]), typed ip2long/long2ip, typed version_compare, zero-arg pi,
- * type.c predicates + gettype/get_debug_type, ctype.c classifiers on
- * typed/literal strings, typed-array count/sizeof, math.c incl. pow/
- * fpow/fdiv on already-numeric args, empty void user functions).
- * Soft-null strlen / ord / chr / math / string / ctype coercions are NOT
- * elided — they emit deprecations (PHP 8.1+). Countable objects stay live
+ * [2,36]), typed ip2long/long2ip/inet_pton/inet_ntop, typed version_compare,
+ * typed min/max/fmin/fmax (≥1 numeric; array-form min/max stays live),
+ * zero-arg pi, type.c predicates + gettype/get_debug_type, ctype.c
+ * classifiers on typed/literal strings, typed-array count/sizeof, math.c
+ * incl. pow/fpow/fdiv on already-numeric args, empty void user functions).
+ * Soft-null strlen / ord / chr / math / string / ctype / inet coercions are
+ * NOT elided — they emit deprecations (PHP 8.1+). Countable objects stay live
  * (user {@code count()} handlers). {@code intdiv} is never discarded here
  * (DivisionByZeroError must stay observable). {@code hex2bin}/
  * {@code base64_decode}/{@code convert_uudecode} stay live (invalid-input
@@ -44,6 +45,8 @@ use PHPCompiler\VM\Variable as VmVariable;
  * {@code __toString}). {@code base_convert} with non-constant bases stays
  * live ({@code ValueError} outside [2,36]). {@code version_compare} with an
  * unknown typed operator stays live ({@code ValueError} on invalid ops).
+ * Single-array {@code min}/{@code max} stays live (element compare / object
+ * handlers).
  */
 final class DiscardedPureCallElision
 {
@@ -92,6 +95,9 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureInetNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureMinMaxNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureVersionCompareNoSideEffect($toCall, $callArgs)) {
@@ -1009,8 +1015,9 @@ final class DiscardedPureCallElision
     }
 
     /**
-     * Discarded {@code ip2long} on typed / literal strings and {@code long2ip}
-     * on typed numerics — php-src {@code basic_functions.c}. Soft-null stays live.
+     * Discarded {@code ip2long}/{@code inet_pton}/{@code inet_ntop} on typed /
+     * literal strings and {@code long2ip} on typed numerics — php-src
+     * {@code basic_functions.c}. Soft-null stays live.
      *
      * @param array<int, Variable> $callArgs
      */
@@ -1025,6 +1032,26 @@ final class DiscardedPureCallElision
         }
 
         return self::inetArgsAllowDiscardedElision($name, $callArgs);
+    }
+
+    /**
+     * Discarded {@code min}/{@code max}/{@code fmin}/{@code fmax} on typed
+     * numeric scalars — php-src {@code array.c} / {@code math.c}. Single-array
+     * {@code min}/{@code max} and soft-null stay live.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureMinMaxNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        $name = strtolower($toCall->getName());
+        if (!NoThrowCallElision::isPureMinMaxBuiltin($name)) {
+            return false;
+        }
+
+        return self::minMaxArgsAllowDiscardedElision($name, $callArgs);
     }
 
     /**
@@ -1094,12 +1121,40 @@ final class DiscardedPureCallElision
         }
         switch ($nameLc) {
             case 'ip2long':
+            case 'inet_pton':
+            case 'inet_ntop':
                 return self::stringArgAllowsDiscardedElision($callArgs[0]);
             case 'long2ip':
                 return self::mathArgAllowsDiscardedElision($callArgs[0]);
             default:
                 return false;
         }
+    }
+
+    /**
+     * Typed numeric scalars only. Single-array {@code min}/{@code max} stays live.
+     * {@code fmin}/{@code fmax} need ≥2 args (ArgumentCountError otherwise).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function minMaxArgsAllowDiscardedElision(string $nameLc, array $callArgs): bool
+    {
+        if ([] === $callArgs) {
+            return false;
+        }
+        if (('fmin' === $nameLc || 'fmax' === $nameLc) && \count($callArgs) < 2) {
+            return false;
+        }
+        if (1 === \count($callArgs) && self::isTypedArrayArg($callArgs[0])) {
+            return false;
+        }
+        foreach ($callArgs as $arg) {
+            if (!$arg instanceof Variable || !self::mathArgAllowsDiscardedElision($arg)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
