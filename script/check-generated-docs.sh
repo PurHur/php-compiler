@@ -65,6 +65,9 @@ step "apps-scoreboard --check" "$PHP_BIN" script/apps/scoreboard.php --check
 # 13. Honest README / docs status snapshot (#36395) — numbers must come from status JSON
 step "status-snapshot --check" "$PHP_BIN" script/status/snapshot.php --check
 
+# 14. ADR index completeness (#36402) — every docs/adr/*.md listed; required set present
+step "check-adr-index" ./script/lib/check-adr-index.sh
+
 if [[ "$fail" -ne 0 ]]; then
   echo "check-generated-docs: drift detected — regenerate in the pinned env (see CONTRIBUTING 'Generated docs')" >&2
   exit 1

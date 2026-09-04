@@ -5,6 +5,8 @@ or `script/`.
 
 Detailed rules live in `.cursor/rules/*.mdc` (Cursor loads them automatically; read them directly
 if your tool does not). Roadmap and release criteria live in `docs/roadmap/`.
+**Architecture decisions:** [`docs/adr/README.md`](docs/adr/README.md) — new architectural PRs
+must reference an ADR or add one (#36402).
 
 ---
 
