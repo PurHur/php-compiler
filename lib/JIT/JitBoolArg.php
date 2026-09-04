@@ -92,6 +92,15 @@ final class JitBoolArg
             return self::coerceNativeStringToBool($context, $context->helper->loadValue($arg));
         }
         if (Variable::TYPE_VALUE === $arg->type) {
+            // LSB static::$bool (#36382): fetchByRuntimeClassId boxes into TYPE_VALUE but
+            // keeps staticPropertyGlobal as i1* — load that directly (peer JUMPIF path).
+            if (
+                null !== $arg->staticPropertyGlobal
+                && Variable::TYPE_NATIVE_BOOL === ($arg->staticPropertyType ?? -1)
+            ) {
+                return $context->builder->load($arg->staticPropertyGlobal);
+            }
+
             return self::lowerBoxedCoerce($context, $arg, $contextLabel, true);
         }
         if (Variable::TYPE_NULL === $arg->type) {
@@ -138,6 +147,13 @@ final class JitBoolArg
             self::emitTypeErrorAndAbort($context, $contextLabel, 'string');
         }
         if (Variable::TYPE_VALUE === $arg->type) {
+            if (
+                null !== $arg->staticPropertyGlobal
+                && Variable::TYPE_NATIVE_BOOL === ($arg->staticPropertyType ?? -1)
+            ) {
+                return $context->builder->load($arg->staticPropertyGlobal);
+            }
+
             return self::lowerBoxed($context, $arg, $contextLabel);
         }
         if (Variable::TYPE_NULL === $arg->type) {
@@ -264,20 +280,11 @@ final class JitBoolArg
         $i8 = $context->getTypeFromString('int8');
         $i1 = $context->getTypeFromString('int1');
 
-        if ($coerceNull) {
-            $nullBlock = BasicBlockHelper::append($context, 'jit_bool_vbox_coerce_null');
-            $afterNull = BasicBlockHelper::append($context, 'jit_bool_vbox_after_coerce_null');
-            $isNull = $context->builder->icmp(
-                Builder::INT_EQ,
-                $typeByte,
-                $i8->constInt(VmVariable::TYPE_NULL, false)
-            );
-            $context->builder->branchIf($isNull, $nullBlock, $afterNull);
-            $context->builder->positionAtEnd($nullBlock);
-
-            return $context->constantFromBool(false);
-        }
-
+        // Null-coercion must not early-return from PHP: that left afterNull as
+        // `unreachable` and segfaulted on non-null boxes (LSB typed static bool return, #36382).
+        $coerceMerge = null;
+        $nullFalse = null;
+        $nullEnd = null;
         $rejectTypes = [
             [VmVariable::TYPE_ARRAY, 'array'],
             [VmVariable::TYPE_OBJECT, 'object'],
@@ -285,6 +292,19 @@ final class JitBoolArg
             [VmVariable::TYPE_STRING, 'string'],
         ];
         if ($coerceNull) {
+            $nullBlock = BasicBlockHelper::append($context, 'jit_bool_vbox_coerce_null');
+            $afterNull = BasicBlockHelper::append($context, 'jit_bool_vbox_after_coerce_null');
+            $coerceMerge = BasicBlockHelper::append($context, 'jit_bool_vbox_coerce_merge');
+            $isNull = $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(VmVariable::TYPE_NULL, false)
+            );
+            $context->builder->branchIf($isNull, $nullBlock, $afterNull);
+            $context->builder->positionAtEnd($nullBlock);
+            $nullFalse = $context->constantFromBool(false);
+            $nullEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($coerceMerge);
             $context->builder->positionAtEnd($afterNull);
             $rejectTypes = [
                 [VmVariable::TYPE_ARRAY, 'array'],
@@ -351,6 +371,17 @@ final class JitBoolArg
         $phi = $context->builder->phi($i1);
         $phi->addIncoming($boolVal, $boolEnd);
         $phi->addIncoming($longVal, $longEnd);
+
+        if (null !== $coerceMerge) {
+            $nonNullEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($coerceMerge);
+            $context->builder->positionAtEnd($coerceMerge);
+            $out = $context->builder->phi($i1);
+            $out->addIncoming($nullFalse, $nullEnd);
+            $out->addIncoming($phi, $nonNullEnd);
+
+            return $out;
+        }
 
         return $phi;
     }
@@ -451,12 +482,21 @@ final class JitBoolArg
         if (Variable::KIND_VALUE !== $arg->kind) {
             return 'object';
         }
+        // TYPE_VALUE boxes are `__value__*` allocas — not `__object__*` / `__enum_case__*`.
+        // GEP+load yields a non-constant Instruction; getConstantValue() then fatals (#36382).
+        if (Variable::TYPE_VALUE === $arg->type || Variable::TYPE_OBJECT !== $arg->type) {
+            return 'object';
+        }
         $objMap = $context->structFieldMap['__object__'] ?? null;
         if (null !== $objMap && isset($objMap['class_id'])) {
             $classIdVal = $context->builder->load(
                 $context->builder->structGep($arg->value, $objMap['class_id'])
             );
-            if (method_exists($classIdVal, 'isConstant') && $classIdVal->isConstant()) {
+            if (
+                method_exists($classIdVal, 'isConstant')
+                && $classIdVal->isConstant()
+                && method_exists($classIdVal, 'getConstantValue')
+            ) {
                 $classId = (int) $classIdVal->getConstantValue();
 
                 return $context->type->object->classNameForId($classId);
@@ -467,7 +507,11 @@ final class JitBoolArg
             $classIdVal = $context->builder->load(
                 $context->builder->structGep($arg->value, $enumMap['class_id'])
             );
-            if (method_exists($classIdVal, 'isConstant') && $classIdVal->isConstant()) {
+            if (
+                method_exists($classIdVal, 'isConstant')
+                && $classIdVal->isConstant()
+                && method_exists($classIdVal, 'getConstantValue')
+            ) {
                 $classId = (int) $classIdVal->getConstantValue();
 
                 return $context->type->object->classNameForId($classId);
