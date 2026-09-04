@@ -782,6 +782,10 @@ trait AdjacentNestedCallArgSlots
             if ($mid instanceof Op\Expr\ConstFetch || $mid instanceof Op\Expr\ClassConstFetch) {
                 continue;
             }
+            if ($mid instanceof Op\Expr\ArrayDimFetch) {
+                // show(id($t), $t[0]) — dim is a sibling arg prelude, not a barrier (#36380).
+                continue;
+            }
             if ($this->isUnaryInlineSiblingCallArgExpr($mid)) {
                 continue;
             }
@@ -793,6 +797,40 @@ trait AdjacentNestedCallArgSlots
         }
 
         return true;
+    }
+
+    /**
+     * Lone hoisted FuncCall before a multi-arg consumer with only ArrayDimFetch (and optional
+     * scalar/unary) preludes between them — needs EXEC_RETURN (#36380).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function nestedFuncCallProducerSeparatedByDimFetchPreludesOnly(
+        int $producerIndex,
+        int $consumerIndex,
+        array $cfgChildren
+    ): bool {
+        if ($producerIndex >= $consumerIndex - 1) {
+            return false;
+        }
+        $sawDim = false;
+        for ($j = $producerIndex + 1; $j < $consumerIndex; ++$j) {
+            $mid = $cfgChildren[$j] ?? null;
+            if ($mid instanceof Op\Expr\ArrayDimFetch) {
+                $sawDim = true;
+                continue;
+            }
+            if ($mid instanceof Op\Expr\ConstFetch || $mid instanceof Op\Expr\ClassConstFetch) {
+                continue;
+            }
+            if ($this->isUnaryInlineSiblingCallArgExpr($mid)) {
+                continue;
+            }
+
+            return false;
+        }
+
+        return $sawDim;
     }
 
     /**

@@ -274,15 +274,45 @@ trait RewireInlineCallArgSendSlots
             return false;
         }
         $consumerIndex = $producerIndex + 1;
+        // Skip dim-fetch / scalar preludes that feed other call args (#36380):
+        // show(id($t), $t[0]) — id must EXEC_RETURN despite ArrayDimFetch between.
+        $scanEnd = min(\count($cfgChildren), $producerIndex + 1 + 8);
+        while ($consumerIndex < $scanEnd) {
+            $gap = $cfgChildren[$consumerIndex] ?? null;
+            if (
+                $gap instanceof Op\Expr\ArrayDimFetch
+                || $gap instanceof Op\Expr\ConstFetch
+                || $gap instanceof Op\Expr\ClassConstFetch
+                || $this->isUnaryInlineSiblingCallArgExpr($gap)
+            ) {
+                ++$consumerIndex;
+                continue;
+            }
+            break;
+        }
         $consumer = $cfgChildren[$consumerIndex] ?? null;
         if (
             null !== $consumer
             && $this->isInlineExprCallArgConsumer($consumer)
-            && $this->isAdjacentNestedFuncCallProducer(
-                $cfgCallOp,
-                $consumer,
-                $producerIndex,
-                $consumerIndex
+            && (
+                $this->isAdjacentNestedFuncCallProducer(
+                    $cfgCallOp,
+                    $consumer,
+                    $producerIndex,
+                    $consumerIndex
+                )
+                || (
+                    $consumerIndex > $producerIndex + 1
+                    && $this->nestedFuncCallProducerSeparatedByDimFetchPreludesOnly(
+                        $producerIndex,
+                        $consumerIndex,
+                        $cfgChildren
+                    )
+                    && property_exists($consumer, 'args')
+                    && \is_array($consumer->args)
+                    && \count($consumer->args) >= 2
+                    && $this->deadInlineTemporaryArgCount($consumer) >= 1
+                )
             )
         ) {
             return true;

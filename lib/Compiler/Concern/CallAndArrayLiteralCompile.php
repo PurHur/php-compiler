@@ -709,6 +709,19 @@ trait CallAndArrayLiteralCompile
             )) {
                 return true;
             }
+            // show(id($t), $t[0]) / chop($Line['text'], ' ') then $Line['text'][0] — lone FuncCall
+            // separated only by ArrayDimFetch sibling args. Without EXEC_RETURN both ARG_SENDs
+            // collapse onto the dim slot (Parsedown setext/table, #36380; peer #23354).
+            if (
+                $this->nestedFuncCallProducerSeparatedByDimFetchPreludesOnly(
+                    $producerIndex,
+                    $consumerIndex,
+                    $cfgChildren
+                )
+                && $this->deadInlineTemporaryArgCount($consumer) >= 1
+            ) {
+                return true;
+            }
             if (
                 null === $firstSibling
                 || $this->countSiblingInlineFuncCallProducers($firstSibling, $consumerIndex, $cfgChildren) < 2
