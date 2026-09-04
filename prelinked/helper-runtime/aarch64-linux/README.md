@@ -12,7 +12,14 @@ non-native link.
 (and `common.o` when present) has ELF `e_machine=183` (EM_AARCH64).
 
 Seed units may be published from any host with LLVM 9 AArch64 (object emit only). Full corpus
-refresh still needs a native aarch64 machine (or a longer QEMU job outside the 20 min cap):
+refresh still needs a native aarch64 machine (or a longer QEMU job outside the 20 min cap).
+
+On x86_64 CI, prove user-program object emit for the aarch64 triple (no link) via:
+
+```bash
+./script/aot-smoke-cross-emit.sh                  # 8/8 EM_AARCH64 objects
+# native aarch64: also runs full ./script/aot-smoke.sh under PHP_COMPILER_TARGET
+```
 
 ```bash
 # one unit → committed tier (unique cache dir; 20 min / 8g cap)

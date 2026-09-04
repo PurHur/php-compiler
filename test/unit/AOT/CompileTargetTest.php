@@ -304,4 +304,33 @@ final class CompileTargetTest extends TestCase
         $this->assertSame(183, CompileTarget::readElfMachine($unit));
         CompileTarget::resolve(CompileTarget::ID_AARCH64_LINUX)->assertObjectMatchesTarget($unit);
     }
+
+    /**
+     * Cross-host aot-smoke subset: KEEP_OBJECT emit + ELF e_machine gate (#36391).
+     * Full link/run on arm64 still needs a native/QEMU runner.
+     */
+    public function testAotSmokeCrossEmitScriptIsWired(): void
+    {
+        $root = dirname(__DIR__, 3);
+        $script = $root.'/script/aot-smoke-cross-emit.sh';
+        $this->assertFileExists($script);
+        $this->assertTrue(is_executable($script), 'aot-smoke-cross-emit.sh must be executable');
+        $body = file_get_contents($script);
+        $this->assertNotFalse($body);
+        $this->assertStringContainsString('PHP_COMPILER_KEEP_OBJECT_FILE=1', $body);
+        $this->assertStringContainsString('readElfMachine', $body);
+        $this->assertStringContainsString('empty result set is not a pass', $body);
+        $this->assertStringContainsString('aarch64-linux', $body);
+    }
+
+    /** Doctor surface must name the active CompileTarget (#36391 Done-when). */
+    public function testDoctorCheckCompileTargetMentionsTriple(): void
+    {
+        $root = dirname(__DIR__, 3);
+        $doctor = file_get_contents($root.'/lib/Doctor.php');
+        $this->assertNotFalse($doctor);
+        $this->assertStringContainsString('checkCompileTarget', $doctor);
+        $this->assertStringContainsString('triple=%s', $doctor);
+        $this->assertStringContainsString('CompileTarget::current()', $doctor);
+    }
 }

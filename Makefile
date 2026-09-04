@@ -111,7 +111,7 @@ test-docker-fast-jit-preflight: docker-build-22
 	JIT_PREFLIGHT_GATE=1 ./script/docker-ci-local.sh fast
 
 # VM smoke: examples/001-SimpleWeb with ?name=Test
-.PHONY: check web-smoke miniwebapp-gates miniwebapp-aot-bisect north-star1-verify north-star2-verify north-star3-verify north-star4-verify north-star5-verify north-star5-verify-fast dev-verify-fast bootstrap-trust-preflight release-readiness bootstrap-gen0-staleness bootstrap-gen0-driver-functional-smoke bootstrap-gen0-refresh-argv-driver bootstrap-vendor-native-rebuild-audit spine-chunk-probe bootstrap-gen0-chunk-emit bootstrap-gen0-chunks
+.PHONY: check web-smoke miniwebapp-gates miniwebapp-aot-bisect north-star1-verify north-star2-verify north-star3-verify north-star4-verify north-star5-verify north-star5-verify-fast dev-verify-fast aot-smoke-cross-emit bootstrap-trust-preflight release-readiness bootstrap-gen0-staleness bootstrap-gen0-driver-functional-smoke bootstrap-gen0-refresh-argv-driver bootstrap-vendor-native-rebuild-audit spine-chunk-probe bootstrap-gen0-chunk-emit bootstrap-gen0-chunks
 web-smoke:
 	./script/web-smoke.sh
 
@@ -137,6 +137,10 @@ north-star5-verify-fast:
 	./script/north-star5-verify.sh --fast
 dev-verify-fast:
 	./script/dev-verify-fast.sh
+
+# Cross-target AOT object emit (default PHP_COMPILER_TARGET=aarch64-linux) — no link on x86 (#36391).
+aot-smoke-cross-emit:
+	./script/aot-smoke-cross-emit.sh $(ARGS)
 
 # Default pre-PR gate (~90s): trust preflight + gen-0 smoke + aot-smoke + VM differential tier-0 (#36211).
 check: dev-verify-fast
