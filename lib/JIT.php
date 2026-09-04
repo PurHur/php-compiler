@@ -3295,6 +3295,17 @@ class JIT {
         }
 
         $this->precompileClosuresBeforeQueue($block);
+        // CFG-only no-throw analysis must run at enqueue — `{main}` lowers method
+        // calls before runQueue fills bodies, so body-time analyzeAndRecord is too
+        // late for call-site ex_stack / pending-throw elision (#36386).
+        if (null !== $block->func && '{main}' !== $block->func->name) {
+            $analyzeName = $logicalName ?? $block->func->getScopedName();
+            JIT\NoThrowCallElision::analyzeAndRecord(
+                $this->context,
+                $block,
+                strtolower((string) $analyzeName)
+            );
+        }
         $this->queue[] = [$func, $block, $argVars];
         if ($callbackType === 'void(*)()' && !Block::containsNonLiteralEvalOpcodes($block)) {
             $this->context->addExport($internalName, $callbackType, $block);

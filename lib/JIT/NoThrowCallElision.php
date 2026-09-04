@@ -16,9 +16,14 @@ use PHPCompiler\JIT\Call\Vararg;
  *
  * php-src always records EG(current_execute_data) frames; when a function body
  * has no {@see OpCode::TYPE_THROW}, no {@see OpCode::TYPE_NEW}, no includes, and
- * only recursive self-calls (leaf recursion like {@code fibo_r}), the AOT frames
- * would never appear on an uncaught trace — paying {@code phpc_ex_stack_push/pop}
+ * only recursive self-calls (leaf recursion like {@code fibo_r}) — or no calls at
+ * all (leaf methods like {@code Node::bump}) — the AOT frames would never appear
+ * on an uncaught trace — paying {@code phpc_ex_stack_push/pop}
  * + {@code phpc_jit_has_throw_pending} on every edge is pure overhead.
+ *
+ * Analyze at enqueue time (before {@see \PHPCompiler\JIT::runQueue}), not only when
+ * the body is lowered: `{main}` resolves method calls while callees are still
+ * queued, so a body-time record is too late for call-site elision.
  */
 final class NoThrowCallElision
 {
@@ -89,7 +94,9 @@ final class NoThrowCallElision
                         return false;
                     }
                     $calleeLc = strtolower((string) $nameOp->value);
-                    if ($calleeLc !== $selfLc) {
+                    // Self-recursion uses the bare method name in CFG; scoped
+                    // `Class::method` keys must still match (#36386 leaf methods).
+                    if ($calleeLc !== $selfLc && $calleeLc !== self::bareName($selfLc)) {
                         return false;
                     }
                 }
@@ -107,5 +114,15 @@ final class NoThrowCallElision
         }
 
         return true;
+    }
+
+    private static function bareName(string $scopedLc): string
+    {
+        $pos = strrpos($scopedLc, '::');
+        if (false === $pos) {
+            return $scopedLc;
+        }
+
+        return substr($scopedLc, $pos + 2);
     }
 }
