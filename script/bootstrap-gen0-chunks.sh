@@ -22,6 +22,7 @@
 #   CHUNK_OUT_DIR       object/receipt directory (default build/chunks)
 #   CHUNK_FORCE=1       ignore fresh receipts
 #   CHUNK_LINK_BINARY=1 pass through (full link; slow)
+#   CHUNK_LINK_AFTER=1  after emit, run bootstrap-gen0-chunk-link.sh (combine; +exe if CHUNK_LINK_EXECUTABLE=1)
 #   CHUNK_KEEP_GOING=1  finish the queue even after a failure
 #   CHUNK_WAVE_BARRIER=0  disable wave barriers (parallel across waves; peer manifests race)
 set -euo pipefail
@@ -45,6 +46,7 @@ OUT_DIR="${CHUNK_OUT_DIR:-${ROOT}/build/chunks}"
 JOBS="${CHUNK_JOBS:-0}"
 FORCE="${CHUNK_FORCE:-0}"
 LINK_BINARY="${CHUNK_LINK_BINARY:-0}"
+LINK_AFTER="${CHUNK_LINK_AFTER:-0}"
 KEEP_GOING="${CHUNK_KEEP_GOING:-0}"
 WAVE_BARRIER="${CHUNK_WAVE_BARRIER:-1}"
 
@@ -335,5 +337,13 @@ echo "bootstrap-gen0-chunks: wall=${wall}s total=${total} ok=${ok} skip=${skip} 
 
 if [[ "${fail}" -gt 0 ]]; then
   exit 1
+fi
+
+if [[ "${LINK_AFTER}" == "1" ]]; then
+  echo "bootstrap-gen0-chunks: CHUNK_LINK_AFTER=1 → bootstrap-gen0-chunk-link.sh"
+  CHUNK_OUT_DIR="${OUT_DIR}" \
+    CHUNK_LINK_EXECUTABLE="${CHUNK_LINK_EXECUTABLE:-0}" \
+    CHUNK_LINK_FORCE="${CHUNK_FORCE:-0}" \
+    "${ROOT}/script/bootstrap-gen0-chunk-link.sh" --plan="${PLAN}"
 fi
 exit 0

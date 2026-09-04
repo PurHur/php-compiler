@@ -204,6 +204,7 @@ final class BootstrapGen0ChunksOrchestratorTest extends TestCase
         $this->assertStringContainsString('--max-bytes', $script);
         $this->assertStringContainsString('wave_barrier', $script);
         $this->assertStringContainsString('CHUNK_WAVE_BARRIER', $script);
+        $this->assertStringContainsString('CHUNK_LINK_AFTER', $script);
         $this->assertMatchesRegularExpression('/nproc - 2|nproc_n - 2/', $script);
     }
 
