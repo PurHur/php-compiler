@@ -4,35 +4,32 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for cos() via CosJitHelper PHP (#15087, #27005, #28042).
+ * JIT/AOT link for cos() via {@code llvm.cos.f64} (#36386).
  *
- * Helper compile: {@see JitVmHelperLink::ensureBridge} (MathSin #28016 / MathHypot #27909 shape).
- * NestedJIT no longer needs a libc cos(3) kernel — helper uses NestedJIT-safe even Taylor.
- * php-src: ext/standard/math.c — PHP_FUNCTION(cos)
+ * Peer of {@see MathSin} / {@see MathFloor}: avoid NestedJIT helper objects on
+ * the AOT hot path. php-src {@code ext/standard/math.c} {@code PHP_FUNCTION(cos)}
+ * → C {@code cos}; the LLVM intrinsic matches IEEE libm behaviour.
+ * The PHP Taylor helper remains for NestedJIT-safe reference only.
  */
 final class MathCos
 {
+    private const LLVM_COS = 'llvm.cos.f64';
+
+    /** Legacy ABI kept as a thin intrinsic wrapper for any external callers. */
     private const ABI_COS = 'phpc_cos';
 
-    private const HELPER_PATH = '/ext/standard/CosJitHelper.php';
-
-    private const COS_HELPER = 'PHPCompiler\\ext\\standard\\CosJitHelper::cosArgv';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::COS_HELPER,
-    ];
-
-    private const BRIDGE_ENTRY = 'cos_bridge_entry';
+    private const BRIDGE_ENTRY = 'cos_llvm_f64_entry';
 
     public static function ensureLinked(Context $context): void
     {
-        self::implement($context);
+        self::llvmCosIntrinsic($context);
+        self::ensurePhpcCosBridge($context);
     }
 
     public static function ensureStandaloneBodies(Context $context): void
@@ -42,34 +39,56 @@ final class MathCos
 
     public static function invoke(Context $context, Value $num): Value
     {
-        self::ensureLinked($context);
+        return $context->builder->call(self::llvmCosIntrinsic($context), $num);
+    }
 
-        return $context->builder->call(
-            $context->lookupFunction(self::ABI_COS),
-            $num
+    private static function llvmCosIntrinsic(Context $context): LlvmFunction
+    {
+        $func = $context->module->getNamedFunction(self::LLVM_COS);
+        if (null !== $func) {
+            return $func;
+        }
+        $double = $context->getTypeFromString('double');
+
+        return $context->module->addFunction(
+            self::LLVM_COS,
+            $context->context->functionType($double, false, $double)
         );
     }
 
-    private static function implement(Context $context): void
+    /**
+     * Define {@code phpc_cos} → {@code llvm.cos.f64} when missing. Skip if a
+     * prior NestedJIT bridge already filled the symbol (cannot replace LLVM
+     * bodies); {@see invoke} never calls that stale path.
+     */
+    private static function ensurePhpcCosBridge(Context $context): void
     {
         $probe = $context->module->getNamedFunction(self::ABI_COS);
-        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction(self::ABI_COS, $probe);
 
             return;
         }
 
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         $double = $context->getTypeFromString('double');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_COS,
-            self::BRIDGE_ENTRY,
-            [$double],
-            $double,
-            self::COS_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#28042'
+        $fn = $probe;
+        if (null === $fn) {
+            $fn = $context->module->addFunction(
+                self::ABI_COS,
+                $context->context->functionType($double, false, $double)
+            );
+        }
+        $entry = $fn->appendBasicBlock(self::BRIDGE_ENTRY);
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue(
+            $context->builder->call(self::llvmCosIntrinsic($context), $fn->getParam(0))
         );
+        $context->registerFunction(self::ABI_COS, $fn);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 }
