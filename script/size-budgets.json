@@ -4,9 +4,9 @@
     "done_when_ceiling": 25000,
     "files": {
         "lib/Compiler.php": {
-            "budget": 3043,
+            "budget": 2334,
             "target": 20000,
-            "note": "Concern trait splits (#36230/#36387/#36403); TryFinallyCatchAndOperandLookup + NestedArrayOutermostAndByRef + peers"
+            "note": "Concern trait splits (#36230/#36387/#36403); EchoCompileOperandTerminalAndGlobalConst + peers"
         },
         "lib/JIT.php": {
             "budget": 24670,
