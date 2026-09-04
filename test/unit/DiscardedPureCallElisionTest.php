@@ -7,9 +7,13 @@ namespace PHPCompiler\Test\Unit;
 use PHPUnit\Framework\TestCase;
 use PHPCompiler\Block;
 use PHPCompiler\ext\standard\abs;
+use PHPCompiler\ext\standard\array_count;
 use PHPCompiler\ext\standard\chr;
+use PHPCompiler\ext\standard\gettype;
 use PHPCompiler\ext\standard\ord;
 use PHPCompiler\ext\standard\sqrt;
+use PHPCompiler\ext\standard\string_trim;
+use PHPCompiler\ext\standard\strtolower;
 use PHPCompiler\ext\types\is_type;
 use PHPCompiler\ext\types\strlen;
 use PHPCompiler\JIT\Call\Native;
@@ -114,6 +118,80 @@ final class DiscardedPureCallElisionTest extends TestCase
         $arg = $this->makeValueBoxVar();
 
         $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testElidesDiscardedGettype(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new gettype();
+        $arg = $this->makeNativeLongVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testElidesDiscardedStrtolowerOnTypedString(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new strtolower();
+        $arg = $this->makeStringVar(null);
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testElidesDiscardedTrimOnLiteralString(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new string_trim();
+        $arg = $this->makeStringVar('  x  ');
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testDoesNotElideStrtolowerOnNativeLong(): void
+    {
+        // Soft strtolower(int) coerces — keep live (#36386).
+        $context = $this->makeContext();
+        $builtin = new strtolower();
+        $arg = $this->makeNativeLongVar();
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testElidesDiscardedCountOnTypedHashtable(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new array_count();
+        $arg = $this->makeHashtableVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testElidesDiscardedSizeofOnTypedHashtable(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new array_count('sizeof');
+        $arg = $this->makeHashtableVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testDoesNotElideCountOnValueBox(): void
+    {
+        // Countable::count() / TypeError paths must stay live (#36386).
+        $context = $this->makeContext();
+        $builtin = new array_count();
+        $arg = $this->makeValueBoxVar();
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testDoesNotElideCountOnNull(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new array_count();
+        $arg = $this->makeNullVar();
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
     }
 
     public function testElidesDiscardedAbsOnNativeLong(): void
@@ -300,6 +378,21 @@ final class DiscardedPureCallElisionTest extends TestCase
         $typeProp = $ref->getProperty('type');
         $typeProp->setAccessible(true);
         $typeProp->setValue($var, Variable::TYPE_VALUE);
+        $kindProp = $ref->getProperty('kind');
+        $kindProp->setAccessible(true);
+        $kindProp->setValue($var, Variable::KIND_VARIABLE);
+
+        return $var;
+    }
+
+    private function makeHashtableVar(): Variable
+    {
+        $ref = new \ReflectionClass(Variable::class);
+        /** @var Variable $var */
+        $var = $ref->newInstanceWithoutConstructor();
+        $typeProp = $ref->getProperty('type');
+        $typeProp->setAccessible(true);
+        $typeProp->setValue($var, Variable::TYPE_HASHTABLE);
         $kindProp = $ref->getProperty('kind');
         $kindProp->setAccessible(true);
         $kindProp->setValue($var, Variable::KIND_VARIABLE);

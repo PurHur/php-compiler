@@ -207,21 +207,41 @@ final class NoThrowCallElision
         }
         $name = strtolower($toCall->getName());
         if (self::isPureTypePredicateBuiltin($name)) {
-            // is_int / is_string / … never invoke user handlers (php-src type.c).
-            // Exclude is_callable / is_a (autoload / __invoke).
+            // is_int / is_string / gettype / … never invoke user handlers
+            // (php-src type.c / basic_functions.c). Exclude is_callable / is_a
+            // (autoload / __invoke).
             return true;
         }
         if (!isset($callArgs[0]) || !$callArgs[0] instanceof Variable) {
             return false;
         }
-        if ('strlen' === $name || 'ord' === $name) {
+        if ('strlen' === $name || 'ord' === $name || self::isPureStringTransformBuiltin($name)) {
             // Z_PARAM_STR family — __toString only on object / value-box.
-            return self::stringParamBuiltinArgCannotThrow($callArgs[0]);
+            // trim/ltrim/rtrim optional $characters must also be throw-free.
+            foreach ($callArgs as $arg) {
+                if (!$arg instanceof Variable || !self::stringParamBuiltinArgCannotThrow($arg)) {
+                    return false;
+                }
+            }
+
+            return true;
         }
         if ('chr' === $name) {
             // Z_PARAM_LONG family — object→int does not call __toString; still
             // keep value-box / object conservative (coercion paths vary).
             return self::intParamBuiltinArgCannotThrow($callArgs[0]);
+        }
+        if ('count' === $name || 'sizeof' === $name) {
+            // Countable::count() is user code — only typed arrays are no-throw.
+            if (!self::typedArrayArgCannotThrow($callArgs[0])) {
+                return false;
+            }
+            if (isset($callArgs[1])) {
+                return $callArgs[1] instanceof Variable
+                    && self::numericParamBuiltinArgCannotThrow($callArgs[1]);
+            }
+
+            return true;
         }
         if (self::isPureMathBuiltin($name)) {
             // Z_PARAM_DOUBLE / LONG family — domain errors yield NAN/INF, not user
@@ -268,6 +288,33 @@ final class NoThrowCallElision
             case 'is_finite':
             case 'is_infinite':
             case 'is_nan':
+            // basic_functions.c gettype — type-tag → string label only (peer is_*).
+            case 'gettype':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * php-src {@code ext/standard/string.c} transforms that only read a string
+     * and allocate a result (no user handlers when the arg is already a string).
+     *
+     * Public for {@see DiscardedPureCallElision} — discarded statements are
+     * side-effect-free on typed / literal string args (#36386). Soft null /
+     * object {@code __toString} coercions are excluded by the caller.
+     */
+    public static function isPureStringTransformBuiltin(string $nameLc): bool
+    {
+        switch ($nameLc) {
+            case 'strtolower':
+            case 'strtoupper':
+            case 'lcfirst':
+            case 'ucfirst':
+            case 'strrev':
+            case 'trim':
+            case 'ltrim':
+            case 'rtrim':
                 return true;
             default:
                 return false;
@@ -325,6 +372,19 @@ final class NoThrowCallElision
     private static function numericParamBuiltinArgCannotThrow(Variable $arg): bool
     {
         return self::intParamBuiltinArgCannotThrow($arg);
+    }
+
+    /**
+     * Typed hashtable / packed native array — no Countable::count() user handler
+     * (php-src Zend/zend_builtin_functions.c PHP_FUNCTION(count)).
+     */
+    private static function typedArrayArgCannotThrow(Variable $arg): bool
+    {
+        if (0 !== ($arg->type & Variable::IS_NATIVE_ARRAY)) {
+            return true;
+        }
+
+        return Variable::TYPE_HASHTABLE === $arg->type;
     }
 
     /**
