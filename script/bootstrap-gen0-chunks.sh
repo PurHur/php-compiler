@@ -153,14 +153,21 @@ if (!is_array($p) || !isset($p["chunks"]) || !is_array($p["chunks"]) || $p["chun
 }
 $dir = $argv[2];
 $waves = [];
+$deferredPath = $dir . "/deferred.tsv";
+$deferredLines = [];
 foreach ($p["chunks"] as $c) {
     if (!is_array($c) || empty($c["chunk_id"]) || empty($c["entry"])) {
         fwrite(STDERR, "bootstrap-gen0-chunks: plan chunk missing chunk_id/entry\n");
         exit(1);
     }
+    if (!empty($c["deferred"])) {
+        $deferredLines[] = $c["chunk_id"] . "\t" . ($c["defer_reason"] ?? "deferred");
+        continue;
+    }
     $w = (int) ($c["wave"] ?? 0);
     $waves[$w][] = $c["chunk_id"] . "\t" . $c["entry"];
 }
+file_put_contents($deferredPath, $deferredLines === [] ? "" : (implode("\n", $deferredLines) . "\n"));
 ksort($waves, SORT_NUMERIC);
 $names = [];
 foreach ($waves as $w => $lines) {
@@ -176,13 +183,30 @@ total="$(php -r '
 $p = json_decode(file_get_contents($argv[1]), true);
 echo (int) ($p["chunk_count"] ?? count($p["chunks"] ?? []));
 ' "${PLAN}")"
+deferred_n="$(php -r '
+$p = json_decode(file_get_contents($argv[1]), true);
+$n = 0;
+foreach (($p["chunks"] ?? []) as $c) {
+    if (!empty($c["deferred"])) { $n++; }
+}
+echo $n;
+' "${PLAN}")"
 
 if [[ "${total}" -eq 0 ]]; then
   echo "bootstrap-gen0-chunks: plan has zero chunks" >&2
   exit 1
 fi
 
-echo "bootstrap-gen0-chunks: ${total} chunk(s), ${JOBS} job(s), waves=[${WAVE_LIST}], barrier=${WAVE_BARRIER}, out=${OUT_DIR}"
+echo "bootstrap-gen0-chunks: ${total} chunk(s), ${JOBS} job(s), waves=[${WAVE_LIST}], barrier=${WAVE_BARRIER}, deferred=${deferred_n}, out=${OUT_DIR}"
+
+# Record deferred chunks as DEFER (honest skip — not a pass of NestedJIT emit).
+if [[ -f "${WAVE_DIR}/deferred.tsv" ]]; then
+  while IFS=$'\t' read -r id reason; do
+    [[ -z "${id}" ]] && continue
+    echo "DEFER" >"${STATUS_DIR}/${id}"
+    echo "bootstrap-gen0-chunks: defer ${id} (${reason})"
+  done <"${WAVE_DIR}/deferred.tsv"
+fi
 
 wall_start=$(date +%s)
 fail_seen=0
@@ -285,6 +309,7 @@ if [[ -d "${STATUS_DIR}" ]]; then
     case "${status}" in
       OK) ok=$((ok + 1)) ;;
       SKIP) skip=$((skip + 1)); ok=$((ok + 1)) ;;
+      DEFER) skip=$((skip + 1)); ok=$((ok + 1)) ;;
       *) fail=$((fail + 1))
          echo "bootstrap-gen0-chunks: FAILED ${id} — see ${LOG_DIR}/${id}.orchestrator.log" >&2
          ;;

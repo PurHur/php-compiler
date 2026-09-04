@@ -415,6 +415,11 @@ class Runtime {
             // Nested JIT parses multi-megabyte lib/ units — skip reference-profile token scans (#17150).
             TryCatchElseSupport::beginCompilationUnit();
             CatchIntersectionSupport::beginCompilationUnit();
+            // SPINE_CHUNK: still hollow demoted hub method bodies before CFG (#36387).
+            // Late JIT demote never runs if NestedJIT OOMs building Blocks for Compiler.php.
+            if (\PHPCompiler\AOT\ExternalMethodBind::spineChunkMode()) {
+                $code = \PHPCompiler\JIT\SpineChunkRuntimeMethodDemote::rewriteSource($code, $filename);
+            }
 
             return [$code, []];
         }
@@ -567,6 +572,10 @@ class Runtime {
      */
     public function rewriteSourceBeforeParser(string $code, string $filename = 'unknown'): string
     {
+        // SPINE_CHUNK hub hollow must run even with jitContext set (include of Compiler.php, #36387).
+        if (\PHPCompiler\AOT\ExternalMethodBind::spineChunkMode()) {
+            $code = \PHPCompiler\JIT\SpineChunkRuntimeMethodDemote::rewriteSource($code, $filename);
+        }
         if (\PHPCompiler\JIT\NestedJitCompileScope::isActive() || null !== $this->jitContext) {
             return $code;
         }
