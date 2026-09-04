@@ -6797,6 +6797,11 @@ trait CompileBlockInternal
                 case OpCode::TYPE_PROPERTY_FETCH_WRITE:
                     \PHPCompiler\JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'prop_fetch_cont');
                     $result = $block->getOperand($op->arg1);
+                    // Vacant result slot (dead fetch / relocated temp) — skip rather than
+                    // TypeError in hasVariableOp / UnboundThisGuard (#36382 Slim).
+                    if (null === $result) {
+                        break;
+                    }
                     // Prior ??= fetch may leave a branch-local objectPropertySlot on a reused
                     // CFG temp; drop it before this fetch so later loads dominate (#33760).
                     if ($this->context->hasVariableOp($result)) {
