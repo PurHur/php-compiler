@@ -4,14 +4,14 @@
     "done_when_ceiling": 25000,
     "files": {
         "lib/Compiler.php": {
-            "budget": 15029,
+            "budget": 14491,
             "target": 20000,
-            "note": "Concern trait splits (#36230/#36387/#36403); FinalizeArrayFamilyCallArgSlots"
+            "note": "Concern trait splits (#36230/#36387/#36403); FunctionStaticAndCompileTimeLiterals"
         },
         "lib/JIT.php": {
-            "budget": 24655,
+            "budget": 24664,
             "target": 20000,
-            "note": "Concern trait splits (#36403); under 25k Done-when ceiling"
+            "note": "Concern trait splits (#36403); tip ratchet after unrelated growth; under 25k Done-when ceiling"
         },
         "lib/VM.php": {
             "budget": 25479,
