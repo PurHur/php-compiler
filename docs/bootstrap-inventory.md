@@ -65712,8 +65712,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Web/SourceBundler.php`
 
 **Warnings** (review for bootstrap subset):
-- 34 class method(s)
-- 1 closure(s)
+- 35 class method(s)
+- 2 closure(s)
 
 ### `lib/Web/SuperglobalRefreshJitHelper.php`
 

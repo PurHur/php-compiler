@@ -51,6 +51,70 @@ final class SourceBundler
     }
 
     /**
+     * Raise PHP memory_limit to PHP_COMPILER_LLVM_MEMORY_LIMIT for large incremental
+     * project graphs. The 1536M CI default OOMs mid-IncludeHelper on Slim (~100 units);
+     * LLVM native heap is outside PHP's limit, so Docker should stay ≥10g (#36382).
+     *
+     * @return string|null Applied limit string, or null when unchanged / below threshold
+     */
+    public static function ensureIncrementalProjectMemoryFloor(int $unitCount): ?string
+    {
+        if ($unitCount < self::INCREMENTAL_REQUIRES_UNIT_THRESHOLD) {
+            return null;
+        }
+
+        $parseMib = static function ($limit): int {
+            if (!is_string($limit) || '' === $limit) {
+                return 0;
+            }
+            if (1 !== preg_match('/^(\d+)\s*([KMG])?$/i', trim($limit), $m)) {
+                return 0;
+            }
+            $n = (int) $m[1];
+            $u = strtoupper($m[2] ?? 'M');
+
+            return match ($u) {
+                'G' => $n * 1024,
+                'K' => intdiv($n, 1024),
+                default => $n,
+            };
+        };
+
+        $floorRaw = \PHPCompiler\Config::getenv('PHP_COMPILER_LLVM_MEMORY_LIMIT');
+        if (!is_string($floorRaw) || '' === $floorRaw) {
+            $floorRaw = '8192M';
+        }
+        $floorMib = $parseMib($floorRaw);
+        if ($floorMib <= 0) {
+            return null;
+        }
+        // Slim+nyholm (~100 IncludeHelper units) exhausts 8192M inside php-llvm Type.php
+        // after surviving a 24g cgroup; measured peak RSS ~17 GiB (#36382). Raise past the
+        // default LLVM budget for very large incremental graphs.
+        if ($unitCount >= 80 && $floorMib < 16384) {
+            $floorRaw = '16384M';
+            $floorMib = 16384;
+        }
+
+        $curEnv = \PHPCompiler\Config::getenv('PHP_COMPILER_MEMORY_LIMIT');
+        $curIni = ini_get('memory_limit');
+        $curMib = max(
+            $parseMib(is_string($curEnv) ? $curEnv : ''),
+            $parseMib(is_string($curIni) ? $curIni : '')
+        );
+        if ($curMib >= $floorMib) {
+            return null;
+        }
+
+        ini_set('memory_limit', $floorRaw);
+        putenv('PHP_COMPILER_MEMORY_LIMIT='.$floorRaw);
+        $_ENV['PHP_COMPILER_MEMORY_LIMIT'] = $floorRaw;
+        $_SERVER['PHP_COMPILER_MEMORY_LIMIT'] = $floorRaw;
+
+        return $floorRaw;
+    }
+
+    /**
      * Build entry source that require_once's each project unit as an absolute literal so
      * JIT IncludeHelper lowers files incrementally (never one 99-file CFG, #36382).
      *

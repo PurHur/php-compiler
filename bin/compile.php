@@ -612,12 +612,22 @@ function run(string $filename, string $code, array $options): void
         // Large Composer graphs (Slim ~99 units): mega-concat OOMs on 8g hosts. Emit
         // require_once literals and let IncludeHelper fold one file at a time (#36382).
         if (SourceBundler::shouldUseIncrementalRequires($includes)) {
+            $unitCount = \count($includes);
             $code = SourceBundler::entryWithIncrementalRequires($filename, $includes);
             fwrite(
                 STDERR,
-                'phpc build: incremental IncludeHelper requires for '.\count($includes)
+                'phpc build: incremental IncludeHelper requires for '.$unitCount
                 ." units (skip SourceBundler mega-concat, #36382)\n"
             );
+            // 1536M CI default OOMs mid-php-llvm Type.php on Slim-sized graphs; raise to
+            // LLVM budget before IncludeHelper lowers ~100 units into one module (#36382).
+            $raised = SourceBundler::ensureIncrementalProjectMemoryFloor($unitCount);
+            if (is_string($raised)) {
+                fwrite(
+                    STDERR,
+                    "phpc build: raised memory_limit to {$raised} for {$unitCount}-unit incremental project (#36382)\n"
+                );
+            }
         } else {
             [$code, $filename] = SourceBundler::bundleForAot($filename, $includes, $projectRoot);
         }
