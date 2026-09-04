@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * deg2rad() for compiled JIT/AOT modules (#15143, #27400, php-in-PHP).
+ * deg2rad() NestedJIT-safe multiply reference (#15143, #27400, php-in-PHP).
  *
- * Inline multiply (same formula as {@see VmMath::deg2rad}) — avoid NestedJIT
- * cross-class stubs that zero VmMath::* under thin standalone AOT (#26996).
+ * AOT/JIT hot path uses inline {@code fmul} by {@code M_PI/180} via
+ * {@see \PHPCompiler\JIT\Builtin\MathDeg2rad} (#36386 / peer MathRad2deg).
+ * This helper remains for NestedJIT-safe reference when NestedJIT cannot emit
+ * the constant multiply in-module.
+ * Avoid {@see VmMath::deg2rad} — NestedJIT re-enters MathDeg2rad under thin AOT.
  * php-src: ext/standard/math.c — PHP_FUNCTION(deg2rad)
  */
 final class Deg2radJitHelper
