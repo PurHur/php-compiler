@@ -22,12 +22,14 @@ use PHPCompiler\ext\standard\escapeshellarg;
 use PHPCompiler\ext\standard\escapeshellcmd;
 use PHPCompiler\ext\standard\explode;
 use PHPCompiler\ext\standard\fdiv;
+use PHPCompiler\ext\standard\floatval;
 use PHPCompiler\ext\standard\gettype;
 use PHPCompiler\ext\standard\hebrev;
 use PHPCompiler\ext\standard\html_entity_decode;
 use PHPCompiler\ext\standard\htmlentities;
 use PHPCompiler\ext\standard\htmlspecialchars;
 use PHPCompiler\ext\standard\htmlspecialchars_decode;
+use PHPCompiler\ext\standard\intval;
 use PHPCompiler\ext\standard\levenshtein;
 use PHPCompiler\ext\standard\md5;
 use PHPCompiler\ext\standard\metaphone;
@@ -42,6 +44,7 @@ use PHPCompiler\ext\standard\quotemeta;
 use PHPCompiler\ext\standard\rawurldecode;
 use PHPCompiler\ext\standard\rawurlencode;
 use PHPCompiler\ext\standard\sha1;
+use PHPCompiler\ext\standard\similar_text;
 use PHPCompiler\ext\standard\soundex;
 use PHPCompiler\ext\standard\sqrt;
 use PHPCompiler\ext\standard\str_contains;
@@ -62,12 +65,14 @@ use PHPCompiler\ext\standard\strpbrk;
 use PHPCompiler\ext\standard\strpos;
 use PHPCompiler\ext\standard\strtolower;
 use PHPCompiler\ext\standard\strtr;
+use PHPCompiler\ext\standard\strval;
 use PHPCompiler\ext\standard\substr;
 use PHPCompiler\ext\standard\substr_replace;
 use PHPCompiler\ext\standard\ucwords;
 use PHPCompiler\ext\standard\urldecode;
 use PHPCompiler\ext\standard\urlencode;
 use PHPCompiler\ext\standard\wordwrap;
+use PHPCompiler\ext\standard\boolval;
 use PHPCompiler\ext\types\is_type;
 use PHPCompiler\ext\types\strlen;
 use PHPCompiler\JIT\Call\Native;
@@ -1158,6 +1163,102 @@ final class DiscardedPureCallElisionTest extends TestCase
             $context,
             new number_format(),
             [$num, $null]
+        ));
+    }
+
+    public function testElidesDiscardedSimilarTextAndScalarCasts(): void
+    {
+        // php-src string.c similar_text / type.c + basic_functions.c casts (#36386).
+        $context = $this->makeContext();
+        $a = $this->makeStringVar('hello');
+        $b = $this->makeStringVar('hallo');
+        $long = $this->makeNativeLongVar();
+        $dbl = $this->makeNativeDoubleVar();
+        $bool = $this->makeNativeBoolVar();
+        $null = $this->makeNullVar();
+        $box = $this->makeValueBoxVar();
+        $ht = $this->makeHashtableVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new similar_text(),
+            [$a, $b]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new intval(),
+            [$long]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new intval(),
+            [$a, $long]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new floatval(),
+            [$dbl]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new floatval('doubleval'),
+            [$long]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new boolval(),
+            [$bool]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new boolval(),
+            [$ht]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new strval(),
+            [$a]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new strval(),
+            [$null]
+        ));
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new similar_text(),
+            [$a, $null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new similar_text(),
+            [$a, $b, $dbl]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new intval(),
+            [$box]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new intval(),
+            [$long, $null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new strval(),
+            [$ht]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new strval(),
+            [$box]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new boolval(),
+            [$box]
         ));
     }
 
