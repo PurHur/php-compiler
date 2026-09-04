@@ -205,7 +205,7 @@ final class BootstrapGen0ChunksOrchestratorTest extends TestCase
         $tmp = sys_get_temp_dir().'/phpc-chunk-plan-defer-'.bin2hex(random_bytes(4));
         mkdir($tmp.'/entries', 0755, true);
         $planPath = $tmp.'/plan.json';
-        // Demote-covered oversize hubs stay emit-eligible; measured post-demote fails defer (#36387).
+        // Demote-covered oversize hubs stay emit-eligible; no measured_emit_fail left (#36387).
         $cmd = escapeshellarg(PHP_BINARY).' '.escapeshellarg($script)
             .' --spine --strategy=dir --max-bytes=120000'
             .' --entries-dir='.escapeshellarg($tmp.'/entries')
@@ -214,7 +214,7 @@ final class BootstrapGen0ChunksOrchestratorTest extends TestCase
         $this->assertSame(0, $rc, implode("\n", $out));
         $plan = json_decode((string) file_get_contents($planPath), true);
         $this->assertIsArray($plan);
-        $this->assertSame(2, (int) ($plan['deferred_count'] ?? -1));
+        $this->assertSame(0, (int) ($plan['deferred_count'] ?? -1));
         $deferredFiles = [];
         foreach ($plan['chunks'] as $chunk) {
             $body = (string) file_get_contents($chunk['entry']);
@@ -225,14 +225,9 @@ final class BootstrapGen0ChunksOrchestratorTest extends TestCase
             if (empty($chunk['deferred'])) {
                 continue;
             }
-            $this->assertSame('measured_emit_fail', $chunk['defer_reason'] ?? '');
-            $deferredFiles[] = (string) ($chunk['defer_file'] ?? '');
+            $deferredFiles[] = (string) ($chunk['defer_file'] ?? $chunk['chunk_id'] ?? '');
         }
-        sort($deferredFiles);
-        $this->assertSame([
-            'ext/soap/VmSoapClient.php',
-            'ext/standard/VmDateTimeNative.php',
-        ], $deferredFiles);
+        $this->assertSame([], $deferredFiles);
         $this->removeTree($tmp);
     }
 

@@ -14,13 +14,21 @@ use PHPCompiler\ext\standard\bin2hex;
 use PHPCompiler\ext\standard\chr;
 use PHPCompiler\ext\standard\convert_uuencode;
 use PHPCompiler\ext\standard\crc32;
+use PHPCompiler\ext\standard\escapeshellarg;
+use PHPCompiler\ext\standard\escapeshellcmd;
 use PHPCompiler\ext\standard\fdiv;
 use PHPCompiler\ext\standard\gettype;
 use PHPCompiler\ext\standard\hebrev;
+use PHPCompiler\ext\standard\html_entity_decode;
+use PHPCompiler\ext\standard\htmlentities;
+use PHPCompiler\ext\standard\htmlspecialchars;
+use PHPCompiler\ext\standard\htmlspecialchars_decode;
 use PHPCompiler\ext\standard\md5;
 use PHPCompiler\ext\standard\metaphone;
+use PHPCompiler\ext\standard\nl2br;
 use PHPCompiler\ext\standard\ord;
 use PHPCompiler\ext\standard\pow;
+use PHPCompiler\ext\standard\preg_quote;
 use PHPCompiler\ext\standard\quotemeta;
 use PHPCompiler\ext\standard\rawurldecode;
 use PHPCompiler\ext\standard\rawurlencode;
@@ -524,6 +532,122 @@ final class DiscardedPureCallElisionTest extends TestCase
         $context = $this->makeContext();
         $builtin = new sqrt();
         $arg = $this->makeValueBoxVar();
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testElidesDiscardedHtmlspecialcharsOnTypedString(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new htmlspecialchars();
+        $arg = $this->makeStringVar(null);
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testElidesDiscardedHtmlspecialcharsWithTypedFlags(): void
+    {
+        // htmlspecialchars($s, ENT_QUOTES) is the common web form — flags are Z_PARAM_LONG.
+        $context = $this->makeContext();
+        $builtin = new htmlspecialchars();
+        $str = $this->makeStringVar(null);
+        $flags = $this->makeNativeLongVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$str, $flags]));
+    }
+
+    public function testElidesDiscardedHtmlspecialcharsWithNullEncoding(): void
+    {
+        // Z_PARAM_STR_OR_NULL encoding — null is not a soft-string deprecate.
+        $context = $this->makeContext();
+        $builtin = new htmlspecialchars();
+        $str = $this->makeStringVar('<a>');
+        $flags = $this->makeNativeLongVar();
+        $enc = $this->makeNullVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$str, $flags, $enc]));
+    }
+
+    public function testDoesNotElideHtmlspecialcharsOnNullString(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new htmlspecialchars();
+        $arg = $this->makeNullVar();
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testElidesDiscardedHtmlentitiesOnLiteral(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new htmlentities();
+        $arg = $this->makeStringVar('&');
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testElidesDiscardedHtmlspecialcharsDecodeWithFlags(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new htmlspecialchars_decode();
+        $str = $this->makeStringVar(null);
+        $flags = $this->makeNativeLongVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$str, $flags]));
+    }
+
+    public function testElidesDiscardedHtmlEntityDecodeOnTypedString(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new html_entity_decode();
+        $arg = $this->makeStringVar(null);
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testElidesDiscardedNl2brWithBoolFlag(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new nl2br();
+        $str = $this->makeStringVar(null);
+        $xhtml = $this->makeNativeBoolVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$str, $xhtml]));
+    }
+
+    public function testElidesDiscardedPregQuoteWithDelimiter(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new preg_quote();
+        $str = $this->makeStringVar(null);
+        $delim = $this->makeStringVar('/');
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$str, $delim]));
+    }
+
+    public function testElidesDiscardedEscapeshellargOnTypedString(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new escapeshellarg();
+        $arg = $this->makeStringVar(null);
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testElidesDiscardedEscapeshellcmdOnLiteral(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new escapeshellcmd();
+        $arg = $this->makeStringVar('echo hi');
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testDoesNotElideNl2brOnNull(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new nl2br();
+        $arg = $this->makeNullVar();
 
         $this->assertFalse(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
     }
