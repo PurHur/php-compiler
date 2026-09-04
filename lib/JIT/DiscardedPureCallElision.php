@@ -29,9 +29,10 @@ use PHPCompiler\VM\Variable as VmVariable;
  * typed checkdate (3 longs), typed hash_equals (2 strings),
  * typed pathinfo (string + optional flags), typed parse_url
  * (string + optional component), typed function_exists /
- * extension_loaded (single string; no autoload), typed
+ * extension_loaded / defined (single string; no autoload), typed
  * method_exists / property_exists (object + string; string class
- * names stay live for autoload),
+ * names stay live for autoload), typed array_key_exists /
+ * key_exists (typed array + non-null scalar key),
  * zero-arg pi, type.c predicates + gettype/get_debug_type, ctype.c
  * classifiers on typed/literal strings, typed-array count/sizeof, math.c
  * incl. pow/fpow/fdiv on already-numeric args, empty void user functions).
@@ -56,11 +57,15 @@ use PHPCompiler\VM\Variable as VmVariable;
  * NAN). Soft-null {@code checkdate} stays live (deprecate). Non-string
  * {@code hash_equals} stays live ({@code TypeError}). Soft-null
  * {@code pathinfo}/{@code parse_url} path/url/flags/component stay live
- * (deprecate). Soft-null {@code function_exists}/{@code extension_loaded}
- * stay live (deprecate). {@code class_exists} stays live (autoload side
- * effects when {@code $autoload} defaults true). Soft-null method/property
- * names and string class-name receivers for {@code method_exists}/
- * {@code property_exists} stay live (deprecate / autoload).
+ * (deprecate). Soft-null {@code function_exists}/{@code extension_loaded}/
+ * {@code defined} stay live (deprecate). {@code class_exists} stays live
+ * (autoload side effects when {@code $autoload} defaults true). Soft-null
+ * method/property names and string class-name receivers for
+ * {@code method_exists}/{@code property_exists} stay live (deprecate /
+ * autoload). Soft-null {@code array_key_exists}/{@code key_exists} keys
+ * stay live (null-key deprecation); object / value-box keys stay live
+ * ({@code TypeError} / unknown). Non-array haystacks stay live
+ * ({@code TypeError}).
  */
 final class DiscardedPureCallElision
 {
@@ -132,10 +137,16 @@ final class DiscardedPureCallElision
         if (self::tryElidePureExtensionLoadedNoSideEffect($toCall, $callArgs)) {
             return true;
         }
+        if (self::tryElidePureDefinedNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
         if (self::tryElidePureMethodExistsNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePurePropertyExistsNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureArrayKeyExistsNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureVersionCompareNoSideEffect($toCall, $callArgs)) {
@@ -1205,6 +1216,25 @@ final class DiscardedPureCallElision
     }
 
     /**
+     * Discarded {@code defined} on typed / literal string — php-src
+     * {@code ext/standard/basic_functions.c}. Soft-null stays live (deprecate).
+     * No autoload side effects.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureDefinedNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if (!NoThrowCallElision::isPureDefinedBuiltin(strtolower($toCall->getName()))) {
+            return false;
+        }
+
+        return self::definedArgsAllowDiscardedElision($callArgs);
+    }
+
+    /**
      * Discarded {@code method_exists} on typed object + typed / literal method
      * string — php-src {@code Zend/zend_builtin_functions.c}. String class-name
      * receivers stay live (autoload). Soft-null method stays live (deprecate).
@@ -1222,6 +1252,26 @@ final class DiscardedPureCallElision
         }
 
         return self::methodExistsArgsAllowDiscardedElision($callArgs);
+    }
+
+    /**
+     * Discarded {@code array_key_exists}/{@code key_exists} on typed array +
+     * non-null scalar key — php-src {@code ext/standard/array.c}. Soft-null
+     * keys stay live (deprecate). Object / value-box keys stay live. Non-array
+     * haystacks stay live ({@code TypeError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureArrayKeyExistsNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if (!NoThrowCallElision::isPureArrayKeyExistsBuiltin(strtolower($toCall->getName()))) {
+            return false;
+        }
+
+        return self::arrayKeyExistsArgsAllowDiscardedElision($callArgs);
     }
 
     /**
@@ -1458,6 +1508,50 @@ final class DiscardedPureCallElision
     private static function extensionLoadedArgsAllowDiscardedElision(array $callArgs): bool
     {
         return self::functionExistsArgsAllowDiscardedElision($callArgs);
+    }
+
+    /**
+     * Exactly one typed / literal string — soft-null stays live (deprecate).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function definedArgsAllowDiscardedElision(array $callArgs): bool
+    {
+        return self::functionExistsArgsAllowDiscardedElision($callArgs);
+    }
+
+    /**
+     * Typed hashtable / native array + non-null scalar key (string / long /
+     * double / bool). Soft-null keys deprecate; object / value-box keys stay
+     * live.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function arrayKeyExistsArgsAllowDiscardedElision(array $callArgs): bool
+    {
+        if (
+            !isset($callArgs[0], $callArgs[1])
+            || isset($callArgs[2])
+            || !$callArgs[0] instanceof Variable
+            || !$callArgs[1] instanceof Variable
+        ) {
+            return false;
+        }
+        if (!self::isTypedArrayArg($callArgs[1])) {
+            return false;
+        }
+        $key = $callArgs[0];
+        if ($key->isNullConstant || Variable::TYPE_NULL === $key->type) {
+            return false;
+        }
+        if (Variable::TYPE_OBJECT === $key->type || Variable::TYPE_VALUE === $key->type) {
+            return false;
+        }
+        if (self::stringArgAllowsDiscardedElision($key)) {
+            return true;
+        }
+
+        return self::mathArgAllowsDiscardedElision($key);
     }
 
     /**

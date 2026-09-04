@@ -9,6 +9,7 @@ use PHPCompiler\Block;
 use PHPCompiler\ext\standard\abs;
 use PHPCompiler\ext\standard\addcslashes;
 use PHPCompiler\ext\standard\addslashes;
+use PHPCompiler\ext\standard\array_key_exists;
 use PHPCompiler\ext\standard\array_count;
 use PHPCompiler\ext\standard\base64_encode;
 use PHPCompiler\ext\standard\base_convert_;
@@ -23,6 +24,7 @@ use PHPCompiler\ext\standard\crc32;
 use PHPCompiler\ext\standard\decbin;
 use PHPCompiler\ext\standard\dechex;
 use PHPCompiler\ext\standard\decoct;
+use PHPCompiler\ext\standard\defined_;
 use PHPCompiler\ext\standard\dirname;
 use PHPCompiler\ext\standard\escapeshellarg;
 use PHPCompiler\ext\standard\escapeshellcmd;
@@ -1925,6 +1927,117 @@ final class DiscardedPureCallElisionTest extends TestCase
             $context,
             new property_exists_(),
             [$obj, $long]
+        ));
+    }
+
+    public function testDiscardedDefinedAndArrayKeyExistsElideOnTypedArgs(): void
+    {
+        $context = $this->makeContext();
+        $str = $this->makeStringVar('PHP_VERSION');
+        $lit = $this->makeStringVar('k');
+        $ht = $this->makeHashtableVar();
+        $long = $this->makeNativeLongVar();
+        $dbl = $this->makeNativeDoubleVar();
+        $bool = $this->makeNativeBoolVar();
+        $null = $this->makeNullVar();
+        $box = $this->makeValueBoxVar();
+        $obj = $this->makeObjectVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new defined_(),
+            [$str]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new defined_(),
+            [$this->makeStringVar('FOO')]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_key_exists(),
+            [$lit, $ht]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_key_exists('key_exists'),
+            [$long, $ht]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_key_exists(),
+            [$dbl, $ht]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_key_exists(),
+            [$bool, $ht]
+        ));
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new defined_(),
+            []
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new defined_(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new defined_(),
+            [$box]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new defined_(),
+            [$ht]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new defined_(),
+            [$long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new defined_(),
+            [$str, $lit]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_key_exists(),
+            [$null, $ht]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_key_exists(),
+            [$obj, $ht]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_key_exists(),
+            [$box, $ht]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_key_exists(),
+            [$lit, $box]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_key_exists(),
+            [$lit, $obj]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_key_exists(),
+            [$lit]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_key_exists(),
+            [$lit, $ht, $long]
         ));
     }
 

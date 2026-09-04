@@ -312,6 +312,10 @@ final class NoThrowCallElision
             // info.c extension_loaded — typed string; table lookup only.
             return self::extensionLoadedArgsCannotThrow($callArgs);
         }
+        if (self::isPureDefinedBuiltin($name)) {
+            // basic_functions.c defined — typed string; constant table only.
+            return self::definedArgsCannotThrow($callArgs);
+        }
         if (self::isPureMethodExistsBuiltin($name)) {
             // zend_builtin_functions.c method_exists — typed object + string method;
             // string class names stay out (autoload can throw).
@@ -321,6 +325,10 @@ final class NoThrowCallElision
             // zend_builtin_functions.c property_exists — typed object + string
             // property; string class names stay out (autoload can throw).
             return self::propertyExistsArgsCannotThrow($callArgs);
+        }
+        if (self::isPureArrayKeyExistsBuiltin($name)) {
+            // array.c array_key_exists/key_exists — typed array + non-null scalar key.
+            return self::arrayKeyExistsArgsCannotThrow($callArgs);
         }
         if (self::isPureVersionCompareBuiltin($name)) {
             // versioning.c — typed strings; optional operator must be proven valid.
@@ -945,6 +953,16 @@ final class NoThrowCallElision
     }
 
     /**
+     * php-src {@code ext/standard/basic_functions.c} {@code defined} — Z_PARAM_STR
+     * constant name; constant table lookup only (no autoload). Soft-null
+     * deprecates. Public for {@see DiscardedPureCallElision} (#36386).
+     */
+    public static function isPureDefinedBuiltin(string $nameLc): bool
+    {
+        return 'defined' === $nameLc;
+    }
+
+    /**
      * php-src {@code Zend/zend_builtin_functions.c} {@code method_exists} —
      * object|string + Z_PARAM_STR method. Only the typed-object receiver is
      * proven no-throw / discardable (string class names autoload). Public for
@@ -963,6 +981,17 @@ final class NoThrowCallElision
     public static function isPurePropertyExistsBuiltin(string $nameLc): bool
     {
         return 'property_exists' === $nameLc;
+    }
+
+    /**
+     * php-src {@code ext/standard/array.c} {@code array_key_exists}/
+     * {@code key_exists} — Z_PARAM_ZVAL key + Z_PARAM_ARRAY array. Soft-null
+     * keys deprecate; object keys throw. Public for
+     * {@see DiscardedPureCallElision} (#36386).
+     */
+    public static function isPureArrayKeyExistsBuiltin(string $nameLc): bool
+    {
+        return 'array_key_exists' === $nameLc || 'key_exists' === $nameLc;
     }
 
     /**
@@ -1205,6 +1234,16 @@ final class NoThrowCallElision
     }
 
     /**
+     * Exactly one typed / literal string — soft-null stays out (deprecate).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    public static function definedArgsCannotThrow(array $callArgs): bool
+    {
+        return self::functionExistsArgsCannotThrow($callArgs);
+    }
+
+    /**
      * Typed object + typed / literal method string — soft-null method deprecates;
      * string class names / value-box receivers stay out (autoload / TypeError).
      *
@@ -1236,6 +1275,39 @@ final class NoThrowCallElision
     public static function propertyExistsArgsCannotThrow(array $callArgs): bool
     {
         return self::methodExistsArgsCannotThrow($callArgs);
+    }
+
+    /**
+     * Typed array + non-null scalar key — soft-null keys deprecate; object /
+     * value-box keys / non-array haystacks stay out.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    public static function arrayKeyExistsArgsCannotThrow(array $callArgs): bool
+    {
+        if (
+            !isset($callArgs[0], $callArgs[1])
+            || isset($callArgs[2])
+            || !$callArgs[0] instanceof Variable
+            || !$callArgs[1] instanceof Variable
+        ) {
+            return false;
+        }
+        if (!self::typedArrayArgCannotThrow($callArgs[1])) {
+            return false;
+        }
+        $key = $callArgs[0];
+        if ($key->isNullConstant || Variable::TYPE_NULL === $key->type) {
+            return false;
+        }
+        if (Variable::TYPE_OBJECT === $key->type || Variable::TYPE_VALUE === $key->type) {
+            return false;
+        }
+        if (self::stringParamBuiltinArgCannotThrow($key)) {
+            return true;
+        }
+
+        return self::numericParamBuiltinArgCannotThrow($key);
     }
 
     /**
