@@ -2,5 +2,5 @@
   "asan_ok_days": [],
   "valgrind_ok_days": [],
   "updated_at": null,
-  "note": "Local ledger for #36397 Done-when (7 consecutive asan_ok_days + valgrind_ok_days). Append UTC YYYY-MM-DD after a green make runtime-assert-asan-smoke / runtime-assert-valgrind-smoke on a scheduled host — do not restamp empty to claim a streak."
+  "note": "Local ledger for #36397 Done-when (7 consecutive asan_ok_days ∩ valgrind_ok_days). Append UTC YYYY-MM-DD via script/runtime-assert/streak.sh record after a real green smoke — empty ≠ pass; SKIP_NO_VALGRIND must not append valgrind_ok_days."
 }

@@ -31,11 +31,15 @@ Injected double-delref (unit test only): `PHP_COMPILER_RUNTIME_ASSERT_INJECT_DOU
 ```bash
 ./script/runtime-assert/asan-smoke.sh          # echo under ASan/UBSan (link-path proof)
 RUNTIME_ASSERT_ASAN_FULL=1 ./script/runtime-assert/asan-smoke.sh  # 8 inline aot-smoke cases
-./script/runtime-assert/valgrind-smoke.sh      # echo under valgrind (skip if missing)
+./script/runtime-assert/valgrind-smoke.sh      # echo under valgrind (SKIP_NO_VALGRIND if missing)
+./script/runtime-assert/streak.sh status       # dual consecutive days (empty ≠ pass)
+./script/runtime-assert/streak.sh record       # append UTC day only after real green smokes
+./script/runtime-assert/streak.sh check        # fail unless STREAK_NEED (default 7) dual days
 make runtime-assert-asan-smoke
+make runtime-assert-streak-status
 ```
 
-Do **not** wrap ASan binaries in GNU `timeout(1)` — it races ASan signal handling and reports false "dumped core". Link with `PHP_COMPILER_ASAN=1` also suppresses `-s` strip (`AotGcSections::stripAtLink`) so ASan metadata survives. Full 8-case ASan under Docker `--memory=8g` can still SIGSEGV intermittently (shadow/quarantine pressure) — that is tracked here, not silenced by restamping. Streak ledger: `test/runtime-assert/STREAK.json` (append UTC days from a scheduled host). An empty ledger is not a pass.
+Do **not** wrap ASan binaries in GNU `timeout(1)` — it races ASan signal handling and reports false "dumped core". Link with `PHP_COMPILER_ASAN=1` also suppresses `-s` strip (`AotGcSections::stripAtLink`) so ASan metadata survives. Full 8-case ASan under Docker `--memory=8g` can still SIGSEGV intermittently (shadow/quarantine pressure) — that is tracked here, not silenced by restamping. Streak ledger: `test/runtime-assert/STREAK.json` via `streak.sh` (append UTC days from a scheduled host that has valgrind). An empty ledger is not a pass; `SKIP_NO_VALGRIND` must not append `valgrind_ok_days`. Differential soak case: `test/differential/cases/refcount_cow_churn_36397.php` (`@differential-repeat: 10`).
 
 ## Undefined array keys ([#273](https://github.com/PurHur/php-compiler/issues/273))
 

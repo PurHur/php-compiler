@@ -58,6 +58,25 @@ final class RuntimeAssertDelrefAotTest extends TestCase
         $this->assertStringContainsString('Do not wrap ASan binaries in GNU timeout', $asan);
         $this->assertStringContainsString('RUNTIME_ASSERT_ASAN_FULL', $asan);
         $this->assertStringContainsString('mode=${mode}', $asan);
+        $this->assertStringContainsString('SKIP_NO_VALGRIND', $vg);
+        $this->assertStringContainsString('expect_n', $vg);
+    }
+
+    public function testStreakLedgerRefusesEmptyPass(): void
+    {
+        $streak = (string) file_get_contents(dirname(__DIR__, 2).'/script/runtime-assert/streak.sh');
+        $ledger = (string) file_get_contents(dirname(__DIR__, 2).'/test/runtime-assert/STREAK.json');
+        $this->assertStringContainsString('dual_consecutive', $streak);
+        $this->assertStringContainsString('SKIP_NO_VALGRIND', $streak);
+        $this->assertStringContainsString('empty intersection is not a pass', $streak);
+        $this->assertStringContainsString('STREAK_SKIP_RUN', $streak);
+        $this->assertStringContainsString('"asan_ok_days": []', $ledger);
+        $this->assertStringContainsString('empty ≠ pass', $ledger);
+        $case = dirname(__DIR__, 2).'/test/differential/cases/refcount_cow_churn_36397.php';
+        $this->assertFileExists($case);
+        $src = (string) file_get_contents($case);
+        $this->assertStringContainsString('@differential-repeat: 10', $src);
+        $this->assertStringContainsString('#36397', $src);
     }
 
     public function testRefcountPhpEmitsM1Guard(): void
