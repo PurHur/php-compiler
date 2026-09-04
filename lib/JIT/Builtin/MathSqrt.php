@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -70,6 +71,9 @@ final class MathSqrt
             return;
         }
 
+        // Peer MathAbs: save/restore insert — defining the bridge mid-lowering
+        // must not steal the caller's builder (#36386).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         $double = $context->getTypeFromString('double');
         $fn = $probe;
         if (null === $fn) {
@@ -84,5 +88,10 @@ final class MathSqrt
             $context->builder->call(self::llvmSqrtIntrinsic($context), $fn->getParam(0))
         );
         $context->registerFunction(self::ABI_SQRT, $fn);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 }

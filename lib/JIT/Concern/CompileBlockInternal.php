@@ -5442,9 +5442,11 @@ trait CompileBlockInternal
                             $this->context->scope->toCall,
                             $outgoingArgIndex
                         );
-                        // Prefer a live native `__string__*` named binding over the {main}
-                        // script-global heap box. CONCAT stores the bytes in a local alloca
-                        // while ARG_SEND/strlen used to read the empty module box (#36366).
+                        // Prefer a live named binding over the {main} script-global heap box.
+                        // CONCAT stores string bytes in a local alloca while ARG_SEND/strlen
+                        // used to read the empty module box (#36366). Float binary results
+                        // from property loads similarly land in a local `__value__` alloca
+                        // while sqrt()/math builtins read the empty script-global (#36386).
                         $sendValue = null;
                         if (null !== $sendLocalName && '' !== $sendLocalName) {
                             $boundName = $this->context->resolveRefAliasName($sendLocalName);
@@ -5452,7 +5454,13 @@ trait CompileBlockInternal
                                 $bound = $this->context->namedVariableBindings[$boundName];
                                 if (
                                     Variable::KIND_VARIABLE === $bound->kind
-                                    && Variable::TYPE_STRING === $bound->type
+                                    && (
+                                        Variable::TYPE_STRING === $bound->type
+                                        || Variable::TYPE_VALUE === $bound->type
+                                        || Variable::TYPE_NATIVE_DOUBLE === $bound->type
+                                        || Variable::TYPE_NATIVE_LONG === $bound->type
+                                        || Variable::TYPE_NATIVE_BOOL === $bound->type
+                                    )
                                 ) {
                                     $sendValue = $bound;
                                 }

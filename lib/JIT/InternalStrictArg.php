@@ -602,15 +602,17 @@ final class InternalStrictArg
         $i8 = $context->getTypeFromString('int8');
         $okBlock = BasicBlockHelper::append($context, 'internal_strict_float_ok');
         $failBlock = BasicBlockHelper::append($context, 'internal_strict_float_fail');
+        // Value boxes store JIT tags ({@see __value__writeDouble} → TYPE_NATIVE_DOUBLE=3).
+        // VmVariable::TYPE_FLOAT=2 collides with TYPE_NATIVE_BOOL and misses doubles (#20651 / #36386).
         $isInt = $context->builder->icmp(
             Builder::INT_EQ,
             $typeByte,
-            $i8->constInt(VmVariable::TYPE_INTEGER, false)
+            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
         );
         $isFloat = $context->builder->icmp(
             Builder::INT_EQ,
             $typeByte,
-            $i8->constInt(VmVariable::TYPE_FLOAT, false)
+            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
         );
         $isOk = $context->builder->or($isInt, $isFloat);
         $context->builder->branchIf($isOk, $okBlock, $failBlock);
@@ -645,15 +647,16 @@ final class InternalStrictArg
         $i8 = $context->getTypeFromString('int8');
         $okBlock = BasicBlockHelper::append($context, 'internal_strict_number_ok');
         $failBlock = BasicBlockHelper::append($context, 'internal_strict_number_fail');
+        // Same JIT tags as enforceFloatValueBox — do not use VmVariable::TYPE_FLOAT (#20651 / #36386).
         $isInt = $context->builder->icmp(
             Builder::INT_EQ,
             $typeByte,
-            $i8->constInt(VmVariable::TYPE_INTEGER, false)
+            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
         );
         $isFloat = $context->builder->icmp(
             Builder::INT_EQ,
             $typeByte,
-            $i8->constInt(VmVariable::TYPE_FLOAT, false)
+            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
         );
         $isOk = $context->builder->or($isInt, $isFloat);
         $context->builder->branchIf($isOk, $okBlock, $failBlock);
