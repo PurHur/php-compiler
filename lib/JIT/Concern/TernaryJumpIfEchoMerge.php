@@ -6,12 +6,15 @@ namespace PHPCompiler;
 
 use PHPCfg\Operand;
 use PHPCompiler\JIT\Variable;
+use PHPLLVM;
 
 /**
- * Ternary / JUMPIF echo-merge and ?: return-phi helpers (#36403).
+ * Ternary / JUMPIF echo-merge, ?: return-phi, and arm-tail CFG RETURN helpers
+ * (#36387 / #36403).
  *
  * Extracted from {@see \PHPCompiler\JIT} so the hub keeps shrinking toward
  * the 20k size-budget target (Concern trait; same namespace as parent).
+ * Includes {@see emitCfgReturnOperand} (#8555) left in the hub by #36751.
  */
 trait TernaryJumpIfEchoMerge
 {
@@ -991,4 +994,84 @@ trait TernaryJumpIfEchoMerge
         return $this->context->getVariableFromOp($source);
     }
 
+
+    /**
+     * Lower CFG RETURN for a shared ?: phi at an arm tail (issue #8555).
+     */
+    private function emitCfgReturnOperand(
+        PHPLLVM\Value\Function_ $func,
+        Block $cfgBlock,
+        Operand $returnOperand,
+        PHPLLVM\BasicBlock $tailBlock,
+        ?Variable $returnValue = null
+    ): void {
+        if (null !== $tailBlock->getTerminator()) {
+            return;
+        }
+        if (null !== $returnValue) {
+            $return = $returnValue;
+        } else {
+            $bound = $this->context->functionScopeBindingVariable($returnOperand, $cfgBlock);
+            if (null !== $bound) {
+                $return = $bound;
+            } else {
+                $return = $this->context->getVariableFromOp($returnOperand);
+            }
+        }
+        $builder = $this->context->builder;
+        $builder->positionAtEnd($tailBlock);
+        $this->markJitThisConstructedIfLeavingConstruct($cfgBlock);
+        if (
+            0 === $this->context->inlineIncludeDepth
+            && JIT\TryCatchHelper::deferReturnIfNeeded($this, $this->context, $func, $cfgBlock, false, $return)
+        ) {
+            return;
+        }
+        if ($cfgBlock->returnTypeVoid) {
+            JIT\Builtin\TypeErrorRaise::registerDeclarations($this->context);
+            JIT\Builtin\TypeErrorRaise::ensureLinked($this->context);
+            JIT\Builtin\TypeErrorRaise::emitRaise(
+                $this->context,
+                'A void function must not return a value'
+            );
+
+            return;
+        }
+        $return->addref();
+        if (null !== $cfgBlock->returnDnfConstraints
+            && !JIT\ClassReturnCheck::generatorSkipsBodyReturnCheck($cfgBlock)
+        ) {
+            JIT\DnfParamCheck::enforce(
+                $this->context,
+                $return,
+                $cfgBlock->returnDnfConstraints,
+                'Return value',
+                $this->jitReturnTypeCallableName($cfgBlock)
+            );
+        }
+        if (!$this->emitJitClassReturnTypeCheck($cfgBlock, $return)) {
+            return;
+        }
+        if (!$this->emitJitScalarReturnTypeCheck($cfgBlock, $return)) {
+            return;
+        }
+        $retval = $this->context->helper->loadValue($return);
+        $expected = $this->cfgFunctionReturnCallbackType($cfgBlock->func);
+        if (null === $expected && null !== $this->context->activeFunction) {
+            $expected = $this->context->functionReturnType[strtolower($this->context->activeFunction)] ?? null;
+        }
+        $retval = $this->coerceReturnValue($return, $retval, $expected);
+        $retval = $this->alignRetvalToLlvmFnReturn($retval, $func);
+        // Arm-tail ?: returns must not use merge-block dead operands — they free branch
+        // locals (e.g. string params) before coerceReturnValue finishes (#8555).
+        if ($this->isVoidLlvmFunction($func)) {
+            $builder->returnVoid();
+        } elseif ($this->cfgFunctionReturnsByRef($cfgBlock->func)) {
+            $builder->returnValue(
+                JIT\JitValueBox::valuePtrFromVariable($this->context, $return)
+            );
+        } else {
+            $builder->returnValue($retval);
+        }
+    }
 }
