@@ -4,36 +4,33 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for fpow() / float pow() via FpowJitHelper PHP (#15189, #19259, #20034, #20664, #28674).
+ * JIT/AOT link for fpow() / float pow() via {@code llvm.pow.f64} (#36386).
  *
- * Helper compile: {@see JitVmHelperLink::ensureBridge} (MathLog10 #28642 / MathLog #28574 shape).
- * NestedJIT no longer needs a libc pow(3) kernel — helper uses NestedJIT-safe log+exp.
- * SSOT: {@see \PHPCompiler\ext\standard\VmMath}.
- * php-src: ext/standard/math.c — PHP_FUNCTION(fpow)
+ * Peer of {@see MathExp} / {@see MathLog}: avoid NestedJIT helper objects on
+ * the AOT hot path. php-src {@code ext/standard/math.c} {@code PHP_FUNCTION(fpow)}
+ * / {@code pow_function} → C {@code pow}; the LLVM intrinsic matches IEEE libm.
+ * The PHP log+exp / successive-squaring helper remains for NestedJIT-safe
+ * reference only.
  */
 final class MathFpow
 {
+    private const LLVM_POW = 'llvm.pow.f64';
+
+    /** Legacy ABI kept as a thin intrinsic wrapper for any external callers. */
     private const ABI_FPOW = 'phpc_fpow';
 
-    private const HELPER_PATH = '/ext/standard/FpowJitHelper.php';
-
-    private const FPOW_HELPER = 'PHPCompiler\\ext\\standard\\FpowJitHelper::fpowArgv';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::FPOW_HELPER,
-    ];
-
-    private const BRIDGE_ENTRY = 'fpow_bridge_entry';
+    private const BRIDGE_ENTRY = 'fpow_llvm_f64_entry';
 
     public static function ensureLinked(Context $context): void
     {
-        self::implement($context);
+        self::llvmPowIntrinsic($context);
+        self::ensurePhpcFpowBridge($context);
     }
 
     public static function ensureStandaloneBodies(Context $context): void
@@ -43,35 +40,60 @@ final class MathFpow
 
     public static function invoke(Context $context, Value $num, Value $exponent): Value
     {
-        self::ensureLinked($context);
+        return $context->builder->call(self::llvmPowIntrinsic($context), $num, $exponent);
+    }
 
-        return $context->builder->call(
-            $context->lookupFunction(self::ABI_FPOW),
-            $num,
-            $exponent
+    private static function llvmPowIntrinsic(Context $context): LlvmFunction
+    {
+        $func = $context->module->getNamedFunction(self::LLVM_POW);
+        if (null !== $func) {
+            return $func;
+        }
+        $double = $context->getTypeFromString('double');
+
+        return $context->module->addFunction(
+            self::LLVM_POW,
+            $context->context->functionType($double, false, $double, $double)
         );
     }
 
-    private static function implement(Context $context): void
+    /**
+     * Define {@code phpc_fpow} → {@code llvm.pow.f64} when missing. Skip if a
+     * prior NestedJIT bridge already filled the symbol (cannot replace LLVM
+     * bodies); {@see invoke} never calls that stale path.
+     */
+    private static function ensurePhpcFpowBridge(Context $context): void
     {
         $probe = $context->module->getNamedFunction(self::ABI_FPOW);
-        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction(self::ABI_FPOW, $probe);
 
             return;
         }
 
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         $double = $context->getTypeFromString('double');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_FPOW,
-            self::BRIDGE_ENTRY,
-            [$double, $double],
-            $double,
-            self::FPOW_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#28674'
+        $fn = $probe;
+        if (null === $fn) {
+            $fn = $context->module->addFunction(
+                self::ABI_FPOW,
+                $context->context->functionType($double, false, $double, $double)
+            );
+        }
+        $entry = $fn->appendBasicBlock(self::BRIDGE_ENTRY);
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue(
+            $context->builder->call(
+                self::llvmPowIntrinsic($context),
+                $fn->getParam(0),
+                $fn->getParam(1)
+            )
         );
+        $context->registerFunction(self::ABI_FPOW, $fn);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 }
