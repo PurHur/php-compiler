@@ -1642,6 +1642,52 @@ trait InitJitMethodCall
                     }
                 }
             }
+            // Interface / abstract (or other) typed receivers: no lowered body on the
+            // declared type — dispatch by runtime class_id among known subtypes
+            // (zend_std_get_method). Unblocks Slim RouteCollectorInterface::getNamedRoute (#36382).
+            $subtypeCandidates = $this->buildRuntimeInstanceMethodCandidatesForDeclaredType(
+                $declaringClassLc,
+                $methodLc
+            );
+            if ([] !== $subtypeCandidates) {
+                $this->context->scope->toCall = new \PHPCompiler\JIT\Call\RuntimeIndirectInstanceMethodCall(
+                    $receiverVar,
+                    $methodLc,
+                    $subtypeCandidates
+                );
+                $this->context->scope->args = [$receiverVar];
+
+                return;
+            }
+            // Interface with no implementors in this compile (optional DI container, etc.):
+            // bind catchable Error so dead `$container && $container->has()` can lower (#36382).
+            if ($this->context->type->object->isInterfaceClassLc($declaringClassLc)) {
+                $this->context->scope->toCall = new \PHPCompiler\JIT\Call\EmitCatchableError(
+                    "Call to undefined method {$className}::{$methodLc}()"
+                );
+                $this->context->scope->args = [$receiverVar];
+
+                return;
+            }
+            // Scope-class fallback when a typed interface property has no implementors in
+            // the TU (Slim CallableResolver::$container → callableresolver::has, #36382).
+            // Zend resolves at runtime; compile-time abort blocks dead branches.
+            if (
+                '' !== $declaringClassLc
+                && 'object' !== $declaringClassLc
+                && $this->context->type->object->hasDeclaredClass($declaringClassLc)
+                && !$this->context->type->object->hasMethod(
+                    $this->context->type->object->lookup($declaringClassLc),
+                    $methodLc
+                )
+            ) {
+                $this->context->scope->toCall = new \PHPCompiler\JIT\Call\EmitCatchableError(
+                    "Call to undefined method {$className}::{$methodLc}()"
+                );
+                $this->context->scope->args = [$receiverVar];
+
+                return;
+            }
             throw new \LogicException("Call to undefined method {$className}::{$methodLc}()");
         }
         $receiverUserType = $receiverOp->type?->userType;
@@ -1898,7 +1944,7 @@ trait InitJitMethodCall
         if (null !== $block->func && null !== $block->func->class) {
             $callerClassLc = strtolower($block->func->class->value);
         } elseif ($this->context->scope->className !== '') {
-            $callerClassLc = $this->context->scope->className;
+            $callerClassLc = strtolower(ltrim($this->context->scope->className, '\\'));
         }
         // `$obj(...)` object-call ignores __invoke visibility; `$obj->__invoke()` does not (#26438).
         if (!($objectCallInvoke && '__invoke' === $methodLc)) {
@@ -1907,7 +1953,9 @@ trait InitJitMethodCall
                 $callerClassLc,
                 $resolvedClassLc,
                 $className,
-                $methodName
+                $methodName,
+                false,
+                fn (string $a, string $b): bool => $this->jitIsClassSameOrSubclassOf($a, $b)
             );
         }
         if (

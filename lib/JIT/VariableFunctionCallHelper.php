@@ -28,7 +28,11 @@ final class VariableFunctionCallHelper
         foreach (self::blocksForHintScan($block) as $scanBlock) {
             if (null !== $nameSlot) {
                 foreach ($scanBlock->opCodes as $op) {
-                    if (OpCode::TYPE_ASSIGN !== $op->type || $op->arg2 !== $nameSlot) {
+                    if (
+                        OpCode::TYPE_ASSIGN !== $op->type
+                        || $op->arg2 !== $nameSlot
+                        || null === $op->arg3
+                    ) {
                         continue;
                     }
                     $literal = self::literalFromAssignSource($scanBlock, $op->arg3);
@@ -200,7 +204,7 @@ final class VariableFunctionCallHelper
     {
         $hints = [];
         foreach ($block->opCodes as $op) {
-            if (OpCode::TYPE_ASSIGN !== $op->type) {
+            if (OpCode::TYPE_ASSIGN !== $op->type || null === $op->arg3) {
                 continue;
             }
             $literal = self::literalFromAssignSource($block, $op->arg3);
