@@ -42,9 +42,11 @@ $entriesDir = $root.'/build/chunks/entries';
 const DEFAULT_MAX_FILES_WITH_BYTES = 24;
 
 /**
- * Singleton files larger than --max-bytes cannot be split further and NestedJIT OOMs
- * under 8g even after SPINE_CHUNK method demote (Compiler.php ~2.1 MB, JIT.php ~1.0 MB).
- * Mark them deferred so the orchestrator can finish the rest of the spine honestly (#36387).
+ * Singleton files larger than --max-bytes cannot be split further. Before SPINE_CHUNK demote
+ * matured, NestedJIT OOMed on those hubs under 8g — so the plan marked them deferred.
+ * Demote-covered trees (and measured-live CompilerVersion) now emit in seconds; only defer
+ * oversize singletons that are *not* demote-eligible (#36387). Compiler.php / JIT.php remain
+ * plan-skipped via SPINE_SKIP_HOST_CFG_OOM.
  */
 const DEFER_SINGLETON_OVER_MAX_BYTES = true;
 
@@ -557,17 +559,38 @@ usort($chunks, static function (array $a, array $b): int {
     return strcmp((string) $a['chunk_id'], (string) $b['chunk_id']);
 });
 
-// Honest capacity gate: singleton TUs larger than --max-bytes cannot be split and
-// NestedJIT OOMs under 8g (Compiler.php / JIT.php / VmDom.php, #36387). Defer them so
-// the rest of the plan can emit; do not pretend they succeeded.
+// Honest capacity gate: oversize singletons that are *not* demote-eligible still NestedJIT /
+// host-CFG OOM under 8g. Demote-covered paths + CompilerVersion emit — do not defer those
+// (#36387; measured Block/VM/VmDom/CompileBlockInternal after T_TRAIT demote).
 $deferred = 0;
 if (DEFER_SINGLETON_OVER_MAX_BYTES && $maxBytes >= 1) {
+    // Autoload for oversizeSingletonCanEmit (mirrors SpineChunkRuntimeMethodDemote coverage).
+    $autoload = $root.'/vendor/autoload.php';
+    if (is_file($autoload)) {
+        require_once $autoload;
+    }
     foreach ($chunks as &$chunk) {
-        if ((int) ($chunk['file_count'] ?? 0) === 1 && (int) ($chunk['byte_count'] ?? 0) > $maxBytes) {
-            $chunk['deferred'] = true;
-            $chunk['defer_reason'] = 'singleton_over_max_bytes';
-            ++$deferred;
+        if ((int) ($chunk['file_count'] ?? 0) !== 1 || (int) ($chunk['byte_count'] ?? 0) <= $maxBytes) {
+            continue;
         }
+        $rel = null;
+        $entryPath = (string) ($chunk['entry'] ?? '');
+        if ($entryPath !== '' && is_file($entryPath)) {
+            foreach (file($entryPath, FILE_IGNORE_NEW_LINES) as $line) {
+                if (preg_match("#require_once __DIR__\\s*\\.\\s*'(?:/\\.\\.)+/((?:lib|ext)/[^']+\\.php)'#", $line, $m)) {
+                    $rel = $m[1];
+                    break;
+                }
+            }
+        }
+        if ($rel !== null && class_exists(\PHPCompiler\JIT\SpineChunkRuntimeMethodDemote::class)
+            && \PHPCompiler\JIT\SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit($rel)
+        ) {
+            continue;
+        }
+        $chunk['deferred'] = true;
+        $chunk['defer_reason'] = 'singleton_over_max_bytes';
+        ++$deferred;
     }
     unset($chunk);
 }
@@ -589,7 +612,7 @@ $plan = [
         .'also applies max-files='.DEFAULT_MAX_FILES_WITH_BYTES.' for tiny-file packs. '
         .'Spine --strategy skips bin/ + lib/Compiler.php + lib/JIT.php + lib/Doctor.php '
         .'(host CFG OOM / null-Op under 8g). Singleton chunks over max-bytes are marked '
-        .'deferred (NestedJIT OOM under 8g).',
+        .'deferred only when not demote-eligible (NestedJIT / host CFG OOM under 8g).',
 ];
 
 $json = json_encode($plan, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n";

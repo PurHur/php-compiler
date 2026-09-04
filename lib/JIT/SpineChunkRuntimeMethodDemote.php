@@ -47,6 +47,10 @@ use PHPCompiler\OpCode;
  *   (isInlineExprCallArgProducer null Op) before JIT demote — skipped in chunk-plan.
  * - Func\* / Cfg\* / Lint\* / Visitor\*: NestedJIT SEGV on Internal/PHP/Linter/
  *   OpSubBlockAccess/VoidCastResolver — measured 2026-09-04.
+ * - Top-level JIT Concern traits ({@see CompileBlockInternal}, AssignOperand, InitJitMethodCall)
+ *   live in namespace PHPCompiler (not PHPCompiler\JIT\Concern). Host CFG of CompileBlockInternal
+ *   (470 KB) OOMs at 1536M unless {@see rewriteSource()} hollows **trait** bodies (T_TRAIT) —
+ *   measured 2026-09-04: rc=255 before; emits after T_TRAIT + demote target.
  *
  * Emptying those bodies (probe) emits .o files in seconds. Host-lowering Runtime::initParsePipeline
  * was already known to hang Zend rebuilds for hours ({@see RuntimeInitParsePipeline}).
@@ -57,24 +61,24 @@ use PHPCompiler\OpCode;
  * {@see \PHPCompiler\Web} / {@see \PHPCompiler\Ast} / {@see \PHPCompiler\Cli} /
  * {@see \PHPCompiler\SourcePreprocessor} / {@see \PHPCompiler\JIT} (sub-NS) /
  * {@see \PHPCompiler\ext} / {@see \PHPCompiler\Func} / {@see \PHPCompiler\Cfg} /
- * {@see \PHPCompiler\Lint} / {@see \PHPCompiler\Visitor} class method CFG
+ * {@see \PHPCompiler\Lint} / {@see \PHPCompiler\Visitor} class/trait method CFG
  * with a void-return stub before {@see \PHPCompiler\JIT::compileBlock} so hub ClassEntry +
  * method symbols still land in the .o / peer manifest. Real bodies stay on C-floor helpers
  * (RuntimeInitParsePipeline / RuntimeParseM5Native), NestedVM object:: proxies, or later
  * peer-bound non-demoted TUs. Does not demote top-level {@see \PHPCompiler\Compiler} /
  * {@see \PHPCompiler\CompilerVersion} / {@see \PHPCompiler\JIT} — Compiler/JIT need file
  * splits before host CFG fits under 8g; CompilerVersion already emits live.
- * {@see self::rewriteSource()} hollows demoted class bodies before CFG when
+ * {@see self::rewriteSource()} hollows demoted class **and trait** bodies before CFG when
  * SourceBundler keeps the entry filename.
  */
 final class SpineChunkRuntimeMethodDemote
 {
-    public static function shouldDemote(string $displayClassLc): bool
+    /**
+     * Whether $displayClassLc is on the SPINE_CHUNK demote list (ignores spine-mode flag).
+     * Used by chunk-plan defer gates so demote-covered oversize singletons stay emit-eligible.
+     */
+    public static function isDemoteTarget(string $displayClassLc): bool
     {
-        if (!ExternalMethodBind::spineChunkMode()) {
-            return false;
-        }
-
         $lc = strtolower(ltrim($displayClassLc, '\\'));
         if (
             'phpcompiler\\runtime' === $lc
@@ -84,6 +88,10 @@ final class SpineChunkRuntimeMethodDemote
             || 'phpcompiler\\moduleabstract' === $lc
             || 'phpcompiler\\frame' === $lc
             || 'phpcompiler\\config' === $lc
+            // JIT Concern traits extracted into namespace PHPCompiler (#36403 / #36387).
+            || 'phpcompiler\\compileblockinternal' === $lc
+            || 'phpcompiler\\assignoperand' === $lc
+            || 'phpcompiler\\initjitmethodcall' === $lc
             || str_starts_with($lc, 'phpcompiler\\builtin')
         ) {
             return true;
@@ -103,6 +111,59 @@ final class SpineChunkRuntimeMethodDemote
             || str_starts_with($lc, 'phpcompiler\\cfg\\')
             || str_starts_with($lc, 'phpcompiler\\lint\\')
             || str_starts_with($lc, 'phpcompiler\\visitor\\');
+    }
+
+    public static function shouldDemote(string $displayClassLc): bool
+    {
+        if (!ExternalMethodBind::spineChunkMode()) {
+            return false;
+        }
+
+        return self::isDemoteTarget($displayClassLc);
+    }
+
+    /**
+     * Repo-relative path → true when oversize singleton emit is safe under SPINE_CHUNK (#36387).
+     * Demote-covered trees + measured live CompilerVersion; Compiler.php / JIT.php stay plan-skipped.
+     */
+    public static function oversizeSingletonCanEmit(string $rel): bool
+    {
+        $rel = str_replace('\\', '/', ltrim($rel, '/'));
+        if ('lib/CompilerVersion.php' === $rel) {
+            return true;
+        }
+        if (
+            'lib/Block.php' === $rel
+            || 'lib/VM.php' === $rel
+            || 'lib/OpCode.php' === $rel
+            || 'lib/ModuleAbstract.php' === $rel
+            || 'lib/Frame.php' === $rel
+            || 'lib/Config.php' === $rel
+            || str_starts_with($rel, 'lib/Builtin')
+        ) {
+            return true;
+        }
+        foreach ([
+            'lib/VM/',
+            'lib/AOT/',
+            'lib/Compiler/',
+            'lib/Web/',
+            'lib/Ast/',
+            'lib/Cli/',
+            'lib/SourcePreprocessor/',
+            'lib/JIT/',
+            'lib/Func/',
+            'lib/Cfg/',
+            'lib/Lint/',
+            'lib/Visitor/',
+            'ext/',
+        ] as $prefix) {
+            if (str_starts_with($rel, $prefix)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -285,8 +346,9 @@ final class SpineChunkRuntimeMethodDemote
                     }
                 }
 
-                $isClassKeyword = \is_array($tok) && T_CLASS === $tok[0];
-                if ($isClassKeyword && T_DOUBLE_COLON !== $prevMeaningful) {
+                // Hollow demoted classes and traits (CompileBlockInternal is a trait, #36387).
+                $isTypeKeyword = \is_array($tok) && (T_CLASS === $tok[0] || T_TRAIT === $tok[0]);
+                if ($isTypeKeyword && T_DOUBLE_COLON !== $prevMeaningful) {
                     $nameIdx = self::nextMeaningfulIndex($tokens, $i + 1);
                     if ($nameIdx < $n) {
                         $nameTok = $tokens[$nameIdx];
