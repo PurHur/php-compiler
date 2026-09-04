@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8188 |
-| Phase A inventory files (M2 ratio SSOT) | 8188 |
+| PHP files on vm.php path | 8189 |
+| Phase A inventory files (M2 ratio SSOT) | 8189 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 25946 |
+| Source constructs flagged (warnings) | 25949 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5593,6 +5593,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/NestedArrayAndLeadingConstCallArgProducers.php` | 0 | 3 |
 | `lib/Compiler/Concern/OuterSiblingAndBuiltinWireCallArgSlots.php` | 0 | 7 |
 | `lib/Compiler/Concern/ParameterAsserts.php` | 0 | 4 |
+| `lib/Compiler/Concern/PrecedingExpressionDimFetchAndHoistedConstCallArgSlots.php` | 0 | 3 |
 | `lib/Compiler/Concern/PrecedingInlineCallArgProducers.php` | 0 | 3 |
 | `lib/Compiler/Concern/RewireInlineCallArgSendSlots.php` | 0 | 4 |
 | `lib/Compiler/Concern/SiblingInlineCallArgProducerSlots.php` | 0 | 3 |
@@ -48980,76 +48981,76 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 771)
-- new CompileFatal (line 805)
-- new CompileError (line 808)
-- new ClassCompileRegistry (line 849)
-- new AttributeClassRegistry (line 850)
-- new ClassCompileRegistry (line 958)
-- new AttributeClassRegistry (line 959)
-- new ClassCompileRegistry (line 1001)
-- new AttributeClassRegistry (line 1002)
-- new Func\PHP (line 1007)
-- new Op\Type\Literal (line 1179)
-- new Block (line 1255)
-- new ArrayObject (line 1263)
-- new Block (line 1311)
-- new Block (line 1323)
-- new OpCode (line 1336)
-- new ArrayObject (line 1389)
-- new OpCode (line 1423)
-- new OpCode (line 1468)
-- new OpCode (line 1490)
-- new OpCode (line 2112)
-- new OpCode (line 2124)
-- new Block (line 2252)
-- new OpCode (line 2259)
-- new Operand\Literal (line 2278)
-- new Operand\Variable (line 2280)
-- new OpCode (line 2393)
-- new Literal (line 2985)
-- new Operand\Literal (line 3019)
-- new Variable (line 3037)
-- new Operand\Variable (line 3114)
-- new Operand\Literal (line 3114)
-- new Operand\Temporary (line 3120)
-- new OpCode (line 3127)
-- new Variable (line 3209)
-- new OpCode (line 3238)
-- new Operand\Temporary (line 4276)
-- new OpCode (line 4278)
-- new OpCode (line 4340)
-- new OpCode (line 4359)
-- new OpCode (line 4368)
-- new OpCode (line 4376)
-- new OpCode (line 4383)
-- new OpCode (line 4395)
-- new OpCode (line 4412)
-- new OpCode (line 4419)
-- new OpCode (line 4428)
-- new OpCode (line 4433)
-- new OpCode (line 4453)
-- new OpCode (line 4468)
-- new Variable (line 4484)
-- new Operand\Literal (line 4486)
-- new OpCode (line 4489)
-- new OpCode (line 4522)
+- new CompileFatal (line 775)
+- new CompileFatal (line 809)
+- new CompileError (line 812)
+- new ClassCompileRegistry (line 853)
+- new AttributeClassRegistry (line 854)
+- new ClassCompileRegistry (line 962)
+- new AttributeClassRegistry (line 963)
+- new ClassCompileRegistry (line 1005)
+- new AttributeClassRegistry (line 1006)
+- new Func\PHP (line 1011)
+- new Op\Type\Literal (line 1183)
+- new Block (line 1259)
+- new ArrayObject (line 1267)
+- new Block (line 1315)
+- new Block (line 1327)
+- new OpCode (line 1340)
+- new ArrayObject (line 1393)
+- new OpCode (line 1427)
+- new OpCode (line 1472)
+- new OpCode (line 1494)
+- new OpCode (line 2116)
+- new OpCode (line 2128)
+- new Block (line 2256)
+- new OpCode (line 2263)
+- new Operand\Literal (line 2282)
+- new Operand\Variable (line 2284)
+- new OpCode (line 2397)
+- new Literal (line 2989)
+- new Operand\Literal (line 3023)
+- new Variable (line 3041)
+- new Operand\Variable (line 3118)
+- new Operand\Literal (line 3118)
+- new Operand\Temporary (line 3124)
+- new OpCode (line 3131)
+- new Variable (line 3213)
+- new OpCode (line 3242)
+- new Operand\Temporary (line 4280)
+- new OpCode (line 4282)
+- new OpCode (line 4344)
+- new OpCode (line 4363)
+- new OpCode (line 4372)
+- new OpCode (line 4380)
+- new OpCode (line 4387)
+- new OpCode (line 4399)
+- new OpCode (line 4416)
+- new OpCode (line 4423)
+- new OpCode (line 4432)
+- new OpCode (line 4437)
+- new OpCode (line 4457)
+- new OpCode (line 4472)
+- new Variable (line 4488)
+- new Operand\Literal (line 4490)
+- new OpCode (line 4493)
 - new OpCode (line 4526)
-- new OpCode (line 4543)
-- new Block (line 4552)
-- new OpCode (line 4555)
-- new OpCode (line 4556)
-- new OpCode (line 4643)
-- new Operand\Temporary (line 4677)
-- new Operand\Temporary (line 4683)
-- new Operand\Temporary (line 4689)
-- new Operand\Temporary (line 4695)
-- new Operand\Temporary (line 4712)
-- new Operand\Temporary (line 4721)
-- new Operand\Literal (line 5905)
-- new Variable (line 5907)
-- 179 class method(s)
-- 6 closure(s)
+- new OpCode (line 4530)
+- new OpCode (line 4547)
+- new Block (line 4556)
+- new OpCode (line 4559)
+- new OpCode (line 4560)
+- new OpCode (line 4647)
+- new Operand\Temporary (line 4681)
+- new Operand\Temporary (line 4687)
+- new Operand\Temporary (line 4693)
+- new Operand\Temporary (line 4699)
+- new Operand\Temporary (line 4716)
+- new Operand\Temporary (line 4725)
+- new Operand\Literal (line 5056)
+- new Variable (line 5058)
+- 151 class method(s)
+- 4 closure(s)
 
 ### `lib/Compiler/AbstractMethodBodyCheck.php`
 
@@ -49796,6 +49797,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new CompileFatal (line 45)
 - 9 class method(s)
 - 1 closure(s)
+
+### `lib/Compiler/Concern/PrecedingExpressionDimFetchAndHoistedConstCallArgSlots.php`
+
+**Warnings** (review for bootstrap subset):
+- trait PrecedingExpressionDimFetchAndHoistedConstCallArgSlots (line 23)
+- 28 class method(s)
+- 2 closure(s)
 
 ### `lib/Compiler/Concern/PrecedingInlineCallArgProducers.php`
 
