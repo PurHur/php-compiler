@@ -24,6 +24,13 @@ final class ErrorHandlerCallbackPolicyTest extends TestCase
         ));
     }
 
+    public function testJitRejectionMentionsClosuresAreSupported(): void
+    {
+        $msg = ErrorHandlerCallbackPolicy::jitRejectionMessage();
+        $this->assertStringContainsString('closure', $msg);
+        $this->assertStringNotContainsString('closures, array callables, and invokable objects are deferred', $msg);
+    }
+
     public function testVmAllowsNullAndStringCallbackTypes(): void
     {
         $this->assertTrue(ErrorHandlerCallbackPolicy::isVmSupportedType(\PHPCompiler\VM\Variable::TYPE_NULL));

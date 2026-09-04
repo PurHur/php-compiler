@@ -7,14 +7,17 @@ namespace PHPCompiler\JIT;
 use PHPCompiler\VM\Variable as VMVariable;
 
 /**
- * Supported vs deferred set_error_handler() callback forms (issue #1379).
+ * Supported vs deferred set_error_handler() callback forms (issue #1379 / #36382).
+ *
+ * JIT/AOT: compile-time string user-function names and closures/arrows (incl. static
+ * + use()-by-ref — Nyholm Stream::getContents). Array callables / invokables stay deferred.
  */
 final class ErrorHandlerCallbackPolicy
 {
     public const DEFERRED_SUMMARY =
-        'set_error_handler callbacks: string user-function names VM-only; closures deferred';
+        'set_error_handler callbacks: string user-function names + closures for JIT/AOT; array/invokable deferred';
 
-    public const DEFERRED_KINDS = 'closures, array callables, and invokable objects';
+    public const DEFERRED_KINDS = 'array callables and invokable objects';
 
     public static function isVmSupportedType(int $type): bool
     {
@@ -29,6 +32,10 @@ final class ErrorHandlerCallbackPolicy
 
     public static function isJitLowerable(Variable $callback): bool
     {
+        if (null !== $callback->closureCall) {
+            return true;
+        }
+
         return self::isJitLowerableScalar(
             $callback->type,
             $callback->isNullConstant,
@@ -47,8 +54,8 @@ final class ErrorHandlerCallbackPolicy
 
     public static function jitRejectionMessage(): string
     {
-        return 'set_error_handler() callback must be a compile-time string function name in this compiler build; '
-            .self::DEFERRED_KINDS.' are deferred (#1379)';
+        return 'set_error_handler() callback must be a compile-time string function name or closure in this compiler build; '
+            .self::DEFERRED_KINDS.' are deferred (#1379, #36382)';
     }
 
     /**

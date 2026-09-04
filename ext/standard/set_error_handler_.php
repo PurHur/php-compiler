@@ -13,9 +13,10 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * set_error_handler() — VM string user-function callbacks (issue #1379).
+ * set_error_handler() — VM callables + JIT string / closure callbacks (issue #1379 / #36382).
  *
  * Soft-null DEP+coerce for int $error_levels (#31465, Zend/zend_builtin_functions.c).
+ * php-src: Zend/zend_builtin_functions.c PHP_FUNCTION(set_error_handler)
  */
 final class set_error_handler_ extends Internal
 {
@@ -50,7 +51,9 @@ final class set_error_handler_ extends Internal
         if (!ErrorHandlerCallbackPolicy::isJitLowerable($args[0])) {
             throw new \LogicException(ErrorHandlerCallbackPolicy::jitRejectionMessage());
         }
-        $this->jitString($context, $args[0], 'set_error_handler() callback');
+        if (null === $args[0]->closureCall) {
+            $this->jitString($context, $args[0], 'set_error_handler() callback');
+        }
         $maskI32 = null;
         if (2 === $argc) {
             // Soft-null DEP+coerce like Zend Z_PARAM_LONG (#31465); not compile-time-only.

@@ -6162,6 +6162,11 @@ trait CompileBlockInternal
                     $this->propagateDomCreateDocumentFragmentCompileTime(
                         $block->getOperand($op->arg1)
                     );
+                    $this->propagateGetClassCompileTimeString(
+                        $block->getOperand($op->arg1),
+                        $this->context->scope->toCall,
+                        $callArgs
+                    );
                     $this->propagateDomTextSplitTextCompileTimeData(
                         $block->getOperand($op->arg1)
                     );
@@ -7717,5 +7722,41 @@ trait CompileBlockInternal
         }
 
         return \PHPCompiler\JIT\BasicBlockHelper::tryGetInsertBlock($this->context) ?? $basicBlock;
+    }
+
+    /**
+     * get_class($obj) keeps a compile-time class name when $obj is a known new/anonymous
+     * instance — needed for stream_wrapper_register(..., get_class(new class {})) (#36382 Nyholm).
+     *
+     * @param array<int, \PHPCompiler\JIT\Variable> $callArgs
+     */
+    private function propagateGetClassCompileTimeString(
+        Operand $result,
+        mixed $toCall,
+        array $callArgs
+    ): void {
+        if (!($toCall instanceof CoreFunc\Internal)) {
+            return;
+        }
+        if ('get_class' !== strtolower($toCall->getName())) {
+            return;
+        }
+        $obj = $callArgs[0] ?? null;
+        if (!$obj instanceof Variable) {
+            return;
+        }
+        $name = $obj->classUserType;
+        if (null === $name || '' === $name) {
+            if (Variable::TYPE_OBJECT === $obj->type && null !== $obj->compileTimeString && '' !== $obj->compileTimeString) {
+                $name = $obj->compileTimeString;
+            } else {
+                return;
+            }
+        }
+        if (!$this->context->hasVariableOp($result)) {
+            return;
+        }
+        $resultVar = $this->context->getVariableFromOp($result);
+        $resultVar->compileTimeString = $name;
     }
 }
