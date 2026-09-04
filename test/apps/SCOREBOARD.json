@@ -1,5 +1,5 @@
 {
-    "generated_at": "2026-09-04T20:59:52Z",
+    "generated_at": "2026-09-04T21:38:16Z",
     "issue": 36380,
     "packages": [
         {
@@ -17,8 +17,8 @@
             },
             "vm": {
                 "status": "fail",
-                "pass": 52,
-                "fail": 12,
+                "pass": 53,
+                "fail": 11,
                 "skip": 0,
                 "rc": 1,
                 "reason": null
@@ -28,13 +28,13 @@
                 "pass": 0,
                 "fail": 0,
                 "skip": 0,
-                "rc": 124,
-                "reason": "phpc_build:_helper-runtime_cache_hit_(17_helpers,_core=1b996aa5c644fbf7d3a2)_(#15889)"
+                "rc": 255,
+                "reason": "phpc_build:_helper-runtime_cache_hit_(17_helpers,_core=1b996aa5c644fbf7d3a2)_(#15889)_PHP_Fatal_error:_Allowed_memory_size_of_1610612736_bytes_exhausted_(tried_to_allocate_262144_bytes)_in_/compiler/l"
             },
             "aot_pass_rate": 0,
             "blockers": [
-                "vm: 12 fixture failures",
-                "aot: phpc_build:_helper-runtime_cache_hit_(17_helpers,_core=1b996aa5c644fbf7d3a2)_(#15889)"
+                "vm: 11 fixture failures",
+                "aot: phpc_build:_helper-runtime_cache_hit_(17_helpers,_core=1b996aa5c644fbf7d3a2)_(#15889)_PHP_Fatal_error:_Allowed_memory_size_of_1610612736_bytes_exhausted_(tried_to_allocate_262144_bytes)_in_/compiler/l"
             ],
             "raw_rc": 0
         },

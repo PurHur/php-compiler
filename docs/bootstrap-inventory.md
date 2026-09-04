@@ -49819,11 +49819,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - trait OuterSiblingAndBuiltinWireCallArgSlots (line 24)
-- new Operand\Temporary (line 389)
-- new Operand\Temporary (line 619)
-- new Operand\Temporary (line 624)
-- new Operand\Temporary (line 697)
-- new Operand\Temporary (line 702)
+- new Operand\Temporary (line 378)
+- new Operand\Temporary (line 608)
+- new Operand\Temporary (line 613)
+- new Operand\Temporary (line 686)
+- new Operand\Temporary (line 691)
 - 13 class method(s)
 
 ### `lib/Compiler/Concern/ParameterAsserts.php`
