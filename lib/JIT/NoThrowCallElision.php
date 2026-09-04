@@ -241,6 +241,10 @@ final class NoThrowCallElision
 
             return true;
         }
+        if (self::isPureHtmlEscapeBuiltin($name)) {
+            // html.c / string.c / exec.c — mixed STR + LONG/BOOL; encoding may be null.
+            return self::htmlEscapeArgsCannotThrow($name, $callArgs);
+        }
         if (self::isPureStringSliceOrCompareBuiltin($name)) {
             // Mixed Z_PARAM_STR + Z_PARAM_LONG (substr/str_repeat/strncmp) or
             // all-string compares/searches — numeric slots never invoke
@@ -388,6 +392,164 @@ final class NoThrowCallElision
             case 'hebrev':
             case 'hebrevc':
                 return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * php-src {@code ext/standard/html.c} / {@code string.c} {@code nl2br} /
+     * {@code ext/pcre/php_pcre.c} {@code preg_quote} / {@code exec.c}
+     * escapeshell* — read typed strings (+ optional long/bool flags); no user
+     * handlers. Public for {@see DiscardedPureCallElision} (#36386).
+     */
+    public static function isPureHtmlEscapeBuiltin(string $nameLc): bool
+    {
+        switch ($nameLc) {
+            case 'htmlspecialchars':
+            case 'htmlentities':
+            case 'htmlspecialchars_decode':
+            case 'html_entity_decode':
+            case 'nl2br':
+            case 'preg_quote':
+            case 'escapeshellarg':
+            case 'escapeshellcmd':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * @param array<int, Variable> $callArgs
+     */
+    public static function htmlEscapeArgsCannotThrow(string $nameLc, array $callArgs): bool
+    {
+        if ([] === $callArgs) {
+            return false;
+        }
+        switch ($nameLc) {
+            case 'escapeshellarg':
+            case 'escapeshellcmd':
+                return isset($callArgs[0])
+                    && $callArgs[0] instanceof Variable
+                    && self::stringParamBuiltinArgCannotThrow($callArgs[0])
+                    && !isset($callArgs[1]);
+            case 'preg_quote':
+                // string [, string|null delimiter]
+                if (
+                    !isset($callArgs[0])
+                    || !$callArgs[0] instanceof Variable
+                    || !self::stringParamBuiltinArgCannotThrow($callArgs[0])
+                ) {
+                    return false;
+                }
+                if (!isset($callArgs[1])) {
+                    return true;
+                }
+
+                return $callArgs[1] instanceof Variable
+                    && (
+                        self::stringParamBuiltinArgCannotThrow($callArgs[1])
+                        || Variable::TYPE_NULL === $callArgs[1]->type
+                        || $callArgs[1]->isNullConstant
+                    );
+            case 'nl2br':
+                // string [, bool use_xhtml]
+                if (
+                    !isset($callArgs[0])
+                    || !$callArgs[0] instanceof Variable
+                    || !self::stringParamBuiltinArgCannotThrow($callArgs[0])
+                ) {
+                    return false;
+                }
+                if (!isset($callArgs[1])) {
+                    return true;
+                }
+
+                return $callArgs[1] instanceof Variable
+                    && self::numericParamBuiltinArgCannotThrow($callArgs[1]);
+            case 'htmlspecialchars_decode':
+                // string [, long flags]
+                if (
+                    !isset($callArgs[0])
+                    || !$callArgs[0] instanceof Variable
+                    || !self::stringParamBuiltinArgCannotThrow($callArgs[0])
+                ) {
+                    return false;
+                }
+                if (!isset($callArgs[1])) {
+                    return true;
+                }
+
+                return $callArgs[1] instanceof Variable
+                    && self::numericParamBuiltinArgCannotThrow($callArgs[1]);
+            case 'htmlspecialchars':
+            case 'htmlentities':
+                // string [, long flags [, string|null encoding [, bool double_encode]]]
+                if (
+                    !isset($callArgs[0])
+                    || !$callArgs[0] instanceof Variable
+                    || !self::stringParamBuiltinArgCannotThrow($callArgs[0])
+                ) {
+                    return false;
+                }
+                if (!isset($callArgs[1])) {
+                    return true;
+                }
+                if (
+                    !$callArgs[1] instanceof Variable
+                    || !self::numericParamBuiltinArgCannotThrow($callArgs[1])
+                ) {
+                    return false;
+                }
+                if (!isset($callArgs[2])) {
+                    return true;
+                }
+                if (
+                    !$callArgs[2] instanceof Variable
+                    || !(
+                        self::stringParamBuiltinArgCannotThrow($callArgs[2])
+                        || Variable::TYPE_NULL === $callArgs[2]->type
+                        || $callArgs[2]->isNullConstant
+                    )
+                ) {
+                    return false;
+                }
+                if (!isset($callArgs[3])) {
+                    return true;
+                }
+
+                return $callArgs[3] instanceof Variable
+                    && self::numericParamBuiltinArgCannotThrow($callArgs[3]);
+            case 'html_entity_decode':
+                // string [, long flags [, string|null encoding]]
+                if (
+                    !isset($callArgs[0])
+                    || !$callArgs[0] instanceof Variable
+                    || !self::stringParamBuiltinArgCannotThrow($callArgs[0])
+                ) {
+                    return false;
+                }
+                if (!isset($callArgs[1])) {
+                    return true;
+                }
+                if (
+                    !$callArgs[1] instanceof Variable
+                    || !self::numericParamBuiltinArgCannotThrow($callArgs[1])
+                ) {
+                    return false;
+                }
+                if (!isset($callArgs[2])) {
+                    return true;
+                }
+
+                return $callArgs[2] instanceof Variable
+                    && (
+                        self::stringParamBuiltinArgCannotThrow($callArgs[2])
+                        || Variable::TYPE_NULL === $callArgs[2]->type
+                        || $callArgs[2]->isNullConstant
+                    );
             default:
                 return false;
         }

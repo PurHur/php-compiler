@@ -15,7 +15,8 @@ use PHPCompiler\VM\Variable as VmVariable;
  * php-src: ZPP may still run user-visible coercions; here we only fold cases that are
  * side-effect-free (literal / typed-string strlen/ord/strtolower/ucwords/bin2hex/
  * urlencode/str_rot13/quotemeta/md5/crc32/base64_encode/soundex/…, typed
- * substr/str_repeat/strcmp/strpos/strstr/…, typed-numeric chr, type.c
+ * substr/str_repeat/strcmp/strpos/strstr/…, typed htmlspecialchars/htmlentities/
+ * nl2br/preg_quote/escapeshell*, typed-numeric chr, type.c
  * predicates + gettype, ctype.c classifiers on typed/literal strings,
  * typed-array count/sizeof, math.c incl. pow/fpow/fdiv on already-numeric
  * args, empty void user functions). Soft-null strlen / ord / chr / math /
@@ -49,6 +50,9 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureStringTransformNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureHtmlEscapeNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureStringSliceOrCompareNoSideEffect($toCall, $callArgs)) {
@@ -201,6 +205,158 @@ final class DiscardedPureCallElision
         }
 
         return true;
+    }
+
+    /**
+     * Discarded {@code htmlspecialchars}/{@code htmlentities}/{@code nl2br}/
+     * {@code preg_quote}/{@code escapeshellarg}/… on typed string (+ optional
+     * numeric flags / null encoding) — php-src {@code html.c}/{@code string.c}/
+     * {@code php_pcre.c}/{@code exec.c}; soft-null string args stay live
+     * (deprecate). Encoding {@code null} is Z_PARAM_STR_OR_NULL and is allowed.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureHtmlEscapeNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        $name = strtolower($toCall->getName());
+        if (!NoThrowCallElision::isPureHtmlEscapeBuiltin($name)) {
+            return false;
+        }
+
+        return self::htmlEscapeArgsAllowDiscardedElision($name, $callArgs);
+    }
+
+    /**
+     * @param array<int, Variable> $callArgs
+     */
+    private static function htmlEscapeArgsAllowDiscardedElision(string $nameLc, array $callArgs): bool
+    {
+        if ([] === $callArgs) {
+            return false;
+        }
+        switch ($nameLc) {
+            case 'escapeshellarg':
+            case 'escapeshellcmd':
+                return isset($callArgs[0])
+                    && $callArgs[0] instanceof Variable
+                    && self::stringArgAllowsDiscardedElision($callArgs[0])
+                    && !isset($callArgs[1]);
+            case 'preg_quote':
+                if (
+                    !isset($callArgs[0])
+                    || !$callArgs[0] instanceof Variable
+                    || !self::stringArgAllowsDiscardedElision($callArgs[0])
+                ) {
+                    return false;
+                }
+                if (!isset($callArgs[1])) {
+                    return true;
+                }
+
+                return $callArgs[1] instanceof Variable
+                    && (
+                        self::stringArgAllowsDiscardedElision($callArgs[1])
+                        || Variable::TYPE_NULL === $callArgs[1]->type
+                        || $callArgs[1]->isNullConstant
+                    );
+            case 'nl2br':
+                if (
+                    !isset($callArgs[0])
+                    || !$callArgs[0] instanceof Variable
+                    || !self::stringArgAllowsDiscardedElision($callArgs[0])
+                ) {
+                    return false;
+                }
+                if (!isset($callArgs[1])) {
+                    return true;
+                }
+
+                return $callArgs[1] instanceof Variable
+                    && self::mathArgAllowsDiscardedElision($callArgs[1]);
+            case 'htmlspecialchars_decode':
+                if (
+                    !isset($callArgs[0])
+                    || !$callArgs[0] instanceof Variable
+                    || !self::stringArgAllowsDiscardedElision($callArgs[0])
+                ) {
+                    return false;
+                }
+                if (!isset($callArgs[1])) {
+                    return true;
+                }
+
+                return $callArgs[1] instanceof Variable
+                    && self::mathArgAllowsDiscardedElision($callArgs[1]);
+            case 'htmlspecialchars':
+            case 'htmlentities':
+                if (
+                    !isset($callArgs[0])
+                    || !$callArgs[0] instanceof Variable
+                    || !self::stringArgAllowsDiscardedElision($callArgs[0])
+                ) {
+                    return false;
+                }
+                if (!isset($callArgs[1])) {
+                    return true;
+                }
+                if (
+                    !$callArgs[1] instanceof Variable
+                    || !self::mathArgAllowsDiscardedElision($callArgs[1])
+                ) {
+                    return false;
+                }
+                if (!isset($callArgs[2])) {
+                    return true;
+                }
+                if (
+                    !$callArgs[2] instanceof Variable
+                    || !(
+                        self::stringArgAllowsDiscardedElision($callArgs[2])
+                        || Variable::TYPE_NULL === $callArgs[2]->type
+                        || $callArgs[2]->isNullConstant
+                    )
+                ) {
+                    return false;
+                }
+                if (!isset($callArgs[3])) {
+                    return true;
+                }
+
+                return $callArgs[3] instanceof Variable
+                    && self::mathArgAllowsDiscardedElision($callArgs[3]);
+            case 'html_entity_decode':
+                if (
+                    !isset($callArgs[0])
+                    || !$callArgs[0] instanceof Variable
+                    || !self::stringArgAllowsDiscardedElision($callArgs[0])
+                ) {
+                    return false;
+                }
+                if (!isset($callArgs[1])) {
+                    return true;
+                }
+                if (
+                    !$callArgs[1] instanceof Variable
+                    || !self::mathArgAllowsDiscardedElision($callArgs[1])
+                ) {
+                    return false;
+                }
+                if (!isset($callArgs[2])) {
+                    return true;
+                }
+
+                return $callArgs[2] instanceof Variable
+                    && (
+                        self::stringArgAllowsDiscardedElision($callArgs[2])
+                        || Variable::TYPE_NULL === $callArgs[2]->type
+                        || $callArgs[2]->isNullConstant
+                    );
+            default:
+                return false;
+        }
     }
 
     /**
