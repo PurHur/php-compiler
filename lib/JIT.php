@@ -20936,7 +20936,9 @@ class JIT {
         if ('__object__*' !== $this->context->getStringFromType($toCall->argTypes[0])) {
             return $args;
         }
-        if (count($args) >= count($toCall->argTypes)) {
+        // Optional trailing params make count($args) < count($argTypes) even when TYPE_NEW
+        // already seeded $this — that used to double-prepend and shift user args (#36382).
+        if (\count($args) >= $toCall->minimumPositionalArgCountWithReceiver()) {
             return $args;
         }
         if (null === $block->func || null === $block->func->cfg) {
@@ -20972,7 +20974,7 @@ class JIT {
         if ('__object__*' !== $this->context->getStringFromType($toCall->argTypes[0])) {
             return $operands;
         }
-        if (\count($operands) >= \count($toCall->argTypes)) {
+        if (\count($operands) >= $toCall->minimumPositionalArgCountWithReceiver()) {
             return $operands;
         }
         if (null === $block->func || null === $block->func->cfg) {

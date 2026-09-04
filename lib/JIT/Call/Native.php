@@ -423,6 +423,31 @@ class Native implements Call {
     }
 
     /**
+     * Minimum positional args when the receiver is already present (TYPE_NEW / $obj->m()).
+     *
+     * Used by {@see \PHPCompiler\JIT::prependImplicitThisForStaticInstanceCall}: comparing
+     * against {@see $argTypes} length wrongly treats optional trailing params as "missing
+     * $this", so `new Request($method, $uri)` inside an instance method double-prepended the
+     * factory `$this` and shifted `$uri` into the `string $method` slot (#36382).
+     */
+    public function minimumPositionalArgCountWithReceiver(): int
+    {
+        $prefix = $this->receiverPrefix();
+        if (0 === $prefix) {
+            return \count($this->argTypes);
+        }
+        $n = $prefix;
+        $userCount = \count($this->paramNames);
+        for ($i = 0; $i < $userCount; ++$i) {
+            if ($this->userParamIsEffectivelyRequired($i)) {
+                ++$n;
+            }
+        }
+
+        return $n;
+    }
+
+    /**
      * User param must be passed: no compile-time default, or default before a later required (#25728).
      */
     private function userParamIsEffectivelyRequired(int $userIdx): bool
