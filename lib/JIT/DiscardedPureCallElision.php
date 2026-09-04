@@ -26,6 +26,7 @@ use PHPCompiler\VM\Variable as VmVariable;
  * decoct / bindec/hexdec/octdec / base_convert (compile-time bases in
  * [2,36]), typed ip2long/long2ip/inet_pton/inet_ntop, typed version_compare,
  * typed min/max/fmin/fmax (≥1 numeric; array-form min/max stays live),
+ * typed checkdate (3 longs), typed hash_equals (2 strings),
  * zero-arg pi, type.c predicates + gettype/get_debug_type, ctype.c
  * classifiers on typed/literal strings, typed-array count/sizeof, math.c
  * incl. pow/fpow/fdiv on already-numeric args, empty void user functions).
@@ -46,7 +47,9 @@ use PHPCompiler\VM\Variable as VmVariable;
  * live ({@code ValueError} outside [2,36]). {@code version_compare} with an
  * unknown typed operator stays live ({@code ValueError} on invalid ops).
  * Single-array {@code min}/{@code max} stays live (element compare / object
- * handlers).
+ * handlers). {@code clamp} stays live ({@code ValueError} when min > max /
+ * NAN). Soft-null {@code checkdate} stays live (deprecate). Non-string
+ * {@code hash_equals} stays live ({@code TypeError}).
  */
 final class DiscardedPureCallElision
 {
@@ -98,6 +101,12 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureMinMaxNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureCheckdateNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureHashEqualsNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureVersionCompareNoSideEffect($toCall, $callArgs)) {
@@ -1055,6 +1064,43 @@ final class DiscardedPureCallElision
     }
 
     /**
+     * Discarded {@code checkdate} on three typed numerics — php-src
+     * {@code datetime.c}. Invalid dates return false (no throw). Soft-null
+     * stays live (deprecate).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureCheckdateNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if (!NoThrowCallElision::isPureCheckdateBuiltin(strtolower($toCall->getName()))) {
+            return false;
+        }
+
+        return self::checkdateArgsAllowDiscardedElision($callArgs);
+    }
+
+    /**
+     * Discarded {@code hash_equals} on two typed / literal strings — php-src
+     * {@code hash.c}. Non-string / soft-null stay live ({@code TypeError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureHashEqualsNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if (!NoThrowCallElision::isPureHashEqualsBuiltin(strtolower($toCall->getName()))) {
+            return false;
+        }
+
+        return self::hashEqualsArgsAllowDiscardedElision($callArgs);
+    }
+
+    /**
      * Discarded {@code version_compare} on typed / literal strings — php-src
      * {@code versioning.c}. Optional operator must be null or a compile-time
      * valid comparison op ({@code ValueError} otherwise).
@@ -1155,6 +1201,44 @@ final class DiscardedPureCallElision
         }
 
         return true;
+    }
+
+    /**
+     * @param array<int, Variable> $callArgs
+     */
+    private static function checkdateArgsAllowDiscardedElision(array $callArgs): bool
+    {
+        if (
+            !isset($callArgs[0], $callArgs[1], $callArgs[2])
+            || isset($callArgs[3])
+        ) {
+            return false;
+        }
+        foreach ($callArgs as $arg) {
+            if (!$arg instanceof Variable || !self::mathArgAllowsDiscardedElision($arg)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @param array<int, Variable> $callArgs
+     */
+    private static function hashEqualsArgsAllowDiscardedElision(array $callArgs): bool
+    {
+        if (
+            !isset($callArgs[0], $callArgs[1])
+            || isset($callArgs[2])
+            || !$callArgs[0] instanceof Variable
+            || !$callArgs[1] instanceof Variable
+        ) {
+            return false;
+        }
+
+        return self::stringArgAllowsDiscardedElision($callArgs[0])
+            && self::stringArgAllowsDiscardedElision($callArgs[1]);
     }
 
     /**
