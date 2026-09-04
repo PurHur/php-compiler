@@ -222,6 +222,9 @@ final class ExtensionLoweringHooks
     /** intl JIT Call surfaces — registered from ext/intl Module::jitInit (#36204). */
     public ?IntlExtensionHooks $intl = null;
 
+    /** simplexml JIT Call surfaces — registered from ext/simplexml Module::jitInit (#36204). */
+    public ?SimpleXmlExtensionHooks $simplexml = null;
+
     public function requirePosixNested(): PosixNestedJitKernels
     {
         if (null === $this->posixNested) {
@@ -308,6 +311,17 @@ final class ExtensionLoweringHooks
         }
 
         return $this->intl;
+    }
+
+    public function requireSimpleXml(): SimpleXmlExtensionHooks
+    {
+        if (null === $this->simplexml) {
+            throw new \RuntimeException(
+                'simplexml extension hooks not registered — ext/simplexml Module::jitInit missing (#36204)'
+            );
+        }
+
+        return $this->simplexml;
     }
 
     public function tryPrepareDimWrite(Context $context, Variable $container, Variable $dim): ?Variable

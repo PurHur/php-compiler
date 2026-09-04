@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
-use PHPCompiler\ext\simplexml\JitSimpleXmlCount;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
 
-/** SimpleXMLElement::count() / Iterator leftover of hasChildren (#26863, #35827, #35844). */
+/**
+ * SimpleXMLElement::count() / Iterator leftover of hasChildren (#26863, #35827, #35844).
+ *
+ * Dispatch via {@see Context::$extensionLowering} so lib/JIT does not import
+ * {@code ext\simplexml} (#36204). php-src: ext/simplexml/sxe.c
+ */
 final class SimpleXMLElementCount implements Call
 {
     public function __construct(private string $name = 'count')
@@ -19,10 +23,11 @@ final class SimpleXMLElementCount implements Call
 
     public function call(Context $context, Variable ...$args): Value
     {
+        $hooks = $context->extensionLowering->requireSimpleXml();
         if ('count' !== $this->name) {
-            return JitSimpleXmlCount::invokeNamed($context, $this->name, ...$args);
+            return $hooks->countNamed($context, $this->name, ...$args);
         }
 
-        return JitSimpleXmlCount::invoke($context, ...$args);
+        return $hooks->count($context, ...$args);
     }
 }
