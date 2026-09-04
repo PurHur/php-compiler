@@ -64,6 +64,8 @@ use PHPCompiler\OpCode;
  * peer-bound non-demoted TUs. Does not demote top-level {@see \PHPCompiler\Compiler} /
  * {@see \PHPCompiler\CompilerVersion} / {@see \PHPCompiler\JIT} — Compiler/JIT need file
  * splits before host CFG fits under 8g; CompilerVersion already emits live.
+ * {@see self::rewriteSource()} hollows demoted class bodies before CFG when
+ * SourceBundler keeps the entry filename.
  */
 final class SpineChunkRuntimeMethodDemote
 {
@@ -127,5 +129,281 @@ final class SpineChunkRuntimeMethodDemote
         return 1 === \count($methodBlock->opCodes)
             && OpCode::TYPE_RETURN_VOID === $methodBlock->opCodes[0]->type
             && [] === $methodBlock->blocks;
+    }
+
+    public static function rewriteSource(string $code, string $filename = 'unknown'): string
+    {
+        $marker = getenv('PHP_COMPILER_SPINE_CHUNK_DEMOTE_LOG');
+        if (is_string($marker) && '' !== $marker) {
+            @file_put_contents(
+                $marker,
+                sprintf(
+                    "enter\t%s\tspine=%s\tbytes=%d\n",
+                    $filename,
+                    ExternalMethodBind::spineChunkMode() ? '1' : '0',
+                    strlen($code)
+                ),
+                FILE_APPEND
+            );
+        }
+        if (!ExternalMethodBind::spineChunkMode()) {
+            return $code;
+        }
+
+        $hollowed = self::hollowDemotedClassesInSource($code);
+        if (is_string($marker) && '' !== $marker && $hollowed !== $code) {
+            @file_put_contents(
+                $marker,
+                sprintf(
+                    "hollow\t%s\tin=%d\tout=%d\n",
+                    $filename,
+                    strlen($code),
+                    strlen($hollowed)
+                ),
+                FILE_APPEND
+            );
+        }
+
+        return $hollowed;
+    }
+
+    /**
+     * lib/Compiler.php → PHPCompiler\Compiler (best-effort; bundler may not use this).
+     */
+    public static function fqcnFromFilename(string $filename): ?string
+    {
+        $path = str_replace('\\', '/', $filename);
+        $pos = strrpos($path, '/lib/');
+        if (false === $pos) {
+            if (str_starts_with($path, 'lib/')) {
+                $rel = substr($path, 4);
+            } else {
+                return null;
+            }
+        } else {
+            $rel = substr($path, $pos + 5);
+        }
+        if (!str_ends_with($rel, '.php')) {
+            return null;
+        }
+        $rel = substr($rel, 0, -4);
+        if ('' === $rel || str_contains($rel, '..')) {
+            return null;
+        }
+
+        return 'PHPCompiler\\'.str_replace('/', '\\', $rel);
+    }
+
+    public static function shortClassName(string $fqcn): string
+    {
+        $fqcn = ltrim($fqcn, '\\');
+        $pos = strrpos($fqcn, '\\');
+
+        return false === $pos ? $fqcn : substr($fqcn, $pos + 1);
+    }
+
+    /**
+     * @deprecated use hollowDemotedClassesInSource — kept for unit tests targeting one class
+     */
+    public static function hollowClassMethodBodies(string $code, string $className): string
+    {
+        // Force a single short-name match by wrapping shouldDemote via temporary namespace scan
+        // that only hollows $className (tests pass unqualified Compiler / JIT).
+        return self::hollowDemotedClassesInSource($code, strtolower($className));
+    }
+
+    /**
+     * Hollow method bodies for every demoted class in $code.
+     *
+     * @param string|null $onlyShortLc when set, only hollow this short class name (test helper)
+     */
+    public static function hollowDemotedClassesInSource(string $code, ?string $onlyShortLc = null): string
+    {
+        $tokens = token_get_all($code);
+        $n = \count($tokens);
+        $out = '';
+        $i = 0;
+        $namespace = '';
+        $namespaceBraceDepth = 0; // >0 when inside `namespace Foo {`
+        $inTargetClass = false;
+        $classBraceDepth = 0;
+        $prevMeaningful = null;
+
+        while ($i < $n) {
+            $tok = $tokens[$i];
+            $text = \is_array($tok) ? $tok[1] : $tok;
+
+            if (!$inTargetClass) {
+                // namespace Foo;  /  namespace Foo {
+                if (\is_array($tok) && T_NAMESPACE === $tok[0]) {
+                    $out .= $text;
+                    ++$i;
+                    $nsParts = [];
+                    while ($i < $n) {
+                        $t2 = $tokens[$i];
+                        $s2 = \is_array($t2) ? $t2[1] : $t2;
+                        $out .= $s2;
+                        ++$i;
+                        if (\is_array($t2) && T_STRING === $t2[0]) {
+                            $nsParts[] = $t2[1];
+                            continue;
+                        }
+                        if (\is_array($t2) && T_NS_SEPARATOR === $t2[0]) {
+                            continue;
+                        }
+                        if ('{' === $s2) {
+                            $namespace = implode('\\', $nsParts);
+                            $namespaceBraceDepth = 1;
+                            break;
+                        }
+                        if (';' === $s2) {
+                            $namespace = implode('\\', $nsParts);
+                            $namespaceBraceDepth = 0;
+                            break;
+                        }
+                    }
+                    $prevMeaningful = null;
+                    continue;
+                }
+
+                if ($namespaceBraceDepth > 0) {
+                    if ('{' === $text) {
+                        ++$namespaceBraceDepth;
+                        $out .= $text;
+                        ++$i;
+                        continue;
+                    }
+                    if ('}' === $text) {
+                        --$namespaceBraceDepth;
+                        $out .= $text;
+                        ++$i;
+                        if ($namespaceBraceDepth <= 0) {
+                            $namespace = '';
+                            $namespaceBraceDepth = 0;
+                        }
+                        continue;
+                    }
+                }
+
+                $isClassKeyword = \is_array($tok) && T_CLASS === $tok[0];
+                if ($isClassKeyword && T_DOUBLE_COLON !== $prevMeaningful) {
+                    $nameIdx = self::nextMeaningfulIndex($tokens, $i + 1);
+                    if ($nameIdx < $n) {
+                        $nameTok = $tokens[$nameIdx];
+                        if (\is_array($nameTok) && T_STRING === $nameTok[0]) {
+                            $short = $nameTok[1];
+                            $fqcn = '' === $namespace
+                                ? $short
+                                : $namespace.'\\'.$short;
+                            $should = null === $onlyShortLc
+                                ? SpineChunkRuntimeMethodDemote::shouldDemote($fqcn)
+                                : (strtolower($short) === $onlyShortLc);
+                            if ($should) {
+                                while ($i < $n) {
+                                    $t2 = $tokens[$i];
+                                    $s2 = \is_array($t2) ? $t2[1] : $t2;
+                                    $out .= $s2;
+                                    if (!\is_array($t2) || (T_WHITESPACE !== $t2[0] && T_COMMENT !== $t2[0] && T_DOC_COMMENT !== $t2[0])) {
+                                        $prevMeaningful = \is_array($t2) ? $t2[0] : $t2;
+                                    }
+                                    ++$i;
+                                    if ('{' === $s2) {
+                                        $inTargetClass = true;
+                                        $classBraceDepth = 1;
+                                        break;
+                                    }
+                                    if (';' === $s2) {
+                                        break;
+                                    }
+                                }
+                                continue;
+                            }
+                        }
+                    }
+                }
+
+                $out .= $text;
+                if (!\is_array($tok) || (T_WHITESPACE !== $tok[0] && T_COMMENT !== $tok[0] && T_DOC_COMMENT !== $tok[0])) {
+                    $prevMeaningful = \is_array($tok) ? $tok[0] : $tok;
+                }
+                ++$i;
+                continue;
+            }
+
+            // Inside a demoted class
+            if ('{' === $text) {
+                ++$classBraceDepth;
+                $out .= $text;
+                ++$i;
+                continue;
+            }
+            if ('}' === $text) {
+                --$classBraceDepth;
+                $out .= $text;
+                ++$i;
+                if ($classBraceDepth <= 0) {
+                    $inTargetClass = false;
+                    $classBraceDepth = 0;
+                }
+                continue;
+            }
+
+            if (1 === $classBraceDepth && \is_array($tok) && T_FUNCTION === $tok[0]) {
+                $out .= $text;
+                ++$i;
+                while ($i < $n) {
+                    $t2 = $tokens[$i];
+                    $s2 = \is_array($t2) ? $t2[1] : $t2;
+                    if ('{' === $s2) {
+                        $out .= '{}';
+                        ++$i;
+                        $depth = 1;
+                        while ($i < $n && $depth > 0) {
+                            $t3 = $tokens[$i];
+                            $s3 = \is_array($t3) ? $t3[1] : $t3;
+                            if ('{' === $s3) {
+                                ++$depth;
+                            } elseif ('}' === $s3) {
+                                --$depth;
+                            }
+                            ++$i;
+                        }
+                        break;
+                    }
+                    $out .= $s2;
+                    ++$i;
+                    if (';' === $s2) {
+                        break;
+                    }
+                }
+                continue;
+            }
+
+            $out .= $text;
+            ++$i;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array<int, string|array{0:int,1:string,2?:int}> $tokens
+     */
+    private static function nextMeaningfulIndex(array $tokens, int $from): int
+    {
+        $n = \count($tokens);
+        for ($i = $from; $i < $n; ++$i) {
+            $tok = $tokens[$i];
+            if (!\is_array($tok)) {
+                return $i;
+            }
+            if (T_WHITESPACE === $tok[0] || T_COMMENT === $tok[0] || T_DOC_COMMENT === $tok[0]) {
+                continue;
+            }
+
+            return $i;
+        }
+
+        return $n;
     }
 }

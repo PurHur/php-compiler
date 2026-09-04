@@ -41,6 +41,13 @@ $entriesDir = $root.'/build/chunks/entries';
 /** Default file-count cap when only --max-bytes is set (tiny-file packs under 8g). */
 const DEFAULT_MAX_FILES_WITH_BYTES = 24;
 
+/**
+ * Singleton files larger than --max-bytes cannot be split further and NestedJIT OOMs
+ * under 8g even after SPINE_CHUNK method demote (Compiler.php ~2.1 MB, JIT.php ~1.0 MB).
+ * Mark them deferred so the orchestrator can finish the rest of the spine honestly (#36387).
+ */
+const DEFER_SINGLETON_OVER_MAX_BYTES = true;
+
 /** Directories oversized enough to need letter/hub sub-splits (mirrors spine-split-probe). */
 const SPINE_SUBSPLIT = [
     'ext/standard' => true,
@@ -550,6 +557,21 @@ usort($chunks, static function (array $a, array $b): int {
     return strcmp((string) $a['chunk_id'], (string) $b['chunk_id']);
 });
 
+// Honest capacity gate: singleton TUs larger than --max-bytes cannot be split and
+// NestedJIT OOMs under 8g (Compiler.php / JIT.php / VmDom.php, #36387). Defer them so
+// the rest of the plan can emit; do not pretend they succeeded.
+$deferred = 0;
+if (DEFER_SINGLETON_OVER_MAX_BYTES && $maxBytes >= 1) {
+    foreach ($chunks as &$chunk) {
+        if ((int) ($chunk['file_count'] ?? 0) === 1 && (int) ($chunk['byte_count'] ?? 0) > $maxBytes) {
+            $chunk['deferred'] = true;
+            $chunk['defer_reason'] = 'singleton_over_max_bytes';
+            ++$deferred;
+        }
+    }
+    unset($chunk);
+}
+
 $plan = [
     'version' => 2,
     'generated_at' => gmdate('c'),
@@ -559,13 +581,15 @@ $plan = [
     'max_files' => $maxFiles > 0 ? $maxFiles : null,
     'max_bytes' => $maxBytes > 0 ? $maxBytes : null,
     'chunk_count' => count($chunks),
+    'deferred_count' => $deferred,
     'chunks' => $chunks,
     'note' => 'Consumed by script/bootstrap-gen0-chunks.sh. Wave 0 hubs emit first so peer '
         .'manifests can bind consumers (#36387 / #36155 Phase C). Hub/requires respect '
         .'--max-files/--max-bytes so Runtime.php-sized TUs fit under 8g. --max-bytes alone '
         .'also applies max-files='.DEFAULT_MAX_FILES_WITH_BYTES.' for tiny-file packs. '
         .'Spine --strategy skips bin/ + lib/Compiler.php + lib/JIT.php + lib/Doctor.php '
-        .'(host CFG OOM / null-Op under 8g).',
+        .'(host CFG OOM / null-Op under 8g). Singleton chunks over max-bytes are marked '
+        .'deferred (NestedJIT OOM under 8g).',
 ];
 
 $json = json_encode($plan, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n";

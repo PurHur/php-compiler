@@ -193,6 +193,37 @@ final class BootstrapGen0ChunksOrchestratorTest extends TestCase
         $this->removeTree($tmp);
     }
 
+    public function testChunkPlanDefersSingletonOverMaxBytes(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $script = $root.'/script/bootstrap-gen0-chunk-plan.php';
+        $tmp = sys_get_temp_dir().'/phpc-chunk-plan-defer-'.bin2hex(random_bytes(4));
+        mkdir($tmp.'/entries', 0755, true);
+        $planPath = $tmp.'/plan.json';
+        // Spine with max-bytes marks Compiler.php / JIT.php singletons as deferred (#36387).
+        $cmd = escapeshellarg(PHP_BINARY).' '.escapeshellarg($script)
+            .' --spine --strategy=sub --max-bytes=120000'
+            .' --entries-dir='.escapeshellarg($tmp.'/entries')
+            .' --plan-out='.escapeshellarg($planPath);
+        exec($cmd.' 2>&1', $out, $rc);
+        $this->assertSame(0, $rc, implode("\n", $out));
+        $plan = json_decode((string) file_get_contents($planPath), true);
+        $this->assertIsArray($plan);
+        $this->assertGreaterThan(0, (int) ($plan['deferred_count'] ?? 0));
+        $deferred = [];
+        foreach ($plan['chunks'] as $chunk) {
+            if (!empty($chunk['deferred'])) {
+                $this->assertSame(1, (int) $chunk['file_count']);
+                $this->assertGreaterThan(120000, (int) $chunk['byte_count']);
+                $this->assertSame('singleton_over_max_bytes', $chunk['defer_reason'] ?? '');
+                $deferred[] = $chunk['chunk_id'];
+            }
+        }
+        $this->assertSame((int) $plan['deferred_count'], count($deferred));
+        $this->assertNotEmpty($deferred);
+        $this->removeTree($tmp);
+    }
+
     public function testChunkPlanSpineStrategyProducesPartitions(): void
     {
         $root = dirname(__DIR__, 2);
@@ -245,6 +276,8 @@ final class BootstrapGen0ChunksOrchestratorTest extends TestCase
         $this->assertStringContainsString('--max-files', $script);
         $this->assertStringContainsString('--max-bytes', $script);
         $this->assertStringContainsString('wave_barrier', $script);
+        $this->assertStringContainsString('DEFER', $script);
+        $this->assertStringContainsString('deferred', $script);
         $this->assertStringContainsString('CHUNK_WAVE_BARRIER', $script);
         $this->assertStringContainsString('CHUNK_LINK_AFTER', $script);
         $this->assertMatchesRegularExpression('/nproc - 2|nproc_n - 2/', $script);
