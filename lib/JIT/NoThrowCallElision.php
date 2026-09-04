@@ -31,10 +31,13 @@ use PHPCompiler\JIT\Call\Vararg;
  * long, pure type predicates ({@code is_int} / {@code is_string} / …), string
  * transforms ({@code strtolower} / {@code ucwords} / {@code bin2hex} /
  * {@code urlencode} / {@code str_rot13} / {@code quotemeta} / {@code md5} /
- * {@code crc32} / {@code base64_encode} / {@code soundex} / …), and
- * pure math ({@code sqrt} / {@code abs} / {@code pow} / {@code fdiv} / …) on
- * native numeric scalars (php-src {@code ext/standard/string.c}
- * {@code PHP_FUNCTION(strlen)} / {@code ord} / {@code chr} / {@code ucwords};
+ * {@code crc32} / {@code base64_encode} / {@code soundex} / …), string
+ * slice/compare/search ({@code substr} / {@code str_repeat} / {@code strcmp} /
+ * {@code strpos} / {@code strstr} / …), and pure math ({@code sqrt} /
+ * {@code abs} / {@code pow} / {@code fdiv} / …) on native numeric scalars
+ * (php-src {@code ext/standard/string.c}
+ * {@code PHP_FUNCTION(strlen)} / {@code ord} / {@code chr} / {@code ucwords} /
+ * {@code substr} / {@code strcmp} / {@code strpos};
  * {@code ext/standard/url.c} {@code urlencode}; {@code ext/standard/crc32.c} /
  * {@code md5.c} / {@code base64.c}; {@code ext/standard/type.c}
  * {@code is_*}; {@code ext/standard/math.c} {@code PHP_FUNCTION(sqrt)} /
@@ -232,6 +235,12 @@ final class NoThrowCallElision
 
             return true;
         }
+        if (self::isPureStringSliceOrCompareBuiltin($name)) {
+            // Mixed Z_PARAM_STR + Z_PARAM_LONG (substr/str_repeat/strncmp) or
+            // all-string compares/searches — numeric slots never invoke
+            // __toString; object/value-box string slots stay conservative.
+            return self::stringSliceOrCompareArgsCannotThrow($name, $callArgs);
+        }
         if ('chr' === $name) {
             // Z_PARAM_LONG family — object→int does not call __toString; still
             // keep value-box / object conservative (coercion paths vary).
@@ -346,6 +355,166 @@ final class NoThrowCallElision
             case 'hebrev':
             case 'hebrevc':
                 return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * php-src {@code ext/standard/string.c} slice / compare / search builtins
+     * that only read string (and optional numeric) args — no user handlers when
+     * every string slot is already a string and every numeric slot is already
+     * numeric. Int needles for {@code strpos}/{@code strchr}/… stay out (PHP 8
+     * deprecations). Public for {@see DiscardedPureCallElision}.
+     */
+    public static function isPureStringSliceOrCompareBuiltin(string $nameLc): bool
+    {
+        switch ($nameLc) {
+            case 'substr':
+            case 'str_repeat':
+            case 'strcmp':
+            case 'strcasecmp':
+            case 'strnatcmp':
+            case 'strnatcasecmp':
+            case 'strncmp':
+            case 'strncasecmp':
+            case 'strpos':
+            case 'stripos':
+            case 'strrpos':
+            case 'strripos':
+            case 'strstr':
+            case 'stristr':
+            case 'strchr':
+            case 'strrchr':
+            case 'strcspn':
+            case 'strspn':
+            case 'substr_count':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * @param array<int, Variable> $callArgs
+     */
+    public static function stringSliceOrCompareArgsCannotThrow(string $nameLc, array $callArgs): bool
+    {
+        if ([] === $callArgs) {
+            return false;
+        }
+        switch ($nameLc) {
+            case 'substr':
+                // string, long offset [, long length]
+                if (!isset($callArgs[0], $callArgs[1])) {
+                    return false;
+                }
+                if (
+                    !$callArgs[0] instanceof Variable
+                    || !self::stringParamBuiltinArgCannotThrow($callArgs[0])
+                ) {
+                    return false;
+                }
+                if (
+                    !$callArgs[1] instanceof Variable
+                    || !self::numericParamBuiltinArgCannotThrow($callArgs[1])
+                ) {
+                    return false;
+                }
+                if (!isset($callArgs[2])) {
+                    return true;
+                }
+
+                return $callArgs[2] instanceof Variable
+                    && self::numericParamBuiltinArgCannotThrow($callArgs[2]);
+            case 'str_repeat':
+                // string, long times
+                if (!isset($callArgs[0], $callArgs[1])) {
+                    return false;
+                }
+
+                return $callArgs[0] instanceof Variable
+                    && self::stringParamBuiltinArgCannotThrow($callArgs[0])
+                    && $callArgs[1] instanceof Variable
+                    && self::numericParamBuiltinArgCannotThrow($callArgs[1]);
+            case 'strncmp':
+            case 'strncasecmp':
+                // string, string, long len
+                if (!isset($callArgs[0], $callArgs[1], $callArgs[2])) {
+                    return false;
+                }
+
+                return $callArgs[0] instanceof Variable
+                    && self::stringParamBuiltinArgCannotThrow($callArgs[0])
+                    && $callArgs[1] instanceof Variable
+                    && self::stringParamBuiltinArgCannotThrow($callArgs[1])
+                    && $callArgs[2] instanceof Variable
+                    && self::numericParamBuiltinArgCannotThrow($callArgs[2]);
+            case 'strcmp':
+            case 'strcasecmp':
+            case 'strnatcmp':
+            case 'strnatcasecmp':
+            case 'strchr':
+            case 'strrchr':
+                // two strings
+                if (!isset($callArgs[0], $callArgs[1]) || isset($callArgs[2])) {
+                    return false;
+                }
+
+                return $callArgs[0] instanceof Variable
+                    && self::stringParamBuiltinArgCannotThrow($callArgs[0])
+                    && $callArgs[1] instanceof Variable
+                    && self::stringParamBuiltinArgCannotThrow($callArgs[1]);
+            case 'strpos':
+            case 'stripos':
+            case 'strrpos':
+            case 'strripos':
+            case 'strcspn':
+            case 'strspn':
+            case 'substr_count':
+                // haystack string, needle string [, numeric…]
+                if (!isset($callArgs[0], $callArgs[1])) {
+                    return false;
+                }
+                if (
+                    !$callArgs[0] instanceof Variable
+                    || !self::stringParamBuiltinArgCannotThrow($callArgs[0])
+                    || !$callArgs[1] instanceof Variable
+                    || !self::stringParamBuiltinArgCannotThrow($callArgs[1])
+                ) {
+                    return false;
+                }
+                for ($i = 2, $n = count($callArgs); $i < $n; ++$i) {
+                    if (
+                        !$callArgs[$i] instanceof Variable
+                        || !self::numericParamBuiltinArgCannotThrow($callArgs[$i])
+                    ) {
+                        return false;
+                    }
+                }
+
+                return true;
+            case 'strstr':
+            case 'stristr':
+                // haystack, needle [, before_needle bool]
+                if (!isset($callArgs[0], $callArgs[1])) {
+                    return false;
+                }
+                if (
+                    !$callArgs[0] instanceof Variable
+                    || !self::stringParamBuiltinArgCannotThrow($callArgs[0])
+                    || !$callArgs[1] instanceof Variable
+                    || !self::stringParamBuiltinArgCannotThrow($callArgs[1])
+                ) {
+                    return false;
+                }
+                if (!isset($callArgs[2])) {
+                    return true;
+                }
+
+                // before_needle: bool/int/float scalars never throw.
+                return $callArgs[2] instanceof Variable
+                    && self::numericParamBuiltinArgCannotThrow($callArgs[2]);
             default:
                 return false;
         }
