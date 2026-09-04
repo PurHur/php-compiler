@@ -289,17 +289,27 @@ final class ComposerVendorMapTest extends TestCase
     public function testIncludeHelperStubsComposerAutoloadOnlyWithProjectAllowlist(): void
     {
         $source = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/IncludeHelper.php');
-        $this->assertStringContainsString('isComposerAutoloadPhp($path)', $source);
+        $this->assertStringContainsString('isComposerAutoloadRuntimePhp($path)', $source);
         $this->assertStringContainsString(
-            'Bare AOT (no file map): follow the file',
+            'Bare AOT (no file map): do not stub',
             $source
         );
-        $pos = strpos($source, 'isComposerAutoloadPhp($path)');
+        $pos = strpos($source, 'isComposerAutoloadRuntimePhp($path)');
         $this->assertNotFalse($pos);
-        $window = substr($source, $pos, 900);
+        $window = substr($source, max(0, $pos - 200), 900);
         $this->assertStringContainsString('is_array($allow) && [] !== $allow', $window);
         $this->assertStringContainsString('assignIncludeResult', $window);
         $this->assertStringContainsString('compileIncludedFile', $window);
+    }
+
+    public function testComposerAutoloadRuntimeClassifier(): void
+    {
+        $this->assertTrue(ComposerVendorMap::isComposerAutoloadRuntimePhp('/app/vendor/autoload.php'));
+        $this->assertTrue(ComposerVendorMap::isComposerAutoloadRuntimePhp('/app/vendor/composer/ClassLoader.php'));
+        $this->assertTrue(ComposerVendorMap::isComposerAutoloadRuntimePhp('/app/vendor/composer/autoload_real.php'));
+        $this->assertTrue(ComposerVendorMap::isComposerAutoloadRuntimePhp('/app/vendor/composer/platform_check.php'));
+        $this->assertTrue(ComposerVendorMap::isComposerAutoloadRuntimePhp('/app/vendor/composer/InstalledVersions.php'));
+        $this->assertFalse(ComposerVendorMap::isComposerAutoloadRuntimePhp('/app/src/App.php'));
     }
 
     /**
@@ -395,7 +405,9 @@ final class ComposerVendorMapTest extends TestCase
             $out = ComposerVendorMap::expandIncludesForAutoload($entry, []);
             $joined = implode("\n", $out);
             $this->assertStringContainsString('vendor/autoload.php', $joined);
-            $this->assertStringContainsString('autoload_real.php', $joined);
+            // Loader machinery is filtered — ProjectGraph stubs it under AOT (#36382).
+            $this->assertStringNotContainsString('autoload_real.php', $joined);
+            $this->assertStringNotContainsString('ClassLoader.php', $joined);
         } finally {
             $this->removeTree($dir);
         }

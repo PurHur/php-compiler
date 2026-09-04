@@ -88,13 +88,9 @@ final class SourceBundler
         if ($floorMib <= 0) {
             return null;
         }
-        // Slim+nyholm (~100 IncludeHelper units) exhausts 8192M inside php-llvm Type.php
-        // after surviving a 24g cgroup; measured peak RSS ~17 GiB (#36382). Raise past the
-        // default LLVM budget for very large incremental graphs.
-        if ($unitCount >= 80 && $floorMib < 16384) {
-            $floorRaw = '16384M';
-            $floorMib = 16384;
-        }
+        // Do not force 16384M above PHP_COMPILER_LLVM_MEMORY_LIMIT. Prior Slim OOMs were
+        // NestedJIT wiping include-once dedupe (unbounded re-inline), not an 8G PHP heap
+        // ceiling (#36382). Cap remains the configured LLVM budget.
 
         $curEnv = \PHPCompiler\Config::getenv('PHP_COMPILER_MEMORY_LIMIT');
         $curIni = ini_get('memory_limit');
@@ -876,7 +872,7 @@ final class SourceBundler
 
     private static function isComposerAutoloadInclude(string $path): bool
     {
-        return str_ends_with(str_replace('\\', '/', $path), '/vendor/autoload.php');
+        return \PHPCompiler\AOT\ComposerVendorMap::isComposerAutoloadRuntimePhp($path);
     }
 
     /** Composer autoload stub for AOT bundle (#1070). */

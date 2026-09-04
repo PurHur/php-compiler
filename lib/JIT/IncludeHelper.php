@@ -96,17 +96,19 @@ final class IncludeHelper
             return;
         }
         $allow = $context->runtime->aotIncludeAllowlist ?? null;
-        if (\PHPCompiler\AOT\ComposerVendorMap::isComposerAutoloadPhp($path)) {
-            // Project builds: stub the dynamic loader — class files come from ProjectGraph (#36382 / #1070).
-            // Bare AOT (no file map): follow the file so fixture autoloads with literal requires work, and
-            // real Composer `include $file` fails loudly instead of silently omitting classes (#36382).
-            if (is_array($allow) && [] !== $allow) {
-                if (null !== $resultOperand) {
-                    $jit->assignIncludeResult($resultOperand);
-                }
-
-                return;
+        // Project builds: stub Composer loader machinery — class files come from ProjectGraph
+        // (#36382 / #1070). Compiling ClassLoader/autoload_real under IncludeHelper is a
+        // multi-minute NestedJIT sink and is unnecessary once the graph owns the units.
+        // Bare AOT (no file map): do not stub — follow the file so fixture autoloads work.
+        if (
+            is_array($allow) && [] !== $allow
+            && \PHPCompiler\AOT\ComposerVendorMap::isComposerAutoloadRuntimePhp($path)
+        ) {
+            if (null !== $resultOperand) {
+                $jit->assignIncludeResult($resultOperand);
             }
+
+            return;
         }
         if (is_array($allow) && [] !== $allow
             && !ProjectIncludeAllowlist::isAllowed($path, $allow)
@@ -251,6 +253,13 @@ final class IncludeHelper
 
         $context->recordJitIncludedFile($path);
 
+        $traceIncludes = self::shouldTraceProjectIncludes();
+        $includeIndex = \count($context->jitIncludedFiles);
+        if ($traceIncludes) {
+            fwrite(STDERR, self::formatIncludeTraceLine('begin', $includeIndex, $path)."\n");
+            Progress::noteFunction('c:include:begin:'.$includeIndex.':'.$path);
+        }
+
         try {
             $included = $context->runtime->parseAndCompileFile($path, true);
         } catch (\Throwable $e) {
@@ -285,6 +294,48 @@ final class IncludeHelper
         $context->markJitIncludedFileCompiled($path);
 
         self::compileInlinedBlock($jit, $func, $callerBlock, $included, $resultOperand, false, 'c:include:'.$path);
+        if ($traceIncludes) {
+            fwrite(STDERR, self::formatIncludeTraceLine('done', $includeIndex, $path)."\n");
+            Progress::noteFunction('c:include:done:'.$includeIndex.':'.$path);
+        }
+    }
+
+    /**
+     * STDERR + progress-file breadcrumbs for large Composer IncludeHelper graphs (#36382).
+     * Enable with PHP_COMPILER_AOT_INCLUDE_TRACE=1.
+     */
+    private static function shouldTraceProjectIncludes(): bool
+    {
+        $env = Config::getenv('PHP_COMPILER_AOT_INCLUDE_TRACE');
+        if (!is_string($env) || '' === $env) {
+            return false;
+        }
+        $v = strtolower($env);
+
+        return in_array($v, ['1', 'true', 'yes', 'on'], true);
+    }
+
+    private static function formatIncludeTraceLine(string $phase, int $index, string $path): string
+    {
+        $phpMiB = (int) round(memory_get_usage(true) / 1048576);
+        $procMiB = self::processRssMiB();
+        $proc = null === $procMiB ? '?' : (string) $procMiB;
+
+        return 'phpc include['.$index.']: '.$phase.' '.$path
+            .' (php_rss_mib='.$phpMiB.' proc_rss_mib='.$proc.')';
+    }
+
+    private static function processRssMiB(): ?int
+    {
+        if (!is_readable('/proc/self/status')) {
+            return null;
+        }
+        $status = @file_get_contents('/proc/self/status');
+        if (!is_string($status) || 1 !== preg_match('/^VmRSS:\s+(\d+)\s+kB/m', $status, $m)) {
+            return null;
+        }
+
+        return (int) round(((int) $m[1]) / 1024);
     }
 
     /**

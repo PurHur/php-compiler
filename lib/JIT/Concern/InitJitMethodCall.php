@@ -1627,6 +1627,21 @@ trait InitJitMethodCall
 
                 return;
             }
+            // Trait method bodies: `$this->m()` may resolve on the composing class only
+            // (Nyholm StreamTrait::__toString → Stream::isSeekable, #36382).
+            if ($this->context->type->object->isTraitClass($declaringClassLc)) {
+                $composing = $this->context->scope->traitComposingClassName;
+                if ('' !== $composing) {
+                    $compLc = strtolower(ltrim($composing, '\\'));
+                    $compProxy = $compLc.'::'.$methodLc;
+                    if ($this->context->functionIsRegistered($compProxy)) {
+                        $this->context->scope->toCall = $this->context->resolveFunctionProxy($compProxy);
+                        $this->context->scope->args = [$receiverVar];
+
+                        return;
+                    }
+                }
+            }
             throw new \LogicException("Call to undefined method {$className}::{$methodLc}()");
         }
         $receiverUserType = $receiverOp->type?->userType;

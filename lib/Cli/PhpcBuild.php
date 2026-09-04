@@ -140,13 +140,19 @@ final class PhpcBuild
         $allowlist = [];
         foreach ($graph['files'] as $path) {
             $key = realpath($path) ?: $path;
-            if ($key !== $entryKey) {
-                $includes[] = $path;
-            }
+            // Keep Composer runtime on the allowlist (computed include / deny paths) but do not
+            // SourceBundler / IncludeHelper-compile ClassLoader/autoload_real (#36382).
             if (!isset($allowSeen[$key])) {
                 $allowSeen[$key] = true;
                 $allowlist[] = $path;
             }
+            if ($key === $entryKey) {
+                continue;
+            }
+            if (\PHPCompiler\AOT\ComposerVendorMap::isComposerAutoloadRuntimePhp($path)) {
+                continue;
+            }
+            $includes[] = $path;
         }
 
         // Method-body includes are intentionally omitted from the bundle (#739 / #878) but must

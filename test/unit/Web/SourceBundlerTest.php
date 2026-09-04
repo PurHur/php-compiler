@@ -512,13 +512,13 @@ final class SourceBundlerTest extends TestCase
         $this->assertNull(SourceBundler::ensureIncrementalProjectMemoryFloor(
             SourceBundler::INCREMENTAL_REQUIRES_UNIT_THRESHOLD
         ));
-        // ≥80 units: Slim-sized floor past default LLVM budget (#36382).
-        putenv('PHP_COMPILER_MEMORY_LIMIT=8192M');
-        $_ENV['PHP_COMPILER_MEMORY_LIMIT'] = '8192M';
+        // ≥80 units: still respect PHP_COMPILER_LLVM_MEMORY_LIMIT (no forced 16384M, #36382).
+        putenv('PHP_COMPILER_MEMORY_LIMIT=4096M');
+        $_ENV['PHP_COMPILER_MEMORY_LIMIT'] = '4096M';
         putenv('PHP_COMPILER_LLVM_MEMORY_LIMIT=8192M');
         $_ENV['PHP_COMPILER_LLVM_MEMORY_LIMIT'] = '8192M';
-        $this->assertSame('16384M', SourceBundler::ensureIncrementalProjectMemoryFloor(103));
-        $this->assertSame('16384M', getenv('PHP_COMPILER_MEMORY_LIMIT'));
+        $this->assertSame('8192M', SourceBundler::ensureIncrementalProjectMemoryFloor(103));
+        $this->assertSame('8192M', getenv('PHP_COMPILER_MEMORY_LIMIT'));
         if (false === $prevMem || null === $prevMem) {
             putenv('PHP_COMPILER_MEMORY_LIMIT');
             unset($_ENV['PHP_COMPILER_MEMORY_LIMIT'], $_SERVER['PHP_COMPILER_MEMORY_LIMIT']);

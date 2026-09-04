@@ -19,6 +19,11 @@ use PHPLLVM\BasicBlock;
  * Restore must use {@see BasicBlockHelper::restoreInsertBlock}: `positionAtEnd` on a sealed
  * outer block leaves later emits as parentless / terminator-in-middle IR (Runtime::parse
  * host-lower under M5 argv — #26756).
+ *
+ * Also restore {@see Context::$jitAotIncludedCompileDone} / {@see Context::$jitIncludedFiles}:
+ * {@see JIT::compileUnscoped} calls {@see Context::resetScriptLocalBindings()}, which clears
+ * include-once tracking. Without restore, NestedJIT during a Composer project graph re-inlines
+ * every unit and IR grows without bound (~27 GiB Slim emit — #36382).
  */
 final class NestedJitCompileScope
 {
@@ -106,6 +111,9 @@ final class NestedJitCompileScope
         // Outer include bindings must not refresh while lowering a NestedJIT helper —
         // refresh stores into caller alloca slots at the current insert BB (#36253).
         $savedInlineIncludeDepth = $context->inlineIncludeDepth;
+        // Outer project IncludeHelper dedupe survives NestedJIT compileUnscoped reset (#36382).
+        $savedJitIncludedFiles = $context->jitIncludedFiles;
+        $savedJitAotIncludedCompileDone = $context->jitAotIncludedCompileDone;
         $context->scope->blockStorage = new \SplObjectStorage();
         $context->scope->blockEntryStorage = new \SplObjectStorage();
         $context->scope->variables = new \SplObjectStorage();
@@ -169,6 +177,8 @@ final class NestedJitCompileScope
             $context->compilingGeneratorResume = $savedCompilingGeneratorResume;
             $context->generatorStateParam = $savedGeneratorStateParam;
             $context->inlineIncludeDepth = $savedInlineIncludeDepth;
+            $context->jitIncludedFiles = $savedJitIncludedFiles;
+            $context->jitAotIncludedCompileDone = $savedJitAotIncludedCompileDone;
             self::resyncNamedBindings($context);
             $context->builder = $savedBuilder;
             $context->syncIntrinsicBuilder();
