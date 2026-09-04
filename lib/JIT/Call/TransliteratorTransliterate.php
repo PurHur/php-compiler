@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
-use PHPCompiler\ext\intl\JitTransliteratorTransliterate;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
@@ -13,7 +12,8 @@ use PHPLLVM\Value;
 /**
  * Transliterator::transliterate() — JIT/AOT via CT fold / NestedJIT (#28657).
  *
- * php-src: ext/intl/transliterator/transliterator_methods.c — zim_Transliterator_transliterate
+ * Dispatch via {@see Context::$extensionLowering} so lib/JIT does not import
+ * {@code ext\intl} (#36204). php-src: ext/intl/transliterator/transliterator_methods.c — zim_Transliterator_transliterate
  */
 final class TransliteratorTransliterate implements Call
 {
@@ -25,6 +25,6 @@ final class TransliteratorTransliterate implements Call
 
     public function call(Context $context, Variable ...$args): Value
     {
-        return JitTransliteratorTransliterate::invokeMethod($context, ...$args);
+        return $context->extensionLowering->requireIntl()->transliteratorTransliterate($context, ...$args);
     }
 }

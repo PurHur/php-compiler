@@ -345,6 +345,49 @@ final class JitPhpExtensionLoweringHooksTest extends TestCase
         }
     }
 
+    public function testIntlCallProxiesDoNotImportIntlExtension(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $module = (string) file_get_contents($root.'/ext/intl/Module.php');
+        $this->assertStringContainsString(
+            'intl = new JitIntlExtensionHooksFacade()',
+            $module,
+            'ext/intl Module::jitInit must register JitIntlExtensionHooksFacade'
+        );
+        $this->assertStringContainsString(
+            'requireIntl',
+            (string) file_get_contents($root.'/lib/JIT/ExtensionLoweringHooks.php'),
+            'ExtensionLoweringHooks must expose requireIntl()'
+        );
+        $files = [
+            'lib/JIT/Call/CollatorCompare.php',
+            'lib/JIT/Call/MessageFormatterConstruct.php',
+            'lib/JIT/Call/MessageFormatterFormat.php',
+            'lib/JIT/Call/NormalizerNormalize.php',
+            'lib/JIT/Call/NumberFormatterCreate.php',
+            'lib/JIT/Call/NumberFormatterFormat.php',
+            'lib/JIT/Call/IntlDateFormatterCreate.php',
+            'lib/JIT/Call/IntlDateFormatterFormat.php',
+            'lib/JIT/Call/TransliteratorCreate.php',
+            'lib/JIT/Call/TransliteratorTransliterate.php',
+        ];
+        foreach ($files as $rel) {
+            $src = (string) file_get_contents($root.'/'.$rel);
+            $stripped = (string) preg_replace('~/\*.*?\*/~s', '', $src);
+            $stripped = (string) preg_replace('~//.*$~m', '', $stripped);
+            $this->assertDoesNotMatchRegularExpression(
+                '/PHPCompiler\\\\ext\\\\intl\\\\/',
+                $stripped,
+                $rel.' still imports ext\\intl — use IntlExtensionHooks'
+            );
+            $this->assertStringContainsString(
+                'requireIntl()',
+                $src,
+                $rel.' must dispatch via requireIntl()'
+            );
+        }
+    }
+
     /**
      * @dataProvider coreJitHelperFilesWithoutNonStandardExtImports
      */
