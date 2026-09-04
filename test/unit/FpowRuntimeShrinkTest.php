@@ -9,11 +9,14 @@ use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
 /**
- * fpow()/pow float NestedJIT via JitVmHelperLink::ensureBridge (#28674 / peer #28642).
+ * fpow()/pow float AOT uses llvm.pow.f64 (#36386); FpowJitHelper remains
+ * NestedJIT-safe reference (peer MathExp / ExpJitHelper).
+ *
+ * php-src: ext/standard/math.c PHP_FUNCTION(fpow) / pow_function.
  */
 final class FpowRuntimeShrinkTest extends TestCase
 {
-    public function testFpowUsesJitHelperNotLibcPow(): void
+    public function testFpowUsesLlvmIntrinsicNotHelperBridge(): void
     {
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/fpow.php');
         $this->assertStringContainsString('MathFpow::invoke', $builtin);
@@ -23,24 +26,21 @@ final class FpowRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('MathFpow::invoke', $jitPow);
         $this->assertStringNotContainsString("lookupFunction('pow')", $jitPow);
         $this->assertStringNotContainsString('invokeLibc', $jitPow);
-    }
 
-    public function testMathFpowAlwaysUsesHelperBridge(): void
-    {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathFpow.php');
-        $this->assertStringContainsString('FpowJitHelper', $source);
-        $this->assertStringContainsString('phpc_fpow', $source);
-        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
-        $this->assertStringNotContainsString('JitFpowKernel', $source);
-        $this->assertStringNotContainsString('NestedJitCompileScope', $source);
-        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
-        $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
-        $this->assertStringNotContainsString('implementKernelBody', $source);
-        $this->assertStringNotContainsString('fpow_kernel_entry', $source);
-        $this->assertStringNotContainsString('invokeLibcPow', $source);
-        $this->assertStringNotContainsString("lookupFunction('pow')", $source);
-        $this->assertStringNotContainsString("addFunction('pow'", $source);
-        $this->assertStringNotContainsString('addFunction($abiName', $source);
+        $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathFpow.php');
+        $this->assertStringContainsString('llvm.pow.f64', $bridge);
+        $this->assertStringContainsString('phpc_fpow', $bridge);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('FpowJitHelper', $bridge);
+        $this->assertStringNotContainsString('JitFpowKernel', $bridge);
+        $this->assertStringNotContainsString('NestedJitCompileScope', $bridge);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
+        $this->assertStringNotContainsString('isThinStandaloneAotMain', $bridge);
+        $this->assertStringNotContainsString('implementKernelBody', $bridge);
+        $this->assertStringNotContainsString('fpow_kernel_entry', $bridge);
+        $this->assertStringNotContainsString('invokeLibcPow', $bridge);
+        $this->assertStringNotContainsString("lookupFunction('pow')", $bridge);
+        $this->assertStringNotContainsString("addFunction('pow'", $bridge);
     }
 
     public function testNestedHelperCoerceExtractsDoubleFromHelperResult(): void

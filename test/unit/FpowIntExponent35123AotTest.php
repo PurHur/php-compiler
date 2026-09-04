@@ -68,7 +68,10 @@ final class FpowIntExponent35123AotTest extends TestCase
         $root = dirname(__DIR__, 2);
         $src = $root.'/test/repro/aot_fpow_int_exponent_35123.php';
         $bin = sys_get_temp_dir().'/phpc_aot_fpow_int_35123_'.getmypid().'.bin';
-        $compile = 'env PHP_COMPILER_HELPER_RUNTIME_O=0 '.escapeshellarg(PHP_BINARY).' '
+        // Default helper-runtime link (HELPER_RUNTIME_O=0 currently segfaults bare
+        // AOT hello on this image — not specific to pow). llvm.pow.f64 (#36386) and
+        // the NestedJIT FpowJitHelper path both need a linked runtime.
+        $compile = 'env PHP_COMPILER_CACHE=0 '.escapeshellarg(PHP_BINARY).' '
             .escapeshellarg($root.'/bin/compile.php')
             .' -o '.escapeshellarg($bin).' '.escapeshellarg($src).' 2>&1';
         exec($compile, $compileOut, $compileRc);
