@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 8178 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 25919 |
+| Source constructs flagged (warnings) | 25921 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5546,7 +5546,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Cli/PhpcRun.php` | 0 | 1 |
 | `lib/Cli/ProcPipeReader.php` | 0 | 1 |
 | `lib/CloneWithSyntaxRejector.php` | 0 | 3 |
-| `lib/Compiler.php` | 0 | 111 |
+| `lib/Compiler.php` | 0 | 113 |
 | `lib/Compiler/AbstractMethodBodyCheck.php` | 0 | 3 |
 | `lib/Compiler/AbstractMethodVisibilityCheck.php` | 0 | 3 |
 | `lib/Compiler/AbstractPromotedPropertyCompileCheck.php` | 0 | 3 |
@@ -49050,26 +49050,28 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new OpCode (line 11268)
 - new OpCode (line 11271)
 - new Operand\Temporary (line 11298)
-- new Operand\Temporary (line 11335)
-- new OpCode (line 11337)
-- new OpCode (line 11350)
-- new Operand\Temporary (line 11353)
-- new OpCode (line 11355)
-- new OpCode (line 11363)
+- new Operand\Temporary (line 11330)
+- new OpCode (line 11332)
+- new Operand\Temporary (line 11345)
+- new OpCode (line 11347)
+- new OpCode (line 11360)
+- new Operand\Temporary (line 11363)
+- new OpCode (line 11365)
 - new OpCode (line 11373)
-- new OpCode (line 11381)
-- new OpCode (line 11384)
-- new OpCode (line 11511)
-- new OpCode (line 11548)
-- new OpCode (line 11574)
-- new OpCode (line 11593)
-- new OpCode (line 11600)
-- new OpCode (line 11870)
-- new Literal (line 12044)
-- new OpCode (line 12149)
-- new Variable (line 12160)
-- new Temporary (line 12162)
-- new OpCode (line 12165)
+- new OpCode (line 11383)
+- new OpCode (line 11391)
+- new OpCode (line 11394)
+- new OpCode (line 11521)
+- new OpCode (line 11558)
+- new OpCode (line 11584)
+- new OpCode (line 11603)
+- new OpCode (line 11610)
+- new OpCode (line 11880)
+- new Literal (line 12054)
+- new OpCode (line 12159)
+- new Variable (line 12170)
+- new Temporary (line 12172)
+- new OpCode (line 12175)
 - 356 class method(s)
 - 8 closure(s)
 
