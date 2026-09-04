@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 8197 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 25970 |
+| Source constructs flagged (warnings) | 25974 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7900,7 +7900,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/GeneratorTrace.php` | 0 | 4 |
 | `lib/VM/GeneratorYieldFromJitHelper.php` | 0 | 2 |
 | `lib/VM/GlobIteratorJitHelper.php` | 0 | 6 |
-| `lib/VM/HashTable.php` | 0 | 96 |
+| `lib/VM/HashTable.php` | 0 | 100 |
 | `lib/VM/HashTableJitHelper.php` | 0 | 1 |
 | `lib/VM/HashTableRegistry.php` | 0 | 1 |
 | `lib/VM/HeaderCallbackQueue.php` | 0 | 1 |
@@ -58475,7 +58475,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/DiscardedPureCallElision.php`
 
 **Warnings** (review for bootstrap subset):
-- 69 class method(s)
+- 71 class method(s)
 
 ### `lib/JIT/DnfParamCheck.php`
 
@@ -59610,8 +59610,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/NoThrowCallElision.php`
 
 **Warnings** (review for bootstrap subset):
-- new Operand\Literal (line 2527)
-- 80 class method(s)
+- new Operand\Literal (line 2582)
+- 82 class method(s)
 
 ### `lib/JIT/NonObjectPropertyFetchHelper.php`
 
@@ -64977,7 +64977,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 2680)
 - new HashTableBucket (line 2691)
 - new Variable (line 2691)
-- 124 class method(s)
+- new HashTableBucket (line 2733)
+- new Variable (line 2733)
+- new HashTableBucket (line 2747)
+- new Variable (line 2747)
+- 125 class method(s)
 
 ### `lib/VM/HashTableJitHelper.php`
 

@@ -47,6 +47,9 @@ use PHPCompiler\VM\Variable as VmVariable;
  * get_declared_traits / get_included_files / get_required_files /
  * php_sapi_name / zend_version (excess argc stays live —
  * ArgumentCountError),
+ * get_loaded_extensions / get_defined_constants / get_defined_functions
+ * (zero-arg or typed bool; soft-null bool stays live — deprecate;
+ * excess argc stays live — ArgumentCountError),
  * zero-arg pi, type.c predicates + gettype/get_debug_type, ctype.c
  * classifiers on typed/literal strings, typed-array count/sizeof, math.c
  * incl. pow/fpow/fdiv on already-numeric args, empty void user functions).
@@ -96,7 +99,10 @@ use PHPCompiler\VM\Variable as VmVariable;
  * {@code get_class_methods} stays live (autoload). Non-zero-arg
  * {@code get_declared_*}/{@code get_included_files}/{@code get_required_files}/
  * {@code php_sapi_name}/{@code zend_version} stay live
- * ({@code ArgumentCountError}).
+ * ({@code ArgumentCountError}). Soft-null
+ * {@code get_loaded_extensions}/{@code get_defined_constants}/
+ * {@code get_defined_functions} bool flags stay live (deprecate); excess
+ * argc stays live ({@code ArgumentCountError}).
  */
 final class DiscardedPureCallElision
 {
@@ -196,6 +202,9 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureZeroArgRuntimeInfoNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureDefinedTableRuntimeInfoNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureVersionCompareNoSideEffect($toCall, $callArgs)) {
@@ -1471,6 +1480,27 @@ final class DiscardedPureCallElision
     }
 
     /**
+     * Discarded {@code get_loaded_extensions}/{@code get_defined_constants}/
+     * {@code get_defined_functions} with zero args or a typed bool flag —
+     * php-src {@code basic_functions.c}/{@code info.c}. Table reads with no
+     * user handlers. Soft-null bool stays live (deprecate). Excess argc stays
+     * live ({@code ArgumentCountError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureDefinedTableRuntimeInfoNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if (!NoThrowCallElision::isPureDefinedTableRuntimeInfoBuiltin(strtolower($toCall->getName()))) {
+            return false;
+        }
+
+        return self::definedTableRuntimeInfoArgsAllowDiscardedElision($callArgs);
+    }
+
+    /**
      * Discarded {@code version_compare} on typed / literal strings — php-src
      * {@code versioning.c}. Optional operator must be null or a compile-time
      * valid comparison op ({@code ValueError} otherwise).
@@ -1832,6 +1862,17 @@ final class DiscardedPureCallElision
     private static function zeroArgRuntimeInfoArgsAllowDiscardedElision(array $callArgs): bool
     {
         return NoThrowCallElision::zeroArgRuntimeInfoArgsCannotThrow($callArgs);
+    }
+
+    /**
+     * Zero args or typed bool flag — peer
+     * {@see NoThrowCallElision::definedTableRuntimeInfoArgsCannotThrow}.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function definedTableRuntimeInfoArgsAllowDiscardedElision(array $callArgs): bool
+    {
+        return NoThrowCallElision::definedTableRuntimeInfoArgsCannotThrow($callArgs);
     }
 
     /**

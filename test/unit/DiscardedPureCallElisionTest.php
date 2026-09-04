@@ -48,7 +48,10 @@ use PHPCompiler\ext\standard\get_debug_type;
 use PHPCompiler\ext\standard\get_declared_classes_;
 use PHPCompiler\ext\standard\get_declared_interfaces_;
 use PHPCompiler\ext\standard\get_declared_traits_;
+use PHPCompiler\ext\standard\get_defined_constants_;
+use PHPCompiler\ext\standard\get_defined_functions_;
 use PHPCompiler\ext\standard\get_included_files_;
+use PHPCompiler\ext\standard\get_loaded_extensions;
 use PHPCompiler\ext\standard\get_parent_class_;
 use PHPCompiler\ext\standard\gettype;
 use PHPCompiler\ext\standard\hash_equals;
@@ -2423,6 +2426,88 @@ final class DiscardedPureCallElisionTest extends TestCase
             $context,
             new zend_version(),
             [$long]
+        ));
+    }
+
+    public function testDiscardedDefinedTableRuntimeInfoElides(): void
+    {
+        // php-src basic_functions.c / info.c — arity 0 or typed bool (#36386).
+        $context = $this->makeContext();
+        $bool = $this->makeNativeBoolVar();
+        $long = $this->makeNativeLongVar();
+        $falseLit = $this->makeCompileTimeLongVar(0);
+        $trueLit = $this->makeCompileTimeLongVar(1);
+        $null = $this->makeNullVar();
+        $str = $this->makeStringVar('x');
+        $box = $this->makeValueBoxVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_loaded_extensions(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_loaded_extensions(),
+            [$bool]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_loaded_extensions(),
+            [$falseLit]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_defined_constants_(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_defined_constants_(),
+            [$trueLit]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_defined_functions_(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_defined_functions_(),
+            [$long]
+        ));
+
+        // Soft-null bool stays live (deprecate).
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_loaded_extensions(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_defined_constants_(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_defined_functions_(),
+            [$null]
+        ));
+        // Non-bool coercible / excess argc stay live.
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_loaded_extensions(),
+            [$str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_defined_constants_(),
+            [$box]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_defined_functions_(),
+            [$bool, $long]
         ));
     }
 
