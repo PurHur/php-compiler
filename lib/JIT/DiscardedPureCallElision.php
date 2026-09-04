@@ -14,12 +14,14 @@ use PHPCompiler\VM\Variable as VmVariable;
  *
  * php-src: ZPP may still run user-visible coercions; here we only fold cases that are
  * side-effect-free (literal / typed-string strlen/ord/strtolower/ucwords/bin2hex/
- * urlencode/str_rot13/quotemeta/…, typed-numeric chr, type.c predicates + gettype,
- * typed-array count/sizeof, math.c incl. pow/fpow/fdiv on already-numeric args,
- * empty void user functions). Soft-null strlen / ord / chr / math / string
- * coercions are NOT elided — they emit deprecations (PHP 8.1+). Countable objects
- * stay live (user {@code count()} handlers). {@code intdiv} is never discarded
- * here (DivisionByZeroError must stay observable).
+ * urlencode/str_rot13/quotemeta/md5/crc32/base64_encode/soundex/…, typed-numeric
+ * chr, type.c predicates + gettype, typed-array count/sizeof, math.c incl.
+ * pow/fpow/fdiv on already-numeric args, empty void user functions). Soft-null
+ * strlen / ord / chr / math / string coercions are NOT elided — they emit
+ * deprecations (PHP 8.1+). Countable objects stay live (user {@code count()}
+ * handlers). {@code intdiv} is never discarded here (DivisionByZeroError must
+ * stay observable). {@code hex2bin}/{@code base64_decode}/{@code convert_uudecode}
+ * stay live (invalid-input warnings / false returns).
  */
 final class DiscardedPureCallElision
 {
@@ -141,10 +143,11 @@ final class DiscardedPureCallElision
 
     /**
      * Discarded {@code strtolower}/{@code ucwords}/{@code bin2hex}/
-     * {@code urlencode}/{@code str_rot13}/{@code quotemeta}/… on typed /
-     * literal strings — php-src {@code string.c}/{@code url.c} Z_PARAM_STR
-     * family; soft null / object {@code __toString} stay live
-     * (peer {@see tryElideStrlenNoSideEffect}).
+     * {@code urlencode}/{@code str_rot13}/{@code quotemeta}/{@code md5}/
+     * {@code crc32}/{@code base64_encode}/{@code soundex}/… on typed /
+     * literal strings — php-src {@code string.c}/{@code url.c}/{@code md5.c}/
+     * {@code crc32.c}/{@code base64.c} Z_PARAM_STR family; soft null / object
+     * {@code __toString} stay live (peer {@see tryElideStrlenNoSideEffect}).
      *
      * @param array<int, Variable> $callArgs
      */
