@@ -1,5 +1,5 @@
 {
-    "generated_at": "2026-09-04T10:44:19Z",
+    "generated_at": "2026-09-04T15:29:01Z",
     "issue": 36380,
     "packages": [
         {
@@ -21,20 +21,20 @@
                 "fail": 0,
                 "skip": 0,
                 "rc": 255,
-                "reason": "PHP_Warning:_Undefined_array_key_0_in_/compiler/test/apps/erusev-parsedown/pinned/Parsedown.php_on_line_1038_PHP_Fatal_error:_Uncaught_TypeError:_array_slice():_Argument_#1_($array)_must_be_of_type_ar"
+                "reason": "FAIL_block-level_html_FAIL_code_block_FAIL_code_span_PHP_Fatal_error:_Allowed_memory_size_of_3221225472_bytes_exhausted_(tried_to_allocate_4096_bytes)_in_/compiler/lib/VM/HashTable.php_on_line_2691"
             },
             "aot": {
                 "status": "block",
                 "pass": 0,
                 "fail": 0,
                 "skip": 0,
-                "rc": 255,
-                "reason": "parse_error_curly_variable_method_$this->{...}"
+                "rc": 124,
+                "reason": "phpc_build:_helper-runtime_cache_hit_(17_helpers,_core=1b996aa5c644fbf7d3a2)_(#15889)"
             },
             "aot_pass_rate": 0,
             "blockers": [
-                "vm: PHP_Warning:_Undefined_array_key_0_in_/compiler/test/apps/erusev-parsedown/pinned/Parsedown.php_on_line_1038_PHP_Fatal_error:_Uncaught_TypeError:_array_slice():_Argument_#1_($array)_must_be_of_type_ar",
-                "aot: parse_error_curly_variable_method_$this->{...}"
+                "vm: FAIL_block-level_html_FAIL_code_block_FAIL_code_span_PHP_Fatal_error:_Allowed_memory_size_of_3221225472_bytes_exhausted_(tried_to_allocate_4096_bytes)_in_/compiler/lib/VM/HashTable.php_on_line_2691",
+                "aot: phpc_build:_helper-runtime_cache_hit_(17_helpers,_core=1b996aa5c644fbf7d3a2)_(#15889)"
             ],
             "raw_rc": 0
         },
