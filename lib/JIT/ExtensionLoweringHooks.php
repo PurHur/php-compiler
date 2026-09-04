@@ -104,7 +104,8 @@ interface DomCompileTimeHooks
  *
  * {@see \PHPCompiler\JIT} must not import {@code ext\simplexml} / {@code ext\dom} /
  * {@code ext\xmlreader} / {@code ext\xmlwriter} / {@code ext\xsl} / {@code ext\mbstring}
- * / {@code ext\posix} / {@code ext\bcmath} for these paths; Modules register from jitInit.
+ * / {@code ext\posix} / {@code ext\bcmath} / {@code ext\intl} for these paths;
+ * Modules register from jitInit.
  */
 final class ExtensionLoweringHooks
 {
@@ -218,6 +219,9 @@ final class ExtensionLoweringHooks
     /** bcmath JIT Call surfaces — registered from ext/bcmath Module::jitInit (#36204). */
     public ?BcMathExtensionHooks $bcmath = null;
 
+    /** intl JIT Call surfaces — registered from ext/intl Module::jitInit (#36204). */
+    public ?IntlExtensionHooks $intl = null;
+
     public function requirePosixNested(): PosixNestedJitKernels
     {
         if (null === $this->posixNested) {
@@ -293,6 +297,17 @@ final class ExtensionLoweringHooks
         }
 
         return $this->bcmath;
+    }
+
+    public function requireIntl(): IntlExtensionHooks
+    {
+        if (null === $this->intl) {
+            throw new \RuntimeException(
+                'intl extension hooks not registered — ext/intl Module::jitInit missing (#36204)'
+            );
+        }
+
+        return $this->intl;
     }
 
     public function tryPrepareDimWrite(Context $context, Variable $container, Variable $dim): ?Variable

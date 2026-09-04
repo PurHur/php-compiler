@@ -60,7 +60,8 @@ class Module extends ModuleAbstract
         $context->functionProxies['locale::filtermatches'] = new LocaleFilterMatches();
         $context->functionProxies['locale::getdisplayname'] = new LocaleGetDisplayName();
         // NumberFormatter / IntlDateFormatter / Collator / Normalizer / MessageFormatter /
-        // Transliterator — Call classes live under lib/JIT/Call\ (no core→ext import).
+        // Transliterator — Call classes live under lib/JIT/Call\; dispatch via hooks (#36204).
+        $context->extensionLowering->intl = new JitIntlExtensionHooksFacade();
         $context->functionProxies['numberformatter::create'] = new JIT\Call\NumberFormatterCreate();
         $context->functionProxies['numberformatter::format'] = new JIT\Call\NumberFormatterFormat();
         $context->functionProxies['intldateformatter::create'] = new JIT\Call\IntlDateFormatterCreate();

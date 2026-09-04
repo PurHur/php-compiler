@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
-use PHPCompiler\ext\intl\JitNumberFormatterCreate;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
@@ -13,7 +12,8 @@ use PHPLLVM\Value;
 /**
  * NumberFormatter::create() — JIT/AOT factory (#27385 / re-#20754).
  *
- * php-src: ext/intl/formatter/formatter_main.c — zim_NumberFormatter_create
+ * Dispatch via {@see Context::$extensionLowering} so lib/JIT does not import
+ * {@code ext\intl} (#36204). php-src: ext/intl/formatter/formatter_main.c — zim_NumberFormatter_create
  */
 final class NumberFormatterCreate implements Call
 {
@@ -28,6 +28,6 @@ final class NumberFormatterCreate implements Call
 
     public function call(Context $context, Variable ...$args): Value
     {
-        return JitNumberFormatterCreate::invoke($context, ...$args);
+        return $context->extensionLowering->requireIntl()->numberFormatterCreate($context, ...$args);
     }
 }
