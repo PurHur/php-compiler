@@ -611,11 +611,19 @@ class Native implements Call {
                 }
                 break;
             case '__string__*':
-                return JitStringArg::lower(
-                    $context,
-                    $arg,
-                    "argument {$argNum} for {$this->name}()"
-                );
+                try {
+                    return JitStringArg::lower(
+                        $context,
+                        $arg,
+                        "argument {$argNum} for {$this->name}()"
+                    );
+                } catch (\LogicException $e) {
+                    throw new \LogicException(
+                        $e->getMessage().' (got JIT type '.$arg->type.' / kind '.$arg->kind.')',
+                        0,
+                        $e
+                    );
+                }
             case '__value__*':
                 if (null !== $arg->valueBoxAliasPtr) {
                     return \PHPCompiler\JIT\JitValueBox::normalizeValuePtr($context, $arg->valueBoxAliasPtr);
