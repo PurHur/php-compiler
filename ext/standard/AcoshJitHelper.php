@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * acosh() for compiled JIT/AOT modules (#15221, #27058, #28331, php-in-PHP).
+ * acosh() NestedJIT-safe fdlibm reference (#15221, #27058, #28331, php-in-PHP).
  *
- * NestedJIT-safe fdlibm e_acosh.c shape with inlined log + Newton sqrt (#28331 /
- * peer MathAcos #28276 / MathAsin #28263).
+ * AOT/JIT hot path uses libm {@code acosh(3)} via {@see \PHPCompiler\JIT\Builtin\MathAcosh}
+ * (#36386 / peer MathAsinh). This helper remains for NestedJIT-safe fdlibm e_acosh.c
+ * shape with inlined log + Newton sqrt when NestedJIT cannot call libc.
  * Avoid `\acosh` / {@see VmMath::acosh} — NestedJIT re-enters MathAcosh bridge under thin AOT.
  * Avoid cross-class Log/Sqrt helper call — NestedJIT stubs to 0 (#27017 / Hypot shape).
  * Avoid pack/unpack (#27496). Avoid unbounded while-loops (#27838).

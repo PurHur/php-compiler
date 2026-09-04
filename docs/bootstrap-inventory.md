@@ -11146,7 +11146,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 827)
 - new Variable (line 853)
 - new Variable (line 882)
-- 48 class method(s)
+- 52 class method(s)
 
 ### `ext/dom/JitDomGetElementById.php`
 
@@ -51823,7 +51823,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/MathAcosh.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/MathAsin.php`
 
@@ -51833,7 +51833,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/MathAsinh.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/MathAtan.php`
 
@@ -51848,7 +51848,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/MathAtanh.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/MathBaseConvert.php`
 
@@ -58147,7 +58147,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/DomExtensionHooks.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 6 class method(s)
 
 ### `lib/JIT/DomInstanceMethodJit.php`
 
@@ -59238,7 +59238,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/NoThrowCallElision.php`
 
 **Warnings** (review for bootstrap subset):
-- new Operand\Literal (line 571)
+- new Operand\Literal (line 574)
 - 20 class method(s)
 
 ### `lib/JIT/NonObjectPropertyFetchHelper.php`

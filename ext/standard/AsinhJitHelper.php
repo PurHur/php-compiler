@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * asinh() for compiled JIT/AOT modules (#15221, #27058, #28355, php-in-PHP).
+ * asinh() NestedJIT-safe fdlibm reference (#15221, #27058, #28355, php-in-PHP).
  *
- * NestedJIT-safe fdlibm e_asinh.c shape with inlined log + Newton sqrt (#28355 /
- * peer MathAcosh #28331 / MathAsin #28263).
+ * AOT/JIT hot path uses libm {@code asinh(3)} via {@see \PHPCompiler\JIT\Builtin\MathAsinh}
+ * (#36386 / peer MathSinh). This helper remains for NestedJIT-safe fdlibm e_asinh.c
+ * shape with inlined log + Newton sqrt when NestedJIT cannot call libc.
  * Avoid `\asinh` / {@see VmMath::asinh} — NestedJIT re-enters MathAsinh bridge under thin AOT.
  * Avoid cross-class Log/Sqrt helper call — NestedJIT stubs to 0 (#27017 / Hypot shape).
  * Avoid pack/unpack (#27496). Avoid unbounded while-loops (#27838).

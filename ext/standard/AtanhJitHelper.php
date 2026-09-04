@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * atanh() for compiled JIT/AOT modules (#15221, #27058, #28377, php-in-PHP).
+ * atanh() NestedJIT-safe fdlibm reference (#15221, #27058, #28377, php-in-PHP).
  *
- * NestedJIT-safe fdlibm e_atanh.c shape with inlined log (#28377 /
- * peer MathAsinh #28355 / MathAcosh #28331).
+ * AOT/JIT hot path uses libm {@code atanh(3)} via {@see \PHPCompiler\JIT\Builtin\MathAtanh}
+ * (#36386 / peer MathAsinh). This helper remains for NestedJIT-safe fdlibm e_atanh.c
+ * shape with inlined log when NestedJIT cannot call libc.
  * Avoid `\atanh` / {@see VmMath::atanh} — NestedJIT re-enters MathAtanh bridge under thin AOT.
  * Avoid cross-class Log helper call — NestedJIT stubs to 0 (#27017 / Hypot shape).
  * Avoid pack/unpack (#27496). Avoid unbounded while-loops (#27838).
