@@ -587,34 +587,17 @@ class Native implements Call {
         $value = $context->helper->loadValue($arg);
         switch ($typeName) {
             case '__object__*':
-                if (
-                    null !== $arg->objectPropertySlot
-                    && Variable::TYPE_VALUE === $arg->objectPropertyType
-                ) {
-                    // loadValue may still be __string__*/__object__* after prop analysis
-                    // (Slim typed props / IncludeHelper) — only readObject on value boxes (#36382).
-                    $slotTy = $context->getStringFromType($value->typeOf());
-                    if (
-                        '__value__*' === $slotTy
-                        || (
-                            \PHPLLVM\Type::KIND_POINTER === $value->typeOf()->getKind()
-                            && '__value__' === $context->getStringFromType($value->typeOf()->getElementType())
-                        )
-                    ) {
-                        return $context->builder->call(
-                            $context->lookupFunction('__value__readObject'),
-                            $value
-                        );
-                    }
-                    if ('__object__*' === $slotTy) {
-                        return $value;
-                    }
-                    if ('__string__*' === $slotTy || 'int8*' === $slotTy) {
-                        return $context->getTypeFromString('__object__*')->constNull();
-                    }
-                }
+                // Always key off the loaded LLVM type first — Slim/IncludeHelper prop
+                // analysis can leave CFG type VALUE while loadValue returns __string__*
+                // (MessageTrait::$protocol etc.). Never pass non-boxes to readObject (#36382).
                 $valueTy = $value->typeOf();
                 $valueTyName = $context->getStringFromType($valueTy);
+                if ('__object__*' === $valueTyName) {
+                    return $value;
+                }
+                if ('__string__*' === $valueTyName || 'int8*' === $valueTyName) {
+                    return $context->getTypeFromString('__object__*')->constNull();
+                }
                 if (
                     '__value__*' === $valueTyName
                     || (
@@ -629,19 +612,30 @@ class Native implements Call {
                 }
                 switch ($arg->type) {
                     case Variable::TYPE_OBJECT:
-                        if ('__value__*' === $valueTyName) {
+                        return $value;
+                    case Variable::TYPE_VALUE:
+                        $boxPtr = \PHPCompiler\JIT\JitValueBox::valuePtrFromVariable($context, $arg);
+                        $boxTyName = $context->getStringFromType($boxPtr->typeOf());
+                        if ('__object__*' === $boxTyName) {
+                            return $boxPtr;
+                        }
+                        if ('__string__*' === $boxTyName || 'int8*' === $boxTyName) {
+                            return $context->getTypeFromString('__object__*')->constNull();
+                        }
+                        if (
+                            '__value__*' === $boxTyName
+                            || (
+                                \PHPLLVM\Type::KIND_POINTER === $boxPtr->typeOf()->getKind()
+                                && '__value__' === $context->getStringFromType($boxPtr->typeOf()->getElementType())
+                            )
+                        ) {
                             return $context->builder->call(
                                 $context->lookupFunction('__value__readObject'),
-                                $value
+                                $boxPtr
                             );
                         }
 
-                        return $value;
-                    case Variable::TYPE_VALUE:
-                        return $context->builder->call(
-                            $context->lookupFunction('__value__readObject'),
-                            \PHPCompiler\JIT\JitValueBox::valuePtrFromVariable($context, $arg)
-                        );
+                        return $context->getTypeFromString('__object__*')->constNull();
                     case Variable::TYPE_NULL:
                         return $context->getTypeFromString('__object__*')->constNull();
                     case Variable::TYPE_HASHTABLE:
