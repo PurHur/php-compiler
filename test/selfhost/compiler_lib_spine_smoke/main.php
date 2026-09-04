@@ -5340,6 +5340,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/CoalesceAndNullsafe.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/ClassLikeAndStmtCompile.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/ErrorSuppressAndPropertyFetch.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/WriteContextRejects.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/TernaryAndLogicalShortCircuit.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileBlockInternal.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AssignOperand.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AdaptByRefCallArgs.php';
