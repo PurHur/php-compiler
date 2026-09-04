@@ -258,4 +258,50 @@ final class CompileTargetTest extends TestCase
         $this->assertNull(CompileTarget::readElfMachine($path));
         @unlink($path);
     }
+
+    /** Linux SPECS must carry crt + dynamic linker so Linker never host-fallbacks (#36391). */
+    public function testLinuxTargetsCarryToolchainPathsAsData(): void
+    {
+        $x86 = CompileTarget::resolve(CompileTarget::ID_X86_64_LINUX);
+        $this->assertSame('/usr/lib/x86_64-linux-gnu', $x86->crtDir());
+        $this->assertSame('/lib64/ld-linux-x86-64.so.2', $x86->dynamicLinker());
+
+        $arm = CompileTarget::resolve(CompileTarget::ID_AARCH64_LINUX);
+        $this->assertSame('/usr/lib/aarch64-linux-gnu', $arm->crtDir());
+        $this->assertSame('/lib/ld-linux-aarch64.so.1', $arm->dynamicLinker());
+
+        $darwin = CompileTarget::resolve(CompileTarget::ID_AARCH64_DARWIN);
+        $this->assertNull($darwin->crtDir());
+        $this->assertNull($darwin->dynamicLinker());
+    }
+
+    /** Guard: Linker must not hardcode x86_64 crt/ld paths (#36391 Done-when). */
+    public function testLinkerUsesCompileTargetNotHardcodedX86Toolchain(): void
+    {
+        $linker = file_get_contents(dirname(__DIR__, 3).'/lib/AOT/Linker.php');
+        $this->assertNotFalse($linker);
+        $this->assertStringNotContainsString(
+            "?? '/usr/lib/x86_64-linux-gnu'",
+            $linker,
+            'Linker must not fall back to host x86_64 crt_dir'
+        );
+        $this->assertStringNotContainsString(
+            "?? '/lib64/ld-linux-x86-64.so.2'",
+            $linker,
+            'Linker must not fall back to host x86_64 dynamic linker'
+        );
+        $this->assertStringContainsString('crt_dir + dynamic_linker in CompileTarget', $linker);
+    }
+
+    /** Seed aarch64 helper unit remains ELF e_machine=183 in the committed tier. */
+    public function testCommittedAarch64SeedUnitIsEmAarch64(): void
+    {
+        $root = dirname(__DIR__, 3);
+        $unit = $root.'/prelinked/helper-runtime/aarch64-linux/units/VM_CoalesceJitHelper_php/unit.o';
+        if (!is_file($unit)) {
+            $this->markTestSkipped('aarch64 seed unit not committed');
+        }
+        $this->assertSame(183, CompileTarget::readElfMachine($unit));
+        CompileTarget::resolve(CompileTarget::ID_AARCH64_LINUX)->assertObjectMatchesTarget($unit);
+    }
 }

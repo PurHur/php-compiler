@@ -26,3 +26,8 @@ PHP_COMPILER_HELPER_RUNTIME_CACHE_DIR=build/helper-runtime-cache-aarch64 \
 # native aarch64 only — full corpus:
 PHP_COMPILER_TARGET=aarch64-linux make helper-runtime-prelink-refresh
 ```
+
+Release images stage **both** Linux helper arches; `Docker/release/Dockerfile`
+keeps only `TARGETARCH`'s tree so multi-arch `ghcr.io/purhur/phpc` digests stay
+honest (no wrong-arch 798 MiB corpus). Darwin aarch64 remains data-only until
+LLVM 22 — see `docs/adr/36391-aarch64-darwin-deferred.md`.
