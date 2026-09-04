@@ -1224,7 +1224,29 @@ final class HashTableWriteLlvm
                 return;
             }
         }
-        $context->builder->store($context->helper->loadValue($element), $slot);
+        $loaded = $context->helper->loadValue($element);
+        // Never store a packed LLVM array aggregate into a hashtable entry / value box (#36382).
+        if (
+            null !== $loaded
+            && \PHPLLVM\Type::KIND_ARRAY === $loaded->typeOf()->getKind()
+            && 0 !== ($element->type & Variable::IS_NATIVE_ARRAY)
+        ) {
+            $ht = HashTableHelper::materializeNativeArrayForCall($context, $element);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeHashtable'),
+                $slot,
+                $ht
+            );
+            $context->refcount->delref(
+                $context->builder->pointerCast(
+                    $ht,
+                    $context->getTypeFromString('__ref__virtual*')
+                )
+            );
+
+            return;
+        }
+        $context->builder->store($loaded, $slot);
     }
 
     public static function setValueBoxKey(

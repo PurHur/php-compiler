@@ -1117,10 +1117,13 @@ trait AssignOperand
                 // Same PHP type can still be a native packed array whose loadValue is
                 // an LLVM array aggregate (`[N x %__string__*]`) while the destination
                 // slot was promoted to a `__value__*` box (IncludeHelper / branch merge).
-                // getStringFromType() maps arrays to "unknown" — key off KIND_ARRAY (#36382).
+                // getStringFromType() maps arrays to "unknown" / uniquified `__value__.N`
+                // as `unknown*` — key off LLVM kinds, not type-name strings (#36382).
                 $srcKind = $toStore->typeOf()->getKind();
-                $destIsValueBox = '__value__*' === $destTy || '__value__' === $destTy;
-                if (\PHPLLVM\Type::KIND_ARRAY === $srcKind && $destIsValueBox) {
+                $destLlvm = $result->value->typeOf();
+                $destIsArrayPtr = \PHPLLVM\Type::KIND_POINTER === $destLlvm->getKind()
+                    && \PHPLLVM\Type::KIND_ARRAY === $destLlvm->getElementType()->getKind();
+                if (\PHPLLVM\Type::KIND_ARRAY === $srcKind && !$destIsArrayPtr) {
                     if (0 === ($value->type & Variable::IS_NATIVE_ARRAY)) {
                         throw new \LogicException(
                             "assignOperand: refusing store LLVM array aggregate into {$destTy} (#36382)"

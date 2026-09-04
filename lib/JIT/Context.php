@@ -4404,6 +4404,33 @@ class Context {
                 return $name;
             }
         }
+        // CreateNamed after helper/bitcode merge uniqueifies (`__value__.2`); map back to
+        // the seeded core name so Slim AOT guards see `__value__*` not `unknown*` (#36382).
+        if (method_exists($type, 'getName')) {
+            $llvmName = (string) $type->getName();
+            if ('' !== $llvmName) {
+                $stripped = self::stripLlvmUniquifySuffix($llvmName);
+                if (isset($this->typeMap[$stripped])) {
+                    return $stripped;
+                }
+                if (isset($this->typeMap[$llvmName])) {
+                    return $llvmName;
+                }
+                if (isset($this->structFieldMap[$stripped])) {
+                    return $stripped;
+                }
+            }
+        }
+        $repr = $type->toString();
+        foreach (array_keys($this->typeMap) as $name) {
+            if (str_contains($name, '*')) {
+                continue;
+            }
+            if ('' !== $name && str_contains($repr, $name)) {
+                return $name;
+            }
+        }
+
         return 'unknown';
     }
 
