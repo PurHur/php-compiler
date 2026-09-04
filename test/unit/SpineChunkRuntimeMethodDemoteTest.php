@@ -91,6 +91,8 @@ final class SpineChunkRuntimeMethodDemoteTest extends TestCase
         $this->assertTrue(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('lib/JIT/Concern/CompileBlockInternal.php'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('lib/CompilerVersion.php'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('ext/dom/VmDom.php'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('ext/soap/VmSoapClient.php'));
+        $this->assertFalse(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('ext/standard/VmDateTimeNative.php'));
         $this->assertFalse(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('lib/Compiler.php'));
         $this->assertFalse(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('lib/JIT.php'));
         // Compiler / CompilerVersion / JIT stay live — Compiler/JIT need file splits for host CFG.

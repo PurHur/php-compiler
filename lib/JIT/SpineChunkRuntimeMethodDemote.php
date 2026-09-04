@@ -129,6 +129,10 @@ final class SpineChunkRuntimeMethodDemote
     public static function oversizeSingletonCanEmit(string $rel): bool
     {
         $rel = str_replace('\\', '/', ltrim($rel, '/'));
+        // Demote empties methods but host CFG still traps on this unit (null Op / #36387).
+        if ('ext/standard/VmDateTimeNative.php' === $rel) {
+            return false;
+        }
         if ('lib/CompilerVersion.php' === $rel) {
             return true;
         }
