@@ -155,9 +155,10 @@ if (!is_dir($entriesDir) && !mkdir($entriesDir, 0755, true) && !is_dir($entriesD
 }
 
 /**
- * Relative path prefix from $fromDir up to $root (always ends with /).
+ * Relative path prefix from $fromDir up to $root (always ends with /), or null when
+ * $fromDir is outside the repo (caller must use absolute requires).
  */
-$relPrefixToRoot = static function (string $fromDir, string $rootPath): string {
+$relPrefixToRoot = static function (string $fromDir, string $rootPath): ?string {
     $from = realpath($fromDir) ?: $fromDir;
     $to = realpath($rootPath) ?: $rootPath;
     $from = str_replace('\\', '/', $from);
@@ -182,7 +183,7 @@ $relPrefixToRoot = static function (string $fromDir, string $rootPath): string {
         $cur = $parent;
     }
 
-    return '../../../';
+    return null;
 };
 
 $entriesRelPrefix = $relPrefixToRoot($entriesDir, $root);
@@ -197,15 +198,24 @@ $writeAutoloadEntry = static function (string $entry, string $comment, array $re
         '// '.$comment,
         '// Autoloader first so Zend can load ModuleAbstract / Func\\Internal (spine-chunk-probe trap #1).',
         '',
-        "require_once __DIR__ . '/{$entriesRelPrefix}vendor/autoload.php';",
     ];
+    if ($entriesRelPrefix !== null) {
+        $lines[] = "require_once __DIR__ . '/{$entriesRelPrefix}vendor/autoload.php';";
+    } else {
+        // entries-dir outside the repo (e.g. /tmp/…) — relative ../../../vendor is wrong.
+        $lines[] = 'require_once '.var_export($root.'/vendor/autoload.php', true).';';
+    }
     foreach ($rels as $rel) {
         $abs = $root.'/'.$rel;
         if (!is_file($abs)) {
             fwrite(STDERR, "bootstrap-gen0-chunk-plan: missing require {$rel}\n");
             exit(1);
         }
-        $lines[] = "require_once __DIR__ . '/{$entriesRelPrefix}{$rel}';";
+        if ($entriesRelPrefix !== null) {
+            $lines[] = "require_once __DIR__ . '/{$entriesRelPrefix}{$rel}';";
+        } else {
+            $lines[] = 'require_once '.var_export($abs, true).';';
+        }
     }
     $lines[] = '';
     if (file_put_contents($entry, implode("\n", $lines)."\n") === false) {
@@ -561,7 +571,9 @@ usort($chunks, static function (array $a, array $b): int {
 
 // Honest capacity gate: oversize singletons that are *not* demote-eligible still NestedJIT /
 // host-CFG OOM under 8g. Demote-covered paths + CompilerVersion emit — do not defer those
-// (#36387; measured Block/VM/VmDom/CompileBlockInternal after T_TRAIT demote).
+// (#36387; measured Block/VM/VmDom/CompileBlockInternal after T_TRAIT demote). Measured
+// post-demote fails (VmSoapClient / VmDateTimeNative) return false from
+// oversizeSingletonCanEmit so they stay deferred.
 $deferred = 0;
 if (DEFER_SINGLETON_OVER_MAX_BYTES && $maxBytes >= 1) {
     // Autoload for oversizeSingletonCanEmit (mirrors SpineChunkRuntimeMethodDemote coverage).
@@ -577,9 +589,20 @@ if (DEFER_SINGLETON_OVER_MAX_BYTES && $maxBytes >= 1) {
         $entryPath = (string) ($chunk['entry'] ?? '');
         if ($entryPath !== '' && is_file($entryPath)) {
             foreach (file($entryPath, FILE_IGNORE_NEW_LINES) as $line) {
+                // In-tree: __DIR__ . '/../../../lib/…'
                 if (preg_match("#require_once __DIR__\\s*\\.\\s*'(?:/\\.\\.)+/((?:lib|ext)/[^']+\\.php)'#", $line, $m)) {
                     $rel = $m[1];
                     break;
+                }
+                // Out-of-tree absolute: require_once '/repo/lib/…'
+                if (preg_match('#require_once\\s+\'([^\']+/(?:lib|ext)/[^\']+\\.php)\'#', $line, $m)) {
+                    $abs = $m[1];
+                    $prefix = rtrim(str_replace('\\', '/', $root), '/').'/';
+                    $norm = str_replace('\\', '/', $abs);
+                    if (str_starts_with($norm, $prefix)) {
+                        $rel = substr($norm, strlen($prefix));
+                        break;
+                    }
                 }
             }
         }
@@ -589,7 +612,14 @@ if (DEFER_SINGLETON_OVER_MAX_BYTES && $maxBytes >= 1) {
             continue;
         }
         $chunk['deferred'] = true;
-        $chunk['defer_reason'] = 'singleton_over_max_bytes';
+        $chunk['defer_reason'] = ($rel !== null
+            && class_exists(\PHPCompiler\JIT\SpineChunkRuntimeMethodDemote::class)
+            && !\PHPCompiler\JIT\SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit($rel))
+            ? 'measured_emit_fail'
+            : 'singleton_over_max_bytes';
+        if ($rel !== null) {
+            $chunk['defer_file'] = $rel;
+        }
         ++$deferred;
     }
     unset($chunk);
@@ -611,8 +641,8 @@ $plan = [
         .'--max-files/--max-bytes so Runtime.php-sized TUs fit under 8g. --max-bytes alone '
         .'also applies max-files='.DEFAULT_MAX_FILES_WITH_BYTES.' for tiny-file packs. '
         .'Spine --strategy skips bin/ + lib/Compiler.php + lib/JIT.php + lib/Doctor.php '
-        .'(host CFG OOM / null-Op under 8g). Singleton chunks over max-bytes are marked '
-        .'deferred only when not demote-eligible (NestedJIT / host CFG OOM under 8g).',
+        .'(host CFG OOM / null-Op under 8g). Oversize singletons deferred only when not '
+        .'demote-eligible (or measured emit-fail after demote).',
 ];
 
 $json = json_encode($plan, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n";

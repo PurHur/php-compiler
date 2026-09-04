@@ -65,10 +65,15 @@ final class BootstrapGen0ChunksOrchestratorTest extends TestCase
             $waves[] = (int) $chunk['wave'];
             $body = (string) file_get_contents($chunk['entry']);
             $this->assertStringContainsString('vendor/autoload.php', $body);
-            // Depth-correct __DIR__ relative (not hardcoded ../../../) so nested OUT_DIR works.
-            $this->assertMatchesRegularExpression(
+            // In-tree: depth-correct __DIR__ relative. Out-of-tree (/tmp): absolute.
+            $relativeOk = (bool) preg_match(
                 "#require_once __DIR__ \\. '/(\\.\\./)+vendor/autoload\\.php';#",
                 $body
+            );
+            $absoluteOk = str_contains($body, "require_once '".$root.'/vendor/autoload.php'."';");
+            $this->assertTrue(
+                $relativeOk || $absoluteOk,
+                "autoload require must be relative-to-repo or absolute\n".$body
             );
             $this->assertGreaterThan(0, (int) $chunk['file_count']);
         }
@@ -193,35 +198,41 @@ final class BootstrapGen0ChunksOrchestratorTest extends TestCase
         $this->removeTree($tmp);
     }
 
-    public function testChunkPlanDoesNotDeferDemoteEligibleOversizeSingletons(): void
+    public function testChunkPlanDefersMeasuredEmitFailsNotDemoteEligibleHubs(): void
     {
         $root = dirname(__DIR__, 2);
         $script = $root.'/script/bootstrap-gen0-chunk-plan.php';
         $tmp = sys_get_temp_dir().'/phpc-chunk-plan-defer-'.bin2hex(random_bytes(4));
         mkdir($tmp.'/entries', 0755, true);
         $planPath = $tmp.'/plan.json';
-        // Demote-covered oversize singletons (VmDom, CompileBlockInternal, …) stay emit-eligible;
-        // Compiler.php / JIT.php are plan-skipped entirely (#36387).
+        // Demote-covered oversize hubs stay emit-eligible; measured post-demote fails defer (#36387).
         $cmd = escapeshellarg(PHP_BINARY).' '.escapeshellarg($script)
-            .' --spine --strategy=sub --max-bytes=120000'
+            .' --spine --strategy=dir --max-bytes=120000'
             .' --entries-dir='.escapeshellarg($tmp.'/entries')
             .' --plan-out='.escapeshellarg($planPath);
         exec($cmd.' 2>&1', $out, $rc);
         $this->assertSame(0, $rc, implode("\n", $out));
         $plan = json_decode((string) file_get_contents($planPath), true);
         $this->assertIsArray($plan);
-        $this->assertSame(0, (int) ($plan['deferred_count'] ?? -1));
-        $ids = [];
+        $this->assertSame(2, (int) ($plan['deferred_count'] ?? -1));
+        $deferredFiles = [];
         foreach ($plan['chunks'] as $chunk) {
-            $this->assertTrue(empty($chunk['deferred']), (string) ($chunk['chunk_id'] ?? ''));
-            $ids[] = (string) $chunk['chunk_id'];
             $body = (string) file_get_contents($chunk['entry']);
             $this->assertStringNotContainsString('lib/Compiler.php', $body);
             $this->assertStringNotContainsString('lib/JIT.php', $body);
+            // Out-of-tree entries use absolute requires.
+            $this->assertStringContainsString($root.'/vendor/autoload.php', $body);
+            if (empty($chunk['deferred'])) {
+                continue;
+            }
+            $this->assertSame('measured_emit_fail', $chunk['defer_reason'] ?? '');
+            $deferredFiles[] = (string) ($chunk['defer_file'] ?? '');
         }
-        $joined = implode(' ', $ids);
-        $this->assertStringContainsString('spine-lib-jit-c', $joined); // CompileBlockInternal partition
-        $this->assertStringContainsString('spine-ext-dom', $joined);
+        sort($deferredFiles);
+        $this->assertSame([
+            'ext/soap/VmSoapClient.php',
+            'ext/standard/VmDateTimeNative.php',
+        ], $deferredFiles);
         $this->removeTree($tmp);
     }
 
