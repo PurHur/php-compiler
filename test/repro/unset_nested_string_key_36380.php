@@ -5,8 +5,7 @@
  * php-src: Zend/zend_compile.c ZEND_FETCH_DIM_W + ZEND_UNSET_DIM
  * (Parsedown::li strips name=p this way).
  *
- * Prefer isset()/array_keys over array_key_exists here — AOT array_key_exists can
- * still report a removed string key after nested unset (follow-up).
+ * array_key_exists after unset: see test/repro/array_key_exists_nested_unset_36732.php (#36732).
  */
 $Elements = [
     [
