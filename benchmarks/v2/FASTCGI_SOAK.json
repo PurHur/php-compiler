@@ -1,0 +1,17 @@
+{
+    "generated_at": "2026-09-04T12:26:01Z",
+    "issue": 36388,
+    "project": "examples/003-MiniWebApp",
+    "requests": 1000,
+    "baseline_at": 100,
+    "rss_kb": {
+        "baseline": 173952,
+        "final": 179668,
+        "limit": 183674
+    },
+    "emalloc": {
+        "baseline": 0,
+        "final": 0
+    },
+    "ok": true
+}

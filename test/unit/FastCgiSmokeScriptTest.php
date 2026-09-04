@@ -22,6 +22,7 @@ final class FastCgiSmokeScriptTest extends TestCase
         $this->assertStringContainsString('--soak', $body);
         $this->assertStringContainsString('fastcgi-soak.php', $body);
         $this->assertStringContainsString('#36388', $body);
+        $this->assertStringContainsString('--soak-project', $body);
     }
 
     public function testFastcgiSoakScriptExists(): void
@@ -32,5 +33,10 @@ final class FastCgiSmokeScriptTest extends TestCase
         $this->assertStringContainsString('MemoryAccounting', $body);
         $this->assertStringContainsString('RequestHandler', $body);
         $this->assertStringContainsString('#36388', $body);
+        $this->assertStringContainsString('--project', $body);
+        $this->assertStringContainsString('003-MiniWebApp', $body);
+        $this->assertStringContainsString('ProjectManifest', $body);
+        $this->assertStringContainsString('max(10,', $body);
+        $this->assertStringContainsString('--write-json', $body);
     }
 }
