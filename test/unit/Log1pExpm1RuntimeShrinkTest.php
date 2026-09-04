@@ -10,38 +10,48 @@ use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
 /**
- * log1p()/expm1() NestedJIT via JitVmHelperLink::ensureBridge (#28495 / #28487).
+ * log1p()/expm1() AOT uses libm log1p(3)/expm1(3) (#36386);
+ * *JitHelper remain NestedJIT-safe reference (peer MathAsinh / AsinhJitHelper).
+ * LLVM 9 has no llvm.log1p.f64 / llvm.expm1.f64.
+ *
+ * php-src: ext/standard/math.c PHP_FUNCTION(log1p|expm1).
  */
 final class Log1pExpm1RuntimeShrinkTest extends TestCase
 {
-    public function testLog1pUsesJitHelperNotKernel(): void
+    public function testLog1pUsesLibmNotHelperBridge(): void
     {
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/log1p.php');
         $this->assertStringContainsString('MathLog1p::invoke', $builtin);
         $this->assertStringNotContainsString("lookupFunction('log1p')", $builtin);
 
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathLog1p.php');
-        $this->assertStringContainsString('Log1pJitHelper', $bridge);
+        $this->assertStringContainsString("LIBC_LOG1P = 'log1p'", $bridge);
         $this->assertStringContainsString('phpc_log1p', $bridge);
-        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringContainsString('log1p_libm_f64_entry', $bridge);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('Log1pJitHelper', $bridge);
         $this->assertStringNotContainsString('JitLog1pKernel', $bridge);
         $this->assertStringNotContainsString('NestedJitCompileScope', $bridge);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
+        $this->assertStringNotContainsString('llvm.log1p', $bridge);
     }
 
-    public function testExpm1UsesJitHelperNotKernel(): void
+    public function testExpm1UsesLibmNotHelperBridge(): void
     {
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/expm1.php');
         $this->assertStringContainsString('MathExpm1::invoke', $builtin);
         $this->assertStringNotContainsString("lookupFunction('expm1')", $builtin);
 
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathExpm1.php');
-        $this->assertStringContainsString('Expm1JitHelper', $bridge);
+        $this->assertStringContainsString("LIBC_EXPM1 = 'expm1'", $bridge);
         $this->assertStringContainsString('phpc_expm1', $bridge);
-        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringContainsString('expm1_libm_f64_entry', $bridge);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('Expm1JitHelper', $bridge);
         $this->assertStringNotContainsString('JitExpm1Kernel', $bridge);
         $this->assertStringNotContainsString('NestedJitCompileScope', $bridge);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
+        $this->assertStringNotContainsString('llvm.expm1', $bridge);
     }
 
     public function testLog1pJitHelperInlinesNestedJitSafeAlgorithm(): void
