@@ -7077,13 +7077,19 @@ trait CompileBlockInternal
                         // __object__.class_id (#34602 file-backed DateInterval residual).
                         // Untyped/mixed `$o` keeps CFG userType "object" — resolve via class_id
                         // so by-ref return aliases the real heap slot (#34721 / re-#34717).
+                        // Also TYPE_PROPERTY_FETCH used as ASSIGN lvalue (`$o->x = …`): CFG often
+                        // omits PROPERTY_FETCH_WRITE, and a compile-time stdClass/object layout
+                        // writes a different slot than Body::$x — callee sees the store, caller
+                        // does not (#36386 nbody / array-elem property stores).
+                        // php-src: Zend/zend_object_handlers.c zend_get_property_offset (ce from
+                        // Z_OBJCE_P, not a static "object" ClassEntry).
                         $declLcForRuntime = strtolower(ltrim($declaringClass, '\\'));
                         if (
                             'static' === $declLcForRuntime
                             || $this->receiverIsFromUnserializeObject($obj)
                             || (
-                                $opcodeIsPropertyWrite
-                                && \in_array($declLcForRuntime, ['object', 'stdclass', ''], true)
+                                $propFetchForWrite
+                                && \in_array($declLcForRuntime, ['object', 'stdclass', 'mixed', ''], true)
                             )
                         ) {
                             \PHPCompiler\JIT\LazyObjectHelper::emitEnsureInitialized(
