@@ -2322,7 +2322,10 @@ final class VmString
         if ($moreEntropy) {
             try {
                 $rnd = self::randomBytes(4);
-                $bytes = \unpack('N', $rnd)[1];
+                // Manual BE u32 — avoid the unpack builtin: NestedJIT of VmString
+                // (parse_url path) would otherwise NestedJIT UnpackEngine into the user
+                // module and OOM Slim-sized AOT (#36382).
+                $bytes = ((\ord($rnd[0]) << 24) | (\ord($rnd[1]) << 16) | (\ord($rnd[2]) << 8) | \ord($rnd[3])) & 0xFFFFFFFF;
             } catch (\Throwable $e) {
                 $bytes = ($tv['usec'] ^ $tv['sec']) & 0xFFFFFFFF;
             }

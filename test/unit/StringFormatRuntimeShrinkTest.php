@@ -26,7 +26,8 @@ final class StringFormatRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('StringFormatInventoryStubs', $source);
         $this->assertStringNotContainsString('ensureDeferredStubsForInventoryEmit', $source);
         $this->assertStringNotContainsString('COMPILED_PATHS', $source);
-        $this->assertLessThan(340, \substr_count($source, "\n") + 1);
+        // HELPER_BUNDLE (+Ieee754) for NestedJIT-safe float decode without unpack() (#36382).
+        $this->assertLessThan(400, \substr_count($source, "\n") + 1);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringFormatInventoryStubs.php');
     }
 
@@ -47,6 +48,9 @@ final class StringFormatRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('new HashTable', $source);
         $this->assertStringNotContainsString('VmSprintf::', $source);
         $this->assertStringNotContainsString('VmString::', $source);
+        // unpack() NestedJIT → UnpackEngine OOM on Slim (#36382); use Ieee754 instead.
+        $this->assertStringNotContainsString("unpack('d'", $source);
+        $this->assertStringContainsString('Ieee754::decodeFloat64Le', $source);
         $this->assertStringContainsString('byteOrd', $source);
         // NestedJIT mishandles `$packed[$i + 1]` on heap blobs (#23871) — readers must ++ only.
         $this->assertDoesNotMatchRegularExpression(
