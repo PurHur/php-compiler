@@ -59603,7 +59603,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/SpineChunkRuntimeMethodDemote.php`
 
 **Warnings** (review for bootstrap subset):
-- new OpCode (line 87)
+- new OpCode (line 101)
 - 3 class method(s)
 
 ### `lib/JIT/SpineChunkStandardHelperBind.php`

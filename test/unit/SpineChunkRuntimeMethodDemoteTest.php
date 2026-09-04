@@ -63,7 +63,13 @@ final class SpineChunkRuntimeMethodDemoteTest extends TestCase
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\JIT\\Variable'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\JIT\\Builtin\\CallArgv'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('phpcompiler\\jit\\arrayfilterllvm'));
-        // Top-level Compiler / CompilerVersion / JIT stay live (no trailing \).
+        // Top-level VM.php — NestedJIT OOM without demote; emits after (#36387).
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\VM'));
+        // ext\* peer TUs — NestedJIT segfault rc=139 on bcmath class/JIT packs (#36387).
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\ext\\bcmath\\NumberAdd'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('phpcompiler\\ext\\bcmath\\jitbcmath'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\ext\\standard\\Strlen'));
+        // Compiler / CompilerVersion / JIT stay live — Compiler/JIT need file splits for host CFG.
         $this->assertFalse(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\Compiler'));
         $this->assertFalse(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\CompilerVersion'));
         $this->assertFalse(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\JIT'));

@@ -35,19 +35,28 @@ use PHPCompiler\OpCode;
  * - Top-level Block.php (159 KB): NestedJIT assign trap hashtable→native-long
  *   ("Cannot assign operands of different types (yet): 135, 1") — omitted from
  *   spine-chunk-core-requires until demoted (2026-09-04).
+ * - PHPCompiler\ext\* peer TUs (e.g. ext/bcmath class+JIT packs): NestedJIT segfault
+ *   rc=139 under SPINE_CHUNK — measured spine-ext-bcmath-00 / ext-bcmath-01 FAIL before
+ *   demote; 2/2 OK in 6s after (2026-09-04).
+ * - Top-level VM.php (1.1 MB): NestedJIT OOM without demote; emits under 1536M after.
+ * - Top-level Compiler.php (2.1 MB) / JIT.php (1.0 MB): host CFG construction OOMs at
+ *   1536M even with empty method bodies — skipped from spine plans (see chunk-plan).
  *
  * Emptying those bodies (probe) emits .o files in seconds. Host-lowering Runtime::initParsePipeline
  * was already known to hang Zend rebuilds for hours ({@see RuntimeInitParsePipeline}).
  *
- * Under {@see ExternalMethodBind::spineChunkMode()}, replace Runtime + Block + every
+ * Under {@see ExternalMethodBind::spineChunkMode()}, replace Runtime + Block + top-level VM +
+ * every
  * {@see \PHPCompiler\VM} / {@see \PHPCompiler\AOT} / {@see \PHPCompiler\Compiler} (sub-NS) /
  * {@see \PHPCompiler\Web} / {@see \PHPCompiler\Ast} / {@see \PHPCompiler\Cli} /
- * {@see \PHPCompiler\SourcePreprocessor} / {@see \PHPCompiler\JIT} (sub-NS) class method CFG
+ * {@see \PHPCompiler\SourcePreprocessor} / {@see \PHPCompiler\JIT} (sub-NS) /
+ * {@see \PHPCompiler\ext} class method CFG
  * with a void-return stub before {@see \PHPCompiler\JIT::compileBlock} so hub ClassEntry +
  * method symbols still land in the .o / peer manifest. Real bodies stay on C-floor helpers
  * (RuntimeInitParsePipeline / RuntimeParseM5Native), NestedVM object:: proxies, or later
  * peer-bound non-demoted TUs. Does not demote top-level {@see \PHPCompiler\Compiler} /
- * {@see \PHPCompiler\CompilerVersion} / {@see \PHPCompiler\JIT} (no trailing `\`).
+ * {@see \PHPCompiler\CompilerVersion} / {@see \PHPCompiler\JIT} — Compiler/JIT need file
+ * splits before host CFG fits under 8g; CompilerVersion already emits live.
  */
 final class SpineChunkRuntimeMethodDemote
 {
@@ -58,11 +67,15 @@ final class SpineChunkRuntimeMethodDemote
         }
 
         $lc = strtolower(ltrim($displayClassLc, '\\'));
-        if ('phpcompiler\\runtime' === $lc || 'phpcompiler\\block' === $lc) {
+        if (
+            'phpcompiler\\runtime' === $lc
+            || 'phpcompiler\\block' === $lc
+            || 'phpcompiler\\vm' === $lc
+        ) {
             return true;
         }
 
-        // Packed hubs keep growing NestedJIT gaps across VM/AOT/Compiler/Web/Ast/Cli/JIT…
+        // Packed hubs keep growing NestedJIT gaps across VM/AOT/Compiler/Web/Ast/Cli/JIT/ext…
         return str_starts_with($lc, 'phpcompiler\\vm\\')
             || str_starts_with($lc, 'phpcompiler\\aot\\')
             || str_starts_with($lc, 'phpcompiler\\compiler\\')
@@ -70,7 +83,8 @@ final class SpineChunkRuntimeMethodDemote
             || str_starts_with($lc, 'phpcompiler\\ast\\')
             || str_starts_with($lc, 'phpcompiler\\cli\\')
             || str_starts_with($lc, 'phpcompiler\\sourcepreprocessor\\')
-            || str_starts_with($lc, 'phpcompiler\\jit\\');
+            || str_starts_with($lc, 'phpcompiler\\jit\\')
+            || str_starts_with($lc, 'phpcompiler\\ext\\');
     }
 
     /**
