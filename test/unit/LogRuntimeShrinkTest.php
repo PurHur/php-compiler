@@ -9,24 +9,27 @@ use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
 /**
- * log() NestedJIT via JitVmHelperLink::ensureBridge (#28574 / peer #28495).
+ * log() AOT uses llvm.log.f64 (#36386); LogJitHelper remains NestedJIT-safe
+ * reference (peer MathExp / ExpJitHelper).
+ *
+ * php-src: ext/standard/math.c PHP_FUNCTION(log).
  */
 final class LogRuntimeShrinkTest extends TestCase
 {
-    public function testLogUsesJitHelperNotKernel(): void
+    public function testLogUsesLlvmIntrinsicNotHelperBridge(): void
     {
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/log.php');
         $this->assertStringContainsString('MathLog::invoke', $builtin);
         $this->assertStringNotContainsString("lookupFunction('log')", $builtin);
 
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathLog.php');
-        $this->assertStringContainsString('LogJitHelper', $bridge);
+        $this->assertStringContainsString('llvm.log.f64', $bridge);
         $this->assertStringContainsString('phpc_log', $bridge);
-        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('LogJitHelper', $bridge);
         $this->assertStringNotContainsString('JitLogKernel', $bridge);
         $this->assertStringNotContainsString('NestedJitCompileScope', $bridge);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
-        $this->assertStringNotContainsString('isThinStandaloneAotMain', $bridge);
     }
 
     public function testLogJitHelperInlinesNestedJitSafeAlgorithm(): void
