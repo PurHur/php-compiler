@@ -12575,6 +12575,10 @@ class JIT {
                                 $methodBlock
                             );
                         }
+                        // SPINE_CHUNK Runtime hub: demote method bodies before NestedJIT OOMs (#36387).
+                        if (JIT\SpineChunkRuntimeMethodDemote::shouldDemote((string) $displayClass)) {
+                            JIT\SpineChunkRuntimeMethodDemote::demoteMethodBlock($methodBlock, $methodLc);
+                        }
                         $this->compileBlock($methodBlock, $funcName);
                     }
                     break;
