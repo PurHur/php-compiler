@@ -77,10 +77,13 @@ final class AotEmitFastExit
         // Spine split-TU hub/consumer chunks compile under SPINE_CHUNK=1 but are not
         // test/selfhost paths; bin/compile.php treats them as user-script AOT and clears
         // SELFHOST_AOT — same post-emit LLVM teardown hang (#31726, #36155 Phase B).
+        // Chunk emit also hits finishRecording/saveArtifact/detachCfgTree after
+        // compiletofile_done; Runtime fast-exits SPINE_CHUNK before those (#36387).
         if (!$isSelfhostPath && !$isSelfhostEnv && !$isSpineChunk) {
             return;
         }
         if (null !== $outfile && '' !== $outfile) {
+            // KEEP_OBJECT / vendor-prelink resolve to *.o via resolveEffectiveOutputPath.
             Linker::assertNonEmptyRequestedOutput($outfile);
         }
         self::warmup();

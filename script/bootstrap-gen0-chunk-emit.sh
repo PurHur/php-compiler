@@ -2,7 +2,10 @@
 # Emit one spine chunk as a cached translation unit with a resumable receipt (#36147).
 #
 # Skips re-emit when the receipt fingerprint matches live lowering sources and the
-# binary is present. Crash mid-chunk only loses that chunk's work, not the full spine.
+# object is present. Crash mid-chunk only loses that chunk's work, not the full spine.
+#
+# Default: object-only emit (PHP_COMPILER_KEEP_OBJECT_FILE=1) + helper-runtime cache
+# so chunk TUs avoid full ld of the helper corpus and post-link teardown (#36387).
 #
 # Usage:
 #   CHUNK_ID=ext-ds CHUNK_ENTRY=build/micro/chunk/ds.php ./script/bootstrap-gen0-chunk-emit.sh
@@ -11,7 +14,9 @@
 # Env:
 #   CHUNK_OUT_DIR          default build/chunks
 #   CHUNK_FORCE=1          ignore fresh receipt
+#   CHUNK_LINK_BINARY=1    also link a runnable .bin (slow; probe-only)
 #   PHP_COMPILER_SPINE_CHUNK=1  default 1
+#   PHP_COMPILER_HELPER_RUNTIME_O=1  default 1 for chunk emit
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -26,6 +31,7 @@ CHUNK_ID="${CHUNK_ID:-}"
 CHUNK_ENTRY="${CHUNK_ENTRY:-}"
 OUT_DIR="${CHUNK_OUT_DIR:-${ROOT}/build/chunks}"
 FORCE="${CHUNK_FORCE:-0}"
+LINK_BINARY="${CHUNK_LINK_BINARY:-0}"
 
 if [[ -z "${CHUNK_ID}" || -z "${CHUNK_ENTRY}" ]]; then
   echo "bootstrap-gen0-chunk-emit: set CHUNK_ID and CHUNK_ENTRY" >&2
@@ -42,6 +48,7 @@ fi
 export ROOT
 mkdir -p "${OUT_DIR}"
 
+OBJ="${OUT_DIR}/${CHUNK_ID}.o"
 BIN="${OUT_DIR}/${CHUNK_ID}.bin"
 LOG="${OUT_DIR}/${CHUNK_ID}.log"
 RECEIPT="${OUT_DIR}/${CHUNK_ID}.receipt.json"
@@ -58,28 +65,58 @@ if [[ -f "${RECEIPT}" ]]; then
   ' "${RECEIPT}" 2>/dev/null || true)"
 fi
 
-if [[ "${FORCE}" != "1" && -x "${BIN}" && "${want_fp}" == "${have_fp}" && -n "${have_fp}" ]]; then
-  echo "bootstrap-gen0-chunk-emit: fresh receipt — skip ${CHUNK_ID} (${BIN})"
+artifact="${OBJ}"
+if [[ "${LINK_BINARY}" == "1" ]]; then
+  artifact="${BIN}"
+fi
+
+if [[ "${FORCE}" != "1" && -f "${artifact}" && -s "${artifact}" && "${want_fp}" == "${have_fp}" && -n "${have_fp}" ]]; then
+  echo "bootstrap-gen0-chunk-emit: fresh receipt — skip ${CHUNK_ID} (${artifact})"
   exit 0
 fi
 
 echo "bootstrap-gen0-chunk-emit: emit ${CHUNK_ID} ← ${CHUNK_ENTRY}"
-rm -f "${BIN}"
+rm -f "${OBJ}" "${BIN}"
 start=$(date +%s)
+
+# Unique helper-cache dir per chunk process (concurrent emits must not share).
+: "${PHP_COMPILER_HELPER_RUNTIME_CACHE_DIR:=${OUT_DIR}/.helper-cache-${CHUNK_ID}-$$}"
+mkdir -p "${PHP_COMPILER_HELPER_RUNTIME_CACHE_DIR}"
+export PHP_COMPILER_HELPER_RUNTIME_CACHE_DIR
+
+keep_object=1
+out_path="${OBJ}"
+if [[ "${LINK_BINARY}" == "1" ]]; then
+  keep_object=0
+  out_path="${BIN}"
+fi
 
 set +e
 env PHP_COMPILER_SPINE_CHUNK="${PHP_COMPILER_SPINE_CHUNK:-1}" \
+  PHP_COMPILER_HELPER_RUNTIME_O="${PHP_COMPILER_HELPER_RUNTIME_O:-1}" \
+  PHP_COMPILER_KEEP_OBJECT_FILE="${keep_object}" \
   PHP_COMPILER_REPORT_EXTERNAL_STUBS=1 \
   PHP_COMPILER_EXTERNAL_STUBS_JSON="${STUBS}" \
   PHP_COMPILER_EMIT_BITCODE="${BITCODE}" \
   PHP_COMPILER_EXTERNAL_METHOD_MANIFEST_EXPORT="${MANIFEST}" \
-  php bin/compile.php -o "${BIN}" "${CHUNK_ENTRY}" >"${LOG}" 2>&1
+  php bin/compile.php -o "${out_path}" "${CHUNK_ENTRY}" >"${LOG}" 2>&1
 rc=$?
 set -e
 
 elapsed=$(( $(date +%s) - start ))
+
+# KEEP_OBJECT with -o ending in .o writes that path; with -o .bin writes .bin.o.
+effective="${out_path}"
+if [[ "${keep_object}" == "1" && "${out_path}" != *.o ]]; then
+  effective="${out_path}.o"
+fi
+if [[ -f "${effective}" && "${effective}" != "${OBJ}" ]]; then
+  mv -f "${effective}" "${OBJ}"
+  effective="${OBJ}"
+fi
+
 size=0
-[[ -f "${BIN}" ]] && size=$(wc -c <"${BIN}")
+[[ -f "${effective}" ]] && size=$(wc -c <"${effective}")
 
 stub_count=0
 if [ -f "${STUBS}" ]; then
@@ -93,23 +130,25 @@ php -r '
 $receipt = [
     "chunk_id" => $argv[1],
     "entry" => $argv[2],
-    "bin" => $argv[3],
-    "lowering_source_fingerprint" => $argv[4],
-    "exit_code" => (int) $argv[5],
-    "size_bytes" => (int) $argv[6],
-    "wall_seconds" => (int) $argv[7],
-    "stub_count" => (int) $argv[8],
+    "object" => $argv[3],
+    "bin" => $argv[4],
+    "lowering_source_fingerprint" => $argv[5],
+    "exit_code" => (int) $argv[6],
+    "size_bytes" => (int) $argv[7],
+    "wall_seconds" => (int) $argv[8],
+    "stub_count" => (int) $argv[9],
+    "object_only" => $argv[10] === "1",
     "generated_at" => gmdate("c"),
 ];
-file_put_contents($argv[9], json_encode($receipt, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
-' "${CHUNK_ID}" "${CHUNK_ENTRY}" "${BIN}" "${want_fp}" "${rc}" "${size}" "${elapsed}" "${stub_count}" "${RECEIPT}"
+file_put_contents($argv[11], json_encode($receipt, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
+' "${CHUNK_ID}" "${CHUNK_ENTRY}" "${OBJ}" "${BIN}" "${want_fp}" "${rc}" "${size}" "${elapsed}" "${stub_count}" "${keep_object}" "${RECEIPT}"
 
-if [[ "${rc}" -ne 0 || ! -x "${BIN}" ]]; then
+if [[ "${rc}" -ne 0 || ! -f "${effective}" || "${size}" -le 0 ]]; then
   echo "bootstrap-gen0-chunk-emit: FAILED ${CHUNK_ID} rc=${rc} (${elapsed}s) — see ${LOG}" >&2
   exit 1
 fi
 
-echo "bootstrap-gen0-chunk-emit: OK ${CHUNK_ID} ${size} bytes ${elapsed}s stubs=${stub_count}"
+echo "bootstrap-gen0-chunk-emit: OK ${CHUNK_ID} ${size} bytes ${elapsed}s stubs=${stub_count} artifact=${effective}"
 if [[ "${stub_count}" -gt 0 ]]; then
   echo "bootstrap-gen0-chunk-emit: ${STUBS} — bind before linking this chunk into gen-0" >&2
 fi
