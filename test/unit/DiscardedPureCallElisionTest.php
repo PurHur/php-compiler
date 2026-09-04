@@ -28,9 +28,11 @@ use PHPCompiler\ext\standard\html_entity_decode;
 use PHPCompiler\ext\standard\htmlentities;
 use PHPCompiler\ext\standard\htmlspecialchars;
 use PHPCompiler\ext\standard\htmlspecialchars_decode;
+use PHPCompiler\ext\standard\levenshtein;
 use PHPCompiler\ext\standard\md5;
 use PHPCompiler\ext\standard\metaphone;
 use PHPCompiler\ext\standard\nl2br;
+use PHPCompiler\ext\standard\number_format;
 use PHPCompiler\ext\standard\ord;
 use PHPCompiler\ext\standard\pow;
 use PHPCompiler\ext\standard\preg_quote;
@@ -44,6 +46,7 @@ use PHPCompiler\ext\standard\soundex;
 use PHPCompiler\ext\standard\sqrt;
 use PHPCompiler\ext\standard\str_contains;
 use PHPCompiler\ext\standard\str_ends_with;
+use PHPCompiler\ext\standard\str_getcsv;
 use PHPCompiler\ext\standard\str_ireplace;
 use PHPCompiler\ext\standard\str_pad;
 use PHPCompiler\ext\standard\str_repeat;
@@ -1080,6 +1083,81 @@ final class DiscardedPureCallElisionTest extends TestCase
             $context,
             new md5(),
             [$s, $null]
+        ));
+    }
+
+    public function testElidesDiscardedLevenshteinStrGetcsvNumberFormat(): void
+    {
+        // php-src levenshtein.c / file.c str_getcsv / number_format.c (#36386).
+        $context = $this->makeContext();
+        $a = $this->makeStringVar('kitten');
+        $b = $this->makeStringVar('sitting');
+        $cost = $this->makeNativeLongVar();
+        $csv = $this->makeStringVar('a,b');
+        $sep = $this->makeStringVar(',');
+        $enc = $this->makeStringVar('"');
+        $esc = $this->makeStringVar('\\');
+        $num = $this->makeNativeDoubleVar();
+        $decimals = $this->makeNativeLongVar();
+        $dot = $this->makeStringVar('.');
+        $comma = $this->makeStringVar(',');
+        $null = $this->makeNullVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new levenshtein(),
+            [$a, $b]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new levenshtein(),
+            [$a, $b, $cost, $cost, $cost]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new str_getcsv(),
+            [$csv, $sep, $enc, $esc]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new number_format(),
+            [$num]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new number_format(),
+            [$num, $decimals, $dot, $comma]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new number_format(),
+            [$num, $decimals, $null, $null]
+        ));
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new levenshtein(),
+            [$a, $null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new str_getcsv(),
+            [$csv]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new str_getcsv(),
+            [$csv, $sep, $enc]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new number_format(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new number_format(),
+            [$num, $null]
         ));
     }
 

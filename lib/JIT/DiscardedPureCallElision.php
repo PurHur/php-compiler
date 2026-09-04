@@ -16,14 +16,14 @@ use PHPCompiler\VM\Variable as VmVariable;
  * side-effect-free (literal / typed-string strlen/ord/strtolower/ucwords/bin2hex/
  * urlencode/str_rot13/quotemeta/md5/crc32/base64_encode/soundex/…, typed
  * substr/str_repeat/strcmp/strpos/strstr/str_contains/str_starts_with/
- * str_ends_with/…, typed str_pad/chunk_split/wordwrap/str_split/explode,
- * typed str_replace/str_ireplace/substr_replace/strtr (string forms),
- * typed addcslashes/stripcslashes/strpbrk,
+ * str_ends_with/levenshtein/…, typed str_pad/chunk_split/wordwrap/str_split/
+ * explode/str_getcsv, typed str_replace/str_ireplace/substr_replace/strtr
+ * (string forms), typed addcslashes/stripcslashes/strpbrk,
  * typed quoted_printable_encode/decode, basename/dirname,
  * typed htmlspecialchars/htmlentities/nl2br/preg_quote/
- * escapeshell*, typed-numeric chr, type.c predicates + gettype, ctype.c
- * classifiers on typed/literal strings, typed-array count/sizeof, math.c
- * incl. pow/fpow/fdiv on already-numeric args, empty void user functions).
+ * escapeshell*, typed-numeric chr/number_format, type.c predicates + gettype,
+ * ctype.c classifiers on typed/literal strings, typed-array count/sizeof,
+ * math.c incl. pow/fpow/fdiv on already-numeric args, empty void user functions).
  * Soft-null strlen / ord / chr / math / string / ctype coercions are NOT
  * elided — they emit deprecations (PHP 8.1+). Countable objects stay live
  * (user {@code count()} handlers). {@code intdiv} is never discarded here
@@ -33,7 +33,8 @@ use PHPCompiler\VM\Variable as VmVariable;
  * stay live (PHP 8 deprecations). Array {@code str_replace}/{@code implode}
  * stay live (element {@code __toString}); {@code str_replace} {@code &$count}
  * stays live (by-ref write). {@code dirname} with a non-constant {@code $levels}
- * stays live ({@code ValueError} when {@code $levels < 1}).
+ * stays live ({@code ValueError} when {@code $levels < 1}). {@code str_getcsv}
+ * without an explicit {@code $escape} stays live (PHP 8.4+ omitted-escape DEP).
  */
 final class DiscardedPureCallElision
 {
@@ -70,6 +71,9 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureStringReplaceOrJoinNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureNumberFormatNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElideCountOnTypedArray($toCall, $callArgs)) {
@@ -460,10 +464,10 @@ final class DiscardedPureCallElision
     /**
      * Discarded {@code substr}/{@code str_repeat}/{@code strcmp}/{@code strpos}/
      * {@code strstr}/{@code strpbrk}/{@code str_contains}/{@code str_starts_with}/
-     * {@code str_ends_with}/… on typed string (+ numeric) args — php-src
-     * {@code string.c} Z_PARAM_STR / Z_PARAM_LONG family; soft null / int-needle
-     * deprecations / {@code __toString} stay live (peer
-     * {@see tryElidePureStringTransformNoSideEffect}).
+     * {@code str_ends_with}/{@code levenshtein}/… on typed string (+ numeric) args —
+     * php-src {@code string.c}/{@code levenshtein.c} Z_PARAM_STR / Z_PARAM_LONG
+     * family; soft null / int-needle deprecations / {@code __toString} stay live
+     * (peer {@see tryElidePureStringTransformNoSideEffect}).
      *
      * @param array<int, Variable> $callArgs
      */
@@ -516,6 +520,31 @@ final class DiscardedPureCallElision
                     && self::stringArgAllowsDiscardedElision($callArgs[0])
                     && $callArgs[1] instanceof Variable
                     && self::mathArgAllowsDiscardedElision($callArgs[1]);
+            case 'levenshtein':
+                if (!isset($callArgs[0], $callArgs[1])) {
+                    return false;
+                }
+                if (
+                    !$callArgs[0] instanceof Variable
+                    || !self::stringArgAllowsDiscardedElision($callArgs[0])
+                    || !$callArgs[1] instanceof Variable
+                    || !self::stringArgAllowsDiscardedElision($callArgs[1])
+                ) {
+                    return false;
+                }
+                for ($i = 2, $n = count($callArgs); $i < $n; ++$i) {
+                    if ($i > 4) {
+                        return false;
+                    }
+                    if (
+                        !$callArgs[$i] instanceof Variable
+                        || !self::mathArgAllowsDiscardedElision($callArgs[$i])
+                    ) {
+                        return false;
+                    }
+                }
+
+                return true;
             case 'strncmp':
             case 'strncasecmp':
                 if (!isset($callArgs[0], $callArgs[1], $callArgs[2])) {
@@ -600,10 +629,10 @@ final class DiscardedPureCallElision
 
     /**
      * Discarded {@code str_pad}/{@code chunk_split}/{@code wordwrap}/
-     * {@code str_split}/{@code explode} on typed string (+ numeric) args —
-     * php-src {@code string.c} Z_PARAM_STR / Z_PARAM_LONG family; soft null /
-     * {@code __toString} stay live (peer
-     * {@see tryElidePureStringSliceOrCompareNoSideEffect}).
+     * {@code str_split}/{@code explode}/{@code str_getcsv} on typed string
+     * (+ numeric) args — php-src {@code string.c}/{@code file.c} Z_PARAM_STR /
+     * Z_PARAM_LONG family; soft null / {@code __toString} stay live.
+     * {@code str_getcsv} without an explicit escape stays live (PHP 8.4+ DEP).
      *
      * @param array<int, Variable> $callArgs
      */
@@ -743,6 +772,23 @@ final class DiscardedPureCallElision
 
                 return $callArgs[2] instanceof Variable
                     && self::mathArgAllowsDiscardedElision($callArgs[2]);
+            case 'str_getcsv':
+                // All four strings required — omitted $escape DEP (php-src 8.4+).
+                if (
+                    !isset($callArgs[0], $callArgs[1], $callArgs[2], $callArgs[3])
+                    || isset($callArgs[4])
+                ) {
+                    return false;
+                }
+
+                return $callArgs[0] instanceof Variable
+                    && self::stringArgAllowsDiscardedElision($callArgs[0])
+                    && $callArgs[1] instanceof Variable
+                    && self::stringArgAllowsDiscardedElision($callArgs[1])
+                    && $callArgs[2] instanceof Variable
+                    && self::stringArgAllowsDiscardedElision($callArgs[2])
+                    && $callArgs[3] instanceof Variable
+                    && self::stringArgAllowsDiscardedElision($callArgs[3]);
             default:
                 return false;
         }
@@ -825,6 +871,65 @@ final class DiscardedPureCallElision
             default:
                 return false;
         }
+    }
+
+    /**
+     * Discarded {@code number_format} on already-numeric args (+ optional typed
+     * decimals / nullable separators) — php-src {@code number_format.c}. Soft-null
+     * num/decimals stay live (deprecate).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureNumberFormatNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if (!NoThrowCallElision::isPureNumberFormatBuiltin(strtolower($toCall->getName()))) {
+            return false;
+        }
+
+        return self::numberFormatArgsAllowDiscardedElision($callArgs);
+    }
+
+    /**
+     * @param array<int, Variable> $callArgs
+     */
+    private static function numberFormatArgsAllowDiscardedElision(array $callArgs): bool
+    {
+        if (
+            !isset($callArgs[0])
+            || !$callArgs[0] instanceof Variable
+            || !self::mathArgAllowsDiscardedElision($callArgs[0])
+        ) {
+            return false;
+        }
+        if (!isset($callArgs[1])) {
+            return true;
+        }
+        if (
+            !$callArgs[1] instanceof Variable
+            || !self::mathArgAllowsDiscardedElision($callArgs[1])
+        ) {
+            return false;
+        }
+        for ($i = 2; $i <= 3; ++$i) {
+            if (!isset($callArgs[$i])) {
+                return true;
+            }
+            if (
+                !$callArgs[$i] instanceof Variable
+                || !(
+                    self::stringArgAllowsDiscardedElision($callArgs[$i])
+                    || Variable::TYPE_NULL === $callArgs[$i]->type
+                    || $callArgs[$i]->isNullConstant
+                )
+            ) {
+                return false;
+            }
+        }
+
+        return !isset($callArgs[4]);
     }
 
     /**
