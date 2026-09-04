@@ -19,6 +19,7 @@ use PHPCompiler\ext\standard\bindec;
 use PHPCompiler\ext\standard\checkdate;
 use PHPCompiler\ext\standard\chr;
 use PHPCompiler\ext\standard\chunk_split;
+use PHPCompiler\ext\standard\class_exists_;
 use PHPCompiler\ext\standard\convert_uuencode;
 use PHPCompiler\ext\standard\crc32;
 use PHPCompiler\ext\standard\decbin;
@@ -30,6 +31,7 @@ use PHPCompiler\ext\standard\escapeshellarg;
 use PHPCompiler\ext\standard\escapeshellcmd;
 use PHPCompiler\ext\standard\explode;
 use PHPCompiler\ext\standard\extension_loaded;
+use PHPCompiler\ext\standard\enum_exists_;
 use PHPCompiler\ext\standard\fdiv;
 use PHPCompiler\ext\standard\fmax;
 use PHPCompiler\ext\standard\fmin;
@@ -49,6 +51,7 @@ use PHPCompiler\ext\standard\int_min;
 use PHPCompiler\ext\standard\intval;
 use PHPCompiler\ext\standard\inet_ntop;
 use PHPCompiler\ext\standard\inet_pton;
+use PHPCompiler\ext\standard\interface_exists_;
 use PHPCompiler\ext\standard\ip2long;
 use PHPCompiler\ext\standard\levenshtein;
 use PHPCompiler\ext\standard\long2ip;
@@ -95,6 +98,7 @@ use PHPCompiler\ext\standard\strtr;
 use PHPCompiler\ext\standard\strval;
 use PHPCompiler\ext\standard\substr;
 use PHPCompiler\ext\standard\substr_replace;
+use PHPCompiler\ext\standard\trait_exists_;
 use PHPCompiler\ext\standard\ucwords;
 use PHPCompiler\ext\standard\urldecode;
 use PHPCompiler\ext\standard\urlencode;
@@ -1927,6 +1931,117 @@ final class DiscardedPureCallElisionTest extends TestCase
             $context,
             new property_exists_(),
             [$obj, $long]
+        ));
+    }
+
+    public function testDiscardedClassExistsFamilyElidesOnlyWithFalseAutoload(): void
+    {
+        $context = $this->makeContext();
+        $name = $this->makeStringVar('stdClass');
+        $lit = $this->makeStringVar('Traversable');
+        $false = $this->makeCompileTimeLongVar(0);
+        $true = $this->makeCompileTimeLongVar(1);
+        $falseBool = $this->makeNativeBoolVar();
+        $falseBool->compileTimeLong = 0;
+        $trueBool = $this->makeNativeBoolVar();
+        $trueBool->compileTimeLong = 1;
+        $dynBool = $this->makeNativeBoolVar();
+        $null = $this->makeNullVar();
+        $box = $this->makeValueBoxVar();
+        $ht = $this->makeHashtableVar();
+        $long = $this->makeNativeLongVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new class_exists_(),
+            [$name, $false]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new class_exists_(),
+            [$lit, $falseBool]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new interface_exists_(),
+            [$name, $false]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new trait_exists_(),
+            [$name, $falseBool]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new enum_exists_(),
+            [$lit, $false]
+        ));
+
+        // Default autoload=true — stay live.
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new class_exists_(),
+            [$name]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new class_exists_(),
+            [$name, $true]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new class_exists_(),
+            [$name, $trueBool]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new class_exists_(),
+            [$name, $dynBool]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new class_exists_(),
+            [$name, $null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new class_exists_(),
+            [$null, $false]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new class_exists_(),
+            [$box, $false]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new class_exists_(),
+            [$ht, $false]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new class_exists_(),
+            [$long, $false]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new interface_exists_(),
+            [$name, $true]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new trait_exists_(),
+            [$name]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new enum_exists_(),
+            [$name, $null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new class_exists_(),
+            [$name, $false, $lit]
         ));
     }
 
