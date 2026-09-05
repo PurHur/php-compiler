@@ -420,6 +420,16 @@ final class NoThrowCallElision
             // soft-null bool deprecates; excess argc is ArgumentCountError.
             return self::clockGetterRuntimeInfoArgsCannotThrow($callArgs);
         }
+        if (self::isPureCivilDateGetterRuntimeInfoBuiltin($name)) {
+            // getdate / localtime / idate — optional typed timestamp; idate
+            // needs a proven one-char format; soft-null deprecates; excess
+            // argc is ArgumentCountError.
+            return self::civilDateGetterRuntimeInfoArgsCannotThrow($name, $callArgs);
+        }
+        if (self::isPureRandmaxRuntimeInfoBuiltin($name)) {
+            // getrandmax / mt_getrandmax — arity 0 only.
+            return self::zeroArgRuntimeInfoArgsCannotThrow($callArgs);
+        }
         if (self::isPureVersionCompareBuiltin($name)) {
             // versioning.c — typed strings; optional operator must be proven valid.
             return self::versionCompareArgsCannotThrow($callArgs);
@@ -1407,6 +1417,43 @@ final class NoThrowCallElision
     }
 
     /**
+     * Civil date getters — php-src {@code ext/date/php_date.c}
+     * ({@code getdate}/{@code idate}), {@code ext/standard/datetime.c}
+     * ({@code localtime}). Soft-null timestamp / format deprecates; idate
+     * warns on non-one-char / unrecognized format; excess argc is
+     * {@code ArgumentCountError}. Public for {@see DiscardedPureCallElision}
+     * (#36386).
+     */
+    public static function isPureCivilDateGetterRuntimeInfoBuiltin(string $nameLc): bool
+    {
+        switch ($nameLc) {
+            case 'getdate':
+            case 'localtime':
+            case 'idate':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * MT rand upper-bound constants — php-src {@code ext/random/random.c}
+     * ({@code getrandmax}/{@code mt_getrandmax}). Arity 0 only; excess argc is
+     * {@code ArgumentCountError}. Public for {@see DiscardedPureCallElision}
+     * (#36386).
+     */
+    public static function isPureRandmaxRuntimeInfoBuiltin(string $nameLc): bool
+    {
+        switch ($nameLc) {
+            case 'getrandmax':
+            case 'mt_getrandmax':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
      * php-src {@code ext/standard/versioning.c} {@code version_compare}. Public
      * for {@see DiscardedPureCallElision} (#36386).
      */
@@ -2054,6 +2101,130 @@ final class NoThrowCallElision
         }
 
         return self::numericParamBuiltinArgCannotThrow($callArgs[0]);
+    }
+
+    /**
+     * {@code getdate}: arity 0 or one typed/long-coercible timestamp.
+     * {@code localtime}: arity 0..2 (timestamp + optional associative bool).
+     * {@code idate}: format string proven as a valid one-char token, plus
+     * optional typed timestamp. Soft-null args do not throw (deprecate /
+     * warning paths stay observable for discarded elision separately).
+     * Public for {@see DiscardedPureCallElision} (#36386).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    public static function civilDateGetterRuntimeInfoArgsCannotThrow(
+        string $nameLc,
+        array $callArgs
+    ): bool {
+        switch ($nameLc) {
+            case 'getdate':
+                if ([] === $callArgs) {
+                    return true;
+                }
+                if (
+                    !isset($callArgs[0])
+                    || !$callArgs[0] instanceof Variable
+                    || isset($callArgs[1])
+                ) {
+                    return false;
+                }
+
+                return self::numericParamBuiltinArgCannotThrow($callArgs[0]);
+            case 'localtime':
+                if ([] === $callArgs) {
+                    return true;
+                }
+                if (
+                    !isset($callArgs[0])
+                    || !$callArgs[0] instanceof Variable
+                    || isset($callArgs[2])
+                ) {
+                    return false;
+                }
+                if (!self::numericParamBuiltinArgCannotThrow($callArgs[0])) {
+                    return false;
+                }
+                if (!isset($callArgs[1])) {
+                    return true;
+                }
+
+                return $callArgs[1] instanceof Variable
+                    && self::numericParamBuiltinArgCannotThrow($callArgs[1]);
+            case 'idate':
+                if (
+                    !isset($callArgs[0])
+                    || !$callArgs[0] instanceof Variable
+                    || isset($callArgs[2])
+                ) {
+                    return false;
+                }
+                if (!self::idateFormatArgCannotThrow($callArgs[0])) {
+                    return false;
+                }
+                if (!isset($callArgs[1])) {
+                    return true;
+                }
+
+                return $callArgs[1] instanceof Variable
+                    && self::numericParamBuiltinArgCannotThrow($callArgs[1]);
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Compile-time one-char idate format that php-src {@code php_idate()}
+     * accepts without warning ({@code ext/date/php_date.c}).
+     */
+    public static function isValidIdateFormatLiteral(string $format): bool
+    {
+        if (1 !== \strlen($format)) {
+            return false;
+        }
+        switch ($format) {
+            case 'B':
+            case 'd':
+            case 'j':
+            case 'h':
+            case 'g':
+            case 'H':
+            case 'i':
+            case 'I':
+            case 'L':
+            case 'm':
+            case 'n':
+            case 'N':
+            case 's':
+            case 't':
+            case 'U':
+            case 'w':
+            case 'W':
+            case 'y':
+            case 'Y':
+            case 'z':
+            case 'o':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * @param Variable $arg
+     */
+    private static function idateFormatArgCannotThrow(Variable $arg): bool
+    {
+        $lit = JitStringArg::compileTimeLiteral($arg);
+        if (null === $lit) {
+            // Soft-null / typed string may warn at runtime — still no user
+            // throw-pending for NoThrow instrumentation.
+            return self::stringParamBuiltinArgCannotThrow($arg)
+                || $arg->isNullConstant
+                || Variable::TYPE_NULL === $arg->type;
+        }
+
+        return self::isValidIdateFormatLiteral($lit);
     }
 
     /**

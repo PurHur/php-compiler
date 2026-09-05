@@ -63,12 +63,14 @@ use PHPCompiler\ext\standard\get_included_files_;
 use PHPCompiler\ext\standard\get_loaded_extensions;
 use PHPCompiler\ext\standard\get_parent_class_;
 use PHPCompiler\ext\standard\getcwd_;
+use PHPCompiler\ext\standard\getdate;
 use PHPCompiler\ext\standard\gethostname;
 use PHPCompiler\ext\standard\getlastmod;
 use PHPCompiler\ext\standard\getmygid;
 use PHPCompiler\ext\standard\getmyinode;
 use PHPCompiler\ext\standard\getmypid;
 use PHPCompiler\ext\standard\getmyuid;
+use PHPCompiler\ext\standard\getrandmax;
 use PHPCompiler\ext\standard\getrusage;
 use PHPCompiler\ext\standard\gc_enabled;
 use PHPCompiler\ext\standard\gc_status;
@@ -88,6 +90,7 @@ use PHPCompiler\ext\standard\htmlspecialchars;
 use PHPCompiler\ext\standard\htmlspecialchars_decode;
 use PHPCompiler\ext\standard\http_get_last_response_headers;
 use PHPCompiler\ext\standard\http_response_code;
+use PHPCompiler\ext\standard\idate;
 use PHPCompiler\ext\standard\ignore_user_abort;
 use PHPCompiler\ext\standard\int_max;
 use PHPCompiler\ext\standard\int_min;
@@ -102,6 +105,7 @@ use PHPCompiler\ext\standard\json_last_error_;
 use PHPCompiler\ext\standard\json_last_error_msg_;
 use PHPCompiler\ext\standard\levenshtein;
 use PHPCompiler\ext\standard\localeconv;
+use PHPCompiler\ext\standard\localtime;
 use PHPCompiler\ext\standard\long2ip;
 use PHPCompiler\ext\standard\memory_get_peak_usage;
 use PHPCompiler\ext\standard\memory_get_usage;
@@ -109,6 +113,7 @@ use PHPCompiler\ext\standard\method_exists_;
 use PHPCompiler\ext\standard\md5;
 use PHPCompiler\ext\standard\metaphone;
 use PHPCompiler\ext\standard\microtime;
+use PHPCompiler\ext\standard\mt_getrandmax;
 use PHPCompiler\ext\standard\nl2br;
 use PHPCompiler\ext\standard\number_format;
 use PHPCompiler\ext\standard\ob_get_contents;
@@ -3299,6 +3304,128 @@ final class DiscardedPureCallElisionTest extends TestCase
             $context,
             new gettimeofday(),
             [$str]
+        ));
+    }
+
+    public function testDiscardedCivilDateGetterAndRandmaxRuntimeInfoElides(): void
+    {
+        // php-src php_date.c / datetime.c / random.c (#36386).
+        $context = $this->makeContext();
+        $bool = $this->makeNativeBoolVar();
+        $long = $this->makeNativeLongVar();
+        $null = $this->makeNullVar();
+        $str = $this->makeStringVar('s');
+        $fmt = $this->makeStringVar('Y');
+        $badFmt = $this->makeStringVar('Z');
+        $longFmt = $this->makeStringVar('YY');
+        $typedFmt = $this->makeStringVar(null);
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new getdate(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new getdate(),
+            [$long]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new localtime(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new localtime(),
+            [$long]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new localtime(),
+            [$long, $bool]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new idate(),
+            [$fmt]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new idate(),
+            [$fmt, $long]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new getrandmax(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new mt_getrandmax(),
+            []
+        ));
+
+        // Soft-null / bad idate format / excess argc stay live.
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new getdate(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new localtime(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new localtime(),
+            [$long, $null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new idate(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new idate(),
+            [$badFmt]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new idate(),
+            [$longFmt]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new idate(),
+            [$typedFmt]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new getdate(),
+            [$long, $bool]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new localtime(),
+            [$long, $bool, $str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new idate(),
+            [$fmt, $long, $bool]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new getrandmax(),
+            [$long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new mt_getrandmax(),
+            [$null]
         ));
     }
 
