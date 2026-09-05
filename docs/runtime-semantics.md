@@ -8,21 +8,26 @@ Numbered ownership invariants. php-src: [Zend/zend_gc.c](https://github.com/php/
 
 | Id | Invariant | Who | When it fires |
 |----|-----------|-----|----------------|
-| **M1** | `refcount > 0` before `__ref__delref` decrements a counted header | `__ref__delref` | Double-delref or underflow; abort prints `PHPC_RUNTIME_ASSERT M1` |
+| **M1** | Under ASSERT: `rc < 0` aborts; `rc == 0` delref is unclaimed no-op (#36252) | `__ref__delref` | Underflow/corruption → `PHPC_RUNTIME_ASSERT M1`; fresh rc=0 containers are not M1 |
 | **M2** | Immortal / non-refcounted headers (`TYPE_INFO_REFCOUNTED` clear) must not take the counted delref path | `__ref__delref` early return | Literal strings, interned keys |
 | **M3** | `__ref__addref` / `__ref__delref` own the count; callers never store `refcount` except init | lowering | Boxed temps, hashtable keys, objects |
 | **M4** | `{main}` may defer object free (`phpc_destruct_delref_allowed`) but still unregisters GC / WeakRef at rc 0 | `__ref__delref` | Request-lifetime objects (#4013) |
-| **M5** | Separate before writing a shared container (`rc > 1`) | `__ref__separate` | Arrays/strings COW |
+| **M5** | Separate before writing a shared container (`rc > 1`) | `__ref__assert_exclusive` / `__ref__separate` | Arrays/strings COW; abort `PHPC_RUNTIME_ASSERT M5` |
 | **M6** | Helper-unit objects must not mix NestedJIT vs Runtime ABI for the same symbol | helper cache | leftover `*.1` symbols (#31894) |
 | **M7** | GC roots are objects whose rc hit 1 (`phpc_gc_register`); collector must not read after free | `GcCollectCyclesRuntime` | cyclic graphs (#36245) |
 
-Enable M1 in IR:
+Enable M1/M5 in IR:
 
 ```bash
 ./script/docker-exec.sh -- bash -lc 'source script/php-env.sh && PHP_COMPILER_RUNTIME_ASSERT=1 PHP_COMPILER_HELPER_RUNTIME_O=0 php bin/compile.php -o /tmp/x FILE.php'
 ```
 
-Injected double-delref (unit test only): `PHP_COMPILER_RUNTIME_ASSERT_INJECT_DOUBLE_DELREF=1` calls `phpc_runtime_assert_inject_double_delref` (malloc counted header at rc 0, one delref) before `{main}`.
+Injected probes (unit test only):
+
+- `PHP_COMPILER_RUNTIME_ASSERT_INJECT_DOUBLE_DELREF=1` → `phpc_runtime_assert_inject_double_delref` (malloc counted header, store rc=-1, one delref) before `{main}` → **M1**.
+- `PHP_COMPILER_RUNTIME_ASSERT_INJECT_SHARED_WRITE=1` → `phpc_runtime_assert_inject_shared_write` (init counted header, store rc=2, then `__ref__assert_exclusive`) before `{main}` → **M5**.
+
+`__ref__assert_exclusive` aborts with **M5** when a counted header still has `rc > 1` (php-src `SEPARATE_ZVAL_IF_NOT_REF` / `SEPARATE_ARRAY` in [Zend/zend_variables.h](https://github.com/php/php-src/blob/master/Zend/zend_variables.h)). Fresh containers may sit at rc=0 until the first owner addref (#36252); that is not M1.
 
 ### ASan / valgrind smoke (#36397)
 
@@ -35,11 +40,13 @@ RUNTIME_ASSERT_ASAN_FULL=1 ./script/runtime-assert/asan-smoke.sh  # 8 inline aot
 ./script/runtime-assert/streak.sh status       # dual consecutive days (empty ≠ pass)
 ./script/runtime-assert/streak.sh record       # append UTC day only after real green smokes
 ./script/runtime-assert/streak.sh check        # fail unless STREAK_NEED (default 7) dual days
+./script/runtime-assert/differential-soak.sh   # COW churn under ASan (--repeat 10); weekly soak path
 make runtime-assert-asan-smoke
 make runtime-assert-streak-status
+make runtime-assert-differential-soak
 ```
 
-Do **not** wrap ASan binaries in GNU `timeout(1)` — it races ASan signal handling and reports false "dumped core". Link with `PHP_COMPILER_ASAN=1` also suppresses `-s` strip (`AotGcSections::stripAtLink`) so ASan metadata survives. Full 8-case ASan under Docker `--memory=8g` can still SIGSEGV intermittently (shadow/quarantine pressure) — that is tracked here, not silenced by restamping. Streak ledger: `test/runtime-assert/STREAK.json` via `streak.sh` (append UTC days from a scheduled host that has valgrind). An empty ledger is not a pass; `SKIP_NO_VALGRIND` must not append `valgrind_ok_days`. Differential soak case: `test/differential/cases/refcount_cow_churn_36397.php` (`@differential-repeat: 10`).
+Do **not** wrap ASan binaries in GNU `timeout(1)` — it races ASan signal handling and reports false "dumped core". Link with `PHP_COMPILER_ASAN=1` also suppresses `-s` strip (`AotGcSections::stripAtLink`) so ASan metadata survives. Full 8-case ASan under Docker `--memory=8g` can still SIGSEGV intermittently (shadow/quarantine pressure) — that is tracked here, not silenced by restamping. Streak ledger: `test/runtime-assert/STREAK.json` via `streak.sh` (append UTC days from a scheduled host that has valgrind). An empty ledger is not a pass; `SKIP_NO_VALGRIND` must not append `valgrind_ok_days`. Differential soak case: `test/differential/cases/refcount_cow_churn_36397.php` (`@differential-repeat: 10`); run under ASan via `script/runtime-assert/differential-soak.sh`.
 
 ## Undefined array keys ([#273](https://github.com/PurHur/php-compiler/issues/273))
 

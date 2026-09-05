@@ -3436,8 +3436,12 @@ class Context {
                 $emitInStandaloneMain(fn () => Builtin\ObjectHandleRuntime::emitSnapBaselineForStandaloneMain($this));
             }
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType
-                && \PHPCompiler\JIT\Builtin\Refcount::runtimeAssertInjectEnabled()) {
+                && \PHPCompiler\JIT\Builtin\Refcount::runtimeAssertInjectDoubleDelrefEnabled()) {
                 $emitInStandaloneMain(fn () => \PHPCompiler\JIT\Builtin\Refcount::emitInjectDoubleDelrefCall($this));
+            }
+            if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType
+                && \PHPCompiler\JIT\Builtin\Refcount::runtimeAssertInjectSharedWriteEnabled()) {
+                $emitInStandaloneMain(fn () => \PHPCompiler\JIT\Builtin\Refcount::emitInjectSharedWriteCall($this));
             }
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType
                 && !$this->shouldSkipStandaloneMainEnvProbeGate()) {

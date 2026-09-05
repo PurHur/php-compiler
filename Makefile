@@ -111,7 +111,7 @@ test-docker-fast-jit-preflight: docker-build-22
 	JIT_PREFLIGHT_GATE=1 ./script/docker-ci-local.sh fast
 
 # VM smoke: examples/001-SimpleWeb with ?name=Test
-.PHONY: check web-smoke miniwebapp-gates miniwebapp-aot-bisect north-star1-verify north-star2-verify north-star3-verify north-star4-verify north-star5-verify north-star5-verify-fast dev-verify-fast aot-smoke-cross-emit runtime-assert-asan-smoke runtime-assert-valgrind-smoke runtime-assert-streak-status runtime-assert-streak-record runtime-assert-streak-check bootstrap-trust-preflight release-readiness bootstrap-gen0-staleness bootstrap-gen0-driver-functional-smoke bootstrap-gen0-refresh-argv-driver bootstrap-vendor-native-rebuild-audit spine-chunk-probe bootstrap-gen0-chunk-emit bootstrap-gen0-chunks apps-scoreboard php-src-phpt-sample
+.PHONY: check web-smoke miniwebapp-gates miniwebapp-aot-bisect north-star1-verify north-star2-verify north-star3-verify north-star4-verify north-star5-verify north-star5-verify-fast dev-verify-fast aot-smoke-cross-emit runtime-assert-asan-smoke runtime-assert-valgrind-smoke runtime-assert-streak-status runtime-assert-streak-record runtime-assert-streak-check runtime-assert-differential-soak bootstrap-trust-preflight release-readiness bootstrap-gen0-staleness bootstrap-gen0-driver-functional-smoke bootstrap-gen0-refresh-argv-driver bootstrap-vendor-native-rebuild-audit spine-chunk-probe bootstrap-gen0-chunk-emit bootstrap-gen0-chunks apps-scoreboard php-src-phpt-sample
 web-smoke:
 	./script/web-smoke.sh
 
@@ -161,7 +161,7 @@ aot-smoke-cross-emit:
 	./script/aot-smoke-cross-emit.sh $(ARGS)
 
 # Memory-safety link smokes (#36397) — ASan requires host clang/gcc, not raw ld.
-.PHONY: runtime-assert-asan-smoke runtime-assert-valgrind-smoke runtime-assert-streak-status runtime-assert-streak-record runtime-assert-streak-check
+.PHONY: runtime-assert-asan-smoke runtime-assert-valgrind-smoke runtime-assert-streak-status runtime-assert-streak-record runtime-assert-streak-check runtime-assert-differential-soak
 runtime-assert-asan-smoke:
 	./script/runtime-assert/asan-smoke.sh
 runtime-assert-valgrind-smoke:
@@ -172,6 +172,8 @@ runtime-assert-streak-record:
 	./script/runtime-assert/streak.sh record
 runtime-assert-streak-check:
 	./script/runtime-assert/streak.sh check
+runtime-assert-differential-soak:
+	./script/runtime-assert/differential-soak.sh
 
 # Default pre-PR gate (~90s): trust preflight + gen-0 smoke + aot-smoke + VM differential tier-0 (#36211).
 check: dev-verify-fast
