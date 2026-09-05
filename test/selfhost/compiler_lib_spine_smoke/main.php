@@ -5396,6 +5396,7 @@ require_once __DIR__.'/../../../lib/JIT/Concern/CompileJumpIf.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileClassConstFetch.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileReturn.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileAssignRef.php';
+require_once __DIR__.'/../../../lib/JIT/Concern/CompileArgRecv.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompilePow.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileCast.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileInitArray.php';
