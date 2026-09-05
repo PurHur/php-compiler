@@ -60,6 +60,9 @@ use PHPCompiler\VM\Variable as VmVariable;
  * live — ArgumentCountError),
  * php_ini_loaded_file / php_ini_scanned_files / gc_enabled (zero-arg;
  * excess argc stays live — ArgumentCountError),
+ * sys_get_temp_dir / getcwd / get_include_path / ob_get_level /
+ * connection_status / connection_aborted / session_status / localeconv /
+ * gc_status (zero-arg; excess argc stays live — ArgumentCountError),
  * zero-arg pi, type.c predicates + gettype/get_debug_type, ctype.c
  * classifiers on typed/literal strings, typed-array count/sizeof, math.c
  * incl. pow/fpow/fdiv on already-numeric args, empty void user functions).
@@ -120,7 +123,11 @@ use PHPCompiler\VM\Variable as VmVariable;
  * {@code memory_get_usage}/{@code memory_get_peak_usage} bool stays live
  * (deprecate / TypeError); excess argc stays live; non-zero-arg
  * {@code php_ini_loaded_file}/{@code php_ini_scanned_files}/
- * {@code gc_enabled} stay live ({@code ArgumentCountError}).
+ * {@code gc_enabled} stay live ({@code ArgumentCountError}). Non-zero-arg
+ * {@code sys_get_temp_dir}/{@code getcwd}/{@code get_include_path}/
+ * {@code ob_get_level}/{@code connection_status}/{@code connection_aborted}/
+ * {@code session_status}/{@code localeconv}/{@code gc_status} stay live
+ * ({@code ArgumentCountError}).
  */
 final class DiscardedPureCallElision
 {
@@ -229,6 +236,9 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureMemoryIniRuntimeInfoNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureEnvPathRequestRuntimeInfoNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureVersionCompareNoSideEffect($toCall, $callArgs)) {
@@ -1570,6 +1580,27 @@ final class DiscardedPureCallElision
     }
 
     /**
+     * Discarded {@code sys_get_temp_dir}/{@code getcwd}/{@code get_include_path}/
+     * {@code ob_get_level}/{@code connection_status}/{@code connection_aborted}/
+     * {@code session_status}/{@code localeconv}/{@code gc_status} — php-src
+     * file/dir/basic_functions/output/session/locale/GC introspection reads.
+     * Excess argc stays live ({@code ArgumentCountError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureEnvPathRequestRuntimeInfoNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if (!NoThrowCallElision::isPureEnvPathRequestRuntimeInfoBuiltin(strtolower($toCall->getName()))) {
+            return false;
+        }
+
+        return self::envPathRequestRuntimeInfoArgsAllowDiscardedElision($callArgs);
+    }
+
+    /**
      * Discarded {@code version_compare} on typed / literal strings — php-src
      * {@code versioning.c}. Optional operator must be null or a compile-time
      * valid comparison op ({@code ValueError} otherwise).
@@ -2001,6 +2032,17 @@ final class DiscardedPureCallElision
             default:
                 return false;
         }
+    }
+
+    /**
+     * Exactly zero arguments — peer
+     * {@see NoThrowCallElision::envPathRequestRuntimeInfoArgsCannotThrow}.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function envPathRequestRuntimeInfoArgsAllowDiscardedElision(array $callArgs): bool
+    {
+        return NoThrowCallElision::envPathRequestRuntimeInfoArgsCannotThrow($callArgs);
     }
 
     /**

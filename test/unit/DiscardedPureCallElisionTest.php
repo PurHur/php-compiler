@@ -23,6 +23,8 @@ use PHPCompiler\ext\standard\class_exists_;
 use PHPCompiler\ext\standard\class_implements_;
 use PHPCompiler\ext\standard\class_parents_;
 use PHPCompiler\ext\standard\class_uses_;
+use PHPCompiler\ext\standard\connection_aborted;
+use PHPCompiler\ext\standard\connection_status;
 use PHPCompiler\ext\standard\convert_uuencode;
 use PHPCompiler\ext\standard\crc32;
 use PHPCompiler\ext\standard\decbin;
@@ -51,15 +53,18 @@ use PHPCompiler\ext\standard\get_declared_interfaces_;
 use PHPCompiler\ext\standard\get_declared_traits_;
 use PHPCompiler\ext\standard\get_defined_constants_;
 use PHPCompiler\ext\standard\get_defined_functions_;
+use PHPCompiler\ext\standard\get_include_path;
 use PHPCompiler\ext\standard\get_included_files_;
 use PHPCompiler\ext\standard\get_loaded_extensions;
 use PHPCompiler\ext\standard\get_parent_class_;
+use PHPCompiler\ext\standard\getcwd_;
 use PHPCompiler\ext\standard\getlastmod;
 use PHPCompiler\ext\standard\getmygid;
 use PHPCompiler\ext\standard\getmyinode;
 use PHPCompiler\ext\standard\getmypid;
 use PHPCompiler\ext\standard\getmyuid;
 use PHPCompiler\ext\standard\gc_enabled;
+use PHPCompiler\ext\standard\gc_status;
 use PHPCompiler\ext\standard\gettype;
 use PHPCompiler\ext\standard\hash_equals;
 use PHPCompiler\ext\standard\hebrev;
@@ -78,6 +83,7 @@ use PHPCompiler\ext\standard\ip2long;
 use PHPCompiler\ext\standard\is_a_;
 use PHPCompiler\ext\standard\is_subclass_of_;
 use PHPCompiler\ext\standard\levenshtein;
+use PHPCompiler\ext\standard\localeconv;
 use PHPCompiler\ext\standard\long2ip;
 use PHPCompiler\ext\standard\memory_get_peak_usage;
 use PHPCompiler\ext\standard\memory_get_usage;
@@ -86,6 +92,7 @@ use PHPCompiler\ext\standard\md5;
 use PHPCompiler\ext\standard\metaphone;
 use PHPCompiler\ext\standard\nl2br;
 use PHPCompiler\ext\standard\number_format;
+use PHPCompiler\ext\standard\ob_get_level;
 use PHPCompiler\ext\standard\octdec;
 use PHPCompiler\ext\standard\ord;
 use PHPCompiler\ext\standard\parse_url;
@@ -104,6 +111,7 @@ use PHPCompiler\ext\standard\quoted_printable_encode;
 use PHPCompiler\ext\standard\quotemeta;
 use PHPCompiler\ext\standard\rawurldecode;
 use PHPCompiler\ext\standard\rawurlencode;
+use PHPCompiler\ext\standard\session_status_;
 use PHPCompiler\ext\standard\sha1;
 use PHPCompiler\ext\standard\similar_text;
 use PHPCompiler\ext\standard\soundex;
@@ -131,6 +139,7 @@ use PHPCompiler\ext\standard\strtr;
 use PHPCompiler\ext\standard\strval;
 use PHPCompiler\ext\standard\substr;
 use PHPCompiler\ext\standard\substr_replace;
+use PHPCompiler\ext\standard\sys_get_temp_dir;
 use PHPCompiler\ext\standard\trait_exists_;
 use PHPCompiler\ext\standard\ucwords;
 use PHPCompiler\ext\standard\urldecode;
@@ -2730,6 +2739,108 @@ final class DiscardedPureCallElisionTest extends TestCase
         $this->assertFalse(DiscardedPureCallElision::tryElide(
             $context,
             new gc_enabled(),
+            [$null]
+        ));
+    }
+
+    public function testDiscardedEnvPathRequestRuntimeInfoElides(): void
+    {
+        // php-src file/dir/basic_functions/output/session/locale/GC (#36386).
+        $context = $this->makeContext();
+        $long = $this->makeNativeLongVar();
+        $null = $this->makeNullVar();
+        $str = $this->makeStringVar('s');
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new sys_get_temp_dir(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new getcwd_(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_include_path(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new ob_get_level(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new connection_status(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new connection_aborted(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new session_status_(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new localeconv(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new gc_status(),
+            []
+        ));
+
+        // Excess argc stays live (ArgumentCountError).
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new sys_get_temp_dir(),
+            [$str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new getcwd_(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_include_path(),
+            [$long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new ob_get_level(),
+            [$str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new connection_status(),
+            [$long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new connection_aborted(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new session_status_(),
+            [$str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new localeconv(),
+            [$long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new gc_status(),
             [$null]
         ));
     }
