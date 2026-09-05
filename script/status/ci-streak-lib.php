@@ -79,7 +79,12 @@ function ci_streak_load(string $path): array
  */
 function ci_streak_record(array $prev, string $sha, string $day, ?array $gates = null): array
 {
-    $gates = $gates ?? ['apply-patches', 'bootstrap-inventory', 'north-star5-verify-fast'];
+    $gates = $gates ?? [
+        'apply-patches',
+        'bootstrap-inventory',
+        'aot-smoke',
+        'north-star5-verify-fast',
+    ];
     $streak = (int) $prev['ci_green_streak_days'];
     $prevDay = (string) $prev['last_green_day'];
 

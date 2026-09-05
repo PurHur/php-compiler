@@ -55,4 +55,26 @@ final class CiStreakTest extends TestCase
         $next = ci_streak_record($prev, 'bbbbbbb', '2026-09-03');
         $this->assertSame($prev, $next);
     }
+
+    public function testRecordDefaultGatesIncludeAotSmoke(): void
+    {
+        require_once dirname(__DIR__, 2) . '/script/status/ci-streak-lib.php';
+        $next = ci_streak_record(ci_streak_defaults(), 'abcdef1', '2026-09-05');
+        $this->assertSame(
+            ['apply-patches', 'bootstrap-inventory', 'aot-smoke', 'north-star5-verify-fast'],
+            $next['gates']
+        );
+    }
+
+    public function testRecordAcceptsCustomGates(): void
+    {
+        require_once dirname(__DIR__, 2) . '/script/status/ci-streak-lib.php';
+        $next = ci_streak_record(
+            ci_streak_defaults(),
+            'abcdef1',
+            '2026-09-05',
+            ['apply-patches', 'aot-smoke']
+        );
+        $this->assertSame(['apply-patches', 'aot-smoke'], $next['gates']);
+    }
 }
