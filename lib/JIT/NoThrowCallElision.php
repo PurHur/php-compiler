@@ -383,6 +383,13 @@ final class NoThrowCallElision
             // bool deprecates / TypeErrors; excess argc is ArgumentCountError.
             return self::memoryIniRuntimeInfoArgsCannotThrow($name, $callArgs);
         }
+        if (self::isPureEnvPathRequestRuntimeInfoBuiltin($name)) {
+            // sys_get_temp_dir / getcwd / get_include_path / ob_get_level /
+            // connection_status / connection_aborted / session_status /
+            // localeconv / gc_status — arity 0 only; excess args are
+            // ArgumentCountError.
+            return self::envPathRequestRuntimeInfoArgsCannotThrow($callArgs);
+        }
         if (self::isPureVersionCompareBuiltin($name)) {
             // versioning.c — typed strings; optional operator must be proven valid.
             return self::versionCompareArgsCannotThrow($callArgs);
@@ -1232,6 +1239,37 @@ final class NoThrowCallElision
     }
 
     /**
+     * Zero-arg env / cwd / include_path / output-buffer / connection / session /
+     * locale / GC-status reads — php-src {@code ext/standard/file.c}
+     * ({@code sys_get_temp_dir}), {@code ext/standard/dir.c} ({@code getcwd}),
+     * {@code ext/standard/basic_functions.c} ({@code get_include_path}/
+     * {@code connection_status}/{@code connection_aborted}),
+     * {@code ext/standard/output.c} ({@code ob_get_level}),
+     * {@code ext/session/session.c} ({@code session_status}),
+     * {@code ext/standard/locale.c} ({@code localeconv}),
+     * {@code Zend/zend_builtin_functions.c} ({@code gc_status}). Excess argc is
+     * {@code ArgumentCountError}. Public for {@see DiscardedPureCallElision}
+     * (#36386).
+     */
+    public static function isPureEnvPathRequestRuntimeInfoBuiltin(string $nameLc): bool
+    {
+        switch ($nameLc) {
+            case 'sys_get_temp_dir':
+            case 'getcwd':
+            case 'get_include_path':
+            case 'ob_get_level':
+            case 'connection_status':
+            case 'connection_aborted':
+            case 'session_status':
+            case 'localeconv':
+            case 'gc_status':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
      * php-src {@code ext/standard/versioning.c} {@code version_compare}. Public
      * for {@see DiscardedPureCallElision} (#36386).
      */
@@ -1747,6 +1785,17 @@ final class NoThrowCallElision
             default:
                 return false;
         }
+    }
+
+    /**
+     * Exactly zero arguments — peer {@see zeroArgRuntimeInfoArgsCannotThrow}.
+     * Excess argc is {@code ArgumentCountError}.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    public static function envPathRequestRuntimeInfoArgsCannotThrow(array $callArgs): bool
+    {
+        return self::zeroArgRuntimeInfoArgsCannotThrow($callArgs);
     }
 
     /**
