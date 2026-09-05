@@ -23,10 +23,12 @@ use PHPCompiler\ext\standard\class_exists_;
 use PHPCompiler\ext\standard\class_implements_;
 use PHPCompiler\ext\standard\class_parents_;
 use PHPCompiler\ext\standard\class_uses_;
+use PHPCompiler\ext\standard\cli_get_process_title;
 use PHPCompiler\ext\standard\connection_aborted;
 use PHPCompiler\ext\standard\connection_status;
 use PHPCompiler\ext\standard\convert_uuencode;
 use PHPCompiler\ext\standard\crc32;
+use PHPCompiler\ext\standard\date_default_timezone_get;
 use PHPCompiler\ext\standard\decbin;
 use PHPCompiler\ext\standard\dechex;
 use PHPCompiler\ext\standard\decoct;
@@ -88,6 +90,8 @@ use PHPCompiler\ext\standard\interface_exists_;
 use PHPCompiler\ext\standard\ip2long;
 use PHPCompiler\ext\standard\is_a_;
 use PHPCompiler\ext\standard\is_subclass_of_;
+use PHPCompiler\ext\standard\json_last_error_;
+use PHPCompiler\ext\standard\json_last_error_msg_;
 use PHPCompiler\ext\standard\levenshtein;
 use PHPCompiler\ext\standard\localeconv;
 use PHPCompiler\ext\standard\long2ip;
@@ -110,6 +114,8 @@ use PHPCompiler\ext\standard\php_ini_scanned_files;
 use PHPCompiler\ext\standard\php_sapi_name;
 use PHPCompiler\ext\standard\php_uname;
 use PHPCompiler\ext\standard\phpversion;
+use PHPCompiler\ext\standard\preg_last_error_;
+use PHPCompiler\ext\standard\preg_last_error_msg_;
 use PHPCompiler\ext\standard\property_exists_;
 use PHPCompiler\ext\standard\pi;
 use PHPCompiler\ext\standard\pow;
@@ -126,6 +132,9 @@ use PHPCompiler\ext\standard\soundex;
 use PHPCompiler\ext\standard\spl_object_hash;
 use PHPCompiler\ext\standard\spl_object_id;
 use PHPCompiler\ext\standard\sqrt;
+use PHPCompiler\ext\standard\stream_get_filters;
+use PHPCompiler\ext\standard\stream_get_transports;
+use PHPCompiler\ext\standard\stream_get_wrappers;
 use PHPCompiler\ext\standard\str_contains;
 use PHPCompiler\ext\standard\str_ends_with;
 use PHPCompiler\ext\standard\str_getcsv;
@@ -148,6 +157,7 @@ use PHPCompiler\ext\standard\strval;
 use PHPCompiler\ext\standard\substr;
 use PHPCompiler\ext\standard\substr_replace;
 use PHPCompiler\ext\standard\sys_get_temp_dir;
+use PHPCompiler\ext\standard\timezone_version_get;
 use PHPCompiler\ext\standard\trait_exists_;
 use PHPCompiler\ext\standard\ucwords;
 use PHPCompiler\ext\standard\urldecode;
@@ -2952,6 +2962,118 @@ final class DiscardedPureCallElisionTest extends TestCase
         $this->assertFalse(DiscardedPureCallElision::tryElide(
             $context,
             new headers_list(),
+            [$str]
+        ));
+    }
+
+    public function testDiscardedJsonPregTzStreamCliRuntimeInfoElides(): void
+    {
+        // php-src json / pcre / date / streams / cli_ops (#36386).
+        $context = $this->makeContext();
+        $long = $this->makeNativeLongVar();
+        $null = $this->makeNullVar();
+        $str = $this->makeStringVar('s');
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new json_last_error_(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new json_last_error_msg_(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new preg_last_error_(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new preg_last_error_msg_(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new date_default_timezone_get(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new timezone_version_get(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new stream_get_wrappers(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new stream_get_transports(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new stream_get_filters(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new cli_get_process_title(),
+            []
+        ));
+
+        // Excess argc stays live (ArgumentCountError).
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new json_last_error_(),
+            [$str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new json_last_error_msg_(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new preg_last_error_(),
+            [$long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new preg_last_error_msg_(),
+            [$str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new date_default_timezone_get(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new timezone_version_get(),
+            [$long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new stream_get_wrappers(),
+            [$str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new stream_get_transports(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new stream_get_filters(),
+            [$long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new cli_get_process_title(),
             [$str]
         ));
     }

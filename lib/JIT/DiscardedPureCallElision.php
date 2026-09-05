@@ -68,6 +68,11 @@ use PHPCompiler\VM\Variable as VmVariable;
  * stays live — ArgumentCountError),
  * getrusage (zero-arg or typed long; soft-null mode stays live —
  * deprecate; excess argc stays live — ArgumentCountError),
+ * json_last_error / json_last_error_msg / preg_last_error /
+ * preg_last_error_msg / date_default_timezone_get / timezone_version_get /
+ * stream_get_wrappers / stream_get_transports / stream_get_filters /
+ * cli_get_process_title (zero-arg; excess argc stays live —
+ * ArgumentCountError),
  * zero-arg pi, type.c predicates + gettype/get_debug_type, ctype.c
  * classifiers on typed/literal strings, typed-array count/sizeof, math.c
  * incl. pow/fpow/fdiv on already-numeric args, empty void user functions).
@@ -136,7 +141,12 @@ use PHPCompiler\VM\Variable as VmVariable;
  * (deprecate); non-zero-arg {@code gethostname}/{@code error_get_last}/
  * {@code hash_algos}/{@code hash_hmac_algos}/{@code ob_get_contents}/
  * {@code ob_get_length}/{@code headers_list} and excess-arg {@code getrusage}
- * stay live ({@code ArgumentCountError}).
+ * stay live ({@code ArgumentCountError}). Non-zero-arg
+ * {@code json_last_error}/{@code json_last_error_msg}/{@code preg_last_error}/
+ * {@code preg_last_error_msg}/{@code date_default_timezone_get}/
+ * {@code timezone_version_get}/{@code stream_get_wrappers}/
+ * {@code stream_get_transports}/{@code stream_get_filters}/
+ * {@code cli_get_process_title} stay live ({@code ArgumentCountError}).
  */
 final class DiscardedPureCallElision
 {
@@ -251,6 +261,9 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureHostErrorHashObRuntimeInfoNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureJsonPregTzStreamCliRuntimeInfoNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureVersionCompareNoSideEffect($toCall, $callArgs)) {
@@ -1636,6 +1649,30 @@ final class DiscardedPureCallElision
     }
 
     /**
+     * Discarded {@code json_last_error}/{@code json_last_error_msg}/
+     * {@code preg_last_error}/{@code preg_last_error_msg}/
+     * {@code date_default_timezone_get}/{@code timezone_version_get}/
+     * {@code stream_get_wrappers}/{@code stream_get_transports}/
+     * {@code stream_get_filters}/{@code cli_get_process_title} — php-src
+     * JSON/PCRE last-error, date default TZ / tzdata version, stream registry,
+     * CLI title introspection reads. Excess argc stays live
+     * ({@code ArgumentCountError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureJsonPregTzStreamCliRuntimeInfoNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if (!NoThrowCallElision::isPureJsonPregTzStreamCliRuntimeInfoBuiltin(strtolower($toCall->getName()))) {
+            return false;
+        }
+
+        return self::jsonPregTzStreamCliRuntimeInfoArgsAllowDiscardedElision($callArgs);
+    }
+
+    /**
      * Discarded {@code version_compare} on typed / literal strings — php-src
      * {@code versioning.c}. Optional operator must be null or a compile-time
      * valid comparison op ({@code ValueError} otherwise).
@@ -2115,6 +2152,17 @@ final class DiscardedPureCallElision
             default:
                 return false;
         }
+    }
+
+    /**
+     * Exactly zero arguments — peer
+     * {@see NoThrowCallElision::jsonPregTzStreamCliRuntimeInfoArgsCannotThrow}.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function jsonPregTzStreamCliRuntimeInfoArgsAllowDiscardedElision(array $callArgs): bool
+    {
+        return NoThrowCallElision::jsonPregTzStreamCliRuntimeInfoArgsCannotThrow($callArgs);
     }
 
     /**
