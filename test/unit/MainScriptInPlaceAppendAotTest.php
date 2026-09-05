@@ -30,6 +30,7 @@ final class MainScriptInPlaceAppendAotTest extends TestCase
         file_put_contents($path, $src);
         try {
             putenv('PHP_COMPILER_DUMP_IR=1');
+            putenv('PHP_COMPILER_CACHE=0');
             $cmd = escapeshellarg(PHP_BINARY).' '
                 .escapeshellarg(__DIR__.'/../../bin/compile.php').' -o '
                 .escapeshellarg($bin).' '.escapeshellarg($path).' 2>&1';
@@ -60,6 +61,22 @@ final class MainScriptInPlaceAppendAotTest extends TestCase
                 '{main} $buf .= must use __string__realloc (#36386)'
             );
             $this->assertStringContainsString('append_', $body, 'expected appendInPlace blocks');
+            // Per-iter publish into the script-global box addrefs so append always COWs (#36386).
+            // Inspect only the append_done block itself (until the next labeled block).
+            if (preg_match_all(
+                '/^(append_done_appendInPlace\w+):\s*\n((?:^[^\n]*\n)*?)(?=^\w|\z)/m',
+                $body,
+                $doneBlocks,
+                PREG_SET_ORDER
+            )) {
+                foreach ($doneBlocks as $done) {
+                    $this->assertStringNotContainsString(
+                        '__value__writeString',
+                        $done[2],
+                        '{main} in-place .= must not __value__writeString in '.$done[1]
+                    );
+                }
+            }
             $reallocStart = strpos($ll, 'define void @__string__realloc');
             $this->assertNotFalse($reallocStart, 'missing @__string__realloc');
             $reallocEnd = strpos($ll, "\ndefine ", $reallocStart + 1);
@@ -76,6 +93,7 @@ final class MainScriptInPlaceAppendAotTest extends TestCase
             $this->assertSame(['3'], $runOut);
         } finally {
             putenv('PHP_COMPILER_DUMP_IR');
+            putenv('PHP_COMPILER_CACHE');
             @unlink($path);
             @unlink($bin);
         }
@@ -152,6 +170,7 @@ final class MainScriptInPlaceAppendAotTest extends TestCase
         file_put_contents($path, $src);
         try {
             putenv('PHP_COMPILER_DUMP_IR=1');
+            putenv('PHP_COMPILER_CACHE=0');
             $cmd = escapeshellarg(PHP_BINARY).' '
                 .escapeshellarg(__DIR__.'/../../bin/compile.php').' -o '
                 .escapeshellarg($bin).' '.escapeshellarg($path).' 2>&1';
@@ -185,6 +204,7 @@ final class MainScriptInPlaceAppendAotTest extends TestCase
             $this->assertSame(['24'], $runOut); // strlen('row-0;row-1;row-2;row-3;') = 24
         } finally {
             putenv('PHP_COMPILER_DUMP_IR');
+            putenv('PHP_COMPILER_CACHE');
             @unlink($path);
             @unlink($bin);
         }
