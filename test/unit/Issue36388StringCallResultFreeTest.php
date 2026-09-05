@@ -74,7 +74,9 @@ final class Issue36388StringCallResultFreeTest extends TestCase
 
     public function testCallResultPromotesOwningStringToKindVariable(): void
     {
-        $src = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT.php');
+        $src = (string) file_get_contents(
+            dirname(__DIR__, 2).'/lib/JIT/Concern/CallResultOperandAssign.php'
+        );
         $this->assertStringContainsString('callResultOwnsFreshString', $src);
         $this->assertStringContainsString('ephemeralStringTemp = true', $src);
     }
