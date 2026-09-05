@@ -212,7 +212,9 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $sidecar = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuSidecarLinktime.php');
         $this->assertStringContainsString('m3EmitSidecarHostCompileEnv', $sidecar);
         $this->assertStringContainsString('isM3HelloworldInventoryCompileDriverTarget', $m3m4m5Policy);
-        $this->assertStringContainsString('PHP_COMPILER_MEMORY_LIMIT', $jit);
+        // Nested sidecar host compiles forward PHP_COMPILER_MEMORY_LIMIT (#23970) — lives in Concern, not hub.
+        $this->assertStringContainsString('PHP_COMPILER_MEMORY_LIMIT', $sidecar);
+        $this->assertStringContainsString('M3M4M5CompileDriverEmitPolicy', $jit);
     }
 
     /** Issue #2880: M4 full-revision probe script and native argv main for bin/compile.php. */
@@ -283,9 +285,15 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $driver = self::$root.'/build/selfhost-helloworld-compile-driver';
         $this->assertFileExists($driver);
         $this->assertTrue(is_executable($driver), "Expected {$driver} to be executable");
-        $runOut = shell_exec($driver);
-        $this->assertIsString($runOut);
-        $this->assertStringContainsString('compiler_helloworld_compile_driver ready', $runOut);
+        // Helloworld compile_driver {main} uses inventory emit (shouldUseM3InventoryEmitDriver /
+        // isM3HelloworldInventoryCompileDriverTarget, #2843) — bare argv no longer echoes the
+        // legacy "ready" stub; env-less run must surface the smoke usage line instead.
+        $runOut = (string) shell_exec($driver.' 2>&1');
+        $this->assertTrue(
+            str_contains($runOut, 'compiler_helloworld_compile_driver ready')
+                || str_contains($runOut, 'helloworld_compile_smoke: set PHP_COMPILER_M3_SOURCE'),
+            "Expected ready stub or inventory-emit usage, got: {$runOut}"
+        );
     }
 
     public function testHelloWorldCompileDriverHasModeDispatch(): void
@@ -525,7 +533,9 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('#23970', $compile);
         $this->assertStringContainsString('PHP_COMPILER_HELPER_RUNTIME_O=1', $compile);
         $this->assertStringContainsString('inventoryArgvSeed', $compile);
-        $this->assertStringContainsString('#36144', $compile);
+        // #36144 reject/floor commentary moved with M3/M4/M5 emit policy (#36387 Concern extract).
+        $m3m4m5Policy = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3M4M5CompileDriverEmitPolicy.php');
+        $this->assertStringContainsString('#36144', $m3m4m5Policy);
         $this->assertMatchesRegularExpression(
             '/function phpc_compile_skip_aot_bundle.*?compile_driver\.php/s',
             $compile
@@ -782,8 +792,9 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
     public function testExternalJitClassRegistersIdToName(): void
     {
         $source = (string) file_get_contents(self::$root.'/lib/JIT/Builtin/Type/Object_.php');
+        // Display spelling (stdClass, not stdclass) — #23641 / #26885; lookup keys stay in $classes.
         $this->assertStringContainsString(
-            '$this->classIdToName[$id] = $lcname;',
+            '$this->classIdToName[$id] = $displayName;',
             $source,
             'registerExternalClass must populate classIdToName for RuntimeInitVmContext propertyFetch (#1514, #2126)'
         );
