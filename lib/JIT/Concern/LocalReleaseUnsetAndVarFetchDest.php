@@ -32,6 +32,17 @@ trait LocalReleaseUnsetAndVarFetchDest
         if ('{main}' === $fnName || str_ends_with($fnName, '::__destruct')) {
             return;
         }
+        // __construct: locals assigned into `$this->prop` are propertyStore-addref'd; a
+        // frame-end delref on the same named CV (often the nullable param reused as
+        // `$md = new T; $this->md = $md`) drops the sole remaining ref and frees the
+        // object under the property — tip reads as uninitialized / SEGV after return
+        // (Slim AppFactory::create / `if (!$md) { $md = new Middleware(...); }`, #36382).
+        // Peer of freeDeadVariables skip on void construct return (CompileReturn).
+        // php-src: zend_execute.c ZEND_RETURN in ctors does not destroy props via CV dtors
+        // when the value escaped into $this.
+        if ($this->isJitConstructFrame($block)) {
+            return;
+        }
         $byRefParamNames = [];
         foreach ($block->paramByRef as $paramIdx => $_) {
             if (isset($block->paramNames[$paramIdx]) && '' !== $block->paramNames[$paramIdx]) {

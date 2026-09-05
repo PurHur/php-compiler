@@ -68,4 +68,30 @@ final class Issue36382NullObjectCtorArgAotTest extends TestCase
         $this->assertStringContainsString('isset:0', $got);
         $this->assertStringContainsString('class:notobj', $got);
     }
+
+    /** Builtin `object` prop accepts any instance; incomplete `$this` store (AppFactory). */
+    public function testTypedObjectPropertyAssignAndThisInCtor(): void
+    {
+        $this->assertSame(
+            "isset1\nA36382Obj\nParent36382This\nok\n",
+            $this->compileAndRun('test/repro/issue_36382_typed_object_prop.php')
+        );
+    }
+
+    public function testAppFactoryCreateShape(): void
+    {
+        $this->assertSame(
+            "C1\nC2\nC3\nC4\nApp36382\nok:1\n",
+            $this->compileAndRun('test/repro/issue_36382_appfactory_create_shape.php')
+        );
+    }
+
+    /** `$md = new; $this->md = $md` on a nullable ctor param must survive return. */
+    public function testCtorParamReuseAssignedIntoThis(): void
+    {
+        $this->assertSame(
+            "R36382Md\nok\n",
+            $this->compileAndRun('test/repro/issue_36382_ctor_param_reuse_prop.php')
+        );
+    }
 }
