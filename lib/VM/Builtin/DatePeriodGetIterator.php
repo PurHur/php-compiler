@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM\Builtin;
 
-use PHPCompiler\ext\spl\InternalIteratorBuiltin;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\DatePeriodSupport;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\InternalIteratorSupport;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -60,6 +60,6 @@ final class DatePeriodGetIterator extends VmClassMethod
         $period->datePeriodIterator = $savedState;
         $period->getProperty('current')->copyFrom($savedCurrent);
 
-        $frame->returnVar->object(InternalIteratorBuiltin::fromTable($ctx, $table));
+        $frame->returnVar->object(InternalIteratorSupport::fromTable($ctx, $table));
     }
 }

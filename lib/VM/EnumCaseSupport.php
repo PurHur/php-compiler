@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 use PHPCompiler\CompilerVersion;
-use PHPCompiler\ext\spl\SplDualIteratorStorage;
 use PHPCompiler\Frame;
 use PHPCompiler\RuntimeStrictness;
 
@@ -939,7 +938,7 @@ final class EnumCaseSupport
 
                 return $out;
             }
-            if (SplDualIteratorStorage::hasStateFor($object)) {
+            if (SplDualIteratorSupport::hasStateFor($object)) {
                 // SPL iterator wrappers keep sidecar state keyed by object id (#17721).
                 $out = new Variable();
                 $out->copyFrom($src);
