@@ -190,6 +190,12 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
             '/function compileVmRunSmokeNative\([\s\S]*?function emitM5ArgvResolveSidecarIdentityStub\(/',
             $vmSmokeNative
         );
+
+        $spineNativeCfg = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuSpineNativeTryAndCfgParamTypes.php');
+        $this->assertMatchesRegularExpression(
+            '/function isM3EmitTuCompilerSpineLoweringName\([\s\S]*?function llvmTypeForCfgParam\(/',
+            $spineNativeCfg
+        );
         $compile = (string) file_get_contents(self::$root.'/bin/compile.php');
         $this->assertStringContainsString('PHP_COMPILER_M3_EMIT_HELPER_SPINE=1', $compile);
         $aot = (string) file_get_contents(self::$root.'/lib/JIT/M3EmitTuTrivialEchoAot.php');
