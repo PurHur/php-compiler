@@ -971,6 +971,12 @@ final class PregAotFastPath
         if (null !== $litPlus) {
             return self::findLiteralCharPlus($litPlus, $subject, $offset);
         }
+        // FastRoute Std::parse — `VARIABLE_REGEX(*SKIP)(*F) | \[` / `\]` (nikic/fast-route).
+        // Thin AOT has no PCRE verbs; kind=0 → Internal error while Zend splits. (#36382)
+        $skipDelim = self::fastRouteSkipVerbDelimiter($pattern);
+        if (null !== $skipDelim) {
+            return self::findFastRouteSkipBraceThenDelim($subject, $offset, $skipDelim);
+        }
         // Custom `[…]` / Nyholm encode classes before kind=0 bail (#36382).
         if (1 === self::tryParseBracketClassPattern($pattern)) {
             return self::findParsedBracketClass($subject, $offset);
@@ -1064,6 +1070,82 @@ final class PregAotFastPath
     public static function takeLastReplaceBodyLen(): int
     {
         return self::$lastReplaceBodyLen;
+    }
+
+    /**
+     * Detect FastRoute `(*SKIP)(*F) | \[` / `\]` split/match patterns (#36382).
+     * php-src: ext/pcre — (*SKIP)(*F) verbs; FastRoute uses them to ignore `[`/`]` inside `{…}`.
+     *
+     * @return string|null delimiter char `[` or `]`, or null when not this shape
+     */
+    private static function fastRouteSkipVerbDelimiter(string $pattern): ?string
+    {
+        $len = \strlen($pattern);
+        if ($len < 20) {
+            return null;
+        }
+        // x-flag patterns keep spaces: "(*SKIP)(*F) | \[" — also accept compacted form.
+        if (false === \strpos($pattern, '(*SKIP)(*F)')) {
+            return null;
+        }
+        if (false !== \strpos($pattern, '\\[') || false !== \strpos($pattern, '[')) {
+            // Prefer escaped form used by FastRoute; bare `[` only when after the verb alt.
+            if (false !== \strpos($pattern, '(*SKIP)(*F) | \\[')
+                || false !== \strpos($pattern, '(*SKIP)(*F)|\\[')
+                || false !== \strpos($pattern, '(*SKIP)(*F) | [')
+                || false !== \strpos($pattern, '(*SKIP)(*F)|[')) {
+                return '[';
+            }
+        }
+        if (false !== \strpos($pattern, '(*SKIP)(*F) | \\]')
+            || false !== \strpos($pattern, '(*SKIP)(*F)|\\]')
+            || false !== \strpos($pattern, '(*SKIP)(*F) | ]')
+            || false !== \strpos($pattern, '(*SKIP)(*F)|]')) {
+            return ']';
+        }
+
+        return null;
+    }
+
+    /**
+     * Find next `$delim` at/after $offset, skipping `{…}` placeholders (nest-aware).
+     * Zend semantics for FastRoute's SKIP/F + literal bracket alt (#36382).
+     *
+     * @return int 1 matched, 0 no match
+     */
+    private static function findFastRouteSkipBraceThenDelim(string $subject, int $offset, string $delim): int
+    {
+        $subLen = \strlen($subject);
+        $i = $offset;
+        if ($i < 0) {
+            $i = 0;
+        }
+        self::$lastReplaceBodyLen = 1;
+        while ($i < $subLen) {
+            $ch = \substr($subject, $i, 1);
+            if ('{' === $ch) {
+                $depth = 1;
+                ++$i;
+                while ($i < $subLen && $depth > 0) {
+                    $inner = \substr($subject, $i, 1);
+                    if ('{' === $inner) {
+                        ++$depth;
+                    } elseif ('}' === $inner) {
+                        --$depth;
+                    }
+                    ++$i;
+                }
+                continue;
+            }
+            if ($delim === $ch) {
+                self::$lastReplacePos = $i;
+
+                return 1;
+            }
+            ++$i;
+        }
+
+        return 0;
     }
 
     /**
