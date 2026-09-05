@@ -390,6 +390,14 @@ final class NoThrowCallElision
             // ArgumentCountError.
             return self::envPathRequestRuntimeInfoArgsCannotThrow($callArgs);
         }
+        if (self::isPureHostErrorHashObRuntimeInfoBuiltin($name)) {
+            // gethostname / error_get_last / getrusage / hash_algos /
+            // hash_hmac_algos / ob_get_contents / ob_get_length /
+            // headers_list — arity 0 (getrusage: optional typed long);
+            // soft-null getrusage mode deprecates; excess argc is
+            // ArgumentCountError.
+            return self::hostErrorHashObRuntimeInfoArgsCannotThrow($name, $callArgs);
+        }
         if (self::isPureVersionCompareBuiltin($name)) {
             // versioning.c — typed strings; optional operator must be proven valid.
             return self::versionCompareArgsCannotThrow($callArgs);
@@ -1270,6 +1278,34 @@ final class NoThrowCallElision
     }
 
     /**
+     * Host / last-error / rusage / hash-algo table / OB buffer / pending-header
+     * reads — php-src {@code ext/standard/basic_functions.c}
+     * ({@code gethostname}/{@code getrusage}/{@code error_get_last}),
+     * {@code ext/hash/hash.c} ({@code hash_algos}/{@code hash_hmac_algos}),
+     * {@code ext/standard/output.c} ({@code ob_get_contents}/
+     * {@code ob_get_length}), {@code ext/standard/head.c}
+     * ({@code headers_list}). Excess argc is {@code ArgumentCountError}.
+     * Soft-null {@code getrusage} mode deprecates. Public for
+     * {@see DiscardedPureCallElision} (#36386).
+     */
+    public static function isPureHostErrorHashObRuntimeInfoBuiltin(string $nameLc): bool
+    {
+        switch ($nameLc) {
+            case 'gethostname':
+            case 'error_get_last':
+            case 'getrusage':
+            case 'hash_algos':
+            case 'hash_hmac_algos':
+            case 'ob_get_contents':
+            case 'ob_get_length':
+            case 'headers_list':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
      * php-src {@code ext/standard/versioning.c} {@code version_compare}. Public
      * for {@see DiscardedPureCallElision} (#36386).
      */
@@ -1796,6 +1832,46 @@ final class NoThrowCallElision
     public static function envPathRequestRuntimeInfoArgsCannotThrow(array $callArgs): bool
     {
         return self::zeroArgRuntimeInfoArgsCannotThrow($callArgs);
+    }
+
+    /**
+     * {@code gethostname}/{@code error_get_last}/{@code hash_algos}/
+     * {@code hash_hmac_algos}/{@code ob_get_contents}/{@code ob_get_length}/
+     * {@code headers_list}: arity 0. {@code getrusage}: arity 0 or one
+     * numeric scalar (soft-null deprecates but does not throw). Excess argc is
+     * {@code ArgumentCountError}. Public for {@see DiscardedPureCallElision}
+     * (#36386).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    public static function hostErrorHashObRuntimeInfoArgsCannotThrow(string $nameLc, array $callArgs): bool
+    {
+        switch ($nameLc) {
+            case 'gethostname':
+            case 'error_get_last':
+            case 'hash_algos':
+            case 'hash_hmac_algos':
+            case 'ob_get_contents':
+            case 'ob_get_length':
+            case 'headers_list':
+                return self::zeroArgRuntimeInfoArgsCannotThrow($callArgs);
+            case 'getrusage':
+                if ([] === $callArgs) {
+                    return true;
+                }
+                if (
+                    !isset($callArgs[0])
+                    || !$callArgs[0] instanceof Variable
+                    || isset($callArgs[1])
+                ) {
+                    return false;
+                }
+
+                // Soft-null deprecates (no throw) — still "cannot throw".
+                return self::intParamBuiltinArgCannotThrow($callArgs[0]);
+            default:
+                return false;
+        }
     }
 
     /**
