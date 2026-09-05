@@ -20,6 +20,7 @@ require_once __DIR__.'/JIT/Concern/CompileStaticPropertyAndUnset.php';
 require_once __DIR__.'/JIT/Concern/CompileConcat.php';
 require_once __DIR__.'/JIT/Concern/CompileFuncCallExecReturn.php';
 require_once __DIR__.'/JIT/Concern/CompileAssign.php';
+require_once __DIR__.'/JIT/Concern/CompileNew.php';
 require_once __DIR__.'/JIT/Concern/CompileArrayDimFetchReadAndWrite.php';
 require_once __DIR__.'/JIT/Concern/InitJitMethodCall.php';
 require_once __DIR__.'/JIT/Concern/AssignOperand.php';
@@ -96,6 +97,7 @@ class JIT {
     use CompileConcat;
     use CompileFuncCallExecReturn;
     use CompileAssign;
+    use CompileNew;
     use CompileArrayDimFetchReadAndWrite;
     use InitJitMethodCall;
     use AssignOperand;
