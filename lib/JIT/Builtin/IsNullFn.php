@@ -4,24 +4,21 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\types\is_type;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
-use PHPCompiler\VM\Variable as VMVariable;
+use PHPCompiler\VM\TypesVmRuntimeSupport;
 use PHPLLVM\Value;
 
+/**
+ * is_null() JIT proxy — delegates to ext/types via {@see TypesVmRuntimeSupport} (#36204).
+ *
+ * php-src: ext/standard/type.c — PHP_FUNCTION(is_null).
+ */
 final class IsNullFn implements Call
 {
-    private is_type $delegate;
-
-    public function __construct()
-    {
-        $this->delegate = new is_type('is_null', VMVariable::TYPE_NULL);
-    }
-
     public function call(Context $context, Variable ...$args): Value
     {
-        return $this->delegate->call($context, ...$args);
+        return TypesVmRuntimeSupport::callIsNull($context, ...$args);
     }
 }

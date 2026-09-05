@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\hash;
 use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
 use PHPCompiler\VM;
+use PHPCompiler\VM\HashVmRuntimeSupport;
 
 /**
  * hash extension module entry (php-src ext/hash/hash.c; issue #6937, #7174, #14975).
@@ -28,6 +29,12 @@ class Module extends ModuleAbstract
             $var->int($value);
             $runtime->vmContext->defineConstant($name, $var);
         }
+        // lib/JIT/Builtin/StringHashCryptoPhp must not import ext\hash (#36204).
+        HashVmRuntimeSupport::setEnsureEvpLeaves(
+            static function (\PHPCompiler\JIT\Context $context): void {
+                JitHashCryptoKernel::ensureEvpLeaves($context);
+            }
+        );
     }
 
     public function getFunctions(): array

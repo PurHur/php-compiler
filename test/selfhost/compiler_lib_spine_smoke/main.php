@@ -7526,6 +7526,8 @@ require_once __DIR__.'/../../../lib/VM/InternalIteratorLiveHandler.php';
 require_once __DIR__.'/../../../lib/VM/InternalIteratorSupport.php';
 require_once __DIR__.'/../../../lib/VM/SplDualIteratorSupport.php';
 require_once __DIR__.'/../../../lib/VM/FilterVmRuntimeSupport.php';
+require_once __DIR__.'/../../../lib/VM/HashVmRuntimeSupport.php';
+require_once __DIR__.'/../../../lib/VM/TypesVmRuntimeSupport.php';
 require_once __DIR__.'/../../../lib/VM/BcMathVmRuntimeSupport.php';
 require_once __DIR__.'/../../../lib/VM/GmpVmRuntimeSupport.php';
 require_once __DIR__.'/../../../lib/VM/DateTimeFormatJitHelper.php';
