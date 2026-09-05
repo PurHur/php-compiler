@@ -5420,6 +5420,7 @@ require_once __DIR__.'/../../../lib/JIT/Concern/M3EmitTuRuntimeSpineDeclsAndComp
 require_once __DIR__.'/../../../lib/JIT/Concern/M3EmitTuRuntimeParseAndInitSpine.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/VmSmokeAndRuntimeM3NativeStubs.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/M3EmitTuCompilerRuntimeMethodCompile.php';
+require_once __DIR__.'/../../../lib/JIT/Concern/M3EmitTuRuntimeSpineStubNative.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/InitJitMethodCall.php';
 require_once __DIR__.'/../../../lib/Compiler/CompileTimeNew.php';
 require_once __DIR__.'/../../../lib/Compiler/DeprecatedMetadata.php';
