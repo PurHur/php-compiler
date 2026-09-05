@@ -36,6 +36,7 @@ require_once __DIR__.'/JIT/Concern/CompileCoalesce.php';
 require_once __DIR__.'/JIT/Concern/CompileFromCallable.php';
 require_once __DIR__.'/JIT/Concern/CompileNullsafe.php';
 require_once __DIR__.'/JIT/Concern/CompileIter.php';
+require_once __DIR__.'/JIT/Concern/CompileEmptyIssetEval.php';
 require_once __DIR__.'/JIT/Concern/CompileArrayDimFetchReadAndWrite.php';
 require_once __DIR__.'/JIT/Concern/InitJitMethodCall.php';
 require_once __DIR__.'/JIT/Concern/AssignOperand.php';
@@ -128,6 +129,7 @@ class JIT {
     use CompileFromCallable;
     use CompileNullsafe;
     use CompileIter;
+    use CompileEmptyIssetEval;
     use CompileArrayDimFetchReadAndWrite;
     use InitJitMethodCall;
     use AssignOperand;
