@@ -42,7 +42,12 @@ final class MultisortRuntime
                     'array_multisort() cannot compile fixed-size literal arrays in JIT/AOT yet; assign to variables first'
                 );
             }
-            $sources[] = self::argToHashtable($context, $array);
+            // By-ref mutator: SEPARATE_ARRAY before in-place multisort (php-src
+            // php_array_multisort / Zend SEPARATE_ARRAY / #36397). M5 assert here
+            // (before packVariables addrefs the HT into the sources list).
+            $ht = self::argToHashtableForWrite($context, $array);
+            Refcount::emitAssertExclusiveCall($context, $ht);
+            $sources[] = $ht;
         }
 
         self::ensureLinked($context);
@@ -53,7 +58,11 @@ final class MultisortRuntime
             $context->getTypeFromString('int1')->constInt($descending ? 1 : 0, false)
         );
         foreach ($arrays as $i => $array) {
-            HashTableHelper::storeHashtableInArrayVariable($context, $array, $sources[$i]);
+            // In-place LLVM multisort — only rebind native int[] into a value box.
+            // Writing the same HT back into a TYPE_VALUE box valueDelref's it (#36388).
+            if (ArrayBuiltinHelper::isNativeArray($array->type)) {
+                HashTableHelper::storeHashtableInArrayVariable($context, $array, $sources[$i]);
+            }
         }
     }
 
@@ -67,13 +76,13 @@ final class MultisortRuntime
         self::ensureLinked($context);
     }
 
-    private static function argToHashtable(Context $context, JITVariable $arg): Value
+    private static function argToHashtableForWrite(Context $context, JITVariable $arg): Value
     {
         if (ArrayBuiltinHelper::isNativeArray($arg->type)) {
             return ArrayBuiltinHelper::nativeListToHashTable($context, $arg);
         }
 
-        return ArrayBuiltinHelper::loadHashTable($context, $arg);
+        return HashTableHelper::separateContainerForWrite($context, $arg);
     }
 
     /**
