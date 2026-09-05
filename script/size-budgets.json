@@ -14,9 +14,9 @@
             "note": "Concern trait splits (#36387/#36403); M3EmitTuRuntimeParseAndInitSpine + M3EmitTuRuntimeSpineDeclsAndCompileDeps + peers"
         },
         "lib/VM.php": {
-            "budget": 18936,
+            "budget": 18326,
             "target": 15000,
-            "note": "PropertyFetchDestAndHookedDimWrite + ObjectPropertyMagicAndClone + ClassTraitComposition + ObjectPropertyReadonlyAndVisibility + Hooks + CollectAndSerialize + IssetEmptyUnset Concern extracts (#36403); toward 15k target"
+            "note": "TypedIntRecursiveAndCountedLoopFastPath + PropertyFetchDestAndHookedDimWrite + ObjectPropertyMagicAndClone + ClassTraitComposition + ObjectPropertyReadonlyAndVisibility + Hooks + CollectAndSerialize + IssetEmptyUnset Concern extracts (#36403); toward 15k target"
         },
         "script/apply-patches.sh": {
             "budget": 7637,
