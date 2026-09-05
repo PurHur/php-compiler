@@ -7155,6 +7155,7 @@
         "lib/JIT/Concern/EmitJitReturn.php",
         "lib/JIT/Concern/InitJitMethodCall.php",
         "lib/JIT/Concern/InitJitStaticCall.php",
+        "lib/JIT/Concern/LocalReleaseUnsetAndVarFetchDest.php",
         "lib/JIT/Concern/M3EmitTuSidecarLinktime.php",
         "lib/JIT/Concern/PropertyFetchCoalesceAndCompileTimeString.php",
         "lib/JIT/Concern/PropertyIncDecCompile.php",
@@ -8451,9 +8452,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8217,
+        "inventory_files": 8218,
         "excluded": 0,
-        "eligible": 8217,
+        "eligible": 8218,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
