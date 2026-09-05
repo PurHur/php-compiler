@@ -11,13 +11,18 @@ non-native link.
 `script/check-helper-runtime-prelink.php --all-arches` asserts every committed `unit.o`
 (and `common.o` when present) has ELF `e_machine=183` (EM_AARCH64).
 
-## Seed corpus (VM_* + lib_VM_* parity with x86_64-linux)
+## Seed corpus (VM_* + lib_VM_* + ext/standard tier)
 
-**22** committed `unit.o` files — the full `VM_*` (13) and `lib_VM_*` (9) sets
-published under `prelinked/helper-runtime/x86_64-linux/units/`. Refresh / expand via:
+**32** committed `unit.o` files:
+
+- full `VM_*` (13) and `lib_VM_*` (9) sets from `x86_64-linux`
+- first `ext/standard` tier (10): ArrayChunk / ArrayIsList / ArraySlice / Bin2hex /
+  CountChars / Crc32 / PrintR / StrWordCount / SubstrCount / VarExport
+
+Refresh / expand via:
 
 ```bash
-./script/seed-aarch64-helper-runtime.sh           # emit + publish (~60 s)
+./script/seed-aarch64-helper-runtime.sh           # emit + publish (~2 min)
 ./script/seed-aarch64-helper-runtime.sh --check   # count + ELF gate
 ```
 
@@ -40,7 +45,7 @@ PHP_COMPILER_TARGET=aarch64-linux \
 PHP_COMPILER_HELPER_RUNTIME_CACHE_DIR=build/helper-runtime-cache-aarch64 \
   php script/publish-helper-units-prelink.php /VM/CoalesceJitHelper.php
 
-# curated VM_* seed (preferred):
+# curated seed (preferred):
 ./script/seed-aarch64-helper-runtime.sh
 
 # native aarch64 only — full corpus:

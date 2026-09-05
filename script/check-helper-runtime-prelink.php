@@ -171,7 +171,7 @@ foreach ($archIds as $archId) {
             // Host x86 corpus is required; aarch64 may still be seed-only / empty during rollout (#36391).
             $exitFail = true;
         } elseif ($strict && $allArches && CompileTarget::ID_AARCH64_LINUX === $r['arch']) {
-            // --all-arches --strict: aarch64 must keep the curated VM_* seed (#36391).
+            // --all-arches --strict: aarch64 must keep the curated seed (#36391).
             $exitFail = true;
         }
         continue;
@@ -200,10 +200,11 @@ foreach ($archIds as $archId) {
     if ($strict && ($r['broken'] + $r['common_broken'] + $r['elf_mismatch']) > 0) {
         $exitFail = true;
     }
-    // Curated aarch64 VM_* seed must not shrink (#36391). Empty / short is not a pass.
+    // Curated aarch64 seed must not shrink (#36391). Empty / short is not a pass.
     if ($allArches && CompileTarget::ID_AARCH64_LINUX === $r['arch'] && !$r['absent']) {
         $seedTotal = $r['fresh'] + $r['stale'] + $r['broken'];
-        $minSeed = 13;
+        // Ratchet with script/seed-aarch64-helper-runtime.sh SEED_UNITS (VM_*+lib_VM_*+ext/standard tier).
+        $minSeed = 32;
         if ($seedTotal < $minSeed) {
             fwrite(STDOUT, sprintf(
                 "check-helper-runtime-prelink: aarch64-linux seed too small (%d < %d) — run ./script/seed-aarch64-helper-runtime.sh (#36391)\n",
