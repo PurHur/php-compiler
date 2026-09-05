@@ -59,10 +59,10 @@ final class EagerThinPregHelpers36382Test extends TestCase
         $this->assertStringContainsString('UriRawurlencodeReplaceJitHelper.php', $runtime);
         $this->assertStringContainsString('ParseUrlRuntime::ensureLinked', $runtime);
 
-        $jit = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT.php');
-        $this->assertStringContainsString('maybeEagerLinkThinPregHelpers', $jit);
-        $this->assertStringContainsString('maybeEagerLinkUriComposerHelpers', $jit);
-        $this->assertStringContainsString('eager_uri_composer_begin', $jit);
+        $m3m4m5Policy = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Concern/M3M4M5CompileDriverEmitPolicy.php');
+        $this->assertStringContainsString('maybeEagerLinkThinPregHelpers', $m3m4m5Policy);
+        $this->assertStringContainsString('maybeEagerLinkUriComposerHelpers', $m3m4m5Policy);
+        $this->assertStringContainsString('eager_uri_composer_begin', $m3m4m5Policy);
 
         $callback = (string) file_get_contents(dirname(__DIR__, 2).'/ext/standard/JitPregReplaceCallback.php');
         $this->assertStringContainsString('UriRawurlencodeReplaceJitHelper', $callback);

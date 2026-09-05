@@ -5426,6 +5426,7 @@ require_once __DIR__.'/../../../lib/JIT/Concern/M3EmitTuRuntimeSpineStubNative.p
 require_once __DIR__.'/../../../lib/JIT/Concern/ValueBoxCoalesceAndConcatHelpers.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/SelfHostEmitHelperAndVendorPrelinkPolicy.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileSkippedOpcodeVmAndCfgBranchStubs.php';
+require_once __DIR__.'/../../../lib/JIT/Concern/M3M4M5CompileDriverEmitPolicy.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/InitJitMethodCall.php';
 require_once __DIR__.'/../../../lib/Compiler/CompileTimeNew.php';
 require_once __DIR__.'/../../../lib/Compiler/DeprecatedMetadata.php';

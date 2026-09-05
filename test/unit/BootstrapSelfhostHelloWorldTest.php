@@ -83,7 +83,7 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
 
     public function testCompilerFirstClassCallableAvoidsMatchThrowInBundle(): void
     {
-        $source = (string) file_get_contents(self::$root.'/lib/Compiler.php');
+        $source = (string) file_get_contents(self::$root.'/lib/Compiler/Concern/FirstClassCallableAndClosure.php');
         $this->assertStringNotContainsString('default => throw', $source);
         $this->assertStringContainsString('3 === $expr->kind', $source);
     }
@@ -208,8 +208,10 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('sidecar_fallback', $resolve);
         $this->assertStringContainsString('BOOTSTRAP_INVENTORY_COMPILED_FIRST', (string) file_get_contents(self::$root.'/script/ci-defaults.env'));
         $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
-        $this->assertStringContainsString('m3EmitSidecarHostCompileEnv', $jit);
-        $this->assertStringContainsString('isM3HelloworldInventoryCompileDriverTarget', $jit);
+        $m3m4m5Policy = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3M4M5CompileDriverEmitPolicy.php');
+        $sidecar = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuSidecarLinktime.php');
+        $this->assertStringContainsString('m3EmitSidecarHostCompileEnv', $sidecar);
+        $this->assertStringContainsString('isM3HelloworldInventoryCompileDriverTarget', $m3m4m5Policy);
         $this->assertStringContainsString('PHP_COMPILER_MEMORY_LIMIT', $jit);
     }
 
@@ -225,9 +227,11 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertFileExists($alias);
         $this->assertStringContainsString('bootstrap-selfhost-full-revision-probe.sh', (string) file_get_contents($alias));
         $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
-        $this->assertStringContainsString('PHP_COMPILER_M4_BIN_COMPILE_DRIVER', $jit);
+        $m3m4m5Policy = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3M4M5CompileDriverEmitPolicy.php');
+        $this->assertStringContainsString('PHP_COMPILER_M4_BIN_COMPILE_DRIVER', $m3m4m5Policy);
+        $this->assertStringContainsString('shouldUseM4BinCompileArgvMainNative', $m3m4m5Policy);
+        $this->assertStringContainsString('isM4BinCompileScriptMain', $m3m4m5Policy);
         $this->assertStringContainsString('shouldUseM4BinCompileArgvMainNative', $jit);
-        $this->assertStringContainsString('isM4BinCompileScriptMain', $jit);
     }
 
     public function testCliDriverEmitProbeAndVmSidecarConstantsExist(): void
@@ -237,12 +241,13 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $jit = (string) file_get_contents(self::$root.'/lib/JIT/M3EmitTuTrivialEchoAot.php');
         $this->assertStringContainsString('BIN_VM_SIDECAR_REL', $jit);
         $this->assertStringContainsString('CLI_DRIVER_SIDECAR_REL', $jit);
-        $this->assertStringContainsString('bin/vm.php', (string) file_get_contents(self::$root.'/lib/JIT.php'));
-        $this->assertStringContainsString('src/cli_driver.php', (string) file_get_contents(self::$root.'/lib/JIT.php'));
+        $sidecar = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuSidecarLinktime.php');
+        $this->assertStringContainsString('bin/vm.php', $sidecar);
+        $this->assertStringContainsString('src/cli_driver.php', $sidecar);
 
         // Sidecar matching is content-based; JIT must compare __string__ buffers safely without relying on
         // null termination (issue #2699).
-        $cmp = (string) file_get_contents(self::$root.'/lib/JIT/JitStringCompare.php');
+        $cmp = (string) file_get_contents(self::$root.'/lib/VM/VmStringCompare.php');
         $this->assertStringContainsString("lookupFunction('memcmp')", $cmp);
     }
 
@@ -294,11 +299,11 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
 
     public function testJitM3AllowlistMatchesBootstrapAotHelloWorldSmoke(): void
     {
-        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
-        $this->assertStringContainsString('isBootstrapHelloWorldSmokeName', $jit);
-        $this->assertStringContainsString('isBootstrapHelloWorldSmokeName', $jit);
-        $this->assertStringContainsString('m3CompileDriverSpineDenyNames', $jit);
-        $this->assertStringContainsString('#1515', $jit);
+        $m3m4m5Policy = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3M4M5CompileDriverEmitPolicy.php');
+        $this->assertStringContainsString('isBootstrapHelloWorldSmokeName', $m3m4m5Policy);
+        $this->assertStringContainsString('isBootstrapHelloWorldSmokeName', $m3m4m5Policy);
+        $this->assertStringContainsString('m3CompileDriverSpineDenyNames', $m3m4m5Policy);
+        $this->assertStringContainsString('#1515', $m3m4m5Policy);
         $driver = (string) file_get_contents(self::$root.'/test/selfhost/compiler_helloworld_smoke/compile_driver.php');
         $this->assertStringContainsString('\\PHPCompiler\\BootstrapAot\\helloworld_compile_smoke', $driver);
         $smoke = (string) file_get_contents(self::$root.'/test/bootstrap-aot/helloworld_compile_smoke.php');
@@ -308,64 +313,64 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
     public function testIncludeHelperAssignCountGuardsCycles(): void
     {
         $source = (string) file_get_contents(self::$root.'/lib/JIT/IncludeHelper.php');
-        $this->assertStringContainsString('spl_object_id($block)', $source);
-        $this->assertStringContainsString('$visited', $source);
+        $this->assertStringContainsString('spl_object_id($operand)', $source);
+        $this->assertStringContainsString('$thisOps', $source);
     }
 
     public function testSpineSidecarHostCompileStubsNonLiteralIncludes(): void
     {
-        $includeHelper = (string) file_get_contents(self::$root.'/lib/JIT/IncludeHelper.php');
+        $sidecar = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuSidecarLinktime.php');
         $this->assertStringContainsString(
             '/test/selfhost/compiler_lib_spine_smoke/main.php',
-            $includeHelper
+            $sidecar
         );
-        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
         $this->assertMatchesRegularExpression(
             '/registerM3EmitTuSidecarFromPath\(\s*\$repoRoot\.\'\/test\/selfhost\/compiler_lib_spine_smoke\/main\.php\'[\s\S]*?true\s*\)/',
-            $jit
+            $sidecar
         );
-        $this->assertStringContainsString('shouldUseM3InventoryMinimalSidecars', $jit);
-        $this->assertStringContainsString('m3EmitTuTryRegisterExistingSidecarBlob', $jit);
-        $this->assertStringContainsString('m3EmitTuReuseStaleCompilerLibSidecar', $jit);
-        $this->assertStringContainsString('m3EmitTuRuntimeRepoRoot', $jit);
-        $this->assertStringContainsString('m3EmitTuPrelinkedSidecarLooksStale', $jit);
+        $this->assertStringContainsString('shouldUseM3InventoryMinimalSidecars', $sidecar);
+        $this->assertStringContainsString('m3EmitTuTryRegisterExistingSidecarBlob', $sidecar);
+        $this->assertStringContainsString('m3EmitTuReuseStaleCompilerLibSidecar', $sidecar);
+        $this->assertStringContainsString('m3EmitTuRuntimeRepoRoot', $sidecar);
+        $this->assertStringContainsString('m3EmitTuPrelinkedSidecarLooksStale', $sidecar);
     }
 
     public function testJitDocumentsM3CompileDriverEnvGate(): void
     {
         $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
-        $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_DRIVER', $jit);
-        $this->assertStringContainsString('isM3CompileDriverRealLoweringName', $jit);
+        $m3m4m5Policy = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3M4M5CompileDriverEmitPolicy.php');
+        $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_DRIVER', $m3m4m5Policy);
+        $this->assertStringContainsString('isM3CompileDriverRealLoweringName', $m3m4m5Policy);
         $this->assertStringContainsString('shouldUseM3EmitTuRuntimeMethodStub', $jit);
         $this->assertStringContainsString('m3EmitTuRuntimeSpineLowered', $jit);
-        $this->assertStringContainsString('helloworld_compile_smoke', $jit);
-        $this->assertStringContainsString('runtime::parseandcompile', $jit);
-        $this->assertStringContainsString('runtime::parse', $jit);
-        $this->assertStringContainsString('runtime::compileemitsmoke', $jit);
-        $this->assertStringContainsString('runtime::compile', $jit);
+        $this->assertStringContainsString('helloworld_compile_smoke', $m3m4m5Policy);
+        $this->assertStringContainsString('runtime::parseandcompile', $m3m4m5Policy);
+        $this->assertStringContainsString('runtime::parse', $m3m4m5Policy);
+        $this->assertStringContainsString('runtime::compileemitsmoke', $m3m4m5Policy);
+        $this->assertStringContainsString('runtime::compile', $m3m4m5Policy);
         $this->assertStringContainsString('jitFunctionSkipName', $jit);
-        $this->assertStringContainsString('m3CompileDriverSpineDenyNames', $jit);
+        $this->assertStringContainsString('m3CompileDriverSpineDenyNames', $m3m4m5Policy);
     }
 
     public function testJitM3AllowlistIncludesParseAndCompileNotOnDenyList(): void
     {
-        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
+        $m3m4m5Policy = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3M4M5CompileDriverEmitPolicy.php');
         $this->assertMatchesRegularExpression(
             "/str_ends_with\\(\\\$lower, '\\\\\\\\runtime::parse'\\)/",
-            $jit,
+            $m3m4m5Policy,
             'Runtime::parse must be on M3 compile-driver allowlist (#1496)'
         );
         $this->assertMatchesRegularExpression(
             "/str_ends_with\\(\\\$lower, '\\\\\\\\runtime::compile'\\)/",
-            $jit,
+            $m3m4m5Policy,
             'Runtime::compile must be on M3 compile-driver allowlist (#1496)'
         );
-        if (preg_match('/private function m3CompileDriverSpineDenyNames\\(\\): array\\s*\\{\\s*return \\[(.*?)\\];/s', $jit, $m)) {
+        if (preg_match('/private function m3CompileDriverSpineDenyNames\\(\\): array\\s*\\{\\s*return \\[(.*?)\\];/s', $m3m4m5Policy, $m)) {
             $denyBlock = $m[1];
             $this->assertStringNotContainsString('runtime::parse', $denyBlock);
             $this->assertStringNotContainsString('runtime::compile', $denyBlock);
         } else {
-            $this->fail('Unable to parse m3CompileDriverSpineDenyNames from lib/JIT.php');
+            $this->fail('Unable to parse m3CompileDriverSpineDenyNames from M3M4M5CompileDriverEmitPolicy');
         }
     }
 
@@ -489,9 +494,9 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER', $script);
         $this->assertStringContainsString('INVENTORY_EMIT_DRIVER=', $script);
         $this->assertStringContainsString('inventory compile_driver', $script);
-        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
-        $this->assertStringContainsString('shouldUseM3InventoryEmitDriver', $jit);
-        $this->assertStringContainsString('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER', $jit);
+        $m3m4m5Policy = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3M4M5CompileDriverEmitPolicy.php');
+        $this->assertStringContainsString('shouldUseM3InventoryEmitDriver', $m3m4m5Policy);
+        $this->assertStringContainsString('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER', $m3m4m5Policy);
     }
 
     /** Issue #23970: skip-bundle + helper-runtime O; 16G floor; gen-0 argv emit-helper fallback. */
@@ -574,31 +579,32 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
     /** Issue #2666: helloworld emit TU registers unit-probe + compile_driver sidecars without probe-only env. */
     public function testEmitTuCompileSmokeBranchRegistersUnifiedSidecars(): void
     {
-        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
-        $this->assertStringContainsString("'compile_smoke_m3_emit' === \$logPrefix", $jit);
-        $this->assertStringContainsString('compiler_unit_probe_compile.php', $jit);
-        $this->assertStringContainsString('COMPILER_UNIT_PROBE_SIDECAR_REL', $jit);
-        $this->assertStringContainsString('compile_driver.php', $jit);
-        $this->assertStringContainsString('COMPILE_DRIVER_SIDECAR_REL', $jit);
-        $this->assertStringContainsString('HELLOWORLD_SMOKE_MAIN_SIDECAR_REL', $jit);
-        $this->assertStringContainsString('BOOTSTRAP_LOOP_SMOKE_MAIN_SIDECAR_REL', $jit);
-        $this->assertStringContainsString('bootstrap_loop_smoke/main.php', $jit);
-        $this->assertStringContainsString('compiler_helloworld_smoke/main.php', $jit);
-        $this->assertStringContainsString('COMPILER_PHP_SIDECAR_REL', $jit);
-        $this->assertStringContainsString('BIN_COMPILE_SIDECAR_REL', $jit);
-        $this->assertStringContainsString('BIN_VM_SIDECAR_REL', $jit);
-        $this->assertStringContainsString('CLI_DRIVER_SIDECAR_REL', $jit);
-        $this->assertStringContainsString('isM5BootstrapSidecarScriptMain', $jit);
-        $this->assertStringNotContainsString('PHP_COMPILER_M3_COMPILER_UNIT_PROBE_EMIT', $jit);
+        $sidecar = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuSidecarLinktime.php');
+        $m3m4m5Policy = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3M4M5CompileDriverEmitPolicy.php');
+        $this->assertStringContainsString("'compile_smoke_m3_emit' === \$logPrefix", $sidecar);
+        $this->assertStringContainsString('compiler_unit_probe_compile.php', $sidecar);
+        $this->assertStringContainsString('COMPILER_UNIT_PROBE_SIDECAR_REL', $sidecar);
+        $this->assertStringContainsString('compile_driver.php', $sidecar);
+        $this->assertStringContainsString('COMPILE_DRIVER_SIDECAR_REL', $sidecar);
+        $this->assertStringContainsString('HELLOWORLD_SMOKE_MAIN_SIDECAR_REL', $sidecar);
+        $this->assertStringContainsString('BOOTSTRAP_LOOP_SMOKE_MAIN_SIDECAR_REL', $sidecar);
+        $this->assertStringContainsString('bootstrap_loop_smoke/main.php', $sidecar);
+        $this->assertStringContainsString('compiler_helloworld_smoke/main.php', $sidecar);
+        $this->assertStringContainsString('COMPILER_PHP_SIDECAR_REL', $sidecar);
+        $this->assertStringContainsString('BIN_COMPILE_SIDECAR_REL', $sidecar);
+        $this->assertStringContainsString('BIN_VM_SIDECAR_REL', $sidecar);
+        $this->assertStringContainsString('CLI_DRIVER_SIDECAR_REL', $sidecar);
+        $this->assertStringContainsString('isM5BootstrapSidecarScriptMain', $m3m4m5Policy);
+        $this->assertStringNotContainsString('PHP_COMPILER_M3_COMPILER_UNIT_PROBE_EMIT', $sidecar);
     }
 
     /** Issue #1492: M3 spine must lower prepareSourceForParser deps before parse is queued. */
     public function testM3EmitSpineLowersPrepareChainBeforeParseQueue(): void
     {
-        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
-        $this->assertStringContainsString("'preprocesssourceforparse'", $jit);
-        $this->assertStringContainsString("'rewritesourcebeforeparser'", $jit);
-        $this->assertStringContainsString("'preparesourceforparser'", $jit);
+        $spineDecls = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuRuntimeSpineDeclsAndCompileDeps.php');
+        $this->assertStringContainsString("'preprocesssourceforparse'", $spineDecls);
+        $this->assertStringContainsString("'rewritesourcebeforeparser'", $spineDecls);
+        $this->assertStringContainsString("'preparesourceforparser'", $spineDecls);
         $driverMain = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuAndCompileDriverMainNative.php');
         $this->assertMatchesRegularExpression(
             '/compileM3EmitTuRuntimeSpineDecls\(\$this->m3CompileDriverMainBlock\);\s+'
@@ -609,10 +615,10 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('allow:\\runtime::preprocesssourceforparse', $allowlist);
         $this->assertStringContainsString('allow:\\runtime::rewritesourcebeforeparser', $allowlist);
         $this->assertStringContainsString('allow:\\runtime::preparesourceforparser', $allowlist);
-        $this->assertStringContainsString('ensureM3EmitTuCompilerRuntimeCompileDeps', $jit);
-        $this->assertStringContainsString("'setpropertyhookregistry'", $jit);
-        $this->assertStringContainsString("'setknownclassreadonly'", $jit);
-        $this->assertStringContainsString("'setbarerethrowlines'", $jit);
+        $this->assertStringContainsString('ensureM3EmitTuCompilerRuntimeCompileDeps', $spineDecls);
+        $this->assertStringContainsString("'setpropertyhookregistry'", $spineDecls);
+        $this->assertStringContainsString("'setknownclassreadonly'", $spineDecls);
+        $this->assertStringContainsString("'setbarerethrowlines'", $spineDecls);
     }
 
     /** Issue #2843: inventory compile_driver links without *_m3_emit_native_entry.php. */
@@ -842,8 +848,8 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
 
     public function testJitStubsFirstClassCallableForSelfHost(): void
     {
-        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
-        $this->assertStringContainsString('compilefirstclasscallable', $jit);
+        $skipped = (string) file_get_contents(self::$root.'/lib/JIT/Concern/SkippedHotPathAndRealLoweringNames.php');
+        $this->assertStringContainsString('compilefirstclasscallable', $skipped);
     }
 
     public function testCliDriverDispatchEntryForM5CompiledDriver(): void
@@ -862,9 +868,9 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
 
     public function testJitM5DriverHostCompileEnv(): void
     {
-        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
-        $this->assertStringContainsString('shouldUseM5DriverHostCompile', $jit);
-        $this->assertStringContainsString('PHP_COMPILER_M5_DRIVER_HOST', $jit);
+        $m3m4m5Policy = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3M4M5CompileDriverEmitPolicy.php');
+        $this->assertStringContainsString('shouldUseM5DriverHostCompile', $m3m4m5Policy);
+        $this->assertStringContainsString('PHP_COMPILER_M5_DRIVER_HOST', $m3m4m5Policy);
 
         $ctx = (string) file_get_contents(self::$root.'/lib/JIT/Context.php');
         $this->assertStringContainsString('CliArgvGlobalInit', $ctx);
