@@ -423,8 +423,12 @@ bootstrap-gen0-driver-functional-smoke:
 	./script/bootstrap-gen0-driver-functional-smoke.sh
 bootstrap-gen0-refresh-argv-driver:
 	./script/bootstrap-gen0-refresh-argv-driver.sh
+# Refresh committed helper units. aot-smoke is mandatory: fingerprint-fresh
+# gc_sections units without PHP_COMPILER_HELPER_RUNTIME_COMMON=1 segfault every
+# AOT binary (bin/compile.php defaults HELPER_RUNTIME_O=1) — #36246 / #36401.
 helper-runtime-prelink-refresh:
 	php script/emit-helper-runtime-object.php --prelink
+	./script/aot-smoke.sh
 # Drop source-gone committed units only (e.g. math helpers retired to builtins #36386).
 # Does not touch live fingerprint-stale units (#25377 / #36401).
 helper-runtime-orphan-prune:

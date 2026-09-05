@@ -1103,7 +1103,7 @@ final class HelperRuntimeCache
                 if (null === $sourceAbs || !self::manifestFingerprintMatches($manifest, $sourceAbs)) {
                     continue; // stale — emitter will refresh it
                 }
-                if (!self::unitObjectIsLinkable($unitDir) || !is_file($unitDir.'/unit.bc')) {
+                if (!self::unitObjectIsSafeToLink($unitDir) || !is_file($unitDir.'/unit.bc')) {
                     continue;
                 }
                 if (!isset($manifest['init_symbol']) || '' === (string) $manifest['init_symbol']) {
@@ -1413,7 +1413,7 @@ final class HelperRuntimeCache
         $unitObjects = [];
         foreach (array_keys(self::$usedUnits) as $unitDir) {
             $object = $unitDir.'/unit.o';
-            if (self::unitObjectIsLinkable($unitDir)) {
+            if (self::unitObjectIsSafeToLink($unitDir)) {
                 $unitObjects[] = $object;
             }
         }
@@ -1469,7 +1469,7 @@ final class HelperRuntimeCache
     public static function resolveLinkableUnitDir(string $slug): ?string
     {
         foreach ([self::unitDir($slug), self::prelinkedUnitsDir().'/'.$slug] as $dir) {
-            if (self::unitObjectIsLinkable($dir)) {
+            if (self::unitObjectIsSafeToLink($dir)) {
                 return $dir;
             }
         }
@@ -1491,6 +1491,34 @@ final class HelperRuntimeCache
         $object = $unitDir.'/unit.o';
 
         return is_file($object) && filesize($object) > 0;
+    }
+
+    /**
+     * Whether a unit.o may participate in an AOT link under HELPER_RUNTIME_O=1.
+     *
+     * Per-function-section units ({@see \PHPCompiler\JIT\AotGcSections}) require
+     * {@see HelperRuntimeCommon} in the link. Without it, `bin/compile.php` (which
+     * defaults HELPER_RUNTIME_O=1) produces SIGSEGV on every binary — measured
+     * aot-smoke 0/9 exit 139 after an accidental gc_sections prelink (#36246 / #36401).
+     * Skip those units so NestedJIT fills the gap until COMMON is opted in.
+     */
+    public static function unitObjectIsSafeToLink(string $unitDir): bool
+    {
+        if (!self::unitObjectIsLinkable($unitDir)) {
+            return false;
+        }
+        if (HelperRuntimeCommon::isLinkEnabled()) {
+            return true;
+        }
+        // Fast path: committed corpus without gc_sections → monolithic .text, no readelf.
+        $prelinkedRoot = self::prelinkedUnitsDir();
+        if (is_string($prelinkedRoot) && '' !== $prelinkedRoot
+            && str_starts_with($unitDir, $prelinkedRoot)
+            && !self::prelinkedCorpusHasGcSections()) {
+            return true;
+        }
+
+        return !self::unitObjectHasPerFunctionSections($unitDir.'/unit.o');
     }
 
     /**

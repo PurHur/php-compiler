@@ -62,4 +62,25 @@ final class HelperRuntimeCommonTest extends TestCase
         putenv(HelperRuntimeCommon::ENV.'=0');
         $this->assertFalse(HelperRuntimeCommon::isLinkEnabled());
     }
+
+    /**
+     * Monolithic committed units stay linkable while COMMON is off (#36401).
+     * gc_sections units without COMMON must not be selected (aot-smoke SIGSEGV).
+     */
+    public function testMonolithicPrelinkedUnitSafeWithoutCommon(): void
+    {
+        putenv(HelperRuntimeCommon::ENV.'=0');
+        unset($_ENV[HelperRuntimeCommon::ENV], $_SERVER[HelperRuntimeCommon::ENV]);
+        $dir = HelperRuntimeCache::prelinkedUnitsDir().'/'.HelperRuntimeCache::slugFor('/ext/ctype/CtypeJitHelper.php');
+        if (!HelperRuntimeCache::unitObjectIsLinkable($dir)) {
+            $this->markTestSkipped('ctype helper unit.o missing from prelinked cache');
+        }
+        if (HelperRuntimeCache::prelinkedCorpusHasGcSections()) {
+            $this->markTestSkipped('prelinked corpus already migrated to gc_sections');
+        }
+        $this->assertTrue(
+            HelperRuntimeCache::unitObjectIsSafeToLink($dir),
+            'monolithic prelinked units must remain safe to link without COMMON'
+        );
+    }
 }
