@@ -9,9 +9,9 @@
             "note": "Concern trait splits (#36230/#36387/#36403); CompileFuncCfgReturnAndGlobalImport + peers"
         },
         "lib/JIT.php": {
-            "budget": 18634,
+            "budget": 17937,
             "target": 20000,
-            "note": "Concern trait splits (#36387/#36403); DateTimeConstructAndMutationMeta + CompileIncDecAndConcatFlatten"
+            "note": "Concern trait splits (#36387/#36403); DomCompileTimeTagMeta + DateTimeConstructAndMutationMeta"
         },
         "lib/VM.php": {
             "budget": 24518,
