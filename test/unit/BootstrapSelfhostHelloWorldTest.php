@@ -769,8 +769,8 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
 
     public function testEmitTuEnsureEmitBridgeSpineSymbols(): void
     {
-        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
-        $this->assertStringContainsString('ensureM3EmitTuEmitBridgeSpineSymbols', $jit);
+        $parseInit = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuRuntimeParseAndInitSpine.php');
+        $this->assertStringContainsString('ensureM3EmitTuEmitBridgeSpineSymbols', $parseInit);
     }
 
     public function testExternalJitClassRegistersIdToName(): void

@@ -145,7 +145,8 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
     {
         $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
         $this->assertStringContainsString('compileM3EmitTuMainNative', $jit);
-        $this->assertStringContainsString('BootstrapCompileSmokeM3Emit::emitMainEntry', $jit);
+        $driverMain = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuAndCompileDriverMainNative.php');
+        $this->assertStringContainsString('BootstrapCompileSmokeM3Emit::emitMainEntry', $driverMain);
         $this->assertStringContainsString('compileM3EmitTuRuntimeMethodFromQueue', $jit);
     }
 
@@ -153,13 +154,9 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
     {
         $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
         $this->assertStringContainsString('shouldUseM3CompileDriverRealLowering()', $jit);
-        $this->assertStringContainsString('compileM3EmitTuRuntimeSpineMethodsForRealLowering', $jit);
         $this->assertStringContainsString('emitMainEntry', $jit);
-        $this->assertStringContainsString('M3EmitTuTrivialEchoAot::registerLinktime', $jit);
         $this->assertStringContainsString('shouldUseEmitHelperLinkStubs()', $jit);
         $this->assertStringContainsString('M3EmitTuTrivialEchoAot::isRegistered', $jit);
-        $this->assertStringContainsString('runtime_trivial_echo.php', $jit);
-        $this->assertStringContainsString('compiler_smoke_standalone.php', $jit);
         $this->assertStringContainsString('compile_smoke_m3_emit', $jit);
         $smoke = (string) file_get_contents(self::$root.'/test/bootstrap-aot/compile_smoke_m3_emit.php');
         $this->assertStringContainsString('getLastParseFailure', $smoke);
@@ -172,13 +169,18 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
         $this->assertStringContainsString('echoLastParseFailureSuffix', $emit);
         $this->assertStringContainsString('noteparsecompilenullforscript', $emit);
         $this->assertStringContainsString('helloworld_compile_smoke', $jit);
-        $this->assertStringContainsString('HELLOWORLD_SIDECAR_REL', $jit);
-        $this->assertStringContainsString('COMPILE_SMOKE_SIDECAR_REL', $jit);
         $spineDecls = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuRuntimeSpineDeclsAndCompileDeps.php');
+        $this->assertStringContainsString('compileM3EmitTuRuntimeSpineMethodsForRealLowering', $spineDecls);
         $this->assertMatchesRegularExpression(
             '/compileM3EmitTuRuntimeSpineDecls\([^)]*\): void[\s\S]*?compileM3EmitTuRuntimeSpineMethodsForRealLowering/',
             $spineDecls
         );
+        $sidecar = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuSidecarLinktime.php');
+        $this->assertStringContainsString('M3EmitTuTrivialEchoAot::registerLinktime', $sidecar);
+        $this->assertStringContainsString('runtime_trivial_echo.php', $sidecar);
+        $this->assertStringContainsString('compiler_smoke_standalone.php', $sidecar);
+        $this->assertStringContainsString('HELLOWORLD_SIDECAR_REL', $sidecar);
+        $this->assertStringContainsString('COMPILE_SMOKE_SIDECAR_REL', $sidecar);
         $compile = (string) file_get_contents(self::$root.'/bin/compile.php');
         $this->assertStringContainsString('PHP_COMPILER_M3_EMIT_HELPER_SPINE=1', $compile);
         $aot = (string) file_get_contents(self::$root.'/lib/JIT/M3EmitTuTrivialEchoAot.php');
@@ -199,7 +201,8 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
         $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
         $this->assertStringContainsString('$funcLc !== $methodLc', $jit);
         $this->assertStringContainsString("'initparsepipeline'", $jit);
-        $this->assertStringContainsString('compileM3EmitTuRuntimeSpineMethodsForRealLowering', $jit);
+        $spineDecls = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuRuntimeSpineDeclsAndCompileDeps.php');
+        $this->assertStringContainsString('compileM3EmitTuRuntimeSpineMethodsForRealLowering', $spineDecls);
     }
 
     public function testM3EmitTuUsesRuntimeInitCompilerFloor(): void
