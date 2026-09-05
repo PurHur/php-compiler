@@ -23,6 +23,10 @@ class Module extends ModuleAbstract
             $var->int($value);
             $runtime->vmContext->defineConstant($name, $var);
         }
+        // lib/VM/Context must not import ext\filter (#36204).
+        VM\FilterVmRuntimeSupport::setVariableForName(
+            static fn (string $name): ?VM\Variable => FilterConstants::variableForName($name)
+        );
     }
 
     public function jitInit(\PHPCompiler\JIT\Context $context): void

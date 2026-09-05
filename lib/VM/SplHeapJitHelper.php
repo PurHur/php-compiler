@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
-use PHPCompiler\ext\spl\SplHeapBuiltin;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
@@ -20,6 +19,13 @@ use PHPLLVM\Value;
  */
 final class SplHeapJitHelper
 {
+    /** Match php-src ext/spl/spl_heap.c / SplHeapBuiltin (#26784, #36204). */
+    public const KIND_MAX = 1;
+
+    public const KIND_MIN = -1;
+
+    public const KIND_USER = 0;
+
     public const PROP_HEAP = '__spl_heap';
 
     public const PROP_ITER_POS = '__spl_iter_pos';
@@ -394,8 +400,8 @@ final class SplHeapJitHelper
     private static function classNameForKind(int $kind): string
     {
         return match ($kind) {
-            SplHeapBuiltin::KIND_MAX => 'SplMaxHeap',
-            SplHeapBuiltin::KIND_MIN => 'SplMinHeap',
+            self::KIND_MAX => 'SplMaxHeap',
+            self::KIND_MIN => 'SplMinHeap',
             default => 'SplHeap',
         };
     }

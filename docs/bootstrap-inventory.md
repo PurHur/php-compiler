@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8240 |
-| Phase A inventory files (M2 ratio SSOT) | 8240 |
+| PHP files on vm.php path | 8244 |
+| Phase A inventory files (M2 ratio SSOT) | 8244 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26067 |
+| Source constructs flagged (warnings) | 26072 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -732,7 +732,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/filter/JitFilterExtensionHooksFacade.php` | 0 | 3 |
 | `ext/filter/JitFilterId.php` | 0 | 1 |
 | `ext/filter/JitFilterList.php` | 0 | 2 |
-| `ext/filter/Module.php` | 0 | 10 |
+| `ext/filter/Module.php` | 0 | 11 |
 | `ext/filter/VmFilter.php` | 0 | 37 |
 | `ext/filter/filter_has_var.php` | 0 | 4 |
 | `ext/filter/filter_id.php` | 0 | 1 |
@@ -2630,12 +2630,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/GlobIteratorSnapshotJitHelper.php` | 0 | 2 |
 | `ext/spl/InfiniteIteratorBuiltin.php` | 0 | 5 |
 | `ext/spl/InternalIteratorBuiltin.php` | 0 | 10 |
-| `ext/spl/InternalIteratorLiveHandler.php` | 0 | 1 |
 | `ext/spl/InternalIteratorSerializeDeny.php` | 0 | 3 |
 | `ext/spl/IteratorIteratorBuiltin.php` | 0 | 19 |
 | `ext/spl/JitSplClasses.php` | 0 | 2 |
 | `ext/spl/LimitIteratorBuiltin.php` | 0 | 8 |
-| `ext/spl/Module.php` | 0 | 4 |
+| `ext/spl/Module.php` | 0 | 5 |
 | `ext/spl/MultipleIteratorBuiltin.php` | 0 | 14 |
 | `ext/spl/ParentIteratorBuiltin.php` | 0 | 8 |
 | `ext/spl/RecursiveArrayIteratorBuiltin.php` | 0 | 9 |
@@ -7935,6 +7934,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/FiberSupport.php` | 0 | 4 |
 | `lib/VM/FiberTrace.php` | 0 | 5 |
 | `lib/VM/FilterIteratorJitHelper.php` | 0 | 3 |
+| `lib/VM/FilterVmRuntimeSupport.php` | 0 | 1 |
 | `lib/VM/ForeachIterator.php` | 0 | 2 |
 | `lib/VM/GeneratorIteratorJitHelper.php` | 0 | 6 |
 | `lib/VM/GeneratorJitHelper.php` | 0 | 1 |
@@ -7954,6 +7954,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/InstanceOfClassName.php` | 0 | 2 |
 | `lib/VM/InstanceOfJitHelper.php` | 0 | 1 |
 | `lib/VM/InterfaceCheck.php` | 0 | 1 |
+| `lib/VM/InternalIteratorLiveHandler.php` | 0 | 1 |
+| `lib/VM/InternalIteratorSupport.php` | 0 | 1 |
 | `lib/VM/InternalStrictArg.php` | 0 | 1 |
 | `lib/VM/IterableCheck.php` | 0 | 1 |
 | `lib/VM/LateStaticBinding.php` | 0 | 1 |
@@ -8023,6 +8025,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/SplArrayHandler.php` | 0 | 1 |
 | `lib/VM/SplArraySupport.php` | 0 | 2 |
 | `lib/VM/SplDllistJitHelper.php` | 0 | 6 |
+| `lib/VM/SplDualIteratorSupport.php` | 0 | 1 |
 | `lib/VM/SplFileObjectJitHelper.php` | 0 | 6 |
 | `lib/VM/SplFixedArrayJitHelper.php` | 0 | 11 |
 | `lib/VM/SplHeapJitHelper.php` | 0 | 5 |
@@ -13778,15 +13781,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new VM\Variable (line 22)
-- new JitFilterExtensionHooksFacade (line 30)
-- new filter_var (line 36)
-- new filter_input (line 37)
-- new filter_has_var (line 38)
-- new filter_input_array (line 39)
-- new filter_var_array (line 40)
-- new filter_list (line 41)
-- new filter_id (line 42)
+- new JitFilterExtensionHooksFacade (line 34)
+- new filter_var (line 40)
+- new filter_input (line 41)
+- new filter_has_var (line 42)
+- new filter_input_array (line 43)
+- new filter_var_array (line 44)
+- new filter_list (line 45)
+- new filter_id (line 46)
 - 3 class method(s)
+- 1 closure(s)
 
 ### `ext/filter/VmFilter.php`
 
@@ -29285,21 +29289,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/InternalIteratorBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 36)
-- new InternalIteratorConstruct (line 43)
-- new InternalIteratorCurrent (line 50)
-- new InternalIteratorKey (line 51)
-- new InternalIteratorNext (line 52)
-- new InternalIteratorValid (line 53)
-- new InternalIteratorRewind (line 54)
-- new ObjectEntry (line 72)
-- new ObjectEntry (line 88)
+- new ClassEntry (line 37)
+- new InternalIteratorConstruct (line 44)
+- new InternalIteratorCurrent (line 51)
+- new InternalIteratorKey (line 52)
+- new InternalIteratorNext (line 53)
+- new InternalIteratorValid (line 54)
+- new InternalIteratorRewind (line 55)
+- new ObjectEntry (line 73)
+- new ObjectEntry (line 89)
 - 17 class method(s)
-
-### `ext/spl/InternalIteratorLiveHandler.php`
-
-**Warnings** (review for bootstrap subset):
-- 5 class method(s)
 
 ### `ext/spl/InternalIteratorSerializeDeny.php`
 
@@ -29354,8 +29353,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new JIT\Call\SplHeapMethod (line 33)
 - new VmSplArrayHandler (line 46)
-- new spl_classes (line 52)
+- new spl_classes (line 66)
 - 3 class method(s)
+- 4 closure(s)
 
 ### `ext/spl/MultipleIteratorBuiltin.php`
 
@@ -52802,7 +52802,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/PosixSessionRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 7 class method(s)
 
 ### `lib/JIT/Builtin/PosixSetegidJit.php`
 
@@ -64398,14 +64398,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/ClassConstMaterializer.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 140)
-- new Variable (line 158)
-- new Variable (line 181)
-- new Variable (line 228)
-- new ObjectEntry (line 241)
-- new ClassEntry (line 308)
-- new ObjectEntry (line 309)
-- new Variable (line 317)
+- new ClassEntry (line 139)
+- new Variable (line 157)
+- new Variable (line 180)
+- new Variable (line 227)
+- new ObjectEntry (line 240)
+- new ClassEntry (line 307)
+- new ObjectEntry (line 308)
+- new Variable (line 316)
 - 14 class method(s)
 
 ### `lib/VM/ClassEntry.php`
@@ -64948,34 +64948,34 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/EnumCaseSupport.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 72)
-- new EnumCaseEntry (line 77)
-- new ObjectEntry (line 87)
-- new Variable (line 93)
-- new Variable (line 107)
-- new Variable (line 109)
-- new EnumCaseEntry (line 110)
-- new Variable (line 139)
-- new Variable (line 254)
-- new Error (line 310)
-- new Variable (line 635)
-- new Variable (line 639)
-- new Variable (line 648)
-- new Variable (line 652)
-- new Variable (line 799)
-- new EnumCaseEntry (line 805)
-- new Variable (line 820)
-- new Variable (line 830)
-- new Variable (line 891)
-- new Variable (line 898)
-- new Variable (line 905)
-- new Variable (line 927)
-- new Variable (line 937)
-- new Variable (line 944)
-- new Variable (line 952)
-- new HashTable (line 1031)
-- new Variable (line 1040)
-- new Error (line 1150)
+- new Variable (line 71)
+- new EnumCaseEntry (line 76)
+- new ObjectEntry (line 86)
+- new Variable (line 92)
+- new Variable (line 106)
+- new Variable (line 108)
+- new EnumCaseEntry (line 109)
+- new Variable (line 138)
+- new Variable (line 253)
+- new Error (line 309)
+- new Variable (line 634)
+- new Variable (line 638)
+- new Variable (line 647)
+- new Variable (line 651)
+- new Variable (line 798)
+- new EnumCaseEntry (line 804)
+- new Variable (line 819)
+- new Variable (line 829)
+- new Variable (line 890)
+- new Variable (line 897)
+- new Variable (line 904)
+- new Variable (line 926)
+- new Variable (line 936)
+- new Variable (line 943)
+- new Variable (line 951)
+- new HashTable (line 1030)
+- new Variable (line 1039)
+- new Error (line 1149)
 - 56 class method(s)
 
 ### `lib/VM/EnumCasesJitHelper.php`
@@ -65110,6 +65110,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JITVariable (line 100)
 - new RuntimeIndirectInstanceMethodCall (line 145)
 - 10 class method(s)
+
+### `lib/VM/FilterVmRuntimeSupport.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
 
 ### `lib/VM/ForeachIterator.php`
 
@@ -65341,6 +65346,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 9 class method(s)
+
+### `lib/VM/InternalIteratorLiveHandler.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
+
+### `lib/VM/InternalIteratorSupport.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
 
 ### `lib/VM/InternalStrictArg.php`
 
@@ -65860,6 +65875,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JITVariable (line 1231)
 - 39 class method(s)
 
+### `lib/VM/SplDualIteratorSupport.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
+
 ### `lib/VM/SplFileObjectJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -65888,10 +65908,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/SplHeapJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 35)
-- new JITVariable (line 50)
-- new JITVariable (line 384)
-- new JITVariable (line 444)
+- new JITVariable (line 41)
+- new JITVariable (line 56)
+- new JITVariable (line 390)
+- new JITVariable (line 450)
 - 21 class method(s)
 
 ### `lib/VM/SplHtPosIteratorJitHelper.php`
@@ -65922,14 +65942,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/SplPriorityQueueJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 43)
-- new JITVariable (line 44)
-- new JITVariable (line 339)
-- new JITVariable (line 348)
+- new JITVariable (line 49)
+- new JITVariable (line 50)
+- new JITVariable (line 345)
 - new JITVariable (line 354)
-- new JITVariable (line 444)
-- new JITVariable (line 456)
-- new JITVariable (line 502)
+- new JITVariable (line 360)
+- new JITVariable (line 450)
+- new JITVariable (line 462)
+- new JITVariable (line 508)
 - 25 class method(s)
 
 ### `lib/VM/StringOffsetJitHelper.php`
@@ -66379,8 +66399,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/WeakMapInternalIteratorHandler.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 28)
-- new Variable (line 49)
+- new self (line 26)
+- new Variable (line 47)
 - 6 class method(s)
 
 ### `lib/VM/WeakMapIterator.php`

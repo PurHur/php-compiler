@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
-use PHPCompiler\ext\spl\InternalIteratorLiveHandler;
-
 /**
  * InternalIterator backing for WeakMap::getIterator() (php-src Zend/zend_weakrefs.c; #22267).
  *

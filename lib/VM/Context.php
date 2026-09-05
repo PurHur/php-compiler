@@ -475,7 +475,7 @@ class Context {
 
                 return $var;
         }
-        $filterVar = \PHPCompiler\ext\filter\FilterConstants::variableForName($name);
+        $filterVar = FilterVmRuntimeSupport::variableForName($name);
         if (null !== $filterVar) {
             return $filterVar;
         }

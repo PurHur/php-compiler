@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
-use PHPCompiler\ext\spl\SplPriorityQueueBuiltin;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\MultisortRuntime;
 use PHPCompiler\JIT\Context;
@@ -24,6 +23,13 @@ use PHPLLVM\Value;
  */
 final class SplPriorityQueueJitHelper
 {
+    /** Match php-src ext/spl/spl_heap.c / SplPriorityQueueBuiltin (#33861, #36204). */
+    public const EXTR_DATA = 1;
+
+    public const EXTR_PRIORITY = 2;
+
+    public const EXTR_BOTH = 3;
+
     public const PROP_DATA = '__spl_data';
 
     public const PROP_PRIO = '__spl_prio';
@@ -52,7 +58,7 @@ final class SplPriorityQueueJitHelper
             $prioVar,
             JITVariable::TYPE_HASHTABLE
         );
-        self::storeLongProperty($context, $obj, self::PROP_FLAGS, SplPriorityQueueBuiltin::EXTR_DATA);
+        self::storeLongProperty($context, $obj, self::PROP_FLAGS, self::EXTR_DATA);
         self::storeLongProperty($context, $obj, self::PROP_ITER_POS, -1);
         $objectType->markObjectConstructed($obj);
 
@@ -133,7 +139,7 @@ final class SplPriorityQueueJitHelper
         $obj = self::loadObject($context, $receiver);
         $i64 = $context->getTypeFromString('int64');
         $flags = JitLongArg::lower($context, $flagsArg, 'SplPriorityQueue::setExtractFlags() flags');
-        $masked = $context->builder->and($flags, $i64->constInt(SplPriorityQueueBuiltin::EXTR_BOTH, false));
+        $masked = $context->builder->and($flags, $i64->constInt(self::EXTR_BOTH, false));
         self::storeLongPropertyValue($context, $obj, self::PROP_FLAGS, $masked);
         $slot = JitValueBox::alloc($context);
         JitValueBox::writeLong($context, $slot, $masked);
@@ -322,7 +328,7 @@ final class SplPriorityQueueJitHelper
         $isBoth = $context->builder->icmp(
             Builder::INT_EQ,
             $flags,
-            $i64->constInt(SplPriorityQueueBuiltin::EXTR_BOTH, false)
+            $i64->constInt(self::EXTR_BOTH, false)
         );
         $notBothBb = BasicBlockHelper::append($context, 'splpq_fmt_not_both');
         $context->builder->branchIf($isBoth, $bothBb, $notBothBb);
@@ -331,7 +337,7 @@ final class SplPriorityQueueJitHelper
         $isPrio = $context->builder->icmp(
             Builder::INT_EQ,
             $flags,
-            $i64->constInt(SplPriorityQueueBuiltin::EXTR_PRIORITY, false)
+            $i64->constInt(self::EXTR_PRIORITY, false)
         );
         $context->builder->branchIf($isPrio, $prioBb, $dataBb);
 

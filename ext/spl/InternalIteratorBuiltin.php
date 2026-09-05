@@ -9,6 +9,7 @@ use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\InternalIteratorLiveHandler;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 use PHPCfg\Func as CfgFunc;

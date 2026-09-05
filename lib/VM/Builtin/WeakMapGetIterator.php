@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM\Builtin;
 
-use PHPCompiler\ext\spl\InternalIteratorBuiltin;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
+use PHPCompiler\VM\InternalIteratorSupport;
 use PHPCompiler\VM\WeakMapInternalIteratorHandler;
 use PHPCompiler\VM\WeakRefSupport;
 
@@ -35,6 +35,6 @@ final class WeakMapGetIterator extends VmClassMethod
         $receiver = WeakRefSupport::requireObject($frame->calledArgs[0], 'WeakMap');
         $map = $receiver->toObject();
         $handler = WeakMapInternalIteratorHandler::forMap($map);
-        $frame->returnVar->object(InternalIteratorBuiltin::fromLiveHandler($ctx, $handler));
+        $frame->returnVar->object(InternalIteratorSupport::fromLiveHandler($ctx, $handler));
     }
 }
