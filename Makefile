@@ -119,6 +119,11 @@ web-smoke:
 apps-scoreboard:
 	./script/docker-exec.sh -- bash -lc 'php script/apps/scoreboard.php $(ARGS)'
 
+# Weekly status Markdown from committed snapshot (#36404). Local-CI only — no GHA.
+.PHONY: status-report
+status-report:
+	./script/docker-exec.sh --sync-back docs/pages/status -- bash -lc 'php script/status/report.php $(ARGS)'
+
 # php-src-shaped .phpt harness self-test (#36381) — sample corpus under VM + baseline diff
 php-src-phpt-sample:
 	./script/docker-exec.sh -- bash -lc 'source script/php-env.sh && script/php-src/php-src-phpt.sh --corpus=sample --backend=vm --diff --scoreboard'
