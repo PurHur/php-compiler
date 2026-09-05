@@ -234,7 +234,43 @@ if [[ "$walk_trimmed" != "10,20|1,2" ]]; then
   exit 1
 fi
 
-echo "runtime-assert-mutate-smoke: source gates for by-ref mutator COW (#36397 slice 9–10)…"
+echo "runtime-assert-mutate-smoke: run COW array_multisort (must not false-positive M5)…"
+MSORT_SRC="$WORKDIR/cow_multisort.php"
+MSORT_BIN="$WORKDIR/cow_multisort.bin"
+cat > "$MSORT_SRC" <<'PHP'
+<?php
+$a = [3, 1, 2];
+$b = $a;
+$c = ['c', 'a', 'b'];
+array_multisort($a, $c);
+echo implode(',', $a), '|', implode(',', $b), '|', implode(',', $c), "\n";
+PHP
+env \
+  PHP_COMPILER_HELPER_RUNTIME_O=0 \
+  PHP_COMPILER_HELPER_RUNTIME_CACHE_DIR="$CACHE-msort" \
+  PHP_COMPILER_RUNTIME_ASSERT=1 \
+  PHP_COMPILER_DUMP_IR=1 \
+  "$PHP_BIN" bin/compile.php -o "$MSORT_BIN" "$MSORT_SRC"
+# M5 is at the call site (before packVariables addrefs); IR must still name assert_exclusive.
+if [[ -f /tmp/phpc-last.ll ]]; then
+  if ! grep -q '__ref__assert_exclusive' /tmp/phpc-last.ll; then
+    echo "runtime-assert-mutate-smoke: FAIL — COW array_multisort IR missing __ref__assert_exclusive" >&2
+    exit 1
+  fi
+fi
+msort_out="$("$MSORT_BIN" 2>&1)"
+msort_rc=$?
+if [[ "$msort_rc" -ne 0 ]]; then
+  echo "runtime-assert-mutate-smoke: FAIL — COW array_multisort exited $msort_rc: $msort_out" >&2
+  exit 1
+fi
+msort_trimmed="$(printf '%s' "$msort_out" | tr -d '\r')"
+if [[ "$msort_trimmed" != "1,2,3|3,1,2|a,b,c" ]]; then
+  echo "runtime-assert-mutate-smoke: FAIL — expected 1,2,3|3,1,2|a,b,c from COW array_multisort, got: $msort_out" >&2
+  exit 1
+fi
+
+echo "runtime-assert-mutate-smoke: source gates for by-ref mutator COW (#36397 slice 9–11)…"
 for f in \
   lib/JIT/Builtin/ArrayPushRuntime.php \
   lib/JIT/Builtin/ArrayUnshiftRuntime.php \
@@ -246,13 +282,18 @@ for f in \
   lib/JIT/Builtin/UsortRuntime.php \
   lib/JIT/Builtin/ValueSortRuntime.php \
   lib/JIT/Builtin/KeySortRuntime.php \
-  lib/JIT/Builtin/NaturalSortRuntime.php
+  lib/JIT/Builtin/NaturalSortRuntime.php \
+  lib/JIT/Builtin/MultisortRuntime.php
 do
   if ! grep -q 'separateContainerForWrite' "$ROOT/$f"; then
     echo "runtime-assert-mutate-smoke: FAIL — $f missing separateContainerForWrite" >&2
     exit 1
   fi
 done
+if ! grep -q 'emitAssertExclusiveCall' "$ROOT/lib/JIT/Builtin/MultisortRuntime.php"; then
+  echo "runtime-assert-mutate-smoke: FAIL — MultisortRuntime.php missing emitAssertExclusiveCall" >&2
+  exit 1
+fi
 for f in \
   lib/JIT/HashTablePopLastLlvm.php \
   lib/JIT/HashTableShiftLlvm.php \

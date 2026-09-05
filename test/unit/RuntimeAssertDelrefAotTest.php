@@ -155,13 +155,15 @@ final class RuntimeAssertDelrefAotTest extends TestCase
         $sort = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Builtin/SortRuntime.php');
         $walk = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Builtin/ArrayWalkRuntime.php');
         $usort = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Builtin/UsortRuntime.php');
+        $multisort = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Builtin/MultisortRuntime.php');
         $popLlvm = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/HashTablePopLastLlvm.php');
         $shiftLlvm = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/HashTableShiftLlvm.php');
         $spliceLlvm = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/HashTableSpliceLlvm.php');
-        foreach ([$push, $unshift, $pop, $shift, $splice, $sort, $walk, $usort] as $src) {
+        foreach ([$push, $unshift, $pop, $shift, $splice, $sort, $walk, $usort, $multisort] as $src) {
             $this->assertStringContainsString('separateContainerForWrite', $src);
         }
         $this->assertStringContainsString('Packed sort mutates in place', $ht);
+        $this->assertStringContainsString('emitAssertExclusiveCall', $multisort);
         $this->assertStringContainsString('emitAssertExclusiveCall', $popLlvm);
         $this->assertStringContainsString('emitAssertExclusiveCall', $shiftLlvm);
         $this->assertStringContainsString('emitAssertExclusiveCall', $spliceLlvm);
