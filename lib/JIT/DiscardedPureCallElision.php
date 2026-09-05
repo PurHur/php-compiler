@@ -128,6 +128,18 @@ use PHPCompiler\VM\Variable as VmVariable;
  * cal_to_jd (compile-time calendar id in [0, CAL_NUM_CALS) + three typed
  * numerics; runtime / invalid calendar stays live — ValueError; soft-null /
  * wrong argc stay live),
+ * cal_info (zero-arg or compile-time calendar id −1 or in [0, CAL_NUM_CALS);
+ * runtime / invalid calendar stays live — ValueError; soft-null / excess
+ * argc stay live),
+ * easter_days / easter_date (compile-time year in the php-src ValueError
+ * window + optional typed mode; zero-arg / soft-null year stay live —
+ * current-year clock; runtime year stays live — ValueError),
+ * jdtojewish (exactly one typed numeric; hebrew/flags forms stay live —
+ * optional ValueError paths; soft-null / wrong argc stay live),
+ * jdtounix (compile-time julian day in [UNIX_EPOCH_JD, max]; runtime /
+ * out-of-range stay live — ValueError; soft-null / wrong argc stay live),
+ * unixtojd (exactly one compile-time timestamp ≥ 0; zero-arg / soft-null
+ * stay live — time()/deprecate; negative / runtime stay live — ValueError),
  * getrandmax / mt_getrandmax (zero-arg; excess argc stays live —
  * ArgumentCountError),
  * typed-array array_key_first / array_key_last / array_is_list (exactly one
@@ -418,6 +430,21 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureCalToJdNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureCalInfoNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureEasterNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureJdtojewishNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureJdtounixNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureUnixtojdNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureRandmaxRuntimeInfoNoSideEffect($toCall, $callArgs)) {
@@ -2207,8 +2234,8 @@ final class DiscardedPureCallElision
      * php-src {@code ext/calendar/calendar.c}. Exactly one typed numeric
      * (julian day). Soft-null / non-numeric stay live ({@code TypeError} /
      * deprecate). Wrong argc stays live ({@code ArgumentCountError}).
-     * {@code jdtojewish} stays live (optional hebrew/flags ValueError paths).
-     * {@code jdtounix} stays live (range {@code ValueError}).
+     * {@code jdtojewish}/{@code jdtounix} have dedicated handlers below
+     * (hebrew/flags and unix-range {@code ValueError} paths).
      *
      * @param array<int, Variable> $callArgs
      */
@@ -2362,6 +2389,179 @@ final class DiscardedPureCallElision
         }
 
         return true;
+    }
+
+    /**
+     * Discarded {@code cal_info} — php-src {@code ext/calendar/calendar.c}.
+     * Zero-arg (all calendars) or compile-time calendar id {@code -1} /
+     * {@code [0, CAL_NUM_CALS)}. Runtime / invalid calendar stays live
+     * ({@code ValueError}). Soft-null / excess argc stay live.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureCalInfoNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if ('cal_info' !== strtolower($toCall->getName())) {
+            return false;
+        }
+        $argc = \count($callArgs);
+        if (0 === $argc) {
+            return true;
+        }
+        if (1 !== $argc) {
+            return false;
+        }
+        if (
+            !$callArgs[0] instanceof Variable
+            || null === $callArgs[0]->compileTimeLong
+        ) {
+            return false;
+        }
+        $cal = $callArgs[0]->compileTimeLong;
+
+        return -1 === $cal || ($cal >= 0 && $cal < 4);
+    }
+
+    /**
+     * Discarded {@code easter_days}/{@code easter_date} — php-src
+     * {@code ext/calendar/easter.c}. Compile-time year inside the php-src
+     * {@code ValueError} window plus optional typed mode. Zero-arg /
+     * soft-null year stay live (current-year clock). Runtime year stays live
+     * ({@code ValueError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureEasterNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        $name = strtolower($toCall->getName());
+        if ('easter_days' !== $name && 'easter_date' !== $name) {
+            return false;
+        }
+        $argc = \count($callArgs);
+        if ($argc < 1 || $argc > 2) {
+            return false;
+        }
+        if (
+            !$callArgs[0] instanceof Variable
+            || null === $callArgs[0]->compileTimeLong
+        ) {
+            return false;
+        }
+        $year = $callArgs[0]->compileTimeLong;
+        $maxYear = intdiv(\PHP_INT_MAX, 5) * 4;
+        if ($year <= 0 || $year > $maxYear) {
+            return false;
+        }
+        if ('easter_date' === $name) {
+            if (\PHP_INT_SIZE >= 8) {
+                if ($year < 1970 || $year > 2000000000) {
+                    return false;
+                }
+            } elseif ($year < 1970 || $year > 2037) {
+                return false;
+            }
+        }
+        if (2 === $argc) {
+            if (
+                !$callArgs[1] instanceof Variable
+                || !self::mathArgAllowsDiscardedElision($callArgs[1])
+            ) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Discarded {@code jdtojewish} — php-src {@code ext/calendar/calendar.c}.
+     * Exactly one typed numeric (hebrew defaults false). Hebrew / flags forms
+     * stay live (optional formatting {@code ValueError} paths). Soft-null /
+     * wrong argc stay live.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureJdtojewishNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if ('jdtojewish' !== strtolower($toCall->getName())) {
+            return false;
+        }
+        if (1 !== \count($callArgs)) {
+            return false;
+        }
+
+        return $callArgs[0] instanceof Variable
+            && self::mathArgAllowsDiscardedElision($callArgs[0]);
+    }
+
+    /**
+     * Discarded {@code jdtounix} — php-src {@code ext/calendar/cal_unix.c}.
+     * Compile-time julian day in {@code [UNIX_EPOCH_JD, UNIX_EPOCH_JD +
+     * PHP_INT_MAX/86400]}. Runtime / out-of-range stay live ({@code ValueError}).
+     * Soft-null / wrong argc stay live.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureJdtounixNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if ('jdtounix' !== strtolower($toCall->getName())) {
+            return false;
+        }
+        if (1 !== \count($callArgs)) {
+            return false;
+        }
+        if (
+            !$callArgs[0] instanceof Variable
+            || null === $callArgs[0]->compileTimeLong
+        ) {
+            return false;
+        }
+        $jd = $callArgs[0]->compileTimeLong;
+        $epochJd = 2440588;
+        $maxJd = $epochJd + intdiv(\PHP_INT_MAX, 86400);
+
+        return $jd >= $epochJd && $jd <= $maxJd;
+    }
+
+    /**
+     * Discarded {@code unixtojd} — php-src {@code ext/calendar/cal_unix.c}.
+     * Exactly one compile-time timestamp ≥ 0 (oversized timestamps return
+     * false — discarded). Zero-arg / soft-null stay live ({@code time()} /
+     * deprecate). Negative / runtime stay live ({@code ValueError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureUnixtojdNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if ('unixtojd' !== strtolower($toCall->getName())) {
+            return false;
+        }
+        if (1 !== \count($callArgs)) {
+            return false;
+        }
+        if (
+            !$callArgs[0] instanceof Variable
+            || null === $callArgs[0]->compileTimeLong
+        ) {
+            return false;
+        }
+
+        return $callArgs[0]->compileTimeLong >= 0;
     }
 
     /**
