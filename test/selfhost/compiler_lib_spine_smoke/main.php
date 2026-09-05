@@ -5416,6 +5416,7 @@ require_once __DIR__.'/../../../lib/JIT/Concern/SkippedSplitCfgAndTernaryMergeHe
 require_once __DIR__.'/../../../lib/JIT/Concern/SkippedHotPathAndRealLoweringNames.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/M3EmitTuCompilerAndRuntimeVoidStubs.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/M3EmitTuAndCompileDriverMainNative.php';
+require_once __DIR__.'/../../../lib/JIT/Concern/M3EmitTuRuntimeSpineDeclsAndCompileDeps.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/InitJitMethodCall.php';
 require_once __DIR__.'/../../../lib/Compiler/CompileTimeNew.php';
 require_once __DIR__.'/../../../lib/Compiler/DeprecatedMetadata.php';
