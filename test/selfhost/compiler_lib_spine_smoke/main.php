@@ -5382,6 +5382,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/EchoCompileOperandTerminalA
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompileOpsTicksAndCfgSplit.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompileFuncCfgReturnAndGlobalImport.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileBlockInternal.php';
+require_once __DIR__.'/../../../lib/JIT/Concern/CompilePropertyFetchReadAndWrite.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AssignOperand.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AdaptByRefCallArgs.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/EmitJitReturn.php';
