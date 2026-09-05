@@ -15,6 +15,7 @@ namespace PHPCompiler;
 require_once __DIR__.'/OpCodeNames.php';
 require_once __DIR__.'/JIT/Concern/CompileBlockInternal.php';
 require_once __DIR__.'/JIT/Concern/CompilePropertyFetchReadAndWrite.php';
+require_once __DIR__.'/JIT/Concern/CompileEchoAndPrint.php';
 require_once __DIR__.'/JIT/Concern/InitJitMethodCall.php';
 require_once __DIR__.'/JIT/Concern/AssignOperand.php';
 require_once __DIR__.'/JIT/Concern/AdaptByRefCallArgs.php';
@@ -85,6 +86,7 @@ class JIT {
 
     use CompileBlockInternal;
     use CompilePropertyFetchReadAndWrite;
+    use CompileEchoAndPrint;
     use InitJitMethodCall;
     use AssignOperand;
     use AdaptByRefCallArgs;
