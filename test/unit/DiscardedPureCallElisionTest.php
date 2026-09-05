@@ -223,16 +223,22 @@ use PHPCompiler\ext\types\is_type;
 use PHPCompiler\ext\types\strlen;
 use PHPCompiler\ext\calendar\cal_days_in_month;
 use PHPCompiler\ext\calendar\cal_from_jd;
+use PHPCompiler\ext\calendar\cal_info;
 use PHPCompiler\ext\calendar\cal_to_jd;
+use PHPCompiler\ext\calendar\easter_date;
+use PHPCompiler\ext\calendar\easter_days;
 use PHPCompiler\ext\calendar\frenchtojd;
 use PHPCompiler\ext\calendar\gregoriantojd;
 use PHPCompiler\ext\calendar\jddayofweek;
 use PHPCompiler\ext\calendar\jdmonthname;
 use PHPCompiler\ext\calendar\jdtofrench;
 use PHPCompiler\ext\calendar\jdtogregorian;
+use PHPCompiler\ext\calendar\jdtojewish;
 use PHPCompiler\ext\calendar\jdtojulian;
+use PHPCompiler\ext\calendar\jdtounix;
 use PHPCompiler\ext\calendar\jewishtojd;
 use PHPCompiler\ext\calendar\juliantojd;
+use PHPCompiler\ext\calendar\unixtojd;
 use PHPCompiler\JIT\Call\Native;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\DiscardedPureCallElision;
@@ -4049,6 +4055,204 @@ final class DiscardedPureCallElisionTest extends TestCase
             $context,
             new cal_to_jd(),
             []
+        ));
+    }
+
+    public function testDiscardedCalInfoEasterJdtojewishUnixJdElideOnSafeArgs(): void
+    {
+        // php-src ext/calendar/{calendar,easter,cal_unix}.c leftovers (#36386).
+        $context = $this->makeContext();
+        $jd = $this->makeNativeLongVar();
+        $mode = $this->makeNativeLongVar();
+        $null = $this->makeNullVar();
+        $box = $this->makeValueBoxVar();
+        $obj = $this->makeObjectVar();
+        $str = $this->makeStringVar('2440588');
+        $calGregorian = $this->makeCompileTimeLongVar(0);
+        $calAll = $this->makeCompileTimeLongVar(-1);
+        $calInvalid = $this->makeCompileTimeLongVar(4);
+        $calRuntime = $this->makeNativeLongVar();
+        $yearOk = $this->makeCompileTimeLongVar(2024);
+        $yearLow = $this->makeCompileTimeLongVar(1969);
+        $yearZero = $this->makeCompileTimeLongVar(0);
+        $yearRuntime = $this->makeNativeLongVar();
+        $unixEpochJd = $this->makeCompileTimeLongVar(2440588);
+        $jdBeforeEpoch = $this->makeCompileTimeLongVar(2440587);
+        $tsZero = $this->makeCompileTimeLongVar(0);
+        $tsNeg = $this->makeCompileTimeLongVar(-1);
+        $tsRuntime = $this->makeNativeLongVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new cal_info(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new cal_info(),
+            [$calGregorian]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new cal_info(),
+            [$calAll]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new cal_info(),
+            [$calInvalid]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new cal_info(),
+            [$calRuntime]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new cal_info(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new cal_info(),
+            [$calGregorian, $mode]
+        ));
+
+        foreach ([new easter_days(), new easter_date()] as $builtin) {
+            $this->assertTrue(DiscardedPureCallElision::tryElide(
+                $context,
+                $builtin,
+                [$yearOk]
+            ));
+            $this->assertTrue(DiscardedPureCallElision::tryElide(
+                $context,
+                $builtin,
+                [$yearOk, $mode]
+            ));
+            $this->assertFalse(DiscardedPureCallElision::tryElide(
+                $context,
+                $builtin,
+                []
+            ));
+            $this->assertFalse(DiscardedPureCallElision::tryElide(
+                $context,
+                $builtin,
+                [$yearRuntime]
+            ));
+            $this->assertFalse(DiscardedPureCallElision::tryElide(
+                $context,
+                $builtin,
+                [$yearZero]
+            ));
+            $this->assertFalse(DiscardedPureCallElision::tryElide(
+                $context,
+                $builtin,
+                [$null]
+            ));
+            $this->assertFalse(DiscardedPureCallElision::tryElide(
+                $context,
+                $builtin,
+                [$yearOk, $null]
+            ));
+        }
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new easter_date(),
+            [$yearLow]
+        ));
+        // easter_days allows years before 1970; easter_date does not.
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new easter_days(),
+            [$yearLow]
+        ));
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new jdtojewish(),
+            [$jd]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new jdtojewish(),
+            [$str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new jdtojewish(),
+            []
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new jdtojewish(),
+            [$jd, $mode]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new jdtojewish(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new jdtojewish(),
+            [$box]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new jdtojewish(),
+            [$obj]
+        ));
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new jdtounix(),
+            [$unixEpochJd]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new jdtounix(),
+            [$jdBeforeEpoch]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new jdtounix(),
+            [$jd]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new jdtounix(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new jdtounix(),
+            []
+        ));
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new unixtojd(),
+            [$tsZero]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new unixtojd(),
+            [$tsNeg]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new unixtojd(),
+            [$tsRuntime]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new unixtojd(),
+            []
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new unixtojd(),
+            [$null]
         ));
     }
 
