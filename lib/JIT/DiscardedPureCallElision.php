@@ -115,6 +115,19 @@ use PHPCompiler\VM\Variable as VmVariable;
  * cal_days_in_month (compile-time calendar id in [0, CAL_NUM_CALS) + two
  * typed numerics; runtime / invalid calendar stays live — ValueError;
  * soft-null / wrong argc stay live),
+ * jdtogregorian / jdtojulian / jdtofrench (exactly one typed numeric —
+ * julian day; soft-null / non-numeric / wrong argc stay live — TypeError /
+ * ArgumentCountError),
+ * jdmonthname (exactly two typed numerics — julian day / mode; soft-null /
+ * wrong argc stay live),
+ * jddayofweek (1..2 typed numerics — julian day + optional mode; soft-null /
+ * wrong argc stay live),
+ * cal_from_jd (typed julian day + compile-time calendar id in
+ * [0, CAL_NUM_CALS); runtime / invalid calendar stays live — ValueError;
+ * soft-null / wrong argc stay live),
+ * cal_to_jd (compile-time calendar id in [0, CAL_NUM_CALS) + three typed
+ * numerics; runtime / invalid calendar stays live — ValueError; soft-null /
+ * wrong argc stay live),
  * getrandmax / mt_getrandmax (zero-arg; excess argc stays live —
  * ArgumentCountError),
  * typed-array array_key_first / array_key_last / array_is_list (exactly one
@@ -390,6 +403,21 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureCalDaysInMonthNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureCalendarFromJdNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureJdMonthNameNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureJdDayOfWeekNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureCalFromJdNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureCalToJdNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureRandmaxRuntimeInfoNoSideEffect($toCall, $callArgs)) {
@@ -2163,6 +2191,168 @@ final class DiscardedPureCallElision
             return false;
         }
         for ($i = 1; $i < 3; ++$i) {
+            if (
+                !$callArgs[$i] instanceof Variable
+                || !self::mathArgAllowsDiscardedElision($callArgs[$i])
+            ) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Discarded {@code jdtogregorian}/{@code jdtojulian}/{@code jdtofrench} —
+     * php-src {@code ext/calendar/calendar.c}. Exactly one typed numeric
+     * (julian day). Soft-null / non-numeric stay live ({@code TypeError} /
+     * deprecate). Wrong argc stays live ({@code ArgumentCountError}).
+     * {@code jdtojewish} stays live (optional hebrew/flags ValueError paths).
+     * {@code jdtounix} stays live (range {@code ValueError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureCalendarFromJdNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        switch (strtolower($toCall->getName())) {
+            case 'jdtogregorian':
+            case 'jdtojulian':
+            case 'jdtofrench':
+                break;
+            default:
+                return false;
+        }
+        if (1 !== \count($callArgs)) {
+            return false;
+        }
+
+        return $callArgs[0] instanceof Variable
+            && self::mathArgAllowsDiscardedElision($callArgs[0]);
+    }
+
+    /**
+     * Discarded {@code jdmonthname} — php-src {@code ext/calendar/calendar.c}.
+     * Exactly two typed numerics (julian day / mode). Soft-null / wrong argc
+     * stay live (deprecate / {@code ArgumentCountError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureJdMonthNameNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if ('jdmonthname' !== strtolower($toCall->getName())) {
+            return false;
+        }
+        if (2 !== \count($callArgs)) {
+            return false;
+        }
+        foreach ($callArgs as $arg) {
+            if (!$arg instanceof Variable || !self::mathArgAllowsDiscardedElision($arg)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Discarded {@code jddayofweek} — php-src {@code ext/calendar/dow.c}.
+     * One or two typed numerics (julian day + optional mode). Soft-null /
+     * wrong argc stay live (deprecate / {@code ArgumentCountError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureJdDayOfWeekNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if ('jddayofweek' !== strtolower($toCall->getName())) {
+            return false;
+        }
+        $argc = \count($callArgs);
+        if ($argc < 1 || $argc > 2) {
+            return false;
+        }
+        foreach ($callArgs as $arg) {
+            if (!$arg instanceof Variable || !self::mathArgAllowsDiscardedElision($arg)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Discarded {@code cal_from_jd} — php-src {@code ext/calendar/calendar.c}.
+     * Typed julian day + compile-time calendar id in {@code [0, CAL_NUM_CALS)}.
+     * Runtime / invalid calendar stays live ({@code ValueError}). Soft-null /
+     * wrong argc stay live (deprecate / {@code ArgumentCountError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureCalFromJdNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if ('cal_from_jd' !== strtolower($toCall->getName())) {
+            return false;
+        }
+        if (2 !== \count($callArgs)) {
+            return false;
+        }
+        if (
+            !$callArgs[0] instanceof Variable
+            || !self::mathArgAllowsDiscardedElision($callArgs[0])
+        ) {
+            return false;
+        }
+        if (
+            !$callArgs[1] instanceof Variable
+            || null === $callArgs[1]->compileTimeLong
+            || $callArgs[1]->compileTimeLong < 0
+            || $callArgs[1]->compileTimeLong >= 4
+        ) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Discarded {@code cal_to_jd} — php-src {@code ext/calendar/calendar.c}.
+     * Compile-time calendar id in {@code [0, CAL_NUM_CALS)} plus three typed
+     * numerics (month / day / year). Runtime / invalid calendar stays live
+     * ({@code ValueError}). Soft-null / wrong argc stay live.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureCalToJdNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if ('cal_to_jd' !== strtolower($toCall->getName())) {
+            return false;
+        }
+        if (4 !== \count($callArgs)) {
+            return false;
+        }
+        if (
+            !$callArgs[0] instanceof Variable
+            || null === $callArgs[0]->compileTimeLong
+            || $callArgs[0]->compileTimeLong < 0
+            || $callArgs[0]->compileTimeLong >= 4
+        ) {
+            return false;
+        }
+        for ($i = 1; $i < 4; ++$i) {
             if (
                 !$callArgs[$i] instanceof Variable
                 || !self::mathArgAllowsDiscardedElision($callArgs[$i])

@@ -222,8 +222,15 @@ use PHPCompiler\ext\standard\boolval;
 use PHPCompiler\ext\types\is_type;
 use PHPCompiler\ext\types\strlen;
 use PHPCompiler\ext\calendar\cal_days_in_month;
+use PHPCompiler\ext\calendar\cal_from_jd;
+use PHPCompiler\ext\calendar\cal_to_jd;
 use PHPCompiler\ext\calendar\frenchtojd;
 use PHPCompiler\ext\calendar\gregoriantojd;
+use PHPCompiler\ext\calendar\jddayofweek;
+use PHPCompiler\ext\calendar\jdmonthname;
+use PHPCompiler\ext\calendar\jdtofrench;
+use PHPCompiler\ext\calendar\jdtogregorian;
+use PHPCompiler\ext\calendar\jdtojulian;
 use PHPCompiler\ext\calendar\jewishtojd;
 use PHPCompiler\ext\calendar\juliantojd;
 use PHPCompiler\JIT\Call\Native;
@@ -3860,6 +3867,187 @@ final class DiscardedPureCallElisionTest extends TestCase
         $this->assertFalse(DiscardedPureCallElision::tryElide(
             $context,
             new cal_days_in_month(),
+            []
+        ));
+    }
+
+    public function testDiscardedCalendarFromJdAndCalToFromJdElideOnTypedArgs(): void
+    {
+        // php-src ext/calendar/calendar.c jdto* + jdmonthname/jddayofweek +
+        // cal_from_jd / cal_to_jd (#36386).
+        $context = $this->makeContext();
+        $jd = $this->makeNativeLongVar();
+        $mode = $this->makeNativeLongVar();
+        $month = $this->makeNativeLongVar();
+        $day = $this->makeNativeLongVar();
+        $year = $this->makeNativeLongVar();
+        $calGregorian = $this->makeCompileTimeLongVar(0);
+        $calJulian = $this->makeCompileTimeLongVar(1);
+        $calInvalid = $this->makeCompileTimeLongVar(4);
+        $calRuntime = $this->makeNativeLongVar();
+        $null = $this->makeNullVar();
+        $box = $this->makeValueBoxVar();
+        $obj = $this->makeObjectVar();
+        $str = $this->makeStringVar('2440588');
+
+        foreach ([
+            new jdtogregorian(),
+            new jdtojulian(),
+            new jdtofrench(),
+        ] as $builtin) {
+            $this->assertTrue(DiscardedPureCallElision::tryElide(
+                $context,
+                $builtin,
+                [$jd]
+            ));
+            $this->assertTrue(DiscardedPureCallElision::tryElide(
+                $context,
+                $builtin,
+                [$str]
+            ));
+            $this->assertFalse(DiscardedPureCallElision::tryElide(
+                $context,
+                $builtin,
+                []
+            ));
+            $this->assertFalse(DiscardedPureCallElision::tryElide(
+                $context,
+                $builtin,
+                [$jd, $mode]
+            ));
+            $this->assertFalse(DiscardedPureCallElision::tryElide(
+                $context,
+                $builtin,
+                [$null]
+            ));
+            $this->assertFalse(DiscardedPureCallElision::tryElide(
+                $context,
+                $builtin,
+                [$box]
+            ));
+            $this->assertFalse(DiscardedPureCallElision::tryElide(
+                $context,
+                $builtin,
+                [$obj]
+            ));
+        }
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new jdmonthname(),
+            [$jd, $mode]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new jdmonthname(),
+            [$jd]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new jdmonthname(),
+            [$null, $mode]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new jdmonthname(),
+            [$jd, $box]
+        ));
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new jddayofweek(),
+            [$jd]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new jddayofweek(),
+            [$jd, $mode]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new jddayofweek(),
+            []
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new jddayofweek(),
+            [$jd, $mode, $day]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new jddayofweek(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new jddayofweek(),
+            [$jd, $null]
+        ));
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new cal_from_jd(),
+            [$jd, $calGregorian]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new cal_from_jd(),
+            [$jd, $calJulian]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new cal_from_jd(),
+            [$jd, $calRuntime]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new cal_from_jd(),
+            [$jd, $calInvalid]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new cal_from_jd(),
+            [$null, $calGregorian]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new cal_from_jd(),
+            [$jd]
+        ));
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new cal_to_jd(),
+            [$calGregorian, $month, $day, $year]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new cal_to_jd(),
+            [$calJulian, $month, $day, $year]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new cal_to_jd(),
+            [$calRuntime, $month, $day, $year]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new cal_to_jd(),
+            [$calInvalid, $month, $day, $year]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new cal_to_jd(),
+            [$calGregorian, $null, $day, $year]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new cal_to_jd(),
+            [$calGregorian, $month, $day]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new cal_to_jd(),
             []
         ));
     }
