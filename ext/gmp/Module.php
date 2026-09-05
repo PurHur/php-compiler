@@ -24,6 +24,25 @@ class Module extends ModuleAbstract
             $var->int($value);
             $runtime->vmContext->defineConstant($name, $var);
         }
+        // Variable.php must not import ext\gmp (#36204).
+        VM\GmpVmRuntimeSupport::setTryCompare(
+            static fn ($left, $right) => VmGmpObject::tryCompare($left, $right)
+        );
+        VM\GmpVmRuntimeSupport::setTryDoOperation(
+            static fn ($result, int $opCode, $left, $right, $ctx): bool => VmGmpObject::tryDoOperation(
+                $result,
+                $opCode,
+                $left,
+                $right,
+                $ctx
+            )
+        );
+        VM\GmpVmRuntimeSupport::setTryUnaryMinus(
+            static fn ($result, $expr, $ctx): bool => VmGmpObject::tryUnaryMinus($result, $expr, $ctx)
+        );
+        VM\GmpVmRuntimeSupport::setTryBitwiseNot(
+            static fn ($result, $expr, $ctx): bool => VmGmpObject::tryBitwiseNot($result, $expr, $ctx)
+        );
     }
 
     public static function registerClasses(Context $ctx): void

@@ -92,6 +92,22 @@ class Module extends ModuleAbstract
             return;
         }
         BuiltinClasses::register($runtime->vmContext);
+        // Variable.php must not import ext\bcmath (#36204).
+        \PHPCompiler\VM\BcMathVmRuntimeSupport::setTryCompare(
+            static fn ($left, $right) => VmBcMathNumber::tryCompare($left, $right)
+        );
+        \PHPCompiler\VM\BcMathVmRuntimeSupport::setTryDoOperation(
+            static fn ($result, int $opCode, $left, $right, $ctx): bool => VmBcMathNumber::tryDoOperation(
+                $result,
+                $opCode,
+                $left,
+                $right,
+                $ctx
+            )
+        );
+        \PHPCompiler\VM\BcMathVmRuntimeSupport::setTryUnaryMinus(
+            static fn ($result, $expr, $ctx): bool => VmBcMathNumber::tryUnaryMinus($result, $expr, $ctx)
+        );
     }
 
     public function getFunctions(): array
