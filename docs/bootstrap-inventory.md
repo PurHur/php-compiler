@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8277 |
-| Phase A inventory files (M2 ratio SSOT) | 8277 |
+| PHP files on vm.php path | 8278 |
+| Phase A inventory files (M2 ratio SSOT) | 8278 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26147 |
+| Source constructs flagged (warnings) | 26149 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7074,6 +7074,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/CompileCast.php` | 0 | 2 |
 | `lib/JIT/Concern/CompileClassAndTraitUses.php` | 0 | 4 |
 | `lib/JIT/Concern/CompileClassConstFetch.php` | 0 | 4 |
+| `lib/JIT/Concern/CompileCoalesce.php` | 0 | 2 |
 | `lib/JIT/Concern/CompileConcat.php` | 0 | 7 |
 | `lib/JIT/Concern/CompileEchoAndPrint.php` | 0 | 5 |
 | `lib/JIT/Concern/CompileFuncCallExecNoreturn.php` | 0 | 2 |
@@ -58137,11 +58138,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Operand\Literal (line 966)
 - new Operand\Literal (line 1083)
 - new OpCode (line 1296)
-- new Variable (line 1624)
-- new Variable (line 1712)
-- new Variable (line 1742)
-- new VM (line 1836)
-- new Operand\Literal (line 2122)
+- new Variable (line 1531)
+- new Variable (line 1619)
+- new Variable (line 1649)
+- new VM (line 1743)
+- new Operand\Literal (line 2029)
 - 2 class method(s)
 - 1 closure(s)
 
@@ -58176,6 +58177,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - trait CompileClassConstFetch (line 21)
 - new Operand\Literal (line 68)
 - new Operand\Literal (line 148)
+- 1 class method(s)
+
+### `lib/JIT/Concern/CompileCoalesce.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CompileCoalesce (line 20)
 - 1 class method(s)
 
 ### `lib/JIT/Concern/CompileConcat.php`
@@ -60427,7 +60434,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/SpineChunkRuntimeMethodDemote.php`
 
 **Warnings** (review for bootstrap subset):
-- new OpCode (line 248)
+- new OpCode (line 250)
 - 11 class method(s)
 
 ### `lib/JIT/SpineChunkStandardHelperBind.php`
