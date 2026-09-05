@@ -212,7 +212,7 @@ miniwebapp-aot-bisect:
 	./script/miniwebapp-aot-bisect.sh
 
 # HTTP smoke: phpc serve + curl for 001-SimpleWeb and 002-StaticWeb (issue #298)
-.PHONY: examples-web-smoke examples-sessions-smoke examples-throws-smoke examples-throws-jit-smoke examples-fastcgiweb-smoke fastcgi-smoke examples-selfhostprobe-smoke examples-serve-jit-smoke examples-fileupload-deploy-smoke examples-throwsweb-deploy-smoke examples-fastcgiweb-deploy-smoke examples-web-smoke-prebuild examples-aot-smoke deploy-smoke deploy-smoke-all
+.PHONY: examples-web-smoke examples-sessions-smoke examples-throws-smoke examples-throws-jit-smoke examples-fastcgiweb-smoke fastcgi-smoke examples-selfhostprobe-smoke examples-serve-jit-smoke examples-fileupload-deploy-smoke examples-throwsweb-deploy-smoke examples-fastcgiweb-deploy-smoke examples-web-smoke-prebuild examples-aot-smoke deploy-smoke deploy-smoke-all deploy-oci-smoke
 examples-web-smoke:
 	./script/examples-web-smoke.sh
 
@@ -276,6 +276,10 @@ deploy-smoke:
 # Full deploy ladder 001–007/009 with explicit skip messages when gates=0 (#2077, #2359)
 deploy-smoke-all:
 	./script/deploy-smoke-all.sh
+
+# OCI/nginx context from phpc deploy --oci (#36392) — no LLVM required.
+deploy-oci-smoke:
+	./script/deploy-oci-smoke.sh
 
 # Local HTTP dev server (see bin/serve.php)
 SERVE_ADDR ?= 127.0.0.1:8080
