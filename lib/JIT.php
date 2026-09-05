@@ -19,6 +19,7 @@ require_once __DIR__.'/JIT/Concern/CompileEchoAndPrint.php';
 require_once __DIR__.'/JIT/Concern/CompileStaticPropertyAndUnset.php';
 require_once __DIR__.'/JIT/Concern/CompileConcat.php';
 require_once __DIR__.'/JIT/Concern/CompileFuncCallExecReturn.php';
+require_once __DIR__.'/JIT/Concern/CompileFuncCallExecNoreturn.php';
 require_once __DIR__.'/JIT/Concern/CompileFuncCallInit.php';
 require_once __DIR__.'/JIT/Concern/CompileAssign.php';
 require_once __DIR__.'/JIT/Concern/CompileNew.php';
@@ -101,6 +102,7 @@ class JIT {
     use CompileStaticPropertyAndUnset;
     use CompileConcat;
     use CompileFuncCallExecReturn;
+    use CompileFuncCallExecNoreturn;
     use CompileFuncCallInit;
     use CompileAssign;
     use CompileNew;
