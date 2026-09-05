@@ -611,7 +611,7 @@ class Native implements Call {
                 $valueTy = $value->typeOf();
                 $valueTyName = $context->getStringFromType($valueTy);
                 if ('__object__*' === $valueTyName || self::llvmPointerTo($valueTy, $context, '__object__')) {
-                    return $value;
+                    return $this->ownByValObjectArg($context, $argNum, $value);
                 }
                 if (
                     '__string__*' === $valueTyName
@@ -626,20 +626,24 @@ class Native implements Call {
                     '__value__*' === $valueTyName
                     || self::llvmPointerTo($valueTy, $context, '__value__')
                 ) {
-                    return $context->builder->call(
-                        $context->lookupFunction('__value__readObject'),
-                        $value
+                    return $this->ownByValObjectArg(
+                        $context,
+                        $argNum,
+                        $context->builder->call(
+                            $context->lookupFunction('__value__readObject'),
+                            $value
+                        )
                     );
                 }
                 switch ($arg->type) {
                     case Variable::TYPE_OBJECT:
-                        return $value;
+                        return $this->ownByValObjectArg($context, $argNum, $value);
                     case Variable::TYPE_VALUE:
                         $boxPtr = \PHPCompiler\JIT\JitValueBox::valuePtrFromVariable($context, $arg);
                         $boxTy = $boxPtr->typeOf();
                         $boxTyName = $context->getStringFromType($boxTy);
                         if ('__object__*' === $boxTyName || self::llvmPointerTo($boxTy, $context, '__object__')) {
-                            return $boxPtr;
+                            return $this->ownByValObjectArg($context, $argNum, $boxPtr);
                         }
                         if (
                             '__string__*' === $boxTyName
@@ -653,9 +657,13 @@ class Native implements Call {
                             '__value__*' === $boxTyName
                             || self::llvmPointerTo($boxTy, $context, '__value__')
                         ) {
-                            return $context->builder->call(
-                                $context->lookupFunction('__value__readObject'),
-                                $boxPtr
+                            return $this->ownByValObjectArg(
+                                $context,
+                                $argNum,
+                                $context->builder->call(
+                                    $context->lookupFunction('__value__readObject'),
+                                    $boxPtr
+                                )
                             );
                         }
 
@@ -664,9 +672,13 @@ class Native implements Call {
                         return $context->getTypeFromString('__object__*')->constNull();
                     case Variable::TYPE_HASHTABLE:
                         // Scope arrays may store VM Variable handles as hashtable pointers (issue #816).
-                        return $context->builder->pointerCast(
-                            $value,
-                            $context->getTypeFromString('__object__*')
+                        return $this->ownByValObjectArg(
+                            $context,
+                            $argNum,
+                            $context->builder->pointerCast(
+                                $value,
+                                $context->getTypeFromString('__object__*')
+                            )
                         );
                     case Variable::TYPE_STRING:
                         return $context->getTypeFromString('__object__*')->constNull();
@@ -1164,6 +1176,23 @@ class Native implements Call {
                     $slot
                 );
         }
+    }
+
+    /**
+     * By-val `__object__*` args need an addref (php-src ZVAL_COPY / zend_send_by_val).
+     * Without it, `take($this)` / `new Holder($this)` lets the callee's formal delref free
+     * the caller's sole-owner object — typed props then read as uninitialized (#36382).
+     * Skip arg 0 of `Class::method` — that is the borrowed `$this` receiver.
+     * `__ref__addref` already no-ops on null.
+     */
+    private function ownByValObjectArg(Context $context, int $argNum, Value $obj): Value
+    {
+        $isMethodReceiver = 0 === $argNum && str_contains($this->name, '::');
+        if (!$isMethodReceiver && !isset($this->paramByRefByArg[$argNum])) {
+            $context->refcount->addref($obj);
+        }
+
+        return $obj;
     }
 
     /**

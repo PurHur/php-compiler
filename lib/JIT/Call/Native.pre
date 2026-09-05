@@ -88,19 +88,26 @@ class Native implements Call {
                 }
                 switch ($arg->type) {
                     case Variable::TYPE_OBJECT:
-                        if ('__value__*' === $valueTyName) {
-                            return $context->builder->call(
-                                $context->lookupFunction('__value__readObject'),
-                                $value
-                            );
+                        // php-src ZVAL_COPY — callee formal delref must not free caller's sole owner (#36382).
+                        if (0 !== $argNum || !str_contains($this->name, '::')) {
+                            if (!isset($this->paramByRefByArg[$argNum])) {
+                                $context->refcount->addref($value);
+                            }
                         }
 
                         return $value;
                     case Variable::TYPE_VALUE:
-                        return $context->builder->call(
+                        $obj = $context->builder->call(
                             $context->lookupFunction('__value__readObject'),
                             \PHPCompiler\JIT\JitValueBox::valuePtrFromVariable($context, $arg)
                         );
+                        if (0 !== $argNum || !str_contains($this->name, '::')) {
+                            if (!isset($this->paramByRefByArg[$argNum])) {
+                                $context->refcount->addref($obj);
+                            }
+                        }
+
+                        return $obj;
                     case Variable::TYPE_NULL:
                         return $context->getTypeFromString('__object__*')->constNull();
                     case Variable::TYPE_HASHTABLE:
