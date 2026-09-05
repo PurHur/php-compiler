@@ -63,6 +63,11 @@ use PHPCompiler\VM\Variable as VmVariable;
  * sys_get_temp_dir / getcwd / get_include_path / ob_get_level /
  * connection_status / connection_aborted / session_status / localeconv /
  * gc_status (zero-arg; excess argc stays live — ArgumentCountError),
+ * gethostname / error_get_last / hash_algos / hash_hmac_algos /
+ * ob_get_contents / ob_get_length / headers_list (zero-arg; excess argc
+ * stays live — ArgumentCountError),
+ * getrusage (zero-arg or typed long; soft-null mode stays live —
+ * deprecate; excess argc stays live — ArgumentCountError),
  * zero-arg pi, type.c predicates + gettype/get_debug_type, ctype.c
  * classifiers on typed/literal strings, typed-array count/sizeof, math.c
  * incl. pow/fpow/fdiv on already-numeric args, empty void user functions).
@@ -127,7 +132,11 @@ use PHPCompiler\VM\Variable as VmVariable;
  * {@code sys_get_temp_dir}/{@code getcwd}/{@code get_include_path}/
  * {@code ob_get_level}/{@code connection_status}/{@code connection_aborted}/
  * {@code session_status}/{@code localeconv}/{@code gc_status} stay live
- * ({@code ArgumentCountError}).
+ * ({@code ArgumentCountError}). Soft-null {@code getrusage} mode stays live
+ * (deprecate); non-zero-arg {@code gethostname}/{@code error_get_last}/
+ * {@code hash_algos}/{@code hash_hmac_algos}/{@code ob_get_contents}/
+ * {@code ob_get_length}/{@code headers_list} and excess-arg {@code getrusage}
+ * stay live ({@code ArgumentCountError}).
  */
 final class DiscardedPureCallElision
 {
@@ -239,6 +248,9 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureEnvPathRequestRuntimeInfoNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureHostErrorHashObRuntimeInfoNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureVersionCompareNoSideEffect($toCall, $callArgs)) {
@@ -1601,6 +1613,29 @@ final class DiscardedPureCallElision
     }
 
     /**
+     * Discarded {@code gethostname}/{@code error_get_last}/{@code getrusage}/
+     * {@code hash_algos}/{@code hash_hmac_algos}/{@code ob_get_contents}/
+     * {@code ob_get_length}/{@code headers_list} — php-src host / last-error /
+     * rusage / hash-algo / OB / pending-header introspection reads. Soft-null
+     * {@code getrusage} mode stays live (deprecate). Excess argc stays live
+     * ({@code ArgumentCountError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureHostErrorHashObRuntimeInfoNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        $nameLc = strtolower($toCall->getName());
+        if (!NoThrowCallElision::isPureHostErrorHashObRuntimeInfoBuiltin($nameLc)) {
+            return false;
+        }
+
+        return self::hostErrorHashObRuntimeInfoArgsAllowDiscardedElision($nameLc, $callArgs);
+    }
+
+    /**
      * Discarded {@code version_compare} on typed / literal strings — php-src
      * {@code versioning.c}. Optional operator must be null or a compile-time
      * valid comparison op ({@code ValueError} otherwise).
@@ -2043,6 +2078,43 @@ final class DiscardedPureCallElision
     private static function envPathRequestRuntimeInfoArgsAllowDiscardedElision(array $callArgs): bool
     {
         return NoThrowCallElision::envPathRequestRuntimeInfoArgsCannotThrow($callArgs);
+    }
+
+    /**
+     * {@code gethostname}/{@code error_get_last}/{@code hash_algos}/
+     * {@code hash_hmac_algos}/{@code ob_get_contents}/{@code ob_get_length}/
+     * {@code headers_list}: arity 0. {@code getrusage}: arity 0 or typed /
+     * literal numeric mode (soft-null stays live — deprecate).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function hostErrorHashObRuntimeInfoArgsAllowDiscardedElision(string $nameLc, array $callArgs): bool
+    {
+        switch ($nameLc) {
+            case 'gethostname':
+            case 'error_get_last':
+            case 'hash_algos':
+            case 'hash_hmac_algos':
+            case 'ob_get_contents':
+            case 'ob_get_length':
+            case 'headers_list':
+                return [] === $callArgs;
+            case 'getrusage':
+                if ([] === $callArgs) {
+                    return true;
+                }
+                if (
+                    !isset($callArgs[0])
+                    || !$callArgs[0] instanceof Variable
+                    || isset($callArgs[1])
+                ) {
+                    return false;
+                }
+
+                return self::mathArgAllowsDiscardedElision($callArgs[0]);
+            default:
+                return false;
+        }
     }
 
     /**

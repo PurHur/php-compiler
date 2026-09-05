@@ -34,6 +34,7 @@ use PHPCompiler\ext\standard\defined_;
 use PHPCompiler\ext\standard\dirname;
 use PHPCompiler\ext\standard\escapeshellarg;
 use PHPCompiler\ext\standard\escapeshellcmd;
+use PHPCompiler\ext\standard\error_get_last;
 use PHPCompiler\ext\standard\explode;
 use PHPCompiler\ext\standard\extension_loaded;
 use PHPCompiler\ext\standard\enum_exists_;
@@ -58,15 +59,20 @@ use PHPCompiler\ext\standard\get_included_files_;
 use PHPCompiler\ext\standard\get_loaded_extensions;
 use PHPCompiler\ext\standard\get_parent_class_;
 use PHPCompiler\ext\standard\getcwd_;
+use PHPCompiler\ext\standard\gethostname;
 use PHPCompiler\ext\standard\getlastmod;
 use PHPCompiler\ext\standard\getmygid;
 use PHPCompiler\ext\standard\getmyinode;
 use PHPCompiler\ext\standard\getmypid;
 use PHPCompiler\ext\standard\getmyuid;
+use PHPCompiler\ext\standard\getrusage;
 use PHPCompiler\ext\standard\gc_enabled;
 use PHPCompiler\ext\standard\gc_status;
 use PHPCompiler\ext\standard\gettype;
+use PHPCompiler\ext\hash\hash_algos;
 use PHPCompiler\ext\standard\hash_equals;
+use PHPCompiler\ext\standard\hash_hmac_algos;
+use PHPCompiler\ext\standard\headers_list;
 use PHPCompiler\ext\standard\hebrev;
 use PHPCompiler\ext\standard\hexdec;
 use PHPCompiler\ext\standard\html_entity_decode;
@@ -92,6 +98,8 @@ use PHPCompiler\ext\standard\md5;
 use PHPCompiler\ext\standard\metaphone;
 use PHPCompiler\ext\standard\nl2br;
 use PHPCompiler\ext\standard\number_format;
+use PHPCompiler\ext\standard\ob_get_contents;
+use PHPCompiler\ext\standard\ob_get_length;
 use PHPCompiler\ext\standard\ob_get_level;
 use PHPCompiler\ext\standard\octdec;
 use PHPCompiler\ext\standard\ord;
@@ -2842,6 +2850,109 @@ final class DiscardedPureCallElisionTest extends TestCase
             $context,
             new gc_status(),
             [$null]
+        ));
+    }
+
+    public function testDiscardedHostErrorHashObRuntimeInfoElides(): void
+    {
+        // php-src basic_functions / hash / output / head (#36386).
+        $context = $this->makeContext();
+        $long = $this->makeNativeLongVar();
+        $null = $this->makeNullVar();
+        $str = $this->makeStringVar('s');
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new gethostname(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new error_get_last(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new getrusage(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new getrusage(),
+            [$long]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new hash_algos(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new hash_hmac_algos(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new ob_get_contents(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new ob_get_length(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new headers_list(),
+            []
+        ));
+
+        // Soft-null getrusage mode stays live (deprecate).
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new getrusage(),
+            [$null]
+        ));
+        // Excess argc stays live (ArgumentCountError).
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new gethostname(),
+            [$str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new error_get_last(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new getrusage(),
+            [$long, $long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new hash_algos(),
+            [$long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new hash_hmac_algos(),
+            [$str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new ob_get_contents(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new ob_get_length(),
+            [$long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new headers_list(),
+            [$str]
         ));
     }
 
