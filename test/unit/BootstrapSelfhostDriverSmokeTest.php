@@ -83,9 +83,10 @@ final class BootstrapSelfhostDriverSmokeTest extends TestCase
     public function testInventoryArgvDriverUsesParseCompileSpineNotNullStub(): void
     {
         $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
-        $this->assertStringContainsString('shouldUseM4BinCompileArgvMainNative', $jit);
-        $parseSpine = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuRuntimeParseAndInitSpine.php');
-        $this->assertStringContainsString('inventoryArgvSidecar', $parseSpine);
+        $parseInitSpine = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuRuntimeParseAndInitSpine.php');
+        $m3m4m5Policy = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3M4M5CompileDriverEmitPolicy.php');
+        $this->assertStringContainsString('inventoryArgvSidecar', $parseInitSpine);
+        $this->assertStringContainsString('shouldUseM4BinCompileArgvMainNative', $m3m4m5Policy);
         $emit = (string) file_get_contents(self::$root.'/lib/JIT/BootstrapCompileSmokeM3Emit.php');
         $this->assertStringContainsString("'compileemitsmoke', 'compile'", $emit);
         $this->assertStringContainsString('Parse once, then try each compile spine in order', $emit);
@@ -115,8 +116,9 @@ final class BootstrapSelfhostDriverSmokeTest extends TestCase
     public function testHelloworldBinCompileArgvUsesInventoryLinkNotStubSidecar(): void
     {
         $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
+        $m3m4m5Policy = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3M4M5CompileDriverEmitPolicy.php');
         $this->assertStringContainsString('shouldUseHelloworldBinCompileInventoryArgvLink', $jit);
-        $this->assertStringContainsString('shouldUseM3InventoryEmitForCompileDriverBlock', $jit);
+        $this->assertStringContainsString('shouldUseM3InventoryEmitForCompileDriverBlock', $m3m4m5Policy);
         $compileBin = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-helloworld-compile-bin.sh');
         $this->assertStringContainsString('build/bin-compile-aot-inventory', $compileBin);
         $this->assertStringContainsString('#3011', $compileBin);
@@ -148,16 +150,17 @@ final class BootstrapSelfhostDriverSmokeTest extends TestCase
     /** Issue #8706: inventory emit-helper must not stub parse/CFG on executable argv drivers. */
     public function testInventoryEmitParseSpineRetiredOnExecutableArgvDrivers(): void
     {
-        $policy = (string) file_get_contents(self::$root.'/lib/JIT/Concern/SelfHostEmitHelperAndVendorPrelinkPolicy.php');
-        $this->assertStringContainsString('shouldStubInventoryEmitParseCompileSpine', $policy);
-        $this->assertStringContainsString('shouldUseVendorPrelinkExecutableEmit', $policy);
+        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
+        $prelinkPolicy = (string) file_get_contents(self::$root.'/lib/JIT/Concern/SelfHostEmitHelperAndVendorPrelinkPolicy.php');
+        $this->assertStringContainsString('shouldStubInventoryEmitParseCompileSpine', $prelinkPolicy);
+        $this->assertStringContainsString('shouldUseVendorPrelinkExecutableEmit', $prelinkPolicy);
         $this->assertStringContainsString(
             'shouldUseM3CompileDriverMainNative() && $this->shouldUseEmitHelperLinkStubs()',
-            $policy
+            $prelinkPolicy
         );
         $this->assertStringNotContainsString(
             '&& !$this->shouldUseSelfHostExecutableEmit()',
-            $policy
+            $jit
         );
     }
 

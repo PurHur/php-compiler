@@ -79,11 +79,13 @@ final class BootstrapSelfhostFullRevisionProbeTest extends TestCase
 
     public function testJitRegistersM5DriverHostForBinCompileSidecar(): void
     {
-        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
-        $this->assertStringContainsString("'/bin/compile.php'))", $jit);
-        $this->assertStringContainsString('PHP_COMPILER_M5_DRIVER_HOST', $jit);
-        $this->assertStringContainsString('shouldUseM4BinCompileArgvMainNative', $jit);
-        $this->assertStringContainsString('compileM3CompileDriverMainNative', $jit);
-        $this->assertStringContainsString('#2900', $jit);
+        $m3m4m5Policy = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3M4M5CompileDriverEmitPolicy.php');
+        $sidecar = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuSidecarLinktime.php');
+        $driverMain = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuAndCompileDriverMainNative.php');
+        $this->assertStringContainsString("'/bin/compile.php'))", $sidecar);
+        $this->assertStringContainsString('PHP_COMPILER_M5_DRIVER_HOST', $m3m4m5Policy);
+        $this->assertStringContainsString('shouldUseM4BinCompileArgvMainNative', $m3m4m5Policy);
+        $this->assertStringContainsString('compileM3CompileDriverMainNative', $driverMain);
+        $this->assertStringContainsString('#2900', $sidecar);
     }
 }

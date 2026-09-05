@@ -134,6 +134,7 @@ final class SpineChunkRuntimeMethodDemote
             || 'phpcompiler\\valueboxcoalesceandconcathelpers' === $lc
             || 'phpcompiler\\selfhostemithelperandvendorprelinkpolicy' === $lc
             || 'phpcompiler\\compileblockphploweringandclosureprep' === $lc
+            || 'phpcompiler\\m3m4m5compiledriveremitpolicy' === $lc
             || str_starts_with($lc, 'phpcompiler\\builtin')
         ) {
             return true;
