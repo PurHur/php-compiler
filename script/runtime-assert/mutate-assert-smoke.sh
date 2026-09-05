@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# #36397 slice 6: prove M5 exclusive-write is wired into real hashtable mutate
-# paths (not inject-only), and that normal COW separate+write still succeeds.
+# #36397 slice 6/7: prove M5 exclusive-write is wired into real hashtable mutate
+# paths (grow + string-key + object-key), and that normal COW separate+write still succeeds.
 #
 # Usage:
 #   ./script/runtime-assert/mutate-assert-smoke.sh
@@ -67,6 +67,19 @@ fi
 # grow body must call assert_exclusive (not only the inject probe symbol).
 if ! grep -A80 'define.*__hashtable__grow' "$IR_DUMP" | grep -q '__ref__assert_exclusive'; then
   echo "runtime-assert-mutate-smoke: FAIL — __hashtable__grow does not call __ref__assert_exclusive" >&2
+  exit 1
+fi
+# Object-key setters were a separate hole (no grow / string-key chokepoint) — #36397 slice 7.
+if ! grep -q '__hashtable__setObjectKeyLong' "$IR_DUMP"; then
+  echo "runtime-assert-mutate-smoke: FAIL — IR missing __hashtable__setObjectKeyLong" >&2
+  exit 1
+fi
+if ! grep -A40 'define.*__hashtable__setObjectKeyLong' "$IR_DUMP" | grep -q '__ref__assert_exclusive'; then
+  echo "runtime-assert-mutate-smoke: FAIL — setObjectKeyLong does not call __ref__assert_exclusive" >&2
+  exit 1
+fi
+if ! grep -A40 'define.*__hashtable__setObjectKeyObject' "$IR_DUMP" | grep -q '__ref__assert_exclusive'; then
+  echo "runtime-assert-mutate-smoke: FAIL — setObjectKeyObject does not call __ref__assert_exclusive" >&2
   exit 1
 fi
 

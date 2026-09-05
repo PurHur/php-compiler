@@ -24,6 +24,8 @@ final class RuntimeAssertDelrefAotTest extends TestCase
         $this->assertStringContainsString('__ref__assert_exclusive', $doc);
         $this->assertStringContainsString('__hashtable__grow', $doc);
         $this->assertStringContainsString('lookupStringKeyForWriteBranch', $doc);
+        $this->assertStringContainsString('setObjectKeyLong', $doc);
+        $this->assertStringContainsString('setObjectKeyObject', $doc);
         $this->assertStringContainsString('zend_gc.c', $doc);
         $this->assertStringContainsString('zend_variables.h', $doc);
         $this->assertStringContainsString('PHP_COMPILER_RUNTIME_ASSERT', $doc);
@@ -84,6 +86,8 @@ final class RuntimeAssertDelrefAotTest extends TestCase
         $this->assertStringContainsString('PHP_COMPILER_ASAN=1', $soak);
         $this->assertStringContainsString('__hashtable__grow', $mutate);
         $this->assertStringContainsString('__ref__assert_exclusive', $mutate);
+        $this->assertStringContainsString('setObjectKeyLong', $mutate);
+        $this->assertStringContainsString('setObjectKeyObject', $mutate);
         $this->assertStringContainsString('INJECT_SHARED_WRITE', $mutate);
     }
 
@@ -123,6 +127,12 @@ final class RuntimeAssertDelrefAotTest extends TestCase
         $this->assertStringContainsString('Refcount::emitAssertExclusiveCall', $ht);
         $this->assertStringContainsString('Packed index writes all go through grow', $ht);
         $this->assertStringContainsString('String-key mutators share this chokepoint', $ht);
+        $this->assertStringContainsString('Object-key mutators skipped the string/grow chokepoints', $ht);
+        $this->assertSame(
+            2,
+            substr_count($ht, 'Object-key mutators skipped the string/grow chokepoints'),
+            'both setObjectKeyLong and setObjectKeyObject must call emitAssertExclusiveCall'
+        );
     }
 
     public function testEnabledReadsAliasAndConfigKnob(): void
@@ -259,6 +269,16 @@ final class RuntimeAssertDelrefAotTest extends TestCase
                 '/define[^\n]*__hashtable__grow[\s\S]{0,4000}?__ref__assert_exclusive/',
                 $ir,
                 'grow must call assert_exclusive under ASSERT'
+            );
+            $this->assertMatchesRegularExpression(
+                '/define[^\n]*__hashtable__setObjectKeyLong[\s\S]{0,800}?__ref__assert_exclusive/',
+                $ir,
+                'setObjectKeyLong must call assert_exclusive under ASSERT'
+            );
+            $this->assertMatchesRegularExpression(
+                '/define[^\n]*__hashtable__setObjectKeyObject[\s\S]{0,800}?__ref__assert_exclusive/',
+                $ir,
+                'setObjectKeyObject must call assert_exclusive under ASSERT'
             );
             $run = [];
             exec(escapeshellarg($bin).' 2>&1', $run, $runRc);
