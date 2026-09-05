@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# #36397 slice 6–9: prove M5 exclusive-write is wired into real hashtable mutate
-# paths (grow + string-key + object-key + unset + by-ref stdlib mutators), and that
-# normal COW separate+write/unset/push still succeeds.
+# #36397 slice 6–12: prove M5 exclusive-write is wired into real hashtable mutate
+# paths (grow + string-key + object-key + unset + by-ref stdlib mutators incl. shuffle),
+# and that normal COW separate+write/unset/push/sort/walk/multisort/shuffle still succeeds.
 #
 # Usage:
 #   ./script/runtime-assert/mutate-assert-smoke.sh
@@ -270,7 +270,81 @@ if [[ "$msort_trimmed" != "1,2,3|3,1,2|a,b,c" ]]; then
   exit 1
 fi
 
-echo "runtime-assert-mutate-smoke: source gates for by-ref mutator COW (#36397 slice 9–11)…"
+echo "runtime-assert-mutate-smoke: run COW shuffle (must not false-positive M5)…"
+SHUF_SRC="$WORKDIR/cow_shuffle.php"
+SHUF_BIN="$WORKDIR/cow_shuffle.bin"
+cat > "$SHUF_SRC" <<'PHP'
+<?php
+$a = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+$b = $a;
+shuffle($a);
+$sorted = $a;
+sort($sorted);
+echo implode(',', $sorted), '|', implode(',', $b), "\n";
+PHP
+env \
+  PHP_COMPILER_HELPER_RUNTIME_O=0 \
+  PHP_COMPILER_HELPER_RUNTIME_CACHE_DIR="$CACHE-shuffle" \
+  PHP_COMPILER_RUNTIME_ASSERT=1 \
+  PHP_COMPILER_DUMP_IR=1 \
+  "$PHP_BIN" bin/compile.php -o "$SHUF_BIN" "$SHUF_SRC"
+if [[ -f /tmp/phpc-last.ll ]]; then
+  if ! grep -q '__ref__assert_exclusive' /tmp/phpc-last.ll; then
+    echo "runtime-assert-mutate-smoke: FAIL — COW shuffle IR missing __ref__assert_exclusive" >&2
+    exit 1
+  fi
+  if ! grep -q '__compiler_random_bytes' /tmp/phpc-last.ll; then
+    echo "runtime-assert-mutate-smoke: FAIL — COW shuffle IR missing __compiler_random_bytes (Fisher–Yates)" >&2
+    exit 1
+  fi
+fi
+shuf_out="$("$SHUF_BIN" 2>&1)"
+shuf_rc=$?
+if [[ "$shuf_rc" -ne 0 ]]; then
+  echo "runtime-assert-mutate-smoke: FAIL — COW shuffle exited $shuf_rc: $shuf_out" >&2
+  exit 1
+fi
+shuf_trimmed="$(printf '%s' "$shuf_out" | tr -d '\r')"
+if [[ "$shuf_trimmed" != "1,2,3,4,5,6,7,8,9,10|1,2,3,4,5,6,7,8,9,10" ]]; then
+  echo "runtime-assert-mutate-smoke: FAIL — expected sorted|original from COW shuffle, got: $shuf_out" >&2
+  exit 1
+fi
+# Shuffle must actually permute (not NestedJIT no-op) — run without relying on $b.
+SHUF2_SRC="$WORKDIR/shuffle_perm.php"
+SHUF2_BIN="$WORKDIR/shuffle_perm.bin"
+cat > "$SHUF2_SRC" <<'PHP'
+<?php
+$a = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+$before = implode(',', $a);
+$changed = false;
+for ($i = 0; $i < 32; $i++) {
+    $t = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    shuffle($t);
+    if (implode(',', $t) !== $before) {
+        $changed = true;
+        break;
+    }
+}
+echo $changed ? "perm\n" : "noop\n";
+PHP
+env \
+  PHP_COMPILER_HELPER_RUNTIME_O=0 \
+  PHP_COMPILER_HELPER_RUNTIME_CACHE_DIR="$CACHE-shuffle-perm" \
+  PHP_COMPILER_RUNTIME_ASSERT=1 \
+  "$PHP_BIN" bin/compile.php -o "$SHUF2_BIN" "$SHUF2_SRC"
+shuf2_out="$("$SHUF2_BIN" 2>&1)"
+shuf2_rc=$?
+if [[ "$shuf2_rc" -ne 0 ]]; then
+  echo "runtime-assert-mutate-smoke: FAIL — shuffle perm probe exited $shuf2_rc: $shuf2_out" >&2
+  exit 1
+fi
+shuf2_trimmed="$(printf '%s' "$shuf2_out" | tr -d '\r')"
+if [[ "$shuf2_trimmed" != "perm" ]]; then
+  echo "runtime-assert-mutate-smoke: FAIL — shuffle did not permute in 32 tries (NestedJIT no-op?): $shuf2_out" >&2
+  exit 1
+fi
+
+echo "runtime-assert-mutate-smoke: source gates for by-ref mutator COW (#36397 slice 9–12)…"
 for f in \
   lib/JIT/Builtin/ArrayPushRuntime.php \
   lib/JIT/Builtin/ArrayUnshiftRuntime.php \
@@ -283,7 +357,8 @@ for f in \
   lib/JIT/Builtin/ValueSortRuntime.php \
   lib/JIT/Builtin/KeySortRuntime.php \
   lib/JIT/Builtin/NaturalSortRuntime.php \
-  lib/JIT/Builtin/MultisortRuntime.php
+  lib/JIT/Builtin/MultisortRuntime.php \
+  lib/JIT/Builtin/ShuffleRuntime.php
 do
   if ! grep -q 'separateContainerForWrite' "$ROOT/$f"; then
     echo "runtime-assert-mutate-smoke: FAIL — $f missing separateContainerForWrite" >&2
