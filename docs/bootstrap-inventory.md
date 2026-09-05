@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8275 |
-| Phase A inventory files (M2 ratio SSOT) | 8275 |
+| PHP files on vm.php path | 8276 |
+| Phase A inventory files (M2 ratio SSOT) | 8276 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26143 |
+| Source constructs flagged (warnings) | 26145 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7079,6 +7079,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/CompileFuncCallExecReturn.php` | 0 | 5 |
 | `lib/JIT/Concern/CompileFuncCallInit.php` | 0 | 2 |
 | `lib/JIT/Concern/CompileIncDecAndConcatFlatten.php` | 0 | 17 |
+| `lib/JIT/Concern/CompileInitArray.php` | 0 | 2 |
 | `lib/JIT/Concern/CompileJumpIf.php` | 0 | 2 |
 | `lib/JIT/Concern/CompileNew.php` | 0 | 8 |
 | `lib/JIT/Concern/CompilePow.php` | 0 | 3 |
@@ -58123,17 +58124,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - trait CompileBlockInternal (line 27)
 - new Type (line 581)
-- new Error (line 846)
-- new Variable (line 883)
-- new Variable (line 891)
-- new Operand\Literal (line 1107)
-- new Operand\Literal (line 1224)
-- new OpCode (line 1437)
-- new Variable (line 1765)
-- new Variable (line 1853)
-- new Variable (line 1883)
-- new VM (line 2121)
-- new Operand\Literal (line 2407)
+- new Error (line 705)
+- new Variable (line 742)
+- new Variable (line 750)
+- new Operand\Literal (line 966)
+- new Operand\Literal (line 1083)
+- new OpCode (line 1296)
+- new Variable (line 1624)
+- new Variable (line 1712)
+- new Variable (line 1742)
+- new VM (line 1980)
+- new Operand\Literal (line 2266)
 - 2 class method(s)
 - 1 closure(s)
 
@@ -58231,6 +58232,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 758)
 - 18 class method(s)
 - 2 closure(s)
+
+### `lib/JIT/Concern/CompileInitArray.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CompileInitArray (line 21)
+- 1 class method(s)
 
 ### `lib/JIT/Concern/CompileJumpIf.php`
 
