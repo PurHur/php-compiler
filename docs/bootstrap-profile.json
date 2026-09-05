@@ -7144,6 +7144,7 @@
         "lib/JIT/Concern/AdaptByRefCallArgs.php",
         "lib/JIT/Concern/AssignOperand.php",
         "lib/JIT/Concern/CallResultCompileTimePropagate.php",
+        "lib/JIT/Concern/CallResultOperandAssign.php",
         "lib/JIT/Concern/CoerceReturnPropertyDeclaringAndByRef.php",
         "lib/JIT/Concern/CompileBlockInternal.php",
         "lib/JIT/Concern/CompileClassAndTraitUses.php",
