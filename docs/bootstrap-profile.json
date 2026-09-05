@@ -7964,6 +7964,7 @@
         "lib/VM/CompareStringableHelper.php",
         "lib/VM/CompareUnlikeHelper.php",
         "lib/VM/Concern/ObjectPropertyCollectAndSerialize.php",
+        "lib/VM/Concern/ObjectPropertyHooks.php",
         "lib/VM/Concern/ObjectPropertyIssetEmptyUnset.php",
         "lib/VM/Context.php",
         "lib/VM/CycleCollector.php",

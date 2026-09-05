@@ -14,9 +14,9 @@
             "note": "Concern trait splits (#36387/#36403); PropertyIncDecCompile + CoerceReturnPropertyDeclaringAndByRef"
         },
         "lib/VM.php": {
-            "budget": 23479,
+            "budget": 22380,
             "target": 15000,
-            "note": "ObjectPropertyCollectAndSerialize + ObjectPropertyIssetEmptyUnset Concern extracts (#36403); toward 15k target"
+            "note": "ObjectPropertyHooks + CollectAndSerialize + IssetEmptyUnset Concern extracts (#36403); toward 15k target"
         },
         "script/apply-patches.sh": {
             "budget": 7637,
