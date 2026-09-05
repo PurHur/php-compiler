@@ -2300,6 +2300,26 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('chmod +x "${ROOT}/script/apply-patches.sh"', $body);
     }
 
+    public function testDockerCapabilityMatrixSurfacesApplyPatchesFailure(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/docker-capability-matrix.sh');
+        $this->assertStringContainsString('apply-patches failed (#36247)', $body);
+        $this->assertDoesNotMatchRegularExpression(
+            '/apply-patches\\.sh[^\\n]*\\|\\| true/',
+            $body,
+            'docker-capability-matrix must not swallow apply-patches failures (#36401)'
+        );
+    }
+
+    public function testEmitHelperRuntimeSupportsBoundedRefreshFlags(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/emit-helper-runtime-object.php');
+        $this->assertStringContainsString('--limit=', $body);
+        $this->assertStringContainsString('--path-prefix=', $body);
+        $this->assertStringContainsString('bounded local emit (#36401)', $body);
+        $this->assertStringContainsString('REFUSE — --prelink with --limit/--path-prefix', $body);
+    }
+
     public function testCiMemoryEnvSurfacesApplyPatchesFailure(): void
     {
         $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-memory-env.sh');

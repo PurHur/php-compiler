@@ -50,6 +50,10 @@ declare(strict_types=1);
  *   ./script/docker-exec.sh -- bash -lc 'php script/emit-helper-runtime-object.php --force --prelink --migrate-to-gc-sections'
  *     # intentional corpus migration to AotGcSections (requires linkable common.o)
  *     # rewrite legacy manifests to v2 deps[] without re-emitting .o (#23458)
+ *   ./script/docker-exec.sh -- bash -lc 'php script/emit-helper-runtime-object.php --force --prelink --path-prefix=/lib/VM/ --limit=8'
+ *     # FORBIDDEN with --prelink (#36401 SIGSEGV); use without --prelink to warm local cache only
+ *   ./script/docker-exec.sh -- bash -lc 'php script/emit-helper-runtime-object.php --force --path-prefix=/lib/VM/ --limit=8'
+ *     # bounded local emit (#36401); always run aot-smoke before committing any --prelink
  *   ./script/docker-exec.sh -- bash -lc 'php script/emit-helper-runtime-object.php --refresh-global-fingerprints'
  *     # recompute v2 unit + arch fingerprints when global material changed (patches/lock)
  *     # but helper sources/deps are unchanged — no .o re-emit (#24302)
@@ -73,6 +77,26 @@ $force = in_array('--force', $argv, true);
 $migrateDeps = in_array('--migrate-deps', $argv, true);
 $refreshGlobal = in_array('--refresh-global-fingerprints', $argv, true);
 $migrateToGcSections = in_array('--migrate-to-gc-sections', $argv, true);
+// Bounded refresh for maintainer lanes (#36401): avoid whole-tree 20m+ hangs.
+$emitLimit = 0;
+$pathPrefix = null;
+foreach ($argv as $arg) {
+    if (str_starts_with($arg, '--limit=')) {
+        $emitLimit = max(0, (int) substr($arg, 8));
+    } elseif (str_starts_with($arg, '--path-prefix=')) {
+        $pathPrefix = substr($arg, 14);
+        if ('' === $pathPrefix) {
+            $pathPrefix = null;
+        }
+    }
+}
+
+if ($emitLimit > 0 || null !== $pathPrefix) {
+    if (in_array('--prelink', $argv, true)) {
+        fwrite(STDERR, "helper-runtime-prelink: REFUSE — --prelink with --limit/--path-prefix publishes a mixed corpus that SIGSEGVs aot-smoke (HELPER_RUNTIME_O=1) (#36401). Emit-only is fine; full --force --prelink needs aot-smoke after, or leave NestedJIT covering fingerprint-stale units.\n");
+        exit(1);
+    }
+}
 
 // Keep monolithic committed corpus shape unless an intentional migration is
 // requested. Default-on AotGcSections would otherwise emit incompatible unit.o
@@ -523,6 +547,9 @@ $knownBroken = 0;
 /** @var array<string, array{path: string, dir: string, fingerprint: string}> */
 $pendingUnits = [];
 foreach ($sites as $path => $names) {
+    if (null !== $pathPrefix && !str_starts_with($path, $pathPrefix)) {
+        continue;
+    }
     $slug = HelperRuntimeCache::slugFor($path);
     $dir = HelperRuntimeCache::unitDir($slug);
     $sourceAbs = HelperRuntimeCache::resolveUnitSource($root, $path);
@@ -556,6 +583,15 @@ foreach ($sites as $path => $names) {
     }
 
     $pendingUnits[$slug] = ['path' => $path, 'dir' => $dir, 'fingerprint' => $fingerprint];
+}
+
+if ($emitLimit > 0 && count($pendingUnits) > $emitLimit) {
+    // Stable order so --limit=N is reproducible across runs (#36401).
+    ksort($pendingUnits);
+    $pendingUnits = array_slice($pendingUnits, 0, $emitLimit, true);
+    fwrite(STDOUT, "helper-runtime-emit: --limit={$emitLimit} applied".(null !== $pathPrefix ? " (path-prefix={$pathPrefix})" : '')."\n");
+} elseif (null !== $pathPrefix) {
+    fwrite(STDOUT, 'helper-runtime-emit: path-prefix='.$pathPrefix.' → '.count($pendingUnits)." pending\n");
 }
 
 /**
