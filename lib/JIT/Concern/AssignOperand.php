@@ -1627,6 +1627,34 @@ trait AssignOperand
 
             return;
         } elseif (
+            Variable::TYPE_HASHTABLE === $result->type
+            && 0 !== ($value->type & Variable::IS_NATIVE_ARRAY)
+        ) {
+            // Packed native array (e.g. string[]) → array-typed local. Parsedown `$Line = [...]`
+            // after `$this->$methodName()` NestedJIT (#36380). Peer VALUE←NATIVE_ARRAY above
+            // and HASHTABLE←VALUE demotion (#3205).
+            $ht = \PHPCompiler\JIT\HashTableHelper::materializeNativeArrayForCall($this->context, $value);
+            $slot = \PHPCompiler\JIT\JitValueBox::alloc($this->context);
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeHashtable'),
+                \PHPCompiler\JIT\JitValueBox::pointer($this->context, $slot),
+                $ht
+            );
+            $this->context->refcount->delref(
+                $this->context->builder->pointerCast(
+                    $ht,
+                    $this->context->getTypeFromString('__ref__virtual*')
+                )
+            );
+            $result->free();
+            $result->type = Variable::TYPE_VALUE;
+            $result->value = $slot;
+            $result->valueBoxHashtable = true;
+            $result->nextFreeElement = $value->nextFreeElement;
+            $this->markScopeVariableAssignedIfTracked($resultOp, $result);
+
+            return;
+        } elseif (
             0 !== ($result->type & Variable::IS_NATIVE_ARRAY)
             && Variable::TYPE_VALUE === $value->type
         ) {

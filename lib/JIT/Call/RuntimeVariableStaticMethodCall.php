@@ -47,6 +47,23 @@ final class RuntimeVariableStaticMethodCall implements Call
             return JitValueBox::alloc($context);
         }
 
+        $argc = \count($args);
+        $compatible = [];
+        foreach ($this->candidatesByMethodLc as $methodLc => $proxy) {
+            if (!$proxy instanceof Call) {
+                continue;
+            }
+            if (!$this->proxyAcceptsArgc($proxy, $argc)) {
+                continue;
+            }
+            $compatible[$methodLc] = $proxy;
+        }
+        if ([] === $compatible) {
+            $context->builder->call($context->lookupFunction('abort'));
+
+            return JitValueBox::alloc($context);
+        }
+
         $nameStr = JitStringArg::lower($context, $this->methodNameVar, 'static method name');
         $tag = 'vsm'.(string) ++self::$blockSeq;
         $merge = BasicBlockHelper::append($context, 'var_static_merge_'.$tag);
@@ -57,7 +74,7 @@ final class RuntimeVariableStaticMethodCall implements Call
 
         $i64 = $context->getTypeFromString('int64');
         $zeroI64 = $i64->constInt(0, false);
-        $names = array_keys($this->candidatesByMethodLc);
+        $names = array_keys($compatible);
         $n = \count($names);
         $checkBlocks = [];
         for ($i = 0; $i < $n; ++$i) {
@@ -76,13 +93,20 @@ final class RuntimeVariableStaticMethodCall implements Call
             $context->builder->branchIf($isMatch, $onMatch, $onMiss);
 
             $context->builder->positionAtEnd($onMatch);
-            $proxy = $this->candidatesByMethodLc[$methodLc];
-            assert($proxy instanceof Call);
-            $raw = $proxy->call($context, ...$args);
-            $context->builder->store(
-                JitValueBox::coerceToValuePtrForStore($context, $raw),
-                $resultSlot
-            );
+            $proxy = $compatible[$methodLc];
+            // Emitting every name arm with this site's argc: skip arms that throw
+            // (arity-strict stubs) so one bad candidate cannot abort the module (#36380).
+            try {
+                $raw = $proxy->call($context, ...$args);
+                $context->builder->store(
+                    JitValueBox::coerceToValuePtrForStore($context, $raw),
+                    $resultSlot
+                );
+            } catch (\LogicException) {
+                BasicBlockHelper::ensureOpenInsertBlock($context, 'var_static_arm_fail_'.$tag.'_'.$i);
+                $context->builder->call($context->lookupFunction('abort'));
+                $context->builder->store($zero, $resultSlot);
+            }
             $context->builder->branch($merge);
         }
 
@@ -93,5 +117,24 @@ final class RuntimeVariableStaticMethodCall implements Call
         $context->builder->positionAtEnd($merge);
 
         return $context->builder->load($resultSlot);
+    }
+
+    /**
+     * Drop candidates whose declared argc cannot accept this call site (#36380).
+     * Instance `$this->$name($a,$b)` must not emit 1-arg method arms (and vice versa).
+     */
+    private function proxyAcceptsArgc(Call $proxy, int $argc): bool
+    {
+        if (!($proxy instanceof Native)) {
+            return true;
+        }
+        $n = \count($proxy->argTypes);
+        if (null !== $proxy->variadicArgIndex) {
+            return $argc >= $proxy->variadicArgIndex;
+        }
+        $defaults = \count($proxy->defaultArgs);
+        $min = max(0, $n - $defaults);
+
+        return $argc >= $min && $argc <= $n;
     }
 }

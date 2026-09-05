@@ -6796,6 +6796,7 @@ trait CompileBlockInternal
                         $nameOp = new Operand\Literal($block->constants[$nameSlot]->toString());
                     }
                     $methodName = null;
+                    $nameVar = null;
                     if ($nameOp instanceof Operand\Literal) {
                         $methodName = is_string($nameOp->value) ? $nameOp->value : (string) $nameOp->value;
                     } else {
@@ -6809,9 +6810,33 @@ trait CompileBlockInternal
                         }
                     }
                     if (null === $methodName || '' === $methodName) {
-                        throw new \LogicException(
-                            'Instance method call name must be a compile-time string (dynamic $obj->$name() without a folded literal is not lowered yet; #34084)'
+                        // Runtime method name: `$this->$methodName()` after concat / HT fetch
+                        // (Parsedown blockContinue / element handler — #36380). Peer of
+                        // Class::$m() via RuntimeVariableStaticMethodCall (#34937).
+                        if (null === $nameVar) {
+                            $nameVar = $this->context->getVariableFromOp($nameOp);
+                        }
+                        $receiverVar = $this->context->getVariableFromOp($receiverOp);
+                        $declaredLc = strtolower(ltrim((string) (
+                            $receiverVar->classUserType
+                            ?? $this->typedPropertyClassConstraintUserType($receiverVar)
+                            ?? $receiverOp->type?->userType
+                            ?? $this->context->scope->className
+                            ?? ''
+                        ), '\\'));
+                        $candidates = $this->buildRuntimeInstanceMethodCandidatesByMethodName($declaredLc);
+                        if ([] === $candidates) {
+                            throw new \LogicException(
+                                'Instance method call name must be a compile-time string or a typed receiver with known methods (dynamic $obj->$name(); #34084 / #36380)'
+                            );
+                        }
+                        $this->context->scope->toCall = new \PHPCompiler\JIT\Call\RuntimeVariableStaticMethodCall(
+                            $nameVar,
+                            $candidates
                         );
+                        $this->context->scope->args = [$receiverVar];
+                        $this->context->scope->argOperands = [$receiverOp];
+                        break;
                     }
                     $this->initJitMethodCall($block, $receiverOp, $methodName, $op->objectCallInvoke);
                     // initJitMethodCall seeds args=[receiver] but not argOperands. ARG_SEND only
