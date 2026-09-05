@@ -118,6 +118,18 @@ use PHPCompiler\VM\Variable as VmVariable;
  * array_intersect_key / array_diff_assoc / array_intersect_assoc (≥1 typed
  * arrays; zero-arg stays live — ArgumentCountError; soft-null / non-array
  * stay live — TypeError; callback u* forms stay live),
+ * typed-array in_array / array_search (typed haystack + any needle + optional
+ * typed strict; soft-null / non-array haystack stay live — TypeError;
+ * soft-null strict stays live — deprecate; argc &lt; 2 / excess stay live),
+ * typed-array array_pad (typed array + compile-time |length| ≤ 1048576 + any
+ * value; non-constant / PHP_INT_MIN / oversized length stay live — ValueError;
+ * soft-null array/length stay live; 4-arg pad_type stays live),
+ * array_fill (typed start + compile-time count in [0, 1048576] + any value;
+ * soft-null / non-constant / negative / oversized count stay live),
+ * array_fill_keys (typed keys array + any value; soft-null / non-array keys
+ * stay live — TypeError),
+ * array_column (typed array + null-or-typed str/int column_key + optional
+ * null-or-typed index_key; soft-null / non-array / non-scalar keys stay live),
  * zero-arg pi, type.c predicates + gettype/get_debug_type, ctype.c
  * classifiers on typed/literal strings, typed-array count/sizeof, math.c
  * incl. pow/fpow/fdiv on already-numeric args, empty void user functions).
@@ -343,6 +355,12 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureArrayMergeDiffNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureArrayLookupNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureArrayConstructNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureVersionCompareNoSideEffect($toCall, $callArgs)) {
@@ -2068,6 +2086,152 @@ final class DiscardedPureCallElision
         }
 
         return true;
+    }
+
+    /**
+     * Discarded {@code in_array}/{@code array_search} on a typed haystack —
+     * php-src {@code ext/standard/array.c}. Soft-null / non-array haystacks
+     * stay live ({@code TypeError}). Soft-null {@code $strict} stays live
+     * (deprecate). Needle is {@code Z_PARAM_ZVAL} (null / object / value-box OK).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureArrayLookupNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        $name = strtolower($toCall->getName());
+        if ('in_array' !== $name && 'array_search' !== $name) {
+            return false;
+        }
+        // needle + haystack required; optional strict; excess argc → ArgumentCountError.
+        if (!isset($callArgs[0], $callArgs[1]) || isset($callArgs[3])) {
+            return false;
+        }
+        if (!$callArgs[0] instanceof Variable || !$callArgs[1] instanceof Variable) {
+            return false;
+        }
+        if (!self::isTypedArrayArg($callArgs[1])) {
+            return false;
+        }
+        if (!isset($callArgs[2])) {
+            return true;
+        }
+
+        return $callArgs[2] instanceof Variable
+            && self::mathArgAllowsDiscardedElision($callArgs[2]);
+    }
+
+    /**
+     * Discarded {@code array_pad}/{@code array_fill}/{@code array_fill_keys}/
+     * {@code array_column} — php-src {@code ext/standard/array.c}. Soft-null /
+     * non-array inputs stay live ({@code TypeError} / deprecate).
+     * {@code array_pad} / {@code array_fill} require compile-time sizes that
+     * cannot trip Zend {@code ValueError} guards.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureArrayConstructNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        $name = strtolower($toCall->getName());
+        switch ($name) {
+            case 'array_pad':
+                // 3-arg only — 4-arg pad_type / ArrayPadType stays live.
+                if (!isset($callArgs[0], $callArgs[1], $callArgs[2]) || isset($callArgs[3])) {
+                    return false;
+                }
+                if (
+                    !$callArgs[0] instanceof Variable
+                    || !$callArgs[1] instanceof Variable
+                    || !$callArgs[2] instanceof Variable
+                ) {
+                    return false;
+                }
+                if (!self::isTypedArrayArg($callArgs[0])) {
+                    return false;
+                }
+                $length = $callArgs[1]->compileTimeLong;
+                // VmArray::rejectOversizedPad: PHP_INT_MIN or |len|-inputSize > 1M.
+                if (null === $length || \PHP_INT_MIN === $length) {
+                    return false;
+                }
+                if (abs($length) > 1048576) {
+                    return false;
+                }
+
+                return true;
+            case 'array_fill':
+                if (!isset($callArgs[0], $callArgs[1], $callArgs[2]) || isset($callArgs[3])) {
+                    return false;
+                }
+                if (
+                    !$callArgs[0] instanceof Variable
+                    || !$callArgs[1] instanceof Variable
+                    || !$callArgs[2] instanceof Variable
+                ) {
+                    return false;
+                }
+                if (!self::mathArgAllowsDiscardedElision($callArgs[0])) {
+                    return false;
+                }
+                $count = $callArgs[1]->compileTimeLong;
+                // php-src php_array_fill: count < 0 or count > 1048576 → ValueError.
+                if (null === $count || $count < 0 || $count > 1048576) {
+                    return false;
+                }
+
+                return true;
+            case 'array_fill_keys':
+                if (!isset($callArgs[0], $callArgs[1]) || isset($callArgs[2])) {
+                    return false;
+                }
+                if (!$callArgs[0] instanceof Variable || !$callArgs[1] instanceof Variable) {
+                    return false;
+                }
+
+                return self::isTypedArrayArg($callArgs[0]);
+            case 'array_column':
+                if (!isset($callArgs[0], $callArgs[1]) || isset($callArgs[3])) {
+                    return false;
+                }
+                if (!$callArgs[0] instanceof Variable || !$callArgs[1] instanceof Variable) {
+                    return false;
+                }
+                if (!self::isTypedArrayArg($callArgs[0])) {
+                    return false;
+                }
+                if (!self::arrayColumnKeyAllowsDiscardedElision($callArgs[1])) {
+                    return false;
+                }
+                if (!isset($callArgs[2])) {
+                    return true;
+                }
+
+                return $callArgs[2] instanceof Variable
+                    && self::arrayColumnKeyAllowsDiscardedElision($callArgs[2]);
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * {@code array_column} column_key / index_key: null, typed string, or typed
+     * long — objects / generic value-boxes stay live ({@code TypeError}).
+     */
+    private static function arrayColumnKeyAllowsDiscardedElision(Variable $arg): bool
+    {
+        if ($arg->isNullConstant || Variable::TYPE_NULL === $arg->type) {
+            return true;
+        }
+        if (self::stringArgAllowsDiscardedElision($arg)) {
+            return true;
+        }
+
+        return self::mathArgAllowsDiscardedElision($arg);
     }
 
     /**

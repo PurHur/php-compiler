@@ -10,9 +10,12 @@ use PHPCompiler\ext\standard\abs;
 use PHPCompiler\ext\standard\addcslashes;
 use PHPCompiler\ext\standard\addslashes;
 use PHPCompiler\ext\standard\array_change_key_case;
+use PHPCompiler\ext\standard\array_column;
 use PHPCompiler\ext\standard\array_diff;
 use PHPCompiler\ext\standard\array_diff_assoc;
 use PHPCompiler\ext\standard\array_diff_key;
+use PHPCompiler\ext\standard\array_fill;
+use PHPCompiler\ext\standard\array_fill_keys;
 use PHPCompiler\ext\standard\array_first;
 use PHPCompiler\ext\standard\array_intersect;
 use PHPCompiler\ext\standard\array_intersect_assoc;
@@ -25,11 +28,14 @@ use PHPCompiler\ext\standard\array_keys;
 use PHPCompiler\ext\standard\array_last;
 use PHPCompiler\ext\standard\array_merge;
 use PHPCompiler\ext\standard\array_merge_recursive;
+use PHPCompiler\ext\standard\array_pad;
 use PHPCompiler\ext\standard\array_replace;
 use PHPCompiler\ext\standard\array_replace_recursive;
 use PHPCompiler\ext\standard\array_reverse;
+use PHPCompiler\ext\standard\array_search;
 use PHPCompiler\ext\standard\array_values;
 use PHPCompiler\ext\standard\array_count;
+use PHPCompiler\ext\standard\in_array;
 use PHPCompiler\ext\standard\base64_encode;
 use PHPCompiler\ext\standard\base_convert_;
 use PHPCompiler\ext\standard\basename;
@@ -3774,6 +3780,193 @@ final class DiscardedPureCallElisionTest extends TestCase
             $context,
             new array_diff_key(),
             [$obj, $ht]
+        ));
+    }
+
+    public function testDiscardedArrayLookupElidesOnTypedHaystack(): void
+    {
+        // php-src ext/standard/array.c in_array / array_search (#36386).
+        $context = $this->makeContext();
+        $ht = $this->makeHashtableVar();
+        $needle = $this->makeNativeLongVar();
+        $strNeedle = $this->makeStringVar('x');
+        $null = $this->makeNullVar();
+        $bool = $this->makeNativeBoolVar();
+        $box = $this->makeValueBoxVar();
+        $obj = $this->makeObjectVar();
+        $str = $this->makeStringVar('s');
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new in_array(),
+            [$needle, $ht]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new in_array(),
+            [$strNeedle, $ht, $bool]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new in_array(),
+            [$null, $ht]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_search(),
+            [$needle, $ht]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_search(),
+            [$obj, $ht, $bool]
+        ));
+
+        $valueBoxHt = $this->makeValueBoxVar();
+        $valueBoxHt->valueBoxHashtable = true;
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new in_array(),
+            [$needle, $valueBoxHt]
+        ));
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new in_array(),
+            [$needle]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new in_array(),
+            [$needle, $null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new in_array(),
+            [$needle, $str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new in_array(),
+            [$needle, $box]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new in_array(),
+            [$needle, $ht, $null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_search(),
+            [$needle, $ht, $bool, $str]
+        ));
+    }
+
+    public function testDiscardedArrayConstructElidesOnSafeArgs(): void
+    {
+        // php-src ext/standard/array.c array_pad/fill/fill_keys/column (#36386).
+        $context = $this->makeContext();
+        $ht = $this->makeHashtableVar();
+        $keys = $this->makeHashtableVar();
+        $start = $this->makeNativeLongVar();
+        $lenOk = $this->makeCompileTimeLongVar(4);
+        $lenHuge = $this->makeCompileTimeLongVar(1048577);
+        $lenDyn = $this->makeNativeLongVar();
+        $countOk = $this->makeCompileTimeLongVar(3);
+        $countNeg = $this->makeCompileTimeLongVar(-1);
+        $val = $this->makeStringVar('v');
+        $col = $this->makeStringVar('name');
+        $colLong = $this->makeNativeLongVar();
+        $null = $this->makeNullVar();
+        $box = $this->makeValueBoxVar();
+        $obj = $this->makeObjectVar();
+        $str = $this->makeStringVar('s');
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_pad(),
+            [$ht, $lenOk, $val]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_fill(),
+            [$start, $countOk, $val]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_fill_keys(),
+            [$keys, $val]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_column(),
+            [$ht, $col]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_column(),
+            [$ht, $null]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_column(),
+            [$ht, $colLong, $col]
+        ));
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_pad(),
+            [$ht, $lenHuge, $val]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_pad(),
+            [$ht, $lenDyn, $val]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_pad(),
+            [$null, $lenOk, $val]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_pad(),
+            [$ht, $lenOk, $val, $start]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_fill(),
+            [$start, $countNeg, $val]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_fill(),
+            [$null, $countOk, $val]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_fill_keys(),
+            [$null, $val]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_fill_keys(),
+            [$box, $val]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_column(),
+            [$ht, $obj]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_column(),
+            [$str, $col]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_column(),
+            [$ht, $box]
         ));
     }
 
