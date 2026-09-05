@@ -551,37 +551,22 @@ trait CompileBlockInternal
                 case OpCode::TYPE_JUMPIF:
                     return $this->compileJumpIfOp($block, $op, $i, $func, $origBasicBlock, ...$args);
                 case OpCode::TYPE_TRY:
-                    \PHPCompiler\JIT\TryCatchHelper::beginTry($this, $func, $this->context, $block, $op, $i, $args);
-
-                    return $origBasicBlock;
                 case OpCode::TYPE_CATCH:
-                    if ([] !== $this->context->tryCatch->handlerStack) {
-                        \PHPCompiler\JIT\TryCatchHelper::finishPostTryOpcode($this->context);
-                        break;
-                    }
-                    if (null !== $op->block1) {
-                        $this->compileBlockInternal($func, $op->block1, null, null, 0, false, ...$args);
-                    }
-
-                    return $origBasicBlock;
                 case OpCode::TYPE_FINALLY:
-                    if ([] !== $this->context->tryCatch->handlerStack) {
-                        \PHPCompiler\JIT\TryCatchHelper::finishPostTryOpcode($this->context);
-                        break;
-                    }
-                    if (null !== $op->block1) {
-                        $this->compileBlockInternal($func, $op->block1, null, null, 0, false, ...$args);
-                    }
-
-                    return $origBasicBlock;
                 case OpCode::TYPE_THROW:
-                    \PHPCompiler\JIT\TryCatchHelper::emitThrow($this, $this->context, $func, $block, $op);
-
-                    return $origBasicBlock;
                 case OpCode::TYPE_RETHROW:
-                    \PHPCompiler\JIT\TryCatchHelper::emitRethrow($this, $this->context, $func, $block);
-
-                    return $origBasicBlock;
+                    $tryCatchCont = $this->compileTryCatchThrowOp(
+                        $block,
+                        $op,
+                        $i,
+                        $func,
+                        $origBasicBlock,
+                        ...$args
+                    );
+                    if (null !== $tryCatchCont) {
+                        return $tryCatchCont;
+                    }
+                    break;
                 case OpCode::TYPE_RETURN_VOID:
                 case OpCode::TYPE_RETURN:
                     return $this->compileReturnOp($block, $op, $func, $builder, $origBasicBlock);
