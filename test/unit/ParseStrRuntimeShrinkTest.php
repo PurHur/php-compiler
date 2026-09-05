@@ -160,7 +160,7 @@ final class ParseStrRuntimeShrinkTest extends TestCase
 
     public function testJitMaterializesNestedStringParamsAtCalleeEntry(): void
     {
-        $source = (string) file_get_contents($this->repoRoot.'/lib/JIT.php');
+        $source = (string) file_get_contents($this->repoRoot.'/lib/JIT/Concern/ValueBoxCoalesceAndConcatHelpers.php');
         $this->assertStringContainsString('prepareNestedJitCalleeParamArgument', $source);
         $this->assertStringContainsString('__string__separate', $source);
         $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);

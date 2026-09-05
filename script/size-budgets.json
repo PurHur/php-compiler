@@ -9,9 +9,9 @@
             "note": "Concern trait splits (#36230/#36387/#36403); CompileFuncCfgReturnAndGlobalImport + peers"
         },
         "lib/JIT.php": {
-            "budget": 3778,
+            "budget": 3475,
             "target": 20000,
-            "note": "Concern trait splits (#36387/#36403); M3EmitTuRuntimeSpineStubNative + M3EmitTuCompilerRuntimeMethodCompile + peers"
+            "note": "Concern trait splits (#36387/#36403); ValueBoxCoalesceAndConcatHelpers + M3EmitTuRuntimeSpineStubNative + peers"
         },
         "lib/VM.php": {
             "budget": 18326,
