@@ -94,7 +94,8 @@ final class SortRuntime
     private static function invokeLlvmPackedSort(Context $context, JITVariable $array, string $abi): void
     {
         $context->type->hashtable->ensureSortAbi($abi);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        // By-ref mutator: SEPARATE_ARRAY before in-place sort (php-src php_array_sort / #36397).
+        $ht = HashTableHelper::separateContainerForWrite($context, $array);
         $context->builder->call($context->lookupFunction($abi), $ht);
         // In-place LLVM sort — only rebind native int[] into a value box. Writing the same
         // HT back into a TYPE_VALUE box valueDelref's it (#36388 / peer UsortRuntime).
@@ -106,7 +107,8 @@ final class SortRuntime
     private static function invokeHelperPackedSort(Context $context, JITVariable $array, string $abi): void
     {
         self::ensureLocaleNaturalLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        // By-ref mutator: SEPARATE_ARRAY before in-place sort (php-src php_array_sort / #36397).
+        $ht = HashTableHelper::separateContainerForWrite($context, $array);
         $context->builder->call($context->lookupFunction($abi), $ht);
         if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);

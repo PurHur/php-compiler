@@ -173,13 +173,80 @@ if [[ "$push_trimmed" != "320" ]]; then
   exit 1
 fi
 
-echo "runtime-assert-mutate-smoke: source gates for by-ref mutator COW (#36397 slice 9)…"
+echo "runtime-assert-mutate-smoke: run COW sort (must not false-positive M5)…"
+SORT_SRC="$WORKDIR/cow_sort.php"
+SORT_BIN="$WORKDIR/cow_sort.bin"
+cat > "$SORT_SRC" <<'PHP'
+<?php
+$a = [3, 1, 2];
+$b = $a;
+sort($a);
+echo implode(',', $a), '|', implode(',', $b), "\n";
+PHP
+env \
+  PHP_COMPILER_HELPER_RUNTIME_O=0 \
+  PHP_COMPILER_HELPER_RUNTIME_CACHE_DIR="$CACHE-sort" \
+  PHP_COMPILER_RUNTIME_ASSERT=1 \
+  PHP_COMPILER_DUMP_IR=1 \
+  "$PHP_BIN" bin/compile.php -o "$SORT_BIN" "$SORT_SRC"
+if [[ -f /tmp/phpc-last.ll ]]; then
+  if ! grep -A40 'define.*__hashtable__sortPacked' /tmp/phpc-last.ll | grep -q '__ref__assert_exclusive'; then
+    echo "runtime-assert-mutate-smoke: FAIL — __hashtable__sortPacked does not call __ref__assert_exclusive" >&2
+    exit 1
+  fi
+fi
+sort_out="$("$SORT_BIN" 2>&1)"
+sort_rc=$?
+if [[ "$sort_rc" -ne 0 ]]; then
+  echo "runtime-assert-mutate-smoke: FAIL — COW sort exited $sort_rc: $sort_out" >&2
+  exit 1
+fi
+sort_trimmed="$(printf '%s' "$sort_out" | tr -d '\r')"
+if [[ "$sort_trimmed" != "1,2,3|3,1,2" ]]; then
+  echo "runtime-assert-mutate-smoke: FAIL — expected 1,2,3|3,1,2 from COW sort, got: $sort_out" >&2
+  exit 1
+fi
+
+echo "runtime-assert-mutate-smoke: run COW array_walk (must not false-positive M5)…"
+WALK_SRC="$WORKDIR/cow_walk.php"
+WALK_BIN="$WORKDIR/cow_walk.bin"
+cat > "$WALK_SRC" <<'PHP'
+<?php
+$a = [1, 2];
+$b = $a;
+array_walk($a, function (&$v) { $v *= 10; });
+echo implode(',', $a), '|', implode(',', $b), "\n";
+PHP
+env \
+  PHP_COMPILER_HELPER_RUNTIME_O=0 \
+  PHP_COMPILER_HELPER_RUNTIME_CACHE_DIR="$CACHE-walk" \
+  PHP_COMPILER_RUNTIME_ASSERT=1 \
+  "$PHP_BIN" bin/compile.php -o "$WALK_BIN" "$WALK_SRC"
+walk_out="$("$WALK_BIN" 2>&1)"
+walk_rc=$?
+if [[ "$walk_rc" -ne 0 ]]; then
+  echo "runtime-assert-mutate-smoke: FAIL — COW array_walk exited $walk_rc: $walk_out" >&2
+  exit 1
+fi
+walk_trimmed="$(printf '%s' "$walk_out" | tr -d '\r')"
+if [[ "$walk_trimmed" != "10,20|1,2" ]]; then
+  echo "runtime-assert-mutate-smoke: FAIL — expected 10,20|1,2 from COW array_walk, got: $walk_out" >&2
+  exit 1
+fi
+
+echo "runtime-assert-mutate-smoke: source gates for by-ref mutator COW (#36397 slice 9–10)…"
 for f in \
   lib/JIT/Builtin/ArrayPushRuntime.php \
   lib/JIT/Builtin/ArrayUnshiftRuntime.php \
   lib/JIT/Builtin/ArrayPopRuntime.php \
   lib/JIT/Builtin/ArrayShiftRuntime.php \
-  lib/JIT/Builtin/ArraySpliceRuntime.php
+  lib/JIT/Builtin/ArraySpliceRuntime.php \
+  lib/JIT/Builtin/SortRuntime.php \
+  lib/JIT/Builtin/ArrayWalkRuntime.php \
+  lib/JIT/Builtin/UsortRuntime.php \
+  lib/JIT/Builtin/ValueSortRuntime.php \
+  lib/JIT/Builtin/KeySortRuntime.php \
+  lib/JIT/Builtin/NaturalSortRuntime.php
 do
   if ! grep -q 'separateContainerForWrite' "$ROOT/$f"; then
     echo "runtime-assert-mutate-smoke: FAIL — $f missing separateContainerForWrite" >&2
@@ -196,6 +263,19 @@ do
     exit 1
   fi
 done
+if ! grep -q 'emitAssertExclusiveCall' "$ROOT/lib/JIT/Builtin/Type/HashTable.php"; then
+  echo "runtime-assert-mutate-smoke: FAIL — HashTable.php missing emitAssertExclusiveCall (sortPacked)" >&2
+  exit 1
+fi
+if ! grep -A5 'implementSortPacked' "$ROOT/lib/JIT/Builtin/Type/HashTable.php" | head -1 >/dev/null; then
+  :
+fi
+# Packed sort ABI must emit M5 at entry (#36397 slice 10).
+if ! awk '/function implementSortPacked\(/,/^    private function implementSortPackedNatural/' \
+    "$ROOT/lib/JIT/Builtin/Type/HashTable.php" | grep -q 'emitAssertExclusiveCall'; then
+  echo "runtime-assert-mutate-smoke: FAIL — implementSortPacked missing emitAssertExclusiveCall" >&2
+  exit 1
+fi
 
 echo "runtime-assert-mutate-smoke: inject shared-write still aborts M5…"
 INJ_SRC="$WORKDIR/inject.php"

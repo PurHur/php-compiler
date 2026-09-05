@@ -78,7 +78,8 @@ final class ArrayWalkRuntime
         }
         $name = $callback->compileTimeString;
 
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        // By-ref mutator: SEPARATE_ARRAY before walk (php-src php_array_walk / #36397).
+        $ht = HashTableHelper::separateContainerForWrite($context, $array);
         self::dispatchStringCallback($context, $ht, $name, false);
 
         return $context->getTypeFromString('int1')->constInt(1, false);
@@ -103,7 +104,8 @@ final class ArrayWalkRuntime
         }
         $name = $callback->compileTimeString;
 
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        // By-ref mutator: SEPARATE_ARRAY before walk (php-src php_array_walk / #36397).
+        $ht = HashTableHelper::separateContainerForWrite($context, $array);
         self::dispatchStringCallback($context, $ht, $name, true);
 
         return $context->getTypeFromString('int1')->constInt(1, false);
@@ -156,7 +158,8 @@ final class ArrayWalkRuntime
         if (null !== $userdata) {
             // Keep NestedJIT bridge for userdata — LLVM path is 2-arg only (#27632).
             self::ensureLinked($context);
-            $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+            // By-ref mutator: SEPARATE_ARRAY before walk (php-src php_array_walk / #36397).
+            $ht = HashTableHelper::separateContainerForWrite($context, $array);
             $valuePtr = $context->getTypeFromString('__value__*');
             $context->builder->call(
                 $context->lookupFunction(self::ABI_WALK_CLOSURE),
@@ -172,7 +175,8 @@ final class ArrayWalkRuntime
         // Pure LLVM + NestedClosureInvoke — NestedJIT ArrayWalkJitHelper segfaults (#27632 / #24156).
         NestedClosureInvokeLlvm::ensureLinked($context);
         VmActiveContextInitLlvm::requestThinStandaloneInit($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        // By-ref mutator: SEPARATE_ARRAY before walk (php-src php_array_walk / #36397).
+        $ht = HashTableHelper::separateContainerForWrite($context, $array);
         ArrayWalkLlvm::walkWithClosure($context, $ht, $callback);
 
         return $context->getTypeFromString('int1')->constInt(1, false);
@@ -201,7 +205,8 @@ final class ArrayWalkRuntime
         // Pure LLVM + NestedClosureInvoke — NestedJIT ArrayWalkJitHelper segfaults (#27632 / #24156).
         NestedClosureInvokeLlvm::ensureLinked($context);
         VmActiveContextInitLlvm::requestThinStandaloneInit($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        // By-ref mutator: SEPARATE_ARRAY before walk (php-src php_array_walk / #36397).
+        $ht = HashTableHelper::separateContainerForWrite($context, $array);
         ArrayWalkLlvm::walkRecursiveWithClosure($context, $ht, $callback);
 
         return $context->getTypeFromString('int1')->constInt(1, false);
