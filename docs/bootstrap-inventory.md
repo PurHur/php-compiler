@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8216 |
-| Phase A inventory files (M2 ratio SSOT) | 8216 |
+| PHP files on vm.php path | 8217 |
+| Phase A inventory files (M2 ratio SSOT) | 8217 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26017 |
+| Source constructs flagged (warnings) | 26019 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7068,6 +7068,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/EmitJitReturn.php` | 0 | 2 |
 | `lib/JIT/Concern/InitJitMethodCall.php` | 0 | 3 |
 | `lib/JIT/Concern/InitJitStaticCall.php` | 0 | 15 |
+| `lib/JIT/Concern/LocalReleaseUnsetAndVarFetchDest.php` | 0 | 2 |
 | `lib/JIT/Concern/M3EmitTuSidecarLinktime.php` | 0 | 2 |
 | `lib/JIT/Concern/PropertyFetchCoalesceAndCompileTimeString.php` | 0 | 6 |
 | `lib/JIT/Concern/PropertyIncDecCompile.php` | 0 | 19 |
@@ -50482,87 +50483,87 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT\Call\ExternalMethod (line 361)
-- new JIT\Scope (line 390)
-- new Operand\Literal (line 640)
-- new Operand\Literal (line 656)
-- new JIT\Call\Native (line 1134)
-- new Variable (line 2140)
-- new JIT\Call\Native (line 2166)
-- new Variable (line 2256)
-- new JIT\Call\Vararg (line 2283)
-- new JIT\Call\Native (line 2293)
-- new JIT\Call\Native (line 2582)
-- new JIT\Variable (line 2822)
-- new JIT\Call\Native (line 2839)
-- new JIT\Call\Native (line 2884)
-- new JIT\Call\Native (line 2954)
-- new JIT\Call\Native (line 2996)
-- new JIT\Call\Native (line 3041)
-- new JIT\Call\Native (line 3096)
-- new JIT\Call\Native (line 4283)
-- new JIT\Call\Native (line 4314)
-- new JIT\Call\Native (line 4361)
-- new JIT\Call\Native (line 4435)
-- new JIT\Call\Native (line 4489)
-- new JIT\Call\Native (line 4576)
-- new JIT\Call\Native (line 5069)
-- new JIT\Call\Native (line 5100)
-- new JIT\Call\Native (line 5136)
-- new JIT\Call\Native (line 5171)
-- new JIT\Call\Native (line 5206)
-- new JIT\Call\Native (line 5241)
-- new JIT\Call\Native (line 5353)
-- new JIT\Call\Native (line 5595)
-- new JIT\Call\Native (line 5633)
-- new JIT\Call\Native (line 5667)
-- new JIT\Call\Native (line 5788)
-- new JIT\Call\Native (line 6438)
-- new JIT\Call\Native (line 6510)
-- new Operand\Literal (line 7021)
-- new Variable (line 7075)
-- new Variable (line 7119)
-- new Variable (line 7179)
-- new Variable (line 7875)
-- new Variable (line 7895)
-- new Variable (line 7916)
-- new Variable (line 7968)
-- new JIT\Call\ForeachIndexedClosureCall (line 8450)
-- new Variable (line 8539)
-- new Variable (line 8569)
-- new Variable (line 8588)
-- new Variable (line 8618)
-- new Variable (line 8655)
-- new Variable (line 8675)
-- new Variable (line 8688)
-- new Variable (line 8731)
-- new JIT\Variable (line 9521)
-- new JIT\Variable (line 9584)
-- new Variable (line 9684)
-- new Variable (line 9728)
-- new Variable (line 9780)
-- new Variable (line 9791)
-- new Variable (line 9802)
-- new Variable (line 9822)
-- new Variable (line 9885)
-- new Variable (line 9948)
-- new Variable (line 10018)
-- new Variable (line 10049)
-- new Variable (line 10117)
-- new Operand\Literal (line 10126)
-- new Variable (line 10141)
-- new Variable (line 10475)
-- new JIT\Call\VmCoerceVariableToString (line 10624)
-- new JIT\Call\NoOpConstruct (line 10827)
-- new Operand\Literal (line 11669)
-- new VM (line 11869)
-- new VM\Variable (line 11878)
-- new VM\ClassEntry (line 11983)
-- new Func\PHP (line 12002)
-- new VM\ClassEntry (line 12048)
-- new Variable (line 12065)
-- new Variable (line 13270)
-- 382 class method(s)
+- new JIT\Call\ExternalMethod (line 364)
+- new JIT\Scope (line 393)
+- new Operand\Literal (line 643)
+- new Operand\Literal (line 659)
+- new JIT\Call\Native (line 1137)
+- new Variable (line 2143)
+- new JIT\Call\Native (line 2169)
+- new Variable (line 2259)
+- new JIT\Call\Vararg (line 2286)
+- new JIT\Call\Native (line 2296)
+- new JIT\Call\Native (line 2585)
+- new JIT\Variable (line 2825)
+- new JIT\Call\Native (line 2842)
+- new JIT\Call\Native (line 2887)
+- new JIT\Call\Native (line 2957)
+- new JIT\Call\Native (line 2999)
+- new JIT\Call\Native (line 3044)
+- new JIT\Call\Native (line 3099)
+- new JIT\Call\Native (line 4286)
+- new JIT\Call\Native (line 4317)
+- new JIT\Call\Native (line 4364)
+- new JIT\Call\Native (line 4438)
+- new JIT\Call\Native (line 4492)
+- new JIT\Call\Native (line 4579)
+- new JIT\Call\Native (line 5072)
+- new JIT\Call\Native (line 5103)
+- new JIT\Call\Native (line 5139)
+- new JIT\Call\Native (line 5174)
+- new JIT\Call\Native (line 5209)
+- new JIT\Call\Native (line 5244)
+- new JIT\Call\Native (line 5356)
+- new JIT\Call\Native (line 5598)
+- new JIT\Call\Native (line 5636)
+- new JIT\Call\Native (line 5670)
+- new JIT\Call\Native (line 5791)
+- new JIT\Call\Native (line 6441)
+- new JIT\Call\Native (line 6513)
+- new Operand\Literal (line 7024)
+- new Variable (line 7078)
+- new Variable (line 7122)
+- new Variable (line 7182)
+- new Variable (line 7878)
+- new Variable (line 7898)
+- new Variable (line 7919)
+- new Variable (line 7971)
+- new JIT\Call\ForeachIndexedClosureCall (line 8453)
+- new Variable (line 8542)
+- new Variable (line 8572)
+- new Variable (line 8591)
+- new Variable (line 8621)
+- new Variable (line 8658)
+- new Variable (line 8678)
+- new Variable (line 8691)
+- new Variable (line 8734)
+- new JIT\Variable (line 9524)
+- new JIT\Variable (line 9587)
+- new Variable (line 9687)
+- new Variable (line 9731)
+- new Variable (line 9783)
+- new Variable (line 9794)
+- new Variable (line 9805)
+- new Variable (line 9825)
+- new Variable (line 9888)
+- new Variable (line 9951)
+- new Variable (line 10021)
+- new Variable (line 10052)
+- new Variable (line 10120)
+- new Operand\Literal (line 10129)
+- new Variable (line 10144)
+- new Variable (line 10478)
+- new JIT\Call\VmCoerceVariableToString (line 10627)
+- new JIT\Call\NoOpConstruct (line 10830)
+- new Operand\Literal (line 11672)
+- new VM (line 11872)
+- new VM\Variable (line 11881)
+- new VM\ClassEntry (line 11986)
+- new Func\PHP (line 12005)
+- new VM\ClassEntry (line 12051)
+- new Variable (line 12068)
+- new Variable (line 12235)
+- 352 class method(s)
 - 15 closure(s)
 
 ### `lib/JIT/Analyzer.php`
@@ -58179,6 +58180,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 12 class method(s)
 - 1 closure(s)
 
+### `lib/JIT/Concern/LocalReleaseUnsetAndVarFetchDest.php`
+
+**Warnings** (review for bootstrap subset):
+- trait LocalReleaseUnsetAndVarFetchDest (line 23)
+- 30 class method(s)
+
 ### `lib/JIT/Concern/M3EmitTuSidecarLinktime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -60067,7 +60074,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/SpineChunkRuntimeMethodDemote.php`
 
 **Warnings** (review for bootstrap subset):
-- new OpCode (line 198)
+- new OpCode (line 199)
 - 11 class method(s)
 
 ### `lib/JIT/SpineChunkStandardHelperBind.php`
