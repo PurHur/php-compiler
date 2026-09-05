@@ -91,6 +91,9 @@ use PHPCompiler\VM\Variable as VmVariable;
  * warning; excess argc stays live — ArgumentCountError),
  * getrandmax / mt_getrandmax (zero-arg; excess argc stays live —
  * ArgumentCountError),
+ * typed-array array_key_first / array_key_last / array_is_list (exactly one
+ * typed hashtable / packed array / value-box hashtable; soft-null / non-array
+ * / excess argc stay live — TypeError / ArgumentCountError),
  * zero-arg pi, type.c predicates + gettype/get_debug_type, ctype.c
  * classifiers on typed/literal strings, typed-array count/sizeof, math.c
  * incl. pow/fpow/fdiv on already-numeric args, empty void user functions).
@@ -304,6 +307,9 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureRandmaxRuntimeInfoNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureArrayKeyEdgeNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureVersionCompareNoSideEffect($toCall, $callArgs)) {
@@ -1800,6 +1806,38 @@ final class DiscardedPureCallElision
     }
 
     /**
+     * Discarded {@code array_key_first}/{@code array_key_last}/
+     * {@code array_is_list} on a typed hashtable / packed array / value-box
+     * hashtable — php-src {@code ext/standard/array.c}. Soft-null / non-array
+     * stay live ({@code TypeError}); excess argc stays live
+     * ({@code ArgumentCountError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureArrayKeyEdgeNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        $name = strtolower($toCall->getName());
+        if (
+            'array_key_first' !== $name
+            && 'array_key_last' !== $name
+            && 'array_is_list' !== $name
+        ) {
+            return false;
+        }
+        if (1 !== \count($callArgs)) {
+            return false;
+        }
+        if (!isset($callArgs[0]) || !$callArgs[0] instanceof Variable) {
+            return false;
+        }
+
+        return self::isTypedArrayArg($callArgs[0]);
+    }
+
+    /**
      * Discarded {@code version_compare} on typed / literal strings — php-src
      * {@code versioning.c}. Optional operator must be null or a compile-time
      * valid comparison op ({@code ValueError} otherwise).
@@ -2562,15 +2600,24 @@ final class DiscardedPureCallElision
     }
 
     /**
-     * Typed hashtable or packed native array — not Countable / value-box.
+     * Typed hashtable, packed native array, or value-box proven to hold a
+     * hashtable — not Countable / generic value-box.
      */
     private static function isTypedArrayArg(Variable $arg): bool
     {
         if (0 !== ($arg->type & Variable::IS_NATIVE_ARRAY)) {
             return true;
         }
+        if (Variable::TYPE_HASHTABLE === $arg->type) {
+            return true;
+        }
+        if ($arg->compileTimeEmptyArrayLiteral) {
+            return true;
+        }
 
-        return Variable::TYPE_HASHTABLE === $arg->type;
+        // Locals like {@code $a = [1,2,3]} lower as TYPE_VALUE with
+        // {@see Variable::$valueBoxHashtable} (#36386 array_key_first elision).
+        return Variable::TYPE_VALUE === $arg->type && $arg->valueBoxHashtable;
     }
 
     /**
