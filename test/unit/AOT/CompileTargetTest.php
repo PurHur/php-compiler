@@ -294,7 +294,7 @@ final class CompileTargetTest extends TestCase
     }
 
     /**
-     * Curated aarch64 seed: VM_* + lib_VM_* + first ext/standard tier — every unit.o
+     * Curated aarch64 seed: VM_* + lib_VM_* + ext/standard tiers — every unit.o
      * must be ELF e_machine=183. Empty / short seed is not a pass (#36391).
      */
     public function testCommittedAarch64SeedUnitIsEmAarch64(): void
@@ -316,15 +316,15 @@ final class CompileTargetTest extends TestCase
             'aarch64 seed must include the full lib_VM_* set (see script/seed-aarch64-helper-runtime.sh)'
         );
         $this->assertGreaterThanOrEqual(
-            10,
+            20,
             \count($extStdDirs),
-            'aarch64 seed must include the ext/standard tier (see script/seed-aarch64-helper-runtime.sh)'
+            'aarch64 seed must include the ext/standard tiers (see script/seed-aarch64-helper-runtime.sh)'
         );
         $dirs = array_merge($vmDirs, $libVmDirs, $extStdDirs);
         $this->assertGreaterThanOrEqual(
-            32,
+            42,
             \count($dirs),
-            'aarch64 seed must be VM_* + lib_VM_* + ext/standard (32); empty/short is not a pass'
+            'aarch64 seed must be VM_* + lib_VM_* + ext/standard (42); empty/short is not a pass'
         );
         $target = CompileTarget::resolve(CompileTarget::ID_AARCH64_LINUX);
         foreach ($dirs as $unit) {
