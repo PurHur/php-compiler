@@ -202,6 +202,11 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
             '/function llvmInternalName\([\s\S]*?function compileSkippedCompilerCfgBranchStub\(/',
             $skippedOpcodeStubs
         );
+        $phpLoweringClosures = (string) file_get_contents(self::$root.'/lib/JIT/Concern/CompileBlockPhpLoweringAndClosurePrep.php');
+        $this->assertMatchesRegularExpression(
+            '/function compileBlockPhpLowering\([\s\S]*?function isClosureNativeInvokeName\(/',
+            $phpLoweringClosures
+        );
         $compile = (string) file_get_contents(self::$root.'/bin/compile.php');
         $this->assertStringContainsString('PHP_COMPILER_M3_EMIT_HELPER_SPINE=1', $compile);
         $aot = (string) file_get_contents(self::$root.'/lib/JIT/M3EmitTuTrivialEchoAot.php');
