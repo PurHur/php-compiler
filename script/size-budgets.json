@@ -14,9 +14,9 @@
             "note": "Concern trait splits (#36387/#36403); DomCompileTimeTagMeta + DateTimeConstructAndMutationMeta"
         },
         "lib/VM.php": {
-            "budget": 24518,
+            "budget": 23479,
             "target": 15000,
-            "note": "ObjectPropertyIssetEmptyUnset Concern extract (#36403); toward 15k target"
+            "note": "ObjectPropertyCollectAndSerialize + ObjectPropertyIssetEmptyUnset Concern extracts (#36403); toward 15k target"
         },
         "script/apply-patches.sh": {
             "budget": 7637,
