@@ -109,6 +109,12 @@ use PHPCompiler\VM\Variable as VmVariable;
  * ArgumentCountError),
  * timezone_name_from_abbr (typed abbr string + optional typed longs;
  * soft-null / excess argc stay live — deprecate / ArgumentCountError),
+ * gregoriantojd / juliantojd / jewishtojd / frenchtojd (exactly three typed
+ * numerics — month / day / year; soft-null / non-numeric / wrong argc stay
+ * live — TypeError / ArgumentCountError),
+ * cal_days_in_month (compile-time calendar id in [0, CAL_NUM_CALS) + two
+ * typed numerics; runtime / invalid calendar stays live — ValueError;
+ * soft-null / wrong argc stay live),
  * getrandmax / mt_getrandmax (zero-arg; excess argc stays live —
  * ArgumentCountError),
  * typed-array array_key_first / array_key_last / array_is_list (exactly one
@@ -378,6 +384,12 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureTimezoneNameFromAbbrNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureCalendarToJdNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureCalDaysInMonthNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureRandmaxRuntimeInfoNoSideEffect($toCall, $callArgs)) {
@@ -2076,6 +2088,81 @@ final class DiscardedPureCallElision
             return false;
         }
         for ($i = 1; $i < $argc; ++$i) {
+            if (
+                !$callArgs[$i] instanceof Variable
+                || !self::mathArgAllowsDiscardedElision($callArgs[$i])
+            ) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Discarded {@code gregoriantojd}/{@code juliantojd}/{@code jewishtojd}/
+     * {@code frenchtojd} — php-src {@code ext/calendar/calendar.c}. Exactly
+     * three typed numerics (month / day / year). Soft-null / non-numeric stay
+     * live ({@code TypeError} / deprecate). Wrong argc stays live
+     * ({@code ArgumentCountError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureCalendarToJdNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        switch (strtolower($toCall->getName())) {
+            case 'gregoriantojd':
+            case 'juliantojd':
+            case 'jewishtojd':
+            case 'frenchtojd':
+                break;
+            default:
+                return false;
+        }
+        if (3 !== \count($callArgs)) {
+            return false;
+        }
+        foreach ($callArgs as $arg) {
+            if (!$arg instanceof Variable || !self::mathArgAllowsDiscardedElision($arg)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Discarded {@code cal_days_in_month} — php-src {@code ext/calendar/calendar.c}.
+     * Compile-time calendar id in {@code [0, CAL_NUM_CALS)} (php-src
+     * {@code CAL_NUM_CALS == 4}) plus two typed numerics (month / year).
+     * Runtime / invalid calendar stays live ({@code ValueError}). Soft-null /
+     * wrong argc stay live (deprecate / {@code ArgumentCountError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureCalDaysInMonthNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if ('cal_days_in_month' !== strtolower($toCall->getName())) {
+            return false;
+        }
+        if (3 !== \count($callArgs)) {
+            return false;
+        }
+        if (
+            !$callArgs[0] instanceof Variable
+            || null === $callArgs[0]->compileTimeLong
+            || $callArgs[0]->compileTimeLong < 0
+            || $callArgs[0]->compileTimeLong >= 4
+        ) {
+            return false;
+        }
+        for ($i = 1; $i < 3; ++$i) {
             if (
                 !$callArgs[$i] instanceof Variable
                 || !self::mathArgAllowsDiscardedElision($callArgs[$i])
