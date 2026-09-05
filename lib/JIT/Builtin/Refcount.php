@@ -188,19 +188,23 @@ class Refcount extends Builtin {
         // Runtime ABI drift mints phpc_weakref_*.1 / phpc_gc_*.1 (#31894 / #32122).
         if (self::runtimeAssertEnabled()) {
             $this->implementRuntimeAssertFail();
+            $this->implementRuntimeAssertExclusive();
         }
         $this->implementInit();
         $this->implementAddref();
         $this->implementDelref();
         $this->implementSeparate();
-        if (self::runtimeAssertInjectEnabled()) {
+        if (self::runtimeAssertInjectDoubleDelrefEnabled()) {
             $this->implementRuntimeAssertInjectDoubleDelref();
+        }
+        if (self::runtimeAssertInjectSharedWriteEnabled()) {
+            $this->implementRuntimeAssertInjectSharedWrite();
         }
     }
 
     /**
      * #36397 — PHPC_RUNTIME_ASSERT=1 / PHP_COMPILER_RUNTIME_ASSERT=1.
-     * Compile-time: extra checks in __ref__delref. Default off (prelinked helpers).
+     * Compile-time: M1 in __ref__delref + M5 via __ref__assert_exclusive. Default off (prelinked helpers).
      */
     public static function runtimeAssertEnabled(): bool
     {
@@ -213,8 +217,14 @@ class Refcount extends Builtin {
         return '1' === $alias || 'true' === strtolower((string) $alias);
     }
 
-    /** Test-only: run a rc=0 delref at standalone {main} entry (#36397). */
+    /** @deprecated Use runtimeAssertInjectDoubleDelrefEnabled() */
     public static function runtimeAssertInjectEnabled(): bool
+    {
+        return self::runtimeAssertInjectDoubleDelrefEnabled();
+    }
+
+    /** Test-only: run a rc=0 delref at standalone {main} entry (#36397). */
+    public static function runtimeAssertInjectDoubleDelrefEnabled(): bool
     {
         if (!self::runtimeAssertEnabled()) {
             return false;
@@ -224,9 +234,29 @@ class Refcount extends Builtin {
         return '1' === $flag || 'true' === strtolower((string) $flag);
     }
 
+    /** Test-only: assert_exclusive on a shared (rc=2) header at standalone {main} (#36397 M5). */
+    public static function runtimeAssertInjectSharedWriteEnabled(): bool
+    {
+        if (!self::runtimeAssertEnabled()) {
+            return false;
+        }
+        $flag = \PHPCompiler\Config::getenv('PHP_COMPILER_RUNTIME_ASSERT_INJECT_SHARED_WRITE');
+
+        return '1' === $flag || 'true' === strtolower((string) $flag);
+    }
+
     public static function emitInjectDoubleDelrefCall(\PHPCompiler\JIT\Context $context): void
     {
         $fn = $context->module->getNamedFunction('phpc_runtime_assert_inject_double_delref');
+        if (null === $fn) {
+            return;
+        }
+        $context->builder->call($fn);
+    }
+
+    public static function emitInjectSharedWriteCall(\PHPCompiler\JIT\Context $context): void
+    {
+        $fn = $context->module->getNamedFunction('phpc_runtime_assert_inject_shared_write');
         if (null === $fn) {
             return;
         }
@@ -1611,7 +1641,13 @@ class Refcount extends Builtin {
     }
 
     /**
-     * Invariant M1: rc > 0 on delref (php-src ZEND_RC_MOD_CHECK / zend_gc.c).
+     * Invariant M1 under ASSERT (#36397 / #36252):
+     * - rc < 0 → abort (refcount already corrupted)
+     * - rc == 0 → return from delref without subtract/free (unclaimed container cancel;
+     *   fresh hashtables sit at rc=0 until first owner addref)
+     * - rc > 0 → continue normal delref
+     * php-src starts at rc=1; our unclaimed-0 model needs the rc==0 no-op so ASSERT
+     * does not false-positive on every hello (prior M1 used rc<=0 and aborted startup).
      */
     private function emitRuntimeAssertDelrefUnderflow($delrefFn, $currentRc): void
     {
@@ -1619,16 +1655,23 @@ class Refcount extends Builtin {
             return;
         }
         $zero = $currentRc->typeOf()->constInt(0, false);
-        $under = $this->context->builder->icmp(\PHPLLVM\Builder::INT_SLE, $currentRc, $zero);
+        $isNeg = $this->context->builder->icmp(\PHPLLVM\Builder::INT_SLT, $currentRc, $zero);
+        $isZero = $this->context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $currentRc, $zero);
         $fail = $delrefFn->appendBasicBlock('runtime_assert_m1_fail');
+        $unclaimed = $delrefFn->appendBasicBlock('runtime_assert_m1_unclaimed');
         $ok = $delrefFn->appendBasicBlock('runtime_assert_m1_ok');
-        $this->context->builder->branchIf($under, $fail, $ok);
+        $notNeg = $delrefFn->appendBasicBlock('runtime_assert_m1_not_neg');
+        $this->context->builder->branchIf($isNeg, $fail, $notNeg);
+        $this->context->builder->positionAtEnd($notNeg);
+        $this->context->builder->branchIf($isZero, $unclaimed, $ok);
         $this->context->builder->positionAtEnd($fail);
         $i32 = $this->context->getTypeFromString('int32');
         $this->context->builder->call(
             $this->context->lookupFunction('phpc_runtime_assert_fail'),
             $i32->constInt(1, false)
         );
+        $this->context->builder->returnVoid();
+        $this->context->builder->positionAtEnd($unclaimed);
         $this->context->builder->returnVoid();
         $this->context->builder->positionAtEnd($ok);
     }
@@ -1657,27 +1700,128 @@ class Refcount extends Builtin {
             $this->context->context->functionType($i32, true, $i8p, $i8p)
         );
         $entry = $existing->appendBasicBlock('entry');
+        $m1 = $existing->appendBasicBlock('msg_m1');
+        $m5 = $existing->appendBasicBlock('msg_m5');
+        $generic = $existing->appendBasicBlock('msg_generic');
+        $abort = $existing->appendBasicBlock('abort');
         $this->context->builder->positionAtEnd($entry);
         $inv = $existing->getParam(0);
-        $fmt = $this->context->builder->pointerCast(
-            $this->context->constantFromString("PHPC_RUNTIME_ASSERT M%d: rc > 0 on delref (double-delref / underflow)\n"),
+        $isM1 = $this->context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $inv, $i32->constInt(1, false));
+        $notM1 = $existing->appendBasicBlock('not_m1');
+        $this->context->builder->branchIf($isM1, $m1, $notM1);
+        $this->context->builder->positionAtEnd($notM1);
+        $isM5 = $this->context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $inv, $i32->constInt(5, false));
+        $this->context->builder->branchIf($isM5, $m5, $generic);
+
+        $stderrG = $this->context->module->getNamedGlobal('stderr');
+        $fprintf = $this->context->lookupFunction('fprintf');
+
+        $this->context->builder->positionAtEnd($m1);
+        $fmt1 = $this->context->builder->pointerCast(
+            $this->context->constantFromString("PHPC_RUNTIME_ASSERT M%d: rc < 0 on delref (refcount underflow / corruption)\n"),
             $i8p
         );
-        $stderrG = $this->context->module->getNamedGlobal('stderr');
-        $stderr = $this->context->builder->load($stderrG);
-        $this->context->builder->call(
-            $this->context->lookupFunction('fprintf'),
-            $stderr,
-            $fmt,
-            $inv
+        $this->context->builder->call($fprintf, $this->context->builder->load($stderrG), $fmt1, $inv);
+        $this->context->builder->branch($abort);
+
+        $this->context->builder->positionAtEnd($m5);
+        $fmt5 = $this->context->builder->pointerCast(
+            $this->context->constantFromString("PHPC_RUNTIME_ASSERT M%d: separate before write to shared container (rc > 1)\n"),
+            $i8p
         );
+        $this->context->builder->call($fprintf, $this->context->builder->load($stderrG), $fmt5, $inv);
+        $this->context->builder->branch($abort);
+
+        $this->context->builder->positionAtEnd($generic);
+        $fmtG = $this->context->builder->pointerCast(
+            $this->context->constantFromString("PHPC_RUNTIME_ASSERT M%d: runtime assert failed\n"),
+            $i8p
+        );
+        $this->context->builder->call($fprintf, $this->context->builder->load($stderrG), $fmtG, $inv);
+        $this->context->builder->branch($abort);
+
+        $this->context->builder->positionAtEnd($abort);
         $this->context->builder->call($this->context->lookupFunction('abort'));
         $this->context->builder->returnVoid();
         $this->context->builder->clearInsertionPosition();
     }
 
     /**
-     * Allocates a counted __ref__ at rc=0 and delrefs it once — M1 must abort (#36397).
+     * Invariant M5: abort when a counted header still has rc > 1 (must SEPARATE before mutate).
+     * php-src: SEPARATE_ZVAL_IF_NOT_REF / SEPARATE_ARRAY (Zend/zend_variables.h).
+     */
+    private function implementRuntimeAssertExclusive(): void
+    {
+        $name = '__ref__assert_exclusive';
+        $existing = $this->context->module->getNamedFunction($name);
+        if (null !== $existing && $existing->countBasicBlocks() > 0) {
+            return;
+        }
+        $void = $this->context->context->voidType();
+        $virtTy = $this->context->getTypeFromString('__ref__virtual*');
+        $i32 = $this->context->getTypeFromString('int32');
+        if (null === $existing) {
+            $ft = $this->context->context->functionType($void, false, $virtTy);
+            $existing = $this->context->module->addFunction($name, $ft);
+            $existing->addAttributeAtIndex(\PHPLLVM\Attribute::INDEX_FUNCTION, $this->context->attributes['alwaysinline']);
+            $this->context->registerFunction($name, $existing);
+        }
+        $entry = $existing->appendBasicBlock('entry');
+        $nullBb = $existing->appendBasicBlock('null');
+        $body = $existing->appendBasicBlock('body');
+        $fail = $existing->appendBasicBlock('m5_fail');
+        $ok = $existing->appendBasicBlock('ok');
+        $this->context->builder->positionAtEnd($entry);
+        $refVirtual = $existing->getParam(0);
+        $isNull = $this->context->builder->icmp(
+            \PHPLLVM\Builder::INT_EQ,
+            $refVirtual,
+            $refVirtual->typeOf()->constNull()
+        );
+        $this->context->builder->branchIf($isNull, $nullBb, $body);
+        $this->context->builder->positionAtEnd($nullBb);
+        $this->context->builder->returnVoid();
+
+        $this->context->builder->positionAtEnd($body);
+        $refField = $this->context->structFieldIndex($refVirtual, 'ref');
+        $refPtr = $this->context->builder->structGep($refVirtual, $refField);
+        $ref = $this->context->builder->load($refPtr);
+        $structName = $ref->typeOf()->getName();
+        $fields = $this->context->structFieldsForTypeName($structName);
+        $typeinfo = $this->context->builder->extractValue($ref, $fields['typeinfo']);
+        $refMask = $i32->constInt(self::TYPE_INFO_REFCOUNTED, false);
+        $isCounted = $this->context->builder->bitwiseAnd(
+            $typeinfo,
+            $this->context->builder->intCast($refMask, $typeinfo->typeOf())
+        );
+        $countedBb = $existing->appendBasicBlock('counted');
+        $this->context->builder->branchIf(
+            $this->context->castToBool($isCounted),
+            $countedBb,
+            $ok
+        );
+        $this->context->builder->positionAtEnd($countedBb);
+        $current = $this->context->builder->extractValue($ref, $fields['refcount']);
+        $shared = $this->context->builder->icmp(
+            \PHPLLVM\Builder::INT_SGT,
+            $current,
+            $current->typeOf()->constInt(1, false)
+        );
+        $this->context->builder->branchIf($shared, $fail, $ok);
+        $this->context->builder->positionAtEnd($fail);
+        $this->context->builder->call(
+            $this->context->lookupFunction('phpc_runtime_assert_fail'),
+            $i32->constInt(5, false)
+        );
+        $this->context->builder->returnVoid();
+        $this->context->builder->positionAtEnd($ok);
+        $this->context->builder->returnVoid();
+        $this->context->builder->clearInsertionPosition();
+    }
+
+    /**
+     * Allocates a counted __ref__, stores rc=-1, delrefs once — M1 must abort (#36397).
+     * rc=0 after init is intentional for unclaimed containers (#36252); M1 is rc < 0.
      */
     private function implementRuntimeAssertInjectDoubleDelref(): void
     {
@@ -1698,14 +1842,71 @@ class Refcount extends Builtin {
         $sizeT = $this->context->getTypeFromString('size_t');
         $raw = $this->context->builder->call(
             $this->context->lookupFunction('malloc'),
-            $sizeT->constInt(32, false)
+            $sizeT->constInt(64, false)
         );
         $virtTy = $this->context->getTypeFromString('__ref__virtual*');
         $ptr = $this->context->builder->pointerCast($raw, $virtTy);
         $i32 = $this->context->getTypeFromString('int32');
         $typeinfo = $i32->constInt(self::TYPE_INFO_REFCOUNTED | self::TYPE_INFO_TYPE_STRING, false);
         $this->context->builder->call($this->context->lookupFunction('__ref__init'), $typeinfo, $ptr);
+        // Poison rc=-1 (already underflowed) — distinct from unclaimed rc=0 (#36252).
+        $refField = $this->context->structFieldIndex($ptr, 'ref');
+        $refPtr = $this->context->builder->structGep($ptr, $refField);
+        $ref = $this->context->builder->load($refPtr);
+        $structType = $ref->typeOf();
+        $rcOff = $this->context->structFieldsForTypeName($structType->getName())['refcount'];
+        $ref = $this->context->builder->insertValue(
+            $ref,
+            $structType->getElementAtIndex($rcOff)->constInt(-1, true),
+            $rcOff
+        );
+        $this->context->builder->store($ref, $refPtr);
         $this->context->builder->call($this->context->lookupFunction('__ref__delref'), $ptr);
+        $this->context->builder->returnVoid();
+        $this->context->builder->clearInsertionPosition();
+    }
+
+    /**
+     * Allocates a counted __ref__ with rc=2, then __ref__assert_exclusive — M5 must abort (#36397).
+     */
+    private function implementRuntimeAssertInjectSharedWrite(): void
+    {
+        $name = 'phpc_runtime_assert_inject_shared_write';
+        $existing = $this->context->module->getNamedFunction($name);
+        if (null !== $existing && $existing->countBasicBlocks() > 0) {
+            return;
+        }
+        $void = $this->context->context->voidType();
+        if (null === $existing) {
+            $ft = $this->context->context->functionType($void, false);
+            $existing = $this->context->module->addFunction($name, $ft);
+            $this->context->registerFunction($name, $existing);
+        }
+        \PHPCompiler\JIT\LibcExtern::ensureMallocFamily($this->context);
+        $entry = $existing->appendBasicBlock('entry');
+        $this->context->builder->positionAtEnd($entry);
+        $sizeT = $this->context->getTypeFromString('size_t');
+        $raw = $this->context->builder->call(
+            $this->context->lookupFunction('malloc'),
+            $sizeT->constInt(64, false)
+        );
+        $virtTy = $this->context->getTypeFromString('__ref__virtual*');
+        $ptr = $this->context->builder->pointerCast($raw, $virtTy);
+        $i32 = $this->context->getTypeFromString('int32');
+        $typeinfo = $i32->constInt(self::TYPE_INFO_REFCOUNTED | self::TYPE_INFO_TYPE_STRING, false);
+        $this->context->builder->call($this->context->lookupFunction('__ref__init'), $typeinfo, $ptr);
+        $refField = $this->context->structFieldIndex($ptr, 'ref');
+        $refPtr = $this->context->builder->structGep($ptr, $refField);
+        $ref = $this->context->builder->load($refPtr);
+        $structType = $ref->typeOf();
+        $rcOff = $this->context->structFieldsForTypeName($structType->getName())['refcount'];
+        $ref = $this->context->builder->insertValue(
+            $ref,
+            $structType->getElementAtIndex($rcOff)->constInt(2, false),
+            $rcOff
+        );
+        $this->context->builder->store($ref, $refPtr);
+        $this->context->builder->call($this->context->lookupFunction('__ref__assert_exclusive'), $ptr);
         $this->context->builder->returnVoid();
         $this->context->builder->clearInsertionPosition();
     }

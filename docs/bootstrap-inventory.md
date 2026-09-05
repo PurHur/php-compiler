@@ -53021,7 +53021,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/Refcount.php`
 
 **Warnings** (review for bootstrap subset):
-- 18 class method(s)
+- 23 class method(s)
 
 ### `lib/JIT/Builtin/ReflectionClassClassMapRuntime.php`
 
@@ -58492,22 +58492,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\PdoConstruct (line 2994)
 - new Call\PdoGetAvailableDrivers (line 2995)
 - new Call\PdoQuote (line 2996)
-- new Result (line 3666)
-- new Result (line 3687)
-- new Variable (line 4950)
-- new Variable (line 5285)
-- new Variable (line 5578)
-- new Variable (line 5705)
-- new VMVariable (line 5939)
-- new VMVariable (line 5955)
-- new VMVariable (line 5961)
-- new VMVariable (line 5967)
-- new VMVariable (line 5978)
-- new Variable (line 6042)
-- new Variable (line 6062)
-- new Variable (line 6107)
+- new Result (line 3670)
+- new Result (line 3691)
+- new Variable (line 4954)
+- new Variable (line 5289)
+- new Variable (line 5582)
+- new Variable (line 5709)
+- new VMVariable (line 5943)
+- new VMVariable (line 5959)
+- new VMVariable (line 5965)
+- new VMVariable (line 5971)
+- new VMVariable (line 5982)
+- new Variable (line 6046)
+- new Variable (line 6066)
+- new Variable (line 6111)
 - 144 class method(s)
-- 36 closure(s)
+- 37 closure(s)
 
 ### `lib/JIT/DatePeriodForeachSnapshot.php`
 
