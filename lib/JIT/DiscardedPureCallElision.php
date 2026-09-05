@@ -96,6 +96,14 @@ use PHPCompiler\VM\Variable as VmVariable;
  * optional null components OK; soft-null hour stays live — deprecate;
  * string / object / excess argc stay live — TypeError /
  * ArgumentCountError),
+ * strtotime (typed datetime string + optional typed-or-null base
+ * timestamp; soft-null datetime stays live — deprecate; excess argc
+ * stays live — ArgumentCountError),
+ * date_parse (exactly one typed datetime string; soft-null stays live —
+ * deprecate; excess / zero argc stay live — ArgumentCountError),
+ * date_parse_from_format (exactly two typed strings; soft-null stays
+ * live — deprecate / TypeError; wrong argc stays live —
+ * ArgumentCountError),
  * getrandmax / mt_getrandmax (zero-arg; excess argc stays live —
  * ArgumentCountError),
  * typed-array array_key_first / array_key_last / array_is_list (exactly one
@@ -353,6 +361,12 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureMktimeRuntimeInfoNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureStrtotimeRuntimeInfoNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureDateParseRuntimeInfoNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureRandmaxRuntimeInfoNoSideEffect($toCall, $callArgs)) {
@@ -1927,6 +1941,76 @@ final class DiscardedPureCallElision
         }
 
         return true;
+    }
+
+    /**
+     * Discarded {@code strtotime} — php-src {@code ext/date/php_date.c}.
+     * Typed datetime string; optional typed-or-null base timestamp. Soft-null
+     * datetime stays live (deprecate). Excess argc stays live
+     * ({@code ArgumentCountError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureStrtotimeRuntimeInfoNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if ('strtotime' !== strtolower($toCall->getName())) {
+            return false;
+        }
+        if (!isset($callArgs[0]) || !$callArgs[0] instanceof Variable || isset($callArgs[2])) {
+            return false;
+        }
+        if (!self::stringArgAllowsDiscardedElision($callArgs[0])) {
+            return false;
+        }
+        if (!isset($callArgs[1])) {
+            return true;
+        }
+        if (!$callArgs[1] instanceof Variable) {
+            return false;
+        }
+        // Z_PARAM_LONG_OR_NULL — explicit null means "now".
+        if ($callArgs[1]->isNullConstant || Variable::TYPE_NULL === $callArgs[1]->type) {
+            return true;
+        }
+
+        return self::mathArgAllowsDiscardedElision($callArgs[1]);
+    }
+
+    /**
+     * Discarded {@code date_parse}/{@code date_parse_from_format} — php-src
+     * {@code ext/date/php_date.c}. Typed string args only. Soft-null stays live
+     * (deprecate / TypeError). Wrong argc stays live ({@code ArgumentCountError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureDateParseRuntimeInfoNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        $name = strtolower($toCall->getName());
+        if ('date_parse' === $name) {
+            if (1 !== \count($callArgs) || !$callArgs[0] instanceof Variable) {
+                return false;
+            }
+
+            return self::stringArgAllowsDiscardedElision($callArgs[0]);
+        }
+        if ('date_parse_from_format' !== $name) {
+            return false;
+        }
+        if (2 !== \count($callArgs)
+            || !$callArgs[0] instanceof Variable
+            || !$callArgs[1] instanceof Variable
+        ) {
+            return false;
+        }
+
+        return self::stringArgAllowsDiscardedElision($callArgs[0])
+            && self::stringArgAllowsDiscardedElision($callArgs[1]);
     }
 
     /**

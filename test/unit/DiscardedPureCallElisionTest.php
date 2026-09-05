@@ -56,6 +56,8 @@ use PHPCompiler\ext\standard\crc32;
 use PHPCompiler\ext\standard\date;
 use PHPCompiler\ext\standard\date_default_timezone_get;
 use PHPCompiler\ext\standard\date_get_last_errors;
+use PHPCompiler\ext\standard\date_parse;
+use PHPCompiler\ext\standard\date_parse_from_format;
 use PHPCompiler\ext\standard\decbin;
 use PHPCompiler\ext\standard\dechex;
 use PHPCompiler\ext\standard\decoct;
@@ -197,6 +199,7 @@ use PHPCompiler\ext\standard\stripcslashes;
 use PHPCompiler\ext\standard\strpbrk;
 use PHPCompiler\ext\standard\strpos;
 use PHPCompiler\ext\standard\strtolower;
+use PHPCompiler\ext\standard\strtotime;
 use PHPCompiler\ext\standard\strtr;
 use PHPCompiler\ext\standard\strval;
 use PHPCompiler\ext\standard\substr;
@@ -3553,6 +3556,106 @@ final class DiscardedPureCallElisionTest extends TestCase
             $context,
             new gmmktime(),
             [$hour, $min, $min, $min, $min, $min, $min]
+        ));
+    }
+
+    public function testDiscardedStrtotimeAndDateParseElideOnTypedArgs(): void
+    {
+        // php-src ext/date/php_date.c strtotime / date_parse / date_parse_from_format (#36386).
+        $context = $this->makeContext();
+        $lit = $this->makeStringVar('2024-01-15');
+        $typed = $this->makeStringVar(null);
+        $fmt = $this->makeStringVar('Y-m-d');
+        $ts = $this->makeNativeLongVar();
+        $null = $this->makeNullVar();
+        $box = $this->makeValueBoxVar();
+        $obj = $this->makeObjectVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new strtotime(),
+            [$lit]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new strtotime(),
+            [$typed, $ts]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new strtotime(),
+            [$lit, $null]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new date_parse(),
+            [$lit]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new date_parse(),
+            [$typed]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new date_parse_from_format(),
+            [$fmt, $typed]
+        ));
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new strtotime(),
+            []
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new strtotime(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new strtotime(),
+            [$box]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new strtotime(),
+            [$lit, $ts, $ts]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new date_parse(),
+            []
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new date_parse(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new date_parse(),
+            [$obj]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new date_parse(),
+            [$lit, $lit]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new date_parse_from_format(),
+            [$fmt]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new date_parse_from_format(),
+            [$null, $typed]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new date_parse_from_format(),
+            [$fmt, $null]
         ));
     }
 
