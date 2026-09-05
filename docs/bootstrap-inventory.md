@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8279 |
-| Phase A inventory files (M2 ratio SSOT) | 8279 |
+| PHP files on vm.php path | 8280 |
+| Phase A inventory files (M2 ratio SSOT) | 8280 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26151 |
+| Source constructs flagged (warnings) | 26153 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7078,6 +7078,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/CompileCoalesce.php` | 0 | 2 |
 | `lib/JIT/Concern/CompileConcat.php` | 0 | 7 |
 | `lib/JIT/Concern/CompileEchoAndPrint.php` | 0 | 5 |
+| `lib/JIT/Concern/CompileFromCallable.php` | 0 | 2 |
 | `lib/JIT/Concern/CompileFuncCallExecNoreturn.php` | 0 | 2 |
 | `lib/JIT/Concern/CompileFuncCallExecReturn.php` | 0 | 5 |
 | `lib/JIT/Concern/CompileFuncCallInit.php` | 0 | 2 |
@@ -58212,6 +58213,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 477)
 - 1 class method(s)
 
+### `lib/JIT/Concern/CompileFromCallable.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CompileFromCallable (line 19)
+- 1 class method(s)
+
 ### `lib/JIT/Concern/CompileFuncCallExecNoreturn.php`
 
 **Warnings** (review for bootstrap subset):
@@ -60441,7 +60448,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/SpineChunkRuntimeMethodDemote.php`
 
 **Warnings** (review for bootstrap subset):
-- new OpCode (line 250)
+- new OpCode (line 251)
 - 11 class method(s)
 
 ### `lib/JIT/SpineChunkStandardHelperBind.php`
