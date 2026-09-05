@@ -113,6 +113,7 @@ final class SpineChunkRuntimeMethodDemote
             || 'phpcompiler\\assignoperandvaluemetaandgeneratorfield' === $lc
             || 'phpcompiler\\jitconstructassignedandnativelonglocal' === $lc
             || 'phpcompiler\\nestedvmhelperandthisresolve' === $lc
+            || 'phpcompiler\\boundmethodinstancecallresolve' === $lc
             || 'phpcompiler\\paramconstraintsandruntimenewinit' === $lc
             || str_starts_with($lc, 'phpcompiler\\builtin')
         ) {
