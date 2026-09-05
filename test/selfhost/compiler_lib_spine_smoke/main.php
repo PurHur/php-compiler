@@ -5405,6 +5405,7 @@ require_once __DIR__.'/../../../lib/JIT/Concern/AssignRefSharedBoxAndClosureInvo
 require_once __DIR__.'/../../../lib/JIT/Concern/ClassConstEnumAndFunctionStatic.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AssignOperandValueMetaAndGeneratorField.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/JitConstructAssignedAndNativeLongLocal.php';
+require_once __DIR__.'/../../../lib/JIT/Concern/NestedVmHelperAndThisResolve.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/ParamConstraintsAndRuntimeNewInit.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/InitJitMethodCall.php';
 require_once __DIR__.'/../../../lib/Compiler/CompileTimeNew.php';
