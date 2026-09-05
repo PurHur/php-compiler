@@ -3893,14 +3893,22 @@ final class DiscardedPureCallElisionTest extends TestCase
         $compile = (string) file_get_contents(
             __DIR__.'/../../lib/JIT/Concern/CompileBlockInternal.php'
         );
-        $this->assertStringContainsString('DiscardedPureCallElision::tryElide', $compile);
         $this->assertStringContainsString('TYPE_FUNCCALL_EXEC_NORETURN', $compile);
+        $this->assertStringContainsString('compileFuncCallExecNoreturnOp', $compile);
 
-        $jit = (string) file_get_contents(__DIR__.'/../../lib/JIT.php');
-        $this->assertStringContainsString('discardedCallElisionVoidNatives', $jit);
+        $noreturn = (string) file_get_contents(
+            __DIR__.'/../../lib/JIT/Concern/CompileFuncCallExecNoreturn.php'
+        );
+        $this->assertStringContainsString('DiscardedPureCallElision::tryElide', $noreturn);
+
+        // Void-native elision registry lives in the PHP-lowering Concern (not hub JIT.php).
+        $lowering = (string) file_get_contents(
+            __DIR__.'/../../lib/JIT/Concern/CompileBlockPhpLoweringAndClosurePrep.php'
+        );
+        $this->assertStringContainsString('discardedCallElisionVoidNatives', $lowering);
         // void(*)(…) formals must still register (#36386 simpleucall hallo(string)).
-        $this->assertStringContainsString('$isVoidReturn', $jit);
-        $this->assertStringContainsString('Capture before appending', $jit);
+        $this->assertStringContainsString('$isVoidReturn', $lowering);
+        $this->assertStringContainsString('Capture before appending', $lowering);
     }
 
     private function makeContext(): Context

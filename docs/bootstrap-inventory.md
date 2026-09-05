@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8272 |
-| Phase A inventory files (M2 ratio SSOT) | 8272 |
+| PHP files on vm.php path | 8273 |
+| Phase A inventory files (M2 ratio SSOT) | 8273 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26137 |
+| Source constructs flagged (warnings) | 26139 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7074,6 +7074,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/CompileClassConstFetch.php` | 0 | 4 |
 | `lib/JIT/Concern/CompileConcat.php` | 0 | 7 |
 | `lib/JIT/Concern/CompileEchoAndPrint.php` | 0 | 5 |
+| `lib/JIT/Concern/CompileFuncCallExecNoreturn.php` | 0 | 2 |
 | `lib/JIT/Concern/CompileFuncCallExecReturn.php` | 0 | 5 |
 | `lib/JIT/Concern/CompileFuncCallInit.php` | 0 | 2 |
 | `lib/JIT/Concern/CompileIncDecAndConcatFlatten.php` | 0 | 17 |
@@ -58130,8 +58131,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 1901)
 - new Variable (line 1989)
 - new Variable (line 2019)
-- new VM (line 2393)
-- new Operand\Literal (line 2679)
+- new VM (line 2257)
+- new Operand\Literal (line 2543)
 - 2 class method(s)
 - 1 closure(s)
 
@@ -58180,6 +58181,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 318)
 - new Variable (line 397)
 - new Variable (line 477)
+- 1 class method(s)
+
+### `lib/JIT/Concern/CompileFuncCallExecNoreturn.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CompileFuncCallExecNoreturn (line 22)
 - 1 class method(s)
 
 ### `lib/JIT/Concern/CompileFuncCallExecReturn.php`
@@ -60392,7 +60399,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/SpineChunkRuntimeMethodDemote.php`
 
 **Warnings** (review for bootstrap subset):
-- new OpCode (line 243)
+- new OpCode (line 244)
 - 11 class method(s)
 
 ### `lib/JIT/SpineChunkStandardHelperBind.php`
