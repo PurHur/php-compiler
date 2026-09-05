@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# #36397 slice 6/7: prove M5 exclusive-write is wired into real hashtable mutate
-# paths (grow + string-key + object-key), and that normal COW separate+write still succeeds.
+# #36397 slice 6/7/8: prove M5 exclusive-write is wired into real hashtable mutate
+# paths (grow + string-key + object-key + unset), and that normal COW separate+write/unset still succeeds.
 #
 # Usage:
 #   ./script/runtime-assert/mutate-assert-smoke.sh
@@ -82,6 +82,23 @@ if ! grep -A40 'define.*__hashtable__setObjectKeyObject' "$IR_DUMP" | grep -q '_
   echo "runtime-assert-mutate-smoke: FAIL — setObjectKeyObject does not call __ref__assert_exclusive" >&2
   exit 1
 fi
+# Unset paths mutate without grow / string-key / object-key write chokepoints — #36397 slice 8.
+if ! grep -q '__hashtable__unsetLongAt' "$IR_DUMP"; then
+  echo "runtime-assert-mutate-smoke: FAIL — IR missing __hashtable__unsetLongAt" >&2
+  exit 1
+fi
+if ! grep -A40 'define.*__hashtable__unsetLongAt' "$IR_DUMP" | grep -q '__ref__assert_exclusive'; then
+  echo "runtime-assert-mutate-smoke: FAIL — unsetLongAt does not call __ref__assert_exclusive" >&2
+  exit 1
+fi
+if ! grep -A40 'define.*__hashtable__unsetStringKey' "$IR_DUMP" | grep -q '__ref__assert_exclusive'; then
+  echo "runtime-assert-mutate-smoke: FAIL — unsetStringKey does not call __ref__assert_exclusive" >&2
+  exit 1
+fi
+if ! grep -A40 'define.*__hashtable__unsetObjectKey' "$IR_DUMP" | grep -q '__ref__assert_exclusive'; then
+  echo "runtime-assert-mutate-smoke: FAIL — unsetObjectKey does not call __ref__assert_exclusive" >&2
+  exit 1
+fi
 
 echo "runtime-assert-mutate-smoke: run COW write (must not false-positive M5)…"
 out="$("$COW_BIN" 2>&1)"
@@ -97,6 +114,35 @@ if [[ "$out" != $'91\n' && "$out" != "91" ]]; then
     echo "runtime-assert-mutate-smoke: FAIL — expected 91, got: $out" >&2
     exit 1
   fi
+fi
+
+echo "runtime-assert-mutate-smoke: run COW unset (must not false-positive M5)…"
+UNSET_SRC="$WORKDIR/cow_unset.php"
+UNSET_BIN="$WORKDIR/cow_unset.bin"
+cat > "$UNSET_SRC" <<'PHP'
+<?php
+$a = [1, 2];
+$b = $a;
+unset($a[0]);
+echo isset($a[0]) ? '1' : '0';
+echo isset($b[0]) ? '1' : '0';
+echo "\n";
+PHP
+env \
+  PHP_COMPILER_HELPER_RUNTIME_O=0 \
+  PHP_COMPILER_HELPER_RUNTIME_CACHE_DIR="$CACHE-unset" \
+  PHP_COMPILER_RUNTIME_ASSERT=1 \
+  "$PHP_BIN" bin/compile.php -o "$UNSET_BIN" "$UNSET_SRC"
+unset_out="$("$UNSET_BIN" 2>&1)"
+unset_rc=$?
+if [[ "$unset_rc" -ne 0 ]]; then
+  echo "runtime-assert-mutate-smoke: FAIL — COW unset exited $unset_rc: $unset_out" >&2
+  exit 1
+fi
+unset_trimmed="$(printf '%s' "$unset_out" | tr -d '\r')"
+if [[ "$unset_trimmed" != "01" ]]; then
+  echo "runtime-assert-mutate-smoke: FAIL — expected 01 from COW unset, got: $unset_out" >&2
+  exit 1
 fi
 
 echo "runtime-assert-mutate-smoke: inject shared-write still aborts M5…"

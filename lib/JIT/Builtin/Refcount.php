@@ -265,7 +265,7 @@ class Refcount extends Builtin {
 
     /**
      * M5 on real mutate paths (#36397): abort when writing a shared container (rc > 1).
-     * Call from hashtable grow / string-key write chokepoints under ASSERT.
+     * Call from hashtable grow / string-key write / object-key write / unset chokepoints under ASSERT.
      * Declares `__ref__assert_exclusive` if Refcount::implement has not run yet.
      */
     public static function emitAssertExclusiveCall(\PHPCompiler\JIT\Context $context, \PHPLLVM\Value $containerPtr): void

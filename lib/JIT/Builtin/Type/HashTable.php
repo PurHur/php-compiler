@@ -3937,6 +3937,8 @@ class HashTable extends Type
         $this->context->builder->positionAtEnd($block);
         $ht = $fn->getParam(0);
         $index = $fn->getParam(1);
+        // Unset mutates without grow / string-key / object-key write chokepoints — M5 (#36397).
+        Refcount::emitAssertExclusiveCall($this->context, $ht);
         $wasSet = $this->context->builder->call(
             $this->context->lookupFunction('__hashtable__offsetIsSet'),
             $ht,
@@ -3997,6 +3999,8 @@ class HashTable extends Type
         $this->context->builder->positionAtEnd($block);
         $ht = $fn->getParam(0);
         $key = $fn->getParam(1);
+        // Unset mutates without grow / string-key write chokepoints — M5 (#36397).
+        Refcount::emitAssertExclusiveCall($this->context, $ht);
 
         $htMap = $this->context->structFieldMap['__hashtable__'];
         $nodeMap = $this->context->structFieldMap['__strkey_node__'];
@@ -4092,6 +4096,8 @@ class HashTable extends Type
         $this->context->builder->positionAtEnd($block);
         $ht = $fn->getParam(0);
         $key = $fn->getParam(1);
+        // Unset mutates without grow / object-key write chokepoints — M5 (#36397).
+        Refcount::emitAssertExclusiveCall($this->context, $ht);
 
         $htMap = $this->context->structFieldMap['__hashtable__'];
         $nodeMap = $this->context->structFieldMap['__objkey_node__'];

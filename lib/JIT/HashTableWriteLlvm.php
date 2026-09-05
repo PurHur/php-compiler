@@ -863,7 +863,9 @@ final class HashTableWriteLlvm
     /** unset() on array/container dimensions (#10031 v4). */
     public static function offsetUnset(Context $context, Variable $container, Variable $dim): void
     {
-        $ht = HashTableReadLlvm::loadHashtablePointer($context, $container);
+        // zend_array_separate before ZEND_UNSET_DIM — by-value `$b = $a` shares the HT (#34508 / #36397).
+        // php-src: Zend/zend_vm_def.h ZEND_UNSET_DIM → SEPARATE_ARRAY (zend_variables.h).
+        $ht = self::separateContainerForWrite($context, $container);
         if (Variable::TYPE_NATIVE_LONG === $dim->type) {
             $index = $context->helper->loadValue($dim);
             $context->builder->call(
