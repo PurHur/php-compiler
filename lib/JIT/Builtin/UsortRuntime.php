@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedClosureInvokeLlvm;
@@ -144,7 +145,8 @@ final class UsortRuntime
 
         NestedClosureInvokeLlvm::ensureLinked($context);
         VmActiveContextInitLlvm::requestThinStandaloneInit($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        // By-ref mutator: SEPARATE_ARRAY before in-place usort (php-src zend_hash_sort / #36397).
+        $ht = HashTableHelper::separateContainerForWrite($context, $array);
         // Sort mutates $ht in place. Do not storeHashtableInArrayVariable back into a
         // TYPE_VALUE box — __value__writeHashtable valueDelref's the same pointer and
         // frees it when the box is sole owner (rc=1). That made honest assign delref
@@ -164,7 +166,8 @@ final class UsortRuntime
         NestedClosureInvokeLlvm::ensureLinked($context);
         VmActiveContextInitLlvm::requestThinStandaloneInit($context);
         SpaceshipRuntime::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        // By-ref mutator: SEPARATE_ARRAY before in-place uksort (php-src / #36397).
+        $ht = HashTableHelper::separateContainerForWrite($context, $array);
         UsortKeyedLlvm::sortKeysWithClosure($context, $ht, $callback);
     }
 
@@ -179,7 +182,8 @@ final class UsortRuntime
         NestedClosureInvokeLlvm::ensureLinked($context);
         VmActiveContextInitLlvm::requestThinStandaloneInit($context);
         SpaceshipRuntime::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        // By-ref mutator: SEPARATE_ARRAY before in-place uasort (php-src / #36397).
+        $ht = HashTableHelper::separateContainerForWrite($context, $array);
         UsortKeyedLlvm::sortValuesWithClosure($context, $ht, $callback);
     }
 
@@ -192,7 +196,8 @@ final class UsortRuntime
             return;
         }
 
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        // By-ref mutator: SEPARATE_ARRAY before in-place sort (php-src / #36397).
+        $ht = HashTableHelper::separateContainerForWrite($context, $array);
         $context->type->hashtable->ensureSortAbi('__hashtable__sortStringKeyValues');
         $context->builder->call($context->lookupFunction('__hashtable__sortStringKeyValues'), $ht);
     }

@@ -85,7 +85,8 @@ final class KeySortRuntime
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($sort);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        // By-ref mutator: SEPARATE_ARRAY before in-place krsort (php-src / #36397).
+        $ht = HashTableHelper::separateContainerForWrite($context, $array);
         $context->builder->call($context->lookupFunction($abi), $ht);
         if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
@@ -112,7 +113,8 @@ final class KeySortRuntime
         $context->builder->branchIf($isList, $done, $sort);
 
         $context->builder->positionAtEnd($sort);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        // By-ref mutator: SEPARATE_ARRAY before in-place ksort (php-src / #36397).
+        $ht = HashTableHelper::separateContainerForWrite($context, $array);
         $context->builder->call($context->lookupFunction($abi), $ht);
         // In-place HT mutation; unconditional store corrupts thin AOT value boxes (#27227).
         if (ArrayBuiltinHelper::isNativeArray($array->type)) {
@@ -128,7 +130,8 @@ final class KeySortRuntime
      */
     private static function krsortPackedListByKey(Context $context, JITVariable $array): void
     {
-        $src = ArrayBuiltinHelper::loadHashTable($context, $array);
+        // By-ref mutator: SEPARATE_ARRAY before rebuild (php-src krsort / #36397).
+        $src = HashTableHelper::separateContainerForWrite($context, $array);
         $sizeT = $context->getTypeFromString('size_t');
         $i64 = $context->getTypeFromString('int64');
         $two = $sizeT->constInt(2, false);

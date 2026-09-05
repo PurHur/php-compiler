@@ -3331,6 +3331,8 @@ class HashTable extends Type
         $main = $fn->appendBasicBlock('main');
         $this->context->builder->positionAtEnd($main);
         $ht = $fn->getParam(0);
+        // Packed sort mutates in place — M5 exclusive check (php-src SEPARATE_ARRAY peer / #36397).
+        Refcount::emitAssertExclusiveCall($this->context, $ht);
         $htMap = $this->context->structFieldMap['__hashtable__'];
         $valueMap = $this->context->structFieldMap['__value__'];
         $sizeT = $this->context->getTypeFromString('size_t');

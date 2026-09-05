@@ -44,7 +44,8 @@ final class NaturalSortRuntime
     private static function invokeNaturalSort(Context $context, JITVariable $array, bool $caseInsensitive): void
     {
         self::ensureLinked($context, $caseInsensitive);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        // By-ref mutator: SEPARATE_ARRAY before natsort (php-src php_natsort / #36397).
+        $ht = HashTableHelper::separateContainerForWrite($context, $array);
         // Packed setAtIndex cannot express reordered int keys; promote then strKey sort (#33618).
         HashTablePromotePackedToStringKeys::promote($context, $ht);
         $strKey = $caseInsensitive ? self::ABI_STRKEY_NATURAL_CASE : self::ABI_STRKEY_NATURAL;

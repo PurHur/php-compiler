@@ -75,7 +75,8 @@ final class ValueSortRuntime
                 'asort()/arsort() cannot compile fixed-size literal arrays in JIT/AOT yet; use bin/vm.php or bin/serve.php'
             );
         }
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        // By-ref mutator: SEPARATE_ARRAY before in-place asort (php-src php_array_asort / #36397).
+        $ht = HashTableHelper::separateContainerForWrite($context, $array);
         ValueSortKeyedLlvm::sortValuesPreserveKeys($context, $ht, $reverse, $caseInsensitive);
         // In-place mutation via HT pointer; store only native slots (peer NaturalSort #26975).
         // Unconditional store corrupts thin-standalone value-boxed arrays (#27227).
@@ -92,7 +93,8 @@ final class ValueSortRuntime
                 'asort()/arsort() cannot compile fixed-size literal arrays in JIT/AOT yet; use bin/vm.php or bin/serve.php'
             );
         }
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        // By-ref mutator: SEPARATE_ARRAY before in-place asort (php-src / #36397).
+        $ht = HashTableHelper::separateContainerForWrite($context, $array);
         $context->builder->call($context->lookupFunction($abi), $ht);
         if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
