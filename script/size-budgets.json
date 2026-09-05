@@ -14,9 +14,9 @@
             "note": "Concern trait splits (#36387/#36403); ClosureThisAndStaticScopeResolve + BoundMethodInstanceCallResolve + NestedVmHelperAndThisResolve + peers"
         },
         "lib/VM.php": {
-            "budget": 20210,
+            "budget": 19646,
             "target": 15000,
-            "note": "ClassTraitComposition + ObjectPropertyReadonlyAndVisibility + Hooks + CollectAndSerialize + IssetEmptyUnset Concern extracts (#36403); toward 15k target"
+            "note": "ObjectPropertyMagicAndClone + ClassTraitComposition + ObjectPropertyReadonlyAndVisibility + Hooks + CollectAndSerialize + IssetEmptyUnset Concern extracts (#36403); toward 15k target"
         },
         "script/apply-patches.sh": {
             "budget": 7637,
@@ -35,9 +35,9 @@
         }
     },
     "script_file_count": {
-        "budget": 278,
+        "budget": 279,
         "target": 150,
-        "note": "script/ top-level *.sh/*.php; ASAN/valgrind smokes under script/runtime-assert/ (#36403/#36397); ratchet after master tip grew to 278"
+        "note": "script/ top-level *.sh/*.php; ASAN/valgrind smokes under script/runtime-assert/ (#36403/#36397); ratchet after master tip grew to 279"
     },
     "ci_defaults_exports": {
         "budget": 141,
