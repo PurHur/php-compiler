@@ -415,6 +415,11 @@ final class NoThrowCallElision
             // deprecates; excess argc is ArgumentCountError.
             return self::dateObHttpSplTimeGetterRuntimeInfoArgsCannotThrow($name, $callArgs);
         }
+        if (self::isPureClockGetterRuntimeInfoBuiltin($name)) {
+            // microtime / hrtime / gettimeofday — arity 0 or typed bool;
+            // soft-null bool deprecates; excess argc is ArgumentCountError.
+            return self::clockGetterRuntimeInfoArgsCannotThrow($callArgs);
+        }
         if (self::isPureVersionCompareBuiltin($name)) {
             // versioning.c — typed strings; optional operator must be proven valid.
             return self::versionCompareArgsCannotThrow($callArgs);
@@ -1383,6 +1388,25 @@ final class NoThrowCallElision
     }
 
     /**
+     * Clock getters — php-src {@code ext/standard/microtime.c}
+     * ({@code microtime}/{@code gettimeofday}), {@code ext/standard/hrtime.c}
+     * ({@code hrtime}). Arity 0 or typed bool flag; soft-null bool deprecates;
+     * excess argc is {@code ArgumentCountError}. Public for
+     * {@see DiscardedPureCallElision} (#36386).
+     */
+    public static function isPureClockGetterRuntimeInfoBuiltin(string $nameLc): bool
+    {
+        switch ($nameLc) {
+            case 'microtime':
+            case 'hrtime':
+            case 'gettimeofday':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
      * php-src {@code ext/standard/versioning.c} {@code version_compare}. Public
      * for {@see DiscardedPureCallElision} (#36386).
      */
@@ -2007,6 +2031,29 @@ final class NoThrowCallElision
             default:
                 return false;
         }
+    }
+
+    /**
+     * {@code microtime}/{@code hrtime}/{@code gettimeofday}: arity 0 or one
+     * typed bool/numeric flag (soft-null deprecates). Public for
+     * {@see DiscardedPureCallElision} (#36386).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    public static function clockGetterRuntimeInfoArgsCannotThrow(array $callArgs): bool
+    {
+        if ([] === $callArgs) {
+            return true;
+        }
+        if (
+            !isset($callArgs[0])
+            || !$callArgs[0] instanceof Variable
+            || isset($callArgs[1])
+        ) {
+            return false;
+        }
+
+        return self::numericParamBuiltinArgCannotThrow($callArgs[0]);
     }
 
     /**

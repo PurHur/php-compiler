@@ -81,6 +81,8 @@ use PHPCompiler\VM\Variable as VmVariable;
  * timezone_identifiers_list (zero-arg or typed long group; soft-null group
  * stays live — deprecate; country-code form stays live — ValueError;
  * excess argc stays live — ArgumentCountError),
+ * microtime / hrtime / gettimeofday (zero-arg or typed bool; soft-null bool
+ * stays live — deprecate; excess argc stays live — ArgumentCountError),
  * zero-arg pi, type.c predicates + gettype/get_debug_type, ctype.c
  * classifiers on typed/literal strings, typed-array count/sizeof, math.c
  * incl. pow/fpow/fdiv on already-numeric args, empty void user functions).
@@ -162,7 +164,9 @@ use PHPCompiler\VM\Variable as VmVariable;
  * group stays live (deprecate); country-code / excess-arg forms stay live.
  * Non-zero-arg {@code error_reporting}/{@code ignore_user_abort}/
  * {@code http_response_code}/{@code headers_sent} stay live (setter /
- * by-ref side effects).
+ * by-ref side effects). Soft-null {@code microtime}/{@code hrtime}/
+ * {@code gettimeofday} bool stays live (deprecate); excess argc stays live
+ * ({@code ArgumentCountError}).
  */
 final class DiscardedPureCallElision
 {
@@ -283,6 +287,9 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureDateObHttpSplTimeGetterRuntimeInfoNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureClockGetterRuntimeInfoNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureVersionCompareNoSideEffect($toCall, $callArgs)) {
@@ -1718,6 +1725,26 @@ final class DiscardedPureCallElision
     }
 
     /**
+     * Discarded {@code microtime}/{@code hrtime}/{@code gettimeofday} — php-src
+     * {@code ext/standard/microtime.c}/{@code hrtime.c}. Clock reads with no
+     * user handlers. Soft-null bool stays live (deprecate). Excess argc stays
+     * live ({@code ArgumentCountError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureClockGetterRuntimeInfoNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if (!NoThrowCallElision::isPureClockGetterRuntimeInfoBuiltin(strtolower($toCall->getName()))) {
+            return false;
+        }
+
+        return self::clockGetterRuntimeInfoArgsAllowDiscardedElision($callArgs);
+    }
+
+    /**
      * Discarded {@code version_compare} on typed / literal strings — php-src
      * {@code versioning.c}. Optional operator must be null or a compile-time
      * valid comparison op ({@code ValueError} otherwise).
@@ -2252,6 +2279,28 @@ final class DiscardedPureCallElision
             default:
                 return false;
         }
+    }
+
+    /**
+     * Exactly zero arguments, or one typed bool/numeric flag. Soft-null stays
+     * live (deprecate) — unlike {@see NoThrowCallElision::clockGetterRuntimeInfoArgsCannotThrow}.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function clockGetterRuntimeInfoArgsAllowDiscardedElision(array $callArgs): bool
+    {
+        if ([] === $callArgs) {
+            return true;
+        }
+        if (
+            !isset($callArgs[0])
+            || !$callArgs[0] instanceof Variable
+            || isset($callArgs[1])
+        ) {
+            return false;
+        }
+
+        return self::mathArgAllowsDiscardedElision($callArgs[0]);
     }
 
     /**
