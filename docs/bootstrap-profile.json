@@ -7143,6 +7143,7 @@
         "lib/JIT/CompilerOperandChainNative.php",
         "lib/JIT/Concern/AdaptByRefCallArgs.php",
         "lib/JIT/Concern/AssignOperand.php",
+        "lib/JIT/Concern/ByRefFormalAssignAndCallArgAdapt.php",
         "lib/JIT/Concern/CallResultCompileTimePropagate.php",
         "lib/JIT/Concern/CallResultOperandAssign.php",
         "lib/JIT/Concern/CoerceReturnPropertyDeclaringAndByRef.php",
@@ -7157,6 +7158,7 @@
         "lib/JIT/Concern/M3EmitTuSidecarLinktime.php",
         "lib/JIT/Concern/PropertyFetchCoalesceAndCompileTimeString.php",
         "lib/JIT/Concern/PropertyIncDecCompile.php",
+        "lib/JIT/Concern/ResolveJitOutgoingCall.php",
         "lib/JIT/Concern/TernaryJumpIfEchoMerge.php",
         "lib/JIT/Context.php",
         "lib/JIT/DatePeriodForeachSnapshot.php",
@@ -8449,9 +8451,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8215,
+        "inventory_files": 8217,
         "excluded": 0,
-        "eligible": 8215,
+        "eligible": 8217,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
