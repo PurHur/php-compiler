@@ -114,10 +114,13 @@ final class ClassReturnCheck
             $scalarBlock = $fn->appendBasicBlock('object_return_value_scalar');
             $resume = $fn->appendBasicBlock('object_return_value_resume');
             $i8 = $context->getTypeFromString('int8');
+            // Value-box writers store JIT tags (TYPE_OBJECT=133); mask IS_REFCOUNTED
+            // like DnfParamCheck / __value__readObject (#36382 Slim AppFactory).
+            $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
             $isObject = $context->builder->icmp(
                 Builder::INT_EQ,
-                $typeByte,
-                $i8->constInt(\PHPCompiler\VM\Variable::TYPE_OBJECT, false)
+                $kind,
+                $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false)
             );
             $context->builder->branchIf($isObject, $objectBlock, $scalarBlock);
             $context->builder->positionAtEnd($scalarBlock);
@@ -281,10 +284,13 @@ final class ClassReturnCheck
         $objectBlock = $fn->appendBasicBlock('class_return_value_object');
         $scalarBlock = $fn->appendBasicBlock('class_return_value_scalar');
         $i8 = $context->getTypeFromString('int8');
+        // Value-box writers store JIT tags (TYPE_OBJECT=133); mask IS_REFCOUNTED
+        // like DnfParamCheck / __value__readObject (#36382 Slim AppFactory).
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
         $isObject = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_OBJECT, false)
+            $kind,
+            $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false)
         );
         $context->builder->branchIf($isObject, $objectBlock, $scalarBlock);
         $context->builder->positionAtEnd($scalarBlock);
