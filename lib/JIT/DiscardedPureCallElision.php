@@ -94,6 +94,12 @@ use PHPCompiler\VM\Variable as VmVariable;
  * typed-array array_key_first / array_key_last / array_is_list (exactly one
  * typed hashtable / packed array / value-box hashtable; soft-null / non-array
  * / excess argc stay live — TypeError / ArgumentCountError),
+ * typed-array array_keys / array_values / array_first / array_last (exactly
+ * one typed array; filtered {@code array_keys} stays live; soft-null /
+ * non-array / excess argc stay live — TypeError / ArgumentCountError),
+ * typed-array array_reverse / array_change_key_case (typed array + optional
+ * typed preserve_keys / case; soft-null optional stays live — deprecate;
+ * soft-null / non-array haystack stay live — TypeError),
  * zero-arg pi, type.c predicates + gettype/get_debug_type, ctype.c
  * classifiers on typed/literal strings, typed-array count/sizeof, math.c
  * incl. pow/fpow/fdiv on already-numeric args, empty void user functions).
@@ -310,6 +316,9 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureArrayKeyEdgeNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureArrayCopyNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureVersionCompareNoSideEffect($toCall, $callArgs)) {
@@ -1835,6 +1844,63 @@ final class DiscardedPureCallElision
         }
 
         return self::isTypedArrayArg($callArgs[0]);
+    }
+
+    /**
+     * Discarded {@code array_keys}/{@code array_values}/{@code array_first}/
+     * {@code array_last}/{@code array_reverse}/{@code array_change_key_case}
+     * on a typed hashtable / packed array / value-box hashtable — php-src
+     * {@code ext/standard/array.c}. Filtered {@code array_keys} (search /
+     * strict) stays live. Soft-null / non-array haystacks stay live
+     * ({@code TypeError}); soft-null optional flags stay live (deprecate);
+     * excess argc stays live ({@code ArgumentCountError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureArrayCopyNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        $name = strtolower($toCall->getName());
+        if (
+            'array_keys' !== $name
+            && 'array_values' !== $name
+            && 'array_first' !== $name
+            && 'array_last' !== $name
+            && 'array_reverse' !== $name
+            && 'array_change_key_case' !== $name
+        ) {
+            return false;
+        }
+        if (!isset($callArgs[0]) || !$callArgs[0] instanceof Variable) {
+            return false;
+        }
+        if (!self::isTypedArrayArg($callArgs[0])) {
+            return false;
+        }
+
+        switch ($name) {
+            case 'array_keys':
+            case 'array_values':
+            case 'array_first':
+            case 'array_last':
+                // One-arg only — filtered array_keys / excess argc stay live.
+                return 1 === \count($callArgs);
+            case 'array_reverse':
+            case 'array_change_key_case':
+                if (isset($callArgs[2])) {
+                    return false;
+                }
+                if (!isset($callArgs[1])) {
+                    return true;
+                }
+
+                return $callArgs[1] instanceof Variable
+                    && self::mathArgAllowsDiscardedElision($callArgs[1]);
+            default:
+                return false;
+        }
     }
 
     /**
