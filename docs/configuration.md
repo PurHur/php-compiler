@@ -97,7 +97,7 @@ defaults — `doctor --env` exits non-zero when they drift.
 | `PHP_COMPILER_REPORT_EXTERNAL_STUBS` | bool | debug | — | Report unbound external method stubs | — |
 | `PHP_COMPILER_REPO_ROOT` | string | runtime | — | Override repository root detection | — |
 | `PHP_COMPILER_REPRODUCIBLE` | bool | compile | — | Force deterministic AOT link (build-id=sha1 + default SOURCE_DATE_EPOCH) | #36399 |
-| `PHP_COMPILER_RUNTIME_ASSERT` | bool | debug | — | Emit __ref__ M1 delref + M5 exclusive-write checks; alias PHPC_RUNTIME_ASSERT | #36397 |
+| `PHP_COMPILER_RUNTIME_ASSERT` | bool | debug | — | Emit __ref__ M1 delref + M5 exclusive-write checks (hashtable grow/string-key writes); alias PHPC_RUNTIME_ASSERT | #36397 |
 | `PHP_COMPILER_RUNTIME_ASSERT_INJECT_DOUBLE_DELREF` | bool | debug | — | Call rc=0 delref probe at standalone main (unit test) | #36397 |
 | `PHP_COMPILER_RUNTIME_ASSERT_INJECT_SHARED_WRITE` | bool | debug | — | Call shared-rc assert_exclusive probe at standalone main (unit test M5) | #36397 |
 | `PHP_COMPILER_SELFHOST_AOT` | bool | compile | — | Self-host AOT emit mode | — |
