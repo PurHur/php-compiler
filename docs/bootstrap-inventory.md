@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8244 |
-| Phase A inventory files (M2 ratio SSOT) | 8244 |
+| PHP files on vm.php path | 8245 |
+| Phase A inventory files (M2 ratio SSOT) | 8245 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26072 |
+| Source constructs flagged (warnings) | 26074 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5680,7 +5680,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/GlobalTypedConstSyntaxRejector.php` | 0 | 2 |
 | `lib/Handler.php` | 0 | 1 |
 | `lib/HexFloat.php` | 0 | 1 |
-| `lib/JIT.php` | 0 | 32 |
+| `lib/JIT.php` | 0 | 24 |
 | `lib/JIT/Analyzer.php` | 0 | 1 |
 | `lib/JIT/AotDebugSymbols.php` | 0 | 1 |
 | `lib/JIT/AotGcSections.php` | 0 | 1 |
@@ -7091,6 +7091,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/SkippedSplitCfgAndTernaryMergeHelpers.php` | 0 | 3 |
 | `lib/JIT/Concern/SubBlockCatchFinallyAndGeneratorResume.php` | 0 | 2 |
 | `lib/JIT/Concern/TernaryJumpIfEchoMerge.php` | 0 | 2 |
+| `lib/JIT/Concern/VmSmokeAndRuntimeM3NativeStubs.php` | 0 | 10 |
 | `lib/JIT/Context.php` | 0 | 334 |
 | `lib/JIT/DatePeriodForeachSnapshot.php` | 0 | 3 |
 | `lib/JIT/DeprecatedCallGuard.php` | 0 | 1 |
@@ -50506,37 +50507,29 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT\Call\ExternalMethod (line 401)
-- new JIT\Scope (line 430)
-- new Operand\Literal (line 680)
-- new Operand\Literal (line 696)
-- new JIT\Call\Native (line 1174)
-- new Variable (line 2180)
-- new JIT\Call\Native (line 2206)
-- new Variable (line 2296)
-- new JIT\Call\Vararg (line 2323)
-- new JIT\Call\Native (line 2333)
-- new JIT\Call\Native (line 2622)
-- new JIT\Variable (line 2862)
-- new JIT\Call\Native (line 2879)
-- new JIT\Call\Native (line 2924)
-- new JIT\Call\Native (line 2994)
-- new JIT\Call\Native (line 3036)
-- new JIT\Call\Native (line 3081)
-- new JIT\Call\Native (line 3136)
-- new JIT\Call\Native (line 4049)
-- new JIT\Call\Native (line 4080)
-- new JIT\Call\Native (line 4172)
-- new JIT\Call\Native (line 4210)
-- new JIT\Call\Native (line 4244)
-- new JIT\Call\Native (line 4365)
-- new JIT\Call\Native (line 5015)
-- new Variable (line 5053)
-- new Variable (line 5073)
-- new Variable (line 5094)
-- new Variable (line 5239)
-- new Variable (line 5283)
-- 153 class method(s)
+- new JIT\Call\ExternalMethod (line 403)
+- new JIT\Scope (line 432)
+- new Operand\Literal (line 682)
+- new Operand\Literal (line 698)
+- new JIT\Call\Native (line 1176)
+- new Variable (line 2182)
+- new JIT\Call\Native (line 2208)
+- new Variable (line 2298)
+- new JIT\Call\Vararg (line 2325)
+- new JIT\Call\Native (line 2335)
+- new JIT\Call\Native (line 3428)
+- new JIT\Call\Native (line 3459)
+- new JIT\Call\Native (line 3551)
+- new JIT\Call\Native (line 3589)
+- new JIT\Call\Native (line 3623)
+- new JIT\Call\Native (line 3744)
+- new JIT\Call\Native (line 4394)
+- new Variable (line 4432)
+- new Variable (line 4452)
+- new Variable (line 4473)
+- new Variable (line 4618)
+- new Variable (line 4662)
+- 130 class method(s)
 - 15 closure(s)
 
 ### `lib/JIT/Analyzer.php`
@@ -58368,6 +58361,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - trait TernaryJumpIfEchoMerge (line 19)
 - 42 class method(s)
 
+### `lib/JIT/Concern/VmSmokeAndRuntimeM3NativeStubs.php`
+
+**Warnings** (review for bootstrap subset):
+- trait VmSmokeAndRuntimeM3NativeStubs (line 21)
+- new JIT\Call\Native (line 122)
+- new JIT\Variable (line 362)
+- new JIT\Call\Native (line 379)
+- new JIT\Call\Native (line 424)
+- new JIT\Call\Native (line 494)
+- new JIT\Call\Native (line 536)
+- new JIT\Call\Native (line 581)
+- new JIT\Call\Native (line 636)
+- 23 class method(s)
+
 ### `lib/JIT/Context.php`
 
 **Warnings** (review for bootstrap subset):
@@ -60211,7 +60218,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/SpineChunkRuntimeMethodDemote.php`
 
 **Warnings** (review for bootstrap subset):
-- new OpCode (line 218)
+- new OpCode (line 219)
 - 11 class method(s)
 
 ### `lib/JIT/SpineChunkStandardHelperBind.php`

@@ -235,20 +235,26 @@ final class RuntimeInitParsePipelineTest extends TestCase
         $jitPath = dirname(__DIR__, 2).'/lib/JIT.php';
         $this->assertFileExists($jitPath);
         $jit = (string) file_get_contents($jitPath);
+        $concernPath = dirname(__DIR__, 2).'/lib/JIT/Concern/VmSmokeAndRuntimeM3NativeStubs.php';
+        $this->assertFileExists($concernPath);
+        $concern = (string) file_get_contents($concernPath);
+        $this->assertStringContainsString('compileRuntimeInitParsePipelineM3Native', $concern);
+        $this->assertStringContainsString('RuntimeInitParsePipeline::emit', $concern);
+        // Call site remains on the hub; body lives in the Concern (#36387).
         $this->assertStringContainsString('compileRuntimeInitParsePipelineM3Native', $jit);
-        $this->assertStringContainsString('RuntimeInitParsePipeline::emit', $jit);
-        $fnPos = strpos($jit, 'function compileRuntimeInitParsePipelineM3Native');
+        $fnPos = strpos($concern, 'function compileRuntimeInitParsePipelineM3Native');
         $this->assertNotFalse($fnPos);
-        $chunk = substr($jit, $fnPos, 3500);
-        $m5Pos = strpos($chunk, 'shouldUseM5DriverHostCompile()');
+        $chunk = substr($concern, $fnPos, 3500);
+        // Gate is shouldUseM5ParseSpineCFloor() (not the broader M5 driver host compile flag).
+        $m5Pos = strpos($chunk, 'shouldUseM5ParseSpineCFloor()');
         $floorPos = strpos($chunk, 'RuntimeInitParsePipeline::emit');
         $stubPos = strpos($chunk, "shouldUseM3EmitTuRuntimeMethodStub('initparsepipeline')");
         $this->assertNotFalse($m5Pos);
         $this->assertNotFalse($floorPos);
-        $this->assertLessThan($floorPos, $m5Pos, 'M5 gate must wrap C-floor emit');
+        $this->assertLessThan($floorPos, $m5Pos, 'M5 parse-spine C-floor gate must wrap C-floor emit');
         if (false !== $stubPos) {
             $this->assertLessThan($stubPos, $floorPos, 'M5 C-floor must run before void-stub gate');
         }
-        $this->assertStringContainsString('shouldUseM5DriverHostCompile()', $chunk);
+        $this->assertStringContainsString('shouldUseM5ParseSpineCFloor()', $chunk);
     }
 }
