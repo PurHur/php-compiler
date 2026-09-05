@@ -172,7 +172,8 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
         $this->assertStringContainsString('peeklastparsefailure', $emit);
         $this->assertStringContainsString('echoLastParseFailureSuffix', $emit);
         $this->assertStringContainsString('noteparsecompilenullforscript', $emit);
-        $this->assertStringContainsString('helloworld_compile_smoke', $jit);
+        $driverPolicy = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3M4M5CompileDriverEmitPolicy.php');
+        $this->assertStringContainsString('helloworld_compile_smoke', $driverPolicy);
         $spineDecls = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuRuntimeSpineDeclsAndCompileDeps.php');
         $this->assertStringContainsString('compileM3EmitTuRuntimeSpineMethodsForRealLowering', $spineDecls);
         $this->assertMatchesRegularExpression(
@@ -234,12 +235,12 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
     /** M3 compile_driver must C-floor initCompiler, not only emit TU (#2568). */
     public function testM3CompileDriverInitCompilerUsesRuntimeInitCompilerFloor(): void
     {
-        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
+        $vmSmoke = (string) file_get_contents(self::$root.'/lib/JIT/Concern/VmSmokeAndRuntimeM3NativeStubs.php');
         $this->assertStringContainsString(
             'shouldUseM3EmitTuNativeBridge() || $this->shouldUseM3CompileDriverRealLowering()',
-            $jit
+            $vmSmoke
         );
-        $this->assertStringContainsString('RuntimeInitCompiler::emit', $jit);
+        $this->assertStringContainsString('RuntimeInitCompiler::emit', $vmSmoke);
     }
 
     public function testEmitTuModeDetectsHelperLinkEnv(): void

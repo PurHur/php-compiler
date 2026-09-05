@@ -294,11 +294,11 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
 
     public function testJitM3AllowlistMatchesBootstrapAotHelloWorldSmoke(): void
     {
-        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
-        $this->assertStringContainsString('isBootstrapHelloWorldSmokeName', $jit);
-        $this->assertStringContainsString('isBootstrapHelloWorldSmokeName', $jit);
-        $this->assertStringContainsString('m3CompileDriverSpineDenyNames', $jit);
-        $this->assertStringContainsString('#1515', $jit);
+        $driverPolicy = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3M4M5CompileDriverEmitPolicy.php');
+        $this->assertStringContainsString('isBootstrapHelloWorldSmokeName', $driverPolicy);
+        $this->assertStringContainsString('isBootstrapHelloWorldSmokeName', $driverPolicy);
+        $this->assertStringContainsString('m3CompileDriverSpineDenyNames', $driverPolicy);
+        $this->assertStringContainsString('#1515', $driverPolicy);
         $driver = (string) file_get_contents(self::$root.'/test/selfhost/compiler_helloworld_smoke/compile_driver.php');
         $this->assertStringContainsString('\\PHPCompiler\\BootstrapAot\\helloworld_compile_smoke', $driver);
         $smoke = (string) file_get_contents(self::$root.'/test/bootstrap-aot/helloworld_compile_smoke.php');
@@ -334,22 +334,23 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
     public function testJitDocumentsM3CompileDriverEnvGate(): void
     {
         $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
-        $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_DRIVER', $jit);
-        $this->assertStringContainsString('isM3CompileDriverRealLoweringName', $jit);
+        $driverPolicy = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3M4M5CompileDriverEmitPolicy.php');
+        $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_DRIVER', $driverPolicy);
+        $this->assertStringContainsString('isM3CompileDriverRealLoweringName', $driverPolicy);
         $this->assertStringContainsString('shouldUseM3EmitTuRuntimeMethodStub', $jit);
         $this->assertStringContainsString('m3EmitTuRuntimeSpineLowered', $jit);
-        $this->assertStringContainsString('helloworld_compile_smoke', $jit);
-        $this->assertStringContainsString('runtime::parseandcompile', $jit);
-        $this->assertStringContainsString('runtime::parse', $jit);
-        $this->assertStringContainsString('runtime::compileemitsmoke', $jit);
-        $this->assertStringContainsString('runtime::compile', $jit);
+        $this->assertStringContainsString('helloworld_compile_smoke', $driverPolicy);
+        $this->assertStringContainsString('runtime::parseandcompile', $driverPolicy);
+        $this->assertStringContainsString('runtime::parse', $driverPolicy);
+        $this->assertStringContainsString('runtime::compileemitsmoke', $driverPolicy);
+        $this->assertStringContainsString('runtime::compile', $driverPolicy);
         $this->assertStringContainsString('jitFunctionSkipName', $jit);
-        $this->assertStringContainsString('m3CompileDriverSpineDenyNames', $jit);
+        $this->assertStringContainsString('m3CompileDriverSpineDenyNames', $driverPolicy);
     }
 
     public function testJitM3AllowlistIncludesParseAndCompileNotOnDenyList(): void
     {
-        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
+        $jit = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3M4M5CompileDriverEmitPolicy.php');
         $this->assertMatchesRegularExpression(
             "/str_ends_with\\(\\\$lower, '\\\\\\\\runtime::parse'\\)/",
             $jit,
@@ -365,7 +366,7 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
             $this->assertStringNotContainsString('runtime::parse', $denyBlock);
             $this->assertStringNotContainsString('runtime::compile', $denyBlock);
         } else {
-            $this->fail('Unable to parse m3CompileDriverSpineDenyNames from lib/JIT.php');
+            $this->fail('Unable to parse m3CompileDriverSpineDenyNames from M3M4M5CompileDriverEmitPolicy');
         }
     }
 
