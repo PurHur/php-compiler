@@ -398,6 +398,13 @@ final class NoThrowCallElision
             // ArgumentCountError.
             return self::hostErrorHashObRuntimeInfoArgsCannotThrow($name, $callArgs);
         }
+        if (self::isPureJsonPregTzStreamCliRuntimeInfoBuiltin($name)) {
+            // json_last_error* / preg_last_error* / date_default_timezone_get /
+            // timezone_version_get / stream_get_{wrappers,transports,filters} /
+            // cli_get_process_title — arity 0 only; excess argc is
+            // ArgumentCountError.
+            return self::jsonPregTzStreamCliRuntimeInfoArgsCannotThrow($callArgs);
+        }
         if (self::isPureVersionCompareBuiltin($name)) {
             // versioning.c — typed strings; optional operator must be proven valid.
             return self::versionCompareArgsCannotThrow($callArgs);
@@ -1306,6 +1313,32 @@ final class NoThrowCallElision
     }
 
     /**
+     * JSON/PCRE last-error, default timezone, tzdata version, stream registry,
+     * CLI title reads — php-src {@code ext/json/json.c}, {@code ext/pcre/php_pcre.c},
+     * {@code ext/date/php_date.c}, {@code ext/standard/streamsfuncs.c},
+     * {@code ext/standard/cli_ops.c}. Excess argc is {@code ArgumentCountError}.
+     * Public for {@see DiscardedPureCallElision} (#36386).
+     */
+    public static function isPureJsonPregTzStreamCliRuntimeInfoBuiltin(string $nameLc): bool
+    {
+        switch ($nameLc) {
+            case 'json_last_error':
+            case 'json_last_error_msg':
+            case 'preg_last_error':
+            case 'preg_last_error_msg':
+            case 'date_default_timezone_get':
+            case 'timezone_version_get':
+            case 'stream_get_wrappers':
+            case 'stream_get_transports':
+            case 'stream_get_filters':
+            case 'cli_get_process_title':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
      * php-src {@code ext/standard/versioning.c} {@code version_compare}. Public
      * for {@see DiscardedPureCallElision} (#36386).
      */
@@ -1872,6 +1905,18 @@ final class NoThrowCallElision
             default:
                 return false;
         }
+    }
+
+    /**
+     * Exactly zero arguments — peer {@see zeroArgRuntimeInfoArgsCannotThrow}.
+     * Excess argc is {@code ArgumentCountError}. Public for
+     * {@see DiscardedPureCallElision} (#36386).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    public static function jsonPregTzStreamCliRuntimeInfoArgsCannotThrow(array $callArgs): bool
+    {
+        return self::zeroArgRuntimeInfoArgsCannotThrow($callArgs);
     }
 
     /**
