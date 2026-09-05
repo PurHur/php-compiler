@@ -385,6 +385,51 @@ trait CompileBlockInternal
                         // (#34684) and broke by-ref element write-back (#27407). Array builtins
                         // that need a value-box coerce at the call site (ArraySumLlvm / #24167).
                         $recvOp = $block->getOperand($op->arg1);
+                        // Prologue already assignOperand'd the packed HT onto Param.result. A
+                        // second assignOperand (same slot or Temporary) free()s that HT
+                        // (delref) before re-storing — dangling pack; $v[0]/implode/foreach
+                        // SEGV (e08_spread #24226, k09 #24167). Same skip as typed `array`
+                        // formals below (#36386 / #36397).
+                        if (
+                            Variable::TYPE_HASHTABLE === $packed->type
+                            && $this->context->hasVariableOp($recvOp)
+                            && Variable::TYPE_HASHTABLE === $this->context->getVariableFromOp($recvOp)->type
+                        ) {
+                            \PHPCompiler\JIT\UndefinedVariableHelper::markAssigned(
+                                $this->context,
+                                $recvOp,
+                                $this->context->getVariableFromOp($recvOp)
+                            );
+                            if (isset($block->paramByRef[(int) $op->arg2])) {
+                                $this->context->getVariableFromOp($recvOp)->borrowedHashtable = true;
+                            }
+                            break;
+                        }
+                        // Same-slot Temporary distinct from Param.result — alias the prologue
+                        // HT instead of assignOperand (which would delref the live pack).
+                        if (
+                            !$this->context->hasVariableOp($recvOp)
+                            && null !== $block->func
+                            && isset($block->func->params[(int) $op->arg2])
+                        ) {
+                            $paramResult = $block->func->params[(int) $op->arg2]->result;
+                            if (
+                                $this->context->hasVariableOp($paramResult)
+                                && Variable::TYPE_HASHTABLE === $this->context->getVariableFromOp($paramResult)->type
+                            ) {
+                                $bound = $this->context->getVariableFromOp($paramResult);
+                                $this->context->setVariableOp($recvOp, $bound);
+                                \PHPCompiler\JIT\UndefinedVariableHelper::markAssigned(
+                                    $this->context,
+                                    $recvOp,
+                                    $bound
+                                );
+                                if (isset($block->paramByRef[(int) $op->arg2])) {
+                                    $bound->borrowedHashtable = true;
+                                }
+                                break;
+                            }
+                        }
                         $this->assignOperand($recvOp, $packed, true);
                         // `&...$args`: dim writes must hit the same HT syncByRefVariadicCallers
                         // reads — FETCH_DIM_W COW would leave the pack stale (#34790 / #34508).
