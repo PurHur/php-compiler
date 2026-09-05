@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8290 |
-| Phase A inventory files (M2 ratio SSOT) | 8290 |
+| PHP files on vm.php path | 8291 |
+| Phase A inventory files (M2 ratio SSOT) | 8291 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26173 |
+| Source constructs flagged (warnings) | 26175 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7079,6 +7079,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/CompileCoalesce.php` | 0 | 2 |
 | `lib/JIT/Concern/CompileConcat.php` | 0 | 7 |
 | `lib/JIT/Concern/CompileConstFetchBooleanNotAndInstanceof.php` | 0 | 4 |
+| `lib/JIT/Concern/CompileDeclareClassLike.php` | 0 | 2 |
 | `lib/JIT/Concern/CompileDeclareGlobalStaticAndVarFetch.php` | 0 | 3 |
 | `lib/JIT/Concern/CompileEchoAndPrint.php` | 0 | 5 |
 | `lib/JIT/Concern/CompileEmptyIssetEval.php` | 0 | 2 |
@@ -58156,7 +58157,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - trait CompileBlockInternal (line 25)
 - new VM (line 658)
-- new Operand\Literal (line 947)
+- new Operand\Literal (line 738)
 - 2 class method(s)
 
 ### `lib/JIT/Concern/CompileBlockPhpLoweringAndClosurePrep.php`
@@ -58216,6 +58217,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Operand\Literal (line 114)
 - 1 class method(s)
 - 1 closure(s)
+
+### `lib/JIT/Concern/CompileDeclareClassLike.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CompileDeclareClassLike (line 22)
+- 1 class method(s)
 
 ### `lib/JIT/Concern/CompileDeclareGlobalStaticAndVarFetch.php`
 
@@ -60518,7 +60525,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/SpineChunkRuntimeMethodDemote.php`
 
 **Warnings** (review for bootstrap subset):
-- new OpCode (line 261)
+- new OpCode (line 262)
 - 11 class method(s)
 
 ### `lib/JIT/SpineChunkStandardHelperBind.php`
