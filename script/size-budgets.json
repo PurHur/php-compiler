@@ -9,9 +9,9 @@
             "note": "Concern trait splits (#36230/#36387/#36403); CompileFuncCfgReturnAndGlobalImport + peers"
         },
         "lib/JIT.php": {
-            "budget": 12739,
+            "budget": 11703,
             "target": 20000,
-            "note": "Concern trait splits (#36387/#36403); ResolveJitOutgoingCall + ByRefFormalAssignAndCallArgAdapt + CallResultOperandAssign"
+            "note": "Concern trait splits (#36387/#36403); LocalReleaseUnsetAndVarFetchDest + ResolveJitOutgoingCall + ByRefFormalAssignAndCallArgAdapt + peers"
         },
         "lib/VM.php": {
             "budget": 21186,

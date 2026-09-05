@@ -7155,6 +7155,7 @@
         "lib/JIT/Concern/EmitJitReturn.php",
         "lib/JIT/Concern/InitJitMethodCall.php",
         "lib/JIT/Concern/InitJitStaticCall.php",
+        "lib/JIT/Concern/LocalReleaseUnsetAndVarFetchDest.php",
         "lib/JIT/Concern/M3EmitTuSidecarLinktime.php",
         "lib/JIT/Concern/PropertyFetchCoalesceAndCompileTimeString.php",
         "lib/JIT/Concern/PropertyIncDecCompile.php",
