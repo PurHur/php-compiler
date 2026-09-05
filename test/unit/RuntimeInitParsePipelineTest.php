@@ -209,20 +209,26 @@ final class RuntimeInitParsePipelineTest extends TestCase
         $this->assertStringContainsString('RuntimeParseM5AstPeer.php', $jit);
         $this->assertStringContainsString('RuntimeParseM5AstPeer::ensureMethods', $jit);
         $this->assertStringContainsString('M5ParserAstPeer.php', $jit);
-        $spineFn = strpos($jit, 'function compileM3EmitTuRuntimeSpineMethodsForRealLowering');
+        $spineDecls = (string) file_get_contents($root.'/lib/JIT/Concern/M3EmitTuRuntimeSpineDeclsAndCompileDeps.php');
+        $spineFn = strpos($spineDecls, 'function compileM3EmitTuRuntimeSpineMethodsForRealLowering');
         $this->assertNotFalse($spineFn);
-        $spineChunk = substr($jit, $spineFn, 8000);
-        $peerPos = strpos($spineChunk, 'RuntimeParseM5AstPeer::ensureMethods');
-        $forcePos = strpos($spineChunk, 'RuntimeParseM5PhpCfgParser::ensureParse');
-        $floorPos = strpos($spineChunk, 'RuntimeParseM5Native::emitFunction');
-        $this->assertNotFalse($peerPos, 'ensureMethods must be wired in spine real-lower');
-        $this->assertNotFalse($forcePos, 'ensureParse must be wired in spine real-lower');
-        $this->assertNotFalse($floorPos, 'C-floor emit must remain in spine real-lower');
+        $spineChunk = substr($spineDecls, $spineFn, 8000);
+        // Body calls hub helper; peer/parser/C-floor wiring lives in ensureM5ParseSpineCFloorSymbols (#36387).
+        $this->assertStringContainsString('ensureM5ParseSpineCFloorSymbols()', $spineChunk);
+        $floorHelper = strpos($jit, 'function ensureM5ParseSpineCFloorSymbols');
+        $this->assertNotFalse($floorHelper, 'M5 parse-spine C-floor helper must remain on the hub');
+        $floorChunk = substr($jit, $floorHelper, 3500);
+        $peerPos = strpos($floorChunk, 'RuntimeParseM5AstPeer::ensureMethods');
+        $forcePos = strpos($floorChunk, 'RuntimeParseM5PhpCfgParser::ensureParse');
+        $floorPos = strpos($floorChunk, 'RuntimeParseM5Native::emitFunction');
+        $this->assertNotFalse($peerPos, 'ensureMethods must be wired in M5 parse-spine C-floor helper');
+        $this->assertNotFalse($forcePos, 'ensureParse must be wired in M5 parse-spine C-floor helper');
+        $this->assertNotFalse($floorPos, 'C-floor emit must remain in M5 parse-spine C-floor helper');
         $this->assertLessThan($forcePos, $peerPos, 'Peer NestedJIT must precede Parser NestedJIT');
         $this->assertLessThan($floorPos, $forcePos, 'Parser NestedJIT must precede C-floor parse emit');
-        $stubPos = strpos($jit, "\$emitHelperStubMethods = array_merge(\$emitHelperStubMethods, [\n                    'parse'");
+        $stubPos = strpos($spineDecls, "\$emitHelperStubMethods = array_merge(\$emitHelperStubMethods, [\n                    'parse'");
         if (false === $stubPos) {
-            $stubPos = strpos($jit, "'parse',\n                    'initparsepipeline'");
+            $stubPos = strpos($spineDecls, "'parse',\n                    'initparsepipeline'");
         }
         $this->assertNotFalse($stubPos, 'M5 must list parse among emitHelperStubMethods');
         $smoke = (string) file_get_contents($root.'/lib/JIT/BootstrapCompileSmokeM3Emit.php');

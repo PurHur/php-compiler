@@ -136,8 +136,9 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
         $this->assertStringContainsString('allocateEmitTuShell', $object);
         $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
         $this->assertStringContainsString('emitMainEntry', $jit);
-        $this->assertStringContainsString('compileM3EmitTuRuntimeMethodFromQueue', $jit);
-        $this->assertStringContainsString('compileM3EmitTuRuntimeMethodFromDeclareClassBlocks', $jit);
+        $methodSources = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuCompilerAndRuntimeMethodSources.php');
+        $this->assertStringContainsString('compileM3EmitTuRuntimeMethodFromQueue', $methodSources);
+        $this->assertStringContainsString('compileM3EmitTuRuntimeMethodFromDeclareClassBlocks', $methodSources);
         $execute = (string) file_get_contents(self::$root.'/script/bootstrap-m3-emit-tu-execute.sh');
         $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_DRIVER=1', $execute);
     }
@@ -148,7 +149,8 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
         $this->assertStringContainsString('compileM3EmitTuMainNative', $jit);
         $driverMain = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuAndCompileDriverMainNative.php');
         $this->assertStringContainsString('BootstrapCompileSmokeM3Emit::emitMainEntry', $driverMain);
-        $this->assertStringContainsString('compileM3EmitTuRuntimeMethodFromQueue', $jit);
+        $methodSources = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuCompilerAndRuntimeMethodSources.php');
+        $this->assertStringContainsString('compileM3EmitTuRuntimeMethodFromQueue', $methodSources);
     }
 
     public function testM3EmitTuRealLoweringSkipsEarlyParseStubDecl(): void
@@ -204,11 +206,12 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
     /** Runtime.php CFG uses bare init* names; emit TU must match them (#2568). */
     public function testM3EmitTuRuntimeMethodFromModulesMatchesBareCfgFuncNames(): void
     {
-        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
-        $this->assertStringContainsString('$funcLc !== $methodLc', $jit);
-        $this->assertStringContainsString("'initparsepipeline'", $jit);
+        $methodSources = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuCompilerAndRuntimeMethodSources.php');
+        $this->assertStringContainsString('$funcLc !== $methodLc', $methodSources);
         $spineDecls = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuRuntimeSpineDeclsAndCompileDeps.php');
         $this->assertStringContainsString('compileM3EmitTuRuntimeSpineMethodsForRealLowering', $spineDecls);
+        // Bare init* names live on the real-lowering method list (#2568); matching logic is above.
+        $this->assertStringContainsString("'initparsepipeline'", $spineDecls);
     }
 
     public function testM3EmitTuUsesRuntimeInitCompilerFloor(): void
