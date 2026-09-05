@@ -97,6 +97,21 @@ if [[ -f "$AF" ]]; then
   php "$ROOT/script/composer/patch-slim-appfactory-36382.php" "$AF"
 fi
 
+NYF="$DEST/vendor/slim/slim/Slim/Factory/Psr17/NyholmPsr17Factory.php"
+if [[ -f "$NYF" ]]; then
+  php "$ROOT/script/composer/patch-slim-nyholm-psr17-factory-36382.php" "$NYF"
+fi
+
+SHC="$DEST/vendor/slim/slim/Slim/Factory/Psr17/SlimHttpServerRequestCreator.php"
+if [[ -f "$SHC" ]]; then
+  php "$ROOT/script/composer/patch-slim-http-src-decorator-36382.php" "$SHC"
+fi
+
+SRCF="$DEST/vendor/slim/slim/Slim/Factory/ServerRequestCreatorFactory.php"
+if [[ -f "$SRCF" ]]; then
+  php "$ROOT/script/composer/patch-slim-server-request-creator-factory-36382.php" "$SRCF"
+fi
+
 echo "Created $DEST ($(find "$DEST" -name '*.php' | wc -l) php files)"
 echo "Try: ./phpc build --project $DEST --dry-run"
 echo "Note: reachable graph ~94 files; AOT uses incremental requires (>=32 units) — see #36382"
