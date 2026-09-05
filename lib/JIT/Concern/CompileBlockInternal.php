@@ -544,48 +544,9 @@ trait CompileBlockInternal
                     $this->compileIterOp($block, $op);
                     break;
                 case OpCode::TYPE_SCRIPT_MAGIC:
-                    if (OpCode::SCRIPT_MAGIC_HALT_OFFSET === (int) $op->arg3) {
-                        $offset = $block->haltCompilerOffset;
-                        if (null === $offset) {
-                            throw new \LogicException('Undefined constant "__COMPILER_HALT_OFFSET__"');
-                        }
-                        $this->assignOperand(
-                            $block->getOperand($op->arg1),
-                            \PHPCompiler\JIT\Variable::fromConstantInt($this->context, $offset)
-                        );
-                    } elseif (OpCode::SCRIPT_MAGIC_LINE === (int) $op->arg3) {
-                        $line = null !== $op->arg2 ? (int) $op->arg2 : 1;
-                        if ($line < 1) {
-                            $line = 1;
-                        }
-                        $this->assignOperand(
-                            $block->getOperand($op->arg1),
-                            \PHPCompiler\JIT\Variable::fromConstantInt($this->context, $line)
-                        );
-                    } else {
-                        $magicStr = \PHPCompiler\JIT\ScriptMagic::stringForBlock($block, (int) $op->arg3);
-                        $lit = new Operand\Literal($magicStr);
-                        $lit->type = \PHPTypes\Type::string();
-                        $this->assignOperand(
-                            $block->getOperand($op->arg1),
-                            \PHPCompiler\JIT\Variable::fromLiteral($this->context, $lit)
-                        );
-                    }
-                    break;
                 case OpCode::TYPE_INCLUDE:
-                    if ($this->context->inlineIncludeDepth > 0) {
-                        \PHPCompiler\JIT\IncludeHelper::refreshInlineIncludeBindings($this->context);
-                    }
-                    \PHPCompiler\JIT\IncludeHelper::compileLiteral(
-                        $this,
-                        $func,
-                        $block,
-                        $op,
-                        null !== $op->arg2 ? $block->getOperand($op->arg2) : null
-                    );
-                    break;
                 case OpCode::TYPE_CLONE:
-                    \PHPCompiler\JIT\CloneOperandHelper::compile($this, $this->context, $block, $op);
+                    $this->compileScriptMagicIncludeCloneOp($block, $op, $func);
                     break;
                 case OpCode::TYPE_BOOLEAN_NOT:
                     $from = $this->context->getVariableFromOp($block->getOperand($op->arg2));
