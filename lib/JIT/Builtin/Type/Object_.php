@@ -3993,6 +3993,7 @@ class Object_ extends Type {
         if (null !== $constraint && '' !== $constraint) {
             $var->objectPropertyClassConstraint = $constraint;
             $var->objectPropertyDeclaredTypeLabel = $this->propertySlotDeclaredTypeLabel($classId, $slotIndex);
+            $var->objectPropertyAllowsNull = $this->propertySlotAllowsNull($classId, $slotIndex);
         }
     }
 
@@ -8337,16 +8338,41 @@ class Object_ extends Type {
 
         if (Variable::TYPE_OBJECT === $expr->type) {
             $obj = $this->context->helper->loadValue($expr);
+            // Typed `?I $v = null` params lower as TYPE_OBJECT + null pointer; loading
+            // class_id from null SIGSEGVs (php-src instanceof on null is false) (#36382).
+            $objType = $this->context->getTypeFromString('__object__*');
+            $isObject = $this->context->builder->icmp(
+                PHPLLVM\Builder::INT_NE,
+                $obj,
+                $objType->constNull()
+            );
+            $objectBlock = BasicBlockHelper::append($this->context, 'instanceof_obj_nonnull');
+            $falseBlock = BasicBlockHelper::append($this->context, 'instanceof_obj_null');
+            $mergeBlock = BasicBlockHelper::append($this->context, 'instanceof_obj_merge');
+            $this->context->builder->branchIf($isObject, $objectBlock, $falseBlock);
+
+            $this->context->builder->positionAtEnd($objectBlock);
             $classId = $this->context->builder->load(
                 $this->context->builder->structGep($obj, $objMap['class_id'])
             );
-            $match = $this->emitClassIdInstanceOf($classId, $className);
+            $matchObj = $this->emitClassIdInstanceOf($classId, $className);
+            $objectEnd = $this->context->builder->getInsertBlock();
+            $this->context->builder->branch($mergeBlock);
+
+            $this->context->builder->positionAtEnd($falseBlock);
+            $this->context->builder->branch($mergeBlock);
+
+            $this->context->builder->positionAtEnd($mergeBlock);
+            $i1 = $this->context->getTypeFromString('int1');
+            $phi = $this->context->builder->phi($i1, 'instanceof_obj_phi');
+            $phi->addIncoming($matchObj, $objectEnd);
+            $phi->addIncoming($falseVal, $falseBlock);
 
             return new Variable(
                 $this->context,
                 Variable::TYPE_NATIVE_BOOL,
                 Variable::KIND_VALUE,
-                $match
+                $phi
             );
         }
 
@@ -9557,8 +9583,54 @@ class Object_ extends Type {
             } else {
                 $valuePtr = JitValueBox::pointer($this->context, $value->value);
             }
+            // Object-tagged null pointers (`?Class $v = null`) must store as TYPE_NULL,
+            // not an object shell with a null __object__* (Zend null; #36382).
+            $objPayload = $this->context->builder->call(
+                $this->context->lookupFunction('__value__readObject'),
+                $valuePtr
+            );
+            $objTy = $this->context->getTypeFromString('__object__*');
+            $payloadNull = $this->context->builder->icmp(
+                PHPLLVM\Builder::INT_EQ,
+                $objPayload,
+                $objTy->constNull()
+            );
+            $valueMap = $this->context->structFieldMap['__value__'];
+            $typeByte = $this->context->builder->load(
+                $this->context->builder->structGep($valuePtr, $valueMap['type'])
+            );
+            $i8 = $this->context->getTypeFromString('int8');
+            $kind = $this->context->builder->and($typeByte, $i8->constInt(0x7f, false));
+            $isObjKind = $this->context->builder->icmp(
+                PHPLLVM\Builder::INT_EQ,
+                $kind,
+                $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false)
+            );
+            $isNullKind = $this->context->builder->icmp(
+                PHPLLVM\Builder::INT_EQ,
+                $kind,
+                $i8->constInt(Variable::TYPE_NULL, false)
+            );
+            $asNull = $this->context->builder->or(
+                $isNullKind,
+                $this->context->builder->and($isObjKind, $payloadNull)
+            );
+            $fnStore = BasicBlockHelper::parentFunction($this->context);
+            $nullStore = $fnStore->appendBasicBlock('prop_store_vb_as_null');
+            $copyStore = $fnStore->appendBasicBlock('prop_store_vb_copy');
+            $storeDone = $fnStore->appendBasicBlock('prop_store_vb_done');
+            $this->context->builder->branchIf($asNull, $nullStore, $copyStore);
+            $this->context->builder->positionAtEnd($nullStore);
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeNull'),
+                $heapPtr
+            );
+            $this->context->builder->branch($storeDone);
+            $this->context->builder->positionAtEnd($copyStore);
             JitValueBox::copyFromPointer($this->context, $heapVal, $valuePtr);
             $value->addref();
+            $this->context->builder->branch($storeDone);
+            $this->context->builder->positionAtEnd($storeDone);
 
             return;
         }
@@ -9580,12 +9652,33 @@ class Object_ extends Type {
         }
 
         if (Variable::TYPE_VALUE === $propertyType && Variable::TYPE_OBJECT === $value->type) {
+            $objPtr = $this->context->helper->loadValue($value);
+            $objTy = $this->context->getTypeFromString('__object__*');
+            $isNullObj = $this->context->builder->icmp(
+                PHPLLVM\Builder::INT_EQ,
+                $objPtr,
+                $objTy->constNull()
+            );
+            $fnObj = BasicBlockHelper::parentFunction($this->context);
+            $nullObjBb = $fnObj->appendBasicBlock('prop_store_obj_as_null');
+            $writeObjBb = $fnObj->appendBasicBlock('prop_store_obj_write');
+            $objDone = $fnObj->appendBasicBlock('prop_store_obj_done');
+            $this->context->builder->branchIf($isNullObj, $nullObjBb, $writeObjBb);
+            $this->context->builder->positionAtEnd($nullObjBb);
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeNull'),
+                $heapPtr
+            );
+            $this->context->builder->branch($objDone);
+            $this->context->builder->positionAtEnd($writeObjBb);
             $this->context->builder->call(
                 $this->context->lookupFunction('__value__writeObject'),
                 $heapPtr,
-                $this->context->helper->loadValue($value)
+                $objPtr
             );
             $value->addref();
+            $this->context->builder->branch($objDone);
+            $this->context->builder->positionAtEnd($objDone);
 
             return;
         }

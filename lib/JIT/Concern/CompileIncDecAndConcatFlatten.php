@@ -618,7 +618,8 @@ trait CompileIncDecAndConcatFlatten
                 $dest->objectPropertyClassConstraint,
                 $dest->objectPropertyClassName ?? '',
                 $dest->objectPropertyName ?? 'property',
-                $dest->objectPropertyDeclaredTypeLabel ?? $dest->objectPropertyClassConstraint
+                $dest->objectPropertyDeclaredTypeLabel ?? $dest->objectPropertyClassConstraint,
+                $dest->objectPropertyAllowsNull
             );
         }
         JIT\ReadonlyClassGuard::emitStoreUnlessPending(
@@ -685,7 +686,8 @@ trait CompileIncDecAndConcatFlatten
                 $dest->objectPropertyClassConstraint,
                 $dest->objectPropertyClassName ?? '',
                 $dest->objectPropertyName ?? 'property',
-                $dest->objectPropertyDeclaredTypeLabel ?? $dest->objectPropertyClassConstraint
+                $dest->objectPropertyDeclaredTypeLabel ?? $dest->objectPropertyClassConstraint,
+                $dest->objectPropertyAllowsNull
             );
         }
         JIT\ReadonlyClassGuard::emitStoreUnlessPending(

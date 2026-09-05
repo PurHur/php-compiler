@@ -522,7 +522,8 @@ trait AssignOperand
                     $result->objectPropertyClassConstraint,
                     $result->objectPropertyClassName ?? '',
                     $result->objectPropertyName ?? 'property',
-                    $result->objectPropertyDeclaredTypeLabel ?? $result->objectPropertyClassConstraint
+                    $result->objectPropertyDeclaredTypeLabel ?? $result->objectPropertyClassConstraint,
+                    $result->objectPropertyAllowsNull
                 );
             }
             if (null !== $result->objectPropertySlot) {

@@ -83,13 +83,43 @@ final class IntersectionParamCheck
         string $ifaceLc
     ): Variable {
         $ifaceLc = strtolower(ltrim($ifaceLc, '\\'));
+        $i1 = $context->getTypeFromString('int1');
         $obj = self::objectPointer($context, $arg);
+        $objType = $context->getTypeFromString('__object__*');
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $obj,
+            $objType->constNull()
+        );
+        $fn = $context->builder->getInsertBlock()->getParent();
+        assert($fn instanceof \PHPLLVM\Value\Function_);
+        $nullBlock = $fn->appendBasicBlock('isect_impl_null');
+        $objBlock = $fn->appendBasicBlock('isect_impl_obj');
+        $done = $fn->appendBasicBlock('isect_impl_done');
+        $context->builder->branchIf($isNull, $nullBlock, $objBlock);
+        $context->builder->positionAtEnd($nullBlock);
+        $falseVal = $i1->constInt(0, false);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($objBlock);
         $objMap = $context->structFieldMap['__object__'];
         $classId = $context->builder->load(
             $context->builder->structGep($obj, $objMap['class_id'])
         );
+        $match = self::emitClassIdImplements($context, $objectType, $classId, $ifaceLc);
+        $matchVal = $context->helper->loadValue($match);
+        $objEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
+        $phi = $context->builder->phi($i1);
+        $phi->addIncoming($falseVal, $nullBlock);
+        $phi->addIncoming($matchVal, $objEnd);
 
-        return self::emitClassIdImplements($context, $objectType, $classId, $ifaceLc);
+        return new Variable(
+            $context,
+            Variable::TYPE_NATIVE_BOOL,
+            Variable::KIND_VALUE,
+            $phi
+        );
     }
 
     private static function emitClassIdImplements(

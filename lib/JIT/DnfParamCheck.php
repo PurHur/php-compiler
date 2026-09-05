@@ -178,11 +178,79 @@ final class DnfParamCheck
                 $i1->constInt('null' === $scalar ? 1 : 0, false)
             );
         }
+        // Typed `?I $v = null` params may lower as TYPE_OBJECT + null pointer (#36382).
+        if (Variable::TYPE_OBJECT === $arg->type) {
+            $obj = $context->helper->loadValue($arg);
+            $objType = $context->getTypeFromString('__object__*');
+            $isNull = $context->builder->icmp(
+                Builder::INT_EQ,
+                $obj,
+                $objType->constNull()
+            );
+
+            return new Variable($context, Variable::TYPE_NATIVE_BOOL, Variable::KIND_VALUE, $isNull);
+        }
         if (Variable::TYPE_VALUE === $arg->type) {
-            return self::emitValueBoxTypeEquals($context, $arg, \PHPCompiler\VM\Variable::TYPE_NULL);
+            return self::emitValueBoxIsNull($context, $arg);
         }
 
         return new Variable($context, Variable::TYPE_NATIVE_BOOL, Variable::KIND_VALUE, $i1->constInt(0, false));
+    }
+
+    /**
+     * Value-box null: TYPE_NULL tag, or TYPE_OBJECT tag with a null object pointer
+     * (`?Class $v = null` often boxes an object-typed null) (#36382).
+     */
+    private static function emitValueBoxIsNull(Context $context, Variable $arg): Variable
+    {
+        $i1 = $context->getTypeFromString('int1');
+        $nullTag = self::emitValueBoxTypeEquals($context, $arg, \PHPCompiler\VM\Variable::TYPE_NULL);
+        $objTag = self::emitValueBoxTypeEquals($context, $arg, \PHPCompiler\VM\Variable::TYPE_OBJECT);
+        $fn = $context->builder->getInsertBlock()->getParent();
+        assert($fn instanceof \PHPLLVM\Value\Function_);
+        $nullTagBlock = $fn->appendBasicBlock('dnf_vb_null_tag');
+        $maybeObjBlock = $fn->appendBasicBlock('dnf_vb_maybe_obj');
+        $objNullBlock = $fn->appendBasicBlock('dnf_vb_obj_nullcheck');
+        $falseBlock = $fn->appendBasicBlock('dnf_vb_not_null');
+        $done = $fn->appendBasicBlock('dnf_vb_isnull_done');
+        $context->builder->branchIf(
+            $context->helper->loadValue($nullTag),
+            $nullTagBlock,
+            $maybeObjBlock
+        );
+        $context->builder->positionAtEnd($nullTagBlock);
+        $trueVal = $i1->constInt(1, false);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($maybeObjBlock);
+        $context->builder->branchIf(
+            $context->helper->loadValue($objTag),
+            $objNullBlock,
+            $falseBlock
+        );
+        $context->builder->positionAtEnd($objNullBlock);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $obj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $valuePtr
+        );
+        $objType = $context->getTypeFromString('__object__*');
+        $ptrNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $obj,
+            $objType->constNull()
+        );
+        $objEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($falseBlock);
+        $falseVal = $i1->constInt(0, false);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
+        $phi = $context->builder->phi($i1);
+        $phi->addIncoming($trueVal, $nullTagBlock);
+        $phi->addIncoming($ptrNull, $objEnd);
+        $phi->addIncoming($falseVal, $falseBlock);
+
+        return new Variable($context, Variable::TYPE_NATIVE_BOOL, Variable::KIND_VALUE, $phi);
     }
 
     private static function compileTimeMatchesLiteralArm(Variable $arg, string $name): bool
@@ -482,6 +550,39 @@ final class DnfParamCheck
         if (null !== $scalar) {
             return new Variable($context, Variable::TYPE_NATIVE_BOOL, Variable::KIND_VALUE, $i1->constInt(0, false));
         }
+        // TYPE_OBJECT null pointer (nullable typed params) is not an intersection match (#36382).
+        if (Variable::TYPE_OBJECT === $arg->type) {
+            $obj = $context->helper->loadValue($arg);
+            $objType = $context->getTypeFromString('__object__*');
+            $isNull = $context->builder->icmp(
+                Builder::INT_EQ,
+                $obj,
+                $objType->constNull()
+            );
+            $fn = $context->builder->getInsertBlock()->getParent();
+            assert($fn instanceof \PHPLLVM\Value\Function_);
+            $nullBlock = $fn->appendBasicBlock('dnf_isect_obj_null');
+            $objBlock = $fn->appendBasicBlock('dnf_isect_obj_nonnull');
+            $done = $fn->appendBasicBlock('dnf_isect_obj_done');
+            $context->builder->branchIf($isNull, $nullBlock, $objBlock);
+            $context->builder->positionAtEnd($nullBlock);
+            $falseVal = $i1->constInt(0, false);
+            $context->builder->branch($done);
+            $context->builder->positionAtEnd($objBlock);
+            $acc = $i1->constInt(1, false);
+            foreach ($interfaceLcs as $memberLc) {
+                $ok = self::emitMemberSatisfies($context, $objectType, $arg, $memberLc);
+                $acc = $context->builder->and($acc, $context->helper->loadValue($ok));
+            }
+            $objEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($done);
+            $context->builder->positionAtEnd($done);
+            $phi = $context->builder->phi($i1);
+            $phi->addIncoming($falseVal, $nullBlock);
+            $phi->addIncoming($acc, $objEnd);
+
+            return new Variable($context, Variable::TYPE_NATIVE_BOOL, Variable::KIND_VALUE, $phi);
+        }
         $acc = $i1->constInt(1, false);
         foreach ($interfaceLcs as $memberLc) {
             $ok = self::emitMemberSatisfies($context, $objectType, $arg, $memberLc);
@@ -751,12 +852,27 @@ final class DnfParamCheck
         string $expected
     ): void {
         $obj = self::objectPointer($context, $arg);
+        $objType = $context->getTypeFromString('__object__*');
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $obj,
+            $objType->constNull()
+        );
+        $fn = $context->builder->getInsertBlock()->getParent();
+        assert($fn instanceof \PHPLLVM\Value\Function_);
+        $nullBlock = $fn->appendBasicBlock('dnf_fail_obj_null');
+        $objBlock = $fn->appendBasicBlock('dnf_fail_obj_nonnull');
+        $context->builder->branchIf($isNull, $nullBlock, $objBlock);
+        $context->builder->positionAtEnd($nullBlock);
+        self::raiseTypeErrorAndAbort(
+            $context,
+            self::formatTypeErrorMessage($context, $kind, $expected, 'null')
+        );
+        $context->builder->positionAtEnd($objBlock);
         $objMap = $context->structFieldMap['__object__'];
         $classId = $context->builder->load(
             $context->builder->structGep($obj, $objMap['class_id'])
         );
-        $fn = $context->builder->getInsertBlock()->getParent();
-        assert($fn instanceof \PHPLLVM\Value\Function_);
         $entry = $context->builder->getInsertBlock();
         $defaultBlock = $fn->appendBasicBlock('dnf_fail_default');
         $checkBlock = $entry;
