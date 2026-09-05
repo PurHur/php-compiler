@@ -9,9 +9,9 @@
             "note": "Concern trait splits (#36230/#36387/#36403); CompileFuncCfgReturnAndGlobalImport + peers"
         },
         "lib/JIT.php": {
-            "budget": 8199,
+            "budget": 8135,
             "target": 20000,
-            "note": "Concern trait splits (#36387/#36403); NestedVmHelperAndThisResolve + ParamConstraintsAndRuntimeNewInit + peers"
+            "note": "Concern trait splits (#36387/#36403); BoundMethodInstanceCallResolve + NestedVmHelperAndThisResolve + peers"
         },
         "lib/VM.php": {
             "budget": 20210,

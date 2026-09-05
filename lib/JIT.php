@@ -39,6 +39,7 @@ require_once __DIR__.'/JIT/Concern/ClassConstEnumAndFunctionStatic.php';
 require_once __DIR__.'/JIT/Concern/AssignOperandValueMetaAndGeneratorField.php';
 require_once __DIR__.'/JIT/Concern/JitConstructAssignedAndNativeLongLocal.php';
 require_once __DIR__.'/JIT/Concern/NestedVmHelperAndThisResolve.php';
+require_once __DIR__.'/JIT/Concern/BoundMethodInstanceCallResolve.php';
 require_once __DIR__.'/JIT/Concern/ParamConstraintsAndRuntimeNewInit.php';
 require_once __DIR__.'/JIT/RuntimeInitVmContext.php';
 require_once __DIR__.'/JIT/RuntimeInitCompiler.php';
@@ -96,6 +97,7 @@ class JIT {
     use AssignOperandValueMetaAndGeneratorField;
     use JitConstructAssignedAndNativeLongLocal;
     use NestedVmHelperAndThisResolve;
+    use BoundMethodInstanceCallResolve;
     use ParamConstraintsAndRuntimeNewInit;
     private static int $functionNumber = 0;
     private static int $blockNumber = 0;
@@ -8128,72 +8130,6 @@ class JIT {
         }
 
         return str_contains($block->func->getScopedName(), '::');
-    }
-
-    /**
-     * True when a queued LLVM function is registered as Class::method (NestedJIT #16075).
-     */
-    private function queuedFuncIsClassMethodAlias(PHPLLVM\Value $llvmFunc, Block $cfgBlock): bool
-    {
-        $methodLc = strtolower($cfgBlock->func->name);
-        foreach ($this->context->functions as $name => $candidate) {
-            if ($candidate !== $llvmFunc || !str_contains($name, '::')) {
-                continue;
-            }
-            [, $methodPart] = explode('::', $name, 2);
-            if (strtolower($methodPart) === $methodLc) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * @param Operand\Literal|Operand\Variable|Operand\Temporary $receiverOp
-     */
-    /**
-     * Fold `$obj->method(...)` FCC array callables to direct instance dispatch (#4040).
-     */
-    private function tryInitBoundMethodFccDirect(Block $block, ?int $calleeSlot): bool
-    {
-        if (null === $calleeSlot) {
-            return false;
-        }
-        $methodLc = JIT\BoundMethodCallableHelper::resolveMethodLcFromCalleeSlot($block, $calleeSlot);
-        if (null === $methodLc) {
-            return false;
-        }
-        $receiverOp = JIT\BoundMethodCallableHelper::resolveBoundMethodReceiverOperand($block, $calleeSlot);
-        if (null === $receiverOp) {
-            return false;
-        }
-        if (null === $receiverOp->type || Type::TYPE_OBJECT !== $receiverOp->type->type) {
-            return false;
-        }
-        $this->initJitMethodCall($block, $receiverOp, $methodLc);
-
-        return true;
-    }
-
-    /**
-     * Fold `['Class','method']()` array callables to INIT_STATIC_METHOD_CALL (#32299).
-     *
-     * RuntimeVariableFunction only dispatches string function names; an array callee
-     * previously emitted abort() (rc=134). php-src: Zend/zend_execute.c ZEND_INIT_DYNAMIC_CALL.
-     */
-    private function tryInitStaticArrayCallableDirect(Block $block, ?int $calleeSlot): bool
-    {
-        if (null === $calleeSlot) {
-            return false;
-        }
-        $slots = VM\VmBoundMethodCallable::resolveStaticArrayCallableSlots($block, $calleeSlot);
-        if (null === $slots) {
-            return false;
-        }
-        $this->initJitStaticCall($slots[2], $slots[0], $slots[1], false, true);
-
-        return true;
     }
 
 }
