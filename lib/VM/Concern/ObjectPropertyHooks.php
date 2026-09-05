@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler;
 
 use PHPCompiler\Func;
+use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\ReflectionPropertyHookSupport;
 use PHPCompiler\VM\TypeCheck;
