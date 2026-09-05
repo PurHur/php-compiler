@@ -423,6 +423,10 @@ bootstrap-gen0-refresh-argv-driver:
 	./script/bootstrap-gen0-refresh-argv-driver.sh
 helper-runtime-prelink-refresh:
 	php script/emit-helper-runtime-object.php --prelink
+# Drop source-gone committed units only (e.g. math helpers retired to builtins #36386).
+# Does not touch live fingerprint-stale units (#25377 / #36401).
+helper-runtime-orphan-prune:
+	php script/emit-helper-runtime-object.php --prelink-orphans-only
 helper-runtime-common-publish:
 	php script/emit-helper-runtime-common.php --from-prelinked
 helper-runtime-prelink-check:
