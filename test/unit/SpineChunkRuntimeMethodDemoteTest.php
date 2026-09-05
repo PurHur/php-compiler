@@ -106,8 +106,9 @@ final class SpineChunkRuntimeMethodDemoteTest extends TestCase
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\AssignOperandValueMetaAndGeneratorField'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\JitConstructAssignedAndNativeLongLocal'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\NestedVmHelperAndThisResolve'));
-$this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\BoundMethodInstanceCallResolve'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\BoundMethodInstanceCallResolve'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\ParamConstraintsAndRuntimeNewInit'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\ClosureThisAndStaticScopeResolve'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::isDemoteTarget('PHPCompiler\\CompileBlockInternal'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::isDemoteTarget('PHPCompiler\\CompileClassAndTraitUses'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::isDemoteTarget('PHPCompiler\\InitJitStaticCall'));
@@ -128,8 +129,9 @@ $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\Boun
         $this->assertTrue(SpineChunkRuntimeMethodDemote::isDemoteTarget('PHPCompiler\\AssignOperandValueMetaAndGeneratorField'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::isDemoteTarget('PHPCompiler\\JitConstructAssignedAndNativeLongLocal'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::isDemoteTarget('PHPCompiler\\NestedVmHelperAndThisResolve'));
-$this->assertTrue(SpineChunkRuntimeMethodDemote::isDemoteTarget('PHPCompiler\\BoundMethodInstanceCallResolve'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::isDemoteTarget('PHPCompiler\\BoundMethodInstanceCallResolve'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::isDemoteTarget('PHPCompiler\\ParamConstraintsAndRuntimeNewInit'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::isDemoteTarget('PHPCompiler\\ClosureThisAndStaticScopeResolve'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('lib/JIT/Concern/CompileBlockInternal.php'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('lib/JIT/Concern/CompileClassAndTraitUses.php'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('lib/JIT/Concern/InitJitStaticCall.php'));
@@ -150,8 +152,9 @@ $this->assertTrue(SpineChunkRuntimeMethodDemote::isDemoteTarget('PHPCompiler\\Bo
         $this->assertTrue(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('lib/JIT/Concern/AssignOperandValueMetaAndGeneratorField.php'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('lib/JIT/Concern/JitConstructAssignedAndNativeLongLocal.php'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('lib/JIT/Concern/NestedVmHelperAndThisResolve.php'));
-$this->assertTrue(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('lib/JIT/Concern/BoundMethodInstanceCallResolve.php'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('lib/JIT/Concern/BoundMethodInstanceCallResolve.php'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('lib/JIT/Concern/ParamConstraintsAndRuntimeNewInit.php'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('lib/JIT/Concern/ClosureThisAndStaticScopeResolve.php'));
         // Doctor.php — NestedJIT OOM without demote; hollow + demote emits (#36387).
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\Doctor'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::isDemoteTarget('PHPCompiler\\Doctor'));
