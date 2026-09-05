@@ -5409,6 +5409,7 @@ require_once __DIR__.'/../../../lib/JIT/Concern/CompileListUnpack.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileBinaryAndUnary.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileScriptMagicIncludeClone.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileExitCaseAndJump.php';
+require_once __DIR__.'/../../../lib/JIT/Concern/CompileConstFetchBooleanNotAndInstanceof.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileArrayDimFetchReadAndWrite.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AssignOperand.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AdaptByRefCallArgs.php';
