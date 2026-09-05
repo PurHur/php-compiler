@@ -92,7 +92,8 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
         $this->assertStringContainsString('isBootstrapM3RuntimeEmitBridgeName', $jit);
         $this->assertStringContainsString('VariableTypeMapNative', $jit);
         $this->assertStringContainsString('runtime_compile_smoke_m3_emit', $jit);
-        $this->assertStringContainsString('compileRuntimeParseAndCompileM3Native', $jit);
+        $vmSmoke = (string) file_get_contents(self::$root.'/lib/JIT/Concern/VmSmokeAndRuntimeM3NativeStubs.php');
+        $this->assertStringContainsString('compileRuntimeParseAndCompileM3Native', $vmSmoke);
         $emit = (string) file_get_contents(self::$root.'/lib/JIT/BootstrapCompileSmokeM3Emit.php');
         $this->assertStringContainsString('declareRuntimeParseAndCompileNative', $emit);
     }
@@ -181,6 +182,11 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
         $this->assertStringContainsString('compiler_smoke_standalone.php', $sidecar);
         $this->assertStringContainsString('HELLOWORLD_SIDECAR_REL', $sidecar);
         $this->assertStringContainsString('COMPILE_SMOKE_SIDECAR_REL', $sidecar);
+        $vmSmokeNative = (string) file_get_contents(self::$root.'/lib/JIT/Concern/VmSmokeAndRuntimeM3NativeStubs.php');
+        $this->assertMatchesRegularExpression(
+            '/function compileVmRunSmokeNative\([\s\S]*?function emitM5ArgvResolveSidecarIdentityStub\(/',
+            $vmSmokeNative
+        );
         $compile = (string) file_get_contents(self::$root.'/bin/compile.php');
         $this->assertStringContainsString('PHP_COMPILER_M3_EMIT_HELPER_SPINE=1', $compile);
         $aot = (string) file_get_contents(self::$root.'/lib/JIT/M3EmitTuTrivialEchoAot.php');
