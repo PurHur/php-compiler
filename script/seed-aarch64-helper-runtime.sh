@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Seed / expand the committed aarch64-linux helper-runtime tier (#36391).
 #
-# Cross-emits a curated VM_* unit set under PHP_COMPILER_TARGET=aarch64-linux
+# Cross-emits a curated helper set under PHP_COMPILER_TARGET=aarch64-linux
 # (object emit only — no link) and publishes into prelinked/helper-runtime/aarch64-linux/.
 # Full corpus refresh still needs a native aarch64 host (or a longer QEMU job).
 #
@@ -14,9 +14,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-# Curated seed: every VM_* and lib_VM_* unit already published for x86_64-linux.
-# Keep in sync with:
-#   ls prelinked/helper-runtime/x86_64-linux/units/ | grep -E '^(VM_|lib_VM_)'
+# Curated seed: every VM_* and lib_VM_* unit already published for x86_64-linux,
+# plus a first ext/standard tier (array/string introspection used near aot-smoke).
+# Keep in sync with x86_64-linux published slugs — do not invent units missing there.
 SEED_UNITS=(
   /VM/AttributeNewInstanceJitHelper.php
   /VM/ClosureBindJitHelper.php
@@ -40,6 +40,16 @@ SEED_UNITS=(
   /lib/VM/StringOffsetJitHelper.php
   /lib/VM/UndefinedPropertyFetchJitHelper.php
   /lib/VM/VmVarFetchJitHelper.php
+  /ext/standard/ArrayChunkJitHelper.php
+  /ext/standard/ArrayIsListJitHelper.php
+  /ext/standard/ArraySliceJitHelper.php
+  /ext/standard/Bin2hexJitHelper.php
+  /ext/standard/CountCharsJitHelper.php
+  /ext/standard/Crc32JitHelper.php
+  /ext/standard/PrintRJitHelper.php
+  /ext/standard/StrWordCountJitHelper.php
+  /ext/standard/SubstrCountJitHelper.php
+  /ext/standard/VarExportJitHelper.php
 )
 
 MIN_SEED=${#SEED_UNITS[@]}

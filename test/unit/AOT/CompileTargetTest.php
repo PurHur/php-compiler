@@ -294,7 +294,7 @@ final class CompileTargetTest extends TestCase
     }
 
     /**
-     * Curated aarch64 VM_* + lib_VM_* seed (parity with x86_64-linux) — every unit.o
+     * Curated aarch64 seed: VM_* + lib_VM_* + first ext/standard tier — every unit.o
      * must be ELF e_machine=183. Empty / short seed is not a pass (#36391).
      */
     public function testCommittedAarch64SeedUnitIsEmAarch64(): void
@@ -304,6 +304,7 @@ final class CompileTargetTest extends TestCase
         $this->assertDirectoryExists($unitsDir);
         $vmDirs = glob($unitsDir.'/VM_*/unit.o') ?: [];
         $libVmDirs = glob($unitsDir.'/lib_VM_*/unit.o') ?: [];
+        $extStdDirs = glob($unitsDir.'/ext_standard_*/unit.o') ?: [];
         $this->assertGreaterThanOrEqual(
             13,
             \count($vmDirs),
@@ -314,11 +315,16 @@ final class CompileTargetTest extends TestCase
             \count($libVmDirs),
             'aarch64 seed must include the full lib_VM_* set (see script/seed-aarch64-helper-runtime.sh)'
         );
-        $dirs = array_merge($vmDirs, $libVmDirs);
         $this->assertGreaterThanOrEqual(
-            22,
+            10,
+            \count($extStdDirs),
+            'aarch64 seed must include the ext/standard tier (see script/seed-aarch64-helper-runtime.sh)'
+        );
+        $dirs = array_merge($vmDirs, $libVmDirs, $extStdDirs);
+        $this->assertGreaterThanOrEqual(
+            32,
             \count($dirs),
-            'aarch64 seed must be VM_* + lib_VM_* (22); empty/short is not a pass'
+            'aarch64 seed must be VM_* + lib_VM_* + ext/standard (32); empty/short is not a pass'
         );
         $target = CompileTarget::resolve(CompileTarget::ID_AARCH64_LINUX);
         foreach ($dirs as $unit) {
@@ -341,6 +347,8 @@ final class CompileTargetTest extends TestCase
         $this->assertStringContainsString('/VM/CoalesceJitHelper.php', $body);
         $this->assertStringContainsString('/lib/VM/ScalarDimFetchJitHelper.php', $body);
         $this->assertStringContainsString('lib_VM_', $body);
+        $this->assertStringContainsString('/ext/standard/ArrayIsListJitHelper.php', $body);
+        $this->assertStringContainsString('/ext/standard/PrintRJitHelper.php', $body);
         $check = $root.'/script/check-release-multiarch-helpers.sh';
         $gate = file_get_contents($check);
         $this->assertNotFalse($gate);
