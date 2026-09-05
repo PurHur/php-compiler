@@ -15,7 +15,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 # Curated seed: every VM_* and lib_VM_* unit already published for x86_64-linux,
-# plus a first ext/standard tier (array/string introspection used near aot-smoke).
+# plus ext/standard tiers (array/string introspection, then array functional +
+# string encode used near aot-smoke / web examples).
 # Keep in sync with x86_64-linux published slugs — do not invent units missing there.
 SEED_UNITS=(
   /VM/AttributeNewInstanceJitHelper.php
@@ -50,6 +51,17 @@ SEED_UNITS=(
   /ext/standard/StrWordCountJitHelper.php
   /ext/standard/SubstrCountJitHelper.php
   /ext/standard/VarExportJitHelper.php
+  # Array functional + string encode tier (#36391 after #36858)
+  /ext/standard/ArrayMapJitHelper.php
+  /ext/standard/ArrayWalkJitHelper.php
+  /ext/standard/ArrayReduceJitHelper.php
+  /ext/standard/ArrayFindJitHelper.php
+  /ext/standard/ArrayMergeRecursiveJitHelper.php
+  /ext/standard/ArrayCountRecursiveJitHelper.php
+  /ext/standard/ArrayElemJitHelper.php
+  /ext/standard/Base64JitHelper.php
+  /ext/standard/Hex2binJitHelper.php
+  /ext/standard/FindSubstrJitHelper.php
 )
 
 MIN_SEED=${#SEED_UNITS[@]}
