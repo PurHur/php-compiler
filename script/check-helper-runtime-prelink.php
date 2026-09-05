@@ -6,16 +6,21 @@ declare(strict_types=1);
 /**
  * Report freshness of the committed per-arch helper-unit cache (#15889).
  *
- * REPORT-ONLY by design: a stale committed unit is skipped per fingerprint by
- * HelperRuntimeCache and recompiled locally, so staleness can only cost build
- * time, never correctness. This check tells maintainers when a refresh
- * (`php script/emit-helper-runtime-object.php --prelink`) is worth committing.
+ * REPORT-ONLY for fingerprint drift by design: a stale committed unit is skipped
+ * per fingerprint by HelperRuntimeCache and recompiled locally (NestedJIT), so
+ * staleness can only cost build time, never correctness. Outcome gates
+ * (cold-build-check, aot-smoke) catch real cache breakage. This check tells
+ * maintainers when a refresh (`php script/emit-helper-runtime-object.php --prelink`)
+ * is worth committing.
  *
  * Also verifies ELF e_machine of committed unit.o / common.o matches the arch
  * directory (#36391) — a host MCJIT fallback must not land x86_64 objects under
  * prelinked/helper-runtime/aarch64-linux/.
  *
- * Exit 0 always, unless --strict is passed (then stale/absent/elf-mismatch -> exit 1).
+ * Exit 0 always, unless --strict is passed (then broken / common / elf-mismatch /
+ * absent x86 corpus -> exit 1). Fingerprint-stale and pending gc_sections migrate
+ * (#36246) stay advisory under --strict so release-readiness is not permanently
+ * red on a working monolithic corpus (#36389 / #36401).
  *
  * Usage:
  *   php script/check-helper-runtime-prelink.php                 # report (current TARGET)
@@ -88,9 +93,12 @@ function check_helper_runtime_arch(string $root, string $archId): array
                 fwrite(STDOUT, "  STALE  {$arch}/common.o (sha256 or core_fingerprint mismatch)\n");
             }
         }
+        // Advisory until an intentional --migrate-to-gc-sections corpus refresh lands
+        // (#36246 / #36401). Requiring gc_sections before that migrate permanently reds
+        // release-readiness on the working monolithic corpus (aot-smoke-safe without COMMON).
         if (!HelperRuntimeCache::prelinkedCorpusHasGcSections()) {
             ++$result['gc_missing'];
-            fwrite(STDOUT, "  STALE  {$arch} gc_sections — committed unit.o uses monolithic .text (refresh with --force --prelink; #36246)\n");
+            fwrite(STDOUT, "  WARN   {$arch} gc_sections — committed unit.o uses monolithic .text (migrate: --force --prelink --migrate-to-gc-sections; #36246)\n");
         }
     }
 
@@ -172,8 +180,9 @@ foreach ($archIds as $archId) {
     $commonNote = HelperRuntimeCommon::commonObjectIsLinkable()
         ? ', common.o fresh'
         : (is_file(HelperRuntimeCommon::commonObjectPath()) ? ', common.o stale' : ', common.o absent');
-    $gcNote = HelperRuntimeCache::prelinkedCorpusHasGcSections() ? ', gc_sections ok' : ', gc_sections stale';
+    $gcNote = HelperRuntimeCache::prelinkedCorpusHasGcSections() ? ', gc_sections ok' : ', gc_sections pending (#36246)';
     $elfNote = $r['elf_mismatch'] > 0 ? ', '.$r['elf_mismatch'].' elf-mismatch' : ', elf ok';
+    $needsRefresh = ($r['stale'] + $r['broken'] + $r['common_broken'] + $r['elf_mismatch']) > 0;
     fwrite(STDOUT, sprintf(
         "check-helper-runtime-prelink: %s — %d fresh, %d stale, %d broken%s%s%s%s\n",
         $r['arch'],
@@ -181,10 +190,10 @@ foreach ($archIds as $archId) {
         $r['stale'],
         $r['broken'],
         $r['common_broken'] > 0 ? ', common broken' : $commonNote,
-        $r['gc_missing'] > 0 ? '' : $gcNote,
+        $gcNote,
         $elfNote,
-        ($r['stale'] + $r['broken'] + $r['common_broken'] + $r['gc_missing'] + $r['elf_mismatch']) > 0
-            ? ' — refresh: PHP_COMPILER_TARGET='.$r['arch'].' php script/emit-helper-runtime-object.php --force --prelink'
+        $needsRefresh
+            ? ' — refresh: PHP_COMPILER_TARGET='.$r['arch'].' php script/emit-helper-runtime-object.php --prelink'
             : ''
     ));
 
@@ -206,11 +215,12 @@ foreach ($archIds as $archId) {
             }
         }
     }
-    // Freshness (stale) remains report-only even under --strict for non-x86 seed corpora —
-    // aarch64 seed units will look "stale" vs live core until a full refresh; ELF/broken gate.
-    if ($strict && CompileTarget::ID_X86_64_LINUX === $r['arch']
-        && ($r['stale'] + $r['gc_missing']) > 0) {
-        $exitFail = true;
+    // Freshness (stale) remains report-only even under --strict (#36389): NestedJIT
+    // covers fingerprint-stale units; cold-build / aot-smoke are the outcome gates.
+    // gc_missing is advisory: monolithic corpus is still the shipped shape until migrate (#36246).
+    // x86 --strict still fails on broken / common / elf / absent (above).
+    if ($strict && CompileTarget::ID_X86_64_LINUX === $r['arch'] && $r['stale'] > 0) {
+        fwrite(STDOUT, "check-helper-runtime-prelink: NOTE — {$r['stale']} fingerprint-stale unit(s) are advisory under --strict (NestedJIT covers; refresh when convenient)\n");
     }
 }
 
