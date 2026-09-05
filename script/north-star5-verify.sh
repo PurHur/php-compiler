@@ -280,8 +280,9 @@ if [[ "${FAST_M5}" -eq 1 ]]; then
       ns5_hint 4 >&2
       exit 1
     fi
+    # Retries for prelinked spine free(): invalid pointer flake (#33501); same default as 4f2 probe.
     spine_fast_ok=0
-    spine_fast_max_attempts=5
+    spine_fast_max_attempts="${BOOTSTRAP_SPINE_BUNDLE_OK_ATTEMPTS:-12}"
     for spine_fast_attempt in $(seq 1 "${spine_fast_max_attempts}"); do
       spine_fast_output="$("${_CI_REPO_ROOT}/build/selfhost-lib-spine-smoke" 2>&1 || true)"
       if printf '%s' "${spine_fast_output}" | grep -q 'compiler_lib_spine_smoke bundle OK'; then
