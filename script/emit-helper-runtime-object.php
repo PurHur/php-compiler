@@ -37,6 +37,7 @@ declare(strict_types=1);
  *   ./script/docker-exec.sh -- bash -lc 'php script/emit-helper-runtime-object.php'
  *   ./script/docker-exec.sh -- bash -lc 'php script/emit-helper-runtime-object.php --prelink'
  *   ./script/docker-exec.sh -- bash -lc 'php script/emit-helper-runtime-object.php --migrate-deps'
+ *   ./script/docker-exec.sh -- bash -lc 'php script/emit-helper-runtime-object.php --prelink-orphans-only'
  *     # rewrite legacy manifests to v2 deps[] without re-emitting .o (#23458)
  *   ./script/docker-exec.sh -- bash -lc 'php script/emit-helper-runtime-object.php --refresh-global-fingerprints'
  *     # recompute v2 unit + arch fingerprints when global material changed (patches/lock)
@@ -209,6 +210,83 @@ foreach ([$root.'/lib', $root.'/ext'] as $dir) {
     }
 }
 ksort($sites);
+
+// --prelink-orphans-only: drop source-gone committed units without re-emitting.
+// Live fingerprint-stale units are kept (#25377). Used after HELPER_PATH retirements
+// (e.g. math builtins #36386) so check-helper-runtime-prelink is not flooded with
+// "source gone" noise while whole-tree --force --prelink remains a 20m+ job (#36401).
+if (in_array('--prelink-orphans-only', $argv, true)) {
+    $arch = HelperRuntimeCache::archKey();
+    $prelinkUnits = HelperRuntimeCache::prelinkedUnitsDir();
+    if (!is_dir($prelinkUnits)) {
+        fwrite(STDERR, "helper-runtime-orphan-prune: missing {$prelinkUnits}\n");
+        exit(1);
+    }
+    $liveSlugs = [];
+    foreach ($sites as $path => $_) {
+        $liveSlugs[HelperRuntimeCache::slugFor($path)] = true;
+    }
+    $removed = [];
+    foreach (glob($prelinkUnits.'/*', GLOB_ONLYDIR) ?: [] as $dir) {
+        $slug = basename($dir);
+        if (isset($liveSlugs[$slug])) {
+            continue;
+        }
+        $manifestPath = $dir.'/manifest.json';
+        $unit = $slug;
+        if (is_readable($manifestPath)) {
+            $j = json_decode((string) file_get_contents($manifestPath), true);
+            if (\is_array($j) && isset($j['unit']) && \is_string($j['unit'])) {
+                $unit = $j['unit'];
+            }
+        }
+        if (isset($sites[$unit])) {
+            continue;
+        }
+        foreach (glob($dir.'/*') ?: [] as $file) {
+            @unlink($file);
+        }
+        @rmdir($dir);
+        $removed[] = $unit;
+    }
+    sort($removed);
+    $archManifestPath = \dirname($prelinkUnits).'/manifest.json';
+    $existingManifest = [];
+    if (is_file($archManifestPath)) {
+        $decoded = json_decode((string) file_get_contents($archManifestPath), true);
+        if (\is_array($decoded)) {
+            $existingManifest = $decoded;
+        }
+    }
+    $committedDirs = glob($prelinkUnits.'/*', GLOB_ONLYDIR) ?: [];
+    $totalBytes = 0;
+    foreach ($committedDirs as $d) {
+        foreach (['unit.o', 'unit.bc', 'manifest.json'] as $name) {
+            $totalBytes += (int) @filesize($d.'/'.$name);
+        }
+    }
+    file_put_contents($archManifestPath, json_encode(array_merge($existingManifest, [
+        'unit_count' => \count($committedDirs),
+        'total_bytes' => $totalBytes,
+        'generated_at' => gmdate('c'),
+        'orphan_prune' => [
+            'issue' => 36401,
+            'removed' => \count($removed),
+            'note' => 'source-gone only; live fingerprint-stale kept (#25377)',
+        ],
+    ]), JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT)."\n");
+    fwrite(STDOUT, sprintf(
+        "helper-runtime-orphan-prune: %s — removed %d source-gone unit(s); committed now %d (live sites %d)\n",
+        $arch,
+        \count($removed),
+        \count($committedDirs),
+        \count($sites)
+    ));
+    foreach ($removed as $u) {
+        fwrite(STDOUT, "  removed {$u}\n");
+    }
+    exit(0);
+}
 
 // --unit=<path> child mode: lower ONE unit into its own TU.
 $unitPath = null;
