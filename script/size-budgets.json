@@ -9,9 +9,9 @@
             "note": "Concern trait splits (#36230/#36387/#36403); CompileFuncCfgReturnAndGlobalImport + peers"
         },
         "lib/JIT.php": {
-            "budget": 16601,
+            "budget": 16202,
             "target": 20000,
-            "note": "Concern trait splits (#36387/#36403); CoerceReturnPropertyDeclaringAndByRef + DomCompileTimeTagMeta"
+            "note": "Concern trait splits (#36387/#36403); PropertyIncDecCompile + CoerceReturnPropertyDeclaringAndByRef"
         },
         "lib/VM.php": {
             "budget": 23479,
@@ -29,9 +29,9 @@
             "note": "already under target; output helpers in LinkerOutputArtifacts (#36403); ASAN via clang/gcc (#36397)"
         },
         "lib/AOT/HelperRuntimeCache.php": {
-            "budget": 1548,
+            "budget": 1576,
             "target": 1200,
-            "note": "helper-cache granularity; sorted linkObjects (#36399)"
+            "note": "helper-cache granularity; sorted linkObjects (#36399); ratchet to tip after #36775 master drift"
         }
     },
     "script_file_count": {
