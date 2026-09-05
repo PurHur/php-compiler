@@ -9,12 +9,12 @@
             "note": "Concern trait splits (#36230/#36387/#36403); CompileFuncCfgReturnAndGlobalImport + peers"
         },
         "lib/JIT.php": {
-            "budget": 21549,
+            "budget": 20737,
             "target": 20000,
-            "note": "Concern trait splits (#36387/#36403); CompileClassAndTraitUses + M3EmitTuSidecarLinktime"
+            "note": "Concern trait splits (#36387/#36403); InitJitStaticCall + CompileClassAndTraitUses"
         },
         "lib/VM.php": {
-            "budget": 25586,
+            "budget": 25653,
             "target": 15000,
             "note": "VM hot-loop / boot decomposition; tip ratchet after master drift (VM untouched this PR)"
         },
