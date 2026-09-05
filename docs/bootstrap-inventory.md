@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8276 |
-| Phase A inventory files (M2 ratio SSOT) | 8276 |
+| PHP files on vm.php path | 8277 |
+| Phase A inventory files (M2 ratio SSOT) | 8277 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26145 |
+| Source constructs flagged (warnings) | 26147 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7064,6 +7064,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/ClassConstEnumAndFunctionStatic.php` | 0 | 9 |
 | `lib/JIT/Concern/ClosureThisAndStaticScopeResolve.php` | 0 | 2 |
 | `lib/JIT/Concern/CoerceReturnPropertyDeclaringAndByRef.php` | 0 | 3 |
+| `lib/JIT/Concern/CompileArgSend.php` | 0 | 2 |
 | `lib/JIT/Concern/CompileArrayDimFetchReadAndWrite.php` | 0 | 7 |
 | `lib/JIT/Concern/CompileAssign.php` | 0 | 6 |
 | `lib/JIT/Concern/CompileAssignRef.php` | 0 | 2 |
@@ -58085,6 +58086,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Operand\Literal (line 834)
 - 41 class method(s)
 
+### `lib/JIT/Concern/CompileArgSend.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CompileArgSend (line 21)
+- 1 class method(s)
+
 ### `lib/JIT/Concern/CompileArrayDimFetchReadAndWrite.php`
 
 **Warnings** (review for bootstrap subset):
@@ -58133,8 +58140,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 1624)
 - new Variable (line 1712)
 - new Variable (line 1742)
-- new VM (line 1980)
-- new Operand\Literal (line 2266)
+- new VM (line 1836)
+- new Operand\Literal (line 2122)
 - 2 class method(s)
 - 1 closure(s)
 
@@ -60420,7 +60427,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/SpineChunkRuntimeMethodDemote.php`
 
 **Warnings** (review for bootstrap subset):
-- new OpCode (line 247)
+- new OpCode (line 248)
 - 11 class method(s)
 
 ### `lib/JIT/SpineChunkStandardHelperBind.php`
