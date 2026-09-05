@@ -5414,6 +5414,7 @@ require_once __DIR__.'/../../../lib/JIT/Concern/SubBlockCatchFinallyAndGenerator
 require_once __DIR__.'/../../../lib/JIT/Concern/ListUnpackClassDeclareAndIncludeAssign.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/SkippedSplitCfgAndTernaryMergeHelpers.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/SkippedHotPathAndRealLoweringNames.php';
+require_once __DIR__.'/../../../lib/JIT/Concern/SkippedVmEmitHelperAndCompileDriverNames.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/M3EmitTuCompilerAndRuntimeVoidStubs.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/M3EmitTuAndCompileDriverMainNative.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/M3EmitTuRuntimeSpineDeclsAndCompileDeps.php';
