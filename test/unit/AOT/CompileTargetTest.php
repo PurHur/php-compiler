@@ -293,16 +293,44 @@ final class CompileTargetTest extends TestCase
         $this->assertStringContainsString('crt_dir + dynamic_linker in CompileTarget', $linker);
     }
 
-    /** Seed aarch64 helper unit remains ELF e_machine=183 in the committed tier. */
+    /**
+     * Curated aarch64 VM_* seed (parity with x86_64-linux VM_* units) — every unit.o
+     * must be ELF e_machine=183. Empty / short seed is not a pass (#36391).
+     */
     public function testCommittedAarch64SeedUnitIsEmAarch64(): void
     {
         $root = dirname(__DIR__, 3);
-        $unit = $root.'/prelinked/helper-runtime/aarch64-linux/units/VM_CoalesceJitHelper_php/unit.o';
-        if (!is_file($unit)) {
-            $this->markTestSkipped('aarch64 seed unit not committed');
+        $unitsDir = $root.'/prelinked/helper-runtime/aarch64-linux/units';
+        $this->assertDirectoryExists($unitsDir);
+        $dirs = glob($unitsDir.'/VM_*/unit.o') ?: [];
+        $this->assertGreaterThanOrEqual(
+            13,
+            \count($dirs),
+            'aarch64 seed must include the full VM_* set (see script/seed-aarch64-helper-runtime.sh)'
+        );
+        $target = CompileTarget::resolve(CompileTarget::ID_AARCH64_LINUX);
+        foreach ($dirs as $unit) {
+            $this->assertSame(183, CompileTarget::readElfMachine($unit), $unit);
+            $target->assertObjectMatchesTarget($unit);
         }
-        $this->assertSame(183, CompileTarget::readElfMachine($unit));
-        CompileTarget::resolve(CompileTarget::ID_AARCH64_LINUX)->assertObjectMatchesTarget($unit);
+    }
+
+    /** Seed refresh script must stay wired into multiarch release gate (#36391). */
+    public function testAarch64SeedScriptIsWired(): void
+    {
+        $root = dirname(__DIR__, 3);
+        $script = $root.'/script/seed-aarch64-helper-runtime.sh';
+        $this->assertFileExists($script);
+        $this->assertTrue(is_executable($script));
+        $body = file_get_contents($script);
+        $this->assertNotFalse($body);
+        $this->assertStringContainsString('PHP_COMPILER_TARGET=aarch64-linux', $body);
+        $this->assertStringContainsString('--check', $body);
+        $this->assertStringContainsString('/VM/CoalesceJitHelper.php', $body);
+        $check = $root.'/script/check-release-multiarch-helpers.sh';
+        $gate = file_get_contents($check);
+        $this->assertNotFalse($gate);
+        $this->assertStringContainsString('seed-aarch64-helper-runtime.sh --check', $gate);
     }
 
     /**

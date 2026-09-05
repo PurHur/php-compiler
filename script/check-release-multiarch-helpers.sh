@@ -25,4 +25,8 @@ grep -q 'PHP_COMPILER_KEEP_OBJECT_FILE=1' script/aot-smoke-cross-emit.sh
 grep -q 'readElfMachine' script/aot-smoke-cross-emit.sh
 grep -q 'empty result set is not a pass' script/aot-smoke-cross-emit.sh
 
+# Curated aarch64 VM_* seed (parity with x86_64-linux VM_* units) — empty is not a pass.
+test -x script/seed-aarch64-helper-runtime.sh
+./script/seed-aarch64-helper-runtime.sh --check
+
 echo "check-release-multiarch-helpers: OK"
