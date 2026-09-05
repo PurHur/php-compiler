@@ -16,9 +16,10 @@ final class M3EmitTuCompileDriverGateTest extends TestCase
         $emit = (string) file_get_contents($root.'/lib/JIT/BootstrapCompileSmokeM3Emit.php');
         $aot = (string) file_get_contents($root.'/lib/JIT/M3EmitTuTrivialEchoAot.php');
 
-        $this->assertStringContainsString('isM3EmitTuCompilerCompileChainLoweringName', $jit);
-        $this->assertStringContainsString('m3EmitTuCompilerCompileChainLoweringSuffixes', $jit);
-        $this->assertStringContainsString('isM3EmitTuRuntimeCompileDriverSpineLoweringName', $jit);
+        $spineNativeCfg = (string) file_get_contents($root.'/lib/JIT/Concern/M3EmitTuSpineNativeTryAndCfgParamTypes.php');
+        $this->assertStringContainsString('isM3EmitTuCompilerCompileChainLoweringName', $spineNativeCfg);
+        $this->assertStringContainsString('m3EmitTuCompilerCompileChainLoweringSuffixes', $spineNativeCfg);
+        $this->assertStringContainsString('isM3EmitTuRuntimeCompileDriverSpineLoweringName', $spineNativeCfg);
         $this->assertStringContainsString('shouldRealLowerInventoryArgvParseSpine', $jit);
         $this->assertStringContainsString('shouldRealLowerInventoryArgvParseSpine())', $jit);
         $this->assertStringContainsString('emitparseandcompilenulldiagnostic', $jit);
@@ -29,7 +30,8 @@ final class M3EmitTuCompileDriverGateTest extends TestCase
         $this->assertStringContainsString('shouldUseM3CompileDriverRealLowering()', $jit);
         // M5 argv / gen-0 seed: C-floor initParsePipeline avoids NestedJIT hang (#26756).
         $this->assertFileExists($root.'/lib/JIT/RuntimeInitParsePipeline.php');
-        $this->assertStringContainsString('RuntimeInitParsePipeline::emit', $jit);
+        $vmSmoke = (string) file_get_contents($root.'/lib/JIT/Concern/VmSmokeAndRuntimeM3NativeStubs.php');
+        $this->assertStringContainsString('RuntimeInitParsePipeline::emit', $vmSmoke);
         $this->assertStringContainsString('require_once __DIR__.\'/JIT/RuntimeInitParsePipeline.php\'', $jit);
         $allowPos = strpos($jit, 'function isM3CompileDriverRealLoweringName');
         $this->assertNotFalse($allowPos);
@@ -47,12 +49,14 @@ final class M3EmitTuCompileDriverGateTest extends TestCase
         $this->assertStringContainsString('contentMatchOnly', $aot);
         $this->assertStringContainsString('!$objectOnlySidecar', $aot);
         $this->assertStringContainsString('COMPILER_LIB_SOURCE_PATH_NORM', $aot);
-        $this->assertStringContainsString('COMPILER_LIB_SIDECAR_REL === $sidecarRel', $jit);
-        $this->assertStringContainsString("memLimit = '8192M'", $jit);
-        $this->assertStringContainsString('full-spine sidecar host-compile OOMs below 8GB (#8559)', $jit);
+        $sidecar = (string) file_get_contents($root.'/lib/JIT/Concern/M3EmitTuSidecarLinktime.php');
+        $this->assertStringContainsString('COMPILER_LIB_SIDECAR_REL === $sidecarRel', $sidecar);
+        $this->assertStringContainsString("memLimit = '8192M'", $sidecar);
+        $this->assertStringContainsString('full-spine sidecar host-compile OOMs below 8GB (#8559)', $sidecar);
         $this->assertStringContainsString('StringFsDir::ensureLinked', $aot);
         $this->assertStringContainsString('ensureSidecarCopyAbisForLink', $aot);
-        $this->assertStringContainsString('ensureSidecarCopyAbisForLink($this->context)', $jit);
+        $spineStub = (string) file_get_contents($root.'/lib/JIT/Concern/M3EmitTuRuntimeSpineStubNative.php');
+        $this->assertStringContainsString('ensureSidecarCopyAbisForLink($this->context)', $spineStub);
         $this->assertStringContainsString('__compiler_resolve_sidecar_source_path', $aot);
         $fnPos = strpos($aot, 'function emitStandaloneWriteCachedAot');
         $this->assertNotFalse($fnPos);
