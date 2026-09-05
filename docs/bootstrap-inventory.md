@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8202 |
-| Phase A inventory files (M2 ratio SSOT) | 8202 |
+| PHP files on vm.php path | 8204 |
+| Phase A inventory files (M2 ratio SSOT) | 8204 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 25986 |
+| Source constructs flagged (warnings) | 25989 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -941,7 +941,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gmp/GmpExtensionPolicy.php` | 0 | 1 |
 | `ext/gmp/GmpFunction.php` | 0 | 1 |
 | `ext/gmp/GmpToString.php` | 0 | 1 |
-| `ext/gmp/Module.php` | 0 | 53 |
+| `ext/gmp/Module.php` | 0 | 54 |
 | `ext/gmp/VmGmp.php` | 0 | 6 |
 | `ext/gmp/VmGmpObject.php` | 0 | 7 |
 | `ext/gmp/gmp_abs.php` | 0 | 2 |
@@ -7371,6 +7371,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/AttributeRegistry.php` | 0 | 1 |
 | `lib/VM/AttributeSupport.php` | 0 | 7 |
 | `lib/VM/BackedEnum.php` | 0 | 7 |
+| `lib/VM/BcMathVmRuntimeSupport.php` | 0 | 1 |
 | `lib/VM/Builtin/AttributeConstruct.php` | 0 | 2 |
 | `lib/VM/Builtin/ClosureBind.php` | 0 | 2 |
 | `lib/VM/Builtin/ClosureBindTo.php` | 0 | 2 |
@@ -7905,6 +7906,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/GeneratorTrace.php` | 0 | 4 |
 | `lib/VM/GeneratorYieldFromJitHelper.php` | 0 | 2 |
 | `lib/VM/GlobIteratorJitHelper.php` | 0 | 6 |
+| `lib/VM/GmpVmRuntimeSupport.php` | 0 | 1 |
 | `lib/VM/HashTable.php` | 0 | 100 |
 | `lib/VM/HashTableJitHelper.php` | 0 | 1 |
 | `lib/VM/HashTableRegistry.php` | 0 | 1 |
@@ -8351,22 +8353,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT\Call\BcMathNumberConstruct (line 47)
 - new JIT\Call\BcMathNumberToString (line 48)
 - new JIT\Call\BcMathNumberMethod (line 50)
-- new bcadd (line 104)
-- new bcsub (line 105)
-- new bcmul (line 106)
-- new bcdiv (line 107)
-- new bcdivmod (line 108)
-- new bcmod (line 109)
-- new bcpow (line 110)
-- new bcsqrt (line 111)
-- new bcscale (line 112)
-- new bccomp (line 113)
-- new bcpowmod (line 114)
-- new bcceil (line 115)
-- new bcfloor (line 116)
-- new bcround (line 117)
+- new bcadd (line 120)
+- new bcsub (line 121)
+- new bcmul (line 122)
+- new bcdiv (line 123)
+- new bcdivmod (line 124)
+- new bcmod (line 125)
+- new bcpow (line 126)
+- new bcsqrt (line 127)
+- new bcscale (line 128)
+- new bccomp (line 129)
+- new bcpowmod (line 130)
+- new bcceil (line 131)
+- new bcfloor (line 132)
+- new bcround (line 133)
 - 5 class method(s)
-- 3 closure(s)
+- 6 closure(s)
 
 ### `ext/bcmath/NumberAdd.php`
 
@@ -15094,58 +15096,59 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new VM\Variable (line 23)
-- new gmp_init (line 44)
-- new gmp_add (line 45)
-- new gmp_sub (line 46)
-- new gmp_mul (line 47)
-- new gmp_cmp (line 48)
-- new gmp_strval (line 49)
-- new gmp_pow (line 50)
-- new gmp_mod (line 51)
-- new gmp_div_q (line 52)
-- new gmp_div_q (line 54)
-- new gmp_div_r (line 55)
-- new gmp_div_qr (line 56)
-- new gmp_abs (line 57)
-- new gmp_neg (line 58)
-- new gmp_and (line 59)
-- new gmp_or (line 60)
-- new gmp_xor (line 61)
-- new gmp_intval (line 62)
-- new gmp_powm (line 63)
-- new gmp_fact (line 64)
-- new gmp_binomial (line 65)
-- new gmp_gcd (line 66)
-- new gmp_lcm (line 67)
-- new gmp_sqrt (line 68)
-- new gmp_sqrtrem (line 69)
-- new gmp_perfect_square (line 70)
-- new gmp_com (line 71)
-- new gmp_random_seed (line 72)
-- new gmp_random_bits (line 73)
-- new gmp_random_range (line 74)
-- new gmp_import (line 75)
-- new gmp_export (line 76)
-- new gmp_sign (line 77)
-- new gmp_prob_prime (line 78)
-- new gmp_nextprime (line 79)
-- new gmp_invert (line 80)
-- new gmp_jacobi (line 81)
-- new gmp_legendre (line 82)
-- new gmp_kronecker (line 83)
-- new gmp_divexact (line 84)
-- new gmp_gcdext (line 85)
-- new gmp_root (line 86)
-- new gmp_rootrem (line 87)
-- new gmp_perfect_power (line 88)
-- new gmp_testbit (line 89)
-- new gmp_setbit (line 90)
-- new gmp_clrbit (line 91)
-- new gmp_scan0 (line 92)
-- new gmp_scan1 (line 93)
-- new gmp_popcount (line 94)
-- new gmp_hamdist (line 95)
+- new gmp_init (line 63)
+- new gmp_add (line 64)
+- new gmp_sub (line 65)
+- new gmp_mul (line 66)
+- new gmp_cmp (line 67)
+- new gmp_strval (line 68)
+- new gmp_pow (line 69)
+- new gmp_mod (line 70)
+- new gmp_div_q (line 71)
+- new gmp_div_q (line 73)
+- new gmp_div_r (line 74)
+- new gmp_div_qr (line 75)
+- new gmp_abs (line 76)
+- new gmp_neg (line 77)
+- new gmp_and (line 78)
+- new gmp_or (line 79)
+- new gmp_xor (line 80)
+- new gmp_intval (line 81)
+- new gmp_powm (line 82)
+- new gmp_fact (line 83)
+- new gmp_binomial (line 84)
+- new gmp_gcd (line 85)
+- new gmp_lcm (line 86)
+- new gmp_sqrt (line 87)
+- new gmp_sqrtrem (line 88)
+- new gmp_perfect_square (line 89)
+- new gmp_com (line 90)
+- new gmp_random_seed (line 91)
+- new gmp_random_bits (line 92)
+- new gmp_random_range (line 93)
+- new gmp_import (line 94)
+- new gmp_export (line 95)
+- new gmp_sign (line 96)
+- new gmp_prob_prime (line 97)
+- new gmp_nextprime (line 98)
+- new gmp_invert (line 99)
+- new gmp_jacobi (line 100)
+- new gmp_legendre (line 101)
+- new gmp_kronecker (line 102)
+- new gmp_divexact (line 103)
+- new gmp_gcdext (line 104)
+- new gmp_root (line 105)
+- new gmp_rootrem (line 106)
+- new gmp_perfect_power (line 107)
+- new gmp_testbit (line 108)
+- new gmp_setbit (line 109)
+- new gmp_clrbit (line 110)
+- new gmp_scan0 (line 111)
+- new gmp_scan1 (line 112)
+- new gmp_popcount (line 113)
+- new gmp_hamdist (line 114)
 - 3 class method(s)
+- 4 closure(s)
 
 ### `ext/gmp/VmGmp.php`
 
@@ -55283,11 +55286,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/Type/ObjectInstancePropertyLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 181)
-- new Variable (line 209)
-- new Variable (line 298)
-- new Variable (line 491)
-- new Variable (line 762)
+- new Variable (line 214)
+- new Variable (line 242)
+- new Variable (line 331)
+- new Variable (line 524)
+- new Variable (line 795)
 - 12 class method(s)
 
 ### `lib/JIT/Builtin/Type/ObjectStaticPropertyInitLlvm.php`
@@ -55329,23 +55332,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new VMVariable (line 5485)
 - new VMVariable (line 5495)
 - new VMVariable (line 5515)
-- new VMVariable (line 7153)
-- new ReflectionClassConstant (line 7895)
-- new Variable (line 8339)
-- new Variable (line 8375)
-- new Variable (line 8402)
-- new Variable (line 8410)
-- new Variable (line 8433)
-- new Variable (line 8459)
-- new Variable (line 8467)
-- new Variable (line 8541)
-- new Literal (line 8558)
-- new Literal (line 8563)
-- new Literal (line 8568)
-- new Variable (line 8579)
-- new Variable (line 8612)
-- new Variable (line 8635)
-- new Variable (line 9185)
+- new VMVariable (line 7159)
+- new ReflectionClassConstant (line 7901)
+- new Variable (line 8345)
+- new Variable (line 8381)
+- new Variable (line 8408)
+- new Variable (line 8416)
+- new Variable (line 8439)
+- new Variable (line 8465)
+- new Variable (line 8473)
+- new Variable (line 8547)
+- new Literal (line 8564)
+- new Literal (line 8569)
+- new Literal (line 8574)
+- new Variable (line 8585)
+- new Variable (line 8618)
+- new Variable (line 8641)
+- new Variable (line 9191)
 - 354 class method(s)
 - 9 closure(s)
 
@@ -59100,12 +59103,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/IncludeHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new ParseError (line 285)
-- new Temporary (line 409)
-- new Variable (line 416)
-- new Variable (line 466)
-- new Variable (line 640)
-- new Variable (line 677)
+- new ParseError (line 288)
+- new Temporary (line 412)
+- new Variable (line 419)
+- new Variable (line 469)
+- new Variable (line 643)
+- new Variable (line 680)
 - 13 class method(s)
 
 ### `lib/JIT/InstanceOfHelper.php`
@@ -61089,6 +61092,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 253)
 - new Variable (line 304)
 - 17 class method(s)
+
+### `lib/VM/BcMathVmRuntimeSupport.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s)
 
 ### `lib/VM/Builtin/AttributeConstruct.php`
 
@@ -64460,44 +64468,44 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Context.php`
 
 **Warnings** (review for bootstrap subset):
-- new ErrorReporter (line 314)
-- new ExceptionHandlerStack (line 315)
-- new ScriptStack (line 316)
-- new Variable (line 325)
+- new ErrorReporter (line 316)
+- new ExceptionHandlerStack (line 317)
+- new ScriptStack (line 318)
 - new Variable (line 327)
-- new Variable (line 331)
-- new Variable (line 356)
-- new Variable (line 374)
+- new Variable (line 329)
+- new Variable (line 333)
+- new Variable (line 358)
 - new Variable (line 376)
-- new Variable (line 381)
-- new Variable (line 408)
-- new Variable (line 413)
-- new Variable (line 418)
-- new Variable (line 423)
-- new Variable (line 433)
-- new Variable (line 441)
-- new Variable (line 446)
-- new Variable (line 451)
-- new Variable (line 456)
-- new Variable (line 461)
-- new Variable (line 466)
-- new Variable (line 471)
-- new Variable (line 482)
-- new Variable (line 489)
-- new Variable (line 496)
-- new Variable (line 507)
-- new Variable (line 845)
-- new HashTable (line 846)
-- new Variable (line 874)
-- new Variable (line 973)
-- new Variable (line 985)
-- new HashTable (line 986)
-- new Variable (line 1017)
-- new Variable (line 1024)
-- new Variable (line 1082)
-- new Variable (line 1089)
-- new Variable (line 1098)
-- new RunStackEntry (line 1162)
+- new Variable (line 378)
+- new Variable (line 383)
+- new Variable (line 410)
+- new Variable (line 415)
+- new Variable (line 420)
+- new Variable (line 425)
+- new Variable (line 435)
+- new Variable (line 443)
+- new Variable (line 448)
+- new Variable (line 453)
+- new Variable (line 458)
+- new Variable (line 463)
+- new Variable (line 468)
+- new Variable (line 473)
+- new Variable (line 484)
+- new Variable (line 491)
+- new Variable (line 498)
+- new Variable (line 509)
+- new Variable (line 847)
+- new HashTable (line 848)
+- new Variable (line 876)
+- new Variable (line 975)
+- new Variable (line 987)
+- new HashTable (line 988)
+- new Variable (line 1019)
+- new Variable (line 1026)
+- new Variable (line 1084)
+- new Variable (line 1091)
+- new Variable (line 1100)
+- new RunStackEntry (line 1164)
 - 61 class method(s)
 
 ### `lib/VM/CycleCollector.php`
@@ -64915,6 +64923,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JITVariable (line 320)
 - new JITVariable (line 333)
 - 18 class method(s)
+
+### `lib/VM/GmpVmRuntimeSupport.php`
+
+**Warnings** (review for bootstrap subset):
+- 9 class method(s)
 
 ### `lib/VM/HashTable.php`
 
@@ -65772,28 +65785,28 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 1752)
 - new EnumCaseEntry (line 1754)
 - new self (line 2366)
-- new self (line 2538)
-- new self (line 2546)
-- new self (line 2554)
-- new self (line 2556)
-- new self (line 2813)
-- new self (line 2820)
-- new ArithmeticError (line 2957)
-- new self (line 2977)
-- new self (line 2984)
-- new self (line 3103)
-- new Error (line 3116)
-- new DivisionByZeroError (line 3316)
-- new DivisionByZeroError (line 3323)
-- new Error (line 3441)
-- new self (line 3462)
-- new Error (line 3512)
-- new self (line 3533)
-- new self (line 3541)
-- new Error (line 3750)
-- new Error (line 3756)
-- new Error (line 3781)
-- new Error (line 3789)
+- new self (line 2535)
+- new self (line 2543)
+- new self (line 2551)
+- new self (line 2553)
+- new self (line 2801)
+- new self (line 2808)
+- new ArithmeticError (line 2945)
+- new self (line 2965)
+- new self (line 2972)
+- new self (line 3091)
+- new Error (line 3104)
+- new DivisionByZeroError (line 3304)
+- new DivisionByZeroError (line 3311)
+- new Error (line 3429)
+- new self (line 3450)
+- new Error (line 3500)
+- new self (line 3521)
+- new self (line 3529)
+- new Error (line 3738)
+- new Error (line 3744)
+- new Error (line 3769)
+- new Error (line 3777)
 - 145 class method(s)
 
 ### `lib/VM/VariableFunctionCall.php`

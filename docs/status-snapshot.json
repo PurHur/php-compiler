@@ -1,9 +1,9 @@
 {
     "generated_by": "script/status/snapshot.php",
     "issue": 36395,
-    "generated_at": "2026-09-05T00:28:50Z",
-    "spine": 8202,
-    "inventory": 8202,
+    "generated_at": "2026-09-05T00:40:20Z",
+    "spine": 8204,
+    "inventory": 8204,
     "builtins_matrix_rows": 4054,
     "builtins_vm_yes": 4021,
     "builtins_jit_yes": 1883,

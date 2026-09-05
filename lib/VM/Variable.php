@@ -2353,9 +2353,9 @@ restart:
      */
     private static function tryRegisteredNumericObjectCompare(Variable $left, Variable $right): ?int
     {
-        $cmp = \PHPCompiler\ext\bcmath\VmBcMathNumber::tryCompare($left, $right);
+        $cmp = BcMathVmRuntimeSupport::tryCompare($left, $right);
         if (null === $cmp) {
-            $cmp = \PHPCompiler\ext\gmp\VmGmpObject::tryCompare($left, $right);
+            $cmp = GmpVmRuntimeSupport::tryCompare($left, $right);
         }
 
         return $cmp;
@@ -2439,10 +2439,7 @@ restart:
                     $right = $right->indirect;
                     goto restart;
                 }
-                $bcCmp = \PHPCompiler\ext\bcmath\VmBcMathNumber::tryCompare($left, $right);
-                if (null === $bcCmp) {
-                    $bcCmp = \PHPCompiler\ext\gmp\VmGmpObject::tryCompare($left, $right);
-                }
+                $bcCmp = self::tryRegisteredNumericObjectCompare($left, $right);
                 if (null !== $bcCmp) {
                     $this->bool($this->_compareFromSpaceship($opCode, $bcCmp));
                 } elseif (self::needsZendUnlikeKindCompare($left, $right)) {
@@ -2581,10 +2578,7 @@ restart:
                 $this->int(0);
                 break;
             case TYPE_PAIR_OBJECT_OBJECT:
-                $bcCmp = \PHPCompiler\ext\bcmath\VmBcMathNumber::tryCompare($leftCopy, $rightCopy);
-                if (null === $bcCmp) {
-                    $bcCmp = \PHPCompiler\ext\gmp\VmGmpObject::tryCompare($leftCopy, $rightCopy);
-                }
+                $bcCmp = self::tryRegisteredNumericObjectCompare($leftCopy, $rightCopy);
                 if (null !== $bcCmp) {
                     $this->int($bcCmp);
                     break;
@@ -2628,20 +2622,14 @@ restart:
                         $this->int(1);
                     }
                 } elseif (self::needsZendUnlikeKindCompare($leftCopy, $rightCopy)) {
-                    $bcCmp = \PHPCompiler\ext\bcmath\VmBcMathNumber::tryCompare($leftCopy, $rightCopy);
-                    if (null === $bcCmp) {
-                        $bcCmp = \PHPCompiler\ext\gmp\VmGmpObject::tryCompare($leftCopy, $rightCopy);
-                    }
+                    $bcCmp = self::tryRegisteredNumericObjectCompare($leftCopy, $rightCopy);
                     if (null !== $bcCmp) {
                         $this->int($bcCmp);
                     } else {
                         $this->int(CompareUnlikeHelper::zendUnlikeValueSpaceship($leftCopy, $rightCopy, $vm));
                     }
                 } else {
-                    $bcCmp = \PHPCompiler\ext\bcmath\VmBcMathNumber::tryCompare($leftCopy, $rightCopy);
-                    if (null === $bcCmp) {
-                        $bcCmp = \PHPCompiler\ext\gmp\VmGmpObject::tryCompare($leftCopy, $rightCopy);
-                    }
+                    $bcCmp = self::tryRegisteredNumericObjectCompare($leftCopy, $rightCopy);
                     if (null !== $bcCmp) {
                         $this->int($bcCmp);
                     } else {
@@ -2841,10 +2829,10 @@ restart:
             $right = $right->indirect;
             goto restart;
         }
-        // GMP bitwise / shift overload — php-src ext/gmp/gmp.c gmp_do_operation (#21265).
+        // GMP bitwise / shift overload — php-src ext/gmp/gmp.c gmp_do_operation (#21265 / #36204).
         $gmpCtx = $frame?->vmContext ?? $vm?->context;
         if (null !== $gmpCtx
-            && \PHPCompiler\ext\gmp\VmGmpObject::tryDoOperation($this, $opCode, $left, $right, $gmpCtx)) {
+            && GmpVmRuntimeSupport::tryDoOperation($this, $opCode, $left, $right, $gmpCtx)) {
             return;
         }
         if (OpCode::TYPE_SHIFT_LEFT === $opCode || OpCode::TYPE_SHIFT_RIGHT === $opCode) {
@@ -3008,13 +2996,13 @@ restart:
 
             return;
         }
-        // BcMath\Number / GMP do_operation — php-src ext/bcmath (#20648, #21266) + ext/gmp (#21265).
+        // BcMath\Number / GMP do_operation — php-src ext/bcmath (#20648, #21266) + ext/gmp (#21265 / #36204).
         // Prefer frame context, but fall back to $vm->context: CFG try/catch/merge frames from
         // Block::getFrame often leave vmContext null even though the VM still has a live Context.
         $opCtx = $frame?->vmContext ?? $vm?->context;
         if (null !== $opCtx
-            && (\PHPCompiler\ext\bcmath\VmBcMathNumber::tryDoOperation($this, $opCode, $left, $right, $opCtx)
-                || \PHPCompiler\ext\gmp\VmGmpObject::tryDoOperation($this, $opCode, $left, $right, $opCtx))) {
+            && (BcMathVmRuntimeSupport::tryDoOperation($this, $opCode, $left, $right, $opCtx)
+                || GmpVmRuntimeSupport::tryDoOperation($this, $opCode, $left, $right, $opCtx))) {
             return;
         }
         if (!self::operandsValidForNumericOp($left, $right)) {
@@ -3583,8 +3571,8 @@ restart:
                 }
                 $opCtx = $frame?->vmContext ?? $vm?->context;
                 if (null !== $opCtx
-                    && (\PHPCompiler\ext\bcmath\VmBcMathNumber::tryUnaryMinus($this, $resolved, $opCtx)
-                        || \PHPCompiler\ext\gmp\VmGmpObject::tryUnaryMinus($this, $resolved, $opCtx))) {
+                    && (BcMathVmRuntimeSupport::tryUnaryMinus($this, $resolved, $opCtx)
+                        || GmpVmRuntimeSupport::tryUnaryMinus($this, $resolved, $opCtx))) {
                     return;
                 }
                 $number = self::coerceUnaryPlusOperand($resolved, $vm, $frame);
@@ -3612,7 +3600,7 @@ restart:
                 }
                 $gmpCtx = $frame?->vmContext ?? $vm?->context;
                 if (null !== $gmpCtx
-                    && \PHPCompiler\ext\gmp\VmGmpObject::tryBitwiseNot($this, $resolved, $gmpCtx)) {
+                    && GmpVmRuntimeSupport::tryBitwiseNot($this, $resolved, $gmpCtx)) {
                     return;
                 }
                 if ($resolved->type === self::TYPE_INTEGER) {

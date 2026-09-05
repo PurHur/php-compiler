@@ -311,6 +311,8 @@ class Context {
         DomVmRuntimeSupport::clear();
         SimpleXmlVmRuntimeSupport::clear();
         PharVmRuntimeSupport::clear();
+        BcMathVmRuntimeSupport::clear();
+        GmpVmRuntimeSupport::clear();
         $this->errors = new ErrorReporter();
         $this->exceptionHandlers = new ExceptionHandlerStack();
         $this->scriptStack = new ScriptStack();
