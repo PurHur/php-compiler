@@ -5393,6 +5393,7 @@ require_once __DIR__.'/../../../lib/JIT/Concern/CompileNew.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileJumpIf.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileClassConstFetch.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileReturn.php';
+require_once __DIR__.'/../../../lib/JIT/Concern/CompileAssignRef.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileArrayDimFetchReadAndWrite.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AssignOperand.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AdaptByRefCallArgs.php';

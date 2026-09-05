@@ -25,6 +25,7 @@ require_once __DIR__.'/JIT/Concern/CompileNew.php';
 require_once __DIR__.'/JIT/Concern/CompileJumpIf.php';
 require_once __DIR__.'/JIT/Concern/CompileClassConstFetch.php';
 require_once __DIR__.'/JIT/Concern/CompileReturn.php';
+require_once __DIR__.'/JIT/Concern/CompileAssignRef.php';
 require_once __DIR__.'/JIT/Concern/CompileArrayDimFetchReadAndWrite.php';
 require_once __DIR__.'/JIT/Concern/InitJitMethodCall.php';
 require_once __DIR__.'/JIT/Concern/AssignOperand.php';
@@ -106,6 +107,7 @@ class JIT {
     use CompileJumpIf;
     use CompileClassConstFetch;
     use CompileReturn;
+    use CompileAssignRef;
     use CompileArrayDimFetchReadAndWrite;
     use InitJitMethodCall;
     use AssignOperand;
