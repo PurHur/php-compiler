@@ -5387,6 +5387,7 @@ require_once __DIR__.'/../../../lib/JIT/Concern/CompileEchoAndPrint.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileStaticPropertyAndUnset.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileConcat.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileFuncCallExecReturn.php';
+require_once __DIR__.'/../../../lib/JIT/Concern/CompileFuncCallInit.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileAssign.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileNew.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileJumpIf.php';
