@@ -77,6 +77,11 @@ if [[ -f "$STREAM" ]]; then
   php "$ROOT/script/composer/patch-nyholm-stream-36382.php" "$STREAM"
 fi
 
+STREAM_TRAIT="$DEST/vendor/nyholm/psr7/src/StreamTrait.php"
+if [[ -f "$STREAM_TRAIT" ]]; then
+  php "$ROOT/script/composer/patch-nyholm-stream-trait-36382.php" "$STREAM_TRAIT"
+fi
+
 REQ_TRAIT="$DEST/vendor/nyholm/psr7/src/RequestTrait.php"
 if [[ -f "$REQ_TRAIT" ]]; then
   php "$ROOT/script/composer/patch-nyholm-request-trait-36382.php" "$REQ_TRAIT"
