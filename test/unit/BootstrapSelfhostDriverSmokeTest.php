@@ -83,8 +83,9 @@ final class BootstrapSelfhostDriverSmokeTest extends TestCase
     public function testInventoryArgvDriverUsesParseCompileSpineNotNullStub(): void
     {
         $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
-        $this->assertStringContainsString('inventoryArgvSidecar', $jit);
         $this->assertStringContainsString('shouldUseM4BinCompileArgvMainNative', $jit);
+        $parseSpine = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuRuntimeParseAndInitSpine.php');
+        $this->assertStringContainsString('inventoryArgvSidecar', $parseSpine);
         $emit = (string) file_get_contents(self::$root.'/lib/JIT/BootstrapCompileSmokeM3Emit.php');
         $this->assertStringContainsString("'compileemitsmoke', 'compile'", $emit);
         $this->assertStringContainsString('Parse once, then try each compile spine in order', $emit);
@@ -103,10 +104,10 @@ final class BootstrapSelfhostDriverSmokeTest extends TestCase
     /** Issue #3011: M4 argv gen-3 must register parseAndCompile decls without inventory env. */
     public function testM4BinCompileArgvParseAndCompileDeclWithoutInventoryEnv(): void
     {
-        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
+        $methodCompile = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuCompilerRuntimeMethodCompile.php');
         $this->assertStringContainsString(
             '&& !$this->shouldUseM4BinCompileArgvMainNative()',
-            $jit
+            $methodCompile
         );
     }
 
@@ -134,11 +135,11 @@ final class BootstrapSelfhostDriverSmokeTest extends TestCase
     /** Issue #3012: inventory argv driver (helloworld prefix) must register spine smoke sidecar. */
     public function testHelloworldEmitPrefixRegistersCompilerLibSpineSidecar(): void
     {
-        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
+        $sidecar = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuSidecarLinktime.php');
         $needle = "'helloworld_compile_smoke' === \$logPrefix";
-        $start = strpos($jit, $needle);
+        $start = strpos($sidecar, $needle);
         $this->assertNotFalse($start, 'helloworld_compile_smoke logPrefix branch');
-        $branch = substr($jit, $start, 4000);
+        $branch = substr($sidecar, $start, 4000);
         $this->assertStringContainsString('compiler_lib_spine_smoke/main.php', $branch);
         $this->assertStringContainsString('COMPILER_LIB_SIDECAR_REL', $branch);
         $this->assertStringContainsString('compilerLibSentinelBlock', $branch);
