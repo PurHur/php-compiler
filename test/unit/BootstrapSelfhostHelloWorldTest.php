@@ -599,10 +599,11 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString("'preprocesssourceforparse'", $jit);
         $this->assertStringContainsString("'rewritesourcebeforeparser'", $jit);
         $this->assertStringContainsString("'preparesourceforparser'", $jit);
+        $driverMain = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuAndCompileDriverMainNative.php');
         $this->assertMatchesRegularExpression(
             '/compileM3EmitTuRuntimeSpineDecls\(\$this->m3CompileDriverMainBlock\);\s+'
             .'\$sidecar = \$this->isM3EmitTuTrivialEchoSidecarActive\(\);/s',
-            $jit
+            $driverMain
         );
         $allowlist = (string) file_get_contents(self::$root.'/script/m3-allowlist-snapshot.txt');
         $this->assertStringContainsString('allow:\\runtime::preprocesssourceforparse', $allowlist);
