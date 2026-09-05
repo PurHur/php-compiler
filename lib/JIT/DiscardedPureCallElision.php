@@ -83,6 +83,14 @@ use PHPCompiler\VM\Variable as VmVariable;
  * excess argc stays live — ArgumentCountError),
  * microtime / hrtime / gettimeofday (zero-arg or typed bool; soft-null bool
  * stays live — deprecate; excess argc stays live — ArgumentCountError),
+ * getdate / localtime (zero-arg or typed timestamp; localtime optional typed
+ * associative; soft-null stays live — deprecate; excess argc stays live —
+ * ArgumentCountError),
+ * idate (compile-time valid one-char format + optional typed timestamp;
+ * soft-null / non-constant / unrecognized format stays live — deprecate /
+ * warning; excess argc stays live — ArgumentCountError),
+ * getrandmax / mt_getrandmax (zero-arg; excess argc stays live —
+ * ArgumentCountError),
  * zero-arg pi, type.c predicates + gettype/get_debug_type, ctype.c
  * classifiers on typed/literal strings, typed-array count/sizeof, math.c
  * incl. pow/fpow/fdiv on already-numeric args, empty void user functions).
@@ -290,6 +298,12 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureClockGetterRuntimeInfoNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureCivilDateGetterRuntimeInfoNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureRandmaxRuntimeInfoNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureVersionCompareNoSideEffect($toCall, $callArgs)) {
@@ -1745,6 +1759,47 @@ final class DiscardedPureCallElision
     }
 
     /**
+     * Discarded {@code getdate}/{@code localtime}/{@code idate} — php-src
+     * {@code ext/date/php_date.c}/{@code ext/standard/datetime.c}. Civil date
+     * reads with no user handlers. Soft-null timestamp / format stays live
+     * (deprecate). {@code idate} non-constant / unrecognized format stays live
+     * (warning). Excess argc stays live ({@code ArgumentCountError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureCivilDateGetterRuntimeInfoNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        $nameLc = strtolower($toCall->getName());
+        if (!NoThrowCallElision::isPureCivilDateGetterRuntimeInfoBuiltin($nameLc)) {
+            return false;
+        }
+
+        return self::civilDateGetterRuntimeInfoArgsAllowDiscardedElision($nameLc, $callArgs);
+    }
+
+    /**
+     * Discarded {@code getrandmax}/{@code mt_getrandmax} — php-src
+     * {@code ext/random/random.c}. Constant MT upper bound. Excess argc stays
+     * live ({@code ArgumentCountError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureRandmaxRuntimeInfoNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if (!NoThrowCallElision::isPureRandmaxRuntimeInfoBuiltin(strtolower($toCall->getName()))) {
+            return false;
+        }
+
+        return [] === $callArgs;
+    }
+
+    /**
      * Discarded {@code version_compare} on typed / literal strings — php-src
      * {@code versioning.c}. Optional operator must be null or a compile-time
      * valid comparison op ({@code ValueError} otherwise).
@@ -2301,6 +2356,73 @@ final class DiscardedPureCallElision
         }
 
         return self::mathArgAllowsDiscardedElision($callArgs[0]);
+    }
+
+    /**
+     * Soft-null timestamp / format stays live (deprecate / warning). {@code idate}
+     * requires a compile-time valid one-char format token.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function civilDateGetterRuntimeInfoArgsAllowDiscardedElision(
+        string $nameLc,
+        array $callArgs
+    ): bool {
+        switch ($nameLc) {
+            case 'getdate':
+                if ([] === $callArgs) {
+                    return true;
+                }
+                if (
+                    !isset($callArgs[0])
+                    || !$callArgs[0] instanceof Variable
+                    || isset($callArgs[1])
+                ) {
+                    return false;
+                }
+
+                return self::mathArgAllowsDiscardedElision($callArgs[0]);
+            case 'localtime':
+                if ([] === $callArgs) {
+                    return true;
+                }
+                if (
+                    !isset($callArgs[0])
+                    || !$callArgs[0] instanceof Variable
+                    || isset($callArgs[2])
+                ) {
+                    return false;
+                }
+                if (!self::mathArgAllowsDiscardedElision($callArgs[0])) {
+                    return false;
+                }
+                if (!isset($callArgs[1])) {
+                    return true;
+                }
+
+                return $callArgs[1] instanceof Variable
+                    && self::mathArgAllowsDiscardedElision($callArgs[1]);
+            case 'idate':
+                if (
+                    !isset($callArgs[0])
+                    || !$callArgs[0] instanceof Variable
+                    || isset($callArgs[2])
+                ) {
+                    return false;
+                }
+                $fmt = JitStringArg::compileTimeLiteral($callArgs[0]);
+                if (null === $fmt || !NoThrowCallElision::isValidIdateFormatLiteral($fmt)) {
+                    return false;
+                }
+                if (!isset($callArgs[1])) {
+                    return true;
+                }
+
+                return $callArgs[1] instanceof Variable
+                    && self::mathArgAllowsDiscardedElision($callArgs[1]);
+            default:
+                return false;
+        }
     }
 
     /**
