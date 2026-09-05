@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8237 |
-| Phase A inventory files (M2 ratio SSOT) | 8237 |
+| PHP files on vm.php path | 8238 |
+| Phase A inventory files (M2 ratio SSOT) | 8238 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26060 |
+| Source constructs flagged (warnings) | 26062 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7079,6 +7079,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/LocalReleaseUnsetAndVarFetchDest.php` | 0 | 2 |
 | `lib/JIT/Concern/M3EmitTuAndCompileDriverMainNative.php` | 0 | 6 |
 | `lib/JIT/Concern/M3EmitTuCompilerAndRuntimeVoidStubs.php` | 0 | 8 |
+| `lib/JIT/Concern/M3EmitTuRuntimeSpineDeclsAndCompileDeps.php` | 0 | 2 |
 | `lib/JIT/Concern/M3EmitTuSidecarLinktime.php` | 0 | 2 |
 | `lib/JIT/Concern/NestedVmHelperAndThisResolve.php` | 0 | 5 |
 | `lib/JIT/Concern/ParamConstraintsAndRuntimeNewInit.php` | 0 | 3 |
@@ -50503,38 +50504,38 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT\Call\ExternalMethod (line 397)
-- new JIT\Scope (line 426)
-- new Operand\Literal (line 676)
-- new Operand\Literal (line 692)
-- new JIT\Call\Native (line 1170)
-- new Variable (line 2176)
-- new JIT\Call\Native (line 2202)
-- new Variable (line 2292)
-- new JIT\Call\Vararg (line 2319)
-- new JIT\Call\Native (line 2329)
-- new JIT\Call\Native (line 2618)
-- new JIT\Variable (line 2858)
-- new JIT\Call\Native (line 2875)
-- new JIT\Call\Native (line 2920)
-- new JIT\Call\Native (line 2990)
-- new JIT\Call\Native (line 3032)
-- new JIT\Call\Native (line 3077)
-- new JIT\Call\Native (line 3132)
-- new JIT\Call\Native (line 4045)
-- new JIT\Call\Native (line 4076)
-- new JIT\Call\Native (line 4655)
-- new JIT\Call\Native (line 4897)
-- new JIT\Call\Native (line 4935)
-- new JIT\Call\Native (line 4969)
-- new JIT\Call\Native (line 5090)
-- new JIT\Call\Native (line 5740)
-- new Variable (line 5778)
-- new Variable (line 5798)
-- new Variable (line 5819)
-- new Variable (line 5964)
-- new Variable (line 6008)
-- 165 class method(s)
+- new JIT\Call\ExternalMethod (line 399)
+- new JIT\Scope (line 428)
+- new Operand\Literal (line 678)
+- new Operand\Literal (line 694)
+- new JIT\Call\Native (line 1172)
+- new Variable (line 2178)
+- new JIT\Call\Native (line 2204)
+- new Variable (line 2294)
+- new JIT\Call\Vararg (line 2321)
+- new JIT\Call\Native (line 2331)
+- new JIT\Call\Native (line 2620)
+- new JIT\Variable (line 2860)
+- new JIT\Call\Native (line 2877)
+- new JIT\Call\Native (line 2922)
+- new JIT\Call\Native (line 2992)
+- new JIT\Call\Native (line 3034)
+- new JIT\Call\Native (line 3079)
+- new JIT\Call\Native (line 3134)
+- new JIT\Call\Native (line 4047)
+- new JIT\Call\Native (line 4078)
+- new JIT\Call\Native (line 4190)
+- new JIT\Call\Native (line 4432)
+- new JIT\Call\Native (line 4470)
+- new JIT\Call\Native (line 4504)
+- new JIT\Call\Native (line 4625)
+- new JIT\Call\Native (line 5275)
+- new Variable (line 5313)
+- new Variable (line 5333)
+- new Variable (line 5354)
+- new Variable (line 5499)
+- new Variable (line 5543)
+- 159 class method(s)
 - 15 closure(s)
 
 ### `lib/JIT/Analyzer.php`
@@ -58259,6 +58260,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT\Call\Native (line 216)
 - 6 class method(s)
 
+### `lib/JIT/Concern/M3EmitTuRuntimeSpineDeclsAndCompileDeps.php`
+
+**Warnings** (review for bootstrap subset):
+- trait M3EmitTuRuntimeSpineDeclsAndCompileDeps (line 18)
+- 6 class method(s)
+
 ### `lib/JIT/Concern/M3EmitTuSidecarLinktime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -60196,7 +60203,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/SpineChunkRuntimeMethodDemote.php`
 
 **Warnings** (review for bootstrap subset):
-- new OpCode (line 216)
+- new OpCode (line 217)
 - 11 class method(s)
 
 ### `lib/JIT/SpineChunkStandardHelperBind.php`

@@ -174,9 +174,10 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
         $this->assertStringContainsString('helloworld_compile_smoke', $jit);
         $this->assertStringContainsString('HELLOWORLD_SIDECAR_REL', $jit);
         $this->assertStringContainsString('COMPILE_SMOKE_SIDECAR_REL', $jit);
+        $spineDecls = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuRuntimeSpineDeclsAndCompileDeps.php');
         $this->assertMatchesRegularExpression(
             '/compileM3EmitTuRuntimeSpineDecls\([^)]*\): void[\s\S]*?compileM3EmitTuRuntimeSpineMethodsForRealLowering/',
-            $jit
+            $spineDecls
         );
         $compile = (string) file_get_contents(self::$root.'/bin/compile.php');
         $this->assertStringContainsString('PHP_COMPILER_M3_EMIT_HELPER_SPINE=1', $compile);
