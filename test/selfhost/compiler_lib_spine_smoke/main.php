@@ -5403,6 +5403,7 @@ require_once __DIR__.'/../../../lib/JIT/Concern/LocalReleaseUnsetAndVarFetchDest
 require_once __DIR__.'/../../../lib/JIT/Concern/ScriptGlobalAssignAndLvalueResolve.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AssignRefSharedBoxAndClosureInvoke.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/ClassConstEnumAndFunctionStatic.php';
+require_once __DIR__.'/../../../lib/JIT/Concern/AssignOperandValueAndCompileTimeMeta.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/InitJitMethodCall.php';
 require_once __DIR__.'/../../../lib/Compiler/CompileTimeNew.php';
 require_once __DIR__.'/../../../lib/Compiler/DeprecatedMetadata.php';
