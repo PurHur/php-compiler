@@ -5404,6 +5404,7 @@ require_once __DIR__.'/../../../lib/JIT/Concern/ScriptGlobalAssignAndLvalueResol
 require_once __DIR__.'/../../../lib/JIT/Concern/AssignRefSharedBoxAndClosureInvoke.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/ClassConstEnumAndFunctionStatic.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AssignOperandValueMetaAndGeneratorField.php';
+require_once __DIR__.'/../../../lib/JIT/Concern/JitConstructAssignedAndNativeLongLocal.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/InitJitMethodCall.php';
 require_once __DIR__.'/../../../lib/Compiler/CompileTimeNew.php';
 require_once __DIR__.'/../../../lib/Compiler/DeprecatedMetadata.php';
