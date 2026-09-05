@@ -7144,6 +7144,7 @@
         "lib/JIT/Concern/AdaptByRefCallArgs.php",
         "lib/JIT/Concern/AssignOperand.php",
         "lib/JIT/Concern/CallResultCompileTimePropagate.php",
+        "lib/JIT/Concern/CallResultOperandAssign.php",
         "lib/JIT/Concern/CoerceReturnPropertyDeclaringAndByRef.php",
         "lib/JIT/Concern/CompileBlockInternal.php",
         "lib/JIT/Concern/CompileClassAndTraitUses.php",
@@ -8448,9 +8449,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8214,
+        "inventory_files": 8215,
         "excluded": 0,
-        "eligible": 8214,
+        "eligible": 8215,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

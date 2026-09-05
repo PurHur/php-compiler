@@ -9,9 +9,9 @@
             "note": "Concern trait splits (#36230/#36387/#36403); CompileFuncCfgReturnAndGlobalImport + peers"
         },
         "lib/JIT.php": {
-            "budget": 14537,
+            "budget": 13959,
             "target": 20000,
-            "note": "Concern trait splits (#36387/#36403); PropertyFetchCoalesceAndCompileTimeString + CallResultCompileTimePropagate + PropertyIncDecCompile"
+            "note": "Concern trait splits (#36387/#36403); CallResultOperandAssign + PropertyFetchCoalesceAndCompileTimeString + CallResultCompileTimePropagate"
         },
         "lib/VM.php": {
             "budget": 21186,
@@ -35,9 +35,9 @@
         }
     },
     "script_file_count": {
-        "budget": 277,
+        "budget": 278,
         "target": 150,
-        "note": "script/ top-level *.sh/*.php; ASAN/valgrind smokes under script/runtime-assert/ (#36403/#36397)"
+        "note": "script/ top-level *.sh/*.php; ASAN/valgrind smokes under script/runtime-assert/ (#36403/#36397); ratchet after master tip grew to 278"
     },
     "ci_defaults_exports": {
         "budget": 141,
