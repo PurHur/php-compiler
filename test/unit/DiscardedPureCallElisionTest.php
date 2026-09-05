@@ -10,13 +10,23 @@ use PHPCompiler\ext\standard\abs;
 use PHPCompiler\ext\standard\addcslashes;
 use PHPCompiler\ext\standard\addslashes;
 use PHPCompiler\ext\standard\array_change_key_case;
+use PHPCompiler\ext\standard\array_diff;
+use PHPCompiler\ext\standard\array_diff_assoc;
+use PHPCompiler\ext\standard\array_diff_key;
 use PHPCompiler\ext\standard\array_first;
+use PHPCompiler\ext\standard\array_intersect;
+use PHPCompiler\ext\standard\array_intersect_assoc;
+use PHPCompiler\ext\standard\array_intersect_key;
 use PHPCompiler\ext\standard\array_is_list;
 use PHPCompiler\ext\standard\array_key_exists;
 use PHPCompiler\ext\standard\array_key_first;
 use PHPCompiler\ext\standard\array_key_last;
 use PHPCompiler\ext\standard\array_keys;
 use PHPCompiler\ext\standard\array_last;
+use PHPCompiler\ext\standard\array_merge;
+use PHPCompiler\ext\standard\array_merge_recursive;
+use PHPCompiler\ext\standard\array_replace;
+use PHPCompiler\ext\standard\array_replace_recursive;
 use PHPCompiler\ext\standard\array_reverse;
 use PHPCompiler\ext\standard\array_values;
 use PHPCompiler\ext\standard\array_count;
@@ -3632,6 +3642,138 @@ final class DiscardedPureCallElisionTest extends TestCase
             $context,
             new array_reverse(),
             [$ht, $bool, $long]
+        ));
+    }
+
+    public function testDiscardedArrayMergeDiffElidesOnTypedArray(): void
+    {
+        // php-src ext/standard/array.c array_merge/replace/diff/intersect (#36386).
+        $context = $this->makeContext();
+        $ht = $this->makeHashtableVar();
+        $ht2 = $this->makeHashtableVar();
+        $null = $this->makeNullVar();
+        $str = $this->makeStringVar('s');
+        $box = $this->makeValueBoxVar();
+        $obj = $this->makeObjectVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_merge(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_merge(),
+            [$ht]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_merge(),
+            [$ht, $ht2]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_merge_recursive(),
+            [$ht, $ht2]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_replace(),
+            [$ht]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_replace(),
+            [$ht, $ht2]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_replace_recursive(),
+            [$ht, $ht2]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_diff(),
+            [$ht]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_diff(),
+            [$ht, $ht2]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_intersect(),
+            [$ht, $ht2]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_diff_key(),
+            [$ht, $ht2]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_intersect_key(),
+            [$ht, $ht2]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_diff_assoc(),
+            [$ht, $ht2]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_intersect_assoc(),
+            [$ht, $ht2]
+        ));
+
+        $valueBoxHt = $this->makeValueBoxVar();
+        $valueBoxHt->valueBoxHashtable = true;
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_merge(),
+            [$valueBoxHt, $ht]
+        ));
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_replace(),
+            []
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_diff(),
+            []
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_intersect(),
+            []
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_merge(),
+            [$ht, $null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_replace(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_diff(),
+            [$ht, $str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_intersect(),
+            [$box, $ht]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_diff_key(),
+            [$obj, $ht]
         ));
     }
 
