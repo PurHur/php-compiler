@@ -5681,7 +5681,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/GlobalTypedConstSyntaxRejector.php` | 0 | 2 |
 | `lib/Handler.php` | 0 | 1 |
 | `lib/HexFloat.php` | 0 | 1 |
-| `lib/JIT.php` | 0 | 71 |
+| `lib/JIT.php` | 0 | 70 |
 | `lib/JIT/Analyzer.php` | 0 | 1 |
 | `lib/JIT/AotDebugSymbols.php` | 0 | 1 |
 | `lib/JIT/AotGcSections.php` | 0 | 1 |
@@ -7056,11 +7056,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/CompilerOperandChainNative.php` | 0 | 3 |
 | `lib/JIT/Concern/AdaptByRefCallArgs.php` | 0 | 2 |
 | `lib/JIT/Concern/AssignOperand.php` | 0 | 23 |
+| `lib/JIT/Concern/AssignOperandValueMetaAndGeneratorField.php` | 0 | 10 |
 | `lib/JIT/Concern/AssignRefSharedBoxAndClosureInvoke.php` | 0 | 4 |
 | `lib/JIT/Concern/ByRefFormalAssignAndCallArgAdapt.php` | 0 | 2 |
 | `lib/JIT/Concern/CallResultCompileTimePropagate.php` | 0 | 7 |
 | `lib/JIT/Concern/CallResultOperandAssign.php` | 0 | 17 |
-| `lib/JIT/Concern/ClassConstEnumAndFunctionStatic.php` | 0 | 9 |
 | `lib/JIT/Concern/CoerceReturnPropertyDeclaringAndByRef.php` | 0 | 3 |
 | `lib/JIT/Concern/CompileBlockInternal.php` | 0 | 51 |
 | `lib/JIT/Concern/CompileClassAndTraitUses.php` | 0 | 4 |
@@ -50524,39 +50524,38 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT\Call\Native (line 5798)
 - new JIT\Call\Native (line 6448)
 - new JIT\Call\Native (line 6520)
-- new Operand\Literal (line 7031)
-- new Variable (line 7085)
-- new Variable (line 7222)
-- new Variable (line 7242)
-- new Variable (line 7263)
-- new Variable (line 7341)
-- new Variable (line 7371)
-- new Variable (line 7390)
-- new Variable (line 7420)
-- new Variable (line 7457)
-- new Variable (line 7477)
-- new Variable (line 7490)
-- new Variable (line 7533)
-- new JIT\Variable (line 8323)
-- new JIT\Variable (line 8386)
-- new Variable (line 8486)
-- new Variable (line 8530)
-- new Variable (line 8582)
-- new Variable (line 8593)
-- new Variable (line 8604)
-- new Variable (line 8624)
-- new Variable (line 8687)
-- new Variable (line 8750)
-- new Variable (line 8820)
-- new Variable (line 8851)
-- new Variable (line 8919)
-- new Operand\Literal (line 8928)
-- new Variable (line 8943)
-- new Variable (line 9277)
-- new JIT\Call\VmCoerceVariableToString (line 9426)
-- new JIT\Call\NoOpConstruct (line 9629)
-- new Operand\Literal (line 9871)
-- 283 class method(s)
+- new Operand\Literal (line 7030)
+- new Variable (line 7084)
+- new Variable (line 7220)
+- new Variable (line 7240)
+- new Variable (line 7261)
+- new JIT\Variable (line 7696)
+- new JIT\Variable (line 7759)
+- new Variable (line 7859)
+- new Variable (line 7903)
+- new Variable (line 7955)
+- new Variable (line 7966)
+- new Variable (line 7977)
+- new Variable (line 7997)
+- new Variable (line 8060)
+- new Variable (line 8123)
+- new Variable (line 8193)
+- new Variable (line 8224)
+- new Variable (line 8292)
+- new Operand\Literal (line 8301)
+- new Variable (line 8316)
+- new Variable (line 8650)
+- new JIT\Call\VmCoerceVariableToString (line 8799)
+- new JIT\Call\NoOpConstruct (line 9002)
+- new Operand\Literal (line 9242)
+- new VM (line 9440)
+- new VM\Variable (line 9449)
+- new VM\ClassEntry (line 9554)
+- new Func\PHP (line 9573)
+- new VM\ClassEntry (line 9619)
+- new Variable (line 9636)
+- new Variable (line 9803)
+- 288 class method(s)
 - 15 closure(s)
 
 ### `lib/JIT/Analyzer.php`
@@ -57999,6 +57998,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 - 1 closure(s)
 
+### `lib/JIT/Concern/AssignOperandValueMetaAndGeneratorField.php`
+
+**Warnings** (review for bootstrap subset):
+- trait AssignOperandValueMetaAndGeneratorField (line 22)
+- new Variable (line 36)
+- new Variable (line 66)
+- new Variable (line 85)
+- new Variable (line 115)
+- new Variable (line 152)
+- new Variable (line 172)
+- new Variable (line 185)
+- new Variable (line 228)
+- 12 class method(s)
+
 ### `lib/JIT/Concern/AssignRefSharedBoxAndClosureInvoke.php`
 
 **Warnings** (review for bootstrap subset):
@@ -58044,19 +58057,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 567)
 - new Variable (line 591)
 - 6 class method(s)
-
-### `lib/JIT/Concern/ClassConstEnumAndFunctionStatic.php`
-
-**Warnings** (review for bootstrap subset):
-- trait ClassConstEnumAndFunctionStatic (line 23)
-- new VM (line 39)
-- new VM\Variable (line 48)
-- new VM\ClassEntry (line 153)
-- new Func\PHP (line 172)
-- new VM\ClassEntry (line 218)
-- new Variable (line 235)
-- new Variable (line 402)
-- 17 class method(s)
 
 ### `lib/JIT/Concern/CoerceReturnPropertyDeclaringAndByRef.php`
 
@@ -58612,7 +58612,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/DiscardedPureCallElision.php`
 
 **Warnings** (review for bootstrap subset):
-- 85 class method(s)
+- 83 class method(s)
 
 ### `lib/JIT/DnfParamCheck.php`
 
@@ -59747,8 +59747,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/NoThrowCallElision.php`
 
 **Warnings** (review for bootstrap subset):
-- new Operand\Literal (line 3006)
-- 96 class method(s)
+- new Operand\Literal (line 2959)
+- 94 class method(s)
 
 ### `lib/JIT/NonObjectPropertyFetchHelper.php`
 
@@ -60102,7 +60102,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/SpineChunkRuntimeMethodDemote.php`
 
 **Warnings** (review for bootstrap subset):
-- new OpCode (line 204)
+- new OpCode (line 203)
 - 11 class method(s)
 
 ### `lib/JIT/SpineChunkStandardHelperBind.php`

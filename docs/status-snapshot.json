@@ -1,6 +1,7 @@
 {
     "generated_by": "script/status/snapshot.php",
     "issue": 36395,
+    "generated_at": "2026-09-05T05:32:19Z",
     "spine": 8221,
     "inventory": 8221,
     "builtins_matrix_rows": 4054,
