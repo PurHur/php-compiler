@@ -7583,6 +7583,7 @@ require_once __DIR__.'/../../../lib/VM/OutgoingCallTempRelease.php';
 require_once __DIR__.'/../../../lib/VM/Concern/ObjectPropertyIssetEmptyUnset.php';
 require_once __DIR__.'/../../../lib/VM/Concern/ObjectPropertyCollectAndSerialize.php';
 require_once __DIR__.'/../../../lib/VM/Concern/ObjectPropertyHooks.php';
+require_once __DIR__.'/../../../lib/VM/Concern/ObjectPropertyReadonlyAndVisibility.php';
 require_once __DIR__.'/../../../lib/VM/ObjectPropertyIterator.php';
 require_once __DIR__.'/../../../lib/VM/ObjectReadonlySupport.php';
 require_once __DIR__.'/../../../lib/VM/ObjectRegistry.php';
