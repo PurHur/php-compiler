@@ -26,6 +26,9 @@ final class RuntimeAssertDelrefAotTest extends TestCase
         $this->assertStringContainsString('lookupStringKeyForWriteBranch', $doc);
         $this->assertStringContainsString('setObjectKeyLong', $doc);
         $this->assertStringContainsString('setObjectKeyObject', $doc);
+        $this->assertStringContainsString('unsetLongAt', $doc);
+        $this->assertStringContainsString('unsetStringKey', $doc);
+        $this->assertStringContainsString('unsetObjectKey', $doc);
         $this->assertStringContainsString('zend_gc.c', $doc);
         $this->assertStringContainsString('zend_variables.h', $doc);
         $this->assertStringContainsString('PHP_COMPILER_RUNTIME_ASSERT', $doc);
@@ -88,6 +91,9 @@ final class RuntimeAssertDelrefAotTest extends TestCase
         $this->assertStringContainsString('__ref__assert_exclusive', $mutate);
         $this->assertStringContainsString('setObjectKeyLong', $mutate);
         $this->assertStringContainsString('setObjectKeyObject', $mutate);
+        $this->assertStringContainsString('unsetLongAt', $mutate);
+        $this->assertStringContainsString('unsetStringKey', $mutate);
+        $this->assertStringContainsString('unsetObjectKey', $mutate);
         $this->assertStringContainsString('INJECT_SHARED_WRITE', $mutate);
     }
 
@@ -133,6 +139,14 @@ final class RuntimeAssertDelrefAotTest extends TestCase
             substr_count($ht, 'Object-key mutators skipped the string/grow chokepoints'),
             'both setObjectKeyLong and setObjectKeyObject must call emitAssertExclusiveCall'
         );
+        $this->assertStringContainsString('Unset mutates without grow / string-key / object-key write chokepoints', $ht);
+        $this->assertSame(
+            1,
+            substr_count($ht, 'Unset mutates without grow / string-key / object-key write chokepoints'),
+            'unsetLongAt must call emitAssertExclusiveCall'
+        );
+        $this->assertStringContainsString('Unset mutates without grow / string-key write chokepoints', $ht);
+        $this->assertStringContainsString('Unset mutates without grow / object-key write chokepoints', $ht);
     }
 
     public function testEnabledReadsAliasAndConfigKnob(): void
