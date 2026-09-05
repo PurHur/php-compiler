@@ -110,6 +110,14 @@ use PHPCompiler\VM\Variable as VmVariable;
  * soft-null optional stays live — deprecate),
  * typed-array array_sum / array_product (exactly one typed array; soft-null
  * / non-array / excess argc stay live — TypeError / ArgumentCountError),
+ * typed-array array_merge / array_merge_recursive / array_replace /
+ * array_replace_recursive (all args typed arrays; zero-arg merge OK;
+ * zero-arg replace stays live — ArgumentCountError; soft-null / non-array
+ * stay live — TypeError),
+ * typed-array array_diff / array_intersect / array_diff_key /
+ * array_intersect_key / array_diff_assoc / array_intersect_assoc (≥1 typed
+ * arrays; zero-arg stays live — ArgumentCountError; soft-null / non-array
+ * stay live — TypeError; callback u* forms stay live),
  * zero-arg pi, type.c predicates + gettype/get_debug_type, ctype.c
  * classifiers on typed/literal strings, typed-array count/sizeof, math.c
  * incl. pow/fpow/fdiv on already-numeric args, empty void user functions).
@@ -332,6 +340,9 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureArrayTransformNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureArrayMergeDiffNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureVersionCompareNoSideEffect($toCall, $callArgs)) {
@@ -2013,6 +2024,50 @@ final class DiscardedPureCallElision
             default:
                 return false;
         }
+    }
+
+    /**
+     * Discarded {@code array_merge}/{@code array_merge_recursive}/
+     * {@code array_replace}/{@code array_replace_recursive}/
+     * {@code array_diff}/{@code array_intersect}/{@code array_diff_key}/
+     * {@code array_intersect_key}/{@code array_diff_assoc}/
+     * {@code array_intersect_assoc} on typed arrays — php-src
+     * {@code ext/standard/array.c}. Soft-null / non-array args stay live
+     * ({@code TypeError}). Zero-arg {@code array_replace*} /
+     * {@code array_diff*} / {@code array_intersect*} stay live
+     * ({@code ArgumentCountError}). Callback {@code array_u*} forms stay live.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureArrayMergeDiffNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        $name = strtolower($toCall->getName());
+        $isMergeFamily = 'array_merge' === $name || 'array_merge_recursive' === $name;
+        $isReplaceFamily = 'array_replace' === $name || 'array_replace_recursive' === $name;
+        $isDiffFamily =
+            'array_diff' === $name
+            || 'array_intersect' === $name
+            || 'array_diff_key' === $name
+            || 'array_intersect_key' === $name
+            || 'array_diff_assoc' === $name
+            || 'array_intersect_assoc' === $name;
+        if (!$isMergeFamily && !$isReplaceFamily && !$isDiffFamily) {
+            return false;
+        }
+        // Zero-arg merge returns [] (php-src); replace/diff/intersect throw.
+        if ([] === $callArgs) {
+            return $isMergeFamily;
+        }
+        foreach ($callArgs as $arg) {
+            if (!$arg instanceof Variable || !self::isTypedArrayArg($arg)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
