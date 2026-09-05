@@ -52,6 +52,14 @@ final class Issue36382NullObjectCtorArgAotTest extends TestCase
         );
     }
 
+    public function testApppOnlyParentAfterCoalesceSameName(): void
+    {
+        $this->assertSame(
+            "P\nPcr\nProxy\nRC\nProxyDone\nPDone\nOK\n",
+            $this->compileAndRun('test/repro/issue_36382_appp_only.php')
+        );
+    }
+
     public function testNullableObjectParamIdenticalAndIsNull(): void
     {
         $got = $this->compileAndRun('test/repro/issue_36382_fn_null_object.php');

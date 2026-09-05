@@ -205,6 +205,13 @@ trait CompileBlockInternal
             }
             if (!(\PHPCompiler\AOT\ExternalMethodBind::spineChunkMode()
                 && \PHPCompiler\JIT\SpineChunkRuntimeMethodDemote::isDemotedStub($block))) {
+            // Re-entering the root CFG via coalesce/nullsafe merge ($entryBlock set) must not
+            // re-assign `$this` from the LLVM param — that clobbers the live receiver binding
+            // after `$this->prop = …` and typed properties read as uninitialized (#36382).
+            $isRootCfgReentry = null !== $entryBlock
+                && null !== $block->func
+                && $block->orig === $block->func->cfg;
+            if (!$isRootCfgReentry) {
             foreach ($block->orig->hoistedOperands as $hoisted) {
                 if ('this' === \PHPCompiler\JIT\OperandName::resolve($hoisted)) {
                     if (!$this->context->hasVariableOp($hoisted)) {
@@ -220,8 +227,17 @@ trait CompileBlockInternal
             } else {
                 $this->context->implicitThisArgument = null;
             }
-            // Only the CFG entry block receives LLVM arguments; branch blocks share the same func (#210).
-            if (null !== $block->func && $block->orig === $block->func->cfg) {
+            }
+            // Only the true function entry receives LLVM arguments; branch blocks share the
+            // same func (#210). When the root CFG Block is re-entered as a coalesce/nullsafe
+            // merge via a pre-created LLVM BB ($entryBlock), skip prologue re-bind — otherwise
+            // `$cr = $cr ?? new T` is wiped by writing the original SSA null formal back into
+            // the named local before `parent::__construct($rf, $cr)` (#36382 AppFactory).
+            if (
+                null !== $block->func
+                && $block->orig === $block->func->cfg
+                && null === $entryBlock
+            ) {
                 foreach ($block->func->params as $idx => $param) {
                     $argIdx = $thisParamOffset + $idx;
                     if ($param->variadic) {
@@ -483,6 +499,23 @@ trait CompileBlockInternal
                         // Same shape as the string skip above (#24137).
                         if (
                             Variable::TYPE_HASHTABLE === $args[$recvSlot]->type
+                            && $this->context->hasVariableOp($recvOp)
+                        ) {
+                            \PHPCompiler\JIT\UndefinedVariableHelper::markAssigned(
+                                $this->context,
+                                $recvOp,
+                                $this->context->getVariableFromOp($recvOp)
+                            );
+                            break;
+                        }
+                        // Typed `object` / class formals: prologue already stored the
+                        // `__object__*` into the local. A second assignOperand runs
+                        // obj_mirror delref on the live object then re-stores — that
+                        // drops the sole caller ref so `take($this)` leaves typed props
+                        // uninitialized (#36382 AppFactory Runner($this) / Holder($this)).
+                        // Peer of string (#24137) and hashtable (#36386) ARG_RECV skips.
+                        if (
+                            Variable::TYPE_OBJECT === $args[$recvSlot]->type
                             && $this->context->hasVariableOp($recvOp)
                         ) {
                             \PHPCompiler\JIT\UndefinedVariableHelper::markAssigned(
