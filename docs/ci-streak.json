@@ -1,11 +1,12 @@
 {
     "issue": 36401,
     "ci_green_streak_days": 2,
-    "last_green_master_sha": "f7590b22d4e6ae53f8ed74fbb169dcb5fcde2933",
+    "last_green_master_sha": "7c4c1b821ff78678702139d6608db8fd79283536",
     "last_green_day": "2026-09-05",
     "gates": [
         "apply-patches",
         "bootstrap-inventory",
+        "aot-smoke",
         "north-star5-verify-fast"
     ],
     "notes": "Local Docker gates; GHA billing-disabled \u2014 not a remote check streak (#36401)"
