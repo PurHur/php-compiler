@@ -100,6 +100,16 @@ use PHPCompiler\VM\Variable as VmVariable;
  * typed-array array_reverse / array_change_key_case (typed array + optional
  * typed preserve_keys / case; soft-null optional stays live — deprecate;
  * soft-null / non-array haystack stay live — TypeError),
+ * typed-array array_unique (typed array + optional typed flags; soft-null
+ * flags stay live — deprecate; soft-null / non-array stay live — TypeError),
+ * typed-array array_slice (typed array + typed offset + optional length
+ * null-or-typed + optional typed preserve_keys; soft-null offset /
+ * preserve_keys stay live — deprecate; soft-null / non-array stay live),
+ * typed-array array_chunk (typed array + compile-time size ≥ 1 + optional
+ * typed preserve_keys; non-constant / &lt;1 size stays live — ValueError;
+ * soft-null optional stays live — deprecate),
+ * typed-array array_sum / array_product (exactly one typed array; soft-null
+ * / non-array / excess argc stay live — TypeError / ArgumentCountError),
  * zero-arg pi, type.c predicates + gettype/get_debug_type, ctype.c
  * classifiers on typed/literal strings, typed-array count/sizeof, math.c
  * incl. pow/fpow/fdiv on already-numeric args, empty void user functions).
@@ -319,6 +329,9 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureArrayCopyNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureArrayTransformNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureVersionCompareNoSideEffect($toCall, $callArgs)) {
@@ -1898,6 +1911,105 @@ final class DiscardedPureCallElision
 
                 return $callArgs[1] instanceof Variable
                     && self::mathArgAllowsDiscardedElision($callArgs[1]);
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Discarded {@code array_unique}/{@code array_slice}/{@code array_chunk}/
+     * {@code array_sum}/{@code array_product} on typed arrays — php-src
+     * {@code ext/standard/array.c}. Soft-null / non-array haystacks stay live
+     * ({@code TypeError}). {@code array_chunk} requires a compile-time size
+     * ≥ 1 ({@code ValueError} otherwise). Soft-null optional flags stay live
+     * (deprecate). Excess argc stays live ({@code ArgumentCountError}).
+     * {@code array_flip} is not elided (non-int/string values → {@code ValueError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureArrayTransformNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        $name = strtolower($toCall->getName());
+        if (
+            'array_unique' !== $name
+            && 'array_slice' !== $name
+            && 'array_chunk' !== $name
+            && 'array_sum' !== $name
+            && 'array_product' !== $name
+        ) {
+            return false;
+        }
+        if (!isset($callArgs[0]) || !$callArgs[0] instanceof Variable) {
+            return false;
+        }
+        if (!self::isTypedArrayArg($callArgs[0])) {
+            return false;
+        }
+
+        switch ($name) {
+            case 'array_sum':
+            case 'array_product':
+                return 1 === \count($callArgs);
+            case 'array_unique':
+                if (isset($callArgs[2])) {
+                    return false;
+                }
+                if (!isset($callArgs[1])) {
+                    return true;
+                }
+
+                return $callArgs[1] instanceof Variable
+                    && self::mathArgAllowsDiscardedElision($callArgs[1]);
+            case 'array_chunk':
+                if (!isset($callArgs[1]) || !$callArgs[1] instanceof Variable) {
+                    return false;
+                }
+                if (isset($callArgs[3])) {
+                    return false;
+                }
+                // ValueError when size < 1 — only elide proven positive sizes.
+                $size = $callArgs[1]->compileTimeLong;
+                if (null === $size || $size < 1) {
+                    return false;
+                }
+                if (!isset($callArgs[2])) {
+                    return true;
+                }
+
+                return $callArgs[2] instanceof Variable
+                    && self::mathArgAllowsDiscardedElision($callArgs[2]);
+            case 'array_slice':
+                if (!isset($callArgs[1]) || !$callArgs[1] instanceof Variable) {
+                    return false;
+                }
+                if (isset($callArgs[4])) {
+                    return false;
+                }
+                if (!self::mathArgAllowsDiscardedElision($callArgs[1])) {
+                    return false;
+                }
+                if (isset($callArgs[2])) {
+                    if (!$callArgs[2] instanceof Variable) {
+                        return false;
+                    }
+                    // null length means "to end" (not a soft-null deprecate).
+                    if (
+                        !$callArgs[2]->isNullConstant
+                        && Variable::TYPE_NULL !== $callArgs[2]->type
+                        && !self::mathArgAllowsDiscardedElision($callArgs[2])
+                    ) {
+                        return false;
+                    }
+                }
+                if (!isset($callArgs[3])) {
+                    return true;
+                }
+
+                return $callArgs[3] instanceof Variable
+                    && self::mathArgAllowsDiscardedElision($callArgs[3]);
             default:
                 return false;
         }
