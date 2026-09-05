@@ -107,6 +107,8 @@ final class IncludeHelper
             if (null !== $resultOperand) {
                 $jit->assignIncludeResult($resultOperand);
             }
+            // Stub must leave the caller insert open for later prelude requires / entry body (#36382).
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'composer_autoload_stub_cont');
 
             return;
         }
@@ -247,6 +249,7 @@ final class IncludeHelper
             if (null !== $resultOperand) {
                 $jit->assignIncludeResult($resultOperand);
             }
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'include_once_already_cont');
 
             return;
         }

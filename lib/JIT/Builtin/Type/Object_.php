@@ -6847,6 +6847,12 @@ class Object_ extends Type {
         if ('' === $className) {
             return;
         }
+        // Trait methods often assign to properties declared on a sibling trait (Nyholm
+        // RequestTrait writes MessageTrait::$headers). Registering those writes as
+        // trait-owned declarations falsifies zend_do_traits_property_binding (#36382).
+        if ($this->isTraitClass(strtolower(ltrim($className, '\\')))) {
+            return;
+        }
         $pending = $this->context->jitUndeclaredInstancePropertyWrites[strtolower(ltrim($className, '\\'))] ?? [];
         foreach ($pending as $propName) {
             if ($this->hasProperty($classId, $propName)) {
