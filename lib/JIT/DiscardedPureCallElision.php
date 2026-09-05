@@ -104,6 +104,11 @@ use PHPCompiler\VM\Variable as VmVariable;
  * date_parse_from_format (exactly two typed strings; soft-null stays
  * live — deprecate / TypeError; wrong argc stays live —
  * ArgumentCountError),
+ * date_sun_info (exactly three typed numerics — timestamp / latitude /
+ * longitude; soft-null / non-numeric / wrong argc stay live — TypeError /
+ * ArgumentCountError),
+ * timezone_name_from_abbr (typed abbr string + optional typed longs;
+ * soft-null / excess argc stay live — deprecate / ArgumentCountError),
  * getrandmax / mt_getrandmax (zero-arg; excess argc stays live —
  * ArgumentCountError),
  * typed-array array_key_first / array_key_last / array_is_list (exactly one
@@ -367,6 +372,12 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureDateParseRuntimeInfoNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureDateSunInfoNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureTimezoneNameFromAbbrNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureRandmaxRuntimeInfoNoSideEffect($toCall, $callArgs)) {
@@ -2011,6 +2022,69 @@ final class DiscardedPureCallElision
 
         return self::stringArgAllowsDiscardedElision($callArgs[0])
             && self::stringArgAllowsDiscardedElision($callArgs[1]);
+    }
+
+    /**
+     * Discarded {@code date_sun_info} — php-src {@code ext/date/php_date.c}.
+     * Exactly three typed numerics (timestamp / latitude / longitude). Soft-null
+     * / non-numeric stay live ({@code TypeError} / deprecate). Wrong argc stays
+     * live ({@code ArgumentCountError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureDateSunInfoNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if ('date_sun_info' !== strtolower($toCall->getName())) {
+            return false;
+        }
+        if (3 !== \count($callArgs)) {
+            return false;
+        }
+        foreach ($callArgs as $arg) {
+            if (!$arg instanceof Variable || !self::mathArgAllowsDiscardedElision($arg)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Discarded {@code timezone_name_from_abbr} — php-src {@code ext/date/php_date.c}.
+     * Typed abbr string + optional typed {@code gmtoffset}/{@code isdst} longs.
+     * Soft-null stays live (deprecate). Excess argc stays live
+     * ({@code ArgumentCountError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureTimezoneNameFromAbbrNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if ('timezone_name_from_abbr' !== strtolower($toCall->getName())) {
+            return false;
+        }
+        $argc = \count($callArgs);
+        if ($argc < 1 || $argc > 3) {
+            return false;
+        }
+        if (!$callArgs[0] instanceof Variable || !self::stringArgAllowsDiscardedElision($callArgs[0])) {
+            return false;
+        }
+        for ($i = 1; $i < $argc; ++$i) {
+            if (
+                !$callArgs[$i] instanceof Variable
+                || !self::mathArgAllowsDiscardedElision($callArgs[$i])
+            ) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
