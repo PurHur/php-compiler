@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8221 |
-| Phase A inventory files (M2 ratio SSOT) | 8221 |
+| PHP files on vm.php path | 8222 |
+| Phase A inventory files (M2 ratio SSOT) | 8222 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26027 |
+| Source constructs flagged (warnings) | 26029 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5681,7 +5681,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/GlobalTypedConstSyntaxRejector.php` | 0 | 2 |
 | `lib/Handler.php` | 0 | 1 |
 | `lib/HexFloat.php` | 0 | 1 |
-| `lib/JIT.php` | 0 | 70 |
+| `lib/JIT.php` | 0 | 63 |
 | `lib/JIT/Analyzer.php` | 0 | 1 |
 | `lib/JIT/AotDebugSymbols.php` | 0 | 1 |
 | `lib/JIT/AotGcSections.php` | 0 | 1 |
@@ -7061,6 +7061,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/ByRefFormalAssignAndCallArgAdapt.php` | 0 | 2 |
 | `lib/JIT/Concern/CallResultCompileTimePropagate.php` | 0 | 7 |
 | `lib/JIT/Concern/CallResultOperandAssign.php` | 0 | 17 |
+| `lib/JIT/Concern/ClassConstEnumAndFunctionStatic.php` | 0 | 9 |
 | `lib/JIT/Concern/CoerceReturnPropertyDeclaringAndByRef.php` | 0 | 3 |
 | `lib/JIT/Concern/CompileBlockInternal.php` | 0 | 51 |
 | `lib/JIT/Concern/CompileClassAndTraitUses.php` | 0 | 4 |
@@ -50487,75 +50488,68 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT\Call\ExternalMethod (line 371)
-- new JIT\Scope (line 400)
-- new Operand\Literal (line 650)
-- new Operand\Literal (line 666)
-- new JIT\Call\Native (line 1144)
-- new Variable (line 2150)
-- new JIT\Call\Native (line 2176)
-- new Variable (line 2266)
-- new JIT\Call\Vararg (line 2293)
-- new JIT\Call\Native (line 2303)
-- new JIT\Call\Native (line 2592)
-- new JIT\Variable (line 2832)
-- new JIT\Call\Native (line 2849)
-- new JIT\Call\Native (line 2894)
-- new JIT\Call\Native (line 2964)
-- new JIT\Call\Native (line 3006)
-- new JIT\Call\Native (line 3051)
-- new JIT\Call\Native (line 3106)
-- new JIT\Call\Native (line 4293)
-- new JIT\Call\Native (line 4324)
-- new JIT\Call\Native (line 4371)
-- new JIT\Call\Native (line 4445)
-- new JIT\Call\Native (line 4499)
-- new JIT\Call\Native (line 4586)
-- new JIT\Call\Native (line 5079)
-- new JIT\Call\Native (line 5110)
-- new JIT\Call\Native (line 5146)
-- new JIT\Call\Native (line 5181)
-- new JIT\Call\Native (line 5216)
-- new JIT\Call\Native (line 5251)
-- new JIT\Call\Native (line 5363)
-- new JIT\Call\Native (line 5605)
-- new JIT\Call\Native (line 5643)
-- new JIT\Call\Native (line 5677)
-- new JIT\Call\Native (line 5798)
-- new JIT\Call\Native (line 6448)
-- new JIT\Call\Native (line 6520)
-- new Operand\Literal (line 7030)
-- new Variable (line 7084)
-- new Variable (line 7220)
-- new Variable (line 7240)
-- new Variable (line 7261)
-- new JIT\Variable (line 7696)
-- new JIT\Variable (line 7759)
-- new Variable (line 7859)
-- new Variable (line 7903)
-- new Variable (line 7955)
-- new Variable (line 7966)
-- new Variable (line 7977)
-- new Variable (line 7997)
-- new Variable (line 8060)
-- new Variable (line 8123)
-- new Variable (line 8193)
-- new Variable (line 8224)
-- new Variable (line 8292)
-- new Operand\Literal (line 8301)
-- new Variable (line 8316)
-- new Variable (line 8650)
-- new JIT\Call\VmCoerceVariableToString (line 8799)
-- new JIT\Call\NoOpConstruct (line 9002)
-- new Operand\Literal (line 9242)
-- new VM (line 9440)
-- new VM\Variable (line 9449)
-- new VM\ClassEntry (line 9554)
-- new Func\PHP (line 9573)
-- new VM\ClassEntry (line 9619)
-- new Variable (line 9636)
-- new Variable (line 9803)
-- 288 class method(s)
+- new JIT\Call\ExternalMethod (line 373)
+- new JIT\Scope (line 402)
+- new Operand\Literal (line 652)
+- new Operand\Literal (line 668)
+- new JIT\Call\Native (line 1146)
+- new Variable (line 2152)
+- new JIT\Call\Native (line 2178)
+- new Variable (line 2268)
+- new JIT\Call\Vararg (line 2295)
+- new JIT\Call\Native (line 2305)
+- new JIT\Call\Native (line 2594)
+- new JIT\Variable (line 2834)
+- new JIT\Call\Native (line 2851)
+- new JIT\Call\Native (line 2896)
+- new JIT\Call\Native (line 2966)
+- new JIT\Call\Native (line 3008)
+- new JIT\Call\Native (line 3053)
+- new JIT\Call\Native (line 3108)
+- new JIT\Call\Native (line 4295)
+- new JIT\Call\Native (line 4326)
+- new JIT\Call\Native (line 4373)
+- new JIT\Call\Native (line 4447)
+- new JIT\Call\Native (line 4501)
+- new JIT\Call\Native (line 4588)
+- new JIT\Call\Native (line 5081)
+- new JIT\Call\Native (line 5112)
+- new JIT\Call\Native (line 5148)
+- new JIT\Call\Native (line 5183)
+- new JIT\Call\Native (line 5218)
+- new JIT\Call\Native (line 5253)
+- new JIT\Call\Native (line 5365)
+- new JIT\Call\Native (line 5607)
+- new JIT\Call\Native (line 5645)
+- new JIT\Call\Native (line 5679)
+- new JIT\Call\Native (line 5800)
+- new JIT\Call\Native (line 6450)
+- new JIT\Call\Native (line 6522)
+- new Operand\Literal (line 7032)
+- new Variable (line 7086)
+- new Variable (line 7222)
+- new Variable (line 7242)
+- new Variable (line 7263)
+- new JIT\Variable (line 7698)
+- new JIT\Variable (line 7761)
+- new Variable (line 7861)
+- new Variable (line 7905)
+- new Variable (line 7957)
+- new Variable (line 7968)
+- new Variable (line 7979)
+- new Variable (line 7999)
+- new Variable (line 8062)
+- new Variable (line 8125)
+- new Variable (line 8195)
+- new Variable (line 8226)
+- new Variable (line 8294)
+- new Operand\Literal (line 8303)
+- new Variable (line 8318)
+- new Variable (line 8652)
+- new JIT\Call\VmCoerceVariableToString (line 8801)
+- new JIT\Call\NoOpConstruct (line 9004)
+- new Operand\Literal (line 9244)
+- 271 class method(s)
 - 15 closure(s)
 
 ### `lib/JIT/Analyzer.php`
@@ -58058,6 +58052,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 591)
 - 6 class method(s)
 
+### `lib/JIT/Concern/ClassConstEnumAndFunctionStatic.php`
+
+**Warnings** (review for bootstrap subset):
+- trait ClassConstEnumAndFunctionStatic (line 23)
+- new VM (line 39)
+- new VM\Variable (line 48)
+- new VM\ClassEntry (line 153)
+- new Func\PHP (line 172)
+- new VM\ClassEntry (line 218)
+- new Variable (line 235)
+- new Variable (line 402)
+- 17 class method(s)
+
 ### `lib/JIT/Concern/CoerceReturnPropertyDeclaringAndByRef.php`
 
 **Warnings** (review for bootstrap subset):
@@ -60102,7 +60109,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/SpineChunkRuntimeMethodDemote.php`
 
 **Warnings** (review for bootstrap subset):
-- new OpCode (line 203)
+- new OpCode (line 204)
 - 11 class method(s)
 
 ### `lib/JIT/SpineChunkStandardHelperBind.php`
