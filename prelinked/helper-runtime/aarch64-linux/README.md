@@ -11,13 +11,17 @@ non-native link.
 `script/check-helper-runtime-prelink.php --all-arches` asserts every committed `unit.o`
 (and `common.o` when present) has ELF `e_machine=183` (EM_AARCH64).
 
-## Seed corpus (VM_* + lib_VM_* + ext/standard tier)
+## Seed corpus (VM_* + lib_VM_* + ext/standard tiers)
 
-**32** committed `unit.o` files:
+**52** committed `unit.o` files:
 
 - full `VM_*` (13) and `lib_VM_*` (9) sets from `x86_64-linux`
 - first `ext/standard` tier (10): ArrayChunk / ArrayIsList / ArraySlice / Bin2hex /
   CountChars / Crc32 / PrintR / StrWordCount / SubstrCount / VarExport
+- array functional + string encode (10): ArrayMap / ArrayWalk / ArrayReduce / ArrayFind /
+  ArrayMergeRecursive / ArrayCountRecursive / ArrayElem / Base64 / Hex2bin / FindSubstr
+- string transform / HTML / escapes (10): StrReplace / StrPad / StrRepeat / Strrev /
+  StripTags / Stripslashes / Addslashes / Htmlspecialchars / Nl2br / Ucwords
 
 Refresh / expand via:
 

@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\HashTablePointerLlvm;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -19,6 +20,7 @@ use PHPLLVM\Value;
  * {@see \PHPCompiler\ext\standard\ArrayPointerJitHelper} / {@see \PHPCompiler\VM\HashTable}.
  *
  * php-src: ext/standard/array.c — php_array_key / current / next / prev / reset / end
+ * (next/prev/reset/end take array by-ref with SEPARATE_ARRAY via zend_parse `a/`).
  */
 final class ArrayPointerRuntime
 {
@@ -42,7 +44,7 @@ final class ArrayPointerRuntime
     {
         return HashTablePointerLlvm::next(
             $context,
-            ArrayBuiltinHelper::loadHashTable($context, $array)
+            self::separateForPointerMutate($context, $array)
         );
     }
 
@@ -50,7 +52,7 @@ final class ArrayPointerRuntime
     {
         return HashTablePointerLlvm::prev(
             $context,
-            ArrayBuiltinHelper::loadHashTable($context, $array)
+            self::separateForPointerMutate($context, $array)
         );
     }
 
@@ -58,7 +60,7 @@ final class ArrayPointerRuntime
     {
         return HashTablePointerLlvm::reset(
             $context,
-            ArrayBuiltinHelper::loadHashTable($context, $array)
+            self::separateForPointerMutate($context, $array)
         );
     }
 
@@ -66,7 +68,7 @@ final class ArrayPointerRuntime
     {
         return HashTablePointerLlvm::end(
             $context,
-            ArrayBuiltinHelper::loadHashTable($context, $array)
+            self::separateForPointerMutate($context, $array)
         );
     }
 
@@ -78,5 +80,17 @@ final class ArrayPointerRuntime
     public static function ensureStandaloneBodies(Context $context): void
     {
         self::ensureLinked($context);
+    }
+
+    /**
+     * By-ref pointer mutators: SEPARATE_ARRAY before writing internalPointer
+     * (php-src zend_parse `a/` / #36397 slice 13).
+     */
+    private static function separateForPointerMutate(Context $context, JITVariable $array): Value
+    {
+        $ht = HashTableHelper::separateContainerForWrite($context, $array);
+        Refcount::emitAssertExclusiveCall($context, $ht);
+
+        return $ht;
     }
 }
