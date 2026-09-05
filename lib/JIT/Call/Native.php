@@ -597,6 +597,14 @@ class Native implements Call {
         $value = $context->helper->loadValue($arg);
         switch ($typeName) {
             case '__object__*':
+                // php-cfg types `null` as TYPE_VALUE + isNullConstant (not TYPE_NULL).
+                // Passing that through readObject / a non-null __object__* load made
+                // `?Class $p = null` / explicit `null` args look assigned — `??` never
+                // fell through and `null === $p` was false (Slim AppFactory::create /
+                // RouteCollectorProxy, #36382). php-src: zend_send_null / IS_NULL.
+                if (Variable::TYPE_NULL === $arg->type || !empty($arg->isNullConstant)) {
+                    return $context->getTypeFromString('__object__*')->constNull();
+                }
                 // Always key off the loaded LLVM type first — Slim/IncludeHelper prop
                 // analysis can leave CFG type VALUE while loadValue returns __string__*
                 // (MessageTrait::$protocol etc.). Never pass non-boxes to readObject (#36382).

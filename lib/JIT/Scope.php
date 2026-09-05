@@ -54,6 +54,14 @@ class Scope {
     public bool $preserveNewResultOnNullCall = false;
 
     /**
+     * True when {@see $args} was seeded with a receiver (`new` / `$obj->m()`), so
+     * {@see \PHPCompiler\JIT::prependImplicitThisForStaticInstanceCall} must not
+     * prepend again. False for `parent::` / static INIT where user args alone are sent
+     * (#36382 AppFactory parent::__construct with explicit null optionals).
+     */
+    public bool $callArgsIncludeReceiver = false;
+
+    /**
      * METHODCALL_INIT bound datetimezone::getoffset; EXEC rewrites DateTime::getOffset when argc==1 (#30761).
      */
     public bool $pendingDateTimeZoneGetOffset = false;

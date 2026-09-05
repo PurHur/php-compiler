@@ -33,12 +33,15 @@ trait InitJitMethodCall
         bool $objectCallInvoke = false
     ): void
     {
+        // Instance method / $obj->__invoke: args are seeded with the receiver (#36382).
+        $this->context->scope->callArgsIncludeReceiver = true;
         if ('__invoke' === strtolower($methodName)) {
             $receiver = $this->context->getVariableFromOp($receiverOp);
             $closureCall = \PHPCompiler\JIT\ClosureHelper::resolveCall($this->context, $receiver);
             if (null !== $closureCall) {
                 $this->context->scope->toCall = $closureCall;
                 $this->context->scope->args = [];
+                $this->context->scope->callArgsIncludeReceiver = false;
 
                 return;
             }
@@ -174,6 +177,7 @@ trait InitJitMethodCall
             if ($this->shouldUseSelfHostJitStubs()) {
                 $this->context->scope->toCall = null;
                 $this->context->scope->args = [];
+                $this->context->scope->callArgsIncludeReceiver = false;
 
                 return;
             }
@@ -183,6 +187,7 @@ trait InitJitMethodCall
             if ($this->shouldUseSelfHostJitStubs()) {
                 $this->context->scope->toCall = null;
                 $this->context->scope->args = [];
+                $this->context->scope->callArgsIncludeReceiver = false;
 
                 return;
             }
@@ -225,6 +230,7 @@ trait InitJitMethodCall
                 }
                 $this->context->scope->toCall = null;
                 $this->context->scope->args = [];
+                $this->context->scope->callArgsIncludeReceiver = false;
 
                 return;
             }
@@ -2006,6 +2012,7 @@ trait InitJitMethodCall
                 && ('open' === $methodLc || 'xml' === $methodLc);
             if (!$keepThis) {
                 $this->context->scope->args = [];
+                $this->context->scope->callArgsIncludeReceiver = false;
 
                 return;
             }

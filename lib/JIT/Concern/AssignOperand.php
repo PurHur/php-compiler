@@ -821,6 +821,51 @@ trait AssignOperand
                 $this->context->setVariableOp($resultOp, $promoted);
                 $result = $promoted;
             } elseif (
+                Variable::TYPE_OBJECT === $result->type
+                && Variable::KIND_VALUE === $result->kind
+                && null !== $result->value
+                && (
+                    '__object__*' === $this->context->getStringFromType($result->value->typeOf())
+                    || str_starts_with($this->context->getStringFromType($result->value->typeOf()), '__object__')
+                )
+            ) {
+                // Nullable `?T $p` formals are KIND_VALUE `__object__*` SSA params. Assigning
+                // `$p = $p ?? new T` must promote to an alloca — SSA params are immutable, so
+                // keeping KIND_VALUE left parent::__construct / ClassParamCheck reading the
+                // original null arg (Slim AppFactory::create, #36382).
+                $llvmFunc = $this->context->builder->getInsertBlock()->getParent();
+                $objPtrTy = $this->context->getTypeFromString('__object__*');
+                $slot = \PHPCompiler\JIT\BasicBlockHelper::entryAllocaForFunction(
+                    $this->context,
+                    $llvmFunc,
+                    $objPtrTy
+                );
+                $this->context->builder->store($result->value, $slot);
+                $promoted = new Variable(
+                    $this->context,
+                    Variable::TYPE_OBJECT,
+                    Variable::KIND_VARIABLE,
+                    $slot
+                );
+                $promoted->classUserType = $result->classUserType;
+                $promoted->isNullConstant = $result->isNullConstant;
+                $this->context->setVariableOp($resultOp, $promoted);
+                $resolved = \PHPCompiler\JIT\OperandName::resolve($resultOp);
+                if (null !== $resolved && '' !== $resolved) {
+                    $this->context->bindVariableByName(
+                        $this->context->resolveRefAliasName($resolved),
+                        $promoted
+                    );
+                }
+                if (null !== $this->context->jitCurrentBlock) {
+                    $this->context->recordScopeSlotObjectMirrorLlvm(
+                        $this->context->jitCurrentBlock,
+                        $resultOp,
+                        $promoted
+                    );
+                }
+                $result = $promoted;
+            } elseif (
                 Variable::KIND_VALUE === $result->kind
                 && in_array($result->type, [
                     Variable::TYPE_NATIVE_BOOL,

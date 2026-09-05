@@ -50,6 +50,7 @@ trait ResolveJitOutgoingCall
             'toCall' => $this->context->scope->toCall,
             'args' => $this->context->scope->args,
             'argOperands' => $this->context->scope->argOperands,
+            'callArgsIncludeReceiver' => $this->context->scope->callArgsIncludeReceiver,
         ];
     }
 
@@ -58,6 +59,7 @@ trait ResolveJitOutgoingCall
         $this->context->scope->toCall = null;
         $this->context->scope->args = [];
         $this->context->scope->argOperands = [];
+        $this->context->scope->callArgsIncludeReceiver = false;
     }
 
     private function restoreJitPendingOutboundCall(): void
@@ -69,6 +71,7 @@ trait ResolveJitOutgoingCall
         $this->context->scope->toCall = $saved['toCall'];
         $this->context->scope->args = $saved['args'];
         $this->context->scope->argOperands = $saved['argOperands'];
+        $this->context->scope->callArgsIncludeReceiver = (bool) ($saved['callArgsIncludeReceiver'] ?? false);
     }
 
     /**
@@ -565,9 +568,12 @@ trait ResolveJitOutgoingCall
         if ('__object__*' !== $this->context->getStringFromType($toCall->argTypes[0])) {
             return $args;
         }
-        // Optional trailing params make count($args) < count($argTypes) even when TYPE_NEW
-        // already seeded $this — that used to double-prepend and shift user args (#36382).
-        if (\count($args) >= $toCall->minimumPositionalArgCountWithReceiver()) {
+        // TYPE_NEW / $obj->m() already seeded the receiver — never double-prepend
+        // (that shifted typed args and broke Slim Request construction, #36382).
+        // Do NOT use minimumPositionalArgCountWithReceiver(): parent::__construct($a,$b,$c,$d)
+        // with explicit nullable optionals has count >= minimum while still missing $this
+        // (AppFactory::create → App::__construct, #36382).
+        if ($this->context->scope->callArgsIncludeReceiver) {
             return $args;
         }
         if (null === $block->func || null === $block->func->cfg) {
@@ -603,7 +609,7 @@ trait ResolveJitOutgoingCall
         if ('__object__*' !== $this->context->getStringFromType($toCall->argTypes[0])) {
             return $operands;
         }
-        if (\count($operands) >= $toCall->minimumPositionalArgCountWithReceiver()) {
+        if ($this->context->scope->callArgsIncludeReceiver) {
             return $operands;
         }
         if (null === $block->func || null === $block->func->cfg) {

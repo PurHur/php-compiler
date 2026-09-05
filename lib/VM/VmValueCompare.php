@@ -568,6 +568,21 @@ final class VmValueCompare
             $context->builder->structGep($valuePtr, $map['type'])
         );
         $i8 = $context->getTypeFromString('int8');
+        $nativeObj = $context->helper->loadValue($object);
+        $objType = $context->getTypeFromString('__object__*');
+        // `null === $nullableObjectParam` — typed null args are __object__* null (#36382).
+        // php-src: zend_is_identical(IS_NULL, IS_NULL) when the object zval is null.
+        $isNullBox = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NULL, false)
+        );
+        $objIsNullPtr = $context->builder->icmp(
+            Builder::INT_EQ,
+            $nativeObj,
+            $objType->constNull()
+        );
+        $bothNull = $context->builder->and($isNullBox, $objIsNullPtr);
         $isObject = $context->builder->icmp(
             Builder::INT_EQ,
             $typeByte,
@@ -577,7 +592,6 @@ final class VmValueCompare
             $context->lookupFunction('__value__readObject'),
             $valuePtr
         );
-        $nativeObj = $context->helper->loadValue($object);
         $voidp = $context->getTypeFromString('void*');
         $sizeT = $context->getTypeFromString('size_t');
         $leftPtr = $context->builder->ptrToInt(
@@ -590,7 +604,7 @@ final class VmValueCompare
         );
         $same = $context->builder->icmp(Builder::INT_EQ, $leftPtr, $rightPtr);
 
-        return $context->builder->and($isObject, $same);
+        return $context->builder->or($bothNull, $context->builder->and($isObject, $same));
     }
 
     public static function identicalValueToValue(

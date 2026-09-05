@@ -70,6 +70,18 @@ final class CoalesceHelper
 
             return self::callTakeLeftBranch($context, $typeByte);
         }
+        // Typed `?T $p` formals are TYPE_OBJECT + nullable __object__* — null pointers
+        // must take the right ?? arm (zend_is_true(IS_NULL) is false) (#36382).
+        if (Variable::TYPE_OBJECT === $check->type) {
+            $obj = $context->helper->loadValue($check);
+            $objTy = $context->getTypeFromString('__object__*');
+
+            return $context->builder->icmp(
+                \PHPLLVM\Builder::INT_NE,
+                $obj,
+                $objTy->constNull()
+            );
+        }
 
         return $context->castToBool($context->helper->loadValue($check));
     }

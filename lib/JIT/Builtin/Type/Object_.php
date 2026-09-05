@@ -736,6 +736,27 @@ class Object_ extends Type {
         $object = $fn->getParam(1);
         $map = $this->context->structFieldMap['__value__'];
         $objPtr = $this->context->getTypeFromString('__object__*');
+        // Nullable `__object__*` formals (`?T` / `?object`) pass a null pointer for PHP
+        // null. Boxing that as TYPE_OBJECT made `null === $p` / `is_null($p)` false and
+        // `isset($p)` true, then property reads SIGSEGV (Slim AppFactory::create, #36382).
+        // php-src: zend_assign_to_variable / ZVAL_NULL — never IS_OBJECT with a null handle.
+        $isNull = $this->context->builder->icmp(
+            PHPLLVM\Builder::INT_EQ,
+            $object,
+            $objPtr->constNull()
+        );
+        $nullBlock = $fn->appendBasicBlock('write_obj_null');
+        $objBlock = $fn->appendBasicBlock('write_obj_ptr');
+        $this->context->builder->branchIf($isNull, $nullBlock, $objBlock);
+
+        $this->context->builder->positionAtEnd($nullBlock);
+        $this->context->builder->call(
+            $this->context->lookupFunction('__value__writeNull'),
+            $value
+        );
+        $this->context->builder->returnVoid();
+
+        $this->context->builder->positionAtEnd($objBlock);
         $this->context->builder->call(
             $this->context->lookupFunction('__value__valueDelref'),
             $value
