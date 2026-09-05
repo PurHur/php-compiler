@@ -18,7 +18,7 @@ declare(strict_types=1);
  *   phpc build --project [dir] [--list-units]  Grep-friendly entry/units/binary summary (no LLVM)
  *   phpc build --project [dir] [--print-includes]  Manifest link order (no LLVM)
  *   phpc build --project [dir] [--probe]       After link, fail when execute stdout is empty (#792)
- *   phpc deploy [dir] -o <dist> [--from-build]  Bundle binary, public/, assets/, phpc.json
+ *   phpc deploy [dir] -o <dist> [--from-build] [--oci]  Bundle binary + optional OCI/nginx context (#36392)
  *   phpc cgi [binary]                           CGI wrapper for AOT binary (issue #665)
  *   phpc fcgi [--listen host:port] [--project dir] [docroot]  FastCGI worker (#2427, #173)
  *   phpc lint [-r 'code'] [--json] [--explain] entry.php
@@ -68,6 +68,7 @@ php-compiler CLI
       PHPC_INVOKE_CWD=<dir>                     Set by ./phpc wrapper; relative paths use this base
   phpc deploy [dir] -o <dist>                   Package AOT binary + manifest trees into dist/
       --from-build                              Require existing binary (skip phpc build --project)
+      --oci                                     Emit Dockerfile + nginx FastCGI recipe (#36392)
   phpc cgi [binary]                             Run AOT binary under CGI env (stdin → REQUEST_BODY)
       PHPC_DEPLOY_ROOT=<dist>                   Resolve bin/app from deploy bundle when binary omitted
   phpc fcgi [--listen host:port] [--project dir] [docroot]
@@ -533,6 +534,7 @@ function phpCommand(): array
 function deployFromProject(string $repoRoot, array $php, array $args): int
 {
     $fromBuild = false;
+    $oci = false;
     $outputDir = null;
     $projectDir = '.';
 
@@ -541,6 +543,11 @@ function deployFromProject(string $repoRoot, array $php, array $args): int
     while ($i < $argc) {
         $arg = $args[$i];
         if ('--from-build' === $arg) {
+            ++$i;
+            continue;
+        }
+        if ('--oci' === $arg) {
+            $oci = true;
             ++$i;
             continue;
         }
@@ -606,6 +613,18 @@ function deployFromProject(string $repoRoot, array $php, array $args): int
 
     $dist = realpath($outputDir) ?: $outputDir;
     fwrite(STDOUT, "Deployed to {$dist}\n");
+
+    if ($oci) {
+        $ociErrors = \PHPCompiler\Web\ProjectDeploy::writeOciBundle($dist);
+        if ([] !== $ociErrors) {
+            foreach ($ociErrors as $message) {
+                fwrite(STDERR, $message."\n");
+            }
+
+            return 1;
+        }
+        fwrite(STDOUT, "OCI/nginx context written under {$dist} (Dockerfile, Dockerfile.fcgi, nginx/fastcgi.conf)\n");
+    }
 
     return 0;
 }

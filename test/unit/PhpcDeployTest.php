@@ -55,6 +55,23 @@ final class PhpcDeployTest extends TestCase
             $this->assertStringContainsString('PHPC_DEPLOY_ROOT', $readme);
             $this->assertStringContainsString('PHP_COMPILER_SESSION_DIR', $readme);
             $this->assertStringContainsString('cgi-wrapper', $readme);
+
+            $ociErrors = ProjectDeploy::writeOciBundle($out);
+            $this->assertSame([], $ociErrors, implode('; ', $ociErrors));
+            $this->assertFileExists($out.'/'.ProjectDeploy::OCI_DOCKERFILE);
+            $this->assertFileExists($out.'/'.ProjectDeploy::OCI_DOCKERFILE_FCGI);
+            $this->assertFileExists($out.'/'.ProjectDeploy::OCI_COMPOSE);
+            $this->assertFileExists($out.'/'.ProjectDeploy::OCI_NGINX);
+            $this->assertFileExists($out.'/'.ProjectDeploy::OCI_README);
+            $dockerfile = (string) file_get_contents($out.'/'.ProjectDeploy::OCI_DOCKERFILE);
+            $this->assertStringContainsString('FROM scratch', $dockerfile);
+            $this->assertStringContainsString('COPY public/', $dockerfile);
+            $this->assertStringContainsString('COPY assets/', $dockerfile);
+            $fcgi = (string) file_get_contents($out.'/'.ProjectDeploy::OCI_DOCKERFILE_FCGI);
+            $this->assertStringContainsString('0.0.0.0:9000', $fcgi);
+            $this->assertStringContainsString('fcgi', $fcgi);
+            $nginx = (string) file_get_contents($out.'/'.ProjectDeploy::OCI_NGINX);
+            $this->assertStringContainsString('fastcgi_pass fcgi:9000', $nginx);
         } finally {
             $this->removeTree($project);
             $this->removeTree($out);
