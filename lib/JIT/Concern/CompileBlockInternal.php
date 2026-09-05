@@ -628,10 +628,7 @@ trait CompileBlockInternal
                     $this->compileFuncCallInitOp($block, $op);
                     break;
                 case OpCode::TYPE_STATICCALL_INIT:
-                    // Nested `new T(self::make(), …)` / AppFactory::create: STATICCALL_INIT
-                    // must save the pending TYPE_NEW construct like FUNCCALL_INIT (#36382).
-                    $this->saveJitPendingOutboundCall();
-                    $this->initJitStaticCall($block, $op->arg1, $op->arg2, $op->staticCallParentScope);
+                    $this->compileStaticCallInitOp($block, $op);
                     break;
                 case OpCode::TYPE_ARG_SEND:
                     $this->compileArgSendOp($block, $op);
@@ -722,72 +719,7 @@ trait CompileBlockInternal
                     $this->compileNewOp($block, $op);
                     break;
                 case OpCode::TYPE_METHODCALL_INIT:
-                    // Nested `$obj->m()` while a TYPE_NEW construct is pending — same save
-                    // as FUNCCALL_INIT / STATICCALL_INIT (#36382 / #27242).
-                    $this->saveJitPendingOutboundCall();
-                    $receiverOp = $block->getOperand($op->arg1);
-                    $nameOp = $block->getOperand($op->arg2);
-                    // `$obj->$m()` — name may be a Temporary; VM uses scope[arg2]->toString()
-                    // (#34084). Fold compile-time string like FUNCCALL_INIT (#1997); #8407 was
-                    // variable *receiver*, not variable *name*.
-                    $nameSlot = $op->arg2;
-                    if (!$nameOp instanceof Operand\Literal && isset($block->constants[$nameSlot])) {
-                        $nameOp = new Operand\Literal($block->constants[$nameSlot]->toString());
-                    }
-                    $methodName = null;
-                    $nameVar = null;
-                    if ($nameOp instanceof Operand\Literal) {
-                        $methodName = is_string($nameOp->value) ? $nameOp->value : (string) $nameOp->value;
-                    } else {
-                        $nameVar = $this->context->getVariableFromOp($nameOp);
-                        $slot = $block->slotForOperand($nameOp);
-                        if (null !== $slot) {
-                            $this->foldCompileTimeStringFromSlot($block, $slot, $nameVar);
-                        }
-                        if (null !== $nameVar->compileTimeString) {
-                            $methodName = $nameVar->compileTimeString;
-                        }
-                    }
-                    if (null === $methodName || '' === $methodName) {
-                        // Runtime method name: `$this->$methodName()` after concat / HT fetch
-                        // (Parsedown blockContinue / element handler — #36380). Peer of
-                        // Class::$m() via RuntimeVariableStaticMethodCall (#34937).
-                        if (null === $nameVar) {
-                            $nameVar = $this->context->getVariableFromOp($nameOp);
-                        }
-                        $receiverVar = $this->context->getVariableFromOp($receiverOp);
-                        $declaredLc = strtolower(ltrim((string) (
-                            $receiverVar->classUserType
-                            ?? $this->typedPropertyClassConstraintUserType($receiverVar)
-                            ?? $receiverOp->type?->userType
-                            ?? $this->context->scope->className
-                            ?? ''
-                        ), '\\'));
-                        $candidates = $this->buildRuntimeInstanceMethodCandidatesByMethodName($declaredLc);
-                        if ([] === $candidates) {
-                            throw new \LogicException(
-                                'Instance method call name must be a compile-time string or a typed receiver with known methods (dynamic $obj->$name(); #34084 / #36380)'
-                            );
-                        }
-                        $this->context->scope->toCall = new \PHPCompiler\JIT\Call\RuntimeVariableStaticMethodCall(
-                            $nameVar,
-                            $candidates
-                        );
-                        $this->context->scope->args = [$receiverVar];
-                        $this->context->scope->callArgsIncludeReceiver = true;
-                        $this->context->scope->argOperands = [$receiverOp];
-                        break;
-                    }
-                    $this->initJitMethodCall($block, $receiverOp, $methodName, $op->objectCallInvoke);
-                    // initJitMethodCall seeds args=[receiver] but not argOperands. ARG_SEND only
-                    // appends user-arg operands — without this prefix, promoteCompileTimeStringOnCallArgs
-                    // pairs each arg with the *next* operand and shifts compileTimeString (#35234).
-                    if (
-                        1 === \count($this->context->scope->args)
-                        && ($this->context->scope->args[0] ?? null) instanceof Variable
-                    ) {
-                        $this->context->scope->argOperands = [$receiverOp];
-                    }
+                    $this->compileMethodCallInitOp($block, $op);
                     break;
                 case OpCode::TYPE_PROPERTY_FETCH:
                 case OpCode::TYPE_PROPERTY_FETCH_WRITE:
