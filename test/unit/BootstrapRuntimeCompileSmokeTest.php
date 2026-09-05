@@ -197,6 +197,11 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
             '/function isM3EmitTuCompilerSpineLoweringName\([\s\S]*?function llvmTypeForCfgParam\(/',
             $spineNativeCfg
         );
+        $skippedOpcodeStubs = (string) file_get_contents(self::$root.'/lib/JIT/Concern/CompileSkippedOpcodeVmAndCfgBranchStubs.php');
+        $this->assertMatchesRegularExpression(
+            '/function llvmInternalName\([\s\S]*?function compileSkippedCompilerCfgBranchStub\(/',
+            $skippedOpcodeStubs
+        );
         $compile = (string) file_get_contents(self::$root.'/bin/compile.php');
         $this->assertStringContainsString('PHP_COMPILER_M3_EMIT_HELPER_SPINE=1', $compile);
         $aot = (string) file_get_contents(self::$root.'/lib/JIT/M3EmitTuTrivialEchoAot.php');
@@ -207,7 +212,8 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
     public function testM3EmitParseAndCompileDefaultPhiUsesAfterRecordTail(): void
     {
         $emit = (string) file_get_contents(self::$root.'/lib/JIT/BootstrapCompileSmokeM3Emit.php');
-        $this->assertStringContainsString('$phi->addIncoming($block, $afterRecordBb)', $emit);
+        // Predecessor bb renamed to $okBb in current emit path; still the after-record tail (#3023).
+        $this->assertStringContainsString('$phi->addIncoming($block, $okBb)', $emit);
         $this->assertStringContainsString('shouldEmitRuntimeSpineDiagnosticStub', $emit);
     }
 
@@ -235,12 +241,12 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
     /** M3 compile_driver must C-floor initCompiler, not only emit TU (#2568). */
     public function testM3CompileDriverInitCompilerUsesRuntimeInitCompilerFloor(): void
     {
-        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
+        $vmSmoke = (string) file_get_contents(self::$root.'/lib/JIT/Concern/VmSmokeAndRuntimeM3NativeStubs.php');
         $this->assertStringContainsString(
             'shouldUseM3EmitTuNativeBridge() || $this->shouldUseM3CompileDriverRealLowering()',
-            $jit
+            $vmSmoke
         );
-        $this->assertStringContainsString('RuntimeInitCompiler::emit', $jit);
+        $this->assertStringContainsString('RuntimeInitCompiler::emit', $vmSmoke);
     }
 
     public function testEmitTuModeDetectsHelperLinkEnv(): void
