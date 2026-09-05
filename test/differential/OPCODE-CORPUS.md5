@@ -1,3 +1,4 @@
+test/differential/cases/array_cow_push_36397.php	15c6f31f720f84620574c14ccd392f9d
 test/differential/cases/array_cow_unset_36397.php	ffd19888e77781e222c007e01cdbd535
 test/differential/cases/array_key_exists_after_unset_36732.php	db18ea553dcd3269874202a53ee55163
 test/differential/cases/asin_acos_libm_36386.php	08c4514046b0a27d6fef4546701808c0
