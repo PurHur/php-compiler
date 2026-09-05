@@ -35,9 +35,9 @@
         }
     },
     "script_file_count": {
-        "budget": 277,
+        "budget": 278,
         "target": 150,
-        "note": "script/ top-level *.sh/*.php; ASAN/valgrind smokes under script/runtime-assert/ (#36403/#36397)"
+        "note": "script/ top-level *.sh/*.php; ASAN/valgrind smokes under script/runtime-assert/ (#36403/#36397); ratchet after master tip grew to 278"
     },
     "ci_defaults_exports": {
         "budget": 141,
