@@ -12,7 +12,7 @@ Numbered ownership invariants. php-src: [Zend/zend_gc.c](https://github.com/php/
 | **M2** | Immortal / non-refcounted headers (`TYPE_INFO_REFCOUNTED` clear) must not take the counted delref path | `__ref__delref` early return | Literal strings, interned keys |
 | **M3** | `__ref__addref` / `__ref__delref` own the count; callers never store `refcount` except init | lowering | Boxed temps, hashtable keys, objects |
 | **M4** | `{main}` may defer object free (`phpc_destruct_delref_allowed`) but still unregisters GC / WeakRef at rc 0 | `__ref__delref` | Request-lifetime objects (#4013) |
-| **M5** | Separate before writing a shared container (`rc > 1`) | `__ref__assert_exclusive` / `__ref__separate` | Arrays/strings COW; abort `PHPC_RUNTIME_ASSERT M5` |
+| **M5** | Separate before writing a shared container (`rc > 1`) | `__ref__assert_exclusive` from `__hashtable__grow` + string-key write lookup; inject probe | Arrays/strings COW; abort `PHPC_RUNTIME_ASSERT M5` |
 | **M6** | Helper-unit objects must not mix NestedJIT vs Runtime ABI for the same symbol | helper cache | leftover `*.1` symbols (#31894) |
 | **M7** | GC roots are objects whose rc hit 1 (`phpc_gc_register`); collector must not read after free | `GcCollectCyclesRuntime` | cyclic graphs (#36245) |
 
@@ -27,7 +27,9 @@ Injected probes (unit test only):
 - `PHP_COMPILER_RUNTIME_ASSERT_INJECT_DOUBLE_DELREF=1` → `phpc_runtime_assert_inject_double_delref` (malloc counted header, store rc=-1, one delref) before `{main}` → **M1**.
 - `PHP_COMPILER_RUNTIME_ASSERT_INJECT_SHARED_WRITE=1` → `phpc_runtime_assert_inject_shared_write` (init counted header, store rc=2, then `__ref__assert_exclusive`) before `{main}` → **M5**.
 
-`__ref__assert_exclusive` aborts with **M5** when a counted header still has `rc > 1` (php-src `SEPARATE_ZVAL_IF_NOT_REF` / `SEPARATE_ARRAY` in [Zend/zend_variables.h](https://github.com/php/php-src/blob/master/Zend/zend_variables.h)). Fresh containers may sit at rc=0 until the first owner addref (#36252); that is not M1.
+Under ASSERT, packed writes (`__hashtable__grow`) and string-key writes (`lookupStringKeyForWriteBranch`) call `__ref__assert_exclusive` on the container before mutating — so a skipped `separate()` on a shared array aborts with **M5** (php-src `SEPARATE_ARRAY` in [Zend/zend_variables.h](https://github.com/php/php-src/blob/master/Zend/zend_variables.h)). Exclusive containers (`rc <= 1`) and unclaimed `rc=0` headers pass.
+
+`__ref__assert_exclusive` aborts with **M5** when a counted header still has `rc > 1`. Fresh containers may sit at rc=0 until the first owner addref (#36252); that is not M1.
 
 ### ASan / valgrind smoke (#36397)
 
@@ -37,11 +39,13 @@ Injected probes (unit test only):
 ./script/runtime-assert/asan-smoke.sh          # echo under ASan/UBSan (link-path proof)
 RUNTIME_ASSERT_ASAN_FULL=1 ./script/runtime-assert/asan-smoke.sh  # 8 inline aot-smoke cases
 ./script/runtime-assert/valgrind-smoke.sh      # echo under valgrind (SKIP_NO_VALGRIND if missing)
+./script/runtime-assert/mutate-assert-smoke.sh # M5 mutate-path: COW write OK + IR has assert in grow
 ./script/runtime-assert/streak.sh status       # dual consecutive days (empty ≠ pass)
 ./script/runtime-assert/streak.sh record       # append UTC day only after real green smokes
 ./script/runtime-assert/streak.sh check        # fail unless STREAK_NEED (default 7) dual days
 ./script/runtime-assert/differential-soak.sh   # COW churn under ASan (--repeat 10); weekly soak path
 make runtime-assert-asan-smoke
+make runtime-assert-mutate-smoke
 make runtime-assert-streak-status
 make runtime-assert-differential-soak
 ```

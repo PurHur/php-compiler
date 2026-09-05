@@ -53023,7 +53023,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/Refcount.php`
 
 **Warnings** (review for bootstrap subset):
-- 23 class method(s)
+- 24 class method(s)
 
 ### `lib/JIT/Builtin/ReflectionClassClassMapRuntime.php`
 
