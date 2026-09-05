@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8251 |
-| Phase A inventory files (M2 ratio SSOT) | 8251 |
+| PHP files on vm.php path | 8252 |
+| Phase A inventory files (M2 ratio SSOT) | 8252 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26086 |
+| Source constructs flagged (warnings) | 26088 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7083,6 +7083,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/M3EmitTuRuntimeSpineDeclsAndCompileDeps.php` | 0 | 2 |
 | `lib/JIT/Concern/M3EmitTuRuntimeSpineStubNative.php` | 0 | 6 |
 | `lib/JIT/Concern/M3EmitTuSidecarLinktime.php` | 0 | 2 |
+| `lib/JIT/Concern/M3EmitTuSpineNativeTryAndCfgParamTypes.php` | 0 | 2 |
 | `lib/JIT/Concern/NestedVmHelperAndThisResolve.php` | 0 | 5 |
 | `lib/JIT/Concern/ParamConstraintsAndRuntimeNewInit.php` | 0 | 3 |
 | `lib/JIT/Concern/PropertyFetchCoalesceAndCompileTimeString.php` | 0 | 6 |
@@ -50515,19 +50516,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT\Call\ExternalMethod (line 411)
-- new JIT\Scope (line 440)
-- new Operand\Literal (line 690)
-- new Operand\Literal (line 706)
-- new JIT\Call\Native (line 1184)
-- new Variable (line 2190)
-- new JIT\Call\Native (line 2216)
-- new Variable (line 2306)
-- new JIT\Call\Vararg (line 2333)
-- new JIT\Call\Native (line 2343)
-- new JIT\Call\Native (line 3196)
-- new JIT\Call\Native (line 3227)
-- 93 class method(s)
+- new JIT\Call\ExternalMethod (line 413)
+- new JIT\Scope (line 442)
+- new Operand\Literal (line 692)
+- new Operand\Literal (line 708)
+- new JIT\Call\Native (line 1186)
+- new Variable (line 2192)
+- new JIT\Call\Native (line 2218)
+- new Variable (line 2308)
+- new JIT\Call\Vararg (line 2335)
+- new JIT\Call\Native (line 2345)
+- new JIT\Call\Native (line 2602)
+- new JIT\Call\Native (line 2633)
+- 73 class method(s)
 - 12 closure(s)
 
 ### `lib/JIT/Analyzer.php`
@@ -58288,6 +58289,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - trait M3EmitTuSidecarLinktime (line 14)
 - 17 class method(s)
 
+### `lib/JIT/Concern/M3EmitTuSpineNativeTryAndCfgParamTypes.php`
+
+**Warnings** (review for bootstrap subset):
+- trait M3EmitTuSpineNativeTryAndCfgParamTypes (line 23)
+- 20 class method(s)
+
 ### `lib/JIT/Concern/NestedVmHelperAndThisResolve.php`
 
 **Warnings** (review for bootstrap subset):
@@ -60250,7 +60257,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/SpineChunkRuntimeMethodDemote.php`
 
 **Warnings** (review for bootstrap subset):
-- new OpCode (line 223)
+- new OpCode (line 224)
 - 11 class method(s)
 
 ### `lib/JIT/SpineChunkStandardHelperBind.php`
