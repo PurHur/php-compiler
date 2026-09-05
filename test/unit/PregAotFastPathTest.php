@@ -328,4 +328,39 @@ final class PregAotFastPathTest extends TestCase
         $this->assertSame(0, PregAotFastPath::matchCount('/^[0-9a-f]{32}$/', $hex, 1));
         $this->assertSame(1, PregAotFastPath::matchCount('#^[0-9a-f]{32}$#', $hex, 0));
     }
+
+    /**
+     * Issue #36382 — FastRoute Std::parse uses VARIABLE_REGEX(*SKIP)(*F)|\[ under thin AOT.
+     * php-src: ext/pcre (*SKIP)(*F); without this, preg_split returns false / Internal error.
+     */
+    public function testFastRouteSkipVerbBracketSplitFind(): void
+    {
+        $rx = <<<'REGEX'
+\{
+    \s* ([a-zA-Z_][a-zA-Z0-9_-]*) \s*
+    (?:
+        : \s* ([^{}]*(?:\{(?-1)\}[^{}]*)*)
+    )?
+\}
+REGEX;
+        $splitPat = '~' . $rx . '(*SKIP)(*F) | \[~x';
+        $this->assertSame(0, PregAotFastPath::replaceFindNext($splitPat, '/hello', 0));
+        $this->assertSame(-1, PregAotFastPath::takeLastReplacePos());
+
+        $this->assertSame(1, PregAotFastPath::replaceFindNext($splitPat, '/hello[/{id}]', 0));
+        $this->assertSame(6, PregAotFastPath::takeLastReplacePos());
+        $this->assertSame(1, PregAotFastPath::takeLastReplaceBodyLen());
+
+        // `[` inside `{…}` must be skipped (FastRoute placeholder custom regex).
+        $this->assertSame(1, PregAotFastPath::replaceFindNext($splitPat, '/x/{a:[0-9]}[opt]', 0));
+        $this->assertSame(12, PregAotFastPath::takeLastReplacePos());
+
+        $closePat = '~' . $rx . '(*SKIP)(*F) | \]~x';
+        $this->assertSame(0, PregAotFastPath::replaceFindNext($closePat, '/hello', 0));
+        $this->assertSame(1, PregAotFastPath::replaceFindNext($closePat, '/hello]', 0));
+        $this->assertSame(6, PregAotFastPath::takeLastReplacePos());
+        // `]` inside `{…}` skipped — outer closer after placeholder.
+        $this->assertSame(1, PregAotFastPath::replaceFindNext($closePat, '/x/{a:]}y]', 0));
+        $this->assertSame(9, PregAotFastPath::takeLastReplacePos());
+    }
 }
