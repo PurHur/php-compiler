@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 #
-# #36397 slice 6/7/8: prove M5 exclusive-write is wired into real hashtable mutate
-# paths (grow + string-key + object-key + unset), and that normal COW separate+write/unset still succeeds.
+# #36397 slice 6–9: prove M5 exclusive-write is wired into real hashtable mutate
+# paths (grow + string-key + object-key + unset + by-ref stdlib mutators), and that
+# normal COW separate+write/unset/push still succeeds.
 #
 # Usage:
 #   ./script/runtime-assert/mutate-assert-smoke.sh
@@ -144,6 +145,57 @@ if [[ "$unset_trimmed" != "01" ]]; then
   echo "runtime-assert-mutate-smoke: FAIL — expected 01 from COW unset, got: $unset_out" >&2
   exit 1
 fi
+
+echo "runtime-assert-mutate-smoke: run COW array_push (must not false-positive M5)…"
+PUSH_SRC="$WORKDIR/cow_push.php"
+PUSH_BIN="$WORKDIR/cow_push.bin"
+cat > "$PUSH_SRC" <<'PHP'
+<?php
+$a = [1, 2];
+$b = $a;
+array_push($a, 3);
+echo count($a), count($b), isset($b[2]) ? '1' : '0', "\n";
+PHP
+env \
+  PHP_COMPILER_HELPER_RUNTIME_O=0 \
+  PHP_COMPILER_HELPER_RUNTIME_CACHE_DIR="$CACHE-push" \
+  PHP_COMPILER_RUNTIME_ASSERT=1 \
+  "$PHP_BIN" bin/compile.php -o "$PUSH_BIN" "$PUSH_SRC"
+push_out="$("$PUSH_BIN" 2>&1)"
+push_rc=$?
+if [[ "$push_rc" -ne 0 ]]; then
+  echo "runtime-assert-mutate-smoke: FAIL — COW array_push exited $push_rc: $push_out" >&2
+  exit 1
+fi
+push_trimmed="$(printf '%s' "$push_out" | tr -d '\r')"
+if [[ "$push_trimmed" != "320" ]]; then
+  echo "runtime-assert-mutate-smoke: FAIL — expected 320 from COW array_push, got: $push_out" >&2
+  exit 1
+fi
+
+echo "runtime-assert-mutate-smoke: source gates for by-ref mutator COW (#36397 slice 9)…"
+for f in \
+  lib/JIT/Builtin/ArrayPushRuntime.php \
+  lib/JIT/Builtin/ArrayUnshiftRuntime.php \
+  lib/JIT/Builtin/ArrayPopRuntime.php \
+  lib/JIT/Builtin/ArrayShiftRuntime.php \
+  lib/JIT/Builtin/ArraySpliceRuntime.php
+do
+  if ! grep -q 'separateContainerForWrite' "$ROOT/$f"; then
+    echo "runtime-assert-mutate-smoke: FAIL — $f missing separateContainerForWrite" >&2
+    exit 1
+  fi
+done
+for f in \
+  lib/JIT/HashTablePopLastLlvm.php \
+  lib/JIT/HashTableShiftLlvm.php \
+  lib/JIT/HashTableSpliceLlvm.php
+do
+  if ! grep -q 'emitAssertExclusiveCall' "$ROOT/$f"; then
+    echo "runtime-assert-mutate-smoke: FAIL — $f missing emitAssertExclusiveCall" >&2
+    exit 1
+  fi
+done
 
 echo "runtime-assert-mutate-smoke: inject shared-write still aborts M5…"
 INJ_SRC="$WORKDIR/inject.php"

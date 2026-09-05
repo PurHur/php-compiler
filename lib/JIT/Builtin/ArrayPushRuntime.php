@@ -29,7 +29,8 @@ final class ArrayPushRuntime
     public static function push(Context $context, JITVariable $array, JITVariable ...$values): Value
     {
         self::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        // By-ref mutator: SEPARATE_ARRAY before append (php-src array_push / #36397).
+        $ht = HashTableHelper::separateContainerForWrite($context, $array);
         $native = ArrayBuiltinHelper::isNativeArray($array->type);
         foreach ($values as $value) {
             ArrayBuiltinHelper::appendElement($context, $ht, $value);

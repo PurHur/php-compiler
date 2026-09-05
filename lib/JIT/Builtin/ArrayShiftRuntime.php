@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\HashTableShiftLlvm;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -23,7 +23,8 @@ final class ArrayShiftRuntime
 {
     public static function shift(Context $context, JITVariable $array): Value
     {
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        // By-ref mutator: SEPARATE_ARRAY before shift (php-src array_shift / #36397).
+        $ht = HashTableHelper::separateContainerForWrite($context, $array);
 
         return HashTableShiftLlvm::shiftFirst($context, $ht);
     }

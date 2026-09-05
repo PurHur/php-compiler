@@ -33,7 +33,8 @@ final class ArraySpliceRuntime
         ?JITVariable $replacement,
         bool $hasReplacementArg
     ): Value {
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        // By-ref mutator: SEPARATE_ARRAY before splice (php-src array_splice / #36397).
+        $ht = HashTableHelper::separateContainerForWrite($context, $array);
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $i1 = $context->getTypeFromString('int1');
         $hasReplFlag = $hasReplacementArg

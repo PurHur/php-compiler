@@ -147,6 +147,22 @@ final class RuntimeAssertDelrefAotTest extends TestCase
         );
         $this->assertStringContainsString('Unset mutates without grow / string-key write chokepoints', $ht);
         $this->assertStringContainsString('Unset mutates without grow / object-key write chokepoints', $ht);
+        $push = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Builtin/ArrayPushRuntime.php');
+        $unshift = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Builtin/ArrayUnshiftRuntime.php');
+        $pop = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Builtin/ArrayPopRuntime.php');
+        $shift = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Builtin/ArrayShiftRuntime.php');
+        $splice = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Builtin/ArraySpliceRuntime.php');
+        $popLlvm = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/HashTablePopLastLlvm.php');
+        $shiftLlvm = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/HashTableShiftLlvm.php');
+        $spliceLlvm = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/HashTableSpliceLlvm.php');
+        foreach ([$push, $unshift, $pop, $shift, $splice] as $src) {
+            $this->assertStringContainsString('separateContainerForWrite', $src);
+        }
+        $this->assertStringContainsString('emitAssertExclusiveCall', $popLlvm);
+        $this->assertStringContainsString('emitAssertExclusiveCall', $shiftLlvm);
+        $this->assertStringContainsString('emitAssertExclusiveCall', $spliceLlvm);
+        $this->assertStringContainsString('Mutates packed storage without grow/unset chokepoints', $popLlvm);
+        $this->assertStringContainsString('In-place splice skips grow/unset write chokepoints', $spliceLlvm);
     }
 
     public function testEnabledReadsAliasAndConfigKnob(): void

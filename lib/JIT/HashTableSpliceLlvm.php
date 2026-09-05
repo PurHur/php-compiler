@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\JIT\Builtin\Refcount;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -109,6 +110,8 @@ final class HashTableSpliceLlvm
         Value $hasReplacement,
         Value $replacementHt
     ): Value {
+        // In-place splice skips grow/unset write chokepoints — M5 (#36397).
+        Refcount::emitAssertExclusiveCall($context, $srcHt);
         $map = $context->structFieldMap['__hashtable__'];
         $sizeT = $context->getTypeFromString('size_t');
         $i64 = $context->getTypeFromString('int64');

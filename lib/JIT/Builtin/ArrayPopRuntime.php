@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\HashTablePopLastLlvm;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -24,7 +24,8 @@ final class ArrayPopRuntime
 {
     public static function pop(Context $context, JITVariable $array): Value
     {
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        // By-ref mutator: SEPARATE_ARRAY before pop (php-src array_pop / #36397).
+        $ht = HashTableHelper::separateContainerForWrite($context, $array);
 
         return HashTablePopLastLlvm::popLast($context, $ht);
     }
