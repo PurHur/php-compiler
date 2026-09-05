@@ -18,6 +18,7 @@ require_once __DIR__.'/JIT/Concern/CompilePropertyFetchReadAndWrite.php';
 require_once __DIR__.'/JIT/Concern/CompileEchoAndPrint.php';
 require_once __DIR__.'/JIT/Concern/CompileConcat.php';
 require_once __DIR__.'/JIT/Concern/CompileFuncCallExecReturn.php';
+require_once __DIR__.'/JIT/Concern/CompileAssign.php';
 require_once __DIR__.'/JIT/Concern/CompileArrayDimFetchReadAndWrite.php';
 require_once __DIR__.'/JIT/Concern/InitJitMethodCall.php';
 require_once __DIR__.'/JIT/Concern/AssignOperand.php';
@@ -92,6 +93,7 @@ class JIT {
     use CompileEchoAndPrint;
     use CompileConcat;
     use CompileFuncCallExecReturn;
+    use CompileAssign;
     use CompileArrayDimFetchReadAndWrite;
     use InitJitMethodCall;
     use AssignOperand;
