@@ -92,6 +92,11 @@ if [[ -f "$RC" ]]; then
   php "$ROOT/script/composer/patch-slim-route-collector-36382.php" "$RC"
 fi
 
+AF="$DEST/vendor/slim/slim/Slim/Factory/AppFactory.php"
+if [[ -f "$AF" ]]; then
+  php "$ROOT/script/composer/patch-slim-appfactory-36382.php" "$AF"
+fi
+
 echo "Created $DEST ($(find "$DEST" -name '*.php' | wc -l) php files)"
 echo "Try: ./phpc build --project $DEST --dry-run"
 echo "Note: reachable graph ~94 files; AOT uses incremental requires (>=32 units) — see #36382"

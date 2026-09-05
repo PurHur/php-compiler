@@ -5857,6 +5857,20 @@ class Context {
                 $returnSlots[$resolved] = true;
             }
         }
+        // Pending call args already SENDed must survive later ?? / sub-block freeDead
+        // before FUNCCALL_EXEC (e.g. `new App(self::make(), self::$o ?? null)` — Slim
+        // AppFactory::create). php-src zend_send_by_val keeps the zval on the VM stack
+        // until DO_FCALL; freeing the producer temp here UAF'd the object (#36382).
+        foreach ($this->scope->argOperands as $pendingArgOp) {
+            if (!$pendingArgOp instanceof Operand) {
+                continue;
+            }
+            $returnOperands[$pendingArgOp] = true;
+            $pendingSlot = $block->slotForOperand($pendingArgOp);
+            if (null !== $pendingSlot) {
+                $returnSlots[$pendingSlot] = true;
+            }
+        }
         $returnVarNames = [];
         foreach ($returnOperands as $returnOp) {
             $name = OperandName::resolve($returnOp);

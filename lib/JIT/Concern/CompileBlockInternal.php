@@ -1812,6 +1812,9 @@ trait CompileBlockInternal
                     $this->compileFuncCallInitOp($block, $op);
                     break;
                 case OpCode::TYPE_STATICCALL_INIT:
+                    // Nested `new T(self::make(), …)` / AppFactory::create: STATICCALL_INIT
+                    // must save the pending TYPE_NEW construct like FUNCCALL_INIT (#36382).
+                    $this->saveJitPendingOutboundCall();
                     $this->initJitStaticCall($block, $op->arg1, $op->arg2, $op->staticCallParentScope);
                     break;
                 case OpCode::TYPE_ARG_SEND:
@@ -2112,6 +2115,9 @@ trait CompileBlockInternal
                     $this->compileNewOp($block, $op);
                     break;
                 case OpCode::TYPE_METHODCALL_INIT:
+                    // Nested `$obj->m()` while a TYPE_NEW construct is pending — same save
+                    // as FUNCCALL_INIT / STATICCALL_INIT (#36382 / #27242).
+                    $this->saveJitPendingOutboundCall();
                     $receiverOp = $block->getOperand($op->arg1);
                     $nameOp = $block->getOperand($op->arg2);
                     // `$obj->$m()` — name may be a Temporary; VM uses scope[arg2]->toString()
