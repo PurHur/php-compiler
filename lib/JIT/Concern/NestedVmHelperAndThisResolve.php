@@ -283,6 +283,90 @@ trait NestedVmHelperAndThisResolve
     }
 
     /**
+     * Map instance method names on one class to proxies for `$obj->$m()` (#36380 / #34084).
+     *
+     * Peer of {@see buildRuntimeStaticMethodCandidatesByMethodName} for `Class::$m()` (#34937)
+     * and {@see \PHPCompiler\VM\VmFromCallable} bound-array callables (#36382).
+     *
+     * @return array<string, JIT\Call> lowercase method => proxy
+     */
+    private function buildRuntimeInstanceMethodCandidatesByMethodName(string $declaredLc): array
+    {
+        $declaredLc = strtolower(ltrim($declaredLc, '\\'));
+        if ('' === $declaredLc || 'object' === $declaredLc) {
+            return [];
+        }
+        if (!$this->context->type->object->hasDeclaredClass($declaredLc)) {
+            return [];
+        }
+        $classId = $this->context->type->object->lookup($declaredLc);
+        $candidates = [];
+        foreach ($this->context->type->object->allMethodNamesForClassId($classId, 0) as $display) {
+            $methodLc = strtolower((string) $display);
+            if ('__construct' === $methodLc || '__destruct' === $methodLc) {
+                continue;
+            }
+            if ($this->context->type->object->hasMethod($classId, $methodLc)) {
+                $vis = $this->context->type->object->methodVisibility($classId, $methodLc);
+                if (0 !== ($vis & \PHPCfg\Func::FLAG_STATIC)) {
+                    continue;
+                }
+            }
+            $proxyName = $this->softResolveJitInstanceMethodProxyName($declaredLc, $methodLc);
+            if (null === $proxyName || !$this->context->functionIsRegistered($proxyName)) {
+                continue;
+            }
+            $proxy = $this->context->resolveFunctionProxy($proxyName);
+            // User methods are Native; arity-strict Call stubs abort when every arm is emitted
+            // with this site's argc (peer VmFromCallable / #36382).
+            if (!($proxy instanceof JIT\Call\Native) && !($proxy instanceof JIT\Call\Vararg)) {
+                continue;
+            }
+            $candidates[$methodLc] = $proxy;
+        }
+        ksort($candidates);
+
+        return $candidates;
+    }
+
+    /**
+     * Soft walk of extends/trait proxies — never throws on missing SPL stubs (#36380).
+     */
+    private function softResolveJitInstanceMethodProxyName(string $classLc, string $methodLc): ?string
+    {
+        $methodLc = strtolower($methodLc);
+        $visited = [];
+        $current = strtolower(ltrim($classLc, '\\'));
+        if ('simplemxml_element' === $current) {
+            $current = 'simplexmlelement';
+        }
+        while (!isset($visited[$current])) {
+            $visited[$current] = true;
+            $proxy = $current.'::'.$methodLc;
+            if ($this->context->functionIsRegistered($proxy)) {
+                return $proxy;
+            }
+            if ($this->context->type->object->hasDeclaredClass($current)) {
+                $cid = $this->context->type->object->lookup($current);
+                $traitLc = $this->context->type->object->traitMethodSource($cid, $methodLc);
+                if (null !== $traitLc) {
+                    $traitProxy = strtolower($traitLc).'::'.$methodLc;
+                    if ($this->context->functionIsRegistered($traitProxy)) {
+                        return $traitProxy;
+                    }
+                }
+            }
+            $parent = $this->context->type->object->parentClassLc($current);
+            if (null === $parent || '' === $parent) {
+                break;
+            }
+            $current = $parent;
+        }
+
+        return null;
+    }
+
+    /**
      * @return array<int, JIT\Call> class id => invoke proxy
      */
     private function buildRuntimeInstanceMethodCandidatesByClassId(string $methodLc): array

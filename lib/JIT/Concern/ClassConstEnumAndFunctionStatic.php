@@ -8,6 +8,8 @@ use PHPCfg\Operand;
 use PHPCompiler\Block;
 use PHPCompiler\Compiler\AttributeClassRegistry;
 use PHPCompiler\JIT\Variable;
+use PHPTypes\Type;
+use PHPLLVM;
 
 /**
  * Class-const / enum seed and function-static init (#36387).
