@@ -28,6 +28,7 @@ require_once __DIR__.'/JIT/Concern/CompileJumpIf.php';
 require_once __DIR__.'/JIT/Concern/CompileClassConstFetch.php';
 require_once __DIR__.'/JIT/Concern/CompileReturn.php';
 require_once __DIR__.'/JIT/Concern/CompileAssignRef.php';
+require_once __DIR__.'/JIT/Concern/CompileArgRecv.php';
 require_once __DIR__.'/JIT/Concern/CompilePow.php';
 require_once __DIR__.'/JIT/Concern/CompileCast.php';
 require_once __DIR__.'/JIT/Concern/CompileInitArray.php';
@@ -116,6 +117,7 @@ class JIT {
     use CompileClassConstFetch;
     use CompileReturn;
     use CompileAssignRef;
+    use CompileArgRecv;
     use CompilePow;
     use CompileCast;
     use CompileInitArray;

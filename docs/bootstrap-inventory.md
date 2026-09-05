@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8278 |
-| Phase A inventory files (M2 ratio SSOT) | 8278 |
+| PHP files on vm.php path | 8279 |
+| Phase A inventory files (M2 ratio SSOT) | 8279 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26149 |
+| Source constructs flagged (warnings) | 26151 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7064,6 +7064,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/ClassConstEnumAndFunctionStatic.php` | 0 | 9 |
 | `lib/JIT/Concern/ClosureThisAndStaticScopeResolve.php` | 0 | 2 |
 | `lib/JIT/Concern/CoerceReturnPropertyDeclaringAndByRef.php` | 0 | 3 |
+| `lib/JIT/Concern/CompileArgRecv.php` | 0 | 2 |
 | `lib/JIT/Concern/CompileArgSend.php` | 0 | 2 |
 | `lib/JIT/Concern/CompileArrayDimFetchReadAndWrite.php` | 0 | 7 |
 | `lib/JIT/Concern/CompileAssign.php` | 0 | 6 |
@@ -58087,6 +58088,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Operand\Literal (line 834)
 - 41 class method(s)
 
+### `lib/JIT/Concern/CompileArgRecv.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CompileArgRecv (line 20)
+- 1 class method(s)
+
 ### `lib/JIT/Concern/CompileArgSend.php`
 
 **Warnings** (review for bootstrap subset):
@@ -58131,18 +58138,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - trait CompileBlockInternal (line 27)
-- new Type (line 581)
-- new Error (line 705)
-- new Variable (line 742)
-- new Variable (line 750)
-- new Operand\Literal (line 966)
-- new Operand\Literal (line 1083)
-- new OpCode (line 1296)
-- new Variable (line 1531)
-- new Variable (line 1619)
-- new Variable (line 1649)
-- new VM (line 1743)
-- new Operand\Literal (line 2029)
+- new Type (line 430)
+- new Error (line 554)
+- new Variable (line 591)
+- new Variable (line 599)
+- new Operand\Literal (line 815)
+- new Operand\Literal (line 932)
+- new OpCode (line 1145)
+- new Variable (line 1380)
+- new Variable (line 1468)
+- new Variable (line 1498)
+- new VM (line 1595)
+- new Operand\Literal (line 1884)
 - 2 class method(s)
 - 1 closure(s)
 
@@ -58914,14 +58921,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 5309)
 - new Variable (line 5602)
 - new Variable (line 5729)
-- new VMVariable (line 5963)
-- new VMVariable (line 5979)
-- new VMVariable (line 5985)
-- new VMVariable (line 5991)
-- new VMVariable (line 6002)
-- new Variable (line 6066)
-- new Variable (line 6086)
-- new Variable (line 6131)
+- new VMVariable (line 5977)
+- new VMVariable (line 5993)
+- new VMVariable (line 5999)
+- new VMVariable (line 6005)
+- new VMVariable (line 6016)
+- new Variable (line 6080)
+- new Variable (line 6100)
+- new Variable (line 6145)
 - 144 class method(s)
 - 37 closure(s)
 
