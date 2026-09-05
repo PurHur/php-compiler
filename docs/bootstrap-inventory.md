@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8257 |
-| Phase A inventory files (M2 ratio SSOT) | 8257 |
+| PHP files on vm.php path | 8258 |
+| Phase A inventory files (M2 ratio SSOT) | 8258 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26107 |
+| Source constructs flagged (warnings) | 26108 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5680,7 +5680,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/GlobalTypedConstSyntaxRejector.php` | 0 | 2 |
 | `lib/Handler.php` | 0 | 1 |
 | `lib/HexFloat.php` | 0 | 1 |
-| `lib/JIT.php` | 0 | 4 |
 | `lib/JIT/Analyzer.php` | 0 | 1 |
 | `lib/JIT/AotDebugSymbols.php` | 0 | 1 |
 | `lib/JIT/AotGcSections.php` | 0 | 1 |
@@ -7076,6 +7075,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/EmitJitReturn.php` | 0 | 2 |
 | `lib/JIT/Concern/InitJitMethodCall.php` | 0 | 3 |
 | `lib/JIT/Concern/InitJitStaticCall.php` | 0 | 15 |
+| `lib/JIT/Concern/JitCompileEntryRunQueueAndBlockStorage.php` | 0 | 5 |
 | `lib/JIT/Concern/JitConstructAssignedAndNativeLongLocal.php` | 0 | 4 |
 | `lib/JIT/Concern/ListUnpackClassDeclareAndIncludeAssign.php` | 0 | 4 |
 | `lib/JIT/Concern/LocalReleaseUnsetAndVarFetchDest.php` | 0 | 2 |
@@ -50518,14 +50518,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
-### `lib/JIT.php`
-
-**Warnings** (review for bootstrap subset):
-- new JIT\Call\ExternalMethod (line 423)
-- new JIT\Scope (line 452)
-- 9 class method(s)
-- 1 closure(s)
-
 ### `lib/JIT/Analyzer.php`
 
 **Warnings** (review for bootstrap subset):
@@ -58229,6 +58221,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 12 class method(s)
 - 1 closure(s)
 
+### `lib/JIT/Concern/JitCompileEntryRunQueueAndBlockStorage.php`
+
+**Warnings** (review for bootstrap subset):
+- trait JitCompileEntryRunQueueAndBlockStorage (line 22)
+- new JIT\Call\ExternalMethod (line 254)
+- new JIT\Scope (line 283)
+- 9 class method(s)
+- 1 closure(s)
+
 ### `lib/JIT/Concern/JitConstructAssignedAndNativeLongLocal.php`
 
 **Warnings** (review for bootstrap subset):
@@ -60298,7 +60299,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/SpineChunkRuntimeMethodDemote.php`
 
 **Warnings** (review for bootstrap subset):
-- new OpCode (line 229)
+- new OpCode (line 230)
 - 11 class method(s)
 
 ### `lib/JIT/SpineChunkStandardHelperBind.php`

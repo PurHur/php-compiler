@@ -1,46 +1,46 @@
 {
-  "version": 1,
-  "role": "size budgets + ratchet (#36403)",
-  "done_when_ceiling": 25000,
-  "files": {
-    "lib/Compiler.php": {
-      "budget": 1028,
-      "target": 20000,
-      "note": "Concern trait splits (#36230/#36387/#36403); CompileFuncCfgReturnAndGlobalImport + peers"
+    "version": 1,
+    "role": "size budgets + ratchet (#36403)",
+    "done_when_ceiling": 25000,
+    "files": {
+        "lib/Compiler.php": {
+            "budget": 1028,
+            "target": 20000,
+            "note": "Concern trait splits (#36230/#36387/#36403); CompileFuncCfgReturnAndGlobalImport + peers"
+        },
+        "lib/JIT.php": {
+            "budget": 193,
+            "target": 20000,
+            "note": "Concern trait splits (#36387/#36403); JitCompileEntryRunQueueAndBlockStorage + CompileBlockDispatchAndReflectionMeta + M3M4M5CompileDriverEmitPolicy + peers"
+        },
+        "lib/VM.php": {
+            "budget": 18326,
+            "target": 15000,
+            "note": "TypedIntRecursiveAndCountedLoopFastPath + PropertyFetchDestAndHookedDimWrite + ObjectPropertyMagicAndClone + ClassTraitComposition + ObjectPropertyReadonlyAndVisibility + Hooks + CollectAndSerialize + IssetEmptyUnset Concern extracts (#36403); toward 15k target"
+        },
+        "script/apply-patches.sh": {
+            "budget": 7637,
+            "target": 4000,
+            "note": "prefer patches/ + short idempotent guards"
+        },
+        "lib/AOT/Linker.php": {
+            "budget": 1008,
+            "target": 8000,
+            "note": "already under target; output helpers in LinkerOutputArtifacts (#36403); ASAN via clang/gcc (#36397)"
+        },
+        "lib/AOT/HelperRuntimeCache.php": {
+            "budget": 1599,
+            "target": 1200,
+            "note": "helper-cache granularity; sorted linkObjects (#36399); refusePrelinkGcMixReason (#36401); ratchet after #36778"
+        }
     },
-    "lib/JIT.php": {
-      "budget": 667,
-      "target": 20000,
-      "note": "Concern trait splits (#36387/#36403); CompileBlockDispatchAndReflectionMeta + M3M4M5CompileDriverEmitPolicy + peers"
+    "script_file_count": {
+        "budget": 279,
+        "target": 150,
+        "note": "script/ top-level *.sh/*.php; ASAN/valgrind smokes under script/runtime-assert/ (#36403/#36397); ratchet after master tip grew to 279"
     },
-    "lib/VM.php": {
-      "budget": 18326,
-      "target": 15000,
-      "note": "TypedIntRecursiveAndCountedLoopFastPath + PropertyFetchDestAndHookedDimWrite + ObjectPropertyMagicAndClone + ClassTraitComposition + ObjectPropertyReadonlyAndVisibility + Hooks + CollectAndSerialize + IssetEmptyUnset Concern extracts (#36403); toward 15k target"
-    },
-    "script/apply-patches.sh": {
-      "budget": 7637,
-      "target": 4000,
-      "note": "prefer patches/ + short idempotent guards"
-    },
-    "lib/AOT/Linker.php": {
-      "budget": 1008,
-      "target": 8000,
-      "note": "already under target; output helpers in LinkerOutputArtifacts (#36403); ASAN via clang/gcc (#36397)"
-    },
-    "lib/AOT/HelperRuntimeCache.php": {
-      "budget": 1599,
-      "target": 1200,
-      "note": "helper-cache granularity; sorted linkObjects (#36399); refusePrelinkGcMixReason (#36401); ratchet after #36778"
+    "ci_defaults_exports": {
+        "budget": 141,
+        "target": 60
     }
-  },
-  "script_file_count": {
-    "budget": 279,
-    "target": 150,
-    "note": "script/ top-level *.sh/*.php; ASAN/valgrind smokes under script/runtime-assert/ (#36403/#36397); ratchet after master tip grew to 279"
-  },
-  "ci_defaults_exports": {
-    "budget": 141,
-    "target": 60
-  }
 }

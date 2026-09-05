@@ -115,9 +115,9 @@ final class BootstrapSelfhostDriverSmokeTest extends TestCase
     /** Issue #3011: gen-2 helloworld driver must not stub-link bin/compile.php via sidecar shortcut. */
     public function testHelloworldBinCompileArgvUsesInventoryLinkNotStubSidecar(): void
     {
-        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
+        $entryRunQueue = (string) file_get_contents(self::$root.'/lib/JIT/Concern/JitCompileEntryRunQueueAndBlockStorage.php');
         $m3m4m5Policy = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3M4M5CompileDriverEmitPolicy.php');
-        $this->assertStringContainsString('shouldUseHelloworldBinCompileInventoryArgvLink', $jit);
+        $this->assertStringContainsString('shouldUseHelloworldBinCompileInventoryArgvLink', $entryRunQueue);
         $this->assertStringContainsString('shouldUseM3InventoryEmitForCompileDriverBlock', $m3m4m5Policy);
         $compileBin = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-helloworld-compile-bin.sh');
         $this->assertStringContainsString('build/bin-compile-aot-inventory', $compileBin);
