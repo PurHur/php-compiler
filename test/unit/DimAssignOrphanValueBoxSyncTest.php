@@ -13,9 +13,11 @@ final class DimAssignOrphanValueBoxSyncTest extends TestCase
 {
     public function testAssignOperandSyncsDimWriteOrphanBox(): void
     {
-        $jit = (string) file_get_contents(__DIR__.'/../../lib/JIT.php');
-        $this->assertStringContainsString('syncDimWriteOrphanValueBox', $jit);
-        $this->assertStringContainsString('#24055', $jit);
+        $concern = (string) file_get_contents(__DIR__.'/../../lib/JIT/Concern/ValueBoxCoalesceAndConcatHelpers.php');
+        $this->assertStringContainsString('syncDimWriteOrphanValueBox', $concern);
+        $this->assertStringContainsString('#24055', $concern);
+        $assign = (string) file_get_contents(__DIR__.'/../../lib/JIT/Concern/AssignOperand.php');
+        $this->assertStringContainsString('syncDimWriteOrphanValueBox', $assign);
     }
 
     public function testSetValueBoxAtIndexDispatchesHashtable(): void
