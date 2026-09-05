@@ -5384,8 +5384,10 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/CompileFuncCfgReturnAndGlob
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileBlockInternal.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompilePropertyFetchReadAndWrite.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileEchoAndPrint.php';
+require_once __DIR__.'/../../../lib/JIT/Concern/CompileStaticPropertyAndUnset.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileConcat.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileFuncCallExecReturn.php';
+require_once __DIR__.'/../../../lib/JIT/Concern/CompileAssign.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileArrayDimFetchReadAndWrite.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AssignOperand.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AdaptByRefCallArgs.php';
