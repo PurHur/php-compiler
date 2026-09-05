@@ -390,6 +390,9 @@ final class Variable {
     /** Declared type label for property TypeError text (e.g. `self`, `parent`). */
     public ?string $objectPropertyDeclaredTypeLabel = null;
 
+    /** Nullable class/interface property (`?T` / `T|null`) — null assigns are legal (#36382). */
+    public bool $objectPropertyAllowsNull = false;
+
     /** __set dispatch when the property slot does not exist (#146, #4022). */
     public ?\PHPLLVM\Value $magicSetReceiver = null;
 

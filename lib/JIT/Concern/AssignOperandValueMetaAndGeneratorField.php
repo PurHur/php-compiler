@@ -462,6 +462,7 @@ trait AssignOperandValueMetaAndGeneratorField
             $dest->objectPropertyDnfArms = null;
             $dest->objectPropertyClassConstraint = null;
             $dest->objectPropertyDeclaredTypeLabel = null;
+            $dest->objectPropertyAllowsNull = false;
         } elseif ($this->isScalarObjectPropertyAliasType($src->objectPropertyType)) {
             // Scalar prop reads: copy the value only (#34465 / peer #33849).
             $dest->objectPropertySlot = null;
@@ -473,6 +474,7 @@ trait AssignOperandValueMetaAndGeneratorField
             $dest->objectPropertyDnfArms = null;
             $dest->objectPropertyClassConstraint = null;
             $dest->objectPropertyDeclaredTypeLabel = null;
+            $dest->objectPropertyAllowsNull = false;
         } else {
             $this->copyObjectPropertyBacking($dest, $src);
         }
@@ -511,6 +513,7 @@ trait AssignOperandValueMetaAndGeneratorField
         $dest->objectPropertyDnfArms = $src->objectPropertyDnfArms;
         $dest->objectPropertyClassConstraint = $src->objectPropertyClassConstraint;
         $dest->objectPropertyDeclaredTypeLabel = $src->objectPropertyDeclaredTypeLabel;
+        $dest->objectPropertyAllowsNull = $src->objectPropertyAllowsNull;
         $dest->closureCall = $src->closureCall;
         $dest->closureIsStatic = $src->closureIsStatic;
         $dest->closureIsMethodFake = $src->closureIsMethodFake;

@@ -724,6 +724,7 @@ trait TernaryJumpIfEchoMerge
         $boxed->objectPropertyDnfArms = null;
         $boxed->objectPropertyClassConstraint = null;
         $boxed->objectPropertyDeclaredTypeLabel = null;
+        $boxed->objectPropertyAllowsNull = false;
 
         return $boxed;
     }
