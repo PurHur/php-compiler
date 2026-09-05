@@ -18,7 +18,8 @@ use PHPCompiler\Web\ProjectManifest;
  * Static PSR-4 class reference discovery for phpc build --project (issue #1803).
  *
  * Walks entry/includes for syntactic class references (new, static call, extends,
- * implements, ::class) and expands the compile graph via phpc.json autoload.psr-4.
+ * implements, ::class, property types, trait uses, FQCN string property defaults)
+ * and expands the compile graph via phpc.json autoload.psr-4.
  */
 final class AutoloadDiscovery
 {
@@ -71,22 +72,7 @@ final class AutoloadDiscovery
                 return;
             }
 
-            foreach (StaticClassReferenceScanner::fromScript($script) as $className) {
-                if (!self::isPsr4Candidate($className, $psr4Map)) {
-                    continue;
-                }
-
-                $resolvedPath = ProjectAutoload::resolveClassPath($className, $psr4Map);
-                if (null === $resolvedPath) {
-                    $expected = self::expectedRelativePath($projectDir, $className, $psr4Map);
-                    $errors[] = 'autoload: unresolved class '.$className
-                        .($expected ? ' (expected '.$expected.')' : '');
-
-                    continue;
-                }
-
-                $visit($resolvedPath);
-            }
+            self::expandScriptReferences($script, $projectDir, $psr4Map, $visit, $errors);
 
             unset($visiting[$resolved]);
             if (isset($seenFiles[$resolved])) {
@@ -109,23 +95,54 @@ final class AutoloadDiscovery
             } catch (\Throwable) {
                 continue;
             }
-            foreach (StaticClassReferenceScanner::fromScript($script) as $className) {
-                if (!self::isPsr4Candidate($className, $psr4Map)) {
-                    continue;
-                }
-                $resolvedPath = ProjectAutoload::resolveClassPath($className, $psr4Map);
-                if (null === $resolvedPath) {
-                    $expected = self::expectedRelativePath($projectDir, $className, $psr4Map);
-                    $errors[] = 'autoload: unresolved class '.$className
-                        .($expected ? ' (expected '.$expected.')' : '');
-
-                    continue;
-                }
-                $visit($resolvedPath);
-            }
+            self::expandScriptReferences($script, $projectDir, $psr4Map, $visit, $errors);
         }
 
         return ['files' => $files, 'errors' => $errors];
+    }
+
+    /**
+     * Expand hard class refs (error if missing) and soft FQCN string defaults
+     * (skip silently when the optional package is not installed — #36382 Slim backends).
+     *
+     * @param array<string, string|list<string>> $psr4Map
+     * @param callable(string): void             $visit
+     * @param list<string>                       $errors
+     */
+    private static function expandScriptReferences(
+        Script $script,
+        string $projectDir,
+        array $psr4Map,
+        callable $visit,
+        array &$errors
+    ): void {
+        $refs = StaticClassReferenceScanner::fromScript($script);
+        foreach ($refs['hard'] as $className) {
+            if (!self::isPsr4Candidate($className, $psr4Map)) {
+                continue;
+            }
+            $resolvedPath = ProjectAutoload::resolveClassPath($className, $psr4Map);
+            if (null === $resolvedPath) {
+                $expected = self::expectedRelativePath($projectDir, $className, $psr4Map);
+                $errors[] = 'autoload: unresolved class '.$className
+                    .($expected ? ' (expected '.$expected.')' : '');
+
+                continue;
+            }
+            $visit($resolvedPath);
+        }
+        foreach ($refs['soft'] as $className) {
+            if (!self::isPsr4Candidate($className, $psr4Map)) {
+                continue;
+            }
+            $resolvedPath = ProjectAutoload::resolveClassPath($className, $psr4Map);
+            if (null === $resolvedPath) {
+                // Optional Composer backends (Slim\Psr7, Guzzle, …) share a PSR-4 prefix
+                // but are not installed — class_exists() stays false at runtime (#36382).
+                continue;
+            }
+            $visit($resolvedPath);
+        }
     }
 
     /**
@@ -191,30 +208,40 @@ final class StaticClassReferenceScanner
         'array', 'bool', 'callable', 'false', 'float', 'int', 'iterable', 'mixed',
         'never', 'null', 'object', 'self', 'parent', 'static', 'string', 'true', 'void',
     ];
+
     /**
-     * @return list<string>
+     * @return array{hard: list<string>, soft: list<string>}
      */
     public static function fromScript(Script $script): array
     {
-        $names = [];
+        $hard = [];
+        $soft = [];
         $seen = new \SplObjectStorage();
         if ($script->main->cfg instanceof CfgBlock) {
-            self::walkBlock($script->main->cfg, $names, $seen);
+            self::walkBlock($script->main->cfg, $hard, $soft, $seen);
         }
         foreach ($script->functions as $func) {
             if ($func instanceof CfgFunc && $func->cfg instanceof CfgBlock) {
-                self::walkBlock($func->cfg, $names, $seen);
+                self::walkBlock($func->cfg, $hard, $soft, $seen);
             }
         }
 
-        return array_values(array_unique($names));
+        return [
+            'hard' => array_values(array_unique($hard)),
+            'soft' => array_values(array_unique($soft)),
+        ];
     }
 
     /**
-     * @param list<string> $names
+     * @param list<string> $hard
+     * @param list<string> $soft
      */
-    private static function walkBlock(CfgBlock $block, array &$names, \SplObjectStorage $seen): void
-    {
+    private static function walkBlock(
+        CfgBlock $block,
+        array &$hard,
+        array &$soft,
+        \SplObjectStorage $seen
+    ): void {
         if ($seen->contains($block)) {
             return;
         }
@@ -222,49 +249,55 @@ final class StaticClassReferenceScanner
 
         foreach ($block->children as $child) {
             if ($child instanceof Op\Expr\New_) {
-                self::collectOperand($child->class, $names);
+                self::collectOperand($child->class, $hard);
             } elseif ($child instanceof Op\Expr\StaticCall) {
-                self::collectOperand($child->class, $names);
+                self::collectOperand($child->class, $hard);
             } elseif ($child instanceof Op\Expr\StaticPropertyFetch) {
-                self::collectOperand($child->class, $names);
+                self::collectOperand($child->class, $hard);
             } elseif ($child instanceof Op\Expr\ClassConstFetch) {
-                self::collectOperand($child->class, $names);
+                self::collectOperand($child->class, $hard);
             } elseif ($child instanceof Op\Expr\InstanceOf_) {
-                self::collectOperand($child->class, $names);
+                self::collectOperand($child->class, $hard);
             } elseif ($child instanceof Op\Stmt\Class_) {
-                self::collectOperand($child->extends, $names);
+                self::collectOperand($child->extends, $hard);
                 foreach ($child->implements as $iface) {
-                    self::collectOperand($iface, $names);
+                    self::collectOperand($iface, $hard);
                 }
             } elseif ($child instanceof Op\Stmt\Property) {
                 // Property types (e.g. Slim CallableResolver::$container : ?ContainerInterface)
                 // are not new/static/extends refs — without this, reachable Composer graphs omit
                 // PSR interfaces and AOT dies on $container->has() (#36382).
-                self::collectDeclaredType($child->declaredType ?? null, $names);
+                self::collectDeclaredType($child->declaredType ?? null, $hard);
+                // String FQCN defaults (Slim NyholmPsr17Factory::$serverRequestCreatorClass =
+                // 'Nyholm\Psr7Server\ServerRequestCreator') feed class_exists() / new $cls at
+                // runtime — without collecting them, reachable closure omits the class and
+                // ServerRequestCreatorFactory::create() finds no implementation (#36382).
+                // Soft: unresolved optionals (Slim\Psr7, Guzzle, …) must not fail the graph.
+                self::collectFqcnStringDefault($child->defaultVar ?? null, $soft);
             } elseif ($child instanceof Op\Expr\Param) {
-                self::collectDeclaredType($child->declaredType ?? null, $names);
+                self::collectDeclaredType($child->declaredType ?? null, $hard);
             } elseif ($child instanceof Op\Stmt\TraitUse) {
                 // Nyholm Request uses MessageTrait/RequestTrait — without this, reachable
                 // Composer graphs omit traits and AOT dies with "Trait not found" (#36382).
                 foreach ($child->traits as $trait) {
-                    self::collectOperand($trait, $names);
+                    self::collectOperand($trait, $hard);
                 }
             } elseif ($child instanceof Op\Stmt\Interface_) {
                 foreach ($child->extends as $parent) {
-                    self::collectOperand($parent, $names);
+                    self::collectOperand($parent, $hard);
                 }
             } elseif ($child instanceof Op\Stmt\Enum_) {
                 foreach ($child->implements as $iface) {
-                    self::collectOperand($iface, $names);
+                    self::collectOperand($iface, $hard);
                 }
             } elseif ($child instanceof Op\Stmt\Function_) {
                 if ($child->func->cfg instanceof CfgBlock) {
-                    self::walkBlock($child->func->cfg, $names, $seen);
+                    self::walkBlock($child->func->cfg, $hard, $soft, $seen);
                 }
             }
 
-            OpSubBlockAccess::walkSubBlocks($child, static function (CfgBlock $sub) use (&$names, $seen): void {
-                self::walkBlock($sub, $names, $seen);
+            OpSubBlockAccess::walkSubBlocks($child, static function (CfgBlock $sub) use (&$hard, &$soft, $seen): void {
+                self::walkBlock($sub, $hard, $soft, $seen);
             });
         }
     }
@@ -311,6 +344,21 @@ final class StaticClassReferenceScanner
         if (null !== $className) {
             $names[] = $className;
         }
+    }
+
+    /**
+     * Collect property-default string literals that look like FQCNs (contain `\`).
+     * Method-name defaults like `'fromGlobals'` are intentionally skipped (#36382).
+     *
+     * @param list<string> $names
+     */
+    private static function collectFqcnStringDefault(?Operand $operand, array &$names): void
+    {
+        $className = self::literalClassName($operand);
+        if (null === $className || !str_contains($className, '\\')) {
+            return;
+        }
+        $names[] = $className;
     }
 
     private static function literalClassName(?Operand $operand): ?string

@@ -102,6 +102,104 @@ final class ComposerVendorMapTest extends TestCase
         }
     }
 
+    /**
+     * Static string FQCN property defaults must expand the reachable graph (#36382).
+     * Slim NyholmPsr17Factory::$serverRequestCreatorClass = 'Nyholm\Psr7Server\…'
+     * is only a string — without discovery, class_exists() is false and App::run() aborts.
+     */
+    public function testAutoloadDiscoveryIncludesFqcnStringPropertyDefaults(): void
+    {
+        $dir = sys_get_temp_dir().'/phpc_fqcn_prop_'.bin2hex(random_bytes(4));
+        $this->assertTrue(mkdir($dir.'/src', 0777, true));
+        try {
+            file_put_contents(
+                $dir.'/src/Target.php',
+                "<?php\nnamespace Disc;\nclass Target { public function id(): string { return 't'; } }\n"
+            );
+            file_put_contents(
+                $dir.'/src/Factory.php',
+                "<?php\nnamespace Disc;\nclass Factory {\n"
+                ."    protected static string \$creatorClass = 'Disc\\\\Target';\n"
+                ."    protected static string \$method = 'fromGlobals';\n"
+                ."    public static function available(): bool {\n"
+                ."        return static::\$creatorClass && class_exists(static::\$creatorClass);\n"
+                ."    }\n"
+                ."}\n"
+            );
+            file_put_contents(
+                $dir.'/entry.php',
+                "<?php\necho Disc\\Factory::available() ? '1' : '0';\n"
+            );
+            file_put_contents(
+                $dir.'/phpc.json',
+                json_encode([
+                    'entry' => 'entry.php',
+                    'binary' => '.phpc/bin/app',
+                    'autoload' => [
+                        'psr-4' => ['Disc\\' => 'src/'],
+                    ],
+                ], JSON_THROW_ON_ERROR)
+            );
+
+            $graph = ProjectGraph::resolve($dir);
+            $this->assertSame([], $graph['errors'], implode("\n", $graph['errors']));
+            $rels = [];
+            foreach ($graph['files'] as $abs) {
+                $rels[] = basename($abs);
+            }
+            $this->assertContains('Factory.php', $rels);
+            $this->assertContains(
+                'Target.php',
+                $rels,
+                'FQCN string property default must pull Target into the reachable graph: '.implode(',', $rels)
+            );
+        } finally {
+            $this->removeTree($dir);
+        }
+    }
+
+    /**
+     * Soft FQCN defaults for uninstalled optional packages must not fail the graph (#36382).
+     * Slim lists Slim\Psr7 / Guzzle / … string backends under the Slim\ prefix.
+     */
+    public function testAutoloadDiscoverySoftFqcnDefaultsSkipMissingOptionals(): void
+    {
+        $dir = sys_get_temp_dir().'/phpc_fqcn_soft_'.bin2hex(random_bytes(4));
+        $this->assertTrue(mkdir($dir.'/src', 0777, true));
+        try {
+            file_put_contents(
+                $dir.'/src/Installed.php',
+                "<?php\nnamespace Disc;\nclass Installed {}\n"
+            );
+            file_put_contents(
+                $dir.'/src/Factory.php',
+                "<?php\nnamespace Disc;\nclass Factory {\n"
+                ."    protected static string \$installed = 'Disc\\\\Installed';\n"
+                ."    protected static string \$missing = 'Disc\\\\MissingOptional';\n"
+                ."}\n"
+            );
+            file_put_contents($dir.'/entry.php', "<?php\nnew Disc\\Factory();\n");
+            file_put_contents(
+                $dir.'/phpc.json',
+                json_encode([
+                    'entry' => 'entry.php',
+                    'binary' => '.phpc/bin/app',
+                    'autoload' => [
+                        'psr-4' => ['Disc\\' => 'src/'],
+                    ],
+                ], JSON_THROW_ON_ERROR)
+            );
+
+            $graph = ProjectGraph::resolve($dir);
+            $this->assertSame([], $graph['errors'], implode("\n", $graph['errors']));
+            $rels = array_map('basename', $graph['files']);
+            $this->assertContains('Installed.php', $rels);
+            $this->assertNotContains('MissingOptional.php', $rels);
+        } finally {
+            $this->removeTree($dir);
+        }
+    }
+
     /** Trait uses must expand before the using class (#36382 Nyholm MessageTrait). */
     public function testAutoloadDiscoveryIncludesTraitsBeforeUsingClass(): void
     {
