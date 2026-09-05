@@ -5412,6 +5412,7 @@ require_once __DIR__.'/../../../lib/JIT/Concern/ParamConstraintsAndRuntimeNewIni
 require_once __DIR__.'/../../../lib/JIT/Concern/BinaryOpConcatAndTypeMapConstants.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/SubBlockCatchFinallyAndGeneratorResume.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/ListUnpackClassDeclareAndIncludeAssign.php';
+require_once __DIR__.'/../../../lib/JIT/Concern/SkippedSplitCfgAndTernaryMergeHelpers.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/InitJitMethodCall.php';
 require_once __DIR__.'/../../../lib/Compiler/CompileTimeNew.php';
 require_once __DIR__.'/../../../lib/Compiler/DeprecatedMetadata.php';

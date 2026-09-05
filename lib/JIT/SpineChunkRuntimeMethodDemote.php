@@ -48,7 +48,7 @@ use PHPCompiler\OpCode;
  *   OOM at 1536M without demote (~148s) — hollow + demote emits under SPINE_CHUNK (#36387).
  * - Func\* / Cfg\* / Lint\* / Visitor\*: NestedJIT SEGV on Internal/PHP/Linter/
  *   OpSubBlockAccess/VoidCastResolver — measured 2026-09-04.
- * - Top-level JIT Concern traits ({@see CompileBlockInternal}, AssignOperand, InitJitMethodCall, InitJitStaticCall, CompileIncDecAndConcatFlatten, DateTimeConstructAndMutationMeta, DomCompileTimeTagMeta, CoerceReturnPropertyDeclaringAndByRef, PropertyIncDecCompile, CallResultCompileTimePropagate, PropertyFetchCoalesceAndCompileTimeString, CallResultOperandAssign, ByRefFormalAssignAndCallArgAdapt, ResolveJitOutgoingCall, LocalReleaseUnsetAndVarFetchDest, ScriptGlobalAssignAndLvalueResolve, AssignRefSharedBoxAndClosureInvoke, ClassConstEnumAndFunctionStatic, AssignOperandValueMetaAndGeneratorField, JitConstructAssignedAndNativeLongLocal, NestedVmHelperAndThisResolve, BoundMethodInstanceCallResolve, ParamConstraintsAndRuntimeNewInit, ClosureThisAndStaticScopeResolve, BinaryOpConcatAndTypeMapConstants, SubBlockCatchFinallyAndGeneratorResume, ListUnpackClassDeclareAndIncludeAssign)
+ * - Top-level JIT Concern traits ({@see CompileBlockInternal}, AssignOperand, InitJitMethodCall, InitJitStaticCall, CompileIncDecAndConcatFlatten, DateTimeConstructAndMutationMeta, DomCompileTimeTagMeta, CoerceReturnPropertyDeclaringAndByRef, PropertyIncDecCompile, CallResultCompileTimePropagate, PropertyFetchCoalesceAndCompileTimeString, CallResultOperandAssign, ByRefFormalAssignAndCallArgAdapt, ResolveJitOutgoingCall, LocalReleaseUnsetAndVarFetchDest, ScriptGlobalAssignAndLvalueResolve, AssignRefSharedBoxAndClosureInvoke, ClassConstEnumAndFunctionStatic, AssignOperandValueMetaAndGeneratorField, JitConstructAssignedAndNativeLongLocal, NestedVmHelperAndThisResolve, BoundMethodInstanceCallResolve, ParamConstraintsAndRuntimeNewInit, ClosureThisAndStaticScopeResolve, BinaryOpConcatAndTypeMapConstants, SubBlockCatchFinallyAndGeneratorResume, ListUnpackClassDeclareAndIncludeAssign, SkippedSplitCfgAndTernaryMergeHelpers)
  *   live in namespace PHPCompiler (not PHPCompiler\JIT\Concern). Host CFG of CompileBlockInternal
  *   (470 KB) OOMs at 1536M unless {@see rewriteSource()} hollows **trait** bodies (T_TRAIT) —
  *   measured 2026-09-04: rc=255 before; emits after T_TRAIT + demote target.
@@ -119,6 +119,7 @@ final class SpineChunkRuntimeMethodDemote
             || 'phpcompiler\\binaryopconcatandtypemapconstants' === $lc
             || 'phpcompiler\\subblockcatchfinallyandgeneratorresume' === $lc
             || 'phpcompiler\\listunpackclassdeclareandincludeassign' === $lc
+            || 'phpcompiler\\skippedsplitcfgandternarymergehelpers' === $lc
             || str_starts_with($lc, 'phpcompiler\\builtin')
         ) {
             return true;
