@@ -5429,6 +5429,7 @@ require_once __DIR__.'/../../../lib/JIT/Concern/CompileSkippedOpcodeVmAndCfgBran
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileBlockPhpLoweringAndClosurePrep.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/M3M4M5CompileDriverEmitPolicy.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileBlockDispatchAndReflectionMeta.php';
+require_once __DIR__.'/../../../lib/JIT/Concern/JitCompileEntryRunQueueAndBlockStorage.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/InitJitMethodCall.php';
 require_once __DIR__.'/../../../lib/Compiler/CompileTimeNew.php';
 require_once __DIR__.'/../../../lib/Compiler/DeprecatedMetadata.php';

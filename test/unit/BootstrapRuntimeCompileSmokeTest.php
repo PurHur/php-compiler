@@ -90,8 +90,9 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
         $this->assertStringContainsString('runtime_compile_smoke_m3_emit', $source);
         $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
         $m3m4m5Policy = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3M4M5CompileDriverEmitPolicy.php');
+        $dispatch = (string) file_get_contents(self::$root.'/lib/JIT/Concern/CompileBlockDispatchAndReflectionMeta.php');
         $this->assertStringContainsString('isBootstrapM3RuntimeEmitBridgeName', $m3m4m5Policy);
-        $this->assertStringContainsString('VariableTypeMapNative', $jit);
+        $this->assertStringContainsString('VariableTypeMapNative', $dispatch);
         $this->assertStringContainsString('runtime_compile_smoke_m3_emit', $m3m4m5Policy);
         $vmSmoke = (string) file_get_contents(self::$root.'/lib/JIT/Concern/VmSmokeAndRuntimeM3NativeStubs.php');
         $this->assertStringContainsString('compileRuntimeParseAndCompileM3Native', $vmSmoke);
