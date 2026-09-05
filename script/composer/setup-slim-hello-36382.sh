@@ -87,6 +87,11 @@ if [[ -f "$REQ_TRAIT" ]]; then
   php "$ROOT/script/composer/patch-nyholm-request-trait-36382.php" "$REQ_TRAIT"
 fi
 
+NY_SRC="$DEST/vendor/nyholm/psr7-server/src/ServerRequestCreator.php"
+if [[ -f "$NY_SRC" ]]; then
+  php "$ROOT/script/composer/patch-nyholm-get-headers-from-server-36382.php" "$NY_SRC"
+fi
+
 RC="$DEST/vendor/slim/slim/Slim/Routing/RouteCollector.php"
 if [[ -f "$RC" ]]; then
   php "$ROOT/script/composer/patch-slim-route-collector-36382.php" "$RC"

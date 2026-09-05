@@ -15,11 +15,12 @@ use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_strtr* via Strtr*JitHelper PHP (#9392, #32858).
+ * JIT/AOT link for __compiler_strtr* via Strtr*JitHelper PHP (#9392, #32858, #36382).
  *
  * Module-local ABI owner (getNamedFunction first): Builtin\Type no longer always-declares
  * empty shells (#32858 / peer #32855) — leftover Type decls mint strtr.1 (#31894 / #32122).
  *
+ * Both helpers are NestedJIT-self-contained (no VmString cross-call — #36382 / peer #27056).
  * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\standard\StrtrArrayJitHelper}; thin LLVM
  * bridge forwards the ABI. Helper compile: {@see JitVmHelperLink::ensureCompiled} (#21844).
  * php-src: ext/standard/string.c
