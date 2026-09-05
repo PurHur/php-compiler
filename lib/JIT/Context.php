@@ -4340,7 +4340,18 @@ class Context {
 
     public function castToBool(PHPLLVM\Value $value): PHPLLVM\Value {
         $type = $value->typeOf();
-        switch ($this->getStringFromType($type)) {
+        $typeName = $this->getStringFromType($type);
+        // CreateNamed uniquify (`__object__.2*`) — same as Call\Native (#36382).
+        if (str_starts_with($typeName, '__object__') && str_ends_with($typeName, '*')) {
+            $typeName = '__object__*';
+        } elseif (str_starts_with($typeName, '__hashtable__') && str_ends_with($typeName, '*')) {
+            $typeName = '__hashtable__*';
+        } elseif (str_starts_with($typeName, '__string__') && str_ends_with($typeName, '*')) {
+            $typeName = '__string__*';
+        } elseif (str_starts_with($typeName, '__value__') && str_ends_with($typeName, '*')) {
+            $typeName = '__value__*';
+        }
+        switch ($typeName) {
             case 'bool':
             case 'int1':
                 return $value;
@@ -4377,9 +4388,18 @@ class Context {
             case '__string__*':
                 return \PHPCompiler\ext\standard\boolval::stringTruthy($this, $value);
             case '__object__':
-            case '__object__*':
                 // zend_is_true / zend_std_cast_object_to_type(_IS_BOOL) → true (#32471 leftover of #32463).
                 return $this->constantFromBool(true);
+            case '__object__*':
+                // Typed `?T $p` / omitted null args are `__object__*` null pointers, not
+                // objects — zend_is_true(IS_NULL) is false. Always-true here made `??`
+                // never fall through (Slim RouteCollectorProxy / AppFactory::create, #36382).
+                // php-src: Zend/zend_operators.c zend_is_true / IS_NULL vs IS_OBJECT.
+                return $this->builder->icmp(
+                    $this->builder::INT_NE,
+                    $value,
+                    $type->constNull()
+                );
             case '__hashtable__':
             case '__hashtable__*':
                 // zend_is_true(IS_ARRAY): zend_hash_num_elements ? true : false (#32455 / #32471).

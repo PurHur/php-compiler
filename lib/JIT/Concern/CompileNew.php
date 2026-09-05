@@ -54,6 +54,7 @@ trait CompileNew
                         $this->context->scope->preserveNewResultOnNullCall = true;
                         $this->context->scope->toCall = null;
                         $this->context->scope->args = [];
+                        $this->context->scope->callArgsIncludeReceiver = false;
                     } else {
                         if (\PHPCompiler\JIT\LateStaticBindingHelper::operandNeedsRuntimeClassResolution(
                             $classOp,
@@ -89,6 +90,7 @@ trait CompileNew
                                     $ctorCandidates
                                 );
                                 $this->context->scope->args = [$resultVar];
+                                $this->context->scope->callArgsIncludeReceiver = true;
                             } else {
                                 $this->context->type->object->markObjectConstructed(
                                     $this->context->helper->loadValue($obj)
@@ -96,6 +98,7 @@ trait CompileNew
                                 $this->context->scope->preserveNewResultOnNullCall = true;
                                 $this->context->scope->toCall = null;
                                 $this->context->scope->args = [];
+                                $this->context->scope->callArgsIncludeReceiver = false;
                             }
                         } else {
                             $classId = $this->context->type->object->resolveClassId($classOp);
@@ -138,18 +141,21 @@ trait CompileNew
                             ) {
                                 $this->context->scope->toCall = $this->context->resolveFunctionProxy('reflectionclass::__construct');
                                 $this->context->scope->args = [$this->context->getVariableFromOp($resultOp)];
+                                $this->context->scope->callArgsIncludeReceiver = true;
                             } elseif ($classOp instanceof Operand\Literal
                                 && 0 === strcasecmp(ltrim($classOp->value, '\\'), 'ReflectionObject')
                             ) {
                                 // Thin AOT: wire __construct like ReflectionClass (#34001 / #20098).
                                 $this->context->scope->toCall = $this->context->resolveFunctionProxy('reflectionobject::__construct');
                                 $this->context->scope->args = [$this->context->getVariableFromOp($resultOp)];
+                                $this->context->scope->callArgsIncludeReceiver = true;
                             } elseif ($classOp instanceof Operand\Literal
                                 && 0 === strcasecmp(ltrim($classOp->value, '\\'), 'ReflectionEnum')
                             ) {
                                 // Thin AOT: wire __construct like ReflectionClass (#27314).
                                 $this->context->scope->toCall = $this->context->resolveFunctionProxy('reflectionenum::__construct');
                                 $this->context->scope->args = [$this->context->getVariableFromOp($resultOp)];
+                                $this->context->scope->callArgsIncludeReceiver = true;
                             } elseif ($classOp instanceof Operand\Literal
                                 && 0 === strcasecmp(ltrim($classOp->value, '\\'), 'SimpleXMLElement')
                                 && ('1' === Config::getenv('PHP_COMPILER_AOT_USER_SCRIPT')
@@ -161,6 +167,7 @@ trait CompileNew
                                 );
                                 $this->context->scope->toCall = $this->context->functionProxies['simplexmlelement::__construct'];
                                 $this->context->scope->args = [$this->context->getVariableFromOp($resultOp)];
+                                $this->context->scope->callArgsIncludeReceiver = true;
                             } elseif ($classOp instanceof Operand\Literal
                                 && 0 === strcasecmp(ltrim($classOp->value, '\\'), 'XMLWriter')
                                 && \PHPCompiler\JIT\XmlWriterInstanceMethodJit::isUserScriptAot()
@@ -177,6 +184,7 @@ trait CompileNew
                                 );
                                 $this->context->scope->toCall = null;
                                 $this->context->scope->args = [];
+                                $this->context->scope->callArgsIncludeReceiver = false;
                             } elseif ($classOp instanceof Operand\Literal
                                 && 0 === strcasecmp(ltrim($classOp->value, '\\'), 'XSLTProcessor')
                                 && \PHPCompiler\JIT\XsltInstanceMethodJit::isUserScriptAot()
@@ -193,6 +201,7 @@ trait CompileNew
                                 );
                                 $this->context->scope->toCall = null;
                                 $this->context->scope->args = [];
+                                $this->context->scope->callArgsIncludeReceiver = false;
                             } elseif ($classOp instanceof Operand\Literal
                                 && \PHPCompiler\JIT\RandomizerInstanceMethodJit::isUserScriptAot()
                                 && (
@@ -204,10 +213,12 @@ trait CompileNew
                                 \PHPCompiler\JIT\RandomizerInstanceMethodJit::ensureProxy($this->context, $ctorProxy);
                                 $this->context->scope->toCall = $this->context->functionProxies[$ctorProxy];
                                 $this->context->scope->args = [$this->context->getVariableFromOp($resultOp)];
+                                $this->context->scope->callArgsIncludeReceiver = true;
                             } elseif ($this->context->type->object->hasConstructor($classId)) {
                                 $proxyName = strtolower($resolvedName).'::'.'__construct';
                                 $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
                                 $this->context->scope->args = [$this->context->getVariableFromOp($resultOp)];
+                                $this->context->scope->callArgsIncludeReceiver = true;
                                 if (0 === strcasecmp($resolvedName, 'DateTimeZone')) {
                                     // Remember New result so construct can stamp zone id onto `$z` (#29732).
                                     $this->context->lastDateTimeZoneNewResultOp = $resultOp;
@@ -242,6 +253,7 @@ trait CompileNew
                                 // User subclass without own __construct inherits Exception/Error ctor (#23974 / #23641).
                                 $this->context->scope->toCall = $this->context->resolveFunctionProxy($inheritedCtor);
                                 $this->context->scope->args = [$this->context->getVariableFromOp($resultOp)];
+                                $this->context->scope->callArgsIncludeReceiver = true;
                             } else {
                                 $this->context->scope->preserveNewResultOnNullCall = true;
                                 $this->context->type->object->markObjectConstructed(
@@ -249,6 +261,7 @@ trait CompileNew
                                 );
                                 $this->context->scope->toCall = null;
                                 $this->context->scope->args = [];
+                                $this->context->scope->callArgsIncludeReceiver = false;
                             }
                         }
                     }

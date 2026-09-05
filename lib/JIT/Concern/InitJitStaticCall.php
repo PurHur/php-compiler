@@ -201,6 +201,8 @@ trait InitJitStaticCall
         bool $parentScope = false,
         bool $fromDynamicCallable = false
     ): void {
+        // parent:: / Class::method — user args only until prependImplicitThis (#36382).
+        $this->context->scope->callArgsIncludeReceiver = false;
         $classOp = $block->getOperand($classOpIdx);
         $nameOp = $block->getOperand($nameOpIdx);
         // Scope can lose Literal operands while slot constants remain (sockets/vm spine

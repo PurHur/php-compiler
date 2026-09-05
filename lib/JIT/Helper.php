@@ -2373,6 +2373,26 @@ restart:
         if (Variable::TYPE_NULL === $rightType && Variable::TYPE_VALUE !== $leftType) {
             $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);
             $trueVal = $this->context->getTypeFromString('int1')->constInt(1, false);
+            // Typed `?T` params are TYPE_OBJECT + null pointer for PHP null (#36382).
+            if (Variable::TYPE_OBJECT === $leftType) {
+                $obj = $this->context->helper->loadValue($left);
+                $isNullPtr = $this->context->builder->icmp(
+                    Builder::INT_EQ,
+                    $obj,
+                    $this->context->getTypeFromString('__object__*')->constNull()
+                );
+                if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_EQUAL === $opcode->type) {
+                    $result = $isNullPtr;
+                    goto return_bool;
+                }
+                if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                    $result = $this->context->builder->xor(
+                        $isNullPtr,
+                        $this->context->getTypeFromString('int1')->constInt(1, false)
+                    );
+                    goto return_bool;
+                }
+            }
             if (OpCode::TYPE_IDENTICAL === $opcode->type) {
                 $result = $falseVal;
                 goto return_bool;
@@ -2385,6 +2405,25 @@ restart:
         if (Variable::TYPE_NULL === $leftType && Variable::TYPE_VALUE !== $rightType) {
             $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);
             $trueVal = $this->context->getTypeFromString('int1')->constInt(1, false);
+            if (Variable::TYPE_OBJECT === $rightType) {
+                $obj = $this->context->helper->loadValue($right);
+                $isNullPtr = $this->context->builder->icmp(
+                    Builder::INT_EQ,
+                    $obj,
+                    $this->context->getTypeFromString('__object__*')->constNull()
+                );
+                if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_EQUAL === $opcode->type) {
+                    $result = $isNullPtr;
+                    goto return_bool;
+                }
+                if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                    $result = $this->context->builder->xor(
+                        $isNullPtr,
+                        $this->context->getTypeFromString('int1')->constInt(1, false)
+                    );
+                    goto return_bool;
+                }
+            }
             if (OpCode::TYPE_IDENTICAL === $opcode->type) {
                 $result = $falseVal;
                 goto return_bool;

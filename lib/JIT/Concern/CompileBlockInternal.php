@@ -2732,6 +2732,7 @@ trait CompileBlockInternal
                             $this->context->builder->call($this->context->lookupFunction('abort'));
                             $this->context->scope->toCall = null;
                             $this->context->scope->args = [];
+                            $this->context->scope->callArgsIncludeReceiver = false;
                             $this->context->scope->argOperands = [];
                             break;
                         }
@@ -2750,6 +2751,7 @@ trait CompileBlockInternal
                             if (null !== $nonStaticMsg) {
                                 $this->context->scope->toCall = new \PHPCompiler\JIT\Call\EmitCatchableError($nonStaticMsg);
                                 $this->context->scope->args = [];
+                                $this->context->scope->callArgsIncludeReceiver = false;
                                 $this->context->scope->argOperands = [];
                                 break;
                             }
@@ -2810,6 +2812,7 @@ trait CompileBlockInternal
                             }
                             $this->context->scope->toCall = $closureCall;
                             $this->context->scope->args = [];
+                            $this->context->scope->callArgsIncludeReceiver = false;
                             $this->context->scope->argOperands = [];
                             break;
                         }
@@ -2833,6 +2836,7 @@ trait CompileBlockInternal
                             if ($this->shouldUseSelfHostJitStubs()) {
                                 $this->context->scope->toCall = null;
                                 $this->context->scope->args = [];
+                                $this->context->scope->callArgsIncludeReceiver = false;
                                 $this->context->scope->argOperands = [];
                                 break;
                             }
@@ -2856,6 +2860,7 @@ trait CompileBlockInternal
                                 $this->context->builder->call($this->context->lookupFunction('abort'));
                                 $this->context->scope->toCall = null;
                                 $this->context->scope->args = [];
+                                $this->context->scope->callArgsIncludeReceiver = false;
                                 $this->context->scope->argOperands = [];
                                 break;
                             }
@@ -2888,6 +2893,7 @@ trait CompileBlockInternal
                                     // $fn() / ['C','m']() — catchable Error, not self:: bind (#32299 / #31968).
                                     $this->context->scope->toCall = new \PHPCompiler\JIT\Call\EmitCatchableError($nonStaticMsg);
                                     $this->context->scope->args = [];
+                                    $this->context->scope->callArgsIncludeReceiver = false;
                                     $this->context->scope->argOperands = [];
                                     break;
                                 }
@@ -2896,6 +2902,7 @@ trait CompileBlockInternal
                         }
                     }
                     $this->context->scope->args = [];
+                    $this->context->scope->callArgsIncludeReceiver = false;
                     $this->context->scope->argOperands = [];
                     break;
                 case OpCode::TYPE_STATICCALL_INIT:
@@ -3528,6 +3535,7 @@ trait CompileBlockInternal
                             $candidates
                         );
                         $this->context->scope->args = [$receiverVar];
+                        $this->context->scope->callArgsIncludeReceiver = true;
                         $this->context->scope->argOperands = [$receiverOp];
                         break;
                     }
