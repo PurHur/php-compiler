@@ -53,6 +53,7 @@ use PHPCompiler\ext\standard\connection_aborted;
 use PHPCompiler\ext\standard\connection_status;
 use PHPCompiler\ext\standard\convert_uuencode;
 use PHPCompiler\ext\standard\crc32;
+use PHPCompiler\ext\standard\date;
 use PHPCompiler\ext\standard\date_default_timezone_get;
 use PHPCompiler\ext\standard\date_get_last_errors;
 use PHPCompiler\ext\standard\decbin;
@@ -101,6 +102,8 @@ use PHPCompiler\ext\standard\gc_enabled;
 use PHPCompiler\ext\standard\gc_status;
 use PHPCompiler\ext\standard\gettype;
 use PHPCompiler\ext\standard\gettimeofday;
+use PHPCompiler\ext\standard\gmdate;
+use PHPCompiler\ext\standard\gmmktime;
 use PHPCompiler\ext\hash\hash_algos;
 use PHPCompiler\ext\standard\hash_equals;
 use PHPCompiler\ext\standard\hash_hmac_algos;
@@ -138,6 +141,7 @@ use PHPCompiler\ext\standard\method_exists_;
 use PHPCompiler\ext\standard\md5;
 use PHPCompiler\ext\standard\metaphone;
 use PHPCompiler\ext\standard\microtime;
+use PHPCompiler\ext\standard\mktime;
 use PHPCompiler\ext\standard\mt_getrandmax;
 use PHPCompiler\ext\standard\nl2br;
 use PHPCompiler\ext\standard\number_format;
@@ -3451,6 +3455,104 @@ final class DiscardedPureCallElisionTest extends TestCase
             $context,
             new mt_getrandmax(),
             [$null]
+        ));
+    }
+
+    public function testDiscardedDateGmdateMktimeElidesOnTypedArgs(): void
+    {
+        // php-src ext/date/php_date.c date/gmdate/mktime/gmmktime (#36386).
+        $context = $this->makeContext();
+        $fmt = $this->makeStringVar('Y-m-d');
+        $typedFmt = $this->makeStringVar(null);
+        $ts = $this->makeNativeLongVar();
+        $hour = $this->makeNativeLongVar();
+        $min = $this->makeNativeLongVar();
+        $null = $this->makeNullVar();
+        $str = $this->makeStringVar('12');
+        $box = $this->makeValueBoxVar();
+        $obj = $this->makeObjectVar();
+        $bool = $this->makeNativeBoolVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new date(),
+            [$fmt]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new date(),
+            [$typedFmt, $ts]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new date(),
+            [$fmt, $null]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new gmdate(),
+            [$fmt, $ts]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new mktime(),
+            [$hour]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new mktime(),
+            [$hour, $min, $null]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new gmmktime(),
+            [$hour, $bool, $min]
+        ));
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new date(),
+            []
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new date(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new date(),
+            [$fmt, $ts, $min]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new gmdate(),
+            [$box]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new mktime(),
+            []
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new mktime(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new mktime(),
+            [$str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new mktime(),
+            [$hour, $obj]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new gmmktime(),
+            [$hour, $min, $min, $min, $min, $min, $min]
         ));
     }
 

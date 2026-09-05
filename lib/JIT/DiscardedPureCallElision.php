@@ -89,6 +89,13 @@ use PHPCompiler\VM\Variable as VmVariable;
  * idate (compile-time valid one-char format + optional typed timestamp;
  * soft-null / non-constant / unrecognized format stays live — deprecate /
  * warning; excess argc stays live — ArgumentCountError),
+ * date / gmdate (typed format string + optional typed-or-null timestamp;
+ * soft-null format stays live — deprecate; excess argc stays live —
+ * ArgumentCountError),
+ * mktime / gmmktime (1..6 typed numeric parts; hour required non-null;
+ * optional null components OK; soft-null hour stays live — deprecate;
+ * string / object / excess argc stay live — TypeError /
+ * ArgumentCountError),
  * getrandmax / mt_getrandmax (zero-arg; excess argc stays live —
  * ArgumentCountError),
  * typed-array array_key_first / array_key_last / array_is_list (exactly one
@@ -340,6 +347,12 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureCivilDateGetterRuntimeInfoNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureDateFormatRuntimeInfoNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureMktimeRuntimeInfoNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureRandmaxRuntimeInfoNoSideEffect($toCall, $callArgs)) {
@@ -1838,6 +1851,85 @@ final class DiscardedPureCallElision
     }
 
     /**
+     * Discarded {@code date}/{@code gmdate} — php-src {@code ext/date/php_date.c}.
+     * Typed format string; optional typed-or-null timestamp. Soft-null format
+     * stays live (deprecate). Excess argc stays live ({@code ArgumentCountError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureDateFormatRuntimeInfoNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        $name = strtolower($toCall->getName());
+        if ('date' !== $name && 'gmdate' !== $name) {
+            return false;
+        }
+        if (!isset($callArgs[0]) || !$callArgs[0] instanceof Variable || isset($callArgs[2])) {
+            return false;
+        }
+        if (!self::stringArgAllowsDiscardedElision($callArgs[0])) {
+            return false;
+        }
+        if (!isset($callArgs[1])) {
+            return true;
+        }
+        if (!$callArgs[1] instanceof Variable) {
+            return false;
+        }
+        // Z_PARAM_LONG_OR_NULL — explicit null means "now"; soft-null format already excluded.
+        if ($callArgs[1]->isNullConstant || Variable::TYPE_NULL === $callArgs[1]->type) {
+            return true;
+        }
+
+        return self::mathArgAllowsDiscardedElision($callArgs[1]);
+    }
+
+    /**
+     * Discarded {@code mktime}/{@code gmmktime} — php-src {@code ext/date/php_date.c}.
+     * 1..6 typed numeric civil parts; hour required non-null; optional null
+     * components OK ({@code ?int}). Soft-null hour / string / object stay live.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureMktimeRuntimeInfoNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        $name = strtolower($toCall->getName());
+        if ('mktime' !== $name && 'gmmktime' !== $name) {
+            return false;
+        }
+        $argc = \count($callArgs);
+        if ($argc < 1 || $argc > 6) {
+            return false;
+        }
+        foreach ($callArgs as $i => $arg) {
+            if (!$arg instanceof Variable) {
+                return false;
+            }
+            if (0 === $i) {
+                // Required hour — soft-null deprecates / TypeErrors under strict.
+                if (!self::mktimeNumericArgAllowsDiscardedElision($arg)) {
+                    return false;
+                }
+                continue;
+            }
+            // Optional ?int — explicit null OK; soft-null / string / object stay live.
+            if ($arg->isNullConstant || Variable::TYPE_NULL === $arg->type) {
+                continue;
+            }
+            if (!self::mktimeNumericArgAllowsDiscardedElision($arg)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * Discarded {@code getrandmax}/{@code mt_getrandmax} — php-src
      * {@code ext/random/random.c}. Constant MT upper bound. Excess argc stays
      * live ({@code ArgumentCountError}).
@@ -1854,6 +1946,25 @@ final class DiscardedPureCallElision
         }
 
         return [] === $callArgs;
+    }
+
+    /**
+     * mktime/gmmktime civil parts — typed long/double/bool / compile-time number.
+     * Numeric string literals stay live (our VM TypeErrors; Zend Z_PARAM_LONG
+     * coerces — keep discarded-elision conservative on strings).
+     */
+    private static function mktimeNumericArgAllowsDiscardedElision(Variable $arg): bool
+    {
+        if ($arg->isNullConstant || Variable::TYPE_NULL === $arg->type) {
+            return false;
+        }
+        if (null !== $arg->compileTimeLong || null !== $arg->compileTimeFloat) {
+            return true;
+        }
+
+        return Variable::TYPE_NATIVE_LONG === $arg->type
+            || Variable::TYPE_NATIVE_DOUBLE === $arg->type
+            || Variable::TYPE_NATIVE_BOOL === $arg->type;
     }
 
     /**
