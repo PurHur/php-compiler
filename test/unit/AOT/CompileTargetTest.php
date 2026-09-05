@@ -294,7 +294,7 @@ final class CompileTargetTest extends TestCase
     }
 
     /**
-     * Curated aarch64 VM_* seed (parity with x86_64-linux VM_* units) — every unit.o
+     * Curated aarch64 VM_* + lib_VM_* seed (parity with x86_64-linux) — every unit.o
      * must be ELF e_machine=183. Empty / short seed is not a pass (#36391).
      */
     public function testCommittedAarch64SeedUnitIsEmAarch64(): void
@@ -302,11 +302,23 @@ final class CompileTargetTest extends TestCase
         $root = dirname(__DIR__, 3);
         $unitsDir = $root.'/prelinked/helper-runtime/aarch64-linux/units';
         $this->assertDirectoryExists($unitsDir);
-        $dirs = glob($unitsDir.'/VM_*/unit.o') ?: [];
+        $vmDirs = glob($unitsDir.'/VM_*/unit.o') ?: [];
+        $libVmDirs = glob($unitsDir.'/lib_VM_*/unit.o') ?: [];
         $this->assertGreaterThanOrEqual(
             13,
-            \count($dirs),
+            \count($vmDirs),
             'aarch64 seed must include the full VM_* set (see script/seed-aarch64-helper-runtime.sh)'
+        );
+        $this->assertGreaterThanOrEqual(
+            9,
+            \count($libVmDirs),
+            'aarch64 seed must include the full lib_VM_* set (see script/seed-aarch64-helper-runtime.sh)'
+        );
+        $dirs = array_merge($vmDirs, $libVmDirs);
+        $this->assertGreaterThanOrEqual(
+            22,
+            \count($dirs),
+            'aarch64 seed must be VM_* + lib_VM_* (22); empty/short is not a pass'
         );
         $target = CompileTarget::resolve(CompileTarget::ID_AARCH64_LINUX);
         foreach ($dirs as $unit) {
@@ -327,6 +339,8 @@ final class CompileTargetTest extends TestCase
         $this->assertStringContainsString('PHP_COMPILER_TARGET=aarch64-linux', $body);
         $this->assertStringContainsString('--check', $body);
         $this->assertStringContainsString('/VM/CoalesceJitHelper.php', $body);
+        $this->assertStringContainsString('/lib/VM/ScalarDimFetchJitHelper.php', $body);
+        $this->assertStringContainsString('lib_VM_', $body);
         $check = $root.'/script/check-release-multiarch-helpers.sh';
         $gate = file_get_contents($check);
         $this->assertNotFalse($gate);

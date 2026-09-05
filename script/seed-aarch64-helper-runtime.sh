@@ -14,8 +14,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-# Curated seed: every VM_* unit already published for x86_64-linux. Keep this list
-# in sync with `ls prelinked/helper-runtime/x86_64-linux/units/ | grep '^VM_'`.
+# Curated seed: every VM_* and lib_VM_* unit already published for x86_64-linux.
+# Keep in sync with:
+#   ls prelinked/helper-runtime/x86_64-linux/units/ | grep -E '^(VM_|lib_VM_)'
 SEED_UNITS=(
   /VM/AttributeNewInstanceJitHelper.php
   /VM/ClosureBindJitHelper.php
@@ -30,6 +31,15 @@ SEED_UNITS=(
   /VM/TryCatchJitHelper.php
   /VM/ValueEchoJitHelper.php
   /VM/VariableFunctionCallJitHelper.php
+  /lib/VM/CompareJitHelperScalars.php
+  /lib/VM/LateStaticJitHelper.php
+  /lib/VM/NonObjectPropertyFetchJitHelper.php
+  /lib/VM/RegexIteratorFilterJitHelper.php
+  /lib/VM/ScalarDimFetchJitHelper.php
+  /lib/VM/ShiftOperandJitHelper.php
+  /lib/VM/StringOffsetJitHelper.php
+  /lib/VM/UndefinedPropertyFetchJitHelper.php
+  /lib/VM/VmVarFetchJitHelper.php
 )
 
 MIN_SEED=${#SEED_UNITS[@]}

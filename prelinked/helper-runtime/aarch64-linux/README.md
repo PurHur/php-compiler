@@ -11,13 +11,13 @@ non-native link.
 `script/check-helper-runtime-prelink.php --all-arches` asserts every committed `unit.o`
 (and `common.o` when present) has ELF `e_machine=183` (EM_AARCH64).
 
-## Seed corpus (VM_* parity with x86_64-linux)
+## Seed corpus (VM_* + lib_VM_* parity with x86_64-linux)
 
-**13** committed `unit.o` files — the full `VM_*` set published under
-`prelinked/helper-runtime/x86_64-linux/units/`. Refresh / expand via:
+**22** committed `unit.o` files — the full `VM_*` (13) and `lib_VM_*` (9) sets
+published under `prelinked/helper-runtime/x86_64-linux/units/`. Refresh / expand via:
 
 ```bash
-./script/seed-aarch64-helper-runtime.sh           # emit + publish (~30 s)
+./script/seed-aarch64-helper-runtime.sh           # emit + publish (~60 s)
 ./script/seed-aarch64-helper-runtime.sh --check   # count + ELF gate
 ```
 
