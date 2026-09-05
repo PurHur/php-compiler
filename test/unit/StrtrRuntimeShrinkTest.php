@@ -22,8 +22,12 @@ final class StrtrRuntimeShrinkTest extends TestCase
 
     public function testStrtrJitHelpersAreNestedJitSafe(): void
     {
+        // #36382 / peer #27056 — two-string form must be self-contained (no VmString).
+        // NestedJIT stubs VmString::strtr to the subject (or SEGVs on constant $from/$to).
         $twoString = (string) file_get_contents(__DIR__.'/../../ext/standard/StrtrTwoStringJitHelper.php');
-        $this->assertStringContainsString('VmString::strtr(', $twoString);
+        $this->assertStringNotContainsString('VmString::', $twoString);
+        $this->assertStringContainsString('\\strlen', $twoString);
+        $this->assertStringContainsString('strtrTwoString', $twoString);
 
         // #27056 — array form must be self-contained (no VmString) for thin AOT NestedJIT.
         $array = (string) file_get_contents(__DIR__.'/../../ext/standard/StrtrArrayJitHelper.php');
