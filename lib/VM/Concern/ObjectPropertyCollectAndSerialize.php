@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\DateIntervalSupport;
 use PHPCompiler\VM\DatePeriodSupport;
 use PHPCompiler\VM\DateTimeSupport;
