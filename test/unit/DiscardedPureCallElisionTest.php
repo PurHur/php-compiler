@@ -73,6 +73,7 @@ use PHPCompiler\ext\standard\getrusage;
 use PHPCompiler\ext\standard\gc_enabled;
 use PHPCompiler\ext\standard\gc_status;
 use PHPCompiler\ext\standard\gettype;
+use PHPCompiler\ext\standard\gettimeofday;
 use PHPCompiler\ext\hash\hash_algos;
 use PHPCompiler\ext\standard\hash_equals;
 use PHPCompiler\ext\standard\hash_hmac_algos;
@@ -80,6 +81,7 @@ use PHPCompiler\ext\standard\headers_list;
 use PHPCompiler\ext\standard\headers_sent;
 use PHPCompiler\ext\standard\hebrev;
 use PHPCompiler\ext\standard\hexdec;
+use PHPCompiler\ext\standard\hrtime;
 use PHPCompiler\ext\standard\html_entity_decode;
 use PHPCompiler\ext\standard\htmlentities;
 use PHPCompiler\ext\standard\htmlspecialchars;
@@ -106,6 +108,7 @@ use PHPCompiler\ext\standard\memory_get_usage;
 use PHPCompiler\ext\standard\method_exists_;
 use PHPCompiler\ext\standard\md5;
 use PHPCompiler\ext\standard\metaphone;
+use PHPCompiler\ext\standard\microtime;
 use PHPCompiler\ext\standard\nl2br;
 use PHPCompiler\ext\standard\number_format;
 use PHPCompiler\ext\standard\ob_get_contents;
@@ -3217,6 +3220,84 @@ final class DiscardedPureCallElisionTest extends TestCase
         $this->assertFalse(DiscardedPureCallElision::tryElide(
             $context,
             new headers_sent(),
+            [$str]
+        ));
+    }
+
+    public function testDiscardedClockGetterRuntimeInfoElides(): void
+    {
+        // php-src microtime.c / hrtime.c (#36386).
+        $context = $this->makeContext();
+        $bool = $this->makeNativeBoolVar();
+        $long = $this->makeNativeLongVar();
+        $null = $this->makeNullVar();
+        $str = $this->makeStringVar('s');
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new microtime(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new microtime(),
+            [$bool]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new microtime(),
+            [$long]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new hrtime(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new hrtime(),
+            [$bool]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new gettimeofday(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new gettimeofday(),
+            [$bool]
+        ));
+
+        // Soft-null bool / excess argc stay live.
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new microtime(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new hrtime(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new gettimeofday(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new microtime(),
+            [$bool, $long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new hrtime(),
+            [$str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new gettimeofday(),
             [$str]
         ));
     }
