@@ -14,6 +14,11 @@ use PHPLLVM\Builder;
  * Nullable `?Class` / `Class|null` must accept null (php-src zend_check_property_type).
  * Typed `?I $v = null` params often lower as TYPE_OBJECT with a null pointer — never
  * load class_id before a null check (#36382 Slim CallableResolver::$container).
+ *
+ * Builtin `object` / `?object` is not a class name: any non-null object passes
+ * (zend_verify_property_type IS_OBJECT). Calling emitInstanceOf(..., "object")
+ * rejected every assign (`Cannot assign A to property H::$o of type object`) and
+ * blocked Slim AppFactory::create (`public object $proxy`, #36382).
  */
 final class TypedPropertyClassAssignCheck
 {
@@ -83,6 +88,11 @@ final class TypedPropertyClassAssignCheck
             return;
         }
 
+        // Builtin `object`: any object value (no class-id match).
+        if (self::isBuiltinObjectConstraint($resolvedClass)) {
+            return;
+        }
+
         $ok = $objectType->emitInstanceOf($value, strtolower($resolvedClass));
         $fn = $context->builder->getInsertBlock()->getParent();
         assert($fn instanceof \PHPLLVM\Value\Function_);
@@ -132,6 +142,20 @@ final class TypedPropertyClassAssignCheck
         }
 
         $context->builder->positionAtEnd($objBlock);
+        // Builtin `object` / `?object`: any non-null object (zend IS_OBJECT), not instanceof
+        // a class literally named "object" (#36382 AppFactory `public object $proxy`).
+        if (self::isBuiltinObjectConstraint($resolvedClass)) {
+            self::enforceBuiltinObjectPayload(
+                $context,
+                $value,
+                $declaringClass,
+                $propertyName,
+                $expectedLabel,
+                $resume
+            );
+
+            return;
+        }
         $ok = $objectType->emitInstanceOf($value, strtolower($resolvedClass));
         $pass = $fn->appendBasicBlock('typed_prop_class_ok');
         $fail = $fn->appendBasicBlock('typed_prop_class_fail');
@@ -142,6 +166,70 @@ final class TypedPropertyClassAssignCheck
         $context->builder->positionAtEnd($pass);
         $context->builder->branch($resume);
         $context->builder->positionAtEnd($resume);
+    }
+
+    /**
+     * After null rejection: TYPE_OBJECT is already an object; TYPE_VALUE must be IS_OBJECT.
+     *
+     * @param \PHPLLVM\Value\BasicBlock $resume
+     */
+    private static function enforceBuiltinObjectPayload(
+        Context $context,
+        Variable $value,
+        string $declaringClass,
+        string $propertyName,
+        string $expectedLabel,
+        $resume
+    ): void {
+        if (Variable::TYPE_OBJECT === $value->type) {
+            $context->builder->branch($resume);
+            $context->builder->positionAtEnd($resume);
+
+            return;
+        }
+        if (Variable::TYPE_VALUE !== $value->type) {
+            $context->builder->branch($resume);
+            $context->builder->positionAtEnd($resume);
+
+            return;
+        }
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $value);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isObj = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false)
+        );
+        $fn = $context->builder->getInsertBlock()->getParent();
+        assert($fn instanceof \PHPLLVM\Value\Function_);
+        $pass = $fn->appendBasicBlock('typed_prop_builtin_obj_ok');
+        $fail = $fn->appendBasicBlock('typed_prop_builtin_obj_fail');
+        $context->builder->branchIf($isObj, $pass, $fail);
+        $context->builder->positionAtEnd($fail);
+        self::raise(
+            $context,
+            sprintf(
+                'Cannot assign %s to property %s::$%s of type %s',
+                'non-object',
+                $declaringClass,
+                $propertyName,
+                $expectedLabel
+            )
+        );
+        $context->builder->positionAtEnd($pass);
+        $context->builder->branch($resume);
+        $context->builder->positionAtEnd($resume);
+    }
+
+    /** Declared type `object` / `?object` — not a user class named "object". */
+    private static function isBuiltinObjectConstraint(string $resolvedClass): bool
+    {
+        return 0 === strcasecmp(ltrim($resolvedClass, '\\'), 'object');
     }
 
     /** True when TYPE_OBJECT pointer is null, or TYPE_VALUE is null / object-tagged null. */
