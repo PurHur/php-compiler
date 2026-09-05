@@ -122,6 +122,7 @@ final class SpineChunkRuntimeMethodDemote
             || 'phpcompiler\\skippedsplitcfgandternarymergehelpers' === $lc
             || 'phpcompiler\\skippedhotpathandrealloweringnames' === $lc
             || 'phpcompiler\\skippedvmemithelperandcompiledrivernames' === $lc
+            || 'phpcompiler\\compileskippedopcodevmandcfgbranchstubs' === $lc
             || 'phpcompiler\\m3emittuspinenativetryandcfgparamtypes' === $lc
             || 'phpcompiler\\m3emittucompilerandruntimevoidstubs' === $lc
             || 'phpcompiler\\m3emittuandcompiledrivermainnative' === $lc
