@@ -108,7 +108,9 @@ use PHPCompiler\ext\standard\gettimeofday;
 use PHPCompiler\ext\standard\gmdate;
 use PHPCompiler\ext\standard\gmmktime;
 use PHPCompiler\ext\hash\hash_algos;
+use PHPCompiler\ext\standard\hash_;
 use PHPCompiler\ext\standard\hash_equals;
+use PHPCompiler\ext\standard\hash_hmac;
 use PHPCompiler\ext\standard\hash_hmac_algos;
 use PHPCompiler\ext\standard\headers_list;
 use PHPCompiler\ext\standard\headers_sent;
@@ -1768,6 +1770,136 @@ final class DiscardedPureCallElisionTest extends TestCase
             $context,
             new hash_equals(),
             [$long, $str]
+        ));
+    }
+
+    public function testDiscardedHashAndHashHmacElideOnKnownAlgo(): void
+    {
+        // php-src ext/hash/hash.c hash / hash_hmac (#36386).
+        $context = $this->makeContext();
+        $algoSha = $this->makeStringVar('sha256');
+        $algoMd5 = $this->makeStringVar('MD5');
+        $algoCrc = $this->makeStringVar('crc32');
+        $algoUnknown = $this->makeStringVar('not-a-real-algo');
+        $algoEmpty = $this->makeStringVar('');
+        $algoRuntime = $this->makeStringVar(null);
+        $data = $this->makeStringVar('payload');
+        $key = $this->makeStringVar('secret');
+        $bool = $this->makeNativeBoolVar();
+        $null = $this->makeNullVar();
+        $long = $this->makeNativeLongVar();
+        $box = $this->makeValueBoxVar();
+        $ht = $this->makeHashtableVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new hash_(),
+            [$algoSha, $data]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new hash_(),
+            [$algoMd5, $data, $bool]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new hash_(),
+            [$algoCrc, $this->makeStringVar('x'), $long]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new hash_hmac(),
+            [$algoSha, $data, $key]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new hash_hmac(),
+            [$algoMd5, $data, $key, $bool]
+        ));
+
+        // Unknown / empty / runtime algo → ValueError paths stay live.
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new hash_(),
+            [$algoUnknown, $data]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new hash_(),
+            [$algoEmpty, $data]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new hash_(),
+            [$algoRuntime, $data]
+        ));
+        // crc32 is not an HMAC algo.
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new hash_hmac(),
+            [$algoCrc, $data, $key]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new hash_hmac(),
+            [$algoUnknown, $data, $key]
+        ));
+
+        // Soft-null / non-string / options / wrong arity stay live.
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new hash_(),
+            [$algoSha]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new hash_(),
+            [$algoSha, $null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new hash_(),
+            [$null, $data]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new hash_(),
+            [$algoSha, $box]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new hash_(),
+            [$algoSha, $data, $null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new hash_(),
+            [$algoSha, $data, $bool, $ht]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new hash_hmac(),
+            [$algoSha, $data]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new hash_hmac(),
+            [$algoSha, $null, $key]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new hash_hmac(),
+            [$algoSha, $data, $box]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new hash_hmac(),
+            [$algoSha, $data, $key, $null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new hash_hmac(),
+            [$algoSha, $data, $key, $bool, $long]
         ));
     }
 

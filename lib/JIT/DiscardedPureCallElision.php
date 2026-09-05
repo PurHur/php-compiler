@@ -27,6 +27,9 @@ use PHPCompiler\VM\Variable as VmVariable;
  * [2,36]), typed ip2long/long2ip/inet_pton/inet_ntop, typed version_compare,
  * typed min/max/fmin/fmax (≥1 numeric; array-form min/max stays live),
  * typed checkdate (3 longs), typed hash_equals (2 strings),
+ * hash / hash_hmac (compile-time known algo + typed string data/key +
+ * optional typed binary; options / unknown algo / soft-null stay live —
+ * ValueError / deprecate),
  * typed pathinfo (string + optional flags), typed parse_url
  * (string + optional component), typed function_exists /
  * extension_loaded / defined (single string; no autoload), typed
@@ -322,6 +325,12 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureHashEqualsNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureHashNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureHashHmacNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePurePathinfoNoSideEffect($toCall, $callArgs)) {
@@ -1457,6 +1466,133 @@ final class DiscardedPureCallElision
         }
 
         return self::hashEqualsArgsAllowDiscardedElision($callArgs);
+    }
+
+    /**
+     * Discarded {@code hash} — php-src {@code ext/hash/hash.c}. Compile-time
+     * known algo ({@see \PHPCompiler\ext\standard\HashAlgosRegistry::ALL_ALGOS})
+     * plus typed / literal data string and optional typed binary. Soft-null /
+     * non-string stay live (deprecate / {@code TypeError}). Unknown / empty
+     * algo stay live ({@code ValueError}). Options array form stays live
+     * (seeded digests). Wrong arity stays live ({@code ArgumentCountError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureHashNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if ('hash' !== strtolower($toCall->getName())) {
+            return false;
+        }
+        $argc = \count($callArgs);
+        if ($argc < 2 || $argc > 3) {
+            return false;
+        }
+        if (
+            !$callArgs[0] instanceof Variable
+            || !self::compileTimeKnownHashAlgoAllowsDiscardedElision($callArgs[0], false)
+        ) {
+            return false;
+        }
+        if (
+            !$callArgs[1] instanceof Variable
+            || !self::stringArgAllowsDiscardedElision($callArgs[1])
+        ) {
+            return false;
+        }
+        if (3 === $argc) {
+            if (
+                !$callArgs[2] instanceof Variable
+                || !self::mathArgAllowsDiscardedElision($callArgs[2])
+            ) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Discarded {@code hash_hmac} — php-src {@code ext/hash/hash.c}. Compile-time
+     * known HMAC algo ({@see \PHPCompiler\ext\standard\HashAlgosRegistry::HMAC_ALGOS})
+     * plus typed / literal data and key strings and optional typed binary.
+     * Soft-null / non-string stay live (deprecate / {@code TypeError}). Unknown
+     * / empty / non-HMAC algo stay live ({@code ValueError}). Wrong arity stays
+     * live ({@code ArgumentCountError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureHashHmacNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if ('hash_hmac' !== strtolower($toCall->getName())) {
+            return false;
+        }
+        $argc = \count($callArgs);
+        if ($argc < 3 || $argc > 4) {
+            return false;
+        }
+        if (
+            !$callArgs[0] instanceof Variable
+            || !self::compileTimeKnownHashAlgoAllowsDiscardedElision($callArgs[0], true)
+        ) {
+            return false;
+        }
+        if (
+            !$callArgs[1] instanceof Variable
+            || !self::stringArgAllowsDiscardedElision($callArgs[1])
+        ) {
+            return false;
+        }
+        if (
+            !$callArgs[2] instanceof Variable
+            || !self::stringArgAllowsDiscardedElision($callArgs[2])
+        ) {
+            return false;
+        }
+        if (4 === $argc) {
+            if (
+                !$callArgs[3] instanceof Variable
+                || !self::mathArgAllowsDiscardedElision($callArgs[3])
+            ) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Compile-time non-empty algo string present in php-src hash / HMAC tables.
+     * Runtime-typed string algos stay live ({@code ValueError} on unknown).
+     */
+    private static function compileTimeKnownHashAlgoAllowsDiscardedElision(
+        Variable $arg,
+        bool $hmacOnly
+    ): bool {
+        $algo = JitStringArg::compileTimeLiteral($arg);
+        if (null === $algo || '' === $algo) {
+            return false;
+        }
+        $lc = strtolower($algo);
+        static $all = null;
+        static $hmac = null;
+        if (null === $all) {
+            $all = [];
+            foreach (\PHPCompiler\ext\standard\HashAlgosRegistry::ALL_ALGOS as $name) {
+                $all[strtolower($name)] = true;
+            }
+            $hmac = [];
+            foreach (\PHPCompiler\ext\standard\HashAlgosRegistry::HMAC_ALGOS as $name) {
+                $hmac[strtolower($name)] = true;
+            }
+        }
+
+        return $hmacOnly ? isset($hmac[$lc]) : isset($all[$lc]);
     }
 
     /**
