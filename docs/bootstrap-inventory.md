@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8234 |
-| Phase A inventory files (M2 ratio SSOT) | 8234 |
+| PHP files on vm.php path | 8235 |
+| Phase A inventory files (M2 ratio SSOT) | 8235 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26054 |
+| Source constructs flagged (warnings) | 26056 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5681,7 +5681,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/GlobalTypedConstSyntaxRejector.php` | 0 | 2 |
 | `lib/Handler.php` | 0 | 1 |
 | `lib/HexFloat.php` | 0 | 1 |
-| `lib/JIT.php` | 0 | 43 |
+| `lib/JIT.php` | 0 | 37 |
 | `lib/JIT/Analyzer.php` | 0 | 1 |
 | `lib/JIT/AotDebugSymbols.php` | 0 | 1 |
 | `lib/JIT/AotGcSections.php` | 0 | 1 |
@@ -7077,6 +7077,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/JitConstructAssignedAndNativeLongLocal.php` | 0 | 4 |
 | `lib/JIT/Concern/ListUnpackClassDeclareAndIncludeAssign.php` | 0 | 4 |
 | `lib/JIT/Concern/LocalReleaseUnsetAndVarFetchDest.php` | 0 | 2 |
+| `lib/JIT/Concern/M3EmitTuCompilerAndRuntimeVoidStubs.php` | 0 | 8 |
 | `lib/JIT/Concern/M3EmitTuSidecarLinktime.php` | 0 | 2 |
 | `lib/JIT/Concern/NestedVmHelperAndThisResolve.php` | 0 | 5 |
 | `lib/JIT/Concern/ParamConstraintsAndRuntimeNewInit.php` | 0 | 3 |
@@ -50500,48 +50501,42 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT\Call\ExternalMethod (line 393)
-- new JIT\Scope (line 422)
-- new Operand\Literal (line 672)
-- new Operand\Literal (line 688)
-- new JIT\Call\Native (line 1166)
-- new Variable (line 2172)
-- new JIT\Call\Native (line 2198)
-- new Variable (line 2288)
-- new JIT\Call\Vararg (line 2315)
-- new JIT\Call\Native (line 2325)
-- new JIT\Call\Native (line 2614)
-- new JIT\Variable (line 2854)
-- new JIT\Call\Native (line 2871)
-- new JIT\Call\Native (line 2916)
-- new JIT\Call\Native (line 2986)
-- new JIT\Call\Native (line 3028)
-- new JIT\Call\Native (line 3073)
-- new JIT\Call\Native (line 3128)
-- new JIT\Call\Native (line 4041)
-- new JIT\Call\Native (line 4072)
-- new JIT\Call\Native (line 4119)
-- new JIT\Call\Native (line 4193)
-- new JIT\Call\Native (line 4247)
-- new JIT\Call\Native (line 4334)
-- new JIT\Call\Native (line 4827)
-- new JIT\Call\Native (line 4858)
-- new JIT\Call\Native (line 4894)
-- new JIT\Call\Native (line 4929)
-- new JIT\Call\Native (line 4964)
-- new JIT\Call\Native (line 4999)
-- new JIT\Call\Native (line 5111)
-- new JIT\Call\Native (line 5353)
-- new JIT\Call\Native (line 5391)
-- new JIT\Call\Native (line 5425)
-- new JIT\Call\Native (line 5546)
-- new JIT\Call\Native (line 6196)
-- new Variable (line 6234)
-- new Variable (line 6254)
-- new Variable (line 6275)
-- new Variable (line 6420)
-- new Variable (line 6464)
-- 174 class method(s)
+- new JIT\Call\ExternalMethod (line 395)
+- new JIT\Scope (line 424)
+- new Operand\Literal (line 674)
+- new Operand\Literal (line 690)
+- new JIT\Call\Native (line 1168)
+- new Variable (line 2174)
+- new JIT\Call\Native (line 2200)
+- new Variable (line 2290)
+- new JIT\Call\Vararg (line 2317)
+- new JIT\Call\Native (line 2327)
+- new JIT\Call\Native (line 2616)
+- new JIT\Variable (line 2856)
+- new JIT\Call\Native (line 2873)
+- new JIT\Call\Native (line 2918)
+- new JIT\Call\Native (line 2988)
+- new JIT\Call\Native (line 3030)
+- new JIT\Call\Native (line 3075)
+- new JIT\Call\Native (line 3130)
+- new JIT\Call\Native (line 4043)
+- new JIT\Call\Native (line 4074)
+- new JIT\Call\Native (line 4121)
+- new JIT\Call\Native (line 4195)
+- new JIT\Call\Native (line 4249)
+- new JIT\Call\Native (line 4336)
+- new JIT\Call\Native (line 4910)
+- new JIT\Call\Native (line 5152)
+- new JIT\Call\Native (line 5190)
+- new JIT\Call\Native (line 5224)
+- new JIT\Call\Native (line 5345)
+- new JIT\Call\Native (line 5995)
+- new Variable (line 6033)
+- new Variable (line 6053)
+- new Variable (line 6074)
+- new Variable (line 6219)
+- new Variable (line 6263)
+- 168 class method(s)
 - 15 closure(s)
 
 ### `lib/JIT/Analyzer.php`
@@ -58243,6 +58238,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - trait LocalReleaseUnsetAndVarFetchDest (line 23)
 - 30 class method(s)
+
+### `lib/JIT/Concern/M3EmitTuCompilerAndRuntimeVoidStubs.php`
+
+**Warnings** (review for bootstrap subset):
+- trait M3EmitTuCompilerAndRuntimeVoidStubs (line 21)
+- new JIT\Call\Native (line 44)
+- new JIT\Call\Native (line 75)
+- new JIT\Call\Native (line 111)
+- new JIT\Call\Native (line 146)
+- new JIT\Call\Native (line 181)
+- new JIT\Call\Native (line 216)
+- 6 class method(s)
 
 ### `lib/JIT/Concern/M3EmitTuSidecarLinktime.php`
 

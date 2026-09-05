@@ -9,9 +9,9 @@
             "note": "Concern trait splits (#36230/#36387/#36403); CompileFuncCfgReturnAndGlobalImport + peers"
         },
         "lib/JIT.php": {
-            "budget": 6510,
+            "budget": 6309,
             "target": 20000,
-            "note": "Concern trait splits (#36387/#36403); SkippedHotPathAndRealLoweringNames + SkippedSplitCfgAndTernaryMergeHelpers + peers"
+            "note": "Concern trait splits (#36387/#36403); M3EmitTuCompilerAndRuntimeVoidStubs + SkippedHotPathAndRealLoweringNames + peers"
         },
         "lib/VM.php": {
             "budget": 19646,
