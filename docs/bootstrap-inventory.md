@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8269 |
-| Phase A inventory files (M2 ratio SSOT) | 8269 |
+| PHP files on vm.php path | 8270 |
+| Phase A inventory files (M2 ratio SSOT) | 8270 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26131 |
+| Source constructs flagged (warnings) | 26133 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7067,9 +7067,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/CompileArrayDimFetchReadAndWrite.php` | 0 | 7 |
 | `lib/JIT/Concern/CompileAssign.php` | 0 | 6 |
 | `lib/JIT/Concern/CompileBlockDispatchAndReflectionMeta.php` | 0 | 3 |
-| `lib/JIT/Concern/CompileBlockInternal.php` | 0 | 18 |
+| `lib/JIT/Concern/CompileBlockInternal.php` | 0 | 16 |
 | `lib/JIT/Concern/CompileBlockPhpLoweringAndClosurePrep.php` | 0 | 7 |
 | `lib/JIT/Concern/CompileClassAndTraitUses.php` | 0 | 4 |
+| `lib/JIT/Concern/CompileClassConstFetch.php` | 0 | 4 |
 | `lib/JIT/Concern/CompileConcat.php` | 0 | 7 |
 | `lib/JIT/Concern/CompileEchoAndPrint.php` | 0 | 5 |
 | `lib/JIT/Concern/CompileFuncCallExecReturn.php` | 0 | 5 |
@@ -58115,16 +58116,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 1031)
 - new Variable (line 1039)
 - new Operand\Literal (line 1255)
-- new Operand\Literal (line 1376)
-- new Operand\Literal (line 1456)
-- new Operand\Literal (line 1549)
-- new Variable (line 1740)
-- new OpCode (line 1898)
-- new Variable (line 2521)
-- new Variable (line 2609)
-- new Variable (line 2639)
-- new VM (line 3013)
-- new Operand\Literal (line 3299)
+- new Operand\Literal (line 1372)
+- new Variable (line 1563)
+- new OpCode (line 1721)
+- new Variable (line 2344)
+- new Variable (line 2432)
+- new Variable (line 2462)
+- new VM (line 2836)
+- new Operand\Literal (line 3122)
 - 2 class method(s)
 - 1 closure(s)
 
@@ -58146,6 +58145,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new CompileError (line 874)
 - new CompileError (line 1038)
 - 9 class method(s)
+
+### `lib/JIT/Concern/CompileClassConstFetch.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CompileClassConstFetch (line 21)
+- new Operand\Literal (line 68)
+- new Operand\Literal (line 148)
+- 1 class method(s)
 
 ### `lib/JIT/Concern/CompileConcat.php`
 
@@ -58877,7 +58884,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/DiscardedPureCallElision.php`
 
 **Warnings** (review for bootstrap subset):
-- 91 class method(s)
+- 92 class method(s)
 
 ### `lib/JIT/DnfParamCheck.php`
 
@@ -60371,7 +60378,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/SpineChunkRuntimeMethodDemote.php`
 
 **Warnings** (review for bootstrap subset):
-- new OpCode (line 240)
+- new OpCode (line 241)
 - 11 class method(s)
 
 ### `lib/JIT/SpineChunkStandardHelperBind.php`
