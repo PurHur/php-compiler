@@ -158,7 +158,8 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
         $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
         $this->assertStringContainsString('shouldUseM3CompileDriverRealLowering()', $jit);
         $this->assertStringContainsString('emitMainEntry', $jit);
-        $this->assertStringContainsString('shouldUseEmitHelperLinkStubs()', $jit);
+        $policy = (string) file_get_contents(self::$root.'/lib/JIT/Concern/SelfHostEmitHelperAndVendorPrelinkPolicy.php');
+        $this->assertStringContainsString('shouldUseEmitHelperLinkStubs()', $policy);
         $spineStub = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuRuntimeSpineStubNative.php');
         $this->assertStringContainsString('M3EmitTuTrivialEchoAot::isRegistered', $spineStub);
         $this->assertStringContainsString('compile_smoke_m3_emit', $jit);

@@ -147,16 +147,16 @@ final class BootstrapSelfhostDriverSmokeTest extends TestCase
     /** Issue #8706: inventory emit-helper must not stub parse/CFG on executable argv drivers. */
     public function testInventoryEmitParseSpineRetiredOnExecutableArgvDrivers(): void
     {
-        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
-        $this->assertStringContainsString('shouldStubInventoryEmitParseCompileSpine', $jit);
-        $this->assertStringContainsString('shouldUseVendorPrelinkExecutableEmit', $jit);
+        $policy = (string) file_get_contents(self::$root.'/lib/JIT/Concern/SelfHostEmitHelperAndVendorPrelinkPolicy.php');
+        $this->assertStringContainsString('shouldStubInventoryEmitParseCompileSpine', $policy);
+        $this->assertStringContainsString('shouldUseVendorPrelinkExecutableEmit', $policy);
         $this->assertStringContainsString(
             'shouldUseM3CompileDriverMainNative() && $this->shouldUseEmitHelperLinkStubs()',
-            $jit
+            $policy
         );
         $this->assertStringNotContainsString(
             '&& !$this->shouldUseSelfHostExecutableEmit()',
-            $jit
+            $policy
         );
     }
 
