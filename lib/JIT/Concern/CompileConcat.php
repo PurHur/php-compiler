@@ -425,7 +425,12 @@ trait CompileConcat
                         } else {
                             $promoted->compileTimeString = null;
                         }
-                        if ($result->functionStaticGlobal) {
+                        // Real `static $s` inside a function still needs the module box
+                        // updated. {main} script-globals also set functionStaticGlobal
+                        // (ensureScriptGlobal) — do not republish those here: the trailing
+                        // publishConcatResultToMainScriptGlobal / per-iter writeString
+                        // addrefs the same buffer so appendInPlace always COWs (#36386).
+                        if ($result->functionStaticGlobal && !$block->isMainScript()) {
                             \PHPCompiler\JIT\JitValueBox::assignToPointer(
                                 $this->context,
                                 \PHPCompiler\JIT\JitValueBox::valuePtrFromVariable($this->context, $result),
@@ -579,7 +584,38 @@ trait CompileConcat
                 // attachEchoScriptGlobalName makes ECHO read. Native-string CONCAT only
                 // wrote a local `__string__*` alloca (#36366). Use the opcode $block
                 // (not jitEnclosingBlock) — same predicate echo uses for script-globals.
-                if (!$this->publishConcatResultToMainScriptGlobal(
+                //
+                // In-place `$buf .= …` that already owns a promoted `__string__**` must
+                // NOT republish: assignToPointer addrefs so the next appendInPlace sees
+                // rc>1 and __ref__separate COWs O(n) every iteration (#36386). Echo /
+                // strlen already prefer the promoted native binding.
+                $inPlaceNativeAppend = (int) $op->arg1 === (int) $op->arg2
+                    && Variable::TYPE_STRING === $result->type
+                    && Variable::KIND_VARIABLE === $result->kind;
+                if ($inPlaceNativeAppend) {
+                    $this->markScopeVariableAssignedIfTracked($destOp, $result);
+                    $bindName = \PHPCompiler\JIT\OperandName::resolve($destOp);
+                    if (null === $bindName || '' === $bindName) {
+                        $slot = $block->slotForOperand($destOp);
+                        if (null !== $slot) {
+                            foreach ($block->scopedOperands() as $scopeOp) {
+                                if ($block->slotForOperand($scopeOp) !== $slot) {
+                                    continue;
+                                }
+                                $bindName = \PHPCompiler\JIT\OperandName::resolve($scopeOp);
+                                if (null !== $bindName && '' !== $bindName) {
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if (null !== $bindName && '' !== $bindName) {
+                        $this->context->bindVariableByName(
+                            $this->context->resolveRefAliasName($bindName),
+                            $result
+                        );
+                    }
+                } elseif (!$this->publishConcatResultToMainScriptGlobal(
                     $block,
                     $destOp,
                     $result,
