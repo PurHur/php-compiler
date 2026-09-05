@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8233 |
-| Phase A inventory files (M2 ratio SSOT) | 8233 |
+| PHP files on vm.php path | 8234 |
+| Phase A inventory files (M2 ratio SSOT) | 8234 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26052 |
+| Source constructs flagged (warnings) | 26054 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7084,6 +7084,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/PropertyIncDecCompile.php` | 0 | 19 |
 | `lib/JIT/Concern/ResolveJitOutgoingCall.php` | 0 | 2 |
 | `lib/JIT/Concern/ScriptGlobalAssignAndLvalueResolve.php` | 0 | 4 |
+| `lib/JIT/Concern/SkippedHotPathAndRealLoweringNames.php` | 0 | 2 |
 | `lib/JIT/Concern/SkippedSplitCfgAndTernaryMergeHelpers.php` | 0 | 3 |
 | `lib/JIT/Concern/SubBlockCatchFinallyAndGeneratorResume.php` | 0 | 2 |
 | `lib/JIT/Concern/TernaryJumpIfEchoMerge.php` | 0 | 2 |
@@ -50499,48 +50500,48 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT\Call\ExternalMethod (line 391)
-- new JIT\Scope (line 420)
-- new Operand\Literal (line 670)
-- new Operand\Literal (line 686)
-- new JIT\Call\Native (line 1164)
-- new Variable (line 2170)
-- new JIT\Call\Native (line 2196)
-- new Variable (line 2286)
-- new JIT\Call\Vararg (line 2313)
-- new JIT\Call\Native (line 2323)
-- new JIT\Call\Native (line 2612)
-- new JIT\Variable (line 2852)
-- new JIT\Call\Native (line 2869)
-- new JIT\Call\Native (line 2914)
-- new JIT\Call\Native (line 2984)
-- new JIT\Call\Native (line 3026)
-- new JIT\Call\Native (line 3071)
-- new JIT\Call\Native (line 3126)
-- new JIT\Call\Native (line 4313)
-- new JIT\Call\Native (line 4344)
-- new JIT\Call\Native (line 4391)
-- new JIT\Call\Native (line 4465)
-- new JIT\Call\Native (line 4519)
-- new JIT\Call\Native (line 4606)
-- new JIT\Call\Native (line 5099)
-- new JIT\Call\Native (line 5130)
-- new JIT\Call\Native (line 5166)
-- new JIT\Call\Native (line 5201)
-- new JIT\Call\Native (line 5236)
-- new JIT\Call\Native (line 5271)
-- new JIT\Call\Native (line 5383)
-- new JIT\Call\Native (line 5625)
-- new JIT\Call\Native (line 5663)
-- new JIT\Call\Native (line 5697)
-- new JIT\Call\Native (line 5818)
-- new JIT\Call\Native (line 6468)
-- new Variable (line 6506)
-- new Variable (line 6526)
-- new Variable (line 6547)
-- new Variable (line 6692)
-- new Variable (line 6736)
-- 184 class method(s)
+- new JIT\Call\ExternalMethod (line 393)
+- new JIT\Scope (line 422)
+- new Operand\Literal (line 672)
+- new Operand\Literal (line 688)
+- new JIT\Call\Native (line 1166)
+- new Variable (line 2172)
+- new JIT\Call\Native (line 2198)
+- new Variable (line 2288)
+- new JIT\Call\Vararg (line 2315)
+- new JIT\Call\Native (line 2325)
+- new JIT\Call\Native (line 2614)
+- new JIT\Variable (line 2854)
+- new JIT\Call\Native (line 2871)
+- new JIT\Call\Native (line 2916)
+- new JIT\Call\Native (line 2986)
+- new JIT\Call\Native (line 3028)
+- new JIT\Call\Native (line 3073)
+- new JIT\Call\Native (line 3128)
+- new JIT\Call\Native (line 4041)
+- new JIT\Call\Native (line 4072)
+- new JIT\Call\Native (line 4119)
+- new JIT\Call\Native (line 4193)
+- new JIT\Call\Native (line 4247)
+- new JIT\Call\Native (line 4334)
+- new JIT\Call\Native (line 4827)
+- new JIT\Call\Native (line 4858)
+- new JIT\Call\Native (line 4894)
+- new JIT\Call\Native (line 4929)
+- new JIT\Call\Native (line 4964)
+- new JIT\Call\Native (line 4999)
+- new JIT\Call\Native (line 5111)
+- new JIT\Call\Native (line 5353)
+- new JIT\Call\Native (line 5391)
+- new JIT\Call\Native (line 5425)
+- new JIT\Call\Native (line 5546)
+- new JIT\Call\Native (line 6196)
+- new Variable (line 6234)
+- new Variable (line 6254)
+- new Variable (line 6275)
+- new Variable (line 6420)
+- new Variable (line 6464)
+- 174 class method(s)
 - 15 closure(s)
 
 ### `lib/JIT/Analyzer.php`
@@ -58312,6 +58313,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 114)
 - 16 class method(s)
 
+### `lib/JIT/Concern/SkippedHotPathAndRealLoweringNames.php`
+
+**Warnings** (review for bootstrap subset):
+- trait SkippedHotPathAndRealLoweringNames (line 18)
+- 10 class method(s)
+
 ### `lib/JIT/Concern/SkippedSplitCfgAndTernaryMergeHelpers.php`
 
 **Warnings** (review for bootstrap subset):
@@ -60174,7 +60181,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/SpineChunkRuntimeMethodDemote.php`
 
 **Warnings** (review for bootstrap subset):
-- new OpCode (line 213)
+- new OpCode (line 215)
 - 11 class method(s)
 
 ### `lib/JIT/SpineChunkStandardHelperBind.php`
