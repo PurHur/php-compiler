@@ -330,14 +330,26 @@ final class HashTablePointerLlvm
         $advBb = BasicBlockHelper::append($context, 'arr_ptr_pnext_adv');
         $mergeBb = BasicBlockHelper::append($context, 'arr_ptr_pnext_merge');
         $context->builder->branchIf($isInvalid, $startBb, $advBb);
+        // INVALID means "implicitly at first" (php-src HT starts at first element) —
+        // advance from first+1, not from 0 (#36397).
         $context->builder->positionAtEnd($startBb);
+        $firstIdx = self::findNextPackedIndex($context, $ht, $zero);
+        $firstOkBb = BasicBlockHelper::append($context, 'arr_ptr_pnext_first_ok');
+        $firstFailBb = BasicBlockHelper::append($context, 'arr_ptr_pnext_first_fail');
+        self::branchIfPackedIndexValid($context, $ht, $firstIdx, $firstOkBb, $firstFailBb);
+        $context->builder->positionAtEnd($firstFailBb);
+        self::storeInternalPointer($context, $ht, $context->builder->sextOrBitCast($nextFree, $i64));
+        self::writeFalse($context, $resultPtr);
+        $context->builder->branch($doneBb);
+        $context->builder->positionAtEnd($firstOkBb);
+        $afterFirst = $context->builder->addNoSignedWrap($firstIdx, $one);
         $context->builder->branch($mergeBb);
         $context->builder->positionAtEnd($advBb);
         $advIdx = $context->builder->addNoSignedWrap($ipAsSize, $one);
         $context->builder->branch($mergeBb);
         $context->builder->positionAtEnd($mergeBb);
         $startPhi = $context->builder->phi($sizeT);
-        $startPhi->addIncoming($zero, $startBb);
+        $startPhi->addIncoming($afterFirst, $firstOkBb);
         $startPhi->addIncoming($advIdx, $advBb);
         $foundIdx = self::findNextPackedIndex($context, $ht, $startPhi);
         $foundValidBb = BasicBlockHelper::append($context, 'arr_ptr_pnext_found');

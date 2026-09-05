@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 #
-# #36397 slice 6–12: prove M5 exclusive-write is wired into real hashtable mutate
-# paths (grow + string-key + object-key + unset + by-ref stdlib mutators incl. shuffle),
-# and that normal COW separate+write/unset/push/sort/walk/multisort/shuffle still succeeds.
+# #36397 slice 6–13: prove M5 exclusive-write is wired into real hashtable mutate
+# paths (grow + string-key + object-key + unset + by-ref stdlib mutators incl. shuffle
+# + next/prev/reset/end), and that normal COW separate+write/unset/push/sort/walk/
+# multisort/shuffle/pointer still succeeds.
 #
 # Usage:
 #   ./script/runtime-assert/mutate-assert-smoke.sh
@@ -344,7 +345,43 @@ if [[ "$shuf2_trimmed" != "perm" ]]; then
   exit 1
 fi
 
-echo "runtime-assert-mutate-smoke: source gates for by-ref mutator COW (#36397 slice 9–12)…"
+echo "runtime-assert-mutate-smoke: run COW next/end (must not false-positive M5)…"
+PTR_SRC="$WORKDIR/cow_pointer.php"
+PTR_BIN="$WORKDIR/cow_pointer.bin"
+cat > "$PTR_SRC" <<'PHP'
+<?php
+$a = [10, 20, 30];
+$b = $a;
+next($a);
+end($a);
+echo var_export(current($a), true), '|', var_export(current($b), true), '|';
+echo var_export(key($a), true), '|', var_export(key($b), true), "\n";
+PHP
+env \
+  PHP_COMPILER_HELPER_RUNTIME_O=0 \
+  PHP_COMPILER_HELPER_RUNTIME_CACHE_DIR="$CACHE-pointer" \
+  PHP_COMPILER_RUNTIME_ASSERT=1 \
+  PHP_COMPILER_DUMP_IR=1 \
+  "$PHP_BIN" bin/compile.php -o "$PTR_BIN" "$PTR_SRC"
+if [[ -f /tmp/phpc-last.ll ]]; then
+  if ! grep -q '__ref__assert_exclusive' /tmp/phpc-last.ll; then
+    echo "runtime-assert-mutate-smoke: FAIL — COW next/end IR missing __ref__assert_exclusive" >&2
+    exit 1
+  fi
+fi
+ptr_out="$("$PTR_BIN" 2>&1)"
+ptr_rc=$?
+if [[ "$ptr_rc" -ne 0 ]]; then
+  echo "runtime-assert-mutate-smoke: FAIL — COW next/end exited $ptr_rc: $ptr_out" >&2
+  exit 1
+fi
+ptr_trimmed="$(printf '%s' "$ptr_out" | tr -d '\r')"
+if [[ "$ptr_trimmed" != "30|10|2|0" ]]; then
+  echo "runtime-assert-mutate-smoke: FAIL — expected 30|10|2|0 from COW next/end, got: $ptr_out" >&2
+  exit 1
+fi
+
+echo "runtime-assert-mutate-smoke: source gates for by-ref mutator COW (#36397 slice 9–13)…"
 for f in \
   lib/JIT/Builtin/ArrayPushRuntime.php \
   lib/JIT/Builtin/ArrayUnshiftRuntime.php \
@@ -358,7 +395,8 @@ for f in \
   lib/JIT/Builtin/KeySortRuntime.php \
   lib/JIT/Builtin/NaturalSortRuntime.php \
   lib/JIT/Builtin/MultisortRuntime.php \
-  lib/JIT/Builtin/ShuffleRuntime.php
+  lib/JIT/Builtin/ShuffleRuntime.php \
+  lib/JIT/Builtin/ArrayPointerRuntime.php
 do
   if ! grep -q 'separateContainerForWrite' "$ROOT/$f"; then
     echo "runtime-assert-mutate-smoke: FAIL — $f missing separateContainerForWrite" >&2
@@ -367,6 +405,10 @@ do
 done
 if ! grep -q 'emitAssertExclusiveCall' "$ROOT/lib/JIT/Builtin/MultisortRuntime.php"; then
   echo "runtime-assert-mutate-smoke: FAIL — MultisortRuntime.php missing emitAssertExclusiveCall" >&2
+  exit 1
+fi
+if ! grep -q 'emitAssertExclusiveCall' "$ROOT/lib/JIT/Builtin/ArrayPointerRuntime.php"; then
+  echo "runtime-assert-mutate-smoke: FAIL — ArrayPointerRuntime.php missing emitAssertExclusiveCall" >&2
   exit 1
 fi
 for f in \
