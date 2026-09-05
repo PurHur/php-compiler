@@ -77,6 +77,11 @@ if [[ -f "$STREAM" ]]; then
   php "$ROOT/script/composer/patch-nyholm-stream-36382.php" "$STREAM"
 fi
 
+REQ_TRAIT="$DEST/vendor/nyholm/psr7/src/RequestTrait.php"
+if [[ -f "$REQ_TRAIT" ]]; then
+  php "$ROOT/script/composer/patch-nyholm-request-trait-36382.php" "$REQ_TRAIT"
+fi
+
 echo "Created $DEST ($(find "$DEST" -name '*.php' | wc -l) php files)"
 echo "Try: ./phpc build --project $DEST --dry-run"
 echo "Note: reachable graph ~94 files; AOT uses incremental requires (>=32 units) — see #36382"

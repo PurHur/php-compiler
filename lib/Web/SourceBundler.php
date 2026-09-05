@@ -123,11 +123,20 @@ final class SourceBundler
             throw new \RuntimeException('cannot read entry: '.$entryPath);
         }
 
+        $entryReal = realpath($entryPath) ?: $entryPath;
         $lines = ['<?php', 'declare(strict_types=1);'];
         foreach ($includePaths as $path) {
             $resolved = realpath($path);
             if (false === $resolved) {
                 $resolved = $path;
+            }
+            // Never require_once the entry into itself: ProjectGraph lists the entry in
+            // includes[], and a prelude require of that path either no-ops (already
+            // "compiled") or inlines a second {main} that returns from the outer script
+            // before the appended entry body runs — Slim CGI then exits 0 with empty
+            // stdout (#36382).
+            if ($resolved === $entryReal || $path === $entryPath || $path === $entryReal) {
+                continue;
             }
             $lines[] = 'require_once '.var_export($resolved, true).';';
         }

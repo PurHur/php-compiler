@@ -545,9 +545,15 @@ final class SourceBundlerTest extends TestCase
                 "<?php\nrequire __DIR__.'/lib.php';\necho incr_hi();\n"
             );
             $libReal = realpath($lib) ?: $lib;
-            $src = SourceBundler::entryWithIncrementalRequires($entry, [$libReal]);
+            $entryReal = realpath($entry) ?: $entry;
+            $src = SourceBundler::entryWithIncrementalRequires($entry, [$libReal, $entryReal]);
             $this->assertStringContainsString('require_once '.var_export($libReal, true), $src);
             $this->assertStringContainsString('echo incr_hi();', $src);
+            // Entry must not appear in the prelude (ProjectGraph lists it in includes[]).
+            $this->assertStringNotContainsString(
+                'require_once '.var_export($entryReal, true),
+                $src
+            );
             // Entry's duplicate require of lib.php is stripped.
             $this->assertSame(1, substr_count($src, 'require'));
         } finally {

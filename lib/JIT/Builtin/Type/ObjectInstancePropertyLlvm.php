@@ -128,6 +128,39 @@ final class ObjectInstancePropertyLlvm
             }
         }
         if (!$hasProp) {
+            $classLcForTrait = strtolower(ltrim($class, '\\'));
+            // Trait methods often write properties declared on a sibling trait (Nyholm
+            // RequestTrait → MessageTrait::$headers). Never invent a trait-owned slot:
+            // that falsifies composition (#36382) and, after compose, steals stores away
+            // from the composing class layout when methods are lowered onto C::method.
+            if ($object->isTraitClass($classLcForTrait)) {
+                $context = $object->jitContext();
+                $composing = $context->scope->traitComposingClassName ?? '';
+                if (!\is_string($composing) || '' === $composing) {
+                    $composing = $context->scope->className ?? '';
+                }
+                if (\is_string($composing) && '' !== $composing
+                    && !$object->isTraitClass(strtolower(ltrim($composing, '\\')))) {
+                    $compId = $object->lookup($composing);
+
+                    return self::propertyFetchDeclaredSlot(
+                        $object,
+                        $obj,
+                        $composing,
+                        $name,
+                        $compId,
+                        $forWrite
+                    );
+                }
+                $runtimeFetch = self::tryPropertyFetchByRuntimeClass($object, $obj, $name, $forWrite);
+                if (null !== $runtimeFetch) {
+                    return $runtimeFetch;
+                }
+                throw new \LogicException(
+                    'PROPERTY_FETCH on trait '.$class.'::$'.$name
+                    .' without a composing class (#36382)'
+                );
+            }
             // Classes that allow dynamic properties must define the slot on *this* class.
             // tryPropertyFetchByRuntimeClass can pick another class that already declared the
             // same name (e.g. user `C::$x` while writing `stdClass::$x`) and skip defineProperty,
