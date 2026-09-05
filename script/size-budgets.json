@@ -14,9 +14,9 @@
             "note": "Concern trait splits (#36387/#36403); PropertyFetchCoalesceAndCompileTimeString + CallResultCompileTimePropagate + PropertyIncDecCompile"
         },
         "lib/VM.php": {
-            "budget": 22380,
+            "budget": 21186,
             "target": 15000,
-            "note": "ObjectPropertyHooks + CollectAndSerialize + IssetEmptyUnset Concern extracts (#36403); toward 15k target"
+            "note": "ObjectPropertyReadonlyAndVisibility + Hooks + CollectAndSerialize + IssetEmptyUnset Concern extracts (#36403); toward 15k target"
         },
         "script/apply-patches.sh": {
             "budget": 7637,

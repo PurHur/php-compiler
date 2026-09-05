@@ -7969,6 +7969,7 @@
         "lib/VM/Concern/ObjectPropertyCollectAndSerialize.php",
         "lib/VM/Concern/ObjectPropertyHooks.php",
         "lib/VM/Concern/ObjectPropertyIssetEmptyUnset.php",
+        "lib/VM/Concern/ObjectPropertyReadonlyAndVisibility.php",
         "lib/VM/Context.php",
         "lib/VM/CycleCollector.php",
         "lib/VM/DateIntervalSupport.php",
