@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8264 |
-| Phase A inventory files (M2 ratio SSOT) | 8264 |
+| PHP files on vm.php path | 8265 |
+| Phase A inventory files (M2 ratio SSOT) | 8265 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26120 |
+| Source constructs flagged (warnings) | 26122 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7065,8 +7065,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/ClosureThisAndStaticScopeResolve.php` | 0 | 2 |
 | `lib/JIT/Concern/CoerceReturnPropertyDeclaringAndByRef.php` | 0 | 3 |
 | `lib/JIT/Concern/CompileArrayDimFetchReadAndWrite.php` | 0 | 7 |
+| `lib/JIT/Concern/CompileAssign.php` | 0 | 6 |
 | `lib/JIT/Concern/CompileBlockDispatchAndReflectionMeta.php` | 0 | 3 |
-| `lib/JIT/Concern/CompileBlockInternal.php` | 0 | 28 |
+| `lib/JIT/Concern/CompileBlockInternal.php` | 0 | 24 |
 | `lib/JIT/Concern/CompileBlockPhpLoweringAndClosurePrep.php` | 0 | 7 |
 | `lib/JIT/Concern/CompileClassAndTraitUses.php` | 0 | 4 |
 | `lib/JIT/Concern/CompileConcat.php` | 0 | 7 |
@@ -58083,6 +58084,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 518)
 - 1 class method(s)
 
+### `lib/JIT/Concern/CompileAssign.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CompileAssign (line 23)
+- new Type (line 136)
+- new Type (line 155)
+- new Variable (line 215)
+- new Variable (line 252)
+- 1 class method(s)
+
 ### `lib/JIT/Concern/CompileBlockDispatchAndReflectionMeta.php`
 
 **Warnings** (review for bootstrap subset):
@@ -58094,31 +58105,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - trait CompileBlockInternal (line 27)
-- new Type (line 560)
-- new Type (line 579)
-- new Variable (line 639)
-- new Variable (line 676)
-- new Type (line 1117)
-- new Error (line 1382)
-- new Variable (line 1419)
-- new Variable (line 1427)
-- new Operand\Literal (line 1643)
-- new Operand\Literal (line 1764)
-- new Operand\Literal (line 1844)
-- new Operand\Literal (line 1937)
-- new Variable (line 2400)
-- new OpCode (line 2558)
-- new Variable (line 3508)
-- new Variable (line 3596)
-- new Variable (line 3626)
-- new VM (line 4190)
-- new Variable (line 4473)
-- new Type (line 4481)
-- new Variable (line 4509)
-- new Type (line 4517)
-- new Variable (line 4557)
-- new Type (line 4568)
-- new Operand\Literal (line 4700)
+- new Type (line 684)
+- new Error (line 949)
+- new Variable (line 986)
+- new Variable (line 994)
+- new Operand\Literal (line 1210)
+- new Operand\Literal (line 1331)
+- new Operand\Literal (line 1411)
+- new Operand\Literal (line 1504)
+- new Variable (line 1967)
+- new OpCode (line 2125)
+- new Variable (line 3075)
+- new Variable (line 3163)
+- new Variable (line 3193)
+- new VM (line 3757)
+- new Variable (line 4040)
+- new Type (line 4048)
+- new Variable (line 4076)
+- new Type (line 4084)
+- new Variable (line 4124)
+- new Type (line 4135)
+- new Operand\Literal (line 4267)
 - 2 class method(s)
 - 1 closure(s)
 
@@ -60335,7 +60342,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/SpineChunkRuntimeMethodDemote.php`
 
 **Warnings** (review for bootstrap subset):
-- new OpCode (line 235)
+- new OpCode (line 236)
 - 11 class method(s)
 
 ### `lib/JIT/SpineChunkStandardHelperBind.php`
