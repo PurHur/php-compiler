@@ -102,11 +102,6 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
     /** Issue #3032: runtime probe links inventory compile_driver only. */
     public function testCompilePhpPreservesSelfhostAotForRuntimeInventoryEmitDriver(): void
     {
-$phpLoweringClosures = (string) file_get_contents(self::$root.'/lib/JIT/Concern/CompileBlockPhpLoweringAndClosurePrep.php');
-        $this->assertMatchesRegularExpression(
-            '/function compileBlockPhpLowering\([\s\S]*?function isClosureNativeInvokeName\(/',
-            $phpLoweringClosures
-        );
         $compile = (string) file_get_contents(self::$root.'/bin/compile.php');
         $this->assertStringContainsString('runtime_compile_smoke/compile_driver.php', $compile);
         $this->assertStringContainsString('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1', $compile);
@@ -152,9 +147,12 @@ $phpLoweringClosures = (string) file_get_contents(self::$root.'/lib/JIT/Concern/
     public function testM3EmitTuMainUsesNativeBridgeEntry(): void
     {
         $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
-        $this->assertStringContainsString('compileM3EmitTuMainNative', $jit);
+        $this->assertStringNotContainsString('function compileM3EmitTuMainNative', $jit);
+        $dispatch = (string) file_get_contents(self::$root.'/lib/JIT/Concern/CompileBlockDispatchAndReflectionMeta.php');
+        $this->assertStringContainsString('compileM3EmitTuMainNative', $dispatch);
         $driverMain = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuAndCompileDriverMainNative.php');
         $this->assertStringContainsString('BootstrapCompileSmokeM3Emit::emitMainEntry', $driverMain);
+        $this->assertStringContainsString('function compileM3EmitTuMainNative', $driverMain);
         $methodCompile = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuCompilerRuntimeMethodCompile.php');
         $this->assertStringContainsString('compileM3EmitTuRuntimeMethodFromQueue', $methodCompile);
     }
@@ -166,7 +164,8 @@ $phpLoweringClosures = (string) file_get_contents(self::$root.'/lib/JIT/Concern/
         $this->assertStringContainsString('shouldUseM3CompileDriverRealLowering()', $m3m4m5Policy);
         $driverMain = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuAndCompileDriverMainNative.php');
         $this->assertStringContainsString('emitMainEntry', $driverMain);
-        $this->assertStringContainsString('shouldUseEmitHelperLinkStubs()', $jit);
+        $policy = (string) file_get_contents(self::$root.'/lib/JIT/Concern/SelfHostEmitHelperAndVendorPrelinkPolicy.php');
+        $this->assertStringContainsString('shouldUseEmitHelperLinkStubs()', $policy);
         $spineStub = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuRuntimeSpineStubNative.php');
         $this->assertStringContainsString('M3EmitTuTrivialEchoAot::isRegistered', $spineStub);
         $this->assertStringContainsString('compile_smoke_m3_emit', $m3m4m5Policy);
@@ -215,6 +214,17 @@ $phpLoweringClosures = (string) file_get_contents(self::$root.'/lib/JIT/Concern/
             '/function llvmInternalName\([\s\S]*?function compileSkippedCompilerCfgBranchStub\(/',
             $skippedOpcodeStubs
         );
+        $phpLoweringClosures = (string) file_get_contents(self::$root.'/lib/JIT/Concern/CompileBlockPhpLoweringAndClosurePrep.php');
+        $this->assertMatchesRegularExpression(
+            '/function compileBlockPhpLowering\([\s\S]*?function isClosureNativeInvokeName\(/',
+            $phpLoweringClosures
+        );
+        $compileBlockDispatch = (string) file_get_contents(self::$root.'/lib/JIT/Concern/CompileBlockDispatchAndReflectionMeta.php');
+        $this->assertMatchesRegularExpression(
+            '/function requiredParameterCountFromBlock\([\s\S]*?function compileBlock\(/',
+            $compileBlockDispatch
+        );
+        $this->assertStringNotContainsString('function compileBlock(', $jit);
         $compile = (string) file_get_contents(self::$root.'/bin/compile.php');
         $this->assertStringContainsString('PHP_COMPILER_M3_EMIT_HELPER_SPINE=1', $compile);
         $aot = (string) file_get_contents(self::$root.'/lib/JIT/M3EmitTuTrivialEchoAot.php');
