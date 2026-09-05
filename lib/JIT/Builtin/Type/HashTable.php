@@ -507,6 +507,8 @@ class HashTable extends Type
         $entry = $fn->appendBasicBlock('main');
         $this->context->builder->positionAtEnd($entry);
         $ht = $fn->getParam(0);
+        // Packed index writes all go through grow — M5 exclusive check here (#36397).
+        Refcount::emitAssertExclusiveCall($this->context, $ht);
         $minCap = $fn->getParam(1);
         $map = $this->context->structFieldMap['__hashtable__'];
         $sizeT = $this->context->getTypeFromString('size_t');
@@ -3774,6 +3776,8 @@ class HashTable extends Type
         PHPLLVM\BasicBlock $insertBlock,
         string $prefix
     ): array {
+        // String-key mutators share this chokepoint — M5 exclusive check (#36397).
+        Refcount::emitAssertExclusiveCall($this->context, $ht);
         $i64 = $this->context->getTypeFromString('int64');
         $hashSlot = $this->context->builder->alloca($i64, 1, $prefix.'_cached_hash');
         // Compute hash once up front; lookupStringKeyValue reuses it (#36468).

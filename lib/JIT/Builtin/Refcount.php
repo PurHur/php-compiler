@@ -264,6 +264,29 @@ class Refcount extends Builtin {
     }
 
     /**
+     * M5 on real mutate paths (#36397): abort when writing a shared container (rc > 1).
+     * Call from hashtable grow / string-key write chokepoints under ASSERT.
+     * Declares `__ref__assert_exclusive` if Refcount::implement has not run yet.
+     */
+    public static function emitAssertExclusiveCall(\PHPCompiler\JIT\Context $context, \PHPLLVM\Value $containerPtr): void
+    {
+        if (!self::runtimeAssertEnabled()) {
+            return;
+        }
+        $virtTy = $context->getTypeFromString('__ref__virtual*');
+        $name = '__ref__assert_exclusive';
+        $fn = $context->module->getNamedFunction($name);
+        if (null === $fn) {
+            $void = $context->context->voidType();
+            $ft = $context->context->functionType($void, false, $virtTy);
+            $fn = $context->module->addFunction($name, $ft);
+            $context->registerFunction($name, $fn);
+        }
+        $cast = $context->builder->pointerCast($containerPtr, $virtTy);
+        $context->builder->call($fn, $cast);
+    }
+
+    /**
      * WeakReference clear + GC unregister + deferred-destruct probes — delref only (#35802).
      */
     private function ensureDelrefHelperAbis(): void
