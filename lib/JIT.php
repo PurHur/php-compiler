@@ -44,6 +44,7 @@ require_once __DIR__.'/JIT/Concern/CompileExitCaseAndJump.php';
 require_once __DIR__.'/JIT/Concern/CompileConstFetchBooleanNotAndInstanceof.php';
 require_once __DIR__.'/JIT/Concern/CompileDeclareGlobalStaticAndVarFetch.php';
 require_once __DIR__.'/JIT/Concern/CompileFuncdefAndClosure.php';
+require_once __DIR__.'/JIT/Concern/CompileDeclareClassLike.php';
 require_once __DIR__.'/JIT/Concern/CompileArrayDimFetchReadAndWrite.php';
 require_once __DIR__.'/JIT/Concern/InitJitMethodCall.php';
 require_once __DIR__.'/JIT/Concern/AssignOperand.php';
@@ -144,6 +145,7 @@ class JIT {
     use CompileConstFetchBooleanNotAndInstanceof;
     use CompileDeclareGlobalStaticAndVarFetch;
     use CompileFuncdefAndClosure;
+    use CompileDeclareClassLike;
     use CompileArrayDimFetchReadAndWrite;
     use InitJitMethodCall;
     use AssignOperand;
