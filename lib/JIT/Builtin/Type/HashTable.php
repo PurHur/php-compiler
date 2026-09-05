@@ -1622,6 +1622,8 @@ class HashTable extends Type
         $ht = $fn->getParam(0);
         $key = $fn->getParam(1);
         $long = $fn->getParam(2);
+        // Object-key mutators skipped the string/grow chokepoints — M5 here (#36397).
+        Refcount::emitAssertExclusiveCall($this->context, $ht);
 
         $htMap = $this->context->structFieldMap['__hashtable__'];
         $nodeMap = $this->context->structFieldMap['__objkey_node__'];
@@ -1696,6 +1698,8 @@ class HashTable extends Type
         $ht = $fn->getParam(0);
         $key = $fn->getParam(1);
         $object = $fn->getParam(2);
+        // Object-key mutators skipped the string/grow chokepoints — M5 here (#36397).
+        Refcount::emitAssertExclusiveCall($this->context, $ht);
 
         $htMap = $this->context->structFieldMap['__hashtable__'];
         $nodeMap = $this->context->structFieldMap['__objkey_node__'];
