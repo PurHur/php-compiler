@@ -58,6 +58,7 @@ use PHPCompiler\ext\standard\date_default_timezone_get;
 use PHPCompiler\ext\standard\date_get_last_errors;
 use PHPCompiler\ext\standard\date_parse;
 use PHPCompiler\ext\standard\date_parse_from_format;
+use PHPCompiler\ext\standard\date_sun_info;
 use PHPCompiler\ext\standard\decbin;
 use PHPCompiler\ext\standard\dechex;
 use PHPCompiler\ext\standard\decoct;
@@ -208,6 +209,7 @@ use PHPCompiler\ext\standard\sys_get_temp_dir;
 use PHPCompiler\ext\standard\time;
 use PHPCompiler\ext\standard\timezone_abbreviations_list;
 use PHPCompiler\ext\standard\timezone_identifiers_list;
+use PHPCompiler\ext\standard\timezone_name_from_abbr;
 use PHPCompiler\ext\standard\timezone_version_get;
 use PHPCompiler\ext\standard\trait_exists_;
 use PHPCompiler\ext\standard\ucwords;
@@ -3656,6 +3658,108 @@ final class DiscardedPureCallElisionTest extends TestCase
             $context,
             new date_parse_from_format(),
             [$fmt, $null]
+        ));
+    }
+
+    public function testDiscardedDateSunInfoAndTimezoneNameFromAbbrElideOnTypedArgs(): void
+    {
+        // php-src ext/date/php_date.c date_sun_info / timezone_name_from_abbr (#36386).
+        $context = $this->makeContext();
+        $ts = $this->makeNativeLongVar();
+        $lat = $this->makeNativeDoubleVar();
+        $lon = $this->makeNativeDoubleVar();
+        $abbr = $this->makeStringVar('CET');
+        $typedAbbr = $this->makeStringVar(null);
+        $offset = $this->makeNativeLongVar();
+        $isdst = $this->makeNativeLongVar();
+        $null = $this->makeNullVar();
+        $box = $this->makeValueBoxVar();
+        $obj = $this->makeObjectVar();
+        $str = $this->makeStringVar('51.5');
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new date_sun_info(),
+            [$ts, $lat, $lon]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new date_sun_info(),
+            [$ts, $ts, $lon]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new timezone_name_from_abbr(),
+            [$abbr]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new timezone_name_from_abbr(),
+            [$typedAbbr, $offset]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new timezone_name_from_abbr(),
+            [$abbr, $offset, $isdst]
+        ));
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new date_sun_info(),
+            []
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new date_sun_info(),
+            [$ts, $lat]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new date_sun_info(),
+            [$null, $lat, $lon]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new date_sun_info(),
+            [$ts, $box, $lon]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new date_sun_info(),
+            [$ts, $lat, $obj]
+        ));
+        // Numeric string literal is allowed by mathArgAllowsDiscardedElision —
+        // keep that behaviour; soft-null / objects stay live above.
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new date_sun_info(),
+            [$ts, $str, $lon]
+        ));
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new timezone_name_from_abbr(),
+            []
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new timezone_name_from_abbr(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new timezone_name_from_abbr(),
+            [$abbr, $null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new timezone_name_from_abbr(),
+            [$abbr, $offset, $isdst, $ts]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new timezone_name_from_abbr(),
+            [$obj]
         ));
     }
 
