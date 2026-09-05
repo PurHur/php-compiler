@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8286 |
-| Phase A inventory files (M2 ratio SSOT) | 8286 |
+| PHP files on vm.php path | 8287 |
+| Phase A inventory files (M2 ratio SSOT) | 8287 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26165 |
+| Source constructs flagged (warnings) | 26167 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7071,7 +7071,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/CompileAssignRef.php` | 0 | 2 |
 | `lib/JIT/Concern/CompileBinaryAndUnary.php` | 0 | 2 |
 | `lib/JIT/Concern/CompileBlockDispatchAndReflectionMeta.php` | 0 | 3 |
-| `lib/JIT/Concern/CompileBlockInternal.php` | 0 | 11 |
+| `lib/JIT/Concern/CompileBlockInternal.php` | 0 | 10 |
 | `lib/JIT/Concern/CompileBlockPhpLoweringAndClosurePrep.php` | 0 | 7 |
 | `lib/JIT/Concern/CompileCast.php` | 0 | 2 |
 | `lib/JIT/Concern/CompileClassAndTraitUses.php` | 0 | 4 |
@@ -7080,6 +7080,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/CompileConcat.php` | 0 | 7 |
 | `lib/JIT/Concern/CompileEchoAndPrint.php` | 0 | 5 |
 | `lib/JIT/Concern/CompileEmptyIssetEval.php` | 0 | 2 |
+| `lib/JIT/Concern/CompileExitCaseAndJump.php` | 0 | 3 |
 | `lib/JIT/Concern/CompileFromCallable.php` | 0 | 2 |
 | `lib/JIT/Concern/CompileFuncCallExecNoreturn.php` | 0 | 2 |
 | `lib/JIT/Concern/CompileFuncCallExecReturn.php` | 0 | 5 |
@@ -58153,12 +58154,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - trait CompileBlockInternal (line 26)
 - new Type (line 429)
 - new Operand\Literal (line 645)
-- new OpCode (line 755)
-- new Variable (line 888)
-- new Variable (line 976)
-- new Variable (line 1006)
-- new VM (line 1103)
-- new Operand\Literal (line 1392)
+- new Variable (line 807)
+- new Variable (line 895)
+- new Variable (line 925)
+- new VM (line 1022)
+- new Operand\Literal (line 1311)
 - 2 class method(s)
 - 1 closure(s)
 
@@ -58226,6 +58226,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - trait CompileEmptyIssetEval (line 24)
 - 1 class method(s)
+
+### `lib/JIT/Concern/CompileExitCaseAndJump.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CompileExitCaseAndJump (line 21)
+- new OpCode (line 68)
+- 3 class method(s)
 
 ### `lib/JIT/Concern/CompileFromCallable.php`
 
@@ -58996,7 +59003,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/DiscardedPureCallElision.php`
 
 **Warnings** (review for bootstrap subset):
-- 109 class method(s)
+- 114 class method(s)
 
 ### `lib/JIT/DnfParamCheck.php`
 
@@ -60490,7 +60497,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/SpineChunkRuntimeMethodDemote.php`
 
 **Warnings** (review for bootstrap subset):
-- new OpCode (line 257)
+- new OpCode (line 258)
 - 11 class method(s)
 
 ### `lib/JIT/SpineChunkStandardHelperBind.php`

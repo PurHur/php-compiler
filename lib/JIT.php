@@ -40,6 +40,7 @@ require_once __DIR__.'/JIT/Concern/CompileEmptyIssetEval.php';
 require_once __DIR__.'/JIT/Concern/CompileListUnpack.php';
 require_once __DIR__.'/JIT/Concern/CompileBinaryAndUnary.php';
 require_once __DIR__.'/JIT/Concern/CompileScriptMagicIncludeClone.php';
+require_once __DIR__.'/JIT/Concern/CompileExitCaseAndJump.php';
 require_once __DIR__.'/JIT/Concern/CompileArrayDimFetchReadAndWrite.php';
 require_once __DIR__.'/JIT/Concern/InitJitMethodCall.php';
 require_once __DIR__.'/JIT/Concern/AssignOperand.php';
@@ -136,6 +137,7 @@ class JIT {
     use CompileListUnpack;
     use CompileBinaryAndUnary;
     use CompileScriptMagicIncludeClone;
+    use CompileExitCaseAndJump;
     use CompileArrayDimFetchReadAndWrite;
     use InitJitMethodCall;
     use AssignOperand;
