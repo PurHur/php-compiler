@@ -14,9 +14,9 @@
             "note": "Concern trait splits (#36387/#36403); DateTimeConstructAndMutationMeta + CompileIncDecAndConcatFlatten"
         },
         "lib/VM.php": {
-            "budget": 25653,
+            "budget": 24518,
             "target": 15000,
-            "note": "VM hot-loop / boot decomposition; tip ratchet after master drift (VM untouched this PR)"
+            "note": "ObjectPropertyIssetEmptyUnset Concern extract (#36403); toward 15k target"
         },
         "script/apply-patches.sh": {
             "budget": 7637,

@@ -21,7 +21,7 @@ Gates are **local/Docker only** — GitHub `CLEAN` means no checks configured (s
 |---|---|---|---|
 | `lib/Compiler.php` + `lib/Compiler/Concern/*` | PHP → CFG/opcodes | `php script/opcode-corpus-md5.php --check`; `script/differential-sweep.sh` | Super-quadratic call-arg scans (#36224); Concern extract opcode drift (#36230) |
 | `lib/JIT.php` + `lib/JIT/Concern/*` | Opcode → LLVM IR | `./script/aot-smoke.sh`; IR size gate in same script | Silent whole-script VM fallback (#36222); alwaysinline never honoured (#36213). Traits live under `lib/JIT/Concern/` but stay in `namespace PHPCompiler` so relative `ext\` / `JIT\` resolves like the parent class. |
-| `lib/VM.php` | Interpreter loop | `script/differential-sweep.sh`; targeted `./script/phpunit.sh --filter VMTest` | 1M-loop exit 255 (#36148/#15906); O(scope²) hot loop (#36207) |
+| `lib/VM.php` + `lib/VM/Concern/*` | Interpreter loop | `script/differential-sweep.sh`; targeted `./script/phpunit.sh --filter VMTest` | 1M-loop exit 255 (#36148/#15906); O(scope²) hot loop (#36207). Traits under `lib/VM/Concern/` stay in `namespace PHPCompiler` like JIT Concerns. |
 | `lib/AOT/Linker.php` | Native link line | `./script/aot-smoke.sh` (size gate) | Unconditional libsodium/… link (#36200); missing `--gc-sections` (#36198) |
 | `lib/AOT/HelperRuntimeCache.php` | Split-TU helper `.o` cache | `php script/check-helper-runtime-prelink.php` | Fingerprint-stale cache silently disabled (#23457); monolithic `.text` vs `common.o` (#36246) |
 | `lib/AOT/HelperRuntimeCommon.php` | Shared runtime prologue | same + `PHP_COMPILER_HELPER_RUNTIME_COMMON=1` smoke | Auto-link segfault until gc-section corpus (#36423/#36429) |
