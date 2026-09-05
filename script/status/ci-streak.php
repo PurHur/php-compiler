@@ -13,8 +13,8 @@ declare(strict_types=1);
  * check streak (.cursor/rules/local-ci-only.mdc).
  *
  * Usage:
- *   php script/ci-streak.php --json
- *   php script/ci-streak.php --record-green --sha=<40hex> --day=YYYY-MM-DD [--write]
+ *   php script/status/ci-streak.php --json
+ *   php script/status/ci-streak.php --record-green --sha=<40hex> --day=YYYY-MM-DD [--gates=a,b,c] [--write]
  *
  * Exit: 0 on success, 1 on usage/IO error, 2 on invalid input.
  */
@@ -29,11 +29,20 @@ $write = in_array('--write', $argv, true);
 
 $sha = null;
 $day = null;
+$gates = null;
 foreach ($argv as $arg) {
     if (str_starts_with($arg, '--sha=')) {
         $sha = substr($arg, 6);
     } elseif (str_starts_with($arg, '--day=')) {
         $day = substr($arg, 6);
+    } elseif (str_starts_with($arg, '--gates=')) {
+        $raw = substr($arg, 8);
+        $parts = array_values(array_filter(array_map('trim', explode(',', $raw)), static fn(string $g): bool => $g !== ''));
+        if ($parts === []) {
+            fwrite(STDERR, "ci-streak: --gates= requires a non-empty comma-separated list\n");
+            exit(2);
+        }
+        $gates = $parts;
     }
 }
 
@@ -48,7 +57,7 @@ if ($record) {
     }
 
     $prev = ci_streak_load($path);
-    $next = ci_streak_record($prev, $sha, $day);
+    $next = ci_streak_record($prev, $sha, $day, $gates);
     if ($write) {
         $encoded = json_encode($next, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n";
         if (false === file_put_contents($path, $encoded)) {
