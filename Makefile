@@ -426,8 +426,9 @@ bootstrap-gen0-driver-functional-smoke:
 bootstrap-gen0-refresh-argv-driver:
 	./script/bootstrap-gen0-refresh-argv-driver.sh
 # Refresh committed helper units. aot-smoke is mandatory: fingerprint-fresh
-# gc_sections units without PHP_COMPILER_HELPER_RUNTIME_COMMON=1 segfault every
-# AOT binary (bin/compile.php defaults HELPER_RUNTIME_O=1) — #36246 / #36401.
+# Refresh committed helper-runtime units. Emit forces AOT_GC_SECTIONS=0 while the
+# corpus is monolithic; gc_sections publish without COMMON is refused (#36246 / #36401).
+# Intentional migration: php script/emit-helper-runtime-object.php --force --prelink --migrate-to-gc-sections
 helper-runtime-prelink-refresh:
 	php script/emit-helper-runtime-object.php --prelink
 	./script/aot-smoke.sh

@@ -25,6 +25,15 @@ declare(strict_types=1);
  * content-based, so any clone on the same arch consumes them cold) and
  * rewrites that arch's manifest.json. Commit the result when intentional.
  *
+ * gc_sections / COMMON (#36246 / #36401): AotGcSections is on by default for
+ * user AOT, but the committed helper-runtime corpus is still monolithic
+ * (gc_sections=false). Publishing a mixed gc_sections batch without linkable
+ * common.o made bin/compile.php (HELPER_RUNTIME_O=1) SIGSEGV aot-smoke 0/9.
+ * Unless the corpus already has gc_sections, or --migrate-to-gc-sections is
+ * passed with a linkable common.o, this script forces
+ * PHP_COMPILER_AOT_GC_SECTIONS=0 for the emit and refuses to publish any
+ * per-function-section unit.o into the prelinked tree.
+ *
  * Prune policy (#25377 / artifact-honesty): by default --prelink only removes
  * committed units whose helper site no longer exists (orphan rename/delete).
  * Units that still have a live site but failed or incomplete local emit are
@@ -38,6 +47,8 @@ declare(strict_types=1);
  *   ./script/docker-exec.sh -- bash -lc 'php script/emit-helper-runtime-object.php --prelink'
  *   ./script/docker-exec.sh -- bash -lc 'php script/emit-helper-runtime-object.php --migrate-deps'
  *   ./script/docker-exec.sh -- bash -lc 'php script/emit-helper-runtime-object.php --prelink-orphans-only'
+ *   ./script/docker-exec.sh -- bash -lc 'php script/emit-helper-runtime-object.php --force --prelink --migrate-to-gc-sections'
+ *     # intentional corpus migration to AotGcSections (requires linkable common.o)
  *     # rewrite legacy manifests to v2 deps[] without re-emitting .o (#23458)
  *   ./script/docker-exec.sh -- bash -lc 'php script/emit-helper-runtime-object.php --refresh-global-fingerprints'
  *     # recompute v2 unit + arch fingerprints when global material changed (patches/lock)
@@ -45,6 +56,8 @@ declare(strict_types=1);
  */
 
 use PHPCompiler\AOT\HelperRuntimeCache;
+use PHPCompiler\AOT\HelperRuntimeCommon;
+use PHPCompiler\JIT\AotGcSections;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\Runtime;
 
@@ -59,6 +72,29 @@ $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
 $force = in_array('--force', $argv, true);
 $migrateDeps = in_array('--migrate-deps', $argv, true);
 $refreshGlobal = in_array('--refresh-global-fingerprints', $argv, true);
+$migrateToGcSections = in_array('--migrate-to-gc-sections', $argv, true);
+
+// Keep monolithic committed corpus shape unless an intentional migration is
+// requested. Default-on AotGcSections would otherwise emit incompatible unit.o
+// that --prelink must refuse (#36246 / #36401 aot-smoke SIGSEGV).
+if (!$migrateToGcSections && !HelperRuntimeCache::prelinkedCorpusHasGcSections()) {
+    $gcEnv = getenv(AotGcSections::ENV);
+    if (false === $gcEnv || '' === $gcEnv) {
+        putenv(AotGcSections::ENV.'=0');
+        $_ENV[AotGcSections::ENV] = '0';
+        $_SERVER[AotGcSections::ENV] = '0';
+        fwrite(STDERR, "helper-runtime-emit: forcing ".AotGcSections::ENV."=0 (monolithic prelinked corpus; pass --migrate-to-gc-sections for intentional gc_sections refresh)\n");
+    }
+}
+if ($migrateToGcSections) {
+    if (!HelperRuntimeCommon::commonObjectIsLinkable()) {
+        fwrite(STDERR, "helper-runtime-emit: --migrate-to-gc-sections requires linkable common.o (PHP_COMPILER_HELPER_RUNTIME_COMMON + matching manifest sha)\n");
+        exit(1);
+    }
+    putenv(AotGcSections::ENV.'=1');
+    $_ENV[AotGcSections::ENV] = '1';
+    $_SERVER[AotGcSections::ENV] = '1';
+}
 
 if ($refreshGlobal) {
     $unitsRoot = HelperRuntimeCache::prelinkedUnitsDir();
@@ -664,6 +700,7 @@ if (in_array('--prelink', $argv, true)) {
     $published = 0;
     $totalBytes = 0;
     $publishedSlugs = [];
+    $refusedGcMix = 0;
     foreach ($sites as $path => $names) {
         $slug = HelperRuntimeCache::slugFor($path);
         $buildDir = HelperRuntimeCache::unitDir($slug);
@@ -673,6 +710,13 @@ if (in_array('--prelink', $argv, true)) {
             || !HelperRuntimeCache::manifestFingerprintMatches($manifest, $sourceAbs)
             || !is_file($buildDir.'/unit.o') || !is_file($buildDir.'/unit.bc')) {
             continue; // only fresh, complete units are published
+        }
+        $unitObject = $buildDir.'/unit.o';
+        $refuse = HelperRuntimeCache::refusePrelinkGcMixReason($unitObject, $migrateToGcSections);
+        if (null !== $refuse) {
+            fwrite(STDERR, "helper-runtime-prelink: REFUSE {$slug} — {$refuse}\n");
+            ++$refusedGcMix;
+            continue;
         }
         $dest = $prelinkUnits.'/'.$slug;
         if (!is_dir($dest) && !mkdir($dest, 0755, true) && !is_dir($dest)) {
@@ -685,6 +729,10 @@ if (in_array('--prelink', $argv, true)) {
         @unlink($dest.'/failed.json'); // never commit crash markers — env-specific
         $publishedSlugs[$slug] = true;
         ++$published;
+    }
+    if ($refusedGcMix > 0) {
+        fwrite(STDERR, "helper-runtime-prelink: refused {$refusedGcMix} gc_sections unit(s) — aborting before rewriting arch manifest (#36401)\n");
+        exit(1);
     }
     // Live helper-site slugs (presence in corpus), independent of emit success.
     $liveSlugs = [];

@@ -1522,6 +1522,29 @@ final class HelperRuntimeCache
     }
 
     /**
+     * Why a built unit.o must not be published into the committed prelinked tree.
+     *
+     * Mixed gc_sections objects into a monolithic corpus (without COMMON) made
+     * HELPER_RUNTIME_O=1 AOT binaries SIGSEGV — aot-smoke 0/9 (#36246 / #36401).
+     *
+     * @return string|null null when publish is allowed
+     */
+    public static function refusePrelinkGcMixReason(string $unitObjectPath, bool $migrateToGcSections = false): ?string
+    {
+        if (!self::unitObjectHasPerFunctionSections($unitObjectPath)) {
+            return null;
+        }
+        if (!HelperRuntimeCommon::commonObjectIsLinkable()) {
+            return 'gc_sections unit.o needs linkable common.o before publish';
+        }
+        if (!self::prelinkedCorpusHasGcSections() && !$migrateToGcSections) {
+            return 'gc_sections unit.o into monolithic corpus';
+        }
+
+        return null;
+    }
+
+    /**
      * True when $objectPath carries AotGcSections per-function ELF sections (.text.<symbol>).
      *
      * Monolithic .text units duplicate runtime symbols that common.o cannot gc (#36246).
