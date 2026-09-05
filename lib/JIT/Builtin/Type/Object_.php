@@ -1490,7 +1490,14 @@ class Object_ extends Type {
         }
     }
 
-    /** Uninitialized {@see __value__} property slots start as boxed null (#4111, Zend typed properties). */
+    /**
+     * Fill empty {@see __value__} property slots at allocate (#4111).
+     *
+     * Typed / explicit `mixed` stay {@see VmVariable::TYPE_UNDEFINED} (Error on read).
+     * Untyped props without an initializer get implicit null — Zend/zend_objects.c /
+     * {@see ClassProperty::hasDeclaredType} (#22021, #22047). Starting them as UNDEFINED
+     * made Nyholm `Uri::$port` warn + SEGV under Slim `fromArrays` (#36382).
+     */
     private function initEmptyValueProperties(PHPLLVM\Value $obj, int $classId): void
     {
         if (!isset($this->properties[$classId])) {
@@ -1529,9 +1536,12 @@ class Object_ extends Type {
                 $heapVal,
                 $this->context->getTypeFromString('__value__*')
             );
+            $initType = $this->propertySlotRequiresTypedInitGuard($classId, $propset[3])
+                ? \PHPCompiler\VM\Variable::TYPE_UNDEFINED
+                : \PHPCompiler\VM\Variable::TYPE_NULL;
             $this->context->builder->store(
                 $this->context->getTypeFromString('int8')->constInt(
-                    \PHPCompiler\VM\Variable::TYPE_UNDEFINED,
+                    $initType,
                     false
                 ),
                 $this->context->builder->structGep($heapVal, $valueMap['type'])
