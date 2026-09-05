@@ -62,6 +62,17 @@ SEED_UNITS=(
   /ext/standard/Base64JitHelper.php
   /ext/standard/Hex2binJitHelper.php
   /ext/standard/FindSubstrJitHelper.php
+  # String transform / HTML / escapes tier (#36391 after #36864)
+  /ext/standard/StrReplaceJitHelper.php
+  /ext/standard/StrPadJitHelper.php
+  /ext/standard/StrRepeatJitHelper.php
+  /ext/standard/StrrevJitHelper.php
+  /ext/standard/StripTagsJitHelper.php
+  /ext/standard/StripslashesJitHelper.php
+  /ext/standard/AddslashesJitHelper.php
+  /ext/standard/HtmlspecialcharsJitHelper.php
+  /ext/standard/Nl2brJitHelper.php
+  /ext/standard/UcwordsJitHelper.php
 )
 
 MIN_SEED=${#SEED_UNITS[@]}

@@ -316,15 +316,15 @@ final class CompileTargetTest extends TestCase
             'aarch64 seed must include the full lib_VM_* set (see script/seed-aarch64-helper-runtime.sh)'
         );
         $this->assertGreaterThanOrEqual(
-            20,
+            30,
             \count($extStdDirs),
             'aarch64 seed must include the ext/standard tiers (see script/seed-aarch64-helper-runtime.sh)'
         );
         $dirs = array_merge($vmDirs, $libVmDirs, $extStdDirs);
         $this->assertGreaterThanOrEqual(
-            42,
+            52,
             \count($dirs),
-            'aarch64 seed must be VM_* + lib_VM_* + ext/standard (42); empty/short is not a pass'
+            'aarch64 seed must be VM_* + lib_VM_* + ext/standard (52); empty/short is not a pass'
         );
         $target = CompileTarget::resolve(CompileTarget::ID_AARCH64_LINUX);
         foreach ($dirs as $unit) {
