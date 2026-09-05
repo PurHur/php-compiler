@@ -14,9 +14,9 @@
             "note": "Concern trait splits (#36387/#36403); M3EmitTuAndCompileDriverMainNative + M3EmitTuCompilerAndRuntimeVoidStubs + peers"
         },
         "lib/VM.php": {
-            "budget": 19646,
+            "budget": 18936,
             "target": 15000,
-            "note": "ObjectPropertyMagicAndClone + ClassTraitComposition + ObjectPropertyReadonlyAndVisibility + Hooks + CollectAndSerialize + IssetEmptyUnset Concern extracts (#36403); toward 15k target"
+            "note": "PropertyFetchDestAndHookedDimWrite + ObjectPropertyMagicAndClone + ClassTraitComposition + ObjectPropertyReadonlyAndVisibility + Hooks + CollectAndSerialize + IssetEmptyUnset Concern extracts (#36403); toward 15k target"
         },
         "script/apply-patches.sh": {
             "budget": 7637,
