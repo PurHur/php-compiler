@@ -30,7 +30,8 @@ final class ArrayUnshiftRuntime
     public static function unshift(Context $context, JITVariable $array, JITVariable ...$values): Value
     {
         self::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        // By-ref mutator: SEPARATE_ARRAY before prepend (php-src array_unshift / #36397).
+        $ht = HashTableHelper::separateContainerForWrite($context, $array);
         $native = ArrayBuiltinHelper::isNativeArray($array->type);
         $htVar = new JITVariable(
             $context,

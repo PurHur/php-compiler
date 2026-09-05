@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\JIT\Builtin\Refcount;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -25,6 +26,8 @@ final class HashTablePopLastLlvm
     public static function popLast(Context $context, Value $ht): Value
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'ht_pop_llvm_cont');
+        // Mutates packed storage without grow/unset chokepoints — M5 (#36397).
+        Refcount::emitAssertExclusiveCall($context, $ht);
         $map = $context->structFieldMap['__hashtable__'];
         $sizeT = $context->getTypeFromString('size_t');
         $zero = $sizeT->constInt(0, false);

@@ -134,7 +134,8 @@ final class ArrayBuiltinHelper
             Variable::KIND_VARIABLE,
             $stackBox->value
         );
-        $stackHt = self::loadHashTable($context, $stackVar);
+        // By-ref unpack push: SEPARATE_ARRAY before append (#36397).
+        $stackHt = HashTableHelper::separateContainerForWrite($context, $stackVar);
         $count = $context->builder->truncOrBitCast(
             self::getNumElements($context, $packedPtr),
             $sizeT
