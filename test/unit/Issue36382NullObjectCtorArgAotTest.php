@@ -86,6 +86,15 @@ final class Issue36382NullObjectCtorArgAotTest extends TestCase
         );
     }
 
+    /** Spill `self::make()` + `??` before `new` (AppFactory::create patch shape). */
+    public function testNewWithMethodAndCoalesceArgTemps(): void
+    {
+        $this->assertSame(
+            "1\n2\nDep36382NewCoal\nok\n",
+            $this->compileAndRun('test/repro/issue_36382_new_method_coalesce_arg.php')
+        );
+    }
+
     /** `$md = new; $this->md = $md` on a nullable ctor param must survive return. */
     public function testCtorParamReuseAssignedIntoThis(): void
     {
