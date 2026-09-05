@@ -9,20 +9,25 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** shuffle() JIT routes through ShuffleJitHelper PHP not __hashtable__shufflePacked LLVM (#12762, #14299, #17775). */
+/**
+ * shuffle() AOT uses call-site Fisher–Yates (NestedJIT ShuffleJitHelper is a no-op under
+ * thin standalone AOT — #36397 slice 12). VM still routes through ShuffleJitHelper PHP.
+ */
 final class ShuffleRuntimeShrinkTest extends TestCase
 {
-    public function testShuffleRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
+    public function testShuffleRuntimeUsesCallSiteLlvmNotNestedJitBridge(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ShuffleRuntime.php');
-        $this->assertStringContainsString('ShuffleJitHelper', $runtime);
-        $this->assertStringContainsString('loadHashTable', $runtime);
+        $this->assertStringContainsString('separateContainerForWrite', $runtime);
+        $this->assertStringContainsString('emitFisherYatesPacked', $runtime);
+        $this->assertStringContainsString('emitAssertExclusiveCall', $runtime);
+        $this->assertStringContainsString('__compiler_random_bytes', $runtime);
+        $this->assertStringNotContainsString('JitVmHelperLink', $runtime);
+        $this->assertStringNotContainsString('__shuffle__packed', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
-        $this->assertStringNotContainsString('ArrayBuiltinHelper::shufflePacked', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/shuffle_.php');
         $this->assertStringContainsString('ShuffleRuntime::shufflePacked', $builtin);
-        $this->assertStringNotContainsString('ArrayBuiltinHelper::shufflePacked(', $builtin);
     }
 
     public function testShuffleJitHelperPreservesElements(): void
