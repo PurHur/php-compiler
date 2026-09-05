@@ -14,6 +14,7 @@ namespace PHPCompiler;
 
 require_once __DIR__.'/OpCodeNames.php';
 require_once __DIR__.'/JIT/Concern/CompileBlockInternal.php';
+require_once __DIR__.'/JIT/Concern/CompilePropertyFetchReadAndWrite.php';
 require_once __DIR__.'/JIT/Concern/InitJitMethodCall.php';
 require_once __DIR__.'/JIT/Concern/AssignOperand.php';
 require_once __DIR__.'/JIT/Concern/AdaptByRefCallArgs.php';
@@ -78,20 +79,12 @@ require_once __DIR__.'/JIT/VmSpineSmokeNative.php';
 require_once __DIR__.'/JIT/VmDriverExecuteNative.php';
 require_once __DIR__.'/JIT/VmUnitProbeExecuteNative.php';
 
-use PHPCfg\Operand;
-use PHPCfg\Op;
-use PHPTypes\Type;
-use PHPCompiler\Compiler\AttributeClassRegistry;
-use PHPCompiler\Compiler\AttributeNames;
-use PHPCompiler\JIT\Builtin\AttributeRegistry;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\IssetHelper;
-use PHPCompiler\JIT\Variable;
-use PHPLLVM;
 
 class JIT {
 
     use CompileBlockInternal;
+    use CompilePropertyFetchReadAndWrite;
     use InitJitMethodCall;
     use AssignOperand;
     use AdaptByRefCallArgs;
