@@ -55,7 +55,8 @@ final class M3EmitTuCompileDriverGateTest extends TestCase
         $this->assertStringContainsString('full-spine sidecar host-compile OOMs below 8GB (#8559)', $sidecar);
         $this->assertStringContainsString('StringFsDir::ensureLinked', $aot);
         $this->assertStringContainsString('ensureSidecarCopyAbisForLink', $aot);
-        $this->assertStringContainsString('ensureSidecarCopyAbisForLink($this->context)', $jit);
+        $spineStub = (string) file_get_contents($root.'/lib/JIT/Concern/M3EmitTuRuntimeSpineStubNative.php');
+        $this->assertStringContainsString('ensureSidecarCopyAbisForLink($this->context)', $spineStub);
         $this->assertStringContainsString('__compiler_resolve_sidecar_source_path', $aot);
         $fnPos = strpos($aot, 'function emitStandaloneWriteCachedAot');
         $this->assertNotFalse($fnPos);
