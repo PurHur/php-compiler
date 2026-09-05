@@ -82,7 +82,6 @@ final class BootstrapSelfhostDriverSmokeTest extends TestCase
     /** Issue #3004: argv bin/compile.php must not return null from parseAndCompile stub when sidecars miss. */
     public function testInventoryArgvDriverUsesParseCompileSpineNotNullStub(): void
     {
-        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
         $parseInitSpine = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuRuntimeParseAndInitSpine.php');
         $m3m4m5Policy = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3M4M5CompileDriverEmitPolicy.php');
         $this->assertStringContainsString('inventoryArgvSidecar', $parseInitSpine);

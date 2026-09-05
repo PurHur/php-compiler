@@ -137,15 +137,16 @@ final class RuntimeInitParsePipelineTest extends TestCase
     {
         $root = dirname(__DIR__, 2);
         $jit = (string) file_get_contents($root.'/lib/JIT.php');
+        $phpLowering = (string) file_get_contents($root.'/lib/JIT/Concern/CompileBlockPhpLoweringAndClosurePrep.php');
         $m3m4m5Policy = (string) file_get_contents($root.'/lib/JIT/Concern/M3M4M5CompileDriverEmitPolicy.php');
         $this->assertStringContainsString('runtime::parse', $jit);
-        $this->assertStringContainsString('Type::string()', $jit);
-        $pos = strpos($jit, 'M5 argv NestedJIT of Runtime::parse');
+        $this->assertStringContainsString('Type::string()', $phpLowering);
+        $pos = strpos($phpLowering, 'M5 argv NestedJIT of Runtime::parse');
         $this->assertNotFalse($pos, 'ABI force comment for #26756 must remain');
         $this->assertStringContainsString('isM5NestedJitPhpCfgParserParse', $m3m4m5Policy);
         $this->assertStringContainsString('effectiveReturnCallbackType', $m3m4m5Policy);
-        $this->assertStringContainsString('PHPCfg\\Parser::parse', $jit);
-        $parserAbi = strpos($jit, 'M5 argv NestedJIT of PHPCfg\\Parser::parse');
+        $this->assertStringContainsString('PHPCfg\\Parser::parse', $phpLowering);
+        $parserAbi = strpos($phpLowering, 'M5 argv NestedJIT of PHPCfg\\Parser::parse');
         $this->assertNotFalse($parserAbi, 'Parser::parse ABI force for #27426 must remain');
     }
 
