@@ -212,7 +212,8 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
     public function testM3EmitParseAndCompileDefaultPhiUsesAfterRecordTail(): void
     {
         $emit = (string) file_get_contents(self::$root.'/lib/JIT/BootstrapCompileSmokeM3Emit.php');
-        $this->assertStringContainsString('$phi->addIncoming($block, $afterRecordBb)', $emit);
+        // Predecessor bb renamed to $okBb in current emit path; still the after-record tail (#3023).
+        $this->assertStringContainsString('$phi->addIncoming($block, $okBb)', $emit);
         $this->assertStringContainsString('shouldEmitRuntimeSpineDiagnosticStub', $emit);
     }
 

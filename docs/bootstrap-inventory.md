@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8253 |
-| Phase A inventory files (M2 ratio SSOT) | 8253 |
+| PHP files on vm.php path | 8254 |
+| Phase A inventory files (M2 ratio SSOT) | 8254 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26090 |
+| Source constructs flagged (warnings) | 26092 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5680,7 +5680,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/GlobalTypedConstSyntaxRejector.php` | 0 | 2 |
 | `lib/Handler.php` | 0 | 1 |
 | `lib/HexFloat.php` | 0 | 1 |
-| `lib/JIT.php` | 0 | 12 |
+| `lib/JIT.php` | 0 | 10 |
 | `lib/JIT/Analyzer.php` | 0 | 1 |
 | `lib/JIT/AotDebugSymbols.php` | 0 | 1 |
 | `lib/JIT/AotGcSections.php` | 0 | 1 |
@@ -7091,6 +7091,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/PropertyIncDecCompile.php` | 0 | 19 |
 | `lib/JIT/Concern/ResolveJitOutgoingCall.php` | 0 | 2 |
 | `lib/JIT/Concern/ScriptGlobalAssignAndLvalueResolve.php` | 0 | 4 |
+| `lib/JIT/Concern/SelfHostEmitHelperAndVendorPrelinkPolicy.php` | 0 | 4 |
 | `lib/JIT/Concern/SkippedHotPathAndRealLoweringNames.php` | 0 | 2 |
 | `lib/JIT/Concern/SkippedSplitCfgAndTernaryMergeHelpers.php` | 0 | 3 |
 | `lib/JIT/Concern/SkippedVmEmitHelperAndCompileDriverNames.php` | 0 | 2 |
@@ -50517,17 +50518,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT\Call\ExternalMethod (line 415)
-- new JIT\Scope (line 444)
-- new Operand\Literal (line 694)
-- new Operand\Literal (line 710)
-- new JIT\Call\Native (line 1188)
-- new Variable (line 2194)
-- new JIT\Call\Native (line 2220)
-- new Variable (line 2310)
-- new JIT\Call\Vararg (line 2337)
-- new JIT\Call\Native (line 2347)
-- 67 class method(s)
+- new JIT\Call\ExternalMethod (line 417)
+- new JIT\Scope (line 446)
+- new JIT\Call\Native (line 970)
+- new Variable (line 1976)
+- new JIT\Call\Native (line 2002)
+- new Variable (line 2092)
+- new JIT\Call\Vararg (line 2119)
+- new JIT\Call\Native (line 2129)
+- 52 class method(s)
 - 12 closure(s)
 
 ### `lib/JIT/Analyzer.php`
@@ -58365,6 +58364,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 114)
 - 16 class method(s)
 
+### `lib/JIT/Concern/SelfHostEmitHelperAndVendorPrelinkPolicy.php`
+
+**Warnings** (review for bootstrap subset):
+- trait SelfHostEmitHelperAndVendorPrelinkPolicy (line 23)
+- new Operand\Literal (line 60)
+- new Operand\Literal (line 76)
+- 15 class method(s)
+
 ### `lib/JIT/Concern/SkippedHotPathAndRealLoweringNames.php`
 
 **Warnings** (review for bootstrap subset):
@@ -60264,7 +60271,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/SpineChunkRuntimeMethodDemote.php`
 
 **Warnings** (review for bootstrap subset):
-- new OpCode (line 225)
+- new OpCode (line 226)
 - 11 class method(s)
 
 ### `lib/JIT/SpineChunkStandardHelperBind.php`
