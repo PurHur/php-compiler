@@ -29,6 +29,7 @@ use PHPCompiler\ext\standard\connection_status;
 use PHPCompiler\ext\standard\convert_uuencode;
 use PHPCompiler\ext\standard\crc32;
 use PHPCompiler\ext\standard\date_default_timezone_get;
+use PHPCompiler\ext\standard\date_get_last_errors;
 use PHPCompiler\ext\standard\decbin;
 use PHPCompiler\ext\standard\dechex;
 use PHPCompiler\ext\standard\decoct;
@@ -37,6 +38,7 @@ use PHPCompiler\ext\standard\dirname;
 use PHPCompiler\ext\standard\escapeshellarg;
 use PHPCompiler\ext\standard\escapeshellcmd;
 use PHPCompiler\ext\standard\error_get_last;
+use PHPCompiler\ext\standard\error_reporting;
 use PHPCompiler\ext\standard\explode;
 use PHPCompiler\ext\standard\extension_loaded;
 use PHPCompiler\ext\standard\enum_exists_;
@@ -75,12 +77,16 @@ use PHPCompiler\ext\hash\hash_algos;
 use PHPCompiler\ext\standard\hash_equals;
 use PHPCompiler\ext\standard\hash_hmac_algos;
 use PHPCompiler\ext\standard\headers_list;
+use PHPCompiler\ext\standard\headers_sent;
 use PHPCompiler\ext\standard\hebrev;
 use PHPCompiler\ext\standard\hexdec;
 use PHPCompiler\ext\standard\html_entity_decode;
 use PHPCompiler\ext\standard\htmlentities;
 use PHPCompiler\ext\standard\htmlspecialchars;
 use PHPCompiler\ext\standard\htmlspecialchars_decode;
+use PHPCompiler\ext\standard\http_get_last_response_headers;
+use PHPCompiler\ext\standard\http_response_code;
+use PHPCompiler\ext\standard\ignore_user_abort;
 use PHPCompiler\ext\standard\int_max;
 use PHPCompiler\ext\standard\int_min;
 use PHPCompiler\ext\standard\intval;
@@ -105,6 +111,7 @@ use PHPCompiler\ext\standard\number_format;
 use PHPCompiler\ext\standard\ob_get_contents;
 use PHPCompiler\ext\standard\ob_get_length;
 use PHPCompiler\ext\standard\ob_get_level;
+use PHPCompiler\ext\standard\ob_list_handlers;
 use PHPCompiler\ext\standard\octdec;
 use PHPCompiler\ext\standard\ord;
 use PHPCompiler\ext\standard\parse_url;
@@ -129,6 +136,7 @@ use PHPCompiler\ext\standard\session_status_;
 use PHPCompiler\ext\standard\sha1;
 use PHPCompiler\ext\standard\similar_text;
 use PHPCompiler\ext\standard\soundex;
+use PHPCompiler\ext\standard\spl_autoload_functions;
 use PHPCompiler\ext\standard\spl_object_hash;
 use PHPCompiler\ext\standard\spl_object_id;
 use PHPCompiler\ext\standard\sqrt;
@@ -157,6 +165,9 @@ use PHPCompiler\ext\standard\strval;
 use PHPCompiler\ext\standard\substr;
 use PHPCompiler\ext\standard\substr_replace;
 use PHPCompiler\ext\standard\sys_get_temp_dir;
+use PHPCompiler\ext\standard\time;
+use PHPCompiler\ext\standard\timezone_abbreviations_list;
+use PHPCompiler\ext\standard\timezone_identifiers_list;
 use PHPCompiler\ext\standard\timezone_version_get;
 use PHPCompiler\ext\standard\trait_exists_;
 use PHPCompiler\ext\standard\ucwords;
@@ -3074,6 +3085,138 @@ final class DiscardedPureCallElisionTest extends TestCase
         $this->assertFalse(DiscardedPureCallElision::tryElide(
             $context,
             new cli_get_process_title(),
+            [$str]
+        ));
+    }
+
+    public function testDiscardedDateObHttpSplTimeGetterRuntimeInfoElides(): void
+    {
+        // php-src date / output / http / spl / basic_functions / head (#36386).
+        $context = $this->makeContext();
+        $long = $this->makeNativeLongVar();
+        $null = $this->makeNullVar();
+        $str = $this->makeStringVar('s');
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new timezone_abbreviations_list(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new timezone_identifiers_list(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new timezone_identifiers_list(),
+            [$long]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new ob_list_handlers(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new date_get_last_errors(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new http_get_last_response_headers(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new spl_autoload_functions(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new time(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new error_reporting(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new ignore_user_abort(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new http_response_code(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new headers_sent(),
+            []
+        ));
+
+        // Soft-null group / setter / by-ref / excess argc stay live.
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new timezone_identifiers_list(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new timezone_identifiers_list(),
+            [$long, $str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new timezone_abbreviations_list(),
+            [$str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new ob_list_handlers(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new date_get_last_errors(),
+            [$long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new http_get_last_response_headers(),
+            [$str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new spl_autoload_functions(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new time(),
+            [$long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new error_reporting(),
+            [$long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new ignore_user_abort(),
+            [$long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new http_response_code(),
+            [$long]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new headers_sent(),
             [$str]
         ));
     }
