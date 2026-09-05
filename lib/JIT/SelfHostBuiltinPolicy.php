@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT;
 
 
 use PHPCompiler\Config;
+use PHPCompiler\ExtensionRegistry;
 
 final class SelfHostBuiltinPolicy
 {
@@ -439,12 +440,16 @@ final class SelfHostBuiltinPolicy
         }
 
         if (null === self::$registeredStdlib) {
+            // Enumerate via ExtensionRegistry (lib SSOT) — no lib→ext\standard / ext\types imports (#36204).
             self::$registeredStdlib = [];
-            foreach ((new \PHPCompiler\ext\standard\Module())->getFunctions() as $fn) {
-                self::$registeredStdlib[strtolower($fn->getName())] = true;
-            }
-            foreach ((new \PHPCompiler\ext\types\Module())->getFunctions() as $fn) {
-                self::$registeredStdlib[strtolower($fn->getName())] = true;
+            foreach (ExtensionRegistry::defaultModules() as $mod) {
+                $ext = $mod->getExtensionName();
+                if ('standard' !== $ext && 'types' !== $ext) {
+                    continue;
+                }
+                foreach ($mod->getFunctions() as $fn) {
+                    self::$registeredStdlib[strtolower($fn->getName())] = true;
+                }
             }
         }
 

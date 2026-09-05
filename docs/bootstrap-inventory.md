@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8246 |
-| Phase A inventory files (M2 ratio SSOT) | 8246 |
+| PHP files on vm.php path | 8248 |
+| Phase A inventory files (M2 ratio SSOT) | 8248 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26077 |
+| Source constructs flagged (warnings) | 26080 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1028,7 +1028,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/hash/JitHashCryptoKernel.php` | 0 | 1 |
 | `ext/hash/JitMhash.php` | 0 | 1 |
 | `ext/hash/MhashRegistry.php` | 0 | 1 |
-| `ext/hash/Module.php` | 0 | 21 |
+| `ext/hash/Module.php` | 0 | 22 |
 | `ext/hash/VmHashContext.php` | 0 | 6 |
 | `ext/hash/VmMhash.php` | 0 | 1 |
 | `ext/hash/hash_algos.php` | 0 | 2 |
@@ -5122,7 +5122,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/tokenizer/token_get_all.php` | 0 | 1 |
 | `ext/tokenizer/token_name.php` | 0 | 2 |
 | `ext/types/JitStrlen.php` | 0 | 1 |
-| `ext/types/Module.php` | 0 | 12 |
+| `ext/types/Module.php` | 0 | 13 |
 | `ext/types/is_type.php` | 0 | 1 |
 | `ext/types/strlen.php` | 0 | 1 |
 | `ext/uploadprogress/Module.php` | 0 | 3 |
@@ -5934,7 +5934,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/IniSet.php` | 0 | 1 |
 | `lib/JIT/Builtin/Internal.php` | 0 | 1 |
 | `lib/JIT/Builtin/IsAnonymousClassRuntime.php` | 0 | 1 |
-| `lib/JIT/Builtin/IsNullFn.php` | 0 | 2 |
+| `lib/JIT/Builtin/IsNullFn.php` | 0 | 1 |
 | `lib/JIT/Builtin/JdmonthnameRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/JdtofrenchRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/JdtogregorianRuntime.php` | 0 | 1 |
@@ -7948,6 +7948,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/HashTable.php` | 0 | 100 |
 | `lib/VM/HashTableJitHelper.php` | 0 | 1 |
 | `lib/VM/HashTableRegistry.php` | 0 | 1 |
+| `lib/VM/HashVmRuntimeSupport.php` | 0 | 1 |
 | `lib/VM/HeaderCallbackQueue.php` | 0 | 1 |
 | `lib/VM/ImplementsHierarchyRuntimeCheck.php` | 0 | 1 |
 | `lib/VM/InOperator.php` | 0 | 1 |
@@ -8045,6 +8046,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/TryCatchJitHelper.php` | 0 | 1 |
 | `lib/VM/TypeCheck.php` | 0 | 7 |
 | `lib/VM/TypedPropertyCheck.php` | 0 | 7 |
+| `lib/VM/TypesVmRuntimeSupport.php` | 0 | 1 |
 | `lib/VM/UndefinedGlobalVariableJitHelper.php` | 0 | 1 |
 | `lib/VM/UndefinedPropertyFetchJitHelper.php` | 0 | 1 |
 | `lib/VM/UndefinedVariableJitHelper.php` | 0 | 1 |
@@ -15758,27 +15760,28 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/hash/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new VM\Variable (line 23)
-- new VM\Variable (line 27)
-- new hash_init (line 36)
-- new hash_update (line 37)
-- new hash_update_file (line 38)
-- new hash_update_stream (line 39)
-- new hash_final (line 40)
-- new hash_copy (line 41)
-- new hash_algos (line 42)
-- new phpc_hash_crypto_hash (line 43)
-- new phpc_hash_crypto_hmac (line 44)
-- new phpc_hash_crypto_pbkdf2 (line 45)
-- new phpc_hash_crypto_hkdf (line 46)
-- new hash_file (line 47)
-- new hash_hmac_file (line 48)
-- new mhash (line 49)
-- new mhash_count (line 50)
-- new mhash_get_hash_name (line 51)
-- new mhash_get_block_size (line 52)
-- new mhash_keygen_s2k (line 53)
+- new VM\Variable (line 24)
+- new VM\Variable (line 28)
+- new hash_init (line 43)
+- new hash_update (line 44)
+- new hash_update_file (line 45)
+- new hash_update_stream (line 46)
+- new hash_final (line 47)
+- new hash_copy (line 48)
+- new hash_algos (line 49)
+- new phpc_hash_crypto_hash (line 50)
+- new phpc_hash_crypto_hmac (line 51)
+- new phpc_hash_crypto_pbkdf2 (line 52)
+- new phpc_hash_crypto_hkdf (line 53)
+- new hash_file (line 54)
+- new hash_hmac_file (line 55)
+- new mhash (line 56)
+- new mhash_count (line 57)
+- new mhash_get_hash_name (line 58)
+- new mhash_get_block_size (line 59)
+- new mhash_keygen_s2k (line 60)
 - 2 class method(s)
+- 1 closure(s)
 
 ### `ext/hash/VmHashContext.php`
 
@@ -45822,18 +45825,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/types/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new strlen (line 22)
-- new is_type (line 23)
-- new is_type (line 24)
 - new is_type (line 25)
-- new is_type (line 26)
-- new is_type (line 27)
-- new is_type (line 28)
-- new is_type (line 29)
-- new is_type (line 30)
-- new is_type (line 31)
+- new strlen (line 31)
 - new is_type (line 32)
-- 1 class method(s)
+- new is_type (line 33)
+- new is_type (line 34)
+- new is_type (line 35)
+- new is_type (line 36)
+- new is_type (line 37)
+- new is_type (line 38)
+- new is_type (line 39)
+- new is_type (line 40)
+- new is_type (line 41)
+- 2 class method(s)
 
 ### `ext/types/is_type.php`
 
@@ -51937,7 +51941,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/IsNullFn.php`
 
 **Warnings** (review for bootstrap subset):
-- new is_type (line 20)
 - 1 class method(s)
 
 ### `lib/JIT/Builtin/JdmonthnameRuntime.php`
@@ -65321,6 +65324,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 6 class method(s)
 
+### `lib/VM/HashVmRuntimeSupport.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
 ### `lib/VM/HeaderCallbackQueue.php`
 
 **Warnings** (review for bootstrap subset):
@@ -66032,6 +66040,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 285)
 - new TypedPropertyReadSignal (line 313)
 - 19 class method(s)
+
+### `lib/VM/TypesVmRuntimeSupport.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `lib/VM/UndefinedGlobalVariableJitHelper.php`
 

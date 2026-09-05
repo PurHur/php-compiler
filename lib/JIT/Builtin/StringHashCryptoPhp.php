@@ -8,13 +8,14 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\VM\HashVmRuntimeSupport;
 
 /**
  * JIT/AOT link for hash crypto via HashCryptoJitHelper PHP (#9164, #21026, #32876, #34828).
  *
  * Embed + thin standalone AOT: {@see HashCryptoJitHelper} via {@see JitVmHelperLink}
  * (HashEquals #20469 / HashAlgos #20652 shape — no thin-standalone libcrypto ABI fork).
- * NestedJIT leaf: {@see \phpc_hash_crypto_hash} → {@see \PHPCompiler\ext\hash\JitHashCryptoKernel} EVP.
+ * NestedJIT leaf: {@see \phpc_hash_crypto_hash} → EVP via {@see \PHPCompiler\VM\HashVmRuntimeSupport}.
  * Non-crypto digests: bundled {@see HashNonCryptoJitHelper} (#34828).
  *
  * Module-local ABI owner (getNamedFunction first via ensureBridge): Builtin\Type no longer
@@ -91,7 +92,7 @@ final class StringHashCryptoPhp
         }
 
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        \PHPCompiler\ext\hash\JitHashCryptoKernel::ensureEvpLeaves($context);
+        HashVmRuntimeSupport::ensureEvpLeaves($context);
         // NonCrypto before HashCrypto — HashCrypto::hash calls supports/digest (#34828).
         JitVmHelperLink::ensureCompiledBundle(
             $context,

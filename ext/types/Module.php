@@ -12,10 +12,19 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\types;
 
 use PHPCompiler\ModuleAbstract;
+use PHPCompiler\Runtime;
+use PHPCompiler\VM\TypesVmRuntimeSupport;
 use PHPCompiler\VM\Variable;
 
 class Module extends ModuleAbstract
 {
+    public function init(Runtime $runtime): void
+    {
+        parent::init($runtime);
+        // lib/JIT/Builtin/IsNullFn must not import ext\types (#36204).
+        TypesVmRuntimeSupport::setIsNullCall(new is_type('is_null', Variable::TYPE_NULL));
+    }
+
     public function getFunctions(): array
     {
         return [
