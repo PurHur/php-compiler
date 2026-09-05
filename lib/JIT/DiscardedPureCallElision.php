@@ -73,6 +73,14 @@ use PHPCompiler\VM\Variable as VmVariable;
  * stream_get_wrappers / stream_get_transports / stream_get_filters /
  * cli_get_process_title (zero-arg; excess argc stays live —
  * ArgumentCountError),
+ * timezone_abbreviations_list / ob_list_handlers / date_get_last_errors /
+ * http_get_last_response_headers / spl_autoload_functions / time /
+ * error_reporting / ignore_user_abort / http_response_code / headers_sent
+ * (zero-arg; setter / by-ref forms stay live; excess argc stays live —
+ * ArgumentCountError),
+ * timezone_identifiers_list (zero-arg or typed long group; soft-null group
+ * stays live — deprecate; country-code form stays live — ValueError;
+ * excess argc stays live — ArgumentCountError),
  * zero-arg pi, type.c predicates + gettype/get_debug_type, ctype.c
  * classifiers on typed/literal strings, typed-array count/sizeof, math.c
  * incl. pow/fpow/fdiv on already-numeric args, empty void user functions).
@@ -147,6 +155,14 @@ use PHPCompiler\VM\Variable as VmVariable;
  * {@code timezone_version_get}/{@code stream_get_wrappers}/
  * {@code stream_get_transports}/{@code stream_get_filters}/
  * {@code cli_get_process_title} stay live ({@code ArgumentCountError}).
+ * Non-zero-arg {@code timezone_abbreviations_list}/{@code ob_list_handlers}/
+ * {@code date_get_last_errors}/{@code http_get_last_response_headers}/
+ * {@code spl_autoload_functions}/{@code time} stay live
+ * ({@code ArgumentCountError}). Soft-null {@code timezone_identifiers_list}
+ * group stays live (deprecate); country-code / excess-arg forms stay live.
+ * Non-zero-arg {@code error_reporting}/{@code ignore_user_abort}/
+ * {@code http_response_code}/{@code headers_sent} stay live (setter /
+ * by-ref side effects).
  */
 final class DiscardedPureCallElision
 {
@@ -264,6 +280,9 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureJsonPregTzStreamCliRuntimeInfoNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureDateObHttpSplTimeGetterRuntimeInfoNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureVersionCompareNoSideEffect($toCall, $callArgs)) {
@@ -1673,6 +1692,32 @@ final class DiscardedPureCallElision
     }
 
     /**
+     * Discarded {@code timezone_abbreviations_list}/
+     * {@code timezone_identifiers_list}/{@code ob_list_handlers}/
+     * {@code date_get_last_errors}/{@code http_get_last_response_headers}/
+     * {@code spl_autoload_functions}/{@code time}/{@code error_reporting}/
+     * {@code ignore_user_abort}/{@code http_response_code}/{@code headers_sent}
+     * — php-src date/OB/HTTP/SPL/time introspection getters. Setter /
+     * by-ref forms stay live. Soft-null {@code timezone_identifiers_list}
+     * group stays live (deprecate). Country-code form stays live
+     * ({@code ValueError}). Excess argc stays live ({@code ArgumentCountError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureDateObHttpSplTimeGetterRuntimeInfoNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        $nameLc = strtolower($toCall->getName());
+        if (!NoThrowCallElision::isPureDateObHttpSplTimeGetterRuntimeInfoBuiltin($nameLc)) {
+            return false;
+        }
+
+        return self::dateObHttpSplTimeGetterRuntimeInfoArgsAllowDiscardedElision($nameLc, $callArgs);
+    }
+
+    /**
      * Discarded {@code version_compare} on typed / literal strings — php-src
      * {@code versioning.c}. Optional operator must be null or a compile-time
      * valid comparison op ({@code ValueError} otherwise).
@@ -2163,6 +2208,50 @@ final class DiscardedPureCallElision
     private static function jsonPregTzStreamCliRuntimeInfoArgsAllowDiscardedElision(array $callArgs): bool
     {
         return NoThrowCallElision::jsonPregTzStreamCliRuntimeInfoArgsCannotThrow($callArgs);
+    }
+
+    /**
+     * {@code timezone_abbreviations_list}/{@code ob_list_handlers}/
+     * {@code date_get_last_errors}/{@code http_get_last_response_headers}/
+     * {@code spl_autoload_functions}/{@code time}/{@code error_reporting}/
+     * {@code ignore_user_abort}/{@code http_response_code}/{@code headers_sent}:
+     * arity 0. {@code timezone_identifiers_list}: arity 0 or typed long group
+     * (soft-null stays live — deprecate).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function dateObHttpSplTimeGetterRuntimeInfoArgsAllowDiscardedElision(
+        string $nameLc,
+        array $callArgs
+    ): bool {
+        switch ($nameLc) {
+            case 'timezone_abbreviations_list':
+            case 'ob_list_handlers':
+            case 'date_get_last_errors':
+            case 'http_get_last_response_headers':
+            case 'spl_autoload_functions':
+            case 'time':
+            case 'error_reporting':
+            case 'ignore_user_abort':
+            case 'http_response_code':
+            case 'headers_sent':
+                return [] === $callArgs;
+            case 'timezone_identifiers_list':
+                if ([] === $callArgs) {
+                    return true;
+                }
+                if (
+                    !isset($callArgs[0])
+                    || !$callArgs[0] instanceof Variable
+                    || isset($callArgs[1])
+                ) {
+                    return false;
+                }
+
+                return self::mathArgAllowsDiscardedElision($callArgs[0]);
+            default:
+                return false;
+        }
     }
 
     /**

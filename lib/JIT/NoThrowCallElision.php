@@ -405,6 +405,16 @@ final class NoThrowCallElision
             // ArgumentCountError.
             return self::jsonPregTzStreamCliRuntimeInfoArgsCannotThrow($callArgs);
         }
+        if (self::isPureDateObHttpSplTimeGetterRuntimeInfoBuiltin($name)) {
+            // timezone_abbreviations_list / timezone_identifiers_list /
+            // ob_list_handlers / date_get_last_errors /
+            // http_get_last_response_headers / spl_autoload_functions / time /
+            // error_reporting / ignore_user_abort / http_response_code /
+            // headers_sent — arity 0 (timezone_identifiers_list: optional typed
+            // long group); setter / by-ref forms stay out; soft-null group
+            // deprecates; excess argc is ArgumentCountError.
+            return self::dateObHttpSplTimeGetterRuntimeInfoArgsCannotThrow($name, $callArgs);
+        }
         if (self::isPureVersionCompareBuiltin($name)) {
             // versioning.c — typed strings; optional operator must be proven valid.
             return self::versionCompareArgsCannotThrow($callArgs);
@@ -1339,6 +1349,40 @@ final class NoThrowCallElision
     }
 
     /**
+     * Date/OB/HTTP/SPL/time introspection getters — php-src
+     * {@code ext/date/php_date.c} ({@code timezone_abbreviations_list}/
+     * {@code timezone_identifiers_list}/{@code date_get_last_errors}/
+     * {@code time}), {@code ext/standard/output.c} ({@code ob_list_handlers}),
+     * {@code ext/standard/http.c} ({@code http_get_last_response_headers}),
+     * {@code ext/spl/php_spl.c} ({@code spl_autoload_functions}),
+     * {@code ext/standard/basic_functions.c} ({@code error_reporting}/
+     * {@code ignore_user_abort}), {@code ext/standard/head.c}
+     * ({@code http_response_code}/{@code headers_sent}). Setter / by-ref
+     * forms stay live. Excess argc is {@code ArgumentCountError}. Soft-null
+     * {@code timezone_identifiers_list} group deprecates. Public for
+     * {@see DiscardedPureCallElision} (#36386).
+     */
+    public static function isPureDateObHttpSplTimeGetterRuntimeInfoBuiltin(string $nameLc): bool
+    {
+        switch ($nameLc) {
+            case 'timezone_abbreviations_list':
+            case 'timezone_identifiers_list':
+            case 'ob_list_handlers':
+            case 'date_get_last_errors':
+            case 'http_get_last_response_headers':
+            case 'spl_autoload_functions':
+            case 'time':
+            case 'error_reporting':
+            case 'ignore_user_abort':
+            case 'http_response_code':
+            case 'headers_sent':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
      * php-src {@code ext/standard/versioning.c} {@code version_compare}. Public
      * for {@see DiscardedPureCallElision} (#36386).
      */
@@ -1917,6 +1961,52 @@ final class NoThrowCallElision
     public static function jsonPregTzStreamCliRuntimeInfoArgsCannotThrow(array $callArgs): bool
     {
         return self::zeroArgRuntimeInfoArgsCannotThrow($callArgs);
+    }
+
+    /**
+     * {@code timezone_abbreviations_list}/{@code ob_list_handlers}/
+     * {@code date_get_last_errors}/{@code http_get_last_response_headers}/
+     * {@code spl_autoload_functions}/{@code time}: arity 0.
+     * {@code error_reporting}/{@code ignore_user_abort}/{@code http_response_code}/
+     * {@code headers_sent}: arity 0 only (setter / by-ref forms stay out).
+     * {@code timezone_identifiers_list}: arity 0 or one typed long group
+     * (soft-null deprecates; country-code form stays out — ValueError).
+     * Public for {@see DiscardedPureCallElision} (#36386).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    public static function dateObHttpSplTimeGetterRuntimeInfoArgsCannotThrow(
+        string $nameLc,
+        array $callArgs
+    ): bool {
+        switch ($nameLc) {
+            case 'timezone_abbreviations_list':
+            case 'ob_list_handlers':
+            case 'date_get_last_errors':
+            case 'http_get_last_response_headers':
+            case 'spl_autoload_functions':
+            case 'time':
+            case 'error_reporting':
+            case 'ignore_user_abort':
+            case 'http_response_code':
+            case 'headers_sent':
+                return self::zeroArgRuntimeInfoArgsCannotThrow($callArgs);
+            case 'timezone_identifiers_list':
+                if ([] === $callArgs) {
+                    return true;
+                }
+                if (
+                    !isset($callArgs[0])
+                    || !$callArgs[0] instanceof Variable
+                    || isset($callArgs[1])
+                ) {
+                    return false;
+                }
+
+                return self::numericParamBuiltinArgCannotThrow($callArgs[0]);
+            default:
+                return false;
+        }
     }
 
     /**
