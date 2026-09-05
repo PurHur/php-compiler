@@ -25,7 +25,12 @@ if ! command -v composer >/dev/null 2>&1; then
 fi
 composer install --no-interaction --ignore-platform-reqs > /dev/null 2>&1
 chmod +x script/*.sh
-script/apply-patches.sh > /dev/null 2>&1 || true
+# Do not swallow patch drift — a silent skip regenerates a lying capabilities.md (#36247 / #36401).
+if ! script/apply-patches.sh > /tmp/apply-patches-cap.log 2>&1; then
+  echo "docker-capability-matrix: apply-patches failed (#36247)" >&2
+  tail -40 /tmp/apply-patches-cap.log >&2 || true
+  exit 1
+fi
 php script/capability-matrix.php
 '
 docker cp "$CID:/compiler/docs/capabilities.md" "$ROOT/docs/capabilities.md"
