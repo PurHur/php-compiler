@@ -101,6 +101,7 @@ final class SpineChunkRuntimeMethodDemoteTest extends TestCase
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\ResolveJitOutgoingCall'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\LocalReleaseUnsetAndVarFetchDest'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\ScriptGlobalAssignAndLvalueResolve'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\AssignRefSharedBoxAndClosureInvoke'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::isDemoteTarget('PHPCompiler\\CompileBlockInternal'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::isDemoteTarget('PHPCompiler\\CompileClassAndTraitUses'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::isDemoteTarget('PHPCompiler\\InitJitStaticCall'));
@@ -116,6 +117,7 @@ final class SpineChunkRuntimeMethodDemoteTest extends TestCase
         $this->assertTrue(SpineChunkRuntimeMethodDemote::isDemoteTarget('PHPCompiler\\ResolveJitOutgoingCall'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::isDemoteTarget('PHPCompiler\\LocalReleaseUnsetAndVarFetchDest'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::isDemoteTarget('PHPCompiler\\ScriptGlobalAssignAndLvalueResolve'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::isDemoteTarget('PHPCompiler\\AssignRefSharedBoxAndClosureInvoke'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('lib/JIT/Concern/CompileBlockInternal.php'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('lib/JIT/Concern/CompileClassAndTraitUses.php'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('lib/JIT/Concern/InitJitStaticCall.php'));
@@ -131,6 +133,7 @@ final class SpineChunkRuntimeMethodDemoteTest extends TestCase
         $this->assertTrue(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('lib/JIT/Concern/ResolveJitOutgoingCall.php'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('lib/JIT/Concern/LocalReleaseUnsetAndVarFetchDest.php'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('lib/JIT/Concern/ScriptGlobalAssignAndLvalueResolve.php'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('lib/JIT/Concern/AssignRefSharedBoxAndClosureInvoke.php'));
         // Doctor.php — NestedJIT OOM without demote; hollow + demote emits (#36387).
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\Doctor'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::isDemoteTarget('PHPCompiler\\Doctor'));
