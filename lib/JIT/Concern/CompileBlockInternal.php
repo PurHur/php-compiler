@@ -4258,7 +4258,14 @@ trait CompileBlockInternal
                     $builder->positionAtEnd($returnBlock);
                     $this->markJitThisConstructedIfLeavingConstruct($block);
                     $this->releaseJitFunctionLocalsAtReturn($block);
-                    if ($this->shouldFreeDeadVariablesBeforeBranch()) {
+                    // #36382: void __construct return must not freeDeadVariables — NEW temps
+                    // assigned into `$this->prop` are already propertyStore-addref'd; the dead
+                    // temp dtor then destroys heap props (circular RouteCollector↔RouteParser)
+                    // and SIGSEGVs after the ctor body (peer TYPE_RETURN addref-before-freeDead
+                    // for `return $new` / Nyholm Uri::withUserInfo). php-src: zend_execute.c
+                    // ZEND_ASSIGN to object props keeps the prop root; ctor frame temps that
+                    // escaped into $this must not be destroyed at ZEND_RETURN / fallthrough.
+                    if ($this->shouldFreeDeadVariablesBeforeBranch() && !$this->isJitConstructFrame($block)) {
                         $this->context->freeDeadVariables($func, $returnBlock, $block);
                     }
                     if (
