@@ -89,9 +89,10 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
         $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_DRIVER=1', $source);
         $this->assertStringContainsString('runtime_compile_smoke_m3_emit', $source);
         $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
-        $this->assertStringContainsString('isBootstrapM3RuntimeEmitBridgeName', $jit);
+        $m3m4m5Policy = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3M4M5CompileDriverEmitPolicy.php');
+        $this->assertStringContainsString('isBootstrapM3RuntimeEmitBridgeName', $m3m4m5Policy);
         $this->assertStringContainsString('VariableTypeMapNative', $jit);
-        $this->assertStringContainsString('runtime_compile_smoke_m3_emit', $jit);
+        $this->assertStringContainsString('runtime_compile_smoke_m3_emit', $m3m4m5Policy);
         $vmSmoke = (string) file_get_contents(self::$root.'/lib/JIT/Concern/VmSmokeAndRuntimeM3NativeStubs.php');
         $this->assertStringContainsString('compileRuntimeParseAndCompileM3Native', $vmSmoke);
         $emit = (string) file_get_contents(self::$root.'/lib/JIT/BootstrapCompileSmokeM3Emit.php');
@@ -101,6 +102,11 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
     /** Issue #3032: runtime probe links inventory compile_driver only. */
     public function testCompilePhpPreservesSelfhostAotForRuntimeInventoryEmitDriver(): void
     {
+$phpLoweringClosures = (string) file_get_contents(self::$root.'/lib/JIT/Concern/CompileBlockPhpLoweringAndClosurePrep.php');
+        $this->assertMatchesRegularExpression(
+            '/function compileBlockPhpLowering\([\s\S]*?function isClosureNativeInvokeName\(/',
+            $phpLoweringClosures
+        );
         $compile = (string) file_get_contents(self::$root.'/bin/compile.php');
         $this->assertStringContainsString('runtime_compile_smoke/compile_driver.php', $compile);
         $this->assertStringContainsString('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1', $compile);
@@ -134,8 +140,8 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
         $this->assertStringContainsString('RuntimeInitVmContext::emit', $init);
         $object = (string) file_get_contents(self::$root.'/lib/JIT/Builtin/Type/Object_.php');
         $this->assertStringContainsString('allocateEmitTuShell', $object);
-        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
-        $this->assertStringContainsString('emitMainEntry', $jit);
+        $driverMain = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuAndCompileDriverMainNative.php');
+        $this->assertStringContainsString('emitMainEntry', $driverMain);
         $methodCompile = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuCompilerRuntimeMethodCompile.php');
         $this->assertStringContainsString('compileM3EmitTuRuntimeMethodFromQueue', $methodCompile);
         $this->assertStringContainsString('compileM3EmitTuRuntimeMethodFromDeclareClassBlocks', $methodCompile);
@@ -156,13 +162,14 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
     public function testM3EmitTuRealLoweringSkipsEarlyParseStubDecl(): void
     {
         $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
-        $this->assertStringContainsString('shouldUseM3CompileDriverRealLowering()', $jit);
-        $this->assertStringContainsString('emitMainEntry', $jit);
-        $policy = (string) file_get_contents(self::$root.'/lib/JIT/Concern/SelfHostEmitHelperAndVendorPrelinkPolicy.php');
-        $this->assertStringContainsString('shouldUseEmitHelperLinkStubs()', $policy);
+        $m3m4m5Policy = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3M4M5CompileDriverEmitPolicy.php');
+        $this->assertStringContainsString('shouldUseM3CompileDriverRealLowering()', $m3m4m5Policy);
+        $driverMain = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuAndCompileDriverMainNative.php');
+        $this->assertStringContainsString('emitMainEntry', $driverMain);
+        $this->assertStringContainsString('shouldUseEmitHelperLinkStubs()', $jit);
         $spineStub = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuRuntimeSpineStubNative.php');
         $this->assertStringContainsString('M3EmitTuTrivialEchoAot::isRegistered', $spineStub);
-        $this->assertStringContainsString('compile_smoke_m3_emit', $jit);
+        $this->assertStringContainsString('compile_smoke_m3_emit', $m3m4m5Policy);
         $smoke = (string) file_get_contents(self::$root.'/test/bootstrap-aot/compile_smoke_m3_emit.php');
         $this->assertStringContainsString('getLastParseFailure', $smoke);
         $hello = (string) file_get_contents(self::$root.'/test/bootstrap-aot/helloworld_compile_smoke.php');
@@ -173,7 +180,7 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
         $this->assertStringContainsString('peeklastparsefailure', $emit);
         $this->assertStringContainsString('echoLastParseFailureSuffix', $emit);
         $this->assertStringContainsString('noteparsecompilenullforscript', $emit);
-        $this->assertStringContainsString('helloworld_compile_smoke', $jit);
+        $this->assertStringContainsString('helloworld_compile_smoke', $m3m4m5Policy);
         $spineDecls = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3EmitTuRuntimeSpineDeclsAndCompileDeps.php');
         $this->assertStringContainsString('compileM3EmitTuRuntimeSpineMethodsForRealLowering', $spineDecls);
         $this->assertMatchesRegularExpression(
@@ -197,15 +204,16 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
             '/function isM3EmitTuCompilerSpineLoweringName\([\s\S]*?function llvmTypeForCfgParam\(/',
             $spineNativeCfg
         );
+        $m3m4m5Policy = (string) file_get_contents(self::$root.'/lib/JIT/Concern/M3M4M5CompileDriverEmitPolicy.php');
+        $this->assertMatchesRegularExpression(
+            '/function shouldUseM3CompileDriverMainNative\([\s\S]*?function isM3CompileDriverBlockPhpLoweringName\(/',
+            $m3m4m5Policy
+        );
+
         $skippedOpcodeStubs = (string) file_get_contents(self::$root.'/lib/JIT/Concern/CompileSkippedOpcodeVmAndCfgBranchStubs.php');
         $this->assertMatchesRegularExpression(
             '/function llvmInternalName\([\s\S]*?function compileSkippedCompilerCfgBranchStub\(/',
             $skippedOpcodeStubs
-        );
-        $phpLoweringClosures = (string) file_get_contents(self::$root.'/lib/JIT/Concern/CompileBlockPhpLoweringAndClosurePrep.php');
-        $this->assertMatchesRegularExpression(
-            '/function compileBlockPhpLowering\([\s\S]*?function isClosureNativeInvokeName\(/',
-            $phpLoweringClosures
         );
         $compile = (string) file_get_contents(self::$root.'/bin/compile.php');
         $this->assertStringContainsString('PHP_COMPILER_M3_EMIT_HELPER_SPINE=1', $compile);
@@ -213,12 +221,13 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
         $this->assertStringContainsString('emitParseAndCompileWithTrivialFallback', $aot);
     }
 
-    /** Issue #3023: tail phi must use afterRecord predecessor, not compileBb. */
+    /** Issue #3023: parseAndCompile fail phi must not use compileBb as predecessor. */
     public function testM3EmitParseAndCompileDefaultPhiUsesAfterRecordTail(): void
     {
         $emit = (string) file_get_contents(self::$root.'/lib/JIT/BootstrapCompileSmokeM3Emit.php');
-        // Predecessor bb renamed to $okBb in current emit path; still the after-record tail (#3023).
-        $this->assertStringContainsString('$phi->addIncoming($block, $okBb)', $emit);
+        $this->assertStringContainsString('$phi->addIncoming($objPtr->constNull(), $parseFailBb)', $emit);
+        $this->assertStringContainsString('$phi->addIncoming($objPtr->constNull(), $allFailedBb)', $emit);
+        $this->assertStringNotContainsString('$phi->addIncoming($block, $compileBb)', $emit);
         $this->assertStringContainsString('shouldEmitRuntimeSpineDiagnosticStub', $emit);
     }
 
@@ -246,6 +255,7 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
     /** M3 compile_driver must C-floor initCompiler, not only emit TU (#2568). */
     public function testM3CompileDriverInitCompilerUsesRuntimeInitCompilerFloor(): void
     {
+        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
         $vmSmoke = (string) file_get_contents(self::$root.'/lib/JIT/Concern/VmSmokeAndRuntimeM3NativeStubs.php');
         $this->assertStringContainsString(
             'shouldUseM3EmitTuNativeBridge() || $this->shouldUseM3CompileDriverRealLowering()',

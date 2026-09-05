@@ -135,15 +135,17 @@ final class RuntimeInitParsePipelineTest extends TestCase
 
     public function testM5ParseStringFormalAbiForced(): void
     {
-        $jit = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT.php');
-        $this->assertStringContainsString('runtime::parse', $jit);
-        $this->assertStringContainsString('Type::string()', $jit);
-        $pos = strpos($jit, 'M5 argv NestedJIT of Runtime::parse');
+        $root = dirname(__DIR__, 2);
+        $m3m4m5Policy = (string) file_get_contents($root.'/lib/JIT/Concern/M3M4M5CompileDriverEmitPolicy.php');
+        $phpLowering = (string) file_get_contents($root.'/lib/JIT/Concern/CompileBlockPhpLoweringAndClosurePrep.php');
+        $this->assertStringContainsString('runtime::parse', $phpLowering);
+        $this->assertStringContainsString('Type::string()', $phpLowering);
+        $pos = strpos($phpLowering, 'M5 argv NestedJIT of Runtime::parse');
         $this->assertNotFalse($pos, 'ABI force comment for #26756 must remain');
-        $this->assertStringContainsString('isM5NestedJitPhpCfgParserParse', $jit);
-        $this->assertStringContainsString('effectiveReturnCallbackType', $jit);
-        $this->assertStringContainsString('PHPCfg\\Parser::parse', $jit);
-        $parserAbi = strpos($jit, 'M5 argv NestedJIT of PHPCfg\\Parser::parse');
+        $this->assertStringContainsString('isM5NestedJitPhpCfgParserParse', $m3m4m5Policy);
+        $this->assertStringContainsString('effectiveReturnCallbackType', $m3m4m5Policy);
+        $this->assertStringContainsString('PHPCfg\\Parser::parse', $phpLowering);
+        $parserAbi = strpos($phpLowering, 'M5 argv NestedJIT of PHPCfg\\Parser::parse');
         $this->assertNotFalse($parserAbi, 'Parser::parse ABI force for #27426 must remain');
     }
 
@@ -164,6 +166,7 @@ final class RuntimeInitParsePipelineTest extends TestCase
     public function testM5ParseFloorWiredInsteadOfNestedJit(): void
     {
         $root = dirname(__DIR__, 2);
+        $m3m4m5Policy = (string) file_get_contents($root.'/lib/JIT/Concern/M3M4M5CompileDriverEmitPolicy.php');
         $this->assertFileExists($root.'/lib/JIT/RuntimeParseM5Native.php');
         $floor = (string) file_get_contents($root.'/lib/JIT/RuntimeParseM5Native.php');
         $this->assertStringContainsString('#26756', $floor);
@@ -202,22 +205,23 @@ final class RuntimeInitParsePipelineTest extends TestCase
             $peerForce
         );
         $jit = (string) file_get_contents($root.'/lib/JIT.php');
+        // require_once stays on hub; call sites live in M3M4M5CompileDriverEmitPolicy (#36387).
         $this->assertStringContainsString('RuntimeParseM5Native.php', $jit);
-        $this->assertStringContainsString('RuntimeParseM5Native::emitFunction', $jit);
         $this->assertStringContainsString('RuntimeParseM5PhpCfgParser.php', $jit);
-        $this->assertStringContainsString('RuntimeParseM5PhpCfgParser::ensureParse', $jit);
         $this->assertStringContainsString('RuntimeParseM5AstPeer.php', $jit);
-        $this->assertStringContainsString('RuntimeParseM5AstPeer::ensureMethods', $jit);
         $this->assertStringContainsString('M5ParserAstPeer.php', $jit);
+        $this->assertStringContainsString('RuntimeParseM5Native::emitFunction', $m3m4m5Policy);
+        $this->assertStringContainsString('RuntimeParseM5PhpCfgParser::ensureParse', $m3m4m5Policy);
+        $this->assertStringContainsString('RuntimeParseM5AstPeer::ensureMethods', $m3m4m5Policy);
         $spineDecls = (string) file_get_contents($root.'/lib/JIT/Concern/M3EmitTuRuntimeSpineDeclsAndCompileDeps.php');
         $spineFn = strpos($spineDecls, 'function compileM3EmitTuRuntimeSpineMethodsForRealLowering');
         $this->assertNotFalse($spineFn);
         $spineChunk = substr($spineDecls, $spineFn, 8000);
         // Body calls hub helper; peer/parser/C-floor wiring lives in ensureM5ParseSpineCFloorSymbols (#36387).
         $this->assertStringContainsString('ensureM5ParseSpineCFloorSymbols()', $spineChunk);
-        $floorHelper = strpos($jit, 'function ensureM5ParseSpineCFloorSymbols');
-        $this->assertNotFalse($floorHelper, 'M5 parse-spine C-floor helper must remain on the hub');
-        $floorChunk = substr($jit, $floorHelper, 3500);
+        $floorHelper = strpos($m3m4m5Policy, 'function ensureM5ParseSpineCFloorSymbols');
+        $this->assertNotFalse($floorHelper, 'M5 parse-spine C-floor helper must remain in M3M4M5CompileDriverEmitPolicy');
+        $floorChunk = substr($m3m4m5Policy, $floorHelper, 3500);
         $peerPos = strpos($floorChunk, 'RuntimeParseM5AstPeer::ensureMethods');
         $forcePos = strpos($floorChunk, 'RuntimeParseM5PhpCfgParser::ensureParse');
         $floorPos = strpos($floorChunk, 'RuntimeParseM5Native::emitFunction');

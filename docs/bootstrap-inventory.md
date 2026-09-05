@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8255 |
-| Phase A inventory files (M2 ratio SSOT) | 8255 |
+| PHP files on vm.php path | 8256 |
+| Phase A inventory files (M2 ratio SSOT) | 8256 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26094 |
+| Source constructs flagged (warnings) | 26097 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5680,7 +5680,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/GlobalTypedConstSyntaxRejector.php` | 0 | 2 |
 | `lib/Handler.php` | 0 | 1 |
 | `lib/HexFloat.php` | 0 | 1 |
-| `lib/JIT.php` | 0 | 5 |
+| `lib/JIT.php` | 0 | 4 |
 | `lib/JIT/Analyzer.php` | 0 | 1 |
 | `lib/JIT/AotDebugSymbols.php` | 0 | 1 |
 | `lib/JIT/AotGcSections.php` | 0 | 1 |
@@ -7086,6 +7086,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/M3EmitTuRuntimeSpineStubNative.php` | 0 | 6 |
 | `lib/JIT/Concern/M3EmitTuSidecarLinktime.php` | 0 | 2 |
 | `lib/JIT/Concern/M3EmitTuSpineNativeTryAndCfgParamTypes.php` | 0 | 2 |
+| `lib/JIT/Concern/M3M4M5CompileDriverEmitPolicy.php` | 0 | 4 |
 | `lib/JIT/Concern/NestedVmHelperAndThisResolve.php` | 0 | 5 |
 | `lib/JIT/Concern/ParamConstraintsAndRuntimeNewInit.php` | 0 | 3 |
 | `lib/JIT/Concern/PropertyFetchCoalesceAndCompileTimeString.php` | 0 | 6 |
@@ -50519,11 +50520,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT\Call\ExternalMethod (line 419)
-- new JIT\Scope (line 448)
-- new JIT\Call\Native (line 972)
-- 47 class method(s)
-- 12 closure(s)
+- new JIT\Call\ExternalMethod (line 421)
+- new JIT\Scope (line 450)
+- 12 class method(s)
+- 2 closure(s)
 
 ### `lib/JIT/Analyzer.php`
 
@@ -58308,6 +58308,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - trait M3EmitTuSpineNativeTryAndCfgParamTypes (line 23)
 - 20 class method(s)
 
+### `lib/JIT/Concern/M3M4M5CompileDriverEmitPolicy.php`
+
+**Warnings** (review for bootstrap subset):
+- trait M3M4M5CompileDriverEmitPolicy (line 18)
+- new JIT\Call\Native (line 329)
+- 35 class method(s)
+- 10 closure(s)
+
 ### `lib/JIT/Concern/NestedVmHelperAndThisResolve.php`
 
 **Warnings** (review for bootstrap subset):
@@ -60278,7 +60286,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/SpineChunkRuntimeMethodDemote.php`
 
 **Warnings** (review for bootstrap subset):
-- new OpCode (line 227)
+- new OpCode (line 228)
 - 11 class method(s)
 
 ### `lib/JIT/SpineChunkStandardHelperBind.php`
