@@ -5413,6 +5413,7 @@ require_once __DIR__.'/../../../lib/JIT/Concern/CompileConstFetchBooleanNotAndIn
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileDeclareGlobalStaticAndVarFetch.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileFuncdefAndClosure.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileDeclareClassLike.php';
+require_once __DIR__.'/../../../lib/JIT/Concern/CompileMethodCallInit.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileArrayDimFetchReadAndWrite.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AssignOperand.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AdaptByRefCallArgs.php';
