@@ -33996,9 +33996,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitSprintf.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 20)
-- new ArgumentCountError (line 39)
-- 11 class method(s)
+- new JITVariable (line 24)
+- new ArgumentCountError (line 43)
+- 13 class method(s)
 
 ### `ext/standard/JitSscanf.php`
 
@@ -58561,9 +58561,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - trait CompileEchoAndPrint (line 21)
-- new Variable (line 318)
-- new Variable (line 397)
-- new Variable (line 477)
+- new Variable (line 316)
+- new Variable (line 395)
+- new Variable (line 475)
 - 1 class method(s)
 
 ### `lib/JIT/Concern/CompileEmptyIssetEval.php`

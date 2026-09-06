@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArithOverflow;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Variable as VmVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
@@ -266,10 +270,36 @@ final class JitSprintf
     /**
      * Coerce any scalar arg to a NUL-terminated C string for `%s` (#33010).
      *
+     * Boxed {@see JITVariable::TYPE_VALUE} args (lazy ±/×/`/` overflow materialize,
+     * #36386 leftover of #37051) must type-switch — the previous fall-through returned
+     * a constant empty C string so {@code printf("%s", $x)} printed nothing while
+     * {@code %g}/{@code print_r}/{@code echo} matched Zend.
+     *
+     * php-src: ext/standard/formatted_print.c php_formatted_print / convert_to_string.
+     *
      * @param Value[] $toFree
      */
     private static function extractAsCString(Context $context, JITVariable $arg, array &$toFree): Value
     {
+        // Overflowable native-long SSA (cold f64 slot): stringify from the flag +
+        // double slot without materializing a heap box mid-snprintf (#36386).
+        // Full materializeOverflowableNativeLong here segfaulted on inline
+        // `printf("%s", PHP_INT_MAX + 1)` while assigned locals (already boxed) were fine.
+        if (
+            null !== $arg->longArithOverflowFlag
+            && null !== $arg->longArithOverflowDoubleSlot
+            && JITVariable::TYPE_NATIVE_LONG === $arg->type
+        ) {
+            return self::extractOverflowableNativeLongAsCString($context, $arg, $toFree);
+        }
+        if (
+            null !== $arg->longArithOverflowFlag
+            && null !== $arg->longArithOverflowPromoted
+            && JITVariable::TYPE_NATIVE_LONG === $arg->type
+        ) {
+            // Legacy promoted box — stringify as TYPE_VALUE.
+            $arg = JitLongArithOverflow::materializeOverflowableNativeLong($context, $arg);
+        }
         if (JITVariable::TYPE_NULL === $arg->type) {
             return $context->builder->pointerCast(
                 $context->constantFromString(''),
@@ -319,11 +349,298 @@ final class JitSprintf
 
             return $numChar;
         }
+        if (
+            JITVariable::TYPE_VALUE === $arg->type
+            || null !== $arg->valueBoxAliasPtr
+            || \in_array(
+                $context->getStringFromType($arg->value->typeOf()),
+                ['__value__*', '__value__value*'],
+                true
+            )
+        ) {
+            return self::extractBoxedValueAsCString($context, $arg, $toFree);
+        }
 
         return $context->builder->pointerCast(
             $context->constantFromString(''),
             $context->getTypeFromString('char*')
         );
+    }
+
+    /**
+     * {@code %s} of a lazy-overflow native-long (flag + f64 slot) without heap boxing.
+     *
+     * @param Value[] $toFree
+     */
+    private static function extractOverflowableNativeLongAsCString(
+        Context $context,
+        JITVariable $arg,
+        array &$toFree
+    ): Value {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'sprintf_as_s_ov_cont');
+        \PHPCompiler\JIT\LibcExtern::ensureSnprintf($context);
+        $saved = null;
+        try {
+            $saved = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+        \PHPCompiler\JIT\Builtin\ZendDoubleStringRuntime::ensureStandaloneBodies($context);
+        if (null !== $saved) {
+            $context->builder->positionAtEnd($saved);
+        }
+
+        $flag = $arg->longArithOverflowFlag;
+        $isOv = \PHPLLVM\Type::KIND_POINTER === $flag->typeOf()->getKind()
+            ? $context->builder->load($flag)
+            : $flag;
+        $charPtr = $context->getTypeFromString('char*');
+        $sizeT = $context->getTypeFromString('size_t');
+
+        $ovBb = BasicBlockHelper::append($context, 'sprintf_as_s_ov_dbl');
+        $okBb = BasicBlockHelper::append($context, 'sprintf_as_s_ov_lng');
+        $outBb = BasicBlockHelper::append($context, 'sprintf_as_s_ov_out');
+        $context->builder->branchIf($isOv, $ovBb, $okBb);
+
+        $context->builder->positionAtEnd($ovBb);
+        $fd = $context->builder->load($arg->longArithOverflowDoubleSlot);
+        $dblStr = \PHPCompiler\JIT\Builtin\ZendDoubleStringRuntime::formatGcvt($context, $fd);
+        $dblSep = $context->builder->call($context->lookupFunction('__string__separate'), $dblStr);
+        $dblNul = \PHPCompiler\JIT\Builtin\SprintfSnprintfRuntime::nullTerminatedCopyPublic($context, $dblSep);
+        // Do NOT push per-arm allocas into $toFree during IR gen — both arms would be
+        // freed at runtime even when only one executed (UAF/segfault, #36386).
+        $endOv = $context->builder->getInsertBlock();
+        $context->builder->branch($outBb);
+
+        $context->builder->positionAtEnd($okBb);
+        $longBits = JITVariable::KIND_VARIABLE === $arg->kind
+            ? $context->builder->load($arg->value)
+            : $arg->value;
+        $longTy = $context->getStringFromType($longBits->typeOf());
+        if ('int64*' === $longTy || 'long long*' === $longTy) {
+            $longBits = $context->builder->load($longBits);
+        }
+        $numBuf = $context->builder->call(
+            $context->lookupFunction('__mm__malloc'),
+            $sizeT->constInt(64, false)
+        );
+        $numChar = $context->builder->pointerCast($numBuf, $charPtr);
+        $lldFmt = $context->builder->pointerCast($context->constantFromString('%lld'), $charPtr);
+        $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $numChar,
+            $sizeT->constInt(64, false),
+            $lldFmt,
+            $longBits
+        );
+        $endOk = $context->builder->getInsertBlock();
+        $context->builder->branch($outBb);
+
+        $context->builder->positionAtEnd($outBb);
+        $phi = $context->builder->phi($charPtr, 'sprintf_as_s_ov_phi');
+        $phi->addIncoming($dblNul, $endOv);
+        $phi->addIncoming($numChar, $endOk);
+        $toFree[] = $phi;
+
+        return $phi;
+    }
+
+    /**
+     * {@code %s} of a boxed {@see __value__*} — type-switch like
+     * {@see \PHPCompiler\JIT\Builtin\SprintfSnprintfRuntime} as_s_* (#36386).
+     *
+     * @param Value[] $toFree
+     */
+    private static function extractBoxedValueAsCString(Context $context, JITVariable $arg, array &$toFree): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'sprintf_as_s_vbox_cont');
+        \PHPCompiler\JIT\LibcExtern::ensureSnprintf($context);
+        $saved = null;
+        try {
+            $saved = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+        \PHPCompiler\JIT\Builtin\ZendDoubleStringRuntime::ensureStandaloneBodies($context);
+        if (null !== $saved) {
+            $context->builder->positionAtEnd($saved);
+        }
+
+        $valuePtr = null !== $arg->valueBoxAliasPtr
+            ? JitValueBox::normalizeValuePtr($context, $arg->valueBoxAliasPtr)
+            : JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $charPtr = $context->getTypeFromString('char*');
+        $sizeT = $context->getTypeFromString('size_t');
+
+        $dblBb = BasicBlockHelper::append($context, 'sprintf_as_s_vbox_dbl');
+        $lngBb = BasicBlockHelper::append($context, 'sprintf_as_s_vbox_lng');
+        $boolBb = BasicBlockHelper::append($context, 'sprintf_as_s_vbox_bool');
+        $strBb = BasicBlockHelper::append($context, 'sprintf_as_s_vbox_str');
+        $fbBb = BasicBlockHelper::append($context, 'sprintf_as_s_vbox_fb');
+        $outBb = BasicBlockHelper::append($context, 'sprintf_as_s_vbox_out');
+
+        $isDbl = $context->builder->or(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(VmVariable::TYPE_FLOAT, false)
+            ),
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(JITVariable::TYPE_NATIVE_DOUBLE, false)
+            )
+        );
+        $afterDbl = BasicBlockHelper::append($context, 'sprintf_as_s_vbox_after_dbl');
+        $context->builder->branchIf($isDbl, $dblBb, $afterDbl);
+
+        $context->builder->positionAtEnd($afterDbl);
+        $isLng = $context->builder->or(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(VmVariable::TYPE_INTEGER, false)
+            ),
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(JITVariable::TYPE_NATIVE_LONG, false)
+            )
+        );
+        $afterLng = BasicBlockHelper::append($context, 'sprintf_as_s_vbox_after_lng');
+        $context->builder->branchIf($isLng, $lngBb, $afterLng);
+
+        $context->builder->positionAtEnd($afterLng);
+        $isBool = $context->builder->or(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(VmVariable::TYPE_BOOLEAN, false)
+            ),
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(JITVariable::TYPE_NATIVE_BOOL, false)
+            )
+        );
+        $afterBool = BasicBlockHelper::append($context, 'sprintf_as_s_vbox_after_bool');
+        $context->builder->branchIf($isBool, $boolBb, $afterBool);
+
+        $context->builder->positionAtEnd($afterBool);
+        $isStr = $context->builder->or(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(VmVariable::TYPE_STRING, false)
+            ),
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(JITVariable::TYPE_STRING, false)
+            )
+        );
+        $context->builder->branchIf($isStr, $strBb, $fbBb);
+
+        $context->builder->positionAtEnd($dblBb);
+        $dbl = $context->builder->call(
+            $context->lookupFunction('__value__readDouble'),
+            $valuePtr
+        );
+        $dblStr = \PHPCompiler\JIT\Builtin\ZendDoubleStringRuntime::formatGcvt($context, $dbl);
+        $dblSep = $context->builder->call($context->lookupFunction('__string__separate'), $dblStr);
+        $dblNul = \PHPCompiler\JIT\Builtin\SprintfSnprintfRuntime::nullTerminatedCopyPublic($context, $dblSep);
+        $endDbl = $context->builder->getInsertBlock();
+        $context->builder->branch($outBb);
+
+        $context->builder->positionAtEnd($lngBb);
+        $lng = $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $valuePtr
+        );
+        $numBuf = $context->builder->call(
+            $context->lookupFunction('__mm__malloc'),
+            $sizeT->constInt(64, false)
+        );
+        $numChar = $context->builder->pointerCast($numBuf, $charPtr);
+        $lldFmt = $context->builder->pointerCast($context->constantFromString('%lld'), $charPtr);
+        $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $numChar,
+            $sizeT->constInt(64, false),
+            $lldFmt,
+            $lng
+        );
+        $endLng = $context->builder->getInsertBlock();
+        $context->builder->branch($outBb);
+
+        $context->builder->positionAtEnd($boolBb);
+        // No __value__readBool ABI — writeBool stores int8 (#29109 / #21892).
+        $boolByte = JitValueBox::readBoolByte($context, $valuePtr);
+        $isTrue = $context->builder->icmp(
+            Builder::INT_NE,
+            $boolByte,
+            $i8->constInt(0, false)
+        );
+        // Zend convert_to_string: true → "1", false → "" (zend_operators.c).
+        // Heap-copy so the selected phi is always __mm__free-safe (#36386).
+        $trueLit = $context->constantFromString('1');
+        $falseLit = $context->constantFromString('');
+        $boolLit = $context->builder->select($isTrue, $trueLit, $falseLit);
+        $boolNul = \PHPCompiler\JIT\Builtin\SprintfSnprintfRuntime::nullTerminatedCopyPublic(
+            $context,
+            $context->builder->call(
+                $context->lookupFunction('__string__init'),
+                $context->builder->select(
+                    $isTrue,
+                    $context->getTypeFromString('int64')->constInt(1, false),
+                    $context->getTypeFromString('int64')->constInt(0, false)
+                ),
+                $context->builder->pointerCast($boolLit, $context->getTypeFromString('int8*'))
+            )
+        );
+        $endBool = $context->builder->getInsertBlock();
+        $context->builder->branch($outBb);
+
+        $context->builder->positionAtEnd($strBb);
+        $strVal = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $valuePtr
+        );
+        $strSep = $context->builder->call($context->lookupFunction('__string__separate'), $strVal);
+        $strNul = \PHPCompiler\JIT\Builtin\SprintfSnprintfRuntime::nullTerminatedCopyPublic($context, $strSep);
+        $endStr = $context->builder->getInsertBlock();
+        $context->builder->branch($outBb);
+
+        $context->builder->positionAtEnd($fbBb);
+        $emptyNul = \PHPCompiler\JIT\Builtin\SprintfSnprintfRuntime::nullTerminatedCopyPublic(
+            $context,
+            $context->builder->call(
+                $context->lookupFunction('__string__init'),
+                $context->getTypeFromString('int64')->constInt(0, false),
+                $context->builder->pointerCast(
+                    $context->constantFromString(''),
+                    $context->getTypeFromString('int8*')
+                )
+            )
+        );
+        $endFb = $context->builder->getInsertBlock();
+        $context->builder->branch($outBb);
+
+        $context->builder->positionAtEnd($outBb);
+        $phi = $context->builder->phi($charPtr, 'sprintf_as_s_vbox_phi');
+        $phi->addIncoming($dblNul, $endDbl);
+        $phi->addIncoming($numChar, $endLng);
+        $phi->addIncoming($boolNul, $endBool);
+        $phi->addIncoming($strNul, $endStr);
+        $phi->addIncoming($emptyNul, $endFb);
+        // Single free of the selected arm — never push per-arm buffers into $toFree
+        // during IR gen (would free unallocated sibling arms → segfault, #36386).
+        $toFree[] = $phi;
+
+        return $phi;
     }
 
     private static function loadDouble(Context $context, JITVariable $arg): Value
