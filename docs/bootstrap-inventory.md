@@ -33776,8 +33776,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitRound.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 219)
-- 9 class method(s)
+- new JITVariable (line 260)
+- 11 class method(s)
 
 ### `ext/standard/JitRoundModeResolve.php`
 
@@ -52531,7 +52531,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/MathRound.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 10 class method(s)
 
 ### `lib/JIT/Builtin/MathSin.php`
 

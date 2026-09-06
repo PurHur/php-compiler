@@ -10,17 +10,22 @@ use PHPCompiler\ext\standard\VmRound;
 use PHPUnit\Framework\TestCase;
 
 /**
- * round() places=0 HALF_UP AOT uses llvm.round.f64 (#36386);
- * RoundJitHelper remains for other modes/places (peer MathFloor / FloorJitHelper).
+ * round() places=0 directed modes AOT use LLVM f64 intrinsics (#36386);
+ * RoundJitHelper remains for HALF_DOWN/EVEN/ODD, AWAY_FROM_ZERO, places≠0
+ * (peer MathFloor / FloorJitHelper).
  *
  * php-src: ext/standard/math.c _php_math_round / PHP_FUNCTION(round).
  */
 final class RoundRuntimeShrinkTest extends TestCase
 {
-    public function testRoundHalfUpPlacesZeroUsesLlvmIntrinsic(): void
+    public function testRoundPlacesZeroDirectedModesUseLlvmIntrinsics(): void
     {
         $jitRound = (string) file_get_contents(__DIR__.'/../../ext/standard/JitRound.php');
         $this->assertStringContainsString('MathRound::invokeHalfUpPlacesZero', $jitRound);
+        $this->assertStringContainsString('invokeCeilingPlacesZero', $jitRound);
+        $this->assertStringContainsString('invokeFloorPlacesZero', $jitRound);
+        $this->assertStringContainsString('invokeTowardZeroPlacesZero', $jitRound);
+        $this->assertStringContainsString('tryInvokePlacesZeroIntrinsic', $jitRound);
         $this->assertStringContainsString('MathRound::invoke', $jitRound);
         $this->assertStringContainsString('tryFoldCompileTime', $jitRound);
         $this->assertStringContainsString('RoundingModeJit::compileTimeRoundMode', $jitRound);
@@ -28,7 +33,13 @@ final class RoundRuntimeShrinkTest extends TestCase
 
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathRound.php');
         $this->assertStringContainsString('llvm.round.f64', $bridge);
+        $this->assertStringContainsString('llvm.trunc.f64', $bridge);
         $this->assertStringContainsString('invokeHalfUpPlacesZero', $bridge);
+        $this->assertStringContainsString('invokeCeilingPlacesZero', $bridge);
+        $this->assertStringContainsString('invokeFloorPlacesZero', $bridge);
+        $this->assertStringContainsString('invokeTowardZeroPlacesZero', $bridge);
+        $this->assertStringContainsString('MathCeil::invoke', $bridge);
+        $this->assertStringContainsString('MathFloor::invoke', $bridge);
         $this->assertStringContainsString('RoundJitHelper', $bridge);
         $this->assertStringContainsString('phpc_round', $bridge);
         $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
@@ -46,7 +57,9 @@ final class RoundRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('1.0e+308', $source);
         $this->assertStringContainsString('26800', $source);
         $this->assertStringContainsString('27248', $source);
-        $this->assertStringContainsString('invokeHalfUpPlacesZero', $source);
+        $this->assertStringContainsString('llvm.round.f64', $source);
+        $this->assertStringContainsString('llvm.ceil.f64', $source);
+        $this->assertStringContainsString('llvm.trunc.f64', $source);
         $this->assertEqualsWithDelta(
             3.14159,
             RoundJitHelper::roundArgv(3.1415926535898, 5, StdlibConstants::PHP_ROUND_HALF_UP),
@@ -63,6 +76,29 @@ final class RoundRuntimeShrinkTest extends TestCase
         );
         $this->assertSame(-1.0, VmRound::mathRound(-0.5, 0, StdlibConstants::PHP_ROUND_HALF_UP));
         $this->assertSame(-1.0, RoundJitHelper::roundArgv(-0.5, 0, StdlibConstants::PHP_ROUND_HALF_UP));
+
+        // Directed modes that map to LLVM intrinsics — helper stays SSOT for NestedJIT.
+        foreach (
+            [
+                [1.1, StdlibConstants::PHP_ROUND_CEILING, 2.0],
+                [-1.1, StdlibConstants::PHP_ROUND_CEILING, -1.0],
+                [1.1, StdlibConstants::PHP_ROUND_FLOOR, 1.0],
+                [-1.1, StdlibConstants::PHP_ROUND_FLOOR, -2.0],
+                [1.9, StdlibConstants::PHP_ROUND_TOWARD_ZERO, 1.0],
+                [-1.9, StdlibConstants::PHP_ROUND_TOWARD_ZERO, -1.0],
+            ] as [$n, $mode, $expected]
+        ) {
+            $this->assertSame(
+                $expected,
+                RoundJitHelper::roundArgv($n, 0, $mode),
+                'helper round('.$n.', 0, '.$mode.')'
+            );
+            $this->assertSame(
+                $expected,
+                VmRound::mathRound($n, 0, $mode),
+                'VmRound round('.$n.', 0, '.$mode.')'
+            );
+        }
     }
 
     public function testSpineBundleIncludesRoundJitHelper(): void
