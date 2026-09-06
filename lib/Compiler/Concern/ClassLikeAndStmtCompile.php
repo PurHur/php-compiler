@@ -130,7 +130,8 @@ use PHPCompiler\Web\Superglobals;
  * {@see CompileInterfaceTraitEnumAndMethodDecl}. Class-const fold / typed rejects live in
  * {@see CompileClassConstFoldAndTypedReject}; promoted property / param defaults live in
  * {@see CompilePromotedPropertyAndParamDefaults}. Param/function/stmt dispatch lives in
- * {@see CompileParamFunctionAndStmtDispatch}. Extracted from {@see \PHPCompiler\Compiler}
+ * {@see CompileParamFunctionAndStmtDispatch}. CFG type-shape / declared-type asserts live in
+ * {@see CfgTypeShapeAndDeclaredAssert}. Extracted from {@see \PHPCompiler\Compiler}
  * behind the opcode-corpus-md5 gate. Visibility stays protected/private so LintCompiler
  * and call sites are unchanged.
  */
