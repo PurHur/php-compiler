@@ -9,19 +9,26 @@ use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Internal ldexp NestedJIT via JitVmHelperLink (#15073 / #29578 / peer #29156).
+ * Internal ldexp AOT uses libm ldexp(3) (#36386);
+ * LdexpJitHelper remains NestedJIT-safe reference (peer MathNextafter / NextafterJitHelper).
  * Userland ldexp() was a phantom vs php-src and was unregistered (#24607).
+ * LLVM 9 has no llvm.ldexp.f64 in the shapes we use.
+ *
+ * php-src: ext/standard/math.c PHP_FUNCTION(ldexp) → C ldexp(3).
  */
 final class LdexpRuntimeShrinkTest extends TestCase
 {
-    public function testMathLdexpBridgeUsesJitHelperNotLibcLookup(): void
+    public function testLdexpUsesLibmNotHelperBridge(): void
     {
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathLdexp.php');
-        $this->assertStringContainsString('LdexpJitHelper', $bridge);
+        $this->assertStringContainsString("LIBC_LDEXP = 'ldexp'", $bridge);
         $this->assertStringContainsString('phpc_ldexp', $bridge);
-        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
-        $this->assertStringNotContainsString("lookupFunction('ldexp')", $bridge);
+        $this->assertStringContainsString('ldexp_libm_f64_entry', $bridge);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('LdexpJitHelper', $bridge);
+        $this->assertStringNotContainsString('NestedJitCompileScope', $bridge);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
+        $this->assertStringNotContainsString('llvm.ldexp', $bridge);
         $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/ldexp.php');
     }
 
@@ -72,7 +79,13 @@ final class LdexpRuntimeShrinkTest extends TestCase
         $this->assertSame(0.0, LdexpJitHelper::ldexpArgv(1.0, -2000));
     }
 
-    public function testSpineBundleIncludesLdexpJitHelper(): void
+    public function testLibcExternNoLongerDeclaresLdexp(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/LibcExtern.php');
+        $this->assertStringNotContainsString("'ldexp'", $source);
+    }
+
+    public function testSpineBundleIncludesLdexpHelperWithoutUserland(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('LdexpJitHelper.php', $spine);

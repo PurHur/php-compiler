@@ -5,14 +5,15 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * ldexp() for compiled JIT/AOT modules (#15073, #29578, php-in-PHP).
+ * NestedJIT-safe ldexp peel (reference only; #15073, #29578, php-in-PHP).
  *
- * NestedJIT-safe: scale by bounded ×2/÷2 (#29578 / peer MathFrexp #29156).
- * Do not call the shared VmMath ldexp helper — `\is_nan` / `\is_infinite` /
- * pow-of-two re-enter math bridges under thin AOT (#27496 class). Avoid
- * compound `&&` / `||` conditions — NestedJIT assignOperand bool→double
- * (#28716). Avoid unbounded while-loops (#27838).
- * php-src: ext/standard/math.c — PHP_FUNCTION(ldexp)
+ * AOT/JIT hot path uses libm {@code ldexp(3)} via {@see \PHPCompiler\JIT\Builtin\MathLdexp}
+ * (#36386 / peer MathNextafter). This helper remains for NestedJIT-safe ×2/÷2
+ * (#29578 / peer MathFrexp #29156). Do not call the shared VmMath ldexp helper —
+ * `\is_nan` / `\is_infinite` / pow-of-two re-enter math bridges under thin AOT
+ * (#27496 class). Avoid compound `&&` / `||` conditions — NestedJIT assignOperand
+ * bool→double (#28716). Avoid unbounded while-loops (#27838).
+ * php-src: ext/standard/math.c — PHP_FUNCTION(ldexp) → C ldexp
  * Userland ldexp() is a php-src phantom and was unregistered (#24607).
  */
 final class LdexpJitHelper
