@@ -5686,6 +5686,7 @@
         "lib/Compiler/Concern/ExpressionPreludeDimFetchAndHoistedConstCallArgSlots.php",
         "lib/Compiler/Concern/FinalSiblingInlineCallArgSendSlot.php",
         "lib/Compiler/Concern/FinalizeArrayFamilyCallArgSlots.php",
+        "lib/Compiler/Concern/FindInlineArrayProducerForCallArg.php",
         "lib/Compiler/Concern/FindInlineCallArgProducerSlot.php",
         "lib/Compiler/Concern/FindInlineCoalesceAndNullsafeCallArgSlots.php",
         "lib/Compiler/Concern/FindInlineExprCallArgProducerSlot.php",
@@ -5712,6 +5713,7 @@
         "lib/Compiler/Concern/OuterSiblingExecReturnAndHoistedConstFetchSlots.php",
         "lib/Compiler/Concern/ParameterAsserts.php",
         "lib/Compiler/Concern/PrecedingInlineCallArgProducers.php",
+        "lib/Compiler/Concern/PrecedingInlineDeadVoidAndDimFetchCallArgSlots.php",
         "lib/Compiler/Concern/RewireInlineCallArgSendSlots.php",
         "lib/Compiler/Concern/SiblingInlineCallArgProducerSlots.php",
         "lib/Compiler/Concern/SiblingInlineFuncCallAndDeadArrayProducers.php",
@@ -8570,9 +8572,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8336,
+        "inventory_files": 8338,
         "excluded": 0,
-        "eligible": 8336,
+        "eligible": 8338,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

@@ -5363,8 +5363,10 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/InlineCallArgProducerMatch.
 require_once __DIR__.'/../../../lib/Compiler/Concern/FindInlineCallArgProducerSlot.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/FindInlineCoalesceAndNullsafeCallArgSlots.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/FindInlineExprCallArgProducerSlot.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/FindInlineArrayProducerForCallArg.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/NestedIifeAndDeferredSiblingCallArgProducers.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/PrecedingInlineCallArgProducers.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/PrecedingInlineDeadVoidAndDimFetchCallArgSlots.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/SiblingMultiArgFuncCallProducerDetect.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/FirstSiblingInlineFuncCallProducerIndex.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/HoistedMultiArgSiblingFuncCallChain.php';

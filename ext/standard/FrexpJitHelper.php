@@ -5,13 +5,15 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * frexp() for compiled JIT/AOT modules (#15201, #22575, #29156, php-in-PHP).
+ * NestedJIT-safe frexp peel (reference only; #15201, #22575, #29156, php-in-PHP).
  *
- * NestedJIT-safe: mantissa peel into [0.5, 1) via bounded ×2/÷2 (#29156 /
- * peer MathNextafter #28716). Do not call the shared math frexp helper — floor /
- * log / pow-of-two re-enter math bridges under thin AOT (#27496 class). Avoid pack/unpack.
- * Avoid unbounded while-loops (#27838). Avoid compound `&&` / `||` conditions —
- * NestedJIT assignOperand bool→double (#28716).
+ * AOT/JIT hot path uses libm {@code frexp(3)} via {@see \PHPCompiler\JIT\Builtin\MathFrexp}
+ * (#36386 / peer MathLdexp). This helper remains for NestedJIT-safe ×2/÷2
+ * mantissa peel into [0.5, 1) (#29156 / peer MathNextafter #28716). Do not call
+ * the shared math frexp helper — floor / log / pow-of-two re-enter math bridges
+ * under thin AOT (#27496 class). Avoid pack/unpack. Avoid unbounded while-loops
+ * (#27838). Avoid compound `&&` / `||` conditions — NestedJIT assignOperand
+ * bool→double (#28716).
  * php-src: frexp(3) / ext/standard/math.c (userland frexp is a php-src phantom — #24133)
  */
 final class FrexpJitHelper
