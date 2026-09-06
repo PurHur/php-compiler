@@ -204,6 +204,11 @@ use PHPCompiler\VM\Variable as VmVariable;
  * only when all three are compile-time longs that pass php-src zero /
  * increasing-negative / oversized step checks; soft-null / runtime step /
  * char-string endpoints stay live),
+ * count_chars (typed string + optional compile-time mode in [0,4]; soft-null /
+ * runtime mode stay live — ValueError / deprecate),
+ * str_word_count (typed string + optional compile-time format in [0,2] +
+ * optional typed chars string; soft-null / runtime format stay live —
+ * ValueError / deprecate),
  * zero-arg pi, type.c predicates + gettype/get_debug_type, ctype.c
  * classifiers on typed/literal strings, typed-array count/sizeof, math.c
  * incl. pow/fpow/fdiv on already-numeric args, empty void user functions).
@@ -509,6 +514,12 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureRangeNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureCountCharsNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureStrWordCountNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureVersionCompareNoSideEffect($toCall, $callArgs)) {
@@ -3478,6 +3489,81 @@ final class DiscardedPureCallElision
         }
 
         return true;
+    }
+
+    /**
+     * Discarded {@code count_chars} — php-src {@code ext/standard/string.c}
+     * {@code PHP_FUNCTION(count_chars)}. Mode must be compile-time in [0, 4]
+     * ({@code ValueError} otherwise). Soft-null string / mode stay live
+     * (deprecate). Runtime typed mode stays live. Excess argc stays live
+     * ({@code ArgumentCountError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureCountCharsNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if ('count_chars' !== strtolower($toCall->getName())) {
+            return false;
+        }
+        if (!isset($callArgs[0]) || isset($callArgs[2])) {
+            return false;
+        }
+        if (!$callArgs[0] instanceof Variable || !self::stringArgAllowsDiscardedElision($callArgs[0])) {
+            return false;
+        }
+        if (!isset($callArgs[1])) {
+            return true;
+        }
+        if (!$callArgs[1] instanceof Variable) {
+            return false;
+        }
+        $mode = $callArgs[1]->compileTimeLong;
+
+        return null !== $mode && $mode >= 0 && $mode <= 4;
+    }
+
+    /**
+     * Discarded {@code str_word_count} — php-src {@code ext/standard/string.c}
+     * {@code PHP_FUNCTION(str_word_count)}. Format must be compile-time in
+     * [0, 2] ({@code ValueError} otherwise). Soft-null string / format / chars
+     * stay live (deprecate). Runtime typed format stays live. Excess argc
+     * stays live ({@code ArgumentCountError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureStrWordCountNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if ('str_word_count' !== strtolower($toCall->getName())) {
+            return false;
+        }
+        if (!isset($callArgs[0]) || isset($callArgs[3])) {
+            return false;
+        }
+        if (!$callArgs[0] instanceof Variable || !self::stringArgAllowsDiscardedElision($callArgs[0])) {
+            return false;
+        }
+        if (!isset($callArgs[1])) {
+            return true;
+        }
+        if (!$callArgs[1] instanceof Variable) {
+            return false;
+        }
+        $format = $callArgs[1]->compileTimeLong;
+        if (null === $format || $format < 0 || $format > 2) {
+            return false;
+        }
+        if (!isset($callArgs[2])) {
+            return true;
+        }
+
+        return $callArgs[2] instanceof Variable
+            && self::stringArgAllowsDiscardedElision($callArgs[2]);
     }
 
     /**
