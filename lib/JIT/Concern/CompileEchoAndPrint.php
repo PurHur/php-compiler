@@ -78,13 +78,11 @@ trait CompileEchoAndPrint
                     if (isset($this->context->namedVariableBindings[$echoNameForByRefEarly])) {
                         $earlyBound = $this->context->namedVariableBindings[$echoNameForByRefEarly];
                         if (
+                            // {main} overflowable ±/×/`/` materialize to a stack `__value__`
+                            // while echoScriptGlobalName still names an empty heap box
+                            // (#36386 leftover of #37051). Also by-ref / alias boxes (#34649).
                             Variable::KIND_VARIABLE === $earlyBound->kind
                             && Variable::TYPE_VALUE === $earlyBound->type
-                            && (
-                                null !== $earlyBound->valueBoxAliasPtr
-                                || $earlyBound->borrowedValueEntry
-                                || $earlyBound->assignRefLvalueAlias
-                            )
                         ) {
                             $scriptGlobalEchoName = null;
                             $arg = $earlyBound;
