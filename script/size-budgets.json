@@ -11,7 +11,9 @@
         "lib/JIT.php": {
             "budget": 256,
             "target": 20000,
-            "note": "Concern trait splits (#36387/#36403); CompileObjectPropertyConcatPowAndFlatten + CompileDeclareGlobalConst + peers"
+            "budget": 258,
+            "target": 20000,
+            "note": "Concern trait splits (#36387/#36403); CompileTypeAssertAndErrorSilence + CompileObjectPropertyConcatPowAndFlatten + peers"
         },
         "lib/VM.php": {
             "budget": 17422,
