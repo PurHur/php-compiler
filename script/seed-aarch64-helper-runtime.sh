@@ -150,6 +150,17 @@ SEED_UNITS=(
   /ext/standard/ConvertUuJitHelper.php
   /ext/standard/HebrevJitHelper.php
   /ext/standard/MetaphoneJitHelper.php
+  # Timezone / clock / date tier (#36391 after #37084)
+  /ext/standard/ClockGettimeJitHelper.php
+  /ext/standard/DefaultTimezoneJitHelper.php
+  /ext/standard/DefaultTimezoneCivilJitHelper.php
+  /ext/standard/DateIntervalFormatJitHelper.php
+  /ext/standard/GmgetdateJitHelper.php
+  /ext/standard/GmmktimeJitHelper.php
+  /ext/standard/MktimeJitHelper.php
+  /ext/standard/TimeJitHelper.php
+  /ext/standard/TimezoneLocationJitHelper.php
+  /ext/standard/HrtimeJitHelper.php
 )
 
 MIN_SEED=${#SEED_UNITS[@]}
