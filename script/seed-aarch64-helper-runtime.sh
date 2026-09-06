@@ -128,6 +128,17 @@ SEED_UNITS=(
   /ext/standard/FsDirJitHelper.php
   /ext/standard/FsGlobJitHelper.php
   /ext/standard/TempnamJitHelper.php
+  # Time / datetime / fstat / vsprintf / substr_compare tier (#36391 after #37074)
+  /ext/standard/MicrotimeJitHelper.php
+  /ext/standard/StrtotimeJitHelper.php
+  /ext/standard/StrftimeJitHelper.php
+  /ext/standard/TimezoneOffsetJitHelper.php
+  /ext/standard/FormatDatetimeJitHelper.php
+  /ext/standard/DateTimeFormatJitHelper.php
+  /ext/standard/GettimeofdayJitHelper.php
+  /ext/standard/FstatJitHelper.php
+  /ext/standard/VsprintfJitHelper.php
+  /ext/standard/SubstrCompareJitHelper.php
 )
 
 MIN_SEED=${#SEED_UNITS[@]}

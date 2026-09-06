@@ -226,7 +226,7 @@ foreach ($archIds as $archId) {
     if ($allArches && CompileTarget::ID_AARCH64_LINUX === $r['arch'] && !$r['absent']) {
         $seedTotal = $r['fresh'] + $r['stale'] + $r['broken'];
         // Ratchet with script/seed-aarch64-helper-runtime.sh SEED_UNITS (VM_*+lib_VM_*+ext/standard tiers).
-        $minSeed = 102;
+        $minSeed = 112;
         if ($seedTotal < $minSeed) {
             fwrite(STDOUT, sprintf(
                 "check-helper-runtime-prelink: aarch64-linux seed too small (%d < %d) — run ./script/seed-aarch64-helper-runtime.sh (#36391)\n",
