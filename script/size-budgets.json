@@ -4,9 +4,9 @@
     "done_when_ceiling": 25000,
     "files": {
         "lib/Compiler.php": {
-            "budget": 1103,
+            "budget": 1106,
             "target": 20000,
-            "note": "Concern trait splits (#36230/#36387/#36403); SubstrNestedHaystackAndMethodOrStaticCallInitSlots + VarExportNestedAndArrayMergeFamilyCallArgSlots + peers"
+            "note": "Concern trait splits (#36230/#36387/#36403); OuterSiblingExecReturnAndHoistedConstFetchSlots + SubstrNestedHaystackAndMethodOrStaticCallInitSlots + VarExportNestedAndArrayMergeFamilyCallArgSlots + peers"
         },
         "lib/JIT.php": {
             "budget": 274,
@@ -35,9 +35,9 @@
         }
     },
     "script_file_count": {
-        "budget": 279,
+        "budget": 283,
         "target": 150,
-        "note": "script/ top-level *.sh/*.php; ASAN/valgrind smokes under script/runtime-assert/ (#36403/#36397); ratchet after master tip grew to 279"
+        "note": "script/ top-level *.sh/*.php; ASAN/valgrind smokes under script/runtime-assert/ (#36403/#36397); ratchet after master tip grew to 283"
     },
     "ci_defaults_exports": {
         "budget": 141,

@@ -48,6 +48,7 @@ require_once __DIR__.'/Compiler/Concern/EnsureDeferredSiblingAndInlineNewProduce
 require_once __DIR__.'/Compiler/Concern/SiblingInlineCallArgProducerSlots.php';
 require_once __DIR__.'/Compiler/Concern/VarExportNestedAndArrayMergeFamilyCallArgSlots.php';
 require_once __DIR__.'/Compiler/Concern/SubstrNestedHaystackAndMethodOrStaticCallInitSlots.php';
+require_once __DIR__.'/Compiler/Concern/OuterSiblingExecReturnAndHoistedConstFetchSlots.php';
 require_once __DIR__.'/Compiler/Concern/SlotForCallArgResolvers.php';
 require_once __DIR__.'/Compiler/Concern/InlineCallArgSlotResolvers.php';
 require_once __DIR__.'/Compiler/Concern/HoistedSiblingFeedAndArrayKeysArgSendRewire.php';
@@ -216,6 +217,7 @@ use PHPCompiler\Compiler\Concern\EnsureDeferredSiblingAndInlineNewProducers;
 use PHPCompiler\Compiler\Concern\SiblingInlineCallArgProducerSlots;
 use PHPCompiler\Compiler\Concern\VarExportNestedAndArrayMergeFamilyCallArgSlots;
 use PHPCompiler\Compiler\Concern\SubstrNestedHaystackAndMethodOrStaticCallInitSlots;
+use PHPCompiler\Compiler\Concern\OuterSiblingExecReturnAndHoistedConstFetchSlots;
 use PHPCompiler\Compiler\Concern\SlotForCallArgResolvers;
 use PHPCompiler\Compiler\Concern\InlineCallArgSlotResolvers;
 use PHPCompiler\Compiler\Concern\HoistedSiblingFeedAndArrayKeysArgSendRewire;
@@ -294,6 +296,7 @@ class Compiler {
     use SiblingInlineCallArgProducerSlots;
     use VarExportNestedAndArrayMergeFamilyCallArgSlots;
     use SubstrNestedHaystackAndMethodOrStaticCallInitSlots;
+    use OuterSiblingExecReturnAndHoistedConstFetchSlots;
     use SlotForCallArgResolvers;
     use InlineCallArgSlotResolvers;
     use HoistedSiblingFeedAndArrayKeysArgSendRewire;
