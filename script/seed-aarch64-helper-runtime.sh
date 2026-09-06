@@ -172,6 +172,17 @@ SEED_UNITS=(
   /ext/standard/InetJitHelper.php
   /ext/standard/FtokJitHelper.php
   /ext/standard/FnmatchJitHelper.php
+  # Env / error / ini / execution tier (#36391 after #37094)
+  /ext/standard/EnvLocalJitHelper.php
+  /ext/standard/EnvironMirrorNativeJitHelper.php
+  /ext/standard/ErrorLastJitHelper.php
+  /ext/standard/ErrorLogJitHelper.php
+  /ext/standard/ErrorSilenceJitHelper.php
+  /ext/standard/ExecutionLimitsJitHelper.php
+  /ext/standard/IniIntrospectionJitHelper.php
+  /ext/standard/IniParseQuantityJitHelper.php
+  /ext/standard/ParseIniNativeJitHelper.php
+  /ext/standard/ProcNiceJitHelper.php
 )
 
 MIN_SEED=${#SEED_UNITS[@]}
