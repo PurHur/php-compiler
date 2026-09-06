@@ -24,15 +24,16 @@ final class ParseUrlHelperRuntimeFresh36382Test extends TestCase
         $this->assertIsArray($const);
         foreach (
             [
-                'phpcompiler\\ext\\standard\\parseurljithelper::parseurlcomponent',
-                'phpcompiler\\ext\\standard\\parseurljithelper::componentstring',
-                'phpcompiler\\ext\\standard\\parseurljithelper::componentint',
+                'phpcompiler\\ext\\standard\\parseurljithelper::pathof',
+                'phpcompiler\\ext\\standard\\parseurljithelper::schemeof',
+                'phpcompiler\\ext\\standard\\parseurljithelper::hostof',
+                'phpcompiler\\ext\\standard\\parseurljithelper::portof',
             ] as $logical
         ) {
             $this->assertArrayHasKey(
                 $logical,
                 $const,
-                'ParseUrlJitHelper must stay USER_SCRIPT_INLINE_ONLY so Slim Uri NestedJITs (#36382)'
+                'ParseUrlJitHelper leaves must stay USER_SCRIPT_INLINE_ONLY so Slim Uri NestedJITs (#36382)'
             );
         }
     }

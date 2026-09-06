@@ -1410,13 +1410,27 @@ final class HashTableReadLlvm
         $context->builder->branch($merge);
 
         $context->builder->positionAtEnd($ok);
+        // Shared nested child after outer COW — SEPARATE into this parent slot (#36397).
+        $exclusive = HashTableWriteLlvm::exclusiveNestedChildHashtable(
+            $context,
+            $existing,
+            static function (Value $copy) use ($context, $ht, $keyStr): void {
+                $context->builder->call(
+                    $context->lookupFunction('__hashtable__setStringKeyHashtable'),
+                    $ht,
+                    $keyStr,
+                    $copy
+                );
+            }
+        );
+        $okEnd = $context->builder->getInsertBlock();
         $context->builder->branch($merge);
 
         $context->builder->positionAtEnd($merge);
         $result = $context->builder->phi($htPtr);
         $result->addIncoming($childHt, $create);
         $result->addIncoming($fixupHt, $fixup);
-        $result->addIncoming($existing, $ok);
+        $result->addIncoming($exclusive, $okEnd);
 
         return $result;
     }
@@ -1469,13 +1483,27 @@ final class HashTableReadLlvm
         $context->builder->branch($merge);
 
         $context->builder->positionAtEnd($ok);
+        // Shared nested child after outer COW — SEPARATE into this parent slot (#36397).
+        $exclusive = HashTableWriteLlvm::exclusiveNestedChildHashtable(
+            $context,
+            $existing,
+            static function (Value $copy) use ($context, $ht, $index): void {
+                $context->builder->call(
+                    $context->lookupFunction('__hashtable__setHashtableAt'),
+                    $ht,
+                    $index,
+                    $copy
+                );
+            }
+        );
+        $okEnd = $context->builder->getInsertBlock();
         $context->builder->branch($merge);
 
         $context->builder->positionAtEnd($merge);
         $result = $context->builder->phi($htPtr);
         $result->addIncoming($childHt, $create);
         $result->addIncoming($fixupHt, $fixup);
-        $result->addIncoming($existing, $ok);
+        $result->addIncoming($exclusive, $okEnd);
 
         return $result;
     }

@@ -61,6 +61,7 @@ require_once __DIR__.'/JIT/Concern/CompileClassAndTraitUses.php';
 require_once __DIR__.'/JIT/Concern/CompileTraitUsesWithAdaptations.php';
 require_once __DIR__.'/JIT/Concern/InitJitStaticCall.php';
 require_once __DIR__.'/JIT/Concern/CompileIncDecAndConcatFlatten.php';
+require_once __DIR__.'/JIT/Concern/CompileIncDecValueBoxAndWarnings.php';
 require_once __DIR__.'/JIT/Concern/CompileObjectPropertyConcatPowAndFlatten.php';
 require_once __DIR__.'/JIT/Concern/DateTimeConstructAndMutationMeta.php';
 require_once __DIR__.'/JIT/Concern/DomCompileTimeTagMeta.php';
@@ -170,6 +171,7 @@ class JIT {
     use CompileTraitUsesWithAdaptations;
     use InitJitStaticCall;
     use CompileIncDecAndConcatFlatten;
+    use CompileIncDecValueBoxAndWarnings;
     use CompileObjectPropertyConcatPowAndFlatten;
     use DateTimeConstructAndMutationMeta;
     use DomCompileTimeTagMeta;
