@@ -15,6 +15,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArithOverflow;
 use PHPCompiler\JIT\JitResourceIdString;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -60,26 +61,42 @@ final class strval extends Internal
         if (!$this->requireExactJitArgCount($context, $args, 'strval', 1)) {
             return $context->builder->load($context->constantStringFromString(''));
         }
-        switch ($args[0]->type) {
+        $arg = $args[0];
+        // Lazy ±/×/`/` overflow (#37051): materialize before the native-long arm so
+        // formatNativeLong does not stringify the overflow-arm dummy i64 0 (#36386).
+        if (
+            null !== $arg->longArithOverflowFlag
+            && (null !== $arg->longArithOverflowDoubleSlot || null !== $arg->longArithOverflowPromoted)
+            && JITVariable::TYPE_NATIVE_LONG === $arg->type
+        ) {
+            $arg = JitLongArithOverflow::materializeOverflowableNativeLong($context, $arg);
+        }
+        switch ($arg->type) {
             case JITVariable::TYPE_STRING:
-                return $this->jitString($context, $args[0], 'strval() argument #1');
+                return $this->jitString($context, $arg, 'strval() argument #1');
             case JITVariable::TYPE_NULL:
                 return $context->builder->load($context->constantStringFromString(''));
             case JITVariable::TYPE_NATIVE_BOOL:
-                return $this->boolToString($context, $context->helper->loadValue($args[0]));
+                return $this->boolToString($context, $context->helper->loadValue($arg));
             case JITVariable::TYPE_NATIVE_LONG:
                 return JitResourceIdString::formatNativeLong(
                     $context,
-                    $context->helper->loadValue($args[0]),
+                    $context->helper->loadValue($arg),
                     null
                 );
             case JITVariable::TYPE_NATIVE_DOUBLE:
                 return \PHPCompiler\JIT\Builtin\ZendDoubleStringRuntime::formatGcvt(
                     $context,
-                    $context->helper->loadValue($args[0])
+                    $context->helper->loadValue($arg)
                 );
             case JITVariable::TYPE_VALUE:
-                return $this->valueToString($context, $args[0]->value);
+                // Prefer valuePtrFromVariable (peer floatval) — raw ->value on foreach /
+                // assign-from-fetch temps can miss the live box so type-switch falls
+                // through to empty (#36386 leftover of #37051).
+                return $this->valueToString(
+                    $context,
+                    JitValueBox::valuePtrFromVariable($context, $arg)
+                );
             default:
                 throw new \LogicException('strval() does not support this value type in this compiler build');
         }
