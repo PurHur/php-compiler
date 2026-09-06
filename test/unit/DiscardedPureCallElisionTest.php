@@ -11,6 +11,7 @@ use PHPCompiler\ext\standard\addcslashes;
 use PHPCompiler\ext\standard\addslashes;
 use PHPCompiler\ext\standard\array_change_key_case;
 use PHPCompiler\ext\standard\array_column;
+use PHPCompiler\ext\standard\array_combine;
 use PHPCompiler\ext\standard\array_diff;
 use PHPCompiler\ext\standard\array_diff_assoc;
 use PHPCompiler\ext\standard\array_diff_key;
@@ -174,6 +175,7 @@ use PHPCompiler\ext\standard\printf_;
 use PHPCompiler\ext\standard\quoted_printable_decode;
 use PHPCompiler\ext\standard\quoted_printable_encode;
 use PHPCompiler\ext\standard\quotemeta;
+use PHPCompiler\ext\standard\range;
 use PHPCompiler\ext\standard\rawurldecode;
 use PHPCompiler\ext\standard\rawurlencode;
 use PHPCompiler\ext\standard\session_status_;
@@ -5130,6 +5132,143 @@ final class DiscardedPureCallElisionTest extends TestCase
             $context,
             new array_column(),
             [$ht, $box]
+        ));
+    }
+
+    public function testDiscardedArrayCombineAndRangeElideOnSafeArgs(): void
+    {
+        // php-src ext/standard/array.c array_combine / range (#36386).
+        $context = $this->makeContext();
+        $emptyKeys = $this->makeHashtableVar();
+        $emptyKeys->compileTimeEmptyArrayLiteral = true;
+        $emptyVals = $this->makeHashtableVar();
+        $emptyVals->compileTimeEmptyArrayLiteral = true;
+        $keysEq = $this->makeHashtableVar();
+        $keysEq->compileTimeArray = ['a', 'b'];
+        $valsEq = $this->makeHashtableVar();
+        $valsEq->compileTimeArray = ['x', 'y'];
+        $keysMismatch = $this->makeHashtableVar();
+        $keysMismatch->compileTimeArray = ['a'];
+        $valsMismatch = $this->makeHashtableVar();
+        $valsMismatch->compileTimeArray = ['x', 'y'];
+        $assocKeys = $this->makeHashtableVar();
+        $assocKeys->compileTimeAssoc = ['k' => 1];
+        $assocVals = $this->makeHashtableVar();
+        $assocVals->compileTimeAssoc = ['v' => 2];
+        $keysEmptyPack = $this->makeHashtableVar();
+        $keysEmptyPack->compileTimeArray = [];
+        $valsEmptyPack = $this->makeHashtableVar();
+        $valsEmptyPack->compileTimeArray = [];
+        $assocEmpty = $this->makeHashtableVar();
+        $assocEmpty->compileTimeAssoc = [];
+        $assocEmpty2 = $this->makeHashtableVar();
+        $assocEmpty2->compileTimeAssoc = [];
+        $ht = $this->makeHashtableVar();
+        $null = $this->makeNullVar();
+        $box = $this->makeValueBoxVar();
+        $start = $this->makeNativeLongVar();
+        $end = $this->makeNativeLongVar();
+        $stepOk = $this->makeCompileTimeLongVar(2);
+        $stepZero = $this->makeCompileTimeLongVar(0);
+        $stepNeg = $this->makeCompileTimeLongVar(-1);
+        $stepHuge = $this->makeCompileTimeLongVar(10);
+        $ctStart = $this->makeCompileTimeLongVar(0);
+        $ctEnd = $this->makeCompileTimeLongVar(8);
+        $ctIncStart = $this->makeCompileTimeLongVar(1);
+        $ctIncEnd = $this->makeCompileTimeLongVar(5);
+        $ctTinyEnd = $this->makeCompileTimeLongVar(1);
+        $stepDyn = $this->makeNativeLongVar();
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_combine(),
+            [$emptyKeys, $emptyVals]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_combine(),
+            [$keysEq, $valsEq]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_combine(),
+            [$assocKeys, $assocVals]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new range(),
+            [$start, $end]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new range(),
+            [$ctStart, $ctEnd, $stepOk]
+        ));
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_combine(),
+            [$keysMismatch, $valsMismatch]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_combine(),
+            [$ht, $ht]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_combine(),
+            [$keysEmptyPack, $valsEmptyPack]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_combine(),
+            [$assocEmpty, $assocEmpty2]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_combine(),
+            [$null, $emptyVals]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_combine(),
+            [$emptyKeys, $box]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new array_combine(),
+            [$emptyKeys]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new range(),
+            [$start, $end, $stepDyn]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new range(),
+            [$ctStart, $ctEnd, $stepZero]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new range(),
+            [$ctIncStart, $ctIncEnd, $stepNeg]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new range(),
+            [$ctStart, $ctTinyEnd, $stepHuge]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new range(),
+            [$null, $end]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new range(),
+            [$start]
         ));
     }
 
