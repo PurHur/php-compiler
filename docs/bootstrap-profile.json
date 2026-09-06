@@ -5675,6 +5675,7 @@
         "lib/Compiler/Concern/CompileTimeGlobalConstAndDefineFold.php",
         "lib/Compiler/Concern/CompileTimeParamDefaultAndExprFold.php",
         "lib/Compiler/Concern/CompileTimeUnaryBinaryAndCastFold.php",
+        "lib/Compiler/Concern/DeadTempInlineArrayAndHaystackCallArgHelpers.php",
         "lib/Compiler/Concern/DeferredSiblingAndArrayMapNullCallArgProducers.php",
         "lib/Compiler/Concern/DimAndPropertyWriteContext.php",
         "lib/Compiler/Concern/EchoCoalesceCallArgCompile.php",
@@ -8573,9 +8574,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8339,
+        "inventory_files": 8340,
         "excluded": 0,
-        "eligible": 8339,
+        "eligible": 8340,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
