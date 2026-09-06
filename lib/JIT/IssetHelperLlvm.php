@@ -459,10 +459,15 @@ final class IssetHelperLlvm
             $context->builder->structGep($valuePtr, $map['type'])
         );
         $i8 = $context->getTypeFromString('int8');
+        // Mask IS_REFCOUNTED: __value__writeString stores JIT TYPE_STRING (4|0x80),
+        // not bare VM TYPE_STRING (4). An unmasked compare always misses, takes the
+        // hashtable arm, and ensureHashtablePointer clobbers the string to [] —
+        // Nyholm Uri::getPath() if/elseif isset($path[1]) (#36382 / peer #22646).
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
         $isString = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_STRING, false)
+            $kind,
+            $i8->constInt(Variable::TYPE_STRING & 0x7f, false)
         );
 
         $fn = BasicBlockHelper::parentFunction($context);
