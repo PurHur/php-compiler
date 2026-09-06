@@ -58,6 +58,7 @@ require_once __DIR__.'/JIT/Concern/M3EmitTuSidecarLinktime.php';
 require_once __DIR__.'/JIT/Concern/CompileClassAndTraitUses.php';
 require_once __DIR__.'/JIT/Concern/InitJitStaticCall.php';
 require_once __DIR__.'/JIT/Concern/CompileIncDecAndConcatFlatten.php';
+require_once __DIR__.'/JIT/Concern/CompileObjectPropertyConcatPowAndFlatten.php';
 require_once __DIR__.'/JIT/Concern/DateTimeConstructAndMutationMeta.php';
 require_once __DIR__.'/JIT/Concern/DomCompileTimeTagMeta.php';
 require_once __DIR__.'/JIT/Concern/CoerceReturnPropertyDeclaringAndByRef.php';
@@ -162,6 +163,7 @@ class JIT {
     use CompileClassAndTraitUses;
     use InitJitStaticCall;
     use CompileIncDecAndConcatFlatten;
+    use CompileObjectPropertyConcatPowAndFlatten;
     use DateTimeConstructAndMutationMeta;
     use DomCompileTimeTagMeta;
     use CoerceReturnPropertyDeclaringAndByRef;

@@ -90,6 +90,7 @@ final class SpineChunkRuntimeMethodDemoteTest extends TestCase
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\CompileClassAndTraitUses'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\InitJitStaticCall'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\CompileIncDecAndConcatFlatten'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\CompileObjectPropertyConcatPowAndFlatten'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\DateTimeConstructAndMutationMeta'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\DomCompileTimeTagMeta'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::shouldDemote('PHPCompiler\\CoerceReturnPropertyDeclaringAndByRef'));
@@ -169,6 +170,7 @@ final class SpineChunkRuntimeMethodDemoteTest extends TestCase
         $this->assertTrue(SpineChunkRuntimeMethodDemote::isDemoteTarget('PHPCompiler\\CompileClassAndTraitUses'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::isDemoteTarget('PHPCompiler\\InitJitStaticCall'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::isDemoteTarget('PHPCompiler\\CompileIncDecAndConcatFlatten'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::isDemoteTarget('PHPCompiler\\CompileObjectPropertyConcatPowAndFlatten'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::isDemoteTarget('PHPCompiler\\DateTimeConstructAndMutationMeta'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::isDemoteTarget('PHPCompiler\\DomCompileTimeTagMeta'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::isDemoteTarget('PHPCompiler\\CoerceReturnPropertyDeclaringAndByRef'));
@@ -248,6 +250,7 @@ final class SpineChunkRuntimeMethodDemoteTest extends TestCase
         $this->assertTrue(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('lib/JIT/Concern/CompileClassAndTraitUses.php'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('lib/JIT/Concern/InitJitStaticCall.php'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('lib/JIT/Concern/CompileIncDecAndConcatFlatten.php'));
+        $this->assertTrue(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('lib/JIT/Concern/CompileObjectPropertyConcatPowAndFlatten.php'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('lib/JIT/Concern/DateTimeConstructAndMutationMeta.php'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('lib/JIT/Concern/DomCompileTimeTagMeta.php'));
         $this->assertTrue(SpineChunkRuntimeMethodDemote::oversizeSingletonCanEmit('lib/JIT/Concern/PropertyIncDecCompile.php'));
