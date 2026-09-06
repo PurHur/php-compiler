@@ -13,7 +13,7 @@ non-native link.
 
 ## Seed corpus (VM_* + lib_VM_* + ext/standard tiers)
 
-**52** committed `unit.o` files:
+**62** committed `unit.o` files:
 
 - full `VM_*` (13) and `lib_VM_*` (9) sets from `x86_64-linux`
 - first `ext/standard` tier (10): ArrayChunk / ArrayIsList / ArraySlice / Bin2hex /
@@ -22,6 +22,8 @@ non-native link.
   ArrayMergeRecursive / ArrayCountRecursive / ArrayElem / Base64 / Hex2bin / FindSubstr
 - string transform / HTML / escapes (10): StrReplace / StrPad / StrRepeat / Strrev /
   StripTags / Stripslashes / Addslashes / Htmlspecialchars / Nl2br / Ucwords
+- URL / query / JSON / sprintf (10): Urlencode / Urldecode / ParseUrl / HttpBuildQuery /
+  ParseStr / JsonDecode / JsonEncodeNested / JsonValidate / Sprintf / HttpResponse
 
 Refresh / expand via:
 
