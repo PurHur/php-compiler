@@ -139,6 +139,17 @@ SEED_UNITS=(
   /ext/standard/FstatJitHelper.php
   /ext/standard/VsprintfJitHelper.php
   /ext/standard/SubstrCompareJitHelper.php
+  # String compare / CSV / escapes / metaphone tier (#36391 after #37076)
+  /ext/standard/CaseCompareJitHelper.php
+  /ext/standard/NCompareJitHelper.php
+  /ext/standard/CharInMaskJitHelper.php
+  /ext/standard/LevenshteinJitHelper.php
+  /ext/standard/CslashesJitHelper.php
+  /ext/standard/CsvFputcsvJitHelper.php
+  /ext/standard/CsvStrGetcsvJitHelper.php
+  /ext/standard/ConvertUuJitHelper.php
+  /ext/standard/HebrevJitHelper.php
+  /ext/standard/MetaphoneJitHelper.php
 )
 
 MIN_SEED=${#SEED_UNITS[@]}
