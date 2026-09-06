@@ -53,6 +53,7 @@ use PHPCompiler\ext\standard\cli_get_process_title;
 use PHPCompiler\ext\standard\connection_aborted;
 use PHPCompiler\ext\standard\connection_status;
 use PHPCompiler\ext\standard\convert_uuencode;
+use PHPCompiler\ext\standard\count_chars;
 use PHPCompiler\ext\standard\crc32;
 use PHPCompiler\ext\standard\date;
 use PHPCompiler\ext\standard\date_default_timezone_get;
@@ -200,6 +201,7 @@ use PHPCompiler\ext\standard\str_replace;
 use PHPCompiler\ext\standard\str_rot13;
 use PHPCompiler\ext\standard\str_split;
 use PHPCompiler\ext\standard\str_starts_with;
+use PHPCompiler\ext\standard\str_word_count;
 use PHPCompiler\ext\standard\strcasecmp;
 use PHPCompiler\ext\standard\strcmp;
 use PHPCompiler\ext\standard\string_trim;
@@ -5269,6 +5271,100 @@ final class DiscardedPureCallElisionTest extends TestCase
             $context,
             new range(),
             [$start]
+        ));
+    }
+
+    public function testDiscardedCountCharsAndStrWordCountElideOnSafeArgs(): void
+    {
+        // php-src ext/standard/string.c count_chars / str_word_count (#36386).
+        $context = $this->makeContext();
+        $str = $this->makeStringVar('hello world');
+        $typedStr = $this->makeStringVar(null);
+        $chars = $this->makeStringVar('_');
+        $null = $this->makeNullVar();
+        $box = $this->makeValueBoxVar();
+        $modeOk = $this->makeCompileTimeLongVar(3);
+        $modeBad = $this->makeCompileTimeLongVar(5);
+        $modeDyn = $this->makeNativeLongVar();
+        $fmtOk = $this->makeCompileTimeLongVar(1);
+        $fmtBad = $this->makeCompileTimeLongVar(3);
+        $fmtDyn = $this->makeNativeLongVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new count_chars(),
+            [$str]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new count_chars(),
+            [$typedStr, $modeOk]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new str_word_count(),
+            [$str]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new str_word_count(),
+            [$typedStr, $fmtOk]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new str_word_count(),
+            [$str, $fmtOk, $chars]
+        ));
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new count_chars(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new count_chars(),
+            [$str, $modeBad]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new count_chars(),
+            [$str, $modeDyn]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new count_chars(),
+            [$str, $modeOk, $modeOk]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new str_word_count(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new str_word_count(),
+            [$str, $fmtBad]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new str_word_count(),
+            [$str, $fmtDyn]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new str_word_count(),
+            [$str, $fmtOk, $null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new str_word_count(),
+            [$str, $fmtOk, $box]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new str_word_count(),
+            [$str, $fmtOk, $chars, $chars]
         ));
     }
 
