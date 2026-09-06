@@ -48,6 +48,18 @@ final class VmArrayNumericOperandGuard
         if ($leftArr && $rightArr && OpCode::TYPE_PLUS === $opCode) {
             return false;
         }
+        // VALUE box (COW `$a = $b`, untyped local) + HASHTABLE/`int[]` RHS for `$a += […]`
+        // must reach ArrayBuiltinHelper::arrayUnion — not compile-time "mixed + array" (#36397).
+        // Do not treat bare VALUE⊙scalar as array here — that breaks `$t += $i` (aot-smoke loop).
+        // php-src: Zend/zend_operators.c add_function.
+        if (OpCode::TYPE_PLUS === $opCode) {
+            if (
+                (self::isValueBoxOperand($left) && $rightArr)
+                || ($leftArr && self::isValueBoxOperand($right))
+            ) {
+                return false;
+            }
+        }
         ExceptionBridge::emitTypeErrorAndAbort(
             $context,
             sprintf(
@@ -190,7 +202,14 @@ final class VmArrayNumericOperandGuard
     private static function isArrayOperand(Variable $var): bool
     {
         return Variable::TYPE_HASHTABLE === $var->type
-            || ArrayBuiltinHelper::isNativeArray($var->type);
+            || ArrayBuiltinHelper::isNativeArray($var->type)
+            || $var->valueBoxHashtable;
+    }
+
+    /** Boxed `__value__` may hold an array at runtime (COW assign / untyped locals). */
+    private static function isValueBoxOperand(Variable $var): bool
+    {
+        return Variable::TYPE_VALUE === $var->type && JitValueBox::isValueOperand($var);
     }
 
     private static function typeLabel(Context $context, Variable $var): string
