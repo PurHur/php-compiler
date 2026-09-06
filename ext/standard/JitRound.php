@@ -20,14 +20,14 @@ use PHPLLVM\Value;
  * When num/precision/mode are compile-time scalars, evaluate on the host and emit a float
  * constant — NestedJIT RoundJitHelper mis-handles places>0 on cold AOT calls (#27249 / #26800).
  *
- * Runtime num with compile-time places=0 + directed modes use LLVM f64
- * intrinsics ({@see MathRound::invokeHalfUpPlacesZero} / Ceiling / Floor /
- * TowardZero, #36386) — php-src {@code _php_math_round} /
- * {@code php_math_round_mode.h}.
+ * Runtime num with compile-time places=0 + any PHP_ROUND_* mode use LLVM f64
+ * ops ({@see MathRound::invokeHalfUpPlacesZero} / HalfDown / HalfEven / HalfOdd /
+ * Ceiling / Floor / TowardZero / AwayFromZero, #36386) — php-src
+ * {@code _php_math_round} / {@code php_math_round_mode.h}.
  *
  * Runtime num with compile-time precision≠0 + default HALF_UP uses user-TU sprintf+strtod
  * so Zend parity survives thin AOT fmul drift (#35741).
- * Other modes / runtime places keep the RoundJitHelper NestedJIT bridge.
+ * Runtime places keep the RoundJitHelper NestedJIT bridge.
  */
 final class JitRound
 {
@@ -216,7 +216,7 @@ final class JitRound
     }
 
     /**
-     * places=0 directed modes with a matching LLVM f64 intrinsic (#36386).
+     * places=0 modes with LLVM f64 lowering — no NestedJIT helper (#36386).
      */
     private static function tryInvokePlacesZeroIntrinsic(
         Context $context,
@@ -226,6 +226,15 @@ final class JitRound
         if (StdlibConstants::PHP_ROUND_HALF_UP === $mode) {
             return MathRound::invokeHalfUpPlacesZero($context, $number);
         }
+        if (StdlibConstants::PHP_ROUND_HALF_DOWN === $mode) {
+            return MathRound::invokeHalfDownPlacesZero($context, $number);
+        }
+        if (StdlibConstants::PHP_ROUND_HALF_EVEN === $mode) {
+            return MathRound::invokeHalfEvenPlacesZero($context, $number);
+        }
+        if (StdlibConstants::PHP_ROUND_HALF_ODD === $mode) {
+            return MathRound::invokeHalfOddPlacesZero($context, $number);
+        }
         if (StdlibConstants::PHP_ROUND_CEILING === $mode) {
             return MathRound::invokeCeilingPlacesZero($context, $number);
         }
@@ -234,6 +243,9 @@ final class JitRound
         }
         if (StdlibConstants::PHP_ROUND_TOWARD_ZERO === $mode) {
             return MathRound::invokeTowardZeroPlacesZero($context, $number);
+        }
+        if (StdlibConstants::PHP_ROUND_AWAY_FROM_ZERO === $mode) {
+            return MathRound::invokeAwayFromZeroPlacesZero($context, $number);
         }
 
         return null;

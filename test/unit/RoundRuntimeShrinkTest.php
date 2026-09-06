@@ -10,9 +10,8 @@ use PHPCompiler\ext\standard\VmRound;
 use PHPUnit\Framework\TestCase;
 
 /**
- * round() places=0 directed modes AOT use LLVM f64 intrinsics (#36386);
- * RoundJitHelper remains for HALF_DOWN/EVEN/ODD, AWAY_FROM_ZERO, places≠0
- * (peer MathFloor / FloorJitHelper).
+ * round() places=0 modes AOT use LLVM f64 ops (#36386);
+ * RoundJitHelper remains for places≠0 (peer MathFloor / FloorJitHelper).
  *
  * php-src: ext/standard/math.c _php_math_round / PHP_FUNCTION(round).
  */
@@ -22,9 +21,13 @@ final class RoundRuntimeShrinkTest extends TestCase
     {
         $jitRound = (string) file_get_contents(__DIR__.'/../../ext/standard/JitRound.php');
         $this->assertStringContainsString('MathRound::invokeHalfUpPlacesZero', $jitRound);
+        $this->assertStringContainsString('invokeHalfDownPlacesZero', $jitRound);
+        $this->assertStringContainsString('invokeHalfEvenPlacesZero', $jitRound);
+        $this->assertStringContainsString('invokeHalfOddPlacesZero', $jitRound);
         $this->assertStringContainsString('invokeCeilingPlacesZero', $jitRound);
         $this->assertStringContainsString('invokeFloorPlacesZero', $jitRound);
         $this->assertStringContainsString('invokeTowardZeroPlacesZero', $jitRound);
+        $this->assertStringContainsString('invokeAwayFromZeroPlacesZero', $jitRound);
         $this->assertStringContainsString('tryInvokePlacesZeroIntrinsic', $jitRound);
         $this->assertStringContainsString('MathRound::invoke', $jitRound);
         $this->assertStringContainsString('tryFoldCompileTime', $jitRound);
@@ -35,11 +38,16 @@ final class RoundRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('llvm.round.f64', $bridge);
         $this->assertStringContainsString('llvm.trunc.f64', $bridge);
         $this->assertStringContainsString('invokeHalfUpPlacesZero', $bridge);
+        $this->assertStringContainsString('invokeHalfDownPlacesZero', $bridge);
+        $this->assertStringContainsString('invokeHalfEvenPlacesZero', $bridge);
+        $this->assertStringContainsString('invokeHalfOddPlacesZero', $bridge);
         $this->assertStringContainsString('invokeCeilingPlacesZero', $bridge);
         $this->assertStringContainsString('invokeFloorPlacesZero', $bridge);
         $this->assertStringContainsString('invokeTowardZeroPlacesZero', $bridge);
+        $this->assertStringContainsString('invokeAwayFromZeroPlacesZero', $bridge);
         $this->assertStringContainsString('MathCeil::invoke', $bridge);
         $this->assertStringContainsString('MathFloor::invoke', $bridge);
+        $this->assertStringContainsString('MathAbs::invokeDouble', $bridge);
         $this->assertStringContainsString('RoundJitHelper', $bridge);
         $this->assertStringContainsString('phpc_round', $bridge);
         $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
@@ -77,15 +85,24 @@ final class RoundRuntimeShrinkTest extends TestCase
         $this->assertSame(-1.0, VmRound::mathRound(-0.5, 0, StdlibConstants::PHP_ROUND_HALF_UP));
         $this->assertSame(-1.0, RoundJitHelper::roundArgv(-0.5, 0, StdlibConstants::PHP_ROUND_HALF_UP));
 
-        // Directed modes that map to LLVM intrinsics — helper stays SSOT for NestedJIT.
+        // Directed / half modes that map to LLVM ops — helper stays SSOT for NestedJIT.
         foreach (
             [
+                [1.5, StdlibConstants::PHP_ROUND_HALF_DOWN, 1.0],
+                [-1.5, StdlibConstants::PHP_ROUND_HALF_DOWN, -1.0],
+                [1.5, StdlibConstants::PHP_ROUND_HALF_EVEN, 2.0],
+                [2.5, StdlibConstants::PHP_ROUND_HALF_EVEN, 2.0],
+                [1.5, StdlibConstants::PHP_ROUND_HALF_ODD, 1.0],
+                [2.5, StdlibConstants::PHP_ROUND_HALF_ODD, 3.0],
                 [1.1, StdlibConstants::PHP_ROUND_CEILING, 2.0],
                 [-1.1, StdlibConstants::PHP_ROUND_CEILING, -1.0],
                 [1.1, StdlibConstants::PHP_ROUND_FLOOR, 1.0],
                 [-1.1, StdlibConstants::PHP_ROUND_FLOOR, -2.0],
                 [1.9, StdlibConstants::PHP_ROUND_TOWARD_ZERO, 1.0],
                 [-1.9, StdlibConstants::PHP_ROUND_TOWARD_ZERO, -1.0],
+                [1.1, StdlibConstants::PHP_ROUND_AWAY_FROM_ZERO, 2.0],
+                [-1.1, StdlibConstants::PHP_ROUND_AWAY_FROM_ZERO, -2.0],
+                [0.5, StdlibConstants::PHP_ROUND_AWAY_FROM_ZERO, 1.0],
             ] as [$n, $mode, $expected]
         ) {
             $this->assertSame(
