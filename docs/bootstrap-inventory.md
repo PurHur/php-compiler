@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8356 |
-| Phase A inventory files (M2 ratio SSOT) | 8356 |
+| PHP files on vm.php path | 8357 |
+| Phase A inventory files (M2 ratio SSOT) | 8357 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26310 |
+| Source constructs flagged (warnings) | 26312 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5624,7 +5624,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/InlineCallArgSlotResolvers.php` | 0 | 2 |
 | `lib/Compiler/Concern/InstanceOfInAndClassConstCompile.php` | 0 | 12 |
 | `lib/Compiler/Concern/IssetEmptyCallArgAndMultiCompile.php` | 0 | 15 |
-| `lib/Compiler/Concern/IssetEmptyUnsetAndDimFetchCompile.php` | 0 | 10 |
+| `lib/Compiler/Concern/IssetEmptyUnsetAndDimFetchCompile.php` | 0 | 4 |
 | `lib/Compiler/Concern/ListDestructAndForeach.php` | 0 | 7 |
 | `lib/Compiler/Concern/MatchInlineCallArgProducerWithEmbeddedLiterals.php` | 0 | 3 |
 | `lib/Compiler/Concern/NestedArrayAndLeadingConstCallArgProducers.php` | 0 | 3 |
@@ -5637,6 +5637,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/ParameterAsserts.php` | 0 | 4 |
 | `lib/Compiler/Concern/PrecedingInlineCallArgProducers.php` | 0 | 3 |
 | `lib/Compiler/Concern/PrecedingInlineDeadVoidAndDimFetchCallArgSlots.php` | 0 | 3 |
+| `lib/Compiler/Concern/PropertyAndDimFetchCompile.php` | 0 | 8 |
 | `lib/Compiler/Concern/RewireArithmeticBranchSubstrEnumAndSiblingMultiArgCallArgSendSlots.php` | 0 | 3 |
 | `lib/Compiler/Concern/RewireHoistedPreludePregCombineAndVarExportCallArgSendSlots.php` | 0 | 3 |
 | `lib/Compiler/Concern/RewireInlineBitmaskNestedFileAndVarExportFlagCallArgSendSlots.php` | 0 | 2 |
@@ -49146,13 +49147,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 937)
-- new CompileFatal (line 971)
-- new CompileError (line 974)
-- new ClassCompileRegistry (line 1015)
-- new AttributeClassRegistry (line 1016)
-- new ClassCompileRegistry (line 1124)
-- new AttributeClassRegistry (line 1125)
+- new CompileFatal (line 940)
+- new CompileFatal (line 974)
+- new CompileError (line 977)
+- new ClassCompileRegistry (line 1018)
+- new AttributeClassRegistry (line 1019)
+- new ClassCompileRegistry (line 1127)
+- new AttributeClassRegistry (line 1128)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -50079,16 +50080,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/IssetEmptyUnsetAndDimFetchCompile.php`
 
 **Warnings** (review for bootstrap subset):
-- trait IssetEmptyUnsetAndDimFetchCompile (line 29)
-- new OpCode (line 252)
-- new OpCode (line 290)
-- new OpCode (line 1051)
-- new OpCode (line 1070)
-- new OpCode (line 1080)
-- new OpCode (line 1099)
-- new OpCode (line 1117)
-- 38 class method(s)
-- 3 closure(s)
+- trait IssetEmptyUnsetAndDimFetchCompile (line 27)
+- new OpCode (line 250)
+- new OpCode (line 288)
+- 20 class method(s)
 
 ### `lib/Compiler/Concern/ListDestructAndForeach.php`
 
@@ -50226,6 +50221,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - trait PrecedingInlineDeadVoidAndDimFetchCallArgSlots (line 32)
 - 11 class method(s)
 - 1 closure(s)
+
+### `lib/Compiler/Concern/PropertyAndDimFetchCompile.php`
+
+**Warnings** (review for bootstrap subset):
+- trait PropertyAndDimFetchCompile (line 26)
+- new OpCode (line 437)
+- new OpCode (line 456)
+- new OpCode (line 466)
+- new OpCode (line 485)
+- new OpCode (line 503)
+- 18 class method(s)
+- 3 closure(s)
 
 ### `lib/Compiler/Concern/RewireArithmeticBranchSubstrEnumAndSiblingMultiArgCallArgSendSlots.php`
 

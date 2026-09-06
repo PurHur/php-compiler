@@ -76,6 +76,7 @@ require_once __DIR__.'/Compiler/Concern/HoistedUnaryAssignAndInlineProducerCallA
 require_once __DIR__.'/Compiler/Concern/ListDestructAndForeach.php';
 require_once __DIR__.'/Compiler/Concern/DimAndPropertyWriteContext.php';
 require_once __DIR__.'/Compiler/Concern/IssetEmptyUnsetAndDimFetchCompile.php';
+require_once __DIR__.'/Compiler/Concern/PropertyAndDimFetchCompile.php';
 require_once __DIR__.'/Compiler/Concern/InlineCallArgCompileTimeFold.php';
 require_once __DIR__.'/Compiler/Concern/EchoCoalesceCallArgCompile.php';
 require_once __DIR__.'/Compiler/Concern/FirstClassCallableAndClosure.php';
@@ -265,6 +266,7 @@ use PHPCompiler\Compiler\Concern\HoistedUnaryAssignAndInlineProducerCallArgSlots
 use PHPCompiler\Compiler\Concern\ListDestructAndForeach;
 use PHPCompiler\Compiler\Concern\DimAndPropertyWriteContext;
 use PHPCompiler\Compiler\Concern\IssetEmptyUnsetAndDimFetchCompile;
+use PHPCompiler\Compiler\Concern\PropertyAndDimFetchCompile;
 use PHPCompiler\Compiler\Concern\InlineCallArgCompileTimeFold;
 use PHPCompiler\Compiler\Concern\EchoCoalesceCallArgCompile;
 use PHPCompiler\Compiler\Concern\FirstClassCallableAndClosure;
@@ -364,6 +366,7 @@ class Compiler {
     use ListDestructAndForeach;
     use DimAndPropertyWriteContext;
     use IssetEmptyUnsetAndDimFetchCompile;
+    use PropertyAndDimFetchCompile;
     use InlineCallArgCompileTimeFold;
     use EchoCoalesceCallArgCompile;
     use FirstClassCallableAndClosure;

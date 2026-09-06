@@ -4,9 +4,9 @@
     "done_when_ceiling": 25000,
     "files": {
         "lib/Compiler.php": {
-            "budget": 1166,
+            "budget": 1169,
             "target": 20000,
-            "note": "Concern trait splits (#36230/#36387/#36403); StaticMethodAndFuncCallCompile + NullsafePropertyAndMethodCompile + peers"
+            "note": "Concern trait splits (#36230/#36387/#36403); PropertyAndDimFetchCompile + StaticMethodAndFuncCallCompile + peers"
         },
         "lib/JIT.php": {
             "budget": 274,
