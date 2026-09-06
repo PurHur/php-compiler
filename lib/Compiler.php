@@ -19,6 +19,7 @@ require_once __DIR__.'/Compiler/Concern/CompileClassConstFoldAndTypedReject.php'
 require_once __DIR__.'/Compiler/Concern/CompilePromotedPropertyAndParamDefaults.php';
 require_once __DIR__.'/Compiler/Concern/CompileParamFunctionAndStmtDispatch.php';
 require_once __DIR__.'/Compiler/Concern/CompileClassBodyAndTraitAdaptations.php';
+require_once __DIR__.'/Compiler/Concern/CfgTypeShapeAndDeclaredAssert.php';
 require_once __DIR__.'/Compiler/Concern/ErrorSuppressAndPropertyFetch.php';
 require_once __DIR__.'/Compiler/Concern/WriteContextRejects.php';
 require_once __DIR__.'/Compiler/Concern/TernaryAndLogicalShortCircuit.php';
@@ -168,6 +169,7 @@ use PHPCompiler\Compiler\Concern\CompileClassConstFoldAndTypedReject;
 use PHPCompiler\Compiler\Concern\CompilePromotedPropertyAndParamDefaults;
 use PHPCompiler\Compiler\Concern\CompileParamFunctionAndStmtDispatch;
 use PHPCompiler\Compiler\Concern\CompileClassBodyAndTraitAdaptations;
+use PHPCompiler\Compiler\Concern\CfgTypeShapeAndDeclaredAssert;
 use PHPCompiler\Compiler\Concern\ErrorSuppressAndPropertyFetch;
 use PHPCompiler\Compiler\Concern\TernaryAndLogicalShortCircuit;
 use PHPCompiler\Compiler\Concern\CompileCallArgSends;
@@ -225,6 +227,7 @@ class Compiler {
     use CompilePromotedPropertyAndParamDefaults;
     use CompileParamFunctionAndStmtDispatch;
     use CompileClassBodyAndTraitAdaptations;
+    use CfgTypeShapeAndDeclaredAssert;
     use ErrorSuppressAndPropertyFetch;
     use WriteContextRejects;
     use TernaryAndLogicalShortCircuit;

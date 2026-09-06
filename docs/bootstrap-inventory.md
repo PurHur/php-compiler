@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8310 |
-| Phase A inventory files (M2 ratio SSOT) | 8310 |
+| PHP files on vm.php path | 8311 |
+| Phase A inventory files (M2 ratio SSOT) | 8311 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26216 |
+| Source constructs flagged (warnings) | 26219 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5566,7 +5566,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/AdjacentNestedCallArgSlots.php` | 0 | 3 |
 | `lib/Compiler/Concern/CallAndArrayLiteralCompile.php` | 0 | 31 |
 | `lib/Compiler/Concern/CfgProducerIndexAndRematerialize.php` | 0 | 2 |
-| `lib/Compiler/Concern/ClassLikeAndStmtCompile.php` | 0 | 21 |
+| `lib/Compiler/Concern/CfgTypeShapeAndDeclaredAssert.php` | 0 | 11 |
+| `lib/Compiler/Concern/ClassLikeAndStmtCompile.php` | 0 | 13 |
 | `lib/Compiler/Concern/CoalesceAndNullsafe.php` | 0 | 62 |
 | `lib/Compiler/Concern/CoalesceLeftAndEchoConcatPreludes.php` | 0 | 9 |
 | `lib/Compiler/Concern/CompileCallArgSends.php` | 0 | 59 |
@@ -49100,13 +49101,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 814)
-- new CompileFatal (line 848)
-- new CompileError (line 851)
-- new ClassCompileRegistry (line 892)
-- new AttributeClassRegistry (line 893)
-- new ClassCompileRegistry (line 1001)
-- new AttributeClassRegistry (line 1002)
+- new CompileFatal (line 817)
+- new CompileFatal (line 851)
+- new CompileError (line 854)
+- new ClassCompileRegistry (line 895)
+- new AttributeClassRegistry (line 896)
+- new ClassCompileRegistry (line 1004)
+- new AttributeClassRegistry (line 1005)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -49271,30 +49272,37 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - trait CfgProducerIndexAndRematerialize (line 26)
 - 14 class method(s)
 
+### `lib/Compiler/Concern/CfgTypeShapeAndDeclaredAssert.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CfgTypeShapeAndDeclaredAssert (line 134)
+- new Block (line 162)
+- new OpCode (line 165)
+- new Block (line 167)
+- new OpCode (line 170)
+- new Block (line 174)
+- new OpCode (line 177)
+- new OpCode (line 181)
+- new OpCode (line 186)
+- 34 class method(s)
+- 7 closure(s)
+
 ### `lib/Compiler/Concern/ClassLikeAndStmtCompile.php`
 
 **Warnings** (review for bootstrap subset):
-- trait ClassLikeAndStmtCompile (line 137)
-- new Variable (line 560)
-- new Operand\Temporary (line 562)
-- new OpCode (line 565)
-- new Variable (line 712)
-- new Variable (line 751)
-- new Variable (line 798)
-- new Block (line 1170)
-- new OpCode (line 1173)
-- new Block (line 1175)
-- new OpCode (line 1178)
-- new Block (line 1182)
-- new OpCode (line 1185)
-- new OpCode (line 1189)
-- new OpCode (line 1194)
-- new CompileFatal (line 2106)
-- new CompileFatal (line 2171)
-- new CompileFatal (line 2242)
-- new Frame (line 2451)
-- 103 class method(s)
-- 8 closure(s)
+- trait ClassLikeAndStmtCompile (line 139)
+- new Variable (line 562)
+- new Operand\Temporary (line 564)
+- new OpCode (line 567)
+- new Variable (line 714)
+- new Variable (line 753)
+- new Variable (line 800)
+- new CompileFatal (line 1266)
+- new CompileFatal (line 1331)
+- new CompileFatal (line 1402)
+- new Frame (line 1611)
+- 69 class method(s)
+- 1 closure(s)
 
 ### `lib/Compiler/Concern/CoalesceAndNullsafe.php`
 
