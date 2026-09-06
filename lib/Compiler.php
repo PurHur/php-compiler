@@ -59,6 +59,7 @@ require_once __DIR__.'/Compiler/Concern/SubstrNestedHaystackAndMethodOrStaticCal
 require_once __DIR__.'/Compiler/Concern/OuterSiblingExecReturnAndHoistedConstFetchSlots.php';
 require_once __DIR__.'/Compiler/Concern/FinalSiblingInlineCallArgSendSlot.php';
 require_once __DIR__.'/Compiler/Concern/SlotForCallArgResolvers.php';
+require_once __DIR__.'/Compiler/Concern/InitArraySpreadArithmeticAndNestedInlineCallArgResolvers.php';
 require_once __DIR__.'/Compiler/Concern/SlotForPropertyClassConstAndClosureBindCallArgResolvers.php';
 require_once __DIR__.'/Compiler/Concern/SlotForInlineClosureAndFirstClassCallableCallArgResolvers.php';
 require_once __DIR__.'/Compiler/Concern/InlineCallArgSlotResolvers.php';
@@ -244,6 +245,7 @@ use PHPCompiler\Compiler\Concern\SubstrNestedHaystackAndMethodOrStaticCallInitSl
 use PHPCompiler\Compiler\Concern\OuterSiblingExecReturnAndHoistedConstFetchSlots;
 use PHPCompiler\Compiler\Concern\FinalSiblingInlineCallArgSendSlot;
 use PHPCompiler\Compiler\Concern\SlotForCallArgResolvers;
+use PHPCompiler\Compiler\Concern\InitArraySpreadArithmeticAndNestedInlineCallArgResolvers;
 use PHPCompiler\Compiler\Concern\SlotForPropertyClassConstAndClosureBindCallArgResolvers;
 use PHPCompiler\Compiler\Concern\SlotForInlineClosureAndFirstClassCallableCallArgResolvers;
 use PHPCompiler\Compiler\Concern\InlineCallArgSlotResolvers;
@@ -339,6 +341,7 @@ class Compiler {
     use OuterSiblingExecReturnAndHoistedConstFetchSlots;
     use FinalSiblingInlineCallArgSendSlot;
     use SlotForCallArgResolvers;
+    use InitArraySpreadArithmeticAndNestedInlineCallArgResolvers;
     use SlotForPropertyClassConstAndClosureBindCallArgResolvers;
     use SlotForInlineClosureAndFirstClassCallableCallArgResolvers;
     use InlineCallArgSlotResolvers;
