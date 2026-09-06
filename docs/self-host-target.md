@@ -45,7 +45,7 @@ Research stretch (not a release gate): that same binary can compile the next rev
 |-------|-------|--------|
 | **Bootstrap driver** | Prelinked gen-0 refreshed via honest inventory argv emit; native `build/bin-compile-aot-inventory` for M4/M5 | Compiled `bin/compile.php` only |
 | **Bundle size** | **7410/7412** literal Phase A inventory in spine smoke | Full vm.php closure |
-| **Inventory coverage** | **8349** / **8349** ✅ | Full closure |
+| **Inventory coverage** | **8350** / **8350** ✅ | Full closure |
 | **HelloWorld** | ✅ `emit_path=native` via gen-0 argv emit helper (`DRIVER -o OUT SOURCE`; [#22178](https://github.com/PurHur/php-compiler/issues/22178)) | Native compile for arbitrary PHP |
 | **Bootstrap loop (M4)** | `make bootstrap-loop-probe` full ladder ✅ — gen-1→gen-2, gen-2→gen-3 full spine, full-revision argv | Native full revision rebuild |
 | **Vendor** | **7410/7412** vendor `object_ok`; committed `.o` cold boot without `vendor/` ✅; `make north-star5-verify-fast` daily ✅; `--strict` ❌ **red at step 4a2** ([#21417](https://github.com/PurHur/php-compiler/issues/21417)) | No Zend `vendor/autoload.php` at bootstrap |
@@ -79,7 +79,7 @@ Research stretch (not a release gate): that same binary can compile the next rev
 |-----------|----------------|--------|-----|
 | **M0** | AOT can link a **small** honest `lib/` subset | ✅ | 100% |
 | **M1** | Bundle is **compiler-shaped** (lint + compile-smoke) | ✅ | 100% |
-| **M2** | Spine grows toward full `bin/vm.php` inventory | ✅ **8349** / **8349** | **100%** |
+| **M2** | Spine grows toward full `bin/vm.php` inventory | ✅ **8350** / **8350** | **100%** |
 | **M3** | Self-host binary **compiles external PHP** (HelloWorld) without Zend emit | ✅ `emit_path=native` via gen-0 argv helper ([#22178](https://github.com/PurHur/php-compiler/issues/22178)) | **~90%** |
 | **M4** | Self-host binary **rebuilds** the next compiler tree | 🚧 ladder runs but gen-1→gen-2 is a COPY ([#21860](https://github.com/PurHur/php-compiler/issues/21860)) | **~60%** |
 | **M5 (release)** | Static `phpc` builds user/Composer projects | 🚧 fast gate ✅; corpus app smoke open ([#36380](https://github.com/PurHur/php-compiler/issues/36380)); see [ADR #36393](adr/36393-selfhost-user-payoff.md) | **payoff** |
@@ -91,7 +91,7 @@ Research stretch (not a release gate): that same binary can compile the next rev
 
 | Indicator | Formula | Jul 2026 |
 |-----------|---------|----------|
-| **M2 spine progress** | `require_once` units in `compiler_lib_spine_smoke` ÷ Phase A inventory file count | **8349** / **8349** (`php script/bootstrap-spine-count.php`) |
+| **M2 spine progress** | `require_once` units in `compiler_lib_spine_smoke` ÷ Phase A inventory file count | **8350** / **8350** (`php script/bootstrap-spine-count.php`) |
 | **Public “Self-host” row** | Same M2 ratio until M3–M5 gates add weight ([`development-status.md`](pages/development-status.md)) | **~97%** |
 | **M5 vendor prelink** | `object_ok` packages ÷ 3 | **3 / 3** (cfg, types, llvm) |
 | **Composite (internal)** | Milestone weights in table above (M0–M1 = 100%, M2 = spine %, M3–M5 = gate %) | **~65%** |
