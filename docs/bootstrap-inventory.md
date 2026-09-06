@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8295 |
-| Phase A inventory files (M2 ratio SSOT) | 8295 |
+| PHP files on vm.php path | 8296 |
+| Phase A inventory files (M2 ratio SSOT) | 8296 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26183 |
+| Source constructs flagged (warnings) | 26185 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -60560,7 +60560,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/SpineChunkRuntimeMethodDemote.php`
 
 **Warnings** (review for bootstrap subset):
-- new OpCode (line 266)
+- new OpCode (line 267)
 - 11 class method(s)
 
 ### `lib/JIT/SpineChunkStandardHelperBind.php`
