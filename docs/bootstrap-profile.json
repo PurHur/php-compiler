@@ -5692,6 +5692,7 @@
         "lib/Compiler/Concern/HoistedEnumAndChainedInlineCallArgProducers.php",
         "lib/Compiler/Concern/HoistedMultiArgSiblingFuncCallChain.php",
         "lib/Compiler/Concern/HoistedSiblingFeedAndArrayKeysArgSendRewire.php",
+        "lib/Compiler/Concern/HoistedUnaryAssignAndInlineProducerCallArgSlots.php",
         "lib/Compiler/Concern/InlineCallArgClosureFeedsAndReturnProducers.php",
         "lib/Compiler/Concern/InlineCallArgCompileTimeFold.php",
         "lib/Compiler/Concern/InlineCallArgProducerMatch.php",
