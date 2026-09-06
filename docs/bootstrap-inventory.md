@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8292 |
-| Phase A inventory files (M2 ratio SSOT) | 8292 |
+| PHP files on vm.php path | 8293 |
+| Phase A inventory files (M2 ratio SSOT) | 8293 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26177 |
+| Source constructs flagged (warnings) | 26179 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7103,6 +7103,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/CompileScriptMagicIncludeClone.php` | 0 | 3 |
 | `lib/JIT/Concern/CompileSkippedOpcodeVmAndCfgBranchStubs.php` | 0 | 4 |
 | `lib/JIT/Concern/CompileStaticPropertyAndUnset.php` | 0 | 2 |
+| `lib/JIT/Concern/CompileTryCatchThrow.php` | 0 | 2 |
 | `lib/JIT/Concern/DateTimeConstructAndMutationMeta.php` | 0 | 3 |
 | `lib/JIT/Concern/DomCompileTimeTagMeta.php` | 0 | 2 |
 | `lib/JIT/Concern/EmitJitReturn.php` | 0 | 2 |
@@ -55277,35 +55278,35 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 1348)
 - new Variable (line 1395)
 - new Variable (line 1438)
-- new Variable (line 2622)
-- new Variable (line 3084)
-- new Variable (line 3149)
-- new Variable (line 3178)
-- new Variable (line 3190)
-- new Variable (line 3203)
-- new Variable (line 3486)
-- new VMVariable (line 4112)
-- new VMVariable (line 5487)
-- new VMVariable (line 5507)
+- new Variable (line 2632)
+- new Variable (line 3094)
+- new Variable (line 3159)
+- new Variable (line 3188)
+- new Variable (line 3200)
+- new Variable (line 3213)
+- new Variable (line 3496)
+- new VMVariable (line 4122)
+- new VMVariable (line 5497)
 - new VMVariable (line 5517)
-- new VMVariable (line 5537)
-- new VMVariable (line 7181)
-- new ReflectionClassConstant (line 7923)
-- new Variable (line 8392)
-- new Variable (line 8428)
-- new Variable (line 8455)
-- new Variable (line 8463)
-- new Variable (line 8486)
-- new Variable (line 8512)
-- new Variable (line 8520)
-- new Variable (line 8594)
-- new Literal (line 8611)
-- new Literal (line 8616)
+- new VMVariable (line 5527)
+- new VMVariable (line 5547)
+- new VMVariable (line 7191)
+- new ReflectionClassConstant (line 7933)
+- new Variable (line 8402)
+- new Variable (line 8438)
+- new Variable (line 8465)
+- new Variable (line 8473)
+- new Variable (line 8496)
+- new Variable (line 8522)
+- new Variable (line 8530)
+- new Variable (line 8604)
 - new Literal (line 8621)
-- new Variable (line 8632)
-- new Variable (line 8665)
-- new Variable (line 8688)
-- new Variable (line 9238)
+- new Literal (line 8626)
+- new Literal (line 8631)
+- new Variable (line 8642)
+- new Variable (line 8675)
+- new Variable (line 8698)
+- new Variable (line 9248)
 - 354 class method(s)
 - 9 closure(s)
 
@@ -58157,7 +58158,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - trait CompileBlockInternal (line 22)
-- new VM (line 652)
+- new VM (line 637)
 - 2 class method(s)
 
 ### `lib/JIT/Concern/CompileBlockPhpLoweringAndClosurePrep.php`
@@ -58407,6 +58408,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - trait CompileStaticPropertyAndUnset (line 22)
+- 1 class method(s)
+
+### `lib/JIT/Concern/CompileTryCatchThrow.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CompileTryCatchThrow (line 22)
 - 1 class method(s)
 
 ### `lib/JIT/Concern/DateTimeConstructAndMutationMeta.php`
