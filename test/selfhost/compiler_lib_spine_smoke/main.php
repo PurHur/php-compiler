@@ -5359,6 +5359,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/WriteContextRejects.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/TernaryAndLogicalShortCircuit.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompileCallArgSends.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompileInlineSpecializedCallArgSends.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/ArrayPadUnpackExtractAndDateSunCallArgSends.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/ExplodeIteratorChunkWalkAndTrailingComparatorCallArgSends.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/InlineCallArgProducerMatch.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/MatchInlineCallArgProducerWithEmbeddedLiterals.php';

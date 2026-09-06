@@ -4,9 +4,9 @@
     "done_when_ceiling": 25000,
     "files": {
         "lib/Compiler.php": {
-            "budget": 1142,
+            "budget": 1145,
             "target": 20000,
-            "note": "Concern trait splits (#36230/#36387/#36403); RewireArithmeticBranchSubstrEnumAndSiblingMultiArgCallArgSendSlots + RewireInlineBitmaskNestedFileAndVarExportFlagCallArgSendSlots + ExplodeIteratorChunkWalkAndTrailingComparatorCallArgSends + peers"
+            "note": "Concern trait splits (#36230/#36387/#36403); ArrayPadUnpackExtractAndDateSunCallArgSends + RewireArithmeticBranchSubstrEnumAndSiblingMultiArgCallArgSendSlots + RewireInlineBitmaskNestedFileAndVarExportFlagCallArgSendSlots + peers"
         },
         "lib/JIT.php": {
             "budget": 274,
