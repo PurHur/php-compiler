@@ -195,6 +195,15 @@ use PHPCompiler\VM\Variable as VmVariable;
  * stay live — TypeError),
  * array_column (typed array + null-or-typed str/int column_key + optional
  * null-or-typed index_key; soft-null / non-array / non-scalar keys stay live),
+ * array_combine (equal-length non-empty {@code compileTimeArray}/
+ * {@code compileTimeAssoc} packs only; empty literals / in-progress empty
+ * packs / runtime typed arrays / {@code array} params stay live —
+ * {@code compileTimeEmptyArrayLiteral} is also set on RECV slots so it is
+ * not a length proof; ValueError on length mismatch),
+ * range (2-arg typed numerics — default step ±1 cannot ValueError; 3-arg
+ * only when all three are compile-time longs that pass php-src zero /
+ * increasing-negative / oversized step checks; soft-null / runtime step /
+ * char-string endpoints stay live),
  * zero-arg pi, type.c predicates + gettype/get_debug_type, ctype.c
  * classifiers on typed/literal strings, typed-array count/sizeof, math.c
  * incl. pow/fpow/fdiv on already-numeric args, empty void user functions).
@@ -494,6 +503,12 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureArrayConstructNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureArrayCombineNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureRangeNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureVersionCompareNoSideEffect($toCall, $callArgs)) {
@@ -3337,6 +3352,132 @@ final class DiscardedPureCallElision
             default:
                 return false;
         }
+    }
+
+    /**
+     * Discarded {@code array_combine} — php-src {@code ext/standard/array.c}
+     * {@code PHP_FUNCTION(array_combine)}. Length mismatch is a {@code ValueError}.
+     * Only equal-length non-empty compile-time packs are elided.
+     * {@code compileTimeEmptyArrayLiteral} is also set on {@code array} RECV
+     * slots, so empty-literal alone is not a size proof.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureArrayCombineNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if ('array_combine' !== strtolower($toCall->getName())) {
+            return false;
+        }
+        if (!isset($callArgs[0], $callArgs[1]) || isset($callArgs[2])) {
+            return false;
+        }
+        if (!$callArgs[0] instanceof Variable || !$callArgs[1] instanceof Variable) {
+            return false;
+        }
+        $keys = $callArgs[0];
+        $values = $callArgs[1];
+        if (!self::isTypedArrayArg($keys) || !self::isTypedArrayArg($values)) {
+            return false;
+        }
+        // Empty compileTimeArray/Assoc ([]) is an in-progress marker; RECV
+        // slots may also carry compileTimeEmptyArrayLiteral — neither proves
+        // equal runtime lengths (ValueError).
+        if (
+            null !== $keys->compileTimeArray
+            && null !== $values->compileTimeArray
+            && \count($keys->compileTimeArray) > 0
+            && \count($keys->compileTimeArray) === \count($values->compileTimeArray)
+        ) {
+            return true;
+        }
+        if (
+            null !== $keys->compileTimeAssoc
+            && null !== $values->compileTimeAssoc
+            && \count($keys->compileTimeAssoc) > 0
+            && \count($keys->compileTimeAssoc) === \count($values->compileTimeAssoc)
+        ) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Discarded {@code range} — php-src {@code ext/standard/array.c}
+     * {@code PHP_FUNCTION(range)}. Two typed numeric endpoints use default
+     * step ±1 (no ValueError). Three-arg form requires compile-time longs that
+     * pass the zero / increasing-negative / oversized step checks (peer
+     * {@see \PHPCompiler\ext\standard\RangeIntJitHelper::intRangeCopy}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureRangeNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if ('range' !== strtolower($toCall->getName())) {
+            return false;
+        }
+        if (!isset($callArgs[0], $callArgs[1]) || isset($callArgs[3])) {
+            return false;
+        }
+        if (!$callArgs[0] instanceof Variable || !$callArgs[1] instanceof Variable) {
+            return false;
+        }
+        if (
+            !self::mathArgAllowsDiscardedElision($callArgs[0])
+            || !self::mathArgAllowsDiscardedElision($callArgs[1])
+        ) {
+            return false;
+        }
+        if (!isset($callArgs[2])) {
+            // Default step is select(±1) — never 0 / never oversized vs span.
+            return true;
+        }
+        if (!$callArgs[2] instanceof Variable) {
+            return false;
+        }
+        $start = $callArgs[0]->compileTimeLong;
+        $end = $callArgs[1]->compileTimeLong;
+        $step = $callArgs[2]->compileTimeLong;
+        if (null === $start || null === $end || null === $step) {
+            // Runtime step / endpoints can still ValueError.
+            return false;
+        }
+
+        return self::compileTimeRangeStepAllowsDiscardedElision($start, $end, $step);
+    }
+
+    /**
+     * Mirror {@see \PHPCompiler\ext\standard\RangeIntJitHelper::intRangeCopy}
+     * ValueError guards for discarded elision (PROFILE-agnostic: reject every
+     * shape that can throw on any supported profile).
+     */
+    private static function compileTimeRangeStepAllowsDiscardedElision(
+        int $start,
+        int $end,
+        int $step
+    ): bool {
+        if (0 === $step) {
+            return false;
+        }
+        // php-src: only end > start rejects a negative step; equal endpoints stay a singleton.
+        if ($start < $end && $step < 0) {
+            return false;
+        }
+        if ($start !== $end) {
+            $span = $start > $end ? ($start - $end) : ($end - $start);
+            $stepAbs = $step < 0 ? -$step : $step;
+            if ($span < $stepAbs) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
