@@ -169,7 +169,13 @@ final class VmUnaryMinus
     }
 
     /**
-     * Runtime long negate with PHP_INT_MIN → double promotion into a value box (#28761).
+     * Runtime long negate with PHP_INT_MIN → double (#28761 / #36386).
+     *
+     * Hot path stays {@see Variable::TYPE_NATIVE_LONG} (no {@code __value__} box);
+     * INT_MIN stores f64 into an entry alloca — the box is created only in
+     * {@see \PHPCompiler\JIT\JitLongArithOverflow::materializeOverflowableNativeLong}.
+     *
+     * @see php-src Zend/zend_operators.c zendi_negate_function
      */
     private static function negateLongWithIntMinPromote(Context $context, LlvmValue $value): Variable
     {
@@ -177,13 +183,15 @@ final class VmUnaryMinus
         $i64 = $context->getTypeFromString('int64');
         $f64 = $context->getTypeFromString('double');
         $long = $context->builder->intCast($value, $i64);
-        $valuePtr = $context->builder->alloca($context->getTypeFromString('__value__'));
 
         $isMin = $context->builder->icmp(
             Builder::INT_EQ,
             $long,
             $i64->constInt(\PHP_INT_MIN, true)
         );
+        // f64 only — no entryAllocaValueBox / TYPE_NULL init on the hot path (#36386).
+        $doubleSlot = BasicBlockHelper::entryAlloca($context, $f64);
+
         $minBlock = BasicBlockHelper::append($context, 'unary_minus_int_min');
         $longBlock = BasicBlockHelper::append($context, 'unary_minus_long');
         $doneBlock = BasicBlockHelper::append($context, 'unary_minus_done');
@@ -192,24 +200,23 @@ final class VmUnaryMinus
         $context->builder->positionAtEnd($minBlock);
         // fneg(sitofp(INT_MIN)): LLVM integer negate wraps INT_MIN to itself.
         $minNeg = $context->builder->fNegate($context->builder->sitofp($long, $f64));
-        $context->builder->call(
-            $context->lookupFunction('__value__writeDouble'),
-            $valuePtr,
-            $minNeg
-        );
+        $context->builder->store($minNeg, $doubleSlot);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($longBlock);
         $negLong = $context->builder->negate($long);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeLong'),
-            $valuePtr,
-            $negLong
-        );
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
+        // Dummy 0 on the INT_MIN arm — consumers must materialize when the flag is set.
+        $mergedLong = $context->builder->phi($i64);
+        $mergedLong->addIncoming($negLong, $longBlock);
+        $mergedLong->addIncoming($i64->constInt(0, false), $minBlock);
 
-        return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VALUE, $valuePtr);
+        $okVar = new Variable($context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $mergedLong);
+        $okVar->longArithOverflowFlag = $isMin;
+        $okVar->longArithOverflowDoubleSlot = $doubleSlot;
+
+        return $okVar;
     }
 }
