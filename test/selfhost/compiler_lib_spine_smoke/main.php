@@ -7713,6 +7713,7 @@ require_once __DIR__.'/../../../lib/VM/Concern/ObjectPropertyMagicAndClone.php';
 require_once __DIR__.'/../../../lib/VM/Concern/PropertyFetchDestAndHookedDimWrite.php';
 require_once __DIR__.'/../../../lib/VM/Concern/TypedIntRecursiveAndCountedLoopFastPath.php';
 require_once __DIR__.'/../../../lib/VM/Concern/ExecuteIncDecAndScopeOperandRead.php';
+require_once __DIR__.'/../../../lib/VM/Concern/TryCatchFinallyAndUncaughtDispatch.php';
 require_once __DIR__.'/../../../lib/VM/ObjectPropertyIterator.php';
 require_once __DIR__.'/../../../lib/VM/ObjectReadonlySupport.php';
 require_once __DIR__.'/../../../lib/VM/ObjectRegistry.php';
