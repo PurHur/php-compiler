@@ -30,6 +30,15 @@ use PHPCompiler\VM\Variable as VmVariable;
  * hash / hash_hmac (compile-time known algo + typed string data/key +
  * optional typed binary; options / unknown algo / soft-null stay live —
  * ValueError / deprecate),
+ * sprintf (compile-time format with only non-positional width/precision
+ * specs in {s,d,i,u,o,x,X,f,F,e,E,g,G,c,b} + enough typed scalar args;
+ * {@code %%} free; {@code %*}/{@code %n$}/{@code %a}/{@code %A}/incomplete
+ * {@code %} stay live — ArgumentCountError / ValueError; soft-null /
+ * object / array args stay live — deprecate / {@code __toString}; extra
+ * args OK; {@code printf}/{@code fprintf} never elided — stdout/IO),
+ * vsprintf (same format rules + typed array only when the format needs
+ * zero value args; non-empty conversion formats stay live — element
+ * count / {@code __toString} unknown),
  * typed pathinfo (string + optional flags), typed parse_url
  * (string + optional component), typed function_exists /
  * extension_loaded / defined (single string; no autoload), typed
@@ -331,6 +340,9 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureHashHmacNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureSprintfNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePurePathinfoNoSideEffect($toCall, $callArgs)) {
@@ -1564,6 +1576,186 @@ final class DiscardedPureCallElision
         }
 
         return true;
+    }
+
+    /**
+     * Discarded {@code sprintf} / {@code vsprintf} — php-src
+     * {@code ext/standard/formatted_print.c}. Compile-time format whose
+     * conversions are a non-positional subset ({@code sdiuoxXfFeEgGcb}) with
+     * enough typed scalar args (string / numeric / bool). Incomplete /
+     * positional / {@code *} width / {@code %a}/{@code %A} stay live
+     * ({@code ArgumentCountError} / {@code ValueError}). Soft-null and
+     * object/array value args stay live. {@code printf}/{@code fprintf}/
+     * {@code vprintf}/{@code vfprintf} are never matched (IO side effects).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureSprintfNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        $name = strtolower($toCall->getName());
+        if ('sprintf' !== $name && 'vsprintf' !== $name) {
+            return false;
+        }
+        if (!isset($callArgs[0]) || !$callArgs[0] instanceof Variable) {
+            return false;
+        }
+        $format = JitStringArg::compileTimeLiteral($callArgs[0]);
+        if (null === $format) {
+            // Soft-null / runtime format stay live (deprecate / ValueError).
+            return false;
+        }
+        $required = self::compileTimeSprintfRequiredValueArgCount($format);
+        if (null === $required) {
+            return false;
+        }
+        if ('vsprintf' === $name) {
+            // Element count / types inside the array are unknown — only elide
+            // formats that need zero value args (literal text / %% only).
+            if (0 !== $required) {
+                return false;
+            }
+            if (2 !== \count($callArgs)) {
+                return false;
+            }
+            if (!$callArgs[1] instanceof Variable || !self::isTypedArrayArg($callArgs[1])) {
+                return false;
+            }
+
+            return true;
+        }
+        $argc = \count($callArgs);
+        // format + required value args; extras are ignored by Zend.
+        if ($argc < 1 + $required) {
+            return false;
+        }
+        for ($i = 1; $i < $argc; ++$i) {
+            if (
+                !$callArgs[$i] instanceof Variable
+                || !self::sprintfValueArgAllowsDiscardedElision($callArgs[$i])
+            ) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Typed string / numeric / bool scalar — no null deprecate / {@code __toString}.
+     */
+    private static function sprintfValueArgAllowsDiscardedElision(Variable $arg): bool
+    {
+        if (self::stringArgAllowsDiscardedElision($arg)) {
+            return true;
+        }
+
+        return self::mathArgAllowsDiscardedElision($arg);
+    }
+
+    /**
+     * Count value arguments a compile-time sprintf format requires, or null when
+     * the format has error/side-effect paths we refuse to elide.
+     *
+     * Rejects positional {@code %n$}, {@code *} width/precision, {@code %a}/
+     * {@code %A} ({@code ValueError}), unknown specs, and a trailing incomplete
+     * {@code %}. php-src: {@code ext/standard/formatted_print.c}.
+     */
+    private static function compileTimeSprintfRequiredValueArgCount(string $format): ?int
+    {
+        $len = \strlen($format);
+        $needed = 0;
+        for ($i = 0; $i < $len; ++$i) {
+            if ('%' !== $format[$i]) {
+                continue;
+            }
+            ++$i;
+            if ($i >= $len) {
+                // Trailing bare "%" — Zend ArgumentCountError / incomplete.
+                return null;
+            }
+            if ('%' === $format[$i]) {
+                continue;
+            }
+            // Positional "%n$" — stay live (arg indexing / missing-arg errors).
+            if (self::sprintfFormatLooksPositional($format, $i)) {
+                return null;
+            }
+            // Flags: '#0- +\' and space (php-src formatted_print.c).
+            while (
+                $i < $len
+                && (
+                    '#' === $format[$i]
+                    || '0' === $format[$i]
+                    || '-' === $format[$i]
+                    || ' ' === $format[$i]
+                    || '+' === $format[$i]
+                    || "'" === $format[$i]
+                )
+            ) {
+                ++$i;
+            }
+            if ($i >= $len) {
+                return null;
+            }
+            // Width: digits only — "*" stays live (extra int arg + errors).
+            if ('*' === $format[$i]) {
+                return null;
+            }
+            while ($i < $len && $format[$i] >= '0' && $format[$i] <= '9') {
+                ++$i;
+            }
+            if ($i >= $len) {
+                return null;
+            }
+            if ('.' === $format[$i]) {
+                ++$i;
+                if ($i >= $len) {
+                    return null;
+                }
+                if ('*' === $format[$i]) {
+                    return null;
+                }
+                while ($i < $len && $format[$i] >= '0' && $format[$i] <= '9') {
+                    ++$i;
+                }
+                if ($i >= $len) {
+                    return null;
+                }
+            }
+            $spec = $format[$i];
+            // %a/%A → ValueError in this runtime (#29085); unknown → stay live.
+            if (
+                's' !== $spec && 'd' !== $spec && 'i' !== $spec && 'u' !== $spec
+                && 'o' !== $spec && 'x' !== $spec && 'X' !== $spec
+                && 'f' !== $spec && 'F' !== $spec && 'e' !== $spec && 'E' !== $spec
+                && 'g' !== $spec && 'G' !== $spec && 'c' !== $spec && 'b' !== $spec
+            ) {
+                return null;
+            }
+            ++$needed;
+        }
+
+        return $needed;
+    }
+
+    /**
+     * True when {@code $format[$i…]} begins a positional conversion ({@code 1$s}).
+     */
+    private static function sprintfFormatLooksPositional(string $format, int $i): bool
+    {
+        $len = \strlen($format);
+        if ($i >= $len || $format[$i] < '1' || $format[$i] > '9') {
+            return false;
+        }
+        $j = $i;
+        while ($j < $len && $format[$j] >= '0' && $format[$j] <= '9') {
+            ++$j;
+        }
+
+        return $j < $len && '$' === $format[$j];
     }
 
     /**
