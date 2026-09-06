@@ -125,9 +125,10 @@ final class JitSprintf
                     self::extractSnprintfLongArg($context, $args[$i + 1]),
                     $i32
                 );
-            } elseif (\in_array($conv, ['d', 'i', 'u', 'o', 'x'], true)) {
-                // Integer conversions: zval_get_long / zend_dval_to_lval — never pass a
-                // double (or overflow-arm 0 i64) to libc %d (#36386 leftover of #37051).
+            } elseif (\in_array($conv, ['d', 'i', 'u', 'o', 'x', 'b'], true)) {
+                // Integer conversions (incl. PHP %b): zval_get_long / zend_dval_to_lval —
+                // never pass a double (or overflow-arm 0 i64) to libc (#36386 leftover of
+                // #37051 / #37075). php-src formatted_print.c — %b is unsigned bit pattern.
                 $snprintfArgs[] = self::extractSnprintfLongArg($context, $args[$i + 1]);
             } else {
                 $snprintfArgs[] = self::extractSnprintfArg($context, $args[$i + 1], $toFree);
@@ -240,12 +241,12 @@ final class JitSprintf
     }
 
     /**
-     * Promote %d/%i/%u/%o/%x/%X to %lld/… so libc receives zend_long-width args (#36386).
+     * Promote %d/%i/%u/%o/%x/%X/%b to %lld/… so libc receives zend_long-width args (#36386).
      *
      * On LP64, bare `%d` reads a 32-bit int from the vararg; PHP_INT_MIN's low
-     * half is 0 so overflow floats printed as {@code 0}. Length modifiers already
-     * present (`l`/`ll`/`z`/…) are left unchanged. `%c` is not promoted (caller
-     * truncates to i32).
+     * half is 0 so overflow floats printed as {@code 0}. Same for PHP `%b` (C23
+     * `%b` / `%llb` on glibc). Length modifiers already present (`l`/`ll`/`z`/…)
+     * are left unchanged. `%c` is not promoted (caller truncates to i32).
      */
     private static function promoteIntegerConversionsForInt64(string $fmt): string
     {
@@ -296,7 +297,7 @@ final class JitSprintf
             }
             if ($i < $len) {
                 $conv = $fmt[$i];
-                if (!$hadLength && \str_contains('diuoxX', $conv)) {
+                if (!$hadLength && \str_contains('diuoxXb', $conv)) {
                     $out .= 'll';
                 }
                 $out .= $conv;
@@ -317,7 +318,7 @@ final class JitSprintf
     }
 
     /**
-     * Integer snprintf args (%d/%i/%u/%o/%x/%c and `*` width): zval_get_long shape.
+     * Integer snprintf args (%d/%i/%u/%o/%x/%b/%c and `*` width): zval_get_long shape.
      *
      * Overflowable native-long (lazy ±/×/`/` #37051) must not use the overflow-arm
      * dummy i64 0 — coerce the cold f64 via zend_dval_to_lval. Native doubles must
@@ -986,6 +987,22 @@ final class JitSprintf
                 $context->builder->call($context->lookupFunction('__value__writeNull'), $ptr);
                 return;
             case JITVariable::TYPE_NATIVE_LONG:
+                // Lazy ±/×/`/` overflow (#37051): loadValue is the dummy i64 0 on the
+                // overflow arm — materialize to a long/double __value__ so non-const
+                // printf/sprintf (%b/%d/…) via __compiler_sprintf match Zend (#36386).
+                if (
+                    null !== $arg->longArithOverflowFlag
+                    && (null !== $arg->longArithOverflowDoubleSlot
+                        || null !== $arg->longArithOverflowPromoted)
+                ) {
+                    self::writeArg(
+                        $context,
+                        $slot,
+                        JitLongArithOverflow::materializeOverflowableNativeLong($context, $arg)
+                    );
+
+                    return;
+                }
                 JitValueBox::writeLong($context, $slot, $context->helper->loadValue($arg));
                 return;
             case JITVariable::TYPE_NATIVE_DOUBLE:
