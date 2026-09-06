@@ -31,7 +31,10 @@ final class ParseUrlRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ParseUrlRuntime.php');
         $this->assertStringContainsString('ParseUrlJitHelper', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
-        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $assoc = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ParseUrlAssocLlvm.php');
+        $comp = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ParseUrlComponentLlvm.php');
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $assoc);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $comp);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString('new JIT(', $source);
@@ -40,13 +43,17 @@ final class ParseUrlRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('emitParseParts', $source);
         $this->assertStringNotContainsString('__phpc_parse_url_strdup0', $source);
         $this->assertStringContainsString('ParseUrlAssocLlvm', $source);
+        $this->assertStringContainsString('ParseUrlComponentLlvm', $source);
         $this->assertLessThan(300, \substr_count($source, "\n") + 1);
-        $assoc = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ParseUrlAssocLlvm.php');
         $this->assertStringContainsString('setStringKeyString', $assoc);
-        $this->assertStringContainsString('componentString', $assoc);
-        $this->assertStringContainsString('componentInt', $assoc);
+        $this->assertStringContainsString('pathOf', $assoc);
+        $this->assertStringContainsString('schemeOf', $assoc);
+        $this->assertStringNotContainsString('::componentString', $assoc);
+        $this->assertStringNotContainsString('::parseUrlComponent', $assoc);
         $this->assertStringNotContainsString('lastString', $assoc);
         $this->assertLessThan(220, \substr_count($assoc, "\n") + 1);
+        $this->assertStringContainsString('pathOf', $comp);
+        $this->assertStringNotContainsString('::componentString', $comp);
     }
 
     public function testParseUrlJitHelperMatchesVmString(): void

@@ -5913,6 +5913,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/ParseStrNativeOpsJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ParseStrRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ParseUrl.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ParseUrlAssocLlvm.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ParseUrlComponentLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ParseUrlComponentJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ParseUrlRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/PasswordCryptoRuntime.php';

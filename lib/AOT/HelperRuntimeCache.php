@@ -72,14 +72,18 @@ final class HelperRuntimeCache
         // Same TU as sprintfArgv — linking the prelinked unit.o would reintroduce the
         // NestedJIT `$packed[$i+1]` miscompile (#23871) alongside the inlined fix.
         'phpcompiler\\ext\\standard\\sprintfjithelper::numberformat' => true,
-        // #36382 — prelinked ParseUrlJitHelper unit.o returns [] for runtime URL strings
-        // under HELPER_RUNTIME_O=1 (string ABI / TU); NestedJIT of Preg-free VmString::parseUrl
-        // into the user module matches Zend. Slim Uri constructors need this (typed string param).
-        'phpcompiler\\ext\\standard\\parseurljithelper::parseurlcomponent' => true,
-        'phpcompiler\\ext\\standard\\parseurljithelper::componentstring' => true,
-        'phpcompiler\\ext\\standard\\parseurljithelper::componentint' => true,
-        'phpcompiler\\ext\\standard\\parseurljithelper::laststring' => true,
-        'phpcompiler\\ext\\standard\\parseurljithelper::lastint' => true,
+        // #36382 — NestedJIT leaf ParseUrlJitHelper methods into user AOT (not prelinked unit /
+        // not componentString→pathOf dispatcher which SEGVs for runtime URL strings).
+        'phpcompiler\\ext\\standard\\parseurljithelper::schemeof' => true,
+        'phpcompiler\\ext\\standard\\parseurljithelper::hostof' => true,
+        'phpcompiler\\ext\\standard\\parseurljithelper::userof' => true,
+        'phpcompiler\\ext\\standard\\parseurljithelper::passof' => true,
+        'phpcompiler\\ext\\standard\\parseurljithelper::pathof' => true,
+        'phpcompiler\\ext\\standard\\parseurljithelper::queryof' => true,
+        'phpcompiler\\ext\\standard\\parseurljithelper::fragmentof' => true,
+        'phpcompiler\\ext\\standard\\parseurljithelper::portof' => true,
+        'phpcompiler\\ext\\standard\\parseurljithelper::hasuser' => true,
+        'phpcompiler\\ext\\standard\\parseurljithelper::haspass' => true,
         // #36382 — NestedJIT UriRawurlencodeReplaceJitHelper into user AOT (not prelinked unit);
         // IncludeHelper Nyholm Uri sites must not fall through to PregAotFastPath.
         'phpcompiler\\ext\\standard\\urirawurlencodereplacejithelper::replaceargv' => true,
