@@ -5403,6 +5403,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/PropertyAndDimFetchCompile.
 require_once __DIR__.'/../../../lib/Compiler/Concern/InlineCallArgCompileTimeFold.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CallArgCompileTimeValueAndProcOpenFold.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/EchoCoalesceCallArgCompile.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/StmtCoalesceFuncCallArgSyncCompile.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/FirstClassCallableAndClosure.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/ErrorSuppressCallArgProducers.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/FinalizeArrayFamilyCallArgSlots.php';
