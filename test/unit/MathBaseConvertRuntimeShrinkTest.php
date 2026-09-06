@@ -53,7 +53,7 @@ final class MathBaseConvertRuntimeShrinkTest extends TestCase
     public function testMathBaseConvertJitHelperIsNestedJitSafeInline(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/MathBaseConvertJitHelper.php');
-        $this->assertStringContainsString('radixDigitChar', $source);
+        $this->assertStringContainsString('radixDigitPlusOne', $source);
         $this->assertStringContainsString('parseRec', $source);
         $this->assertStringContainsString('substr(', $source);
         $this->assertDoesNotMatchRegularExpression('/VmMath::\w+\s*\(/', $source);

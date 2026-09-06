@@ -14,6 +14,9 @@ namespace PHPCompiler\ext\standard;
  * - Prefer recursion over while/for accumulation — NestedJIT loop induction failed to
  *   advance past the first digit (hexdec("ff") → 15) while unrolled/recursive paths are green.
  * - Bridge must pass `__string__*`.
+ * - Digit encoding is digit+1 / 0=invalid — NestedJIT `$digit < 0` SIGSEGV (#36386).
+ * - Overflow check must not use `(int)(PHP_INT_MAX / $base)` — NestedJIT yields 0 and
+ *   every multi-digit value falsely took the float path (#36386).
  *
  * SSOT algorithm mirrors VmMath::baseToZval / baseConvert.
  * php-src: ext/standard/math.c
@@ -24,7 +27,9 @@ final class MathBaseConvertJitHelper
 
     private static float $lastDouble = 0.0;
 
-    private static bool $lastInvalidChars = false;
+    private static int $lastInvalidChars = 0;
+
+    private static int $parseOverflow = 0;
 
     public static function baseConvert(string $number, int $fromBase, int $toBase): string
     {
@@ -46,7 +51,8 @@ final class MathBaseConvertJitHelper
     /** @return int 0=long result, 1=double result (LLVM i32 ABI) */
     public static function parseBaseToZval(string $str, int $base): int
     {
-        self::$lastInvalidChars = false;
+        self::$lastInvalidChars = 0;
+        self::$parseOverflow = 0;
         self::$lastLong = 0;
         self::$lastDouble = 0.0;
 
@@ -56,7 +62,9 @@ final class MathBaseConvertJitHelper
         $start = self::skipRadixPrefix($str, $start, $end, $base);
 
         $parsed = self::parseRec($str, $start, $end, $base, 0);
-        if ($parsed < 0) {
+        // Post-pass: NestedJIT mid-parse static stores on the invalid-digit arm SIGSEGV (#36386).
+        self::$lastInvalidChars = self::scanInvalid($str, $start, $end, $base);
+        if (1 === self::$parseOverflow) {
             self::$lastDouble = self::floatRec($str, $start, $end, $base, 0.0);
 
             return 1;
@@ -79,7 +87,7 @@ final class MathBaseConvertJitHelper
     /** @return int LLVM i32 ABI — 1 when last parse skipped invalid digits (#24950). */
     public static function lastInvalidChars(): int
     {
-        return self::$lastInvalidChars ? 1 : 0;
+        return 1 === self::$lastInvalidChars ? 1 : 0;
     }
 
     /** @internal test reset */
@@ -87,7 +95,8 @@ final class MathBaseConvertJitHelper
     {
         self::$lastLong = 0;
         self::$lastDouble = 0.0;
-        self::$lastInvalidChars = false;
+        self::$lastInvalidChars = 0;
+        self::$parseOverflow = 0;
     }
 
     private static function skipLeadingSpaces(string $str, int $start, int $len): int
@@ -137,7 +146,7 @@ final class MathBaseConvertJitHelper
     /**
      * Recursive digit walk — NestedJIT-safe (#26884).
      *
-     * @return int accumulated long, or -1 when integer range exhausted (use floatRec)
+     * On range exhaustion sets {@see $parseOverflow} (never returns -1 — #36386).
      */
     private static function parseRec(string $str, int $pos, int $end, int $base, int $num): int
     {
@@ -148,17 +157,18 @@ final class MathBaseConvertJitHelper
         if ($base < 2 || $base > 36) {
             return $num;
         }
-        $digit = self::radixDigitChar(\substr($str, $pos, 1), $base);
-        if ($digit < 0) {
-            self::$lastInvalidChars = true;
-
-            return self::parseRec($str, $pos + 1, $end, $base, $num);
+        $digitPlus = self::radixDigitPlusOne(\substr($str, $pos, 1), $base);
+        if (0 === $digitPlus) {
+            return self::parseRec($str, $pos + 1, $end, $base, $num * 1);
         }
+        $digit = $digitPlus - 1;
 
-        $cutoffDiv = (int) (9223372036854775807 / $base);
-        $cutlim = 9223372036854775807 - $cutoffDiv * $base;
-        if ($num > $cutoffDiv || ($num === $cutoffDiv && $digit > $cutlim)) {
-            return -1;
+        // NestedJIT: `(int)(PHP_INT_MAX / $base)` becomes 0, so every multi-digit
+        // value falsely took the float path and doubleToBase emitted "00" (#36386).
+        if ((float) $num * (float) $base + (float) $digit > 9223372036854775807.0) {
+            self::$parseOverflow = 1;
+
+            return $num * 1;
         }
 
         return self::parseRec($str, $pos + 1, $end, $base, $num * $base + $digit);
@@ -169,14 +179,26 @@ final class MathBaseConvertJitHelper
         if ($pos >= $end) {
             return $fnum;
         }
-        $digit = self::radixDigitChar(\substr($str, $pos, 1), $base);
-        if ($digit < 0) {
-            self::$lastInvalidChars = true;
-
-            return self::floatRec($str, $pos + 1, $end, $base, $fnum);
+        $digitPlus = self::radixDigitPlusOne(\substr($str, $pos, 1), $base);
+        if (0 === $digitPlus) {
+            return self::floatRec($str, $pos + 1, $end, $base, $fnum + 0.0);
         }
+        $digit = $digitPlus - 1;
 
         return self::floatRec($str, $pos + 1, $end, $base, $fnum * (float) $base + (float) $digit);
+    }
+
+    /** @return int 1 when any char is invalid for $base */
+    private static function scanInvalid(string $str, int $pos, int $end, int $base): int
+    {
+        if ($pos >= $end) {
+            return 0;
+        }
+        if (0 === self::radixDigitPlusOne(\substr($str, $pos, 1), $base)) {
+            return 1;
+        }
+
+        return self::scanInvalid($str, $pos + 1, $end, $base);
     }
 
     private static function isSpaceChar(string $c): bool
@@ -184,8 +206,8 @@ final class MathBaseConvertJitHelper
         return ' ' === $c || "\t" === $c || "\n" === $c || "\r" === $c || "\v" === $c || "\f" === $c;
     }
 
-    /** @return int digit or -1 when invalid for $base */
-    private static function radixDigitChar(string $c, int $base): int
+    /** @return int 0=invalid; else digit+1 (1..36). NestedJIT-safe (#36386). */
+    private static function radixDigitPlusOne(string $c, int $base): int
     {
         if ('0' === $c) {
             $digit = 0;
@@ -260,10 +282,14 @@ final class MathBaseConvertJitHelper
         } elseif ('Z' === $c || 'z' === $c) {
             $digit = 35;
         } else {
-            return -1;
+            return 0;
         }
 
-        return $digit < $base ? $digit : -1;
+        if ($digit >= $base) {
+            return 0;
+        }
+
+        return $digit + 1;
     }
 
     private static function longToBase(int $arg, int $base): string
@@ -283,7 +309,7 @@ final class MathBaseConvertJitHelper
         $digits = '0123456789abcdefghijklmnopqrstuvwxyz';
         $out = '';
         while ($n > 0) {
-            $out = $digits[$n % $base].$out;
+            $out = \substr($digits, $n % $base, 1).$out;
             $n = (int) ($n / $base);
         }
 
@@ -319,13 +345,10 @@ final class MathBaseConvertJitHelper
         while ($fvalue >= 1.0) {
             $whole = (int) ($fvalue / (float) $base);
             $digit = (int) ($fvalue - ((float) $whole) * (float) $base);
-            if ($digit < 0) {
-                $digit = 0;
-            }
             if ($digit >= $base) {
                 $digit = $base - 1;
             }
-            $buf = $digits[$digit].$buf;
+            $buf = \substr($digits, $digit, 1).$buf;
             $fvalue = $fvalue / (float) $base;
         }
 
