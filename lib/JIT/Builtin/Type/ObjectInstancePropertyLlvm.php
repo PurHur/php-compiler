@@ -97,6 +97,31 @@ final class ObjectInstancePropertyLlvm
         $context = $object->jitContext();
         $className = $object->classNameForId($classId);
         $classLc = strtolower(ltrim($class, '\\'));
+        // Trait methods compile with `$this` typed as the trait. Trait-local slot indices
+        // are not the composing-class layout: RequestTrait::$uri at trait slot N aliases
+        // MessageTrait's N-th property on the composed object (Nyholm Request abort; #36382).
+        // Always resolve against the composing class when known — including properties that
+        // *are* declared on this trait (the prior !$hasProp-only redirect was incomplete).
+        // php-src: Zend/zend_inheritance.c zend_do_traits_property_binding
+        if ($object->isTraitClass($classLc)) {
+            $composing = $context->scope->traitComposingClassName ?? '';
+            if (!\is_string($composing) || '' === $composing) {
+                $composing = $context->scope->className ?? '';
+            }
+            if (\is_string($composing) && '' !== $composing
+                && !$object->isTraitClass(strtolower(ltrim($composing, '\\')))) {
+                $compId = $object->lookup($composing);
+
+                return self::propertyFetchDeclaredSlot(
+                    $object,
+                    $obj,
+                    $composing,
+                    $name,
+                    $compId,
+                    $forWrite
+                );
+            }
+        }
         // CFG often collapses `$b = new B` receivers to generic "object" on later reads while
         // unset still resolved B — defining an untyped slot on the synthetic object ClassEntry
         // skipped TypedPropertyUninitGuard (empty/garbage after unset; #34382 / #33886).
@@ -133,25 +158,8 @@ final class ObjectInstancePropertyLlvm
             // RequestTrait → MessageTrait::$headers). Never invent a trait-owned slot:
             // that falsifies composition (#36382) and, after compose, steals stores away
             // from the composing class layout when methods are lowered onto C::method.
+            // (Composing-class redirect above already handled the common flatten path.)
             if ($object->isTraitClass($classLcForTrait)) {
-                $context = $object->jitContext();
-                $composing = $context->scope->traitComposingClassName ?? '';
-                if (!\is_string($composing) || '' === $composing) {
-                    $composing = $context->scope->className ?? '';
-                }
-                if (\is_string($composing) && '' !== $composing
-                    && !$object->isTraitClass(strtolower(ltrim($composing, '\\')))) {
-                    $compId = $object->lookup($composing);
-
-                    return self::propertyFetchDeclaredSlot(
-                        $object,
-                        $obj,
-                        $composing,
-                        $name,
-                        $compId,
-                        $forWrite
-                    );
-                }
                 $runtimeFetch = self::tryPropertyFetchByRuntimeClass($object, $obj, $name, $forWrite);
                 if (null !== $runtimeFetch) {
                     return $runtimeFetch;
