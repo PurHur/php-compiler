@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8298 |
-| Phase A inventory files (M2 ratio SSOT) | 8298 |
+| PHP files on vm.php path | 8299 |
+| Phase A inventory files (M2 ratio SSOT) | 8299 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26189 |
+| Source constructs flagged (warnings) | 26191 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7074,7 +7074,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/CompileBlockInternal.php` | 0 | 2 |
 | `lib/JIT/Concern/CompileBlockPhpLoweringAndClosurePrep.php` | 0 | 7 |
 | `lib/JIT/Concern/CompileCast.php` | 0 | 2 |
-| `lib/JIT/Concern/CompileClassAndTraitUses.php` | 0 | 4 |
+| `lib/JIT/Concern/CompileClassAndTraitUses.php` | 0 | 2 |
 | `lib/JIT/Concern/CompileClassConstFetch.php` | 0 | 4 |
 | `lib/JIT/Concern/CompileCoalesce.php` | 0 | 2 |
 | `lib/JIT/Concern/CompileConcat.php` | 0 | 7 |
@@ -7105,6 +7105,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/CompileScriptMagicIncludeClone.php` | 0 | 3 |
 | `lib/JIT/Concern/CompileSkippedOpcodeVmAndCfgBranchStubs.php` | 0 | 4 |
 | `lib/JIT/Concern/CompileStaticPropertyAndUnset.php` | 0 | 2 |
+| `lib/JIT/Concern/CompileTraitUsesWithAdaptations.php` | 0 | 4 |
 | `lib/JIT/Concern/CompileTryCatchThrow.php` | 0 | 2 |
 | `lib/JIT/Concern/CompileTypeAssertAndErrorSilence.php` | 0 | 2 |
 | `lib/JIT/Concern/CompileYield.php` | 0 | 2 |
@@ -58184,10 +58185,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Concern/CompileClassAndTraitUses.php`
 
 **Warnings** (review for bootstrap subset):
-- trait CompileClassAndTraitUses (line 19)
-- new CompileError (line 874)
-- new CompileError (line 1038)
-- 9 class method(s)
+- trait CompileClassAndTraitUses (line 18)
+- 1 class method(s)
 
 ### `lib/JIT/Concern/CompileClassConstFetch.php`
 
@@ -58425,6 +58424,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - trait CompileStaticPropertyAndUnset (line 22)
 - 1 class method(s)
+
+### `lib/JIT/Concern/CompileTraitUsesWithAdaptations.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CompileTraitUsesWithAdaptations (line 19)
+- new CompileError (line 278)
+- new CompileError (line 442)
+- 8 class method(s)
 
 ### `lib/JIT/Concern/CompileTryCatchThrow.php`
 
@@ -60574,7 +60581,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/SpineChunkRuntimeMethodDemote.php`
 
 **Warnings** (review for bootstrap subset):
-- new OpCode (line 269)
+- new OpCode (line 270)
 - 11 class method(s)
 
 ### `lib/JIT/SpineChunkStandardHelperBind.php`
