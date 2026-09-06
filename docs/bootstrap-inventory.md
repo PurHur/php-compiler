@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8332 |
-| Phase A inventory files (M2 ratio SSOT) | 8332 |
+| PHP files on vm.php path | 8333 |
+| Phase A inventory files (M2 ratio SSOT) | 8333 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26261 |
+| Source constructs flagged (warnings) | 26263 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -49123,13 +49123,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 880)
-- new CompileFatal (line 914)
-- new CompileError (line 917)
-- new ClassCompileRegistry (line 958)
-- new AttributeClassRegistry (line 959)
-- new ClassCompileRegistry (line 1067)
-- new AttributeClassRegistry (line 1068)
+- new CompileFatal (line 883)
+- new CompileFatal (line 917)
+- new CompileError (line 920)
+- new ClassCompileRegistry (line 961)
+- new AttributeClassRegistry (line 962)
+- new ClassCompileRegistry (line 1070)
+- new AttributeClassRegistry (line 1071)
 - 26 class method(s)
 - 1 closure(s)
 
