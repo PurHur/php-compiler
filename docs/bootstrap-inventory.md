@@ -5603,6 +5603,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/FinalSiblingInlineCallArgSendSlot.php` | 0 | 2 |
 | `lib/Compiler/Concern/FinalizeArrayFamilyCallArgSlots.php` | 0 | 5 |
 | `lib/Compiler/Concern/FindInlineCallArgProducerSlot.php` | 0 | 3 |
+| `lib/Compiler/Concern/FindInlineExprCallArgProducerSlot.php` | 0 | 2 |
 | `lib/Compiler/Concern/FirstClassCallableAndClosure.php` | 0 | 14 |
 | `lib/Compiler/Concern/FirstSiblingInlineFuncCallProducerIndex.php` | 0 | 2 |
 | `lib/Compiler/Concern/FunctionStaticAndCompileTimeLiterals.php` | 0 | 15 |
@@ -49924,9 +49925,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/FindInlineCallArgProducerSlot.php`
 
 **Warnings** (review for bootstrap subset):
-- trait FindInlineCallArgProducerSlot (line 29)
-- 27 class method(s)
+- trait FindInlineCallArgProducerSlot (line 30)
+- 26 class method(s)
 - 4 closure(s)
+
+### `lib/Compiler/Concern/FindInlineExprCallArgProducerSlot.php`
+
+**Warnings** (review for bootstrap subset):
+- trait FindInlineExprCallArgProducerSlot (line 24)
+- 1 class method(s)
 
 ### `lib/Compiler/Concern/FirstClassCallableAndClosure.php`
 

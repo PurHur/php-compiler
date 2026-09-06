@@ -5687,6 +5687,7 @@
         "lib/Compiler/Concern/FinalSiblingInlineCallArgSendSlot.php",
         "lib/Compiler/Concern/FinalizeArrayFamilyCallArgSlots.php",
         "lib/Compiler/Concern/FindInlineCallArgProducerSlot.php",
+        "lib/Compiler/Concern/FindInlineExprCallArgProducerSlot.php",
         "lib/Compiler/Concern/FirstClassCallableAndClosure.php",
         "lib/Compiler/Concern/FirstSiblingInlineFuncCallProducerIndex.php",
         "lib/Compiler/Concern/FunctionStaticAndCompileTimeLiterals.php",
