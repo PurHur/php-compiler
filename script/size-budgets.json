@@ -9,9 +9,9 @@
             "note": "Concern trait splits (#36230/#36387/#36403); CompileFuncCfgReturnAndGlobalImport + peers"
         },
         "lib/JIT.php": {
-            "budget": 254,
+            "budget": 256,
             "target": 20000,
-            "note": "Concern trait splits (#36387/#36403); CompileDeclareGlobalConst + CompileTryCatchThrow + peers"
+            "note": "Concern trait splits (#36387/#36403); CompileObjectPropertyConcatPowAndFlatten + CompileDeclareGlobalConst + peers"
         },
         "lib/VM.php": {
             "budget": 17422,
