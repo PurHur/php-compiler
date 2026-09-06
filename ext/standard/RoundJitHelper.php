@@ -12,7 +12,9 @@ namespace PHPCompiler\ext\standard;
  * HALF_UP → {@code llvm.round.f64}, HALF_DOWN/EVEN/ODD → trunc+select,
  * CEILING → {@code llvm.ceil.f64}, FLOOR → {@code llvm.floor.f64},
  * TOWARD_ZERO → {@code llvm.trunc.f64}, AWAY_FROM_ZERO → ceil(|x|) with sign.
- * This helper remains for non-zero places and NestedJIT-safe reference.
+ * Compile-time places≠0 + directed modes scale+unscale through the same
+ * places=0 LLVM path ({@see \PHPCompiler\ext\standard\JitRound}). This helper
+ * remains for runtime-unknown places and NestedJIT-safe reference.
  *
  * Same-class only (peer AbsJitHelper). Avoid `\is_finite`/`\floor`/`\ceil`/`\abs`/`\fmod`
  * — NestedJIT re-enters *JitHelper bridges (gdb: isfiniteargv ↔ phpc_is_finite).

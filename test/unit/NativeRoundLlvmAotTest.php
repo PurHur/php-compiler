@@ -273,4 +273,85 @@ final class NativeRoundLlvmAotTest extends TestCase
             @unlink($bin);
         }
     }
+
+    public function testRoundPlacesTwoDirectedModesScaleWithoutHelperBridge(): void
+    {
+        // places≠0 + directed modes: scale → places=0 LLVM → unscale (#36386).
+        // Mode ints: 2=HALF_DOWN 3=HALF_EVEN 4=HALF_ODD 5=CEILING 6=FLOOR.
+        // Use values where f64 scale matches Zend (avoid 1.235*100 cliff).
+        $src = <<<'PHP'
+        <?php
+        declare(strict_types=1);
+        function work(float $x): void {
+            echo round($x, 2, 2), "\n";
+            echo round($x, 2, 3), "\n";
+            echo round($x, 2, 4), "\n";
+            echo round($x, 2, 5), "\n";
+            echo round($x, 2, 6), "\n";
+        }
+        work(2.675);
+        work(1.234);
+        work(-2.675);
+        PHP;
+        $path = sys_get_temp_dir().'/phpc_round_p2_'.getmypid().'.php';
+        $bin = sys_get_temp_dir().'/phpc_round_p2_'.getmypid().'.bin';
+        file_put_contents($path, $src);
+        try {
+            putenv('PHP_COMPILER_DUMP_IR=1');
+            putenv('PHP_COMPILER_CACHE=0');
+            $cmd = escapeshellarg(PHP_BINARY).' '
+                .escapeshellarg(__DIR__.'/../../bin/compile.php').' -o '
+                .escapeshellarg($bin).' '.escapeshellarg($path).' 2>&1';
+            exec($cmd, $out, $rc);
+            $this->assertSame(0, $rc, implode("\n", $out));
+            $ll = (string) file_get_contents('/tmp/phpc-last.ll');
+
+            $sig = null;
+            if (preg_match('/define void @work\([^\)]*\)/', $ll, $m)) {
+                $sig = $m[0];
+            }
+            $this->assertNotNull($sig, 'missing define void @work');
+            $fnStart = strpos($ll, $sig);
+            $this->assertNotFalse($fnStart);
+            $fnEnd = strpos($ll, "\ndefine ", $fnStart + 1);
+            $body = false === $fnEnd ? substr($ll, $fnStart) : substr($ll, $fnStart, $fnEnd - $fnStart);
+
+            $this->assertMatchesRegularExpression('/fmul double/', $body);
+            $this->assertMatchesRegularExpression('/fdiv double/', $body);
+            $this->assertMatchesRegularExpression('/call double @llvm\.trunc\.f64\(/', $body);
+            $this->assertMatchesRegularExpression('/call double @llvm\.ceil\.f64\(/', $body);
+            $this->assertMatchesRegularExpression('/call double @llvm\.floor\.f64\(/', $body);
+            $this->assertStringNotContainsString('round_bridge_entry', $body);
+            $this->assertStringNotContainsString('RoundJitHelper', $body);
+            $this->assertStringNotContainsString('call double @phpc_round(', $body);
+            $this->assertStringNotContainsString('phpc_jit_has_throw_pending', $body);
+
+            exec(escapeshellarg($bin), $runOut, $runRc);
+            $this->assertSame(0, $runRc, 'AOT binary must not segfault');
+            $this->assertCount(15, $runOut);
+            // 2.675 → 267.5: HD=267 HE=268 HO=267 CEIL=268 FLOOR=267
+            $this->assertEqualsWithDelta(2.67, (float) $runOut[0], 1e-12);
+            $this->assertEqualsWithDelta(2.68, (float) $runOut[1], 1e-12);
+            $this->assertEqualsWithDelta(2.67, (float) $runOut[2], 1e-12);
+            $this->assertEqualsWithDelta(2.68, (float) $runOut[3], 1e-12);
+            $this->assertEqualsWithDelta(2.67, (float) $runOut[4], 1e-12);
+            // 1.234 → 123.4: all → 1.23 except CEIL still 1.24? ceil(123.4)=124 → 1.24
+            $this->assertEqualsWithDelta(1.23, (float) $runOut[5], 1e-12);
+            $this->assertEqualsWithDelta(1.23, (float) $runOut[6], 1e-12);
+            $this->assertEqualsWithDelta(1.23, (float) $runOut[7], 1e-12);
+            $this->assertEqualsWithDelta(1.24, (float) $runOut[8], 1e-12);
+            $this->assertEqualsWithDelta(1.23, (float) $runOut[9], 1e-12);
+            // -2.675 → -267.5: HD=-267 HE=-268 HO=-267 CEIL=-267 FLOOR=-268
+            $this->assertEqualsWithDelta(-2.67, (float) $runOut[10], 1e-12);
+            $this->assertEqualsWithDelta(-2.68, (float) $runOut[11], 1e-12);
+            $this->assertEqualsWithDelta(-2.67, (float) $runOut[12], 1e-12);
+            $this->assertEqualsWithDelta(-2.67, (float) $runOut[13], 1e-12);
+            $this->assertEqualsWithDelta(-2.68, (float) $runOut[14], 1e-12);
+        } finally {
+            putenv('PHP_COMPILER_DUMP_IR');
+            putenv('PHP_COMPILER_CACHE');
+            @unlink($path);
+            @unlink($bin);
+        }
+    }
 }
