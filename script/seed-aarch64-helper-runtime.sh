@@ -161,6 +161,17 @@ SEED_UNITS=(
   /ext/standard/TimeJitHelper.php
   /ext/standard/TimezoneLocationJitHelper.php
   /ext/standard/HrtimeJitHelper.php
+  # Network / host / process / dns tier (#36391 after #37089)
+  /ext/standard/CheckdnsrrJitHelper.php
+  /ext/standard/GethostbyaddrJitHelper.php
+  /ext/standard/GetHeadersJitHelper.php
+  /ext/standard/GethostnameJitHelper.php
+  /ext/standard/GetmypidJitHelper.php
+  /ext/standard/GetrusageJitHelper.php
+  /ext/standard/GetoptJitHelper.php
+  /ext/standard/InetJitHelper.php
+  /ext/standard/FtokJitHelper.php
+  /ext/standard/FnmatchJitHelper.php
 )
 
 MIN_SEED=${#SEED_UNITS[@]}
