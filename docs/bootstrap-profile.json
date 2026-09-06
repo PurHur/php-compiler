@@ -5732,6 +5732,7 @@
         "lib/Compiler/Concern/SlotForCallArgResolvers.php",
         "lib/Compiler/Concern/SlotForInlineClosureAndFirstClassCallableCallArgResolvers.php",
         "lib/Compiler/Concern/SlotForPropertyClassConstAndClosureBindCallArgResolvers.php",
+        "lib/Compiler/Concern/StaticMethodAndFuncCallCompile.php",
         "lib/Compiler/Concern/StmtLevelSideEffectAndEmittedCallGuards.php",
         "lib/Compiler/Concern/SubstrNestedHaystackAndMethodOrStaticCallInitSlots.php",
         "lib/Compiler/Concern/TernaryAndLogicalShortCircuit.php",
@@ -8587,9 +8588,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8352,
+        "inventory_files": 8354,
         "excluded": 0,
-        "eligible": 8352,
+        "eligible": 8354,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
