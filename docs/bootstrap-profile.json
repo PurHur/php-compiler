@@ -8090,6 +8090,7 @@
         "lib/VM/CompareJitHelperScalars.php",
         "lib/VM/CompareStringableHelper.php",
         "lib/VM/CompareUnlikeHelper.php",
+        "lib/VM/Concern/BuiltinHostExceptionDispatch.php",
         "lib/VM/Concern/ClassInheritDefineAndConstDeclare.php",
         "lib/VM/Concern/ClassTraitComposition.php",
         "lib/VM/Concern/ExecuteIncDecAndScopeOperandRead.php",
@@ -8585,9 +8586,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8351,
+        "inventory_files": 8352,
         "excluded": 0,
-        "eligible": 8351,
+        "eligible": 8352,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
