@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8332 |
-| Phase A inventory files (M2 ratio SSOT) | 8332 |
+| PHP files on vm.php path | 8333 |
+| Phase A inventory files (M2 ratio SSOT) | 8333 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26261 |
+| Source constructs flagged (warnings) | 26263 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5563,7 +5563,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/ClassConstVisibilityInheritCheck.php` | 0 | 3 |
 | `lib/Compiler/ClosureUseDuplicateCompileCheck.php` | 0 | 1 |
 | `lib/Compiler/CompileFatal.php` | 0 | 2 |
-| `lib/Compiler/Concern/AdjacentNestedCallArgSlots.php` | 0 | 3 |
+| `lib/Compiler/Concern/AdjacentNestedCallArgSlots.php` | 0 | 2 |
 | `lib/Compiler/Concern/CallAndArrayLiteralCompile.php` | 0 | 31 |
 | `lib/Compiler/Concern/CfgProducerIndexAndRematerialize.php` | 0 | 2 |
 | `lib/Compiler/Concern/CfgTypeShapeAndDeclaredAssert.php` | 0 | 11 |
@@ -5609,6 +5609,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/HoistedEnumAndChainedInlineCallArgProducers.php` | 0 | 2 |
 | `lib/Compiler/Concern/HoistedMultiArgSiblingFuncCallChain.php` | 0 | 2 |
 | `lib/Compiler/Concern/HoistedSiblingFeedAndArrayKeysArgSendRewire.php` | 0 | 2 |
+| `lib/Compiler/Concern/HoistedUnaryAssignAndInlineProducerCallArgSlots.php` | 0 | 3 |
 | `lib/Compiler/Concern/InlineCallArgClosureFeedsAndReturnProducers.php` | 0 | 2 |
 | `lib/Compiler/Concern/InlineCallArgCompileTimeFold.php` | 0 | 9 |
 | `lib/Compiler/Concern/InlineCallArgProducerMatch.php` | 0 | 3 |
@@ -49122,13 +49123,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 880)
-- new CompileFatal (line 914)
-- new CompileError (line 917)
-- new ClassCompileRegistry (line 958)
-- new AttributeClassRegistry (line 959)
-- new ClassCompileRegistry (line 1067)
-- new AttributeClassRegistry (line 1068)
+- new CompileFatal (line 883)
+- new CompileFatal (line 917)
+- new CompileError (line 920)
+- new ClassCompileRegistry (line 961)
+- new AttributeClassRegistry (line 962)
+- new ClassCompileRegistry (line 1070)
+- new AttributeClassRegistry (line 1071)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -49248,9 +49249,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/AdjacentNestedCallArgSlots.php`
 
 **Warnings** (review for bootstrap subset):
-- trait AdjacentNestedCallArgSlots (line 26)
-- 37 class method(s)
-- 1 closure(s)
+- trait AdjacentNestedCallArgSlots (line 27)
+- 29 class method(s)
 
 ### `lib/Compiler/Concern/CallAndArrayLiteralCompile.php`
 
@@ -49988,6 +49988,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - trait HoistedSiblingFeedAndArrayKeysArgSendRewire (line 37)
 - 13 class method(s)
+
+### `lib/Compiler/Concern/HoistedUnaryAssignAndInlineProducerCallArgSlots.php`
+
+**Warnings** (review for bootstrap subset):
+- trait HoistedUnaryAssignAndInlineProducerCallArgSlots (line 24)
+- 8 class method(s)
+- 1 closure(s)
 
 ### `lib/Compiler/Concern/InlineCallArgClosureFeedsAndReturnProducers.php`
 
