@@ -1,25 +1,25 @@
 {
-  "generated_by": "script/status/snapshot.php",
-  "issue": 36395,
-  "generated_at": "2026-09-06T18:56:48Z",
-  "spine": 8344,
-  "inventory": 8344,
-  "builtins_matrix_rows": 4054,
-  "builtins_vm_yes": 4021,
-  "builtins_jit_yes": 1883,
-  "builtins_aot_yes": 1737,
-  "differential_cases": 343,
-  "apps_packages": 12,
-  "apps_ready": 1,
-  "vm_driver_probe_ms_target": 20,
-  "ci_green_streak_days": 3,
-  "last_green_master_sha": "1e817dac050a6bb7641c752dfbd4e5da254833cf",
-  "notes": {
-    "m3_helloworld": "emit_path=native via gen-0 argv helper (#22178); BOOTSTRAP_M3_REQUIRE_NATIVE_EMIT refuses sidecar COPY (#21860/#36146)",
-    "m4_honesty": "BOOTSTRAP_M4_REQUIRE_NATIVE_EMIT=1 refuses sidecar COPY (#36146); default bootstrap-loop-probe may exit 2 when degraded",
-    "m5_fast": "Daily gate: make north-star5-verify-fast (do not claim pass/fail without a run receipt)",
-    "m5_strict": "make north-star5-verify ARGS=--strict before merging bootstrap/gen-0/vendor work",
-    "ci": "Remote GitHub Actions are not the merge gate; verify with Docker scripts on disk",
-    "ci_streak": "docs/ci-streak.json via script/status/ci-streak.php (#36401); advance only after verified local green"
-  }
+    "generated_by": "script/status/snapshot.php",
+    "issue": 36395,
+    "generated_at": "2026-09-06T19:24:03Z",
+    "spine": 8344,
+    "inventory": 8344,
+    "builtins_matrix_rows": 4054,
+    "builtins_vm_yes": 4021,
+    "builtins_jit_yes": 1883,
+    "builtins_aot_yes": 1737,
+    "differential_cases": 343,
+    "apps_packages": 12,
+    "apps_ready": 1,
+    "vm_driver_probe_ms_target": 20,
+    "ci_green_streak_days": 3,
+    "last_green_master_sha": "469a884205e5c89b72925ef1b5ed11d47d09641d",
+    "notes": {
+        "m3_helloworld": "emit_path=native via gen-0 argv helper (#22178); BOOTSTRAP_M3_REQUIRE_NATIVE_EMIT refuses sidecar COPY (#21860/#36146)",
+        "m4_honesty": "BOOTSTRAP_M4_REQUIRE_NATIVE_EMIT=1 refuses sidecar COPY (#36146); default bootstrap-loop-probe may exit 2 when degraded",
+        "m5_fast": "Daily gate: make north-star5-verify-fast (do not claim pass/fail without a run receipt)",
+        "m5_strict": "make north-star5-verify ARGS=--strict before merging bootstrap/gen-0/vendor work",
+        "ci": "Remote GitHub Actions are not the merge gate; verify with Docker scripts on disk",
+        "ci_streak": "docs/ci-streak.json via script/status/ci-streak.php (#36401); advance only after verified local green"
+    }
 }
