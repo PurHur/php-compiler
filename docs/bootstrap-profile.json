@@ -5655,11 +5655,14 @@
         "lib/Compiler/Concern/CoalesceAndNullsafe.php",
         "lib/Compiler/Concern/CoalesceLeftAndEchoConcatPreludes.php",
         "lib/Compiler/Concern/CompileCallArgSends.php",
+        "lib/Compiler/Concern/CompileClassBodyAndTraitAdaptations.php",
         "lib/Compiler/Concern/CompileClassConstFoldAndTypedReject.php",
         "lib/Compiler/Concern/CompileFuncCfgReturnAndGlobalImport.php",
         "lib/Compiler/Concern/CompileInlineSpecializedCallArgSends.php",
         "lib/Compiler/Concern/CompileInterfaceTraitEnumAndMethodDecl.php",
         "lib/Compiler/Concern/CompileOpsTicksAndCfgSplit.php",
+        "lib/Compiler/Concern/CompileParamFunctionAndStmtDispatch.php",
+        "lib/Compiler/Concern/CompilePromotedPropertyAndParamDefaults.php",
         "lib/Compiler/Concern/CompileTimeFold.php",
         "lib/Compiler/Concern/DeferredSiblingAndArrayMapNullCallArgProducers.php",
         "lib/Compiler/Concern/DimAndPropertyWriteContext.php",
@@ -8542,9 +8545,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8308,
+        "inventory_files": 8311,
         "excluded": 0,
-        "eligible": 8308,
+        "eligible": 8311,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
