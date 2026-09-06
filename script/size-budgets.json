@@ -4,9 +4,9 @@
     "done_when_ceiling": 25000,
     "files": {
         "lib/Compiler.php": {
-            "budget": 1142,
+            "budget": 1148,
             "target": 20000,
-            "note": "Concern trait splits (#36230/#36387/#36403); RewireArithmeticBranchSubstrEnumAndSiblingMultiArgCallArgSendSlots + RewireInlineBitmaskNestedFileAndVarExportFlagCallArgSendSlots + ExplodeIteratorChunkWalkAndTrailingComparatorCallArgSends + peers"
+"note": "Concern trait splits (#36230/#36387/#36403); RewireHoistedPreludePregCombineAndVarExportCallArgSendSlots + ArrayPadUnpackExtractAndDateSunCallArgSends + RewireArithmeticBranchSubstrEnumAndSiblingMultiArgCallArgSendSlots + peers"
         },
         "lib/JIT.php": {
             "budget": 274,
@@ -14,9 +14,9 @@
             "note": "Concern trait splits (#36387/#36403); DateTimeMutationAndUnserializeMeta + TernaryPhiReturnMerge + peers"
         },
         "lib/VM.php": {
-            "budget": 17422,
+            "budget": 16545,
             "target": 15000,
-            "note": "ExecuteIncDecAndScopeOperandRead + TypedIntRecursiveAndCountedLoopFastPath + PropertyFetchDestAndHookedDimWrite + ObjectPropertyMagicAndClone + ClassTraitComposition + ObjectPropertyReadonlyAndVisibility + Hooks + CollectAndSerialize + IssetEmptyUnset Concern extracts (#36403); toward 15k target"
+            "note": "TryCatchFinallyAndUncaughtDispatch + ExecuteIncDecAndScopeOperandRead + TypedIntRecursiveAndCountedLoopFastPath + PropertyFetchDestAndHookedDimWrite + ObjectPropertyMagicAndClone + ClassTraitComposition + ObjectPropertyReadonlyAndVisibility + Hooks + CollectAndSerialize + IssetEmptyUnset Concern extracts (#36403); toward 15k target"
         },
         "script/apply-patches.sh": {
             "budget": 7637,
