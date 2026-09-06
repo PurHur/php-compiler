@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8300 |
-| Phase A inventory files (M2 ratio SSOT) | 8300 |
+| PHP files on vm.php path | 8301 |
+| Phase A inventory files (M2 ratio SSOT) | 8301 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26192 |
+| Source constructs flagged (warnings) | 26194 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7064,7 +7064,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/CallResultOperandAssign.php` | 0 | 17 |
 | `lib/JIT/Concern/ClassConstEnumAndFunctionStatic.php` | 0 | 9 |
 | `lib/JIT/Concern/ClosureThisAndStaticScopeResolve.php` | 0 | 2 |
-| `lib/JIT/Concern/CoerceReturnPropertyDeclaringAndByRef.php` | 0 | 3 |
+| `lib/JIT/Concern/CoerceReturnPropertyDeclaringAndByRef.php` | 0 | 2 |
 | `lib/JIT/Concern/CompileArgRecv.php` | 0 | 2 |
 | `lib/JIT/Concern/CompileArgSend.php` | 0 | 2 |
 | `lib/JIT/Concern/CompileArrayDimFetchReadAndWrite.php` | 0 | 7 |
@@ -7131,6 +7131,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/M3M4M5CompileDriverEmitPolicy.php` | 0 | 4 |
 | `lib/JIT/Concern/NestedVmHelperAndThisResolve.php` | 0 | 5 |
 | `lib/JIT/Concern/ParamConstraintsAndRuntimeNewInit.php` | 0 | 3 |
+| `lib/JIT/Concern/PropertyDeclaringClassResolve.php` | 0 | 3 |
 | `lib/JIT/Concern/PropertyFetchCoalesceAndCompileTimeString.php` | 0 | 6 |
 | `lib/JIT/Concern/PropertyIncDecCompile.php` | 0 | 19 |
 | `lib/JIT/Concern/ResolveJitOutgoingCall.php` | 0 | 2 |
@@ -50738,13 +50739,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ArrayWalkLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 234)
-- new Variable (line 461)
-- new Variable (line 470)
-- new NestedClosureInvoke (line 485)
-- new Variable (line 496)
-- new Variable (line 508)
-- new NestedClosureInvoke (line 523)
+- new Variable (line 236)
+- new Variable (line 463)
+- new Variable (line 472)
+- new NestedClosureInvoke (line 487)
+- new Variable (line 498)
+- new Variable (line 510)
+- new NestedClosureInvoke (line 525)
 - 16 class method(s)
 - 4 closure(s)
 
@@ -58111,8 +58112,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - trait CoerceReturnPropertyDeclaringAndByRef (line 20)
-- new Operand\Literal (line 834)
-- 41 class method(s)
+- 31 class method(s)
 
 ### `lib/JIT/Concern/CompileArgRecv.php`
 
@@ -58628,6 +58628,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - trait ParamConstraintsAndRuntimeNewInit (line 21)
 - new Operand\Literal (line 140)
 - 11 class method(s)
+
+### `lib/JIT/Concern/PropertyDeclaringClassResolve.php`
+
+**Warnings** (review for bootstrap subset):
+- trait PropertyDeclaringClassResolve (line 22)
+- new Operand\Literal (line 135)
+- 10 class method(s)
 
 ### `lib/JIT/Concern/PropertyFetchCoalesceAndCompileTimeString.php`
 
@@ -60587,7 +60594,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/SpineChunkRuntimeMethodDemote.php`
 
 **Warnings** (review for bootstrap subset):
-- new OpCode (line 270)
+- new OpCode (line 271)
 - 11 class method(s)
 
 ### `lib/JIT/SpineChunkStandardHelperBind.php`
