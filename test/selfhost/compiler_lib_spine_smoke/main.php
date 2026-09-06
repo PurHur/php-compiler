@@ -5364,6 +5364,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/FindInlineCallArgProducerSl
 require_once __DIR__.'/../../../lib/Compiler/Concern/FindInlineExprCallArgProducerSlot.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/NestedIifeAndDeferredSiblingCallArgProducers.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/PrecedingInlineCallArgProducers.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/PrecedingInlineDeadVoidAndDimFetchCallArgSlots.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/SiblingMultiArgFuncCallProducerDetect.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/FirstSiblingInlineFuncCallProducerIndex.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/HoistedMultiArgSiblingFuncCallChain.php';
