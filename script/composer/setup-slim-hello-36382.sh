@@ -97,6 +97,21 @@ if [[ -f "$RC" ]]; then
   php "$ROOT/script/composer/patch-slim-route-collector-36382.php" "$RC"
 fi
 
+RR="$DEST/vendor/slim/slim/Slim/Routing/RouteResolver.php"
+if [[ -f "$RR" ]]; then
+  php "$ROOT/script/composer/patch-slim-route-resolver-36382.php" "$RR"
+fi
+
+RCP="$DEST/vendor/slim/slim/Slim/Routing/RouteCollectorProxy.php"
+if [[ -f "$RCP" ]]; then
+  php "$ROOT/script/composer/patch-slim-route-collector-proxy-36382.php" "$RCP"
+fi
+
+APP="$DEST/vendor/slim/slim/Slim/App.php"
+if [[ -f "$APP" ]]; then
+  php "$ROOT/script/composer/patch-slim-app-36382.php" "$APP"
+fi
+
 AF="$DEST/vendor/slim/slim/Slim/Factory/AppFactory.php"
 if [[ -f "$AF" ]]; then
   php "$ROOT/script/composer/patch-slim-appfactory-36382.php" "$AF"
@@ -115,6 +130,11 @@ fi
 SRCF="$DEST/vendor/slim/slim/Slim/Factory/ServerRequestCreatorFactory.php"
 if [[ -f "$SRCF" ]]; then
   php "$ROOT/script/composer/patch-slim-server-request-creator-factory-36382.php" "$SRCF"
+fi
+
+FR="$DEST/vendor/nikic/fast-route/src/functions.php"
+if [[ -f "$FR" ]]; then
+  php "$ROOT/script/composer/patch-fastroute-options-plus-36382.php" "$FR"
 fi
 
 echo "Created $DEST ($(find "$DEST" -name '*.php' | wc -l) php files)"
