@@ -50,6 +50,21 @@ trait CoerceReturnPropertyDeclaringAndByRef
 
     private function coerceReturnValue(Variable $return, PHPLLVM\Value $retval, ?string $expected): PHPLLVM\Value
     {
+        // Overflowable native-long ±/×/`/` must box before ABI coerce — writeLong of the
+        // i64 phi would return 0 on the promote arm (#36386 / leftover of #37051).
+        if (
+            null !== $return->longArithOverflowFlag
+            && (null !== $return->longArithOverflowDoubleSlot || null !== $return->longArithOverflowPromoted)
+            && Variable::TYPE_NATIVE_LONG === $return->type
+            && (
+                '__value__*' === $expected
+                || '__value__' === $expected
+                || null === $expected
+            )
+        ) {
+            $return = JIT\JitLongArithOverflow::materializeOverflowableNativeLong($this->context, $return);
+            $retval = $this->context->helper->loadValue($return);
+        }
         if ('__object__*' === $expected && Variable::TYPE_OBJECT === $return->type) {
             return $retval;
         }
