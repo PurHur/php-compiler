@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8333 |
-| Phase A inventory files (M2 ratio SSOT) | 8333 |
+| PHP files on vm.php path | 8334 |
+| Phase A inventory files (M2 ratio SSOT) | 8334 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26263 |
+| Source constructs flagged (warnings) | 26265 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5603,6 +5603,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/FinalSiblingInlineCallArgSendSlot.php` | 0 | 2 |
 | `lib/Compiler/Concern/FinalizeArrayFamilyCallArgSlots.php` | 0 | 5 |
 | `lib/Compiler/Concern/FindInlineCallArgProducerSlot.php` | 0 | 3 |
+| `lib/Compiler/Concern/FindInlineExprCallArgProducerSlot.php` | 0 | 2 |
 | `lib/Compiler/Concern/FirstClassCallableAndClosure.php` | 0 | 14 |
 | `lib/Compiler/Concern/FirstSiblingInlineFuncCallProducerIndex.php` | 0 | 2 |
 | `lib/Compiler/Concern/FunctionStaticAndCompileTimeLiterals.php` | 0 | 15 |
@@ -49123,13 +49124,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 883)
-- new CompileFatal (line 917)
-- new CompileError (line 920)
-- new ClassCompileRegistry (line 961)
-- new AttributeClassRegistry (line 962)
-- new ClassCompileRegistry (line 1070)
-- new AttributeClassRegistry (line 1071)
+- new CompileFatal (line 886)
+- new CompileFatal (line 920)
+- new CompileError (line 923)
+- new ClassCompileRegistry (line 964)
+- new AttributeClassRegistry (line 965)
+- new ClassCompileRegistry (line 1073)
+- new AttributeClassRegistry (line 1074)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -49924,9 +49925,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/FindInlineCallArgProducerSlot.php`
 
 **Warnings** (review for bootstrap subset):
-- trait FindInlineCallArgProducerSlot (line 29)
-- 27 class method(s)
+- trait FindInlineCallArgProducerSlot (line 30)
+- 26 class method(s)
 - 4 closure(s)
+
+### `lib/Compiler/Concern/FindInlineExprCallArgProducerSlot.php`
+
+**Warnings** (review for bootstrap subset):
+- trait FindInlineExprCallArgProducerSlot (line 24)
+- 1 class method(s)
 
 ### `lib/Compiler/Concern/FirstClassCallableAndClosure.php`
 

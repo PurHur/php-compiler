@@ -5687,6 +5687,7 @@
         "lib/Compiler/Concern/FinalSiblingInlineCallArgSendSlot.php",
         "lib/Compiler/Concern/FinalizeArrayFamilyCallArgSlots.php",
         "lib/Compiler/Concern/FindInlineCallArgProducerSlot.php",
+        "lib/Compiler/Concern/FindInlineExprCallArgProducerSlot.php",
         "lib/Compiler/Concern/FirstClassCallableAndClosure.php",
         "lib/Compiler/Concern/FirstSiblingInlineFuncCallProducerIndex.php",
         "lib/Compiler/Concern/FunctionStaticAndCompileTimeLiterals.php",
@@ -8567,9 +8568,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8333,
+        "inventory_files": 8334,
         "excluded": 0,
-        "eligible": 8333,
+        "eligible": 8334,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
