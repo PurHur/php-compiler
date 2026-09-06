@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8346 |
-| Phase A inventory files (M2 ratio SSOT) | 8346 |
+| PHP files on vm.php path | 8347 |
+| Phase A inventory files (M2 ratio SSOT) | 8347 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26290 |
+| Source constructs flagged (warnings) | 26292 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5643,6 +5643,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/SiblingInlineFuncCallProducers.php` | 0 | 1 |
 | `lib/Compiler/Concern/SiblingMultiArgFuncCallProducerDetect.php` | 0 | 2 |
 | `lib/Compiler/Concern/SlotForCallArgResolvers.php` | 0 | 5 |
+| `lib/Compiler/Concern/SlotForInlineClosureAndFirstClassCallableCallArgResolvers.php` | 0 | 2 |
 | `lib/Compiler/Concern/StmtLevelSideEffectAndEmittedCallGuards.php` | 0 | 2 |
 | `lib/Compiler/Concern/SubstrNestedHaystackAndMethodOrStaticCallInitSlots.php` | 0 | 2 |
 | `lib/Compiler/Concern/TernaryAndLogicalShortCircuit.php` | 0 | 5 |
@@ -49136,13 +49137,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 919)
-- new CompileFatal (line 953)
-- new CompileError (line 956)
-- new ClassCompileRegistry (line 997)
-- new AttributeClassRegistry (line 998)
-- new ClassCompileRegistry (line 1106)
-- new AttributeClassRegistry (line 1107)
+- new CompileFatal (line 922)
+- new CompileFatal (line 956)
+- new CompileError (line 959)
+- new ClassCompileRegistry (line 1000)
+- new AttributeClassRegistry (line 1001)
+- new ClassCompileRegistry (line 1109)
+- new AttributeClassRegistry (line 1110)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -50265,7 +50266,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Operand\Temporary (line 176)
 - new Operand\Temporary (line 215)
 - new Temporary (line 470)
-- 35 class method(s)
+- 27 class method(s)
+
+### `lib/Compiler/Concern/SlotForInlineClosureAndFirstClassCallableCallArgResolvers.php`
+
+**Warnings** (review for bootstrap subset):
+- trait SlotForInlineClosureAndFirstClassCallableCallArgResolvers (line 26)
+- 8 class method(s)
 
 ### `lib/Compiler/Concern/StmtLevelSideEffectAndEmittedCallGuards.php`
 
@@ -58270,27 +58277,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - trait AssignOperand (line 27)
-- new Variable (line 134)
-- new Variable (line 166)
-- new Variable (line 197)
-- new Variable (line 264)
-- new Type (line 299)
-- new Variable (line 393)
-- new Variable (line 435)
-- new Variable (line 461)
-- new Variable (line 724)
-- new Variable (line 742)
-- new Type (line 789)
-- new Variable (line 810)
-- new Variable (line 844)
-- new Variable (line 910)
-- new Variable (line 954)
-- new Variable (line 988)
-- new Type (line 1492)
-- new Variable (line 1639)
-- new Variable (line 1903)
-- new Type (line 1915)
-- new Type (line 2222)
+- new Variable (line 151)
+- new Variable (line 183)
+- new Variable (line 227)
+- new Variable (line 294)
+- new Type (line 329)
+- new Variable (line 423)
+- new Variable (line 465)
+- new Variable (line 491)
+- new Variable (line 754)
+- new Variable (line 772)
+- new Type (line 819)
+- new Variable (line 840)
+- new Variable (line 874)
+- new Variable (line 940)
+- new Variable (line 984)
+- new Variable (line 1018)
+- new Type (line 1537)
+- new Variable (line 1684)
+- new Variable (line 1948)
+- new Type (line 1960)
+- new Type (line 2267)
 - 1 class method(s)
 - 1 closure(s)
 
@@ -59955,17 +59962,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 252)
 - new Variable (line 256)
 - new Variable (line 258)
-- new Variable (line 2534)
-- new Variable (line 2538)
-- new Variable (line 2774)
-- new Variable (line 2786)
-- new Variable (line 2936)
-- new Variable (line 3027)
-- new Variable (line 3081)
-- new Variable (line 3301)
-- new Variable (line 3317)
-- new Variable (line 3339)
-- new Variable (line 3350)
+- new Variable (line 2553)
+- new Variable (line 2557)
+- new Variable (line 2793)
+- new Variable (line 2805)
+- new Variable (line 2955)
+- new Variable (line 3046)
+- new Variable (line 3100)
+- new Variable (line 3320)
+- new Variable (line 3336)
+- new Variable (line 3358)
+- new Variable (line 3369)
 - 24 class method(s)
 - 8 closure(s)
 
@@ -60163,16 +60170,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 45)
 - new Variable (line 53)
 - new Variable (line 112)
-- new Variable (line 179)
+- new Variable (line 187)
 - 10 class method(s)
 
 ### `lib/JIT/JitLongDiv.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 32)
-- new Variable (line 40)
-- new Variable (line 60)
-- new DivisionByZeroError (line 141)
+- new Variable (line 34)
+- new Variable (line 42)
+- new Variable (line 116)
+- new DivisionByZeroError (line 201)
 - 5 class method(s)
 
 ### `lib/JIT/JitMemoryUsageArg.php`
@@ -60763,20 +60770,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ScalarReturnCheck.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 96)
-- new Variable (line 225)
-- new Variable (line 235)
-- new Variable (line 280)
-- new Variable (line 296)
-- new Variable (line 303)
-- new Variable (line 392)
-- new Variable (line 413)
-- new Variable (line 428)
-- new Variable (line 447)
-- new Variable (line 455)
-- new Variable (line 462)
-- new Variable (line 490)
-- new Variable (line 510)
+- new Variable (line 129)
+- new Variable (line 258)
+- new Variable (line 268)
+- new Variable (line 313)
+- new Variable (line 329)
+- new Variable (line 336)
+- new Variable (line 425)
+- new Variable (line 446)
+- new Variable (line 461)
+- new Variable (line 480)
+- new Variable (line 488)
+- new Variable (line 495)
+- new Variable (line 523)
+- new Variable (line 543)
 - 12 class method(s)
 
 ### `lib/JIT/ScopeBuiltinDefinedLlvm.php`
