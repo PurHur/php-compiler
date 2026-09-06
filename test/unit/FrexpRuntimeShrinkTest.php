@@ -9,26 +9,31 @@ use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
 /**
- * frexp() NestedJIT via JitVmHelperLink::ensureCompiled (#22575 / #29156 / peer #28716).
+ * Internal frexp AOT uses libm frexp(3) (#36386);
+ * FrexpJitHelper remains NestedJIT-safe reference (peer MathLdexp / LdexpJitHelper).
+ * Userland frexp() was a phantom vs php-src and was unregistered (#24133).
+ * LLVM 9 has no llvm.frexp.f64 in the shapes we use.
+ *
+ * php-src: ext/standard/math.c PHP_FUNCTION(frexp) → C frexp(3).
  */
 final class FrexpRuntimeShrinkTest extends TestCase
 {
-    public function testFrexpUsesJitHelperNotLibcLookup(): void
+    public function testFrexpUsesLibmNotHelperBridge(): void
     {
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/frexp.php');
         $this->assertStringContainsString('MathFrexp::invoke', $builtin);
         $this->assertStringNotContainsString("lookupFunction('frexp')", $builtin);
 
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathFrexp.php');
-        $this->assertStringContainsString('FrexpJitHelper', $bridge);
+        $this->assertStringContainsString("LIBC_FREXP = 'frexp'", $bridge);
         $this->assertStringContainsString('phpc_frexp', $bridge);
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $bridge);
-        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $bridge);
-        $this->assertStringNotContainsString('NestedJitCompileScope::run', $bridge);
-        $this->assertStringNotContainsString('parseAndCompile', $bridge);
-        $this->assertStringNotContainsString('new JIT(', $bridge);
-        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $bridge);
+        $this->assertStringContainsString('frexp_libm_f64_entry', $bridge);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureCompiled', $bridge);
+        $this->assertStringNotContainsString('FrexpJitHelper', $bridge);
+        $this->assertStringNotContainsString('NestedJitCompileScope', $bridge);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
+        $this->assertStringNotContainsString('llvm.frexp', $bridge);
     }
 
     public function testFrexpJitHelperInlinesNestedJitSafePeel(): void
@@ -92,7 +97,13 @@ final class FrexpRuntimeShrinkTest extends TestCase
         $this->assertLessThan(1.0, $maxFrac);
     }
 
-    public function testSpineBundleIncludesFrexpJitHelper(): void
+    public function testLibcExternNoLongerDeclaresFrexp(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/LibcExtern.php');
+        $this->assertStringNotContainsString("'frexp'", $source);
+    }
+
+    public function testSpineBundleIncludesFrexpHelperWithoutUserlandRegistration(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('FrexpJitHelper.php', $spine);
