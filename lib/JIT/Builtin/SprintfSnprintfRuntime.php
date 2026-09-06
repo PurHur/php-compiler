@@ -230,8 +230,8 @@ final class SprintfSnprintfRuntime
         $dbl = $context->builder->call($context->lookupFunction('__value__readDouble'), $entry);
         // Default to zend_gcvt stringify. Only pass a double to libc when the conversion
         // is clearly floating (fFeEgGaA) — %s + double is SIGSEGV (#33010).
-        // Integer conversions (d/i/u/o/x/X/c) must zend_dval_to_lval first (#36386) —
-        // passing IEEE bits / a char* to libc %d prints 0.
+        // Integer conversions (d/i/u/o/x/X/c/b) must zend_dval_to_lval first (#36386) —
+        // passing IEEE bits / a char* to libc %d/%b prints 0.
         $fmt0 = $context->builder->load($fmtNul);
         $pScan = $context->builder->alloca($charPtr);
         $context->builder->store($context->builder->gep($fmtNul, $i64->constInt(1, false)), $pScan);
@@ -285,7 +285,10 @@ final class SprintfSnprintfRuntime
                             $context->builder->icmp(Builder::INT_EQ, $sc, $i8->constInt(ord('x'), false)),
                             $context->builder->or(
                                 $context->builder->icmp(Builder::INT_EQ, $sc, $i8->constInt(ord('X'), false)),
-                                $context->builder->icmp(Builder::INT_EQ, $sc, $i8->constInt(ord('c'), false))
+                                $context->builder->or(
+                                    $context->builder->icmp(Builder::INT_EQ, $sc, $i8->constInt(ord('c'), false)),
+                                    $context->builder->icmp(Builder::INT_EQ, $sc, $i8->constInt(ord('b'), false))
+                                )
                             )
                         )
                     )
@@ -538,7 +541,7 @@ final class SprintfSnprintfRuntime
     }
 
     /**
-     * Copy format inserting {@code ll} before bare {@code d/i/u/o/x/X} (#36386).
+     * Copy format inserting {@code ll} before bare {@code d/i/u/o/x/X/b} (#36386).
      * Returns a malloc'd NUL-terminated string; caller must {@code __mm__free}.
      */
     private static function ensureFormatPromoteLl(Context $context): void
@@ -737,7 +740,10 @@ final class SprintfSnprintfRuntime
                         $context->builder->icmp(Builder::INT_EQ, $sch2, $i8->constInt(ord('o'), false)),
                         $context->builder->or(
                             $context->builder->icmp(Builder::INT_EQ, $sch2, $i8->constInt(ord('x'), false)),
-                            $context->builder->icmp(Builder::INT_EQ, $sch2, $i8->constInt(ord('X'), false))
+                            $context->builder->or(
+                                $context->builder->icmp(Builder::INT_EQ, $sch2, $i8->constInt(ord('X'), false)),
+                                $context->builder->icmp(Builder::INT_EQ, $sch2, $i8->constInt(ord('b'), false))
+                            )
                         )
                     )
                 )
