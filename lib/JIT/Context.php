@@ -531,6 +531,17 @@ class Context {
      */
     public array $gotoResumeHandlers = [];
 
+    /**
+     * Deferred {@see Call\RuntimeIndirectClosureCall} bodies — filled at seal with the full
+     * `{closure}_N` proxy set so IncludeHelper mid-graph invokes see entry-script closures (#36382).
+     *
+     * @var list<array{func: \PHPLLVM\Value\Function_, closureClassId: int, nargs: int, candidates: array<string, Call>}>
+     */
+    public array $pendingRuntimeIndirectClosureDispatches = [];
+
+    /** True while {@see Call\RuntimeIndirectClosureCall::materializePending} fills deferred bodies. */
+    public bool $materializingRuntimeIndirectClosureDispatch = false;
+
     /** ?? / ?-> result operands that must receive branch assigns even when php-cfg marks them dead (#99, #3219). */
     public \SplObjectStorage $coalesceAssignTargets;
 
@@ -3840,6 +3851,7 @@ class Context {
         }
         $this->registerAotDebugSourceGlobal();
         Progress::noteFunction('jit_context_compile_common_phase_seal_functions');
+        Call\RuntimeIndirectClosureCall::materializePending($this);
         TryCatchHelper::materializeAllPendingGotoResumeHandlers($this);
         $function = $this->module->getFirstFunction();
         while (null !== $function) {
