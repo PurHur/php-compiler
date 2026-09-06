@@ -13,24 +13,36 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * Assoc parse_url HT via parseUrlComponent + componentString/Int (#27078, #33226, #36382).
+ * Assoc parse_url HT via leaf ParseUrlJitHelper methods (#27078, #33226, #36382).
+ *
+ * Do not NestedJIT-call ParseUrlJitHelper componentString / parseUrlComponent dispatchers:
+ * those nest into pathOf and SEGV under thin AOT (stack / epilogue) for runtime URL strings —
+ * while direct pathOf is fine (#36382).
  *
  * NestedJIT array returns / static string field copies are unsafe under thin AOT.
  * Emitted under {@see ParseUrlRuntime} {@see BasicBlockHelper::scopeLoweringToFunction} (#27211).
  */
 final class ParseUrlAssocLlvm
 {
-    private const COMPONENT = 'PHPCompiler\\ext\\standard\\ParseUrlJitHelper::parseUrlComponent';
+    private const SCHEME = 'PHPCompiler\\ext\\standard\\ParseUrlJitHelper::schemeOf';
 
-    private const COMPONENT_STRING = 'PHPCompiler\\ext\\standard\\ParseUrlJitHelper::componentString';
+    private const HOST = 'PHPCompiler\\ext\\standard\\ParseUrlJitHelper::hostOf';
 
-    private const COMPONENT_INT = 'PHPCompiler\\ext\\standard\\ParseUrlJitHelper::componentInt';
+    private const USER = 'PHPCompiler\\ext\\standard\\ParseUrlJitHelper::userOf';
 
-    private const TAG_FALSE = 0;
+    private const PASS = 'PHPCompiler\\ext\\standard\\ParseUrlJitHelper::passOf';
 
-    private const TAG_STRING = 2;
+    private const PATH = 'PHPCompiler\\ext\\standard\\ParseUrlJitHelper::pathOf';
 
-    private const TAG_INT = 3;
+    private const QUERY = 'PHPCompiler\\ext\\standard\\ParseUrlJitHelper::queryOf';
+
+    private const FRAGMENT = 'PHPCompiler\\ext\\standard\\ParseUrlJitHelper::fragmentOf';
+
+    private const PORT = 'PHPCompiler\\ext\\standard\\ParseUrlJitHelper::portOf';
+
+    private const HAS_USER = 'PHPCompiler\\ext\\standard\\ParseUrlJitHelper::hasUser';
+
+    private const HAS_PASS = 'PHPCompiler\\ext\\standard\\ParseUrlJitHelper::hasPass';
 
     public static function implement(Context $context, LlvmFunction $fn): void
     {
@@ -50,133 +62,103 @@ final class ParseUrlAssocLlvm
         $context->builder->returnVoid();
 
         $context->builder->positionAtEnd($bodyBb);
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $schemeTag = self::componentTag($context, $url, \PHP_URL_SCHEME);
-        $falseBb = BasicBlockHelper::append($context, 'pua_false');
-        $storeBb = BasicBlockHelper::append($context, 'pua_store');
-        $doneBb = BasicBlockHelper::append($context, 'pua_done');
-        $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_EQ, $schemeTag, $i32->constInt(self::TAG_FALSE, false)),
-            $falseBb,
-            $storeBb
-        );
-        $context->builder->positionAtEnd($falseBb);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeBool'),
-            $out,
-            $i32->constInt(0, false)
-        );
-        $context->builder->branch($doneBb);
-
-        $context->builder->positionAtEnd($storeBb);
         $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
-        self::storeString($context, $fn, $ht, $url, 'scheme', $schemeTag, \PHP_URL_SCHEME);
-        foreach (
-            [
-                ['host', \PHP_URL_HOST, false],
-                ['port', \PHP_URL_PORT, true],
-                ['user', \PHP_URL_USER, false],
-                ['pass', \PHP_URL_PASS, false],
-                ['path', \PHP_URL_PATH, false],
-                ['query', \PHP_URL_QUERY, false],
-                ['fragment', \PHP_URL_FRAGMENT, false],
-            ] as [$key, $comp, $wantInt]
-        ) {
-            $tag = self::componentTag($context, $url, $comp);
-            if ($wantInt) {
-                self::storeLong($context, $fn, $ht, $url, $key, $tag, $comp);
-            } else {
-                self::storeString($context, $fn, $ht, $url, $key, $tag, $comp);
-            }
-        }
+        self::storeNonEmptyString($context, $fn, $ht, $url, 'scheme', self::SCHEME);
+        self::storeNonEmptyString($context, $fn, $ht, $url, 'host', self::HOST);
+        self::storePort($context, $fn, $ht, $url);
+        self::storePresentUserPass($context, $fn, $ht, $url, 'user', self::HAS_USER, self::USER);
+        self::storePresentUserPass($context, $fn, $ht, $url, 'pass', self::HAS_PASS, self::PASS);
+        self::storeNonEmptyString($context, $fn, $ht, $url, 'path', self::PATH);
+        self::storeNonEmptyString($context, $fn, $ht, $url, 'query', self::QUERY);
+        self::storeNonEmptyString($context, $fn, $ht, $url, 'fragment', self::FRAGMENT);
         $context->builder->call($context->lookupFunction('__value__writeHashtable'), $out, $ht);
-        $context->builder->branch($doneBb);
-        $context->builder->positionAtEnd($doneBb);
         $context->builder->returnVoid();
     }
 
-    private static function componentTag(Context $context, Value $url, int $comp): Value
-    {
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-
-        return $context->builder->trunc(
-            JitNestedHelperCoerce::extractLongFromHelperResult(
-                $context,
-                JitNestedHelperCoerce::callHelper(
-                    $context,
-                    self::helper($context, self::COMPONENT),
-                    [$url, $i32->constInt($comp, false)]
-                ),
-                $i64
-            ),
-            $i32
-        );
-    }
-
-    private static function storeString(
+    private static function storeNonEmptyString(
         Context $context,
         LlvmFunction $fn,
         Value $ht,
         Value $url,
         string $key,
-        Value $tagI32,
-        int $comp
+        string $logical
     ): void {
-        $i32 = $context->getTypeFromString('int32');
+        $str = JitNestedHelperCoerce::extractStringPtrFromHelperResult(
+            $context,
+            JitNestedHelperCoerce::callHelper($context, self::helper($context, $logical), [$url])
+        );
+        $len = $context->builder->call($context->lookupFunction('__string__strlen'), $str);
+        $i64 = $context->getTypeFromString('int64');
         $setBb = $fn->appendBasicBlock('pua_str_'.$key);
         $skipBb = $fn->appendBasicBlock('pua_str_skip_'.$key);
         $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_EQ, $tagI32, $i32->constInt(self::TAG_STRING, false)),
-            $setBb,
-            $skipBb
+            $context->builder->icmp(Builder::INT_EQ, $len, $i64->constInt(0, false)),
+            $skipBb,
+            $setBb
         );
         $context->builder->positionAtEnd($setBb);
-        $strRaw = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helper($context, self::COMPONENT_STRING),
-            [$url, $i32->constInt($comp, false)]
-        );
         $context->builder->call(
             $context->lookupFunction('__hashtable__setStringKeyString'),
             $ht,
             $context->builder->load($context->constantStringFromString($key)),
-            JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $strRaw)
+            $str
         );
         $context->builder->branch($skipBb);
         $context->builder->positionAtEnd($skipBb);
     }
 
-    private static function storeLong(
+    private static function storePort(Context $context, LlvmFunction $fn, Value $ht, Value $url): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $port = JitNestedHelperCoerce::extractLongFromHelperResult(
+            $context,
+            JitNestedHelperCoerce::callHelper($context, self::helper($context, self::PORT), [$url]),
+            $i64
+        );
+        $setBb = $fn->appendBasicBlock('pua_long_port');
+        $skipBb = $fn->appendBasicBlock('pua_long_skip_port');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_SLT, $port, $i64->constInt(0, true)),
+            $skipBb,
+            $setBb
+        );
+        $context->builder->positionAtEnd($setBb);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyLong'),
+            $ht,
+            $context->builder->load($context->constantStringFromString('port')),
+            $port
+        );
+        $context->builder->branch($skipBb);
+        $context->builder->positionAtEnd($skipBb);
+    }
+
+    private static function storePresentUserPass(
         Context $context,
         LlvmFunction $fn,
         Value $ht,
         Value $url,
         string $key,
-        Value $tagI32,
-        int $comp
+        string $hasLogical,
+        string $valueLogical
     ): void {
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $setBb = $fn->appendBasicBlock('pua_long_'.$key);
-        $skipBb = $fn->appendBasicBlock('pua_long_skip_'.$key);
-        $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_EQ, $tagI32, $i32->constInt(self::TAG_INT, false)),
-            $setBb,
-            $skipBb
-        );
-        $context->builder->positionAtEnd($setBb);
-        $intRaw = JitNestedHelperCoerce::callHelper(
+        $has = JitNestedHelperCoerce::extractBoolFromHelperResult(
             $context,
-            self::helper($context, self::COMPONENT_INT),
-            [$url, $i32->constInt($comp, false)]
+            JitNestedHelperCoerce::callHelper($context, self::helper($context, $hasLogical), [$url])
+        );
+        $setBb = $fn->appendBasicBlock('pua_str_'.$key);
+        $skipBb = $fn->appendBasicBlock('pua_str_skip_'.$key);
+        $context->builder->branchIf($has, $setBb, $skipBb);
+        $context->builder->positionAtEnd($setBb);
+        $str = JitNestedHelperCoerce::extractStringPtrFromHelperResult(
+            $context,
+            JitNestedHelperCoerce::callHelper($context, self::helper($context, $valueLogical), [$url])
         );
         $context->builder->call(
-            $context->lookupFunction('__hashtable__setStringKeyLong'),
+            $context->lookupFunction('__hashtable__setStringKeyString'),
             $ht,
             $context->builder->load($context->constantStringFromString($key)),
-            JitNestedHelperCoerce::extractLongFromHelperResult($context, $intRaw, $i64)
+            $str
         );
         $context->builder->branch($skipBb);
         $context->builder->positionAtEnd($skipBb);
