@@ -9,9 +9,9 @@
             "note": "Concern trait splits (#36230/#36387/#36403); CompileInterfaceTraitEnumAndMethodDecl + peers"
         },
         "lib/JIT.php": {
-            "budget": 272,
+            "budget": 274,
             "target": 20000,
-            "note": "Concern trait splits (#36387/#36403); TernaryPhiReturnMerge + CompileTimeStringFoldAndPromote + peers"
+            "note": "Concern trait splits (#36387/#36403); DateTimeMutationAndUnserializeMeta + TernaryPhiReturnMerge + peers"
         },
         "lib/VM.php": {
             "budget": 17422,

@@ -65,6 +65,7 @@ require_once __DIR__.'/JIT/Concern/CompileIncDecAndConcatFlatten.php';
 require_once __DIR__.'/JIT/Concern/CompileIncDecValueBoxAndWarnings.php';
 require_once __DIR__.'/JIT/Concern/CompileObjectPropertyConcatPowAndFlatten.php';
 require_once __DIR__.'/JIT/Concern/DateTimeConstructAndMutationMeta.php';
+require_once __DIR__.'/JIT/Concern/DateTimeMutationAndUnserializeMeta.php';
 require_once __DIR__.'/JIT/Concern/DomCompileTimeTagMeta.php';
 require_once __DIR__.'/JIT/Concern/PropertyDeclaringClassResolve.php';
 require_once __DIR__.'/JIT/Concern/CoerceReturnPropertyDeclaringAndByRef.php';
@@ -178,6 +179,7 @@ class JIT {
     use CompileIncDecValueBoxAndWarnings;
     use CompileObjectPropertyConcatPowAndFlatten;
     use DateTimeConstructAndMutationMeta;
+    use DateTimeMutationAndUnserializeMeta;
     use DomCompileTimeTagMeta;
     use PropertyDeclaringClassResolve;
     use CoerceReturnPropertyDeclaringAndByRef;
