@@ -4,9 +4,9 @@
     "done_when_ceiling": 25000,
     "files": {
         "lib/Compiler.php": {
-            "budget": 1052,
+            "budget": 1055,
             "target": 20000,
-            "note": "Concern trait splits (#36230/#36387/#36403); CompileParamTypedDefaultAndDeprecation + CompileClassLikeDeclAndScope + CfgTypeShapeAndDeclaredAssert + peers"
+            "note": "Concern trait splits (#36230/#36387/#36403); CompileReservedNamesPseudoClassAndClassConst + CompileParamTypedDefaultAndDeprecation + peers"
         },
         "lib/JIT.php": {
             "budget": 274,
