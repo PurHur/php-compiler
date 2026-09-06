@@ -237,6 +237,69 @@ final class ComposerVendorMapTest extends TestCase
     }
 
     /**
+     * Unused methods still feed AutoloadDiscovery (#36382 Slim App addErrorMiddleware).
+     * A hello entry that never calls addError* still pulled Error* and Logger units until the
+     * fixture strip patch removed those method CFGs.
+     */
+    public function testAutoloadDiscoveryWalksUnusedMethodNewExpressions(): void
+    {
+        $dir = sys_get_temp_dir().'/phpc_unused_mw_'.bin2hex(random_bytes(4));
+        $this->assertTrue(mkdir($dir.'/src', 0777, true));
+        try {
+            file_put_contents(
+                $dir.'/src/ErrorLike.php',
+                "<?php\nnamespace Disc;\nclass ErrorLike {}\n"
+            );
+            file_put_contents(
+                $dir.'/src/App.php',
+                "<?php\nnamespace Disc;\nclass App {\n"
+                ."    public function handle(): void {}\n"
+                ."    public function addError(): ErrorLike {\n"
+                ."        return new ErrorLike();\n"
+                ."    }\n"
+                ."}\n"
+            );
+            file_put_contents(
+                $dir.'/entry.php',
+                "<?php\n\$a = new Disc\\App();\n\$a->handle();\n"
+            );
+            file_put_contents(
+                $dir.'/phpc.json',
+                json_encode([
+                    'entry' => 'entry.php',
+                    'binary' => '.phpc/bin/app',
+                    'autoload' => [
+                        'psr-4' => ['Disc\\' => 'src/'],
+                    ],
+                ], JSON_THROW_ON_ERROR)
+            );
+
+            $with = ProjectGraph::resolve($dir);
+            $this->assertSame([], $with['errors'], implode("\n", $with['errors']));
+            $withRels = array_map('basename', $with['files']);
+            $this->assertContains(
+                'ErrorLike.php',
+                $withRels,
+                'unused addError() new ErrorLike must expand the graph: '.implode(',', $withRels)
+            );
+
+            file_put_contents(
+                $dir.'/src/App.php',
+                "<?php\nnamespace Disc;\nclass App {\n"
+                ."    public function handle(): void {}\n"
+                ."}\n"
+            );
+            $without = ProjectGraph::resolve($dir);
+            $this->assertSame([], $without['errors'], implode("\n", $without['errors']));
+            $withoutRels = array_map('basename', $without['files']);
+            $this->assertNotContains('ErrorLike.php', $withoutRels);
+            $this->assertContains('App.php', $withoutRels);
+        } finally {
+            $this->removeTree($dir);
+        }
+    }
+
+    /**
      * Soft FQCN defaults for uninstalled optional packages must not fail the graph (#36382).
      * Slim lists Slim\Psr7 / Guzzle / … string backends under the Slim\ prefix.
      */

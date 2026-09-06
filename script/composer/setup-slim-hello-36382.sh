@@ -110,6 +110,7 @@ fi
 APP="$DEST/vendor/slim/slim/Slim/App.php"
 if [[ -f "$APP" ]]; then
   php "$ROOT/script/composer/patch-slim-app-36382.php" "$APP"
+  php "$ROOT/script/composer/patch-slim-app-strip-unused-mw-36382.php" "$APP"
 fi
 
 AF="$DEST/vendor/slim/slim/Slim/Factory/AppFactory.php"
