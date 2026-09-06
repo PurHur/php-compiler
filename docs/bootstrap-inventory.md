@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8319 |
-| Phase A inventory files (M2 ratio SSOT) | 8319 |
+| PHP files on vm.php path | 8320 |
+| Phase A inventory files (M2 ratio SSOT) | 8320 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26234 |
+| Source constructs flagged (warnings) | 26236 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5586,8 +5586,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/CompilePseudoClassScopeAndConst.php` | 0 | 6 |
 | `lib/Compiler/Concern/CompileReservedNamesPseudoClassAndClassConst.php` | 0 | 2 |
 | `lib/Compiler/Concern/CompileTimeClassConstFetchFold.php` | 0 | 22 |
-| `lib/Compiler/Concern/CompileTimeFold.php` | 0 | 25 |
+| `lib/Compiler/Concern/CompileTimeFold.php` | 0 | 12 |
 | `lib/Compiler/Concern/CompileTimeGlobalConstAndDefineFold.php` | 0 | 16 |
+| `lib/Compiler/Concern/CompileTimeUnaryBinaryAndCastFold.php` | 0 | 15 |
 | `lib/Compiler/Concern/DeferredSiblingAndArrayMapNullCallArgProducers.php` | 0 | 2 |
 | `lib/Compiler/Concern/DimAndPropertyWriteContext.php` | 0 | 2 |
 | `lib/Compiler/Concern/EchoCoalesceCallArgCompile.php` | 0 | 11 |
@@ -49109,13 +49110,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 841)
-- new CompileFatal (line 875)
-- new CompileError (line 878)
-- new ClassCompileRegistry (line 919)
-- new AttributeClassRegistry (line 920)
-- new ClassCompileRegistry (line 1028)
-- new AttributeClassRegistry (line 1029)
+- new CompileFatal (line 844)
+- new CompileFatal (line 878)
+- new CompileError (line 881)
+- new ClassCompileRegistry (line 922)
+- new AttributeClassRegistry (line 923)
+- new ClassCompileRegistry (line 1031)
+- new AttributeClassRegistry (line 1032)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -49668,31 +49669,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/CompileTimeFold.php`
 
 **Warnings** (review for bootstrap subset):
-- trait CompileTimeFold (line 27)
-- new Op\Type\Literal (line 34)
-- new Op\Expr\Param (line 35)
-- new Operand\Literal (line 36)
-- new Op\Type\Mixed_ (line 37)
-- new Variable (line 168)
-- new Variable (line 322)
-- new Variable (line 332)
+- trait CompileTimeFold (line 21)
+- new Op\Type\Literal (line 28)
+- new Op\Expr\Param (line 29)
+- new Operand\Literal (line 30)
+- new Op\Type\Mixed_ (line 31)
+- new Variable (line 162)
+- new Variable (line 316)
+- new Variable (line 326)
+- new Variable (line 336)
 - new Variable (line 342)
-- new Variable (line 348)
-- new Variable (line 397)
-- new Variable (line 437)
-- new Variable (line 453)
-- new ClassEntry (line 458)
-- new ObjectEntry (line 460)
-- new Variable (line 484)
-- new Variable (line 543)
-- new Variable (line 576)
-- new Variable (line 607)
-- new Variable (line 621)
-- new Variable (line 666)
-- new Variable (line 671)
-- new Variable (line 789)
-- new Variable (line 796)
-- 18 class method(s)
+- new Variable (line 391)
+- 8 class method(s)
 
 ### `lib/Compiler/Concern/CompileTimeGlobalConstAndDefineFold.php`
 
@@ -49713,6 +49701,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 174)
 - new Variable (line 329)
 - 11 class method(s)
+
+### `lib/Compiler/Concern/CompileTimeUnaryBinaryAndCastFold.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CompileTimeUnaryBinaryAndCastFold (line 25)
+- new Variable (line 61)
+- new Variable (line 77)
+- new ClassEntry (line 82)
+- new ObjectEntry (line 84)
+- new Variable (line 108)
+- new Variable (line 167)
+- new Variable (line 200)
+- new Variable (line 231)
+- new Variable (line 245)
+- new Variable (line 290)
+- new Variable (line 295)
+- new Variable (line 413)
+- new Variable (line 420)
+- 10 class method(s)
 
 ### `lib/Compiler/Concern/DeferredSiblingAndArrayMapNullCallArgProducers.php`
 
