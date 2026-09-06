@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 8344 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26288 |
+| Source constructs flagged (warnings) | 26287 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7280,7 +7280,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/JitIncDec.php` | 0 | 6 |
 | `lib/JIT/JitIterableArg.php` | 0 | 2 |
 | `lib/JIT/JitLongArg.php` | 0 | 1 |
-| `lib/JIT/JitLongArithOverflow.php` | 0 | 6 |
+| `lib/JIT/JitLongArithOverflow.php` | 0 | 5 |
 | `lib/JIT/JitLongDiv.php` | 0 | 5 |
 | `lib/JIT/JitMemoryUsageArg.php` | 0 | 1 |
 | `lib/JIT/JitNativeMethodReturn.php` | 0 | 1 |
@@ -60155,9 +60155,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Variable (line 45)
 - new Variable (line 53)
-- new Variable (line 107)
-- new Variable (line 117)
-- new Variable (line 162)
+- new Variable (line 112)
+- new Variable (line 179)
 - 10 class method(s)
 
 ### `lib/JIT/JitLongDiv.php`
@@ -61131,41 +61130,41 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Variable.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 706)
-- new Variable (line 784)
-- new Variable (line 809)
-- new Variable (line 832)
-- new Variable (line 940)
-- new Variable (line 986)
-- new Variable (line 1017)
-- new Variable (line 1064)
-- new Variable (line 1086)
-- new Variable (line 1106)
-- new self (line 1124)
-- new self (line 1135)
+- new Variable (line 718)
+- new Variable (line 796)
+- new Variable (line 821)
+- new Variable (line 844)
+- new Variable (line 952)
+- new Variable (line 998)
+- new Variable (line 1029)
+- new Variable (line 1076)
+- new Variable (line 1098)
+- new Variable (line 1118)
+- new self (line 1136)
 - new self (line 1147)
-- new self (line 1163)
-- new self (line 1170)
-- new self (line 1177)
-- new self (line 1187)
-- new self (line 1203)
-- new self (line 1213)
-- new self (line 1235)
-- new Variable (line 1434)
-- new Variable (line 1450)
-- new Variable (line 1459)
-- new Variable (line 1493)
-- new Variable (line 1536)
-- new Variable (line 1595)
-- new Variable (line 1609)
-- new Variable (line 1660)
-- new Variable (line 1684)
-- new Variable (line 1712)
-- new Variable (line 1741)
-- new Variable (line 1810)
-- new Variable (line 1861)
-- new Variable (line 1874)
-- new self (line 1948)
+- new self (line 1159)
+- new self (line 1175)
+- new self (line 1182)
+- new self (line 1189)
+- new self (line 1199)
+- new self (line 1215)
+- new self (line 1225)
+- new self (line 1247)
+- new Variable (line 1446)
+- new Variable (line 1462)
+- new Variable (line 1471)
+- new Variable (line 1505)
+- new Variable (line 1548)
+- new Variable (line 1607)
+- new Variable (line 1621)
+- new Variable (line 1672)
+- new Variable (line 1696)
+- new Variable (line 1724)
+- new Variable (line 1753)
+- new Variable (line 1822)
+- new Variable (line 1873)
+- new Variable (line 1886)
+- new self (line 1960)
 - 26 class method(s)
 - 1 closure(s)
 
