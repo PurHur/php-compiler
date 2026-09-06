@@ -5657,6 +5657,7 @@
         "lib/Compiler/Concern/CompileCallArgSends.php",
         "lib/Compiler/Concern/CompileClassBodyAndTraitAdaptations.php",
         "lib/Compiler/Concern/CompileClassConstFoldAndTypedReject.php",
+        "lib/Compiler/Concern/CompileClassLikeDeclAndScope.php",
         "lib/Compiler/Concern/CompileFuncCfgReturnAndGlobalImport.php",
         "lib/Compiler/Concern/CompileInlineSpecializedCallArgSends.php",
         "lib/Compiler/Concern/CompileInterfaceTraitEnumAndMethodDecl.php",
@@ -8545,9 +8546,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8311,
+        "inventory_files": 8312,
         "excluded": 0,
-        "eligible": 8311,
+        "eligible": 8312,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
