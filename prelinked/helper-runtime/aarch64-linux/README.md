@@ -13,7 +13,7 @@ non-native link.
 
 ## Seed corpus (VM_* + lib_VM_* + ext/standard tiers)
 
-**122** committed `unit.o` files:
+**132** committed `unit.o` files:
 
 - full `VM_*` (13) and `lib_VM_*` (9) sets from `x86_64-linux`
 - first `ext/standard` tier (10): ArrayChunk / ArrayIsList / ArraySlice / Bin2hex /
@@ -41,6 +41,9 @@ non-native link.
 - string compare / CSV / escapes / metaphone (10): CaseCompare / NCompare /
   CharInMask / Levenshtein / Cslashes / CsvFputcsv / CsvStrGetcsv / ConvertUu /
   Hebrev / Metaphone
+- timezone / clock / date (10): ClockGettime / DefaultTimezone / DefaultTimezoneCivil /
+  DateIntervalFormat / Gmgetdate / Gmmktime / Mktime / Time / TimezoneLocation /
+  Hrtime
 
 Refresh / expand via:
 
