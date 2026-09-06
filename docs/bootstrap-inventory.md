@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8347 |
-| Phase A inventory files (M2 ratio SSOT) | 8347 |
+| PHP files on vm.php path | 8348 |
+| Phase A inventory files (M2 ratio SSOT) | 8348 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26292 |
+| Source constructs flagged (warnings) | 26294 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5616,6 +5616,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/HoistedMultiArgSiblingFuncCallChain.php` | 0 | 2 |
 | `lib/Compiler/Concern/HoistedSiblingFeedAndArrayKeysArgSendRewire.php` | 0 | 2 |
 | `lib/Compiler/Concern/HoistedUnaryAssignAndInlineProducerCallArgSlots.php` | 0 | 3 |
+| `lib/Compiler/Concern/InitArraySpreadArithmeticAndNestedInlineCallArgResolvers.php` | 0 | 2 |
 | `lib/Compiler/Concern/InlineCallArgClosureFeedsAndReturnProducers.php` | 0 | 2 |
 | `lib/Compiler/Concern/InlineCallArgCompileTimeFold.php` | 0 | 9 |
 | `lib/Compiler/Concern/InlineCallArgProducerMatch.php` | 0 | 3 |
@@ -49137,13 +49138,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 922)
-- new CompileFatal (line 956)
-- new CompileError (line 959)
-- new ClassCompileRegistry (line 1000)
-- new AttributeClassRegistry (line 1001)
-- new ClassCompileRegistry (line 1109)
-- new AttributeClassRegistry (line 1110)
+- new CompileFatal (line 925)
+- new CompileFatal (line 959)
+- new CompileError (line 962)
+- new ClassCompileRegistry (line 1003)
+- new AttributeClassRegistry (line 1004)
+- new ClassCompileRegistry (line 1112)
+- new AttributeClassRegistry (line 1113)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -50044,6 +50045,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 8 class method(s)
 - 1 closure(s)
 
+### `lib/Compiler/Concern/InitArraySpreadArithmeticAndNestedInlineCallArgResolvers.php`
+
+**Warnings** (review for bootstrap subset):
+- trait InitArraySpreadArithmeticAndNestedInlineCallArgResolvers (line 28)
+- 15 class method(s)
+
 ### `lib/Compiler/Concern/InlineCallArgClosureFeedsAndReturnProducers.php`
 
 **Warnings** (review for bootstrap subset):
@@ -50262,11 +50269,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/SlotForCallArgResolvers.php`
 
 **Warnings** (review for bootstrap subset):
-- trait SlotForCallArgResolvers (line 25)
-- new Operand\Temporary (line 176)
-- new Operand\Temporary (line 215)
-- new Temporary (line 470)
-- 27 class method(s)
+- trait SlotForCallArgResolvers (line 27)
+- new Operand\Temporary (line 178)
+- new Operand\Temporary (line 217)
+- new Temporary (line 472)
+- 12 class method(s)
 
 ### `lib/Compiler/Concern/SlotForInlineClosureAndFirstClassCallableCallArgResolvers.php`
 
