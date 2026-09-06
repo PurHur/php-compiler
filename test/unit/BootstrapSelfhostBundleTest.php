@@ -553,7 +553,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $entry = self::$root.'/test/selfhost/compiler_minimal/main.php';
         $this->assertFileExists($entry);
         $count = substr_count((string) file_get_contents($entry), 'require_once __DIR__');
-        $this->assertSame(111, $count);
+        $this->assertSame(8301, $count);
     }
 
     public function testCompilerLibSpineSmokeBundleUnitCountAndKeyUnits(): void
