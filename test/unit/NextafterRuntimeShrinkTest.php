@@ -9,35 +9,30 @@ use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
 /**
- * nextafter() NestedJIT via JitVmHelperLink::ensureBridge (#28716 / peer #28674).
+ * nextafter() AOT uses libm nextafter(3) (#36386);
+ * NextafterJitHelper remains NestedJIT-safe reference (peer MathAtan2 / Atan2JitHelper).
+ * LLVM 9 has no llvm.nextafter.f64.
+ *
+ * php-src: ext/standard/math.c PHP_FUNCTION(nextafter).
  */
 final class NextafterRuntimeShrinkTest extends TestCase
 {
-    public function testNextafterUsesJitHelperNotLibcLookup(): void
+    public function testNextafterUsesLibmNotHelperBridge(): void
     {
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/nextafter.php');
         $this->assertStringContainsString('MathNextafter::invoke', $builtin);
         $this->assertStringNotContainsString("lookupFunction('nextafter')", $builtin);
-        $this->assertStringNotContainsString('invokeLibc', $builtin);
-    }
 
-    public function testMathNextafterAlwaysUsesHelperBridge(): void
-    {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathNextafter.php');
-        $this->assertStringContainsString('NextafterJitHelper', $source);
-        $this->assertStringContainsString('phpc_nextafter', $source);
-        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
-        $this->assertStringNotContainsString('JitNextafterKernel', $source);
-        $this->assertStringNotContainsString('NestedJitCompileScope', $source);
-        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
-        $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
-        $this->assertStringNotContainsString("lookupFunction('nextafter')", $source);
-    }
-
-    public function testLibcExternNoLongerDeclaresNextafter(): void
-    {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/LibcExtern.php');
-        $this->assertStringNotContainsString("'nextafter'", $source);
+        $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathNextafter.php');
+        $this->assertStringContainsString("LIBC_NEXTAFTER = 'nextafter'", $bridge);
+        $this->assertStringContainsString('phpc_nextafter', $bridge);
+        $this->assertStringContainsString('nextafter_libm_f64_entry', $bridge);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('NextafterJitHelper', $bridge);
+        $this->assertStringNotContainsString('JitNextafterKernel', $bridge);
+        $this->assertStringNotContainsString('NestedJitCompileScope', $bridge);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
+        $this->assertStringNotContainsString('llvm.nextafter', $bridge);
     }
 
     public function testNextafterJitHelperInlinesNestedJitSafeAlgorithm(): void
@@ -73,6 +68,12 @@ final class NextafterRuntimeShrinkTest extends TestCase
         // Non-power-of-two normals agree with VmMath bit walk.
         $this->assertSame(VmMath::nextafter(1.5, 2.0), NextafterJitHelper::nextafterArgv(1.5, 2.0));
         $this->assertSame(VmMath::nextafter(3.0, 0.0), NextafterJitHelper::nextafterArgv(3.0, 0.0));
+    }
+
+    public function testLibcExternNoLongerDeclaresNextafter(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/LibcExtern.php');
+        $this->assertStringNotContainsString("'nextafter'", $source);
     }
 
     public function testNextafterKernelFilesRemoved(): void

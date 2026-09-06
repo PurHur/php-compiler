@@ -4,35 +4,35 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for nextafter() via NextafterJitHelper PHP (#15062, #19259, #20034, #20664, #28716).
+ * JIT/AOT link for nextafter() via libm {@code nextafter(3)} (#36386).
  *
- * Helper compile: {@see JitVmHelperLink::ensureBridge} (MathFpow #28674 / MathLog10 #28642 shape).
- * NestedJIT no longer needs an LLVM bitcast kernel — helper uses NestedJIT-safe ULP peel.
- * php-src: libc nextafter(3) semantics (userland nextafter is a php-src phantom — #28565).
+ * Peer of {@see MathAtan2} / {@see MathHypot}: avoid NestedJIT helper objects on
+ * the AOT hot path. php-src {@code ext/standard/math.c} {@code PHP_FUNCTION(nextafter)}
+ * → C {@code nextafter}. LLVM 9 has no nextafter intrinsic, so declare the libc
+ * symbol the linker already pulls via {@code -lm}
+ * ({@see MathAtan2} two-arg libm shape).
+ * The PHP NestedJIT-safe ULP peel remains for NestedJIT-safe reference only.
  */
 final class MathNextafter
 {
+    /** Libc nextafter(3) — no LLVM 9 intrinsic. */
+    private const LIBC_NEXTAFTER = 'nextafter';
+
+    /** Legacy ABI kept as a thin libm wrapper for any external callers. */
     private const ABI_NEXTAFTER = 'phpc_nextafter';
 
-    private const HELPER_PATH = '/ext/standard/NextafterJitHelper.php';
-
-    private const NEXTAFTER_HELPER = 'PHPCompiler\\ext\\standard\\NextafterJitHelper::nextafterArgv';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::NEXTAFTER_HELPER,
-    ];
-
-    private const BRIDGE_ENTRY = 'nextafter_bridge_entry';
+    private const BRIDGE_ENTRY = 'nextafter_libm_f64_entry';
 
     public static function ensureLinked(Context $context): void
     {
-        self::implement($context);
+        self::libcNextafterDecl($context);
+        self::ensurePhpcNextafterBridge($context);
     }
 
     public static function ensureStandaloneBodies(Context $context): void
@@ -42,35 +42,64 @@ final class MathNextafter
 
     public static function invoke(Context $context, Value $num, Value $next): Value
     {
-        self::ensureLinked($context);
-
-        return $context->builder->call(
-            $context->lookupFunction(self::ABI_NEXTAFTER),
-            $num,
-            $next
-        );
+        return $context->builder->call(self::libcNextafterDecl($context), $num, $next);
     }
 
-    private static function implement(Context $context): void
+    private static function libcNextafterDecl(Context $context): LlvmFunction
+    {
+        $func = $context->module->getNamedFunction(self::LIBC_NEXTAFTER);
+        if (null !== $func) {
+            $context->registerFunction(self::LIBC_NEXTAFTER, $func);
+
+            return $func;
+        }
+        $double = $context->getTypeFromString('double');
+        $fn = $context->module->addFunction(
+            self::LIBC_NEXTAFTER,
+            $context->context->functionType($double, false, $double, $double)
+        );
+        $context->registerFunction(self::LIBC_NEXTAFTER, $fn);
+
+        return $fn;
+    }
+
+    /**
+     * Define {@code phpc_nextafter} → libm {@code nextafter} when missing. Skip if a prior
+     * NestedJIT bridge already filled the symbol (cannot replace LLVM bodies);
+     * {@see invoke} never calls that stale path.
+     */
+    private static function ensurePhpcNextafterBridge(Context $context): void
     {
         $probe = $context->module->getNamedFunction(self::ABI_NEXTAFTER);
-        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction(self::ABI_NEXTAFTER, $probe);
 
             return;
         }
 
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         $double = $context->getTypeFromString('double');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_NEXTAFTER,
-            self::BRIDGE_ENTRY,
-            [$double, $double],
-            $double,
-            self::NEXTAFTER_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#28716'
+        $fn = $probe;
+        if (null === $fn) {
+            $fn = $context->module->addFunction(
+                self::ABI_NEXTAFTER,
+                $context->context->functionType($double, false, $double, $double)
+            );
+        }
+        $entry = $fn->appendBasicBlock(self::BRIDGE_ENTRY);
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue(
+            $context->builder->call(
+                self::libcNextafterDecl($context),
+                $fn->getParam(0),
+                $fn->getParam(1)
+            )
         );
+        $context->registerFunction(self::ABI_NEXTAFTER, $fn);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 }
