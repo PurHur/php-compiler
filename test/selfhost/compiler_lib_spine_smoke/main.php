@@ -5372,6 +5372,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/SiblingInlineCallArgProduce
 require_once __DIR__.'/../../../lib/Compiler/Concern/VarExportNestedAndArrayMergeFamilyCallArgSlots.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/SubstrNestedHaystackAndMethodOrStaticCallInitSlots.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/OuterSiblingExecReturnAndHoistedConstFetchSlots.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/FinalSiblingInlineCallArgSendSlot.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/SlotForCallArgResolvers.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/InlineCallArgSlotResolvers.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/HoistedSiblingFeedAndArrayKeysArgSendRewire.php';

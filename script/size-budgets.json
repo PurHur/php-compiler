@@ -4,9 +4,9 @@
     "done_when_ceiling": 25000,
     "files": {
         "lib/Compiler.php": {
-            "budget": 1106,
+            "budget": 1109,
             "target": 20000,
-            "note": "Concern trait splits (#36230/#36387/#36403); OuterSiblingExecReturnAndHoistedConstFetchSlots + SubstrNestedHaystackAndMethodOrStaticCallInitSlots + VarExportNestedAndArrayMergeFamilyCallArgSlots + peers"
+            "note": "Concern trait splits (#36230/#36387/#36403); FinalSiblingInlineCallArgSendSlot + OuterSiblingExecReturnAndHoistedConstFetchSlots + peers"
         },
         "lib/JIT.php": {
             "budget": 274,
