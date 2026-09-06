@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8349 |
-| Phase A inventory files (M2 ratio SSOT) | 8349 |
+| PHP files on vm.php path | 8350 |
+| Phase A inventory files (M2 ratio SSOT) | 8350 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26296 |
+| Source constructs flagged (warnings) | 26298 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5577,6 +5577,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/CompileClassConstFoldAndTypedReject.php` | 0 | 15 |
 | `lib/Compiler/Concern/CompileClassLikeDeclAndScope.php` | 0 | 8 |
 | `lib/Compiler/Concern/CompileErrorSuppressEndBlockAndSlotInherit.php` | 0 | 2 |
+| `lib/Compiler/Concern/CompileExprAndOpcodeTypes.php` | 0 | 46 |
 | `lib/Compiler/Concern/CompileFuncCfgReturnAndGlobalImport.php` | 0 | 15 |
 | `lib/Compiler/Concern/CompileInlineSpecializedCallArgSends.php` | 0 | 1 |
 | `lib/Compiler/Concern/CompileInterfaceTraitEnumAndMethodDecl.php` | 0 | 20 |
@@ -5598,7 +5599,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/EchoCoalesceCallArgCompile.php` | 0 | 11 |
 | `lib/Compiler/Concern/EchoCompileOperandTerminalAndGlobalConst.php` | 0 | 39 |
 | `lib/Compiler/Concern/EnsureDeferredSiblingAndInlineNewProducers.php` | 0 | 2 |
-| `lib/Compiler/Concern/ErrorSuppressAndPropertyFetch.php` | 0 | 60 |
+| `lib/Compiler/Concern/ErrorSuppressAndPropertyFetch.php` | 0 | 16 |
 | `lib/Compiler/Concern/ErrorSuppressCallArgProducers.php` | 0 | 2 |
 | `lib/Compiler/Concern/ExactHoistedAndInlineNewCallArgProducers.php` | 0 | 2 |
 | `lib/Compiler/Concern/ExplodeIteratorChunkWalkAndTrailingComparatorCallArgSends.php` | 0 | 8 |
@@ -49139,13 +49140,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 928)
-- new CompileFatal (line 962)
-- new CompileError (line 965)
-- new ClassCompileRegistry (line 1006)
-- new AttributeClassRegistry (line 1007)
-- new ClassCompileRegistry (line 1115)
-- new AttributeClassRegistry (line 1116)
+- new CompileFatal (line 931)
+- new CompileFatal (line 965)
+- new CompileError (line 968)
+- new ClassCompileRegistry (line 1009)
+- new AttributeClassRegistry (line 1010)
+- new ClassCompileRegistry (line 1118)
+- new AttributeClassRegistry (line 1119)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -49546,6 +49547,56 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - trait CompileErrorSuppressEndBlockAndSlotInherit (line 135)
 - 2 class method(s)
 
+### `lib/Compiler/Concern/CompileExprAndOpcodeTypes.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CompileExprAndOpcodeTypes (line 130)
+- new OpCode (line 214)
+- new OpCode (line 264)
+- new OpCode (line 290)
+- new OpCode (line 311)
+- new OpCode (line 335)
+- new Operand\Literal (line 352)
+- new OpCode (line 353)
+- new OpCode (line 374)
+- new OpCode (line 385)
+- new OpCode (line 395)
+- new OpCode (line 410)
+- new OpCode (line 423)
+- new OpCode (line 436)
+- new OpCode (line 515)
+- new OpCode (line 534)
+- new OpCode (line 562)
+- new OpCode (line 570)
+- new OpCode (line 590)
+- new OpCode (line 607)
+- new OpCode (line 629)
+- new OpCode (line 640)
+- new OpCode (line 649)
+- new OpCode (line 661)
+- new Operand\Temporary (line 693)
+- new OpCode (line 699)
+- new OpCode (line 711)
+- new OpCode (line 726)
+- new OpCode (line 738)
+- new Operand\Literal (line 761)
+- new Operand\Literal (line 791)
+- new Operand\Literal (line 817)
+- new OpCode (line 819)
+- new OpCode (line 850)
+- new Operand\Temporary (line 887)
+- new OpCode (line 893)
+- new OpCode (line 919)
+- new OpCode (line 948)
+- new OpCode (line 969)
+- new OpCode (line 978)
+- new OpCode (line 987)
+- new OpCode (line 1027)
+- new OpCode (line 1034)
+- new OpCode (line 1045)
+- new OpCode (line 1064)
+- 5 class method(s)
+
 ### `lib/Compiler/Concern/CompileFuncCfgReturnAndGlobalImport.php`
 
 **Warnings** (review for bootstrap subset):
@@ -49852,61 +49903,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new OpCode (line 448)
 - new Block (line 460)
 - new OpCode (line 467)
-- new OpCode (line 586)
-- new OpCode (line 636)
-- new OpCode (line 662)
-- new OpCode (line 683)
-- new OpCode (line 707)
-- new Operand\Literal (line 724)
-- new OpCode (line 725)
-- new OpCode (line 746)
+- new OpCode (line 578)
+- new Operand\Literal (line 612)
+- new OpCode (line 615)
+- new Operand\Literal (line 632)
+- new OpCode (line 637)
+- new OpCode (line 650)
 - new OpCode (line 757)
-- new OpCode (line 767)
-- new OpCode (line 782)
-- new OpCode (line 795)
-- new OpCode (line 808)
+- new OpCode (line 787)
+- new OpCode (line 833)
 - new OpCode (line 887)
-- new OpCode (line 906)
-- new OpCode (line 934)
-- new OpCode (line 942)
-- new OpCode (line 962)
-- new OpCode (line 979)
-- new OpCode (line 1001)
-- new OpCode (line 1012)
-- new OpCode (line 1021)
-- new OpCode (line 1033)
-- new Operand\Temporary (line 1065)
-- new OpCode (line 1071)
-- new OpCode (line 1083)
-- new OpCode (line 1098)
-- new OpCode (line 1110)
-- new Operand\Literal (line 1133)
-- new Operand\Literal (line 1163)
-- new Operand\Literal (line 1189)
-- new OpCode (line 1191)
-- new OpCode (line 1222)
-- new Operand\Temporary (line 1259)
-- new OpCode (line 1265)
-- new OpCode (line 1291)
-- new OpCode (line 1320)
-- new OpCode (line 1341)
-- new OpCode (line 1350)
-- new OpCode (line 1359)
-- new OpCode (line 1399)
-- new OpCode (line 1406)
-- new OpCode (line 1417)
-- new OpCode (line 1436)
-- new OpCode (line 1538)
-- new Operand\Literal (line 1572)
-- new OpCode (line 1575)
-- new Operand\Literal (line 1592)
-- new OpCode (line 1597)
-- new OpCode (line 1610)
-- new OpCode (line 1717)
-- new OpCode (line 1747)
-- new OpCode (line 1793)
-- new OpCode (line 1847)
-- 35 class method(s)
+- 30 class method(s)
 
 ### `lib/Compiler/Concern/ErrorSuppressCallArgProducers.php`
 
