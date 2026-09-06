@@ -34,6 +34,13 @@ function cachedDispatcher(callable $routeDefinitionCallback, array $options = []
             'routeCollector' => 'FastRoute\\RouteCollector',
             'cacheDisabled' => false,
         ];
+        if (!$options['cacheDisabled'] && file_exists($options['cacheFile'])) {
+            $dispatchData = require $options['cacheFile'];
+            if (!is_array($dispatchData)) {
+                throw new \RuntimeException('Invalid cache file "' . $options['cacheFile'] . '"');
+            }
+            return new $options['dispatcher']($dispatchData);
+        }
 }
 PHP;
         file_put_contents($tmp, $seed);
@@ -44,8 +51,10 @@ PHP;
         $this->assertNotFalse($patched);
         $this->assertStringContainsString('AOT (#36382): coalesce dispatcher options', $patched);
         $this->assertStringContainsString("\$options['routeParser'] ??", $patched);
+        $this->assertStringContainsString('AOT (#36382): skip dynamic require $cacheFile', $patched);
         $this->assertStringNotContainsString('$options += [', $patched);
         $this->assertStringNotContainsString('if (!isset($options[$k]))', $patched);
+        $this->assertStringNotContainsString('require $options[\'cacheFile\']', $patched);
         exec(escapeshellarg(PHP_BINARY).' '.escapeshellarg($script).' '.escapeshellarg($tmp).' 2>&1', $out2, $rc2);
         $this->assertSame(0, $rc2, implode("\n", $out2));
         $this->assertStringContainsString('already patched', implode("\n", $out2));
