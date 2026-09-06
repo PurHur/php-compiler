@@ -189,6 +189,17 @@ final class HashTableHelper
     }
 
     /**
+     * Nested dim write when the outer key is a boxed `__value__` (untyped params, #36382).
+     */
+    public static function readValueBoxKeyHashtableForNestedWrite(
+        Context $context,
+        Value $ht,
+        Variable $dim
+    ): Value {
+        return HashTableReadLlvm::readValueBoxKeyHashtableForNestedWrite($context, $ht, $dim);
+    }
+
+    /**
      * Lvalue marker for $arr['key'] = … without reading the old value first (#107).
      */
     public static function prepareStringKeyWrite(Context $context, Value $ht, Value $keyStr): Variable

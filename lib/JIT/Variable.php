@@ -1521,6 +1521,25 @@ final class Variable {
                 $ht = HashTableHelper::loadHashtablePointer($this->context, $container);
                 if (self::TYPE_VALUE === $dim->type) {
                     if ($forWrite) {
+                        // Nested FETCH_DIM_W (`$a[$k][$j]=`): live child HT, not an orphan
+                        // write box — untyped param keys are TYPE_VALUE; string/index keys
+                        // already branch on TYPE_ARRAY (#24011). FastRoute addStaticRoute
+                        // uses `$this->staticRoutes[$httpMethod][$routeStr] = $handler` (#36382).
+                        // php-src: Zend/zend_execute.c ZEND_FETCH_DIM_W.
+                        if (null !== $expectedType && Type::TYPE_ARRAY === $expectedType->type) {
+                            $childHt = HashTableHelper::readValueBoxKeyHashtableForNestedWrite(
+                                $this->context,
+                                $ht,
+                                $dim
+                            );
+
+                            return new Variable(
+                                $this->context,
+                                self::TYPE_HASHTABLE,
+                                self::KIND_VALUE,
+                                $childHt
+                            );
+                        }
                         $lvalue = HashTableHelper::prepareValueBoxKeyWrite($this->context, $ht, $dim);
 
                         return $lvalue;
