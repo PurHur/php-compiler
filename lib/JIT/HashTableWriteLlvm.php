@@ -1823,6 +1823,78 @@ final class HashTableWriteLlvm
     }
 
     /**
+     * Nested FETCH_DIM_W / recursive walk: SEPARATE a shared child HT before mutating it.
+     *
+     * By-value `$b = $a` then `$a['x']['y'] = 9` only shallow-duplicates the outer table;
+     * the nested HT at `'x'` stays shared until ZEND_FETCH_DIM_W runs SEPARATE_ARRAY on it
+     * and stores the private copy back into the parent slot (php-src zend_execute.c).
+     * Without this, AOT mutates `$b['x']` as well (#36397 / residual #34508).
+     *
+     * @param callable(Value):void $rebindExclusiveCopy store the duplicate into the parent
+     *                                                  (setStringKeyHashtable / setHashtableAt /
+     *                                                  __value__writeHashtable) — writeHashtable
+     *                                                  delrefs the old shared child
+     *
+     * @return Value exclusive `__hashtable__*` (possibly $childHt when rc ≤ 1)
+     *
+     * @see php-src Zend/zend_execute.c ZEND_FETCH_DIM_W → SEPARATE_ARRAY
+     * @see php-src ext/standard/array.c php_array_walk_recursive (separate before descend)
+     */
+    public static function exclusiveNestedChildHashtable(
+        Context $context,
+        Value $childHt,
+        callable $rebindExclusiveCopy
+    ): Value {
+        $htPtrTy = $context->getTypeFromString('__hashtable__*');
+        $nullHt = $htPtrTy->constNull();
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $childHt, $nullHt);
+        $fn = BasicBlockHelper::parentFunction($context);
+        $tag = (string) self::nextSeq();
+        $nullBlock = $fn->appendBasicBlock('ht_nested_cow_null_'.$tag);
+        $checkBlock = $fn->appendBasicBlock('ht_nested_cow_check_'.$tag);
+        $dupBlock = $fn->appendBasicBlock('ht_nested_cow_dup_'.$tag);
+        $doneBlock = $fn->appendBasicBlock('ht_nested_cow_done_'.$tag);
+        $context->builder->branchIf($isNull, $nullBlock, $checkBlock);
+
+        $context->builder->positionAtEnd($nullBlock);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($checkBlock);
+        $refVirtual = $context->builder->pointerCast(
+            $childHt,
+            $context->getTypeFromString('__ref__virtual*')
+        );
+        $refMap = $context->structFieldMap['__ref__virtual'];
+        $refStruct = $context->builder->load(
+            $context->builder->structGep($refVirtual, $refMap['ref'])
+        );
+        $rcOff = $context->structFieldMap['__ref__']['refcount'];
+        $rc = $context->builder->extractValue($refStruct, $rcOff);
+        $i32 = $context->getTypeFromString('int32');
+        $shared = $context->builder->icmp(
+            Builder::INT_SGT,
+            $rc,
+            $i32->constInt(1, false)
+        );
+        $context->builder->branchIf($shared, $dupBlock, $doneBlock);
+
+        $context->builder->positionAtEnd($dupBlock);
+        HashTableDuplicateRuntime::ensureLinked($context);
+        $copy = HashTableDuplicateRuntime::duplicate($context, $childHt);
+        $rebindExclusiveCopy($copy);
+        $dupEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($htPtrTy, 'ht_nested_cow_'.$tag);
+        $phi->addIncoming($nullHt, $nullBlock);
+        $phi->addIncoming($childHt, $checkBlock);
+        $phi->addIncoming($copy, $dupEnd);
+
+        return $phi;
+    }
+
+    /**
      * Store a (possibly duplicated) HT pointer back into a KIND_VARIABLE / value-box lvalue.
      *
      * @return bool true when the store already released the previous HT (writeHashtable)
