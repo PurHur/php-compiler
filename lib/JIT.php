@@ -56,6 +56,7 @@ require_once __DIR__.'/JIT/Concern/AssignOperand.php';
 require_once __DIR__.'/JIT/Concern/AdaptByRefCallArgs.php';
 require_once __DIR__.'/JIT/Concern/EmitJitReturn.php';
 require_once __DIR__.'/JIT/Concern/TernaryJumpIfEchoMerge.php';
+require_once __DIR__.'/JIT/Concern/TernaryPhiReturnMerge.php';
 require_once __DIR__.'/JIT/Concern/M3EmitTuSidecarLinktime.php';
 require_once __DIR__.'/JIT/Concern/CompileClassAndTraitUses.php';
 require_once __DIR__.'/JIT/Concern/CompileTraitUsesWithAdaptations.php';
@@ -168,6 +169,7 @@ class JIT {
     use AdaptByRefCallArgs;
     use EmitJitReturn;
     use TernaryJumpIfEchoMerge;
+    use TernaryPhiReturnMerge;
     use M3EmitTuSidecarLinktime;
     use CompileClassAndTraitUses;
     use CompileTraitUsesWithAdaptations;

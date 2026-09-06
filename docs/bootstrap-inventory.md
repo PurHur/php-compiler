@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8303 |
-| Phase A inventory files (M2 ratio SSOT) | 8303 |
+| PHP files on vm.php path | 8304 |
+| Phase A inventory files (M2 ratio SSOT) | 8304 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26198 |
+| Source constructs flagged (warnings) | 26200 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7143,6 +7143,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/SkippedVmEmitHelperAndCompileDriverNames.php` | 0 | 2 |
 | `lib/JIT/Concern/SubBlockCatchFinallyAndGeneratorResume.php` | 0 | 2 |
 | `lib/JIT/Concern/TernaryJumpIfEchoMerge.php` | 0 | 2 |
+| `lib/JIT/Concern/TernaryPhiReturnMerge.php` | 0 | 2 |
 | `lib/JIT/Concern/ValueBoxCoalesceAndConcatHelpers.php` | 0 | 7 |
 | `lib/JIT/Concern/VarFetchDestLvalueContext.php` | 0 | 2 |
 | `lib/JIT/Concern/VmSmokeAndRuntimeM3NativeStubs.php` | 0 | 10 |
@@ -58727,8 +58728,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Concern/TernaryJumpIfEchoMerge.php`
 
 **Warnings** (review for bootstrap subset):
-- trait TernaryJumpIfEchoMerge (line 19)
-- 42 class method(s)
+- trait TernaryJumpIfEchoMerge (line 18)
+- 26 class method(s)
+
+### `lib/JIT/Concern/TernaryPhiReturnMerge.php`
+
+**Warnings** (review for bootstrap subset):
+- trait TernaryPhiReturnMerge (line 22)
+- 16 class method(s)
 
 ### `lib/JIT/Concern/ValueBoxCoalesceAndConcatHelpers.php`
 
@@ -59307,7 +59314,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 200)
 - new Variable (line 250)
 - new Variable (line 323)
-- new Variable (line 390)
+- new Variable (line 392)
 - 9 class method(s)
 - 1 closure(s)
 
@@ -59762,13 +59769,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 237)
 - new Variable (line 248)
 - new Variable (line 325)
-- new Variable (line 511)
-- new Variable (line 523)
-- new Variable (line 550)
-- new Variable (line 564)
-- new Variable (line 591)
-- new Variable (line 603)
-- new Variable (line 613)
+- new Variable (line 516)
+- new Variable (line 528)
+- new Variable (line 555)
+- new Variable (line 569)
+- new Variable (line 596)
+- new Variable (line 608)
+- new Variable (line 618)
 - 15 class method(s)
 
 ### `lib/JIT/IteratorHelper.php`
@@ -60608,7 +60615,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/SpineChunkRuntimeMethodDemote.php`
 
 **Warnings** (review for bootstrap subset):
-- new OpCode (line 273)
+- new OpCode (line 275)
 - 11 class method(s)
 
 ### `lib/JIT/SpineChunkStandardHelperBind.php`
