@@ -4,9 +4,9 @@
     "done_when_ceiling": 25000,
     "files": {
         "lib/Compiler.php": {
-            "budget": 1073,
+            "budget": 1076,
             "target": 20000,
-            "note": "Concern trait splits (#36230/#36387/#36403); CompileTimeUnaryBinaryAndCastFold + CompileErrorSuppressEndBlockAndSlotInherit + peers"
+            "note": "Concern trait splits (#36230/#36387/#36403); CompileTimeParamDefaultAndExprFold + CompileTimeUnaryBinaryAndCastFold + peers"
         },
         "lib/JIT.php": {
             "budget": 274,
