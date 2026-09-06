@@ -112,11 +112,22 @@ fi
 RC="$DEST/vendor/slim/slim/Slim/Routing/RouteCollector.php"
 if [[ -f "$RC" ]]; then
   php "$ROOT/script/composer/patch-slim-route-collector-36382.php" "$RC"
+  php "$ROOT/script/composer/patch-slim-fastroute-rows-36382.php" "$RC"
 fi
 
 RR="$DEST/vendor/slim/slim/Slim/Routing/RouteResolver.php"
 if [[ -f "$RR" ]]; then
   php "$ROOT/script/composer/patch-slim-route-resolver-36382.php" "$RR"
+fi
+
+DISP="$DEST/vendor/slim/slim/Slim/Routing/Dispatcher.php"
+if [[ -f "$DISP" ]]; then
+  php "$ROOT/script/composer/patch-slim-dispatcher-closure-36382.php" "$DISP"
+fi
+
+FRD="$DEST/vendor/slim/slim/Slim/Routing/FastRouteDispatcher.php"
+if [[ -f "$FRD" ]]; then
+  php "$ROOT/script/composer/patch-slim-fastroute-dispatcher-return-36382.php" "$FRD"
 fi
 
 RCP="$DEST/vendor/slim/slim/Slim/Routing/RouteCollectorProxy.php"
