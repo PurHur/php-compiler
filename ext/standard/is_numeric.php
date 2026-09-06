@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StreamLifecycleJit;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
@@ -53,14 +54,25 @@ final class is_numeric extends Internal
         if (!$this->requireExactJitArgCount($context, $args, 'is_numeric', 1)) {
             return $context->constantFromBool(false);
         }
-        switch ($args[0]->type) {
+        $arg = $args[0];
+        // Lazy ±/×/`/` overflow (#37051): either the i64 ok arm or the f64 promote arm is
+        // numeric (Zend IS_LONG / IS_DOUBLE). Short-circuit before JitIsResource on the
+        // overflow-arm dummy i64 0 (#36386 leftover of #37051).
+        if (
+            null !== $arg->longArithOverflowFlag
+            && (null !== $arg->longArithOverflowDoubleSlot || null !== $arg->longArithOverflowPromoted)
+            && JITVariable::TYPE_NATIVE_LONG === $arg->type
+        ) {
+            return $context->constantFromBool(true);
+        }
+        switch ($arg->type) {
             case JITVariable::TYPE_NATIVE_LONG:
                 StreamLifecycleJit::implement($context);
 
                 return $this->longIsNumeric(
                     $context,
                     $context->builder->truncOrBitCast(
-                        JitLongArg::lower($context, $args[0], 'is_numeric() argument #1'),
+                        JitLongArg::lower($context, $arg, 'is_numeric() argument #1'),
                         $context->getTypeFromString('int64')
                     )
                 );
@@ -70,12 +82,12 @@ final class is_numeric extends Internal
             case JITVariable::TYPE_NULL:
                 return $context->constantFromBool(false);
             case JITVariable::TYPE_STRING:
-                return $this->stringIsNumeric($context, $this->jitString($context, $args[0], 'is_numeric() argument #1'));
+                return $this->stringIsNumeric($context, $this->jitString($context, $arg, 'is_numeric() argument #1'));
             case JITVariable::TYPE_OBJECT:
             case JITVariable::TYPE_HASHTABLE:
                 return $context->constantFromBool(false);
             case JITVariable::TYPE_VALUE:
-                return $this->valueIsNumeric($context, $args[0]);
+                return $this->valueIsNumeric($context, $arg);
             default:
                 return $context->constantFromBool(false);
         }
@@ -156,30 +168,74 @@ final class is_numeric extends Internal
     private function valueIsNumeric(Context $context, JITVariable $arg): Value
     {
         StreamLifecycleJit::implement($context);
+        // Named locals from overflow ±/× are TYPE_VALUE boxes (AssignOperand materialize).
+        // Eager __value__readString / readLong before type select SIGSEGVs on double
+        // payloads (strtod on garbage) — branch per tag like floatval (#36386 leftover of #37051).
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
         $map = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load($context->builder->structGep($valuePtr, $map['type']));
         $i8 = $context->getTypeFromString('int8');
         $falseVal = $context->constantFromBool(false);
         $trueVal = $context->constantFromBool(true);
-        $isLong = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_NATIVE_LONG, false));
-        $isDouble = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_NATIVE_DOUBLE, false));
-        $isString = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_STRING, false));
-        $isEnumCase = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(Variable::TYPE_ENUM_CASE, false));
-        $isObject = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_OBJECT, false));
-        $isHashtable = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_HASHTABLE, false));
+
+        $longBlock = BasicBlockHelper::append($context, 'is_numeric_value_long');
+        $doubleBlock = BasicBlockHelper::append($context, 'is_numeric_value_double');
+        $stringBlock = BasicBlockHelper::append($context, 'is_numeric_value_string');
+        $falseBlock = BasicBlockHelper::append($context, 'is_numeric_value_false');
+        $doneBlock = BasicBlockHelper::append($context, 'is_numeric_value_done');
+
+        $afterLong = BasicBlockHelper::append($context, 'is_numeric_value_after_long');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_NATIVE_LONG, false)),
+            $longBlock,
+            $afterLong
+        );
+
+        $context->builder->positionAtEnd($longBlock);
         $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr);
         $longNumeric = $this->longIsNumeric($context, $longVal);
+        $longEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterLong);
+        $afterDouble = BasicBlockHelper::append($context, 'is_numeric_value_after_double');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_NATIVE_DOUBLE, false)),
+            $doubleBlock,
+            $afterDouble
+        );
+
+        $context->builder->positionAtEnd($doubleBlock);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterDouble);
+        $afterString = BasicBlockHelper::append($context, 'is_numeric_value_after_string');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_STRING, false)),
+            $stringBlock,
+            $afterString
+        );
+
+        $context->builder->positionAtEnd($stringBlock);
         $stringVal = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
         $stringNumeric = $this->stringIsNumeric($context, $stringVal);
-        $numeric = $context->builder->select(
-            $isLong,
-            $longNumeric,
-            $context->builder->select($isDouble, $trueVal, $context->builder->select($isString, $stringNumeric, $falseVal))
-        );
-        $nonNumeric = $context->builder->or($isEnumCase, $context->builder->or($isObject, $isHashtable));
+        $stringEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
 
-        return $context->builder->select($nonNumeric, $falseVal, $numeric);
+        $context->builder->positionAtEnd($afterString);
+        $context->builder->branch($falseBlock);
+
+        $context->builder->positionAtEnd($falseBlock);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($trueVal->typeOf());
+        $phi->addIncoming($longNumeric, $longEnd);
+        $phi->addIncoming($trueVal, $doubleBlock);
+        $phi->addIncoming($stringNumeric, $stringEnd);
+        $phi->addIncoming($falseVal, $falseBlock);
+
+        return $phi;
     }
 
 }
