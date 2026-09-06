@@ -1,7 +1,7 @@
 {
     "generated_by": "script/status/snapshot.php",
     "issue": 36395,
-    "generated_at": "2026-09-06T11:40:35Z",
+    "generated_at": "2026-09-06T12:29:34Z",
     "spine": 8327,
     "inventory": 8327,
     "builtins_matrix_rows": 4054,
@@ -13,7 +13,7 @@
     "apps_ready": 1,
     "vm_driver_probe_ms_target": 20,
     "ci_green_streak_days": 3,
-    "last_green_master_sha": "cafec520a3a2c6396d6e0f873c59e33a2bdb672a",
+    "last_green_master_sha": "a9792e33b0421762d7e7996bfe6df842c1a1cd86",
     "notes": {
         "m3_helloworld": "emit_path=native via gen-0 argv helper (#22178); BOOTSTRAP_M3_REQUIRE_NATIVE_EMIT refuses sidecar COPY (#21860/#36146)",
         "m4_honesty": "BOOTSTRAP_M4_REQUIRE_NATIVE_EMIT=1 refuses sidecar COPY (#36146); default bootstrap-loop-probe may exit 2 when degraded",
