@@ -16,6 +16,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * NestedJIT of {@see \PHPCompiler\ext\standard\ArrayWalkJitHelper} segfaults under thin AOT
  * (same class as ArrayMapJitHelper #24156 / ArrayReduceLlvm). Emit packed + string-key walks
  * with live HT value slots so by-ref &$value mutates in place (php_array_walk).
+ * Recursive descend SEPARATEs shared nested HTs into the parent slot before walking
+ * (#36397 / php-src php_array_walk_recursive).
  * Body emit must {@see BasicBlockHelper::scopeLoweringToFunction} so packed BBs stay in the
  * ABI fn when the outer user fn owns {@see Context::$loweringLlvmFunction} (#33713 / peer #33706).
  *
@@ -278,6 +280,18 @@ final class ArrayWalkLlvm
                 $context->lookupFunction('__value__readHashtable'),
                 $entry
             );
+            // php_array_walk_recursive: SEPARATE nested array before descend (#36397).
+            $child = HashTableWriteLlvm::exclusiveNestedChildHashtable(
+                $context,
+                $child,
+                static function (Value $copy) use ($context, $entry): void {
+                    $context->builder->call(
+                        $context->lookupFunction('__value__writeHashtable'),
+                        $entry,
+                        $copy
+                    );
+                }
+            );
             self::callWalkAbi($context, $fn, $child, $closurePtr);
             $context->builder->branch($packedAdvance);
 
@@ -363,6 +377,18 @@ final class ArrayWalkLlvm
             $child = $context->builder->call(
                 $context->lookupFunction('__value__readHashtable'),
                 $valEntry
+            );
+            // php_array_walk_recursive: SEPARATE nested array before descend (#36397).
+            $child = HashTableWriteLlvm::exclusiveNestedChildHashtable(
+                $context,
+                $child,
+                static function (Value $copy) use ($context, $valEntry): void {
+                    $context->builder->call(
+                        $context->lookupFunction('__value__writeHashtable'),
+                        $valEntry,
+                        $copy
+                    );
+                }
             );
             self::callWalkAbi($context, $fn, $child, $closurePtr);
             $context->builder->branch($strNext);
