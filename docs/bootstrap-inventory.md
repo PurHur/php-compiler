@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8329 |
-| Phase A inventory files (M2 ratio SSOT) | 8329 |
+| PHP files on vm.php path | 8330 |
+| Phase A inventory files (M2 ratio SSOT) | 8330 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26253 |
+| Source constructs flagged (warnings) | 26255 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5629,6 +5629,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/SiblingInlineFuncCallProducers.php` | 0 | 1 |
 | `lib/Compiler/Concern/SiblingMultiArgFuncCallProducerDetect.php` | 0 | 2 |
 | `lib/Compiler/Concern/SlotForCallArgResolvers.php` | 0 | 5 |
+| `lib/Compiler/Concern/SubstrNestedHaystackAndMethodOrStaticCallInitSlots.php` | 0 | 2 |
 | `lib/Compiler/Concern/TernaryAndLogicalShortCircuit.php` | 0 | 5 |
 | `lib/Compiler/Concern/TryFinallyCatchAndOperandLookup.php` | 0 | 4 |
 | `lib/Compiler/Concern/VarExportNestedAndArrayMergeFamilyCallArgSlots.php` | 0 | 3 |
@@ -49119,13 +49120,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 871)
-- new CompileFatal (line 905)
-- new CompileError (line 908)
-- new ClassCompileRegistry (line 949)
-- new AttributeClassRegistry (line 950)
-- new ClassCompileRegistry (line 1058)
-- new AttributeClassRegistry (line 1059)
+- new CompileFatal (line 874)
+- new CompileFatal (line 908)
+- new CompileError (line 911)
+- new ClassCompileRegistry (line 952)
+- new AttributeClassRegistry (line 953)
+- new ClassCompileRegistry (line 1061)
+- new AttributeClassRegistry (line 1062)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -50138,8 +50139,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/SiblingInlineCallArgProducerSlots.php`
 
 **Warnings** (review for bootstrap subset):
-- trait SiblingInlineCallArgProducerSlots (line 26)
-- 26 class method(s)
+- trait SiblingInlineCallArgProducerSlots (line 28)
+- 16 class method(s)
 
 ### `lib/Compiler/Concern/SiblingInlineFuncCallAndDeadArrayProducers.php`
 
@@ -50166,6 +50167,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Operand\Temporary (line 215)
 - new Temporary (line 470)
 - 35 class method(s)
+
+### `lib/Compiler/Concern/SubstrNestedHaystackAndMethodOrStaticCallInitSlots.php`
+
+**Warnings** (review for bootstrap subset):
+- trait SubstrNestedHaystackAndMethodOrStaticCallInitSlots (line 24)
+- 10 class method(s)
 
 ### `lib/Compiler/Concern/TernaryAndLogicalShortCircuit.php`
 
@@ -58170,12 +58177,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 844)
 - new Variable (line 910)
 - new Variable (line 954)
-- new Variable (line 979)
-- new Type (line 1483)
-- new Variable (line 1630)
-- new Variable (line 1854)
-- new Type (line 1866)
-- new Type (line 2173)
+- new Variable (line 988)
+- new Type (line 1492)
+- new Variable (line 1639)
+- new Variable (line 1903)
+- new Type (line 1915)
+- new Type (line 2222)
 - 1 class method(s)
 - 1 closure(s)
 

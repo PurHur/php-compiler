@@ -5713,6 +5713,7 @@
         "lib/Compiler/Concern/SiblingInlineFuncCallProducers.php",
         "lib/Compiler/Concern/SiblingMultiArgFuncCallProducerDetect.php",
         "lib/Compiler/Concern/SlotForCallArgResolvers.php",
+        "lib/Compiler/Concern/SubstrNestedHaystackAndMethodOrStaticCallInitSlots.php",
         "lib/Compiler/Concern/TernaryAndLogicalShortCircuit.php",
         "lib/Compiler/Concern/TryFinallyCatchAndOperandLookup.php",
         "lib/Compiler/Concern/VarExportNestedAndArrayMergeFamilyCallArgSlots.php",
@@ -8563,9 +8564,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8329,
+        "inventory_files": 8330,
         "excluded": 0,
-        "eligible": 8329,
+        "eligible": 8330,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
