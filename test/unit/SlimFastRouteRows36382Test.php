@@ -112,10 +112,14 @@ class Dispatcher {
 PHP);
         exec('php '.escapeshellarg($patch).' '.escapeshellarg($tmp).' 2>&1', $out, $ec);
         $this->assertSame(0, $ec, implode("\n", $out));
+        $staticPatch = $repo.'/script/composer/patch-slim-dispatcher-static-map-36382.php';
+        exec('php '.escapeshellarg($staticPatch).' '.escapeshellarg($tmp).' 2>&1', $out2, $ec2);
+        $this->assertSame(0, $ec2, implode("\n", $out2));
         $text = (string) file_get_contents($tmp);
-        $this->assertStringContainsString('inline FastRoute registration', $text);
+        $this->assertStringContainsString('static map from exportFastRouteRows', $text);
         $this->assertStringContainsString('exportFastRouteRows()', $text);
-        $this->assertStringContainsString('$frCollector->addRoute($row[0]', $text);
+        $this->assertStringContainsString('new FastRouteDispatcher([$static, []])', $text);
+        $this->assertStringNotContainsString('$frCollector->addRoute', $text);
         @unlink($tmp);
     }
 
@@ -125,7 +129,12 @@ PHP);
         $setup = (string) file_get_contents($repo.'/script/composer/setup-slim-hello-36382.sh');
         $this->assertStringContainsString('patch-slim-fastroute-rows-36382.php', $setup);
         $this->assertStringContainsString('patch-slim-dispatcher-closure-36382.php', $setup);
+        $this->assertStringContainsString('patch-slim-dispatcher-static-map-36382.php', $setup);
         $this->assertStringContainsString('patch-slim-fastroute-dispatcher-return-36382.php', $setup);
+        $this->assertStringContainsString('patch-nyholm-uri-construct-36382.php', $setup);
+        $this->assertStringContainsString('patch-fastroute-groupcount-ctor-36382.php', $setup);
+        $this->assertStringContainsString('patch-slim-fastroute-dispatcher-isset-36382.php', $setup);
+        $this->assertStringContainsString('patch-slim-routing-results-return-36382.php', $setup);
         $this->assertStringNotContainsString('patch-slim-fastroute-rows-36382.php" "$ROUTE"', $setup);
     }
 }
