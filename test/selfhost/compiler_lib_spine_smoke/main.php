@@ -5414,6 +5414,7 @@ require_once __DIR__.'/../../../lib/JIT/Concern/CompileDeclareGlobalStaticAndVar
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileFuncdefAndClosure.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileDeclareClassLike.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileMethodCallInit.php';
+require_once __DIR__.'/../../../lib/JIT/Concern/CompileTryCatchThrow.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileArrayDimFetchReadAndWrite.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AssignOperand.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/AdaptByRefCallArgs.php';
