@@ -5,11 +5,15 @@
     "files": {
         "lib/Compiler.php": {
 <<<<<<< HEAD
+<<<<<<< HEAD
             "budget": 1055,
             "target": 20000,
             "note": "Concern trait splits (#36230/#36387/#36403); CompileTimeClassConstFetchFold + CompileParamTypedDefaultAndDeprecation + CompileClassLikeDeclAndScope + peers"
 =======
             "budget": 1053,
+=======
+            "budget": 1055,
+>>>>>>> 6ffa99491e (Fix: wire CompilePseudoClassScopeAndConst trait into Compiler (#36387))
             "target": 20000,
             "note": "Concern trait splits (#36230/#36387/#36403); CompilePseudoClassScopeAndConst + CompileParamTypedDefaultAndDeprecation + peers"
 >>>>>>> 7dea006acd (Split-TU: extract CompilePseudoClassScopeAndConst from ClassLikeAndStmtCompile (#36387))

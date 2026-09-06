@@ -177,6 +177,7 @@ use PHPCompiler\Compiler\Concern\CompileClassBodyAndTraitAdaptations;
 use PHPCompiler\Compiler\Concern\CfgTypeShapeAndDeclaredAssert;
 use PHPCompiler\Compiler\Concern\CompileClassLikeDeclAndScope;
 use PHPCompiler\Compiler\Concern\CompileParamTypedDefaultAndDeprecation;
+use PHPCompiler\Compiler\Concern\CompilePseudoClassScopeAndConst;
 use PHPCompiler\Compiler\Concern\ErrorSuppressAndPropertyFetch;
 use PHPCompiler\Compiler\Concern\TernaryAndLogicalShortCircuit;
 use PHPCompiler\Compiler\Concern\CompileCallArgSends;
@@ -238,6 +239,7 @@ class Compiler {
     use CfgTypeShapeAndDeclaredAssert;
     use CompileClassLikeDeclAndScope;
     use CompileParamTypedDefaultAndDeprecation;
+    use CompilePseudoClassScopeAndConst;
     use ErrorSuppressAndPropertyFetch;
     use WriteContextRejects;
     use TernaryAndLogicalShortCircuit;
