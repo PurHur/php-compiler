@@ -49,6 +49,7 @@ require_once __DIR__.'/JIT/Concern/CompileMethodCallInit.php';
 require_once __DIR__.'/JIT/Concern/CompileTryCatchThrow.php';
 require_once __DIR__.'/JIT/Concern/CompileDeclareGlobalConst.php';
 require_once __DIR__.'/JIT/Concern/CompileTypeAssertAndErrorSilence.php';
+require_once __DIR__.'/JIT/Concern/CompileYield.php';
 require_once __DIR__.'/JIT/Concern/CompileArrayDimFetchReadAndWrite.php';
 require_once __DIR__.'/JIT/Concern/InitJitMethodCall.php';
 require_once __DIR__.'/JIT/Concern/AssignOperand.php';
@@ -155,6 +156,7 @@ class JIT {
     use CompileTryCatchThrow;
     use CompileDeclareGlobalConst;
     use CompileTypeAssertAndErrorSilence;
+    use CompileYield;
     use CompileArrayDimFetchReadAndWrite;
     use InitJitMethodCall;
     use AssignOperand;
