@@ -13,7 +13,7 @@ non-native link.
 
 ## Seed corpus (VM_* + lib_VM_* + ext/standard tiers)
 
-**92** committed `unit.o` files:
+**102** committed `unit.o` files:
 
 - full `VM_*` (13) and `lib_VM_*` (9) sets from `x86_64-linux`
 - first `ext/standard` tier (10): ArrayChunk / ArrayIsList / ArraySlice / Bin2hex /
@@ -33,6 +33,8 @@ non-native link.
 - class vars / type / array-assoc / sort (10): GetClassVars / ClassUsesRecursive /
   UnitEnumExists / Settype / ArrayDiffAssoc / ArrayIntersectAssoc / ArrayReplaceKey /
   Sort / Usort / Round
+- math / string / path / cwd / fs (10): PowInt / Clamp / Wordwrap / Quotemeta /
+  Pathinfo / Getcwd / Chdir / FsDir / FsGlob / Tempnam
 
 Refresh / expand via:
 

@@ -117,6 +117,17 @@ SEED_UNITS=(
   /ext/standard/SortJitHelper.php
   /ext/standard/UsortJitHelper.php
   /ext/standard/RoundJitHelper.php
+  # Math / string / path / cwd / fs tier (#36391 after #37067)
+  /ext/standard/PowIntJitHelper.php
+  /ext/standard/ClampJitHelper.php
+  /ext/standard/WordwrapJitHelper.php
+  /ext/standard/QuotemetaJitHelper.php
+  /ext/standard/PathinfoJitHelper.php
+  /ext/standard/GetcwdJitHelper.php
+  /ext/standard/ChdirJitHelper.php
+  /ext/standard/FsDirJitHelper.php
+  /ext/standard/FsGlobJitHelper.php
+  /ext/standard/TempnamJitHelper.php
 )
 
 MIN_SEED=${#SEED_UNITS[@]}
