@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8340 |
-| Phase A inventory files (M2 ratio SSOT) | 8340 |
+| PHP files on vm.php path | 8341 |
+| Phase A inventory files (M2 ratio SSOT) | 8341 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26278 |
+| Source constructs flagged (warnings) | 26280 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5577,7 +5577,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/CompileClassLikeDeclAndScope.php` | 0 | 8 |
 | `lib/Compiler/Concern/CompileErrorSuppressEndBlockAndSlotInherit.php` | 0 | 2 |
 | `lib/Compiler/Concern/CompileFuncCfgReturnAndGlobalImport.php` | 0 | 15 |
-| `lib/Compiler/Concern/CompileInlineSpecializedCallArgSends.php` | 0 | 18 |
+| `lib/Compiler/Concern/CompileInlineSpecializedCallArgSends.php` | 0 | 12 |
 | `lib/Compiler/Concern/CompileInterfaceTraitEnumAndMethodDecl.php` | 0 | 20 |
 | `lib/Compiler/Concern/CompileOpsTicksAndCfgSplit.php` | 0 | 9 |
 | `lib/Compiler/Concern/CompileParamFunctionAndStmtDispatch.php` | 0 | 17 |
@@ -5600,6 +5600,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/ErrorSuppressAndPropertyFetch.php` | 0 | 60 |
 | `lib/Compiler/Concern/ErrorSuppressCallArgProducers.php` | 0 | 2 |
 | `lib/Compiler/Concern/ExactHoistedAndInlineNewCallArgProducers.php` | 0 | 2 |
+| `lib/Compiler/Concern/ExplodeIteratorChunkWalkAndTrailingComparatorCallArgSends.php` | 0 | 8 |
 | `lib/Compiler/Concern/ExpressionPreludeDimFetchAndHoistedConstCallArgSlots.php` | 0 | 3 |
 | `lib/Compiler/Concern/FinalSiblingInlineCallArgSendSlot.php` | 0 | 2 |
 | `lib/Compiler/Concern/FinalizeArrayFamilyCallArgSlots.php` | 0 | 5 |
@@ -49130,13 +49131,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 904)
-- new CompileFatal (line 938)
-- new CompileError (line 941)
-- new ClassCompileRegistry (line 982)
-- new AttributeClassRegistry (line 983)
-- new ClassCompileRegistry (line 1091)
-- new AttributeClassRegistry (line 1092)
+- new CompileFatal (line 907)
+- new CompileFatal (line 941)
+- new CompileError (line 944)
+- new ClassCompileRegistry (line 985)
+- new AttributeClassRegistry (line 986)
+- new ClassCompileRegistry (line 1094)
+- new AttributeClassRegistry (line 1095)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -49543,24 +49544,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/CompileInlineSpecializedCallArgSends.php`
 
 **Warnings** (review for bootstrap subset):
-- trait CompileInlineSpecializedCallArgSends (line 26)
-- new OpCode (line 126)
-- new OpCode (line 238)
-- new OpCode (line 364)
-- new OpCode (line 436)
-- new OpCode (line 539)
-- new OpCode (line 613)
-- new OpCode (line 756)
-- new OpCode (line 859)
-- new OpCode (line 953)
-- new OpCode (line 1034)
-- new OpCode (line 1119)
-- new OpCode (line 1209)
-- new Variable (line 1259)
-- new Operand\Temporary (line 1266)
-- new Operand\Temporary (line 1271)
-- new OpCode (line 1331)
-- 15 class method(s)
+- trait CompileInlineSpecializedCallArgSends (line 25)
+- new OpCode (line 116)
+- new OpCode (line 219)
+- new OpCode (line 313)
+- new OpCode (line 394)
+- new OpCode (line 479)
+- new OpCode (line 569)
+- new Variable (line 619)
+- new Operand\Temporary (line 626)
+- new Operand\Temporary (line 631)
+- new OpCode (line 691)
+- 7 class method(s)
 
 ### `lib/Compiler/Concern/CompileInterfaceTraitEnumAndMethodDecl.php`
 
@@ -49911,6 +49906,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - trait ExactHoistedAndInlineNewCallArgProducers (line 24)
 - 26 class method(s)
+
+### `lib/Compiler/Concern/ExplodeIteratorChunkWalkAndTrailingComparatorCallArgSends.php`
+
+**Warnings** (review for bootstrap subset):
+- trait ExplodeIteratorChunkWalkAndTrailingComparatorCallArgSends (line 22)
+- new OpCode (line 122)
+- new OpCode (line 234)
+- new OpCode (line 360)
+- new OpCode (line 432)
+- new OpCode (line 535)
+- new OpCode (line 609)
+- 8 class method(s)
 
 ### `lib/Compiler/Concern/ExpressionPreludeDimFetchAndHoistedConstCallArgSlots.php`
 
