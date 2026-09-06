@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8313 |
-| Phase A inventory files (M2 ratio SSOT) | 8313 |
+| PHP files on vm.php path | 8314 |
+| Phase A inventory files (M2 ratio SSOT) | 8314 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26223 |
+| Source constructs flagged (warnings) | 26225 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5581,7 +5581,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/CompileParamFunctionAndStmtDispatch.php` | 0 | 17 |
 | `lib/Compiler/Concern/CompileParamTypedDefaultAndDeprecation.php` | 0 | 3 |
 | `lib/Compiler/Concern/CompilePromotedPropertyAndParamDefaults.php` | 0 | 15 |
-| `lib/Compiler/Concern/CompileTimeFold.php` | 0 | 59 |
+| `lib/Compiler/Concern/CompileTimeClassConstFetchFold.php` | 0 | 22 |
+| `lib/Compiler/Concern/CompileTimeFold.php` | 0 | 39 |
 | `lib/Compiler/Concern/DeferredSiblingAndArrayMapNullCallArgProducers.php` | 0 | 2 |
 | `lib/Compiler/Concern/DimAndPropertyWriteContext.php` | 0 | 2 |
 | `lib/Compiler/Concern/EchoCoalesceCallArgCompile.php` | 0 | 11 |
@@ -49103,13 +49104,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 823)
-- new CompileFatal (line 857)
-- new CompileError (line 860)
-- new ClassCompileRegistry (line 901)
-- new AttributeClassRegistry (line 902)
-- new ClassCompileRegistry (line 1010)
-- new AttributeClassRegistry (line 1011)
+- new CompileFatal (line 826)
+- new CompileFatal (line 860)
+- new CompileError (line 863)
+- new ClassCompileRegistry (line 904)
+- new AttributeClassRegistry (line 905)
+- new ClassCompileRegistry (line 1013)
+- new AttributeClassRegistry (line 1014)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -49610,68 +49611,74 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 16 class method(s)
 - 3 closure(s)
 
+### `lib/Compiler/Concern/CompileTimeClassConstFetchFold.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CompileTimeClassConstFetchFold (line 25)
+- new Variable (line 36)
+- new Variable (line 45)
+- new Variable (line 52)
+- new Variable (line 61)
+- new Variable (line 116)
+- new Variable (line 122)
+- new Variable (line 135)
+- new Variable (line 149)
+- new Variable (line 155)
+- new Variable (line 168)
+- new Variable (line 201)
+- new Variable (line 207)
+- new Variable (line 212)
+- new Variable (line 305)
+- new Variable (line 325)
+- new ReflectionClassConstant (line 351)
+- new Variable (line 357)
+- new Variable (line 363)
+- new Variable (line 369)
+- new Variable (line 375)
+- 8 class method(s)
+
 ### `lib/Compiler/Concern/CompileTimeFold.php`
 
 **Warnings** (review for bootstrap subset):
-- trait CompileTimeFold (line 35)
-- new Op\Type\Literal (line 42)
-- new Op\Expr\Param (line 43)
-- new Operand\Literal (line 44)
-- new Op\Type\Mixed_ (line 45)
-- new Variable (line 176)
-- new Variable (line 330)
-- new Variable (line 340)
-- new Variable (line 350)
-- new Variable (line 356)
-- new Variable (line 405)
-- new Variable (line 445)
-- new Variable (line 461)
-- new ClassEntry (line 466)
-- new ObjectEntry (line 468)
-- new Variable (line 492)
-- new Variable (line 551)
-- new Variable (line 584)
-- new Variable (line 615)
-- new Variable (line 629)
-- new Variable (line 674)
-- new Variable (line 679)
-- new Variable (line 797)
-- new Variable (line 804)
-- new Variable (line 816)
-- new Variable (line 831)
-- new Variable (line 834)
-- new Variable (line 840)
-- new Variable (line 847)
-- new Variable (line 854)
-- new Variable (line 860)
-- new Variable (line 866)
-- new Variable (line 873)
-- new Variable (line 881)
-- new Variable (line 888)
-- new Variable (line 895)
-- new Variable (line 965)
-- new Variable (line 1120)
-- new Variable (line 1150)
-- new Variable (line 1159)
-- new Variable (line 1166)
-- new Variable (line 1175)
-- new Variable (line 1230)
-- new Variable (line 1236)
-- new Variable (line 1249)
-- new Variable (line 1263)
-- new Variable (line 1269)
-- new Variable (line 1282)
-- new Variable (line 1315)
-- new Variable (line 1321)
-- new Variable (line 1326)
-- new Variable (line 1419)
-- new Variable (line 1439)
-- new ReflectionClassConstant (line 1465)
-- new Variable (line 1471)
-- new Variable (line 1477)
-- new Variable (line 1483)
-- new Variable (line 1489)
-- 37 class method(s)
+- trait CompileTimeFold (line 31)
+- new Op\Type\Literal (line 38)
+- new Op\Expr\Param (line 39)
+- new Operand\Literal (line 40)
+- new Op\Type\Mixed_ (line 41)
+- new Variable (line 172)
+- new Variable (line 326)
+- new Variable (line 336)
+- new Variable (line 346)
+- new Variable (line 352)
+- new Variable (line 401)
+- new Variable (line 441)
+- new Variable (line 457)
+- new ClassEntry (line 462)
+- new ObjectEntry (line 464)
+- new Variable (line 488)
+- new Variable (line 547)
+- new Variable (line 580)
+- new Variable (line 611)
+- new Variable (line 625)
+- new Variable (line 670)
+- new Variable (line 675)
+- new Variable (line 793)
+- new Variable (line 800)
+- new Variable (line 812)
+- new Variable (line 827)
+- new Variable (line 830)
+- new Variable (line 836)
+- new Variable (line 843)
+- new Variable (line 850)
+- new Variable (line 856)
+- new Variable (line 862)
+- new Variable (line 869)
+- new Variable (line 877)
+- new Variable (line 884)
+- new Variable (line 891)
+- new Variable (line 961)
+- new Variable (line 1116)
+- 29 class method(s)
 
 ### `lib/Compiler/Concern/DeferredSiblingAndArrayMapNullCallArgProducers.php`
 
