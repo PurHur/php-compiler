@@ -817,7 +817,9 @@ final class JitValueBox
      */
     public static function valuePtrFromNativeVariable(Context $context, Variable $var): Value
     {
-        if (null !== $var->longArithOverflowPromoted) {
+        if (null !== $var->longArithOverflowFlag
+            && (null !== $var->longArithOverflowDoubleSlot || null !== $var->longArithOverflowPromoted)
+        ) {
             $materialized = JitLongArithOverflow::materializeOverflowableNativeLong($context, $var);
 
             return self::valuePtrFromVariable($context, $materialized);

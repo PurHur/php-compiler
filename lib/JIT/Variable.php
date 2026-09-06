@@ -462,13 +462,25 @@ final class Variable {
     public ?\PHPLLVM\Value $valueBoxAliasPtr = null;
 
     /**
-     * i1 alloca: native long + / − / * took the overflow→double cold path (#36189).
+     * i1 SSA (not alloca): native long + / − / * took the overflow→double cold path (#36189).
      *
      * @var \PHPLLVM\Value|null
      */
     public ?\PHPLLVM\Value $longArithOverflowFlag = null;
 
-    /** Cold-path double box when {@see $longArithOverflowFlag} is set (#36189). */
+    /**
+     * f64 entry alloca holding the promoted double when {@see $longArithOverflowFlag} is set.
+     * Lazily boxed in {@see JitLongArithOverflow::materializeOverflowableNativeLong} so the
+     * hot path never pays {@see BasicBlockHelper::entryAllocaValueBox} (#36386 / #36189).
+     *
+     * @var \PHPLLVM\Value|null
+     */
+    public ?\PHPLLVM\Value $longArithOverflowDoubleSlot = null;
+
+    /**
+     * Legacy cold-path {@see __value__} box when set (pre-#36386 heap/entry box). Prefer
+     * {@see $longArithOverflowDoubleSlot}.
+     */
     public ?Variable $longArithOverflowPromoted = null;
 
     /** Module-global {@see __value__*} slot for function-local static storage (#3778, #2286). */
