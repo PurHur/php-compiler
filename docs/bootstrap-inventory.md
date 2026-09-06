@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8322 |
-| Phase A inventory files (M2 ratio SSOT) | 8322 |
+| PHP files on vm.php path | 8323 |
+| Phase A inventory files (M2 ratio SSOT) | 8323 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26240 |
+| Source constructs flagged (warnings) | 26242 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5622,6 +5622,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/SiblingInlineCallArgProducerSlots.php` | 0 | 3 |
 | `lib/Compiler/Concern/SiblingInlineFuncCallAndDeadArrayProducers.php` | 0 | 2 |
 | `lib/Compiler/Concern/SiblingInlineFuncCallProducers.php` | 0 | 2 |
+| `lib/Compiler/Concern/SiblingMultiArgFuncCallProducerDetect.php` | 0 | 2 |
 | `lib/Compiler/Concern/SlotForCallArgResolvers.php` | 0 | 5 |
 | `lib/Compiler/Concern/TernaryAndLogicalShortCircuit.php` | 0 | 5 |
 | `lib/Compiler/Concern/TryFinallyCatchAndOperandLookup.php` | 0 | 4 |
@@ -49112,13 +49113,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 850)
-- new CompileFatal (line 884)
-- new CompileError (line 887)
-- new ClassCompileRegistry (line 928)
-- new AttributeClassRegistry (line 929)
-- new ClassCompileRegistry (line 1037)
-- new AttributeClassRegistry (line 1038)
+- new CompileFatal (line 853)
+- new CompileFatal (line 887)
+- new CompileError (line 890)
+- new ClassCompileRegistry (line 931)
+- new AttributeClassRegistry (line 932)
+- new ClassCompileRegistry (line 1040)
+- new AttributeClassRegistry (line 1041)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -50115,7 +50116,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - trait SiblingInlineFuncCallProducers (line 27)
-- 37 class method(s)
+- 31 class method(s)
+
+### `lib/Compiler/Concern/SiblingMultiArgFuncCallProducerDetect.php`
+
+**Warnings** (review for bootstrap subset):
+- trait SiblingMultiArgFuncCallProducerDetect (line 31)
+- 6 class method(s)
 
 ### `lib/Compiler/Concern/SlotForCallArgResolvers.php`
 
