@@ -14,7 +14,8 @@ use PHPUnit\Framework\TestCase;
  * (false float path) and `$digit < 0` crashed. Digit encoding is now digit+1 /
  * 0=invalid; overflow uses a float compare; invalid-char flag is a post-pass scan.
  *
- * Direct float args still need Z_PARAM_STR coerce work (use `(string)$v` for now).
+ * Untyped float locals go through value-box convert_to_string (not bare
+ * {@code __value__readString}, which returned null and SIGSEGV'd).
  *
  * php-src: ext/standard/math.c php_base_convert / _php_math_basetozval.
  *
@@ -96,6 +97,45 @@ final class BaseConvertOverflowableAotTest extends TestCase
         echo base_convert(255.0, 10, 16), "\n";
         PHP;
         $this->assertAotMatchesZend($src, 'bc_f255');
+    }
+
+    public function testBaseConvertUntypedFloatLocalMatchesZend(): void
+    {
+        $src = <<<'PHP'
+        <?php
+        $v = 255.0;
+        echo base_convert($v, 10, 16), "\n";
+        PHP;
+        $this->assertAotMatchesZend($src, 'bc_f255v');
+    }
+
+    public function testBaseConvertOverflowFloatDirectMatchesZend(): void
+    {
+        $src = <<<'PHP'
+        <?php
+        $v = PHP_INT_MAX + 1;
+        echo base_convert($v, 10, 16), "\n";
+        PHP;
+        $this->assertAotMatchesZend($src, 'bc_ov_direct');
+    }
+
+    public function testBaseConvertLargeFloatLiteralMatchesZend(): void
+    {
+        $src = <<<'PHP'
+        <?php
+        echo base_convert(1.5e20, 10, 16), "\n";
+        PHP;
+        $this->assertAotMatchesZend($src, 'bc_f15e20');
+    }
+
+    public function testStrlenUntypedFloatLocalMatchesZend(): void
+    {
+        $src = <<<'PHP'
+        <?php
+        $v = 255.0;
+        echo strlen($v), "\n";
+        PHP;
+        $this->assertAotMatchesZend($src, 'strlen_f255v');
     }
 
     private function assertAotMatchesZend(string $src, string $tag): void
