@@ -23,6 +23,7 @@ require_once __DIR__.'/Compiler/Concern/CompileClassBodyAndTraitAdaptations.php'
 require_once __DIR__.'/Compiler/Concern/CfgTypeShapeAndDeclaredAssert.php';
 require_once __DIR__.'/Compiler/Concern/CompileClassLikeDeclAndScope.php';
 require_once __DIR__.'/Compiler/Concern/CompileParamTypedDefaultAndDeprecation.php';
+require_once __DIR__.'/Compiler/Concern/CompilePseudoClassScopeAndConst.php';
 require_once __DIR__.'/Compiler/Concern/ErrorSuppressAndPropertyFetch.php';
 require_once __DIR__.'/Compiler/Concern/WriteContextRejects.php';
 require_once __DIR__.'/Compiler/Concern/TernaryAndLogicalShortCircuit.php';

@@ -4,9 +4,15 @@
     "done_when_ceiling": 25000,
     "files": {
         "lib/Compiler.php": {
+<<<<<<< HEAD
             "budget": 1055,
             "target": 20000,
             "note": "Concern trait splits (#36230/#36387/#36403); CompileTimeClassConstFetchFold + CompileParamTypedDefaultAndDeprecation + CompileClassLikeDeclAndScope + peers"
+=======
+            "budget": 1053,
+            "target": 20000,
+            "note": "Concern trait splits (#36230/#36387/#36403); CompilePseudoClassScopeAndConst + CompileParamTypedDefaultAndDeprecation + peers"
+>>>>>>> 7dea006acd (Split-TU: extract CompilePseudoClassScopeAndConst from ClassLikeAndStmtCompile (#36387))
         },
         "lib/JIT.php": {
             "budget": 274,
