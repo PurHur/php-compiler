@@ -5346,6 +5346,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/CompileParamFunctionAndStmt
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompileClassBodyAndTraitAdaptations.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CfgTypeShapeAndDeclaredAssert.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompileClassLikeDeclAndScope.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/CompileParamTypedDefaultAndDeprecation.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/ErrorSuppressAndPropertyFetch.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/WriteContextRejects.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/TernaryAndLogicalShortCircuit.php';
