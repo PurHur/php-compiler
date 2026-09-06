@@ -5343,6 +5343,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/CompileInterfaceTraitEnumAn
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompileClassConstFoldAndTypedReject.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompilePromotedPropertyAndParamDefaults.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompileParamFunctionAndStmtDispatch.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/CompileClassBodyAndTraitAdaptations.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/ErrorSuppressAndPropertyFetch.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/WriteContextRejects.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/TernaryAndLogicalShortCircuit.php';
