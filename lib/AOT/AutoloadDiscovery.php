@@ -18,8 +18,9 @@ use PHPCompiler\Web\ProjectManifest;
  * Static PSR-4 class reference discovery for phpc build --project (issue #1803).
  *
  * Walks entry/includes for syntactic class references (new, static call, extends,
- * implements, ::class, property types, trait uses, FQCN string property defaults)
- * and expands the compile graph via phpc.json autoload.psr-4.
+ * implements, ::class, property types, trait uses, FQCN string property defaults,
+ * and FQCN string coalesce defaults feeding `new $merged['k']`) and expands the
+ * compile graph via phpc.json autoload.psr-4.
  */
 final class AutoloadDiscovery
 {
@@ -274,6 +275,12 @@ final class StaticClassReferenceScanner
                 // ServerRequestCreatorFactory::create() finds no implementation (#36382).
                 // Soft: unresolved optionals (Slim\Psr7, Guzzle, …) must not fail the graph.
                 self::collectFqcnStringDefault($child->defaultVar ?? null, $soft);
+            } elseif ($child instanceof Op\Expr\BinaryOp\Coalesce) {
+                // FastRoute simpleDispatcher: `$merged['routeCollector'] ?? 'FastRoute\RouteCollector'`
+                // then `new $merged['routeCollector']`. The New_ class operand is dynamic, so only
+                // the coalesce RHS FQCN literal seeds AutoloadDiscovery — without it, reachable
+                // graphs keep functions.php but omit RouteCollector and AOT aborts after START (#36382).
+                self::collectFqcnStringDefault($child->right ?? null, $soft);
             } elseif ($child instanceof Op\Expr\Param) {
                 self::collectDeclaredType($child->declaredType ?? null, $hard);
             } elseif ($child instanceof Op\Stmt\TraitUse) {
