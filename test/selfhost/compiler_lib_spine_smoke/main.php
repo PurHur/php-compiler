@@ -5342,6 +5342,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/CompileTimeUnaryBinaryAndCa
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompileTimeParamDefaultAndExprFold.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/ParameterAsserts.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CoalesceAndNullsafe.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/NullsafePropertyAndMethodCompile.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/ClassLikeAndStmtCompile.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompileInterfaceTraitEnumAndMethodDecl.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompileClassConstFoldAndTypedReject.php';

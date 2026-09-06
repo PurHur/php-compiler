@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8352 |
-| Phase A inventory files (M2 ratio SSOT) | 8352 |
+| PHP files on vm.php path | 8353 |
+| Phase A inventory files (M2 ratio SSOT) | 8353 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26302 |
+| Source constructs flagged (warnings) | 26304 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5569,7 +5569,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/CfgProducerIndexAndRematerialize.php` | 0 | 2 |
 | `lib/Compiler/Concern/CfgTypeShapeAndDeclaredAssert.php` | 0 | 11 |
 | `lib/Compiler/Concern/ClassLikeAndStmtCompile.php` | 0 | 1 |
-| `lib/Compiler/Concern/CoalesceAndNullsafe.php` | 0 | 62 |
+| `lib/Compiler/Concern/CoalesceAndNullsafe.php` | 0 | 17 |
 | `lib/Compiler/Concern/CoalesceLeftAndEchoConcatPreludes.php` | 0 | 9 |
 | `lib/Compiler/Concern/CompileAnonymousFunctionGeneratorAndNever.php` | 0 | 5 |
 | `lib/Compiler/Concern/CompileCallArgSends.php` | 0 | 59 |
@@ -5630,6 +5630,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/NestedArrayAndLeadingConstCallArgProducers.php` | 0 | 3 |
 | `lib/Compiler/Concern/NestedArrayOutermostAndByRefCallArgHelpers.php` | 0 | 4 |
 | `lib/Compiler/Concern/NestedIifeAndDeferredSiblingCallArgProducers.php` | 0 | 2 |
+| `lib/Compiler/Concern/NullsafePropertyAndMethodCompile.php` | 0 | 47 |
 | `lib/Compiler/Concern/OperandAccessAndDeferredArrayCompile.php` | 0 | 4 |
 | `lib/Compiler/Concern/OuterSiblingAndBuiltinWireCallArgSlots.php` | 0 | 7 |
 | `lib/Compiler/Concern/OuterSiblingExecReturnAndHoistedConstFetchSlots.php` | 0 | 2 |
@@ -49142,13 +49143,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 931)
-- new CompileFatal (line 965)
-- new CompileError (line 968)
-- new ClassCompileRegistry (line 1009)
-- new AttributeClassRegistry (line 1010)
-- new ClassCompileRegistry (line 1118)
-- new AttributeClassRegistry (line 1119)
+- new CompileFatal (line 934)
+- new CompileFatal (line 968)
+- new CompileError (line 971)
+- new ClassCompileRegistry (line 1012)
+- new AttributeClassRegistry (line 1013)
+- new ClassCompileRegistry (line 1121)
+- new AttributeClassRegistry (line 1122)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -49351,68 +49352,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/CoalesceAndNullsafe.php`
 
 **Warnings** (review for bootstrap subset):
-- trait CoalesceAndNullsafe (line 19)
-- new OpCode (line 483)
-- new OpCode (line 511)
-- new OpCode (line 518)
-- new Block (line 526)
-- new Block (line 530)
-- new OpCode (line 560)
-- new Block (line 568)
-- new OpCode (line 583)
-- new OpCode (line 594)
-- new OpCode (line 605)
-- new OpCode (line 615)
-- new OpCode (line 626)
-- new OpCode (line 635)
-- new OpCode (line 638)
-- new OpCode (line 649)
-- new Block (line 756)
-- new Block (line 760)
-- new Operand\Literal (line 763)
-- new OpCode (line 766)
-- new OpCode (line 772)
-- new Block (line 776)
-- new OpCode (line 779)
-- new OpCode (line 785)
-- new OpCode (line 791)
-- new Block (line 812)
-- new Block (line 816)
-- new Operand\Literal (line 819)
-- new OpCode (line 822)
-- new OpCode (line 828)
-- new Block (line 832)
-- new OpCode (line 837)
-- new OpCode (line 850)
-- new OpCode (line 858)
-- new OpCode (line 909)
-- new Block (line 938)
-- new Block (line 955)
-- new Block (line 977)
-- new OpCode (line 981)
-- new OpCode (line 987)
-- new Block (line 991)
-- new OpCode (line 1001)
-- new OpCode (line 1006)
-- new OpCode (line 1022)
-- new Block (line 1047)
-- new OpCode (line 1051)
-- new OpCode (line 1057)
-- new Block (line 1061)
-- new OpCode (line 1065)
-- new OpCode (line 1071)
-- new OpCode (line 1076)
-- new OpCode (line 1092)
-- new Block (line 1116)
-- new Block (line 1120)
-- new Operand\Literal (line 1123)
-- new OpCode (line 1126)
-- new OpCode (line 1132)
-- new Block (line 1136)
-- new OpCode (line 1168)
-- new OpCode (line 1181)
-- new OpCode (line 1189)
-- 38 class method(s)
+- trait CoalesceAndNullsafe (line 20)
+- new OpCode (line 255)
+- new OpCode (line 283)
+- new OpCode (line 290)
+- new Block (line 298)
+- new Block (line 302)
+- new OpCode (line 332)
+- new Block (line 340)
+- new OpCode (line 355)
+- new OpCode (line 366)
+- new OpCode (line 377)
+- new OpCode (line 387)
+- new OpCode (line 398)
+- new OpCode (line 407)
+- new OpCode (line 410)
+- new OpCode (line 421)
+- 7 class method(s)
 
 ### `lib/Compiler/Concern/CoalesceLeftAndEchoConcatPreludes.php`
 
@@ -50180,6 +50136,57 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - trait NestedIifeAndDeferredSiblingCallArgProducers (line 25)
 - 8 class method(s)
+
+### `lib/Compiler/Concern/NullsafePropertyAndMethodCompile.php`
+
+**Warnings** (review for bootstrap subset):
+- trait NullsafePropertyAndMethodCompile (line 20)
+- new Block (line 345)
+- new Block (line 349)
+- new Operand\Literal (line 352)
+- new OpCode (line 355)
+- new OpCode (line 361)
+- new Block (line 365)
+- new OpCode (line 368)
+- new OpCode (line 374)
+- new OpCode (line 380)
+- new Block (line 401)
+- new Block (line 405)
+- new Operand\Literal (line 408)
+- new OpCode (line 411)
+- new OpCode (line 417)
+- new Block (line 421)
+- new OpCode (line 426)
+- new OpCode (line 439)
+- new OpCode (line 447)
+- new OpCode (line 498)
+- new Block (line 527)
+- new Block (line 544)
+- new Block (line 566)
+- new OpCode (line 570)
+- new OpCode (line 576)
+- new Block (line 580)
+- new OpCode (line 590)
+- new OpCode (line 595)
+- new OpCode (line 611)
+- new Block (line 636)
+- new OpCode (line 640)
+- new OpCode (line 646)
+- new Block (line 650)
+- new OpCode (line 654)
+- new OpCode (line 660)
+- new OpCode (line 665)
+- new OpCode (line 681)
+- new Block (line 705)
+- new Block (line 709)
+- new Operand\Literal (line 712)
+- new OpCode (line 715)
+- new OpCode (line 721)
+- new Block (line 725)
+- new OpCode (line 757)
+- new OpCode (line 770)
+- new OpCode (line 778)
+- 31 class method(s)
 
 ### `lib/Compiler/Concern/OperandAccessAndDeferredArrayCompile.php`
 
