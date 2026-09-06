@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8302 |
-| Phase A inventory files (M2 ratio SSOT) | 8302 |
+| PHP files on vm.php path | 8303 |
+| Phase A inventory files (M2 ratio SSOT) | 8303 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26196 |
+| Source constructs flagged (warnings) | 26198 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7107,6 +7107,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/CompileScriptMagicIncludeClone.php` | 0 | 3 |
 | `lib/JIT/Concern/CompileSkippedOpcodeVmAndCfgBranchStubs.php` | 0 | 4 |
 | `lib/JIT/Concern/CompileStaticPropertyAndUnset.php` | 0 | 2 |
+| `lib/JIT/Concern/CompileTimeStringFoldAndPromote.php` | 0 | 2 |
 | `lib/JIT/Concern/CompileTraitUsesWithAdaptations.php` | 0 | 4 |
 | `lib/JIT/Concern/CompileTryCatchThrow.php` | 0 | 2 |
 | `lib/JIT/Concern/CompileTypeAssertAndErrorSilence.php` | 0 | 2 |
@@ -58439,6 +58440,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - trait CompileStaticPropertyAndUnset (line 22)
 - 1 class method(s)
 
+### `lib/JIT/Concern/CompileTimeStringFoldAndPromote.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CompileTimeStringFoldAndPromote (line 21)
+- 12 class method(s)
+
 ### `lib/JIT/Concern/CompileTraitUsesWithAdaptations.php`
 
 **Warnings** (review for bootstrap subset):
@@ -58645,7 +58652,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 167)
 - new Variable (line 227)
 - new Variable (line 446)
-- 30 class method(s)
+- 18 class method(s)
 
 ### `lib/JIT/Concern/PropertyIncDecCompile.php`
 
@@ -60601,7 +60608,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/SpineChunkRuntimeMethodDemote.php`
 
 **Warnings** (review for bootstrap subset):
-- new OpCode (line 272)
+- new OpCode (line 273)
 - 11 class method(s)
 
 ### `lib/JIT/SpineChunkStandardHelperBind.php`

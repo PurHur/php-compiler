@@ -5436,6 +5436,7 @@ require_once __DIR__.'/../../../lib/JIT/Concern/PropertyDeclaringClassResolve.ph
 require_once __DIR__.'/../../../lib/JIT/Concern/CoerceReturnPropertyDeclaringAndByRef.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/PropertyIncDecCompile.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CallResultCompileTimePropagate.php';
+require_once __DIR__.'/../../../lib/JIT/Concern/CompileTimeStringFoldAndPromote.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/PropertyFetchCoalesceAndCompileTimeString.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CallResultOperandAssign.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/ByRefFormalAssignAndCallArgAdapt.php';
