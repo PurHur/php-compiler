@@ -408,6 +408,40 @@ if ! grep -q 'separateContainerForWrite' "$ROOT/lib/VM/VmIteratorForeach.php"; t
   exit 1
 fi
 
+echo "runtime-assert-mutate-smoke: run string-key foreach-by-ref RMW (no dim-hydrate)…"
+cat > "$WORKDIR/foreach_rmw.php" <<'PHP'
+<?php
+$b = ['x' => 1, 'y' => 2];
+$a = $b;
+foreach ($a as &$w) {
+    $w += 1;
+}
+unset($w);
+echo implode(',', $a), '|', implode(',', $b), "\n";
+$b2 = ['x' => 1, 'y' => 2];
+$a2 = $b2;
+foreach ($a2 as &$w2) {
+    $w2 = $w2 + 1;
+}
+unset($w2);
+echo implode(',', $a2), '|', implode(',', $b2), "\n";
+PHP
+"$PHP_BIN" bin/compile.php -o "$WORKDIR/foreach_rmw.bin" "$WORKDIR/foreach_rmw.php" >/dev/null
+rmw_out="$("$WORKDIR/foreach_rmw.bin" 2>&1)"
+rmw_rc=$?
+if [[ "$rmw_rc" -ne 0 ]]; then
+  echo "runtime-assert-mutate-smoke: FAIL — string-key foreach RMW exited $rmw_rc: $rmw_out" >&2
+  exit 1
+fi
+if [[ "$rmw_out" != $'2,3|1,2\n2,3|1,2\n' && "$rmw_out" != $'2,3|1,2\n2,3|1,2' ]]; then
+  echo "runtime-assert-mutate-smoke: FAIL — expected 2,3|1,2 twice from string-key foreach RMW, got: $rmw_out" >&2
+  exit 1
+fi
+if ! grep -q 'foreachByRefPackedArm' "$ROOT/lib/JIT/HashTableWriteLlvm.php"; then
+  echo "runtime-assert-mutate-smoke: FAIL — HashTableWriteLlvm.php missing foreachByRefPackedArm hydrate skip" >&2
+  exit 1
+fi
+
 echo "runtime-assert-mutate-smoke: source gates for by-ref mutator COW (#36397 slice 9–16)…"
 for f in \
   lib/JIT/Builtin/ArrayPushRuntime.php \

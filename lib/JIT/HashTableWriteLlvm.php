@@ -2617,6 +2617,15 @@ final class HashTableWriteLlvm
         if (null === $lvalue->writableHt) {
             return;
         }
+        // Foreach by-ref stashes the walk cursor in writableIndex for packed-arm
+        // commit, but the live value is already at borrowedValueEntry. Treating that
+        // cursor as a FETCH_DIM_W packed index runs offsetIsSet/setNullAt on string-key
+        // tables → "Undefined array key N" + infinite growth / SEGV (#36397).
+        // php-src: ZEND_FE_FETCH_RW borrows the zval*; ASSIGN_OP mutates in place — no
+        // ZEND_FETCH_DIM_W hydrate.
+        if (null !== $lvalue->foreachByRefPackedArm) {
+            return;
+        }
         if (null !== $lvalue->writableIndex) {
             self::hydrateIndexWriteLvalue($context, $lvalue);
 
@@ -2646,6 +2655,10 @@ final class HashTableWriteLlvm
     public static function commitDimWriteLvalue(Context $context, Variable $lvalue): void
     {
         if (null === $lvalue->writableHt) {
+            return;
+        }
+        // Foreach by-ref commits via emitForeachByRefAssign (borrowed entry), not dim index.
+        if (null !== $lvalue->foreachByRefPackedArm) {
             return;
         }
         if (null !== $lvalue->writableIndex) {

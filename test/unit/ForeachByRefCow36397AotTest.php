@@ -28,4 +28,21 @@ final class ForeachByRefCow36397AotTest extends TestCase
         $this->assertSame(0, $runEc, "run failed:\n".implode("\n", $runOut));
         $this->assertSame("1,2|10,20\n", implode("\n", $runOut)."\n");
     }
+
+    /** String-key `$w += 1` / `$w = $w + 1` must not SEGV or invent packed keys (#36397). */
+    public function testStringKeyByRefForeachRmw(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $src = $root.'/test/repro/foreach_byref_rmw_string_36397.php';
+        $bin = sys_get_temp_dir().'/phpc_foreach_byref_rmw_36397_'.getmypid().'.bin';
+        $compile = escapeshellarg(PHP_BINARY).' '.escapeshellarg($root.'/bin/compile.php')
+            .' -o '.escapeshellarg($bin).' '.escapeshellarg($src);
+        exec($compile.' 2>&1', $out, $ec);
+        $this->assertSame(0, $ec, "compile failed:\n".implode("\n", $out));
+        $this->assertFileExists($bin);
+        exec(escapeshellarg($bin).' 2>&1', $runOut, $runEc);
+        @unlink($bin);
+        $this->assertSame(0, $runEc, "run failed:\n".implode("\n", $runOut));
+        $this->assertSame("2,3|1,2\n2,3|1,2\n", implode("\n", $runOut)."\n");
+    }
 }
