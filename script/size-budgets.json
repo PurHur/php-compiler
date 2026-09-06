@@ -29,9 +29,9 @@
             "note": "already under target; output helpers in LinkerOutputArtifacts (#36403); ASAN via clang/gcc (#36397)"
         },
         "lib/AOT/HelperRuntimeCache.php": {
-            "budget": 1599,
+            "budget": 1603,
             "target": 1200,
-            "note": "helper-cache granularity; sorted linkObjects (#36399); refusePrelinkGcMixReason (#36401); ratchet after #36778"
+            "note": "helper-cache granularity; sorted linkObjects (#36399); refusePrelinkGcMixReason (#36401); tip-ratchet after #36946 ParseUrl leaf growth"
         }
     },
     "script_file_count": {

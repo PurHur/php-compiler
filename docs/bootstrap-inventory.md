@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 8301 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26192 |
+| Source constructs flagged (warnings) | 26194 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -50739,13 +50739,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ArrayWalkLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 234)
-- new Variable (line 461)
-- new Variable (line 470)
-- new NestedClosureInvoke (line 485)
-- new Variable (line 496)
-- new Variable (line 508)
-- new NestedClosureInvoke (line 523)
+- new Variable (line 236)
+- new Variable (line 463)
+- new Variable (line 472)
+- new NestedClosureInvoke (line 487)
+- new Variable (line 498)
+- new Variable (line 510)
+- new NestedClosureInvoke (line 525)
 - 16 class method(s)
 - 4 closure(s)
 
@@ -60594,7 +60594,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/SpineChunkRuntimeMethodDemote.php`
 
 **Warnings** (review for bootstrap subset):
-- new OpCode (line 270)
+- new OpCode (line 271)
 - 11 class method(s)
 
 ### `lib/JIT/SpineChunkStandardHelperBind.php`
