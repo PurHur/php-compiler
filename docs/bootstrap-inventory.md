@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8347 |
-| Phase A inventory files (M2 ratio SSOT) | 8347 |
+| PHP files on vm.php path | 8348 |
+| Phase A inventory files (M2 ratio SSOT) | 8348 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26292 |
+| Source constructs flagged (warnings) | 26294 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5642,8 +5642,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/SiblingInlineFuncCallAndDeadArrayProducers.php` | 0 | 2 |
 | `lib/Compiler/Concern/SiblingInlineFuncCallProducers.php` | 0 | 1 |
 | `lib/Compiler/Concern/SiblingMultiArgFuncCallProducerDetect.php` | 0 | 2 |
-| `lib/Compiler/Concern/SlotForCallArgResolvers.php` | 0 | 5 |
+| `lib/Compiler/Concern/SlotForCallArgResolvers.php` | 0 | 2 |
 | `lib/Compiler/Concern/SlotForInlineClosureAndFirstClassCallableCallArgResolvers.php` | 0 | 2 |
+| `lib/Compiler/Concern/SlotForPropertyClassConstAndClosureBindCallArgResolvers.php` | 0 | 5 |
 | `lib/Compiler/Concern/StmtLevelSideEffectAndEmittedCallGuards.php` | 0 | 2 |
 | `lib/Compiler/Concern/SubstrNestedHaystackAndMethodOrStaticCallInitSlots.php` | 0 | 2 |
 | `lib/Compiler/Concern/TernaryAndLogicalShortCircuit.php` | 0 | 5 |
@@ -49137,13 +49138,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 922)
-- new CompileFatal (line 956)
-- new CompileError (line 959)
-- new ClassCompileRegistry (line 1000)
-- new AttributeClassRegistry (line 1001)
-- new ClassCompileRegistry (line 1109)
-- new AttributeClassRegistry (line 1110)
+- new CompileFatal (line 925)
+- new CompileFatal (line 959)
+- new CompileError (line 962)
+- new ClassCompileRegistry (line 1003)
+- new AttributeClassRegistry (line 1004)
+- new ClassCompileRegistry (line 1112)
+- new AttributeClassRegistry (line 1113)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -50262,17 +50263,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/SlotForCallArgResolvers.php`
 
 **Warnings** (review for bootstrap subset):
-- trait SlotForCallArgResolvers (line 25)
-- new Operand\Temporary (line 176)
-- new Operand\Temporary (line 215)
-- new Temporary (line 470)
-- 27 class method(s)
+- trait SlotForCallArgResolvers (line 24)
+- 18 class method(s)
 
 ### `lib/Compiler/Concern/SlotForInlineClosureAndFirstClassCallableCallArgResolvers.php`
 
 **Warnings** (review for bootstrap subset):
 - trait SlotForInlineClosureAndFirstClassCallableCallArgResolvers (line 26)
 - 8 class method(s)
+
+### `lib/Compiler/Concern/SlotForPropertyClassConstAndClosureBindCallArgResolvers.php`
+
+**Warnings** (review for bootstrap subset):
+- trait SlotForPropertyClassConstAndClosureBindCallArgResolvers (line 26)
+- new Operand\Temporary (line 177)
+- new Operand\Temporary (line 216)
+- new Temporary (line 471)
+- 9 class method(s)
 
 ### `lib/Compiler/Concern/StmtLevelSideEffectAndEmittedCallGuards.php`
 
