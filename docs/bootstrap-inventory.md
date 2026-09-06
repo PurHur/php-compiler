@@ -5581,6 +5581,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/CompileParamFunctionAndStmtDispatch.php` | 0 | 17 |
 | `lib/Compiler/Concern/CompileParamTypedDefaultAndDeprecation.php` | 0 | 3 |
 | `lib/Compiler/Concern/CompilePromotedPropertyAndParamDefaults.php` | 0 | 15 |
+| `lib/Compiler/Concern/CompilePropertyFetchEmptyAssignAndUnset.php` | 0 | 2 |
 | `lib/Compiler/Concern/CompilePseudoClassScopeAndConst.php` | 0 | 6 |
 | `lib/Compiler/Concern/CompileReservedNamesPseudoClassAndClassConst.php` | 0 | 2 |
 | `lib/Compiler/Concern/CompileTimeClassConstFetchFold.php` | 0 | 22 |
@@ -49296,8 +49297,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/ClassLikeAndStmtCompile.php`
 
 **Warnings** (review for bootstrap subset):
-- trait ClassLikeAndStmtCompile (line 143)
-- 14 class method(s)
+- trait ClassLikeAndStmtCompile (line 144)
+- 2 class method(s)
 
 ### `lib/Compiler/Concern/CoalesceAndNullsafe.php`
 
@@ -49609,6 +49610,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Operand\Temporary (line 378)
 - 16 class method(s)
 - 3 closure(s)
+
+### `lib/Compiler/Concern/CompilePropertyFetchEmptyAssignAndUnset.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CompilePropertyFetchEmptyAssignAndUnset (line 19)
+- 12 class method(s)
 
 ### `lib/Compiler/Concern/CompilePseudoClassScopeAndConst.php`
 
