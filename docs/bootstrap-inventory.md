@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8320 |
-| Phase A inventory files (M2 ratio SSOT) | 8320 |
+| PHP files on vm.php path | 8321 |
+| Phase A inventory files (M2 ratio SSOT) | 8321 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26236 |
+| Source constructs flagged (warnings) | 26237 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5586,8 +5586,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/CompilePseudoClassScopeAndConst.php` | 0 | 6 |
 | `lib/Compiler/Concern/CompileReservedNamesPseudoClassAndClassConst.php` | 0 | 2 |
 | `lib/Compiler/Concern/CompileTimeClassConstFetchFold.php` | 0 | 22 |
-| `lib/Compiler/Concern/CompileTimeFold.php` | 0 | 12 |
+| `lib/Compiler/Concern/CompileTimeFold.php` | 0 | 1 |
 | `lib/Compiler/Concern/CompileTimeGlobalConstAndDefineFold.php` | 0 | 16 |
+| `lib/Compiler/Concern/CompileTimeParamDefaultAndExprFold.php` | 0 | 12 |
 | `lib/Compiler/Concern/CompileTimeUnaryBinaryAndCastFold.php` | 0 | 15 |
 | `lib/Compiler/Concern/DeferredSiblingAndArrayMapNullCallArgProducers.php` | 0 | 2 |
 | `lib/Compiler/Concern/DimAndPropertyWriteContext.php` | 0 | 2 |
@@ -49110,13 +49111,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 844)
-- new CompileFatal (line 878)
-- new CompileError (line 881)
-- new ClassCompileRegistry (line 922)
-- new AttributeClassRegistry (line 923)
-- new ClassCompileRegistry (line 1031)
-- new AttributeClassRegistry (line 1032)
+- new CompileFatal (line 847)
+- new CompileFatal (line 881)
+- new CompileError (line 884)
+- new ClassCompileRegistry (line 925)
+- new AttributeClassRegistry (line 926)
+- new ClassCompileRegistry (line 1034)
+- new AttributeClassRegistry (line 1035)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -49669,18 +49670,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/CompileTimeFold.php`
 
 **Warnings** (review for bootstrap subset):
-- trait CompileTimeFold (line 21)
-- new Op\Type\Literal (line 28)
-- new Op\Expr\Param (line 29)
-- new Operand\Literal (line 30)
-- new Op\Type\Mixed_ (line 31)
-- new Variable (line 162)
-- new Variable (line 316)
-- new Variable (line 326)
-- new Variable (line 336)
-- new Variable (line 342)
-- new Variable (line 391)
-- 8 class method(s)
+- trait CompileTimeFold (line 17)
 
 ### `lib/Compiler/Concern/CompileTimeGlobalConstAndDefineFold.php`
 
@@ -49701,6 +49691,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 174)
 - new Variable (line 329)
 - 11 class method(s)
+
+### `lib/Compiler/Concern/CompileTimeParamDefaultAndExprFold.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CompileTimeParamDefaultAndExprFold (line 21)
+- new Op\Type\Literal (line 28)
+- new Op\Expr\Param (line 29)
+- new Operand\Literal (line 30)
+- new Op\Type\Mixed_ (line 31)
+- new Variable (line 162)
+- new Variable (line 316)
+- new Variable (line 326)
+- new Variable (line 336)
+- new Variable (line 342)
+- new Variable (line 391)
+- 8 class method(s)
 
 ### `lib/Compiler/Concern/CompileTimeUnaryBinaryAndCastFold.php`
 
@@ -55369,11 +55375,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/Type/ObjectInstancePropertyLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 222)
-- new Variable (line 250)
-- new Variable (line 339)
-- new Variable (line 532)
-- new Variable (line 803)
+- new Variable (line 219)
+- new Variable (line 247)
+- new Variable (line 336)
+- new Variable (line 529)
+- new Variable (line 800)
 - 12 class method(s)
 
 ### `lib/JIT/Builtin/Type/ObjectStaticPropertyInitLlvm.php`
