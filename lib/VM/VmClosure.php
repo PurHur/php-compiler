@@ -111,6 +111,21 @@ final class VmClosure
             return $context->helper->loadValue($callable);
         }
         if (JitVariable::TYPE_VALUE === $callable->type) {
+            // KIND_VALUE `__value__*` formals: valuePtrFromVariable may allocate a fresh
+            // null box (e06_byref); use the formal pointer directly (#36382 `$cb()`).
+            if (JitVariable::KIND_VALUE === $callable->kind) {
+                $tyName = $context->getStringFromType($callable->value->typeOf());
+                if ('__value__*' === $tyName) {
+                    return $context->builder->call(
+                        $context->lookupFunction('__value__readObject'),
+                        JitValueBox::normalizeValuePtr($context, $callable->value)
+                    );
+                }
+                if ('__object__*' === $tyName) {
+                    return $callable->value;
+                }
+            }
+
             return $context->builder->call(
                 $context->lookupFunction('__value__readObject'),
                 JitValueBox::valuePtrFromVariable($context, $callable)
@@ -262,10 +277,13 @@ final class VmClosure
         if (JitVariable::TYPE_STRING === $receiver->type) {
             return null;
         }
-        if (0 !== ($receiver->type & JitVariable::TYPE_HASHTABLE)) {
+        // Discriminant equality — `& TYPE_HASHTABLE` also matches TYPE_VALUE/OBJECT
+        // (shared IS_REFCOUNTED bit), which blocked `$cb()` on callable formals (#36382).
+        if (JitVariable::TYPE_HASHTABLE === $receiver->type) {
             return null;
         }
-        if (JitVariable::TYPE_VALUE === $receiver->type && null !== $receiver->valueBoxHashtable) {
+        // valueBoxHashtable is bool (default false); `null !==` was always true (#36382).
+        if (JitVariable::TYPE_VALUE === $receiver->type && $receiver->valueBoxHashtable) {
             return null;
         }
         if (JitVariable::TYPE_VALUE === $receiver->type && null !== $receiver->compileTimeString) {
