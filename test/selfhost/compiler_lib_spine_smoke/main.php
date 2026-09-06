@@ -7728,6 +7728,7 @@ require_once __DIR__.'/../../../lib/VM/Concern/BuiltinHostExceptionDispatch.php'
 require_once __DIR__.'/../../../lib/VM/Concern/UserInvokeArrayAccessAndClosureCall.php';
 require_once __DIR__.'/../../../lib/VM/Concern/FrameObjectRefAndDeadTempRelease.php';
 require_once __DIR__.'/../../../lib/VM/Concern/GeneratorForeachAndYieldFrom.php';
+require_once __DIR__.'/../../../lib/VM/Concern/FiberStartResumeAndThrow.php';
 require_once __DIR__.'/../../../lib/VM/ObjectPropertyIterator.php';
 require_once __DIR__.'/../../../lib/VM/ObjectReadonlySupport.php';
 require_once __DIR__.'/../../../lib/VM/ObjectRegistry.php';
