@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8341 |
-| Phase A inventory files (M2 ratio SSOT) | 8341 |
+| PHP files on vm.php path | 8342 |
+| Phase A inventory files (M2 ratio SSOT) | 8342 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26280 |
+| Source constructs flagged (warnings) | 26282 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5633,6 +5633,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/ParameterAsserts.php` | 0 | 4 |
 | `lib/Compiler/Concern/PrecedingInlineCallArgProducers.php` | 0 | 3 |
 | `lib/Compiler/Concern/PrecedingInlineDeadVoidAndDimFetchCallArgSlots.php` | 0 | 3 |
+| `lib/Compiler/Concern/RewireInlineBitmaskNestedFileAndVarExportFlagCallArgSendSlots.php` | 0 | 2 |
 | `lib/Compiler/Concern/RewireInlineCallArgSendSlots.php` | 0 | 4 |
 | `lib/Compiler/Concern/SiblingInlineCallArgProducerSlots.php` | 0 | 2 |
 | `lib/Compiler/Concern/SiblingInlineFuncCallAndDeadArrayProducers.php` | 0 | 2 |
@@ -33776,7 +33777,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitRound.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 260)
+- new JITVariable (line 272)
 - 11 class method(s)
 
 ### `ext/standard/JitRoundModeResolve.php`
@@ -49131,13 +49132,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 907)
-- new CompileFatal (line 941)
-- new CompileError (line 944)
-- new ClassCompileRegistry (line 985)
-- new AttributeClassRegistry (line 986)
-- new ClassCompileRegistry (line 1094)
-- new AttributeClassRegistry (line 1095)
+- new CompileFatal (line 910)
+- new CompileFatal (line 944)
+- new CompileError (line 947)
+- new ClassCompileRegistry (line 988)
+- new AttributeClassRegistry (line 989)
+- new ClassCompileRegistry (line 1097)
+- new AttributeClassRegistry (line 1098)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -50200,12 +50201,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 11 class method(s)
 - 1 closure(s)
 
+### `lib/Compiler/Concern/RewireInlineBitmaskNestedFileAndVarExportFlagCallArgSendSlots.php`
+
+**Warnings** (review for bootstrap subset):
+- trait RewireInlineBitmaskNestedFileAndVarExportFlagCallArgSendSlots (line 22)
+- 9 class method(s)
+
 ### `lib/Compiler/Concern/RewireInlineCallArgSendSlots.php`
 
 **Warnings** (review for bootstrap subset):
-- trait RewireInlineCallArgSendSlots (line 25)
-- new Operand\Literal (line 146)
-- 23 class method(s)
+- trait RewireInlineCallArgSendSlots (line 27)
+- new Operand\Literal (line 148)
+- 14 class method(s)
 - 1 closure(s)
 
 ### `lib/Compiler/Concern/SiblingInlineCallArgProducerSlots.php`
@@ -52531,7 +52538,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/MathRound.php`
 
 **Warnings** (review for bootstrap subset):
-- 10 class method(s)
+- 15 class method(s)
 
 ### `lib/JIT/Builtin/MathSin.php`
 
