@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8335 |
-| Phase A inventory files (M2 ratio SSOT) | 8335 |
+| PHP files on vm.php path | 8336 |
+| Phase A inventory files (M2 ratio SSOT) | 8336 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26267 |
+| Source constructs flagged (warnings) | 26270 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5627,6 +5627,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/OuterSiblingExecReturnAndHoistedConstFetchSlots.php` | 0 | 2 |
 | `lib/Compiler/Concern/ParameterAsserts.php` | 0 | 4 |
 | `lib/Compiler/Concern/PrecedingInlineCallArgProducers.php` | 0 | 3 |
+| `lib/Compiler/Concern/PrecedingInlineDeadVoidAndDimFetchCallArgSlots.php` | 0 | 3 |
 | `lib/Compiler/Concern/RewireInlineCallArgSendSlots.php` | 0 | 4 |
 | `lib/Compiler/Concern/SiblingInlineCallArgProducerSlots.php` | 0 | 2 |
 | `lib/Compiler/Concern/SiblingInlineFuncCallAndDeadArrayProducers.php` | 0 | 2 |
@@ -49125,13 +49126,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 889)
-- new CompileFatal (line 923)
-- new CompileError (line 926)
-- new ClassCompileRegistry (line 967)
-- new AttributeClassRegistry (line 968)
-- new ClassCompileRegistry (line 1076)
-- new AttributeClassRegistry (line 1077)
+- new CompileFatal (line 892)
+- new CompileFatal (line 926)
+- new CompileError (line 929)
+- new ClassCompileRegistry (line 970)
+- new AttributeClassRegistry (line 971)
+- new ClassCompileRegistry (line 1079)
+- new AttributeClassRegistry (line 1080)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -50153,9 +50154,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/PrecedingInlineCallArgProducers.php`
 
 **Warnings** (review for bootstrap subset):
-- trait PrecedingInlineCallArgProducers (line 28)
-- 20 class method(s)
-- 3 closure(s)
+- trait PrecedingInlineCallArgProducers (line 31)
+- 9 class method(s)
+- 2 closure(s)
+
+### `lib/Compiler/Concern/PrecedingInlineDeadVoidAndDimFetchCallArgSlots.php`
+
+**Warnings** (review for bootstrap subset):
+- trait PrecedingInlineDeadVoidAndDimFetchCallArgSlots (line 32)
+- 11 class method(s)
+- 1 closure(s)
 
 ### `lib/Compiler/Concern/RewireInlineCallArgSendSlots.php`
 
