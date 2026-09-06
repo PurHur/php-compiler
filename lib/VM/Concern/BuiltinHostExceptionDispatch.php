@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
 /**
