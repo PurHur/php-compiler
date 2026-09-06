@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8300 |
-| Phase A inventory files (M2 ratio SSOT) | 8300 |
+| PHP files on vm.php path | 8301 |
+| Phase A inventory files (M2 ratio SSOT) | 8301 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26192 |
+| Source constructs flagged (warnings) | 26194 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7092,6 +7092,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/CompileFuncCallInit.php` | 0 | 2 |
 | `lib/JIT/Concern/CompileFuncdefAndClosure.php` | 0 | 5 |
 | `lib/JIT/Concern/CompileIncDecAndConcatFlatten.php` | 0 | 14 |
+| `lib/JIT/Concern/CompileIncDecValueBoxAndWarnings.php` | 0 | 2 |
 | `lib/JIT/Concern/CompileInitArray.php` | 0 | 2 |
 | `lib/JIT/Concern/CompileIter.php` | 0 | 2 |
 | `lib/JIT/Concern/CompileJumpIf.php` | 0 | 2 |
@@ -50738,15 +50739,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ArrayWalkLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 234)
-- new Variable (line 437)
-- new Variable (line 446)
-- new NestedClosureInvoke (line 461)
+- new Variable (line 236)
+- new Variable (line 463)
 - new Variable (line 472)
-- new Variable (line 484)
-- new NestedClosureInvoke (line 499)
+- new NestedClosureInvoke (line 487)
+- new Variable (line 498)
+- new Variable (line 510)
+- new NestedClosureInvoke (line 525)
 - 16 class method(s)
-- 2 closure(s)
+- 4 closure(s)
 
 ### `lib/JIT/AsymmetricVisibilityGuard.php`
 
@@ -58321,7 +58322,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 327)
 - new OpCode (line 349)
 - new Variable (line 350)
-- 9 class method(s)
+- 1 class method(s)
+
+### `lib/JIT/Concern/CompileIncDecValueBoxAndWarnings.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CompileIncDecValueBoxAndWarnings (line 22)
+- 8 class method(s)
 
 ### `lib/JIT/Concern/CompileInitArray.php`
 
@@ -59539,7 +59546,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 563)
 - new Variable (line 1028)
 - 31 class method(s)
-- 1 closure(s)
+- 3 closure(s)
 
 ### `lib/JIT/HashTableReplaceRecursiveLlvm.php`
 
@@ -59595,30 +59602,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 960)
-- new Variable (line 1875)
-- new Variable (line 1921)
-- new Variable (line 2210)
-- new Variable (line 2217)
-- new Variable (line 2277)
-- new Variable (line 2293)
-- new Variable (line 2309)
-- new Variable (line 2616)
-- new Variable (line 2679)
-- new Variable (line 2722)
-- new Variable (line 2724)
-- new Variable (line 2863)
-- new Variable (line 2887)
-- new Variable (line 3000)
-- new Variable (line 3018)
-- new Variable (line 3045)
-- new Variable (line 3059)
+- new Variable (line 1947)
+- new Variable (line 1993)
+- new Variable (line 2282)
+- new Variable (line 2289)
+- new Variable (line 2349)
+- new Variable (line 2365)
+- new Variable (line 2381)
+- new Variable (line 2688)
+- new Variable (line 2751)
+- new Variable (line 2794)
+- new Variable (line 2796)
+- new Variable (line 2935)
+- new Variable (line 2959)
 - new Variable (line 3072)
-- new Variable (line 3082)
-- new Variable (line 3109)
-- new Variable (line 3134)
-- new Variable (line 3189)
-- new Variable (line 3210)
-- 65 class method(s)
+- new Variable (line 3090)
+- new Variable (line 3117)
+- new Variable (line 3131)
+- new Variable (line 3144)
+- new Variable (line 3154)
+- new Variable (line 3181)
+- new Variable (line 3206)
+- new Variable (line 3261)
+- new Variable (line 3282)
+- 66 class method(s)
 - 3 closure(s)
 
 ### `lib/JIT/HeaderCallbackPolicy.php`
@@ -60587,7 +60594,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/SpineChunkRuntimeMethodDemote.php`
 
 **Warnings** (review for bootstrap subset):
-- new OpCode (line 270)
+- new OpCode (line 271)
 - 11 class method(s)
 
 ### `lib/JIT/SpineChunkStandardHelperBind.php`

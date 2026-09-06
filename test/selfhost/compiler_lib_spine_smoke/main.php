@@ -5428,6 +5428,7 @@ require_once __DIR__.'/../../../lib/JIT/Concern/CompileClassAndTraitUses.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileTraitUsesWithAdaptations.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/InitJitStaticCall.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileIncDecAndConcatFlatten.php';
+require_once __DIR__.'/../../../lib/JIT/Concern/CompileIncDecValueBoxAndWarnings.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileObjectPropertyConcatPowAndFlatten.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/DateTimeConstructAndMutationMeta.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/DomCompileTimeTagMeta.php';
