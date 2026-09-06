@@ -878,9 +878,6 @@ trait ClassLikeAndStmtCompile
         return true;
     }
 
-    /**
-
-
     /** php-cfg: {@see ErrorSuppressBlock} jump target where silenced reads are lowered (#3546). */
     private function isErrorSuppressEndBlock(CfgBlock $block): bool
     {

@@ -131,6 +131,7 @@ use PHPCompiler\Web\Superglobals;
  */
 trait CompileParamDefaultTypeAndDeprecation
 {
+    /**
      * Non-nullable declared type with `= null` default (php-src implicit nullable, #4449).
      */
     protected function paramIsImplicitNullable(Op\Expr\Param $param, ?int $defaultSlot, Block $block): bool
