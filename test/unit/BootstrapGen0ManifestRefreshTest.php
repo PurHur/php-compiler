@@ -38,6 +38,16 @@ final class BootstrapGen0ManifestRefreshTest extends TestCase
             $this->assertSame($after['sha256_driver'] ?? null, $again['sha256_driver'] ?? null);
             $this->assertSame($after['size_bytes_compiler_lib_sidecar'] ?? null, $again['size_bytes_compiler_lib_sidecar'] ?? null);
             $this->assertSame($after['sha256_compiler_lib_sidecar'] ?? null, $again['sha256_compiler_lib_sidecar'] ?? null);
+
+            $m3 = $again['m3_sidecars'] ?? null;
+            if (\is_array($m3) && [] !== $m3) {
+                $this->assertIsArray($again['sha256_m3_sidecars'] ?? null);
+                $this->assertSame([], bootstrap_gen0_manifest_m3_sidecar_sync_errors(self::$root, $again));
+                foreach ($m3 as $name) {
+                    $this->assertArrayHasKey($name, $again['sha256_m3_sidecars']);
+                    $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/', $again['sha256_m3_sidecars'][$name]);
+                }
+            }
         } finally {
             file_put_contents($manifestPath, $origManifest);
         }
@@ -130,22 +140,29 @@ final class BootstrapGen0ManifestRefreshTest extends TestCase
             }
 
             // With a matching receipt, stamp succeeds (#36218 — no unverified override).
+            // Skip the happy path when a stale local build/ receipt disagrees with
+            // committed blobs (common on harness checkouts that never relinked).
             $receiptPath = self::$root.'/build/.gen0-build-receipt.json';
             if (is_readable($receiptPath)) {
                 $receipt = json_decode((string) file_get_contents($receiptPath), true);
                 $this->assertIsArray($receipt);
                 $receiptFp = strtolower((string) ($receipt['lowering_source_fingerprint'] ?? ''));
                 if ('' !== $receiptFp) {
-                    $stamped = bootstrap_gen0_manifest_stamp_lowering_fingerprint(self::$root, $receiptFp);
-                    $this->assertSame($receiptFp, $stamped['lowering_source_fingerprint'] ?? null);
-                    $this->assertSame('verified-fresh', $stamped['provenance'] ?? null);
-                    $read = bootstrap_gen0_manifest_read(self::$root);
-                    $this->assertSame($receiptFp, $read['lowering_source_fingerprint'] ?? null);
-                    $this->assertSame($receiptFp, trim((string) file_get_contents($stampPath)));
+                    $receiptErrors = bootstrap_gen0_build_receipt_errors(self::$root, $receiptFp);
+                    if ([] === $receiptErrors) {
+                        $stamped = bootstrap_gen0_manifest_stamp_lowering_fingerprint(self::$root, $receiptFp);
+                        $this->assertSame($receiptFp, $stamped['lowering_source_fingerprint'] ?? null);
+                        $this->assertSame('verified-fresh', $stamped['provenance'] ?? null);
+                        $read = bootstrap_gen0_manifest_read(self::$root);
+                        $this->assertSame($receiptFp, $read['lowering_source_fingerprint'] ?? null);
+                        $this->assertSame($receiptFp, trim((string) file_get_contents($stampPath)));
 
-                    bootstrap_gen0_manifest_refresh_from_disk(self::$root);
-                    $preserved = bootstrap_gen0_manifest_read(self::$root);
-                    $this->assertSame($receiptFp, $preserved['lowering_source_fingerprint'] ?? null);
+                        bootstrap_gen0_manifest_refresh_from_disk(self::$root);
+                        $preserved = bootstrap_gen0_manifest_read(self::$root);
+                        $this->assertSame($receiptFp, $preserved['lowering_source_fingerprint'] ?? null);
+                    } else {
+                        $this->assertStringContainsString('differs from the artifact', implode(' ', $receiptErrors));
+                    }
                 }
             }
         } finally {

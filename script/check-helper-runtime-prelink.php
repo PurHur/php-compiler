@@ -18,9 +18,10 @@ declare(strict_types=1);
  * prelinked/helper-runtime/aarch64-linux/.
  *
  * Exit 0 always, unless --strict is passed (then broken / common / elf-mismatch /
- * absent x86 corpus -> exit 1). Fingerprint-stale and pending gc_sections migrate
- * (#36246) stay advisory under --strict so release-readiness is not permanently
- * red on a working monolithic corpus (#36389 / #36401).
+ * UNITS_SHA256SUMS byte mismatch / absent x86 corpus -> exit 1). Fingerprint-stale
+ * and pending gc_sections migrate (#36246) stay advisory under --strict so
+ * release-readiness is not permanently red on a working monolithic corpus
+ * (#36389 / #36401).
  *
  * Usage:
  *   php script/check-helper-runtime-prelink.php                 # report (current TARGET)
@@ -34,12 +35,13 @@ use PHPCompiler\AOT\HelperRuntimeCommon;
 
 $root = dirname(__DIR__);
 require $root.'/vendor/autoload.php';
+require __DIR__.'/helper-runtime-unit-checksums-lib.php';
 
 $strict = in_array('--strict', $argv, true);
 $allArches = in_array('--all-arches', $argv, true);
 
 /**
- * @return array{arch: string, fresh: int, stale: int, broken: int, elf_mismatch: int, common_broken: int, gc_missing: int, absent: bool}
+ * @return array{arch: string, fresh: int, stale: int, broken: int, elf_mismatch: int, common_broken: int, gc_missing: int, checksum_broken: int, absent: bool}
  */
 function check_helper_runtime_arch(string $root, string $archId): array
 {
@@ -50,7 +52,8 @@ function check_helper_runtime_arch(string $root, string $archId): array
 
     $arch = HelperRuntimeCache::archKey();
     $unitsDir = HelperRuntimeCache::prelinkedUnitsDir();
-    $archManifestPath = \dirname($unitsDir).'/manifest.json';
+    $archDir = \dirname($unitsDir);
+    $archManifestPath = $archDir.'/manifest.json';
     $liveCore = HelperRuntimeCache::coreFingerprint();
     $target = CompileTarget::resolve($archId);
 
@@ -62,6 +65,7 @@ function check_helper_runtime_arch(string $root, string $archId): array
         'elf_mismatch' => 0,
         'common_broken' => 0,
         'gc_missing' => 0,
+        'checksum_broken' => 0,
         'absent' => false,
     ];
 
@@ -69,6 +73,22 @@ function check_helper_runtime_arch(string $root, string $archId): array
         $result['absent'] = true;
 
         return $result;
+    }
+
+    // Byte ledger (#36399): when UNITS_SHA256SUMS is present, every unit.o/unit.bc
+    // must match. Missing ledger is advisory until the next intentional refresh
+    // commits one (x86 --strict still fails on broken/common/elf).
+    $checksumErrors = helper_runtime_verify_units_sha256sums($archDir, false);
+    if ([] !== $checksumErrors) {
+        $result['checksum_broken'] = \count($checksumErrors);
+        foreach (array_slice($checksumErrors, 0, 8) as $err) {
+            fwrite(STDOUT, "  HASH   {$err}\n");
+        }
+        if (\count($checksumErrors) > 8) {
+            fwrite(STDOUT, '  HASH   … +'.(\count($checksumErrors) - 8)." more (#36399)\n");
+        }
+    } elseif (!is_readable(helper_runtime_units_sha256sums_path($archDir))) {
+        fwrite(STDOUT, "  WARN   {$arch} missing UNITS_SHA256SUMS — php script/write-helper-runtime-unit-checksums.php (#36399)\n");
     }
 
     if (is_file($archManifestPath)) {
@@ -182,9 +202,10 @@ foreach ($archIds as $archId) {
         : (is_file(HelperRuntimeCommon::commonObjectPath()) ? ', common.o stale' : ', common.o absent');
     $gcNote = HelperRuntimeCache::prelinkedCorpusHasGcSections() ? ', gc_sections ok' : ', gc_sections pending (#36246)';
     $elfNote = $r['elf_mismatch'] > 0 ? ', '.$r['elf_mismatch'].' elf-mismatch' : ', elf ok';
-    $needsRefresh = ($r['stale'] + $r['broken'] + $r['common_broken'] + $r['elf_mismatch']) > 0;
+    $hashNote = $r['checksum_broken'] > 0 ? ', '.$r['checksum_broken'].' hash-mismatch' : ', units hash ok';
+    $needsRefresh = ($r['stale'] + $r['broken'] + $r['common_broken'] + $r['elf_mismatch'] + $r['checksum_broken']) > 0;
     fwrite(STDOUT, sprintf(
-        "check-helper-runtime-prelink: %s — %d fresh, %d stale, %d broken%s%s%s%s\n",
+        "check-helper-runtime-prelink: %s — %d fresh, %d stale, %d broken%s%s%s%s%s\n",
         $r['arch'],
         $r['fresh'],
         $r['stale'],
@@ -192,12 +213,13 @@ foreach ($archIds as $archId) {
         $r['common_broken'] > 0 ? ', common broken' : $commonNote,
         $gcNote,
         $elfNote,
+        $hashNote,
         $needsRefresh
             ? ' — refresh: PHP_COMPILER_TARGET='.$r['arch'].' php script/emit-helper-runtime-object.php --prelink'
             : ''
     ));
 
-    if ($strict && ($r['broken'] + $r['common_broken'] + $r['elf_mismatch']) > 0) {
+    if ($strict && ($r['broken'] + $r['common_broken'] + $r['elf_mismatch'] + $r['checksum_broken']) > 0) {
         $exitFail = true;
     }
     // Curated aarch64 seed must not shrink (#36391). Empty / short is not a pass.

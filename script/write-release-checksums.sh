@@ -7,7 +7,7 @@
 #   script/write-release-checksums.sh OUT_DIR --glob 'build/phpc-*.tar.*'
 #
 # Writes OUT_DIR/SHA256SUMS (GNU sha256sum format, sorted by basename).
-# Does not sign; pair with minisign/cosign in a later #36399 slice.
+# Pair with script/sign-release-artifacts.sh for a detached openssl signature (#36399).
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

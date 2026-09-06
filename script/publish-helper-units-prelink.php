@@ -68,7 +68,15 @@ foreach ($committedDirs as $dir) {
         $totalBytes += (int) @filesize($dir.'/'.$name);
     }
 }
-file_put_contents($archDir.'/manifest.json', json_encode([
+$existingManifest = [];
+$archManifestPath = $archDir.'/manifest.json';
+if (is_file($archManifestPath)) {
+    $decoded = json_decode((string) file_get_contents($archManifestPath), true);
+    if (\is_array($decoded)) {
+        $existingManifest = $decoded;
+    }
+}
+file_put_contents($archManifestPath, json_encode(array_merge($existingManifest, [
     'version' => 1,
     'generated_at' => gmdate('c'),
     'arch' => $arch,
@@ -80,7 +88,15 @@ file_put_contents($archDir.'/manifest.json', json_encode([
     'kept_live_unpublished' => 0,
     'total_bytes' => $totalBytes,
     'refresh' => 'php script/publish-helper-units-prelink.php (targeted dom refresh #32122)',
-], JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT)."\n");
+]), JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT)."\n");
+
+require_once __DIR__.'/helper-runtime-unit-checksums-lib.php';
+try {
+    $hashed = helper_runtime_write_units_sha256sums($archDir);
+    fwrite(STDOUT, "publish-helper-units-prelink: wrote UNITS_SHA256SUMS ({$hashed} file(s))\n");
+} catch (\Throwable $e) {
+    fwrite(STDERR, 'publish-helper-units-prelink: UNITS_SHA256SUMS: '.$e->getMessage()."\n");
+}
 
 fwrite(STDOUT, sprintf(
     "publish-helper-units-prelink: %s — %d published, %d committed, %.1f MB total\n",

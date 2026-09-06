@@ -837,6 +837,13 @@ if (in_array('--prelink', $argv, true)) {
         'gc_sections' => $gcSections,
         'refresh' => 'php script/emit-helper-runtime-object.php --prelink (pinned env; live-site prune guard #25377)',
     ]), JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT)."\n");
+    require_once __DIR__.'/helper-runtime-unit-checksums-lib.php';
+    try {
+        $hashed = helper_runtime_write_units_sha256sums($archDir);
+        fwrite(STDOUT, "helper-runtime-prelink: wrote UNITS_SHA256SUMS ({$hashed} file(s))\n");
+    } catch (\Throwable $e) {
+        fwrite(STDERR, 'helper-runtime-prelink: UNITS_SHA256SUMS: '.$e->getMessage()."\n");
+    }
     fwrite(STDOUT, sprintf(
         "helper-runtime-prelink: %s — %d fresh published (%.1f MB), %d removed, %d kept live-unpublished, %d committed — commit prelinked/helper-runtime when intentional\n",
         $arch,
