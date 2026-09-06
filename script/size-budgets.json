@@ -4,9 +4,9 @@
     "done_when_ceiling": 25000,
     "files": {
         "lib/Compiler.php": {
-            "budget": 1046,
+            "budget": 1049,
             "target": 20000,
-            "note": "Concern trait splits (#36230/#36387/#36403); CfgTypeShapeAndDeclaredAssert + peers"
+            "note": "Concern trait splits (#36230/#36387/#36403); CompileClassLikeDeclAndScope + CfgTypeShapeAndDeclaredAssert + peers"
         },
         "lib/JIT.php": {
             "budget": 274,
