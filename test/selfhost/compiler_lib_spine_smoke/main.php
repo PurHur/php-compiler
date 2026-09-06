@@ -5355,6 +5355,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/CompilePseudoClassScopeAndC
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompileReservedNamesPseudoClassAndClassConst.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompilePropertyFetchEmptyAssignAndUnset.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/ErrorSuppressAndPropertyFetch.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/CompileExprAndOpcodeTypes.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/WriteContextRejects.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/TernaryAndLogicalShortCircuit.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompileCallArgSends.php';
