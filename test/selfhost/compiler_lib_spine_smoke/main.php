@@ -8454,4 +8454,5 @@ unset($__spineMimeEnc, $__spineMimeDec);
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompileErrorSuppressEndBlockAndSlotInherit.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/CompileAnonymousFunctionGeneratorAndNever.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
