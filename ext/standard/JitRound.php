@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\MathAbs;
 use PHPCompiler\JIT\Builtin\MathRound;
 use PHPCompiler\JIT\Builtin\RoundingModeJit;
 use PHPCompiler\JIT\Context;
@@ -12,6 +13,7 @@ use PHPCompiler\JIT\JitRoundModeArg;
 use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
@@ -25,9 +27,13 @@ use PHPLLVM\Value;
  * Ceiling / Floor / TowardZero / AwayFromZero, #36386) — php-src
  * {@code _php_math_round} / {@code php_math_round_mode.h}.
  *
+ * Runtime num with compile-time precision≠0 + directed modes (not HALF_UP) scale
+ * by {@see RoundJitHelper::pow10abs}, round places=0 via LLVM, then unscale —
+ * same algorithm as RoundJitHelper / php-src {@code _php_math_round} (#36386).
+ *
  * Runtime num with compile-time precision≠0 + default HALF_UP uses user-TU sprintf+strtod
  * so Zend parity survives thin AOT fmul drift (#35741).
- * Runtime places keep the RoundJitHelper NestedJIT bridge.
+ * Runtime (unknown) places keep the RoundJitHelper NestedJIT bridge.
  */
 final class JitRound
 {
@@ -54,6 +60,19 @@ final class JitRound
             $viaIntrinsic = self::tryInvokePlacesZeroIntrinsic($context, $number, $knownMode);
             if (null !== $viaIntrinsic) {
                 return $viaIntrinsic;
+            }
+        }
+        // places≠0 + directed modes: scale → places=0 LLVM → unscale (#36386).
+        if (null !== $knownPlaces && 0 !== $knownPlaces && null !== $knownMode
+            && StdlibConstants::PHP_ROUND_HALF_UP !== $knownMode) {
+            $viaScaled = self::tryLowerRuntimeRoundScaledIntrinsic(
+                $context,
+                $number,
+                $knownPlaces,
+                $knownMode
+            );
+            if (null !== $viaScaled) {
+                return $viaScaled;
             }
         }
         if (null !== $knownPlaces && 0 !== $knownPlaces && self::isCompileTimeHalfUp($context, $modeArg)) {
@@ -103,6 +122,18 @@ final class JitRound
             $viaIntrinsic = self::tryInvokePlacesZeroIntrinsic($context, $number, $mode);
             if (null !== $viaIntrinsic) {
                 return $viaIntrinsic;
+            }
+        }
+        if (null !== $knownPlaces && 0 !== $knownPlaces
+            && StdlibConstants::PHP_ROUND_HALF_UP !== $mode) {
+            $viaScaled = self::tryLowerRuntimeRoundScaledIntrinsic(
+                $context,
+                $number,
+                $knownPlaces,
+                $mode
+            );
+            if (null !== $viaScaled) {
+                return $viaScaled;
             }
         }
         if (null !== $knownPlaces && 0 !== $knownPlaces && $mode === StdlibConstants::PHP_ROUND_HALF_UP) {
@@ -249,6 +280,70 @@ final class JitRound
         }
 
         return null;
+    }
+
+    /**
+     * round($runtime, literal places≠0, directed mode) — scale by 10^|places|,
+     * places=0 LLVM intrinsic, unscale. Matches RoundJitHelper / php-src
+     * {@code _php_math_round} (#36386). HALF_UP stays on sprintf (#35741).
+     */
+    private static function tryLowerRuntimeRoundScaledIntrinsic(
+        Context $context,
+        Value $number,
+        int $places,
+        int $mode
+    ): ?Value {
+        if (!self::isDirectedRoundMode($mode)) {
+            return null;
+        }
+
+        $placesClamped = $places;
+        if ($placesClamped < -9223372036854775807) {
+            $placesClamped = -9223372036854775807;
+        }
+        if ($placesClamped > 308) {
+            $placesClamped = 308;
+        }
+        if ($placesClamped < -308) {
+            $placesClamped = -308;
+        }
+        $absPlaces = $placesClamped < 0 ? -$placesClamped : $placesClamped;
+        $exponent = RoundJitHelper::pow10abs($absPlaces);
+        $double = $context->getTypeFromString('double');
+        $expVal = $double->constReal($exponent);
+        $positivePlaces = $placesClamped > 0;
+        $scaled = $positivePlaces
+            ? $context->builder->fmul($number, $expVal)
+            : $context->builder->fdiv($number, $expVal);
+
+        // RoundJitHelper: |scaled| >= 1e16 → return original (precision cliff).
+        $absScaled = MathAbs::invokeDouble($context, $scaled);
+        $tooBig = $context->builder->fcmp(
+            Builder::REAL_OGE,
+            $absScaled,
+            $double->constReal(1.0e16)
+        );
+        $rounded = self::tryInvokePlacesZeroIntrinsic($context, $scaled, $mode);
+        if (null === $rounded) {
+            return null;
+        }
+        $unscaled = $positivePlaces
+            ? $context->builder->fdiv($rounded, $expVal)
+            : $context->builder->fmul($rounded, $expVal);
+
+        return $context->builder->select($tooBig, $number, $unscaled);
+    }
+
+    /** Modes with places=0 LLVM lowering (everything except HALF_UP / unknown). */
+    private static function isDirectedRoundMode(int $mode): bool
+    {
+        return StdlibConstants::PHP_ROUND_HALF_DOWN === $mode
+            || StdlibConstants::PHP_ROUND_HALF_EVEN === $mode
+            || StdlibConstants::PHP_ROUND_HALF_ODD === $mode
+            || StdlibConstants::PHP_ROUND_CEILING === $mode
+            || StdlibConstants::PHP_ROUND_FLOOR === $mode
+            || StdlibConstants::PHP_ROUND_TOWARD_ZERO === $mode
+            || StdlibConstants::PHP_ROUND_AWAY_FROM_ZERO === $mode;
     }
 
     /**
