@@ -73,6 +73,17 @@ SEED_UNITS=(
   /ext/standard/HtmlspecialcharsJitHelper.php
   /ext/standard/Nl2brJitHelper.php
   /ext/standard/UcwordsJitHelper.php
+  # URL / query / JSON / sprintf web tier (#36391 after #36869)
+  /ext/standard/UrlencodeJitHelper.php
+  /ext/standard/UrldecodeJitHelper.php
+  /ext/standard/ParseUrlJitHelper.php
+  /ext/standard/HttpBuildQueryJitHelper.php
+  /ext/standard/ParseStrJitHelper.php
+  /ext/standard/JsonDecodeJitHelper.php
+  /ext/standard/JsonEncodeNestedJitHelper.php
+  /ext/standard/JsonValidateJitHelper.php
+  /ext/standard/SprintfJitHelper.php
+  /ext/standard/HttpResponseJitHelper.php
 )
 
 MIN_SEED=${#SEED_UNITS[@]}
