@@ -89,6 +89,11 @@ print("patched ServerRequestCreator for AOT (#36382)")
 PY
 fi
 
+URI="$DEST/vendor/nyholm/psr7/src/Uri.php"
+if [[ -f "$URI" ]]; then
+  php "$ROOT/script/composer/patch-nyholm-uri-construct-36382.php" "$URI"
+fi
+
 STREAM="$DEST/vendor/nyholm/psr7/src/Stream.php"
 if [[ -f "$STREAM" ]]; then
   php "$ROOT/script/composer/patch-nyholm-stream-36382.php" "$STREAM"
@@ -123,11 +128,18 @@ fi
 DISP="$DEST/vendor/slim/slim/Slim/Routing/Dispatcher.php"
 if [[ -f "$DISP" ]]; then
   php "$ROOT/script/composer/patch-slim-dispatcher-closure-36382.php" "$DISP"
+  php "$ROOT/script/composer/patch-slim-dispatcher-static-map-36382.php" "$DISP"
 fi
 
 FRD="$DEST/vendor/slim/slim/Slim/Routing/FastRouteDispatcher.php"
 if [[ -f "$FRD" ]]; then
   php "$ROOT/script/composer/patch-slim-fastroute-dispatcher-return-36382.php" "$FRD"
+  php "$ROOT/script/composer/patch-slim-fastroute-dispatcher-isset-36382.php" "$FRD"
+fi
+
+RRR="$DEST/vendor/slim/slim/Slim/Routing/RoutingResults.php"
+if [[ -f "$RRR" ]]; then
+  php "$ROOT/script/composer/patch-slim-routing-results-return-36382.php" "$RRR"
 fi
 
 RCP="$DEST/vendor/slim/slim/Slim/Routing/RouteCollectorProxy.php"
@@ -171,6 +183,11 @@ fi
 FRC="$DEST/vendor/nikic/fast-route/src/RouteCollector.php"
 if [[ -f "$FRC" ]]; then
   php "$ROOT/script/composer/patch-fastroute-array-cast-36382.php" "$FRC"
+fi
+
+FRG="$DEST/vendor/nikic/fast-route/src/Dispatcher/GroupCountBased.php"
+if [[ -f "$FRG" ]]; then
+  php "$ROOT/script/composer/patch-fastroute-groupcount-ctor-36382.php" "$FRG"
 fi
 
 echo "Created $DEST ($(find "$DEST" -name '*.php' | wc -l) php files)"
