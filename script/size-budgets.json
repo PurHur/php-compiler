@@ -4,9 +4,9 @@
     "done_when_ceiling": 25000,
     "files": {
         "lib/Compiler.php": {
-            "budget": 1124,
+            "budget": 1127,
             "target": 20000,
-            "note": "Concern trait splits (#36230/#36387/#36403); FindInlineArrayProducerForCallArg + PrecedingInlineDeadVoidAndDimFetchCallArgSlots + StmtLevelSideEffectAndEmittedCallGuards + peers"
+            "note": "Concern trait splits (#36230/#36387/#36403); FindInlineCoalesceAndNullsafeCallArgSlots + FindInlineArrayProducerForCallArg + PrecedingInlineDeadVoidAndDimFetchCallArgSlots + StmtLevelSideEffectAndEmittedCallGuards + peers"
         },
         "lib/JIT.php": {
             "budget": 274,
