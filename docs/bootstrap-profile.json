@@ -5721,6 +5721,7 @@
         "lib/Compiler/Concern/ParameterAsserts.php",
         "lib/Compiler/Concern/PrecedingInlineCallArgProducers.php",
         "lib/Compiler/Concern/PrecedingInlineDeadVoidAndDimFetchCallArgSlots.php",
+        "lib/Compiler/Concern/PropertyAndDimFetchCompile.php",
         "lib/Compiler/Concern/RewireArithmeticBranchSubstrEnumAndSiblingMultiArgCallArgSendSlots.php",
         "lib/Compiler/Concern/RewireHoistedPreludePregCombineAndVarExportCallArgSendSlots.php",
         "lib/Compiler/Concern/RewireInlineBitmaskNestedFileAndVarExportFlagCallArgSendSlots.php",
@@ -8588,9 +8589,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8354,
+        "inventory_files": 8355,
         "excluded": 0,
-        "eligible": 8354,
+        "eligible": 8355,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
