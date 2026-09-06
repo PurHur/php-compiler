@@ -41,6 +41,39 @@ final class ScalarReturnCheck
         if (null === $expectedJit) {
             return true;
         }
+        // Lazy ±/×/`/` may still be TYPE_NATIVE_LONG with a promote flag. For `: int`
+        // under strict_types, promote → TypeError; exact stays native (no box). Weak
+        // mode materializes then coerces (#36386).
+        if (
+            null !== $return->longArithOverflowFlag
+            && (null !== $return->longArithOverflowDoubleSlot || null !== $return->longArithOverflowPromoted)
+            && Variable::TYPE_NATIVE_LONG === $return->type
+            && Variable::TYPE_NATIVE_LONG === $expectedJit
+        ) {
+            if ($block->strictTypes) {
+                $flag = $return->longArithOverflowFlag;
+                $isOv = \PHPLLVM\Type::KIND_POINTER === $flag->typeOf()->getKind()
+                    ? $context->builder->load($flag)
+                    : $flag;
+                $okBb = BasicBlockHelper::append($context, 'scalar_ret_long_ok');
+                $badBb = BasicBlockHelper::append($context, 'scalar_ret_long_promote');
+                $context->builder->branchIf($isOv, $badBb, $okBb);
+
+                $context->builder->positionAtEnd($badBb);
+                $callableName = self::callableName($block);
+                $expectedLabel = self::expectedLabel($constraint, $block->returnLiteralBoolType);
+                self::raiseReturnTypeError($context, $callableName, $expectedLabel, 'float');
+
+                $context->builder->positionAtEnd($okBb);
+                // Exact long — drop promote metadata so coerceReturn writeLong is safe.
+                $return->longArithOverflowFlag = null;
+                $return->longArithOverflowDoubleSlot = null;
+                $return->longArithOverflowPromoted = null;
+
+                return true;
+            }
+            $return = JitLongArithOverflow::materializeOverflowableNativeLong($context, $return);
+        }
         if ($return->type === $expectedJit
             || (Variable::TYPE_HASHTABLE === $expectedJit && 0 !== ($return->type & Variable::IS_NATIVE_ARRAY))
         ) {

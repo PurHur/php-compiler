@@ -462,7 +462,7 @@ final class Variable {
     public ?\PHPLLVM\Value $valueBoxAliasPtr = null;
 
     /**
-     * i1 SSA (not alloca): native long + / − / * took the overflow→double cold path (#36189).
+     * i1 SSA (not alloca): native long + / − / * / `/` took the overflow→double cold path (#36189 / #36386).
      *
      * @var \PHPLLVM\Value|null
      */

@@ -146,7 +146,15 @@ final class JitLongArithOverflow
         $context->builder->positionAtEnd($longBb);
         $slot = JitValueBox::alloc($context);
         $slotPtr = JitValueBox::pointer($context, $slot);
-        JitValueBox::writeLong($context, $slot, $var->value);
+        $longBits = Variable::KIND_VARIABLE === $var->kind
+            ? $context->builder->load($var->value)
+            : $var->value;
+        // Typed native props / return slots may be int64* even as KIND_VALUE (#33018 peer).
+        $longTy = $context->getStringFromType($longBits->typeOf());
+        if ('int64*' === $longTy || 'long long*' === $longTy) {
+            $longBits = $context->builder->load($longBits);
+        }
+        JitValueBox::writeLong($context, $slot, $longBits);
         JitValueBox::publishAfterWrite($context, $slotPtr);
         $context->builder->branch($outBb);
 

@@ -34,6 +34,23 @@ trait AssignOperand
         )) {
             $value = $this->detachScalarObjectPropertyAliasForAssign($value);
         }
+        // Lazy ±/×/`/` overflow/promote results are TYPE_NATIVE_LONG with a cold f64 slot.
+        // Named locals must not keep the i64 phi alone (dummy 0 on promote) — box before
+        // binding. Unnamed SSA temps (e.g. fibo_r `$n-1`) keep the flag and stay native
+        // (#36386 / leftover of #37051).
+        if (
+            null !== $value->longArithOverflowFlag
+            && (null !== $value->longArithOverflowDoubleSlot || null !== $value->longArithOverflowPromoted)
+            && Variable::TYPE_NATIVE_LONG === $value->type
+        ) {
+            $assignName = \PHPCompiler\JIT\OperandName::resolve($resultOp);
+            if (null !== $assignName && '' !== $assignName) {
+                $value = \PHPCompiler\JIT\JitLongArithOverflow::materializeOverflowableNativeLong(
+                    $this->context,
+                    $value
+                );
+            }
+        }
         $value = $this->coerceNamedLocalNativeLongPropertyAssign($resultOp, $value);
         $branchMergeTarget = $force && $this->context->coalesceAssignTargets->contains($resultOp);
         // ?: false arm (`'null'`) after the true arm fetched `$o->tagName`: bindPropertyFetchResult
@@ -177,6 +194,19 @@ trait AssignOperand
                     $this->context->bindVariableByName($resolved, $var);
                 }
                 $this->markScopeVariableAssignedIfTracked($resultOp, $var);
+
+                return;
+            } elseif (
+                Variable::TYPE_NATIVE_LONG === $value->type
+                && Variable::KIND_VALUE === $value->kind
+                && null !== $value->longArithOverflowFlag
+                && (null !== $value->longArithOverflowDoubleSlot || null !== $value->longArithOverflowPromoted)
+            ) {
+                // Unnamed SSA (named locals already materialized above): keep the
+                // overflowable native-long Variable so later box sites can materialize
+                // (#36386). makeVariableFromValueOp would drop the promote flag.
+                $this->context->setVariableOp($resultOp, $value);
+                $this->markScopeVariableAssignedIfTracked($resultOp, $value);
 
                 return;
             } elseif (
@@ -1213,6 +1243,21 @@ trait AssignOperand
                 $toStore,
                 $result->value
             );
+            // Propagate lazy ±/×/`/` promote metadata onto the dest slot so `: int`
+            // return checks / later materialize still see the cold f64 (#36386).
+            if (
+                Variable::TYPE_NATIVE_LONG === $value->type
+                && null !== $value->longArithOverflowFlag
+                && (null !== $value->longArithOverflowDoubleSlot || null !== $value->longArithOverflowPromoted)
+            ) {
+                $result->longArithOverflowFlag = $value->longArithOverflowFlag;
+                $result->longArithOverflowDoubleSlot = $value->longArithOverflowDoubleSlot;
+                $result->longArithOverflowPromoted = $value->longArithOverflowPromoted;
+            } elseif (Variable::TYPE_NATIVE_LONG === $result->type) {
+                $result->longArithOverflowFlag = null;
+                $result->longArithOverflowDoubleSlot = null;
+                $result->longArithOverflowPromoted = null;
+            }
             $this->maybeCopyObjectPropertyBacking($result, $value, $force);
             // User-function NEW rvalues (KIND_VALUE) already own rc=1; addref into the
             // result temp would leave a root past ZEND_ASSIGN + return (#36245 scope_exit).

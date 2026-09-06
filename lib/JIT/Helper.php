@@ -259,6 +259,25 @@ return_string:
     }
 
     public function binaryOp(OpCode $opcode, Variable $left, Variable $right): Variable {
+        // Lazy ±/×/`/` results carry a promote flag + cold f64 slot. Feeding the i64 phi
+        // (dummy 0 on promote) into another native-long op loses the float — materialize
+        // first so VALUE⊙LONG / VALUE⊙VALUE paths match Zend (#36386). Unnamed call-arg
+        // temps (fibo_r `$n-1`) never enter binaryOp as operands with a live flag from a
+        // prior sub used only as a call arg.
+        if (
+            null !== $left->longArithOverflowFlag
+            && (null !== $left->longArithOverflowDoubleSlot || null !== $left->longArithOverflowPromoted)
+            && Variable::TYPE_NATIVE_LONG === $left->type
+        ) {
+            $left = JitLongArithOverflow::materializeOverflowableNativeLong($this->context, $left);
+        }
+        if (
+            null !== $right->longArithOverflowFlag
+            && (null !== $right->longArithOverflowDoubleSlot || null !== $right->longArithOverflowPromoted)
+            && Variable::TYPE_NATIVE_LONG === $right->type
+        ) {
+            $right = JitLongArithOverflow::materializeOverflowableNativeLong($this->context, $right);
+        }
         // Operand eval (fromLiteral / value_copy) can leave insert cleared after const-string
         // builder swaps; reload must not create parentless loads (#26756).
         // Prefer void-ret rewrite so compare after value-box assign is not orphaned (#31101).
