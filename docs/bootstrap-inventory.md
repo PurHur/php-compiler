@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8321 |
-| Phase A inventory files (M2 ratio SSOT) | 8321 |
+| PHP files on vm.php path | 8322 |
+| Phase A inventory files (M2 ratio SSOT) | 8322 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26237 |
+| Source constructs flagged (warnings) | 26240 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -49112,13 +49112,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 847)
-- new CompileFatal (line 881)
-- new CompileError (line 884)
-- new ClassCompileRegistry (line 925)
-- new AttributeClassRegistry (line 926)
-- new ClassCompileRegistry (line 1034)
-- new AttributeClassRegistry (line 1035)
+- new CompileFatal (line 850)
+- new CompileFatal (line 884)
+- new CompileError (line 887)
+- new ClassCompileRegistry (line 928)
+- new AttributeClassRegistry (line 929)
+- new ClassCompileRegistry (line 1037)
+- new AttributeClassRegistry (line 1038)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -58306,7 +58306,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 277)
 - new JIT\Call\Vararg (line 304)
 - new JIT\Call\Native (line 314)
-- 5 class method(s)
+- 6 class method(s)
 
 ### `lib/JIT/Concern/CompileCast.php`
 
