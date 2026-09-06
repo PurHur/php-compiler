@@ -73,6 +73,7 @@ require_once __DIR__.'/JIT/Concern/PropertyFetchCoalesceAndCompileTimeString.php
 require_once __DIR__.'/JIT/Concern/CallResultOperandAssign.php';
 require_once __DIR__.'/JIT/Concern/ByRefFormalAssignAndCallArgAdapt.php';
 require_once __DIR__.'/JIT/Concern/ResolveJitOutgoingCall.php';
+require_once __DIR__.'/JIT/Concern/VarFetchDestLvalueContext.php';
 require_once __DIR__.'/JIT/Concern/LocalReleaseUnsetAndVarFetchDest.php';
 require_once __DIR__.'/JIT/Concern/ScriptGlobalAssignAndLvalueResolve.php';
 require_once __DIR__.'/JIT/Concern/AssignRefSharedBoxAndClosureInvoke.php';
@@ -183,6 +184,7 @@ class JIT {
     use CallResultOperandAssign;
     use ByRefFormalAssignAndCallArgAdapt;
     use ResolveJitOutgoingCall;
+    use VarFetchDestLvalueContext;
     use LocalReleaseUnsetAndVarFetchDest;
     use ScriptGlobalAssignAndLvalueResolve;
     use AssignRefSharedBoxAndClosureInvoke;
