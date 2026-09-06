@@ -106,6 +106,17 @@ SEED_UNITS=(
   /ext/standard/ClassUsesJitHelper.php
   /ext/standard/GetClassMethodsJitHelper.php
   /ext/standard/GetParentClassJitHelper.php
+  # Class vars / type / array-assoc / sort tier (#36391 after #37059)
+  /ext/standard/GetClassVarsJitHelper.php
+  /ext/standard/ClassUsesRecursiveJitHelper.php
+  /ext/standard/UnitEnumExistsJitHelper.php
+  /ext/standard/SettypeJitHelper.php
+  /ext/standard/ArrayDiffAssocJitHelper.php
+  /ext/standard/ArrayIntersectAssocJitHelper.php
+  /ext/standard/ArrayReplaceKeyJitHelper.php
+  /ext/standard/SortJitHelper.php
+  /ext/standard/UsortJitHelper.php
+  /ext/standard/RoundJitHelper.php
 )
 
 MIN_SEED=${#SEED_UNITS[@]}
