@@ -5386,6 +5386,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/InlineCallArgSlotResolvers.
 require_once __DIR__.'/../../../lib/Compiler/Concern/HoistedSiblingFeedAndArrayKeysArgSendRewire.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/RewireArithmeticBranchSubstrEnumAndSiblingMultiArgCallArgSendSlots.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/RewireInlineCallArgSendSlots.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/RewireHoistedPreludePregCombineAndVarExportCallArgSendSlots.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/RewireInlineBitmaskNestedFileAndVarExportFlagCallArgSendSlots.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/StmtLevelSideEffectAndEmittedCallGuards.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/AdjacentNestedCallArgSlots.php';
