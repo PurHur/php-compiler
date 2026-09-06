@@ -69,6 +69,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/Compiler/Concern/CompileParamFunctionAndStmtDispatch.php',
             'lib/Compiler/Concern/CompileParamTypedDefaultAndDeprecation.php',
             'lib/Compiler/Concern/CompilePromotedPropertyAndParamDefaults.php',
+            'lib/Compiler/Concern/CompileTimeClassConstFetchFold.php',
             'lib/Compiler/Concern/CompileTimeFold.php',
             'lib/Compiler/Concern/DeferredSiblingAndArrayMapNullCallArgProducers.php',
             'lib/Compiler/Concern/DimAndPropertyWriteContext.php',

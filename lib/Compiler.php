@@ -11,6 +11,7 @@ namespace PHPCompiler;
 
 require_once __DIR__.'/OpCodeNames.php';
 require_once __DIR__.'/Compiler/Concern/CompileTimeFold.php';
+require_once __DIR__.'/Compiler/Concern/CompileTimeClassConstFetchFold.php';
 require_once __DIR__.'/Compiler/Concern/ParameterAsserts.php';
 require_once __DIR__.'/Compiler/Concern/CoalesceAndNullsafe.php';
 require_once __DIR__.'/Compiler/Concern/ClassLikeAndStmtCompile.php';
@@ -163,6 +164,7 @@ use PHPCompiler\Compiler\TypedPropertyInheritCheck;
 use PHPCompiler\Compiler\VariadicPromotedPropertyCompileCheck;
 use PHPCompiler\Compiler\ClassCompileRegistry;
 use PHPCompiler\Compiler\Concern\CompileTimeFold;
+use PHPCompiler\Compiler\Concern\CompileTimeClassConstFetchFold;
 use PHPCompiler\Compiler\Concern\ParameterAsserts;
 use PHPCompiler\Compiler\Concern\CoalesceAndNullsafe;
 use PHPCompiler\Compiler\Concern\ClassLikeAndStmtCompile;
@@ -223,6 +225,7 @@ use PHPCompiler\Web\Superglobals;
 class Compiler {
 
     use CompileTimeFold;
+    use CompileTimeClassConstFetchFold;
     use ParameterAsserts;
     use CoalesceAndNullsafe;
     use ClassLikeAndStmtCompile;
