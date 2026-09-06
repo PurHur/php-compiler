@@ -1,15 +1,18 @@
 <?php
 /**
- * #36382 — coalesce defaults merge must not segfault (isset-foreach on array param does).
+ * #36382 — assoc defaults via a fresh local (not reassignment onto the array param).
+ * FastRoute simpleDispatcher shape after patch-fastroute-options-plus-36382.php.
  */
 function merge_coalesce(array $options): array
 {
-    return [
+    $merged = [
         'routeParser' => $options['routeParser'] ?? 'FastRoute\\RouteParser\\Std',
         'dataGenerator' => $options['dataGenerator'] ?? 'FastRoute\\DataGenerator\\GroupCountBased',
         'dispatcher' => $options['dispatcher'] ?? 'FastRoute\\Dispatcher\\GroupCountBased',
         'routeCollector' => $options['routeCollector'] ?? 'FastRoute\\RouteCollector',
     ];
+
+    return $merged;
 }
 
 $full = [

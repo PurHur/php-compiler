@@ -49,12 +49,15 @@ PHP;
         $this->assertSame(0, $rc, implode("\n", $out));
         $patched = file_get_contents($tmp);
         $this->assertNotFalse($patched);
-        $this->assertStringContainsString('AOT (#36382): coalesce dispatcher options', $patched);
+        $this->assertStringContainsString('AOT (#36382): coalesce dispatcher options into $merged', $patched);
+        $this->assertStringContainsString('$merged = [', $patched);
         $this->assertStringContainsString("\$options['routeParser'] ??", $patched);
         $this->assertStringContainsString('AOT (#36382): skip dynamic require $cacheFile', $patched);
         $this->assertStringNotContainsString('$options += [', $patched);
         $this->assertStringNotContainsString('if (!isset($options[$k]))', $patched);
         $this->assertStringNotContainsString('require $options[\'cacheFile\']', $patched);
+        // Must not assign the assoc rebuild back onto the array param (#36382).
+        $this->assertStringNotContainsString("\$options = [\n            'routeParser'", $patched);
         exec(escapeshellarg(PHP_BINARY).' '.escapeshellarg($script).' '.escapeshellarg($tmp).' 2>&1', $out2, $rc2);
         $this->assertSame(0, $rc2, implode("\n", $out2));
         $this->assertStringContainsString('already patched', implode("\n", $out2));
@@ -106,8 +109,9 @@ PHP;
         $this->assertSame(0, $rc, implode("\n", $out));
         $patched = file_get_contents($tmp);
         $this->assertNotFalse($patched);
-        $this->assertStringContainsString('coalesce dispatcher options', $patched);
+        $this->assertStringContainsString('coalesce dispatcher options into $merged', $patched);
         $this->assertStringNotContainsString('if (!isset($options[$k]))', $patched);
+        $this->assertStringContainsString('$merged = [', $patched);
         @unlink($tmp);
     }
 }

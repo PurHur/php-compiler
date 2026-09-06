@@ -725,7 +725,12 @@ trait LocalReleaseUnsetAndVarFetchDest
         if (null === $name || '' === $name) {
             return;
         }
-        $var = $this->context->getVariableFromOp($op);
+        // Prefer the Operand's scope Variable over getVariableFromOp(): the latter
+        // prefers namedVariableBindings and can resurrect a stale formal after
+        // assignOperand setVariableOp'd a fresh VALUE/hashtable slot (FastRoute
+        // `$options = ['k' => …]` then `$options['k']` → Undefined array key, #36382).
+        // php-src: Zend/zend_execute.c ZEND_ASSIGN into CV; zend_hash_find on that CV.
+        $var = $this->context->scope->variables[$op];
         $this->context->bindVariableByName($name, $var);
         // TYPE_ASSIGN dest is a defined CV for later ZEND_CHECK_UNDEFINED_VAR (#32041).
         JIT\UndefinedVariableHelper::markAssigned($this->context, $op, $var);
