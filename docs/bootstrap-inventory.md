@@ -33998,9 +33998,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitSprintf.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 20)
-- new ArgumentCountError (line 39)
-- 11 class method(s)
+- new JITVariable (line 24)
+- new ArgumentCountError (line 43)
+- 13 class method(s)
 
 ### `ext/standard/JitSscanf.php`
 
