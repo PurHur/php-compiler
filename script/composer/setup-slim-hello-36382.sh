@@ -26,6 +26,12 @@ cat >"$DEST/phpc.json" <<'EOF'
 EOF
 cat >"$DEST/public/index.php" <<'EOF'
 <?php
+/**
+ * #36382 — Slim hello via `$app->handle` + CGI emit (not App::run()).
+ * AutoloadDiscovery walks every method CFG; App::run() pulls ServerRequestCreator
+ * / ResponseEmitter / SlimHttp* into the graph and stalls full AOT. Handle+emit
+ * keeps the Done-when /hello body under `phpc fcgi` / CGI env without that stack.
+ */
 use Slim\Factory\AppFactory;
 use Nyholm\Psr7\Factory\Psr17Factory;
 
@@ -38,7 +44,18 @@ $app->get('/hello', function ($request, $response, $args) {
     $response->getBody()->write('hello');
     return $response;
 });
-$app->run();
+
+$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+$uri = $_SERVER['REQUEST_URI'] ?? '/hello';
+$request = $psr17->createServerRequest($method, $uri);
+$response = $app->handle($request);
+http_response_code($response->getStatusCode());
+foreach ($response->getHeaders() as $name => $values) {
+    foreach ($values as $value) {
+        header($name . ': ' . $value, false);
+    }
+}
+echo (string) $response->getBody();
 EOF
 (cd "$DEST" && composer install --no-interaction --no-progress)
 
@@ -111,11 +128,13 @@ APP="$DEST/vendor/slim/slim/Slim/App.php"
 if [[ -f "$APP" ]]; then
   php "$ROOT/script/composer/patch-slim-app-36382.php" "$APP"
   php "$ROOT/script/composer/patch-slim-app-strip-unused-mw-36382.php" "$APP"
+  php "$ROOT/script/composer/patch-slim-app-strip-run-36382.php" "$APP"
 fi
 
 AF="$DEST/vendor/slim/slim/Slim/Factory/AppFactory.php"
 if [[ -f "$AF" ]]; then
   php "$ROOT/script/composer/patch-slim-appfactory-36382.php" "$AF"
+  php "$ROOT/script/composer/patch-slim-appfactory-strip-probe-36382.php" "$AF"
 fi
 
 NYF="$DEST/vendor/slim/slim/Slim/Factory/Psr17/NyholmPsr17Factory.php"
@@ -140,4 +159,4 @@ fi
 
 echo "Created $DEST ($(find "$DEST" -name '*.php' | wc -l) php files)"
 echo "Try: ./phpc build --project $DEST --dry-run"
-echo "Note: reachable graph ~94 files; AOT uses incremental requires (>=32 units) — see #36382"
+echo "Note: reachable handle+emit graph ~76 files (run()/ServerRequest* stripped); AOT uses incremental requires (>=32 units) — see #36382"
