@@ -570,42 +570,10 @@ trait CompileBlockInternal
                     break;
                 case OpCode::TYPE_YIELD:
                 case OpCode::TYPE_YIELD_FROM:
-                    if ($this->context->compilingGeneratorResume) {
-                        $yieldId = spl_object_id($op);
-                        if (!isset($this->context->generatorYieldPointIndex[$yieldId])) {
-                            throw new \LogicException('yield opcode missing from resume-point index (#35142)');
-                        }
-                        $pointIndex = $this->context->generatorYieldPointIndex[$yieldId];
-                        $stateParam = $this->context->generatorStateParam;
-                        assert(null !== $stateParam);
-                        if (OpCode::TYPE_YIELD_FROM === $op->type) {
-                            \PHPCompiler\VM\GeneratorYieldFromJitHelper::emitYieldFromPoint(
-                                $this,
-                                $block,
-                                $op,
-                                $stateParam,
-                                $pointIndex
-                            );
-                        } else {
-                            \PHPCompiler\VM\GeneratorIteratorJitHelper::emitYieldPoint(
-                                $this,
-                                $block,
-                                $op,
-                                $stateParam,
-                                $pointIndex + 1
-                            );
-                        }
-                        $contIp = $pointIndex + 1;
-                        if (!isset($this->context->generatorResumeContinuations[$contIp])) {
-                            throw new \LogicException('generator resume continuation missing for ip '.$contIp.' (#35142)');
-                        }
-                        $cont = $this->context->generatorResumeContinuations[$contIp];
-                        $this->context->builder->positionAtEnd($cont);
-                        $basicBlock = $cont;
-                        $origBasicBlock = $cont;
-                        break;
-                    }
-                    throw new \LogicException('Generators (yield) are VM-only (issue #167)');
+                    $yieldCont = $this->compileYieldOp($block, $op);
+                    $basicBlock = $yieldCont;
+                    $origBasicBlock = $yieldCont;
+                    break;
                 case OpCode::TYPE_FUNCCALL_INIT:
                     $this->compileFuncCallInitOp($block, $op);
                     break;

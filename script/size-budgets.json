@@ -9,11 +9,9 @@
             "note": "Concern trait splits (#36230/#36387/#36403); CompileFuncCfgReturnAndGlobalImport + peers"
         },
         "lib/JIT.php": {
-            "budget": 256,
+            "budget": 260,
             "target": 20000,
-            "budget": 258,
-            "target": 20000,
-            "note": "Concern trait splits (#36387/#36403); CompileTypeAssertAndErrorSilence + CompileObjectPropertyConcatPowAndFlatten + peers"
+            "note": "Concern trait splits (#36387/#36403); CompileYield + CompileTypeAssertAndErrorSilence + peers"
         },
         "lib/VM.php": {
             "budget": 17422,
