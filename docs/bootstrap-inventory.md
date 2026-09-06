@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8312 |
-| Phase A inventory files (M2 ratio SSOT) | 8312 |
+| PHP files on vm.php path | 8313 |
+| Phase A inventory files (M2 ratio SSOT) | 8313 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26221 |
+| Source constructs flagged (warnings) | 26223 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5567,7 +5567,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/CallAndArrayLiteralCompile.php` | 0 | 31 |
 | `lib/Compiler/Concern/CfgProducerIndexAndRematerialize.php` | 0 | 2 |
 | `lib/Compiler/Concern/CfgTypeShapeAndDeclaredAssert.php` | 0 | 11 |
-| `lib/Compiler/Concern/ClassLikeAndStmtCompile.php` | 0 | 7 |
+| `lib/Compiler/Concern/ClassLikeAndStmtCompile.php` | 0 | 6 |
 | `lib/Compiler/Concern/CoalesceAndNullsafe.php` | 0 | 62 |
 | `lib/Compiler/Concern/CoalesceLeftAndEchoConcatPreludes.php` | 0 | 9 |
 | `lib/Compiler/Concern/CompileCallArgSends.php` | 0 | 59 |
@@ -5579,6 +5579,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/CompileInterfaceTraitEnumAndMethodDecl.php` | 0 | 20 |
 | `lib/Compiler/Concern/CompileOpsTicksAndCfgSplit.php` | 0 | 9 |
 | `lib/Compiler/Concern/CompileParamFunctionAndStmtDispatch.php` | 0 | 17 |
+| `lib/Compiler/Concern/CompileParamTypedDefaultAndDeprecation.php` | 0 | 3 |
 | `lib/Compiler/Concern/CompilePromotedPropertyAndParamDefaults.php` | 0 | 15 |
 | `lib/Compiler/Concern/CompileTimeFold.php` | 0 | 59 |
 | `lib/Compiler/Concern/DeferredSiblingAndArrayMapNullCallArgProducers.php` | 0 | 2 |
@@ -49102,13 +49103,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 820)
-- new CompileFatal (line 854)
-- new CompileError (line 857)
-- new ClassCompileRegistry (line 898)
-- new AttributeClassRegistry (line 899)
-- new ClassCompileRegistry (line 1007)
-- new AttributeClassRegistry (line 1008)
+- new CompileFatal (line 823)
+- new CompileFatal (line 857)
+- new CompileError (line 860)
+- new ClassCompileRegistry (line 901)
+- new AttributeClassRegistry (line 902)
+- new ClassCompileRegistry (line 1010)
+- new AttributeClassRegistry (line 1011)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -49291,12 +49292,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/ClassLikeAndStmtCompile.php`
 
 **Warnings** (review for bootstrap subset):
-- trait ClassLikeAndStmtCompile (line 140)
-- new CompileFatal (line 661)
-- new CompileFatal (line 726)
-- new CompileFatal (line 797)
-- new Frame (line 1006)
-- 47 class method(s)
+- trait ClassLikeAndStmtCompile (line 141)
+- new CompileFatal (line 662)
+- new CompileFatal (line 727)
+- new CompileFatal (line 798)
+- 32 class method(s)
 - 1 closure(s)
 
 ### `lib/Compiler/Concern/CoalesceAndNullsafe.php`
@@ -49583,6 +49583,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new OpCode (line 658)
 - 10 class method(s)
 - 1 closure(s)
+
+### `lib/Compiler/Concern/CompileParamTypedDefaultAndDeprecation.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CompileParamTypedDefaultAndDeprecation (line 134)
+- new Frame (line 262)
+- 15 class method(s)
 
 ### `lib/Compiler/Concern/CompilePromotedPropertyAndParamDefaults.php`
 
