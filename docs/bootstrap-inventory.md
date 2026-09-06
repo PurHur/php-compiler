@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 8326 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26248 |
+| Source constructs flagged (warnings) | 26247 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5606,7 +5606,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/FirstSiblingInlineFuncCallProducerIndex.php` | 0 | 2 |
 | `lib/Compiler/Concern/FunctionStaticAndCompileTimeLiterals.php` | 0 | 15 |
 | `lib/Compiler/Concern/HoistedEnumAndChainedInlineCallArgProducers.php` | 0 | 2 |
-| `lib/Compiler/Concern/HoistedSiblingFeedAndArrayKeysArgSendRewire.php` | 0 | 2 |
+| `lib/Compiler/Concern/HoistedMultiArgSiblingFuncCallChain.php` | 0 | 2 |
 | `lib/Compiler/Concern/InlineCallArgClosureFeedsAndReturnProducers.php` | 0 | 2 |
 | `lib/Compiler/Concern/InlineCallArgCompileTimeFold.php` | 0 | 9 |
 | `lib/Compiler/Concern/InlineCallArgProducerMatch.php` | 0 | 3 |
@@ -5624,7 +5624,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/RewireInlineCallArgSendSlots.php` | 0 | 4 |
 | `lib/Compiler/Concern/SiblingInlineCallArgProducerSlots.php` | 0 | 3 |
 | `lib/Compiler/Concern/SiblingInlineFuncCallAndDeadArrayProducers.php` | 0 | 2 |
-| `lib/Compiler/Concern/SiblingInlineFuncCallProducers.php` | 0 | 2 |
+| `lib/Compiler/Concern/SiblingInlineFuncCallProducers.php` | 0 | 1 |
 | `lib/Compiler/Concern/SiblingMultiArgFuncCallProducerDetect.php` | 0 | 2 |
 | `lib/Compiler/Concern/SlotForCallArgResolvers.php` | 0 | 5 |
 | `lib/Compiler/Concern/TernaryAndLogicalShortCircuit.php` | 0 | 5 |
@@ -49965,11 +49965,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - trait HoistedEnumAndChainedInlineCallArgProducers (line 25)
 - 21 class method(s)
 
-### `lib/Compiler/Concern/HoistedSiblingFeedAndArrayKeysArgSendRewire.php`
+### `lib/Compiler/Concern/HoistedMultiArgSiblingFuncCallChain.php`
 
 **Warnings** (review for bootstrap subset):
-- trait HoistedSiblingFeedAndArrayKeysArgSendRewire (line 37)
-- 13 class method(s)
+- trait HoistedMultiArgSiblingFuncCallChain (line 25)
+- 11 class method(s)
 
 ### `lib/Compiler/Concern/InlineCallArgClosureFeedsAndReturnProducers.php`
 
@@ -50115,9 +50115,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/RewireInlineCallArgSendSlots.php`
 
 **Warnings** (review for bootstrap subset):
-- trait RewireInlineCallArgSendSlots (line 25)
-- new Operand\Literal (line 146)
-- 23 class method(s)
+- trait RewireInlineCallArgSendSlots (line 24)
+- new Operand\Literal (line 761)
+- 36 class method(s)
 - 1 closure(s)
 
 ### `lib/Compiler/Concern/SiblingInlineCallArgProducerSlots.php`
@@ -50136,8 +50136,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/SiblingInlineFuncCallProducers.php`
 
 **Warnings** (review for bootstrap subset):
-- trait SiblingInlineFuncCallProducers (line 25)
-- 11 class method(s)
+- trait SiblingInlineFuncCallProducers (line 16)
 
 ### `lib/Compiler/Concern/SiblingMultiArgFuncCallProducerDetect.php`
 
