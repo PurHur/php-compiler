@@ -20,9 +20,10 @@ use PHPLLVM\Value;
  * When num/precision/mode are compile-time scalars, evaluate on the host and emit a float
  * constant — NestedJIT RoundJitHelper mis-handles places>0 on cold AOT calls (#27249 / #26800).
  *
- * Runtime num with compile-time places=0 + HALF_UP uses {@code llvm.round.f64}
- * ({@see MathRound::invokeHalfUpPlacesZero}, #36386) — php-src {@code _php_math_round}
- * half-away-from-zero matches C {@code round(3)}.
+ * Runtime num with compile-time places=0 + directed modes use LLVM f64
+ * intrinsics ({@see MathRound::invokeHalfUpPlacesZero} / Ceiling / Floor /
+ * TowardZero, #36386) — php-src {@code _php_math_round} /
+ * {@code php_math_round_mode.h}.
  *
  * Runtime num with compile-time precision≠0 + default HALF_UP uses user-TU sprintf+strtod
  * so Zend parity survives thin AOT fmul drift (#35741).
@@ -45,14 +46,17 @@ final class JitRound
             ? $args[2]
             : null;
         $knownPlaces = self::compileTimePlaces($precisionArg);
-        $halfUp = self::isCompileTimeHalfUp($context, $modeArg);
+        $knownMode = self::compileTimeRoundMode($context, $modeArg);
 
         $number = self::coerceDouble($context, $args[0]);
-        // places=0 + HALF_UP: llvm.round.f64 — no NestedJIT helper link (#36386).
-        if (null !== $knownPlaces && 0 === $knownPlaces && $halfUp) {
-            return MathRound::invokeHalfUpPlacesZero($context, $number);
+        // places=0 + directed modes: LLVM intrinsics — no NestedJIT helper (#36386).
+        if (null !== $knownPlaces && 0 === $knownPlaces && null !== $knownMode) {
+            $viaIntrinsic = self::tryInvokePlacesZeroIntrinsic($context, $number, $knownMode);
+            if (null !== $viaIntrinsic) {
+                return $viaIntrinsic;
+            }
         }
-        if (null !== $knownPlaces && 0 !== $knownPlaces && $halfUp) {
+        if (null !== $knownPlaces && 0 !== $knownPlaces && self::isCompileTimeHalfUp($context, $modeArg)) {
             return self::lowerRuntimeRoundHalfUpSprintf($context, $number, $knownPlaces);
         }
 
@@ -95,8 +99,11 @@ final class JitRound
 
         $knownPlaces = self::compileTimePlaces($precision);
         $number = self::coerceDouble($context, $num);
-        if (null !== $knownPlaces && 0 === $knownPlaces && $mode === StdlibConstants::PHP_ROUND_HALF_UP) {
-            return MathRound::invokeHalfUpPlacesZero($context, $number);
+        if (null !== $knownPlaces && 0 === $knownPlaces) {
+            $viaIntrinsic = self::tryInvokePlacesZeroIntrinsic($context, $number, $mode);
+            if (null !== $viaIntrinsic) {
+                return $viaIntrinsic;
+            }
         }
         if (null !== $knownPlaces && 0 !== $knownPlaces && $mode === StdlibConstants::PHP_ROUND_HALF_UP) {
             return self::lowerRuntimeRoundHalfUpSprintf($context, $number, $knownPlaces);
@@ -184,18 +191,52 @@ final class JitRound
 
     private static function isCompileTimeHalfUp(Context $context, ?JITVariable $modeArg): bool
     {
+        $resolved = self::compileTimeRoundMode($context, $modeArg);
+
+        return null !== $resolved && StdlibConstants::PHP_ROUND_HALF_UP === $resolved;
+    }
+
+    /**
+     * Compile-time PHP_ROUND_* / RoundingMode when resolvable; omitted → HALF_UP.
+     */
+    private static function compileTimeRoundMode(Context $context, ?JITVariable $modeArg): ?int
+    {
         if (null === $modeArg || NamedOptionalCallArgs::isOmittedOptional($modeArg)) {
-            return true;
+            return StdlibConstants::PHP_ROUND_HALF_UP;
         }
         $resolved = RoundingModeJit::compileTimeRoundMode($context, $modeArg);
         if (null !== $resolved) {
-            return $resolved === StdlibConstants::PHP_ROUND_HALF_UP;
+            return $resolved;
         }
         if (null !== $modeArg->compileTimeLong) {
-            return (int) $modeArg->compileTimeLong === StdlibConstants::PHP_ROUND_HALF_UP;
+            return (int) $modeArg->compileTimeLong;
         }
 
-        return false;
+        return null;
+    }
+
+    /**
+     * places=0 directed modes with a matching LLVM f64 intrinsic (#36386).
+     */
+    private static function tryInvokePlacesZeroIntrinsic(
+        Context $context,
+        Value $number,
+        int $mode
+    ): ?Value {
+        if (StdlibConstants::PHP_ROUND_HALF_UP === $mode) {
+            return MathRound::invokeHalfUpPlacesZero($context, $number);
+        }
+        if (StdlibConstants::PHP_ROUND_CEILING === $mode) {
+            return MathRound::invokeCeilingPlacesZero($context, $number);
+        }
+        if (StdlibConstants::PHP_ROUND_FLOOR === $mode) {
+            return MathRound::invokeFloorPlacesZero($context, $number);
+        }
+        if (StdlibConstants::PHP_ROUND_TOWARD_ZERO === $mode) {
+            return MathRound::invokeTowardZeroPlacesZero($context, $number);
+        }
+
+        return null;
     }
 
     /**
