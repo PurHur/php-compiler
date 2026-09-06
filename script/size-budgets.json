@@ -4,9 +4,9 @@
     "done_when_ceiling": 25000,
     "files": {
         "lib/Compiler.php": {
-            "budget": 1097,
+            "budget": 1100,
             "target": 20000,
-            "note": "Concern trait splits (#36230/#36387/#36403); NestedIifeAndDeferredSiblingCallArgProducers + HoistedMultiArgSiblingFuncCallChain + HoistedSiblingFeedAndArrayKeysArgSendRewire + peers"
+            "note": "Concern trait splits (#36230/#36387/#36403); VarExportNestedAndArrayMergeFamilyCallArgSlots + NestedIifeAndDeferredSiblingCallArgProducers + peers"
         },
         "lib/JIT.php": {
             "budget": 274,
