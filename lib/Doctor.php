@@ -1677,10 +1677,12 @@ final class Doctor
         $units = is_dir($helperDir.'/units') ? count(glob($helperDir.'/units/*/unit.o') ?: []) : 0;
         $native = $target->isHostNative() ? 'native' : 'cross (emit/link limited)';
         $link = $target->canLinkOnThisHost() ? 'link=ok' : 'link=blocked';
+        // Empty helper-cache forces a full corpus re-emit on cold install (#24302 / #36390).
+        $ok = $units > 0;
 
         return [
             'name' => 'Compile target',
-            'ok' => true,
+            'ok' => $ok,
             'required' => false,
             'detail' => sprintf(
                 '%s triple=%s cpu=%s %s %s; helper-cache %s (%d unit.o)',
@@ -1692,9 +1694,11 @@ final class Doctor
                 $helperDir,
                 $units
             ),
-            'hint' => $target->canLinkOnThisHost()
-                ? ''
-                : 'AOT link needs a matching host; object emit still uses this triple/CPU (#36391)',
+            'hint' => !$ok
+                ? 'No committed helper-runtime unit.o for this target — cold AOT will re-emit the corpus (#36390 / #36391)'
+                : ($target->canLinkOnThisHost()
+                    ? ''
+                    : 'AOT link needs a matching host; object emit still uses this triple/CPU (#36391)'),
         ];
     }
 

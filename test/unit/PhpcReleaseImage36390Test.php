@@ -55,15 +55,31 @@ final class PhpcReleaseImage36390Test extends TestCase
         $this->assertStringContainsString('mode":"image"', $body);
     }
 
+    public function testColdBuildCheckSupportsSdkMode(): void
+    {
+        $script = self::$root.'/script/cold-build-check.sh';
+        $body = (string) file_get_contents($script);
+        $this->assertStringContainsString('--sdk', $body);
+        $this->assertStringContainsString('mode":"sdk"', $body);
+        $this->assertStringContainsString('PHPC_SDK_TARBALL', $body);
+        $this->assertStringContainsString('helper_units', $body);
+        $this->assertStringContainsString('refusing (would re-emit corpus)', $body);
+        // Harness empty bind-mount: docker create + cp (same pattern as --image).
+        $this->assertStringContainsString('docker create', $body);
+        $this->assertStringContainsString('USE_SDK_MOUNT', $body);
+    }
+
     public function testMakefileTargetsAndGettingStartedLeadWithDocker(): void
     {
         $makefile = (string) file_get_contents(self::$root.'/Makefile');
         $this->assertStringContainsString('docker-build-phpc-release:', $makefile);
         $this->assertStringContainsString('pack-phpc-sdk:', $makefile);
         $this->assertStringContainsString('cold-build-check-image:', $makefile);
+        $this->assertStringContainsString('cold-build-check-sdk:', $makefile);
 
         $gs = (string) file_get_contents(self::$root.'/docs/GETTING-STARTED.md');
         $this->assertStringContainsString('Install (app authors — Docker only)', $gs);
+        $this->assertStringContainsString('cold-build-check-sdk', $gs);
         $this->assertLessThan(
             strpos($gs, 'Bootstrap contributors'),
             strpos($gs, 'ghcr.io/purhur/phpc'),
