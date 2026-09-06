@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * modf() for compiled JIT/AOT modules (#15200, #22519, #29244, php-in-PHP).
+ * NestedJIT-safe modf peel — reference only after AOT hot path moved to libm
+ * {@code modf(3)} via {@see \PHPCompiler\JIT\Builtin\MathModf} (#36386).
  *
  * NestedJIT-safe: integer-part trunc toward −∞ (positive) / +∞ (negative) via
  * Floor/Ceil #27650 peel shape (#29244 / peer MathFrexp #29156). Do not call

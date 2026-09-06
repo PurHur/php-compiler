@@ -9,22 +9,27 @@ use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Internal modf NestedJIT via JitVmHelperLink::ensureCompiled (#15200 / #22519 / #29244).
+ * Internal modf AOT uses libm modf(3) (#36386);
+ * ModfJitHelper remains NestedJIT-safe reference (peer MathFrexp / FrexpJitHelper).
  * Userland modf() was a phantom vs php-src and was unregistered (#25359).
+ * LLVM 9 has no llvm.modf.f64 in the shapes we use.
+ *
+ * php-src: ext/standard/math.c PHP_FUNCTION(modf) → C modf(3).
  */
 final class ModfRuntimeShrinkTest extends TestCase
 {
-    public function testMathModfBridgeUsesJitHelperNotLibcLookup(): void
+    public function testModfUsesLibmNotHelperBridge(): void
     {
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathModf.php');
-        $this->assertStringContainsString('ModfJitHelper', $bridge);
+        $this->assertStringContainsString("LIBC_MODF = 'modf'", $bridge);
         $this->assertStringContainsString('phpc_modf', $bridge);
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $bridge);
-        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $bridge);
-        $this->assertStringNotContainsString("lookupFunction('modf')", $bridge);
-        $this->assertStringNotContainsString('NestedJitCompileScope::run', $bridge);
-        $this->assertStringNotContainsString('parseAndCompile', $bridge);
-        $this->assertStringNotContainsString('new JIT(', $bridge);
+        $this->assertStringContainsString('modf_libm_f64_entry', $bridge);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureCompiled', $bridge);
+        $this->assertStringNotContainsString('ModfJitHelper', $bridge);
+        $this->assertStringNotContainsString('NestedJitCompileScope', $bridge);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
+        $this->assertStringNotContainsString('llvm.modf', $bridge);
         $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/modf.php');
     }
 
@@ -84,7 +89,13 @@ final class ModfRuntimeShrinkTest extends TestCase
         $this->assertLessThan(0.0, ModfJitHelper::intPart());
     }
 
-    public function testSpineBundleIncludesModfJitHelper(): void
+    public function testLibcExternNoLongerDeclaresModf(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/LibcExtern.php');
+        $this->assertStringNotContainsString("'modf'", $source);
+    }
+
+    public function testSpineBundleIncludesModfHelperWithoutUserland(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('ModfJitHelper.php', $spine);
