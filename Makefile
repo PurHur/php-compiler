@@ -161,6 +161,20 @@ verify-reproducible:
 release-checksums:
 	./script/write-release-checksums.sh $(ARGS)
 
+# Detached openssl signature of SHA256SUMS (#36399).
+.PHONY: release-sign
+release-sign:
+	./script/sign-release-artifacts.sh $(ARGS)
+
+.PHONY: release-verify
+release-verify:
+	./script/verify-release-artifacts.sh $(ARGS)
+
+# Per-arch helper unit.o/unit.bc sha256 ledger (#36399).
+.PHONY: helper-runtime-unit-checksums
+helper-runtime-unit-checksums:
+	php script/write-helper-runtime-unit-checksums.php $(ARGS)
+
 # Cross-target AOT object emit (default PHP_COMPILER_TARGET=aarch64-linux) — no link on x86 (#36391).
 aot-smoke-cross-emit:
 	./script/aot-smoke-cross-emit.sh $(ARGS)

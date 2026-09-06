@@ -82,6 +82,8 @@ if [[ "$BYTES" -gt 1073741824 ]]; then
   echo "pack-phpc-sdk: WARNING — tarball exceeds 1 GiB cold-install budget (#36390)" >&2
   exit 1
 fi
-# Release checksums next to the tarball (#36399) — signatures remain a follow-up.
+# Release checksums + detached openssl signature next to the tarball (#36399).
 "${REPO_ROOT}/script/write-release-checksums.sh" "$OUT_DIR" "$OUT"
+"${REPO_ROOT}/script/sign-release-artifacts.sh" "$OUT_DIR"
+PHPC_RELEASE_REQUIRE_SIGNATURE=1 "${REPO_ROOT}/script/verify-release-artifacts.sh" "$OUT_DIR"
 echo "pack-phpc-sdk: extract and run: ./phpc-host doctor   # or: ./phpc-host build -o hello hello.php"

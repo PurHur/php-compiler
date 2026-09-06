@@ -201,6 +201,71 @@ function bootstrap_gen0_manifest_blob_sync_errors(string $root, ?array $manifest
         }
     }
 
+    foreach (bootstrap_gen0_manifest_m3_sidecar_sync_errors($root, $manifest) as $m3Error) {
+        $errors[] = $m3Error;
+    }
+
+    return $errors;
+}
+
+/**
+ * sha256 ledger for every name in manifest m3_sidecars[] (#36399).
+ *
+ * @return list<string>
+ */
+function bootstrap_gen0_manifest_m3_sidecar_sync_errors(string $root, ?array $manifest = null): array
+{
+    if (null === $manifest) {
+        $manifest = bootstrap_gen0_manifest_read($root);
+    }
+    if (null === $manifest) {
+        return [];
+    }
+    $names = $manifest['m3_sidecars'] ?? null;
+    if (!\is_array($names) || [] === $names) {
+        return [];
+    }
+    $ledger = $manifest['sha256_m3_sidecars'] ?? null;
+    if (!\is_array($ledger) || [] === $ledger) {
+        // Soft until refresh populates the map — hard-fail would red every tree
+        // that has not yet run bootstrap-gen0-manifest-refresh.php (#36399).
+        return [];
+    }
+
+    $errors = [];
+    $base = rtrim($root, '/').'/prelinked/bootstrap-gen0';
+    foreach ($names as $name) {
+        if (!\is_string($name) || '' === $name) {
+            continue;
+        }
+        if (str_contains($name, '/') || str_contains($name, '..')) {
+            $errors[] = "m3_sidecars: refused path {$name}";
+            continue;
+        }
+        $want = strtolower((string) ($ledger[$name] ?? ''));
+        if ('' === $want) {
+            $errors[] = "m3_sidecars: {$name} listed but missing from sha256_m3_sidecars";
+            continue;
+        }
+        $abs = $base.'/'.$name;
+        if (!is_file($abs)) {
+            $errors[] = "m3_sidecars: missing prelinked/bootstrap-gen0/{$name}";
+            continue;
+        }
+        $have = hash_file('sha256', $abs);
+        if (!is_string($have) || strtolower($have) !== $want) {
+            $errors[] = "m3_sidecars: sha256 mismatch for {$name} (manifest {$want}, on-disk ".($have ?: '?').')';
+        }
+    }
+    foreach ($ledger as $name => $_sha) {
+        if (!\is_string($name)) {
+            continue;
+        }
+        if (!\in_array($name, $names, true)) {
+            $errors[] = "sha256_m3_sidecars: {$name} not in m3_sidecars list";
+        }
+    }
+
     return $errors;
 }
 
@@ -335,6 +400,28 @@ function bootstrap_gen0_manifest_refresh_from_disk(string $root): array
         }
         $manifest[$defaults['size']] = (int) $bytes;
         $manifest[$defaults['sha']] = strtolower($sha);
+    }
+
+    $m3Names = $manifest['m3_sidecars'] ?? null;
+    if (\is_array($m3Names) && [] !== $m3Names) {
+        $m3Ledger = [];
+        $m3Base = rtrim($root, '/').'/prelinked/bootstrap-gen0';
+        foreach ($m3Names as $name) {
+            if (!\is_string($name) || '' === $name || str_contains($name, '/') || str_contains($name, '..')) {
+                throw new \RuntimeException("m3_sidecars: refused path ".(string) $name);
+            }
+            $abs = $m3Base.'/'.$name;
+            if (!is_file($abs) || !is_readable($abs)) {
+                throw new \RuntimeException("m3_sidecars: missing {$name}");
+            }
+            $sha = hash_file('sha256', $abs);
+            if (!is_string($sha)) {
+                throw new \RuntimeException("m3_sidecars: cannot hash {$name}");
+            }
+            $m3Ledger[$name] = strtolower($sha);
+        }
+        ksort($m3Ledger);
+        $manifest['sha256_m3_sidecars'] = $m3Ledger;
     }
 
     $manifest['generated_at'] = gmdate('c');

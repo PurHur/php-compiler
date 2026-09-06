@@ -1,6 +1,6 @@
 {
     "version": 1,
-    "generated_at": "2026-09-04T06:10:14+00:00",
+    "generated_at": "2026-09-06T13:33:30+00:00",
     "driver": "prelinked/bootstrap-gen0/bin-compile-aot",
     "compiler_minimal_sidecar": "prelinked/bootstrap-gen0/compiler_minimal_aot_blob",
     "compiler_lib_sidecar": "prelinked/bootstrap-gen0/compiler_lib_aot_blob",
@@ -30,5 +30,21 @@
     "build_target": "inventory argv emit (Zend native rebuild, BOOTSTRAP_INVENTORY_DRIVER_USE_PRELINKED=0)",
     "issue": "#3053, #1492, #2880, #3046, #8713",
     "lowering_source_fingerprint": "369b5dbb15da2c6f0a51b686aca9128a36d9699d5c481099c6d8aa57e1c23b38",
-    "provenance": "unverified-restamp"
+    "provenance": "unverified-restamp",
+    "sha256_m3_sidecars": {
+        ".m3_bin_compile_aot_blob": "fafe4a63f2ddb014ae643afc09ce4cce7aef641920753a3f9d3cbbab30390707",
+        ".m3_bootstrap_loop_smoke_main_aot_blob": "48732b264080cb4164e38ca6e8edf5c2adee56850c60a89885ea4e0121e77caf",
+        ".m3_cli_driver_aot_blob": "782bcc89766f1a8189e46e6568957dc8d4c6b318bba87cc005c706b1cfa8c740",
+        ".m3_compile_driver_aot_blob": "83ce0667bf262a4908c3d431d66aee730d969bd39d85541ef4dcd2f48e59755c",
+        ".m3_compile_smoke_aot_blob": "705c30697678ad7d230a7bab1ce91b862fcb602805684925d8c7a44bd9262839",
+        ".m3_compiler_lib_aot_blob": "c7c1c5d49f310d865866081fcc7f6aa58ecb9fa39fae4fe96657452782a7f7b8",
+        ".m3_compiler_minimal_aot_blob": "ecc681eb5caa780a187a605c0b0f970f78d602cfa4144cb00ee06ce5f4b2d7d8",
+        ".m3_compiler_php_aot_blob": "fafc8b9b807d7e77840e783ecc27d395468c093d2b0542d626482575de7191f8",
+        ".m3_compiler_unit_probe_aot_blob": "0fb725217fe51b1ea334f1e0717e5ad2b0ddce3ec5a2fc039ecaf9ed4bad3735",
+        ".m3_helloworld_aot_blob": "d26a24c7f4d45035ca82a6baac9635e6238102e98aea717f22e116e88ad36fc6",
+        ".m3_helloworld_smoke_main_aot_blob": "290106b7daf3d3b8cdfef78081d0e0f4e5bd772dab1d55e3741cb20aeb0497ce",
+        ".m3_vendor_php_cfg_prelink.o": "105fcc6e159f8d8418026e54e7a5f3b6d5eff6ef0c5b326bd282d281b4449c7c",
+        ".m3_vendor_php_llvm_prelink.o": "70fd7ff107078da932eec64f2a92fa07d7717fccc2763f0b24d1d2300bc99d96",
+        ".m3_vendor_php_types_prelink.o": "589629d10b03e0ee2a62445a7630719fe4361e81638ff7eceec113bd9df4c951"
+    }
 }
