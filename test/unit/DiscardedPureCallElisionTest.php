@@ -169,6 +169,7 @@ use PHPCompiler\ext\standard\property_exists_;
 use PHPCompiler\ext\standard\pi;
 use PHPCompiler\ext\standard\pow;
 use PHPCompiler\ext\standard\preg_quote;
+use PHPCompiler\ext\standard\printf_;
 use PHPCompiler\ext\standard\quoted_printable_decode;
 use PHPCompiler\ext\standard\quoted_printable_encode;
 use PHPCompiler\ext\standard\quotemeta;
@@ -181,6 +182,7 @@ use PHPCompiler\ext\standard\soundex;
 use PHPCompiler\ext\standard\spl_autoload_functions;
 use PHPCompiler\ext\standard\spl_object_hash;
 use PHPCompiler\ext\standard\spl_object_id;
+use PHPCompiler\ext\standard\sprintf_;
 use PHPCompiler\ext\standard\sqrt;
 use PHPCompiler\ext\standard\stream_get_filters;
 use PHPCompiler\ext\standard\stream_get_transports;
@@ -218,6 +220,7 @@ use PHPCompiler\ext\standard\ucwords;
 use PHPCompiler\ext\standard\urldecode;
 use PHPCompiler\ext\standard\urlencode;
 use PHPCompiler\ext\standard\version_compare;
+use PHPCompiler\ext\standard\vsprintf;
 use PHPCompiler\ext\standard\wordwrap;
 use PHPCompiler\ext\standard\zend_version;
 use PHPCompiler\ext\standard\boolval;
@@ -1900,6 +1903,157 @@ final class DiscardedPureCallElisionTest extends TestCase
             $context,
             new hash_hmac(),
             [$algoSha, $data, $key, $bool, $long]
+        ));
+    }
+
+    public function testDiscardedSprintfAndVsprintfElideOnSafeFormat(): void
+    {
+        // php-src ext/standard/formatted_print.c sprintf / vsprintf (#36386).
+        $context = $this->makeContext();
+        $hello = $this->makeStringVar('hello');
+        $pct = $this->makeStringVar('%%');
+        $fmtSd = $this->makeStringVar('%s %d');
+        $fmtS = $this->makeStringVar('%s');
+        $fmtPad = $this->makeStringVar('%-10s');
+        $fmtZero = $this->makeStringVar('%02d');
+        $fmtPos = $this->makeStringVar('%1$s');
+        $fmtStar = $this->makeStringVar('%*s');
+        $fmtA = $this->makeStringVar('%a');
+        $fmtBare = $this->makeStringVar('%');
+        $fmtRuntime = $this->makeStringVar(null);
+        $str = $this->makeStringVar('x');
+        $long = $this->makeNativeLongVar();
+        $bool = $this->makeNativeBoolVar();
+        $null = $this->makeNullVar();
+        $box = $this->makeValueBoxVar();
+        $ht = $this->makeHashtableVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new sprintf_(),
+            [$hello]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new sprintf_(),
+            [$pct]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new sprintf_(),
+            [$fmtS, $str]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new sprintf_(),
+            [$fmtSd, $str, $long]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new sprintf_(),
+            [$fmtPad, $str]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new sprintf_(),
+            [$fmtZero, $long]
+        ));
+        // Extra args are ignored by Zend.
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new sprintf_(),
+            [$fmtS, $str, $long]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new sprintf_(),
+            [$fmtS, $bool]
+        ));
+        // vsprintf: only zero-conversion formats (array element types unknown).
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new vsprintf(),
+            [$hello, $ht]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new vsprintf(),
+            [$pct, $ht]
+        ));
+
+        // Too few args / bad formats stay live (ArgumentCountError / ValueError).
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new sprintf_(),
+            [$fmtS]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new sprintf_(),
+            [$fmtSd, $str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new sprintf_(),
+            [$fmtPos, $str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new sprintf_(),
+            [$fmtStar, $long, $str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new sprintf_(),
+            [$fmtA, $str]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new sprintf_(),
+            [$fmtBare]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new sprintf_(),
+            [$fmtRuntime, $str]
+        ));
+        // Soft-null / object box / array value args stay live.
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new sprintf_(),
+            [$fmtS, $null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new sprintf_(),
+            [$fmtS, $box]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new sprintf_(),
+            [$fmtS, $ht]
+        ));
+        // vsprintf with conversions stays live (element count / __toString).
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new vsprintf(),
+            [$fmtS, $ht]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new vsprintf(),
+            [$hello]
+        ));
+        // printf writes stdout — never elided.
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new printf_(),
+            [$hello]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new printf_(),
+            [$fmtS, $str]
         ));
     }
 
