@@ -157,6 +157,11 @@ if [[ -f "$FR" ]]; then
   php "$ROOT/script/composer/patch-fastroute-options-plus-36382.php" "$FR"
 fi
 
+FRC="$DEST/vendor/nikic/fast-route/src/RouteCollector.php"
+if [[ -f "$FRC" ]]; then
+  php "$ROOT/script/composer/patch-fastroute-array-cast-36382.php" "$FRC"
+fi
+
 echo "Created $DEST ($(find "$DEST" -name '*.php' | wc -l) php files)"
 echo "Try: ./phpc build --project $DEST --dry-run"
-echo "Note: reachable handle+emit graph ~76 files (run()/ServerRequest* stripped); AOT uses incremental requires (>=32 units) — see #36382"
+echo "Note: reachable handle+emit graph ~73 files (run()/ServerRequest* stripped; FastRoute (array) cast avoided); AOT uses incremental requires (>=32 units) — see #36382"

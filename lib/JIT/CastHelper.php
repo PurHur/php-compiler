@@ -18,12 +18,21 @@ final class CastHelper
 {
     public static function emitArrayCast(Context $context, Variable $src): Variable
     {
+        // Breadcrumb: first TYPE_CAST_ARRAY mid-IncludeHelper can stall minutes while
+        // JitGetObjectVarsNative class-id dispatch is inlined (#36382 Slim/FastRoute).
+        Progress::noteFunction('cast_array_begin:src_type='.$src->type);
         CastArrayShared::ensureInsertBlock($context, 'cast_array_body');
         if (Variable::TYPE_VALUE === $src->type) {
-            return CastArrayValueBoxJit::emit($context, $src);
+            $out = CastArrayValueBoxJit::emit($context, $src);
+            Progress::noteFunction('cast_array_done:value_box');
+
+            return $out;
         }
 
-        return CastArrayNativeJit::emit($context, $src);
+        $out = CastArrayNativeJit::emit($context, $src);
+        Progress::noteFunction('cast_array_done:native');
+
+        return $out;
     }
 
     public static function emitObjectCast(
