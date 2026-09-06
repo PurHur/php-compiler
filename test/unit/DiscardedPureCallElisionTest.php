@@ -125,6 +125,7 @@ use PHPCompiler\ext\standard\http_get_last_response_headers;
 use PHPCompiler\ext\standard\http_response_code;
 use PHPCompiler\ext\standard\idate;
 use PHPCompiler\ext\standard\ignore_user_abort;
+use PHPCompiler\ext\standard\implode;
 use PHPCompiler\ext\standard\int_max;
 use PHPCompiler\ext\standard\int_min;
 use PHPCompiler\ext\standard\intval;
@@ -2054,6 +2055,80 @@ final class DiscardedPureCallElisionTest extends TestCase
             $context,
             new printf_(),
             [$fmtS, $str]
+        ));
+    }
+
+    public function testDiscardedImplodeAndJoinElideOnSafePieces(): void
+    {
+        // php-src ext/standard/string.c php_implode (#36386).
+        $context = $this->makeContext();
+        $sep = $this->makeStringVar(',');
+        $sepLit = $this->makeStringVar('-');
+        $null = $this->makeNullVar();
+        $box = $this->makeValueBoxVar();
+        $ht = $this->makeHashtableVar();
+        $empty = $this->makeHashtableVar();
+        $empty->compileTimeEmptyArrayLiteral = true;
+        $valueBoxHt = $this->makeValueBoxVar();
+        $valueBoxHt->valueBoxHashtable = true;
+        $native = $this->makeNativeLongArrayVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new implode(),
+            [$empty]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new implode(),
+            [$ht]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new implode(),
+            [$sep, $ht]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new implode(),
+            [$sep, $valueBoxHt]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new implode('join'),
+            [$sepLit, $native]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new implode('join'),
+            [$native]
+        ));
+
+        // Soft-null separator / non-array / array-first stay live.
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new implode(),
+            [$null, $ht]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new implode(),
+            [$ht, $sep]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new implode(),
+            [$box]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new implode(),
+            []
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new implode(),
+            [$sep, $ht, $null]
         ));
     }
 
@@ -5341,6 +5416,21 @@ final class DiscardedPureCallElisionTest extends TestCase
         $typeProp = $ref->getProperty('type');
         $typeProp->setAccessible(true);
         $typeProp->setValue($var, Variable::TYPE_HASHTABLE);
+        $kindProp = $ref->getProperty('kind');
+        $kindProp->setAccessible(true);
+        $kindProp->setValue($var, Variable::KIND_VARIABLE);
+
+        return $var;
+    }
+
+    private function makeNativeLongArrayVar(): Variable
+    {
+        $ref = new \ReflectionClass(Variable::class);
+        /** @var Variable $var */
+        $var = $ref->newInstanceWithoutConstructor();
+        $typeProp = $ref->getProperty('type');
+        $typeProp->setAccessible(true);
+        $typeProp->setValue($var, Variable::IS_NATIVE_ARRAY | Variable::TYPE_NATIVE_LONG);
         $kindProp = $ref->getProperty('kind');
         $kindProp->setAccessible(true);
         $kindProp->setValue($var, Variable::KIND_VARIABLE);

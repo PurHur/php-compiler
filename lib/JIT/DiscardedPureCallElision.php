@@ -18,7 +18,9 @@ use PHPCompiler\VM\Variable as VmVariable;
  * substr/str_repeat/strcmp/strpos/strstr/str_contains/str_starts_with/
  * str_ends_with/levenshtein/…, typed str_pad/chunk_split/wordwrap/str_split/
  * explode/str_getcsv, typed str_replace/str_ireplace/substr_replace/strtr
- * (string forms), typed addcslashes/stripcslashes/strpbrk,
+ * (string forms), typed implode/join (typed array pieces + typed string
+ * separator; array-first two-arg stays live), typed
+ * addcslashes/stripcslashes/strpbrk,
  * typed quoted_printable_encode/decode, basename/dirname,
  * typed htmlspecialchars/htmlentities/nl2br/preg_quote/
  * escapeshell*, typed-numeric chr/number_format, typed similar_text
@@ -202,8 +204,10 @@ use PHPCompiler\VM\Variable as VmVariable;
  * (DivisionByZeroError must stay observable). {@code hex2bin}/
  * {@code base64_decode}/{@code convert_uudecode} stay live (invalid-input
  * warnings / false returns). Int needles for {@code strpos}/{@code strchr}/…
- * stay live (PHP 8 deprecations). Array {@code str_replace}/{@code implode}
- * stay live (element {@code __toString}); {@code str_replace} {@code &$count}
+ * stay live (PHP 8 deprecations). Array {@code str_replace} stays live
+ * (element {@code __toString}); discarded {@code implode}/{@code join} elide
+ * on typed array pieces + typed string separator (array-first two-arg and
+ * soft-null separator stay live); {@code str_replace} {@code &$count}
  * stays live (by-ref write). {@code dirname} with a non-constant {@code $levels}
  * stays live ({@code ValueError} when {@code $levels < 1}). {@code str_getcsv}
  * without an explicit {@code $escape} stays live (PHP 8.4+ omitted-escape DEP).
@@ -313,6 +317,9 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureStringReplaceOrJoinNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureImplodeJoinNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureNumberFormatNoSideEffect($toCall, $callArgs)) {
@@ -1298,6 +1305,46 @@ final class DiscardedPureCallElision
             default:
                 return false;
         }
+    }
+
+    /**
+     * Discarded {@code implode}/{@code join} on typed array pieces — php-src
+     * {@code ext/standard/string.c} {@code php_implode}. Soft-null separator
+     * stays live (deprecate). Array-first two-arg form stays live (legacy
+     * order / PROFILE≥8.4 TypeError on {@code implode}). Soft-null /
+     * non-array pieces stay live ({@code TypeError}). Peer typed-array
+     * {@see tryElidePureArrayTransformNoSideEffect}.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureImplodeJoinNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        $name = strtolower($toCall->getName());
+        if ('implode' !== $name && 'join' !== $name) {
+            return false;
+        }
+        if (!isset($callArgs[0]) || !$callArgs[0] instanceof Variable) {
+            return false;
+        }
+        if (isset($callArgs[2])) {
+            return false;
+        }
+        if (!isset($callArgs[1])) {
+            // One-arg: pieces array only.
+            return self::isTypedArrayArg($callArgs[0]);
+        }
+        // Two-arg: separator string + pieces array (never array-first).
+        if (
+            !self::stringArgAllowsDiscardedElision($callArgs[0])
+            || !$callArgs[1] instanceof Variable
+        ) {
+            return false;
+        }
+
+        return self::isTypedArrayArg($callArgs[1]);
     }
 
     /**
