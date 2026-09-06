@@ -1751,6 +1751,46 @@ trait AssignOperand
             $this->markScopeVariableAssignedIfTracked($resultOp, $result);
 
             return;
+        } elseif (
+            (
+                Variable::TYPE_NATIVE_LONG === $result->type
+                || Variable::TYPE_NATIVE_BOOL === $result->type
+                || Variable::TYPE_NATIVE_DOUBLE === $result->type
+            )
+            && Variable::TYPE_HASHTABLE === $value->type
+        ) {
+            // AssignOp-fused `$a += […]`: PLUS result is HASHTABLE but the SSA CV for `$a`
+            // may still be a scalar slot (php-types int[] / fresh SSA) (#36397).
+            // php-src: Zend/zend_operators.c add_function array union → assign into CV.
+            $slot = \PHPCompiler\JIT\JitValueBox::alloc($this->context);
+            $htPtr = $this->context->helper->loadValue($value);
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeHashtable'),
+                \PHPCompiler\JIT\JitValueBox::pointer($this->context, $slot),
+                $htPtr
+            );
+            if ($value->ephemeralArrayTemp) {
+                $this->context->builder->store(
+                    $this->context->getTypeFromString('__hashtable__*')->constNull(),
+                    $value->value
+                );
+                $value->ephemeralArrayTemp = false;
+            }
+            $result->free();
+            $result->type = Variable::TYPE_VALUE;
+            $result->value = $slot;
+            $result->valueBoxHashtable = true;
+            $this->context->setVariableOp($resultOp, $result);
+            $this->markScopeVariableAssignedIfTracked($resultOp, $result);
+            $resolved = \PHPCompiler\JIT\OperandName::resolve($resultOp);
+            if (null !== $resolved && '' !== $resolved) {
+                $this->context->bindVariableByName(
+                    $this->context->resolveRefAliasName($resolved),
+                    $result
+                );
+            }
+
+            return;
         } elseif (Variable::TYPE_VALUE === $result->type && Variable::TYPE_HASHTABLE === $value->type) {
             // INIT_ARRAY temps already hold rc=1. writeHashtable addrefs for the box's
             // sole-owner claim — without releasing the temp that leaves rc=2 so unset
