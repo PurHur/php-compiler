@@ -2355,6 +2355,89 @@ final class HashTableWriteLlvm
         return $var;
     }
 
+    /**
+     * Nested string-offset write into an HT string slot (`$a['s'][0] = 'X'`).
+     *
+     * Separates the string and writes the exclusive copy back into the live HT
+     * `__value__` so subsequent {@see StringOffsetHelper::dimFetch} / dimAssign
+     * mutate bytes that remain reachable from the array (#36397).
+     *
+     * php-src: Zend/zend_execute.c ZEND_FETCH_DIM_W + zend_assign_to_string_offset
+     * (does not autovivify an array over an existing string).
+     */
+    public static function separateStringAtStringKeyForOffsetWrite(
+        Context $context,
+        Value $ht,
+        Value $keyStr
+    ): Variable {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'ht_str_off_sk');
+        $valPtr = $context->builder->call(
+            $context->lookupFunction('__hashtable__readStringKeyValue'),
+            $ht,
+            $keyStr
+        );
+        $str = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $valPtr
+        );
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $str
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $valPtr,
+            $owned
+        );
+
+        return new Variable(
+            $context,
+            Variable::TYPE_STRING,
+            Variable::KIND_VALUE,
+            $owned
+        );
+    }
+
+    /**
+     * Nested string-offset write into a packed HT string slot (`$a[0][1] = 'X'`).
+     *
+     * Mirrors {@see separateStringAtStringKeyForOffsetWrite} for packed indexes.
+     *
+     * php-src: Zend/zend_execute.c ZEND_FETCH_DIM_W + zend_assign_to_string_offset
+     */
+    public static function separateStringAtIndexForOffsetWrite(
+        Context $context,
+        Value $ht,
+        Value $index
+    ): Variable {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'ht_str_off_idx');
+        $map = $context->structFieldMap['__hashtable__'];
+        $values = $context->builder->load(
+            $context->builder->structGep($ht, $map['values'])
+        );
+        $entry = $context->builder->inBoundsGep($values, $index);
+        $str = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $entry
+        );
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $str
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $entry,
+            $owned
+        );
+
+        return new Variable(
+            $context,
+            Variable::TYPE_STRING,
+            Variable::KIND_VALUE,
+            $owned
+        );
+    }
+
     /** Lvalue marker for $arr[$key] = … when $key is a boxed __value__ (issue #86, #17865). */
     public static function prepareValueBoxKeyWrite(Context $context, Value $ht, Variable $dim): Variable
     {

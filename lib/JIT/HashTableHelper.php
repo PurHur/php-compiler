@@ -208,6 +208,28 @@ final class HashTableHelper
     }
 
     /**
+     * Nested `$a['k'][i]=` when CFG types `$a['k']` as string (#36397).
+     */
+    public static function separateStringAtStringKeyForOffsetWrite(
+        Context $context,
+        Value $ht,
+        Value $keyStr
+    ): Variable {
+        return HashTableWriteLlvm::separateStringAtStringKeyForOffsetWrite($context, $ht, $keyStr);
+    }
+
+    /**
+     * Nested `$a[i][j]=` when CFG types `$a[i]` as string (#36397).
+     */
+    public static function separateStringAtIndexForOffsetWrite(
+        Context $context,
+        Value $ht,
+        Value $index
+    ): Variable {
+        return HashTableWriteLlvm::separateStringAtIndexForOffsetWrite($context, $ht, $index);
+    }
+
+    /**
      * Lvalue marker for $arr[$key] = … when $key is a boxed __value__ (issue #86).
      */
     public static function prepareValueBoxKeyWrite(Context $context, Value $ht, Variable $dim): Variable
