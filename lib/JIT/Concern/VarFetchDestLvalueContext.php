@@ -235,6 +235,16 @@ trait VarFetchDestLvalueContext
                 || $this->varFetchDestUsedAsDimWriteContainer($block, $opIndex, $destSlot)
             )
         ) {
+            // CFG string intermediate: `$a['s'][0] = 'X'` — Zend assigns into the string,
+            // it does not autovivify an empty array over an existing string (#36397).
+            // php-src: Zend/zend_execute.c ZEND_FETCH_DIM_W + zend_assign_to_string_offset.
+            if (
+                null !== $resultType
+                && \PHPTypes\Type::TYPE_STRING === $resultType->type
+            ) {
+                return $resultType;
+            }
+
             return \PHPTypes\Type::fromDecl('array');
         }
 

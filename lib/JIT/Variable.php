@@ -1568,6 +1568,19 @@ final class Variable {
                 }
                 if (self::TYPE_STRING === $dim->type) {
                     $key = $this->context->helper->loadValue($dim);
+                    // Nested string-offset: `$a['s'][0]='X'` — exclusive string in the HT
+                    // slot, not prepareStringKeyWrite orphan / array fillup (#36397).
+                    if (
+                        $forWrite
+                        && null !== $expectedType
+                        && Type::TYPE_STRING === $expectedType->type
+                    ) {
+                        return HashTableHelper::separateStringAtStringKeyForOffsetWrite(
+                            $this->context,
+                            $ht,
+                            $key
+                        );
+                    }
                     if ($forWrite && (null === $expectedType || Type::TYPE_ARRAY !== $expectedType->type)) {
                         $lvalue = HashTableHelper::prepareStringKeyWrite($this->context, $ht, $key);
 
@@ -1617,6 +1630,18 @@ final class Variable {
                     return $boxed;
                 }
                 $index = self::materializePackedIndex($this->context, $dim, $forWrite, $emitFloatKeyDeprecation);
+                // Nested string-offset: `$a[0][1]='X'` when `$a[0]` is a string (#36397).
+                if (
+                    $forWrite
+                    && null !== $expectedType
+                    && Type::TYPE_STRING === $expectedType->type
+                ) {
+                    return HashTableHelper::separateStringAtIndexForOffsetWrite(
+                        $this->context,
+                        $ht,
+                        $index
+                    );
+                }
                 // Scalar $arr[i]=… uses prepareIndexWrite; nested FETCH_DIM_W ($arr[i][j]=…)
                 // must return the live child HT so the inner write persists (#24011; string keys
                 // already branch on TYPE_ARRAY above — zend_execute.c ZEND_FETCH_DIM_W).
