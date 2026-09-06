@@ -1508,4 +1508,120 @@ final class HashTableReadLlvm
         return $result;
     }
 
+    /**
+     * Nested FETCH_DIM_W intermediate when the outer key is a boxed `__value__`
+     * (untyped method params). Must return a live child HT — prepareValueBoxKeyWrite
+     * orphans would drop `$this->routes[$method][$path] = $h` (FastRoute / #36382).
+     *
+     * Mirrors {@see readStringKeyHashtableForNestedWrite} /
+     * {@see readIndexedHashtableForNestedWrite} after resolving the value-box key kind.
+     *
+     * @see php-src Zend/zend_execute.c ZEND_FETCH_DIM_W (write / nested dimension)
+     */
+    public static function readValueBoxKeyHashtableForNestedWrite(
+        Context $context,
+        Value $ht,
+        Variable $dim
+    ): Value {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'ht_nested_vk');
+        $valPtr = self::valuePtrFromDim($context, $dim);
+        $valueMap = $context->structFieldMap['__value__'];
+        $i8 = $context->getTypeFromString('int8');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valPtr, $valueMap['type'])
+        );
+        // Mask IS_REFCOUNTED — value boxes may differ on the high bit (#27217).
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $stringBlock = $fn->appendBasicBlock('ht_nested_vk_str');
+        $longBlock = $fn->appendBasicBlock('ht_nested_vk_long');
+        $illegalBlock = $fn->appendBasicBlock('ht_nested_vk_illegal');
+        $merge = $fn->appendBasicBlock('ht_nested_vk_merge');
+        $afterString = $fn->appendBasicBlock('ht_nested_vk_after_str');
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $kind,
+                $i8->constInt(Variable::TYPE_STRING & 0x7f, false)
+            ),
+            $stringBlock,
+            $afterString
+        );
+
+        $context->builder->positionAtEnd($stringBlock);
+        $keyStr = $context->builder->call($context->lookupFunction('__value__readString'), $valPtr);
+        $strChild = self::readStringKeyHashtableForNestedWrite($context, $ht, $keyStr);
+        $strEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($afterString);
+        $afterLong = $fn->appendBasicBlock('ht_nested_vk_after_long');
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $kind,
+                $i8->constInt(Variable::TYPE_NATIVE_LONG & 0x7f, false)
+            ),
+            $longBlock,
+            $afterLong
+        );
+
+        $context->builder->positionAtEnd($longBlock);
+        $index = $context->builder->truncOrBitCast(
+            $context->builder->call($context->lookupFunction('__value__readLong'), $valPtr),
+            $context->getTypeFromString('size_t')
+        );
+        $longChild = self::readIndexedHashtableForNestedWrite($context, $ht, $index);
+        $longEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($afterLong);
+        // Bool before float: JIT NATIVE_BOOL (2) == VM TYPE_FLOAT (2) (#34667).
+        $boolBlock = $fn->appendBasicBlock('ht_nested_vk_bool');
+        $afterBool = $fn->appendBasicBlock('ht_nested_vk_after_bool');
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $kind,
+                $i8->constInt(Variable::TYPE_NATIVE_BOOL & 0x7f, false)
+            ),
+            $boolBlock,
+            $afterBool
+        );
+
+        $context->builder->positionAtEnd($boolBlock);
+        $boolLong = \PHPCompiler\ext\standard\JitZendScalarCast::readBoolByteFromValueBox(
+            $context,
+            $valPtr,
+            $context->getTypeFromString('int64')
+        );
+        $boolIndex = $context->builder->truncOrBitCast(
+            $boolLong,
+            $context->getTypeFromString('size_t')
+        );
+        $boolChild = self::readIndexedHashtableForNestedWrite($context, $ht, $boolIndex);
+        $boolEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($afterBool);
+        $context->builder->branch($illegalBlock);
+        $context->builder->positionAtEnd($illegalBlock);
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitRaise($context, 'Illegal offset type');
+        $context->builder->call($context->lookupFunction('abort'));
+        // Unreachable — keep CFG complete for the phi.
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($merge);
+        $result = $context->builder->phi($htPtr);
+        $result->addIncoming($strChild, $strEnd);
+        $result->addIncoming($longChild, $longEnd);
+        $result->addIncoming($boolChild, $boolEnd);
+        $result->addIncoming($htPtr->constNull(), $illegalBlock);
+
+        return $result;
+    }
+
 }
