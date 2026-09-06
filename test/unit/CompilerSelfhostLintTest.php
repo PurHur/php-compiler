@@ -320,6 +320,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/VM/Concern/ObjectPropertyMagicAndClone.php',
             'lib/VM/Concern/ObjectPropertyReadonlyAndVisibility.php',
             'lib/VM/Concern/PropertyFetchDestAndHookedDimWrite.php',
+            'lib/VM/Concern/TryCatchFinallyAndUncaughtDispatch.php',
             'lib/VM/Concern/TypedIntRecursiveAndCountedLoopFastPath.php',
             'lib/VM/Context.php',
             'lib/VM/ErrorReporter.php',
