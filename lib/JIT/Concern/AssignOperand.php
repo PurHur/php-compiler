@@ -961,6 +961,15 @@ trait AssignOperand
                     $promoted->valueBoxHashtable = true;
                 }
                 $this->context->setVariableOp($resultOp, $promoted);
+                // Named formals must follow the promoted alloca — otherwise later
+                // getVariableFromOp resurrects the KIND_VALUE LLVM param (#36382).
+                $resolvedPromo = \PHPCompiler\JIT\OperandName::resolve($resultOp);
+                if (null !== $resolvedPromo && '' !== $resolvedPromo) {
+                    $this->context->bindVariableByName(
+                        $this->context->resolveRefAliasName($resolvedPromo),
+                        $promoted
+                    );
+                }
                 $result = $promoted;
             } else {
                 throw new \LogicException('Cannot assign to a value');
@@ -1656,6 +1665,8 @@ trait AssignOperand
         } elseif (Variable::TYPE_HASHTABLE === $result->type && Variable::TYPE_VALUE === $value->type) {
             // ini_get_all() and similar builtins return array|false as __value__; keep the box
             // so strict comparisons against false use JitValueCompare (issue #3205, #848).
+            // Rebind named formals onto the demoted VALUE slot — peer scalar←HASHTABLE (#36397)
+            // and FastRoute `$options = [… ?? …]` (#36382).
             $slot = \PHPCompiler\JIT\JitValueBox::alloc($this->context);
             \PHPCompiler\JIT\JitValueBox::copyFromPointer(
                 $this->context,
@@ -1666,10 +1677,20 @@ trait AssignOperand
             $result->type = Variable::TYPE_VALUE;
             $result->value = $slot;
             $this->copyValueBoxJitFlags($result, $value, $force);
+            $result->valueBoxHashtable = $result->valueBoxHashtable || $value->valueBoxHashtable;
             $result->compileTimeConstantName = $value->compileTimeConstantName;
             $result->compileTimeEnumCase = $value->compileTimeEnumCase;
             $this->syncCompileTimeString($result, $value, $force);
             $result->addref();
+            $this->context->setVariableOp($resultOp, $result);
+            $resolved = \PHPCompiler\JIT\OperandName::resolve($resultOp);
+            if (null !== $resolved && '' !== $resolved) {
+                $this->context->bindVariableByName(
+                    $this->context->resolveRefAliasName($resolved),
+                    $result
+                );
+            }
+            $this->markScopeVariableAssignedIfTracked($resultOp, $result);
 
             return;
         } elseif (
@@ -1697,6 +1718,14 @@ trait AssignOperand
             $result->value = $slot;
             $result->valueBoxHashtable = true;
             $result->nextFreeElement = $value->nextFreeElement;
+            $this->context->setVariableOp($resultOp, $result);
+            $resolved = \PHPCompiler\JIT\OperandName::resolve($resultOp);
+            if (null !== $resolved && '' !== $resolved) {
+                $this->context->bindVariableByName(
+                    $this->context->resolveRefAliasName($resolved),
+                    $result
+                );
+            }
             $this->markScopeVariableAssignedIfTracked($resultOp, $result);
 
             return;
@@ -1707,6 +1736,8 @@ trait AssignOperand
             // phpdoc list<string> / string[] locals are native __string__*[]; many call
             // results (array_merge, glob, getenv parsing) arrive as TYPE_VALUE boxes.
             // Demote the destination like HASHTABLE←VALUE (#36387 HelperRuntimeCache).
+            // Assoc INIT_ARRAY into a string[]-inferred formal must keep the VALUE box
+            // visible to later FETCH_DIM (#36382 FastRoute options coalesce).
             $slot = \PHPCompiler\JIT\JitValueBox::alloc($this->context);
             \PHPCompiler\JIT\JitValueBox::copyFromPointer(
                 $this->context,
@@ -1717,10 +1748,20 @@ trait AssignOperand
             $result->type = Variable::TYPE_VALUE;
             $result->value = $slot;
             $this->copyValueBoxJitFlags($result, $value, $force);
+            $result->valueBoxHashtable = $result->valueBoxHashtable || $value->valueBoxHashtable;
             $result->compileTimeConstantName = $value->compileTimeConstantName;
             $result->compileTimeEnumCase = $value->compileTimeEnumCase;
             $this->syncCompileTimeString($result, $value, $force);
             $result->addref();
+            $this->context->setVariableOp($resultOp, $result);
+            $resolved = \PHPCompiler\JIT\OperandName::resolve($resultOp);
+            if (null !== $resolved && '' !== $resolved) {
+                $this->context->bindVariableByName(
+                    $this->context->resolveRefAliasName($resolved),
+                    $result
+                );
+            }
+            $this->markScopeVariableAssignedIfTracked($resultOp, $result);
 
             return;
         } elseif (
@@ -1748,6 +1789,14 @@ trait AssignOperand
             $result->type = Variable::TYPE_VALUE;
             $result->value = $slot;
             $result->valueBoxHashtable = true;
+            $this->context->setVariableOp($resultOp, $result);
+            $resolved = \PHPCompiler\JIT\OperandName::resolve($resultOp);
+            if (null !== $resolved && '' !== $resolved) {
+                $this->context->bindVariableByName(
+                    $this->context->resolveRefAliasName($resolved),
+                    $result
+                );
+            }
             $this->markScopeVariableAssignedIfTracked($resultOp, $result);
 
             return;
