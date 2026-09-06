@@ -7106,6 +7106,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/CompileSkippedOpcodeVmAndCfgBranchStubs.php` | 0 | 4 |
 | `lib/JIT/Concern/CompileStaticPropertyAndUnset.php` | 0 | 2 |
 | `lib/JIT/Concern/CompileTryCatchThrow.php` | 0 | 2 |
+| `lib/JIT/Concern/CompileTypeAssertAndErrorSilence.php` | 0 | 2 |
 | `lib/JIT/Concern/DateTimeConstructAndMutationMeta.php` | 0 | 3 |
 | `lib/JIT/Concern/DomCompileTimeTagMeta.php` | 0 | 2 |
 | `lib/JIT/Concern/EmitJitReturn.php` | 0 | 2 |
@@ -58429,6 +58430,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - trait CompileTryCatchThrow (line 22)
 - 1 class method(s)
+
+### `lib/JIT/Concern/CompileTypeAssertAndErrorSilence.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CompileTypeAssertAndErrorSilence (line 16)
+- 3 class method(s)
 
 ### `lib/JIT/Concern/DateTimeConstructAndMutationMeta.php`
 

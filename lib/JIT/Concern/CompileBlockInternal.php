@@ -416,10 +416,7 @@ trait CompileBlockInternal
                     $this->compileListUnpackOp($block, $op, $func);
                     break;
                 case OpCode::TYPE_TYPE_ASSERT:
-                    $this->assignOperand(
-                        $block->getOperand($op->arg1),
-                        $this->context->getVariableFromOp($block->getOperand($op->arg2))
-                    );
+                    $this->compileTypeAssertOp($block, $op);
                     break;
                 case OpCode::TYPE_EMPTY:
                 case OpCode::TYPE_EMPTY_OBJECT_PROPERTY:
@@ -650,10 +647,10 @@ trait CompileBlockInternal
                     }
                     break;
                 case OpCode::TYPE_BEGIN_SILENCE:
-                    \PHPCompiler\JIT\ErrorSilenceHelper::beginSilence($this->context);
+                    $this->compileBeginSilenceOp();
                     break;
                 case OpCode::TYPE_END_SILENCE:
-                    \PHPCompiler\JIT\ErrorSilenceHelper::endSilence($this->context);
+                    $this->compileEndSilenceOp();
                     break;
                 default:
                     throw new \LogicException("Unknown JIT opcode: ". \PHPCompiler\opcode_type_name($op->type));
