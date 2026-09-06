@@ -344,10 +344,12 @@ final class EmptyDimensionLlvm
             $context->builder->structGep($valuePtr, $map['type'])
         );
         $i8 = $context->getTypeFromString('int8');
+        // Mask IS_REFCOUNTED — same as IssetHelperLlvm::compileValueBoxDimIsSet (#36382).
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
         $isString = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_STRING, false)
+            $kind,
+            $i8->constInt(Variable::TYPE_STRING & 0x7f, false)
         );
 
         $fn = BasicBlockHelper::parentFunction($context);
