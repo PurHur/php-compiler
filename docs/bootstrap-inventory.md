@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8301 |
-| Phase A inventory files (M2 ratio SSOT) | 8301 |
+| PHP files on vm.php path | 8302 |
+| Phase A inventory files (M2 ratio SSOT) | 8302 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26194 |
+| Source constructs flagged (warnings) | 26196 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7143,6 +7143,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/SubBlockCatchFinallyAndGeneratorResume.php` | 0 | 2 |
 | `lib/JIT/Concern/TernaryJumpIfEchoMerge.php` | 0 | 2 |
 | `lib/JIT/Concern/ValueBoxCoalesceAndConcatHelpers.php` | 0 | 7 |
+| `lib/JIT/Concern/VarFetchDestLvalueContext.php` | 0 | 2 |
 | `lib/JIT/Concern/VmSmokeAndRuntimeM3NativeStubs.php` | 0 | 10 |
 | `lib/JIT/Context.php` | 0 | 334 |
 | `lib/JIT/DatePeriodForeachSnapshot.php` | 0 | 3 |
@@ -58538,7 +58539,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - trait LocalReleaseUnsetAndVarFetchDest (line 23)
-- 30 class method(s)
+- 18 class method(s)
 
 ### `lib/JIT/Concern/M3EmitTuAndCompileDriverMainNative.php`
 
@@ -58732,6 +58733,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 241)
 - new Variable (line 285)
 - 9 class method(s)
+
+### `lib/JIT/Concern/VarFetchDestLvalueContext.php`
+
+**Warnings** (review for bootstrap subset):
+- trait VarFetchDestLvalueContext (line 21)
+- 12 class method(s)
 
 ### `lib/JIT/Concern/VmSmokeAndRuntimeM3NativeStubs.php`
 
@@ -60594,7 +60601,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/SpineChunkRuntimeMethodDemote.php`
 
 **Warnings** (review for bootstrap subset):
-- new OpCode (line 271)
+- new OpCode (line 272)
 - 11 class method(s)
 
 ### `lib/JIT/SpineChunkStandardHelperBind.php`
