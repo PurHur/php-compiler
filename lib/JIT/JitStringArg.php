@@ -27,10 +27,22 @@ final class JitStringArg
             Variable::TYPE_NATIVE_BOOL,
         ], true)) {
             $coerced = JitNativeString::coerce($context, $arg);
+            $strPtr = $context->helper->loadValue($coerced);
+            // NestedJIT-safe owned copy — peer TYPE_VALUE path (#36386).
+            $owned = $context->builder->call(
+                $context->lookupFunction('__string__separate'),
+                $strPtr
+            );
+            $slot = BasicBlockHelper::entryAlloca(
+                $context,
+                $context->getTypeFromString('__string__*')
+            );
+            $context->builder->store($owned, $slot);
 
-            return $context->helper->loadValue($coerced);
+            return $context->builder->load($slot);
         }
         if (Variable::TYPE_VALUE === $arg->type) {
+            // Same convert_to_string path as stringPtrFromVariable (#36386 float locals).
             return self::stringPtrFromVariable($context, $arg);
         }
         $literal = self::compileTimeLiteral($arg);
@@ -75,10 +87,27 @@ final class JitStringArg
     public static function stringPtrFromVariable(Context $context, Variable $arg): Value
     {
         if (Variable::TYPE_VALUE === $arg->type) {
-            return $context->builder->call(
-                $context->lookupFunction('__value__readString'),
+            // Z_PARAM_STR / convert_to_string — {@see __value__readString} returns null for
+            // non-string tags (float/int/bool). Passing that null into strlen/base_convert
+            // SIGSEGVs (#36386).
+            // NestedJIT mishandles some freshly-minted coerce temps (scientific floats);
+            // {@code __string__separate} into an entry slot matches named-local shape.
+            JitNativeString::ensureInsertBlock($context);
+            $strPtr = (new \PHPCompiler\ext\standard\strval())->valueToString(
+                $context,
                 JitValueBox::valuePtrFromVariable($context, $arg)
             );
+            $owned = $context->builder->call(
+                $context->lookupFunction('__string__separate'),
+                $strPtr
+            );
+            $slot = BasicBlockHelper::entryAlloca(
+                $context,
+                $context->getTypeFromString('__string__*')
+            );
+            $context->builder->store($owned, $slot);
+
+            return $context->builder->load($slot);
         }
         if (Variable::KIND_VALUE === $arg->kind) {
             $llvmType = $context->getStringFromType($arg->value->typeOf());
@@ -147,12 +176,10 @@ final class JitStringArg
             return self::stringPtrFromVariable($context, $arg);
         }
         if (Variable::TYPE_VALUE === $arg->type) {
-            $str = $context->builder->call(
-                $context->lookupFunction('__value__readString'),
-                JitValueBox::valuePtrFromVariable($context, $arg)
+            return self::materializeStringSlot(
+                $context,
+                self::stringPtrFromVariable($context, $arg)
             );
-
-            return self::materializeStringSlot($context, $str);
         }
 
         return self::lower($context, $arg, $contextLabel);

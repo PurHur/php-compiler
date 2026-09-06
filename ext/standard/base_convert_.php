@@ -69,6 +69,10 @@ final class base_convert_ extends Internal
         if (null !== $folded) {
             return $folded;
         }
+        // Link NestedJIT bridges before float→string coercion. valueToString of
+        // scientific floats builds multi-block CFG; ensureLinked mid-arg would
+        // leave the string phi non-dominating at the call (#36386 SIGSEGV).
+        MathBaseConvert::ensureLinked($context);
         $num = $context->callerStrictTypes
             ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'base_convert', 0, 'num')
             : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'base_convert', 0, 'num');
@@ -81,16 +85,21 @@ final class base_convert_ extends Internal
                 $context->builder->load($context->constantStringFromString('0'))
             );
         }
-        MathBaseConvert::ensureLinked($context);
         $fromBase = $context->callerStrictTypes
             ? JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[1], 'base_convert', 2, 'from_base')
             : JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'base_convert', 2, 'from_base');
         $toBase = $context->callerStrictTypes
             ? JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[2], 'base_convert', 3, 'to_base')
             : JitIntdiv::lowerIntBuiltinArg($context, $args[2], 'base_convert', 3, 'to_base');
+        // NestedJIT MathBaseConvertJitHelper mishandles some KIND_VALUE string temps
+        // (inline `(string)$float` / strval) — own a heap copy like a named local (#36386).
+        $numOwned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $num
+        );
         $fn = $context->lookupFunction('phpc_base_convert');
 
-        return $context->builder->call($fn, $num, $fromBase, $toBase);
+        return $context->builder->call($fn, $numOwned, $fromBase, $toBase);
     }
 
     /**
@@ -103,6 +112,10 @@ final class base_convert_ extends Internal
         $num = JitStringArg::compileTimeLiteral($args[0]);
         if (null === $num && null !== $args[0]->compileTimeLong) {
             $num = (string) $args[0]->compileTimeLong;
+        }
+        // Float literals / overflow longs: Zend Z_PARAM_STR → zend_gcvt then parse (#36386).
+        if (null === $num && null !== $args[0]->compileTimeFloat) {
+            $num = (string) $args[0]->compileTimeFloat;
         }
         if (null === $num) {
             return null;
