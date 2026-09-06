@@ -39,6 +39,7 @@ require_once __DIR__.'/Compiler/Concern/CompileInlineSpecializedCallArgSends.php
 require_once __DIR__.'/Compiler/Concern/InlineCallArgProducerMatch.php';
 require_once __DIR__.'/Compiler/Concern/FindInlineCallArgProducerSlot.php';
 require_once __DIR__.'/Compiler/Concern/FindInlineExprCallArgProducerSlot.php';
+require_once __DIR__.'/Compiler/Concern/FindInlineArrayProducerForCallArg.php';
 require_once __DIR__.'/Compiler/Concern/NestedIifeAndDeferredSiblingCallArgProducers.php';
 require_once __DIR__.'/Compiler/Concern/PrecedingInlineCallArgProducers.php';
 require_once __DIR__.'/Compiler/Concern/PrecedingInlineDeadVoidAndDimFetchCallArgSlots.php';
@@ -213,6 +214,7 @@ use PHPCompiler\Compiler\Concern\CompileInlineSpecializedCallArgSends;
 use PHPCompiler\Compiler\Concern\InlineCallArgProducerMatch;
 use PHPCompiler\Compiler\Concern\FindInlineCallArgProducerSlot;
 use PHPCompiler\Compiler\Concern\FindInlineExprCallArgProducerSlot;
+use PHPCompiler\Compiler\Concern\FindInlineArrayProducerForCallArg;
 use PHPCompiler\Compiler\Concern\NestedIifeAndDeferredSiblingCallArgProducers;
 use PHPCompiler\Compiler\Concern\PrecedingInlineCallArgProducers;
 use PHPCompiler\Compiler\Concern\PrecedingInlineDeadVoidAndDimFetchCallArgSlots;
@@ -297,6 +299,7 @@ class Compiler {
     use InlineCallArgProducerMatch;
     use FindInlineCallArgProducerSlot;
     use FindInlineExprCallArgProducerSlot;
+    use FindInlineArrayProducerForCallArg;
     use NestedIifeAndDeferredSiblingCallArgProducers;
     use PrecedingInlineCallArgProducers;
     use PrecedingInlineDeadVoidAndDimFetchCallArgSlots;
