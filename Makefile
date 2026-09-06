@@ -111,9 +111,15 @@ test-docker-fast-jit-preflight: docker-build-22
 	JIT_PREFLIGHT_GATE=1 ./script/docker-ci-local.sh fast
 
 # VM smoke: examples/001-SimpleWeb with ?name=Test
-.PHONY: check web-smoke miniwebapp-gates miniwebapp-aot-bisect north-star1-verify north-star2-verify north-star3-verify north-star4-verify north-star5-verify north-star5-verify-fast dev-verify-fast aot-smoke-cross-emit seed-aarch64-helper-runtime runtime-assert-asan-smoke runtime-assert-valgrind-smoke runtime-assert-mutate-smoke runtime-assert-streak-status runtime-assert-streak-record runtime-assert-streak-check runtime-assert-differential-soak bootstrap-trust-preflight release-readiness bootstrap-gen0-staleness bootstrap-gen0-driver-functional-smoke bootstrap-gen0-refresh-argv-driver bootstrap-vendor-native-rebuild-audit spine-chunk-probe bootstrap-gen0-chunk-emit bootstrap-gen0-chunks apps-scoreboard php-src-phpt-sample
+.PHONY: check web-smoke miniwebapp-gates miniwebapp-aot-bisect north-star1-verify north-star2-verify north-star3-verify north-star4-verify north-star5-verify north-star5-verify-fast dev-verify-fast aot-smoke-cross-emit seed-aarch64-helper-runtime runtime-assert-asan-smoke runtime-assert-valgrind-smoke runtime-assert-mutate-smoke runtime-assert-streak-status runtime-assert-streak-record runtime-assert-streak-check runtime-assert-differential-soak bootstrap-trust-preflight release-readiness bootstrap-gen0-staleness bootstrap-gen0-driver-functional-smoke bootstrap-gen0-refresh-argv-driver bootstrap-vendor-native-rebuild-audit spine-chunk-probe bootstrap-gen0-chunk-emit bootstrap-gen0-chunks apps-scoreboard php-src-phpt-sample fuzz-smoke fuzz-nightly
 web-smoke:
 	./script/web-smoke.sh
+
+# Differential fuzz smoke / nightly 2k@60m gate (#36398)
+fuzz-smoke:
+	./script/fuzz/fuzz-smoke.sh
+fuzz-nightly:
+	./script/fuzz/nightly.sh
 
 # Real-world OSS apps corpus scoreboard (#36380)
 apps-scoreboard:

@@ -6,8 +6,9 @@ declare(strict_types=1);
 /**
  * Line-oriented delta-debug reducer for differential fuzz failures (#36398).
  *
- * Keeps the PHP header + declare block, then greedily drops body lines while the
- * oracle (Zend vs backend mismatch / crash) still fires.
+ * Keeps the PHP header + declare block, then removes body lines via hierarchical
+ * ddmin + greedy single-line passes while the oracle (Zend vs backend mismatch /
+ * crash) still fires.
  *
  * Usage:
  *   php script/fuzz/reduce.php --in fail.php --backend vm --out reduced.php
@@ -42,64 +43,23 @@ if (!fuzz_oracle_interesting($original, $backend, $root, $phpBin, $timeout)) {
     exit(1);
 }
 
-$reduced = fuzz_reduce_lines($original, $backend, $root, $phpBin, $timeout);
-$lineCount = substr_count($reduced, "\n") + 1;
-fwrite(STDERR, "fuzz/reduce: {$lineCount} lines (from ". (substr_count($original, "\n") + 1) .")\n");
+$reduced = fuzz_reduce_source(
+    $original,
+    static fn (string $src): bool => fuzz_oracle_interesting($src, $backend, $root, $phpBin, $timeout)
+);
+$lineCount = fuzz_count_nonempty_lines($reduced);
+$rawLines = substr_count($reduced, "\n") + (str_ends_with($reduced, "\n") ? 0 : 1);
+fwrite(
+    STDERR,
+    "fuzz/reduce: {$lineCount} nonempty / {$rawLines} raw lines (from "
+    .fuzz_count_nonempty_lines($original)." nonempty)\n"
+);
 
 if ($out !== null) {
     file_put_contents($out, $reduced);
     fwrite(STDOUT, $out."\n");
 } else {
     fwrite(STDOUT, $reduced);
-}
-
-function fuzz_reduce_lines(string $src, string $backend, string $root, string $phpBin, int $timeout): string
-{
-    $lines = preg_split("/\r\n|\n|\r/", $src) ?: [];
-    // Never drop the opening tag / declare / fuzz metadata comments in the header.
-    $headerEnd = 0;
-    foreach ($lines as $i => $line) {
-        if ($i === 0) {
-            continue;
-        }
-        if (preg_match('/^\s*(?:\/\/|#)/', $line) === 1 || trim($line) === '' || str_starts_with(ltrim($line), 'declare')) {
-            $headerEnd = $i;
-            continue;
-        }
-        break;
-    }
-
-    $changed = true;
-    while ($changed) {
-        $changed = false;
-        $i = $headerEnd + 1;
-        while ($i < count($lines)) {
-            if (trim($lines[$i]) === '') {
-                ++$i;
-                continue;
-            }
-            $trial = $lines;
-            array_splice($trial, $i, 1);
-            $candidate = implode("\n", $trial);
-            if (!str_ends_with($candidate, "\n")) {
-                $candidate .= "\n";
-            }
-            if (fuzz_oracle_interesting($candidate, $backend, $root, $phpBin, $timeout)) {
-                $lines = $trial;
-                $changed = true;
-                // stay on same index — next line shifted into place
-                continue;
-            }
-            ++$i;
-        }
-    }
-
-    $out = implode("\n", $lines);
-    if (!str_ends_with($out, "\n")) {
-        $out .= "\n";
-    }
-
-    return $out;
 }
 
 function fuzz_oracle_interesting(string $src, string $backend, string $root, string $phpBin, int $timeout): bool

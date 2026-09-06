@@ -87,4 +87,41 @@ PHP;
         $this->assertSame(1, $rc, implode("\n", $lines));
         $this->assertStringContainsString('does not reproduce', implode("\n", $lines));
     }
+
+    public function testDdminReducerHitsFifteenLineBudget(): void
+    {
+        // Synthetic oracle: interesting iff source still contains both MARKER and NEEDLE.
+        // Noise lines must be dropped; Done-when targets ≤15 nonempty lines for ≥80% of failures.
+        $noise = [];
+        for ($i = 0; $i < 40; ++$i) {
+            $noise[] = '// noise '.$i;
+            $noise[] = '$n'.$i.' = '.$i.';';
+        }
+        $src = "<?php\n\ndeclare(strict_types=1);\n\n"
+            ."// @fuzz-seed: 0\n"
+            ."// @fuzz-shape: synthetic\n\n"
+            .implode("\n", $noise)."\n"
+            ."\$marker = 'MARKER';\n"
+            ."echo 'NEEDLE';\n"
+            ."echo \$marker, \"\\n\";\n";
+
+        $interesting = static function (string $s): bool {
+            return str_contains($s, 'MARKER') && str_contains($s, 'NEEDLE');
+        };
+        $this->assertTrue($interesting($src));
+
+        $reduced = fuzz_reduce_source($src, $interesting);
+        $this->assertTrue($interesting($reduced));
+        $nonempty = fuzz_count_nonempty_lines($reduced);
+        $this->assertLessThanOrEqual(15, $nonempty, $reduced);
+        $this->assertStringContainsString('MARKER', $reduced);
+        $this->assertStringContainsString('NEEDLE', $reduced);
+    }
+
+    public function testNightlyScriptExists(): void
+    {
+        $path = self::$root.'/script/fuzz/nightly.sh';
+        $this->assertFileExists($path);
+        $this->assertTrue(is_executable($path), 'nightly.sh must be executable');
+    }
 }

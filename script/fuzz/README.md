@@ -38,4 +38,17 @@ Aim for ≤ 15-line reproducers; attach fixed cases under `test/differential/cas
   'script/differential-sweep.sh --aot --dir test/differential/cases/fuzz --repeat 3'
 ```
 
-Nightly 2,000-program / ASan jobs are follow-up slices of #36398 — this tree is the generator + oracle loop.
+## Nightly batch (2k / 60 min gate)
+
+```bash
+make fuzz-nightly
+# or:
+./script/fuzz/nightly.sh
+# smaller local check:
+FUZZ_NIGHTLY_COUNT=100 FUZZ_NIGHTLY_WALL_SEC=600 ./script/fuzz/nightly.sh
+```
+
+Writes `build/fuzz-nightly/report.json` (elapsed, unique signatures, ≤15-line reduce rate).
+Fails if the batch does not finish within `FUZZ_NIGHTLY_WALL_SEC` (default 3600), or if
+≥5 unique failures reduce and fewer than 80% are ≤15 nonempty lines. ASan / signature
+issue filing remain follow-up slices of #36398.
