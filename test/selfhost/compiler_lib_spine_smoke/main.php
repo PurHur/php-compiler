@@ -5425,6 +5425,7 @@ require_once __DIR__.'/../../../lib/JIT/Concern/EmitJitReturn.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/TernaryJumpIfEchoMerge.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/M3EmitTuSidecarLinktime.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileClassAndTraitUses.php';
+require_once __DIR__.'/../../../lib/JIT/Concern/CompileTraitUsesWithAdaptations.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/InitJitStaticCall.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileIncDecAndConcatFlatten.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileObjectPropertyConcatPowAndFlatten.php';

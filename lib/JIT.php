@@ -58,6 +58,7 @@ require_once __DIR__.'/JIT/Concern/EmitJitReturn.php';
 require_once __DIR__.'/JIT/Concern/TernaryJumpIfEchoMerge.php';
 require_once __DIR__.'/JIT/Concern/M3EmitTuSidecarLinktime.php';
 require_once __DIR__.'/JIT/Concern/CompileClassAndTraitUses.php';
+require_once __DIR__.'/JIT/Concern/CompileTraitUsesWithAdaptations.php';
 require_once __DIR__.'/JIT/Concern/InitJitStaticCall.php';
 require_once __DIR__.'/JIT/Concern/CompileIncDecAndConcatFlatten.php';
 require_once __DIR__.'/JIT/Concern/CompileObjectPropertyConcatPowAndFlatten.php';
@@ -165,6 +166,7 @@ class JIT {
     use TernaryJumpIfEchoMerge;
     use M3EmitTuSidecarLinktime;
     use CompileClassAndTraitUses;
+    use CompileTraitUsesWithAdaptations;
     use InitJitStaticCall;
     use CompileIncDecAndConcatFlatten;
     use CompileObjectPropertyConcatPowAndFlatten;
