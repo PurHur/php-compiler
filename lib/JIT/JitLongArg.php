@@ -4,6 +4,32 @@ namespace PHPCompiler\JIT;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 final class JitLongArg {
+    /**
+     * zend_dval_to_lval / x86 {@code cvttsd2si} for out-of-range doubles (#36386).
+     *
+     * LLVM {@code fptosi} is UB outside int64; on x86_64 Zend returns
+     * {@see PHP_INT_MIN} for |d| ≥ 2^63. Uses {@code select} (no new BBs) so it
+     * is safe mid-snprintf arg setup — branchy helpers SEGV the compiler.
+     *
+     * php-src: Zend/zend_operators.h zend_dval_to_lval / zend_dval_to_lval_slow.
+     */
+    public static function doubleToZendLong(Context $context, Value $dbl): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $f64 = $dbl->typeOf();
+        $posLimit = $f64->constReal(9223372036854775808.0);
+        $negLimit = $f64->constReal(-9223372036854775808.0);
+        $tooPos = $context->builder->fcmp(Builder::REAL_OGE, $dbl, $posLimit);
+        $tooNeg = $context->builder->fcmp(Builder::REAL_OLT, $dbl, $negLimit);
+        $outOfRange = $context->builder->or($tooPos, $tooNeg);
+        // Avoid fptosi poison on the out-of-range arm: truncate 0.0 instead.
+        $safeDbl = $context->builder->select($outOfRange, $f64->constReal(0.0), $dbl);
+        $truncVal = $context->builder->fpToSi($safeDbl, $i64);
+        $satVal = $i64->constInt(\PHP_INT_MIN, true);
+
+        return $context->builder->select($outOfRange, $satVal, $truncVal);
+    }
+
     public static function lower(Context $context, Variable $arg, string $contextLabel = "argument"): Value {
         // Fold only LLVM i64 constants. Loop-carried `$i` is KIND_VALUE with
         // stale compileTimeLong from `for ($i = 0; …)` (#32831 / #32605).
