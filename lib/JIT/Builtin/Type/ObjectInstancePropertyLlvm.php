@@ -197,18 +197,15 @@ final class ObjectInstancePropertyLlvm
                 $slot = $object->propertySlotPtr($obj, $propset[3]);
                 if (Variable::TYPE_VALUE === $propset[2]) {
                     $valueType = $context->getTypeFromString('__value__');
-                    // Write-only FETCH (ZEND_ASSIGN_OBJ) must not entryAlloca: that parks the
-                    // builder at function entry while ARG_RECV's value-copy is still open,
-                    // so the store is emitted in entry and the ctor body never runs (#32349).
-                    if ($forWrite) {
-                        $storage = $context->builder->alloca($valueType);
-                    } else {
-                        $storage = BasicBlockHelper::entryAlloca($context, $valueType);
-                    }
+                    // Always entryAlloca: mid-block alloca inside a loop body allocates a
+                    // fresh stack frame slot every iteration and SEGV around ~550k writes
+                    // (`$o->x = $o->x + 1` / `$o->x++` on untyped props — #36386).
+                    // entryAlloca restores the insert BB, so ARG_RECV / ctor-promo stores
+                    // stay in the open body (unlike an older park-at-entry bug, #32349).
+                    $storage = BasicBlockHelper::entryAlloca($context, $valueType);
                     // ??= BP_VAR_IS must see the live slot (UNDEF/null vs set). WRITE used to
                     // skip the load, so coalesce took the left branch on an empty alloca
-                    // and never stored (#33748 / re-#32880). Keep current-block alloca
-                    // for #32349 (do not entryAlloca on the write path).
+                    // and never stored (#33748 / re-#32880).
                     $valueMap = $context->structFieldMap['__value__'];
                     $context->builder->store(
                         $context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),
@@ -225,9 +222,9 @@ final class ObjectInstancePropertyLlvm
                         Variable::KIND_VARIABLE,
                         $storage,
                     );
-                    // Mid-block write box: free()/delref at return may not be dominated by
-                    // this alloca (Nyholm Uri::__construct → module verify, #36382). Skip
-                    // valueDelref — propertyStore already owns the payload.
+                    // Write-fetch box: free()/delref at return may not dominate this
+                    // entry alloca across every CFG path (Nyholm Uri::__construct →
+                    // module verify, #36382). Skip valueDelref — propertyStore owns it.
                     if ($forWrite) {
                         $var->borrowedValueEntry = true;
                     }

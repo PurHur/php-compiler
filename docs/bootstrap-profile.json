@@ -5658,6 +5658,7 @@
         "lib/Compiler/Concern/CompileClassBodyAndTraitAdaptations.php",
         "lib/Compiler/Concern/CompileClassConstFoldAndTypedReject.php",
         "lib/Compiler/Concern/CompileClassLikeDeclAndScope.php",
+        "lib/Compiler/Concern/CompileErrorSuppressEndBlockAndSlotInherit.php",
         "lib/Compiler/Concern/CompileFuncCfgReturnAndGlobalImport.php",
         "lib/Compiler/Concern/CompileInlineSpecializedCallArgSends.php",
         "lib/Compiler/Concern/CompileInterfaceTraitEnumAndMethodDecl.php",
@@ -5671,6 +5672,7 @@
         "lib/Compiler/Concern/CompileTimeClassConstFetchFold.php",
         "lib/Compiler/Concern/CompileTimeFold.php",
         "lib/Compiler/Concern/CompileTimeGlobalConstAndDefineFold.php",
+        "lib/Compiler/Concern/CompileTimeUnaryBinaryAndCastFold.php",
         "lib/Compiler/Concern/DeferredSiblingAndArrayMapNullCallArgProducers.php",
         "lib/Compiler/Concern/DimAndPropertyWriteContext.php",
         "lib/Compiler/Concern/EchoCoalesceCallArgCompile.php",
@@ -8552,9 +8554,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8318,
+        "inventory_files": 8320,
         "excluded": 0,
-        "eligible": 8318,
+        "eligible": 8320,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
