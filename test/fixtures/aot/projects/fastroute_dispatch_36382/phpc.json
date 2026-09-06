@@ -1,0 +1,5 @@
+{
+  "entry": "public/index.php",
+  "binary": ".phpc/bin/fastroute-dispatch",
+  "autoload": "composer"
+}

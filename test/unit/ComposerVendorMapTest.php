@@ -159,6 +159,84 @@ final class ComposerVendorMapTest extends TestCase
     }
 
     /**
+     * Soft FQCN coalesce defaults (FastRoute `$x ?? 'FastRoute\RouteCollector'`) must
+     * expand the reachable graph when later used as `new $merged['routeCollector']` (#36382).
+     */
+    public function testAutoloadDiscoveryIncludesFqcnCoalesceDefaults(): void
+    {
+        $dir = sys_get_temp_dir().'/phpc_fqcn_coal_'.bin2hex(random_bytes(4));
+        $this->assertTrue(mkdir($dir.'/src', 0777, true));
+        try {
+            file_put_contents(
+                $dir.'/src/RouteCollector.php',
+                "<?php\nnamespace Disc;\nclass RouteCollector {\n"
+                ."    public function addRoute(\$m, \$r, \$h): void {}\n"
+                ."    public function getData(): array { return [[], []]; }\n"
+                ."}\n"
+            );
+            file_put_contents(
+                $dir.'/src/Dispatcher.php',
+                "<?php\nnamespace Disc;\nclass Dispatcher {\n"
+                ."    public function __construct(public array \$data) {}\n"
+                ."    public function dispatch(\$m, \$u): array { return [1, 'hello_id', []]; }\n"
+                ."}\n"
+            );
+            // Class method (not a separate functions.php require) so ProjectGraph seeds stay
+            // hard-ref reachable without an includes[] manifest entry.
+            file_put_contents(
+                $dir.'/src/Factory.php',
+                "<?php\nnamespace Disc;\nclass Factory {\n"
+                ."    public static function simpleDispatcher(callable \$cb, array \$options = []) {\n"
+                ."        \$merged = [\n"
+                ."            'routeCollector' => \$options['routeCollector'] ?? 'Disc\\\\RouteCollector',\n"
+                ."            'dispatcher' => \$options['dispatcher'] ?? 'Disc\\\\Dispatcher',\n"
+                ."        ];\n"
+                ."        \$rc = new \$merged['routeCollector']();\n"
+                ."        \$cb(\$rc);\n"
+                ."        return new \$merged['dispatcher'](\$rc->getData());\n"
+                ."    }\n"
+                ."}\n"
+            );
+            file_put_contents(
+                $dir.'/entry.php',
+                "<?php\n"
+                ."echo \"START\\n\";\n"
+                ."\$d = Disc\\Factory::simpleDispatcher(function (\$r) { \$r->addRoute('GET', '/hello', 'hello_id'); });\n"
+                ."\$res = \$d->dispatch('GET', '/hello');\n"
+                ."echo \$res[0], ':', \$res[1], \"\\n\";\n"
+                ."echo \"OK\\n\";\n"
+            );
+            file_put_contents(
+                $dir.'/phpc.json',
+                json_encode([
+                    'entry' => 'entry.php',
+                    'binary' => '.phpc/bin/app',
+                    'autoload' => [
+                        'psr-4' => ['Disc\\' => 'src/'],
+                    ],
+                ], JSON_THROW_ON_ERROR)
+            );
+
+            $graph = ProjectGraph::resolve($dir);
+            $this->assertSame([], $graph['errors'], implode("\n", $graph['errors']));
+            $rels = array_map('basename', $graph['files']);
+            $this->assertContains('Factory.php', $rels);
+            $this->assertContains(
+                'RouteCollector.php',
+                $rels,
+                'coalesce FQCN default must pull RouteCollector into the graph: '.implode(',', $rels)
+            );
+            $this->assertContains(
+                'Dispatcher.php',
+                $rels,
+                'coalesce FQCN default must pull Dispatcher into the graph: '.implode(',', $rels)
+            );
+        } finally {
+            $this->removeTree($dir);
+        }
+    }
+
+    /**
      * Soft FQCN defaults for uninstalled optional packages must not fail the graph (#36382).
      * Slim lists Slim\Psr7 / Guzzle / … string backends under the Slim\ prefix.
      */
