@@ -34003,7 +34003,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new JITVariable (line 24)
 - new ArgumentCountError (line 43)
-- 13 class method(s)
+- 16 class method(s)
 
 ### `ext/standard/JitSscanf.php`
 
@@ -53979,7 +53979,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/SprintfSnprintfRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 7 class method(s)
 
 ### `lib/JIT/Builtin/Sscanf.php`
 
@@ -60199,7 +60199,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitLongArg.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 8 class method(s)
 
 ### `lib/JIT/JitLongArithOverflow.php`
 
