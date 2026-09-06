@@ -4,9 +4,9 @@
     "done_when_ceiling": 25000,
     "files": {
         "lib/Compiler.php": {
-            "budget": 1133,
+            "budget": 1136,
             "target": 20000,
-            "note": "Concern trait splits (#36230/#36387/#36403); MatchInlineCallArgProducerWithEmbeddedLiterals + DeadTempInlineArrayAndHaystackCallArgHelpers + FindInlineCoalesceAndNullsafeCallArgSlots + peers"
+            "note": "Concern trait splits (#36230/#36387/#36403); ExplodeIteratorChunkWalkAndTrailingComparatorCallArgSends + MatchInlineCallArgProducerWithEmbeddedLiterals + DeadTempInlineArrayAndHaystackCallArgHelpers + peers"
         },
         "lib/JIT.php": {
             "budget": 274,
