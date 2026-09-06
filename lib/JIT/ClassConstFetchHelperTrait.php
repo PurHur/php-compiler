@@ -675,53 +675,24 @@ trait ClassConstFetchHelperTrait
      */
     private static function emitResolveClassIdFromNameString(Object_ $objectType, Value $resolvedNameStr): Value
     {
+        // Length-checked memcmp via classIdFromRuntimeName — the prior ABI_STRCASECMP
+        // select chain falsely matched (same #34078 / #4940 defect as the old
+        // strncasecmp path), so `new $className` could allocate the wrong class
+        // (e.g. InstanceOfJitHelper instead of FastRoute\DataGenerator\GroupCountBased)
+        // and Slim `$app->handle` aborted in createDispatcher (#36382).
         $context = $objectType->jitContext();
-        StringCaseCompare::ensureStrcasecmpLinked($context);
-        ErrorRaise::ensureLinked($context);
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $sentinel = $i64->constInt(-1, false);
-        $result = $sentinel;
-        foreach ($objectType->allDeclaredClassLowerNames() as $declLc) {
-            $classId = $objectType->classIdForLowerName($declLc);
-            if (null === $classId) {
-                continue;
-            }
-            $lcGlobal = $context->builder->load(
-                $context->constantStringFromString($declLc)
-            );
-            $cmp = $context->builder->call(
-                $context->lookupFunction(StringCaseCompare::ABI_STRCASECMP),
-                self::stringDataPtr($context, $resolvedNameStr),
-                self::stringDataPtr($context, $lcGlobal)
-            );
-            $isMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
-            $idVal = $context->constantFromInteger($classId, 'int64');
-            $result = $context->builder->select($isMatch, $idVal, $result);
-        }
+        $strMap = $context->structFieldMap['__string__'];
+        $i8p = $context->getTypeFromString('int8*');
+        $namePtr = $context->builder->pointerCast(
+            $context->builder->structGep($resolvedNameStr, $strMap['value']),
+            $i8p
+        );
+        // __string__.length is int64; classIdFromRuntimeName compares as size_t (same width on LP64).
+        $nameLen = $context->builder->load(
+            $context->builder->structGep($resolvedNameStr, $strMap['length'])
+        );
 
-        $fn = BasicBlockHelper::parentFunction($context);
-        $entry = $context->builder->getInsertBlock();
-        $ok = $fn->appendBasicBlock('class_const_resolve_id_ok');
-        $fail = $fn->appendBasicBlock('class_const_resolve_id_fail');
-        $merge = $fn->appendBasicBlock('class_const_resolve_id_merge');
-        $isUnknown = $context->builder->icmp(Builder::INT_EQ, $result, $sentinel);
-        $context->builder->branchIf($isUnknown, $fail, $ok);
-
-        $context->builder->positionAtEnd($fail);
-        // Catchable when `new $var` / class fetch is inside try (#27156, #4242).
-        if ([] !== $context->tryCatch->handlerStack) {
-            TryCatchHelper::emitCatchableClassError($context, 'Error', 'Class not found', null);
-        } else {
-            ErrorRaise::emitRaise($context, 'Class not found');
-            $context->builder->call($context->lookupFunction('abort'));
-        }
-
-        $context->builder->positionAtEnd($ok);
-        $context->builder->branch($merge);
-        $context->builder->positionAtEnd($merge);
-
-        return $result;
+        return $objectType->classIdFromRuntimeName($namePtr, $nameLen);
     }
 
     /**
@@ -732,50 +703,18 @@ trait ClassConstFetchHelperTrait
     private static function emitClassPseudoConstFromResolvedName(Object_ $objectType, Value $resolvedNameStr): Value
     {
         $context = $objectType->jitContext();
-        StringCaseCompare::ensureStrcasecmpLinked($context);
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $known = $i64->constInt(0, false);
-        foreach ($objectType->allDeclaredClassLowerNames() as $declLc) {
-            if (null === $objectType->classIdForLowerName($declLc)) {
-                continue;
-            }
-            $lcGlobal = $context->builder->load(
-                $context->constantStringFromString($declLc)
-            );
-            $cmp = $context->builder->call(
-                $context->lookupFunction(StringCaseCompare::ABI_STRCASECMP),
-                self::stringDataPtr($context, $resolvedNameStr),
-                self::stringDataPtr($context, $lcGlobal)
-            );
-            $isMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
-            $known = $context->builder->select(
-                $isMatch,
-                $i64->constInt(1, false),
-                $known
-            );
-        }
-
-        $fn = BasicBlockHelper::parentFunction($context);
-        $entry = $context->builder->getInsertBlock();
-        $ok = $fn->appendBasicBlock('class_pseudo_const_ok');
-        $fail = $fn->appendBasicBlock('class_pseudo_const_fail');
-        $merge = $fn->appendBasicBlock('class_pseudo_const_merge');
-        $isUnknown = $context->builder->icmp(Builder::INT_EQ, $known, $i64->constInt(0, false));
-        $context->builder->branchIf($isUnknown, $fail, $ok);
-
-        $context->builder->positionAtEnd($fail);
-        $message = 'Unknown class for constant fetch';
-        $context->builder->call(
-            $context->lookupFunction('__compiler_jit_raise_logic_exception'),
-            self::messageDataPtrForRuntime($context, $message),
-            $context->constantFromInteger(strlen($message), 'size_t')
+        // Same length-checked resolve as emitResolveClassIdFromNameString (#36382 / #34078).
+        $strMap = $context->structFieldMap['__string__'];
+        $i8p = $context->getTypeFromString('int8*');
+        $namePtr = $context->builder->pointerCast(
+            $context->builder->structGep($resolvedNameStr, $strMap['value']),
+            $i8p
         );
-        $context->builder->returnVoid();
-
-        $context->builder->positionAtEnd($ok);
-        $context->builder->branch($merge);
-        $context->builder->positionAtEnd($merge);
+        $nameLen = $context->builder->load(
+            $context->builder->structGep($resolvedNameStr, $strMap['length'])
+        );
+        // classIdFromRuntimeName aborts (or raises catchable Error in try) when unknown.
+        $objectType->classIdFromRuntimeName($namePtr, $nameLen);
 
         return $resolvedNameStr;
     }
