@@ -209,6 +209,12 @@ use PHPCompiler\VM\Variable as VmVariable;
  * str_word_count (typed string + optional compile-time format in [0,2] +
  * optional typed chars string; soft-null / runtime format stay live —
  * ValueError / deprecate),
+ * strip_tags (typed string + optional typed string / array / null
+ * allowable_tags; soft-null subject stays live — deprecate; object /
+ * excess argc stay live — TypeError / ArgumentCountError),
+ * get_html_translation_table (zero-arg or typed numeric / named int-constant
+ * table/flags + optional typed encoding string; soft-null table/flags/encoding
+ * stay live — deprecate; excess argc stays live — ArgumentCountError),
  * zero-arg pi, type.c predicates + gettype/get_debug_type, ctype.c
  * classifiers on typed/literal strings, typed-array count/sizeof, math.c
  * incl. pow/fpow/fdiv on already-numeric args, empty void user functions).
@@ -520,6 +526,12 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureStrWordCountNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureStripTagsNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureGetHtmlTranslationTableNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureVersionCompareNoSideEffect($toCall, $callArgs)) {
@@ -3564,6 +3576,115 @@ final class DiscardedPureCallElision
 
         return $callArgs[2] instanceof Variable
             && self::stringArgAllowsDiscardedElision($callArgs[2]);
+    }
+
+    /**
+     * Discarded {@code strip_tags} — php-src {@code ext/standard/string.c}
+     * {@code PHP_FUNCTION(strip_tags)}. Subject must be a typed / literal
+     * string. Optional {@code $allowed_tags} is typed string, typed array, or
+     * null (strip all). Soft-null subject stays live (deprecate). Object /
+     * value-box subject stays live ({@code __toString} / TypeError). Excess
+     * argc stays live ({@code ArgumentCountError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureStripTagsNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if ('strip_tags' !== strtolower($toCall->getName())) {
+            return false;
+        }
+        if (!isset($callArgs[0]) || isset($callArgs[2])) {
+            return false;
+        }
+        if (!$callArgs[0] instanceof Variable || !self::stringArgAllowsDiscardedElision($callArgs[0])) {
+            return false;
+        }
+        if (!isset($callArgs[1])) {
+            return true;
+        }
+        if (!$callArgs[1] instanceof Variable) {
+            return false;
+        }
+
+        return self::stripTagsAllowedTagsAllowsDiscardedElision($callArgs[1]);
+    }
+
+    /**
+     * {@code strip_tags} {@code $allowed_tags}: null, typed string, or typed
+     * array — objects / generic value-boxes stay live ({@code TypeError}).
+     */
+    private static function stripTagsAllowedTagsAllowsDiscardedElision(Variable $arg): bool
+    {
+        if ($arg->isNullConstant || Variable::TYPE_NULL === $arg->type) {
+            return true;
+        }
+        if (self::stringArgAllowsDiscardedElision($arg)) {
+            return true;
+        }
+
+        return self::isTypedArrayArg($arg);
+    }
+
+    /**
+     * Discarded {@code get_html_translation_table} — php-src
+     * {@code ext/standard/html.c}. Zero-arg OK. Optional table/flags must be
+     * typed numeric (soft-null stays live — deprecate). Optional encoding must
+     * be typed / literal string (unsupported charset only warns and assumes
+     * UTF-8). Excess argc stays live ({@code ArgumentCountError}).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureGetHtmlTranslationTableNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if ('get_html_translation_table' !== strtolower($toCall->getName())) {
+            return false;
+        }
+        if (isset($callArgs[3])) {
+            return false;
+        }
+        if (isset($callArgs[0])) {
+            if (
+                !$callArgs[0] instanceof Variable
+                || !self::htmlTranslationIntArgAllowsDiscardedElision($callArgs[0])
+            ) {
+                return false;
+            }
+        }
+        if (isset($callArgs[1])) {
+            if (
+                !$callArgs[1] instanceof Variable
+                || !self::htmlTranslationIntArgAllowsDiscardedElision($callArgs[1])
+            ) {
+                return false;
+            }
+        }
+        if (isset($callArgs[2])) {
+            if (!$callArgs[2] instanceof Variable || !self::stringArgAllowsDiscardedElision($callArgs[2])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Table / flags for {@code get_html_translation_table}: typed numeric or a
+     * named compile-time int constant ({@code HTML_SPECIALCHARS}, {@code ENT_*}).
+     * Soft-null stays out (deprecate).
+     */
+    private static function htmlTranslationIntArgAllowsDiscardedElision(Variable $arg): bool
+    {
+        if (self::mathArgAllowsDiscardedElision($arg)) {
+            return true;
+        }
+
+        return null !== ($arg->compileTimeConstantName ?? null);
     }
 
     /**

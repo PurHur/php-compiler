@@ -96,6 +96,7 @@ use PHPCompiler\ext\standard\get_parent_class_;
 use PHPCompiler\ext\standard\getcwd_;
 use PHPCompiler\ext\standard\getdate;
 use PHPCompiler\ext\standard\gethostname;
+use PHPCompiler\ext\standard\get_html_translation_table;
 use PHPCompiler\ext\standard\getlastmod;
 use PHPCompiler\ext\standard\getmygid;
 use PHPCompiler\ext\standard\getmyinode;
@@ -202,6 +203,7 @@ use PHPCompiler\ext\standard\str_rot13;
 use PHPCompiler\ext\standard\str_split;
 use PHPCompiler\ext\standard\str_starts_with;
 use PHPCompiler\ext\standard\str_word_count;
+use PHPCompiler\ext\standard\strip_tags;
 use PHPCompiler\ext\standard\strcasecmp;
 use PHPCompiler\ext\standard\strcmp;
 use PHPCompiler\ext\standard\string_trim;
@@ -5365,6 +5367,106 @@ final class DiscardedPureCallElisionTest extends TestCase
             $context,
             new str_word_count(),
             [$str, $fmtOk, $chars, $chars]
+        ));
+    }
+
+    public function testDiscardedStripTagsAndGetHtmlTranslationTableElideOnSafeArgs(): void
+    {
+        // php-src ext/standard/string.c strip_tags / html.c get_html_translation_table (#36386).
+        $context = $this->makeContext();
+        $str = $this->makeStringVar('<b>hi</b>');
+        $typedStr = $this->makeStringVar(null);
+        $allow = $this->makeStringVar('<b>');
+        $allowHt = $this->makeHashtableVar();
+        $null = $this->makeNullVar();
+        $box = $this->makeValueBoxVar();
+        $table = $this->makeCompileTimeLongVar(0);
+        $flags = $this->makeCompileTimeLongVar(3);
+        $tableDyn = $this->makeNativeLongVar();
+        $enc = $this->makeStringVar('UTF-8');
+        $named = $this->makeNativeLongVar();
+        $named->compileTimeConstantName = 'HTML_SPECIALCHARS';
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new strip_tags(),
+            [$str]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new strip_tags(),
+            [$typedStr, $allow]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new strip_tags(),
+            [$str, $allowHt]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new strip_tags(),
+            [$str, $null]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_html_translation_table(),
+            []
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_html_translation_table(),
+            [$table]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_html_translation_table(),
+            [$tableDyn, $flags]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_html_translation_table(),
+            [$named, $flags]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_html_translation_table(),
+            [$table, $flags, $enc]
+        ));
+
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new strip_tags(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new strip_tags(),
+            [$str, $box]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new strip_tags(),
+            [$str, $allow, $allow]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_html_translation_table(),
+            [$null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_html_translation_table(),
+            [$table, $null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_html_translation_table(),
+            [$table, $flags, $null]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            new get_html_translation_table(),
+            [$table, $flags, $enc, $enc]
         ));
     }
 
