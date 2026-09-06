@@ -1042,7 +1042,7 @@ class Module extends ModuleAbstract
         // module-locally; ChrootJitHelper uses @chroot (Module always-on removed).
         // Math libc always-on decls dropped (#30666 / LibcExtern #28808): MathAbs / MathRound /
         // MathSqrt / MathLog* / MathExp* / MathSin… / MathPow / MathHypot / MathAtan2 /
-        // MathModf / MathFrexp route via JitVmHelperLink + *JitHelper PHP (no Module
-        // lookupFunction consumers remain).
+        // MathModf / MathFrexp declare libm on demand (#36386; NestedJIT *JitHelper remains
+        // reference-only — no Module lookupFunction consumers remain).
     }
 }
