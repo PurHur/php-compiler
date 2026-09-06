@@ -5362,6 +5362,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/CompileInlineSpecializedCal
 require_once __DIR__.'/../../../lib/Compiler/Concern/InlineCallArgProducerMatch.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/FindInlineCallArgProducerSlot.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/FindInlineExprCallArgProducerSlot.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/FindInlineArrayProducerForCallArg.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/NestedIifeAndDeferredSiblingCallArgProducers.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/PrecedingInlineCallArgProducers.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/PrecedingInlineDeadVoidAndDimFetchCallArgSlots.php';
