@@ -61,8 +61,11 @@ final class JitLongArithOverflow
     /**
      * Native long ⊙ native long with overflow → double (#31964).
      *
-     * Hot path stays {@see Variable::TYPE_NATIVE_LONG} (no __value__ box) per #36189;
-     * overflow promotes to a cold {@see Variable::TYPE_VALUE} double box.
+     * Hot path stays {@see Variable::TYPE_NATIVE_LONG} (no {@code __value__} box) per #36189;
+     * overflow stores a cold f64 into an entry alloca — the {@code __value__} box is created
+     * only if {@see materializeOverflowableNativeLong} runs (#36386). Typed recursion like
+     * {@code fibo_r} never materializes, so it no longer pays three entry value-box inits
+     * per {@code +}/{@code -} site.
      *
      * Uses {@code llvm.s{add,sub,mul}.with.overflow.i64} (php-src
      * {@code ZEND_SIGNED_*_OVERFLOW} / {@code __builtin_*_overflow} shape) so the
@@ -82,9 +85,8 @@ final class JitLongArithOverflow
 
         [$lres, $overflow] = self::emitWithOverflow($context, $opType, $a, $b);
 
-        $i1 = $context->getTypeFromString('int1');
-        $overflowFlag = BasicBlockHelper::entryAlloca($context, $i1);
-        $longSlot = BasicBlockHelper::entryAlloca($context, $i64);
+        // f64 only — no entryAllocaValueBox / TYPE_NULL init on the hot path (#36386).
+        $doubleSlot = BasicBlockHelper::entryAlloca($context, $f64);
 
         $ovBlock = BasicBlockHelper::append($context, 'native_long_bin_ov');
         $okBlock = BasicBlockHelper::append($context, 'native_long_bin_ok');
@@ -92,31 +94,24 @@ final class JitLongArithOverflow
         $context->builder->branchIf($overflow, $ovBlock, $okBlock);
 
         $context->builder->positionAtEnd($ovBlock);
-        $context->builder->store($i1->constInt(1, false), $overflowFlag);
         $ad = $context->builder->siToFp($a, $f64);
         $bd = $context->builder->siToFp($b, $f64);
         $fd = self::emitFloatOp($context, $opType, $ad, $bd);
-        $slot = JitValueBox::alloc($context);
-        $slotPtr = JitValueBox::pointer($context, $slot);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeDouble'),
-            $slotPtr,
-            $fd
-        );
-        JitValueBox::publishAfterWrite($context, $slotPtr);
-        $overflowVar = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VALUE, $slotPtr);
+        $context->builder->store($fd, $doubleSlot);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($okBlock);
-        $context->builder->store($i1->constInt(0, false), $overflowFlag);
-        $context->builder->store($lres, $longSlot);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
-        $mergedLong = $context->builder->load($longSlot);
+        // Dummy 0 on the overflow arm — consumers must materialize when the flag is set.
+        $mergedLong = $context->builder->phi($i64);
+        $mergedLong->addIncoming($lres, $okBlock);
+        $mergedLong->addIncoming($i64->constInt(0, false), $ovBlock);
+
         $okVar = new Variable($context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $mergedLong);
-        $okVar->longArithOverflowFlag = $overflowFlag;
-        $okVar->longArithOverflowPromoted = $overflowVar;
+        $okVar->longArithOverflowFlag = $overflow;
+        $okVar->longArithOverflowDoubleSlot = $doubleSlot;
 
         return $okVar;
     }
@@ -127,15 +122,21 @@ final class JitLongArithOverflow
      */
     public static function materializeOverflowableNativeLong(Context $context, Variable $var): Variable
     {
-        if (null === $var->longArithOverflowPromoted || null === $var->longArithOverflowFlag) {
+        if (null === $var->longArithOverflowFlag) {
+            return $var;
+        }
+        if (null === $var->longArithOverflowDoubleSlot && null === $var->longArithOverflowPromoted) {
             return $var;
         }
         if (Variable::TYPE_VALUE === $var->type) {
             return $var;
         }
 
-        $i1 = $context->getTypeFromString('int1');
-        $isOv = $context->builder->load($var->longArithOverflowFlag);
+        // Flag is the i1 SSA from llvm.*.with.overflow (or a legacy i1* alloca).
+        $flag = $var->longArithOverflowFlag;
+        $isOv = \PHPLLVM\Type::KIND_POINTER === $flag->typeOf()->getKind()
+            ? $context->builder->load($flag)
+            : $flag;
 
         $longBb = BasicBlockHelper::append($context, 'long_arith_mat_long');
         $ovBb = BasicBlockHelper::append($context, 'long_arith_mat_ov');
@@ -150,7 +151,23 @@ final class JitLongArithOverflow
         $context->builder->branch($outBb);
 
         $context->builder->positionAtEnd($ovBb);
-        $ovPtr = JitValueBox::normalizeValuePtr($context, $var->longArithOverflowPromoted->value);
+        if (null !== $var->longArithOverflowDoubleSlot) {
+            $fd = $context->builder->load($var->longArithOverflowDoubleSlot);
+            $ovSlot = JitValueBox::alloc($context);
+            $ovPtr = JitValueBox::pointer($context, $ovSlot);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $ovPtr,
+                $fd
+            );
+            JitValueBox::publishAfterWrite($context, $ovPtr);
+        } else {
+            $legacy = $var->longArithOverflowPromoted;
+            if (null === $legacy) {
+                throw new \LogicException('native long overflow materialize missing double slot and legacy box');
+            }
+            $ovPtr = JitValueBox::normalizeValuePtr($context, $legacy->value);
+        }
         $context->builder->branch($outBb);
 
         $context->builder->positionAtEnd($outBb);
