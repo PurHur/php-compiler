@@ -27,6 +27,7 @@ require_once __DIR__.'/Compiler/Concern/CompileParamTypedDefaultAndDeprecation.p
 require_once __DIR__.'/Compiler/Concern/CompilePseudoClassScopeAndConst.php';
 require_once __DIR__.'/Compiler/Concern/CompileReservedNamesPseudoClassAndClassConst.php';
 require_once __DIR__.'/Compiler/Concern/CompilePropertyFetchEmptyAssignAndUnset.php';
+require_once __DIR__.'/Compiler/Concern/CompileErrorSuppressEndBlockAndSlotInherit.php';
 require_once __DIR__.'/Compiler/Concern/ErrorSuppressAndPropertyFetch.php';
 require_once __DIR__.'/Compiler/Concern/WriteContextRejects.php';
 require_once __DIR__.'/Compiler/Concern/TernaryAndLogicalShortCircuit.php';
@@ -184,6 +185,7 @@ use PHPCompiler\Compiler\Concern\CompileParamTypedDefaultAndDeprecation;
 use PHPCompiler\Compiler\Concern\CompilePseudoClassScopeAndConst;
 use PHPCompiler\Compiler\Concern\CompileReservedNamesPseudoClassAndClassConst;
 use PHPCompiler\Compiler\Concern\CompilePropertyFetchEmptyAssignAndUnset;
+use PHPCompiler\Compiler\Concern\CompileErrorSuppressEndBlockAndSlotInherit;
 use PHPCompiler\Compiler\Concern\ErrorSuppressAndPropertyFetch;
 use PHPCompiler\Compiler\Concern\TernaryAndLogicalShortCircuit;
 use PHPCompiler\Compiler\Concern\CompileCallArgSends;
@@ -249,6 +251,7 @@ class Compiler {
     use CompilePseudoClassScopeAndConst;
     use CompileReservedNamesPseudoClassAndClassConst;
     use CompilePropertyFetchEmptyAssignAndUnset;
+    use CompileErrorSuppressEndBlockAndSlotInherit;
     use ErrorSuppressAndPropertyFetch;
     use WriteContextRejects;
     use TernaryAndLogicalShortCircuit;
