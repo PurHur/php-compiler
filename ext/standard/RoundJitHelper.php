@@ -7,12 +7,12 @@ namespace PHPCompiler\ext\standard;
 /**
  * round() NestedJIT-safe algorithm SSOT (#15211, #26800, #27248, php-in-PHP).
  *
- * AOT/JIT hot path for places=0 + directed modes uses LLVM f64 intrinsics via
+ * AOT/JIT hot path for places=0 uses LLVM f64 ops via
  * {@see \PHPCompiler\JIT\Builtin\MathRound} (#36386 / peer MathFloor):
- * HALF_UP → {@code llvm.round.f64}, CEILING → {@code llvm.ceil.f64},
- * FLOOR → {@code llvm.floor.f64}, TOWARD_ZERO → {@code llvm.trunc.f64}.
- * This helper remains for non-zero places, HALF_DOWN/EVEN/ODD, AWAY_FROM_ZERO,
- * and NestedJIT-safe reference when NestedJIT cannot emit the intrinsic.
+ * HALF_UP → {@code llvm.round.f64}, HALF_DOWN/EVEN/ODD → trunc+select,
+ * CEILING → {@code llvm.ceil.f64}, FLOOR → {@code llvm.floor.f64},
+ * TOWARD_ZERO → {@code llvm.trunc.f64}, AWAY_FROM_ZERO → ceil(|x|) with sign.
+ * This helper remains for non-zero places and NestedJIT-safe reference.
  *
  * Same-class only (peer AbsJitHelper). Avoid `\is_finite`/`\floor`/`\ceil`/`\abs`/`\fmod`
  * — NestedJIT re-enters *JitHelper bridges (gdb: isfiniteargv ↔ phpc_is_finite).
