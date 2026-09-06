@@ -5433,6 +5433,7 @@ require_once __DIR__.'/../../../lib/JIT/Concern/CompileIncDecAndConcatFlatten.ph
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileIncDecValueBoxAndWarnings.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileObjectPropertyConcatPowAndFlatten.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/DateTimeConstructAndMutationMeta.php';
+require_once __DIR__.'/../../../lib/JIT/Concern/DateTimeMutationAndUnserializeMeta.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/DomCompileTimeTagMeta.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/PropertyDeclaringClassResolve.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CoerceReturnPropertyDeclaringAndByRef.php';

@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8305 |
-| Phase A inventory files (M2 ratio SSOT) | 8305 |
+| PHP files on vm.php path | 8306 |
+| Phase A inventory files (M2 ratio SSOT) | 8306 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26203 |
+| Source constructs flagged (warnings) | 26206 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7114,6 +7114,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/CompileTypeAssertAndErrorSilence.php` | 0 | 2 |
 | `lib/JIT/Concern/CompileYield.php` | 0 | 2 |
 | `lib/JIT/Concern/DateTimeConstructAndMutationMeta.php` | 0 | 3 |
+| `lib/JIT/Concern/DateTimeMutationAndUnserializeMeta.php` | 0 | 3 |
 | `lib/JIT/Concern/DomCompileTimeTagMeta.php` | 0 | 2 |
 | `lib/JIT/Concern/EmitJitReturn.php` | 0 | 2 |
 | `lib/JIT/Concern/InitJitMethodCall.php` | 0 | 3 |
@@ -58485,8 +58486,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - trait DateTimeConstructAndMutationMeta (line 17)
-- 19 class method(s)
-- 5 closure(s)
+- 9 class method(s)
+- 4 closure(s)
+
+### `lib/JIT/Concern/DateTimeMutationAndUnserializeMeta.php`
+
+**Warnings** (review for bootstrap subset):
+- trait DateTimeMutationAndUnserializeMeta (line 21)
+- 10 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Concern/DomCompileTimeTagMeta.php`
 
@@ -60623,7 +60631,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/SpineChunkRuntimeMethodDemote.php`
 
 **Warnings** (review for bootstrap subset):
-- new OpCode (line 275)
+- new OpCode (line 276)
 - 11 class method(s)
 
 ### `lib/JIT/SpineChunkStandardHelperBind.php`
