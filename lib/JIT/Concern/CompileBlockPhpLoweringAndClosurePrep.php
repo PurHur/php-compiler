@@ -376,10 +376,20 @@ trait CompileBlockPhpLoweringAndClosurePrep
      * "undeclared static property" into top-level closures (#34896 leftover of #34868).
      * Method bodies never DECLARE_CLASS — precompile there still covers #34868.
      * Top-level closures compile later at TYPE_CLOSURE (after declares in runQueue).
+     *
+     * Also skip when the block has TYPE_INCLUDE: incremental Composer graphs
+     * (`SourceBundler::entryWithIncrementalRequires`) put `require_once` of class
+     * units before entry closures. Precompile would lower `$r->addRoute()` on a
+     * typed param before IncludeHelper NestedJITs the class — `undefined method
+     * …::addroute()` (#36382 / FastRoute simpleDispatcher). TYPE_CLOSURE after
+     * INCLUDE in runQueue sees the registered method proxies.
      */
     private function precompileClosuresBeforeQueue(Block $block): void
     {
         if ($this->blockDeclaresClassLike($block)) {
+            return;
+        }
+        if ($this->blockHasIncludeBeforeClosure($block)) {
             return;
         }
         foreach ($block->opCodes as $i => $op) {
@@ -436,6 +446,28 @@ trait CompileBlockPhpLoweringAndClosurePrep
                 || OpCode::TYPE_DECLARE_TRAIT === $op->type
                 || OpCode::TYPE_DECLARE_ENUM === $op->type
             ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * True when an include/require appears before a TYPE_CLOSURE in this block (#36382).
+     *
+     * IncludeHelper NestedJITs the unit during runQueue; precompile must not lower
+     * typed method calls on those classes first.
+     */
+    private function blockHasIncludeBeforeClosure(Block $block): bool
+    {
+        $sawInclude = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INCLUDE === $op->type) {
+                $sawInclude = true;
+                continue;
+            }
+            if ($sawInclude && OpCode::TYPE_CLOSURE === $op->type) {
                 return true;
             }
         }
