@@ -75,6 +75,11 @@ final class RuntimeIndirectClosureCall implements Call
             throw new \LogicException('Indirect closure invoke requires object or value-box callee');
         }
 
+        // KIND_VALUE `__value__*` formals — prefer VmClosure path (avoids null alloca, #36382).
+        if (Variable::KIND_VALUE === $this->callee->kind) {
+            return ClosureHelper::loadObjectFromCallable($context, $this->callee);
+        }
+
         $valPtr = JitValueBox::valuePtrFromVariable($context, $this->callee);
         $typeByte = $context->builder->load(
             $context->builder->structGep(
