@@ -84,6 +84,17 @@ SEED_UNITS=(
   /ext/standard/JsonValidateJitHelper.php
   /ext/standard/SprintfJitHelper.php
   /ext/standard/HttpResponseJitHelper.php
+  # HTML decode / file I/O / class introspect tier (#36391 after #37015)
+  /ext/standard/HtmlEntitiesJitHelper.php
+  /ext/standard/HtmlEntityDecodeJitHelper.php
+  /ext/standard/HtmlspecialcharsDecodeJitHelper.php
+  /ext/standard/ChunkSplitJitHelper.php
+  /ext/standard/HashEqualsJitHelper.php
+  /ext/standard/FileGetContentsJitHelper.php
+  /ext/standard/FilePutContentsJitHelper.php
+  /ext/standard/ClassExistsJitHelper.php
+  /ext/standard/FunctionExistsJitHelper.php
+  /ext/standard/GetObjectVarsJitHelper.php
 )
 
 MIN_SEED=${#SEED_UNITS[@]}
