@@ -95,6 +95,17 @@ SEED_UNITS=(
   /ext/standard/ClassExistsJitHelper.php
   /ext/standard/FunctionExistsJitHelper.php
   /ext/standard/GetObjectVarsJitHelper.php
+  # OO hierarchy / method-property introspect tier (#36391 after #37021)
+  /ext/standard/InterfaceExistsJitHelper.php
+  /ext/standard/TraitExistsJitHelper.php
+  /ext/standard/EnumExistsJitHelper.php
+  /ext/standard/MethodExistsJitHelper.php
+  /ext/standard/PropertyExistsJitHelper.php
+  /ext/standard/ClassImplementsJitHelper.php
+  /ext/standard/ClassParentsJitHelper.php
+  /ext/standard/ClassUsesJitHelper.php
+  /ext/standard/GetClassMethodsJitHelper.php
+  /ext/standard/GetParentClassJitHelper.php
 )
 
 MIN_SEED=${#SEED_UNITS[@]}
