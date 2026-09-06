@@ -119,6 +119,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/Compiler/Concern/NestedArrayAndLeadingConstCallArgProducers.php',
             'lib/Compiler/Concern/NestedArrayOutermostAndByRefCallArgHelpers.php',
             'lib/Compiler/Concern/NestedIifeAndDeferredSiblingCallArgProducers.php',
+            'lib/Compiler/Concern/NullsafeChainCompile.php',
             'lib/Compiler/Concern/NullsafePropertyAndMethodCompile.php',
             'lib/Compiler/Concern/OperandAccessAndDeferredArrayCompile.php',
             'lib/Compiler/Concern/OuterSiblingAndBuiltinWireCallArgSlots.php',
