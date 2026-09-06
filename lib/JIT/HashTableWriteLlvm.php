@@ -324,13 +324,10 @@ final class HashTableWriteLlvm
         $context->builder->positionAtEnd($done);
     }
 
-    /** Foreach by-ref: packed index writes vs borrowed string-key entry (#4364, #31977 v10). */
+    /** Foreach by-ref: packed index vs string-key node entry (#4364, #36366, #36397). */
     public static function assignForeachByRefWritable(Context $context, Variable $lvalue, Variable $element): void
     {
-        if (null === $lvalue->writableHt || null === $lvalue->foreachByRefPackedArm || null === $lvalue->writableIndex) {
-            throw new \LogicException('assignForeachByRefWritable requires foreach by-ref writable markers');
-        }
-        self::setAtIndex($context, $lvalue->writableHt, $lvalue->writableIndex, $element);
+        \PHPCompiler\VM\VmIteratorForeach::emitForeachByRefAssign($context, $lvalue, $element);
     }
 
     public static function setAtIndex(Context $context, Value $ht, Value $index, Variable $element): void

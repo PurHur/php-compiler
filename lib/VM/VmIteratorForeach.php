@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Builtin\WeakRefNative;
 use PHPCompiler\JIT\Builtin\WeakRefRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\HashTableWriteLlvm;
 use PHPCompiler\JIT\DatePeriodForeachSnapshot;
 use PHPCompiler\JIT\DomNodeListForeachSnapshot;
 use PHPCompiler\JIT\IteratorProtocolHelper;
@@ -1481,6 +1482,28 @@ final class VmIteratorForeach
     }
 
     /**
+     * Commit a foreach by-ref mutation through the borrowed HT entry (#36366 / #36397).
+     *
+     * Packed and string-key arms both set {@see JitVariable::$borrowedValueEntry} on the
+     * ITER_VALUE lvalue; writing via {@see JitValueBox::assignToPointer} updates that
+     * node in place. {@see HashTableWriteLlvm::setAtIndex} is wrong for string keys
+     * (treats the walk index as a packed slot and corrupts the table).
+     */
+    public static function emitForeachByRefAssign(Context $context, JitVariable $lvalue, JitVariable $element): void
+    {
+        if (null === $lvalue->writableHt || null === $lvalue->foreachByRefPackedArm || null === $lvalue->writableIndex) {
+            throw new \LogicException('emitForeachByRefAssign requires foreach by-ref writable markers');
+        }
+        if ($lvalue->borrowedValueEntry) {
+            JitValueBox::assignToPointer($context, $lvalue->value, $element);
+            JitValueBox::publishAfterWrite($context, $lvalue->value);
+
+            return;
+        }
+        HashTableWriteLlvm::setAtIndex($context, $lvalue->writableHt, $lvalue->writableIndex, $element);
+    }
+
+    /**
      * php-src zend_execute.c FE_RESET_RW — array-backed SPL containers (#19444).
      */
     private static function isArrayBackedSplIteratorUserType(?string $containerUserType): bool
@@ -1557,7 +1580,14 @@ final class VmIteratorForeach
         if ($slotKey->type & JitVariable::IS_NATIVE_ARRAY) {
             return self::compileValueByRefNativeArray($context, $slotKey);
         }
-        $ht = $context->helper->loadValue($array);
+        // Zend FE_RESET_RW SEPARATE_ARRAY (#36397): by-ref foreach borrows entry pointers
+        // into the live HT. A by-value `$a = $b` shares that table — without SEPARATE,
+        // `$v *= 10` mutates `$b` as well (php-src zend_vm_def.h ZEND_FE_RESET_RW;
+        // VM peer: rebindArrayForeachToLiveContainer → separateArrayForWrite).
+        // Prefer the live CV ($slotKey) when it is array-like so the lvalue rebinds;
+        // Aggregate/SPL inner-HT paths keep $array (backing table) as the COW target.
+        $cowTarget = self::isArrayLikeForeachCowTarget($slotKey) ? $slotKey : $array;
+        $ht = HashTableHelper::separateContainerForWrite($context, $cowTarget);
         $map = $context->structFieldMap['__hashtable__'];
         $nodeMap = $context->structFieldMap['__strkey_node__'];
         $idx = $context->builder->load(self::indexSlot($context, $slotKey));
@@ -1591,6 +1621,27 @@ final class VmIteratorForeach
         $var->foreachByRefPackedArm = $packedArm;
 
         return $var;
+    }
+
+    /**
+     * True when $slotKey is the array CV that FE_RESET_RW must SEPARATE (#36397).
+     * Objects (Aggregate / property foreach) are not COW targets here — their backing
+     * HT is passed as $array instead.
+     */
+    private static function isArrayLikeForeachCowTarget(JitVariable $slotKey): bool
+    {
+        if ($slotKey->type & JitVariable::IS_NATIVE_ARRAY) {
+            return true;
+        }
+        if (JitVariable::TYPE_HASHTABLE === $slotKey->type) {
+            return true;
+        }
+        // Untyped / VALUE-boxed arrays after `$a = $b` (common {main} shape).
+        if (JitVariable::TYPE_VALUE === $slotKey->type) {
+            return true;
+        }
+
+        return false;
     }
 
     private static function compileValueHashtable(Context $context, JitVariable $array, JitVariable $slotKey): JitVariable

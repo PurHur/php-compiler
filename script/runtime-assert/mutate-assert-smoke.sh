@@ -381,7 +381,34 @@ if [[ "$ptr_trimmed" != "30|10|2|0" ]]; then
   exit 1
 fi
 
-echo "runtime-assert-mutate-smoke: source gates for by-ref mutator COW (#36397 slice 9–13)…"
+echo "runtime-assert-mutate-smoke: run COW foreach-by-ref (must not false-positive M5)…"
+cat > "$WORKDIR/foreach_cow.php" <<'PHP'
+<?php
+$b = [1, 2];
+$a = $b;
+foreach ($a as &$v) {
+    $v *= 10;
+}
+unset($v);
+echo implode(',', $b), '|', implode(',', $a), "\n";
+PHP
+"$PHP_BIN" bin/compile.php -o "$WORKDIR/foreach_cow.bin" "$WORKDIR/foreach_cow.php" >/dev/null
+fe_out="$("$WORKDIR/foreach_cow.bin" 2>&1)"
+fe_rc=$?
+if [[ "$fe_rc" -ne 0 ]]; then
+  echo "runtime-assert-mutate-smoke: FAIL — COW foreach-by-ref exited $fe_rc: $fe_out" >&2
+  exit 1
+fi
+if [[ "$fe_out" != $'1,2|10,20\n' && "$fe_out" != '1,2|10,20' ]]; then
+  echo "runtime-assert-mutate-smoke: FAIL — expected 1,2|10,20 from COW foreach-by-ref, got: $fe_out" >&2
+  exit 1
+fi
+if ! grep -q 'separateContainerForWrite' "$ROOT/lib/VM/VmIteratorForeach.php"; then
+  echo "runtime-assert-mutate-smoke: FAIL — VmIteratorForeach.php missing separateContainerForWrite" >&2
+  exit 1
+fi
+
+echo "runtime-assert-mutate-smoke: source gates for by-ref mutator COW (#36397 slice 9–16)…"
 for f in \
   lib/JIT/Builtin/ArrayPushRuntime.php \
   lib/JIT/Builtin/ArrayUnshiftRuntime.php \
@@ -396,7 +423,8 @@ for f in \
   lib/JIT/Builtin/NaturalSortRuntime.php \
   lib/JIT/Builtin/MultisortRuntime.php \
   lib/JIT/Builtin/ShuffleRuntime.php \
-  lib/JIT/Builtin/ArrayPointerRuntime.php
+  lib/JIT/Builtin/ArrayPointerRuntime.php \
+  lib/VM/VmIteratorForeach.php
 do
   if ! grep -q 'separateContainerForWrite' "$ROOT/$f"; then
     echo "runtime-assert-mutate-smoke: FAIL — $f missing separateContainerForWrite" >&2
@@ -429,8 +457,9 @@ if ! grep -A5 'implementSortPacked' "$ROOT/lib/JIT/Builtin/Type/HashTable.php" |
   :
 fi
 # Packed sort ABI must emit M5 at entry (#36397 slice 10).
+# Avoid `grep -q` under `pipefail`: early close SIGPIPEs awk → false FAIL.
 if ! awk '/function implementSortPacked\(/,/^    private function implementSortPackedNatural/' \
-    "$ROOT/lib/JIT/Builtin/Type/HashTable.php" | grep -q 'emitAssertExclusiveCall'; then
+    "$ROOT/lib/JIT/Builtin/Type/HashTable.php" | grep 'emitAssertExclusiveCall' >/dev/null; then
   echo "runtime-assert-mutate-smoke: FAIL — implementSortPacked missing emitAssertExclusiveCall" >&2
   exit 1
 fi
