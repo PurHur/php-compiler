@@ -75,8 +75,23 @@ final class JitSprintf
         $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
         $charPtr = $context->getTypeFromString('char*');
+        $i32 = $context->getTypeFromString('int32');
 
-        $fmtNul = \PHPCompiler\JIT\Builtin\SprintfSnprintfRuntime::nullTerminatedCopyPublic($context, $fmt);
+        // libc %d/%u/%x expect 32-bit int on LP64; we pass i64 (zend_long). Promote
+        // conversions to %lld/%llu/%llx so PHP_INT_MIN does not print as 0 (#36386).
+        $fmtForSnprintf = self::promoteIntegerConversionsForInt64($constFmt);
+        $fmtStr = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $i64->constInt(\strlen($fmtForSnprintf), false),
+            $context->builder->pointerCast(
+                $context->constantFromString($fmtForSnprintf),
+                $i8p
+            )
+        );
+        $fmtNul = \PHPCompiler\JIT\Builtin\SprintfSnprintfRuntime::nullTerminatedCopyPublic(
+            $context,
+            $fmtStr
+        );
 
         $bufSize = 1024;
         $outBuf = $context->builder->call(
@@ -95,11 +110,25 @@ final class JitSprintf
             // '*' = sequential star width/precision — always i64 for libc snprintf (#34969).
             // Without this slot, %*s maps the width int onto %s → SIGSEGV (#33010 class).
             if ('*' === $conv) {
-                $snprintfArgs[] = self::extractStarLongArg($context, $args[$i + 1]);
+                // libc `*` width expects int; trunc i64 (widths are small).
+                $snprintfArgs[] = $context->builder->trunc(
+                    self::extractStarLongArg($context, $args[$i + 1]),
+                    $i32
+                );
             } elseif ('s' === $conv || 'S' === $conv) {
                 $snprintfArgs[] = self::extractAsCString($context, $args[$i + 1], $toFree);
             } elseif (\in_array($conv, ['f', 'e', 'g', 'a'], true)) {
                 $snprintfArgs[] = self::extractSnprintfFloatArg($context, $args[$i + 1]);
+            } elseif ('c' === $conv) {
+                // %c stays 32-bit; trunc zend_long.
+                $snprintfArgs[] = $context->builder->trunc(
+                    self::extractSnprintfLongArg($context, $args[$i + 1]),
+                    $i32
+                );
+            } elseif (\in_array($conv, ['d', 'i', 'u', 'o', 'x'], true)) {
+                // Integer conversions: zval_get_long / zend_dval_to_lval — never pass a
+                // double (or overflow-arm 0 i64) to libc %d (#36386 leftover of #37051).
+                $snprintfArgs[] = self::extractSnprintfLongArg($context, $args[$i + 1]);
             } else {
                 $snprintfArgs[] = self::extractSnprintfArg($context, $args[$i + 1], $toFree);
             }
@@ -211,15 +240,116 @@ final class JitSprintf
     }
 
     /**
+     * Promote %d/%i/%u/%o/%x/%X to %lld/… so libc receives zend_long-width args (#36386).
+     *
+     * On LP64, bare `%d` reads a 32-bit int from the vararg; PHP_INT_MIN's low
+     * half is 0 so overflow floats printed as {@code 0}. Length modifiers already
+     * present (`l`/`ll`/`z`/…) are left unchanged. `%c` is not promoted (caller
+     * truncates to i32).
+     */
+    private static function promoteIntegerConversionsForInt64(string $fmt): string
+    {
+        $out = '';
+        $len = \strlen($fmt);
+        for ($i = 0; $i < $len; ++$i) {
+            $out .= $fmt[$i];
+            if ('%' !== $fmt[$i]) {
+                continue;
+            }
+            if ($i + 1 < $len && '%' === $fmt[$i + 1]) {
+                $out .= '%';
+                ++$i;
+                continue;
+            }
+            ++$i;
+            while ($i < $len && \str_contains("#0- +'", $fmt[$i])) {
+                $out .= $fmt[$i];
+                ++$i;
+            }
+            if ($i < $len && '*' === $fmt[$i]) {
+                $out .= '*';
+                ++$i;
+            } else {
+                while ($i < $len && $fmt[$i] >= '0' && $fmt[$i] <= '9') {
+                    $out .= $fmt[$i];
+                    ++$i;
+                }
+            }
+            if ($i < $len && '.' === $fmt[$i]) {
+                $out .= '.';
+                ++$i;
+                if ($i < $len && '*' === $fmt[$i]) {
+                    $out .= '*';
+                    ++$i;
+                } else {
+                    while ($i < $len && $fmt[$i] >= '0' && $fmt[$i] <= '9') {
+                        $out .= $fmt[$i];
+                        ++$i;
+                    }
+                }
+            }
+            $hadLength = false;
+            while ($i < $len && \str_contains('hlLzjt', $fmt[$i])) {
+                $out .= $fmt[$i];
+                $hadLength = true;
+                ++$i;
+            }
+            if ($i < $len) {
+                $conv = $fmt[$i];
+                if (!$hadLength && \str_contains('diuoxX', $conv)) {
+                    $out .= 'll';
+                }
+                $out .= $conv;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * Star width/precision arg as int64 for libc snprintf (#34969).
      *
      * php-src: formatted_print.c — `*` consumes next arg via zval_get_long.
      */
     private static function extractStarLongArg(Context $context, JITVariable $arg): Value
     {
+        return self::extractSnprintfLongArg($context, $arg);
+    }
+
+    /**
+     * Integer snprintf args (%d/%i/%u/%o/%x/%c and `*` width): zval_get_long shape.
+     *
+     * Overflowable native-long (lazy ±/×/`/` #37051) must not use the overflow-arm
+     * dummy i64 0 — coerce the cold f64 via zend_dval_to_lval. Native doubles must
+     * not be passed as IEEE bits to libc `%d` (ABI mismatch → prints 0).
+     *
+     * Uses plain fptosi (no E_DEPRECATED bridge) — php-src printf does not warn on
+     * float→long for %d; the precision-warning helper clears the insert block mid
+     * snprintf arg setup and segfaults the compiler (#36386).
+     *
+     * php-src: ext/standard/formatted_print.c php_formatted_print / zval_get_long;
+     * Zend/zend_operators.h zend_dval_to_lval.
+     */
+    private static function extractSnprintfLongArg(Context $context, JITVariable $arg): Value
+    {
         $i64 = $context->getTypeFromString('int64');
         if (JITVariable::TYPE_NULL === $arg->type) {
             return $i64->constInt(0, false);
+        }
+        // Lazy overflow flag + f64 slot: pick long or zend_dval_to_lval(double).
+        if (
+            null !== $arg->longArithOverflowFlag
+            && null !== $arg->longArithOverflowDoubleSlot
+            && JITVariable::TYPE_NATIVE_LONG === $arg->type
+        ) {
+            return self::extractOverflowableNativeLongAsLong($context, $arg);
+        }
+        if (
+            null !== $arg->longArithOverflowFlag
+            && null !== $arg->longArithOverflowPromoted
+            && JITVariable::TYPE_NATIVE_LONG === $arg->type
+        ) {
+            $arg = JitLongArithOverflow::materializeOverflowableNativeLong($context, $arg);
         }
         if (JITVariable::TYPE_NATIVE_LONG === $arg->type
             || JITVariable::TYPE_NATIVE_BOOL === $arg->type
@@ -242,9 +372,10 @@ final class JitSprintf
             return $context->helper->loadValue($arg);
         }
         if (JITVariable::TYPE_NATIVE_DOUBLE === $arg->type) {
-            $dbl = $context->helper->loadValue($arg);
-
-            return $context->builder->fpToSi($dbl, $i64);
+            return \PHPCompiler\JIT\JitLongArg::doubleToZendLong(
+                $context,
+                $context->helper->loadValue($arg)
+            );
         }
         if (JITVariable::TYPE_VALUE === $arg->type
             || null !== $arg->valueBoxAliasPtr
@@ -263,8 +394,55 @@ final class JitSprintf
                 $valuePtr
             );
         }
+        if (JITVariable::TYPE_STRING === $arg->type) {
+            return \PHPCompiler\JIT\JitLongArg::lower($context, $arg, 'sprintf');
+        }
 
         return $i64->constInt(0, false);
+    }
+
+    /**
+     * Overflowable native-long → i64 for %d without heap-boxing mid-snprintf.
+     */
+    private static function extractOverflowableNativeLongAsLong(
+        Context $context,
+        JITVariable $arg
+    ): Value {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'sprintf_as_d_ov_cont');
+        $i64 = $context->getTypeFromString('int64');
+        $flag = $arg->longArithOverflowFlag;
+        $isOv = \PHPLLVM\Type::KIND_POINTER === $flag->typeOf()->getKind()
+            ? $context->builder->load($flag)
+            : $flag;
+
+        $ovBb = BasicBlockHelper::append($context, 'sprintf_as_d_ov_dbl');
+        $okBb = BasicBlockHelper::append($context, 'sprintf_as_d_ok');
+        $outBb = BasicBlockHelper::append($context, 'sprintf_as_d_out');
+        $context->builder->branchIf($isOv, $ovBb, $okBb);
+
+        $context->builder->positionAtEnd($okBb);
+        $longBits = JITVariable::KIND_VARIABLE === $arg->kind
+            ? $context->builder->load($arg->value)
+            : $arg->value;
+        $longTy = $context->getStringFromType($longBits->typeOf());
+        if ('int64*' === $longTy || 'long long*' === $longTy) {
+            $longBits = $context->builder->load($longBits);
+        }
+        $okEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($outBb);
+
+        $context->builder->positionAtEnd($ovBb);
+        $fd = $context->builder->load($arg->longArithOverflowDoubleSlot);
+        $ovLong = \PHPCompiler\JIT\JitLongArg::doubleToZendLong($context, $fd);
+        $ovEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($outBb);
+
+        $context->builder->positionAtEnd($outBb);
+        $phi = $context->builder->phi($i64, 'sprintf_as_d_phi');
+        $phi->addIncoming($longBits, $okEnd);
+        $phi->addIncoming($ovLong, $ovEnd);
+
+        return $phi;
     }
 
     /**

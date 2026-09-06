@@ -26,6 +26,8 @@ final class SprintfSnprintfRuntime
 
     private const FMT_IS_S_ABI = '__phpc_sprintf_fmt_is_string_conv';
 
+    private const FMT_PROMOTE_LL_ABI = '__phpc_sprintf_fmt_promote_ll';
+
     /** Format with one __value__ arg using the user format string as snprintf pattern. */
     public static function formatOneArg(
         Context $context,
@@ -228,12 +230,16 @@ final class SprintfSnprintfRuntime
         $dbl = $context->builder->call($context->lookupFunction('__value__readDouble'), $entry);
         // Default to zend_gcvt stringify. Only pass a double to libc when the conversion
         // is clearly floating (fFeEgGaA) — %s + double is SIGSEGV (#33010).
+        // Integer conversions (d/i/u/o/x/X/c) must zend_dval_to_lval first (#36386) —
+        // passing IEEE bits / a char* to libc %d prints 0.
         $fmt0 = $context->builder->load($fmtNul);
         $pScan = $context->builder->alloca($charPtr);
         $context->builder->store($context->builder->gep($fmtNul, $i64->constInt(1, false)), $pScan);
         $findConv = $fn->appendBasicBlock('sprintf_dbl_find_conv');
         $isFloatConvBb = $fn->appendBasicBlock('sprintf_dbl_float_conv');
+        $isIntConvBb = $fn->appendBasicBlock('sprintf_dbl_int_conv');
         $dblToS = $fn->appendBasicBlock('sprintf_typed_dbl_as_s');
+        $dblToLong = $fn->appendBasicBlock('sprintf_typed_dbl_as_long');
         $dblRaw = $fn->appendBasicBlock('sprintf_typed_dbl_raw');
         $isPct0 = $context->builder->icmp(Builder::INT_EQ, $fmt0, $i8->constInt(ord('%'), false));
         $context->builder->branchIf($isPct0, $findConv, $dblToS);
@@ -261,6 +267,25 @@ final class SprintfSnprintfRuntime
                                     $context->builder->icmp(Builder::INT_EQ, $sc, $i8->constInt(ord('a'), false)),
                                     $context->builder->icmp(Builder::INT_EQ, $sc, $i8->constInt(ord('A'), false))
                                 )
+                            )
+                        )
+                    )
+                )
+            )
+        );
+        $isIntCh = $context->builder->or(
+            $context->builder->icmp(Builder::INT_EQ, $sc, $i8->constInt(ord('d'), false)),
+            $context->builder->or(
+                $context->builder->icmp(Builder::INT_EQ, $sc, $i8->constInt(ord('i'), false)),
+                $context->builder->or(
+                    $context->builder->icmp(Builder::INT_EQ, $sc, $i8->constInt(ord('u'), false)),
+                    $context->builder->or(
+                        $context->builder->icmp(Builder::INT_EQ, $sc, $i8->constInt(ord('o'), false)),
+                        $context->builder->or(
+                            $context->builder->icmp(Builder::INT_EQ, $sc, $i8->constInt(ord('x'), false)),
+                            $context->builder->or(
+                                $context->builder->icmp(Builder::INT_EQ, $sc, $i8->constInt(ord('X'), false)),
+                                $context->builder->icmp(Builder::INT_EQ, $sc, $i8->constInt(ord('c'), false))
                             )
                         )
                     )
@@ -295,7 +320,9 @@ final class SprintfSnprintfRuntime
         $skipAdv = $fn->appendBasicBlock('sprintf_dbl_skip_adv');
         $context->builder->branchIf($isFloatCh, $dblRaw, $isFloatConvBb);
         $context->builder->positionAtEnd($isFloatConvBb);
-        $context->builder->branchIf($isSkipCh, $skipAdv, $dblToS);
+        $context->builder->branchIf($isSkipCh, $skipAdv, $isIntConvBb);
+        $context->builder->positionAtEnd($isIntConvBb);
+        $context->builder->branchIf($isIntCh, $dblToLong, $dblToS);
         $context->builder->positionAtEnd($skipAdv);
         $context->builder->store($context->builder->gep($sp, $i64->constInt(1, false)), $pScan);
         $context->builder->branch($findConv);
@@ -315,6 +342,25 @@ final class SprintfSnprintfRuntime
         $endDs2 = $context->builder->getInsertBlock();
         $context->builder->branch($doneBb);
 
+        $context->builder->positionAtEnd($dblToLong);
+        // zend_dval_to_lval / cvttsd2si sentinel for |d|≥2^63 (#36386).
+        // Promote %d→%lld so LP64 libc reads a full zend_long.
+        $lngFromDbl = \PHPCompiler\JIT\JitLongArg::doubleToZendLong($context, $dbl);
+        $fmtLlDl = $context->builder->call(
+            $context->lookupFunction(self::FMT_PROMOTE_LL_ABI),
+            $fmtNul
+        );
+        $writtenDl = $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $outChar,
+            $bufSize,
+            $fmtLlDl,
+            $lngFromDbl
+        );
+        $context->builder->call($context->lookupFunction('__mm__free'), $fmtLlDl);
+        $endDl = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
+
         $context->builder->positionAtEnd($dblRaw);
         $writtenD = $context->builder->call(
             $context->lookupFunction('snprintf'),
@@ -328,13 +374,18 @@ final class SprintfSnprintfRuntime
 
         $context->builder->positionAtEnd($longBb);
         $lng = $context->builder->call($context->lookupFunction('__value__readLong'), $entry);
+        $fmtLlL = $context->builder->call(
+            $context->lookupFunction(self::FMT_PROMOTE_LL_ABI),
+            $fmtNul
+        );
         $writtenL = $context->builder->call(
             $context->lookupFunction('snprintf'),
             $outChar,
             $bufSize,
-            $fmtNul,
+            $fmtLlL,
             $lng
         );
+        $context->builder->call($context->lookupFunction('__mm__free'), $fmtLlL);
         $endL = $context->builder->getInsertBlock();
         $context->builder->branch($doneBb);
 
@@ -389,6 +440,7 @@ final class SprintfSnprintfRuntime
         $writtenPhi->addIncoming($writtenStrS, $endStrS);
         $writtenPhi->addIncoming($writtenFbS, $endFbS);
         $writtenPhi->addIncoming($writtenDs2, $endDs2);
+        $writtenPhi->addIncoming($writtenDl, $endDl);
         $writtenPhi->addIncoming($writtenD, $endD);
         $writtenPhi->addIncoming($writtenL, $endL);
         $writtenPhi->addIncoming($writtenS, $endS);
@@ -482,6 +534,247 @@ final class SprintfSnprintfRuntime
         }
         LibcExtern::ensureMemcpyImplemented($context);
         self::ensureFormatIsStringConv($context);
+        self::ensureFormatPromoteLl($context);
+    }
+
+    /**
+     * Copy format inserting {@code ll} before bare {@code d/i/u/o/x/X} (#36386).
+     * Returns a malloc'd NUL-terminated string; caller must {@code __mm__free}.
+     */
+    private static function ensureFormatPromoteLl(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction(self::FMT_PROMOTE_LL_ABI);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction(self::FMT_PROMOTE_LL_ABI, $probe);
+
+            return;
+        }
+
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
+        $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
+        $charPtr = $context->getTypeFromString('char*');
+        $ft = $context->context->functionType($charPtr, false, $charPtr);
+        $fn = null !== $probe ? $probe : $context->module->addFunction(self::FMT_PROMOTE_LL_ABI, $ft);
+        $one = $i64->constInt(1, false);
+
+        $entry = $fn->appendBasicBlock('fmt_prom_ll_entry');
+        $lenLoop = $fn->appendBasicBlock('fmt_prom_ll_len');
+        $copyLoop = $fn->appendBasicBlock('fmt_prom_ll_copy');
+        $sawPct = $fn->appendBasicBlock('fmt_prom_ll_pct');
+        $scan = $fn->appendBasicBlock('fmt_prom_ll_scan');
+        $emitConv = $fn->appendBasicBlock('fmt_prom_ll_emit');
+        $done = $fn->appendBasicBlock('fmt_prom_ll_done');
+
+        $context->builder->positionAtEnd($entry);
+        $srcAlloca = $context->builder->alloca($charPtr);
+        $context->builder->store($fn->getParam(0), $srcAlloca);
+        $lenAlloca = $context->builder->alloca($i64);
+        $context->builder->store($i64->constInt(0, false), $lenAlloca);
+        $context->builder->branch($lenLoop);
+
+        $context->builder->positionAtEnd($lenLoop);
+        $sp = $context->builder->load($srcAlloca);
+        $sch = $context->builder->load($sp);
+        $lenDone = $fn->appendBasicBlock('fmt_prom_ll_len_done');
+        $lenAdv = $fn->appendBasicBlock('fmt_prom_ll_len_adv');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $sch, $i8->constInt(0, false)),
+            $lenDone,
+            $lenAdv
+        );
+        $context->builder->positionAtEnd($lenAdv);
+        $context->builder->store(
+            $context->builder->add($context->builder->load($lenAlloca), $one),
+            $lenAlloca
+        );
+        $context->builder->store($context->builder->gep($sp, $one), $srcAlloca);
+        $context->builder->branch($lenLoop);
+
+        $context->builder->positionAtEnd($lenDone);
+        // Worst case: insert "ll" at every conversion → 3x.
+        $len = $context->builder->load($lenAlloca);
+        $cap = $context->builder->add(
+            $context->builder->mul($len, $i64->constInt(3, false)),
+            $one
+        );
+        $buf = $context->builder->call($context->lookupFunction('__mm__malloc'), $cap);
+        $context->builder->store($fn->getParam(0), $srcAlloca);
+        $dstAlloca = $context->builder->alloca($charPtr);
+        $context->builder->store($context->builder->pointerCast($buf, $charPtr), $dstAlloca);
+        $hadLenAlloca = $context->builder->alloca($i8);
+        $context->builder->store($i8->constInt(0, false), $hadLenAlloca);
+        $context->builder->branch($copyLoop);
+
+        $context->builder->positionAtEnd($copyLoop);
+        $csp = $context->builder->load($srcAlloca);
+        $cch = $context->builder->load($csp);
+        $copyCh = $fn->appendBasicBlock('fmt_prom_ll_ch');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $cch, $i8->constInt(0, false)),
+            $done,
+            $copyCh
+        );
+
+        $context->builder->positionAtEnd($copyCh);
+        $isPct = $context->builder->icmp(Builder::INT_EQ, $cch, $i8->constInt(ord('%'), false));
+        $emitPlain = $fn->appendBasicBlock('fmt_prom_ll_plain');
+        $context->builder->branchIf($isPct, $sawPct, $emitPlain);
+
+        $context->builder->positionAtEnd($emitPlain);
+        $dp = $context->builder->load($dstAlloca);
+        $context->builder->store($cch, $dp);
+        $context->builder->store($context->builder->gep($dp, $one), $dstAlloca);
+        $context->builder->store($context->builder->gep($csp, $one), $srcAlloca);
+        $context->builder->branch($copyLoop);
+
+        $context->builder->positionAtEnd($sawPct);
+        // Emit '%'.
+        $dpPct = $context->builder->load($dstAlloca);
+        $context->builder->store($cch, $dpPct);
+        $context->builder->store($context->builder->gep($dpPct, $one), $dstAlloca);
+        $context->builder->store($context->builder->gep($csp, $one), $srcAlloca);
+        $context->builder->store($i8->constInt(0, false), $hadLenAlloca);
+        // Check for %% .
+        $nsp = $context->builder->load($srcAlloca);
+        $nch = $context->builder->load($nsp);
+        $isPctPct = $context->builder->icmp(Builder::INT_EQ, $nch, $i8->constInt(ord('%'), false));
+        $emitPctPct = $fn->appendBasicBlock('fmt_prom_ll_pctpct');
+        $context->builder->branchIf($isPctPct, $emitPctPct, $scan);
+
+        $context->builder->positionAtEnd($emitPctPct);
+        $dp2 = $context->builder->load($dstAlloca);
+        $context->builder->store($nch, $dp2);
+        $context->builder->store($context->builder->gep($dp2, $one), $dstAlloca);
+        $context->builder->store($context->builder->gep($nsp, $one), $srcAlloca);
+        $context->builder->branch($copyLoop);
+
+        $context->builder->positionAtEnd($scan);
+        $ssp = $context->builder->load($srcAlloca);
+        $sch2 = $context->builder->load($ssp);
+        $scanNul = $context->builder->icmp(Builder::INT_EQ, $sch2, $i8->constInt(0, false));
+        $scanWork = $fn->appendBasicBlock('fmt_prom_ll_scan_work');
+        $context->builder->branchIf($scanNul, $done, $scanWork);
+        $context->builder->positionAtEnd($scanWork);
+        $isFlag = $context->builder->or(
+            $context->builder->icmp(Builder::INT_EQ, $sch2, $i8->constInt(ord('#'), false)),
+            $context->builder->or(
+                $context->builder->icmp(Builder::INT_EQ, $sch2, $i8->constInt(ord('0'), false)),
+                $context->builder->or(
+                    $context->builder->icmp(Builder::INT_EQ, $sch2, $i8->constInt(ord('-'), false)),
+                    $context->builder->or(
+                        $context->builder->icmp(Builder::INT_EQ, $sch2, $i8->constInt(ord('+'), false)),
+                        $context->builder->or(
+                            $context->builder->icmp(Builder::INT_EQ, $sch2, $i8->constInt(ord(' '), false)),
+                            $context->builder->icmp(Builder::INT_EQ, $sch2, $i8->constInt(ord('\''), false))
+                        )
+                    )
+                )
+            )
+        );
+        $isStar = $context->builder->icmp(Builder::INT_EQ, $sch2, $i8->constInt(ord('*'), false));
+        $isDot = $context->builder->icmp(Builder::INT_EQ, $sch2, $i8->constInt(ord('.'), false));
+        $isDigit = $context->builder->and(
+            $context->builder->icmp(Builder::INT_SGE, $sch2, $i8->constInt(ord('0'), false)),
+            $context->builder->icmp(Builder::INT_SLE, $sch2, $i8->constInt(ord('9'), false))
+        );
+        $isLenMod = $context->builder->or(
+            $context->builder->icmp(Builder::INT_EQ, $sch2, $i8->constInt(ord('h'), false)),
+            $context->builder->or(
+                $context->builder->icmp(Builder::INT_EQ, $sch2, $i8->constInt(ord('l'), false)),
+                $context->builder->or(
+                    $context->builder->icmp(Builder::INT_EQ, $sch2, $i8->constInt(ord('L'), false)),
+                    $context->builder->or(
+                        $context->builder->icmp(Builder::INT_EQ, $sch2, $i8->constInt(ord('z'), false)),
+                        $context->builder->or(
+                            $context->builder->icmp(Builder::INT_EQ, $sch2, $i8->constInt(ord('j'), false)),
+                            $context->builder->icmp(Builder::INT_EQ, $sch2, $i8->constInt(ord('t'), false))
+                        )
+                    )
+                )
+            )
+        );
+        $copyScanCh = $fn->appendBasicBlock('fmt_prom_ll_scan_copy');
+        $markLen = $fn->appendBasicBlock('fmt_prom_ll_mark_len');
+        $context->builder->branchIf(
+            $context->builder->or($isFlag, $context->builder->or($isStar, $context->builder->or($isDot, $isDigit))),
+            $copyScanCh,
+            $maybeLen = $fn->appendBasicBlock('fmt_prom_ll_maybe_len')
+        );
+        $context->builder->positionAtEnd($maybeLen);
+        $context->builder->branchIf($isLenMod, $markLen, $emitConv);
+
+        $context->builder->positionAtEnd($copyScanCh);
+        $sdp = $context->builder->load($dstAlloca);
+        $context->builder->store($sch2, $sdp);
+        $context->builder->store($context->builder->gep($sdp, $one), $dstAlloca);
+        $context->builder->store($context->builder->gep($ssp, $one), $srcAlloca);
+        $context->builder->branch($scan);
+
+        $context->builder->positionAtEnd($markLen);
+        $context->builder->store($i8->constInt(1, false), $hadLenAlloca);
+        $ldp = $context->builder->load($dstAlloca);
+        $context->builder->store($sch2, $ldp);
+        $context->builder->store($context->builder->gep($ldp, $one), $dstAlloca);
+        $context->builder->store($context->builder->gep($ssp, $one), $srcAlloca);
+        $context->builder->branch($scan);
+
+        $context->builder->positionAtEnd($emitConv);
+        $hadLen = $context->builder->load($hadLenAlloca);
+        $needLl = $context->builder->icmp(Builder::INT_EQ, $hadLen, $i8->constInt(0, false));
+        $isIntConv = $context->builder->or(
+            $context->builder->icmp(Builder::INT_EQ, $sch2, $i8->constInt(ord('d'), false)),
+            $context->builder->or(
+                $context->builder->icmp(Builder::INT_EQ, $sch2, $i8->constInt(ord('i'), false)),
+                $context->builder->or(
+                    $context->builder->icmp(Builder::INT_EQ, $sch2, $i8->constInt(ord('u'), false)),
+                    $context->builder->or(
+                        $context->builder->icmp(Builder::INT_EQ, $sch2, $i8->constInt(ord('o'), false)),
+                        $context->builder->or(
+                            $context->builder->icmp(Builder::INT_EQ, $sch2, $i8->constInt(ord('x'), false)),
+                            $context->builder->icmp(Builder::INT_EQ, $sch2, $i8->constInt(ord('X'), false))
+                        )
+                    )
+                )
+            )
+        );
+        $insertLl = $fn->appendBasicBlock('fmt_prom_ll_insert');
+        $emitConvCh = $fn->appendBasicBlock('fmt_prom_ll_convch');
+        $context->builder->branchIf(
+            $context->builder->and($needLl, $isIntConv),
+            $insertLl,
+            $emitConvCh
+        );
+        $context->builder->positionAtEnd($insertLl);
+        $idp = $context->builder->load($dstAlloca);
+        $context->builder->store($i8->constInt(ord('l'), false), $idp);
+        $idp2 = $context->builder->gep($idp, $one);
+        $context->builder->store($i8->constInt(ord('l'), false), $idp2);
+        $context->builder->store($context->builder->gep($idp2, $one), $dstAlloca);
+        $context->builder->branch($emitConvCh);
+        $context->builder->positionAtEnd($emitConvCh);
+        $cdp = $context->builder->load($dstAlloca);
+        $context->builder->store($sch2, $cdp);
+        $context->builder->store($context->builder->gep($cdp, $one), $dstAlloca);
+        $context->builder->store($context->builder->gep($ssp, $one), $srcAlloca);
+        $context->builder->branch($copyLoop);
+
+        $context->builder->positionAtEnd($done);
+        $endp = $context->builder->load($dstAlloca);
+        $context->builder->store($i8->constInt(0, false), $endp);
+        $context->builder->returnValue($context->builder->pointerCast($buf, $charPtr));
+
+        $context->registerFunction(self::FMT_PROMOTE_LL_ABI, $fn);
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     /**

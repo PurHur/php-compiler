@@ -609,6 +609,15 @@ final class SprintfJitHelper
         if ($offset + 9 > $packLen) {
             return null;
         }
+        // TAG_DOUBLE → zend_dval_to_lval via (int) cast (#36386).
+        if (self::isByte($packed[$p], 2)) {
+            $f = self::readPackedDoubleAtOffset($packed, $packLen, $offset);
+            if (null === $f) {
+                return null;
+            }
+
+            return (int) $f;
+        }
         if (!self::isByte($packed[$p], 1)) {
             return null;
         }
@@ -1096,6 +1105,16 @@ final class SprintfJitHelper
 
             return 0;
         }
+        // TAG_DOUBLE → zend_dval_to_lval (#36386).
+        if (self::isByte($packed[$cursor], 2)) {
+            $f = self::readPackedDoubleAtOffset($packed, $packLen, $cursor);
+            if (null === $f) {
+                return null;
+            }
+            $cursor += 9;
+
+            return (int) $f;
+        }
         if ($cursor + 9 > $packLen || !self::isByte($packed[$cursor], 1)) {
             return null;
         }
@@ -1257,9 +1276,18 @@ final class SprintfJitHelper
     private static function readPackedLong(string $packed, int $packLen): ?int
     {
         // TAG_NULL → 0 (#24258); TAG_LONG (1) + 8-byte little-endian int64.
+        // TAG_DOUBLE (2) → zend_dval_to_lval (#36386 leftover of float %d).
         // Index with ++ only — `$packed[$i + 1]` miscompiles under NestedJIT (#23871).
         if (1 === $packLen && self::isByte($packed[0], 0)) {
             return 0;
+        }
+        if ($packLen >= 9 && self::isByte($packed[0], 2)) {
+            $f = self::readPackedDoubleAtOffset($packed, $packLen, 0);
+            if (null === $f) {
+                return null;
+            }
+
+            return (int) $f;
         }
         if ($packLen < 9 || !self::isByte($packed[0], 1)) {
             return null;
