@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8316 |
-| Phase A inventory files (M2 ratio SSOT) | 8316 |
+| PHP files on vm.php path | 8317 |
+| Phase A inventory files (M2 ratio SSOT) | 8317 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26229 |
+| Source constructs flagged (warnings) | 26231 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5584,7 +5584,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/CompilePseudoClassScopeAndConst.php` | 0 | 6 |
 | `lib/Compiler/Concern/CompileReservedNamesPseudoClassAndClassConst.php` | 0 | 2 |
 | `lib/Compiler/Concern/CompileTimeClassConstFetchFold.php` | 0 | 22 |
-| `lib/Compiler/Concern/CompileTimeFold.php` | 0 | 39 |
+| `lib/Compiler/Concern/CompileTimeFold.php` | 0 | 25 |
+| `lib/Compiler/Concern/CompileTimeGlobalConstAndDefineFold.php` | 0 | 16 |
 | `lib/Compiler/Concern/DeferredSiblingAndArrayMapNullCallArgProducers.php` | 0 | 2 |
 | `lib/Compiler/Concern/DimAndPropertyWriteContext.php` | 0 | 2 |
 | `lib/Compiler/Concern/EchoCoalesceCallArgCompile.php` | 0 | 11 |
@@ -49106,13 +49107,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 832)
-- new CompileFatal (line 866)
-- new CompileError (line 869)
-- new ClassCompileRegistry (line 910)
-- new AttributeClassRegistry (line 911)
-- new ClassCompileRegistry (line 1019)
-- new AttributeClassRegistry (line 1020)
+- new CompileFatal (line 835)
+- new CompileFatal (line 869)
+- new CompileError (line 872)
+- new ClassCompileRegistry (line 913)
+- new AttributeClassRegistry (line 914)
+- new ClassCompileRegistry (line 1022)
+- new AttributeClassRegistry (line 1023)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -49654,45 +49655,51 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/CompileTimeFold.php`
 
 **Warnings** (review for bootstrap subset):
-- trait CompileTimeFold (line 31)
-- new Op\Type\Literal (line 38)
-- new Op\Expr\Param (line 39)
-- new Operand\Literal (line 40)
-- new Op\Type\Mixed_ (line 41)
-- new Variable (line 172)
-- new Variable (line 326)
-- new Variable (line 336)
-- new Variable (line 346)
-- new Variable (line 352)
-- new Variable (line 401)
-- new Variable (line 441)
-- new Variable (line 457)
-- new ClassEntry (line 462)
-- new ObjectEntry (line 464)
-- new Variable (line 488)
-- new Variable (line 547)
-- new Variable (line 580)
-- new Variable (line 611)
-- new Variable (line 625)
-- new Variable (line 670)
-- new Variable (line 675)
-- new Variable (line 793)
-- new Variable (line 800)
-- new Variable (line 812)
-- new Variable (line 827)
-- new Variable (line 830)
-- new Variable (line 836)
-- new Variable (line 843)
-- new Variable (line 850)
-- new Variable (line 856)
-- new Variable (line 862)
-- new Variable (line 869)
-- new Variable (line 877)
-- new Variable (line 884)
-- new Variable (line 891)
-- new Variable (line 961)
-- new Variable (line 1116)
-- 29 class method(s)
+- trait CompileTimeFold (line 27)
+- new Op\Type\Literal (line 34)
+- new Op\Expr\Param (line 35)
+- new Operand\Literal (line 36)
+- new Op\Type\Mixed_ (line 37)
+- new Variable (line 168)
+- new Variable (line 322)
+- new Variable (line 332)
+- new Variable (line 342)
+- new Variable (line 348)
+- new Variable (line 397)
+- new Variable (line 437)
+- new Variable (line 453)
+- new ClassEntry (line 458)
+- new ObjectEntry (line 460)
+- new Variable (line 484)
+- new Variable (line 543)
+- new Variable (line 576)
+- new Variable (line 607)
+- new Variable (line 621)
+- new Variable (line 666)
+- new Variable (line 671)
+- new Variable (line 789)
+- new Variable (line 796)
+- 18 class method(s)
+
+### `lib/Compiler/Concern/CompileTimeGlobalConstAndDefineFold.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CompileTimeGlobalConstAndDefineFold (line 21)
+- new Variable (line 25)
+- new Variable (line 40)
+- new Variable (line 43)
+- new Variable (line 49)
+- new Variable (line 56)
+- new Variable (line 63)
+- new Variable (line 69)
+- new Variable (line 75)
+- new Variable (line 82)
+- new Variable (line 90)
+- new Variable (line 97)
+- new Variable (line 104)
+- new Variable (line 174)
+- new Variable (line 329)
+- 11 class method(s)
 
 ### `lib/Compiler/Concern/DeferredSiblingAndArrayMapNullCallArgProducers.php`
 

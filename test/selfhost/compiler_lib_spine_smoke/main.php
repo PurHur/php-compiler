@@ -5337,6 +5337,7 @@ require_once __DIR__.'/../../../lib/Compiler/CompileFatal.php';
 require_once __DIR__.'/../../../lib/Compiler/CompileTimeEnumCase.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompileTimeFold.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompileTimeClassConstFetchFold.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/CompileTimeGlobalConstAndDefineFold.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/ParameterAsserts.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CoalesceAndNullsafe.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/ClassLikeAndStmtCompile.php';
