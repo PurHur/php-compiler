@@ -1,7 +1,7 @@
 {
     "issue": 36401,
     "ci_green_streak_days": 3,
-    "last_green_master_sha": "ba0a1d1844faa62181901c5f491f2dbcb1d02cf0",
+    "last_green_master_sha": "02662f841aa409a175a7b6debfb7074c6677ac4e",
     "last_green_day": "2026-09-06",
     "gates": [
         "apply-patches",
