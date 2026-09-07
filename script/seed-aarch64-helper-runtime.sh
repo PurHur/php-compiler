@@ -195,6 +195,17 @@ SEED_UNITS=(
   /ext/standard/VersionCompareJitHelper.php
   /ext/standard/SysGetTempDirJitHelper.php
   /ext/standard/SysGetloadavgJitHelper.php
+  # Filesystem / link / dir / readfile / stat tier (#36391 after #37155)
+  /ext/standard/LinkJitHelper.php
+  /ext/standard/ReadlinkJitHelper.php
+  /ext/standard/SymlinkJitHelper.php
+  /ext/standard/RenameJitHelper.php
+  /ext/standard/ReadfileJitHelper.php
+  /ext/standard/StatArrayJitHelper.php
+  /ext/standard/StatCacheJitHelper.php
+  /ext/standard/OpendirJitHelper.php
+  /ext/standard/DirHandleJitHelper.php
+  /ext/standard/DirSnapshotJitHelper.php
 )
 
 MIN_SEED=${#SEED_UNITS[@]}
