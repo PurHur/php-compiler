@@ -58,6 +58,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/Compiler/Concern/CallArgEarlyFastPathAndMixedPropertyFetchSends.php',
             'lib/Compiler/Concern/CallArgInlineArrayUnpackReduceAndFamilyResolve.php',
             'lib/Compiler/Concern/CallArgInlineEnumCastErrorSuppressAndFccSends.php',
+            'lib/Compiler/Concern/CallArgNullLiteralHoistedPropertyConstAndCoalesceValueSlots.php',
             'lib/Compiler/Concern/CallArgNullMergePropertyFetchAndHoistedPreludeSends.php',
             'lib/Compiler/Concern/CallArgPostFccDimCoalesceExprPreludeAndNestedNewSends.php',
             'lib/Compiler/Concern/CfgProducerIndexAndRematerialize.php',

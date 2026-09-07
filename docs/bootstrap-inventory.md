@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8388 |
-| Phase A inventory files (M2 ratio SSOT) | 8388 |
+| PHP files on vm.php path | 8389 |
+| Phase A inventory files (M2 ratio SSOT) | 8389 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26399 |
+| Source constructs flagged (warnings) | 26401 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5570,6 +5570,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/CallArgEarlyFastPathAndMixedPropertyFetchSends.php` | 0 | 9 |
 | `lib/Compiler/Concern/CallArgInlineArrayUnpackReduceAndFamilyResolve.php` | 0 | 5 |
 | `lib/Compiler/Concern/CallArgInlineEnumCastErrorSuppressAndFccSends.php` | 0 | 17 |
+| `lib/Compiler/Concern/CallArgNullLiteralHoistedPropertyConstAndCoalesceValueSlots.php` | 0 | 2 |
 | `lib/Compiler/Concern/CallArgNullMergePropertyFetchAndHoistedPreludeSends.php` | 0 | 23 |
 | `lib/Compiler/Concern/CallArgPostFccDimCoalesceExprPreludeAndNestedNewSends.php` | 0 | 6 |
 | `lib/Compiler/Concern/CfgProducerIndexAndRematerialize.php` | 0 | 2 |
@@ -49177,13 +49178,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 1006)
-- new CompileFatal (line 1040)
-- new CompileError (line 1043)
-- new ClassCompileRegistry (line 1084)
-- new AttributeClassRegistry (line 1085)
-- new ClassCompileRegistry (line 1193)
-- new AttributeClassRegistry (line 1194)
+- new CompileFatal (line 1009)
+- new CompileFatal (line 1043)
+- new CompileError (line 1046)
+- new ClassCompileRegistry (line 1087)
+- new AttributeClassRegistry (line 1088)
+- new ClassCompileRegistry (line 1196)
+- new AttributeClassRegistry (line 1197)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -49401,6 +49402,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 - 1 closure(s)
 
+### `lib/Compiler/Concern/CallArgNullLiteralHoistedPropertyConstAndCoalesceValueSlots.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CallArgNullLiteralHoistedPropertyConstAndCoalesceValueSlots (line 23)
+- 1 class method(s)
+
 ### `lib/Compiler/Concern/CallArgNullMergePropertyFetchAndHoistedPreludeSends.php`
 
 **Warnings** (review for bootstrap subset):
@@ -49510,15 +49517,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/CompileCallArgSends.php`
 
 **Warnings** (review for bootstrap subset):
-- trait CompileCallArgSends (line 36)
-- new Operand\Temporary (line 1795)
-- new Operand\Temporary (line 2326)
-- new Operand\Temporary (line 2512)
-- new Operand\Temporary (line 2544)
-- new Operand\Temporary (line 2641)
-- new Operand\Temporary (line 2770)
-- new OpCode (line 2772)
-- new OpCode (line 4428)
+- trait CompileCallArgSends (line 38)
+- new Operand\Temporary (line 1683)
+- new Operand\Temporary (line 2214)
+- new Operand\Temporary (line 2400)
+- new Operand\Temporary (line 2432)
+- new Operand\Temporary (line 2529)
+- new Operand\Temporary (line 2658)
+- new OpCode (line 2660)
+- new OpCode (line 4316)
 - 1 class method(s)
 - 3 closure(s)
 
@@ -58594,21 +58601,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - trait CallResultOperandAssign (line 25)
-- new Variable (line 298)
-- new Variable (line 321)
-- new Variable (line 350)
-- new Variable (line 376)
-- new Variable (line 401)
-- new Variable (line 446)
-- new Type (line 454)
-- new Variable (line 474)
-- new Type (line 483)
-- new Variable (line 502)
-- new Type (line 510)
-- new Variable (line 536)
-- new Type (line 544)
-- new Variable (line 567)
-- new Variable (line 591)
+- new Variable (line 302)
+- new Variable (line 325)
+- new Variable (line 354)
+- new Variable (line 380)
+- new Variable (line 405)
+- new Variable (line 450)
+- new Type (line 458)
+- new Variable (line 478)
+- new Type (line 487)
+- new Variable (line 506)
+- new Type (line 514)
+- new Variable (line 540)
+- new Type (line 548)
+- new Variable (line 571)
+- new Variable (line 595)
 - 6 class method(s)
 
 ### `lib/JIT/Concern/ClassConstEnumAndFunctionStatic.php`
