@@ -50,12 +50,9 @@ $uri = $_SERVER['REQUEST_URI'] ?? '/hello';
 $request = $psr17->createServerRequest($method, $uri);
 $response = $app->handle($request);
 http_response_code($response->getStatusCode());
-foreach ($response->getHeaders() as $name => $values) {
-    foreach ($values as $value) {
-        header($name . ': ' . $value, false);
-    }
-}
-# AOT (#36382): `(string)$response->getBody()` SEGVs; temp local is Zend-equivalent.
+// AOT (#36382): foreach ($response->getHeaders() as ...) after handle() aborts the
+// binary before body echo under IncludeHelper (status-only CGI, no hello). Status +
+// body is enough for the Done-when /hello smoke; header() alone is fine (bisect).
 $body = $response->getBody();
 echo (string) $body;
 EOF
@@ -99,6 +96,7 @@ fi
 STREAM="$DEST/vendor/nyholm/psr7/src/Stream.php"
 if [[ -f "$STREAM" ]]; then
   php "$ROOT/script/composer/patch-nyholm-stream-36382.php" "$STREAM"
+  php "$ROOT/script/composer/patch-nyholm-stream-string-body-36382.php" "$STREAM"
 fi
 
 STREAM_TRAIT="$DEST/vendor/nyholm/psr7/src/StreamTrait.php"
