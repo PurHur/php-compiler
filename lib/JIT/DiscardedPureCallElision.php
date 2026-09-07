@@ -217,7 +217,7 @@ use PHPCompiler\VM\Variable as VmVariable;
  * stay live — deprecate; excess argc stays live — ArgumentCountError),
  * zero-arg pi, type.c predicates + gettype/get_debug_type, ctype.c
  * classifiers on typed/literal strings, typed-array count/sizeof, math.c
- * incl. pow/fpow/fdiv on already-numeric args, empty void user functions).
+ * incl. pow/fpow/fdiv/nextafter on already-numeric args, empty void user functions).
  * Soft-null strlen / ord / chr / math / string / ctype / inet coercions are
  * NOT elided — they emit deprecations (PHP 8.1+). Countable objects stay live
  * (user {@code count()} handlers). {@code intdiv} is never discarded here
@@ -237,8 +237,9 @@ use PHPCompiler\VM\Variable as VmVariable;
  * live ({@code ValueError} outside [2,36]). {@code version_compare} with an
  * unknown typed operator stays live ({@code ValueError} on invalid ops).
  * Single-array {@code min}/{@code max} stays live (element compare / object
- * handlers). {@code clamp} stays live ({@code ValueError} when min > max /
- * NAN). Soft-null {@code checkdate} stays live (deprecate). Non-string
+ * handlers). {@code clamp} elides only when min/max are compile-time numerics
+ * with {@code min <= max} and neither is NAN (runtime / inverted / NAN bounds
+ * stay live — {@code ValueError}). Soft-null {@code checkdate} stays live (deprecate). Non-string
  * {@code hash_equals} stays live ({@code TypeError}). Soft-null
  * {@code pathinfo}/{@code parse_url} path/url/flags/component stay live
  * (deprecate). Soft-null {@code function_exists}/{@code extension_loaded}/
@@ -358,6 +359,9 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureCheckdateNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureClampNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureHashEqualsNoSideEffect($toCall, $callArgs)) {
@@ -1545,6 +1549,26 @@ final class DiscardedPureCallElision
         }
 
         return self::checkdateArgsAllowDiscardedElision($callArgs);
+    }
+
+    /**
+     * Discarded {@code clamp} when min/max are compile-time numerics that cannot
+     * {@code ValueError} — php-src {@code ext/standard/math.c}
+     * {@code PHP_FUNCTION(clamp)} / {@code php_math_clamp}. Runtime / inverted /
+     * NAN bounds stay live (#36386).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureClampNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if ('clamp' !== strtolower($toCall->getName())) {
+            return false;
+        }
+
+        return self::clampArgsAllowDiscardedElision($callArgs);
     }
 
     /**
@@ -3829,6 +3853,53 @@ final class DiscardedPureCallElision
     /**
      * @param array<int, Variable> $callArgs
      */
+    private static function clampArgsAllowDiscardedElision(array $callArgs): bool
+    {
+        if (
+            !isset($callArgs[0], $callArgs[1], $callArgs[2])
+            || isset($callArgs[3])
+            || !$callArgs[0] instanceof Variable
+            || !$callArgs[1] instanceof Variable
+            || !$callArgs[2] instanceof Variable
+        ) {
+            return false;
+        }
+        // Value may be runtime typed numeric; bounds must be proven at compile time.
+        if (!self::mathArgAllowsDiscardedElision($callArgs[0])) {
+            return false;
+        }
+        $min = self::compileTimeNumericScalar($callArgs[1]);
+        $max = self::compileTimeNumericScalar($callArgs[2]);
+        if (null === $min || null === $max) {
+            return false;
+        }
+        // php-src: NAN min/max → ValueError; min > max → ValueError.
+        if ($min !== $min || $max !== $max) {
+            return false;
+        }
+
+        return $min <= $max;
+    }
+
+    /**
+     * Compile-time int/float/numeric-string scalar for clamp bound proofs.
+     */
+    private static function compileTimeNumericScalar(Variable $arg): ?float
+    {
+        if (null !== $arg->compileTimeLong) {
+            return (float) $arg->compileTimeLong;
+        }
+        if (null !== $arg->compileTimeFloat) {
+            return $arg->compileTimeFloat;
+        }
+        $lit = JitStringArg::compileTimeLiteral($arg);
+
+        return null !== $lit && is_numeric($lit) ? (float) $lit : null;
+    }
+
+    /**
+     * @param array<int, Variable> $callArgs
+     */
     private static function hashEqualsArgsAllowDiscardedElision(array $callArgs): bool
     {
         if (
@@ -4490,6 +4561,7 @@ final class DiscardedPureCallElision
      * Discarded {@code abs}/{@code sqrt}/{@code floor}/…/{@code pi} on already-numeric
      * args (or zero-arg {@code pi}) — php-src {@code math.c} has no user handlers;
      * null soft-coercion deprecates so TYPE_NULL is excluded (peer strlen null).
+     * Multi-arg builtins require exact arity ({@code ArgumentCountError} otherwise).
      *
      * @param array<int, Variable> $callArgs
      */
@@ -4510,6 +4582,18 @@ final class DiscardedPureCallElision
             // Extra args stay live (ArgumentCountError).
             return false;
         }
+        $argc = \count($callArgs);
+        if ('log' === $name) {
+            // log(num) or log(num, base) — both legal; other arities ArgumentCountError.
+            if ($argc < 1 || $argc > 2) {
+                return false;
+            }
+        } else {
+            $required = self::pureMathBuiltinRequiredArgc($name);
+            if (null !== $required && $argc !== $required) {
+                return false;
+            }
+        }
         foreach ($callArgs as $arg) {
             if (!$arg instanceof Variable || !self::mathArgAllowsDiscardedElision($arg)) {
                 return false;
@@ -4517,6 +4601,28 @@ final class DiscardedPureCallElision
         }
 
         return true;
+    }
+
+    /**
+     * Exact argc for math.c builtins that reject wrong arity with
+     * {@code ArgumentCountError}. Null only for {@code pi} (handled above);
+     * {@code log} is gated separately (1..2).
+     */
+    private static function pureMathBuiltinRequiredArgc(string $nameLc): ?int
+    {
+        switch ($nameLc) {
+            case 'hypot':
+            case 'fmod':
+            case 'atan2':
+            case 'pow':
+            case 'fpow':
+            case 'fdiv':
+            case 'nextafter':
+                return 2;
+            default:
+                // Unary math.c entries (abs/sqrt/sin/…); excess argc stays live.
+                return 1;
+        }
     }
 
     /**

@@ -55744,11 +55744,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/Type/ObjectInstancePropertyLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 219)
-- new Variable (line 247)
-- new Variable (line 336)
-- new Variable (line 529)
-- new Variable (line 800)
+- new Variable (line 228)
+- new Variable (line 256)
+- new Variable (line 345)
+- new Variable (line 538)
+- new Variable (line 809)
 - 12 class method(s)
 
 ### `lib/JIT/Builtin/Type/ObjectStaticPropertyInitLlvm.php`
@@ -59615,7 +59615,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/DiscardedPureCallElision.php`
 
 **Warnings** (review for bootstrap subset):
-- 131 class method(s)
+- 135 class method(s)
 
 ### `lib/JIT/DnfParamCheck.php`
 
@@ -60755,7 +60755,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/NoThrowCallElision.php`
 
 **Warnings** (review for bootstrap subset):
-- new Operand\Literal (line 3177)
+- new Operand\Literal (line 3180)
 - 101 class method(s)
 
 ### `lib/JIT/NonObjectPropertyFetchHelper.php`
