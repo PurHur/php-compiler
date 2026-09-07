@@ -764,6 +764,23 @@ restart:
                                 $leftValue
                             );
                         }
+                        // Same-operand $n/$n → 1 (omit sdiv/srem/exactness; keep /0; #36386).
+                        $sameDiv = DiscardedPureCallElision::nativeLongArithSameOperandFold(
+                            $opcode->type,
+                            $left,
+                            $right
+                        );
+                        if ('one' === $sameDiv) {
+                            if (!DiscardedPureCallElision::intdivCanSkipZeroDivisorGuard($right)) {
+                                JitNumericDivisionGuard::emitZeroLongDivisorGuard(
+                                    $this->context,
+                                    $leftValue,
+                                    'Division by zero'
+                                );
+                            }
+                            $result = $this->context->getTypeFromString('int64')->constInt(1, false);
+                            goto return_long;
+                        }
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
                         // Compile-time nonzero divisor → skip DivisionByZeroError (#36386).
                         $skipZero = DiscardedPureCallElision::intdivCanSkipZeroDivisorGuard($right);
@@ -780,6 +797,23 @@ restart:
                     case OpCode::TYPE_MODULO:
                         // Compile-time ±1 → 0 without srem / zero guard (mod_function).
                         if (DiscardedPureCallElision::nativeLongModuloDivisorFoldsToZero($right)) {
+                            $result = $this->context->getTypeFromString('int64')->constInt(0, false);
+                            goto return_long;
+                        }
+                        // Same-operand $n%$n → 0 (omit srem / neg-one PHI; keep %0; #36386).
+                        $sameMod = DiscardedPureCallElision::nativeLongArithSameOperandFold(
+                            $opcode->type,
+                            $left,
+                            $right
+                        );
+                        if ('zero' === $sameMod) {
+                            if (!DiscardedPureCallElision::intdivCanSkipZeroDivisorGuard($right)) {
+                                JitNumericDivisionGuard::emitZeroLongDivisorGuard(
+                                    $this->context,
+                                    $leftValue,
+                                    'Modulo by zero'
+                                );
+                            }
                             $result = $this->context->getTypeFromString('int64')->constInt(0, false);
                             goto return_long;
                         }

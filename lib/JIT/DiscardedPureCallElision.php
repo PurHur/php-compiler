@@ -253,10 +253,13 @@ use PHPCompiler\VM\Variable as VmVariable;
  * folds to {@code 0} (no {@code sub} / overflow intrinsic;
  * {@see nativeLongArithSameOperandFold}). Same-operand typed {@code $n + $n}
  * lowers to {@code shl 1} with {@code ashr} round-trip overflow (peer
- * {@code * 2}; {@see nativeLongArithSameOperandFold}). Compile-time divisors ≠
- * {@code -1} skip the typed {@code /} {@code PHP_INT_MIN}/{-1} promote arm
- * ({@see nativeLongDivisorCanSkipNegOneModuloBranch}). Typed {@code / 1} is
- * identity (no {@code sdiv}/{@code srem}/exactness promote;
+ * {@code * 2}; {@see nativeLongArithSameOperandFold}). Same-operand typed
+ * {@code $n / $n} folds to {@code 1} and {@code $n % $n} to {@code 0} (omit
+ * {@code sdiv}/{@code srem}/exactness; keep {@code DivisionByZeroError} when
+ * {@code n == 0}; {@see nativeLongArithSameOperandFold}). Compile-time
+ * divisors ≠ {@code -1} skip the typed {@code /} {@code PHP_INT_MIN}/{-1}
+ * promote arm ({@see nativeLongDivisorCanSkipNegOneModuloBranch}). Typed
+ * {@code / 1} is identity (no {@code sdiv}/{@code srem}/exactness promote;
  * {@see nativeLongDivisorIsCompileTimeOne}). {@code intdiv($n, 1)} is the same
  * identity at the builtin call site; {@code intdiv($n, -1)} and typed
  * {@code / -1} lower to {@code negate} with the {@code INT_MIN} guard /
@@ -4297,16 +4300,24 @@ final class DiscardedPureCallElision
      *   no-op for equal operands).
      * - {@code $n + $n} → {@code shl 1} with {@code ashr} overflow (omit
      *   {@code llvm.sadd.with.overflow}; same shape as compile-time {@code * 2}).
+     * - {@code $n / $n} → {@code 1} (omit {@code sdiv}/{@code srem}/exactness;
+     *   callers keep {@code DivisionByZeroError} when {@code n == 0}). Equal
+     *   nonzero longs always divide exactly ({@code INT_MIN}/{@code INT_MIN}
+     *   is 1, not the INT_MIN/−1 promote case).
+     * - {@code $n % $n} → {@code 0} (omit {@code srem} / neg-one PHI; callers
+     *   keep the zero-divisor guard).
      *
      * Peer same-operand bitwise ({@see bitwiseLogicSameOperandFold}),
      * compile-time {@code - 0}/{@code + 0} identity
-     * ({@see nativeLongArithIsCompileTimeIdentityOrZero}), and
-     * {@see nativeLongMulCompileTimePowerOfTwoShift}.
+     * ({@see nativeLongArithIsCompileTimeIdentityOrZero}),
+     * {@see nativeLongMulCompileTimePowerOfTwoShift}, and compile-time
+     * {@code % ±1} / {@code / 1} ({@see nativeLongModuloDivisorFoldsToZero} /
+     * {@see nativeLongDivisorIsCompileTimeOne}).
      *
      * php-src: Zend/zend_operators.c sub_function / add_function /
-     * ZEND_SIGNED_{SUB,ADD}_OVERFLOW.
+     * div_function / mod_function / ZEND_SIGNED_{SUB,ADD}_OVERFLOW.
      *
-     * @return 'zero'|'shl1'|null fold to 0, lower as shl×2, or null when N/A
+     * @return 'zero'|'shl1'|'one'|null fold to 0, shl×2, const 1, or null when N/A
      */
     public static function nativeLongArithSameOperandFold(
         int $opType,
@@ -4316,11 +4327,16 @@ final class DiscardedPureCallElision
         if (!self::nativeLongOperandsAreSame($left, $right)) {
             return null;
         }
-        if (\PHPCompiler\OpCode::TYPE_MINUS === $opType) {
+        if (\PHPCompiler\OpCode::TYPE_MINUS === $opType
+            || \PHPCompiler\OpCode::TYPE_MODULO === $opType
+        ) {
             return 'zero';
         }
         if (\PHPCompiler\OpCode::TYPE_PLUS === $opType) {
             return 'shl1';
+        }
+        if (\PHPCompiler\OpCode::TYPE_DIV === $opType) {
+            return 'one';
         }
 
         return null;
