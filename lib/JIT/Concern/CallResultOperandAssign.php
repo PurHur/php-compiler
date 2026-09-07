@@ -134,7 +134,7 @@ trait CallResultOperandAssign
 
     /**
      * True when the current call returns a freshly allocated `__string__*` the caller owns
-     * (str_repeat / NestedJIT StrRepeat helper / user `: string` returns). Borrowed
+     * (str_repeat / sprintf / NestedJIT StrRepeat helper / user `: string` returns). Borrowed
      * `__string__*` results must stay KIND_VALUE so freeDeadVariables is a no-op (#36388).
      */
     private function callResultOwnsFreshString(): bool
@@ -174,9 +174,13 @@ trait CallResultOperandAssign
 
     private function isOwningStringInternalName(string $name): bool
     {
+        // Fresh heap strings from Internal::call — php-src zend_string_init / formatted_print.
+        // sprintf/vsprintf were missing: KIND_VALUE left them immortal across unset (#36388).
         static $owning = [
             'str_repeat' => true,
             'str_pad' => true,
+            'sprintf' => true,
+            'vsprintf' => true,
         ];
 
         return isset($owning[strtolower($name)]);

@@ -79,5 +79,67 @@ final class Issue36388StringCallResultFreeTest extends TestCase
         );
         $this->assertStringContainsString('callResultOwnsFreshString', $src);
         $this->assertStringContainsString('ephemeralStringTemp = true', $src);
+        $this->assertStringContainsString("'sprintf' => true", $src);
+        $this->assertStringContainsString("'vsprintf' => true", $src);
+    }
+
+    public function testSprintfCompileTimeFormatUsesModuleCStringNotHeapInit(): void
+    {
+        $src = (string) file_get_contents(dirname(__DIR__, 2).'/ext/standard/JitSprintf.php');
+        $this->assertStringContainsString('pointerFromStringConstant($fmtForSnprintf)', $src);
+        $this->assertStringContainsString('toDelref', $src);
+        $this->assertStringContainsString('refcount->delref($tmpStr)', $src);
+    }
+
+    public function testSprintfLocalUnsetFreesUnderAot(): void
+    {
+        if (!\PHPCompiler\LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $root = dirname(__DIR__, 2);
+        $src = $root.'/test/repro/issue_36388_sprintf_local_free.php';
+        $bin = sys_get_temp_dir().'/phpc_36388_splf_'.getmypid();
+        $compile = escapeshellarg(PHP_BINARY).' '
+            .escapeshellarg($root.'/bin/compile.php').' -o '
+            .escapeshellarg($bin).' '
+            .escapeshellarg($src);
+        $cwd = getcwd();
+        chdir($root);
+        exec($compile.' 2>&1', $out, $rc);
+        chdir($cwd);
+        $this->assertSame(0, $rc, implode("\n", $out));
+        exec(escapeshellarg($bin).' 2000 2>&1', $runOut, $runRc);
+        @unlink($bin);
+        $this->assertSame(0, $runRc, implode("\n", $runOut));
+        $text = implode("\n", $runOut);
+        $this->assertStringContainsString('sprintf_local delta=', $text);
+        $this->assertStringNotContainsString('LEAK', $text);
+        $this->assertStringContainsString(' ok', $text);
+    }
+
+    public function testSprintfKeyUnsetFreesUnderAot(): void
+    {
+        if (!\PHPCompiler\LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $root = dirname(__DIR__, 2);
+        $src = $root.'/test/repro/issue_36388_sprintf_key_leak.php';
+        $bin = sys_get_temp_dir().'/phpc_36388_spkl_'.getmypid();
+        $compile = escapeshellarg(PHP_BINARY).' '
+            .escapeshellarg($root.'/bin/compile.php').' -o '
+            .escapeshellarg($bin).' '
+            .escapeshellarg($src);
+        $cwd = getcwd();
+        chdir($root);
+        exec($compile.' 2>&1', $out, $rc);
+        chdir($cwd);
+        $this->assertSame(0, $rc, implode("\n", $out));
+        exec(escapeshellarg($bin).' 2000 2>&1', $runOut, $runRc);
+        @unlink($bin);
+        $this->assertSame(0, $runRc, implode("\n", $runOut));
+        $text = implode("\n", $runOut);
+        $this->assertStringContainsString('sprintf_key delta=', $text);
+        $this->assertStringNotContainsString('LEAK', $text);
+        $this->assertStringContainsString(' ok', $text);
     }
 }
