@@ -72,6 +72,24 @@ final class intdiv extends Internal
             return $folded;
         }
         [$left, $right] = JitIntdiv::lowerOperands($context, $args[0], $args[1]);
+        // intdiv($n, 1) is identity — omit sdiv / zero / INT_MIN guards
+        // (peer typed / 1; #36386). php-src math.c PHP_FUNCTION(intdiv).
+        if (DiscardedPureCallElision::nativeLongDivisorIsCompileTimeOne($args[1])) {
+            return $left;
+        }
+        // intdiv($n, -1) → -n; ArithmeticError only for PHP_INT_MIN (#36386).
+        if (DiscardedPureCallElision::nativeLongDivisorIsCompileTimeNegOne($args[1])) {
+            if (!DiscardedPureCallElision::intdivCanSkipIntMinNegOneGuard($args[0], $args[1])) {
+                JitNumericDivisionGuard::emitIntMinNegOneOverflowGuard(
+                    $context,
+                    $left,
+                    $right,
+                    'Division of PHP_INT_MIN by -1 is not an integer'
+                );
+            }
+
+            return $context->builder->negate($left);
+        }
         // Skip DivisionByZeroError / ArithmeticError branches when the divisor
         // (and, for -1, the dividend) are compile-time proven safe — peer
         // discarded-elision proofs (#36386 / #37153). php-src math.c intdiv.

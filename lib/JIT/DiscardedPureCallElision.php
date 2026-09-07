@@ -247,7 +247,10 @@ use PHPCompiler\VM\Variable as VmVariable;
  * {@code -1} skip the typed {@code /} {@code PHP_INT_MIN}/{-1} promote arm
  * ({@see nativeLongDivisorCanSkipNegOneModuloBranch}). Typed {@code / 1} is
  * identity (no {@code sdiv}/{@code srem}/exactness promote;
- * {@see nativeLongDivisorIsCompileTimeOne}). Typed {@code % 1} folds to
+ * {@see nativeLongDivisorIsCompileTimeOne}). {@code intdiv($n, 1)} is the same
+ * identity at the builtin call site; {@code intdiv($n, -1)} lowers to
+ * {@code negate} with the {@code INT_MIN} guard only when needed
+ * ({@see nativeLongDivisorIsCompileTimeNegOne}). Typed {@code % 1} folds to
  * {@code 0} (peer {@code % -1}; {@see nativeLongModuloDivisorFoldsToZero}).
  * Typed {@code + 0}/{@code - 0}/{@code * 1} are arithmetic identities and
  * {@code * 0} folds to {@code 0} (no {@code add}/{@code sub}/{@code mul};
@@ -4080,6 +4083,19 @@ final class DiscardedPureCallElision
         $d = self::compileTimeLongScalar($divisor);
 
         return null !== $d && 1 === $d;
+    }
+
+    /**
+     * Compile-time divisor {@code -1} for {@code intdiv($n, -1)} → {@code -n}
+     * (php-src {@code PHP_FUNCTION(intdiv)}; peer typed {@code % -1} → {@code 0}).
+     * Callers still emit the {@code PHP_INT_MIN} {@code ArithmeticError} unless
+     * {@see intdivCanSkipIntMinNegOneGuard} proves safe.
+     */
+    public static function nativeLongDivisorIsCompileTimeNegOne(Variable $divisor): bool
+    {
+        $d = self::compileTimeLongScalar($divisor);
+
+        return null !== $d && -1 === $d;
     }
 
     /**
