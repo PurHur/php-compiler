@@ -27,8 +27,9 @@ use PHPLLVM\Value;
 /**
  * str_pad() for strings (STR_PAD_LEFT, STR_PAD_RIGHT, STR_PAD_BOTH).
  *
- * VM: {@see VmString::strPad()}; JIT/AOT: {@see StringStrPad} + {@see StrPadJitHelper}
- * (helper inlines pad logic — do not call VmString from NestedJIT, #23911 / peer #23204).
+ * VM: {@see VmString::strPad()}; JIT/AOT: native {@see StringStrPad} /
+ * {@see \PHPCompiler\JIT\Builtin\StrPadRuntime} {@code phpc_str_pad_r1} (#36388;
+ * NestedJIT StrPadJitHelper concat leaked under thin AOT — peer str_replace_r1).
  */
 final class str_pad extends Internal
 {
@@ -83,15 +84,13 @@ final class str_pad extends Internal
         } else {
             $padType = $context->getTypeFromString('int64')->constInt(1, false);
         }
-        StringStrPad::ensureLinked($context);
+        $result = StringStrPad::invoke($context, $input, $padLength, $padString, $padType);
+        JitStringBuiltinArg::releaseEphemeralArgAfterCopy($context, $args[0], $input);
+        if (isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
+            JitStringBuiltinArg::releaseEphemeralArgAfterCopy($context, $args[2], $padString);
+        }
 
-        return $context->builder->call(
-            $context->lookupFunction('__compiler_str_pad'),
-            $input,
-            $padLength,
-            $padString,
-            $padType
-        );
+        return $result;
     }
 
     private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string

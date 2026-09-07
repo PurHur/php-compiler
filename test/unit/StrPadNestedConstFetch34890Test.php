@@ -36,12 +36,21 @@ final class StrPadNestedConstFetch34890Test extends TestCase
     public function testDeferredInitHelperPresent(): void
     {
         $root = dirname(__DIR__, 2);
-        $compiler = (string) file_get_contents($root.'/lib/Compiler.php');
-        $this->assertStringContainsString('strPadDeferredInitForNestedCallArg', $compiler);
-        $this->assertStringContainsString('#34890', $compiler);
-        $this->assertStringContainsString('skipPrependForStrPadNestedCallArg', $compiler);
-        $this->assertStringContainsString("'str_pad' !== \$name && 'mb_str_pad' !== \$name", $compiler);
-        $this->assertStringContainsString('firstSiblingInlineFuncCallProducerIndex', $compiler);
+        $resolver = (string) file_get_contents(
+            $root.'/lib/Compiler/Concern/InitArraySpreadArithmeticAndNestedInlineCallArgResolvers.php'
+        );
+        $this->assertStringContainsString('strPadDeferredInitForNestedCallArg', $resolver);
+        $this->assertStringContainsString('#34890', $resolver);
+        $this->assertStringContainsString("'str_pad' !== \$name && 'mb_str_pad' !== \$name", $resolver);
+        $static = (string) file_get_contents(
+            $root.'/lib/Compiler/Concern/StaticMethodAndFuncCallCompile.php'
+        );
+        $this->assertStringContainsString('strPadDeferredInitForNestedCallArg', $static);
+        $this->assertStringContainsString('skipPrependForStrPadNestedCallArg', $static);
+        $firstSibling = (string) file_get_contents(
+            $root.'/lib/Compiler/Concern/FirstSiblingInlineFuncCallProducerIndex.php'
+        );
+        $this->assertStringContainsString('firstSiblingInlineFuncCallProducerIndex', $firstSibling);
     }
 
     private function runPhp(string $src): string

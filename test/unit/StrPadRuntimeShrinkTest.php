@@ -8,29 +8,29 @@ use PHPCompiler\ext\standard\StrPadJitHelper;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** str_pad() JIT routes through StrPadJitHelper PHP not inline LLVM (#14863). */
+/**
+ * str_pad() thin AOT uses native phpc_str_pad_r1 (#36388); helper remains SSOT peer.
+ */
 final class StrPadRuntimeShrinkTest extends TestCase
 {
-    public function testStringStrPadUsesJitHelperNotInlineLlvm(): void
+    public function testStringStrPadUsesNativeR1NotNestedJit(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringStrPad.php');
-        $this->assertStringContainsString('StrPadJitHelper', $source);
+        $this->assertStringContainsString('StrPadRuntime', $source);
+        $this->assertStringContainsString('phpc_str_pad_r1', $source);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureBridge', $source);
         $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitStrPad.php');
 
+        $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StrPadRuntime.php');
+        $this->assertStringContainsString('phpc_str_pad_r1', $runtime);
+        $this->assertStringContainsString('__string__alloc', $runtime);
+        $this->assertStringContainsString('__string__separate', $runtime);
+
         $strPad = (string) file_get_contents(__DIR__.'/../../ext/standard/str_pad.php');
-        $this->assertStringContainsString('StringStrPad::ensureLinked', $strPad);
-        $this->assertStringContainsString('__compiler_str_pad', $strPad);
+        $this->assertStringContainsString('StringStrPad::invoke', $strPad);
+        $this->assertStringContainsString('releaseEphemeralArgAfterCopy', $strPad);
+        $this->assertStringNotContainsString('__compiler_str_pad', $strPad);
         $this->assertStringNotContainsString('JitStrPad', $strPad);
-
-        $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringStrPad.php');
-        $this->assertStringContainsString('__compiler_str_pad', $bridge);
-
-        $cache = (string) file_get_contents(__DIR__.'/../../lib/AOT/HelperRuntimeCache.php');
-        $this->assertStringContainsString(
-            'strpadjithelper::padargv',
-            $cache,
-            'USER_SCRIPT_INLINE_ONLY must NestedJIT padArgv — prelinked unit.o SIGSEGVs'
-        );
     }
 
     public function testStrPadJitHelperInlinesWithoutVmStringCall(): void
@@ -52,11 +52,11 @@ final class StrPadRuntimeShrinkTest extends TestCase
         $this->assertSame('p----', VmString::strPad('p', 5, '-', 1));
     }
 
-    public function testSpineBundleIncludesStrPadJitHelper(): void
+    public function testSpineBundleIncludesStrPadRuntime(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringNotContainsString('JitStrPad.php', $spine);
-        $this->assertStringContainsString('StrPadJitHelper.php', $spine);
+        $this->assertStringContainsString('StrPadRuntime.php', $spine);
         $this->assertStringContainsString('StringStrPad.php', $spine);
     }
 }
