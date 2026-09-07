@@ -615,12 +615,15 @@ restart:
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
                         // Compile-time nonzero divisor → skip DivisionByZeroError (#36386).
                         $skipZero = DiscardedPureCallElision::intdivCanSkipZeroDivisorGuard($right);
+                        // Compile-time divisor ≠ -1 → skip INT_MIN/−1 promote (#36386).
+                        $skipIntMinNegOne = DiscardedPureCallElision::nativeLongDivisorCanSkipNegOneModuloBranch($right);
 
                         return JitLongDiv::binaryNativeLong(
                             $this->context,
                             $leftValue,
                             $__right,
-                            $skipZero
+                            $skipZero,
+                            $skipIntMinNegOne
                         );
                     case OpCode::TYPE_MODULO:
                         // Compile-time -1 → 0 without srem / zero guard (mod_function).
@@ -1063,7 +1066,13 @@ restart:
                     $leftLong = JitLongArg::lowerStringValue($this->context, $leftValue);
                     $rightLong = JitLongArg::lowerStringValue($this->context, $rightValue);
                     if (OpCode::TYPE_DIV === $opcode->type) {
-                        return JitLongDiv::binaryNativeLong($this->context, $leftLong, $rightLong);
+                        return JitLongDiv::binaryNativeLong(
+                            $this->context,
+                            $leftLong,
+                            $rightLong,
+                            DiscardedPureCallElision::intdivCanSkipZeroDivisorGuard($right),
+                            DiscardedPureCallElision::nativeLongDivisorCanSkipNegOneModuloBranch($right)
+                        );
                     }
                     // convert_to_long then ZEND_SIGNED_*_OVERFLOW (#32426 leftover of #31964).
                     return JitLongArithOverflow::binaryNativeLong(
@@ -2263,7 +2272,13 @@ restart:
                 $leftLong = JitLongArg::lowerStringValue($this->context, $leftValue);
                 $__right = $this->context->builder->intCast($rightValue, $leftLong->typeOf());
 
-                return JitLongDiv::binaryNativeLong($this->context, $leftLong, $__right);
+                return JitLongDiv::binaryNativeLong(
+                    $this->context,
+                    $leftLong,
+                    $__right,
+                    DiscardedPureCallElision::intdivCanSkipZeroDivisorGuard($right),
+                    DiscardedPureCallElision::nativeLongDivisorCanSkipNegOneModuloBranch($right)
+                );
             }
             if (OpCode::TYPE_SPACESHIP === $opcode->type || self::isOrderedCompareOpcode($opcode->type)) {
                 $leftLong = JitLongArg::lowerStringValue($this->context, $leftValue);
@@ -2367,7 +2382,13 @@ restart:
                 $rightLong = JitLongArg::lowerStringValue($this->context, $rightValue);
                 $__left = $this->context->builder->intCast($leftValue, $rightLong->typeOf());
 
-                return JitLongDiv::binaryNativeLong($this->context, $__left, $rightLong);
+                return JitLongDiv::binaryNativeLong(
+                    $this->context,
+                    $__left,
+                    $rightLong,
+                    DiscardedPureCallElision::intdivCanSkipZeroDivisorGuard($right),
+                    DiscardedPureCallElision::nativeLongDivisorCanSkipNegOneModuloBranch($right)
+                );
             }
             if (OpCode::TYPE_SPACESHIP === $opcode->type || self::isOrderedCompareOpcode($opcode->type)) {
                 $rightLong = JitLongArg::lowerStringValue($this->context, $rightValue);

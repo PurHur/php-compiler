@@ -238,7 +238,9 @@ use PHPCompiler\VM\Variable as VmVariable;
  * throw-pending checks when the result is used ({@see intdivArgsCannotThrow} /
  * {@see intdivCanSkipZeroDivisorGuard}). Compile-time non-negative bit-shift
  * counts skip the negative-count {@code ArithmeticError} blocks
- * ({@see bitShiftCountCanSkipNegativeGuard}). Proven-safe {@code str_increment}/
+ * ({@see bitShiftCountCanSkipNegativeGuard}). Compile-time divisors ≠
+ * {@code -1} skip the typed {@code /} {@code PHP_INT_MIN}/{-1} promote arm
+ * ({@see nativeLongDivisorCanSkipNegOneModuloBranch}). Proven-safe {@code str_increment}/
  * {@code str_decrement} literals likewise fold at the call site and skip
  * after-call throw-pending ({@see strIncDecArgsCannotThrow}). {@code hex2bin}/
  * {@code base64_decode}/{@code convert_uudecode} stay live (invalid-input
@@ -4038,6 +4040,9 @@ final class DiscardedPureCallElision
      * Skip the {@code n % -1 → 0} PHI when the divisor is a compile-time long
      * proven ≠ {@code -1} (php-src {@code mod_function}; LLVM {@code srem}
      * of {@code INT_MIN}/{-1} is poison only for {@code -1}).
+     *
+     * Also skips the typed native-long {@code /} {@code PHP_INT_MIN}/{-1}
+     * promote arm ({@see \PHPCompiler\JIT\JitLongDiv::binaryNativeLong}).
      */
     public static function nativeLongDivisorCanSkipNegOneModuloBranch(Variable $divisor): bool
     {
