@@ -50,6 +50,7 @@ require_once __DIR__.'/Compiler/Concern/ArrayPadUnpackExtractAndDateSunCallArgSe
 require_once __DIR__.'/Compiler/Concern/ExplodeIteratorChunkWalkAndTrailingComparatorCallArgSends.php';
 require_once __DIR__.'/Compiler/Concern/InlineCallArgDeadTempAndSiblingNewProducers.php';
 require_once __DIR__.'/Compiler/Concern/InlineCallArgArrayColumnMbstringAndCallbackProducers.php';
+require_once __DIR__.'/Compiler/Concern/InlineCallArgMergeFamilyAndHoistedAssignProducers.php';
 require_once __DIR__.'/Compiler/Concern/InlineCallArgProducerMatch.php';
 require_once __DIR__.'/Compiler/Concern/MatchInlineCallArgProducerWithEmbeddedLiterals.php';
 require_once __DIR__.'/Compiler/Concern/FindInlineCallArgProducerSlot.php';
@@ -256,6 +257,7 @@ use PHPCompiler\Compiler\Concern\ArrayPadUnpackExtractAndDateSunCallArgSends;
 use PHPCompiler\Compiler\Concern\ExplodeIteratorChunkWalkAndTrailingComparatorCallArgSends;
 use PHPCompiler\Compiler\Concern\InlineCallArgDeadTempAndSiblingNewProducers;
 use PHPCompiler\Compiler\Concern\InlineCallArgArrayColumnMbstringAndCallbackProducers;
+use PHPCompiler\Compiler\Concern\InlineCallArgMergeFamilyAndHoistedAssignProducers;
 use PHPCompiler\Compiler\Concern\InlineCallArgProducerMatch;
 use PHPCompiler\Compiler\Concern\MatchInlineCallArgProducerWithEmbeddedLiterals;
 use PHPCompiler\Compiler\Concern\FindInlineCallArgProducerSlot;
@@ -372,6 +374,7 @@ class Compiler {
     use ExplodeIteratorChunkWalkAndTrailingComparatorCallArgSends;
     use InlineCallArgDeadTempAndSiblingNewProducers;
     use InlineCallArgArrayColumnMbstringAndCallbackProducers;
+    use InlineCallArgMergeFamilyAndHoistedAssignProducers;
     use InlineCallArgProducerMatch;
     use MatchInlineCallArgProducerWithEmbeddedLiterals;
     use FindInlineCallArgProducerSlot;

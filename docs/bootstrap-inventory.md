@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8379 |
-| Phase A inventory files (M2 ratio SSOT) | 8379 |
+| PHP files on vm.php path | 8380 |
+| Phase A inventory files (M2 ratio SSOT) | 8380 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26375 |
+| Source constructs flagged (warnings) | 26378 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5628,6 +5628,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/InlineCallArgClosureFeedsAndReturnProducers.php` | 0 | 2 |
 | `lib/Compiler/Concern/InlineCallArgCompileTimeFold.php` | 0 | 4 |
 | `lib/Compiler/Concern/InlineCallArgDeadTempAndSiblingNewProducers.php` | 0 | 2 |
+| `lib/Compiler/Concern/InlineCallArgMergeFamilyAndHoistedAssignProducers.php` | 0 | 3 |
 | `lib/Compiler/Concern/InlineCallArgProducerMatch.php` | 0 | 3 |
 | `lib/Compiler/Concern/InlineCallArgSlotResolvers.php` | 0 | 2 |
 | `lib/Compiler/Concern/InlineCallArgUnionSiblingCastAndComparisonMatchers.php` | 0 | 2 |
@@ -49168,13 +49169,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 988)
-- new CompileFatal (line 1022)
-- new CompileError (line 1025)
-- new ClassCompileRegistry (line 1066)
-- new AttributeClassRegistry (line 1067)
-- new ClassCompileRegistry (line 1175)
-- new AttributeClassRegistry (line 1176)
+- new CompileFatal (line 991)
+- new CompileFatal (line 1025)
+- new CompileError (line 1028)
+- new ClassCompileRegistry (line 1069)
+- new AttributeClassRegistry (line 1070)
+- new ClassCompileRegistry (line 1178)
+- new AttributeClassRegistry (line 1179)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -50100,12 +50101,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - trait InlineCallArgDeadTempAndSiblingNewProducers (line 25)
 - 1 class method(s)
 
+### `lib/Compiler/Concern/InlineCallArgMergeFamilyAndHoistedAssignProducers.php`
+
+**Warnings** (review for bootstrap subset):
+- trait InlineCallArgMergeFamilyAndHoistedAssignProducers (line 20)
+- 2 class method(s)
+- 1 closure(s)
+
 ### `lib/Compiler/Concern/InlineCallArgProducerMatch.php`
 
 **Warnings** (review for bootstrap subset):
-- trait InlineCallArgProducerMatch (line 39)
+- trait InlineCallArgProducerMatch (line 41)
 - 1 class method(s)
-- 3 closure(s)
+- 2 closure(s)
 
 ### `lib/Compiler/Concern/InlineCallArgSlotResolvers.php`
 
