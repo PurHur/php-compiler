@@ -258,7 +258,10 @@ use PHPCompiler\VM\Variable as VmVariable;
  * {@see nativeLongArithIsCompileTimeIdentityOrZero}). Typed {@code * -1} /
  * {@code -1 *} lowers to {@code negate} with {@code PHP_INT_MIN} → float
  * promote (no {@code llvm.smul.with.overflow};
- * {@see nativeLongMulIsCompileTimeNegOne}). Remaining compile-time
+ * {@see nativeLongMulIsCompileTimeNegOne}). Typed {@code * 2^k} ({@code k} in
+ * 1..62) lowers to {@code shl} with {@code ashr} round-trip overflow (no
+ * {@code llvm.smul.with.overflow};
+ * {@see nativeLongMulCompileTimePowerOfTwoShift}). Remaining compile-time
  * identity/zero operands on typed {@code +}/{@code -}/{@code *} still skip
  * {@code llvm.s{add,sub,mul}.with.overflow}
  * ({@see \PHPCompiler\JIT\JitLongArithOverflow::canSkipOverflowPromote}).
@@ -4213,6 +4216,65 @@ final class DiscardedPureCallElision
         }
 
         return null;
+    }
+
+    /**
+     * Typed native-long {@code *} with a compile-time positive power-of-two
+     * factor {@code 2^k} ({@code k} in 1..62) may lower to {@code shl} of the
+     * other operand (overflow via {@code ashr} round-trip ≠ src → float
+     * promote; peer {@code * -1} / {@code * 1}).
+     *
+     * php-src: Zend/zend_operators.c mul_function /
+     * {@code ZEND_LONG_MUL_OVERFLOW}. {@code * 1} stays
+     * {@see nativeLongArithIsCompileTimeIdentityOrZero}; {@code * -1} stays
+     * {@see nativeLongMulIsCompileTimeNegOne}. Negative factors and {@code 2^63}
+     * (stored as {@code PHP_INT_MIN}) are not powers of two here.
+     *
+     * @return array{side: 'left'|'right', shift: int}|null which operand to
+     *         shift and the shift count, or null when not {@code * 2^k}
+     */
+    public static function nativeLongMulCompileTimePowerOfTwoShift(
+        Variable $left,
+        Variable $right
+    ): ?array {
+        $a = self::compileTimeLongScalar($left);
+        $b = self::compileTimeLongScalar($right);
+        if (null !== $a) {
+            $shift = self::positivePowerOfTwoShift($a);
+            if (null !== $shift) {
+                return ['side' => 'right', 'shift' => $shift];
+            }
+        }
+        if (null !== $b) {
+            $shift = self::positivePowerOfTwoShift($b);
+            if (null !== $shift) {
+                return ['side' => 'left', 'shift' => $shift];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Shift count for a positive power-of-two factor {@code 2^k} ({@code k} in
+     * 1..62), or null when not applicable ({@code * 1} / negatives / non-pow2).
+     */
+    private static function positivePowerOfTwoShift(int $factor): ?int
+    {
+        if ($factor < 2) {
+            return null;
+        }
+        if (0 !== ($factor & ($factor - 1))) {
+            return null;
+        }
+        $shift = 0;
+        $v = $factor;
+        while (0 === ($v & 1)) {
+            ++$shift;
+            $v >>= 1;
+        }
+
+        return $shift >= 1 && $shift <= 62 ? $shift : null;
     }
 
     /**
