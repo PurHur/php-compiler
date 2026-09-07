@@ -89,6 +89,9 @@ final class Issue36388StringCallResultFreeTest extends TestCase
         $this->assertStringContainsString("'ucfirst' => true", $src);
         $this->assertStringContainsString("'basename' => true", $src);
         $this->assertStringContainsString("'dirname' => true", $src);
+        $this->assertStringContainsString("'number_format' => true", $src);
+        $this->assertStringContainsString("'str_replace' => true", $src);
+        $this->assertStringContainsString("'str_ireplace' => true", $src);
         $this->assertStringContainsString('releaseEphemeralArgAfterCopy', (string) file_get_contents(
             dirname(__DIR__, 2).'/lib/JIT/JitStringBuiltinArg.php'
         ));
@@ -109,6 +112,16 @@ final class Issue36388StringCallResultFreeTest extends TestCase
         ));
         $this->assertStringContainsString('releaseEphemeralArgAfterCopy', (string) file_get_contents(
             dirname(__DIR__, 2).'/ext/standard/dirname.php'
+        ));
+        $this->assertStringContainsString('releaseEphemeralArgAfterCopy', (string) file_get_contents(
+            dirname(__DIR__, 2).'/ext/standard/str_replace.php'
+        ));
+        $helper = (string) file_get_contents(
+            dirname(__DIR__, 2).'/ext/standard/StrReplaceJitHelper.php'
+        );
+        $this->assertStringContainsString('Always allocate', $helper);
+        $this->assertStringContainsString('releaseEphemeralArgAfterCopy', (string) file_get_contents(
+            dirname(__DIR__, 2).'/ext/standard/JitNumberFormat.php'
         ));
     }
 
@@ -220,6 +233,8 @@ final class Issue36388StringCallResultFreeTest extends TestCase
             'lcfirst' => ['test/repro/issue_36388_lcfirst_local_free.php', 'lcfirst_local delta='],
             'basename' => ['test/repro/issue_36388_basename_local_free.php', 'basename_local delta='],
             'basename_lit' => ['test/repro/issue_36388_basename_lit_free.php', 'basename_lit delta='],
+            'number_format' => ['test/repro/issue_36388_number_format_local_free.php', 'number_format_local delta='],
+            'number_format_lit' => ['test/repro/issue_36388_number_format_lit_free.php', 'number_format_lit delta='],
         ];
     }
 }
