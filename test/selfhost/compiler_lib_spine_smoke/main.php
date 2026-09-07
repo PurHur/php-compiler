@@ -7737,6 +7737,7 @@ require_once __DIR__.'/../../../lib/VM/Concern/GeneratorForeachAndYieldFrom.php'
 require_once __DIR__.'/../../../lib/VM/Concern/FiberStartResumeAndThrow.php';
 require_once __DIR__.'/../../../lib/VM/Concern/FrameActivationThisAndIncludeScope.php';
 require_once __DIR__.'/../../../lib/VM/Concern/DeprecationNoticeEmit.php';
+require_once __DIR__.'/../../../lib/VM/Concern/ReturnTypeEnforce.php';
 require_once __DIR__.'/../../../lib/VM/ObjectPropertyIterator.php';
 require_once __DIR__.'/../../../lib/VM/ObjectReadonlySupport.php';
 require_once __DIR__.'/../../../lib/VM/ObjectRegistry.php';
