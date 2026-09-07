@@ -45,6 +45,7 @@ require_once __DIR__.'/Compiler/Concern/CallArgEarlyFastPathAndMixedPropertyFetc
 require_once __DIR__.'/Compiler/Concern/CallArgNullMergePropertyFetchAndHoistedPreludeSends.php';
 require_once __DIR__.'/Compiler/Concern/CallArgInlineEnumCastErrorSuppressAndFccSends.php';
 require_once __DIR__.'/Compiler/Concern/CallArgPostFccDimCoalesceExprPreludeAndNestedNewSends.php';
+require_once __DIR__.'/Compiler/Concern/CallArgInlineArrayUnpackReduceAndFamilyResolve.php';
 require_once __DIR__.'/Compiler/Concern/CompileCallArgSends.php';
 require_once __DIR__.'/Compiler/Concern/CompileInlineSpecializedCallArgSends.php';
 require_once __DIR__.'/Compiler/Concern/ArrayPadUnpackExtractAndDateSunCallArgSends.php';
@@ -255,6 +256,7 @@ use PHPCompiler\Compiler\Concern\CallArgEarlyFastPathAndMixedPropertyFetchSends;
 use PHPCompiler\Compiler\Concern\CallArgNullMergePropertyFetchAndHoistedPreludeSends;
 use PHPCompiler\Compiler\Concern\CallArgInlineEnumCastErrorSuppressAndFccSends;
 use PHPCompiler\Compiler\Concern\CallArgPostFccDimCoalesceExprPreludeAndNestedNewSends;
+use PHPCompiler\Compiler\Concern\CallArgInlineArrayUnpackReduceAndFamilyResolve;
 use PHPCompiler\Compiler\Concern\CompileCallArgSends;
 use PHPCompiler\Compiler\Concern\CompileInlineSpecializedCallArgSends;
 use PHPCompiler\Compiler\Concern\ArrayPadUnpackExtractAndDateSunCallArgSends;
@@ -375,6 +377,7 @@ class Compiler {
     use CallArgNullMergePropertyFetchAndHoistedPreludeSends;
     use CallArgInlineEnumCastErrorSuppressAndFccSends;
     use CallArgPostFccDimCoalesceExprPreludeAndNestedNewSends;
+    use CallArgInlineArrayUnpackReduceAndFamilyResolve;
     use CompileCallArgSends;
     use CompileInlineSpecializedCallArgSends;
     use ArrayPadUnpackExtractAndDateSunCallArgSends;
