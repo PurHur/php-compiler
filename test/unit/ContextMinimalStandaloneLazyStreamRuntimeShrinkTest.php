@@ -55,7 +55,7 @@ final class ContextMinimalStandaloneLazyStreamRuntimeShrinkTest extends TestCase
             'ext/standard/JitFgetc.php' => 'StreamReadRuntime::ensureLinked',
             'ext/standard/JitFgets.php' => 'StreamReadRuntime::ensureLinked',
             'ext/standard/JitStreamBucket.php' => 'StreamBucket::ensureLinked',
-            'ext/standard/JitIsResource.php' => 'StreamBucket::ensureLinked',
+            'ext/standard/JitIsResource.php' => 'isThinStandaloneAotMain',
             'lib/JIT/Builtin/StringVarDump.php' => 'StreamLifecycleRuntime::ensureLinked',
             'lib/JIT/Builtin/StringPrintR.php' => 'StreamLifecycleRuntime::ensureLinked',
             'lib/JIT/Builtin/SilenceRuntime.php' => 'StreamLifecycleRuntime::ensureLinked',

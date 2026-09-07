@@ -30,10 +30,9 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * always-on `__compiler_feof` / `__compiler_fflush` / `__compiler_is_resource` /
  * `__compiler_pclose` shells dropped #33080 / #33084 / #33088 / #33093).
  * Embed: NestedJIT {@see StreamLifecycleJitHelper} / {@see StreamLibcHandleJitHelper}.
- * Thin user-script AOT: {@see __compiler_is_resource} probes LLVM {@see StreamGlobalsJit}
- * handle table (same slots {@see JitStreamIoKernel} fopen fills) — NestedJIT helpers never
- * see those slots (#27186).
- * SSOT: {@see VmFs}, {@see StreamLifecycleJitHelper}, {@see StreamGlobalsJit}
+ * Thin user-script AOT: {@see JitStreamLifecycleThinAot} — LLVM {@see StreamGlobalsJit}
+ * handle table (same slots {@see JitStreamIoKernel} fopen fills); no NestedJIT (#36382 / #27186).
+ * SSOT: {@see VmFs}, {@see StreamLifecycleJitHelper}, {@see StreamGlobalsJit}, {@see JitStreamLifecycleThinAot}
  * php-src: ext/standard/file.c, ext/standard/streamsfuncs.c, ext/standard/exec.c
  */
 final class JitStreamLifecycleKernel
@@ -138,32 +137,12 @@ final class JitStreamLifecycleKernel
     }
 
     /**
-     * Thin AOT: is_resource reads {@see StreamGlobalsJit} slots; other lifecycle ABI still NestedJIT.
+     * Thin AOT lifecycle — LLVM handle table only; no NestedJIT (#36382 / #23777 / #27186).
      */
     private static function implementThinStandaloneBridges(Context $context): void
     {
-        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
-
-        StreamGlobalsJit::implementThinIsResource($context);
-
-        self::ensureJitHelperCompiled($context);
-        foreach (self::ABI_TO_HELPER as $abi => $helper) {
-            if ('__compiler_is_resource' === $abi) {
-                continue;
-            }
-            if ('__compiler_fclose' === $abi || '__compiler_pclose' === $abi) {
-                self::implementCloseBridge($context, $abi, $helper);
-                continue;
-            }
-            self::implementIfMissing($context, $abi, $helper);
-        }
+        JitStreamLifecycleThinAot::implement($context);
         self::registerLinkedRuntime($context);
-
-        if (null !== $savedBlock) {
-            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
     }
 
     private static function implementRealBridges(Context $context): void

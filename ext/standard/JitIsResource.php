@@ -6,22 +6,37 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StreamBucket;
+use PHPCompiler\JIT\Builtin\StreamGlobalsJit;
 use PHPCompiler\JIT\Builtin\StreamLifecycleRuntime;
 use PHPCompiler\JIT\Builtin\StreamFilter as StreamFilterBuiltin;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for is_resource() via __compiler_is_resource (#3519, #6323 bucket/brigade). */
+/**
+ * LLVM lowering for is_resource() via __compiler_is_resource (#3519, #6323 bucket/brigade).
+ *
+ * Thin standalone / user-script AOT (#36382 / #23777 / #27186): probe
+ * {@see StreamGlobalsJit} slots that {@see JitStreamIoKernel} fopen fills — do **not**
+ * NestedJIT StreamBucket / StreamLifecycleJitHelper (that hang NestedJIT of
+ * JitOpenStreamHandles + StreamLifecycle and never see the thin FILE* table).
+ */
 final class JitIsResource
 {
     public static function invoke(Context $context, Value $handleLong): Value
     {
         $restoreBlock = BasicBlockHelper::tryGetInsertBlock($context);
-        StreamBucket::ensureLinked($context);
-        $probe = $context->module->getNamedFunction('__compiler_is_resource');
-        if (null === $probe || 0 === $probe->countBasicBlocks()) {
-            StreamLifecycleRuntime::ensureLinked($context);
+        if ($context->isThinStandaloneAotMain()) {
+            $probe = $context->module->getNamedFunction('__compiler_is_resource');
+            if (null === $probe || 0 === $probe->countBasicBlocks()) {
+                StreamGlobalsJit::implementThinIsResource($context);
+            }
+        } else {
+            StreamBucket::ensureLinked($context);
+            $probe = $context->module->getNamedFunction('__compiler_is_resource');
+            if (null === $probe || 0 === $probe->countBasicBlocks()) {
+                StreamLifecycleRuntime::ensureLinked($context);
+            }
         }
         if (null !== $restoreBlock) {
             BasicBlockHelper::restoreInsertBlock($context, $restoreBlock);

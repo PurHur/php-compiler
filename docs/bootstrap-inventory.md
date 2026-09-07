@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8420 |
-| Phase A inventory files (M2 ratio SSOT) | 8420 |
+| PHP files on vm.php path | 8421 |
+| Phase A inventory files (M2 ratio SSOT) | 8421 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26468 |
+| Source constructs flagged (warnings) | 26469 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3401,6 +3401,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitStreamIsatty.php` | 0 | 1 |
 | `ext/standard/JitStreamLibcHandleKernel.php` | 0 | 1 |
 | `ext/standard/JitStreamLifecycleKernel.php` | 0 | 1 |
+| `ext/standard/JitStreamLifecycleThinAot.php` | 0 | 1 |
 | `ext/standard/JitStreamMetaKernel.php` | 0 | 1 |
 | `ext/standard/JitStreamMetaThinAot.php` | 0 | 1 |
 | `ext/standard/JitStreamModeKernel.php` | 0 | 1 |
@@ -34312,7 +34313,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitStreamIoKernel.php`
 
 **Warnings** (review for bootstrap subset):
-- 53 class method(s)
+- 55 class method(s)
 
 ### `ext/standard/JitStreamIsLocal.php`
 
@@ -34333,6 +34334,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 10 class method(s)
+
+### `ext/standard/JitStreamLifecycleThinAot.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `ext/standard/JitStreamMetaKernel.php`
 

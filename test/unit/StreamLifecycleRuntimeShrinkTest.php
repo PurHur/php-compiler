@@ -52,6 +52,7 @@ final class StreamLifecycleRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StreamLifecycleJitHelper', $source);
         $this->assertStringContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringContainsString('StreamGlobalsJit::implementThinIsResource', $source);
+        $this->assertStringContainsString('JitStreamLifecycleThinAot', $source);
         $this->assertStringContainsString('JitMemoryStreamHelper.php', $source);
         $this->assertStringContainsString('emitFcloseAndClearLlvmHandleSlot', $source);
         $this->assertStringContainsString('#33426', $source);
