@@ -58,6 +58,7 @@ require_once __DIR__.'/Compiler/Concern/CallArgFilterJsonDecodeMergeMapFilterSpl
 require_once __DIR__.'/Compiler/Concern/CallArgDimAdjacentFilterInputMapMergeLogicalMultisortValueSlots.php';
 require_once __DIR__.'/Compiler/Concern/CallArgAssignProcOpenTernaryHaystackSliceChainedMergeIifeValueSlots.php';
 require_once __DIR__.'/Compiler/Concern/CallArgColumnCombineCoalesceStreamFilterSpaceshipAndFilterFamilyValueSlots.php';
+require_once __DIR__.'/Compiler/Concern/CallArgNestedAdjacentSiblingVarExportMergeForceConstPreludeValueSlots.php';
 require_once __DIR__.'/Compiler/Concern/CompileCallArgSends.php';
 require_once __DIR__.'/Compiler/Concern/CompileInlineSpecializedCallArgSends.php';
 require_once __DIR__.'/Compiler/Concern/ArrayPadUnpackExtractAndDateSunCallArgSends.php';
@@ -287,6 +288,7 @@ use PHPCompiler\Compiler\Concern\CallArgFilterJsonDecodeMergeMapFilterSplitExplo
 use PHPCompiler\Compiler\Concern\CallArgDimAdjacentFilterInputMapMergeLogicalMultisortValueSlots;
 use PHPCompiler\Compiler\Concern\CallArgAssignProcOpenTernaryHaystackSliceChainedMergeIifeValueSlots;
 use PHPCompiler\Compiler\Concern\CallArgColumnCombineCoalesceStreamFilterSpaceshipAndFilterFamilyValueSlots;
+use PHPCompiler\Compiler\Concern\CallArgNestedAdjacentSiblingVarExportMergeForceConstPreludeValueSlots;
 use PHPCompiler\Compiler\Concern\CompileCallArgSends;
 use PHPCompiler\Compiler\Concern\CompileInlineSpecializedCallArgSends;
 use PHPCompiler\Compiler\Concern\ArrayPadUnpackExtractAndDateSunCallArgSends;
@@ -426,6 +428,7 @@ class Compiler {
     use CallArgDimAdjacentFilterInputMapMergeLogicalMultisortValueSlots;
     use CallArgAssignProcOpenTernaryHaystackSliceChainedMergeIifeValueSlots;
     use CallArgColumnCombineCoalesceStreamFilterSpaceshipAndFilterFamilyValueSlots;
+    use CallArgNestedAdjacentSiblingVarExportMergeForceConstPreludeValueSlots;
     use CompileCallArgSends;
     use CompileInlineSpecializedCallArgSends;
     use ArrayPadUnpackExtractAndDateSunCallArgSends;
