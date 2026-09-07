@@ -5,13 +5,16 @@
 # regenerates docs/pages/bench.html, and runs bench-gate --v2.
 #
 # Usage:
-#   ./script/bench-nightly.sh                 # full measure + publish (wall-capped)
-#   ./script/bench-nightly.sh --publish-only  # history + chart from existing RESULTS.json
-#   BENCH_NIGHTLY_WALL_SEC=600 ./script/bench-nightly.sh
+#   ./script/bench/nightly.sh                 # full measure + publish (wall-capped)
+#   ./script/bench/nightly.sh --publish-only  # history + chart from existing RESULTS.json
+#   BENCH_NIGHTLY_WALL_SEC=600 ./script/bench/nightly.sh
+#   make bench-nightly
 #
-# Re-execs via docker-exec when not already in the CI image.
+# Lives under script/bench/ so it does not inflate the top-level script/
+# *.sh/*.php count budget (#36403). Re-execs via docker-exec when not already
+# in the CI image.
 set -euo pipefail
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
 
 PUBLISH_ONLY=0
@@ -48,10 +51,10 @@ if ! { [[ -f /.dockerenv ]] && [[ -f /opt/llvm9/libLLVM-9.so.1 ]]; } \
     "source script/php-env.sh && \
      BENCH_NIGHTLY_WALL_SEC=${WALL_SEC} BENCH_NIGHTLY_OUTDIR=${OUTDIR} \
      BENCH_NIGHTLY_SKIP_GATE=${SKIP_GATE} PHP_COMPILER_BENCH_SKIP_WEB=${SKIP_WEB} \
-     ./script/bench-nightly.sh ${EXTRA_ARGS[*]-}"
+     ./script/bench/nightly.sh ${EXTRA_ARGS[*]-}"
 fi
 
-# shellcheck source=php-env.sh
+# shellcheck source=../php-env.sh
 source script/php-env.sh
 
 mkdir -p "$OUTDIR"

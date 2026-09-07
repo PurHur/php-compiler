@@ -50,7 +50,7 @@ Environment: 8.2.32 · LLVM 9 available · 5 iterations averaged, wall time per 
 ./script/bench-gate.sh --v2
 php script/bench-web-request.php --merge-results   # MiniWebApp req/s column
 php script/generate-bench-chart.php                # docs/pages/bench.html
-./script/bench-nightly.sh --publish-only           # history/<sha>.json + chart + gate
+./script/bench/nightly.sh --publish-only           # history/<sha>.json + chart + gate
 # Full nightly measure (wall-capped, history=1):
 #   make bench-nightly
 ```
@@ -60,7 +60,7 @@ Numbers live in:
 - `benchmarks/v2/README.md` (generated table)
 - `benchmarks/v2/RESULTS.json`
 - `benchmarks/v2/WEB_REQUEST.json`
-- `benchmarks/history/<sha>.json` via `PHP_COMPILER_BENCH_HISTORY=1` or `script/bench-nightly.sh`
+- `benchmarks/history/<sha>.json` via `PHP_COMPILER_BENCH_HISTORY=1` or `script/bench/nightly.sh`
 - Chart: `docs/pages/bench.html`
 - Nightly report: `build/bench-nightly/report.json`
 
