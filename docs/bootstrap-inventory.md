@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8415 |
-| Phase A inventory files (M2 ratio SSOT) | 8415 |
+| PHP files on vm.php path | 8416 |
+| Phase A inventory files (M2 ratio SSOT) | 8416 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26457 |
+| Source constructs flagged (warnings) | 26459 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5657,6 +5657,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/InlineCallArgUnionSiblingCastAndComparisonMatchers.php` | 0 | 2 |
 | `lib/Compiler/Concern/InlineNewCallArgProducers.php` | 0 | 2 |
 | `lib/Compiler/Concern/InstanceOfInAndClassConstCompile.php` | 0 | 12 |
+| `lib/Compiler/Concern/InvokableReceiverAndClosureDetect.php` | 0 | 2 |
 | `lib/Compiler/Concern/IssetEmptyCallArgAndMultiCompile.php` | 0 | 26 |
 | `lib/Compiler/Concern/IssetEmptyUnsetAndDimFetchCompile.php` | 0 | 6 |
 | `lib/Compiler/Concern/ListDestructAndForeach.php` | 0 | 7 |
@@ -49210,13 +49211,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 1072)
-- new CompileFatal (line 1106)
-- new CompileError (line 1109)
-- new ClassCompileRegistry (line 1150)
-- new AttributeClassRegistry (line 1151)
-- new ClassCompileRegistry (line 1259)
-- new AttributeClassRegistry (line 1260)
+- new CompileFatal (line 1075)
+- new CompileFatal (line 1109)
+- new CompileError (line 1112)
+- new ClassCompileRegistry (line 1153)
+- new AttributeClassRegistry (line 1154)
+- new ClassCompileRegistry (line 1262)
+- new AttributeClassRegistry (line 1263)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -50141,20 +50142,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/FirstClassCallableAndClosure.php`
 
 **Warnings** (review for bootstrap subset):
-- trait FirstClassCallableAndClosure (line 28)
-- new Operand\Literal (line 67)
-- new OpCode (line 68)
-- new Operand\Literal (line 106)
-- new OpCode (line 108)
-- new OpCode (line 116)
-- new OpCode (line 122)
-- new Operand\Variable (line 275)
-- new Operand\Literal (line 275)
-- new OpCode (line 315)
-- new OpCode (line 349)
-- new OpCode (line 358)
-- new OpCode (line 364)
-- 28 class method(s)
+- trait FirstClassCallableAndClosure (line 24)
+- new Operand\Literal (line 63)
+- new OpCode (line 64)
+- new Operand\Literal (line 102)
+- new OpCode (line 104)
+- new OpCode (line 112)
+- new OpCode (line 118)
+- new Operand\Variable (line 271)
+- new Operand\Literal (line 271)
+- new OpCode (line 311)
+- new OpCode (line 345)
+- new OpCode (line 354)
+- new OpCode (line 360)
+- 12 class method(s)
 
 ### `lib/Compiler/Concern/FirstSiblingInlineFuncCallProducerIndex.php`
 
@@ -50311,6 +50312,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 727)
 - new Temporary (line 729)
 - 21 class method(s)
+
+### `lib/Compiler/Concern/InvokableReceiverAndClosureDetect.php`
+
+**Warnings** (review for bootstrap subset):
+- trait InvokableReceiverAndClosureDetect (line 26)
+- 16 class method(s)
 
 ### `lib/Compiler/Concern/IssetEmptyCallArgAndMultiCompile.php`
 
@@ -58676,27 +58683,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - trait AssignOperand (line 27)
-- new Variable (line 151)
-- new Variable (line 183)
-- new Variable (line 227)
-- new Variable (line 294)
-- new Type (line 329)
-- new Variable (line 423)
-- new Variable (line 465)
-- new Variable (line 491)
-- new Variable (line 756)
-- new Variable (line 774)
-- new Type (line 821)
-- new Variable (line 842)
-- new Variable (line 876)
-- new Variable (line 942)
-- new Variable (line 986)
-- new Variable (line 1020)
-- new Type (line 1542)
-- new Variable (line 1689)
-- new Variable (line 1953)
-- new Type (line 1965)
-- new Type (line 2272)
+- new Variable (line 160)
+- new Variable (line 192)
+- new Variable (line 236)
+- new Variable (line 303)
+- new Type (line 338)
+- new Variable (line 432)
+- new Variable (line 474)
+- new Variable (line 500)
+- new Variable (line 765)
+- new Variable (line 783)
+- new Type (line 830)
+- new Variable (line 851)
+- new Variable (line 885)
+- new Variable (line 951)
+- new Variable (line 995)
+- new Variable (line 1029)
+- new Type (line 1551)
+- new Variable (line 1698)
+- new Variable (line 1962)
+- new Type (line 1974)
+- new Type (line 2281)
 - 1 class method(s)
 - 1 closure(s)
 
@@ -60361,17 +60368,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 253)
 - new Variable (line 257)
 - new Variable (line 259)
-- new Variable (line 2853)
-- new Variable (line 2857)
-- new Variable (line 3093)
-- new Variable (line 3105)
-- new Variable (line 3255)
-- new Variable (line 3346)
-- new Variable (line 3400)
-- new Variable (line 3642)
-- new Variable (line 3658)
-- new Variable (line 3680)
-- new Variable (line 3691)
+- new Variable (line 2887)
+- new Variable (line 2891)
+- new Variable (line 3127)
+- new Variable (line 3139)
+- new Variable (line 3289)
+- new Variable (line 3380)
+- new Variable (line 3434)
+- new Variable (line 3676)
+- new Variable (line 3692)
+- new Variable (line 3714)
+- new Variable (line 3725)
 - 24 class method(s)
 - 8 closure(s)
 
