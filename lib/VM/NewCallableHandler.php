@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPLLVM\Value;
 
 /**
@@ -39,6 +40,6 @@ final class NewCallableHandler extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('new(...) first-class callable is not supported in JIT in this compiler build');
+        UnsupportedFeature::raise('new-first-class-callable-jit');
     }
 }

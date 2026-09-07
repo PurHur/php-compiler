@@ -10,6 +10,7 @@ use PHPCompiler\JIT\GeneratorHelper as JitGeneratorHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPCompiler\OpCode;
 use PHPCfg\Operand;
 use PHPLLVM\Builder;
@@ -279,7 +280,7 @@ final class GeneratorIteratorJitHelper
     public static function compileIterValid(Context $context, Variable $gen): Value
     {
         if (null === $gen->generatorStatePtr || null === $gen->generatorResumeName) {
-            throw new \LogicException('foreach requires a Generator value in this compiler build');
+            UnsupportedFeature::raise('foreach-generator-value');
         }
         $state = $gen->generatorStatePtr;
         $map = $context->structFieldMap['__generator_state__'];

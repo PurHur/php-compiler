@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT;
 use PHPCompiler\JIT\Builtin\GetClassRuntime;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPCompiler\VM\LazyGhostTraitSupport;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -25,7 +26,10 @@ final class ReflectionBuiltinHelper
     {
         $name = JitStringArg::compileTimeLiteral($arg);
         if (null === $name) {
-            throw new \LogicException("{$label} must be a string literal in this compiler build");
+            UnsupportedFeature::raise(
+                'reflection-class-name-literal',
+                "{$label} must be a string literal"
+            );
         }
 
         return $name;
@@ -330,7 +334,7 @@ final class ReflectionBuiltinHelper
     public static function getClassName(Context $context, Variable $object): Value
     {
         if (Variable::TYPE_OBJECT !== $object->type && Variable::TYPE_VALUE !== $object->type) {
-            throw new \LogicException('get_class() argument must be an object in this compiler build');
+            UnsupportedFeature::raise('get-class-object-arg');
         }
         $objBuiltin = self::objectBuiltin($context);
         $objMap = $context->structFieldMap['__object__'];
@@ -370,7 +374,7 @@ final class ReflectionBuiltinHelper
     public static function getDebugTypeClassName(Context $context, Variable $object): Value
     {
         if (Variable::TYPE_OBJECT !== $object->type && Variable::TYPE_VALUE !== $object->type) {
-            throw new \LogicException('get_debug_type() argument must be an object in this compiler build');
+            UnsupportedFeature::raise('get-debug-type-object-arg');
         }
         $objBuiltin = self::objectBuiltin($context);
         $objMap = $context->structFieldMap['__object__'];

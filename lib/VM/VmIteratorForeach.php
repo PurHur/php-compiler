@@ -20,6 +20,7 @@ use PHPCompiler\JIT\ObjectPropertyForeachHelper;
 use PHPCompiler\JIT\SimpleXmlForeachSnapshot;
 use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable as JitVariable;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -478,9 +479,7 @@ final class VmIteratorForeach
                 );
             }
 
-            throw new \LogicException(
-                'foreach over objects is only supported for SplObjectStorage in this compiler build'
-            );
+            UnsupportedFeature::raise('foreach-object-container');
         }
         throw new \LogicException(
             'foreach requires an array, got '.JitVariable::getStringType($array->type)

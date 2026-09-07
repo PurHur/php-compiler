@@ -258,6 +258,72 @@ final class UnsupportedRegistry
             'issue' => 3206,
             'alternative' => 'use literals, consts, or constant expressions (php-src zend_compile_attribute / zend_ast_evaluate)',
         ],
+        'backed-enum-from-jit' => [
+            'feature' => 'BackedEnum::from()/tryFrom() via Internal::call under JIT/AOT',
+            'matrixRow' => 'docs/capabilities-syntax.md#enums',
+            'issue' => 3114,
+            'alternative' => 'use the VM path, or call from()/tryFrom() so JIT lowers via EnumSupport lookup (php-src Zend/zend_enum.c)',
+        ],
+        'new-first-class-callable-jit' => [
+            'feature' => 'new Class(...) first-class callable under JIT/AOT',
+            'matrixRow' => 'docs/capabilities-syntax.md#first-class-callable',
+            'issue' => 9767,
+            'alternative' => 'construct with new Class(...args) directly, or run under VM (php-src zend_compile.c Expr_New first-class callable)',
+        ],
+        'isset-static-property-dynamic-name' => [
+            'feature' => 'isset(Class::$prop) with a dynamic property name under JIT/AOT',
+            'matrixRow' => 'docs/capabilities-syntax.md#isset',
+            'issue' => 10170,
+            'alternative' => 'use a compile-time string property name (php-src ZEND_ISSET_ISEMPTY_STATIC_PROP)',
+        ],
+        'empty-static-property-dynamic-name' => [
+            'feature' => 'empty(Class::$prop) with a dynamic property name under JIT/AOT',
+            'matrixRow' => 'docs/capabilities-syntax.md#empty',
+            'issue' => 23983,
+            'alternative' => 'use a compile-time string property name (php-src ZEND_ISSET_ISEMPTY_STATIC_PROP)',
+        ],
+        'yield-script-scope-aot' => [
+            'feature' => 'yield in the main script under AOT',
+            'matrixRow' => 'docs/capabilities-syntax.md#generators',
+            'issue' => 3115,
+            'alternative' => 'move yield into a generator function; script-scope yield remains deferred (docs/generators-jit-aot.md)',
+        ],
+        'reflection-class-name-literal' => [
+            'feature' => 'Reflection/introspection class name not a compile-time string literal',
+            'matrixRow' => 'docs/capabilities.md#reflectionclass',
+            'issue' => 1214,
+            'alternative' => 'pass a compile-time string class name (php-src ext/reflection/php_reflection.c)',
+        ],
+        'get-class-object-arg' => [
+            'feature' => 'get_class() argument that is not an object or boxed value under JIT/AOT',
+            'matrixRow' => 'docs/capabilities.md#get_class',
+            'issue' => 1214,
+            'alternative' => 'pass an object or omit the argument for the current class (php-src ext/standard/basic_functions.c)',
+        ],
+        'get-debug-type-object-arg' => [
+            'feature' => 'get_debug_type() argument that is not an object or boxed value under JIT/AOT',
+            'matrixRow' => 'docs/capabilities.md#get_debug_type',
+            'issue' => 1214,
+            'alternative' => 'pass an object or boxed value (php-src Zend/zend_builtin_functions.c zend_get_debug_type)',
+        ],
+        'spl-object-storage-key-type' => [
+            'feature' => 'SplObjectStorage offset key that is not an object under JIT/AOT',
+            'matrixRow' => 'docs/capabilities.md#splobjectstorage-offsetset',
+            'issue' => 601,
+            'alternative' => 'use object keys only (php-src ext/spl/spl_observer.c)',
+        ],
+        'foreach-object-container' => [
+            'feature' => 'foreach over object containers other than SplObjectStorage/ArrayIterator/WeakMap under JIT/AOT',
+            'matrixRow' => 'docs/capabilities-syntax.md#foreach',
+            'issue' => 3331,
+            'alternative' => 'foreach a hashtable/array, SplObjectStorage, ArrayIterator, or WeakMap (php-src zend_fe_reset_ex)',
+        ],
+        'foreach-generator-value' => [
+            'feature' => 'foreach over a non-Generator value in generator iterator lowering',
+            'matrixRow' => 'docs/capabilities-syntax.md#generators',
+            'issue' => 167,
+            'alternative' => 'foreach a Generator returned from a yield function (php-src Zend/zend_generators.c)',
+        ],
     ];
 
     /**

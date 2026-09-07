@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT;
 use PHPCfg\Operand;
 use PHPCfg\Operand\Literal;
 use PHPCompiler\JIT\Builtin\Type\Object_;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -21,7 +22,7 @@ final class EmptyStaticPropertyHelper
         ?Operand $nameOp
     ): Value {
         if (!$nameOp instanceof Literal || !is_string($nameOp->value)) {
-            throw new \LogicException('empty() on static property with dynamic name is not supported in JIT');
+            UnsupportedFeature::raise('empty-static-property-dynamic-name');
         }
         $object = $context->type->object;
         assert($object instanceof Object_);
