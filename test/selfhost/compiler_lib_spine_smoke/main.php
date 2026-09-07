@@ -5470,6 +5470,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/HoistedEnumAndChainedInline
 require_once __DIR__.'/../../../lib/Compiler/Concern/ExactHoistedAndInlineNewCallArgProducers.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/InlineNewCallArgProducers.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/ExpressionPreludeDimFetchAndHoistedConstCallArgSlots.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/HoistedConstCallArgSlots.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CfgProducerIndexAndRematerialize.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/InlineCallArgClosureFeedsAndReturnProducers.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/NestedArrayOutermostAndByRefCallArgHelpers.php';
