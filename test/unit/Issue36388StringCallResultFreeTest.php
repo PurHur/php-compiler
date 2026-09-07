@@ -93,6 +93,7 @@ final class Issue36388StringCallResultFreeTest extends TestCase
         $this->assertStringContainsString("'str_replace' => true", $src);
         $this->assertStringContainsString("'str_ireplace' => true", $src);
         $this->assertStringContainsString("'str_pad' => true", $src);
+        $this->assertStringContainsString("'md5' => true", $src);
         $concat = (string) file_get_contents(
             dirname(__DIR__, 2).'/lib/JIT/Concern/CompileConcat.php'
         );
@@ -141,6 +142,12 @@ final class Issue36388StringCallResultFreeTest extends TestCase
         ));
         $this->assertStringContainsString('StringStrPad::invoke', (string) file_get_contents(
             dirname(__DIR__, 2).'/ext/standard/str_pad.php'
+        ));
+        $this->assertStringContainsString('phpc_md5_r1', (string) file_get_contents(
+            dirname(__DIR__, 2).'/lib/JIT/Builtin/Md5Runtime.php'
+        ));
+        $this->assertStringContainsString('StringMd5::invoke', (string) file_get_contents(
+            dirname(__DIR__, 2).'/ext/standard/JitMd5.php'
         ));
     }
 

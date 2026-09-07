@@ -72,7 +72,7 @@ final class DiscardedQuotPrintPathElisionAotTest extends TestCase
             );
             $this->assertSame(
                 0,
-                preg_match_all('/call [^\n]*@__compiler_hash\b/', $body),
+                preg_match_all('/call [^\n]*@(phpc_md5_r1|__compiler_hash)\b/', $body),
                 'discarded md5/sha1 with binary flag must be elided'
             );
 

@@ -93,10 +93,11 @@ final class DiscardedHashEncodeElisionAotTest extends TestCase
                 preg_match_all('/call [^\n]*@__compiler_base64_encode\b/', $body),
                 'exactly one live base64_encode; discarded loop calls must be elided'
             );
-            // md5 lowers via __compiler_hash — live return keeps one digest path.
+            // md5 lowers via phpc_md5_r1 (#36388); sha1 still __compiler_hash —
+            // live return keeps one digest path.
             $this->assertLessThanOrEqual(
                 2,
-                preg_match_all('/call [^\n]*@__compiler_hash\b/', $body),
+                preg_match_all('/call [^\n]*@(phpc_md5_r1|__compiler_hash)\b/', $body),
                 'discarded md5/sha1 must not multiply hash calls beyond live uses'
             );
 

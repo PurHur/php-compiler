@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8442 |
-| Phase A inventory files (M2 ratio SSOT) | 8442 |
+| PHP files on vm.php path | 8444 |
+| Phase A inventory files (M2 ratio SSOT) | 8444 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26507 |
+| Source constructs flagged (warnings) | 26509 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -6137,6 +6137,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/MbSubstituteCharacterRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/MbSubstrCountRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/MbTrimRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/Md5Runtime.php` | 0 | 1 |
 | `lib/JIT/Builtin/MemoryManager.php` | 0 | 4 |
 | `lib/JIT/Builtin/MemoryManager/EmbedMcjit.php` | 0 | 1 |
 | `lib/JIT/Builtin/MemoryManager/Native.php` | 0 | 1 |
@@ -6505,6 +6506,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringLocaltime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringLz4.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringLzf.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringMd5.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringMemcmp.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringMetaphone.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringMethodExists.php` | 0 | 1 |
@@ -53255,6 +53257,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 7 class method(s)
 
+### `lib/JIT/Builtin/Md5Runtime.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Builtin/MemoryManager.php`
 
 **Warnings** (review for bootstrap subset):
@@ -55223,6 +55230,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 6 class method(s)
+
+### `lib/JIT/Builtin/StringMd5.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/StringMemcmp.php`
 
@@ -58911,21 +58923,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - trait CallResultOperandAssign (line 25)
-- new Variable (line 341)
-- new Variable (line 364)
-- new Variable (line 393)
-- new Variable (line 419)
-- new Variable (line 444)
-- new Variable (line 489)
-- new Type (line 497)
-- new Variable (line 517)
-- new Type (line 526)
-- new Variable (line 545)
-- new Type (line 553)
-- new Variable (line 579)
-- new Type (line 587)
-- new Variable (line 610)
-- new Variable (line 634)
+- new Variable (line 342)
+- new Variable (line 365)
+- new Variable (line 394)
+- new Variable (line 420)
+- new Variable (line 445)
+- new Variable (line 490)
+- new Type (line 498)
+- new Variable (line 518)
+- new Type (line 527)
+- new Variable (line 546)
+- new Type (line 554)
+- new Variable (line 580)
+- new Type (line 588)
+- new Variable (line 611)
+- new Variable (line 635)
 - 6 class method(s)
 
 ### `lib/JIT/Concern/CfgParamReturnTypeAndCalleeByRef.php`

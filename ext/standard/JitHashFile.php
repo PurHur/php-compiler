@@ -22,7 +22,19 @@ final class JitHashFile
             $context,
             $path,
             $raw,
-            static fn (Context $ctx, Value $data, Value $r) => JitMd5::digest($ctx, $data, $r)
+            // JitMd5 returns owning __string__*; md5_file phi needs __value__* (#36388).
+            static function (Context $ctx, Value $data, Value $r): Value {
+                $digest = JitMd5::digest($ctx, $data, $r);
+                $slot = JitValueBox::alloc($ctx);
+                $ptr = JitValueBox::pointer($ctx, $slot);
+                $ctx->builder->call(
+                    $ctx->lookupFunction('__value__writeString'),
+                    $ptr,
+                    $digest
+                );
+
+                return $ptr;
+            }
         );
     }
 
