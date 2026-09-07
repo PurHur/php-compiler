@@ -54,6 +54,7 @@ require_once __DIR__.'/Compiler/Concern/CallArgClosureDeadTempProducerEvalAndPre
 require_once __DIR__.'/Compiler/Concern/CallArgMultiProducerNamedLocalArrayColumnSearchPadValueSlots.php';
 require_once __DIR__.'/Compiler/Concern/CallArgSiblingMergeEmbeddedIssetLogicalNamedAssignValueSlots.php';
 require_once __DIR__.'/Compiler/Concern/CallArgDeadArrayComparisonConcatPointerValueSlots.php';
+require_once __DIR__.'/Compiler/Concern/CallArgFilterJsonDecodeMergeMapFilterSplitExplodeValueSlots.php';
 require_once __DIR__.'/Compiler/Concern/CompileCallArgSends.php';
 require_once __DIR__.'/Compiler/Concern/CompileInlineSpecializedCallArgSends.php';
 require_once __DIR__.'/Compiler/Concern/ArrayPadUnpackExtractAndDateSunCallArgSends.php';
@@ -278,6 +279,7 @@ use PHPCompiler\Compiler\Concern\CallArgClosureDeadTempProducerEvalAndPreferName
 use PHPCompiler\Compiler\Concern\CallArgMultiProducerNamedLocalArrayColumnSearchPadValueSlots;
 use PHPCompiler\Compiler\Concern\CallArgSiblingMergeEmbeddedIssetLogicalNamedAssignValueSlots;
 use PHPCompiler\Compiler\Concern\CallArgDeadArrayComparisonConcatPointerValueSlots;
+use PHPCompiler\Compiler\Concern\CallArgFilterJsonDecodeMergeMapFilterSplitExplodeValueSlots;
 use PHPCompiler\Compiler\Concern\CompileCallArgSends;
 use PHPCompiler\Compiler\Concern\CompileInlineSpecializedCallArgSends;
 use PHPCompiler\Compiler\Concern\ArrayPadUnpackExtractAndDateSunCallArgSends;
@@ -412,6 +414,7 @@ class Compiler {
     use CallArgMultiProducerNamedLocalArrayColumnSearchPadValueSlots;
     use CallArgSiblingMergeEmbeddedIssetLogicalNamedAssignValueSlots;
     use CallArgDeadArrayComparisonConcatPointerValueSlots;
+    use CallArgFilterJsonDecodeMergeMapFilterSplitExplodeValueSlots;
     use CompileCallArgSends;
     use CompileInlineSpecializedCallArgSends;
     use ArrayPadUnpackExtractAndDateSunCallArgSends;
