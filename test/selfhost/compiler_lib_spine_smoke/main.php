@@ -5409,6 +5409,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/HoistedSiblingFeedAndArrayK
 require_once __DIR__.'/../../../lib/Compiler/Concern/RewireArithmeticBranchSubstrEnumAndSiblingMultiArgCallArgSendSlots.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/RewireInlineCallArgSendSlots.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/RewireHoistedPreludePregCombineAndVarExportCallArgSendSlots.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/RewireVarExportNestedInlineCallArgSendSlots.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/RewireInlineBitmaskNestedFileAndVarExportFlagCallArgSendSlots.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/StmtLevelSideEffectAndEmittedCallGuards.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/AdjacentNestedCallArgSlots.php';

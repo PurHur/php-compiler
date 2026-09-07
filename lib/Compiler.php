@@ -86,6 +86,7 @@ require_once __DIR__.'/Compiler/Concern/HoistedSiblingFeedAndArrayKeysArgSendRew
 require_once __DIR__.'/Compiler/Concern/RewireArithmeticBranchSubstrEnumAndSiblingMultiArgCallArgSendSlots.php';
 require_once __DIR__.'/Compiler/Concern/RewireInlineCallArgSendSlots.php';
 require_once __DIR__.'/Compiler/Concern/RewireHoistedPreludePregCombineAndVarExportCallArgSendSlots.php';
+require_once __DIR__.'/Compiler/Concern/RewireVarExportNestedInlineCallArgSendSlots.php';
 require_once __DIR__.'/Compiler/Concern/RewireInlineBitmaskNestedFileAndVarExportFlagCallArgSendSlots.php';
 require_once __DIR__.'/Compiler/Concern/StmtLevelSideEffectAndEmittedCallGuards.php';
 require_once __DIR__.'/Compiler/Concern/AdjacentNestedCallArgSlots.php';
@@ -297,6 +298,7 @@ use PHPCompiler\Compiler\Concern\HoistedSiblingFeedAndArrayKeysArgSendRewire;
 use PHPCompiler\Compiler\Concern\RewireArithmeticBranchSubstrEnumAndSiblingMultiArgCallArgSendSlots;
 use PHPCompiler\Compiler\Concern\RewireInlineCallArgSendSlots;
 use PHPCompiler\Compiler\Concern\RewireHoistedPreludePregCombineAndVarExportCallArgSendSlots;
+use PHPCompiler\Compiler\Concern\RewireVarExportNestedInlineCallArgSendSlots;
 use PHPCompiler\Compiler\Concern\RewireInlineBitmaskNestedFileAndVarExportFlagCallArgSendSlots;
 use PHPCompiler\Compiler\Concern\StmtLevelSideEffectAndEmittedCallGuards;
 use PHPCompiler\Compiler\Concern\AdjacentNestedCallArgSlots;
@@ -418,6 +420,7 @@ class Compiler {
     use RewireArithmeticBranchSubstrEnumAndSiblingMultiArgCallArgSendSlots;
     use RewireInlineCallArgSendSlots;
     use RewireHoistedPreludePregCombineAndVarExportCallArgSendSlots;
+    use RewireVarExportNestedInlineCallArgSendSlots;
     use RewireInlineBitmaskNestedFileAndVarExportFlagCallArgSendSlots;
     use StmtLevelSideEffectAndEmittedCallGuards;
     use AdjacentNestedCallArgSlots;
