@@ -251,7 +251,9 @@ use PHPCompiler\VM\Variable as VmVariable;
  * {@code 0} (no {@code and}/{@code or}/{@code xor};
  * {@see bitwiseLogicSameOperandFold}). Same-operand typed {@code $n - $n}
  * folds to {@code 0} (no {@code sub} / overflow intrinsic;
- * {@see nativeLongArithSameOperandFold}). Compile-time divisors ≠
+ * {@see nativeLongArithSameOperandFold}). Same-operand typed {@code $n + $n}
+ * lowers to {@code shl 1} with {@code ashr} round-trip overflow (peer
+ * {@code * 2}; {@see nativeLongArithSameOperandFold}). Compile-time divisors ≠
  * {@code -1} skip the typed {@code /} {@code PHP_INT_MIN}/{-1} promote arm
  * ({@see nativeLongDivisorCanSkipNegOneModuloBranch}). Typed {@code / 1} is
  * identity (no {@code sdiv}/{@code srem}/exactness promote;
@@ -4288,31 +4290,40 @@ final class DiscardedPureCallElision
 
     /**
      * Typed native-long arithmetic when both operands are the same storage /
-     * SSA payload: {@code $n - $n} → {@code 0} (omit {@code sub} /
-     * {@code llvm.ssub.with.overflow}). Algebra holds for every zend_long
-     * including {@code PHP_INT_MIN} ({@code ZEND_SIGNED_SUB_OVERFLOW} is a
-     * no-op for equal operands).
+     * SSA payload:
+     * - {@code $n - $n} → {@code 0} (omit {@code sub} /
+     *   {@code llvm.ssub.with.overflow}). Algebra holds for every zend_long
+     *   including {@code PHP_INT_MIN} ({@code ZEND_SIGNED_SUB_OVERFLOW} is a
+     *   no-op for equal operands).
+     * - {@code $n + $n} → {@code shl 1} with {@code ashr} overflow (omit
+     *   {@code llvm.sadd.with.overflow}; same shape as compile-time {@code * 2}).
      *
-     * Peer same-operand bitwise ({@see bitwiseLogicSameOperandFold}) and
-     * compile-time {@code - 0} identity ({@see nativeLongArithIsCompileTimeIdentityOrZero}).
+     * Peer same-operand bitwise ({@see bitwiseLogicSameOperandFold}),
+     * compile-time {@code - 0}/{@code + 0} identity
+     * ({@see nativeLongArithIsCompileTimeIdentityOrZero}), and
+     * {@see nativeLongMulCompileTimePowerOfTwoShift}.
      *
-     * php-src: Zend/zend_operators.c sub_function / ZEND_SIGNED_SUB_OVERFLOW.
+     * php-src: Zend/zend_operators.c sub_function / add_function /
+     * ZEND_SIGNED_{SUB,ADD}_OVERFLOW.
      *
-     * @return 'zero'|null fold to 0, or null when not same-operand sub
+     * @return 'zero'|'shl1'|null fold to 0, lower as shl×2, or null when N/A
      */
     public static function nativeLongArithSameOperandFold(
         int $opType,
         Variable $left,
         Variable $right
     ): ?string {
-        if (\PHPCompiler\OpCode::TYPE_MINUS !== $opType) {
-            return null;
-        }
         if (!self::nativeLongOperandsAreSame($left, $right)) {
             return null;
         }
+        if (\PHPCompiler\OpCode::TYPE_MINUS === $opType) {
+            return 'zero';
+        }
+        if (\PHPCompiler\OpCode::TYPE_PLUS === $opType) {
+            return 'shl1';
+        }
 
-        return 'zero';
+        return null;
     }
 
     /**
