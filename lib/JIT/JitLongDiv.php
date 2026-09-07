@@ -58,13 +58,18 @@ final class JitLongDiv
      * When {@code $skipZeroGuard} is true the divisor is already a compile-time
      * long ≠ 0 — omit the {@code DivisionByZeroError} branch (#36386 / peer intdiv).
      *
+     * When {@code $skipIntMinNegOnePromote} is true the divisor is a compile-time
+     * long ≠ {@code -1} — omit the {@code PHP_INT_MIN}/{-1} promote arm (peer
+     * typed {@code %} {@see DiscardedPureCallElision::nativeLongDivisorCanSkipNegOneModuloBranch}).
+     *
      * @see php-src Zend/zend_operators.c div_function
      */
     public static function binaryNativeLong(
         Context $context,
         LlvmValue $left,
         LlvmValue $right,
-        bool $skipZeroGuard = false
+        bool $skipZeroGuard = false,
+        bool $skipIntMinNegOnePromote = false
     ): Variable {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'longdiv_native_cont');
         $i64 = $context->getTypeFromString('int64');
@@ -81,17 +86,22 @@ final class JitLongDiv
             $rem,
             $i64->constInt(0, false)
         );
-        $intMin = $i64->constInt(\PHP_INT_MIN, true);
-        $negOne = $i64->constInt(-1, true);
-        $isIntMinNegOne = $context->builder->and(
-            $context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $a, $intMin),
-            $context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $b, $negOne)
-        );
         // Promote when non-exact OR INT_MIN/−1 (exact rem but not representable as long).
-        $promote = $context->builder->or(
-            $context->builder->not($isExact),
-            $isIntMinNegOne
-        );
+        // Proven divisor ≠ -1 → INT_MIN/−1 is impossible (#36386).
+        if ($skipIntMinNegOnePromote) {
+            $promote = $context->builder->not($isExact);
+        } else {
+            $intMin = $i64->constInt(\PHP_INT_MIN, true);
+            $negOne = $i64->constInt(-1, true);
+            $isIntMinNegOne = $context->builder->and(
+                $context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $a, $intMin),
+                $context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $b, $negOne)
+            );
+            $promote = $context->builder->or(
+                $context->builder->not($isExact),
+                $isIntMinNegOne
+            );
+        }
 
         // f64 only — no entryAllocaValueBox / TYPE_NULL init on the hot path (#36386).
         $doubleSlot = BasicBlockHelper::entryAlloca($context, $f64);
@@ -130,13 +140,15 @@ final class JitLongDiv
      * Boxed long ⊙ boxed long `/` — write long or double into an existing value slot.
      *
      * {@code $skipZeroGuard}: compile-time divisor ≠ 0 (#36386).
+     * {@code $skipIntMinNegOnePromote}: compile-time divisor ≠ {@code -1} (#36386).
      */
     public static function writeBoxedBinary(
         Context $context,
         LlvmValue $left,
         LlvmValue $right,
         LlvmValue $slotPtr,
-        bool $skipZeroGuard = false
+        bool $skipZeroGuard = false,
+        bool $skipIntMinNegOnePromote = false
     ): void {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'longdiv_boxed_cont');
         $i64 = $context->getTypeFromString('int64');
@@ -156,15 +168,20 @@ final class JitLongDiv
         $context->builder->branchIf($isExact, $exactBlock, $floatBlock);
 
         $context->builder->positionAtEnd($exactBlock);
-        $intMin = $i64->constInt(\PHP_INT_MIN, true);
-        $negOne = $i64->constInt(-1, true);
-        $isIntMinNegOne = $context->builder->and(
-            $context->builder->icmp(Builder::INT_EQ, $a, $intMin),
-            $context->builder->icmp(Builder::INT_EQ, $b, $negOne)
-        );
-        $exactLongBlock = BasicBlockHelper::append($context, 'longdiv_box_exact_long');
-        $exactDoubleBlock = BasicBlockHelper::append($context, 'longdiv_box_exact_double');
-        $context->builder->branchIf($isIntMinNegOne, $exactDoubleBlock, $exactLongBlock);
+        if ($skipIntMinNegOnePromote) {
+            $exactLongBlock = $exactBlock;
+            $exactDoubleBlock = null;
+        } else {
+            $intMin = $i64->constInt(\PHP_INT_MIN, true);
+            $negOne = $i64->constInt(-1, true);
+            $isIntMinNegOne = $context->builder->and(
+                $context->builder->icmp(Builder::INT_EQ, $a, $intMin),
+                $context->builder->icmp(Builder::INT_EQ, $b, $negOne)
+            );
+            $exactLongBlock = BasicBlockHelper::append($context, 'longdiv_box_exact_long');
+            $exactDoubleBlock = BasicBlockHelper::append($context, 'longdiv_box_exact_double');
+            $context->builder->branchIf($isIntMinNegOne, $exactDoubleBlock, $exactLongBlock);
+        }
 
         $context->builder->positionAtEnd($exactLongBlock);
         $longResult = $context->builder->signedDiv($a, $b);
@@ -175,17 +192,19 @@ final class JitLongDiv
         );
         $context->builder->branch($doneBlock);
 
-        $context->builder->positionAtEnd($exactDoubleBlock);
-        $intMinDouble = $context->builder->fdiv(
-            $context->builder->siToFp($a, $f64),
-            $context->builder->siToFp($b, $f64)
-        );
-        $context->builder->call(
-            $context->lookupFunction('__value__writeDouble'),
-            $slotPtr,
-            $intMinDouble
-        );
-        $context->builder->branch($doneBlock);
+        if (null !== $exactDoubleBlock) {
+            $context->builder->positionAtEnd($exactDoubleBlock);
+            $intMinDouble = $context->builder->fdiv(
+                $context->builder->siToFp($a, $f64),
+                $context->builder->siToFp($b, $f64)
+            );
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $intMinDouble
+            );
+            $context->builder->branch($doneBlock);
+        }
 
         $context->builder->positionAtEnd($floatBlock);
         $floatResult = $context->builder->fdiv(
