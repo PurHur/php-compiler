@@ -6934,6 +6934,7 @@ require_once __DIR__.'/../../../lib/JIT/CompileCacheSemanticHash.php';
 require_once __DIR__.'/../../../lib/JIT/CompileCachePartialEmitDemote.php';
 require_once __DIR__.'/../../../lib/JIT/CompileCacheArtifactPersist.php';
 require_once __DIR__.'/../../../lib/JIT/CompileCacheEditScaffold.php';
+require_once __DIR__.'/../../../lib/JIT/CompileCacheBitcodePersist.php';
 require_once __DIR__.'/../../../lib/JIT/CompileCacheProjectIndex.php';
 require_once __DIR__.'/../../../lib/JIT/CompileCacheKeyLayout.php';
 require_once __DIR__.'/../../../lib/JIT/CompileCache.php';
