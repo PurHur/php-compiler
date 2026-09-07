@@ -7781,6 +7781,7 @@ require_once __DIR__.'/../../../lib/VM/Concern/InheritanceFinalVarianceAndConstF
 require_once __DIR__.'/../../../lib/VM/Concern/ClassConstAndPropertyDefaultMaterialize.php';
 require_once __DIR__.'/../../../lib/VM/Concern/OutgoingCallArgResolve.php';
 require_once __DIR__.'/../../../lib/VM/Concern/InternalHandlerExecuteAndAssignCopy.php';
+require_once __DIR__.'/../../../lib/VM/Concern/ClosureBindAndFunctionStatic.php';
 require_once __DIR__.'/../../../lib/VM/ObjectPropertyIterator.php';
 require_once __DIR__.'/../../../lib/VM/ObjectReadonlySupport.php';
 require_once __DIR__.'/../../../lib/VM/ObjectRegistry.php';

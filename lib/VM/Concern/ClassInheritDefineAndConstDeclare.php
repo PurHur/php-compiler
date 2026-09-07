@@ -1273,7 +1273,7 @@ trait ClassInheritDefineAndConstDeclare
                     $backingSource
                 );
             }
-            $entry->constants[$name] = EnumCaseSupport::createCase(
+            $entry->constants[$name] = VM\EnumCaseSupport::createCase(
                 $entry,
                 $canonical,
                 $caseBacking
