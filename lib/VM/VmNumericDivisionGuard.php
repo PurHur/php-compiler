@@ -173,9 +173,18 @@ final class VmNumericDivisionGuard
 
     /**
      * Zend shift_left/right_function — negative count is catchable ArithmeticError (#21912).
+     *
+     * When {@code $skip} is true the count is compile-time {@code ≥ 0} — omit
+     * the error blocks (#36386 / peer typed {@code /} proven-divisor).
      */
-    public static function emitNegativeBitShiftCountGuard(Context $context, Value $shiftCount): void
-    {
+    public static function emitNegativeBitShiftCountGuard(
+        Context $context,
+        Value $shiftCount,
+        bool $skip = false
+    ): void {
+        if ($skip) {
+            return;
+        }
         $i64 = $context->getTypeFromString('int64');
         $zero = $i64->constInt(0, false);
         $count = $context->builder->intCast($shiftCount, $i64);

@@ -348,11 +348,25 @@ return_string:
         $rightType = $this->operandJitType($right);
         if (OpCode::TYPE_SHIFT_LEFT === $opcode->type || OpCode::TYPE_SHIFT_RIGHT === $opcode->type) {
             if (Variable::TYPE_NATIVE_DOUBLE === $leftType || Variable::TYPE_NATIVE_DOUBLE === $rightType) {
-                $result = $this->emitShiftWithFloatOperands($opcode, $leftValue, $rightValue, $leftType, $rightType);
+                $result = $this->emitShiftWithFloatOperands(
+                    $opcode,
+                    $leftValue,
+                    $rightValue,
+                    $leftType,
+                    $rightType,
+                    $right
+                );
                 goto return_long;
             }
             if (Variable::TYPE_NATIVE_BOOL === $leftType || Variable::TYPE_NATIVE_BOOL === $rightType) {
-                $result = $this->emitShiftWithBoolOperands($opcode, $leftValue, $rightValue, $leftType, $rightType);
+                $result = $this->emitShiftWithBoolOperands(
+                    $opcode,
+                    $leftValue,
+                    $rightValue,
+                    $leftType,
+                    $rightType,
+                    $right
+                );
                 goto return_long;
             }
         }
@@ -647,7 +661,12 @@ restart:
                     case OpCode::TYPE_SHIFT_LEFT:
                     case OpCode::TYPE_SHIFT_RIGHT:
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
-                        $result = $this->emitGuardedIntShift($opcode->type, $leftValue, $__right);
+                        $result = $this->emitGuardedIntShift(
+                            $opcode->type,
+                            $leftValue,
+                            $__right,
+                            DiscardedPureCallElision::bitShiftCountCanSkipNegativeGuard($right)
+                        );
                         goto return_long;
                     case OpCode::TYPE_GREATER_OR_EQUAL:
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
@@ -1260,7 +1279,12 @@ restart:
                     }
                     $leftLong = JitLongArg::lower($this->context, $left, 'binary op left operand');
                     $rightLong = JitLongArg::lower($this->context, $right, 'binary op right operand');
-                    $result = $this->emitGuardedIntShift($opcode->type, $leftLong, $rightLong);
+                    $result = $this->emitGuardedIntShift(
+                        $opcode->type,
+                        $leftLong,
+                        $rightLong,
+                        DiscardedPureCallElision::bitShiftCountCanSkipNegativeGuard($right)
+                    );
                     goto return_long;
             }
             if (OpCode::TYPE_IDENTICAL === $opcode->type) {
@@ -1404,7 +1428,12 @@ restart:
                         goto return_long;
                     case OpCode::TYPE_SHIFT_LEFT:
                     case OpCode::TYPE_SHIFT_RIGHT:
-                        $result = $this->emitGuardedIntShift($opcode->type, $leftLong, $__right);
+                        $result = $this->emitGuardedIntShift(
+                            $opcode->type,
+                            $leftLong,
+                            $__right,
+                            DiscardedPureCallElision::bitShiftCountCanSkipNegativeGuard($right)
+                        );
                         goto return_long;
                     case OpCode::TYPE_EQUAL:
                         if (Variable::TYPE_NATIVE_LONG === $rightType) {
@@ -1582,7 +1611,12 @@ restart:
                         goto return_long;
                     case OpCode::TYPE_SHIFT_LEFT:
                     case OpCode::TYPE_SHIFT_RIGHT:
-                        $result = $this->emitGuardedIntShift($opcode->type, $__left, $rightLong);
+                        $result = $this->emitGuardedIntShift(
+                            $opcode->type,
+                            $__left,
+                            $rightLong,
+                            DiscardedPureCallElision::bitShiftCountCanSkipNegativeGuard($right)
+                        );
                         goto return_long;
                     case OpCode::TYPE_EQUAL:
                         if (Variable::TYPE_NATIVE_LONG === $leftType) {
@@ -2179,7 +2213,12 @@ restart:
             if (OpCode::TYPE_SHIFT_LEFT === $opcode->type || OpCode::TYPE_SHIFT_RIGHT === $opcode->type) {
                 $leftLong = JitLongArg::lowerStringValue($this->context, $leftValue);
                 $__right = $this->context->builder->intCast($rightValue, $leftLong->typeOf());
-                $result = $this->emitGuardedIntShift($opcode->type, $leftLong, $__right);
+                $result = $this->emitGuardedIntShift(
+                    $opcode->type,
+                    $leftLong,
+                    $__right,
+                    DiscardedPureCallElision::bitShiftCountCanSkipNegativeGuard($right)
+                );
                 goto return_long;
             }
             if ($this->isBitwiseLogicOpcode($opcode->type)) {
@@ -2278,7 +2317,12 @@ restart:
             if (OpCode::TYPE_SHIFT_LEFT === $opcode->type || OpCode::TYPE_SHIFT_RIGHT === $opcode->type) {
                 $rightLong = JitLongArg::lowerStringValue($this->context, $rightValue);
                 $__left = $this->context->builder->intCast($leftValue, $rightLong->typeOf());
-                $result = $this->emitGuardedIntShift($opcode->type, $__left, $rightLong);
+                $result = $this->emitGuardedIntShift(
+                    $opcode->type,
+                    $__left,
+                    $rightLong,
+                    DiscardedPureCallElision::bitShiftCountCanSkipNegativeGuard($right)
+                );
                 goto return_long;
             }
             if ($this->isBitwiseLogicOpcode($opcode->type)) {
@@ -3190,10 +3234,18 @@ return_bool:
         return $this->context->builder->bitwiseXor($leftLong, $__right);
     }
 
-    /** Zend shift_left/right_function: negative count → catchable ArithmeticError (#21912). */
-    private function emitGuardedIntShift(int $opType, $leftLong, $rightLong)
+    /**
+     * Zend shift_left/right_function: negative count → catchable ArithmeticError (#21912).
+     *
+     * {@code $skipNegativeGuard}: compile-time count {@code ≥ 0} (#36386).
+     */
+    private function emitGuardedIntShift(int $opType, $leftLong, $rightLong, bool $skipNegativeGuard = false)
     {
-        JitNumericDivisionGuard::emitNegativeBitShiftCountGuard($this->context, $rightLong);
+        JitNumericDivisionGuard::emitNegativeBitShiftCountGuard(
+            $this->context,
+            $rightLong,
+            $skipNegativeGuard
+        );
         if (OpCode::TYPE_SHIFT_LEFT === $opType) {
             return $this->context->builder->shl($leftLong, $rightLong);
         }
@@ -3207,7 +3259,8 @@ return_bool:
         $leftValue,
         $rightValue,
         int $leftType,
-        int $rightType
+        int $rightType,
+        Variable $rightOperand
     ) {
         $i64 = $this->context->getTypeFromString('int64');
         if (Variable::TYPE_NATIVE_BOOL === $leftType) {
@@ -3221,7 +3274,12 @@ return_bool:
             $rightLong = $this->context->builder->intCast($rightValue, $leftLong->typeOf());
         }
 
-        return $this->emitGuardedIntShift($opcode->type, $leftLong, $rightLong);
+        return $this->emitGuardedIntShift(
+            $opcode->type,
+            $leftLong,
+            $rightLong,
+            DiscardedPureCallElision::bitShiftCountCanSkipNegativeGuard($rightOperand)
+        );
     }
 
     /** Zend shift_left/right_function: float operands truncate to int before shift (#5270). */
@@ -3230,7 +3288,8 @@ return_bool:
         $leftValue,
         $rightValue,
         int $leftType,
-        int $rightType
+        int $rightType,
+        Variable $rightOperand
     ) {
         $i64 = $this->context->getTypeFromString('int64');
         if (Variable::TYPE_NATIVE_DOUBLE === $leftType) {
@@ -3244,7 +3303,12 @@ return_bool:
             $rightLong = $this->context->builder->intCast($rightValue, $leftLong->typeOf());
         }
 
-        return $this->emitGuardedIntShift($opcode->type, $leftLong, $rightLong);
+        return $this->emitGuardedIntShift(
+            $opcode->type,
+            $leftLong,
+            $rightLong,
+            DiscardedPureCallElision::bitShiftCountCanSkipNegativeGuard($rightOperand)
+        );
     }
 
     private function tryResolveCoreIntConstant(Variable $var): ?int
