@@ -20,7 +20,7 @@ use PHPTypes\Type;
  * Extracted from {@see PrecedingInlineCallArgProducers} so gen-0 split-TU can hollow
  * a smaller Concern TU ({@see filterDeadVoidStatementMethodCallProducers} through
  * {@see resolvePrecedingArrayDimFetchCallArgSlot}). Leading-callback / haystack
- * producer discovery remains in PrecedingInlineCallArgProducers.
+ * producer discovery lives in {@see PrecedingInlineLeadingCallbackAndHaystackProducers}.
  *
  * Call sites and visibility stay identical so LintCompiler overrides are unaffected.
  * Mirrors php-src Zend/zend_compile.c / zend_execute.c ARG_SEND ordering for dead
