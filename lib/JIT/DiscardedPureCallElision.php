@@ -4021,12 +4021,42 @@ final class DiscardedPureCallElision
     /**
      * Skip the LLVM zero-divisor branch when the divisor truncates to a
      * compile-time long ≠ 0 (php-src {@code Z_PARAM_LONG}).
+     *
+     * Also used for typed native-long {@code /} and {@code %} (zend_operators.c
+     * {@code div_function} / {@code mod_function}) — same proof (#36386).
      */
     public static function intdivCanSkipZeroDivisorGuard(Variable $divisor): bool
     {
         $d = self::compileTimeLongScalar($divisor);
 
         return null !== $d && 0 !== $d;
+    }
+
+    /**
+     * Skip the {@code n % -1 → 0} PHI when the divisor is a compile-time long
+     * proven ≠ {@code -1} (php-src {@code mod_function}; LLVM {@code srem}
+     * of {@code INT_MIN}/{-1} is poison only for {@code -1}).
+     */
+    public static function nativeLongDivisorCanSkipNegOneModuloBranch(Variable $divisor): bool
+    {
+        $d = self::compileTimeLongScalar($divisor);
+
+        return null !== $d && -1 !== $d;
+    }
+
+    /**
+     * Skip the LLVM double zero-divisor branch when the divisor is a
+     * compile-time numeric proven ≠ {@code 0.0} (NAN is not equal to 0 under
+     * ordered compare — php-src leaves {@code / NAN} as NAN).
+     */
+    public static function doubleDivisorCanSkipZeroGuard(Variable $divisor): bool
+    {
+        $d = self::compileTimeNumericScalar($divisor);
+        if (null === $d) {
+            return false;
+        }
+        // +0.0 / -0.0 must keep DivisionByZeroError; NAN ≠ 0 → safe to skip.
+        return 0.0 !== $d;
     }
 
     /**

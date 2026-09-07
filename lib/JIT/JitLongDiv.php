@@ -55,19 +55,25 @@ final class JitLongDiv
      * (#36386). Non-exact / INT_MIN÷−1 stores f64 into an entry alloca; the {@code __value__}
      * box is created only in {@see JitLongArithOverflow::materializeOverflowableNativeLong}.
      *
+     * When {@code $skipZeroGuard} is true the divisor is already a compile-time
+     * long ≠ 0 — omit the {@code DivisionByZeroError} branch (#36386 / peer intdiv).
+     *
      * @see php-src Zend/zend_operators.c div_function
      */
     public static function binaryNativeLong(
         Context $context,
         LlvmValue $left,
-        LlvmValue $right
+        LlvmValue $right,
+        bool $skipZeroGuard = false
     ): Variable {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'longdiv_native_cont');
         $i64 = $context->getTypeFromString('int64');
         $f64 = $context->getTypeFromString('double');
         $a = $context->builder->intCast($left, $i64);
         $b = $context->builder->intCast($right, $i64);
-        JitNumericDivisionGuard::emitZeroLongDivisorGuard($context, $b, 'Division by zero');
+        if (!$skipZeroGuard) {
+            JitNumericDivisionGuard::emitZeroLongDivisorGuard($context, $b, 'Division by zero');
+        }
 
         $rem = $context->builder->signedRem($a, $b);
         $isExact = $context->builder->icmp(
@@ -122,19 +128,24 @@ final class JitLongDiv
 
     /**
      * Boxed long ⊙ boxed long `/` — write long or double into an existing value slot.
+     *
+     * {@code $skipZeroGuard}: compile-time divisor ≠ 0 (#36386).
      */
     public static function writeBoxedBinary(
         Context $context,
         LlvmValue $left,
         LlvmValue $right,
-        LlvmValue $slotPtr
+        LlvmValue $slotPtr,
+        bool $skipZeroGuard = false
     ): void {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'longdiv_boxed_cont');
         $i64 = $context->getTypeFromString('int64');
         $f64 = $context->getTypeFromString('double');
         $a = $context->builder->intCast($left, $i64);
         $b = $context->builder->intCast($right, $i64);
-        JitNumericDivisionGuard::emitZeroLongDivisorGuard($context, $b, 'Division by zero');
+        if (!$skipZeroGuard) {
+            JitNumericDivisionGuard::emitZeroLongDivisorGuard($context, $b, 'Division by zero');
+        }
 
         $rem = $context->builder->signedRem($a, $b);
         $isExact = $context->builder->icmp(Builder::INT_EQ, $rem, $i64->constInt(0, false));
