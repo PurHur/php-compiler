@@ -121,6 +121,15 @@ final class ObjectInstancePropertyLlvm
                     $forWrite
                 );
             }
+            // IncludeHelper may lower trait methods in a trait-only unit with no
+            // composing class in scope. Trait-local slot N is not the composed
+            // object's layout (MessageTrait::$stream aliases Response::$statusCode
+            // → getBody returns int; #36382). Resolve by runtime class_id.
+            // php-src: Zend/zend_inheritance.c zend_do_traits_property_binding
+            $runtimeFetch = self::tryPropertyFetchByRuntimeClass($object, $obj, $name, $forWrite);
+            if (null !== $runtimeFetch) {
+                return $runtimeFetch;
+            }
         }
         // CFG often collapses `$b = new B` receivers to generic "object" on later reads while
         // unset still resolved B — defining an untyped slot on the synthetic object ClassEntry

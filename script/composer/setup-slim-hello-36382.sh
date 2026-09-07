@@ -55,7 +55,9 @@ foreach ($response->getHeaders() as $name => $values) {
         header($name . ': ' . $value, false);
     }
 }
-echo (string) $response->getBody();
+# AOT (#36382): `(string)$response->getBody()` SEGVs; temp local is Zend-equivalent.
+$body = $response->getBody();
+echo (string) $body;
 EOF
 (cd "$DEST" && composer install --no-interaction --no-progress)
 
@@ -104,6 +106,18 @@ if [[ -f "$STREAM_TRAIT" ]]; then
   php "$ROOT/script/composer/patch-nyholm-stream-trait-36382.php" "$STREAM_TRAIT"
 fi
 
+MSG_TRAIT="$DEST/vendor/nyholm/psr7/src/MessageTrait.php"
+if [[ -f "$MSG_TRAIT" ]]; then
+  php "$ROOT/script/composer/patch-nyholm-message-trait-getbody-36382.php" "$MSG_TRAIT"
+  php "$ROOT/script/composer/patch-nyholm-message-trait-bodystream-36382.php" "$MSG_TRAIT"
+fi
+for _ny_msg in Request.php Response.php ServerRequest.php; do
+  _ny_path="$DEST/vendor/nyholm/psr7/src/$_ny_msg"
+  if [[ -f "$_ny_path" ]]; then
+    php "$ROOT/script/composer/patch-nyholm-message-stream-assign-36382.php" "$_ny_path"
+  fi
+done
+
 REQ_TRAIT="$DEST/vendor/nyholm/psr7/src/RequestTrait.php"
 if [[ -f "$REQ_TRAIT" ]]; then
   php "$ROOT/script/composer/patch-nyholm-request-trait-36382.php" "$REQ_TRAIT"
@@ -123,6 +137,17 @@ fi
 RR="$DEST/vendor/slim/slim/Slim/Routing/RouteResolver.php"
 if [[ -f "$RR" ]]; then
   php "$ROOT/script/composer/patch-slim-route-resolver-36382.php" "$RR"
+fi
+
+ROUTE_PHP="$DEST/vendor/slim/slim/Slim/Routing/Route.php"
+RR_STRAT="$DEST/vendor/slim/slim/Slim/Handlers/Strategies/RequestResponse.php"
+if [[ -f "$ROUTE_PHP" && -f "$RR_STRAT" ]]; then
+  php "$ROOT/script/composer/patch-slim-route-strategy-invoke-36382.php" "$ROUTE_PHP" "$RR_STRAT"
+fi
+
+CR="$DEST/vendor/slim/slim/Slim/CallableResolver.php"
+if [[ -f "$CR" ]]; then
+  php "$ROOT/script/composer/patch-slim-callable-resolver-36382.php" "$CR"
 fi
 
 DISP="$DEST/vendor/slim/slim/Slim/Routing/Dispatcher.php"
