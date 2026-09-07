@@ -34,9 +34,9 @@
             "note": "helper-cache granularity; Fingerprint+Link+Bind extracts (#36387/#36403); sorted linkObjects (#36399); refusePrelinkGcMixReason (#36401)"
         },
         "lib/JIT/CompileCache.php": {
-            "budget": 534,
+            "budget": 499,
             "target": 2000,
-            "note": "MCJIT/AOT warm cache; SemanticHash + PartialEmitDemote + ArtifactPersist + EditScaffold + ProjectIndex + KeyLayout + BitcodePersist + Recording + EditSession extracts (#36387/#36403)"
+            "note": "MCJIT/AOT warm cache; SemanticHash + PartialEmitDemote + ArtifactPersist + EditScaffold + ProjectIndex + KeyLayout + BitcodePersist + Recording + EditSession + ProjectMembers extracts (#36387/#36403)"
         },
         "lib/JIT/CompileCacheRecording.php": {
             "budget": 276,

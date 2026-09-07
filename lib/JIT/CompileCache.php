@@ -16,6 +16,7 @@ require_once __DIR__.'/CompileCacheKeyLayout.php';
 require_once __DIR__.'/CompileCacheBitcodePersist.php';
 require_once __DIR__.'/CompileCacheRecording.php';
 require_once __DIR__.'/CompileCacheEditSession.php';
+require_once __DIR__.'/CompileCacheProjectMembers.php';
 
 /**
  * On-disk MCJIT bitcode cache (issue #153).
@@ -34,7 +35,8 @@ require_once __DIR__.'/CompileCacheEditSession.php';
  * cache-entry paths / freshness / fingerprint live in {@see CompileCacheKeyLayout};
  * MCJIT bitcode restore/persist lives in {@see CompileCacheBitcodePersist};
  * cold-emit recording / symbol membership maps live in {@see CompileCacheRecording};
- * edit-scaffold session arm / state live in {@see CompileCacheEditSession}
+ * edit-scaffold session arm / state live in {@see CompileCacheEditSession};
+ * project member path list / compile entry live in {@see CompileCacheProjectMembers}
  * (#36387 one-file-edit Done-when / #36403 size-budget split-TU).
  */
 final class CompileCache
@@ -43,6 +45,7 @@ final class CompileCache
     use CompileCacheBitcodePersist;
     use CompileCacheRecording;
     use CompileCacheEditSession;
+    use CompileCacheProjectMembers;
     /** @var list<array{llvm: string, signature: string, scoped: string}>|null */
     private static ?array $recordingExports = null;
 
@@ -52,11 +55,6 @@ final class CompileCache
     /** @var array<string, string>|null logical lc → LLVM name for NestedJIT helpers (#36387). */
     private static ?array $recordingHelperSymbols = null;
 
-    /** @var list<string>|null absolute member paths for multi-file project index (#36387). */
-    private static ?array $projectMembers = null;
-
-    /** Absolute entry script path (before setProjectMembers sort) (#36387). */
-    private static ?string $projectEntry = null;
 
     private static ?string $recordingKey = null;
 
@@ -149,39 +147,6 @@ final class CompileCache
         return true;
     }
 
-    /**
-     * Record absolute source paths that make up a multi-file AOT project (#36387).
-     *
-     * @param list<string> $absolutePaths entry + includes (pre-bundle)
-     */
-    public static function setProjectMembers(array $absolutePaths): void
-    {
-        $clean = [];
-        foreach ($absolutePaths as $path) {
-            if (!is_string($path) || '' === $path) {
-                continue;
-            }
-            $resolved = realpath($path);
-            $clean[] = false !== $resolved ? $resolved : $path;
-        }
-        // First path is the compile entry (compile.php merges entry + includes) (#36387).
-        self::$projectEntry = $clean[0] ?? null;
-        $clean = array_values(array_unique($clean));
-        sort($clean);
-        self::$projectMembers = $clean;
-    }
-
-    /** @return list<string> */
-    public static function projectMembers(): array
-    {
-        return self::$projectMembers ?? [];
-    }
-
-    /** Compile entry path captured by {@see setProjectMembers()} (#36387). */
-    public static function projectEntry(): ?string
-    {
-        return self::$projectEntry;
-    }
 
     /**
      * Compiler fingerprint for project-index / meta durability (#36387).
