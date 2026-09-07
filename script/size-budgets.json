@@ -29,9 +29,9 @@
       "note": "already under target; output helpers in LinkerOutputArtifacts (#36403); ASAN via clang/gcc (#36397)"
     },
     "lib/AOT/HelperRuntimeCache.php": {
-      "budget": 1078,
+      "budget": 577,
       "target": 1200,
-      "note": "helper-cache granularity; HelperRuntimeFingerprint + HelperRuntimeLink extracts (#36387/#36403); sorted linkObjects (#36399); refusePrelinkGcMixReason (#36401)"
+      "note": "helper-cache granularity; Fingerprint+Link+Bind extracts (#36387/#36403); sorted linkObjects (#36399); refusePrelinkGcMixReason (#36401)"
     },
     "lib/JIT/CompileCache.php": {
       "budget": 1541,
