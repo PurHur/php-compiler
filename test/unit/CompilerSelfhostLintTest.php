@@ -147,6 +147,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/Compiler/Concern/RewireHoistedPreludePregCombineAndVarExportCallArgSendSlots.php',
             'lib/Compiler/Concern/RewireInlineBitmaskNestedFileAndVarExportFlagCallArgSendSlots.php',
             'lib/Compiler/Concern/RewireInlineCallArgSendSlots.php',
+            'lib/Compiler/Concern/RewireSiblingMultiArgInlineCallArgSendSlots.php',
             'lib/Compiler/Concern/RewireVarExportNestedInlineCallArgSendSlots.php',
             'lib/Compiler/Concern/SiblingInlineCallArgProducerSlots.php',
             'lib/Compiler/Concern/SiblingInlineFuncCallAndDeadArrayProducers.php',

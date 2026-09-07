@@ -5742,6 +5742,7 @@
         "lib/Compiler/Concern/RewireHoistedPreludePregCombineAndVarExportCallArgSendSlots.php",
         "lib/Compiler/Concern/RewireInlineBitmaskNestedFileAndVarExportFlagCallArgSendSlots.php",
         "lib/Compiler/Concern/RewireInlineCallArgSendSlots.php",
+        "lib/Compiler/Concern/RewireSiblingMultiArgInlineCallArgSendSlots.php",
         "lib/Compiler/Concern/RewireVarExportNestedInlineCallArgSendSlots.php",
         "lib/Compiler/Concern/SiblingInlineCallArgProducerSlots.php",
         "lib/Compiler/Concern/SiblingInlineFuncCallAndDeadArrayProducers.php",
@@ -8116,6 +8117,7 @@
         "lib/VM/CompareStringableHelper.php",
         "lib/VM/CompareUnlikeHelper.php",
         "lib/VM/Concern/BuiltinHostExceptionDispatch.php",
+        "lib/VM/Concern/ClassConstAndPropertyDefaultMaterialize.php",
         "lib/VM/Concern/ClassInheritDefineAndConstDeclare.php",
         "lib/VM/Concern/ClassTraitComposition.php",
         "lib/VM/Concern/DeprecationNoticeEmit.php",
@@ -8621,9 +8623,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8387,
+        "inventory_files": 8389,
         "excluded": 0,
-        "eligible": 8387,
+        "eligible": 8389,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
