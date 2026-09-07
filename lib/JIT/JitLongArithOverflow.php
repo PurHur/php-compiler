@@ -59,6 +59,46 @@ final class JitLongArithOverflow
     }
 
     /**
+     * True when {@code +}/{@code -}/{@code *} cannot overflow because an operand is
+     * a compile-time identity/zero (php-src {@code ZEND_SIGNED_*_OVERFLOW} is a no-op):
+     * {@code + 0}, {@code - 0}, {@code * 0}, {@code * 1}, and {@code * -1} when the
+     * other side is also a compile-time long ≠ {@code PHP_INT_MIN}.
+     *
+     * Peer of typed {@code /} skip INT_MIN/−1 (#37197) / proven-divisor (#37187).
+     */
+    public static function canSkipOverflowPromote(
+        Context $context,
+        int $opType,
+        Variable $left,
+        Variable $right
+    ): bool {
+        if (!self::supportsOpcode($opType)) {
+            return false;
+        }
+        $a = self::extractConstantLong($context, $left);
+        $b = self::extractConstantLong($context, $right);
+        if (OpCode::TYPE_PLUS === $opType) {
+            return 0 === $a || 0 === $b;
+        }
+        if (OpCode::TYPE_MINUS === $opType) {
+            // Only right-hand 0 is identity; {@code 0 - PHP_INT_MIN} overflows.
+            return 0 === $b;
+        }
+        // MUL
+        if (0 === $a || 0 === $b || 1 === $a || 1 === $b) {
+            return true;
+        }
+        if (-1 === $a) {
+            return null !== $b && \PHP_INT_MIN !== $b;
+        }
+        if (-1 === $b) {
+            return null !== $a && \PHP_INT_MIN !== $a;
+        }
+
+        return false;
+    }
+
+    /**
      * Native long ⊙ native long with overflow → double (#31964).
      *
      * Hot path stays {@see Variable::TYPE_NATIVE_LONG} (no {@code __value__} box) per #36189;
@@ -70,18 +110,35 @@ final class JitLongArithOverflow
      * Uses {@code llvm.s{add,sub,mul}.with.overflow.i64} (php-src
      * {@code ZEND_SIGNED_*_OVERFLOW} / {@code __builtin_*_overflow} shape) so the
      * hot path is one intrinsic + extract instead of a multi-icmp dance (#36386).
+     *
+     * When {@code $skipOverflow} is true (compile-time identity/zero operand —
+     * {@see canSkipOverflowPromote}) emit bare {@code add}/{@code sub}/{@code mul}
+     * with no overflow flag or f64 slot (#36386).
      */
     public static function binaryNativeLong(
         Context $context,
         int $opType,
         LlvmValue $left,
-        LlvmValue $right
+        LlvmValue $right,
+        bool $skipOverflow = false
     ): Variable {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'native_long_bin_cont');
         $i64 = $context->getTypeFromString('int64');
         $f64 = $context->getTypeFromString('double');
         $a = $context->builder->intCast($left, $i64);
         $b = $context->builder->intCast($right, $i64);
+
+        if ($skipOverflow) {
+            if (OpCode::TYPE_PLUS === $opType) {
+                $res = $context->builder->add($a, $b);
+            } elseif (OpCode::TYPE_MUL === $opType) {
+                $res = $context->builder->mul($a, $b);
+            } else {
+                $res = $context->builder->sub($a, $b);
+            }
+
+            return new Variable($context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $res);
+        }
 
         [$lres, $overflow] = self::emitWithOverflow($context, $opType, $a, $b);
 

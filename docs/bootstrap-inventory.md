@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 8402 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26427 |
+| Source constructs flagged (warnings) | 26428 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7324,7 +7324,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/JitIncDec.php` | 0 | 6 |
 | `lib/JIT/JitIterableArg.php` | 0 | 2 |
 | `lib/JIT/JitLongArg.php` | 0 | 1 |
-| `lib/JIT/JitLongArithOverflow.php` | 0 | 5 |
+| `lib/JIT/JitLongArithOverflow.php` | 0 | 6 |
 | `lib/JIT/JitLongDiv.php` | 0 | 5 |
 | `lib/JIT/JitMemoryUsageArg.php` | 0 | 1 |
 | `lib/JIT/JitNativeMethodReturn.php` | 0 | 1 |
@@ -58691,21 +58691,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - trait CallResultOperandAssign (line 25)
-- new Variable (line 302)
-- new Variable (line 325)
-- new Variable (line 354)
-- new Variable (line 380)
-- new Variable (line 405)
-- new Variable (line 450)
-- new Type (line 458)
-- new Variable (line 478)
-- new Type (line 487)
-- new Variable (line 506)
-- new Type (line 514)
-- new Variable (line 540)
-- new Type (line 548)
-- new Variable (line 571)
-- new Variable (line 595)
+- new Variable (line 319)
+- new Variable (line 342)
+- new Variable (line 371)
+- new Variable (line 397)
+- new Variable (line 422)
+- new Variable (line 467)
+- new Type (line 475)
+- new Variable (line 495)
+- new Type (line 504)
+- new Variable (line 523)
+- new Type (line 531)
+- new Variable (line 557)
+- new Type (line 565)
+- new Variable (line 588)
+- new Variable (line 612)
 - 6 class method(s)
 
 ### `lib/JIT/Concern/ClassConstEnumAndFunctionStatic.php`
@@ -60286,17 +60286,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 252)
 - new Variable (line 256)
 - new Variable (line 258)
-- new Variable (line 2621)
-- new Variable (line 2625)
-- new Variable (line 2861)
-- new Variable (line 2873)
-- new Variable (line 3023)
-- new Variable (line 3114)
-- new Variable (line 3168)
-- new Variable (line 3408)
-- new Variable (line 3424)
-- new Variable (line 3446)
-- new Variable (line 3457)
+- new Variable (line 2666)
+- new Variable (line 2670)
+- new Variable (line 2906)
+- new Variable (line 2918)
+- new Variable (line 3068)
+- new Variable (line 3159)
+- new Variable (line 3213)
+- new Variable (line 3453)
+- new Variable (line 3469)
+- new Variable (line 3491)
+- new Variable (line 3502)
 - 24 class method(s)
 - 8 closure(s)
 
@@ -60493,17 +60493,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Variable (line 45)
 - new Variable (line 53)
-- new Variable (line 112)
-- new Variable (line 187)
-- 10 class method(s)
+- new Variable (line 140)
+- new Variable (line 169)
+- new Variable (line 244)
+- 11 class method(s)
 
 ### `lib/JIT/JitLongDiv.php`
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 34)
 - new Variable (line 42)
-- new Variable (line 122)
-- new DivisionByZeroError (line 212)
+- new Variable (line 132)
+- new DivisionByZeroError (line 231)
 - 5 class method(s)
 
 ### `lib/JIT/JitMemoryUsageArg.php`
@@ -60602,7 +60603,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 544)
-- 28 class method(s)
+- 29 class method(s)
 
 ### `lib/JIT/JitStringCompare.php`
 
