@@ -50,9 +50,13 @@ $uri = $_SERVER['REQUEST_URI'] ?? '/hello';
 $request = $psr17->createServerRequest($method, $uri);
 $response = $app->handle($request);
 http_response_code($response->getStatusCode());
-// AOT (#36382): foreach ($response->getHeaders() as ...) after handle() aborts the
-// binary before body echo under IncludeHelper (status-only CGI, no hello). Status +
-// body is enough for the Done-when /hello smoke; header() alone is fine (bisect).
+// AOT (#36382): typed `: array` getHeaders() owns a HT ref on return (CompileReturn
+// ZVAL_COPY mirror of IS_ARRAY) so foreach + header() no longer SEGV before body.
+foreach ($response->getHeaders() as $name => $values) {
+    foreach ($values as $value) {
+        header($name . ': ' . $value, false);
+    }
+}
 $body = $response->getBody();
 echo (string) $body;
 EOF
