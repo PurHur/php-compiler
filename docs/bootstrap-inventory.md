@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 8362 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26323 |
+| Source constructs flagged (warnings) | 26322 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3313,7 +3313,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitResolveIncludePath.php` | 0 | 1 |
 | `ext/standard/JitRewind.php` | 0 | 1 |
 | `ext/standard/JitRmdir.php` | 0 | 1 |
-| `ext/standard/JitRound.php` | 0 | 2 |
+| `ext/standard/JitRound.php` | 0 | 1 |
 | `ext/standard/JitRoundModeResolve.php` | 0 | 1 |
 | `ext/standard/JitScalarEnumCoerce.php` | 0 | 1 |
 | `ext/standard/JitScalarTypeCoerce.php` | 0 | 3 |
@@ -33797,8 +33797,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitRound.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 367)
-- 13 class method(s)
+- 11 class method(s)
 
 ### `ext/standard/JitRoundModeResolve.php`
 
