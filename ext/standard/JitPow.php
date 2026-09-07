@@ -11,10 +11,12 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\DiscardedPureCallElision;
 use PHPCompiler\JIT\JitEnumNumericOperandGuard;
 use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitLongArithOverflow;
 use PHPCompiler\JIT\JitPowNumericOperandGuard;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitValueNumeric;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\OpCode;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -133,9 +135,10 @@ final class JitPow
     /**
      * Integer ** via MathFpow — avoids broken __phpc_pow_int on boxed operands (#35978).
      *
-     * Compile-time exponent {@code 0} → {@code 1} and {@code 1} → identity
-     * omit {@code llvm.pow.f64} (#36386; php-src {@code pow_function} /
-     * {@code zend_pow}).
+     * Compile-time exponent {@code 0} → {@code 1}, {@code 1} → identity, and
+     * {@code 2} → {@code base * base} with smul overflow→float omit
+     * {@code llvm.pow.f64} (#36386; php-src {@code pow_function} /
+     * {@code zend_pow} / {@code mul_function}).
      */
     private static function emitIntegerPowViaMathFpow(
         Context $context,
@@ -160,6 +163,21 @@ final class JitPow
                 $context->lookupFunction('__value__writeLong'),
                 $slotPtr,
                 $context->builder->intCast($baseL, $context->getTypeFromString('int64'))
+            );
+
+            return;
+        }
+        if ('square' === $expFold) {
+            // Same shape as typed $n*$n — overflow promotes to float (mul_function).
+            $baseL = JitLongArg::lower($context, $base, 'pow() base');
+            $i64 = $context->getTypeFromString('int64');
+            $baseI64 = $context->builder->intCast($baseL, $i64);
+            JitLongArithOverflow::writeBoxedBinary(
+                $context,
+                OpCode::TYPE_MUL,
+                $baseI64,
+                $baseI64,
+                $slotPtr
             );
 
             return;

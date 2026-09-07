@@ -270,8 +270,9 @@ use PHPCompiler\VM\Variable as VmVariable;
  * (omit {@code sdiv} / {@code INT_MIN}/{-1} {@code ArithmeticError}; keep
  * {@code DivisionByZeroError} when {@code n == 0}; peer typed {@code $n / $n};
  * {@see intdivSameOperandFoldsToOne}). Typed {@code $n ** 0} / {@code pow($n, 0)}
- * folds to {@code 1} and {@code $n ** 1} / {@code pow($n, 1)} is identity
- * (omit {@code llvm.pow.f64} / float round-trip;
+ * folds to {@code 1}, {@code $n ** 1} / {@code pow($n, 1)} is identity, and
+ * {@code $n ** 2} / {@code pow($n, 2)} lowers to {@code $n * $n} with smul
+ * overflow→float (omit {@code llvm.pow.f64} / float round-trip;
  * {@see nativeLongPowCompileTimeExponentFold}). {@code intdiv($n, -1)} and typed
  * {@code / -1} lower to {@code negate} with the {@code INT_MIN} guard /
  * float promote only when needed ({@see nativeLongDivisorIsCompileTimeNegOne}).
@@ -4376,18 +4377,23 @@ final class DiscardedPureCallElision
      * compile-time long:
      * - {@code $n ** 0} / {@code pow($n, 0)} → {@code 1} (incl. {@code 0 ** 0})
      * - {@code $n ** 1} / {@code pow($n, 1)} → {@code $n} (identity)
+     * - {@code $n ** 2} / {@code pow($n, 2)} → {@code $n * $n} with
+     *   {@code llvm.smul.with.overflow} → float promote on overflow (same
+     *   shape as typed {@code *} / {@code mul_function})
      *
      * Omits {@code llvm.pow.f64} and the siToFp/fpToSi round-trip on the
      * integer fast path ({@see \PHPCompiler\ext\standard\JitPow}). Peer
-     * compile-time {@code * 1} identity ({@see nativeLongArithIsCompileTimeIdentityOrZero}).
+     * compile-time {@code * 1} identity ({@see nativeLongArithIsCompileTimeIdentityOrZero})
+     * and {@code * 2^k} shl ({@see nativeLongMulCompileTimePowerOfTwoShift}).
      *
-     * Float exponents ({@code 0.0}/{@code 1.0}) stay on the float path —
-     * Zend returns {@code float} for those shapes.
+     * Float exponents ({@code 0.0}/{@code 1.0}/{@code 2.0}) stay on the float
+     * path — Zend returns {@code float} for those shapes.
      *
      * php-src: Zend/zend_operators.c {@code pow_function} /
-     * {@code zend_pow}; ext/standard/math.c {@code PHP_FUNCTION(pow)}.
+     * {@code zend_pow} / {@code mul_function}; ext/standard/math.c
+     * {@code PHP_FUNCTION(pow)}.
      *
-     * @return 'one'|'identity'|null fold to 1, keep base, or null when N/A
+     * @return 'one'|'identity'|'square'|null fold to 1, keep base, mul square, or null
      */
     public static function nativeLongPowCompileTimeExponentFold(
         Variable $exponent
@@ -4401,6 +4407,9 @@ final class DiscardedPureCallElision
         }
         if (1 === $e) {
             return 'identity';
+        }
+        if (2 === $e) {
+            return 'square';
         }
 
         return null;
