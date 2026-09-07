@@ -273,7 +273,7 @@ trait TryFinallyCatchAndOperandLookup
         if ($this->isArrayDimFetchForWrite($fetch, $block)) {
             return;
         }
-        // String match ErrorSuppressAndPropertyFetch::ARRAY_EMPTY_OFFSET_READ_COMPILE_ERROR
+        // String match SwitchIssetIncludeAndThrowCompile::ARRAY_EMPTY_OFFSET_READ_COMPILE_ERROR
         // (private trait const is not visible across sibling Concerns).
         $this->throwCompileError('Cannot use [] for reading');
     }
