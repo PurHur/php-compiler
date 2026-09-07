@@ -39,6 +39,8 @@ use PHPTypes\Type;
  * {@see CallArgClosureDeadTempProducerEvalAndPreferNamedLocalValueSlots};
  * multi-producer / named-local / array_column / in_array family / array_pad slots in
  * {@see CallArgMultiProducerNamedLocalArrayColumnSearchPadValueSlots};
+ * adjacent-assign / sibling array-merge / embedded-producer rematch in
+ * {@see CallArgAdjacentAssignSiblingArrayMergeAndEmbeddedProducerRematch};
  * inline Array_ unpack / array_reduce / family resolve in
  * {@see CallArgInlineArrayUnpackReduceAndFamilyResolve}.
  *
@@ -319,152 +321,18 @@ trait CompileCallArgSends
                 $assignedNamedLocal,
                 $inlineArrayLiteralArgWired
             );
-            foreach ($this->tryEmitAdjacentAssignForInlineCallArg(
+            $this->resolveCallArgAdjacentAssignSiblingArrayMergeAndEmbeddedProducerRematch(
                 $arg,
-                null !== $valueSlot ? (string) $valueSlot : null,
+                (int) $argIndex,
                 $block,
+                $calleeName,
                 $cfgCallOp,
-                (int) $argIndex
-            ) as $assignOp) {
-                $sends[] = $assignOp;
-            }
-            if (null !== $cfgCallOp) {
-                $skipSiblingArrayProducer = (null !== $unpackFlag)
-                    || (
-                        $this->callArgIsDeadInlineTemporary($arg)
-                        && $this->callArgOperandExpectsArrayProducer($arg)
-                        && !$this->shouldUseArrayProducerCallArgResolution($cfgCallOp, (int) $argIndex, $calleeName)
-                    );
-                $skipSiblingForLeadingArrayMergeFamily = false;
-                if (null !== $block->orig) {
-                    $mergeName = strtolower($calleeName ?? $this->resolveCfgFuncCallName($cfgCallOp) ?? '');
-                    if (
-                        \in_array($mergeName, ['array_merge', 'array_merge_recursive', 'array_replace', 'array_replace_recursive'], true)
-                    ) {
-                        $mergeProducers = $this->arrayMergeFamilyInlineProducersForCfgCall(
-                            $block->orig->children,
-                            $cfgCallOp
-                        );
-                        if (null !== $this->matchArrayMergeFuncCallAndArrayInlineProducers(
-                            $mergeProducers,
-                            (int) $argIndex
-                        )) {
-                            $skipSiblingForLeadingArrayMergeFamily = true;
-                        } elseif (0 === (int) $argIndex && $this->arrayMergeHasLeadingInlineArrayBeforeArrayKeysSibling($block, $cfgCallOp)) {
-                            $skipSiblingForLeadingArrayMergeFamily = true;
-                        }
-                    }
-                }
-                if (
-                    null !== $cfgCallOp
-                    && null !== $block->orig
-                    && $this->callArgIsDeadInlineTemporary($arg)
-                    && !$inlineArrayLiteralArgWired
-                    && null === $dimFetchSlot
-                    && null === $valueSlot
-                ) {
-                    $embeddedProducers = $this->precedingInlineCallArgProducersBeforeCfgOp(
-                        $block->orig->children,
-                        $cfgCallOp
-                    );
-                    $embeddedTarget = $this->matchInlineCallArgProducerWithEmbeddedLiterals(
-                        $embeddedProducers,
-                        $cfgCallOp->args ?? [],
-                        (int) $argIndex,
-                        $cfgCallOp,
-                        $block,
-                        $calleeName
-                    );
-                    if ($embeddedTarget instanceof Op\Expr) {
-                        $foldedEmbedded = $embeddedTarget instanceof Op\Expr\ConstFetch
-                            ? $this->tryFoldGlobalConstFetch($embeddedTarget)
-                            : null;
-                        if (null !== $foldedEmbedded) {
-                            $valueSlot = (string) $block->registerConstant(new Operand\Temporary(), $foldedEmbedded);
-                        } else {
-                            $embeddedSlot = $block->slotForOperand($embeddedTarget->result);
-                            if (null === $embeddedSlot) {
-                                foreach ($this->compileExpr($embeddedTarget, $block) as $op) {
-                                    $sends[] = $op;
-                                }
-                                $embeddedSlot = $block->slotForOperand($embeddedTarget->result);
-                            }
-                            if (null !== $embeddedSlot) {
-                                $valueSlot = (string) $embeddedSlot;
-                            }
-                        }
-                    }
-                }
-                if (!$skipSiblingArrayProducer && !$skipSiblingForLeadingArrayMergeFamily && null === $valueSlot) {
-                $siblingOps = [];
-                $siblingSlot = $this->resolveSiblingInlineCallArgProducerSlot(
-                    $block,
-                    $cfgCallOp,
-                    (int) $argIndex,
-                    $siblingOps
-                );
-                if (null !== $siblingSlot && !$inlineArrayLiteralArgWired && null === $dimFetchSlot) {
-                    if ([] !== $siblingOps) {
-                        $sends = array_merge($sends, $siblingOps);
-                    }
-                    $valueSlot = $siblingSlot;
-                } elseif (
-                    null !== $cfgCallOp
-                    && $this->siblingConsumerHasTrailingByRefNamedLocal($cfgCallOp)
-                    && $this->callArgIsDeadInlineTemporary($arg)
-                ) {
-                    // #15476 regression from #15848: operand→slot map drifts for precompiled
-                    // hoisted str_repeat() producers when a trailing by-ref local follows.
-                    $execReturnSlot = $this->slotForSiblingInlineFuncCallProducerExecReturnOrdinal(
-                        $block,
-                        (int) $argIndex
-                    );
-                    if (null !== $execReturnSlot) {
-                        $valueSlot = (string) $execReturnSlot;
-                    }
-                }
-                }
-                if (
-                    0 === (int) $argIndex
-                    && $skipSiblingForLeadingArrayMergeFamily
-                    && null === $unpackFlag
-                    && null === $valueSlot
-                    && null !== $block->orig
-                ) {
-                    $mergeProducers = $this->arrayMergeFamilyInlineProducersForCfgCall(
-                        $block->orig->children,
-                        $cfgCallOp
-                    );
-                    $mergeMapped = $this->matchArrayMergeFuncCallAndArrayInlineProducers(
-                        $mergeProducers,
-                        (int) $argIndex
-                    );
-                    if (
-                        $mergeMapped instanceof Op\Expr\FuncCall
-                        || $mergeMapped instanceof Op\Expr\NsFuncCall
-                    ) {
-                        $funcOrdinal = 0;
-                        foreach ($mergeProducers as $producer) {
-                            if ($producer === $mergeMapped) {
-                                break;
-                            }
-                            if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
-                                ++$funcOrdinal;
-                            }
-                        }
-                        $execSlot = $this->slotForFuncCallExecReturnOrdinal($block, $funcOrdinal, $sends);
-                        if (null !== $execSlot) {
-                            $valueSlot = (string) $execSlot;
-                        }
-                    } elseif ($mergeMapped instanceof Op\Expr\Array_) {
-                        $leadingInitSlot = $this->slotForInitArrayOrdinal($block, 0, $sends);
-                        if (null !== $leadingInitSlot) {
-                            $valueSlot = $leadingInitSlot;
-                            $inlineArrayLiteralArgWired = true;
-                        }
-                    }
-                }
-            }
+                $unpackFlag,
+                $dimFetchSlot,
+                $sends,
+                $valueSlot,
+                $inlineArrayLiteralArgWired
+            );
             if (
                 null !== $cfgCallOp
                 && null !== $nameSlot
