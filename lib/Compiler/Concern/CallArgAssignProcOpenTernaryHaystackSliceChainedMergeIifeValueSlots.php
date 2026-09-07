@@ -26,6 +26,7 @@ trait CallArgAssignProcOpenTernaryHaystackSliceChainedMergeIifeValueSlots
     /**
      * @param list<\PHPCompiler\OpCode> $sends already-emitted ARG_SENDs (compileExpr may append)
      * @param-out mixed $valueSlot
+     * @param-out mixed $arraySliceSlot
      */
     private function resolveCallArgAssignProcOpenTernaryHaystackSliceChainedMergeIifeValueSlots(
         mixed $arg,
@@ -39,8 +40,10 @@ trait CallArgAssignProcOpenTernaryHaystackSliceChainedMergeIifeValueSlots
         bool $hoistedEnumPropertyCallArgSlotWired,
         array &$sends,
         &$valueSlot,
-        bool &$outerMultiArraySetOpArgWired
+        bool &$outerMultiArraySetOpArgWired,
+        &$arraySliceSlot
     ): void {
+        $arraySliceSlot = null;
         if (null !== $cfgCallOp) {
             $assignInCallArg = $cfgCallOp->args[(int) $argIndex] ?? $arg;
             if (
