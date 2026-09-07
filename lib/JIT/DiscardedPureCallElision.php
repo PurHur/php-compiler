@@ -249,7 +249,9 @@ use PHPCompiler\VM\Variable as VmVariable;
  * {@see bitwiseLogicIsCompileTimeConstantResult}). Same-operand typed
  * {@code $n & $n}/{@code $n | $n} are identity and {@code $n ^ $n} folds to
  * {@code 0} (no {@code and}/{@code or}/{@code xor};
- * {@see bitwiseLogicSameOperandFold}). Compile-time divisors ≠
+ * {@see bitwiseLogicSameOperandFold}). Same-operand typed {@code $n - $n}
+ * folds to {@code 0} (no {@code sub} / overflow intrinsic;
+ * {@see nativeLongArithSameOperandFold}). Compile-time divisors ≠
  * {@code -1} skip the typed {@code /} {@code PHP_INT_MIN}/{-1} promote arm
  * ({@see nativeLongDivisorCanSkipNegOneModuloBranch}). Typed {@code / 1} is
  * identity (no {@code sdiv}/{@code srem}/exactness promote;
@@ -4282,6 +4284,35 @@ final class DiscardedPureCallElision
         }
 
         return null;
+    }
+
+    /**
+     * Typed native-long arithmetic when both operands are the same storage /
+     * SSA payload: {@code $n - $n} → {@code 0} (omit {@code sub} /
+     * {@code llvm.ssub.with.overflow}). Algebra holds for every zend_long
+     * including {@code PHP_INT_MIN} ({@code ZEND_SIGNED_SUB_OVERFLOW} is a
+     * no-op for equal operands).
+     *
+     * Peer same-operand bitwise ({@see bitwiseLogicSameOperandFold}) and
+     * compile-time {@code - 0} identity ({@see nativeLongArithIsCompileTimeIdentityOrZero}).
+     *
+     * php-src: Zend/zend_operators.c sub_function / ZEND_SIGNED_SUB_OVERFLOW.
+     *
+     * @return 'zero'|null fold to 0, or null when not same-operand sub
+     */
+    public static function nativeLongArithSameOperandFold(
+        int $opType,
+        Variable $left,
+        Variable $right
+    ): ?string {
+        if (\PHPCompiler\OpCode::TYPE_MINUS !== $opType) {
+            return null;
+        }
+        if (!self::nativeLongOperandsAreSame($left, $right)) {
+            return null;
+        }
+
+        return 'zero';
     }
 
     /**

@@ -699,6 +699,16 @@ restart:
                             $result = $leftValue;
                             goto return_long;
                         }
+                        // Same-operand $n-$n → 0 (omit ssub.with.overflow; #36386).
+                        $sameSub = DiscardedPureCallElision::nativeLongArithSameOperandFold(
+                            $opcode->type,
+                            $left,
+                            $right
+                        );
+                        if ('zero' === $sameSub) {
+                            $result = $this->context->getTypeFromString('int64')->constInt(0, false);
+                            goto return_long;
+                        }
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
                         $skipOv = JitLongArithOverflow::canSkipOverflowPromote(
                             $this->context,
