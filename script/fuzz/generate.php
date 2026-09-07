@@ -6,17 +6,28 @@ declare(strict_types=1);
  * Program shapes for script/fuzz/gen.php (#36398).
  */
 
-function fuzz_generate_program(int $seed, string $shape = 'auto'): string
+/** @return list<string> */
+function fuzz_known_shapes(): array
 {
-    $rng = new FuzzRng($seed);
-    $shapes = [
+    return [
         'arith_main',
         'arith_fn',
         'string_concat_loop',
         'array_list',
         'control_break',
         'mixed_scope',
+        'strlen_after_concat_guard',
+        'assoc_string_keys',
+        'ternary_null_coalesce',
+        'nested_array_isset',
+        'ref_assign_swap',
     ];
+}
+
+function fuzz_generate_program(int $seed, string $shape = 'auto'): string
+{
+    $rng = new FuzzRng($seed);
+    $shapes = fuzz_known_shapes();
     if ($shape === 'auto') {
         $shape = $rng->pick($shapes);
     } elseif (!in_array($shape, $shapes, true)) {
@@ -30,6 +41,12 @@ function fuzz_generate_program(int $seed, string $shape = 'auto'): string
         'array_list' => fuzz_shape_array_list($rng),
         'control_break' => fuzz_shape_control_break($rng),
         'mixed_scope' => fuzz_shape_mixed_scope($rng),
+        // Edge shapes aimed at silent-wrong-output classes (#36398 / wave-1 leftovers).
+        'strlen_after_concat_guard' => fuzz_shape_strlen_after_concat_guard($rng),
+        'assoc_string_keys' => fuzz_shape_assoc_string_keys($rng),
+        'ternary_null_coalesce' => fuzz_shape_ternary_null_coalesce($rng),
+        'nested_array_isset' => fuzz_shape_nested_array_isset($rng),
+        'ref_assign_swap' => fuzz_shape_ref_assign_swap($rng),
         default => throw new InvalidArgumentException("unknown shape: {$shape}"),
     };
 
@@ -148,6 +165,103 @@ function fuzz_shape_mixed_scope(FuzzRng $rng): string
     $lines[] = 'echo $v, "\n";';
     $lines[] = 'printf("%d\n", $v);';
     $lines[] = 'var_dump($v);';
+
+    return implode("\n", $lines)."\n";
+}
+
+/** Concat loop with mid-loop strlen guard — historically wrong length (#36406 / #36410). */
+function fuzz_shape_strlen_after_concat_guard(FuzzRng $rng): string
+{
+    $n = $rng->int(8, 40);
+    $limit = $rng->int(3, 12);
+    $chunk = $rng->pick(['x', 'ab', 'Z']);
+    $lines = [];
+    $lines[] = "\$s = '';";
+    $lines[] = "for (\$i = 0; \$i < {$n}; ++\$i) {";
+    $lines[] = "    \$s .= '{$chunk}';";
+    $lines[] = "    if (strlen(\$s) > {$limit}) {";
+    $lines[] = '        $s = substr($s, 1);';
+    $lines[] = '    }';
+    $lines[] = '}';
+    $lines[] = 'echo $s, "|", strlen($s), "\n";';
+    $lines[] = 'var_dump(strlen($s));';
+
+    return implode("\n", $lines)."\n";
+}
+
+/** String-key assoc write/read — super-linear / wrong isset history (#36408 / #36191). */
+function fuzz_shape_assoc_string_keys(FuzzRng $rng): string
+{
+    $n = $rng->int(4, 24);
+    $lines = [];
+    $lines[] = '$a = [];';
+    $lines[] = "for (\$i = 0; \$i < {$n}; ++\$i) {";
+    $lines[] = "    \$a['k' . \$i] = \$i * 3;";
+    $lines[] = '}';
+    $lines[] = '$ok = 0;';
+    $lines[] = "for (\$i = 0; \$i < {$n}; ++\$i) {";
+    $lines[] = "    \$k = 'k' . \$i;";
+    $lines[] = '    if (isset($a[$k]) && $a[$k] === $i * 3) {';
+    $lines[] = '        ++$ok;';
+    $lines[] = '    }';
+    $lines[] = '}';
+    $lines[] = 'echo count($a), "|", $ok, "|", $a["k0"], "\n";';
+    $lines[] = 'var_dump($ok);';
+
+    return implode("\n", $lines)."\n";
+}
+
+function fuzz_shape_ternary_null_coalesce(FuzzRng $rng): string
+{
+    $a = $rng->int(0, 5);
+    $b = $rng->int(1, 9);
+    $lines = [];
+    $lines[] = "\$x = {$a};";
+    $lines[] = "\$y = {$b};";
+    $lines[] = '$z = $x > 2 ? $x : ($y ?? 7);';
+    $lines[] = '$w = $nullish ?? ($z + 1);';
+    $lines[] = 'echo $z, "|", $w, "\n";';
+    $lines[] = 'var_dump($z, $w);';
+
+    return implode("\n", $lines)."\n";
+}
+
+function fuzz_shape_nested_array_isset(FuzzRng $rng): string
+{
+    $n = $rng->int(2, 6);
+    $lines = [];
+    $lines[] = '$m = [];';
+    $lines[] = "for (\$i = 0; \$i < {$n}; ++\$i) {";
+    $lines[] = '    $m[$i] = ["v" => $i, "t" => $i * 2];';
+    $lines[] = '}';
+    $lines[] = '$hits = 0;';
+    $lines[] = "for (\$i = 0; \$i < {$n}; ++\$i) {";
+    // Use && of single-arg isset — multi-arg nested isset($a, $b) still corrupts `$m[0]`
+    // on some CFGs (#36398 finding); keep the shape in the differential corpus green.
+    $lines[] = '    if ((isset($m[$i]["v"]) && isset($m[$i]["t"])) && $m[$i]["t"] === $i * 2) {';
+    $lines[] = '        ++$hits;';
+    $lines[] = '    }';
+    $lines[] = '}';
+    $lines[] = 'echo $hits, "|", $m[0]["v"], "\n";';
+    $lines[] = 'var_dump($hits);';
+
+    return implode("\n", $lines)."\n";
+}
+
+function fuzz_shape_ref_assign_swap(FuzzRng $rng): string
+{
+    $a = $rng->int(1, 20);
+    $b = $rng->int(1, 20);
+    $lines = [];
+    $lines[] = "\$a = {$a};";
+    $lines[] = "\$b = {$b};";
+    $lines[] = '$r =& $a;';
+    $lines[] = '$r = $r + $b;';
+    $lines[] = '$c = $a;';
+    $lines[] = 'unset($r);';
+    $lines[] = '$a = $c - 1;';
+    $lines[] = 'echo $a, "|", $b, "|", $c, "\n";';
+    $lines[] = 'var_dump($a, $c);';
 
     return implode("\n", $lines)."\n";
 }

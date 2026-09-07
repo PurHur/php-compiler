@@ -8,6 +8,7 @@ use PHPCompiler\OpCode;
 use PHPCfg\Op;
 use PHPCfg\Operand;
 use PHPCfg\Operand\Temporary;
+use PHPTypes\Type;
 
 /**
  * isset()/empty()/unset() quiet ArrayDimFetch skips and nested dim-chain
@@ -231,7 +232,7 @@ trait IssetEmptyUnsetAndDimFetchCompile
      * @param list<Op\Expr\ArrayDimFetch> $chain outermost first
      * @return array{0: list<OpCode>, 1: int} prefix opcodes + container slot for the final dim
      */
-    private function emitQuietDimFetchChainPrefix(array $chain, Block $block): array
+    protected function emitQuietDimFetchChainPrefix(array $chain, Block $block): array
     {
         $first = $chain[0];
         $containerSlot = $this->compileOperand($first->var, $block, true);
@@ -244,6 +245,43 @@ trait IssetEmptyUnsetAndDimFetchCompile
             $fetch = $chain[$i];
             $this->rejectArrayEmptyOffsetRead($fetch, $block);
             $resultSlot = $this->compileOperand($fetch->result, $block, false);
+            $dimSlot = null !== $fetch->dim
+                ? $this->compileOperand($fetch->dim, $block, true)
+                : null;
+            $op = new OpCode(OpCode::TYPE_ARRAY_DIM_FETCH, $resultSlot, $containerSlot, $dimSlot);
+            $op->arrayDimFetchIs = true;
+            $this->assignSourceMetadata($op, $fetch);
+            $opcodes[] = $op;
+            $containerSlot = $resultSlot;
+        }
+
+        return [$opcodes, $containerSlot];
+    }
+
+    /**
+     * Like {@see emitQuietDimFetchChainPrefix} but allocates fresh temps for intermediate
+     * FETCH_DIM_IS destinations so multi-arg isset JUMPIF blocks cannot recycle php-cfg
+     * fetch->result slots that later `$m[0]["k"]` expressions still need (#36398).
+     *
+     * @param list<Op\Expr\ArrayDimFetch> $chain outermost first
+     * @return array{0: list<OpCode>, 1: int}
+     */
+    protected function emitQuietDimFetchChainPrefixFresh(array $chain, Block $block): array
+    {
+        $first = $chain[0];
+        $containerSlot = $this->compileOperand($first->var, $block, true);
+        if (count($chain) < 2) {
+            return [[], $containerSlot];
+        }
+        $opcodes = [];
+        $prefixLen = count($chain) - 1;
+        for ($i = 0; $i < $prefixLen; ++$i) {
+            $fetch = $chain[$i];
+            $this->rejectArrayEmptyOffsetRead($fetch, $block);
+            $resultOperand = new Temporary;
+            $resultOperand->type = Type::mixed();
+            $resultOperand->usages[] = $resultOperand;
+            $resultSlot = $block->getVarSlot($resultOperand, false);
             $dimSlot = null !== $fetch->dim
                 ? $this->compileOperand($fetch->dim, $block, true)
                 : null;

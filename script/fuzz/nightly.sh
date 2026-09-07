@@ -136,4 +136,21 @@ if [[ "$REDUCED_OK" -ge "$MIN_REDUCE_SAMPLES" && "$LE15_PCT" -lt "$REDUCE_TARGET
 fi
 
 echo "fuzz-nightly: OK (${ELAPSED}s for ${COUNT} programs; unique=${UNIQUE}; le15=${REDUCED_LE15}/${REDUCED_OK})"
+
+# Optional: draft / file GitHub issues for new signatures (#36398 slice 3).
+if [[ "${FUZZ_NIGHTLY_FILE_ISSUES:-0}" == "1" && "$UNIQUE" -gt 0 ]]; then
+  FILE_ARGS=(
+    php script/fuzz/file-signatures.php
+    --failures-dir "$KEEP"
+    --reduced-dir "$OUTDIR/reduced"
+    --outdir "$OUTDIR/issue-drafts"
+    --registry test/differential/cases/fuzz/SIGNATURES.json
+  )
+  if [[ "${FUZZ_NIGHTLY_CREATE_ISSUES:-0}" == "1" ]]; then
+    FILE_ARGS+=(--create)
+  fi
+  echo "fuzz-nightly: filing signatures (create=${FUZZ_NIGHTLY_CREATE_ISSUES:-0})..."
+  "${FILE_ARGS[@]}"
+fi
+
 exit 0

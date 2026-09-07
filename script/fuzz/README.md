@@ -50,5 +50,29 @@ FUZZ_NIGHTLY_COUNT=100 FUZZ_NIGHTLY_WALL_SEC=600 ./script/fuzz/nightly.sh
 
 Writes `build/fuzz-nightly/report.json` (elapsed, unique signatures, ≤15-line reduce rate).
 Fails if the batch does not finish within `FUZZ_NIGHTLY_WALL_SEC` (default 3600), or if
-≥5 unique failures reduce and fewer than 80% are ≤15 nonempty lines. ASan / signature
-issue filing remain follow-up slices of #36398.
+≥5 unique failures reduce and fewer than 80% are ≤15 nonempty lines.
+
+## Signature issue filing (slice 3)
+
+```bash
+# After a keep-failures / reduce pass:
+./script/docker-exec.sh -- bash -lc \
+  'php script/fuzz/file-signatures.php --failures-dir build/fuzz-nightly/failures \
+   --reduced-dir build/fuzz-nightly/reduced --dry-run'
+
+# Write drafts + update test/differential/cases/fuzz/SIGNATURES.json:
+./script/docker-exec.sh -- bash -lc \
+  'php script/fuzz/file-signatures.php --failures-dir build/fuzz-nightly/failures \
+   --reduced-dir build/fuzz-nightly/reduced'
+
+# Also create GitHub issues (deduped by registry):
+./script/docker-exec.sh -- bash -lc \
+  'php script/fuzz/file-signatures.php --failures-dir build/fuzz-nightly/failures \
+   --reduced-dir build/fuzz-nightly/reduced --create'
+
+# From nightly (drafts only unless CREATE=1):
+FUZZ_NIGHTLY_FILE_ISSUES=1 make fuzz-nightly
+FUZZ_NIGHTLY_FILE_ISSUES=1 FUZZ_NIGHTLY_CREATE_ISSUES=1 make fuzz-nightly
+```
+
+ASan / coverage-biased generation remain follow-up slices of #36398.

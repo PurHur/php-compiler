@@ -30,7 +30,7 @@ final class DifferentialFuzz36398Test extends TestCase
 
     public function testExplicitShapesAreDeterministic(): void
     {
-        foreach (['arith_main', 'arith_fn', 'string_concat_loop', 'array_list', 'control_break', 'mixed_scope'] as $shape) {
+        foreach (fuzz_known_shapes() as $shape) {
             $a = fuzz_generate_program(99, $shape);
             $b = fuzz_generate_program(99, $shape);
             $this->assertSame($a, $b, $shape);
@@ -66,7 +66,7 @@ final class DifferentialFuzz36398Test extends TestCase
         $count = (int) trim((string) file_get_contents($dir.'/COUNT'));
         $cases = glob($dir.'/seed_*.php') ?: [];
         $this->assertSame($count, count($cases));
-        $this->assertGreaterThanOrEqual(6, $count);
+        $this->assertGreaterThanOrEqual(7, $count);
     }
 
     public function testReducerShrinksRedundantEcho(): void
@@ -123,5 +123,65 @@ PHP;
         $path = self::$root.'/script/fuzz/nightly.sh';
         $this->assertFileExists($path);
         $this->assertTrue(is_executable($path), 'nightly.sh must be executable');
+    }
+
+    public function testFileSignaturesScriptDraftsIssueBody(): void
+    {
+        $failDir = self::$root.'/build/fuzz-file-sig-unit';
+        if (is_dir($failDir)) {
+            foreach (glob($failDir.'/*') ?: [] as $f) {
+                @unlink($f);
+            }
+        } else {
+            mkdir($failDir, 0777, true);
+        }
+        $outdir = $failDir.'/drafts';
+        $registry = $failDir.'/SIGNATURES.json';
+        $sig = fuzz_normalize_signature('vm_diff', 0, 1, "ok\n", "bad\n");
+        $src = "<?php\ndeclare(strict_types=1);\necho \"bad\\n\";\n";
+        file_put_contents($failDir.'/vm_diff_seed99.php', $src);
+        file_put_contents($failDir.'/vm_diff_seed99.json', json_encode([
+            'seed' => 99,
+            'kind' => 'vm_diff',
+            'signature' => $sig,
+            'zend_rc' => 0,
+            'got_rc' => 1,
+            'zend_out' => "ok\n",
+            'got_out' => "bad\n",
+        ], JSON_PRETTY_PRINT));
+
+        $cmd = 'cd '.escapeshellarg(self::$root)
+            .' && php script/fuzz/file-signatures.php'
+            .' --failures-dir '.escapeshellarg($failDir)
+            .' --outdir '.escapeshellarg($outdir)
+            .' --registry '.escapeshellarg($registry)
+            .' --limit 5 2>&1';
+        exec($cmd, $lines, $rc);
+        $joined = implode("\n", $lines);
+        $this->assertSame(0, $rc, $joined);
+        $this->assertFileExists($outdir.'/vm_diff_seed99.md');
+        $md = (string) file_get_contents($outdir.'/vm_diff_seed99.md');
+        $this->assertStringContainsString('Fuzz:', $md);
+        $this->assertStringContainsString($sig, $md);
+        $this->assertStringContainsString('Part of #36398', $md);
+        $reg = json_decode((string) file_get_contents($registry), true);
+        $this->assertIsArray($reg);
+        $this->assertArrayHasKey($sig, $reg['signatures']);
+
+        // Second run must skip the known signature.
+        $lines2 = [];
+        exec($cmd, $lines2, $rc2);
+        $joined2 = implode("\n", $lines2);
+        $this->assertSame(0, $rc2, $joined2);
+        $this->assertStringContainsString('"skipped_known": 1', $joined2);
+        $this->assertStringContainsString('"processed": 0', $joined2);
+    }
+
+    public function testEdgeShapesAreRegistered(): void
+    {
+        $shapes = fuzz_known_shapes();
+        $this->assertContains('strlen_after_concat_guard', $shapes);
+        $this->assertContains('assoc_string_keys', $shapes);
+        $this->assertGreaterThanOrEqual(11, count($shapes));
     }
 }

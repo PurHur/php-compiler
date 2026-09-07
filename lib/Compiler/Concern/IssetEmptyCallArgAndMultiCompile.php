@@ -642,6 +642,20 @@ trait IssetEmptyCallArgAndMultiCompile
      */
     protected function compileIssetMulti(Op\Expr\Isset_ $expr, Block $block): Block
     {
+        // Nested dim chains under multi-arg isset (`isset($m[0]["v"], $m[0]["t"])`) must
+        // reuse single-arg compileIsset lowering. The multi JUMPIF + ASSIGN path recycled
+        // FETCH_DIM_W/`$m[0]=…` hash bucket cells as the isset result and turned `$m[0]`
+        // into bool (#36398). Flat multi-arg (no nested dims) keeps the fast path below.
+        foreach ($expr->vars as $var) {
+            $dimFetch = $this->findCoalesceArrayDimFetch($var, $block);
+            if (null === $dimFetch) {
+                continue;
+            }
+            if (count($this->collectArrayDimFetchChain($dimFetch, $block)) > 1) {
+                return $this->compileIssetMultiViaSingles($expr, $block);
+            }
+        }
+
         $resultSlot = $this->compileOperand($expr->result, $block, false);
         $falseSlot = $this->compileBoolConstant($block, false);
         $endBlock = new Block($block->orig);
@@ -673,21 +687,49 @@ trait IssetEmptyCallArgAndMultiCompile
             $dimFetch = null !== $propFetch || null !== $staticPropFetch
                 ? null
                 : $this->findCoalesceArrayDimFetch($var, $block);
-            [$containerSlot, $dimSlot] = null !== $propFetch
-                ? $this->resolveIssetTargetFromPropertyFetch($propFetch, $current)
-                : (null !== $staticPropFetch
-                    ? $this->resolveIssetTargetFromStaticPropertyFetch($staticPropFetch, $current)
-                    : (null !== $dimFetch
-                        ? $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $current)
-                        : $this->resolveIssetTarget($var, $current)));
             $checkSlot = $resultSlot;
             if ($i < $last) {
                 $checkSlot = $this->compileBoolTemporary($current);
             }
-            if (null === $containerSlot) {
-                $varSlot = $this->compileOperand($var, $current, true);
-                $current->addOpCode(new OpCode(OpCode::TYPE_ISSET, $checkSlot, $varSlot, null));
-            } else {
+            if (null !== $dimFetch) {
+                // Nested dims need the same FETCH_DIM_IS prefix as single-arg compileIsset (#36398).
+                // resolveIssetTargetFromArrayDimFetch only sees the innermost fetch's var (a temp),
+                // so isset($m[0]["v"], …) was always false when assigned.
+                //
+                // Use fresh intermediate slots (not php-cfg fetch->result): multi-arg JUMPIF
+                // blocks reuse VM scope slots, and writing the isset bool into a recycled
+                // FETCH_DIM_IS dest left `$m[0]` reads as bool true (#36398 / #36380 class).
+                $chain = $this->collectArrayDimFetchChain($dimFetch, $current);
+                foreach ($chain as $chainFetch) {
+                    $this->rejectArrayEmptyOffsetRead($chainFetch, $current);
+                }
+                [$prefixOps, $containerSlot] = $this->emitQuietDimFetchChainPrefixFresh($chain, $current);
+                foreach ($prefixOps as $prefixOp) {
+                    $current->addOpCode($prefixOp);
+                }
+                $lastFetch = $chain[count($chain) - 1];
+                $dimSlot = null !== $lastFetch->dim
+                    ? $this->compileOperand($lastFetch->dim, $current, true)
+                    : null;
+                // Always write into a fresh bool temp, then assign to the isset result on the
+                // last arm — keeps resultSlot free of dim-indirect aliasing.
+                $issetDest = $i < $last ? $checkSlot : $this->compileBoolTemporary($current);
+                if ($i === $last) {
+                    $checkSlot = $issetDest;
+                }
+                $current->addOpCode($this->makeIssetOpCode($issetDest, $containerSlot, $dimSlot, false));
+                if ($i === $last) {
+                    $current->addOpCode(new OpCode(
+                        OpCode::TYPE_ASSIGN,
+                        $resultSlot,
+                        $resultSlot,
+                        $issetDest
+                    ));
+                }
+            } elseif (null !== $propFetch || null !== $staticPropFetch) {
+                [$containerSlot, $dimSlot] = null !== $propFetch
+                    ? $this->resolveIssetTargetFromPropertyFetch($propFetch, $current)
+                    : $this->resolveIssetTargetFromStaticPropertyFetch($staticPropFetch, $current);
                 $issetOp = $this->makeIssetOpCode(
                     $checkSlot,
                     $containerSlot,
@@ -698,6 +740,14 @@ trait IssetEmptyCallArgAndMultiCompile
                     $issetOp->issetOnStaticProperty = true;
                 }
                 $current->addOpCode($issetOp);
+            } else {
+                [$containerSlot, $dimSlot] = $this->resolveIssetTarget($var, $current);
+                if (null === $containerSlot) {
+                    $varSlot = $this->compileOperand($var, $current, true);
+                    $current->addOpCode(new OpCode(OpCode::TYPE_ISSET, $checkSlot, $varSlot, null));
+                } else {
+                    $current->addOpCode($this->makeIssetOpCode($checkSlot, $containerSlot, $dimSlot, false));
+                }
             }
             if ($i < $last) {
                 $next = new Block($block->orig);
@@ -710,6 +760,75 @@ trait IssetEmptyCallArgAndMultiCompile
                 $falseBlock->parents[] = $current;
                 $current->addOpCode($jump);
                 $current = $next;
+            }
+        }
+
+        $doneJump = new OpCode(OpCode::TYPE_JUMP);
+        $doneJump->block1 = $endBlock;
+        $current->addOpCode($doneJump);
+        $endBlock->parents[] = $current;
+
+        return $endBlock;
+    }
+
+    /**
+     * Desugar multi-arg isset to short-circuit AND of single-arg compileIsset (#36398).
+     *
+     * php-src: Zend/zend_compile.c zend_compile_isset_or_isempty (multi-var → ISSET_ISEMPTY_*).
+     */
+    protected function compileIssetMultiViaSingles(Op\Expr\Isset_ $expr, Block $block): Block
+    {
+        $resultSlot = $this->compileOperand($expr->result, $block, false);
+        $falseSlot = $this->compileBoolConstant($block, false);
+        $endBlock = new Block($block->orig);
+        $endBlock->inheritUndefinedLocals = true;
+        $endBlock->inheritScopeFrom($block);
+        $falseBlock = new Block($block->orig);
+        $falseBlock->inheritUndefinedLocals = true;
+        $falseBlock->inheritScopeFrom($block);
+        $falseBlock->addOpCode(new OpCode(
+            OpCode::TYPE_ASSIGN,
+            $resultSlot,
+            $resultSlot,
+            $falseSlot
+        ));
+        $falseJump = new OpCode(OpCode::TYPE_JUMP);
+        $falseJump->block1 = $endBlock;
+        $falseBlock->addOpCode($falseJump);
+        $endBlock->parents[] = $falseBlock;
+
+        $current = $block;
+        $vars = $expr->vars;
+        $last = count($vars) - 1;
+        foreach ($vars as $i => $var) {
+            $checkOperand = new Temporary;
+            $checkOperand->type = Type::bool();
+            $checkOperand->usages[] = $checkOperand;
+            $synthetic = new Op\Expr\Isset_([$var]);
+            $synthetic->result = $checkOperand;
+            $checkOperand->usages[] = $synthetic;
+            foreach ($this->compileIsset($synthetic, $current) as $op) {
+                $current->addOpCode($op);
+            }
+            $checkSlot = $current->getVarSlot($checkOperand, true);
+            if ($i < $last) {
+                $next = new Block($block->orig);
+                $next->inheritUndefinedLocals = true;
+                $next->inheritScopeFrom($current);
+                $jump = new OpCode(OpCode::TYPE_JUMPIF, $checkSlot);
+                $jump->block1 = $next;
+                $jump->block2 = $falseBlock;
+                $next->parents[] = $current;
+                $falseBlock->parents[] = $current;
+                $current->addOpCode($jump);
+                $current = $next;
+            } else {
+                $current->addOpCode(new OpCode(
+                    OpCode::TYPE_ASSIGN,
+                    $resultSlot,
+                    $resultSlot,
+                    $checkSlot
+                ));
             }
         }
 

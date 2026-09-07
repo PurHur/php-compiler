@@ -1,0 +1,16 @@
+{
+    "parent_issue": 36398,
+    "updated_at": "2026-09-07T01:45:00+00:00",
+    "signatures": {
+        "8db47a551afff703b2a9a2380661c64010ccbb056aea87cc803e2671351c928b": {
+            "seed": 0,
+            "kind": "vm_diff",
+            "nonempty_lines": 12,
+            "issue": 37114,
+            "url": "https://github.com/PurHur/php-compiler/issues/37114",
+            "filed_at": "2026-09-07T01:45:00+00:00",
+            "parent": 36398,
+            "repro": "test/repro/isset_multi_nested_dim_36398.php"
+        }
+    }
+}
