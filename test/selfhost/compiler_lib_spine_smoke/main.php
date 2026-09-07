@@ -5364,6 +5364,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/ErrorSuppressAndPropertyFet
 require_once __DIR__.'/../../../lib/Compiler/Concern/SwitchIssetIncludeAndThrowCompile.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompileExprAndOpcodeTypes.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompileExprDispatch.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/CompileExprAssignDispatch.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/WriteContextRejects.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/TernaryAndLogicalShortCircuit.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/TernaryMergeVarSlotCompile.php';
