@@ -1141,6 +1141,23 @@ class Runtime {
                     'edit-scaffold: module.bc bound in Context but user-symbol strip failed (#36387)'
                 );
             }
+            // Thin-boot/restore missed — disarm pending so NestedJIT / full lower do not
+            // keep treating this Context as edit-scaffold (#36382 / #36387).
+            JIT\CompileCache::takePendingEditScaffoldKey();
+            if ([] === JIT\SuperglobalInit::$globals) {
+                JIT\SuperglobalInit::initialize($context);
+                JIT\CliArgvGlobalInit::initialize($context);
+                if (
+                    JIT\Builtin::LOAD_TYPE_STANDALONE === $context->loadType
+                    || JIT\Builtin::LOAD_TYPE_EMBED === $context->loadType
+                ) {
+                    $refresh = $context->module->getNamedFunction('__superglobals__refresh');
+                    if (null === $refresh) {
+                        JIT\SuperglobalInit::declareRefresh($context);
+                        JIT\SuperglobalInit::implementRefresh($context);
+                    }
+                }
+            }
         }
         if (
             null !== $block
