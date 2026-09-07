@@ -234,7 +234,9 @@ use PHPCompiler\VM\Variable as VmVariable;
  * are already-numeric and the divisor is a compile-time long ≠ 0; divisor
  * {@code -1} additionally requires a compile-time dividend ≠ {@code PHP_INT_MIN}
  * ({@code DivisionByZeroError} / {@code ArithmeticError} otherwise stay live).
- * {@code hex2bin}/
+ * The same proofs skip the LLVM zero/overflow guards and after-call
+ * throw-pending checks when the result is used ({@see intdivArgsCannotThrow} /
+ * {@see intdivCanSkipZeroDivisorGuard}). {@code hex2bin}/
  * {@code base64_decode}/{@code convert_uudecode} stay live (invalid-input
  * warnings / false returns). Int needles for {@code strpos}/{@code strchr}/…
  * stay live (PHP 8 deprecations). Array {@code str_replace} stays live
@@ -3984,6 +3986,47 @@ final class DiscardedPureCallElision
         }
 
         return $min <= $max;
+    }
+
+    /**
+     * Public for {@see NoThrowCallElision} — when true, discarded or used
+     * {@code intdiv} cannot {@code DivisionByZeroError} / {@code ArithmeticError}
+     * / {@code TypeError} / soft-null deprecate (#36386 / peer #37153).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    public static function intdivArgsCannotThrow(array $callArgs): bool
+    {
+        return self::intdivArgsAllowDiscardedElision($callArgs);
+    }
+
+    /**
+     * Skip the LLVM zero-divisor branch when the divisor truncates to a
+     * compile-time long ≠ 0 (php-src {@code Z_PARAM_LONG}).
+     */
+    public static function intdivCanSkipZeroDivisorGuard(Variable $divisor): bool
+    {
+        $d = self::compileTimeLongScalar($divisor);
+
+        return null !== $d && 0 !== $d;
+    }
+
+    /**
+     * Skip the LLVM {@code PHP_INT_MIN}/{-1} branch when the divisor cannot be
+     * {@code -1}, or both operands are compile-time longs that are not that pair.
+     */
+    public static function intdivCanSkipIntMinNegOneGuard(Variable $dividend, Variable $divisor): bool
+    {
+        $d = self::compileTimeLongScalar($divisor);
+        if (null === $d) {
+            return false;
+        }
+        if (-1 !== $d) {
+            return true;
+        }
+        $n = self::compileTimeLongScalar($dividend);
+
+        return null !== $n && \PHP_INT_MIN !== $n;
     }
 
     /**

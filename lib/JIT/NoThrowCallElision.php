@@ -36,13 +36,15 @@ use PHPCompiler\JIT\Call\Vararg;
  * {@code strpos} / {@code strstr} / {@code str_contains} /
  * {@code str_starts_with} / {@code str_ends_with} / …), and pure math
  * ({@code sqrt} / {@code abs} / {@code pow} / {@code fdiv} / …) on native
- * numeric scalars (php-src {@code ext/standard/string.c}
+ * numeric scalars, and {@code intdiv} when the divisor is a compile-time long
+ * proven not to {@code DivisionByZeroError} / {@code ArithmeticError} (php-src
+ * {@code ext/standard/string.c}
  * {@code PHP_FUNCTION(strlen)} / {@code ord} / {@code chr} / {@code ucwords} /
  * {@code substr} / {@code strcmp} / {@code strpos} / {@code str_contains};
  * {@code ext/standard/url.c} {@code urlencode}; {@code ext/standard/crc32.c} /
  * {@code md5.c} / {@code base64.c}; {@code ext/standard/type.c}
  * {@code is_*}; {@code ext/standard/math.c} {@code PHP_FUNCTION(sqrt)} /
- * {@code pow} etc.; throwing {@code __toString} needs an object/value box).
+ * {@code pow} / {@code intdiv} etc.; throwing {@code __toString} needs an object/value box).
  * Discarded calls with the same arg proofs are dropped entirely by
  * {@see DiscardedPureCallElision}.
  *
@@ -462,6 +464,12 @@ final class NoThrowCallElision
             }
 
             return true;
+        }
+        if ('intdiv' === $name) {
+            // math.c intdiv — DivisionByZeroError / ArithmeticError stay live
+            // unless the divisor (and INT_MIN/-1 pair) are compile-time proven
+            // safe and both args are already numeric (#36386 / peer discarded).
+            return DiscardedPureCallElision::intdivArgsCannotThrow($callArgs);
         }
 
         return false;
@@ -2882,7 +2890,9 @@ final class NoThrowCallElision
             // on typed numeric args (peer hypot / fmod; #36386).
             case 'nextafter':
             // math.c pow / fpow / fdiv — no user handlers; domain errors are
-            // NAN/INF (fdiv ÷0 → INF). intdiv stays out (DivisionByZeroError).
+            // NAN/INF (fdiv ÷0 → INF). intdiv is handled separately via
+            // {@see DiscardedPureCallElision::intdivArgsCannotThrow} (DivisionByZeroError /
+            // ArithmeticError unless divisor is compile-time-safe).
             case 'pow':
             case 'fpow':
             case 'fdiv':
