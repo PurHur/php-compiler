@@ -43777,7 +43777,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/str_decrement.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `ext/standard/str_ends_with.php`
 
@@ -43794,7 +43794,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/str_increment.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `ext/standard/str_ireplace.php`
 
@@ -59689,7 +59689,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/DiscardedPureCallElision.php`
 
 **Warnings** (review for bootstrap subset):
-- 146 class method(s)
+- 147 class method(s)
 
 ### `lib/JIT/DnfParamCheck.php`
 
@@ -60829,7 +60829,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/NoThrowCallElision.php`
 
 **Warnings** (review for bootstrap subset):
-- new Operand\Literal (line 3190)
+- new Operand\Literal (line 3199)
 - 101 class method(s)
 
 ### `lib/JIT/NonObjectPropertyFetchHelper.php`

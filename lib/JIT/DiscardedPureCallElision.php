@@ -236,7 +236,9 @@ use PHPCompiler\VM\Variable as VmVariable;
  * ({@code DivisionByZeroError} / {@code ArithmeticError} otherwise stay live).
  * The same proofs skip the LLVM zero/overflow guards and after-call
  * throw-pending checks when the result is used ({@see intdivArgsCannotThrow} /
- * {@see intdivCanSkipZeroDivisorGuard}). {@code hex2bin}/
+ * {@see intdivCanSkipZeroDivisorGuard}). Proven-safe {@code str_increment}/
+ * {@code str_decrement} literals likewise fold at the call site and skip
+ * after-call throw-pending ({@see strIncDecArgsCannotThrow}). {@code hex2bin}/
  * {@code base64_decode}/{@code convert_uudecode} stay live (invalid-input
  * warnings / false returns). Int needles for {@code strpos}/{@code strchr}/…
  * stay live (PHP 8 deprecations). Array {@code str_replace} stays live
@@ -1629,11 +1631,27 @@ final class DiscardedPureCallElision
         if (!$toCall instanceof CoreFuncInternal) {
             return false;
         }
-        if (!CompilerVersion::supportsStrIncrement()) {
+
+        return self::strIncDecArgsCannotThrow(strtolower($toCall->getName()), $callArgs);
+    }
+
+    /**
+     * Public for {@see NoThrowCallElision} and {@code str_increment}/
+     * {@code str_decrement} compile-time fold — when true, the call cannot
+     * {@code ValueError} / soft-null-deprecate (#36386 / peer #37168).
+     * Uses {@see JitStringArg::compileTimeLiteral} (same as discarded elision):
+     * call-arg temps for source literals are often {@code KIND_VARIABLE} with
+     * {@code compileTimeString} set; {@see JitStringArg::compileTimeLiteralForFold}
+     * would reject those and miss the hot path.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    public static function strIncDecArgsCannotThrow(string $nameLc, array $callArgs): bool
+    {
+        if ('str_increment' !== $nameLc && 'str_decrement' !== $nameLc) {
             return false;
         }
-        $name = strtolower($toCall->getName());
-        if ('str_increment' !== $name && 'str_decrement' !== $name) {
+        if (!CompilerVersion::supportsStrIncrement()) {
             return false;
         }
         if (1 !== \count($callArgs) || !$callArgs[0] instanceof Variable) {
@@ -1643,7 +1661,7 @@ final class DiscardedPureCallElision
         if (null === $lit) {
             return false;
         }
-        if ('str_increment' === $name) {
+        if ('str_increment' === $nameLc) {
             return self::compileTimeStrIncrementAllowsDiscardedElision($lit);
         }
 
