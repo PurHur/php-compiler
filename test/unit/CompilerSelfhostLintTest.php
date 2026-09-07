@@ -171,6 +171,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/Compiler/Concern/PrecedingInlineCallArgProducers.php',
             'lib/Compiler/Concern/PrecedingInlineDeadVoidAndDimFetchCallArgSlots.php',
             'lib/Compiler/Concern/PrecedingInlineLeadingCallbackAndHaystackProducers.php',
+            'lib/Compiler/Concern/PreferNamedLocalAndAdjacentAssignCallArgSlots.php',
             'lib/Compiler/Concern/PropertyAndDimFetchCompile.php',
             'lib/Compiler/Concern/RewireArithmeticBranchSubstrEnumAndSiblingMultiArgCallArgSendSlots.php',
             'lib/Compiler/Concern/RewireHoistedPreludePregCombineAndVarExportCallArgSendSlots.php',

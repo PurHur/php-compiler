@@ -5457,6 +5457,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/InvokableReceiverAndClosure
 require_once __DIR__.'/../../../lib/Compiler/Concern/ErrorSuppressCallArgProducers.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/FinalizeArrayFamilyCallArgSlots.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/FinalizeArrayCombineColumnCallArgSlots.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/PreferNamedLocalAndAdjacentAssignCallArgSlots.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/FunctionStaticAndCompileTimeLiterals.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/IssetEmptyCallArgAndMultiCompile.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CoalesceLeftAndEchoConcatPreludes.php';
