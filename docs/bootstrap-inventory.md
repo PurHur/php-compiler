@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8392 |
-| Phase A inventory files (M2 ratio SSOT) | 8392 |
+| PHP files on vm.php path | 8393 |
+| Phase A inventory files (M2 ratio SSOT) | 8393 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26407 |
+| Source constructs flagged (warnings) | 26409 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5474,6 +5474,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/AOT/ExternalMethodBind.php` | 0 | 2 |
 | `lib/AOT/HelperRuntimeCache.php` | 0 | 2 |
 | `lib/AOT/HelperRuntimeCommon.php` | 0 | 1 |
+| `lib/AOT/HelperRuntimeFingerprint.php` | 0 | 2 |
 | `lib/AOT/HelperUnitGlobalCtor.php` | 0 | 1 |
 | `lib/AOT/Linker.php` | 0 | 1 |
 | `lib/AOT/LinkerOutputArtifacts.php` | 0 | 1 |
@@ -48721,13 +48722,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/AOT/HelperRuntimeCache.php`
 
 **Warnings** (review for bootstrap subset):
-- 56 class method(s)
-- 3 closure(s)
+- 48 class method(s)
+- 2 closure(s)
 
 ### `lib/AOT/HelperRuntimeCommon.php`
 
 **Warnings** (review for bootstrap subset):
 - 10 class method(s)
+
+### `lib/AOT/HelperRuntimeFingerprint.php`
+
+**Warnings** (review for bootstrap subset):
+- 23 class method(s)
+- 1 closure(s)
 
 ### `lib/AOT/HelperUnitGlobalCtor.php`
 
