@@ -210,6 +210,20 @@ final class ScalarReturnCheck
                 $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
             );
             $isMatch = $context->builder->or($isFloat, $isInt);
+        } elseif (Variable::TYPE_HASHTABLE === $expectedJit) {
+            // Writers may store VM TYPE_ARRAY (6) or JIT TYPE_HASHTABLE kind 7
+            // (#26977 / HashTable.php readHashtable). Either is a valid `: array`.
+            $isVmArray = $context->builder->icmp(
+                Builder::INT_EQ,
+                $kind,
+                $i8->constInt(VMVariable::TYPE_ARRAY, false)
+            );
+            $isJitHt = $context->builder->icmp(
+                Builder::INT_EQ,
+                $kind,
+                $i8->constInt(Variable::TYPE_HASHTABLE & 0x7f, false)
+            );
+            $isMatch = $context->builder->or($isVmArray, $isJitHt);
         } else {
             $isMatch = $context->builder->icmp(
                 Builder::INT_EQ,
@@ -333,14 +347,19 @@ final class ScalarReturnCheck
                     $context->castToBool($context->builder->load($firstByte))
                 );
             case Variable::TYPE_HASHTABLE:
+                // Own a ref for the `: array` ABI — the source VALUE box may delref on
+                // free (Nyholm getHeaders / Slim CGI, #36382). php-src: ZEND_RETURN ZVAL_COPY.
+                $ht = $context->builder->call(
+                    $context->lookupFunction('__value__readHashtable'),
+                    $valuePtr
+                );
+                $context->refcount->addref($ht);
+
                 return new Variable(
                     $context,
                     Variable::TYPE_HASHTABLE,
                     Variable::KIND_VALUE,
-                    $context->builder->call(
-                        $context->lookupFunction('__value__readHashtable'),
-                        $valuePtr
-                    )
+                    $ht
                 );
             default:
                 throw new \LogicException('ScalarReturnCheck: unsupported value-box unwrap');
@@ -497,6 +516,32 @@ final class ScalarReturnCheck
                     Variable::TYPE_NATIVE_BOOL,
                     Variable::KIND_VALUE,
                     JitBoolArg::lowerCoerce($context, $return, 'Return value')
+                );
+            case Variable::TYPE_HASHTABLE:
+                // Weak `: array` from a VALUE box (user array properties are TYPE_VALUE,
+                // #4598). Without this, coerceWeak falls through to TypeError and AOT
+                // returns garbage — foreach/var_dump SEGV (#36382 MessageTrait::getHeaders).
+                // php-src: zend_verify_return_type IS_ARRAY + ZEND_RETURN ZVAL_COPY.
+                if (Variable::TYPE_HASHTABLE === $return->type
+                    || 0 !== ($return->type & Variable::IS_NATIVE_ARRAY)
+                ) {
+                    return $return;
+                }
+                if (Variable::TYPE_VALUE !== $return->type) {
+                    return null;
+                }
+                $valuePtr = JitValueBox::valuePtrFromVariable($context, $return);
+                $ht = $context->builder->call(
+                    $context->lookupFunction('__value__readHashtable'),
+                    $valuePtr
+                );
+                $context->refcount->addref($ht);
+
+                return new Variable(
+                    $context,
+                    Variable::TYPE_HASHTABLE,
+                    Variable::KIND_VALUE,
+                    $ht
                 );
             default:
                 return null;

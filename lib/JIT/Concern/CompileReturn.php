@@ -324,6 +324,25 @@ trait CompileReturn
                             return $origBasicBlock;
                         }
                     }
+                    // Typed `: array` ABI is `__hashtable__*`. User array properties live in
+                    // TYPE_VALUE boxes (#4598); TYPE_VALUE::addref is a no-op, so returning the
+                    // raw HT from readHashtable without owning a ref leaves a dangling pointer
+                    // once the return CV / property temp is freed — foreach/var_dump SEGV
+                    // (Nyholm MessageTrait::getHeaders / Slim CGI headers, #36382).
+                    // php-src: Zend/zend_execute.c ZEND_RETURN ZVAL_COPY of IS_ARRAY.
+                    if ('__hashtable__*' === $expected && Variable::TYPE_VALUE === $return->type) {
+                        $ht = $this->context->builder->call(
+                            $this->context->lookupFunction('__value__readHashtable'),
+                            \PHPCompiler\JIT\JitValueBox::valuePtrFromVariable($this->context, $return)
+                        );
+                        $this->context->refcount->addref($ht);
+                        $return->free();
+                        $this->context->builder->returnValue(
+                            $this->alignRetvalToLlvmFnReturn($ht, $func)
+                        );
+
+                        return $origBasicBlock;
+                    }
                     $retval = $this->coerceReturnValue($return, $retval, $expected);
                     $retval = $this->alignRetvalToLlvmFnReturn($retval, $func);
                     $this->context->builder->returnValue($retval);
