@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8377 |
-| Phase A inventory files (M2 ratio SSOT) | 8377 |
+| PHP files on vm.php path | 8378 |
+| Phase A inventory files (M2 ratio SSOT) | 8378 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26369 |
+| Source constructs flagged (warnings) | 26372 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5623,6 +5623,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/HoistedSiblingFeedAndArrayKeysArgSendRewire.php` | 0 | 2 |
 | `lib/Compiler/Concern/HoistedUnaryAssignAndInlineProducerCallArgSlots.php` | 0 | 3 |
 | `lib/Compiler/Concern/InitArraySpreadArithmeticAndNestedInlineCallArgResolvers.php` | 0 | 2 |
+| `lib/Compiler/Concern/InlineCallArgArrayColumnMbstringAndCallbackProducers.php` | 0 | 3 |
 | `lib/Compiler/Concern/InlineCallArgClosureFeedsAndReturnProducers.php` | 0 | 2 |
 | `lib/Compiler/Concern/InlineCallArgCompileTimeFold.php` | 0 | 4 |
 | `lib/Compiler/Concern/InlineCallArgDeadTempAndSiblingNewProducers.php` | 0 | 2 |
@@ -49166,13 +49167,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 982)
-- new CompileFatal (line 1016)
-- new CompileError (line 1019)
-- new ClassCompileRegistry (line 1060)
-- new AttributeClassRegistry (line 1061)
-- new ClassCompileRegistry (line 1169)
-- new AttributeClassRegistry (line 1170)
+- new CompileFatal (line 985)
+- new CompileFatal (line 1019)
+- new CompileError (line 1022)
+- new ClassCompileRegistry (line 1063)
+- new AttributeClassRegistry (line 1064)
+- new ClassCompileRegistry (line 1172)
+- new AttributeClassRegistry (line 1173)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -49213,9 +49214,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/AttributeConstantEvaluator.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileTimeEnumCase (line 366)
-- new CompileFatal (line 429)
-- new CompileTimeNew (line 445)
+- new CompileTimeEnumCase (line 349)
+- new CompileFatal (line 404)
+- new CompileTimeNew (line 420)
 - 17 class method(s)
 
 ### `lib/Compiler/AttributeEntry.php`
@@ -50064,6 +50065,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - trait InitArraySpreadArithmeticAndNestedInlineCallArgResolvers (line 28)
 - 15 class method(s)
 
+### `lib/Compiler/Concern/InlineCallArgArrayColumnMbstringAndCallbackProducers.php`
+
+**Warnings** (review for bootstrap subset):
+- trait InlineCallArgArrayColumnMbstringAndCallbackProducers (line 20)
+- 1 class method(s)
+- 2 closure(s)
+
 ### `lib/Compiler/Concern/InlineCallArgClosureFeedsAndReturnProducers.php`
 
 **Warnings** (review for bootstrap subset):
@@ -50087,9 +50095,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/InlineCallArgProducerMatch.php`
 
 **Warnings** (review for bootstrap subset):
-- trait InlineCallArgProducerMatch (line 37)
+- trait InlineCallArgProducerMatch (line 39)
 - 1 class method(s)
-- 5 closure(s)
+- 3 closure(s)
 
 ### `lib/Compiler/Concern/InlineCallArgSlotResolvers.php`
 
@@ -50962,12 +50970,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Func/Internal.php`
 
 **Warnings** (review for bootstrap subset):
-- new Frame (line 48)
-- new ArgumentCountError (line 125)
-- new ArgumentCountError (line 133)
-- new ArgumentCountError (line 141)
-- new ArgumentCountError (line 149)
-- new ArgumentCountError (line 152)
+- new Frame (line 49)
+- new ArgumentCountError (line 129)
+- new ArgumentCountError (line 137)
+- new ArgumentCountError (line 145)
+- new ArgumentCountError (line 153)
+- new ArgumentCountError (line 156)
 - 18 class method(s)
 
 ### `lib/Func/JIT.php`
@@ -56057,7 +56065,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/ClosureFromCallable.php`
 
 **Warnings** (review for bootstrap subset):
-- new Block (line 56)
+- new Block (line 55)
 - 1 class method(s)
 
 ### `lib/JIT/Call/ClosureWithBinding.php`
@@ -59796,8 +59804,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/EmptyStaticPropertyHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 71)
-- new Variable (line 84)
+- new Variable (line 72)
+- new Variable (line 85)
 - 2 class method(s)
 
 ### `lib/JIT/EnumCasesHelper.php`
@@ -61225,8 +61233,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/UnsetHelperLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 372)
-- new Type (line 491)
+- new Variable (line 373)
+- new Type (line 492)
 - 13 class method(s)
 - 2 closure(s)
 
@@ -61642,49 +61650,49 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Runtime.php`
 
 **Warnings** (review for bootstrap subset):
-- new NodeTraverser (line 172)
-- new Ast\ConfusableBuiltinTypeHintCheck (line 174)
-- new MultiBlockNameResolver (line 176)
-- new Ast\EnumCaseImportRewriter (line 177)
-- new GroupUseStripper (line 179)
-- new Ast\AbstractEnumMarker (line 180)
-- new Ast\BreakContinueOperandCompileCheck (line 182)
-- new Ast\StrictTypesDeclareCompileCheck (line 184)
-- new SealedClassAnnotator (line 186)
-- new StaticClassAnnotator (line 188)
-- new Ast\EnumPropertyCompileCheck (line 190)
-- new Ast\ReadonlyClassTraitPropertyCompileCheck (line 191)
-- new Ast\GeneratorYieldSourceMarker (line 192)
-- new Ast\AssertExprMessageRewriter (line 194)
-- new ReadonlyFunctionAnnotator (line 195)
-- new TryCatchElseAttacher (line 196)
-- new CatchIntersectionAttacher (line 197)
-- new Parser (line 198)
-- new ParserFactory (line 199)
-- new Traverser (line 203)
-- new InOperatorResolver (line 204)
-- new ExitFunctionResolver (line 205)
-- new VoidCastResolver (line 206)
-- new Visitor\Simplifier (line 207)
-- new Visitor\DeadBlockEliminator (line 208)
-- new Traverser (line 209)
-- new Visitor\PhiResolver (line 210)
-- new NullSafeLivenessDetector (line 211)
-- new Optimizer\AssignOp (line 212)
-- new CompilerTypeReconstructor (line 214)
-- new Compiler (line 232)
-- new VMContext (line 237)
-- new VM (line 243)
-- new JIT (line 353)
-- new JITContext (line 367)
-- new SealedClassPreprocessor (line 449)
-- new StaticClassPreprocessor (line 453)
-- new SourcePreprocessor\PropertyHooks (line 457)
-- new State (line 638)
-- new ReflectionProperty (line 696)
-- new ReflectionProperty (line 698)
-- new LintCompiler (line 1320)
-- new Variable (line 1454)
+- new NodeTraverser (line 173)
+- new Ast\ConfusableBuiltinTypeHintCheck (line 175)
+- new MultiBlockNameResolver (line 177)
+- new Ast\EnumCaseImportRewriter (line 178)
+- new GroupUseStripper (line 180)
+- new Ast\AbstractEnumMarker (line 181)
+- new Ast\BreakContinueOperandCompileCheck (line 183)
+- new Ast\StrictTypesDeclareCompileCheck (line 185)
+- new SealedClassAnnotator (line 187)
+- new StaticClassAnnotator (line 189)
+- new Ast\EnumPropertyCompileCheck (line 191)
+- new Ast\ReadonlyClassTraitPropertyCompileCheck (line 192)
+- new Ast\GeneratorYieldSourceMarker (line 193)
+- new Ast\AssertExprMessageRewriter (line 195)
+- new ReadonlyFunctionAnnotator (line 196)
+- new TryCatchElseAttacher (line 197)
+- new CatchIntersectionAttacher (line 198)
+- new Parser (line 199)
+- new ParserFactory (line 200)
+- new Traverser (line 204)
+- new InOperatorResolver (line 205)
+- new ExitFunctionResolver (line 206)
+- new VoidCastResolver (line 207)
+- new Visitor\Simplifier (line 208)
+- new Visitor\DeadBlockEliminator (line 209)
+- new Traverser (line 210)
+- new Visitor\PhiResolver (line 211)
+- new NullSafeLivenessDetector (line 212)
+- new Optimizer\AssignOp (line 213)
+- new CompilerTypeReconstructor (line 215)
+- new Compiler (line 233)
+- new VMContext (line 238)
+- new VM (line 244)
+- new JIT (line 354)
+- new JITContext (line 368)
+- new SealedClassPreprocessor (line 450)
+- new StaticClassPreprocessor (line 454)
+- new SourcePreprocessor\PropertyHooks (line 458)
+- new State (line 639)
+- new ReflectionProperty (line 697)
+- new ReflectionProperty (line 699)
+- new LintCompiler (line 1321)
+- new Variable (line 1455)
 - 54 class method(s)
 
 ### `lib/RuntimeStrictness.php`
@@ -65933,7 +65941,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/EnumFromHandler.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 35)
+- new ArgumentCountError (line 36)
 - 2 class method(s)
 
 ### `lib/VM/EnumFromJitHelper.php`
@@ -66072,11 +66080,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/GeneratorIteratorJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 356)
-- new Variable (line 369)
-- new Variable (line 381)
-- new Variable (line 388)
-- new Variable (line 568)
+- new Variable (line 357)
+- new Variable (line 370)
+- new Variable (line 382)
+- new Variable (line 389)
+- new Variable (line 569)
 - 23 class method(s)
 
 ### `lib/VM/GeneratorJitHelper.php`
@@ -67189,24 +67197,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/VmIteratorForeach.php`
 
 **Warnings** (review for bootstrap subset):
-- new JitVariable (line 272)
-- new JitVariable (line 297)
-- new JitVariable (line 343)
-- new JitVariable (line 379)
-- new JitVariable (line 423)
-- new JitVariable (line 473)
-- new JitVariable (line 1180)
-- new JitVariable (line 1202)
-- new JitVariable (line 1225)
-- new JitVariable (line 1250)
-- new JitVariable (line 1375)
-- new JitVariable (line 1402)
-- new JitVariable (line 1474)
-- new JitVariable (line 1540)
-- new JitVariable (line 1563)
-- new JitVariable (line 1572)
-- new JitVariable (line 1613)
-- new JitVariable (line 1669)
+- new JitVariable (line 273)
+- new JitVariable (line 298)
+- new JitVariable (line 344)
+- new JitVariable (line 380)
+- new JitVariable (line 424)
+- new JitVariable (line 474)
+- new JitVariable (line 1179)
+- new JitVariable (line 1201)
+- new JitVariable (line 1224)
+- new JitVariable (line 1249)
+- new JitVariable (line 1374)
+- new JitVariable (line 1401)
+- new JitVariable (line 1473)
+- new JitVariable (line 1539)
+- new JitVariable (line 1562)
+- new JitVariable (line 1571)
+- new JitVariable (line 1612)
+- new JitVariable (line 1668)
 - 57 class method(s)
 
 ### `lib/VM/VmIteratorProtocol.php`
