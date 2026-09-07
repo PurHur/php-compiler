@@ -109,6 +109,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/Compiler/Concern/DimAndPropertyWriteContext.php',
             'lib/Compiler/Concern/EchoCoalesceCallArgCompile.php',
             'lib/Compiler/Concern/EchoCompileOperandTerminalAndGlobalConst.php',
+            'lib/Compiler/Concern/EchoConcatPreludes.php',
             'lib/Compiler/Concern/EnsureDeferredSiblingAndInlineNewProducers.php',
             'lib/Compiler/Concern/ErrorSuppressAndPropertyFetch.php',
             'lib/Compiler/Concern/ErrorSuppressCallArgProducers.php',
