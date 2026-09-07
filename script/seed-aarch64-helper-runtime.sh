@@ -183,6 +183,18 @@ SEED_UNITS=(
   /ext/standard/IniParseQuantityJitHelper.php
   /ext/standard/ParseIniNativeJitHelper.php
   /ext/standard/ProcNiceJitHelper.php
+  # Math / random / memory / soundex / sys / version / uniqid tier (#36391 after #37102)
+  # Frexp/Ldexp/Modf/Nextafter are algorithm SSOT only (no HELPER_PATH) — skip.
+  /ext/standard/MathBaseConvertJitHelper.php
+  /ext/standard/LcgJitHelper.php
+  /ext/standard/RandJitHelper.php
+  /ext/standard/RandomBytesJitHelper.php
+  /ext/standard/MemoryJitHelper.php
+  /ext/standard/SoundexJitHelper.php
+  /ext/standard/UniqidJitHelper.php
+  /ext/standard/VersionCompareJitHelper.php
+  /ext/standard/SysGetTempDirJitHelper.php
+  /ext/standard/SysGetloadavgJitHelper.php
 )
 
 MIN_SEED=${#SEED_UNITS[@]}
