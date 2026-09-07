@@ -238,7 +238,9 @@ use PHPCompiler\VM\Variable as VmVariable;
  * throw-pending checks when the result is used ({@see intdivArgsCannotThrow} /
  * {@see intdivCanSkipZeroDivisorGuard}). Compile-time non-negative bit-shift
  * counts skip the negative-count {@code ArithmeticError} blocks
- * ({@see bitShiftCountCanSkipNegativeGuard}). Compile-time divisors ≠
+ * ({@see bitShiftCountCanSkipNegativeGuard}). Compile-time shift count
+ * {@code 0} is a typed {@code <<}/{@code >>} identity (no {@code shl}/{@code ashr};
+ * {@see bitShiftCountIsCompileTimeZero}). Compile-time divisors ≠
  * {@code -1} skip the typed {@code /} {@code PHP_INT_MIN}/{-1} promote arm
  * ({@see nativeLongDivisorCanSkipNegOneModuloBranch}). Compile-time identity/zero
  * operands on typed {@code +}/{@code -}/{@code *} skip
@@ -4065,6 +4067,20 @@ final class DiscardedPureCallElision
         $c = self::compileTimeLongScalar($count);
 
         return null !== $c && $c >= 0;
+    }
+
+    /**
+     * Typed {@code <<}/{@code >>} with compile-time count {@code 0} is identity —
+     * emit the left operand (no {@code shl}/{@code ashr}, no negative-count
+     * guard). Peer {@code + 0}/{@code - 0} overflow skip (#37200 / #36386).
+     *
+     * @see php-src Zend/zend_operators.c shift_left_function / shift_right_function
+     */
+    public static function bitShiftCountIsCompileTimeZero(Variable $count): bool
+    {
+        $c = self::compileTimeLongScalar($count);
+
+        return null !== $c && 0 === $c;
     }
 
     /**
