@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\Lint\UnsupportedFeature;
+use PHPCompiler\Lint\UnsupportedRegistry;
 use PHPCompiler\VM\Variable as VMVariable;
 
 /**
@@ -65,7 +67,7 @@ final class UsortCallbackPolicy
     {
         self::prepareJitCallback($context, $callback);
         if (!self::isJitLowerable($callback)) {
-            throw new \LogicException(self::jitRejectionMessage());
+            UnsupportedFeature::raise('usort-callback-deferred');
         }
     }
 
@@ -103,8 +105,14 @@ final class UsortCallbackPolicy
 
     public static function jitRejectionMessage(): string
     {
-        return 'usort() callback must be '.self::JIT_SUBSET
-            .' for JIT/AOT in this compiler build; '.self::DEFERRED_KINDS.' are deferred';
+        $row = UnsupportedRegistry::feature('usort-callback-deferred');
+
+        return UnsupportedFeature::format(
+            $row['feature'],
+            $row['matrixRow'],
+            $row['issue'],
+            $row['alternative']
+        );
     }
 
     /**
@@ -118,7 +126,13 @@ final class UsortCallbackPolicy
 
     public static function vmRejectionMessage(): string
     {
-        return 'usort() callback must be '.self::VM_SUBSET
-            .' in this compiler build; '.self::DEFERRED_KINDS.' are deferred';
+        $row = UnsupportedRegistry::feature('usort-callback-deferred');
+
+        return UnsupportedFeature::format(
+            'usort() callback must be '.self::VM_SUBSET,
+            $row['matrixRow'],
+            $row['issue'],
+            $row['alternative']
+        );
     }
 }

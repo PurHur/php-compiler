@@ -9,6 +9,7 @@ use PHPCfg\Operand\Literal;
 use PHPTypes\Type;
 use PHPCompiler\Block;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPCompiler\OpCode;
 use PHPCompiler\VM\DateIntervalSupport;
 use PHPCompiler\VM\Variable as VmVariable;
@@ -111,7 +112,7 @@ final class UnsetHelperLlvm
 
             return;
         }
-        throw new \LogicException('unset() offset only supports arrays and objects in this compiler build');
+        UnsupportedFeature::raise('unset-offset-container');
     }
 
     /**

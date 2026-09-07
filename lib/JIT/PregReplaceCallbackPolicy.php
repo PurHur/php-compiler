@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\Lint\UnsupportedFeature;
+use PHPCompiler\Lint\UnsupportedRegistry;
 use PHPCompiler\VM\Variable as VMVariable;
 
 /**
@@ -76,8 +78,14 @@ final class PregReplaceCallbackPolicy
 
     public static function jitRejectionMessage(): string
     {
-        return 'preg_replace_callback() callback must be '.self::JIT_SUBSET
-            .' for JIT/AOT in this compiler build; '.self::DEFERRED_KINDS.' are deferred (#1177, #142, #36382)';
+        $row = UnsupportedRegistry::feature('preg-replace-callback-deferred');
+
+        return UnsupportedFeature::format(
+            $row['feature'],
+            $row['matrixRow'],
+            $row['issue'],
+            $row['alternative']
+        );
     }
 
     public static function vmRejectionMessage(): string

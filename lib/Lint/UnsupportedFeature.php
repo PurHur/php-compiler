@@ -48,7 +48,7 @@ final class UnsupportedFeature extends \LogicException
      *
      * @return never
      */
-    public static function raise(string $featureId, ?string $featureOverride = null): void
+    public static function raise(string $featureId, ?string $featureOverride = null): never
     {
         $row = UnsupportedRegistry::feature($featureId);
         throw new self(

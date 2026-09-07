@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\Lint\UnsupportedFeature;
+use PHPCompiler\Lint\UnsupportedRegistry;
 
 /**
  * array_filter() callback validation messages (ext/standard/array.c; #10782).
@@ -28,8 +30,14 @@ final class ArrayFilterCallbackPolicy
 
     public static function jitRejectionMessage(): string
     {
-        return 'array_filter() callback must be '.self::JIT_SUBSET
-            .' for JIT/AOT in this compiler build; string/array callables are deferred';
+        $row = UnsupportedRegistry::feature('array-filter-callback-deferred');
+
+        return UnsupportedFeature::format(
+            $row['feature'],
+            $row['matrixRow'],
+            $row['issue'],
+            $row['alternative']
+        );
     }
 
     /**

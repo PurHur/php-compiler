@@ -11,6 +11,7 @@ use PhpParser\Node\Scalar;
 use PHPCompiler\ext\standard\DateConstants;
 use PHPCompiler\ext\standard\StdlibConstants;
 use PHPCompiler\ext\standard\VmPhpCoreConstants;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPCompiler\VM\AttributeSupport;
 use PHPCompiler\VM\Context as VmContext;
 use PHPCompiler\VM\Variable;
@@ -123,9 +124,7 @@ final class AttributeConstantEvaluator
         if ($expr instanceof Expr\UnaryMinus) {
             $v = self::evalExpr($expr->expr);
             if (!\is_int($v) && !\is_float($v)) {
-                throw new \LogicException(
-                    'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
-                );
+                UnsupportedFeature::raise('attribute-non-constant-arg');
             }
 
             return -$v;
@@ -133,9 +132,7 @@ final class AttributeConstantEvaluator
         if ($expr instanceof Expr\UnaryPlus) {
             $v = self::evalExpr($expr->expr);
             if (!\is_int($v) && !\is_float($v)) {
-                throw new \LogicException(
-                    'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
-                );
+                UnsupportedFeature::raise('attribute-non-constant-arg');
             }
 
             return +$v;
@@ -178,9 +175,7 @@ final class AttributeConstantEvaluator
             return self::evalNumericBinary($expr, '**');
         }
 
-        throw new \LogicException(
-            'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
-        );
+        UnsupportedFeature::raise('attribute-non-constant-arg');
     }
 
     /**
@@ -239,9 +234,7 @@ final class AttributeConstantEvaluator
             return $userland;
         }
 
-        throw new \LogicException(
-            'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
-        );
+        UnsupportedFeature::raise('attribute-non-constant-arg');
     }
 
     /**
@@ -294,9 +287,7 @@ final class AttributeConstantEvaluator
             Variable::TYPE_FLOAT => $var->toFloat(),
             Variable::TYPE_BOOLEAN => $var->toBool(),
             Variable::TYPE_STRING => $var->toString(),
-            default => throw new \LogicException(
-                'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
-            ),
+            default => UnsupportedFeature::raise('attribute-non-constant-arg'),
         };
     }
 
@@ -304,9 +295,7 @@ final class AttributeConstantEvaluator
     {
         $file = self::$scriptFile;
         if ('' === $file) {
-            throw new \LogicException(
-                'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
-            );
+            UnsupportedFeature::raise('attribute-non-constant-arg');
         }
         if (is_file($file)) {
             $real = realpath($file);
@@ -326,14 +315,10 @@ final class AttributeConstantEvaluator
     private static function evalClassConstFetch(Expr\ClassConstFetch $expr): int|string|CompileTimeEnumCase
     {
         if (!$expr->class instanceof Node\Name) {
-            throw new \LogicException(
-                'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
-            );
+            UnsupportedFeature::raise('attribute-non-constant-arg');
         }
         if (!$expr->name instanceof Node\Identifier) {
-            throw new \LogicException(
-                'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
-            );
+            UnsupportedFeature::raise('attribute-non-constant-arg');
         }
 
         $className = ltrim($expr->class->toString(), '\\');
@@ -341,9 +326,7 @@ final class AttributeConstantEvaluator
         if ('attribute' === strtolower($className)) {
             $value = self::attributeBuiltinConstValue(strtolower($constName));
             if (null === $value) {
-                throw new \LogicException(
-                    'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
-                );
+                UnsupportedFeature::raise('attribute-non-constant-arg');
             }
 
             return $value;
@@ -377,18 +360,14 @@ final class AttributeConstantEvaluator
         $left = self::evalExpr($expr->left);
         $right = self::evalExpr($expr->right);
         if (!\is_int($left) || !\is_int($right)) {
-            throw new \LogicException(
-                'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
-            );
+            UnsupportedFeature::raise('attribute-non-constant-arg');
         }
 
         return match ($op) {
             '|' => $left | $right,
             '&' => $left & $right,
             '^' => $left ^ $right,
-            default => throw new \LogicException(
-                'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
-            ),
+            default => UnsupportedFeature::raise('attribute-non-constant-arg'),
         };
     }
 
@@ -402,9 +381,7 @@ final class AttributeConstantEvaluator
         $left = self::evalExpr($expr->left);
         $right = self::evalExpr($expr->right);
         if ((!(\is_int($left) || \is_float($left))) || (!(\is_int($right) || \is_float($right)))) {
-            throw new \LogicException(
-                'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
-            );
+            UnsupportedFeature::raise('attribute-non-constant-arg');
         }
 
         return match ($op) {
@@ -414,9 +391,7 @@ final class AttributeConstantEvaluator
             '/' => $left / $right,
             '%' => $left % $right,
             '**' => $left ** $right,
-            default => throw new \LogicException(
-                'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
-            ),
+            default => UnsupportedFeature::raise('attribute-non-constant-arg'),
         };
     }
 
@@ -456,14 +431,10 @@ final class AttributeConstantEvaluator
         $nextIndex = 0;
         foreach ($expr->items as $item) {
             if (null === $item) {
-                throw new \LogicException(
-                    'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
-                );
+                UnsupportedFeature::raise('attribute-non-constant-arg');
             }
             if ($item->unpack) {
-                throw new \LogicException(
-                    'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
-                );
+                UnsupportedFeature::raise('attribute-non-constant-arg');
             }
             $value = self::evalExpr($item->value);
             if (null === $item->key) {
@@ -474,9 +445,7 @@ final class AttributeConstantEvaluator
             }
             $key = self::evalExpr($item->key);
             if (!\is_int($key) && !\is_string($key)) {
-                throw new \LogicException(
-                    'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
-                );
+                UnsupportedFeature::raise('attribute-non-constant-arg');
             }
             $result[$key] = $value;
             if (\is_int($key) && $key >= $nextIndex) {

@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 namespace PHPCompiler\JIT;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 final class JitLongArg {
@@ -58,7 +59,10 @@ final class JitLongArg {
         if (Variable::TYPE_STRING === $arg->type) {
             return self::lowerStringValue($context, $context->helper->loadValue($arg));
         }
-        throw new \LogicException("{$contextLabel} must be an integer in this compiler build");
+        UnsupportedFeature::raise(
+            'jit-long-arg',
+            "{$contextLabel} must be an integer"
+        );
     }
 
     public static function lowerStringValue(Context $context, Value $strPtr): Value
@@ -98,7 +102,10 @@ final class JitLongArg {
         if (Variable::TYPE_STRING === $arg->type) {
             return self::lowerZendLongString($context, $context->helper->loadValue($arg));
         }
-        throw new \LogicException("{$contextLabel} must be an integer in this compiler build");
+        UnsupportedFeature::raise(
+            'jit-long-arg',
+            "{$contextLabel} must be an integer"
+        );
     }
 
     private static function lowerValueBoxToLong(Context $context, Variable $arg, int $base = 10): Value

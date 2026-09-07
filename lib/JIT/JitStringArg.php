@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPCompiler\VM\PropertyNameSupport;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
@@ -78,7 +79,10 @@ final class JitStringArg
             );
         }
 
-        throw new \LogicException("{$contextLabel} must be a string in this compiler build");
+        UnsupportedFeature::raise(
+            'jit-string-arg',
+            "{$contextLabel} must be a string"
+        );
     }
 
     /**

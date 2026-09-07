@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\Lint\UnsupportedFeature;
+use PHPCompiler\Lint\UnsupportedRegistry;
 use PHPCompiler\VM\Variable as VMVariable;
 
 /**
@@ -46,8 +48,14 @@ final class SplAutoloadCallbackPolicy
 
     public static function vmRejectionMessage(): string
     {
-        return 'spl_autoload_register() callback must be a valid callable in this compiler build; '
-            .self::DEFERRED_KINDS.' are deferred (#1369, #1776)';
+        $row = UnsupportedRegistry::feature('spl-autoload-callback-deferred');
+
+        return UnsupportedFeature::format(
+            $row['feature'],
+            $row['matrixRow'],
+            $row['issue'],
+            $row['alternative']
+        );
     }
 
     public static function isJitLowerable(Variable $callback): bool
@@ -96,8 +104,14 @@ final class SplAutoloadCallbackPolicy
 
     public static function jitRejectionMessage(): string
     {
-        return 'spl_autoload_register() callback must be a compile-time function name, Class::method, or closure in this compiler build; '
-            .self::DEFERRED_KINDS.' are deferred (#1776, #4744)';
+        $row = UnsupportedRegistry::feature('spl-autoload-callback-deferred');
+
+        return UnsupportedFeature::format(
+            $row['feature'],
+            $row['matrixRow'],
+            $row['issue'],
+            $row['alternative']
+        );
     }
 
     /**

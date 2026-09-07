@@ -8,6 +8,7 @@ use PHPCompiler\ext\standard\JitDatePeriodConstruct;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPCompiler\VM\DatePeriodSupport;
 use PHPLLVM\Value;
 
@@ -27,10 +28,7 @@ final class DatePeriodConstruct implements Call
         $userArgs = $argc - 1;
         // ISO-8601 string form — factory / VM path.
         if ($userArgs <= 2) {
-            throw new \LogicException(
-                'DatePeriod::__construct(string $isostr) requires DatePeriod::createFromISO8601String() '
-                .'or VM path in this compiler build (#26772)'
-            );
+            UnsupportedFeature::raise('date-period-iso-construct');
         }
         if ($userArgs < 3) {
             throw new \TypeError(DatePeriodSupport::CONSTRUCTOR_SIGNATURE_TYPE_ERROR);
