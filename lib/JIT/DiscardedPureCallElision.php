@@ -4030,6 +4030,34 @@ final class DiscardedPureCallElision
     }
 
     /**
+     * Compile-time {@code log()} base as a float (php-src {@code Z_PARAM_DOUBLE}).
+     * Null when the base is not a compile-time numeric scalar.
+     */
+    public static function compileTimeLogBase(Variable $base): ?float
+    {
+        return self::compileTimeNumericScalar($base);
+    }
+
+    /**
+     * Skip {@code log()} base≤0 {@code ValueError} when the base is a
+     * compile-time float {@code > 0} or {@code NAN} (php-src math.c: NAN is
+     * not ≤ 0). Soft-null / runtime typed / ≤0 stay live (#36386).
+     */
+    public static function logBaseCanSkipValueErrorGuard(Variable $base): bool
+    {
+        $b = self::compileTimeNumericScalar($base);
+        if (null === $b) {
+            return false;
+        }
+        // NAN is not ≤ 0 in php-src; finite ≤0 must keep the ValueError branch.
+        if ($b !== $b) {
+            return true;
+        }
+
+        return $b > 0.0;
+    }
+
+    /**
      * Skip the LLVM {@code PHP_INT_MIN}/{-1} branch when the divisor cannot be
      * {@code -1}, or both operands are compile-time longs that are not that pair.
      */
