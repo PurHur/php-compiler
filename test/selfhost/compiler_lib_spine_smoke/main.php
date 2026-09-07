@@ -5401,6 +5401,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/PrecedingInlineLeadingCallb
 require_once __DIR__.'/../../../lib/Compiler/Concern/SiblingMultiArgFuncCallProducerDetect.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/FirstSiblingInlineFuncCallProducerIndex.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/HoistedMultiArgSiblingFuncCallChain.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/HoistedMultiArgContiguousLiteralPreludeAndConsumerFeed.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/SiblingInlineFuncCallProducers.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/EnsureDeferredSiblingAndInlineNewProducers.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/SiblingInlineCallArgProducerSlots.php';
