@@ -8,7 +8,7 @@
       "sha": "4e433a8d57078645b55d21fd12c887d3ba6ca01e",
       "difficulty": 1,
       "status": "ready",
-      "notes": "Markdown fixtures under test/data; blocked on runtime $obj->$name() (#34084 follow-up)"
+      "notes": "Markdown fixtures under test/data; AOT needs LLVM memory floor + incremental includes (run.sh); residual compile-RSS on Parsedown.php tracked under #36387"
     },
     {
       "slug": "symfony-yaml",

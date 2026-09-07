@@ -6,7 +6,12 @@ APP_DIR="$(cd "$(dirname "$0")" && pwd)"
 SLUG="$(basename "$APP_DIR")"
 PHP_BIN="${PHP_BIN:-php}"
 VM_TIMEOUT="${APPS_VM_TIMEOUT:-90}"
-AOT_TIMEOUT="${APPS_AOT_TIMEOUT:-120}"
+# Parsedown-sized libraries need minutes under IncludeHelper; 120s left rc=124 with a
+# misleading "helper-runtime cache hit" reason (#36380).
+AOT_TIMEOUT="${APPS_AOT_TIMEOUT:-600}"
+# Cap PHP heap so LLVM native RSS still fits under the 8–10g harness cgroup (#36380).
+# Override with APPS_AOT_MEMORY=8192M on larger hosts.
+AOT_MEMORY="${APPS_AOT_MEMORY:-4096M}"
 
 cd "$ROOT"
 # shellcheck disable=SC1091
@@ -60,8 +65,15 @@ run_backend() {
       local bin="$APP_DIR/.phpc/bin/parsedown-runner"
       mkdir -p "$APP_DIR/.phpc/bin"
       local build_out=""
+      # Skip SourceBundler mega-concat of Parsedown.php; raise memory floor via #36380.
+      export PHP_COMPILER_AOT_INCREMENTAL_INCLUDES="${PHP_COMPILER_AOT_INCREMENTAL_INCLUDES:-1}"
+      export PHP_COMPILER_MEMORY_LIMIT="$AOT_MEMORY"
+      # Keep floor from SourceBundler::ensureIncrementalProjectMemoryFloor at the same cap.
+      export PHP_COMPILER_LLVM_MEMORY_LIMIT="$AOT_MEMORY"
+      export PHP_COMPILER_HELPER_RUNTIME_CACHE_DIR="${PHP_COMPILER_HELPER_RUNTIME_CACHE_DIR:-$APP_DIR/.phpc/helper-cache}"
+      mkdir -p "$PHP_COMPILER_HELPER_RUNTIME_CACHE_DIR"
       set +e
-      build_out="$(timeout "$AOT_TIMEOUT" $PHP_BIN bin/compile.php -o "$bin" "$APP_DIR/runner.php" 2>&1)"
+      build_out="$(timeout "$AOT_TIMEOUT" $PHP_BIN -d "memory_limit=${AOT_MEMORY}" bin/compile.php -o "$bin" "$APP_DIR/runner.php" 2>&1)"
       local build_rc=$?
       set -e
       if [[ "$build_rc" -ne 0 ]] || [[ ! -x "$bin" ]]; then
@@ -71,6 +83,12 @@ run_backend() {
           reason="dynamic_method_name_not_lowered_#34084"
         elif echo "$build_out" | grep -q 'unexpected token "{"'; then
           reason="parse_error_curly_variable_method_\$this->{...}"
+        elif echo "$build_out" | grep -q 'Allowed memory size'; then
+          reason="aot_compile_oom_${AOT_MEMORY}_#36387"
+        elif [[ "$build_rc" -eq 124 ]]; then
+          reason="aot_compile_timeout_${AOT_TIMEOUT}s_#36387"
+        elif [[ "$build_rc" -eq 137 ]]; then
+          reason="aot_compile_sigkill_cgroup_oom_#36387"
         fi
         emit_result aot block 0 0 0 "$build_rc" "$reason"
         return 0

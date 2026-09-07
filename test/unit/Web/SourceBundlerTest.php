@@ -498,11 +498,27 @@ final class SourceBundlerTest extends TestCase
         // Below threshold: no memory bump (#36382).
         $prevMem = getenv('PHP_COMPILER_MEMORY_LIMIT');
         $prevLlvm = getenv('PHP_COMPILER_LLVM_MEMORY_LIMIT');
+        $prevIncr = getenv('PHP_COMPILER_AOT_INCREMENTAL_INCLUDES');
+        putenv('PHP_COMPILER_AOT_INCREMENTAL_INCLUDES');
+        unset($_ENV['PHP_COMPILER_AOT_INCREMENTAL_INCLUDES'], $_SERVER['PHP_COMPILER_AOT_INCREMENTAL_INCLUDES']);
         putenv('PHP_COMPILER_MEMORY_LIMIT=1536M');
         $_ENV['PHP_COMPILER_MEMORY_LIMIT'] = '1536M';
         putenv('PHP_COMPILER_LLVM_MEMORY_LIMIT=4096M');
         $_ENV['PHP_COMPILER_LLVM_MEMORY_LIMIT'] = '4096M';
         $this->assertNull(SourceBundler::ensureIncrementalProjectMemoryFloor(3));
+        // Forced incremental (apps corpus / large single libs): bump even below unit threshold (#36380).
+        putenv('PHP_COMPILER_AOT_INCREMENTAL_INCLUDES=1');
+        $_ENV['PHP_COMPILER_AOT_INCREMENTAL_INCLUDES'] = '1';
+        putenv('PHP_COMPILER_MEMORY_LIMIT=1536M');
+        $_ENV['PHP_COMPILER_MEMORY_LIMIT'] = '1536M';
+        $this->assertSame('4096M', SourceBundler::ensureIncrementalProjectMemoryFloor(3));
+        $this->assertSame('4096M', getenv('PHP_COMPILER_MEMORY_LIMIT'));
+        putenv('PHP_COMPILER_AOT_INCREMENTAL_INCLUDES');
+        unset($_ENV['PHP_COMPILER_AOT_INCREMENTAL_INCLUDES'], $_SERVER['PHP_COMPILER_AOT_INCREMENTAL_INCLUDES']);
+        // Reset PHP ini as well — ensureIncrementalProjectMemoryFloor reads max(env, ini).
+        putenv('PHP_COMPILER_MEMORY_LIMIT=1536M');
+        $_ENV['PHP_COMPILER_MEMORY_LIMIT'] = '1536M';
+        ini_set('memory_limit', '1536M');
         $raised = SourceBundler::ensureIncrementalProjectMemoryFloor(
             SourceBundler::INCREMENTAL_REQUIRES_UNIT_THRESHOLD
         );
@@ -532,6 +548,13 @@ final class SourceBundlerTest extends TestCase
         } else {
             putenv('PHP_COMPILER_LLVM_MEMORY_LIMIT='.$prevLlvm);
             $_ENV['PHP_COMPILER_LLVM_MEMORY_LIMIT'] = $prevLlvm;
+        }
+        if (false === $prevIncr || null === $prevIncr) {
+            putenv('PHP_COMPILER_AOT_INCREMENTAL_INCLUDES');
+            unset($_ENV['PHP_COMPILER_AOT_INCREMENTAL_INCLUDES'], $_SERVER['PHP_COMPILER_AOT_INCREMENTAL_INCLUDES']);
+        } else {
+            putenv('PHP_COMPILER_AOT_INCREMENTAL_INCLUDES='.$prevIncr);
+            $_ENV['PHP_COMPILER_AOT_INCREMENTAL_INCLUDES'] = $prevIncr;
         }
 
         $dir = sys_get_temp_dir().'/phpc_incr_'.bin2hex(random_bytes(4));
