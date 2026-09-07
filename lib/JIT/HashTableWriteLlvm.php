@@ -1060,6 +1060,11 @@ final class HashTableWriteLlvm
         if (Variable::TYPE_STRING === $key->type) {
             $keyPtr = $context->helper->loadValue($key);
             self::setAtKeyCoercingNumericString($context, $ht, $keyPtr, $element);
+            // setStringKey* always `__string__separate`s the key into the node.
+            // Ephemeral concat / KIND_VALUE temps must release the original or
+            // `$a = ["k".$i => $i]; unset($a)` leaks ~96 B/iter (#36388).
+            // Immortal literals: delref is a no-op. Named CVs are not ephemeral.
+            self::releaseEphemeralStringKeyAfterHashInsert($context, $key, $keyPtr);
 
             return;
         }
@@ -2344,8 +2349,12 @@ final class HashTableWriteLlvm
     /**
      * Lvalue marker for $arr['key'] = … without reading the old value first (#107, #17865).
      */
-    public static function prepareStringKeyWrite(Context $context, Value $ht, Value $keyStr): Variable
-    {
+    public static function prepareStringKeyWrite(
+        Context $context,
+        Value $ht,
+        Value $keyStr,
+        bool $ephemeralKey = false
+    ): Variable {
         $slot = JitValueBox::alloc($context);
         $var = new Variable(
             $context,
@@ -2355,8 +2364,78 @@ final class HashTableWriteLlvm
         );
         $var->writableHt = $ht;
         $var->writableStringKey = $keyStr;
+        $var->writableStringKeyEphemeral = $ephemeralKey;
 
         return $var;
+    }
+
+    /**
+     * True when a string key is a consumed temp (concat / rvalue), not a named CV (#36388).
+     *
+     * php-src: ZEND_INIT_ARRAY / ZEND_ADD_ARRAY_ELEMENT / ZEND_ASSIGN_DIM release the
+     * temporary key zval after zend_hash_update; CV keys stay live.
+     */
+    public static function isEphemeralStringKey(Variable $key): bool
+    {
+        if ($key->ephemeralStringTemp || $key->ephemeralConcatTemp) {
+            return true;
+        }
+
+        // Bare KIND_VALUE __string__* (literals + unsaved concat) — immortal delref no-ops.
+        return Variable::KIND_VALUE === $key->kind && Variable::TYPE_STRING === $key->type;
+    }
+
+    /**
+     * Delref an ephemeral key after HT insert duplicated it via `__string__separate` (#36388).
+     */
+    public static function releaseEphemeralStringKeyAfterHashInsert(
+        Context $context,
+        Variable $key,
+        Value $keyPtr
+    ): void {
+        if (!self::isEphemeralStringKey($key)) {
+            return;
+        }
+        $context->refcount->delref(
+            $context->builder->pointerCast(
+                $keyPtr,
+                $context->getTypeFromString('__ref__virtual*')
+            )
+        );
+        // Null the alloca so freeDeadVariables cannot double-delref the freed pointer.
+        // Keep ephemeralConcatTemp so freeDeadVariables still skips this Temporary (#36388).
+        if (
+            Variable::KIND_VARIABLE === $key->kind
+            && Variable::TYPE_STRING === $key->type
+            && null !== $key->value
+        ) {
+            $slotTy = $context->getStringFromType($key->value->typeOf());
+            if ('__string__**' === $slotTy || 'ptr' === $slotTy) {
+                $context->builder->store(
+                    $context->getTypeFromString('__string__*')->constNull(),
+                    $key->value
+                );
+            }
+        }
+        $key->ephemeralStringTemp = false;
+        // ephemeralConcatTemp stays true → freeDeadVariables skip (Variable.php).
+    }
+
+    /**
+     * Release {@see Variable::$writableStringKey} when marked ephemeral (#36388).
+     */
+    public static function releaseWritableStringKeyIfEphemeral(Context $context, Variable $lvalue): void
+    {
+        if (!$lvalue->writableStringKeyEphemeral || null === $lvalue->writableStringKey) {
+            return;
+        }
+        $context->refcount->delref(
+            $context->builder->pointerCast(
+                $lvalue->writableStringKey,
+                $context->getTypeFromString('__ref__virtual*')
+            )
+        );
+        $lvalue->writableStringKeyEphemeral = false;
     }
 
     /**

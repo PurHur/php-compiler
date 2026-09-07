@@ -202,9 +202,25 @@ final class HashTableHelper
     /**
      * Lvalue marker for $arr['key'] = … without reading the old value first (#107).
      */
-    public static function prepareStringKeyWrite(Context $context, Value $ht, Value $keyStr): Variable
+    public static function prepareStringKeyWrite(
+        Context $context,
+        Value $ht,
+        Value $keyStr,
+        bool $ephemeralKey = false
+    ): Variable {
+        return HashTableWriteLlvm::prepareStringKeyWrite($context, $ht, $keyStr, $ephemeralKey);
+    }
+
+    /** @see HashTableWriteLlvm::isEphemeralStringKey */
+    public static function isEphemeralStringKey(Variable $key): bool
     {
-        return HashTableWriteLlvm::prepareStringKeyWrite($context, $ht, $keyStr);
+        return HashTableWriteLlvm::isEphemeralStringKey($key);
+    }
+
+    /** @see HashTableWriteLlvm::releaseWritableStringKeyIfEphemeral */
+    public static function releaseWritableStringKeyIfEphemeral(Context $context, Variable $lvalue): void
+    {
+        HashTableWriteLlvm::releaseWritableStringKeyIfEphemeral($context, $lvalue);
     }
 
     /**

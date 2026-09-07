@@ -107,6 +107,8 @@ trait BinaryOpConcatAndTypeMapConstants
         if ($leftIsLong && !$rightIsLong) {
             return $this->compileConcatStringAndI64($right, $left, $rightOp, true);
         }
+        $leftIn = $left;
+        $rightIn = $right;
         $left = JIT\JitNativeString::coerce($this->context, $left, $leftOp);
         $right = JIT\JitNativeString::coerce($this->context, $right, $rightOp);
         $leftVar = $this->context->helper->loadValue($left);
@@ -132,6 +134,10 @@ trait BinaryOpConcatAndTypeMapConstants
         $char = $this->context->builder->gep($char, $leftSize);
         $rightChar = $this->context->builder->structGep($rightVar, $map['value']);
         $this->context->intrinsic->memcpy($char, $rightChar, $rightSize, false);
+        // Coerce of int/float/value-box allocates a heap `__string__` that concat only
+        // reads; release it (php-src convert_to_string temp dtor) (#36388).
+        $this->releaseCoercedConcatOperandIfNew($leftIn, $left, $leftVar);
+        $this->releaseCoercedConcatOperandIfNew($rightIn, $right, $rightVar);
 
         $var = new Variable(
             $this->context,
@@ -147,6 +153,29 @@ trait BinaryOpConcatAndTypeMapConstants
         }
 
         return $var;
+    }
+
+    /**
+     * Free a coerce()-minted string after CONCAT copied its bytes (#36388).
+     */
+    private function releaseCoercedConcatOperandIfNew(
+        Variable $before,
+        Variable $after,
+        \PHPLLVM\Value $loaded
+    ): void {
+        if ($after === $before) {
+            return;
+        }
+        if (Variable::TYPE_STRING !== $after->type) {
+            return;
+        }
+        // Immortal / compile-time literals: delref is a no-op when non-refcounted.
+        $this->context->refcount->delref(
+            $this->context->builder->pointerCast(
+                $loaded,
+                $this->context->getTypeFromString('__ref__virtual*')
+            )
+        );
     }
 
     /**

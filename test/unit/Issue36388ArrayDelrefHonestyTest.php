@@ -159,4 +159,84 @@ final class Issue36388ArrayDelrefHonestyTest extends TestCase
         $this->assertSame(0, $sig, "assoc short-lived unset SIGSEGV rate {$sig}/15 (#36388)");
         $this->assertSame(15, $ok);
     }
+
+    public function testEphemeralConcatKeyReleaseWired(): void
+    {
+        $ht = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/HashTableWriteLlvm.php');
+        $this->assertStringContainsString(
+            'releaseEphemeralStringKeyAfterHashInsert',
+            $ht,
+            'addElement must release ephemeral concat keys after HT insert (#36388)'
+        );
+        $concat = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Concern/CompileConcat.php');
+        $this->assertStringContainsString(
+            'ephemeralConcatTemp = true',
+            $concat,
+            'unnamed CONCAT Temporary must be marked ephemeral for key release (#36388)'
+        );
+    }
+
+    /**
+     * Functional: `$a = ["k".$i => $i]; unset($a)` must not grow usage (#36388).
+     *
+     * @group llvm
+     * @group aot
+     */
+    public function testConcatStringKeyDeltaZeroUnderAot(): void
+    {
+        if (!\PHPCompiler\LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $root = dirname(__DIR__, 2);
+        $src = $root.'/test/repro/issue_36388_concat_key_leak.php';
+        $bin = sys_get_temp_dir().'/phpc_36388_concat_key_'.getmypid();
+        $compile = escapeshellarg(PHP_BINARY).' '
+            .escapeshellarg($root.'/bin/compile.php').' -o '
+            .escapeshellarg($bin).' '
+            .escapeshellarg($src);
+        $cwd = getcwd();
+        chdir($root);
+        putenv('PHP_COMPILER_CACHE=0');
+        exec($compile.' 2>&1', $out, $rc);
+        chdir($cwd);
+        $this->assertSame(0, $rc, implode("\n", $out));
+        exec(escapeshellarg($bin).' 2000 2>&1', $runOut, $runRc);
+        @unlink($bin);
+        $this->assertSame(0, $runRc, implode("\n", $runOut));
+        $concatLine = $runOut[0] ?? '';
+        $this->assertMatchesRegularExpression('/concat done.*delta=0\b/', $concatLine, $concatLine);
+        $this->assertMatchesRegularExpression('/packed done.*delta=0\b/', $runOut[1] ?? '', $runOut[1] ?? '');
+        $this->assertMatchesRegularExpression('/literal done.*delta=0\b/', $runOut[2] ?? '', $runOut[2] ?? '');
+    }
+
+    /**
+     * Functional: `$a["k".$i] = $i; unset($a)` must not grow usage (#36388).
+     *
+     * @group llvm
+     * @group aot
+     */
+    public function testConcatStringKeyDimAssignDeltaZeroUnderAot(): void
+    {
+        if (!\PHPCompiler\LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $root = dirname(__DIR__, 2);
+        $src = $root.'/test/repro/issue_36388_concat_key_dim_assign.php';
+        $bin = sys_get_temp_dir().'/phpc_36388_concat_dim_'.getmypid();
+        $compile = escapeshellarg(PHP_BINARY).' '
+            .escapeshellarg($root.'/bin/compile.php').' -o '
+            .escapeshellarg($bin).' '
+            .escapeshellarg($src);
+        $cwd = getcwd();
+        chdir($root);
+        putenv('PHP_COMPILER_CACHE=0');
+        exec($compile.' 2>&1', $out, $rc);
+        chdir($cwd);
+        $this->assertSame(0, $rc, implode("\n", $out));
+        exec(escapeshellarg($bin).' 2000 2>&1', $runOut, $runRc);
+        @unlink($bin);
+        $this->assertSame(0, $runRc, implode("\n", $runOut));
+        $line = $runOut[0] ?? '';
+        $this->assertMatchesRegularExpression('/dim delta=0\b/', $line, $line);
+    }
 }

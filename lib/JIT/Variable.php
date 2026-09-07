@@ -75,6 +75,12 @@ final class Variable {
     /** @var \PHPLLVM\Value|null */
     public ?\PHPLLVM\Value $writableStringKey = null;
 
+    /**
+     * {@see $writableStringKey} came from an ephemeral concat / rvalue temp (#36388).
+     * After setAtStringKey (which `__string__separate`s into the HT), delref the original.
+     */
+    public bool $writableStringKeyEphemeral = false;
+
     /** FETCH_DIM_W ++/-- / += orphan: warn on hydrate when key was absent (#30078 / #31991). */
     /** @var \PHPLLVM\Value|null */
     public ?\PHPLLVM\Value $writableObjectKey = null;
@@ -1594,7 +1600,12 @@ final class Variable {
                         );
                     }
                     if ($forWrite && (null === $expectedType || Type::TYPE_ARRAY !== $expectedType->type)) {
-                        $lvalue = HashTableHelper::prepareStringKeyWrite($this->context, $ht, $key);
+                        $lvalue = HashTableHelper::prepareStringKeyWrite(
+                            $this->context,
+                            $ht,
+                            $key,
+                            HashTableHelper::isEphemeralStringKey($dim)
+                        );
 
                         return $lvalue;
                     }
