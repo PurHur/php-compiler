@@ -323,6 +323,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/JIT/Concern/M3EmitTuSpineNativeTryAndCfgParamTypes.php',
             'lib/JIT/Concern/M3M4M5CompileDriverEmitPolicy.php',
             'lib/JIT/Concern/NestedVmHelperAndThisResolve.php',
+            'lib/JIT/Concern/OpCodeArgSlotAndAssignRhs.php',
             'lib/JIT/Concern/ParamConstraintsAndRuntimeNewInit.php',
             'lib/JIT/Concern/PropertyDeclaringClassResolve.php',
             'lib/JIT/Concern/PropertyFetchCoalesceAndCompileTimeString.php',

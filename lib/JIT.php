@@ -70,6 +70,7 @@ require_once __DIR__.'/JIT/Concern/DomCompileTimeTagMeta.php';
 require_once __DIR__.'/JIT/Concern/PropertyDeclaringClassResolve.php';
 require_once __DIR__.'/JIT/Concern/CoerceReturnPropertyDeclaringAndByRef.php';
 require_once __DIR__.'/JIT/Concern/CfgParamReturnTypeAndCalleeByRef.php';
+require_once __DIR__.'/JIT/Concern/OpCodeArgSlotAndAssignRhs.php';
 require_once __DIR__.'/JIT/Concern/PropertyIncDecCompile.php';
 require_once __DIR__.'/JIT/Concern/CallResultCompileTimePropagate.php';
 require_once __DIR__.'/JIT/Concern/CompileTimeStringFoldAndPromote.php';
@@ -185,6 +186,7 @@ class JIT {
     use PropertyDeclaringClassResolve;
     use CoerceReturnPropertyDeclaringAndByRef;
     use CfgParamReturnTypeAndCalleeByRef;
+    use OpCodeArgSlotAndAssignRhs;
     use PropertyIncDecCompile;
     use CallResultCompileTimePropagate;
     use CompileTimeStringFoldAndPromote;
