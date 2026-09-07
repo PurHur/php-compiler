@@ -4,9 +4,9 @@
     "done_when_ceiling": 25000,
     "files": {
         "lib/Compiler.php": {
-            "budget": 1175,
+            "budget": 1178,
             "target": 20000,
-            "note": "Concern trait splits (#36230/#36387/#36403); StmtCoalesceFuncCallArgSyncCompile + CallArgCompileTimeValueAndProcOpenFold + peers"
+            "note": "Concern trait splits (#36230/#36387/#36403); NullsafeChainCompile + StmtCoalesceFuncCallArgSyncCompile + peers"
         },
         "lib/JIT.php": {
             "budget": 274,

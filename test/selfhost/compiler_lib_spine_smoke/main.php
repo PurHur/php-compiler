@@ -5343,6 +5343,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/CompileTimeParamDefaultAndE
 require_once __DIR__.'/../../../lib/Compiler/Concern/ParameterAsserts.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CoalesceAndNullsafe.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/NullsafePropertyAndMethodCompile.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/NullsafeChainCompile.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/ClassLikeAndStmtCompile.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompileInterfaceTraitEnumAndMethodDecl.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompileClassConstFoldAndTypedReject.php';
