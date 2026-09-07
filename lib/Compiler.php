@@ -47,6 +47,7 @@ require_once __DIR__.'/Compiler/Concern/CallArgInlineEnumCastErrorSuppressAndFcc
 require_once __DIR__.'/Compiler/Concern/CallArgPostFccDimCoalesceExprPreludeAndNestedNewSends.php';
 require_once __DIR__.'/Compiler/Concern/CallArgInlineArrayUnpackReduceAndFamilyResolve.php';
 require_once __DIR__.'/Compiler/Concern/CallArgNullLiteralHoistedPropertyConstAndCoalesceValueSlots.php';
+require_once __DIR__.'/Compiler/Concern/CallArgDimFetchAndInlineArrayLiteralValueSlotWire.php';
 require_once __DIR__.'/Compiler/Concern/CompileCallArgSends.php';
 require_once __DIR__.'/Compiler/Concern/CompileInlineSpecializedCallArgSends.php';
 require_once __DIR__.'/Compiler/Concern/ArrayPadUnpackExtractAndDateSunCallArgSends.php';
@@ -262,6 +263,7 @@ use PHPCompiler\Compiler\Concern\CallArgInlineEnumCastErrorSuppressAndFccSends;
 use PHPCompiler\Compiler\Concern\CallArgPostFccDimCoalesceExprPreludeAndNestedNewSends;
 use PHPCompiler\Compiler\Concern\CallArgInlineArrayUnpackReduceAndFamilyResolve;
 use PHPCompiler\Compiler\Concern\CallArgNullLiteralHoistedPropertyConstAndCoalesceValueSlots;
+use PHPCompiler\Compiler\Concern\CallArgDimFetchAndInlineArrayLiteralValueSlotWire;
 use PHPCompiler\Compiler\Concern\CompileCallArgSends;
 use PHPCompiler\Compiler\Concern\CompileInlineSpecializedCallArgSends;
 use PHPCompiler\Compiler\Concern\ArrayPadUnpackExtractAndDateSunCallArgSends;
@@ -387,6 +389,7 @@ class Compiler {
     use CallArgPostFccDimCoalesceExprPreludeAndNestedNewSends;
     use CallArgInlineArrayUnpackReduceAndFamilyResolve;
     use CallArgNullLiteralHoistedPropertyConstAndCoalesceValueSlots;
+    use CallArgDimFetchAndInlineArrayLiteralValueSlotWire;
     use CompileCallArgSends;
     use CompileInlineSpecializedCallArgSends;
     use ArrayPadUnpackExtractAndDateSunCallArgSends;

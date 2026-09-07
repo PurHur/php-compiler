@@ -5370,6 +5370,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/CallArgInlineEnumCastErrorS
 require_once __DIR__.'/../../../lib/Compiler/Concern/CallArgPostFccDimCoalesceExprPreludeAndNestedNewSends.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CallArgInlineArrayUnpackReduceAndFamilyResolve.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CallArgNullLiteralHoistedPropertyConstAndCoalesceValueSlots.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/CallArgDimFetchAndInlineArrayLiteralValueSlotWire.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompileCallArgSends.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompileInlineSpecializedCallArgSends.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/ArrayPadUnpackExtractAndDateSunCallArgSends.php';
