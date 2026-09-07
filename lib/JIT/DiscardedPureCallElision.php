@@ -266,7 +266,10 @@ use PHPCompiler\VM\Variable as VmVariable;
  * promote arm ({@see nativeLongDivisorCanSkipNegOneModuloBranch}). Typed
  * {@code / 1} is identity (no {@code sdiv}/{@code srem}/exactness promote;
  * {@see nativeLongDivisorIsCompileTimeOne}). {@code intdiv($n, 1)} is the same
- * identity at the builtin call site; {@code intdiv($n, -1)} and typed
+ * identity at the builtin call site; {@code intdiv($n, $n)} folds to {@code 1}
+ * (omit {@code sdiv} / {@code INT_MIN}/{-1} {@code ArithmeticError}; keep
+ * {@code DivisionByZeroError} when {@code n == 0}; peer typed {@code $n / $n};
+ * {@see intdivSameOperandFoldsToOne}). {@code intdiv($n, -1)} and typed
  * {@code / -1} lower to {@code negate} with the {@code INT_MIN} guard /
  * float promote only when needed ({@see nativeLongDivisorIsCompileTimeNegOne}).
  * Typed {@code % 1} folds to {@code 0} (peer {@code % -1};
@@ -4345,6 +4348,24 @@ final class DiscardedPureCallElision
         }
 
         return null;
+    }
+
+    /**
+     * {@code intdiv($n, $n)} → {@code 1} when both args are the same typed
+     * native-long storage / SSA payload (peer typed {@code $n / $n}).
+     *
+     * Omits {@code sdiv} and the {@code PHP_INT_MIN}/{-1} {@code ArithmeticError}
+     * arm (equal nonzero longs always divide exactly; {@code INT_MIN}/{@code INT_MIN}
+     * is 1, not the INT_MIN/−1 case). Callers keep {@code DivisionByZeroError}
+     * when {@code n == 0}.
+     *
+     * php-src: ext/standard/math.c {@code PHP_FUNCTION(intdiv)}.
+     */
+    public static function intdivSameOperandFoldsToOne(
+        Variable $left,
+        Variable $right
+    ): bool {
+        return self::nativeLongOperandsAreSame($left, $right);
     }
 
     /**

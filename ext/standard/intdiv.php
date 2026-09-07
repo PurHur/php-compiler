@@ -90,6 +90,18 @@ final class intdiv extends Internal
 
             return $context->builder->negate($left);
         }
+        // intdiv($n, $n) → 1 (omit sdiv / INT_MIN/−1; keep /0; peer $n/$n; #36386).
+        if (DiscardedPureCallElision::intdivSameOperandFoldsToOne($args[0], $args[1])) {
+            if (!DiscardedPureCallElision::intdivCanSkipZeroDivisorGuard($args[1])) {
+                JitNumericDivisionGuard::emitZeroLongDivisorGuard(
+                    $context,
+                    $left,
+                    'Division by zero'
+                );
+            }
+
+            return $context->getTypeFromString('int64')->constInt(1, false);
+        }
         // Skip DivisionByZeroError / ArithmeticError branches when the divisor
         // (and, for -1, the dividend) are compile-time proven safe — peer
         // discarded-elision proofs (#36386 / #37153). php-src math.c intdiv.
