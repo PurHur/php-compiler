@@ -206,6 +206,17 @@ SEED_UNITS=(
   /ext/standard/OpendirJitHelper.php
   /ext/standard/DirHandleJitHelper.php
   /ext/standard/DirSnapshotJitHelper.php
+  # Stream core / fopen / filter / path tier (#36391 after #37225)
+  /ext/standard/StreamBucketJitHelper.php
+  /ext/standard/StreamBufferJitHelper.php
+  /ext/standard/StreamCapsJitHelper.php
+  /ext/standard/StreamErrorStoreJitHelper.php
+  /ext/standard/StreamFilterJitHelper.php
+  /ext/standard/StreamIncludeOpenJitHelper.php
+  /ext/standard/StreamIoJitHelper.php
+  /ext/standard/StreamLibcHandleJitHelper.php
+  /ext/standard/StreamLifecycleJitHelper.php
+  /ext/standard/StreamMetaJitHelper.php
 )
 
 MIN_SEED=${#SEED_UNITS[@]}
