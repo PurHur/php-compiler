@@ -122,6 +122,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/Compiler/Concern/ExplodeIteratorChunkWalkAndTrailingComparatorCallArgSends.php',
             'lib/Compiler/Concern/ExpressionPreludeDimFetchAndHoistedConstCallArgSlots.php',
             'lib/Compiler/Concern/FinalSiblingInlineCallArgSendSlot.php',
+            'lib/Compiler/Concern/FinalizeArrayCombineColumnCallArgSlots.php',
             'lib/Compiler/Concern/FinalizeArrayFamilyCallArgSlots.php',
             'lib/Compiler/Concern/FindInlineArrayProducerForCallArg.php',
             'lib/Compiler/Concern/FindInlineCallArgProducerSlot.php',

@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8435 |
-| Phase A inventory files (M2 ratio SSOT) | 8435 |
+| PHP files on vm.php path | 8436 |
+| Phase A inventory files (M2 ratio SSOT) | 8436 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26495 |
+| Source constructs flagged (warnings) | 26498 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5638,6 +5638,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/ExplodeIteratorChunkWalkAndTrailingComparatorCallArgSends.php` | 0 | 8 |
 | `lib/Compiler/Concern/ExpressionPreludeDimFetchAndHoistedConstCallArgSlots.php` | 0 | 2 |
 | `lib/Compiler/Concern/FinalSiblingInlineCallArgSendSlot.php` | 0 | 2 |
+| `lib/Compiler/Concern/FinalizeArrayCombineColumnCallArgSlots.php` | 0 | 3 |
 | `lib/Compiler/Concern/FinalizeArrayFamilyCallArgSlots.php` | 0 | 5 |
 | `lib/Compiler/Concern/FindInlineArrayProducerForCallArg.php` | 0 | 3 |
 | `lib/Compiler/Concern/FindInlineCallArgProducerSlot.php` | 0 | 1 |
@@ -49245,13 +49246,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 1099)
-- new CompileFatal (line 1133)
-- new CompileError (line 1136)
-- new ClassCompileRegistry (line 1177)
-- new AttributeClassRegistry (line 1178)
-- new ClassCompileRegistry (line 1286)
-- new AttributeClassRegistry (line 1287)
+- new CompileFatal (line 1102)
+- new CompileFatal (line 1136)
+- new CompileError (line 1139)
+- new ClassCompileRegistry (line 1180)
+- new AttributeClassRegistry (line 1181)
+- new ClassCompileRegistry (line 1289)
+- new AttributeClassRegistry (line 1290)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -50170,14 +50171,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - trait FinalSiblingInlineCallArgSendSlot (line 24)
 - 1 class method(s)
 
+### `lib/Compiler/Concern/FinalizeArrayCombineColumnCallArgSlots.php`
+
+**Warnings** (review for bootstrap subset):
+- trait FinalizeArrayCombineColumnCallArgSlots (line 24)
+- 6 class method(s)
+- 1 closure(s)
+
 ### `lib/Compiler/Concern/FinalizeArrayFamilyCallArgSlots.php`
 
 **Warnings** (review for bootstrap subset):
-- trait FinalizeArrayFamilyCallArgSlots (line 25)
-- new Operand\Temporary (line 92)
-- new OpCode (line 716)
-- 19 class method(s)
-- 2 closure(s)
+- trait FinalizeArrayFamilyCallArgSlots (line 26)
+- new Operand\Temporary (line 93)
+- new OpCode (line 445)
+- 13 class method(s)
+- 1 closure(s)
 
 ### `lib/Compiler/Concern/FindInlineArrayProducerForCallArg.php`
 
