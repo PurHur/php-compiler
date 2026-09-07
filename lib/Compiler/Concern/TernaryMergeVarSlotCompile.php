@@ -17,7 +17,7 @@ use PHPCompiler\OpCode;
  * Ternary (?:) merge phi / var-slot wiring (#36387 / #36403).
  *
  * Extracted from {@see TernaryAndLogicalShortCircuit} so gen-0 split-TU can
- * hollow a smaller Concern TU. Covers recordTernaryMergeVarSlots through
+ * hollow a smaller Concern TU. Companion to {@see TernaryMergeAndLogicalShortCircuitSlots}. Covers recordTernaryMergeVarSlots through
  * mergeEchoSlotForBranch. Mirrors php-src Zend/zend_compile.c ternary / QM_ASSIGN
  * phi wiring — move-only; no behavior change intended.
  *
