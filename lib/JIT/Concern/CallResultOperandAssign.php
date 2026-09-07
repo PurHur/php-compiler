@@ -205,6 +205,23 @@ trait CallResultOperandAssign
 
     private function assignCallResultOperand(Operand $result, PHPLLVM\Value $llvmResult, bool $returnsByRef): void
     {
+        // Typed abs() / peers stash an overflowable native-long Variable so
+        // PHP_INT_MIN → double promote metadata survives Internal::call (#36386).
+        if (null !== $this->context->overflowableInternalCallResult) {
+            $okVar = $this->context->overflowableInternalCallResult;
+            $this->context->overflowableInternalCallResult = null;
+            if ($this->context->hasVariableOp($result)) {
+                $this->context->getVariableFromOp($result)->free();
+            }
+            $this->context->setVariableOp($result, $okVar);
+            $name = JIT\OperandName::resolve($result);
+            if (null !== $name && '' !== $name) {
+                $resolved = $this->context->resolveRefAliasName($name);
+                $this->context->bindVariableByName($resolved, $okVar);
+            }
+
+            return;
+        }
         if ('void' === $this->context->getStringFromType($llvmResult->typeOf())) {
             return;
         }

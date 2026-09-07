@@ -108,6 +108,8 @@ trait ResolveJitOutgoingCall
      */
     private function invokeJitCall(JIT\Call $toCall, array $callArgs): \PHPLLVM\Value
     {
+        // Drop a stale overflowable Internal result (e.g. discarded abs) (#36386).
+        $this->context->overflowableInternalCallResult = null;
         JIT\DeprecatedCallGuard::emitBeforeCall($this->context, $toCall);
         // Leaf-recursive no-throw callees (fibo_r): skip uncaught-trace frames + pending
         // throw checks — they cannot appear on an exception path (#36386).
