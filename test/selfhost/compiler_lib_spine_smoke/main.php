@@ -5358,6 +5358,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/CompileReservedNamesPseudoC
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompilePropertyFetchEmptyAssignAndUnset.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/ErrorSuppressAndPropertyFetch.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompileExprAndOpcodeTypes.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/CompileExprDispatch.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/WriteContextRejects.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/TernaryAndLogicalShortCircuit.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/TernaryMergeVarSlotCompile.php';
