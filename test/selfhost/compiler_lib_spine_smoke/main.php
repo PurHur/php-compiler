@@ -5365,6 +5365,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/TernaryMergeVarSlotCompile.
 require_once __DIR__.'/../../../lib/Compiler/Concern/TernaryMergeAndLogicalShortCircuitSlots.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/TernaryNullableParamNullAndUnpackHelpers.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CallArgEarlyFastPathAndMixedPropertyFetchSends.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/CallArgNullMergePropertyFetchAndHoistedPreludeSends.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompileCallArgSends.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompileInlineSpecializedCallArgSends.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/ArrayPadUnpackExtractAndDateSunCallArgSends.php';
