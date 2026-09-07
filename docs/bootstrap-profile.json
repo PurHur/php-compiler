@@ -7237,6 +7237,7 @@
         "lib/JIT/ClosureHelper.php",
         "lib/JIT/CoalesceHelper.php",
         "lib/JIT/CompileCache.php",
+        "lib/JIT/CompileCachePartialEmitDemote.php",
         "lib/JIT/CompileCacheSemanticHash.php",
         "lib/JIT/CompilerOperandChainNative.php",
         "lib/JIT/Concern/AdaptByRefCallArgs.php",
