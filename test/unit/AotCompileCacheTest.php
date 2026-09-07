@@ -76,6 +76,24 @@ final class AotCompileCacheTest extends TestCase
         $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/', $segment);
     }
 
+    public function testShouldSkipBuiltinImplementRequiresBoundBitcode(): void
+    {
+        // Pending arm without thin-boot must not skip SuperglobalInit (#36382).
+        CompileCache::finishRecording();
+        CompileCache::armEditScaffold('pending-only-key');
+        $this->assertFalse(
+            CompileCache::shouldSkipBuiltinImplement(),
+            'pending key alone must not skip builtin implement'
+        );
+        CompileCache::markEditScaffoldBitcodeBound();
+        $this->assertTrue(
+            CompileCache::shouldSkipBuiltinImplement(),
+            'bound edit-scaffold bitcode skips implement IR'
+        );
+        CompileCache::finishRecording();
+        $this->assertFalse(CompileCache::shouldSkipBuiltinImplement());
+    }
+
     public function testSecondAotBuildUsesDiskCacheForHelloWorld(): void
     {
         if (!LlvmToolchain::isReady($this->repoRoot)) {

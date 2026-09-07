@@ -542,10 +542,18 @@ final class CompileCache
         return $key;
     }
 
-    /** True while Context should register decls/types only (no implement IR) (#36387). */
+    /**
+     * True while Context should register decls/types only (no implement IR) (#36387).
+     *
+     * Pending alone is not enough: {@see Context::tryBindEditScaffoldBitcodeBeforeBuiltins()}
+     * may fail to load module.bc while {@see armEditScaffold()} left a pending key. Skipping
+     * {@see SuperglobalInit::initialize()} in that case leaves {@see SuperglobalInit::$globals}
+     * empty and Slim/Composer rebuilds throw "Superglobal not initialized for JIT: _SERVER"
+     * (#36382). Only skip after thin-boot bound the prior module (or restore completed).
+     */
     public static function shouldSkipBuiltinImplement(): bool
     {
-        return null !== self::$pendingEditScaffoldKey || self::$editScaffoldActive;
+        return self::$editScaffoldActive || self::$editScaffoldBitcodeBound;
     }
 
     /**
