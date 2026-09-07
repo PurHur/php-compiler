@@ -50,6 +50,7 @@ require_once __DIR__.'/Compiler/Concern/CallArgNullLiteralHoistedPropertyConstAn
 require_once __DIR__.'/Compiler/Concern/CallArgDimFetchAndInlineArrayLiteralValueSlotWire.php';
 require_once __DIR__.'/Compiler/Concern/CallArgEncapsedConcatArithmeticNamedLocalAndPrecedingProducerValueSlots.php';
 require_once __DIR__.'/Compiler/Concern/CallArgResidualDimCoalesceNewHoistedFoldAndAdjacentProducerValueSlots.php';
+require_once __DIR__.'/Compiler/Concern/CallArgClosureDeadTempProducerEvalAndPreferNamedLocalValueSlots.php';
 require_once __DIR__.'/Compiler/Concern/CompileCallArgSends.php';
 require_once __DIR__.'/Compiler/Concern/CompileInlineSpecializedCallArgSends.php';
 require_once __DIR__.'/Compiler/Concern/ArrayPadUnpackExtractAndDateSunCallArgSends.php';
@@ -268,6 +269,7 @@ use PHPCompiler\Compiler\Concern\CallArgNullLiteralHoistedPropertyConstAndCoales
 use PHPCompiler\Compiler\Concern\CallArgDimFetchAndInlineArrayLiteralValueSlotWire;
 use PHPCompiler\Compiler\Concern\CallArgEncapsedConcatArithmeticNamedLocalAndPrecedingProducerValueSlots;
 use PHPCompiler\Compiler\Concern\CallArgResidualDimCoalesceNewHoistedFoldAndAdjacentProducerValueSlots;
+use PHPCompiler\Compiler\Concern\CallArgClosureDeadTempProducerEvalAndPreferNamedLocalValueSlots;
 use PHPCompiler\Compiler\Concern\CompileCallArgSends;
 use PHPCompiler\Compiler\Concern\CompileInlineSpecializedCallArgSends;
 use PHPCompiler\Compiler\Concern\ArrayPadUnpackExtractAndDateSunCallArgSends;
@@ -396,6 +398,7 @@ class Compiler {
     use CallArgDimFetchAndInlineArrayLiteralValueSlotWire;
     use CallArgEncapsedConcatArithmeticNamedLocalAndPrecedingProducerValueSlots;
     use CallArgResidualDimCoalesceNewHoistedFoldAndAdjacentProducerValueSlots;
+    use CallArgClosureDeadTempProducerEvalAndPreferNamedLocalValueSlots;
     use CompileCallArgSends;
     use CompileInlineSpecializedCallArgSends;
     use ArrayPadUnpackExtractAndDateSunCallArgSends;
