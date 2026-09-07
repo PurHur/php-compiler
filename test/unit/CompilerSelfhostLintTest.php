@@ -144,6 +144,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/Compiler/Concern/StmtLevelSideEffectAndEmittedCallGuards.php',
             'lib/Compiler/Concern/SubstrNestedHaystackAndMethodOrStaticCallInitSlots.php',
             'lib/Compiler/Concern/TernaryAndLogicalShortCircuit.php',
+            'lib/Compiler/Concern/TernaryMergeVarSlotCompile.php',
             'lib/Compiler/Concern/TryFinallyCatchAndOperandLookup.php',
             'lib/Compiler/Concern/VarExportNestedAndArrayMergeFamilyCallArgSlots.php',
             'lib/Compiler/Concern/WriteContextRejects.php',
