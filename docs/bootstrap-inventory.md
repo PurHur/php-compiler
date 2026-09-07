@@ -5632,6 +5632,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/FirstSiblingInlineFuncCallProducerIndex.php` | 0 | 2 |
 | `lib/Compiler/Concern/FunctionStaticAndCompileTimeLiterals.php` | 0 | 15 |
 | `lib/Compiler/Concern/HoistedEnumAndChainedInlineCallArgProducers.php` | 0 | 2 |
+| `lib/Compiler/Concern/HoistedMultiArgContiguousLiteralPreludeAndConsumerFeed.php` | 0 | 2 |
 | `lib/Compiler/Concern/HoistedMultiArgSiblingFuncCallChain.php` | 0 | 2 |
 | `lib/Compiler/Concern/HoistedSiblingFeedAndArrayKeysArgSendRewire.php` | 0 | 2 |
 | `lib/Compiler/Concern/HoistedUnaryAssignAndInlineProducerCallArgSlots.php` | 0 | 3 |
@@ -50142,11 +50143,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - trait HoistedEnumAndChainedInlineCallArgProducers (line 25)
 - 21 class method(s)
 
+### `lib/Compiler/Concern/HoistedMultiArgContiguousLiteralPreludeAndConsumerFeed.php`
+
+**Warnings** (review for bootstrap subset):
+- trait HoistedMultiArgContiguousLiteralPreludeAndConsumerFeed (line 24)
+- 6 class method(s)
+
 ### `lib/Compiler/Concern/HoistedMultiArgSiblingFuncCallChain.php`
 
 **Warnings** (review for bootstrap subset):
-- trait HoistedMultiArgSiblingFuncCallChain (line 25)
-- 11 class method(s)
+- trait HoistedMultiArgSiblingFuncCallChain (line 26)
+- 5 class method(s)
 
 ### `lib/Compiler/Concern/HoistedSiblingFeedAndArrayKeysArgSendRewire.php`
 
