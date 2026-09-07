@@ -49160,13 +49160,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 964)
-- new CompileFatal (line 998)
-- new CompileError (line 1001)
-- new ClassCompileRegistry (line 1042)
-- new AttributeClassRegistry (line 1043)
-- new ClassCompileRegistry (line 1151)
-- new AttributeClassRegistry (line 1152)
+- new CompileFatal (line 967)
+- new CompileFatal (line 1001)
+- new CompileError (line 1004)
+- new ClassCompileRegistry (line 1045)
+- new AttributeClassRegistry (line 1046)
+- new ClassCompileRegistry (line 1154)
+- new AttributeClassRegistry (line 1155)
 - 26 class method(s)
 - 1 closure(s)
 
