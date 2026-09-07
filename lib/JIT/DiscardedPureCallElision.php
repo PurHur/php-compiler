@@ -274,9 +274,11 @@ use PHPCompiler\VM\Variable as VmVariable;
  * {@code $n ** 2} / {@code pow($n, 2)} lowers to {@code $n * $n} with smul
  * overflow→float, {@code $n ** 3} / {@code pow($n, 3)} to
  * {@code $n * $n * $n} with chained smul, {@code $n ** 4} /
- * {@code pow($n, 4)} to {@code ($n*$n)*($n*$n)} (square-of-square), and
+ * {@code pow($n, 4)} to {@code ($n*$n)*($n*$n)} (square-of-square),
  * {@code $n ** 5} / {@code pow($n, 5)} to {@code ($n*$n*$n)*($n*$n)} with
- * chained smul (omit {@code llvm.pow.f64} / float round-trip;
+ * chained smul, and {@code $n ** 6} / {@code pow($n, 6)} to
+ * {@code ($n*$n*$n)*($n*$n*$n)} (cube-of-cube) with chained smul (omit
+ * {@code llvm.pow.f64} / float round-trip;
  * {@see nativeLongPowCompileTimeExponentFold}). {@code intdiv($n, -1)} and typed
  * {@code / -1} lower to {@code negate} with the {@code INT_MIN} guard /
  * float promote only when needed ({@see nativeLongDivisorIsCompileTimeNegOne}).
@@ -4390,20 +4392,22 @@ final class DiscardedPureCallElision
      *   chained smul overflow→float (square, then square-of-square)
      * - {@code $n ** 5} / {@code pow($n, 5)} → {@code ($n*$n*$n)*($n*$n)} with
      *   chained smul overflow→float (cube × square)
+     * - {@code $n ** 6} / {@code pow($n, 6)} → {@code ($n*$n*$n)*($n*$n*$n)} with
+     *   chained smul overflow→float (cube × cube)
      *
      * Omits {@code llvm.pow.f64} and the siToFp/fpToSi round-trip on the
      * integer fast path ({@see \PHPCompiler\ext\standard\JitPow}). Peer
      * compile-time {@code * 1} identity ({@see nativeLongArithIsCompileTimeIdentityOrZero})
      * and {@code * 2^k} shl ({@see nativeLongMulCompileTimePowerOfTwoShift}).
      *
-     * Float exponents ({@code 0.0}/{@code 1.0}/{@code 2.0}/{@code 3.0}/{@code 4.0}/{@code 5.0}) stay
+     * Float exponents ({@code 0.0}/{@code 1.0}/{@code 2.0}/{@code 3.0}/{@code 4.0}/{@code 5.0}/{@code 6.0}) stay
      * on the float path — Zend returns {@code float} for those shapes.
      *
      * php-src: Zend/zend_operators.c {@code pow_function} /
      * {@code zend_pow} / {@code mul_function}; ext/standard/math.c
      * {@code PHP_FUNCTION(pow)}.
      *
-     * @return 'one'|'identity'|'square'|'cube'|'fourth'|'fifth'|null fold to 1, keep base, mul square/cube/fourth/fifth, or null
+     * @return 'one'|'identity'|'square'|'cube'|'fourth'|'fifth'|'sixth'|null fold to 1, keep base, mul square/cube/fourth/fifth/sixth, or null
      */
     public static function nativeLongPowCompileTimeExponentFold(
         Variable $exponent
@@ -4429,6 +4433,9 @@ final class DiscardedPureCallElision
         }
         if (5 === $e) {
             return 'fifth';
+        }
+        if (6 === $e) {
+            return 'sixth';
         }
 
         return null;
