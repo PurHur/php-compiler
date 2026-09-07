@@ -8,6 +8,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\MathFpow;
 use PHPCompiler\JIT\Builtin\PowIntRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\DiscardedPureCallElision;
 use PHPCompiler\JIT\JitEnumNumericOperandGuard;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitPowNumericOperandGuard;
@@ -129,13 +130,40 @@ final class JitPow
         return JitValueBox::isValueOperand($args[0]) || JitValueBox::isValueOperand($args[1]);
     }
 
-    /** Integer ** via MathFpow — avoids broken __phpc_pow_int on boxed operands (#35978). */
+    /**
+     * Integer ** via MathFpow — avoids broken __phpc_pow_int on boxed operands (#35978).
+     *
+     * Compile-time exponent {@code 0} → {@code 1} and {@code 1} → identity
+     * omit {@code llvm.pow.f64} (#36386; php-src {@code pow_function} /
+     * {@code zend_pow}).
+     */
     private static function emitIntegerPowViaMathFpow(
         Context $context,
         Value $slotPtr,
         JITVariable $base,
         JITVariable $exp
     ): void {
+        $expFold = DiscardedPureCallElision::nativeLongPowCompileTimeExponentFold($exp);
+        if ('one' === $expFold) {
+            // Incl. 0**0 → 1 (Zend pow_function).
+            $context->builder->call(
+                $context->lookupFunction('__value__writeLong'),
+                $slotPtr,
+                $context->getTypeFromString('int64')->constInt(1, false)
+            );
+
+            return;
+        }
+        if ('identity' === $expFold) {
+            $baseL = JitLongArg::lower($context, $base, 'pow() base');
+            $context->builder->call(
+                $context->lookupFunction('__value__writeLong'),
+                $slotPtr,
+                $context->builder->intCast($baseL, $context->getTypeFromString('int64'))
+            );
+
+            return;
+        }
         MathFpow::ensureLinked($context);
         $baseL = JitLongArg::lower($context, $base, 'pow() base');
         $expL = JitLongArg::lower($context, $exp, 'pow() exponent');
@@ -177,19 +205,7 @@ final class JitPow
         $context->builder->branchIf($needsFloat, $floatBlock, $intBlock);
 
         $context->builder->positionAtEnd($intBlock);
-        $baseL = JitLongArg::lower($context, $base, 'pow() base');
-        $expL = JitLongArg::lower($context, $exp, 'pow() exponent');
-        $double = $context->getTypeFromString('double');
-        $i64 = $context->getTypeFromString('int64');
-        $baseD = $context->builder->siToFp($baseL, $double);
-        $expD = $context->builder->siToFp($expL, $double);
-        $fres = MathFpow::invoke($context, $baseD, $expD);
-        $longRes = $context->builder->fpToSi($fres, $i64);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeLong'),
-            $slotPtr,
-            $longRes
-        );
+        self::emitIntegerPowViaMathFpow($context, $slotPtr, $base, $exp);
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($floatBlock);
