@@ -87,6 +87,8 @@ final class Issue36388StringCallResultFreeTest extends TestCase
         $this->assertStringContainsString("'strrev' => true", $src);
         $this->assertStringContainsString("'str_rot13' => true", $src);
         $this->assertStringContainsString("'ucfirst' => true", $src);
+        $this->assertStringContainsString("'basename' => true", $src);
+        $this->assertStringContainsString("'dirname' => true", $src);
         $this->assertStringContainsString('releaseEphemeralArgAfterCopy', (string) file_get_contents(
             dirname(__DIR__, 2).'/lib/JIT/JitStringBuiltinArg.php'
         ));
@@ -101,6 +103,12 @@ final class Issue36388StringCallResultFreeTest extends TestCase
         ));
         $this->assertStringContainsString('releaseEphemeralArgAfterCopy', (string) file_get_contents(
             dirname(__DIR__, 2).'/ext/standard/ucfirst.php'
+        ));
+        $this->assertStringContainsString('releaseEphemeralArgAfterCopy', (string) file_get_contents(
+            dirname(__DIR__, 2).'/ext/standard/basename.php'
+        ));
+        $this->assertStringContainsString('releaseEphemeralArgAfterCopy', (string) file_get_contents(
+            dirname(__DIR__, 2).'/ext/standard/dirname.php'
         ));
     }
 
@@ -210,6 +218,8 @@ final class Issue36388StringCallResultFreeTest extends TestCase
             'ucfirst' => ['test/repro/issue_36388_ucfirst_local_free.php', 'ucfirst_local delta='],
             'ucfirst_lit' => ['test/repro/issue_36388_ucfirst_lit_free.php', 'ucfirst_lit delta='],
             'lcfirst' => ['test/repro/issue_36388_lcfirst_local_free.php', 'lcfirst_local delta='],
+            'basename' => ['test/repro/issue_36388_basename_local_free.php', 'basename_local delta='],
+            'basename_lit' => ['test/repro/issue_36388_basename_lit_free.php', 'basename_lit delta='],
         ];
     }
 }
