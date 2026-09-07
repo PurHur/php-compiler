@@ -175,6 +175,33 @@ final class UnsupportedFeatureTest extends TestCase
         }
     }
 
+    public function testKsortWebEnumCastSitesUseCatalog(): void
+    {
+        foreach ([
+            'ksort-flags-numeric-natural' => 4118,
+            'arrayobject-offset-key-type' => 26823,
+            'web-params-source-array' => 157,
+            'web-int-numeric-value' => 157,
+            'fiber-suspend-during-clone' => 3130,
+            'backed-enum-backing-type-jit' => 4053,
+            'object-cast-operand-type' => 10244,
+            'array-map-mapped-value-type' => 23974,
+            'array-map-null-zip-arity' => 34978,
+            'variable-constant-fetch-jit' => 36396,
+            'class-const-append-expr' => 3592,
+        ] as $id => $issue) {
+            try {
+                UnsupportedFeature::raise($id);
+                $this->fail('expected UnsupportedFeature for '.$id);
+            } catch (UnsupportedFeature $e) {
+                $this->assertSame($issue, $e->issue, $id);
+                $this->assertStringStartsWith('phpc: unsupported: ', $e->getMessage(), $id);
+                $row = UnsupportedRegistry::feature($id);
+                $this->assertStringContainsString($row['matrixRow'], $e->getMessage(), $id);
+            }
+        }
+    }
+
     /**
      * Sites routed in this slice must not keep the legacy bare LogicException wording.
      */
@@ -216,6 +243,14 @@ final class UnsupportedFeatureTest extends TestCase
             dirname(__DIR__, 2).'/lib/JIT/ReflectionBuiltinHelper.php',
             dirname(__DIR__, 2).'/lib/VM/VmIteratorForeach.php',
             dirname(__DIR__, 2).'/lib/VM/GeneratorIteratorJitHelper.php',
+            dirname(__DIR__, 2).'/lib/VM/ArrayObjectJitHelper.php',
+            dirname(__DIR__, 2).'/lib/Web/Params.php',
+            dirname(__DIR__, 2).'/lib/VM/Concern/ObjectPropertyMagicAndClone.php',
+            dirname(__DIR__, 2).'/lib/JIT/BackedEnumFromJit.php',
+            dirname(__DIR__, 2).'/lib/JIT/CastObjectNativeJit.php',
+            dirname(__DIR__, 2).'/lib/JIT/ArrayMapLlvm.php',
+            dirname(__DIR__, 2).'/lib/JIT/Context.php',
+            dirname(__DIR__, 2).'/lib/VM/ClassConstExpr.php',
         ];
         $legacy = [
             'range() step must be an integer in this compiler build',
@@ -250,6 +285,13 @@ final class UnsupportedFeatureTest extends TestCase
             'SplObjectStorage keys must be objects in this compiler build',
             'foreach over objects is only supported for SplObjectStorage in this compiler build',
             'foreach requires a Generator value in this compiler build',
+            'ksort() flags are not supported in JIT/AOT in this compiler build',
+            'web_*() first argument must be an array in this compiler build',
+            'web_int() value must be numeric in this compiler build',
+            'Fiber suspend during __clone() is not supported in this compiler build',
+            'array_map(null) multi-zip requires ≥2 source hashtables (#34978)',
+            'Variable constant fetch not supported yet',
+            '[] append is not supported in class constant expressions',
         ];
         foreach ($roots as $path) {
             $this->assertFileExists($path);
@@ -258,6 +300,19 @@ final class UnsupportedFeatureTest extends TestCase
             foreach ($legacy as $needle) {
                 $this->assertStringNotContainsString($needle, $src, basename($path).' still has legacy: '.$needle);
             }
+        }
+
+        // Sites that keep a dynamic featureOverride must still raise via UnsupportedFeature.
+        foreach ([
+            dirname(__DIR__, 2).'/lib/VM/ArrayObjectJitHelper.php' => 'arrayobject-offset-key-type',
+            dirname(__DIR__, 2).'/lib/JIT/BackedEnumFromJit.php' => 'backed-enum-backing-type-jit',
+            dirname(__DIR__, 2).'/lib/JIT/CastObjectNativeJit.php' => 'object-cast-operand-type',
+            dirname(__DIR__, 2).'/lib/JIT/ArrayMapLlvm.php' => 'array-map-mapped-value-type',
+        ] as $path => $featureId) {
+            $src = file_get_contents($path);
+            $this->assertNotFalse($src);
+            $this->assertStringContainsString("'".$featureId."'", $src, basename($path));
+            $this->assertStringContainsString('UnsupportedFeature::raise', $src, basename($path));
         }
     }
 }

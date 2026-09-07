@@ -8,6 +8,7 @@ use PHPCompiler\Block;
 use PHPCompiler\JIT\Builtin\CastObjectFromHashtableJit;
 use PHPCompiler\JIT\Builtin\CastObjectValueBoxJit;
 use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectBuiltin;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPCompiler\OpCode;
 use PHPLLVM\Builder;
 
@@ -52,7 +53,8 @@ final class CastObjectNativeJit
             return CastObjectFromHashtableJit::emitScalarStdClass($context, $src);
         }
 
-        throw new \LogicException(
+        UnsupportedFeature::raise(
+            'object-cast-operand-type',
             '(object) cast unsupported operand type in JIT: '.Variable::getStringType($src->type)
         );
     }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
@@ -161,7 +162,7 @@ trait ObjectPropertyMagicAndClone
                 return $this->context->cloneMagicExternalCatchFrame;
             }
             if (self::FIBER_SUSPEND === $result) {
-                throw new \LogicException('Fiber suspend during __clone() is not supported in this compiler build');
+                UnsupportedFeature::raise('fiber-suspend-during-clone');
             }
             if (self::SUCCESS !== $result) {
                 throw new \LogicException('__clone() invocation failed in this compiler build');

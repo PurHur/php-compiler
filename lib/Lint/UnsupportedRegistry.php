@@ -324,6 +324,72 @@ final class UnsupportedRegistry
             'issue' => 167,
             'alternative' => 'foreach a Generator returned from a yield function (php-src Zend/zend_generators.c)',
         ],
+        'ksort-flags-numeric-natural' => [
+            'feature' => 'ksort()/ArrayObject::ksort() with SORT_NUMERIC or SORT_NATURAL under JIT/AOT',
+            'matrixRow' => 'docs/capabilities.md#ksort',
+            'issue' => 4118,
+            'alternative' => 'use SORT_REGULAR or SORT_STRING (php-src php_ksort / ext/standard/array.c)',
+        ],
+        'arrayobject-offset-key-type' => [
+            'feature' => 'ArrayObject offset key type not lowerable for thin AOT',
+            'matrixRow' => 'docs/capabilities.md#arrayobject-offsetget',
+            'issue' => 26823,
+            'alternative' => 'use int/string/bool/null keys (php-src ext/spl/spl_array.c)',
+        ],
+        'web-params-source-array' => [
+            'feature' => 'web_*() first argument that is not an array',
+            'matrixRow' => 'docs/capabilities.md#web_int',
+            'issue' => 157,
+            'alternative' => 'pass $_GET/$_POST/$_REQUEST (or another hashtable) as the first argument',
+        ],
+        'web-int-numeric-value' => [
+            'feature' => 'web_int() value that is not numeric',
+            'matrixRow' => 'docs/capabilities.md#web_int',
+            'issue' => 157,
+            'alternative' => 'pass an int/float/numeric-string value, or rely on the default when the key is missing',
+        ],
+        'fiber-suspend-during-clone' => [
+            'feature' => 'Fiber::suspend() during __clone()',
+            'matrixRow' => 'docs/capabilities-syntax.md#fibers',
+            'issue' => 3130,
+            'alternative' => 'do not suspend inside __clone(); clone synchronously (php-src zend_std_clone_object / zend_fibers.c)',
+        ],
+        'backed-enum-backing-type-jit' => [
+            'feature' => 'BackedEnum::from()/tryFrom() with a non-int/string backing type under JIT/AOT',
+            'matrixRow' => 'docs/capabilities-syntax.md#enums',
+            'issue' => 4053,
+            'alternative' => 'use int|string backed enums (php-src Zend/zend_enum.c)',
+        ],
+        'object-cast-operand-type' => [
+            'feature' => '(object) cast operand type not lowerable for JIT/AOT',
+            'matrixRow' => 'docs/capabilities-syntax.md#casts',
+            'issue' => 10244,
+            'alternative' => 'cast null/bool/int/float/string/array/hashtable or a boxed value (php-src Zend/zend_operators.c convert_to_object)',
+        ],
+        'array-map-mapped-value-type' => [
+            'feature' => 'array_map() mapped element type not storeable under JIT/AOT',
+            'matrixRow' => 'docs/capabilities.md#array_map',
+            'issue' => 23974,
+            'alternative' => 'map to int/float/string/bool/null/object/hashtable/boxed values (php-src php_array_map)',
+        ],
+        'array-map-null-zip-arity' => [
+            'feature' => 'array_map(null) multi-zip with fewer than two source hashtables',
+            'matrixRow' => 'docs/capabilities.md#array_map',
+            'issue' => 34978,
+            'alternative' => 'pass at least two arrays when using a null callback (php-src php_array_map)',
+        ],
+        'variable-constant-fetch-jit' => [
+            'feature' => 'variable class/constant fetch under JIT/AOT',
+            'matrixRow' => 'docs/capabilities-syntax.md#class-constants',
+            'issue' => 36396,
+            'alternative' => 'use a compile-time ClassName::CONST or literal class reference (php-src ZEND_FETCH_CLASS_CONSTANT)',
+        ],
+        'class-const-append-expr' => [
+            'feature' => '[] append inside a class constant expression',
+            'matrixRow' => 'docs/capabilities-syntax.md#class-constants',
+            'issue' => 3592,
+            'alternative' => 'build the array with explicit keys/values in the const initializer (php-src zend_ast_evaluate)',
+        ],
     ];
 
     /**

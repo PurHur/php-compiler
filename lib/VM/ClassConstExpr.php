@@ -6,6 +6,7 @@ namespace PHPCompiler\VM;
 
 use PHPCompiler\Block;
 use PHPCompiler\Frame;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPCompiler\OpCode;
 
 /**
@@ -461,7 +462,7 @@ final class ClassConstExpr
         OpCode $op
     ): void {
         if (null === $op->arg3) {
-            throw new \LogicException('[] append is not supported in class constant expressions');
+            UnsupportedFeature::raise('class-const-append-expr');
         }
         $container = self::resolveValue($frame, $block, $op->arg2);
         $dim = self::resolveValue($frame, $block, $op->arg3);
