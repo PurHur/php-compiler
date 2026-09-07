@@ -34,6 +34,7 @@ require_once __DIR__.'/Compiler/Concern/CompilePropertyFetchEmptyAssignAndUnset.
 require_once __DIR__.'/Compiler/Concern/CompileErrorSuppressEndBlockAndSlotInherit.php';
 require_once __DIR__.'/Compiler/Concern/CompileAnonymousFunctionGeneratorAndNever.php';
 require_once __DIR__.'/Compiler/Concern/ErrorSuppressAndPropertyFetch.php';
+require_once __DIR__.'/Compiler/Concern/SwitchIssetIncludeAndThrowCompile.php';
 require_once __DIR__.'/Compiler/Concern/CompileExprAndOpcodeTypes.php';
 require_once __DIR__.'/Compiler/Concern/CompileExprDispatch.php';
 require_once __DIR__.'/Compiler/Concern/WriteContextRejects.php';
@@ -267,6 +268,7 @@ use PHPCompiler\Compiler\Concern\CompilePropertyFetchEmptyAssignAndUnset;
 use PHPCompiler\Compiler\Concern\CompileErrorSuppressEndBlockAndSlotInherit;
 use PHPCompiler\Compiler\Concern\CompileAnonymousFunctionGeneratorAndNever;
 use PHPCompiler\Compiler\Concern\ErrorSuppressAndPropertyFetch;
+use PHPCompiler\Compiler\Concern\SwitchIssetIncludeAndThrowCompile;
 use PHPCompiler\Compiler\Concern\CompileExprAndOpcodeTypes;
 use PHPCompiler\Compiler\Concern\CompileExprDispatch;
 use PHPCompiler\Compiler\Concern\TernaryAndLogicalShortCircuit;
@@ -408,6 +410,7 @@ class Compiler {
     use CompileErrorSuppressEndBlockAndSlotInherit;
     use CompileAnonymousFunctionGeneratorAndNever;
     use ErrorSuppressAndPropertyFetch;
+    use SwitchIssetIncludeAndThrowCompile;
     use CompileExprAndOpcodeTypes;
     use CompileExprDispatch;
     use WriteContextRejects;
