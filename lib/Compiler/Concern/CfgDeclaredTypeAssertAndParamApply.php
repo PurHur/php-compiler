@@ -24,7 +24,7 @@ use PHPTypes\Type;
  * Declared-type asserts, DNF labels, and param type-hint apply (#36387 / #36403).
  *
  * Extracted from {@see CfgTypeShapeAndDeclaredAssert} so gen-0 split-TU can hollow
- * a smaller Concern TU. CFG type-shape predicates stay in the parent; this trait owns
+ * a smaller Concern TU. CFG type-shape probes live in {@see CfgTypeShapeQueries}; this trait owns
  * intersection/void/never/mixed asserts, property/param declared-type checks, DNF
  * label/resolve helpers, and {@see applyParamDeclaredType} (php-src Zend/zend_compile.c).
  */
@@ -120,122 +120,6 @@ trait CfgDeclaredTypeAssertAndParamApply
         if ($this->cfgTypeContainsNonStandaloneMixed($type)) {
             $this->throwCompileError('Type mixed can only be used as a standalone type');
         }
-    }
-
-    protected function cfgTypeIsPureMixed(?Op\Type $type): bool
-    {
-        if ($type instanceof Op\Type\Literal && 'mixed' === strtolower($type->name)) {
-            return true;
-        }
-
-        return $type instanceof Op\Type\Mixed_;
-    }
-
-    protected function cfgTypeIsNullableMixed(?Op\Type $type): bool
-    {
-        return $type instanceof Op\Type\Nullable && $this->cfgTypeIsPureMixed($type->subtype);
-    }
-
-    /**
-     * True when user-written {@code mixed} appears in a union/intersection (not as a lone type).
-     * Nullable-of-pure-mixed is handled by {@see cfgTypeIsNullableMixed} instead.
-     */
-    protected function cfgTypeContainsNonStandaloneMixed(?Op\Type $type): bool
-    {
-        if (null === $type || $this->cfgTypeIsPureMixed($type)) {
-            return false;
-        }
-        if ($type instanceof Op\Type\Nullable) {
-            if ($this->cfgTypeIsPureMixed($type->subtype)) {
-                return false;
-            }
-
-            return $this->cfgTypeContainsNonStandaloneMixed($type->subtype);
-        }
-        if ($type instanceof Op\Type\Union_) {
-            $hasMixed = false;
-            $hasOther = false;
-            foreach ($type->types as $member) {
-                if ($this->cfgTypeIsPureMixed($member) || $this->cfgTypeContainsPureMixed($member)) {
-                    $hasMixed = true;
-                } else {
-                    $hasOther = true;
-                }
-                if ($this->cfgTypeContainsNonStandaloneMixed($member)) {
-                    return true;
-                }
-            }
-
-            return $hasMixed && $hasOther;
-        }
-        if ($type instanceof Op\Type\Intersection) {
-            foreach ($type->types as $member) {
-                if ($this->cfgTypeIsPureMixed($member) || $this->cfgTypeContainsPureMixed($member)) {
-                    return true;
-                }
-                if ($this->cfgTypeContainsNonStandaloneMixed($member)) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    protected function cfgTypeContainsPureMixed(?Op\Type $type): bool
-    {
-        if (null === $type) {
-            return false;
-        }
-        if ($this->cfgTypeIsPureMixed($type)) {
-            return true;
-        }
-        if ($type instanceof Op\Type\Union_ || $type instanceof Op\Type\Intersection) {
-            foreach ($type->types as $member) {
-                if ($this->cfgTypeContainsPureMixed($member)) {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-        if ($type instanceof Op\Type\Nullable) {
-            return $this->cfgTypeContainsPureMixed($type->subtype);
-        }
-
-        return false;
-    }
-
-    /**
-     * True when callable appears anywhere in a declared type tree (union / nullable / intersection).
-     */
-    protected function cfgTypeContainsCallable(?Op\Type $type): bool
-    {
-        if (null === $type) {
-            return false;
-        }
-        if ($type instanceof Op\Type\Literal && 'callable' === strtolower($type->name)) {
-            return true;
-        }
-        if ($type instanceof Op\Type\Union_) {
-            foreach ($type->types as $member) {
-                if ($this->cfgTypeContainsCallable($member)) {
-                    return true;
-                }
-            }
-        }
-        if ($type instanceof Op\Type\Intersection) {
-            foreach ($type->types as $member) {
-                if ($this->cfgTypeContainsCallable($member)) {
-                    return true;
-                }
-            }
-        }
-        if ($type instanceof Op\Type\Nullable) {
-            return $this->cfgTypeContainsCallable($type->subtype);
-        }
-
-        return false;
     }
 
     /**

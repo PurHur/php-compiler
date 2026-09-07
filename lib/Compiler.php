@@ -27,6 +27,7 @@ require_once __DIR__.'/Compiler/Concern/CompileParamFunctionAndStmtDispatch.php'
 require_once __DIR__.'/Compiler/Concern/CompileClassBodyAndTraitAdaptations.php';
 require_once __DIR__.'/Compiler/Concern/CfgTypeShapeAndDeclaredAssert.php';
 require_once __DIR__.'/Compiler/Concern/CfgDeclaredTypeAssertAndParamApply.php';
+require_once __DIR__.'/Compiler/Concern/CfgTypeShapeQueries.php';
 require_once __DIR__.'/Compiler/Concern/CompileClassLikeDeclAndScope.php';
 require_once __DIR__.'/Compiler/Concern/CompileParamTypedDefaultAndDeprecation.php';
 require_once __DIR__.'/Compiler/Concern/CompilePseudoClassScopeAndConst.php';
@@ -264,6 +265,7 @@ use PHPCompiler\Compiler\Concern\CompileParamFunctionAndStmtDispatch;
 use PHPCompiler\Compiler\Concern\CompileClassBodyAndTraitAdaptations;
 use PHPCompiler\Compiler\Concern\CfgTypeShapeAndDeclaredAssert;
 use PHPCompiler\Compiler\Concern\CfgDeclaredTypeAssertAndParamApply;
+use PHPCompiler\Compiler\Concern\CfgTypeShapeQueries;
 use PHPCompiler\Compiler\Concern\CompileClassLikeDeclAndScope;
 use PHPCompiler\Compiler\Concern\CompileParamTypedDefaultAndDeprecation;
 use PHPCompiler\Compiler\Concern\CompilePseudoClassScopeAndConst;
@@ -409,6 +411,7 @@ class Compiler {
     use CompileClassBodyAndTraitAdaptations;
     use CfgTypeShapeAndDeclaredAssert;
     use CfgDeclaredTypeAssertAndParamApply;
+    use CfgTypeShapeQueries;
     use CompileClassLikeDeclAndScope;
     use CompileParamTypedDefaultAndDeprecation;
     use CompilePseudoClassScopeAndConst;
