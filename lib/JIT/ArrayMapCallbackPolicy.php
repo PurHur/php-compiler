@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\Lint\UnsupportedFeature;
+use PHPCompiler\Lint\UnsupportedRegistry;
 use PHPCompiler\VM\Variable as VMVariable;
 
 /**
@@ -115,12 +117,25 @@ final class ArrayMapCallbackPolicy
 
     public static function jitRejectionMessage(): string
     {
-        return 'array_map() callback must be '.self::JIT_SUBSET
-            .' for JIT/AOT in this compiler build; '.self::DEFERRED_KINDS.' are deferred';
+        $row = UnsupportedRegistry::feature('array-map-invokable-deferred');
+
+        return UnsupportedFeature::format(
+            $row['feature'],
+            $row['matrixRow'],
+            $row['issue'],
+            $row['alternative']
+        );
     }
 
     public static function vmRejectionMessage(): string
     {
-        return 'array_map() callback must be null, a string builtin name, a closure, an invokable object, or an array callable in this compiler build';
+        $row = UnsupportedRegistry::feature('array-map-invokable-deferred');
+
+        return UnsupportedFeature::format(
+            $row['feature'],
+            $row['matrixRow'],
+            $row['issue'],
+            $row['alternative']
+        );
     }
 }

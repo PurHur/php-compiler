@@ -10,6 +10,7 @@ use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\UserScriptAotEnv;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPLLVM\Value;
 
 /**
@@ -40,7 +41,7 @@ final class JitSimpleXmlLoadString
             return self::softFalseForNonLiteral($context, ...$args);
         }
 
-        throw new \LogicException('simplexml_load_string() is not JIT-lowered in this compiler build');
+        UnsupportedFeature::raise('simplexml-load-string-jit');
     }
 
     /**

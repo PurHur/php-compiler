@@ -8,6 +8,7 @@ use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPLLVM\Value;
 
 /**
@@ -30,9 +31,7 @@ final class MultisortRuntime
     public static function multisortPacked(Context $context, array $arrays, bool $descending): void
     {
         if (\count($arrays) < 2) {
-            throw new \LogicException(
-                'array_multisort() requires at least two array arguments in this compiler build'
-            );
+            UnsupportedFeature::raise('array-multisort-arity');
         }
 
         $sources = [];

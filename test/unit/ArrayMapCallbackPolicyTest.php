@@ -74,9 +74,13 @@ final class ArrayMapCallbackPolicyTest extends TestCase
 
     public function testRejectionMessagesMentionDeferredKinds(): void
     {
-        $this->assertStringContainsString('closure', ArrayMapCallbackPolicy::jitRejectionMessage());
-        $this->assertStringContainsString('array callable', ArrayMapCallbackPolicy::vmRejectionMessage());
-        $this->assertStringContainsString('invokable', ArrayMapCallbackPolicy::jitRejectionMessage());
+        $jit = ArrayMapCallbackPolicy::jitRejectionMessage();
+        $vm = ArrayMapCallbackPolicy::vmRejectionMessage();
+        $this->assertStringStartsWith('phpc: unsupported: ', $jit);
+        $this->assertStringContainsString('closure', $jit);
+        $this->assertStringContainsString('invokable', $jit);
+        $this->assertStringContainsString('#16228', $jit);
+        $this->assertSame($jit, $vm);
     }
 
     public function testCompileTimeStaticArrayCallableNames(): void

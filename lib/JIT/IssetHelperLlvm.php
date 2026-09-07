@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT;
 use PHPCfg\Operand;
 use PHPTypes\Type;
 use PHPCompiler\JIT\Builtin;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPCompiler\VM\VmIsset;
 use PHPCompiler\Web\Superglobals;
 use PHPLLVM\Builder;
@@ -576,9 +577,7 @@ final class IssetHelperLlvm
             return self::hashtableFromValueBox($context, $boxed);
         }
 
-        throw new \LogicException(
-            'isset() with array offset on object containers only supports SplObjectStorage or typed object properties in this compiler build'
-        );
+        UnsupportedFeature::raise('isset-object-array-offset');
     }
 
     private static function compileStringOffsetIsSet(Context $context, Variable $container, Variable $dim): Value

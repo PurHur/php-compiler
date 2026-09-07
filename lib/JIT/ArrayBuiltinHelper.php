@@ -17,6 +17,7 @@ use PHPCompiler\JIT\Builtin\SortRuntime;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Call;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -83,9 +84,7 @@ final class ArrayBuiltinHelper
             return HashTableHelper::ensureHashtablePointer($context, $array);
         }
         if (Variable::TYPE_STRING === $array->type) {
-            throw new \LogicException(
-                'Expected array (hashtable), got string (path strings cannot be used as arrays in this compiler build)'
-            );
+            UnsupportedFeature::raise('path-string-as-array');
         }
 
         throw new \LogicException(
@@ -190,9 +189,7 @@ final class ArrayBuiltinHelper
             return ArrayMapRuntime::mapMultipleWithBuiltin($context, $arrays, $callback->compileTimeString);
         }
 
-        throw new \LogicException(
-            'array_map() with multiple arrays requires a null, closure, or compile-time string builtin callback for JIT/AOT in this compiler build'
-        );
+        UnsupportedFeature::raise('array-map-multi-callback');
     }
 
     /**
