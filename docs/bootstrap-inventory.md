@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8367 |
-| Phase A inventory files (M2 ratio SSOT) | 8367 |
+| PHP files on vm.php path | 8368 |
+| Phase A inventory files (M2 ratio SSOT) | 8368 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26332 |
+| Source constructs flagged (warnings) | 26334 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5657,9 +5657,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/StmtCoalesceFuncCallArgSyncCompile.php` | 0 | 3 |
 | `lib/Compiler/Concern/StmtLevelSideEffectAndEmittedCallGuards.php` | 0 | 2 |
 | `lib/Compiler/Concern/SubstrNestedHaystackAndMethodOrStaticCallInitSlots.php` | 0 | 2 |
-| `lib/Compiler/Concern/TernaryAndLogicalShortCircuit.php` | 0 | 5 |
+| `lib/Compiler/Concern/TernaryAndLogicalShortCircuit.php` | 0 | 2 |
 | `lib/Compiler/Concern/TernaryMergeAndLogicalShortCircuitSlots.php` | 0 | 2 |
 | `lib/Compiler/Concern/TernaryMergeVarSlotCompile.php` | 0 | 2 |
+| `lib/Compiler/Concern/TernaryNullableParamNullAndUnpackHelpers.php` | 0 | 5 |
 | `lib/Compiler/Concern/TryFinallyCatchAndOperandLookup.php` | 0 | 4 |
 | `lib/Compiler/Concern/VarExportNestedAndArrayMergeFamilyCallArgSlots.php` | 0 | 3 |
 | `lib/Compiler/Concern/WriteContextRejects.php` | 0 | 2 |
@@ -49156,13 +49157,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 961)
-- new CompileFatal (line 995)
-- new CompileError (line 998)
-- new ClassCompileRegistry (line 1039)
-- new AttributeClassRegistry (line 1040)
-- new ClassCompileRegistry (line 1148)
-- new AttributeClassRegistry (line 1149)
+- new CompileFatal (line 964)
+- new CompileFatal (line 998)
+- new CompileError (line 1001)
+- new ClassCompileRegistry (line 1042)
+- new AttributeClassRegistry (line 1043)
+- new ClassCompileRegistry (line 1151)
+- new AttributeClassRegistry (line 1152)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -50375,11 +50376,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/TernaryAndLogicalShortCircuit.php`
 
 **Warnings** (review for bootstrap subset):
-- trait TernaryAndLogicalShortCircuit (line 29)
-- new Literal (line 436)
-- new Op\Expr\BinaryOp\Coalesce (line 445)
-- new OpCode (line 447)
-- 22 class method(s)
+- trait TernaryAndLogicalShortCircuit (line 23)
+- 7 class method(s)
 
 ### `lib/Compiler/Concern/TernaryMergeAndLogicalShortCircuitSlots.php`
 
@@ -50391,6 +50389,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - trait TernaryMergeVarSlotCompile (line 26)
+- 15 class method(s)
+
+### `lib/Compiler/Concern/TernaryNullableParamNullAndUnpackHelpers.php`
+
+**Warnings** (review for bootstrap subset):
+- trait TernaryNullableParamNullAndUnpackHelpers (line 29)
+- new Literal (line 317)
+- new Op\Expr\BinaryOp\Coalesce (line 326)
+- new OpCode (line 328)
 - 15 class method(s)
 
 ### `lib/Compiler/Concern/TryFinallyCatchAndOperandLookup.php`
