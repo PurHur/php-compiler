@@ -5394,6 +5394,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/InitArraySpreadArithmeticAn
 require_once __DIR__.'/../../../lib/Compiler/Concern/SlotForPropertyClassConstAndClosureBindCallArgResolvers.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/SlotForInlineClosureAndFirstClassCallableCallArgResolvers.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/InlineCallArgSlotResolvers.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/InlineCallArgUnionSiblingCastAndComparisonMatchers.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/HoistedSiblingFeedAndArrayKeysArgSendRewire.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/RewireArithmeticBranchSubstrEnumAndSiblingMultiArgCallArgSendSlots.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/RewireInlineCallArgSendSlots.php';
