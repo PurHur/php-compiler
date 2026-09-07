@@ -13,7 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\Builtin\StringStrRot13;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -21,12 +21,13 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
  * str_rot13() for strings (subset of PHP; ASCII letters only).
  *
- * VM: {@see VmString::strRot13()}; JIT/AOT: {@see StringStrRot13} + {@see StrRot13JitHelper}.
+ * VM: {@see VmString::strRot13()}; JIT/AOT: separate + in-place transform (#36388).
  */
 final class str_rot13 extends Internal
 {
@@ -57,13 +58,78 @@ final class str_rot13 extends Internal
             return $unreachable;
         }
 
+        // In-place ROT13 after separate — avoids NestedJIT `$out .=` leaks (#36388).
+        // php-src: ext/standard/string.c PHP_FUNCTION(str_rot13) / php_strtr_ex letter map.
         $str = self::jitStringArg($context, $args[0], 0, 'string');
-        StringStrRot13::ensureLinked($context);
+        $copy = $context->builder->call($context->lookupFunction('__string__separate'), $str);
+        JitStringBuiltinArg::releaseEphemeralArgAfterCopy($context, $args[0], $str);
+        self::transformRot13InPlace($context, $copy);
 
-        return $context->builder->call(
-            $context->lookupFunction('__compiler_str_rot13'),
-            $str
+        return $copy;
+    }
+
+    /**
+     * ASCII letter ROT13 into a mutable {@see __string__*} (rc=1 after separate).
+     *
+     * php-src: ext/standard/string.c — PHP_FUNCTION(str_rot13).
+     */
+    private static function transformRot13InPlace(Context $context, Value $strPtr): void
+    {
+        $map = $context->structFieldsFor($strPtr);
+        $len = $context->builder->load(
+            $context->builder->structGep($strPtr, $map['length'])
         );
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+        $zero = $i64->constInt(0, false);
+        $one = $i64->constInt(1, false);
+        $charPtr = $context->builder->structGep($strPtr, $map['value']);
+        $iSlot = $context->builder->alloca($i64, 1, 'rot13_i');
+        $context->builder->store($zero, $iSlot);
+
+        $done = BasicBlockHelper::append($context, 'rot13_done');
+        $loopHead = BasicBlockHelper::append($context, 'rot13_head');
+        $loopBody = BasicBlockHelper::append($context, 'rot13_body');
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($loopHead);
+        $i = $context->builder->load($iSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $i, $len);
+        $context->builder->branchIf($atEnd, $done, $loopBody);
+
+        $context->builder->positionAtEnd($loopBody);
+        $atChar = $context->builder->gep($charPtr, $i);
+        $ch = $context->builder->load($atChar);
+        $chI32 = $context->builder->zExt($ch, $i32);
+        $plus = $context->builder->addNoSignedWrap($chI32, $i32->constInt(13, false));
+        $minus = $context->builder->sub($chI32, $i32->constInt(13, false));
+        // A-M / a-m → +13; N-Z / n-z → -13; else unchanged.
+        $isAm = $context->builder->and(
+            $context->builder->icmp(Builder::INT_SGE, $chI32, $i32->constInt(65, false)),
+            $context->builder->icmp(Builder::INT_SLE, $chI32, $i32->constInt(77, false))
+        );
+        $isAmLower = $context->builder->and(
+            $context->builder->icmp(Builder::INT_SGE, $chI32, $i32->constInt(97, false)),
+            $context->builder->icmp(Builder::INT_SLE, $chI32, $i32->constInt(109, false))
+        );
+        $isNz = $context->builder->and(
+            $context->builder->icmp(Builder::INT_SGE, $chI32, $i32->constInt(78, false)),
+            $context->builder->icmp(Builder::INT_SLE, $chI32, $i32->constInt(90, false))
+        );
+        $isNzLower = $context->builder->and(
+            $context->builder->icmp(Builder::INT_SGE, $chI32, $i32->constInt(110, false)),
+            $context->builder->icmp(Builder::INT_SLE, $chI32, $i32->constInt(122, false))
+        );
+        $doPlus = $context->builder->or($isAm, $isAmLower);
+        $doMinus = $context->builder->or($isNz, $isNzLower);
+        $afterPlus = $context->builder->select($doPlus, $plus, $chI32);
+        $afterMinus = $context->builder->select($doMinus, $minus, $afterPlus);
+        $newCh = $context->builder->truncOrBitCast($afterMinus, $ch->typeOf());
+        $context->builder->store($newCh, $atChar);
+        $context->builder->store($context->builder->addNoSignedWrap($i, $one), $iSlot);
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($done);
     }
 
     private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
