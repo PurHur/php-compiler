@@ -70,6 +70,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/Compiler/Concern/CompileFuncCfgReturnAndGlobalImport.php',
             'lib/Compiler/Concern/CompileInlineSpecializedCallArgSends.php',
             'lib/Compiler/Concern/CompileInterfaceTraitEnumAndMethodDecl.php',
+            'lib/Compiler/Concern/CompileOpsAndStringDimCfgSplit.php',
             'lib/Compiler/Concern/CompileOpsTicksAndCfgSplit.php',
             'lib/Compiler/Concern/CompileParamFunctionAndStmtDispatch.php',
             'lib/Compiler/Concern/CompileParamTypedDefaultAndDeprecation.php',

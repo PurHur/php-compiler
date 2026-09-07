@@ -4,9 +4,9 @@
     "done_when_ceiling": 25000,
     "files": {
         "lib/Compiler.php": {
-            "budget": 1181,
+            "budget": 1184,
             "target": 20000,
-            "note": "Concern trait splits (#36230/#36387/#36403); TernaryMergeVarSlotCompile + NullsafeChainCompile + peers"
+            "note": "Concern trait splits (#36230/#36387/#36403); CompileOpsAndStringDimCfgSplit + TernaryMergeVarSlotCompile + peers"
         },
         "lib/JIT.php": {
             "budget": 274,

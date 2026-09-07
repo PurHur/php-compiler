@@ -106,6 +106,7 @@ require_once __DIR__.'/Compiler/Concern/OperandAccessAndDeferredArrayCompile.php
 require_once __DIR__.'/Compiler/Concern/TryFinallyCatchAndOperandLookup.php';
 require_once __DIR__.'/Compiler/Concern/EchoCompileOperandTerminalAndGlobalConst.php';
 require_once __DIR__.'/Compiler/Concern/CompileOpsTicksAndCfgSplit.php';
+require_once __DIR__.'/Compiler/Concern/CompileOpsAndStringDimCfgSplit.php';
 require_once __DIR__.'/Compiler/Concern/CompileFuncCfgReturnAndGlobalImport.php';
 
 use SplObjectStorage;
@@ -300,6 +301,7 @@ use PHPCompiler\Compiler\Concern\OperandAccessAndDeferredArrayCompile;
 use PHPCompiler\Compiler\Concern\TryFinallyCatchAndOperandLookup;
 use PHPCompiler\Compiler\Concern\EchoCompileOperandTerminalAndGlobalConst;
 use PHPCompiler\Compiler\Concern\CompileOpsTicksAndCfgSplit;
+use PHPCompiler\Compiler\Concern\CompileOpsAndStringDimCfgSplit;
 use PHPCompiler\Compiler\Concern\CompileFuncCfgReturnAndGlobalImport;
 use PHPCompiler\Compiler\OverrideValidator;
 use PHPCompiler\Web\ConstStringFolder;
@@ -404,6 +406,7 @@ class Compiler {
     use TryFinallyCatchAndOperandLookup;
     use EchoCompileOperandTerminalAndGlobalConst;
     use CompileOpsTicksAndCfgSplit;
+    use CompileOpsAndStringDimCfgSplit;
     use CompileFuncCfgReturnAndGlobalImport;
 
     protected ?SplObjectStorage $seen = null;

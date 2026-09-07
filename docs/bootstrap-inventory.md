@@ -5582,7 +5582,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/CompileFuncCfgReturnAndGlobalImport.php` | 0 | 15 |
 | `lib/Compiler/Concern/CompileInlineSpecializedCallArgSends.php` | 0 | 1 |
 | `lib/Compiler/Concern/CompileInterfaceTraitEnumAndMethodDecl.php` | 0 | 20 |
-| `lib/Compiler/Concern/CompileOpsTicksAndCfgSplit.php` | 0 | 9 |
+| `lib/Compiler/Concern/CompileOpsAndStringDimCfgSplit.php` | 0 | 6 |
+| `lib/Compiler/Concern/CompileOpsTicksAndCfgSplit.php` | 0 | 5 |
 | `lib/Compiler/Concern/CompileParamFunctionAndStmtDispatch.php` | 0 | 17 |
 | `lib/Compiler/Concern/CompileParamTypedDefaultAndDeprecation.php` | 0 | 3 |
 | `lib/Compiler/Concern/CompilePromotedPropertyAndParamDefaults.php` | 0 | 15 |
@@ -49613,18 +49614,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 17 class method(s)
 - 2 closure(s)
 
+### `lib/Compiler/Concern/CompileOpsAndStringDimCfgSplit.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CompileOpsAndStringDimCfgSplit (line 26)
+- new OpCode (line 548)
+- new OpCode (line 560)
+- new Block (line 688)
+- new OpCode (line 695)
+- 3 class method(s)
+
 ### `lib/Compiler/Concern/CompileOpsTicksAndCfgSplit.php`
 
 **Warnings** (review for bootstrap subset):
-- trait CompileOpsTicksAndCfgSplit (line 24)
-- new OpCode (line 29)
-- new OpCode (line 74)
-- new OpCode (line 96)
-- new OpCode (line 718)
-- new OpCode (line 730)
-- new Block (line 858)
-- new OpCode (line 865)
-- 6 class method(s)
+- trait CompileOpsTicksAndCfgSplit (line 20)
+- new OpCode (line 25)
+- new OpCode (line 70)
+- new OpCode (line 92)
+- 3 class method(s)
 
 ### `lib/Compiler/Concern/CompileParamFunctionAndStmtDispatch.php`
 
