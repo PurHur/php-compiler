@@ -79,6 +79,7 @@ require_once __DIR__.'/Compiler/Concern/PrecedingInlineLeadingCallbackAndHaystac
 require_once __DIR__.'/Compiler/Concern/SiblingMultiArgFuncCallProducerDetect.php';
 require_once __DIR__.'/Compiler/Concern/FirstSiblingInlineFuncCallProducerIndex.php';
 require_once __DIR__.'/Compiler/Concern/HoistedMultiArgSiblingFuncCallChain.php';
+require_once __DIR__.'/Compiler/Concern/HoistedMultiArgSiblingProducerTargetArgIndex.php';
 require_once __DIR__.'/Compiler/Concern/HoistedMultiArgContiguousLiteralPreludeAndConsumerFeed.php';
 require_once __DIR__.'/Compiler/Concern/SiblingInlineFuncCallProducers.php';
 require_once __DIR__.'/Compiler/Concern/EnsureDeferredSiblingAndInlineNewProducers.php';
@@ -305,6 +306,7 @@ use PHPCompiler\Compiler\Concern\PrecedingInlineLeadingCallbackAndHaystackProduc
 use PHPCompiler\Compiler\Concern\SiblingMultiArgFuncCallProducerDetect;
 use PHPCompiler\Compiler\Concern\FirstSiblingInlineFuncCallProducerIndex;
 use PHPCompiler\Compiler\Concern\HoistedMultiArgSiblingFuncCallChain;
+use PHPCompiler\Compiler\Concern\HoistedMultiArgSiblingProducerTargetArgIndex;
 use PHPCompiler\Compiler\Concern\HoistedMultiArgContiguousLiteralPreludeAndConsumerFeed;
 use PHPCompiler\Compiler\Concern\SiblingInlineFuncCallProducers;
 use PHPCompiler\Compiler\Concern\EnsureDeferredSiblingAndInlineNewProducers;
@@ -441,6 +443,7 @@ class Compiler {
     use SiblingMultiArgFuncCallProducerDetect;
     use FirstSiblingInlineFuncCallProducerIndex;
     use HoistedMultiArgSiblingFuncCallChain;
+    use HoistedMultiArgSiblingProducerTargetArgIndex;
     use HoistedMultiArgContiguousLiteralPreludeAndConsumerFeed;
     use SiblingInlineFuncCallProducers;
     use EnsureDeferredSiblingAndInlineNewProducers;

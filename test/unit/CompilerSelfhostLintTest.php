@@ -123,6 +123,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/Compiler/Concern/HoistedEnumAndChainedInlineCallArgProducers.php',
             'lib/Compiler/Concern/HoistedMultiArgContiguousLiteralPreludeAndConsumerFeed.php',
             'lib/Compiler/Concern/HoistedMultiArgSiblingFuncCallChain.php',
+            'lib/Compiler/Concern/HoistedMultiArgSiblingProducerTargetArgIndex.php',
             'lib/Compiler/Concern/HoistedSiblingFeedAndArrayKeysArgSendRewire.php',
             'lib/Compiler/Concern/HoistedUnaryAssignAndInlineProducerCallArgSlots.php',
             'lib/Compiler/Concern/InitArraySpreadArithmeticAndNestedInlineCallArgResolvers.php',
