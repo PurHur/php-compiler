@@ -4,9 +4,9 @@
     "done_when_ceiling": 25000,
     "files": {
         "lib/Compiler.php": {
-            "budget": 1274,
+            "budget": 1277,
             "target": 20000,
-            "note": "Concern trait splits (#36230/#36387/#36403); CallArgFilterJsonDecodeMergeMapFilterSplitExplodeValueSlots + InlineNewCallArgProducers + HoistedMultiArgContiguousLiteralPreludeAndConsumerFeed + peers"
+            "note": "Concern trait splits (#36230/#36387/#36403); CallArgDimAdjacentFilterInputMapMergeLogicalMultisortValueSlots + CallArgFilterJsonDecodeMergeMapFilterSplitExplodeValueSlots + InlineNewCallArgProducers + peers"
         },
         "lib/JIT.php": {
             "budget": 274,
