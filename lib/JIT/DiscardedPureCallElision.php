@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal as CoreFuncInternal;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Call\Native;
 use PHPCompiler\ext\standard\VmRoundMode;
+use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\VM\Variable as VmVariable;
 
 /**
@@ -223,6 +224,9 @@ use PHPCompiler\VM\Variable as VmVariable;
  * precision/mode (argc 1..3; mode must be compile-time {@code PHP_ROUND_*} when
  * {@see CompilerVersion::supportsRoundingModeEnum} else typed numeric —
  * invalid / soft-null mode stay live for {@code ValueError} / deprecate),
+ * str_increment / str_decrement (compile-time ASCII-alphanumeric string
+ * proven not to {@code ValueError}; soft-null / runtime typed / empty /
+ * non-alphanumeric / out-of-range decrement stay live),
  * empty void user functions).
  * Soft-null strlen / ord / chr / math / string / ctype / inet coercions are
  * NOT elided — they emit deprecations (PHP 8.1+). Countable objects stay live
@@ -335,6 +339,9 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureStringTransformNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureStrIncDecNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureHtmlEscapeNoSideEffect($toCall, $callArgs)) {
@@ -1602,6 +1609,71 @@ final class DiscardedPureCallElision
         }
 
         return self::intdivArgsAllowDiscardedElision($callArgs);
+    }
+
+    /**
+     * Discarded {@code str_increment}/{@code str_decrement} when the single arg
+     * is a compile-time ASCII-alphanumeric string that cannot
+     * {@code ValueError} — php-src {@code ext/standard/string.c}
+     * {@code PHP_FUNCTION(str_increment)} / {@code PHP_FUNCTION(str_decrement)}.
+     * Soft-null / runtime typed strings / empty / non-alphanumeric / leading
+     * {@code '0'} or single-char {@code a}/{@code A} decrement stay live
+     * (#36386).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureStrIncDecNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if (!CompilerVersion::supportsStrIncrement()) {
+            return false;
+        }
+        $name = strtolower($toCall->getName());
+        if ('str_increment' !== $name && 'str_decrement' !== $name) {
+            return false;
+        }
+        if (1 !== \count($callArgs) || !$callArgs[0] instanceof Variable) {
+            return false;
+        }
+        $lit = JitStringArg::compileTimeLiteral($callArgs[0]);
+        if (null === $lit) {
+            return false;
+        }
+        if ('str_increment' === $name) {
+            return self::compileTimeStrIncrementAllowsDiscardedElision($lit);
+        }
+
+        return self::compileTimeStrDecrementAllowsDiscardedElision($lit);
+    }
+
+    /**
+     * php-src {@code str_increment} ValueError gates — empty / non-alphanumeric.
+     */
+    private static function compileTimeStrIncrementAllowsDiscardedElision(string $literal): bool
+    {
+        return '' !== $literal && VmString::onlyAsciiAlphanumeric($literal);
+    }
+
+    /**
+     * php-src {@code str_decrement} ValueError gates — empty / non-alphanumeric /
+     * leading {@code '0'} / single-char {@code a}/{@code A} (out of range).
+     */
+    private static function compileTimeStrDecrementAllowsDiscardedElision(string $literal): bool
+    {
+        if ('' === $literal || !VmString::onlyAsciiAlphanumeric($literal)) {
+            return false;
+        }
+        if ('0' === $literal[0]) {
+            return false;
+        }
+        // Single-char a/A underflows the alphabet (php-src string.c).
+        if (1 === \strlen($literal) && ('a' === $literal || 'A' === $literal)) {
+            return false;
+        }
+
+        return true;
     }
 
     /**

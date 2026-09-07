@@ -198,8 +198,10 @@ use PHPCompiler\ext\standard\stream_get_filters;
 use PHPCompiler\ext\standard\stream_get_transports;
 use PHPCompiler\ext\standard\stream_get_wrappers;
 use PHPCompiler\ext\standard\str_contains;
+use PHPCompiler\ext\standard\str_decrement;
 use PHPCompiler\ext\standard\str_ends_with;
 use PHPCompiler\ext\standard\str_getcsv;
+use PHPCompiler\ext\standard\str_increment;
 use PHPCompiler\ext\standard\str_ireplace;
 use PHPCompiler\ext\standard\str_pad;
 use PHPCompiler\ext\standard\str_repeat;
@@ -1013,6 +1015,86 @@ final class DiscardedPureCallElisionTest extends TestCase
                 $this->makeCompileTimeLongVar(StdlibConstants::PHP_ROUND_HALF_UP),
                 $this->makeCompileTimeLongVar(1),
             ]
+        ));
+    }
+
+    public function testElidesDiscardedStrIncrementDecrementWithProvenSafeLiteral(): void
+    {
+        // str_increment/str_decrement — ValueError on empty / non-alnum / out-of-range
+        // decrement. Only compile-time literals that pass php-src string.c gates elide.
+        // php-src ext/standard/string.c PHP_FUNCTION(str_increment|str_decrement).
+        if (!\PHPCompiler\CompilerVersion::supportsStrIncrement()) {
+            $this->markTestSkipped('str_increment/str_decrement not registered on this profile');
+        }
+        $context = $this->makeContext();
+        $inc = new str_increment();
+        $dec = new str_decrement();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            $inc,
+            [$this->makeStringVar('a9')]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            $inc,
+            [$this->makeStringVar('Z')]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            $dec,
+            [$this->makeStringVar('b')]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            $dec,
+            [$this->makeStringVar('10')]
+        ));
+
+        // Runtime typed string (no literal) stays live — ValueError unknown.
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            $inc,
+            [$this->makeStringVar(null)]
+        ));
+        // Soft-null stays live (deprecate / ValueError on '').
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            $inc,
+            [$this->makeNullVar()]
+        ));
+        // Empty / non-alphanumeric stay live (ValueError).
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            $inc,
+            [$this->makeStringVar('')]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            $inc,
+            [$this->makeStringVar('a!')]
+        ));
+        // Leading '0' / single-char a|A decrement stay live (ValueError).
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            $dec,
+            [$this->makeStringVar('0a')]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            $dec,
+            [$this->makeStringVar('a')]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            $dec,
+            [$this->makeStringVar('A')]
+        ));
+        // Excess argc stays live (ArgumentCountError).
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            $inc,
+            [$this->makeStringVar('a'), $this->makeStringVar('b')]
         ));
     }
 
