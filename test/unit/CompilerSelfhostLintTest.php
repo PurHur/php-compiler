@@ -55,6 +55,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/Compiler/Concern/ArrayPadUnpackExtractAndDateSunCallArgSends.php',
             'lib/Compiler/Concern/CallAndArrayLiteralCompile.php',
             'lib/Compiler/Concern/CallArgCompileTimeValueAndProcOpenFold.php',
+            'lib/Compiler/Concern/CallArgEarlyFastPathAndMixedPropertyFetchSends.php',
             'lib/Compiler/Concern/CfgProducerIndexAndRematerialize.php',
             'lib/Compiler/Concern/CfgTypeShapeAndDeclaredAssert.php',
             'lib/Compiler/Concern/ClassLikeAndStmtCompile.php',
