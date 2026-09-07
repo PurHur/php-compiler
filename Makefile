@@ -67,11 +67,11 @@ bench:
 # Nightly v2 measure + history JSON + chart + bench-gate (#36385)
 .PHONY: bench-nightly
 bench-nightly:
-	./script/bench-nightly.sh
+	./script/bench/nightly.sh
 
 .PHONY: bench-nightly-publish
 bench-nightly-publish:
-	./script/bench-nightly.sh --publish-only
+	./script/bench/nightly.sh --publish-only
 
 .PHONY: fix
 fix:

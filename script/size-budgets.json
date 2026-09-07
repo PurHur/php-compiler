@@ -42,7 +42,7 @@
     "script_file_count": {
         "budget": 283,
         "target": 150,
-        "note": "script/ top-level *.sh/*.php; ASAN/valgrind smokes under script/runtime-assert/ (#36403/#36397); ratchet after tip grew to 283"
+        "note": "script/ top-level *.sh/*.php; ASAN/valgrind under script/runtime-assert/; bench nightly under script/bench/ (#36403/#36385/#36397); do not add top-level scripts without removing another"
     },
     "ci_defaults_exports": {
         "budget": 141,

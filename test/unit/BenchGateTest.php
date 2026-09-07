@@ -92,9 +92,9 @@ final class BenchGateTest extends TestCase
         $root = dirname(__DIR__, 2);
         $this->assertFileExists($root.'/script/bench-web-request.php');
         $this->assertFileExists($root.'/script/generate-bench-chart.php');
-        $this->assertFileExists($root.'/script/bench-nightly.sh');
-        $this->assertTrue(is_executable($root.'/script/bench-nightly.sh'));
-        $nightly = (string) file_get_contents($root.'/script/bench-nightly.sh');
+        $this->assertFileExists($root.'/script/bench/nightly.sh');
+        $this->assertTrue(is_executable($root.'/script/bench/nightly.sh'));
+        $nightly = (string) file_get_contents($root.'/script/bench/nightly.sh');
         $this->assertStringContainsString('PHP_COMPILER_BENCH_HISTORY', $nightly);
         $this->assertStringContainsString('--publish-only', $nightly);
         $this->assertStringContainsString('bench-gate.sh --v2', $nightly);
@@ -106,7 +106,7 @@ final class BenchGateTest extends TestCase
         $this->assertStringNotContainsString('9.1x faster', $readme);
         $this->assertStringNotContainsString('7.6x slower', $readme);
         $this->assertStringContainsString('Do not hand-edit timing numbers', $readme);
-        $this->assertStringContainsString('bench-nightly.sh', $readme);
+        $this->assertStringContainsString('script/bench/nightly.sh', $readme);
     }
 
     public function testGenerateBenchChartEmbedsHistory(): void
