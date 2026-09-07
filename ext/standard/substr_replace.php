@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPCompiler\RuntimeStrictness;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
@@ -155,9 +156,7 @@ final class substr_replace extends Internal
         }
 
         if (JitStrReplaceSubject::isKnownArray($args[1])) {
-            throw new \LogicException(
-                'substr_replace() array $replace with array $string is not supported in this compiler build'
-            );
+            UnsupportedFeature::raise('substr-replace-array-with-array');
         }
 
         return JitSubstrReplaceArray::invoke(
@@ -188,14 +187,10 @@ final class substr_replace extends Internal
             if (\is_string($first) || \is_int($first) || \is_float($first) || \is_bool($first)) {
                 return $context->builder->load($context->constantStringFromString((string) $first));
             }
-            throw new \LogicException(
-                'substr_replace() array $replace element must be string-coercible at compile time in this compiler build'
-            );
+            UnsupportedFeature::raise('substr-replace-array-element-type');
         }
         if (JitStrReplaceSubject::isKnownArray($arg)) {
-            throw new \LogicException(
-                'substr_replace() runtime array $replace is not supported in this compiler build'
-            );
+            UnsupportedFeature::raise('substr-replace-runtime-array-replace');
         }
 
         return JitStringBuiltinArg::lower($context, $arg, 'substr_replace', 1, 'replace', 'array|string');

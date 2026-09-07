@@ -17,6 +17,7 @@ use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\JIT\VmActiveContextInitLlvm;
 use PHPCompiler\JIT\VmActiveContextLlvm;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPLLVM\Value;
 
 /**
@@ -129,9 +130,9 @@ final class ArrayWalkRuntime
             return;
         }
         if (!$context->functionIsRegistered($name)) {
-            throw new \LogicException(
-                'array_walk() string callback must be a compile-time stdlib builtin or user function'
-                .' in this compile unit for JIT/AOT in this compiler build (#33728); got '.$name
+            UnsupportedFeature::raise(
+                'array-walk-string-callback',
+                'array_walk() string callback "'.$name.'" not registered in this compile unit'
             );
         }
         if ($recursive) {
@@ -197,9 +198,7 @@ final class ArrayWalkRuntime
             );
         }
         if (null !== $userdata) {
-            throw new \LogicException(
-                'array_walk_recursive() userdata is not supported for JIT/AOT in this compiler build (#4913)'
-            );
+            UnsupportedFeature::raise('array-walk-recursive-userdata');
         }
 
         // Pure LLVM + NestedClosureInvoke — NestedJIT ArrayWalkJitHelper segfaults (#27632 / #24156).

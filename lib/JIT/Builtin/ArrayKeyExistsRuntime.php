@@ -13,6 +13,7 @@ use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -93,9 +94,9 @@ final class ArrayKeyExistsRuntime
             return self::hashtableKeyExistsValueBoxKey($context, $ht, $key);
         }
 
-        throw new \LogicException(
-            $function.'() key type not supported in this compiler build: '
-            .JITVariable::getStringType($key->type)
+        UnsupportedFeature::raise(
+            'array-key-exists-key-type',
+            $function.'() key type not lowerable for JIT/AOT: '.JITVariable::getStringType($key->type)
         );
     }
 
@@ -124,8 +125,9 @@ final class ArrayKeyExistsRuntime
             return $context->constantFromInteger(0, 'int1');
         }
         if (JITVariable::TYPE_NATIVE_LONG !== $key->type) {
-            throw new \LogicException(
-                $function.'() on native arrays only supports integer keys in this compiler build'
+            UnsupportedFeature::raise(
+                'array-key-exists-native-key-type',
+                $function.'() on native arrays only supports integer keys'
             );
         }
         $index = JitLongArg::lower($context, $key, $function.'() key');

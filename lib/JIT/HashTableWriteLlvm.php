@@ -13,6 +13,7 @@ use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\HashTableDuplicateRuntime;
 use PHPCompiler\JIT\Builtin\ListUnpackRuntime;
 use PHPCompiler\JIT\ExceptionBridge;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -924,7 +925,10 @@ final class HashTableWriteLlvm
 
             return;
         }
-        throw new \LogicException('unset() array offset requires int or string index in this compiler build');
+        UnsupportedFeature::raise(
+            'hashtable-index-type',
+            'unset() array offset requires int or string index'
+        );
     }
 
     /** SplObjectStorage-style map: writable object-identity key slot (#10031 v4). */

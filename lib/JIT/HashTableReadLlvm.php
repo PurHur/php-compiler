@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\StringTriggerError;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPCompiler\VM\ErrorReporter;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -672,8 +673,9 @@ final class HashTableReadLlvm
             return self::offsetIsSetValueBoxKey($context, $ht, $dim);
         }
 
-        throw new \LogicException(
-            'isset() on HashTable arrays only supports integer or string indices in this compiler build'
+        UnsupportedFeature::raise(
+            'hashtable-index-type',
+            'isset() on HashTable arrays only supports integer or string indices'
         );
     }
 
@@ -998,8 +1000,9 @@ final class HashTableReadLlvm
             );
         }
 
-        throw new \LogicException(
-            'Array fetch only supports integer or string indices in this compiler build'
+        UnsupportedFeature::raise(
+            'hashtable-index-type',
+            'Array fetch only supports integer or string indices'
         );
     }
 

@@ -84,6 +84,96 @@ final class UnsupportedRegistry
             'issue' => 57,
             'alternative' => 'handle errors without try/catch, or run under VM until AOT unwind lands',
         ],
+        'range-non-int-step' => [
+            'feature' => 'range() step outside int/float/bool/boxed numeric',
+            'matrixRow' => 'docs/capabilities.md#range',
+            'issue' => 4258,
+            'alternative' => 'pass an int or float step (php-src ext/standard/array.c Z_PARAM_NUMBER)',
+        ],
+        'array-map-multi-callback' => [
+            'feature' => 'array_map() with multiple arrays and a non-lowerable callback',
+            'matrixRow' => 'docs/capabilities.md#array_map',
+            'issue' => 4539,
+            'alternative' => 'use null, a closure, or a compile-time string builtin callback (php-src ext/standard/array.c)',
+        ],
+        'array-map-invokable-deferred' => [
+            'feature' => 'array_map() invokable-object callback',
+            'matrixRow' => 'docs/capabilities.md#array_map',
+            'issue' => 16228,
+            'alternative' => 'use null, a compile-time string builtin, a closure/arrow, or a static/bound [Class|$this, method] callable',
+        ],
+        'array-walk-string-callback' => [
+            'feature' => 'array_walk() string callback not registered in this compile unit',
+            'matrixRow' => 'docs/capabilities.md#array_walk',
+            'issue' => 33728,
+            'alternative' => 'use a stdlib builtin name or a user function defined in the same compile unit',
+        ],
+        'array-walk-recursive-userdata' => [
+            'feature' => 'array_walk_recursive() with userdata under JIT/AOT',
+            'matrixRow' => 'docs/capabilities.md#array_walk_recursive',
+            'issue' => 4913,
+            'alternative' => 'omit userdata, or close over state in a 2-arg closure (php-src php_array_walk)',
+        ],
+        'substr-replace-array-with-array' => [
+            'feature' => 'substr_replace() array $string with array $replace',
+            'matrixRow' => 'docs/capabilities.md#substr_replace',
+            'issue' => 29309,
+            'alternative' => 'pass a scalar string $replace, or replace one string at a time (php-src ext/standard/string.c)',
+        ],
+        'substr-replace-array-element-type' => [
+            'feature' => 'substr_replace() array $replace element not string-coercible at compile time',
+            'matrixRow' => 'docs/capabilities.md#substr_replace',
+            'issue' => 29309,
+            'alternative' => 'use string/int/float/bool/null elements in a compile-time array literal',
+        ],
+        'substr-replace-runtime-array-replace' => [
+            'feature' => 'substr_replace() runtime array $replace',
+            'matrixRow' => 'docs/capabilities.md#substr_replace',
+            'issue' => 29309,
+            'alternative' => 'pass a scalar string $replace, or a compile-time array literal',
+        ],
+        'simplexml-load-string-jit' => [
+            'feature' => 'simplexml_load_string() outside user-script AOT fold path',
+            'matrixRow' => 'docs/capabilities.md#simplexml_load_string',
+            'issue' => 26863,
+            'alternative' => 'use a compile-time XML literal under `phpc build`, or parse under VM',
+        ],
+        'array-multisort-arity' => [
+            'feature' => 'array_multisort() with fewer than two array arguments under JIT/AOT',
+            'matrixRow' => 'docs/capabilities.md#array_multisort',
+            'issue' => 26908,
+            'alternative' => 'pass at least two arrays (php-src php_array_multisort)',
+        ],
+        'path-string-as-array' => [
+            'feature' => 'using a string path as an array container under JIT/AOT',
+            'matrixRow' => 'docs/capabilities-syntax.md#arrays',
+            'issue' => 36396,
+            'alternative' => 'pass a hashtable/array variable, not a filesystem path string',
+        ],
+        'hashtable-index-type' => [
+            'feature' => 'hashtable offset that is not int or string under JIT/AOT',
+            'matrixRow' => 'docs/capabilities-syntax.md#arrays',
+            'issue' => 29567,
+            'alternative' => 'use integer or string keys (php-src zend_hash / Zend/zend_execute.c)',
+        ],
+        'isset-object-array-offset' => [
+            'feature' => 'isset() array offset on object containers other than SplObjectStorage/typed properties',
+            'matrixRow' => 'docs/capabilities-syntax.md#isset',
+            'issue' => 10170,
+            'alternative' => 'use SplObjectStorage, a typed object property array, or a hashtable variable',
+        ],
+        'array-key-exists-key-type' => [
+            'feature' => 'array_key_exists()/key_exists() key type not lowerable for JIT/AOT',
+            'matrixRow' => 'docs/capabilities.md#array_key_exists',
+            'issue' => 13735,
+            'alternative' => 'use int/string/null/bool/float keys, or a value-boxed key (php-src ext/standard/array.c)',
+        ],
+        'array-key-exists-native-key-type' => [
+            'feature' => 'array_key_exists()/key_exists() non-integer key on a native array',
+            'matrixRow' => 'docs/capabilities.md#array_key_exists',
+            'issue' => 13735,
+            'alternative' => 'use an integer key, or assign the array to a hashtable variable first',
+        ],
     ];
 
     /**

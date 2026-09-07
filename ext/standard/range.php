@@ -324,7 +324,7 @@ final class range extends Internal
             && JITVariable::TYPE_NATIVE_BOOL !== $arg->type
             && JITVariable::TYPE_NATIVE_DOUBLE !== $arg->type
             && !JitValueBox::isValueOperand($arg)) {
-            throw new \LogicException('range() step must be an integer in this compiler build');
+            UnsupportedFeature::raise('range-non-int-step');
         }
 
         return JitLongArg::lower($context, $arg, 'range() step');
