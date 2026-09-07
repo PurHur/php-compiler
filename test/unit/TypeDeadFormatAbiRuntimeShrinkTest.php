@@ -21,7 +21,7 @@ final class TypeDeadFormatAbiRuntimeShrinkTest extends TestCase
         return [
             '__compiler_sprintf',
             '__compiler_printf',
-            '__compiler_number_format',
+            '__compiler_number_format_r1',
         ];
     }
 

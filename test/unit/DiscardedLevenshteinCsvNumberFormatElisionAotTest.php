@@ -61,7 +61,7 @@ final class DiscardedLevenshteinCsvNumberFormatElisionAotTest extends TestCase
             $this->assertSame(
                 0,
                 preg_match_all(
-                    '/phpc_levenshtein|__compiler_str_getcsv|__compiler_number_format|StringLevenshtein|JitStrGetcsv|JitNumberFormat|levenshtein_bridge/',
+                    '/phpc_levenshtein|__compiler_str_getcsv|__compiler_number_format_r1|StringLevenshtein|JitStrGetcsv|JitNumberFormat|levenshtein_bridge/',
                     $body
                 ),
                 'discarded levenshtein/str_getcsv/number_format must be elided'

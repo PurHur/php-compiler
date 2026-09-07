@@ -27,7 +27,10 @@ final class StrReplaceJitHelper
     {
         self::$lastCount = 0;
         if ('' === $search) {
-            return $subject;
+            // Always allocate — empty needle must not return the subject pointer so thin-AOT
+            // can treat the result as owning (__string__* FUNCCALL free) (#36388).
+            // php-src php_str_to_str_ex may return the subject; NestedJIT copies instead.
+            return self::slice($subject, 0, self::byteLen($subject));
         }
         $searchLen = self::byteLen($search);
         $out = '';
@@ -51,7 +54,10 @@ final class StrReplaceJitHelper
     {
         self::$lastCount = 0;
         if ('' === $search) {
-            return $subject;
+            // Always allocate — empty needle must not return the subject pointer so thin-AOT
+            // can treat the result as owning (__string__* FUNCCALL free) (#36388).
+            // php-src php_str_to_str_ex may return the subject; NestedJIT copies instead.
+            return self::slice($subject, 0, self::byteLen($subject));
         }
         $searchLen = self::byteLen($search);
         $out = '';

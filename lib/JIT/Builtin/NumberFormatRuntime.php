@@ -271,6 +271,9 @@ final class NumberFormatRuntime
             $newLen,
             $outI8
         );
+        // __string__init copies — free scratch + the replaced input string (#36388).
+        $context->builder->call($context->lookupFunction('__mm__free'), $outBuf);
+        $context->refcount->delref($str);
         $stripEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBb);
 
@@ -413,11 +416,16 @@ final class NumberFormatRuntime
         self::copyBytes($context, $fn, $data, $outI8, $outPosPtr, $srcPosPtr, $fracLen, 'c_'.$s);
         $finalLen = $context->builder->load($outPosPtr);
 
-        return $context->builder->call(
+        $grouped = $context->builder->call(
             $context->lookupFunction('__string__init'),
             $finalLen,
             $outI8
         );
+        // __string__init copies — free the scratch buffer and the replaced raw string (#36388).
+        $context->builder->call($context->lookupFunction('__mm__free'), $outBuf);
+        $context->refcount->delref($rawStr);
+
+        return $grouped;
     }
 
     private static function copyBytes(

@@ -25,7 +25,7 @@ final class StringFormatRuntimeStandaloneTest extends TestCase
             [
                 '__compiler_sprintf',
                 '__compiler_printf',
-                '__compiler_number_format',
+                '__compiler_number_format_r1',
             ] as $name
         ) {
             $fn = $ctx->lookupFunction($name);

@@ -39,7 +39,14 @@ final class StringFormat
 
     private const PRINTF_BRIDGE_ENTRY = 'printf_bridge_entry';
 
-    private const NUMBER_FORMAT_BRIDGE_ENTRY = 'number_format_bridge_entry';
+    private const NUMBER_FORMAT_BRIDGE_ENTRY = 'number_format_bridge_entry_r1';
+
+    /**
+     * Thin-AOT number_format ABI. Stale helper TUs still define leaky
+     * `__compiler_number_format` (separator separate + grouping scratch); call sites
+     * use this symbol so {@see NumberFormatRuntime} free paths always win (#36388).
+     */
+    private const NUMBER_FORMAT_ABI = '__compiler_number_format_r1';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
@@ -50,7 +57,7 @@ final class StringFormat
     private const ABI_FUNCTIONS = [
         '__compiler_sprintf',
         '__compiler_printf',
-        '__compiler_number_format',
+        self::NUMBER_FORMAT_ABI,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -65,6 +72,10 @@ final class StringFormat
         if ($force) {
             $probe = $context->module->getNamedFunction('__compiler_sprintf');
             if (null !== $probe && $probe->countBasicBlocks() > 0) {
+                // sprintf already linked from helper-runtime — still emit the r1
+                // number_format bridge (stale TUs keep leaky __compiler_number_format) (#36388).
+                self::ensureNumberFormatBridge($context);
+
                 return;
             }
             $savedBlock = null;
@@ -104,7 +115,7 @@ final class StringFormat
 
         $sprintfProbe = $context->module->getNamedFunction('__compiler_sprintf');
         $printfProbe = $context->module->getNamedFunction('__compiler_printf');
-        $numberProbe = $context->module->getNamedFunction('__compiler_number_format');
+        $numberProbe = $context->module->getNamedFunction(self::NUMBER_FORMAT_ABI);
         // Helper-cache / NestedJIT bridges still call __phpc_ob_echo_substr (#34747).
         ObOutputRuntime::ensureLinked($context);
 
@@ -253,9 +264,20 @@ final class StringFormat
         $context->registerFunction($abiName, $fn);
     }
 
+    /**
+     * Ensure {@see NUMBER_FORMAT_ABI} is implemented in the current module (#36388).
+     */
+    public static function ensureNumberFormatBridge(Context $context): void
+    {
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        self::ensureRuntimeHelpers($context);
+        self::implementNumberFormatBridge($context);
+        BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+    }
+
     private static function implementNumberFormatBridge(Context $context): void
     {
-        $abiName = '__compiler_number_format';
+        $abiName = self::NUMBER_FORMAT_ABI;
         $probe = $context->module->getNamedFunction($abiName);
         if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::NUMBER_FORMAT_BRIDGE_ENTRY)) {
             $context->registerFunction($abiName, $probe);
@@ -288,6 +310,9 @@ final class StringFormat
         );
         $decOrd = self::stringFirstByteOrd($context, $fn, $decSep);
         $thouOrd = self::stringFirstByteOrd($context, $fn, $thouSep);
+        // separate() copies for ordinals — drop the copies before formatting (#36388).
+        $context->refcount->delref($decSep);
+        $context->refcount->delref($thouSep);
         NumberFormatRuntime::emitBridgeBody($context, $fn, $decOrd, $thouOrd);
         $context->registerFunction($abiName, $fn);
     }

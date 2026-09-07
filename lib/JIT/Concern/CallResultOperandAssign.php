@@ -177,7 +177,7 @@ trait CallResultOperandAssign
     {
         // Fresh heap strings from Internal::call — php-src zend_string_init / php_substr /
         // php_trim / php_strtoupper / formatted_print (and peers that always allocate).
-        // Do not list str_replace/strtr: php_str_to_str_ex may return the subject (#36388).
+        // NestedJIT str_replace always allocates (empty needle copies subject) (#36388).
         // Immortal constant folds delref as no-ops.
         static $owning = [
             'str_repeat' => true,
@@ -200,6 +200,9 @@ trait CallResultOperandAssign
             'str_decrement' => true,
             'basename' => true,
             'dirname' => true,
+            'number_format' => true,
+            'str_replace' => true,
+            'str_ireplace' => true,
         ];
 
         return isset($owning[strtolower($name)]);

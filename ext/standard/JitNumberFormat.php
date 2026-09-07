@@ -52,7 +52,7 @@ final class JitNumberFormat
     public static function format(Context $context, JITVariable ...$args): Value
     {
         // User-standalone init skips StringFormat::ensureLinked (#13571) —
-        // link __compiler_number_format on first call-site lowering (#15642, #18525).
+        // link number_format_r1 on first call-site lowering (#15642, #18525, #36388).
         if ('1' !== getenv('PHP_COMPILER_HELPER_RUNTIME_EMITTING')) {
             StringFormat::implementIfDeclared($context, true);
         }
@@ -101,14 +101,23 @@ final class JitNumberFormat
             ? JitStringBuiltinArg::lower($context, $args[3], 'number_format', 3, 'thousands_separator', '?string')
             : $context->builder->load($context->constantStringFromString(','));
 
-        return $context->builder->call(
-            $context->lookupFunction('__compiler_number_format'),
+        $result = $context->builder->call(
+            $context->lookupFunction('__compiler_number_format_r1'),
             $number,
             $decimals,
             $decSep,
             $thouSep,
             $mode
         );
+        // Formatter copies separators into the result — release ephemeral concat seps (#36388).
+        if ($argc >= 3 && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
+            JitStringBuiltinArg::releaseEphemeralArgAfterCopy($context, $args[2], $decSep);
+        }
+        if ($argc >= 4 && !NamedOptionalCallArgs::isOmittedOptional($args[3])) {
+            JitStringBuiltinArg::releaseEphemeralArgAfterCopy($context, $args[3], $thouSep);
+        }
+
+        return $result;
     }
 
     /**
