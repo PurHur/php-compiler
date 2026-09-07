@@ -79,18 +79,12 @@ final class JitSprintf
 
         // libc %d/%u/%x expect 32-bit int on LP64; we pass i64 (zend_long). Promote
         // conversions to %lld/%llu/%llx so PHP_INT_MIN does not print as 0 (#36386).
+        // Compile-time format: pass the module C string directly — do NOT
+        // `__string__init` + malloc NUL copy (leaked every call, #36388).
         $fmtForSnprintf = self::promoteIntegerConversionsForInt64($constFmt);
-        $fmtStr = $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $i64->constInt(\strlen($fmtForSnprintf), false),
-            $context->builder->pointerCast(
-                $context->constantFromString($fmtForSnprintf),
-                $i8p
-            )
-        );
-        $fmtNul = \PHPCompiler\JIT\Builtin\SprintfSnprintfRuntime::nullTerminatedCopyPublic(
-            $context,
-            $fmtStr
+        $fmtNul = $context->builder->pointerCast(
+            $context->pointerFromStringConstant($fmtForSnprintf),
+            $charPtr
         );
 
         $bufSize = 1024;
@@ -105,6 +99,8 @@ final class JitSprintf
             $fmtNul,
         ];
         $toFree = [];
+        /** @var Value[] $toDelref temporary `__string__*` from `__string__separate` / format helpers */
+        $toDelref = [];
         for ($i = 0; $i < $numArgs; ++$i) {
             $conv = $conversions[$i] ?? '';
             // '*' = sequential star width/precision — always i64 for libc snprintf (#34969).
@@ -116,7 +112,7 @@ final class JitSprintf
                     $i32
                 );
             } elseif ('s' === $conv || 'S' === $conv) {
-                $snprintfArgs[] = self::extractAsCString($context, $args[$i + 1], $toFree);
+                $snprintfArgs[] = self::extractAsCString($context, $args[$i + 1], $toFree, $toDelref);
             } elseif (\in_array($conv, ['f', 'e', 'g', 'a'], true)) {
                 $snprintfArgs[] = self::extractSnprintfFloatArg($context, $args[$i + 1]);
             } elseif ('c' === $conv) {
@@ -131,7 +127,7 @@ final class JitSprintf
                 // #37051 / #37075). php-src formatted_print.c — %b is unsigned bit pattern.
                 $snprintfArgs[] = self::extractSnprintfLongArg($context, $args[$i + 1]);
             } else {
-                $snprintfArgs[] = self::extractSnprintfArg($context, $args[$i + 1], $toFree);
+                $snprintfArgs[] = self::extractSnprintfArg($context, $args[$i + 1], $toFree, $toDelref);
             }
         }
 
@@ -147,9 +143,11 @@ final class JitSprintf
             $context->builder->pointerCast($outBuf, $i8p)
         );
         $context->builder->call($context->lookupFunction('__mm__free'), $outBuf);
-        $context->builder->call($context->lookupFunction('__mm__free'), $fmtNul);
         foreach ($toFree as $ptr) {
             $context->builder->call($context->lookupFunction('__mm__free'), $ptr);
+        }
+        foreach ($toDelref as $tmpStr) {
+            $context->refcount->delref($tmpStr);
         }
 
         return $result;
@@ -457,9 +455,14 @@ final class JitSprintf
      * php-src: ext/standard/formatted_print.c php_formatted_print / convert_to_string.
      *
      * @param Value[] $toFree
+     * @param Value[] $toDelref temporary `__string__*` to release after snprintf (#36388)
      */
-    private static function extractAsCString(Context $context, JITVariable $arg, array &$toFree): Value
-    {
+    private static function extractAsCString(
+        Context $context,
+        JITVariable $arg,
+        array &$toFree,
+        array &$toDelref
+    ): Value {
         // Overflowable native-long SSA (cold f64 slot): stringify from the flag +
         // double slot without materializing a heap box mid-snprintf (#36386).
         // Full materializeOverflowableNativeLong here segfaulted on inline
@@ -469,7 +472,7 @@ final class JitSprintf
             && null !== $arg->longArithOverflowDoubleSlot
             && JITVariable::TYPE_NATIVE_LONG === $arg->type
         ) {
-            return self::extractOverflowableNativeLongAsCString($context, $arg, $toFree);
+            return self::extractOverflowableNativeLongAsCString($context, $arg, $toFree, $toDelref);
         }
         if (
             null !== $arg->longArithOverflowFlag
@@ -486,7 +489,7 @@ final class JitSprintf
             );
         }
         if (JITVariable::TYPE_STRING === $arg->type) {
-            return self::extractSnprintfArg($context, $arg, $toFree);
+            return self::extractSnprintfArg($context, $arg, $toFree, $toDelref);
         }
         if (JITVariable::TYPE_NATIVE_DOUBLE === $arg->type) {
             $saved = null;
@@ -503,12 +506,14 @@ final class JitSprintf
             $sep = $context->builder->call($context->lookupFunction('__string__separate'), $str);
             $nul = \PHPCompiler\JIT\Builtin\SprintfSnprintfRuntime::nullTerminatedCopyPublic($context, $sep);
             $toFree[] = $nul;
+            $toDelref[] = $str;
+            $toDelref[] = $sep;
 
             return $nul;
         }
         if (JITVariable::TYPE_NATIVE_LONG === $arg->type || JITVariable::TYPE_NATIVE_BOOL === $arg->type) {
             \PHPCompiler\JIT\LibcExtern::ensureSnprintf($context);
-            $lng = self::extractSnprintfArg($context, $arg, $toFree);
+            $lng = self::extractSnprintfArg($context, $arg, $toFree, $toDelref);
             $charPtr = $context->getTypeFromString('char*');
             $sizeT = $context->getTypeFromString('size_t');
             $numBuf = $context->builder->call(
@@ -537,7 +542,7 @@ final class JitSprintf
                 true
             )
         ) {
-            return self::extractBoxedValueAsCString($context, $arg, $toFree);
+            return self::extractBoxedValueAsCString($context, $arg, $toFree, $toDelref);
         }
 
         return $context->builder->pointerCast(
@@ -550,11 +555,13 @@ final class JitSprintf
      * {@code %s} of a lazy-overflow native-long (flag + f64 slot) without heap boxing.
      *
      * @param Value[] $toFree
+     * @param Value[] $toDelref
      */
     private static function extractOverflowableNativeLongAsCString(
         Context $context,
         JITVariable $arg,
-        array &$toFree
+        array &$toFree,
+        array &$toDelref
     ): Value {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'sprintf_as_s_ov_cont');
         \PHPCompiler\JIT\LibcExtern::ensureSnprintf($context);
@@ -585,6 +592,9 @@ final class JitSprintf
         $dblStr = \PHPCompiler\JIT\Builtin\ZendDoubleStringRuntime::formatGcvt($context, $fd);
         $dblSep = $context->builder->call($context->lookupFunction('__string__separate'), $dblStr);
         $dblNul = \PHPCompiler\JIT\Builtin\SprintfSnprintfRuntime::nullTerminatedCopyPublic($context, $dblSep);
+        // Release temps on this arm only — do not PHI them into $toDelref (#36388 / #36386).
+        $context->refcount->delref($dblStr);
+        $context->refcount->delref($dblSep);
         // Do NOT push per-arm allocas into $toFree during IR gen — both arms would be
         // freed at runtime even when only one executed (UAF/segfault, #36386).
         $endOv = $context->builder->getInsertBlock();
@@ -628,9 +638,14 @@ final class JitSprintf
      * {@see \PHPCompiler\JIT\Builtin\SprintfSnprintfRuntime} as_s_* (#36386).
      *
      * @param Value[] $toFree
+     * @param Value[] $toDelref unused for multi-arm phi (temps released per-arm, #36388)
      */
-    private static function extractBoxedValueAsCString(Context $context, JITVariable $arg, array &$toFree): Value
-    {
+    private static function extractBoxedValueAsCString(
+        Context $context,
+        JITVariable $arg,
+        array &$toFree,
+        array &$toDelref
+    ): Value {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'sprintf_as_s_vbox_cont');
         \PHPCompiler\JIT\LibcExtern::ensureSnprintf($context);
         $saved = null;
@@ -731,6 +746,8 @@ final class JitSprintf
         $dblStr = \PHPCompiler\JIT\Builtin\ZendDoubleStringRuntime::formatGcvt($context, $dbl);
         $dblSep = $context->builder->call($context->lookupFunction('__string__separate'), $dblStr);
         $dblNul = \PHPCompiler\JIT\Builtin\SprintfSnprintfRuntime::nullTerminatedCopyPublic($context, $dblSep);
+        $context->refcount->delref($dblStr);
+        $context->refcount->delref($dblSep);
         $endDbl = $context->builder->getInsertBlock();
         $context->builder->branch($outBb);
 
@@ -768,18 +785,20 @@ final class JitSprintf
         $trueLit = $context->constantFromString('1');
         $falseLit = $context->constantFromString('');
         $boolLit = $context->builder->select($isTrue, $trueLit, $falseLit);
+        $boolStr = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $context->builder->select(
+                $isTrue,
+                $context->getTypeFromString('int64')->constInt(1, false),
+                $context->getTypeFromString('int64')->constInt(0, false)
+            ),
+            $context->builder->pointerCast($boolLit, $context->getTypeFromString('int8*'))
+        );
         $boolNul = \PHPCompiler\JIT\Builtin\SprintfSnprintfRuntime::nullTerminatedCopyPublic(
             $context,
-            $context->builder->call(
-                $context->lookupFunction('__string__init'),
-                $context->builder->select(
-                    $isTrue,
-                    $context->getTypeFromString('int64')->constInt(1, false),
-                    $context->getTypeFromString('int64')->constInt(0, false)
-                ),
-                $context->builder->pointerCast($boolLit, $context->getTypeFromString('int8*'))
-            )
+            $boolStr
         );
+        $context->refcount->delref($boolStr);
         $endBool = $context->builder->getInsertBlock();
         $context->builder->branch($outBb);
 
@@ -790,21 +809,24 @@ final class JitSprintf
         );
         $strSep = $context->builder->call($context->lookupFunction('__string__separate'), $strVal);
         $strNul = \PHPCompiler\JIT\Builtin\SprintfSnprintfRuntime::nullTerminatedCopyPublic($context, $strSep);
+        $context->refcount->delref($strSep);
         $endStr = $context->builder->getInsertBlock();
         $context->builder->branch($outBb);
 
         $context->builder->positionAtEnd($fbBb);
-        $emptyNul = \PHPCompiler\JIT\Builtin\SprintfSnprintfRuntime::nullTerminatedCopyPublic(
-            $context,
-            $context->builder->call(
-                $context->lookupFunction('__string__init'),
-                $context->getTypeFromString('int64')->constInt(0, false),
-                $context->builder->pointerCast(
-                    $context->constantFromString(''),
-                    $context->getTypeFromString('int8*')
-                )
+        $emptyStr = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $context->getTypeFromString('int64')->constInt(0, false),
+            $context->builder->pointerCast(
+                $context->constantFromString(''),
+                $context->getTypeFromString('int8*')
             )
         );
+        $emptyNul = \PHPCompiler\JIT\Builtin\SprintfSnprintfRuntime::nullTerminatedCopyPublic(
+            $context,
+            $emptyStr
+        );
+        $context->refcount->delref($emptyStr);
         $endFb = $context->builder->getInsertBlock();
         $context->builder->branch($outBb);
 
@@ -882,9 +904,14 @@ final class JitSprintf
      * String args are NUL-terminated into a malloc'd buffer tracked in $toFree.
      *
      * @param Value[] $toFree collects malloc'd buffers to free after snprintf
+     * @param Value[] $toDelref temporary `__string__*` from `__string__separate` (#36388)
      */
-    private static function extractSnprintfArg(Context $context, JITVariable $arg, array &$toFree): Value
-    {
+    private static function extractSnprintfArg(
+        Context $context,
+        JITVariable $arg,
+        array &$toFree,
+        array &$toDelref
+    ): Value {
         // When inference says native type but storage is __value__*, read from the box.
         if (null === $arg->valueBoxAliasPtr
             && \in_array($arg->type, [
@@ -916,6 +943,7 @@ final class JitSprintf
                     );
                     $nul = \PHPCompiler\JIT\Builtin\SprintfSnprintfRuntime::nullTerminatedCopyPublic($context, $strSep);
                     $toFree[] = $nul;
+                    $toDelref[] = $strSep;
 
                     return $nul;
                 default:
@@ -941,6 +969,7 @@ final class JitSprintf
                 );
                 $nul = \PHPCompiler\JIT\Builtin\SprintfSnprintfRuntime::nullTerminatedCopyPublic($context, $owned);
                 $toFree[] = $nul;
+                $toDelref[] = $owned;
 
                 return $nul;
             case JITVariable::TYPE_VALUE:
