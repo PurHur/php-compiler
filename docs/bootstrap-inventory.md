@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8431 |
-| Phase A inventory files (M2 ratio SSOT) | 8431 |
+| PHP files on vm.php path | 8432 |
+| Phase A inventory files (M2 ratio SSOT) | 8432 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26487 |
+| Source constructs flagged (warnings) | 26489 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5606,7 +5606,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/CompileErrorSuppressEndBlockAndSlotInherit.php` | 0 | 2 |
 | `lib/Compiler/Concern/CompileExprAndOpcodeTypes.php` | 0 | 3 |
 | `lib/Compiler/Concern/CompileExprAssignDispatch.php` | 0 | 13 |
-| `lib/Compiler/Concern/CompileExprDispatch.php` | 0 | 34 |
+| `lib/Compiler/Concern/CompileExprBinaryOpCastAndUnaryDispatch.php` | 0 | 14 |
+| `lib/Compiler/Concern/CompileExprDispatch.php` | 0 | 22 |
 | `lib/Compiler/Concern/CompileFuncCfgReturnAndGlobalImport.php` | 0 | 15 |
 | `lib/Compiler/Concern/CompileInlineSpecializedCallArgSends.php` | 0 | 1 |
 | `lib/Compiler/Concern/CompileInterfaceTraitEnumAndMethodDecl.php` | 0 | 20 |
@@ -49241,13 +49242,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 1093)
-- new CompileFatal (line 1127)
-- new CompileError (line 1130)
-- new ClassCompileRegistry (line 1171)
-- new AttributeClassRegistry (line 1172)
-- new ClassCompileRegistry (line 1280)
-- new AttributeClassRegistry (line 1281)
+- new CompileFatal (line 1096)
+- new CompileFatal (line 1130)
+- new CompileError (line 1133)
+- new ClassCompileRegistry (line 1174)
+- new AttributeClassRegistry (line 1175)
+- new ClassCompileRegistry (line 1283)
+- new AttributeClassRegistry (line 1284)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -49756,42 +49757,48 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new OpCode (line 256)
 - 2 class method(s)
 
+### `lib/Compiler/Concern/CompileExprBinaryOpCastAndUnaryDispatch.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CompileExprBinaryOpCastAndUnaryDispatch (line 20)
+- new OpCode (line 46)
+- new OpCode (line 80)
+- new OpCode (line 101)
+- new OpCode (line 129)
+- new OpCode (line 156)
+- new OpCode (line 170)
+- new OpCode (line 198)
+- new OpCode (line 215)
+- new OpCode (line 237)
+- new OpCode (line 248)
+- new OpCode (line 265)
+- new OpCode (line 285)
+- 8 class method(s)
+
 ### `lib/Compiler/Concern/CompileExprDispatch.php`
 
 **Warnings** (review for bootstrap subset):
-- trait CompileExprDispatch (line 127)
-- new OpCode (line 148)
-- new OpCode (line 174)
-- new OpCode (line 195)
-- new OpCode (line 219)
-- new OpCode (line 235)
-- new OpCode (line 263)
-- new OpCode (line 271)
-- new OpCode (line 291)
-- new OpCode (line 308)
-- new OpCode (line 330)
-- new OpCode (line 341)
-- new OpCode (line 350)
-- new OpCode (line 362)
-- new Operand\Temporary (line 394)
-- new OpCode (line 400)
-- new OpCode (line 412)
-- new OpCode (line 427)
-- new OpCode (line 439)
-- new Operand\Literal (line 462)
-- new Operand\Literal (line 492)
-- new Operand\Literal (line 518)
-- new OpCode (line 520)
-- new OpCode (line 551)
-- new Operand\Temporary (line 588)
-- new OpCode (line 594)
-- new OpCode (line 620)
-- new OpCode (line 649)
-- new OpCode (line 670)
-- new OpCode (line 679)
-- new OpCode (line 688)
-- new OpCode (line 706)
-- new OpCode (line 725)
+- trait CompileExprDispatch (line 129)
+- new OpCode (line 150)
+- new Operand\Temporary (line 206)
+- new OpCode (line 212)
+- new OpCode (line 224)
+- new OpCode (line 239)
+- new OpCode (line 251)
+- new Operand\Literal (line 274)
+- new Operand\Literal (line 304)
+- new Operand\Literal (line 330)
+- new OpCode (line 332)
+- new OpCode (line 363)
+- new Operand\Temporary (line 400)
+- new OpCode (line 406)
+- new OpCode (line 432)
+- new OpCode (line 461)
+- new OpCode (line 482)
+- new OpCode (line 491)
+- new OpCode (line 500)
+- new OpCode (line 518)
+- new OpCode (line 537)
 - 1 class method(s)
 
 ### `lib/Compiler/Concern/CompileFuncCfgReturnAndGlobalImport.php`
