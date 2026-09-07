@@ -24,7 +24,9 @@ Gates are **local/Docker only** — GitHub `CLEAN` means no checks configured (s
 | `lib/VM.php` + `lib/VM/Concern/*` | Interpreter loop | `script/differential-sweep.sh`; targeted `./script/phpunit.sh --filter VMTest` | 1M-loop exit 255 (#36148/#15906); O(scope²) hot loop (#36207). Traits under `lib/VM/Concern/` stay in `namespace PHPCompiler` like JIT Concerns. |
 | `lib/AOT/Linker.php` | Native link line | `./script/aot-smoke.sh` (size gate) | Unconditional libsodium/… link (#36200); missing `--gc-sections` (#36198) |
 | `lib/AOT/HelperRuntimeCache.php` | Split-TU helper `.o` cache | `php script/check-helper-runtime-prelink.php` | Fingerprint-stale cache silently disabled (#23457); monolithic `.text` vs `common.o` (#36246) |
+| `lib/AOT/HelperRuntimeFingerprint.php` | Helper-unit / core fingerprint identity | same + `./script/phpunit.sh --filter HelperRuntimeCacheFingerprint` | Fingerprint restamp without rebuild (#23458); path-token LLVM identity (#24381) |
 | `lib/AOT/HelperRuntimeCommon.php` | Shared runtime prologue | same + `PHP_COMPILER_HELPER_RUNTIME_COMMON=1` smoke | Auto-link segfault until gc-section corpus (#36423/#36429) |
+| `lib/JIT/CompileCache.php` + `CompileCacheSemanticHash.php` | MCJIT/AOT warm + edit-scaffold strip plan | `./script/phpunit.sh --filter AotCompileCacheTest`; bench-gate one-file-edit | Comment-only edits falsely stripped (#36387); module.bc void* round-trip (#36479) |
 | `lib/JIT/Builtin/` | Runtime value model | aot-smoke + differential `--aot --repeat 3` | `__value__` align-1 UB (#36214); packed stride (#36214) |
 | `lib/Config.php` | `PHP_COMPILER_*` env | `php script/generate-configuration-docs.php --check` | 204 unregistered getenv knobs (#36201) |
 | `lib/ExtensionRegistry.php` + `ext/*/ext.json` | Extension load graph | `php script/sync-extension-manifests.php --check` | lib→ext imports / dual registries (#36204/#23480) |

@@ -32,6 +32,11 @@
             "budget": 1168,
             "target": 1200,
             "note": "helper-cache granularity; HelperRuntimeFingerprint extract (#36387/#36403); sorted linkObjects (#36399); refusePrelinkGcMixReason (#36401)"
+        },
+        "lib/JIT/CompileCache.php": {
+            "budget": 2319,
+            "target": 2000,
+            "note": "MCJIT/AOT warm cache; CompileCacheSemanticHash extract (#36387 one-file-edit / split-TU)"
         }
     },
     "script_file_count": {
