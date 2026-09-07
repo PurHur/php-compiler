@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Builtin;
-use PHPCompiler\JIT\Builtin\StreamFilter;
 use PHPCompiler\JIT\Builtin\StreamGlobalsJit;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\LibcExtern;
@@ -30,6 +29,9 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  */
 final class JitStreamIoKernel
 {
+    /** Re-entrancy guard for {@see implementForUserScriptLowering} (#36382). */
+    private static int $userScriptImplementDepth = 0;
+
     private const MAX_HANDLES = 256;
 
     private const DEFAULT_CHUNK_SIZE = 8192;
@@ -66,42 +68,62 @@ final class JitStreamIoKernel
      */
     public static function implementForUserScriptLowering(Context $context): void
     {
-        $savedBlock = \PHPCompiler\JIT\BasicBlockHelper::tryGetInsertBlock($context);
-        $context->builder->clearInsertionPosition();
-
-        self::clearDeferStubs($context);
-        self::ensureStreamGlobals($context);
-        StreamFilter::ensureLinked($context);
-        // Thin AOT: NestedJIT apply SEGVs — pure-LLVM string-filter registry (#35426).
-        // Only fill identity for leftover inventory stubs (never wipe real apply bodies).
-        JitStreamFilterApplyKernel::implementPureLlvmApply($context);
-        self::ensureIdentityStreamFilterApply($context);
-        StreamGlobalsJit::implement($context);
-
-        self::implementIfMissing($context, '__compiler_fwrite', self::emitFwrite(...));
-        self::implementIfMissing($context, '__phpc_try_fopen_stdio', self::emitTryFopenStdio(...));
-        self::implementIfMissing($context, '__phpc_try_fopen_php_memory', self::emitTryFopenPhpMemory(...));
-        // RFC2397 data:// before plain libc fopen (#34744 / peer #34731 file_get_contents).
-        \PHPCompiler\JIT\Builtin\StringBase64Decode::ensureLinked($context);
-        self::implementIfMissing($context, '__phpc_try_fopen_data_uri', self::emitTryFopenDataUri(...));
-        self::implementIfMissing($context, '__phpc_php_fopen_plain', self::emitPhpFopenPlain(...));
-        self::implementIfMissing($context, '__compiler_fopen', self::emitFopen(...));
-        self::implementIfMissing($context, '__compiler_popen', self::emitPopen(...));
-        self::implementIfMissing($context, '__compiler_tmpfile', self::emitTmpfile(...));
-        self::implementIfMissing($context, '__compiler_fread', self::emitFread(...));
-        self::implementFgetsForce($context);
-        self::implementStreamGetLineForce($context);
-        self::implementFseekForce($context);
-        self::implementFtellForce($context);
-        self::implementStreamGetContentsForce($context);
-        self::implementIfMissing($context, '__compiler_stream_supports', self::emitStreamSupports(...));
-        self::registerLinkedRuntime($context);
-
-        if (null !== $savedBlock) {
-            \PHPCompiler\JIT\BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
+        // Re-entrancy: emitters / StreamGlobals lookup can call ensureLinked again (#36382).
+        if (self::$userScriptImplementDepth > 0) {
+            return;
         }
+        ++self::$userScriptImplementDepth;
+        try {
+            $savedBlock = \PHPCompiler\JIT\BasicBlockHelper::tryGetInsertBlock($context);
+            $context->builder->clearInsertionPosition();
+
+            self::clearDeferStubs($context);
+            self::ensureStreamGlobals($context);
+            // Thin AOT: do not NestedJIT StreamFilterJitHelper on every fopen (#36382 / #23777).
+            JitStreamFilterApplyKernel::implementPureLlvmApply($context);
+            self::ensureIdentityStreamFilterApply($context);
+            StreamGlobalsJit::implement($context);
+
+            self::implementIfMissing($context, '__compiler_fwrite', self::emitFwrite(...));
+            self::implementIfMissing($context, '__phpc_try_fopen_stdio', self::emitTryFopenStdio(...));
+            self::implementIfMissing($context, '__phpc_try_fopen_php_memory', self::emitTryFopenPhpMemory(...));
+            // Stub data:// — full emit NestedJITs StringBase64Decode and re-entered forever (#36382).
+            self::implementIfMissing($context, '__phpc_try_fopen_data_uri', self::emitTryFopenDataUriStub(...));
+            self::implementIfMissing($context, '__phpc_php_fopen_plain', self::emitPhpFopenPlain(...));
+            self::implementIfMissing($context, '__compiler_fopen', self::emitFopen(...));
+            self::implementIfMissing($context, '__compiler_popen', self::emitPopen(...));
+            self::implementIfMissing($context, '__compiler_tmpfile', self::emitTmpfile(...));
+            self::implementIfMissing($context, '__compiler_fread', self::emitFread(...));
+            self::implementFgetsForce($context);
+            self::implementStreamGetLineForce($context);
+            self::implementFseekForce($context);
+            self::implementFtellForce($context);
+            self::implementStreamGetContentsForce($context);
+            self::implementIfMissing($context, '__compiler_stream_supports', self::emitStreamSupports(...));
+            self::registerLinkedRuntime($context);
+
+            if (null !== $savedBlock) {
+                \PHPCompiler\JIT\BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+            } else {
+                $context->builder->clearInsertionPosition();
+            }
+        } finally {
+            --self::$userScriptImplementDepth;
+        }
+    }
+
+    /**
+     * Thin AOT peers for feof/fflush on the same {@see StreamGlobalsJit} FILE* table
+     * as fopen (#36382 / #27186). Call from JitFeof / JitFflush user-script lowering —
+     * not from eager StreamLifecycle thin init (that linked a broken fflush into hello).
+     */
+    public static function implementLifecyclePeersForThinAot(Context $context): void
+    {
+        self::ensureStreamGlobals($context);
+        // Resolve must have a body before emitFflush/emitFeof lookup (#32287).
+        StreamGlobalsJit::implement($context);
+        self::implementFeofForce($context);
+        self::implementFflushForce($context);
     }
 
     private static function clearDeferStubs(Context $context): void
@@ -760,6 +782,18 @@ final class JitStreamIoKernel
     }
 
     /**
+     * Thin AOT stub: data:// → null (fall through to plain fopen) without NestedJIT
+     * StringBase64Decode (#36382). Full RFC2397: {@see emitTryFopenDataUri}.
+     */
+    private static function emitTryFopenDataUriStub(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('data_uri_try_stub_entry');
+        $context->builder->positionAtEnd($entry);
+        $i8p = $context->getTypeFromString('int8*');
+        $context->builder->returnValue($i8p->constNull());
+    }
+
+    /**
      * __phpc_try_fopen_data_uri(path, mode) — RFC2397 data:// as tmpfile + payload (#34744).
      *
      * php-src: ext/standard/php_data_wrapper.c — php_stream_data_wrapper (read-only).
@@ -768,6 +802,9 @@ final class JitStreamIoKernel
      */
     private static function emitTryFopenDataUri(Context $context, LlvmFunction $fn): void
     {
+        // NestedJIT base64 only when this full opener is emitted (#36382 / #34744).
+        \PHPCompiler\JIT\Builtin\StringBase64Decode::ensureLinked($context);
+
         $entry = $fn->appendBasicBlock('data_uri_try_entry');
         $context->builder->positionAtEnd($entry);
 

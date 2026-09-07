@@ -21,9 +21,14 @@ final class JitFflush
     /** @return Value */
     public static function invoke(Context $context, Value $handleLong): Value
     {
-        StreamLifecycleRuntime::ensureLinked($context);
-        // Replace NestedJIT __compiler_fflush with libc resolve→fflush (#33354).
-        StreamReadRuntime::ensureLinked($context);
+        if ($context->isThinStandaloneAotMain()) {
+            // Thin: libc fflush on StreamGlobalsJit slots — no NestedJIT (#36382 / #33354).
+            JitStreamIoKernel::implementLifecyclePeersForThinAot($context);
+        } else {
+            StreamLifecycleRuntime::ensureLinked($context);
+            // Replace NestedJIT __compiler_fflush with libc resolve→fflush (#33354).
+            StreamReadRuntime::ensureLinked($context);
+        }
         $ret = $context->builder->call($context->lookupFunction('__compiler_fflush'), $handleLong);
         $i32 = $context->getTypeFromString('int32');
 

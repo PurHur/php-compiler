@@ -3459,6 +3459,7 @@
         "ext/standard/JitStreamIsatty.php",
         "ext/standard/JitStreamLibcHandleKernel.php",
         "ext/standard/JitStreamLifecycleKernel.php",
+        "ext/standard/JitStreamLifecycleThinAot.php",
         "ext/standard/JitStreamMetaKernel.php",
         "ext/standard/JitStreamMetaThinAot.php",
         "ext/standard/JitStreamModeKernel.php",
@@ -8654,9 +8655,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8419,
+        "inventory_files": 8421,
         "excluded": 0,
-        "eligible": 8419,
+        "eligible": 8421,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

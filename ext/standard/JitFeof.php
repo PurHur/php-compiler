@@ -17,7 +17,12 @@ final class JitFeof
     public static function invoke(Context $context, Value $handleLong): Value
     {
         // Type::initialize no longer eagerly StreamLifecycle::ensureLinked (#34439).
-        StreamLifecycleRuntime::ensureLinkedForUserScriptLowering($context);
+        if ($context->isThinStandaloneAotMain()) {
+            // Thin: libc feof on StreamGlobalsJit slots — no NestedJIT (#36382).
+            JitStreamIoKernel::implementLifecyclePeersForThinAot($context);
+        } else {
+            StreamLifecycleRuntime::ensureLinkedForUserScriptLowering($context);
+        }
 
         $ret = $context->builder->call($context->lookupFunction('__compiler_feof'), $handleLong);
         $i32 = $context->getTypeFromString('int32');
