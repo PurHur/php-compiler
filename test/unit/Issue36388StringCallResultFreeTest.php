@@ -92,6 +92,7 @@ final class Issue36388StringCallResultFreeTest extends TestCase
         $this->assertStringContainsString("'number_format' => true", $src);
         $this->assertStringContainsString("'str_replace' => true", $src);
         $this->assertStringContainsString("'str_ireplace' => true", $src);
+        $this->assertStringContainsString("'str_pad' => true", $src);
         $concat = (string) file_get_contents(
             dirname(__DIR__, 2).'/lib/JIT/Concern/CompileConcat.php'
         );
@@ -134,6 +135,12 @@ final class Issue36388StringCallResultFreeTest extends TestCase
         $this->assertStringContainsString('Always allocate', $helper);
         $this->assertStringContainsString('releaseEphemeralArgAfterCopy', (string) file_get_contents(
             dirname(__DIR__, 2).'/ext/standard/JitNumberFormat.php'
+        ));
+        $this->assertStringContainsString('phpc_str_pad_r1', (string) file_get_contents(
+            dirname(__DIR__, 2).'/lib/JIT/Builtin/StrPadRuntime.php'
+        ));
+        $this->assertStringContainsString('StringStrPad::invoke', (string) file_get_contents(
+            dirname(__DIR__, 2).'/ext/standard/str_pad.php'
         ));
     }
 
@@ -250,6 +257,9 @@ final class Issue36388StringCallResultFreeTest extends TestCase
             'str_replace_hit' => ['test/repro/issue_36388_str_replace_hit_free.php', 'str_replace_hit delta='],
             'str_replace_miss' => ['test/repro/issue_36388_str_replace_miss_free.php', 'str_replace_miss delta='],
             'str_replace_local' => ['test/repro/issue_36388_str_replace_local_free.php', 'str_replace_local delta='],
+            'str_pad_local' => ['test/repro/issue_36388_str_pad_local_free.php', 'str_pad_local delta='],
+            'str_pad_lit' => ['test/repro/issue_36388_str_pad_lit_free.php', 'str_pad_lit delta='],
+            'str_pad_sides' => ['test/repro/issue_36388_str_pad_sides_free.php', 'str_pad_sides delta='],
             'dead_inplace_concat' => ['test/repro/issue_36388_dead_inplace_concat_free.php', 'dead_inplace_concat delta='],
         ];
     }
