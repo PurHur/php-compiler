@@ -136,9 +136,10 @@ final class JitPow
      * Integer ** via MathFpow — avoids broken __phpc_pow_int on boxed operands (#35978).
      *
      * Compile-time exponent {@code 0} → {@code 1}, {@code 1} → identity,
-     * {@code 2} → {@code base * base}, and {@code 3} → {@code base^3} with
-     * chained smul overflow→float omit {@code llvm.pow.f64} (#36386; php-src
-     * {@code pow_function} / {@code zend_pow} / {@code mul_function}).
+     * {@code 2} → {@code base * base}, {@code 3} → {@code base^3}, and
+     * {@code 4} → {@code (base*base)^2} with chained smul overflow→float omit
+     * {@code llvm.pow.f64} (#36386; php-src {@code pow_function} /
+     * {@code zend_pow} / {@code mul_function}).
      */
     private static function emitIntegerPowViaMathFpow(
         Context $context,
@@ -224,6 +225,55 @@ final class JitPow
                 OpCode::TYPE_MUL,
                 $sqLong,
                 $n,
+                $slotPtr
+            );
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($doneBlock);
+
+            return;
+        }
+        if ('fourth' === $expFold) {
+            // (n*n)*(n*n): first smul n*n; on overflow finish sqF*sqF in float;
+            // else smul sq*sq (overflow→float via writeBoxedBinary).
+            $baseL = JitLongArg::lower($context, $base, 'pow() base');
+            $i64 = $context->getTypeFromString('int64');
+            $n = $context->builder->intCast($baseL, $i64);
+            $sqVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $n,
+                $n
+            );
+            $ov1 = $sqVar->longArithOverflowFlag;
+            if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **4 expected smul overflow metadata');
+            }
+            $sqLong = JITVariable::KIND_VARIABLE === $sqVar->kind
+                ? $context->builder->load($sqVar->value)
+                : $sqVar->value;
+            $ovBlock = BasicBlockHelper::append($context, 'pow_fourth_sq_ov');
+            $okBlock = BasicBlockHelper::append($context, 'pow_fourth_sq_ok');
+            $doneBlock = BasicBlockHelper::append($context, 'pow_fourth_done');
+            $context->builder->branchIf($ov1, $ovBlock, $okBlock);
+
+            $context->builder->positionAtEnd($ovBlock);
+            $sqF = $context->builder->load($sqVar->longArithOverflowDoubleSlot);
+            $fourthF = $context->builder->fmul($sqF, $sqF);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $fourthF
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($okBlock);
+            JitLongArithOverflow::writeBoxedBinary(
+                $context,
+                OpCode::TYPE_MUL,
+                $sqLong,
+                $sqLong,
                 $slotPtr
             );
             $context->builder->branch($doneBlock);
