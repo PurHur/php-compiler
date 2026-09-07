@@ -133,6 +133,8 @@ trait CompileFuncCallExecNoreturn
                     );
                     if (!\PHPCompiler\JIT\DiscardedPureCallElision::tryElide($this->context, $this->context->scope->toCall, $callArgs)) {
                         $this->invokeJitCall($this->context->scope->toCall, $callArgs);
+                        // Discarded return — do not leave overflowable abs metadata for the next call.
+                        $this->context->overflowableInternalCallResult = null;
                     }
                     $this->markByRefOutParamsAssignedAfterCall(
                         $this->context->scope->toCall,

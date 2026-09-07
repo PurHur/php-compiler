@@ -451,6 +451,13 @@ class Context {
     /** When true, pow() lowering returns a boxed {@see __value__*} (power operator **). */
     public bool $powReturnValueBox = false;
 
+    /**
+     * Overflowable native-long result from an Internal::call (e.g. typed abs with
+     * PHP_INT_MIN → double). {@see Concern\CallResultOperandAssign} consumes this
+     * so the call operand keeps promote metadata (#36386).
+     */
+    public ?Variable $overflowableInternalCallResult = null;
+
     /** Link-time source bytes for runtime_trivial_echo.php (M3 emit-helper #2559). */
     public ?string $m3EmitTuTrivialEchoSource = null;
 

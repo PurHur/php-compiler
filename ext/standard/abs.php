@@ -78,9 +78,18 @@ final class abs extends Internal
             if (\PHP_INT_MIN === $constLong) {
                 return $context->getTypeFromString('double')->constReal(-(float) $constLong);
             }
-            $v = JitLongArg::lower($context, $args[0], 'abs() argument #1');
+            // Compile-time long ≠ INT_MIN — fold / bare select (skip INT_MIN promote).
+            if (null !== $constLong) {
+                $folded = $constLong < 0 ? -$constLong : $constLong;
 
-            return MathAbs::invokeLong($context, $v);
+                return $context->constantFromInteger($folded, 'int64');
+            }
+            $v = JitLongArg::lower($context, $args[0], 'abs() argument #1');
+            // Runtime typed int: PHP_INT_MIN → double (php-src math.c); peer unary −.
+            $okVar = MathAbs::invokeLongWithIntMinPromote($context, $v);
+            $context->overflowableInternalCallResult = $okVar;
+
+            return $okVar->value;
         }
         // Boxed long from overflow-checked +/* (#31964) must stay int unless ZEND_LONG_MIN
         // (php-src math.c PHP_FUNCTION(abs)). lowerToDouble made abs(PHP_INT_MIN+1) a float (#32309).
