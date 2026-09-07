@@ -669,6 +669,19 @@ restart:
                             );
                             goto return_long;
                         }
+                        // Same-operand $n+$n → shl 1 + ashr overflow (peer * 2; #36386).
+                        $sameAdd = DiscardedPureCallElision::nativeLongArithSameOperandFold(
+                            $opcode->type,
+                            $left,
+                            $right
+                        );
+                        if ('shl1' === $sameAdd) {
+                            return JitLongArithOverflow::binaryNativeLongMulPow2Shl(
+                                $this->context,
+                                $leftValue,
+                                1
+                            );
+                        }
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
                         $skipOv = JitLongArithOverflow::canSkipOverflowPromote(
                             $this->context,
