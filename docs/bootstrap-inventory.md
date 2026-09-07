@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8438 |
-| Phase A inventory files (M2 ratio SSOT) | 8438 |
+| PHP files on vm.php path | 8439 |
+| Phase A inventory files (M2 ratio SSOT) | 8439 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26500 |
+| Source constructs flagged (warnings) | 26502 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7560,7 +7560,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/TraitMethodFunctionStatic.php` | 0 | 4 |
 | `lib/TryCatchElseSyntaxRejector.php` | 0 | 2 |
 | `lib/TypedFunctionStaticSyntaxRejector.php` | 0 | 2 |
-| `lib/VM.php` | 0 | 72 |
+| `lib/VM.php` | 0 | 64 |
 | `lib/VM/AbstractPropertyHookCheck.php` | 0 | 1 |
 | `lib/VM/ArrayAccessDimension.php` | 0 | 3 |
 | `lib/VM/ArrayObjectJitHelper.php` | 0 | 23 |
@@ -8079,6 +8079,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/Concern/IncludePathAndClassPseudoConst.php` | 0 | 3 |
 | `lib/VM/Concern/InheritanceFinalVarianceAndConstFetch.php` | 0 | 12 |
 | `lib/VM/Concern/InternalHandlerExecuteAndAssignCopy.php` | 0 | 3 |
+| `lib/VM/Concern/IteratorToArrayConvert.php` | 0 | 10 |
 | `lib/VM/Concern/MethodCallAndStaticCallableInit.php` | 0 | 7 |
 | `lib/VM/Concern/ObjectPropertyCollectAndSerialize.php` | 0 | 25 |
 | `lib/VM/Concern/ObjectPropertyHooks.php` | 0 | 35 |
@@ -62143,77 +62144,69 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 262)
-- new HashTable (line 350)
-- new Variable (line 357)
-- new Variable (line 375)
-- new HashTable (line 423)
-- new Variable (line 426)
-- new HashTable (line 436)
-- new Variable (line 446)
-- new Variable (line 483)
-- new ObjectEntry (line 550)
-- new Variable (line 559)
-- new Variable (line 588)
-- new VM\GeneratorUncaughtThrow (line 603)
-- new VM\FiberUncaughtThrow (line 617)
-- new VM\DestructorThrowCatchSignal (line 622)
-- new Variable (line 745)
-- new Variable (line 765)
-- new Variable (line 839)
-- new Variable (line 1093)
-- new Variable (line 1209)
-- new Variable (line 1264)
-- new Variable (line 1280)
-- new Error (line 1400)
-- new HashTable (line 1485)
-- new Variable (line 1528)
-- new Variable (line 1530)
-- new VM\ArrayAccessDimension (line 1532)
-- new Variable (line 1555)
-- new Variable (line 1605)
-- new Variable (line 1617)
-- new Variable (line 1725)
-- new VM\ArrayAccessDimension (line 1726)
-- new Variable (line 1729)
-- new Variable (line 2249)
-- new Func\PHP (line 3444)
-- new ClosureState (line 3456)
-- new Variable (line 3491)
-- new CompileError (line 3584)
-- new Func\PHP (line 3594)
-- new Variable (line 3860)
-- new Variable (line 3869)
-- new GeneratorState (line 3944)
-- new Variable (line 4330)
-- new VM\ClassEntry (line 4486)
-- new ClassEntry (line 4522)
-- new Variable (line 4536)
-- new Variable (line 4539)
-- new ClassEntry (line 4577)
-- new CompileError (line 4622)
-- new ClassEntry (line 4649)
-- new CompileError (line 4714)
-- new ObjectEntry (line 4853)
-- new Variable (line 5197)
-- new Variable (line 5229)
-- new Variable (line 5365)
-- new Variable (line 5480)
-- new Variable (line 5523)
-- new Variable (line 5795)
-- new Variable (line 5906)
-- new ParseError (line 6160)
-- new WeakMapIterator (line 6403)
-- new ObjectPropertyIterator (line 6408)
-- new Variable (line 6663)
-- new Error (line 7266)
-- new ClassEntry (line 7302)
-- new Variable (line 7303)
-- new VM\ClassProperty (line 7304)
-- new ObjectEntry (line 7307)
-- new Variable (line 7310)
-- new Variable (line 7405)
-- 47 class method(s)
+- new Variable (line 263)
+- new ObjectEntry (line 387)
+- new Variable (line 396)
+- new Variable (line 425)
+- new VM\GeneratorUncaughtThrow (line 440)
+- new VM\FiberUncaughtThrow (line 454)
+- new VM\DestructorThrowCatchSignal (line 459)
+- new Variable (line 582)
+- new Variable (line 602)
+- new Variable (line 676)
+- new Variable (line 930)
+- new Variable (line 1046)
+- new Variable (line 1101)
+- new Variable (line 1117)
+- new Error (line 1237)
+- new HashTable (line 1322)
+- new Variable (line 1365)
+- new Variable (line 1367)
+- new VM\ArrayAccessDimension (line 1369)
+- new Variable (line 1392)
+- new Variable (line 1442)
+- new Variable (line 1454)
+- new Variable (line 1562)
+- new VM\ArrayAccessDimension (line 1563)
+- new Variable (line 1566)
+- new Variable (line 2086)
+- new Func\PHP (line 3281)
+- new ClosureState (line 3293)
+- new Variable (line 3328)
+- new CompileError (line 3421)
+- new Func\PHP (line 3431)
+- new Variable (line 3697)
+- new Variable (line 3706)
+- new GeneratorState (line 3781)
+- new Variable (line 4167)
+- new VM\ClassEntry (line 4323)
+- new ClassEntry (line 4359)
+- new Variable (line 4373)
+- new Variable (line 4376)
+- new ClassEntry (line 4414)
+- new CompileError (line 4459)
+- new ClassEntry (line 4486)
+- new CompileError (line 4551)
+- new ObjectEntry (line 4690)
+- new Variable (line 5034)
+- new Variable (line 5066)
+- new Variable (line 5202)
+- new Variable (line 5317)
+- new Variable (line 5360)
+- new Variable (line 5632)
+- new Variable (line 5743)
+- new ParseError (line 5997)
+- new WeakMapIterator (line 6240)
+- new ObjectPropertyIterator (line 6245)
+- new Variable (line 6500)
+- new Error (line 7103)
+- new ClassEntry (line 7139)
+- new Variable (line 7140)
+- new VM\ClassProperty (line 7141)
+- new ObjectEntry (line 7144)
+- new Variable (line 7147)
+- new Variable (line 7242)
+- 42 class method(s)
 - 3 closure(s)
 
 ### `lib/VM/AbstractPropertyHookCheck.php`
@@ -65864,6 +65857,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - trait InternalHandlerExecuteAndAssignCopy (line 22)
 - new Variable (line 31)
 - 2 class method(s)
+
+### `lib/VM/Concern/IteratorToArrayConvert.php`
+
+**Warnings** (review for bootstrap subset):
+- trait IteratorToArrayConvert (line 23)
+- new HashTable (line 37)
+- new Variable (line 44)
+- new Variable (line 62)
+- new HashTable (line 110)
+- new Variable (line 113)
+- new HashTable (line 123)
+- new Variable (line 133)
+- new Variable (line 170)
+- 5 class method(s)
 
 ### `lib/VM/Concern/MethodCallAndStaticCallableInit.php`
 

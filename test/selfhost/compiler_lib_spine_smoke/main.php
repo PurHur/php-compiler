@@ -7806,6 +7806,7 @@ require_once __DIR__.'/../../../lib/VM/Concern/InternalHandlerExecuteAndAssignCo
 require_once __DIR__.'/../../../lib/VM/Concern/ClosureBindAndFunctionStatic.php';
 require_once __DIR__.'/../../../lib/VM/Concern/ClassScopeAndStaticPropertyResolve.php';
 require_once __DIR__.'/../../../lib/VM/Concern/IncludePathAndClassPseudoConst.php';
+require_once __DIR__.'/../../../lib/VM/Concern/IteratorToArrayConvert.php';
 require_once __DIR__.'/../../../lib/VM/ObjectPropertyIterator.php';
 require_once __DIR__.'/../../../lib/VM/ObjectReadonlySupport.php';
 require_once __DIR__.'/../../../lib/VM/ObjectRegistry.php';

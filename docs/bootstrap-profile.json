@@ -6449,6 +6449,7 @@
         "lib/JIT/Builtin/StatPathRuntime.php",
         "lib/JIT/Builtin/Stats.php",
         "lib/JIT/Builtin/StatsJit.php",
+        "lib/JIT/Builtin/StrPadRuntime.php",
         "lib/JIT/Builtin/StrReplaceRuntime.php",
         "lib/JIT/Builtin/StreamBucket.php",
         "lib/JIT/Builtin/StreamBuffer.php",
@@ -7250,6 +7251,7 @@
         "lib/JIT/CompileCacheArtifactPersist.php",
         "lib/JIT/CompileCacheEditScaffold.php",
         "lib/JIT/CompileCachePartialEmitDemote.php",
+        "lib/JIT/CompileCacheProjectIndex.php",
         "lib/JIT/CompileCacheSemanticHash.php",
         "lib/JIT/CompilerOperandChainNative.php",
         "lib/JIT/Concern/AdaptByRefCallArgs.php",
@@ -8173,6 +8175,7 @@
         "lib/VM/Concern/IncludePathAndClassPseudoConst.php",
         "lib/VM/Concern/InheritanceFinalVarianceAndConstFetch.php",
         "lib/VM/Concern/InternalHandlerExecuteAndAssignCopy.php",
+        "lib/VM/Concern/IteratorToArrayConvert.php",
         "lib/VM/Concern/MethodCallAndStaticCallableInit.php",
         "lib/VM/Concern/ObjectPropertyCollectAndSerialize.php",
         "lib/VM/Concern/ObjectPropertyHooks.php",
@@ -8670,9 +8673,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8436,
+        "inventory_files": 8439,
         "excluded": 0,
-        "eligible": 8436,
+        "eligible": 8439,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
