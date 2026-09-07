@@ -175,9 +175,12 @@ final class VmUnaryMinus
      * INT_MIN stores f64 into an entry alloca — the box is created only in
      * {@see \PHPCompiler\JIT\JitLongArithOverflow::materializeOverflowableNativeLong}.
      *
-     * @see php-src Zend/zend_operators.c zendi_negate_function
+     * Also used for typed {@code $n * -1} / {@code -1 * $n} (omit
+     * {@code llvm.smul.with.overflow}; peer {@code intdiv($n, -1)}).
+     *
+     * @see php-src Zend/zend_operators.c zendi_negate_function / mul_function
      */
-    private static function negateLongWithIntMinPromote(Context $context, LlvmValue $value): Variable
+    public static function negateLongWithIntMinPromote(Context $context, LlvmValue $value): Variable
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'unary_minus_int_min_cont');
         $i64 = $context->getTypeFromString('int64');

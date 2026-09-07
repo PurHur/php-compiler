@@ -254,9 +254,11 @@ use PHPCompiler\VM\Variable as VmVariable;
  * {@code 0} (peer {@code % -1}; {@see nativeLongModuloDivisorFoldsToZero}).
  * Typed {@code + 0}/{@code - 0}/{@code * 1} are arithmetic identities and
  * {@code * 0} folds to {@code 0} (no {@code add}/{@code sub}/{@code mul};
- * {@see nativeLongArithIsCompileTimeIdentityOrZero}). Remaining compile-time
- * identity/zero operands on typed {@code +}/{@code -}/{@code *} (e.g.
- * {@code * -1} when proven ≠ {@code PHP_INT_MIN}) still skip
+ * {@see nativeLongArithIsCompileTimeIdentityOrZero}). Typed {@code * -1} /
+ * {@code -1 *} lowers to {@code negate} with {@code PHP_INT_MIN} → float
+ * promote (no {@code llvm.smul.with.overflow};
+ * {@see nativeLongMulIsCompileTimeNegOne}). Remaining compile-time
+ * identity/zero operands on typed {@code +}/{@code -}/{@code *} still skip
  * {@code llvm.s{add,sub,mul}.with.overflow}
  * ({@see \PHPCompiler\JIT\JitLongArithOverflow::canSkipOverflowPromote}).
  * Proven-safe {@code str_increment}/
@@ -4183,14 +4185,42 @@ final class DiscardedPureCallElision
     }
 
     /**
+     * Typed native-long {@code *} with a compile-time {@code -1} operand is
+     * {@code zendi_negate_function} — emit {@code negate} of the other operand
+     * (no {@code llvm.smul.with.overflow}). Callers still promote
+     * {@code PHP_INT_MIN} → float unless
+     * {@see \PHPCompiler\JIT\JitLongArithOverflow::canSkipOverflowPromote}
+     * proves safe (peer {@code intdiv($n, -1)} / unary −).
+     *
+     * php-src: Zend/zend_operators.c mul_function / zendi_negate_function.
+     *
+     * @return 'left'|'right'|null which operand to negate, or null when not {@code * -1}
+     */
+    public static function nativeLongMulIsCompileTimeNegOne(
+        Variable $left,
+        Variable $right
+    ): ?string {
+        $a = self::compileTimeLongScalar($left);
+        $b = self::compileTimeLongScalar($right);
+        if (-1 === $a) {
+            return 'right';
+        }
+        if (-1 === $b) {
+            return 'left';
+        }
+
+        return null;
+    }
+
+    /**
      * Typed native-long {@code +}/{@code -}/{@code *} identity / zero when one
      * operand is a compile-time long that does not change the other (or forces
      * zero):
      * {@code + 0}, {@code - 0}, {@code * 1} (and mirrored {@code 0 +}/{@code 1 *}),
      * and {@code * 0} → constant {@code 0}.
      * Emit the kept operand / {@code 0} (no {@code add}/{@code sub}/{@code mul},
-     * no overflow intrinsic). {@code 0 - $n} is not identity; {@code * -1} stays
-     * on the bare-mul overflow-skip path ({@see canSkipOverflowPromote}).
+     * no overflow intrinsic). {@code 0 - $n} is not identity; {@code * -1} uses
+     * {@see nativeLongMulIsCompileTimeNegOne} → negate.
      *
      * php-src: Zend/zend_operators.c add/sub/mul_function after convert_to_long;
      * {@code ZEND_SIGNED_*_OVERFLOW} is a no-op for these shapes.
