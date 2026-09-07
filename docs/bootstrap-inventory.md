@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8370 |
-| Phase A inventory files (M2 ratio SSOT) | 8370 |
+| PHP files on vm.php path | 8371 |
+| Phase A inventory files (M2 ratio SSOT) | 8371 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26354 |
+| Source constructs flagged (warnings) | 26356 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5567,13 +5567,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/ArrayPadUnpackExtractAndDateSunCallArgSends.php` | 0 | 12 |
 | `lib/Compiler/Concern/CallAndArrayLiteralCompile.php` | 0 | 20 |
 | `lib/Compiler/Concern/CallArgCompileTimeValueAndProcOpenFold.php` | 0 | 8 |
+| `lib/Compiler/Concern/CallArgEarlyFastPathAndMixedPropertyFetchSends.php` | 0 | 9 |
 | `lib/Compiler/Concern/CfgProducerIndexAndRematerialize.php` | 0 | 2 |
 | `lib/Compiler/Concern/CfgTypeShapeAndDeclaredAssert.php` | 0 | 11 |
 | `lib/Compiler/Concern/ClassLikeAndStmtCompile.php` | 0 | 1 |
 | `lib/Compiler/Concern/CoalesceAndNullsafe.php` | 0 | 17 |
 | `lib/Compiler/Concern/CoalesceLeftAndEchoConcatPreludes.php` | 0 | 9 |
 | `lib/Compiler/Concern/CompileAnonymousFunctionGeneratorAndNever.php` | 0 | 5 |
-| `lib/Compiler/Concern/CompileCallArgSends.php` | 0 | 59 |
+| `lib/Compiler/Concern/CompileCallArgSends.php` | 0 | 52 |
 | `lib/Compiler/Concern/CompileClassBodyAndTraitAdaptations.php` | 0 | 9 |
 | `lib/Compiler/Concern/CompileClassConstFoldAndTypedReject.php` | 0 | 15 |
 | `lib/Compiler/Concern/CompileClassLikeDeclAndScope.php` | 0 | 8 |
@@ -49159,13 +49160,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 964)
-- new CompileFatal (line 998)
-- new CompileError (line 1001)
-- new ClassCompileRegistry (line 1042)
-- new AttributeClassRegistry (line 1043)
-- new ClassCompileRegistry (line 1151)
-- new AttributeClassRegistry (line 1152)
+- new CompileFatal (line 967)
+- new CompileFatal (line 1001)
+- new CompileError (line 1004)
+- new ClassCompileRegistry (line 1045)
+- new AttributeClassRegistry (line 1046)
+- new ClassCompileRegistry (line 1154)
+- new AttributeClassRegistry (line 1155)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -49340,6 +49341,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 9 class method(s)
 - 3 closure(s)
 
+### `lib/Compiler/Concern/CallArgEarlyFastPathAndMixedPropertyFetchSends.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CallArgEarlyFastPathAndMixedPropertyFetchSends (line 25)
+- new OpCode (line 65)
+- new OpCode (line 108)
+- new OpCode (line 129)
+- new OpCode (line 151)
+- new OpCode (line 186)
+- new OpCode (line 249)
+- new OpCode (line 543)
+- 1 class method(s)
+
 ### `lib/Compiler/Concern/CfgProducerIndexAndRematerialize.php`
 
 **Warnings** (review for bootstrap subset):
@@ -49413,62 +49427,55 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - trait CompileCallArgSends (line 34)
-- new OpCode (line 163)
-- new OpCode (line 207)
-- new OpCode (line 229)
-- new OpCode (line 252)
-- new OpCode (line 288)
-- new OpCode (line 352)
-- new OpCode (line 647)
-- new OpCode (line 671)
-- new OpCode (line 704)
-- new OpCode (line 772)
-- new OpCode (line 802)
-- new OpCode (line 833)
-- new OpCode (line 881)
-- new OpCode (line 898)
-- new OpCode (line 917)
-- new OpCode (line 937)
+- new OpCode (line 166)
+- new OpCode (line 199)
+- new OpCode (line 267)
+- new OpCode (line 297)
+- new OpCode (line 328)
+- new OpCode (line 376)
+- new OpCode (line 393)
+- new OpCode (line 412)
+- new OpCode (line 432)
+- new OpCode (line 446)
+- new Operand\Temporary (line 468)
+- new OpCode (line 502)
+- new OpCode (line 539)
+- new Operand\Temporary (line 543)
+- new OpCode (line 559)
+- new OpCode (line 605)
+- new OpCode (line 660)
+- new OpCode (line 676)
+- new OpCode (line 700)
+- new OpCode (line 717)
+- new OpCode (line 731)
+- new OpCode (line 753)
+- new OpCode (line 775)
+- new OpCode (line 784)
+- new OpCode (line 804)
+- new OpCode (line 903)
+- new OpCode (line 916)
+- new OpCode (line 929)
+- new OpCode (line 934)
 - new OpCode (line 951)
-- new Operand\Temporary (line 973)
-- new OpCode (line 1007)
-- new OpCode (line 1044)
-- new Operand\Temporary (line 1048)
-- new OpCode (line 1064)
-- new OpCode (line 1110)
-- new OpCode (line 1165)
-- new OpCode (line 1181)
-- new OpCode (line 1205)
-- new OpCode (line 1222)
-- new OpCode (line 1236)
-- new OpCode (line 1258)
-- new OpCode (line 1280)
-- new OpCode (line 1289)
+- new OpCode (line 997)
+- new OpCode (line 1046)
+- new OpCode (line 1169)
+- new OpCode (line 1208)
 - new OpCode (line 1309)
-- new OpCode (line 1408)
-- new OpCode (line 1421)
-- new OpCode (line 1434)
-- new OpCode (line 1439)
-- new OpCode (line 1456)
-- new OpCode (line 1502)
-- new OpCode (line 1551)
-- new OpCode (line 1674)
-- new OpCode (line 1713)
-- new OpCode (line 1814)
-- new OpCode (line 1831)
-- new OpCode (line 1866)
-- new OpCode (line 1908)
-- new OpCode (line 2000)
-- new OpCode (line 2054)
-- new OpCode (line 2076)
-- new Operand\Temporary (line 3888)
-- new Operand\Temporary (line 4419)
-- new Operand\Temporary (line 4605)
-- new Operand\Temporary (line 4637)
-- new Operand\Temporary (line 4734)
-- new Operand\Temporary (line 4863)
-- new OpCode (line 4865)
-- new OpCode (line 6521)
+- new OpCode (line 1326)
+- new OpCode (line 1361)
+- new OpCode (line 1403)
+- new OpCode (line 1495)
+- new OpCode (line 1549)
+- new OpCode (line 1571)
+- new Operand\Temporary (line 3383)
+- new Operand\Temporary (line 3914)
+- new Operand\Temporary (line 4100)
+- new Operand\Temporary (line 4132)
+- new Operand\Temporary (line 4229)
+- new Operand\Temporary (line 4358)
+- new OpCode (line 4360)
+- new OpCode (line 6016)
 - 1 class method(s)
 - 5 closure(s)
 

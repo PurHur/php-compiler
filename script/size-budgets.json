@@ -4,9 +4,9 @@
     "done_when_ceiling": 25000,
     "files": {
         "lib/Compiler.php": {
-            "budget": 1193,
+            "budget": 1196,
             "target": 20000,
-            "note": "Concern trait splits (#36230/#36387/#36403); TernaryNullableParamNullAndUnpackHelpers + PrecedingInlineLeadingCallbackAndHaystackProducers + peers"
+            "note": "Concern trait splits (#36230/#36387/#36403); CallArgEarlyFastPathAndMixedPropertyFetchSends + TernaryNullableParamNullAndUnpackHelpers + peers"
         },
         "lib/JIT.php": {
             "budget": 274,
