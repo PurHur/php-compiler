@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 8413 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26452 |
+| Source constructs flagged (warnings) | 26453 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7333,7 +7333,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/JitIncDec.php` | 0 | 6 |
 | `lib/JIT/JitIterableArg.php` | 0 | 2 |
 | `lib/JIT/JitLongArg.php` | 0 | 1 |
-| `lib/JIT/JitLongArithOverflow.php` | 0 | 6 |
+| `lib/JIT/JitLongArithOverflow.php` | 0 | 7 |
 | `lib/JIT/JitLongDiv.php` | 0 | 5 |
 | `lib/JIT/JitMemoryUsageArg.php` | 0 | 1 |
 | `lib/JIT/JitNativeMethodReturn.php` | 0 | 1 |
@@ -59811,7 +59811,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/DiscardedPureCallElision.php`
 
 **Warnings** (review for bootstrap subset):
-- 159 class method(s)
+- 161 class method(s)
 
 ### `lib/JIT/DnfParamCheck.php`
 
@@ -60353,17 +60353,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 253)
 - new Variable (line 257)
 - new Variable (line 259)
-- new Variable (line 2777)
-- new Variable (line 2781)
-- new Variable (line 3017)
-- new Variable (line 3029)
-- new Variable (line 3179)
-- new Variable (line 3270)
-- new Variable (line 3324)
-- new Variable (line 3566)
+- new Variable (line 2793)
+- new Variable (line 2797)
+- new Variable (line 3033)
+- new Variable (line 3045)
+- new Variable (line 3195)
+- new Variable (line 3286)
+- new Variable (line 3340)
 - new Variable (line 3582)
-- new Variable (line 3604)
-- new Variable (line 3615)
+- new Variable (line 3598)
+- new Variable (line 3620)
+- new Variable (line 3631)
 - 24 class method(s)
 - 8 closure(s)
 
@@ -60560,10 +60560,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Variable (line 45)
 - new Variable (line 53)
-- new Variable (line 140)
-- new Variable (line 169)
-- new Variable (line 244)
-- 11 class method(s)
+- new Variable (line 152)
+- new Variable (line 198)
+- new Variable (line 227)
+- new Variable (line 302)
+- 12 class method(s)
 
 ### `lib/JIT/JitLongDiv.php`
 

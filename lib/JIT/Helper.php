@@ -616,6 +616,22 @@ restart:
 
                             return VmUnaryMinus::negateLongWithIntMinPromote($this->context, $src);
                         }
+                        // Compile-time * 2^k → shl + ashr overflow (peer * −1; #36386).
+                        $pow2 = DiscardedPureCallElision::nativeLongMulCompileTimePowerOfTwoShift(
+                            $left,
+                            $right
+                        );
+                        if (null !== $pow2) {
+                            $src = 'left' === $pow2['side']
+                                ? $leftValue
+                                : $this->context->builder->intCast($rightValue, $leftValue->typeOf());
+
+                            return JitLongArithOverflow::binaryNativeLongMulPow2Shl(
+                                $this->context,
+                                $src,
+                                $pow2['shift']
+                            );
+                        }
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
                         $skipOv = JitLongArithOverflow::canSkipOverflowPromote(
                             $this->context,

@@ -99,6 +99,64 @@ final class JitLongArithOverflow
     }
 
     /**
+     * Typed native-long {@code * 2^k} ({@code k} in 1..62): {@code shl} hot path
+     * with {@code ashr} round-trip overflow → double (#36386).
+     *
+     * Omits {@code llvm.smul.with.overflow.i64} when the factor is a compile-time
+     * positive power of two (peer {@code * -1} negate / {@code * 1} identity).
+     * Overflow flag is {@code ashr(shl(src,k),k) ≠ src} — equivalent to
+     * {@code ZEND_LONG_MUL_OVERFLOW} for {@code 2^k}.
+     *
+     * @see php-src Zend/zend_operators.c mul_function
+     */
+    public static function binaryNativeLongMulPow2Shl(
+        Context $context,
+        LlvmValue $src,
+        int $shift
+    ): Variable {
+        if ($shift < 1 || $shift > 62) {
+            throw new \InvalidArgumentException('mul pow2 shl shift must be in 1..62, got '.$shift);
+        }
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'native_long_mul_pow2_cont');
+        $i64 = $context->getTypeFromString('int64');
+        $f64 = $context->getTypeFromString('double');
+        $a = $context->builder->intCast($src, $i64);
+        $k = $i64->constInt($shift, false);
+        $factor = $i64->constInt(1 << $shift, false);
+        $lres = $context->builder->shl($a, $k);
+        $restored = $context->builder->aShr($lres, $k);
+        $overflow = $context->builder->icmp(\PHPLLVM\Builder::INT_NE, $restored, $a);
+
+        $doubleSlot = BasicBlockHelper::entryAlloca($context, $f64);
+
+        $ovBlock = BasicBlockHelper::append($context, 'native_long_mul_pow2_ov');
+        $okBlock = BasicBlockHelper::append($context, 'native_long_mul_pow2_ok');
+        $doneBlock = BasicBlockHelper::append($context, 'native_long_mul_pow2_done');
+        $context->builder->branchIf($overflow, $ovBlock, $okBlock);
+
+        $context->builder->positionAtEnd($ovBlock);
+        $ad = $context->builder->siToFp($a, $f64);
+        $bd = $context->builder->siToFp($factor, $f64);
+        $fd = $context->builder->fmul($ad, $bd);
+        $context->builder->store($fd, $doubleSlot);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $mergedLong = $context->builder->phi($i64);
+        $mergedLong->addIncoming($lres, $okBlock);
+        $mergedLong->addIncoming($i64->constInt(0, false), $ovBlock);
+
+        $okVar = new Variable($context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $mergedLong);
+        $okVar->longArithOverflowFlag = $overflow;
+        $okVar->longArithOverflowDoubleSlot = $doubleSlot;
+
+        return $okVar;
+    }
+
+    /**
      * Native long ⊙ native long with overflow → double (#31964).
      *
      * Hot path stays {@see Variable::TYPE_NATIVE_LONG} (no {@code __value__} box) per #36189;
