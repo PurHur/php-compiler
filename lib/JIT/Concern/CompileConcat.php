@@ -298,6 +298,11 @@ trait CompileConcat
                         Variable::KIND_VARIABLE,
                         $slot
                     );
+                    // Unnamed CONCAT Temporary used as array key / dim must be released
+                    // after HT `__string__separate` (#36388 concat-key leak).
+                    if ($destOp instanceof \PHPCfg\Operand\Temporary) {
+                        $promoted->ephemeralConcatTemp = true;
+                    }
                     // Seed at function entry — not at the CONCAT site (may be a loop body) (#22845).
                     if (null !== $result->value) {
                         \PHPCompiler\JIT\BasicBlockHelper::storeAtFunctionEntry(
@@ -403,12 +408,15 @@ trait CompileConcat
                         // __string__realloc to store the moved pointer back into the
                         // `__string__**` slot (fixed this PR) — previously corrupted after
                         // the first geometric grow past the 32-byte initial cap.
+                        $rightIn = $right;
                         $rightCoerced = \PHPCompiler\JIT\JitNativeString::coerce(
                             $this->context,
                             $right,
                             $block->getOperand($op->arg3)
                         );
                         $this->context->type->string->appendInPlace($promoted, $rightCoerced);
+                        $rightLoaded = $this->context->helper->loadValue($rightCoerced);
+                        $this->releaseCoercedConcatOperandIfNew($rightIn, $rightCoerced, $rightLoaded);
                         $newStr = $this->context->builder->load($destSlot);
                         $newVal = new Variable(
                             $this->context,
@@ -494,6 +502,10 @@ trait CompileConcat
                             Variable::KIND_VARIABLE,
                             $destSlot
                         );
+                        // Unnamed CONCAT Temporary → array key must be freed after HT insert (#36388).
+                        if ($destOp instanceof \PHPCfg\Operand\Temporary) {
+                            $promoted->ephemeralConcatTemp = true;
+                        }
                         // Seed at entry so loop-carried CONCAT does not reset (#22845).
                         $seed = null !== $result->value
                             && Variable::KIND_VALUE === $result->kind
@@ -518,26 +530,39 @@ trait CompileConcat
                         // buffer into a script-global box. Without dropping that alias,
                         // __ref__separate COWs the whole string on every .= (#36386).
                         $this->dropMainScriptStringAliasIfSame($block, $destOp, $destSlot);
+                        $rightIn = $right;
                         $rightCoerced = \PHPCompiler\JIT\JitNativeString::coerce(
                             $this->context,
                             $right,
                             $block->getOperand($op->arg3)
                         );
                         $this->context->type->string->appendInPlace($result, $rightCoerced);
+                        $rightLoaded = $this->context->helper->loadValue($rightCoerced);
+                        $this->releaseCoercedConcatOperandIfNew($rightIn, $rightCoerced, $rightLoaded);
                         $newStr = $this->context->builder->load($destSlot);
                     } else {
-                        $leftVar = $this->context->helper->loadValue(
-                            \PHPCompiler\JIT\JitNativeString::coerce($this->context, $left, $block->getOperand($op->arg2))
+                        $leftIn = $left;
+                        $rightIn = $right;
+                        $leftCoerced = \PHPCompiler\JIT\JitNativeString::coerce(
+                            $this->context,
+                            $left,
+                            $block->getOperand($op->arg2)
                         );
-                        $rightVar = $this->context->helper->loadValue(
-                            \PHPCompiler\JIT\JitNativeString::coerce($this->context, $right, $block->getOperand($op->arg3))
+                        $rightCoerced = \PHPCompiler\JIT\JitNativeString::coerce(
+                            $this->context,
+                            $right,
+                            $block->getOperand($op->arg3)
                         );
+                        $leftVar = $this->context->helper->loadValue($leftCoerced);
+                        $rightVar = $this->context->helper->loadValue($rightCoerced);
                         $newStr = \PHPCompiler\ext\standard\JitStringConcat::concat(
                             $this->context,
                             $leftVar,
                             $rightVar
                         );
                         $this->context->builder->store($newStr, $destSlot);
+                        $this->releaseCoercedConcatOperandIfNew($leftIn, $leftCoerced, $leftVar);
+                        $this->releaseCoercedConcatOperandIfNew($rightIn, $rightCoerced, $rightVar);
                     }
                     $nativeConcatVal = new Variable(
                         $this->context,
@@ -567,6 +592,13 @@ trait CompileConcat
                     if (null !== $leftResolved && null !== $rightResolved) {
                         $result->compileTimeString = $leftResolved.$rightResolved;
                     }
+                }
+                // Unnamed CONCAT Temporary used as INIT_ARRAY / ASSIGN_DIM key: HT insert
+                // `__string__separate`s a copy — mark so addElement can delref the original (#36388).
+                // Named `$s = $a.$b` must stay non-ephemeral (CV still owns the buffer).
+                if ($destOp instanceof \PHPCfg\Operand\Temporary) {
+                    $result->ephemeralConcatTemp = true;
+                    $this->context->setVariableOp($destOp, $result);
                 }
                 $scopeName = \PHPCompiler\JIT\OperandName::resolve($destOp);
                 if (

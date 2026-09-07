@@ -699,6 +699,8 @@ trait AssignOperand
                 $result->writableStringKey,
                 $value
             );
+            // Ephemeral concat dims: setAtStringKey separate()d a copy; release original (#36388).
+            \PHPCompiler\JIT\HashTableHelper::releaseWritableStringKeyIfEphemeral($this->context, $result);
             $this->syncDimWriteOrphanValueBox($result, $value);
 
             return;
@@ -1379,6 +1381,7 @@ trait AssignOperand
                             $result->writableStringKey,
                             $this->context->helper->loadValue($value)
                         );
+                        \PHPCompiler\JIT\HashTableHelper::releaseWritableStringKeyIfEphemeral($this->context, $result);
 
                         return;
                     }
@@ -1430,6 +1433,7 @@ trait AssignOperand
                                 $this->context->getTypeFromString('int1')
                             )
                         );
+                        \PHPCompiler\JIT\HashTableHelper::releaseWritableStringKeyIfEphemeral($this->context, $result);
 
                         return;
                     }
@@ -1476,6 +1480,7 @@ trait AssignOperand
                             $result->writableStringKey,
                             $owned
                         );
+                        \PHPCompiler\JIT\HashTableHelper::releaseWritableStringKeyIfEphemeral($this->context, $result);
 
                         return;
                     }
