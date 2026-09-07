@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8396 |
-| Phase A inventory files (M2 ratio SSOT) | 8396 |
+| PHP files on vm.php path | 8397 |
+| Phase A inventory files (M2 ratio SSOT) | 8397 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26414 |
+| Source constructs flagged (warnings) | 26417 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5568,6 +5568,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/ArrayPadUnpackExtractAndDateSunCallArgSends.php` | 0 | 12 |
 | `lib/Compiler/Concern/AssignInCallRhsAndDeadInlineNestedFuncCallFeedSlots.php` | 0 | 2 |
 | `lib/Compiler/Concern/CallAndArrayLiteralCompile.php` | 0 | 20 |
+| `lib/Compiler/Concern/CallArgClosureDeadTempNullPreferProducerEvalAndNamedLocalValueSlots.php` | 0 | 2 |
 | `lib/Compiler/Concern/CallArgCompileTimeValueAndProcOpenFold.php` | 0 | 8 |
 | `lib/Compiler/Concern/CallArgDimFetchAndInlineArrayLiteralValueSlotWire.php` | 0 | 2 |
 | `lib/Compiler/Concern/CallArgEarlyFastPathAndMixedPropertyFetchSends.php` | 0 | 9 |
@@ -7412,7 +7413,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/RuntimeParseM5PhpCfgParser.php` | 0 | 2 |
 | `lib/JIT/RuntimePrepareSpineIdentity.php` | 0 | 1 |
 | `lib/JIT/ScalarDimFetchHelper.php` | 0 | 2 |
-| `lib/JIT/ScalarReturnCheck.php` | 0 | 15 |
+| `lib/JIT/ScalarReturnCheck.php` | 0 | 16 |
 | `lib/JIT/ScopeBuiltinDefinedLlvm.php` | 0 | 2 |
 | `lib/JIT/ScopeBuiltinEmitHelper.php` | 0 | 4 |
 | `lib/JIT/ScopeBuiltinHelper.php` | 0 | 1 |
@@ -49191,13 +49192,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 1024)
-- new CompileFatal (line 1058)
-- new CompileError (line 1061)
-- new ClassCompileRegistry (line 1102)
-- new AttributeClassRegistry (line 1103)
-- new ClassCompileRegistry (line 1211)
-- new AttributeClassRegistry (line 1212)
+- new CompileFatal (line 1027)
+- new CompileFatal (line 1061)
+- new CompileError (line 1064)
+- new ClassCompileRegistry (line 1105)
+- new AttributeClassRegistry (line 1106)
+- new ClassCompileRegistry (line 1214)
+- new AttributeClassRegistry (line 1215)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -49365,6 +49366,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new OpCode (line 418)
 - 6 class method(s)
 - 1 closure(s)
+
+### `lib/Compiler/Concern/CallArgClosureDeadTempNullPreferProducerEvalAndNamedLocalValueSlots.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CallArgClosureDeadTempNullPreferProducerEvalAndNamedLocalValueSlots (line 25)
+- 1 class method(s)
 
 ### `lib/Compiler/Concern/CallArgCompileTimeValueAndProcOpenFold.php`
 
@@ -49554,15 +49561,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/CompileCallArgSends.php`
 
 **Warnings** (review for bootstrap subset):
-- trait CompileCallArgSends (line 44)
-- new Operand\Temporary (line 1025)
-- new Operand\Temporary (line 1556)
-- new Operand\Temporary (line 1742)
-- new Operand\Temporary (line 1774)
-- new Operand\Temporary (line 1871)
-- new Operand\Temporary (line 2000)
-- new OpCode (line 2002)
-- new OpCode (line 3658)
+- trait CompileCallArgSends (line 46)
+- new Operand\Temporary (line 688)
+- new Operand\Temporary (line 1219)
+- new Operand\Temporary (line 1405)
+- new Operand\Temporary (line 1437)
+- new Operand\Temporary (line 1534)
+- new Operand\Temporary (line 1663)
+- new OpCode (line 1665)
+- new OpCode (line 3321)
 - 1 class method(s)
 - 3 closure(s)
 
@@ -61053,19 +61060,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 129)
-- new Variable (line 258)
-- new Variable (line 268)
-- new Variable (line 313)
-- new Variable (line 329)
-- new Variable (line 336)
-- new Variable (line 425)
-- new Variable (line 446)
-- new Variable (line 461)
+- new Variable (line 272)
+- new Variable (line 282)
+- new Variable (line 327)
+- new Variable (line 343)
+- new Variable (line 358)
+- new Variable (line 444)
+- new Variable (line 465)
 - new Variable (line 480)
-- new Variable (line 488)
-- new Variable (line 495)
-- new Variable (line 523)
-- new Variable (line 543)
+- new Variable (line 499)
+- new Variable (line 507)
+- new Variable (line 514)
+- new Variable (line 540)
+- new Variable (line 568)
+- new Variable (line 588)
 - 12 class method(s)
 
 ### `lib/JIT/ScopeBuiltinDefinedLlvm.php`
