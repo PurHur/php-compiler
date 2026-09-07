@@ -15,7 +15,8 @@ namespace PHPCompiler\ext\standard;
  * Compile-time places≠0 + known PHP_ROUND_* modes (incl. HALF_UP) scale+unscale
  * through the same places=0 LLVM path ({@see \PHPCompiler\ext\standard\JitRound}).
  * Runtime places + known mode scale via {@code llvm.pow.f64}(10, |places|) (#36386).
- * This helper remains for unknown mode and NestedJIT-safe reference.
+ * Runtime mode selects among places=0 LLVM paths (icmp+select) (#36386).
+ * This helper remains for exotic compile-time mode ints and NestedJIT-safe reference.
  *
  * Same-class only (peer AbsJitHelper). Avoid `\is_finite`/`\floor`/`\ceil`/`\abs`/`\fmod`
  * — NestedJIT re-enters *JitHelper bridges (gdb: isfiniteargv ↔ phpc_is_finite).

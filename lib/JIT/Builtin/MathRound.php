@@ -29,9 +29,10 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * Non-zero places with a compile-time known mode (incl. HALF_UP) scale via
  * {@see \PHPCompiler\ext\standard\JitRound} (no NestedJIT). Runtime places with a
  * known mode scale via {@code llvm.pow.f64}(10, |places|) then places=0 LLVM
- * (#36386). Unknown mode still uses the NestedJIT
- * {@see \PHPCompiler\ext\standard\RoundJitHelper} bridge. SSOT:
- * {@see \PHPCompiler\ext\standard\RoundJitHelper::roundArgv}.
+ * (#36386). Runtime mode selects among places=0 LLVM paths via icmp+select
+ * (default HALF_UP). Exotic compile-time mode ints outside PHP_ROUND_* still
+ * use the NestedJIT {@see \PHPCompiler\ext\standard\RoundJitHelper} bridge.
+ * SSOT: {@see \PHPCompiler\ext\standard\RoundJitHelper::roundArgv}.
  */
 final class MathRound
 {
