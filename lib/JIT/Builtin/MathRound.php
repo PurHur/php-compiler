@@ -26,7 +26,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * Matching php-src {@code ext/standard/math.c} {@code _php_math_round} /
  * {@code php_math_round_mode.h} for those modes.
  *
- * Non-zero places with a compile-time directed mode scale via
+ * Non-zero places with a compile-time known mode (incl. HALF_UP) scale via
  * {@see \PHPCompiler\ext\standard\JitRound} (no NestedJIT). Runtime-unknown
  * places still use the NestedJIT {@see \PHPCompiler\ext\standard\RoundJitHelper}
  * bridge. SSOT: {@see \PHPCompiler\ext\standard\RoundJitHelper::roundArgv}.
