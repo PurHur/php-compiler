@@ -249,8 +249,12 @@ use PHPCompiler\VM\Variable as VmVariable;
  * identity (no {@code sdiv}/{@code srem}/exactness promote;
  * {@see nativeLongDivisorIsCompileTimeOne}). Typed {@code % 1} folds to
  * {@code 0} (peer {@code % -1}; {@see nativeLongModuloDivisorFoldsToZero}).
- * Compile-time identity/zero operands on typed {@code +}/{@code -}/{@code *}
- * skip {@code llvm.s{add,sub,mul}.with.overflow}
+ * Typed {@code + 0}/{@code - 0}/{@code * 1} are arithmetic identities and
+ * {@code * 0} folds to {@code 0} (no {@code add}/{@code sub}/{@code mul};
+ * {@see nativeLongArithIsCompileTimeIdentityOrZero}). Remaining compile-time
+ * identity/zero operands on typed {@code +}/{@code -}/{@code *} (e.g.
+ * {@code * -1} when proven ≠ {@code PHP_INT_MIN}) still skip
+ * {@code llvm.s{add,sub,mul}.with.overflow}
  * ({@see \PHPCompiler\JIT\JitLongArithOverflow::canSkipOverflowPromote}).
  * Proven-safe {@code str_increment}/
  * {@code str_decrement} literals likewise fold at the call site and skip
@@ -4153,6 +4157,64 @@ final class DiscardedPureCallElision
                 return 'right';
             }
             if (-1 === $b) {
+                return 'left';
+            }
+
+            return null;
+        }
+
+        return null;
+    }
+
+    /**
+     * Typed native-long {@code +}/{@code -}/{@code *} identity / zero when one
+     * operand is a compile-time long that does not change the other (or forces
+     * zero):
+     * {@code + 0}, {@code - 0}, {@code * 1} (and mirrored {@code 0 +}/{@code 1 *}),
+     * and {@code * 0} → constant {@code 0}.
+     * Emit the kept operand / {@code 0} (no {@code add}/{@code sub}/{@code mul},
+     * no overflow intrinsic). {@code 0 - $n} is not identity; {@code * -1} stays
+     * on the bare-mul overflow-skip path ({@see canSkipOverflowPromote}).
+     *
+     * php-src: Zend/zend_operators.c add/sub/mul_function after convert_to_long;
+     * {@code ZEND_SIGNED_*_OVERFLOW} is a no-op for these shapes.
+     * Peer {@code / 1} / {@code | 0} / {@code << 0} (#37214 / #37212 / #37208).
+     *
+     * @return 'left'|'right'|'zero'|null which result to emit, or null when not folded
+     */
+    public static function nativeLongArithIsCompileTimeIdentityOrZero(
+        int $opType,
+        Variable $left,
+        Variable $right
+    ): ?string {
+        $a = self::compileTimeLongScalar($left);
+        $b = self::compileTimeLongScalar($right);
+        if (\PHPCompiler\OpCode::TYPE_PLUS === $opType) {
+            if (0 === $a) {
+                return 'right';
+            }
+            if (0 === $b) {
+                return 'left';
+            }
+
+            return null;
+        }
+        if (\PHPCompiler\OpCode::TYPE_MINUS === $opType) {
+            // Only right-hand 0 is identity; {@code 0 - PHP_INT_MIN} overflows.
+            if (0 === $b) {
+                return 'left';
+            }
+
+            return null;
+        }
+        if (\PHPCompiler\OpCode::TYPE_MUL === $opType) {
+            if (0 === $a || 0 === $b) {
+                return 'zero';
+            }
+            if (1 === $a) {
+                return 'right';
+            }
+            if (1 === $b) {
                 return 'left';
             }
 
