@@ -38,14 +38,21 @@ $root = fuzz_repo_root();
 $phpBin = PHP_BINARY !== '' ? PHP_BINARY : 'php';
 
 $original = (string) file_get_contents($in);
-if (!fuzz_oracle_interesting($original, $backend, $root, $phpBin, $timeout)) {
+$originalProbe = fuzz_oracle_probe($original, $backend, $root, $phpBin, $timeout);
+if ($originalProbe === null || !$originalProbe['interesting']) {
     fwrite(STDERR, "fuzz/reduce: input does not reproduce a Zend mismatch/crash under {$backend}\n");
     exit(1);
 }
+$wantSig = $originalProbe['signature'];
 
 $reduced = fuzz_reduce_source(
     $original,
-    static fn (string $src): bool => fuzz_oracle_interesting($src, $backend, $root, $phpBin, $timeout)
+    static function (string $src) use ($backend, $root, $phpBin, $timeout, $wantSig): bool {
+        $probe = fuzz_oracle_probe($src, $backend, $root, $phpBin, $timeout);
+        return $probe !== null
+            && $probe['interesting']
+            && $probe['signature'] === $wantSig;
+    }
 );
 $lineCount = fuzz_count_nonempty_lines($reduced);
 $rawLines = substr_count($reduced, "\n") + (str_ends_with($reduced, "\n") ? 0 : 1);
@@ -64,9 +71,19 @@ if ($out !== null) {
 
 function fuzz_oracle_interesting(string $src, string $backend, string $root, string $phpBin, int $timeout): bool
 {
+    $probe = fuzz_oracle_probe($src, $backend, $root, $phpBin, $timeout);
+
+    return $probe !== null && $probe['interesting'];
+}
+
+/**
+ * @return ?array{interesting: bool, signature: string, kind: string, zend_rc: int, got_rc: int}
+ */
+function fuzz_oracle_probe(string $src, string $backend, string $root, string $phpBin, int $timeout): ?array
+{
     $tmp = tempnam(sys_get_temp_dir(), 'fuzzred');
     if ($tmp === false) {
-        return false;
+        return null;
     }
     $php = $tmp.'.php';
     rename($tmp, $php);
@@ -76,16 +93,17 @@ function fuzz_oracle_interesting(string $src, string $backend, string $root, str
         // Must be valid PHP for Zend.
         [$zendOut, $zendRc, $zendTimed] = fuzz_reduce_run($timeout, [$phpBin, '-l', $php]);
         if ($zendTimed || $zendRc !== 0) {
-            return false;
+            return null;
         }
         [$zendOut, $zendRc, $zendTimed] = fuzz_reduce_run(
             $timeout,
             [$phpBin, '-d', 'error_reporting=-1', '-d', 'display_errors=1', $php]
         );
         if ($zendTimed) {
-            return false;
+            return null;
         }
 
+        $kind = 'vm_diff';
         if ($backend === 'vm') {
             [$gotOut, $gotRc, $gotTimed] = fuzz_reduce_run(
                 $timeout,
@@ -98,20 +116,56 @@ function fuzz_oracle_interesting(string $src, string $backend, string $root, str
                 [$phpBin, $root.'/bin/compile.php', '-o', $bin, $php]
             );
             if ($ctimed || $crc !== 0 || !is_file($bin)) {
-                return true; // compile failure is interesting
+                $sig = fuzz_normalize_signature('aot_crash', $zendRc, $crc, $zendOut, $clog);
+
+                return [
+                    'interesting' => true,
+                    'signature' => $sig,
+                    'kind' => 'aot_crash',
+                    'zend_rc' => $zendRc,
+                    'got_rc' => $crc,
+                ];
             }
             [$gotOut, $gotRc, $gotTimed] = fuzz_reduce_run($timeout, [$bin]);
             @unlink($bin);
+            $kind = 'aot_diff';
         }
 
         if ($gotTimed) {
-            return true;
+            $kind = $backend === 'vm' ? 'vm_timeout' : 'aot_timeout';
+            $sig = fuzz_normalize_signature($kind, $zendRc, 124, $zendOut, $gotOut);
+
+            return [
+                'interesting' => true,
+                'signature' => $sig,
+                'kind' => $kind,
+                'zend_rc' => $zendRc,
+                'got_rc' => 124,
+            ];
         }
         if ($gotRc >= 128 || in_array($gotRc, [134, 139], true)) {
-            return true;
+            $kind = $backend === 'vm' ? 'vm_crash' : 'aot_crash';
+            $sig = fuzz_normalize_signature($kind, $zendRc, $gotRc, $zendOut, $gotOut);
+
+            return [
+                'interesting' => true,
+                'signature' => $sig,
+                'kind' => $kind,
+                'zend_rc' => $zendRc,
+                'got_rc' => $gotRc,
+            ];
         }
 
-        return !($zendOut === $gotOut && $zendRc === $gotRc);
+        $interesting = !($zendOut === $gotOut && $zendRc === $gotRc);
+        $sig = fuzz_normalize_signature($kind, $zendRc, $gotRc, $zendOut, $gotOut);
+
+        return [
+            'interesting' => $interesting,
+            'signature' => $sig,
+            'kind' => $kind,
+            'zend_rc' => $zendRc,
+            'got_rc' => $gotRc,
+        ];
     } finally {
         @unlink($php);
     }

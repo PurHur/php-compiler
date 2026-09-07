@@ -705,13 +705,48 @@ restart:
                     // must not punch through into `$Block['data']['type']` (#36380 Parsedown lists).
                     // Keep write-through for FETCH_DIM_W lvalues, property lvalues, and explicit
                     // PHP references (`$r =& …` / foreach-by-ref — {@see Variable::$phpReference}).
+                    $assignDestSlot = (int) $op->arg2;
+                    $keepWriteThrough = $this->assignDestKeptAsWriteThrough($frame, $assignDestSlot);
                     if (
                         $arg2->isIndirect()
                         && !$arg2->phpReference
                         && !$arg2->propertyAssignLvalue
-                        && !$this->assignDestKeptAsWriteThrough($frame, (int) $op->arg2)
+                        && !$keepWriteThrough
                     ) {
                         $arg2->reset();
+                    }
+                    // Hash-table bucket cells must never be the ASSIGN destination Variable object
+                    // itself unless this is a real FETCH_DIM_W lvalue — multi-arg nested isset
+                    // recycled the `$m[0] = …` write cell as the isset result slot and turned
+                    // `$m[0]` into bool (#36398).
+                    if ($arg2->hashTableBucketCell && !$keepWriteThrough) {
+                        $fresh = new Variable();
+                        $frame->scope[$assignDestSlot] = $fresh;
+                        if ((int) $op->arg1 === $assignDestSlot) {
+                            $arg1 = $fresh;
+                        }
+                        $arg2 = $fresh;
+                    }
+                    // Boolean/null sources are never dim write-backs: always break stale
+                    // indirection before copyFrom write-through (#36398 isset result).
+                    if (null !== $op->arg3) {
+                        $srcPeek = isset($frame->block->constants[$op->arg3])
+                            ? $frame->block->constants[$op->arg3]
+                            : $frame->scope[(int) $op->arg3];
+                        $srcPeek = $srcPeek->resolveIndirect();
+                        if (
+                            (Variable::TYPE_BOOLEAN === $srcPeek->type || Variable::TYPE_NULL === $srcPeek->type)
+                            && $arg2->isIndirect()
+                            && !$arg2->phpReference
+                            && !$arg2->propertyAssignLvalue
+                        ) {
+                            $fresh = new Variable();
+                            $frame->scope[$assignDestSlot] = $fresh;
+                            if ((int) $op->arg1 === $assignDestSlot) {
+                                $arg1 = $fresh;
+                            }
+                            $arg2 = $fresh;
+                        }
                     }
                     if (null !== $op->arg3) {
                         $arg3 = isset($frame->block->constants[$op->arg3])
@@ -5725,7 +5760,20 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_ISSET:
-                    $dst = $frame->scope[$op->arg1];
+                    // Never mutate a hash-table bucket (or a stale FETCH_DIM read indirect)
+                    // in place when materialising the isset bool — slot reuse after
+                    // FETCH_DIM_IS left `$m[0]` as bool true for multi-arg nested isset (#36398 /
+                    // same class as #36380 Parsedown).
+                    $issetDstSlot = (int) $op->arg1;
+                    $dst = $frame->scope[$issetDstSlot];
+                    if (
+                        $dst->hashTableBucketCell
+                        || ($dst->isIndirect() && !$dst->phpReference && !$dst->propertyAssignLvalue)
+                    ) {
+                        $fresh = new Variable();
+                        $frame->scope[$issetDstSlot] = $fresh;
+                        $dst = $fresh;
+                    }
                     if (null === $op->arg3 && $this->isUnboundThisSlot($frame, (int) $op->arg2)) {
                         $dst->bool(false);
                         break;
