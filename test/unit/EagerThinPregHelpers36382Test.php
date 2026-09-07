@@ -38,7 +38,11 @@ final class EagerThinPregHelpers36382Test extends TestCase
     {
         $src = (string) file_get_contents(dirname(__DIR__, 2).'/bin/compile.php');
         $this->assertStringContainsString('$eagerThinPregHelpers = false', $src);
-        $this->assertStringContainsString('$eagerUriComposerHelpers = true', $src);
+        // Composer-sized graphs only — env-forced incremental on 2-file apps must not arm Uri (#36380).
+        $this->assertStringContainsString(
+            '$eagerUriComposerHelpers = $unitCount >= SourceBundler::INCREMENTAL_REQUIRES_UNIT_THRESHOLD',
+            $src
+        );
         $this->assertStringContainsString('UriRawurlencodeReplaceJitHelper', $src);
         // Incremental path must not flip thin-preg on (Uri specialization #36382).
         $this->assertDoesNotMatchRegularExpression(
@@ -48,7 +52,11 @@ final class EagerThinPregHelpers36382Test extends TestCase
         // Eager Uri/ParseUrl is armed on the incremental branch (before the raised-memory if).
         $incPos = strpos($src, 'shouldUseIncrementalRequires($includes)');
         $this->assertNotFalse($incPos);
-        $uriPos = strpos($src, '$eagerUriComposerHelpers = true', $incPos);
+        $uriPos = strpos(
+            $src,
+            '$eagerUriComposerHelpers = $unitCount >= SourceBundler::INCREMENTAL_REQUIRES_UNIT_THRESHOLD',
+            $incPos
+        );
         $elsePos = strpos($src, '} else {', $incPos);
         $this->assertNotFalse($uriPos);
         $this->assertNotFalse($elsePos);

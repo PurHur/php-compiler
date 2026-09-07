@@ -1,5 +1,5 @@
 {
-    "generated_at": "2026-09-04T23:38:55Z",
+    "generated_at": "2026-09-07T08:48:32Z",
     "issue": 36380,
     "packages": [
         {
@@ -16,11 +16,11 @@
                 "reason": null
             },
             "vm": {
-                "status": "ok",
-                "pass": 64,
-                "fail": 0,
+                "status": "fail",
+                "pass": 31,
+                "fail": 33,
                 "skip": 0,
-                "rc": 0,
+                "rc": 1,
                 "reason": null
             },
             "aot": {
@@ -28,12 +28,13 @@
                 "pass": 0,
                 "fail": 0,
                 "skip": 0,
-                "rc": 124,
-                "reason": "phpc_build:_helper-runtime_cache_hit_(17_helpers,_core=1b996aa5c644fbf7d3a2)_(#15889)"
+                "rc": 255,
+                "reason": "aot_compile_oom_4096M_#36387"
             },
             "aot_pass_rate": 0,
             "blockers": [
-                "aot: phpc_build:_helper-runtime_cache_hit_(17_helpers,_core=1b996aa5c644fbf7d3a2)_(#15889)"
+                "vm: 31/64 fixtures (tables/lists/blockquotes diverge from Zend)",
+                "aot: aot_compile_oom_4096M_#36387"
             ],
             "raw_rc": 0
         },

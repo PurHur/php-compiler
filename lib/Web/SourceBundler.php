@@ -55,11 +55,21 @@ final class SourceBundler
      * project graphs. The 1536M CI default OOMs mid-IncludeHelper on Slim (~100 units);
      * LLVM native heap is outside PHP's limit, so Docker should stay ≥10g (#36382).
      *
+     * Also raises when {@see PHP_COMPILER_AOT_INCREMENTAL_INCLUDES} forces incremental
+     * for small graphs (apps corpus / large single libraries like Parsedown, #36380) —
+     * mega-concat is skipped but the 1536M CI default still OOMs mid-Context.
+     *
      * @return string|null Applied limit string, or null when unchanged / below threshold
      */
     public static function ensureIncrementalProjectMemoryFloor(int $unitCount): ?string
     {
-        if ($unitCount < self::INCREMENTAL_REQUIRES_UNIT_THRESHOLD) {
+        $envForced = false;
+        $env = getenv('PHP_COMPILER_AOT_INCREMENTAL_INCLUDES');
+        if (is_string($env) && '' !== $env) {
+            $v = strtolower($env);
+            $envForced = in_array($v, ['1', 'true', 'yes', 'on'], true);
+        }
+        if ($unitCount < self::INCREMENTAL_REQUIRES_UNIT_THRESHOLD && !$envForced) {
             return null;
         }
 

@@ -620,8 +620,10 @@ function run(string $filename, string $code, array $options): void
             // Eager NestedJIT of thin preg here fattens the module before IncludeHelper, so every
             // later method (and Uri itself after parse_url) stalls for minutes on LLVM (#36382).
             // Instead NestedJIT Uri + ParseUrl helpers while the entry is still only require_once.
+            // Only for Composer-sized graphs (≥ threshold). Env-forced incremental on small apps
+            // (Parsedown, #36380) must not pull Uri helpers into an unrelated module.
             $eagerThinPregHelpers = false;
-            $eagerUriComposerHelpers = true;
+            $eagerUriComposerHelpers = $unitCount >= SourceBundler::INCREMENTAL_REQUIRES_UNIT_THRESHOLD;
             fwrite(
                 STDERR,
                 'phpc build: incremental IncludeHelper requires for '.$unitCount
