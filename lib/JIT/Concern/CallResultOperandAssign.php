@@ -203,6 +203,7 @@ trait CallResultOperandAssign
             'number_format' => true,
             'str_replace' => true,
             'str_ireplace' => true,
+            'md5' => true,
         ];
 
         return isset($owning[strtolower($name)]);

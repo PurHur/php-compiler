@@ -18,7 +18,11 @@ use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** md5() — hex digest via native __compiler_hash (issue #179; #21181 null DEP+coerce on 8.4). */
+/**
+ * md5() — thin AOT via native {@see \PHPCompiler\JIT\Builtin\StringMd5} /
+ * {@code phpc_md5_r1} (#36388; NestedJIT __compiler_hash leaked under thin AOT).
+ * php-src: ext/standard/md5.c — PHP_FUNCTION(md5) (#179; #21181 null DEP+coerce on 8.4).
+ */
 final class md5 extends Internal
 {
     public function __construct()
@@ -83,11 +87,11 @@ final class md5 extends Internal
             $raw = JitBoolArg::lowerCoerceZParamBool($context, $args[1], 'md5', 'binary', 2);
         }
 
-        return JitMd5::digest(
-            $context,
-            self::jitStringArg($context, $args[0]),
-            $raw
-        );
+        $data = self::jitStringArg($context, $args[0]);
+        $result = JitMd5::digest($context, $data, $raw);
+        JitStringBuiltinArg::releaseEphemeralArgAfterCopy($context, $args[0], $data);
+
+        return $result;
     }
 
     /**
