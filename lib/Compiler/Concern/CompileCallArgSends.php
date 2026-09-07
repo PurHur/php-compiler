@@ -26,9 +26,11 @@ use PHPTypes\Type;
  * Call-arg send compilation (#36387 / #36403).
  *
  * Extracted from {@see \PHPCompiler\Compiler} so the hub can shrink toward
- * host-CFG split-TU emit under SPINE_CHUNK (gen-0 <30m). Inline Array_ unpack /
- * array_reduce early ARG_SEND / filter|combine|merge|substr_replace|proc_open
- * family resolve lives in {@see CallArgInlineArrayUnpackReduceAndFamilyResolve}.
+ * host-CFG split-TU emit under SPINE_CHUNK (gen-0 <30m). Null-literal / hoisted
+ * property-const / coalesce early valueSlot wiring lives in
+ * {@see CallArgNullLiteralHoistedPropertyConstAndCoalesceValueSlots}; inline Array_
+ * unpack / array_reduce / family resolve in
+ * {@see CallArgInlineArrayUnpackReduceAndFamilyResolve}.
  *
  * Note: no declare(strict_types=1) — parent Compiler.php is weak-types and passes
  * string slot ids into OpCode(?int) via coercion; strict_types here TypeErrors.
@@ -230,132 +232,18 @@ trait CompileCallArgSends
             $assignedNamedLocal = null;
             $valueSlot = null;
             $nullLiteralCallArgSlot = null;
-            if (null !== $cfgCallOp) {
-                $nullLiteralArg = $cfgCallOp->args[(int) $argIndex] ?? $arg;
-                if (
-                    $nullLiteralArg instanceof Operand
-                    && $this->callArgIsNullLiteral(
-                        $nullLiteralArg,
-                        $cfgCallOp,
-                        (int) $argIndex,
-                        $block
-                    )
-                ) {
-                    $nullLiteralCallArgSlot = (string) $this->registerNullConstantSlot($block, $nullLiteralArg);
-                    $valueSlot = $nullLiteralCallArgSlot;
-                }
-            }
             $hoistedEnumPropertyCallArgSlotWired = false;
-            if (null !== $cfgCallOp && !$this->isCallArgDirectArrayDimFetch($arg)) {
-                $valueSlot = $this->resolveHoistedIssetOrEmptyCallArgSlot(
-                    $arg,
-                    $block,
-                    $cfgCallOp,
-                    (int) $argIndex
-                );
-            }
-            if (null !== $cfgCallOp && null !== $block->orig) {
-                $dateSunSlot = $this->wireDateSunFuncHoistedCallArgSlot($block, $cfgCallOp, (int) $argIndex);
-                if (null !== $dateSunSlot) {
-                    $valueSlot = $dateSunSlot;
-                }
-                if (null === $valueSlot) {
-                    $arraySpliceSlot = $this->wireArraySpliceUnaryOffsetReplacementCallArgSlot(
-                        $block,
-                        $cfgCallOp,
-                        (int) $argIndex,
-                        $sends
-                    );
-                    if (null !== $arraySpliceSlot) {
-                        $valueSlot = $arraySpliceSlot;
-                    }
-                }
-                if (null === $valueSlot) {
-                    $mbstringSlot = $this->wireMbstringUnaryOffsetNullLengthCallArgSlot(
-                        $block,
-                        $cfgCallOp,
-                        (int) $argIndex,
-                        $sends
-                    );
-                    if (null !== $mbstringSlot) {
-                        $valueSlot = $mbstringSlot;
-                    }
-                }
-            }
-            // E::A->name / E::A?->name in call args — wire PropertyFetch slot before enum const fold (#10286, #9684).
-            if (null === $valueSlot && null !== $cfgCallOp) {
-                $immediatePropertySlot = $this->slotForImmediatePropertyOrMethodFetchBeforeCfgCall($block, $cfgCallOp);
-                if (null !== $immediatePropertySlot) {
-                    $valueSlot = $immediatePropertySlot;
-                    $hoistedEnumPropertyCallArgSlotWired = true;
-                } else {
-                    $hoistedPropertyOrConstSlot = $this->slotForHoistedClassConstFetchCallArg(
-                        $arg,
-                        $block,
-                        $cfgCallOp,
-                        (int) $argIndex
-                    );
-                    if (null !== $hoistedPropertyOrConstSlot) {
-                        $valueSlot = $hoistedPropertyOrConstSlot;
-                        $hoistedEnumPropertyCallArgSlotWired = true;
-                    }
-                }
-            }
-            if (null === $valueSlot && null !== $cfgCallOp) {
-                $hoistedScalarSlot = $this->tryFoldHoistedBoolNullLiteralCallArg(
-                    $callArgOperand,
-                    $block,
-                    $cfgCallOp,
-                    (int) $argIndex
-                );
-                if (null !== $hoistedScalarSlot) {
-                    $valueSlot = (string) $hoistedScalarSlot;
-                }
-            }
-            if (null === $valueSlot && null !== $cfgCallOp) {
-                $hoistedConstPreludeSlot = $this->slotForImmediateConstFetchPreludeCallArg(
-                    $block,
-                    $cfgCallOp,
-                    (int) $argIndex,
-                    $sends
-                );
-                if (null !== $hoistedConstPreludeSlot) {
-                    $valueSlot = (string) $hoistedConstPreludeSlot;
-                }
-            }
-            $syncedCoalesceSlot = $this->resolveSyncedCoalesceFuncCallArgSlot($callArgOperand);
-            if (null === $syncedCoalesceSlot) {
-                $syncedCoalesceSlot = $this->resolveSyncedCoalesceFuncCallArgSlot($arg);
-            }
-            if (null !== $syncedCoalesceSlot && null === $valueSlot) {
-                $valueSlot = (string) $syncedCoalesceSlot;
-            }
-            if (null === $valueSlot) {
-                $coalesceArgSlot = $this->compileCallArgCoalesceSlot(
-                    $callArgOperand,
-                    $block,
-                    $cfgCallOp,
-                    (int) $argIndex
-                );
-                if (null === $coalesceArgSlot) {
-                    $coalesceArgSlot = $this->compileCallArgCoalesceSlot(
-                        $arg,
-                        $block,
-                        $cfgCallOp,
-                        (int) $argIndex
-                    );
-                }
-                if (null !== $coalesceArgSlot) {
-                    $valueSlot = (string) $coalesceArgSlot;
-                }
-            }
-            $callArgConstRoot = $this->unwrapOperandChain($callArgOperand);
-            if ($callArgConstRoot instanceof Op\Expr\ConstFetch && null === $valueSlot) {
-                $foldedGlobalConst = $this->tryFoldGlobalConstFetch($callArgConstRoot);
-                if (null !== $foldedGlobalConst) {
-                    $valueSlot = (string) $block->registerConstant($callArgOperand, $foldedGlobalConst);
-                }
-            }
+            $this->resolveCallArgNullLiteralHoistedPropertyConstAndCoalesceValueSlots(
+                $arg,
+                (int) $argIndex,
+                $block,
+                $cfgCallOp,
+                $callArgOperand,
+                $sends,
+                $valueSlot,
+                $nullLiteralCallArgSlot,
+                $hoistedEnumPropertyCallArgSlotWired
+            );
             if (
                 null !== $dimFetchSlot
                 && null === $valueSlot
