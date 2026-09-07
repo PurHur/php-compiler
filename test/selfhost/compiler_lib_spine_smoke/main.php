@@ -5444,6 +5444,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/CallArgCompileTimeValueAndP
 require_once __DIR__.'/../../../lib/Compiler/Concern/EchoCoalesceCallArgCompile.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/StmtCoalesceFuncCallArgSyncCompile.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/FirstClassCallableAndClosure.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/InvokableReceiverAndClosureDetect.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/ErrorSuppressCallArgProducers.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/FinalizeArrayFamilyCallArgSlots.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/FunctionStaticAndCompileTimeLiterals.php';

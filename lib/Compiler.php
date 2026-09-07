@@ -120,6 +120,7 @@ require_once __DIR__.'/Compiler/Concern/CallArgCompileTimeValueAndProcOpenFold.p
 require_once __DIR__.'/Compiler/Concern/EchoCoalesceCallArgCompile.php';
 require_once __DIR__.'/Compiler/Concern/StmtCoalesceFuncCallArgSyncCompile.php';
 require_once __DIR__.'/Compiler/Concern/FirstClassCallableAndClosure.php';
+require_once __DIR__.'/Compiler/Concern/InvokableReceiverAndClosureDetect.php';
 require_once __DIR__.'/Compiler/Concern/ErrorSuppressCallArgProducers.php';
 require_once __DIR__.'/Compiler/Concern/FinalizeArrayFamilyCallArgSlots.php';
 require_once __DIR__.'/Compiler/Concern/FunctionStaticAndCompileTimeLiterals.php';
@@ -354,6 +355,7 @@ use PHPCompiler\Compiler\Concern\CallArgCompileTimeValueAndProcOpenFold;
 use PHPCompiler\Compiler\Concern\EchoCoalesceCallArgCompile;
 use PHPCompiler\Compiler\Concern\StmtCoalesceFuncCallArgSyncCompile;
 use PHPCompiler\Compiler\Concern\FirstClassCallableAndClosure;
+use PHPCompiler\Compiler\Concern\InvokableReceiverAndClosureDetect;
 use PHPCompiler\Compiler\Concern\ErrorSuppressCallArgProducers;
 use PHPCompiler\Compiler\Concern\FinalizeArrayFamilyCallArgSlots;
 use PHPCompiler\Compiler\Concern\FunctionStaticAndCompileTimeLiterals;
@@ -498,6 +500,7 @@ class Compiler {
     use EchoCoalesceCallArgCompile;
     use StmtCoalesceFuncCallArgSyncCompile;
     use FirstClassCallableAndClosure;
+    use InvokableReceiverAndClosureDetect;
     use ErrorSuppressCallArgProducers;
     use FinalizeArrayFamilyCallArgSlots;
     use FunctionStaticAndCompileTimeLiterals;
