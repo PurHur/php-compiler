@@ -7755,6 +7755,7 @@ require_once __DIR__.'/../../../lib/VM/Concern/ReturnTypeEnforce.php';
 require_once __DIR__.'/../../../lib/VM/Concern/VirtualPropertyHookEnforce.php';
 require_once __DIR__.'/../../../lib/VM/Concern/MethodCallAndStaticCallableInit.php';
 require_once __DIR__.'/../../../lib/VM/Concern/InheritanceFinalVarianceAndConstFetch.php';
+require_once __DIR__.'/../../../lib/VM/Concern/ClassConstAndPropertyDefaultMaterialize.php';
 require_once __DIR__.'/../../../lib/VM/ObjectPropertyIterator.php';
 require_once __DIR__.'/../../../lib/VM/ObjectReadonlySupport.php';
 require_once __DIR__.'/../../../lib/VM/ObjectRegistry.php';
