@@ -144,7 +144,6 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/Compiler/Concern/InlineCallArgMergeFamilyAndHoistedAssignProducers.php',
             'lib/Compiler/Concern/InlineCallArgProducerMatch.php',
             'lib/Compiler/Concern/InlineCallArgSlotResolvers.php',
-            'lib/Compiler/Concern/InlineCallArgUnaryBitmaskResolve.php',
             'lib/Compiler/Concern/InlineCallArgUnionSiblingCastAndComparisonMatchers.php',
             'lib/Compiler/Concern/InlineNewCallArgProducers.php',
             'lib/Compiler/Concern/InstanceOfInAndClassConstCompile.php',

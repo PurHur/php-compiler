@@ -4,9 +4,9 @@
     "done_when_ceiling": 25000,
     "files": {
         "lib/Compiler.php": {
-            "budget": 1316,
+            "budget": 1313,
             "target": 20000,
-            "note": "Concern trait splits (#36230/#36387/#36403); InlineCallArgUnaryBitmaskResolve + InlineCallArgConcatArithmeticFold + CfgTypeShapeQueries + peers"
+            "note": "Concern trait splits (#36230/#36387/#36403); InlineCallArgConcatArithmeticFold + CfgTypeShapeQueries + CfgDeclaredTypeAssertAndParamApply + peers"
         },
         "lib/JIT.php": {
             "budget": 274,
@@ -34,9 +34,9 @@
             "note": "helper-cache granularity; HelperRuntimeFingerprint extract (#36387/#36403); sorted linkObjects (#36399); refusePrelinkGcMixReason (#36401)"
         },
         "lib/JIT/CompileCache.php": {
-            "budget": 2033,
+            "budget": 1541,
             "target": 2000,
-            "note": "MCJIT/AOT warm cache; CompileCacheSemanticHash + CompileCachePartialEmitDemote extracts (#36387 one-file-edit / split-TU)"
+            "note": "MCJIT/AOT warm cache; CompileCacheSemanticHash + CompileCachePartialEmitDemote + CompileCacheEditScaffold extracts (#36387/#36403)"
         }
     },
     "script_file_count": {
