@@ -130,6 +130,7 @@ use PHPCompiler\ext\standard\http_response_code;
 use PHPCompiler\ext\standard\idate;
 use PHPCompiler\ext\standard\ignore_user_abort;
 use PHPCompiler\ext\standard\implode;
+use PHPCompiler\ext\standard\intdiv;
 use PHPCompiler\ext\standard\int_max;
 use PHPCompiler\ext\standard\int_min;
 use PHPCompiler\ext\standard\intval;
@@ -624,6 +625,99 @@ final class DiscardedPureCallElisionTest extends TestCase
             $context,
             $builtin,
             [$value, $this->makeCompileTimeLongVar(1)]
+        ));
+    }
+
+    public function testElidesDiscardedIntdivWithProvenSafeDivisor(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new intdiv();
+        $num = $this->makeNativeLongVar();
+
+        // Typed dividend + compile-time non-zero / non--1 divisor.
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            $builtin,
+            [$num, $this->makeCompileTimeLongVar(2)]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            $builtin,
+            [
+                $this->makeCompileTimeLongVar(10),
+                $this->makeCompileTimeLongVar(3),
+            ]
+        ));
+        // Float divisor truncates like Z_PARAM_LONG (1.9 → 1).
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            $builtin,
+            [$num, $this->makeCompileTimeFloatVar(1.9)]
+        ));
+        // Divisor -1 with proven dividend ≠ PHP_INT_MIN.
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            $builtin,
+            [
+                $this->makeCompileTimeLongVar(42),
+                $this->makeCompileTimeLongVar(-1),
+            ]
+        ));
+
+        // Runtime divisor can still DivisionByZeroError.
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            $builtin,
+            [$num, $this->makeNativeLongVar()]
+        ));
+        // Divisor 0 stays live.
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            $builtin,
+            [$num, $this->makeCompileTimeLongVar(0)]
+        ));
+        // Float 0.5 truncates to 0 — stays live.
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            $builtin,
+            [$num, $this->makeCompileTimeFloatVar(0.5)]
+        ));
+        // Divisor -1 with runtime dividend — ArithmeticError possible.
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            $builtin,
+            [$num, $this->makeCompileTimeLongVar(-1)]
+        ));
+        // INT_MIN / -1 stays live.
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            $builtin,
+            [
+                $this->makeCompileTimeLongVar(\PHP_INT_MIN),
+                $this->makeCompileTimeLongVar(-1),
+            ]
+        ));
+        // Soft-null stays live (deprecate).
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            $builtin,
+            [$this->makeNullVar(), $this->makeCompileTimeLongVar(2)]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            $builtin,
+            [$num, $this->makeNullVar()]
+        ));
+        // Wrong arity stays live.
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            $builtin,
+            [$num]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            $builtin,
+            [$num, $this->makeCompileTimeLongVar(2), $this->makeCompileTimeLongVar(3)]
         ));
     }
 

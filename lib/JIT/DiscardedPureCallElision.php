@@ -220,8 +220,11 @@ use PHPCompiler\VM\Variable as VmVariable;
  * incl. pow/fpow/fdiv/nextafter on already-numeric args, empty void user functions).
  * Soft-null strlen / ord / chr / math / string / ctype / inet coercions are
  * NOT elided — they emit deprecations (PHP 8.1+). Countable objects stay live
- * (user {@code count()} handlers). {@code intdiv} is never discarded here
- * (DivisionByZeroError must stay observable). {@code hex2bin}/
+ * (user {@code count()} handlers). {@code intdiv} elides only when both args
+ * are already-numeric and the divisor is a compile-time long ≠ 0; divisor
+ * {@code -1} additionally requires a compile-time dividend ≠ {@code PHP_INT_MIN}
+ * ({@code DivisionByZeroError} / {@code ArithmeticError} otherwise stay live).
+ * {@code hex2bin}/
  * {@code base64_decode}/{@code convert_uudecode} stay live (invalid-input
  * warnings / false returns). Int needles for {@code strpos}/{@code strchr}/…
  * stay live (PHP 8 deprecations). Array {@code str_replace} stays live
@@ -362,6 +365,9 @@ final class DiscardedPureCallElision
             return true;
         }
         if (self::tryElidePureClampNoSideEffect($toCall, $callArgs)) {
+            return true;
+        }
+        if (self::tryElidePureIntdivNoSideEffect($toCall, $callArgs)) {
             return true;
         }
         if (self::tryElidePureHashEqualsNoSideEffect($toCall, $callArgs)) {
@@ -1569,6 +1575,27 @@ final class DiscardedPureCallElision
         }
 
         return self::clampArgsAllowDiscardedElision($callArgs);
+    }
+
+    /**
+     * Discarded {@code intdiv} when both args are already-numeric and the divisor
+     * is a compile-time long that cannot {@code DivisionByZeroError} /
+     * {@code ArithmeticError} — php-src {@code ext/standard/math.c}
+     * {@code PHP_FUNCTION(intdiv)}. Runtime / zero / {@code INT_MIN}/{-1} stay
+     * live (#36386).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private static function tryElidePureIntdivNoSideEffect(?Call $toCall, array $callArgs): bool
+    {
+        if (!$toCall instanceof CoreFuncInternal) {
+            return false;
+        }
+        if ('intdiv' !== strtolower($toCall->getName())) {
+            return false;
+        }
+
+        return self::intdivArgsAllowDiscardedElision($callArgs);
     }
 
     /**
@@ -3879,6 +3906,77 @@ final class DiscardedPureCallElision
         }
 
         return $min <= $max;
+    }
+
+    /**
+     * @param array<int, Variable> $callArgs
+     */
+    private static function intdivArgsAllowDiscardedElision(array $callArgs): bool
+    {
+        if (
+            !isset($callArgs[0], $callArgs[1])
+            || isset($callArgs[2])
+            || !$callArgs[0] instanceof Variable
+            || !$callArgs[1] instanceof Variable
+        ) {
+            return false;
+        }
+        if (
+            !self::mathArgAllowsDiscardedElision($callArgs[0])
+            || !self::mathArgAllowsDiscardedElision($callArgs[1])
+        ) {
+            return false;
+        }
+        // Z_PARAM_LONG truncation — only proven compile-time longs are safe for
+        // DivisionByZeroError / ArithmeticError proofs (float 0.5 → 0).
+        $divisor = self::compileTimeLongScalar($callArgs[1]);
+        if (null === $divisor || 0 === $divisor) {
+            return false;
+        }
+        // php-src: PHP_INT_MIN / -1 → ArithmeticError; runtime dividend with
+        // divisor -1 cannot prove ≠ INT_MIN.
+        if (-1 === $divisor) {
+            $dividend = self::compileTimeLongScalar($callArgs[0]);
+            if (null === $dividend || \PHP_INT_MIN === $dividend) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Compile-time int / finite-in-range float / numeric-string → zend_long
+     * truncation for intdiv proofs (php-src {@code Z_PARAM_LONG}).
+     */
+    private static function compileTimeLongScalar(Variable $arg): ?int
+    {
+        if (null !== $arg->compileTimeLong) {
+            return $arg->compileTimeLong;
+        }
+        if (null !== $arg->compileTimeFloat) {
+            $f = $arg->compileTimeFloat;
+            if ($f !== $f || \is_infinite($f)) {
+                return null;
+            }
+            if ($f > (float) \PHP_INT_MAX || $f < (float) \PHP_INT_MIN) {
+                return null;
+            }
+
+            return (int) $f;
+        }
+        $lit = JitStringArg::compileTimeLiteral($arg);
+        if (null === $lit || !is_numeric($lit)) {
+            return null;
+        }
+        // Reject non-integer numeric strings that truncate to 0 unexpectedly
+        // only via float path; (int)"1.5" === 1 matches Z_PARAM_LONG.
+        $asFloat = (float) $lit;
+        if ($asFloat > (float) \PHP_INT_MAX || $asFloat < (float) \PHP_INT_MIN) {
+            return null;
+        }
+
+        return (int) $lit;
     }
 
     /**
