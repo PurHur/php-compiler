@@ -246,7 +246,10 @@ use PHPCompiler\VM\Variable as VmVariable;
  * {@see bitwiseLogicIsCompileTimeIdentity}). Typed {@code & 0} folds to
  * {@code 0}, {@code | -1} to {@code -1}, and {@code ^ -1} to {@code not}
  * (omit {@code and}/{@code or}/{@code xor}; peer identity folds;
- * {@see bitwiseLogicIsCompileTimeConstantResult}). Compile-time divisors ≠
+ * {@see bitwiseLogicIsCompileTimeConstantResult}). Same-operand typed
+ * {@code $n & $n}/{@code $n | $n} are identity and {@code $n ^ $n} folds to
+ * {@code 0} (no {@code and}/{@code or}/{@code xor};
+ * {@see bitwiseLogicSameOperandFold}). Compile-time divisors ≠
  * {@code -1} skip the typed {@code /} {@code PHP_INT_MIN}/{-1} promote arm
  * ({@see nativeLongDivisorCanSkipNegOneModuloBranch}). Typed {@code / 1} is
  * identity (no {@code sdiv}/{@code srem}/exactness promote;
@@ -4246,6 +4249,55 @@ final class DiscardedPureCallElision
         }
 
         return null;
+    }
+
+    /**
+     * Typed native-long {@code &}|{@code ^} when both operands are the same
+     * storage / SSA payload: {@code $n & $n} / {@code $n | $n} → {@code $n},
+     * {@code $n ^ $n} → {@code 0} (omit {@code and}/{@code or}/{@code xor}).
+     *
+     * Algebra holds for any zend_long; peer compile-time {@code |0}/{@code ^0}/
+     * {@code &-1} identity (#37212 / #36386) and constant folds
+     * ({@see bitwiseLogicIsCompileTimeConstantResult}).
+     *
+     * php-src: Zend/zend_operators.c bitwise_and/or/xor_function.
+     *
+     * @return 'left'|'zero'|null keep left, fold to 0, or null when not same-operand
+     */
+    public static function bitwiseLogicSameOperandFold(
+        int $opType,
+        Variable $left,
+        Variable $right
+    ): ?string {
+        if (!self::nativeLongOperandsAreSame($left, $right)) {
+            return null;
+        }
+        if (\PHPCompiler\OpCode::TYPE_BITWISE_AND === $opType
+            || \PHPCompiler\OpCode::TYPE_BITWISE_OR === $opType
+        ) {
+            return 'left';
+        }
+        if (\PHPCompiler\OpCode::TYPE_BITWISE_XOR === $opType) {
+            return 'zero';
+        }
+
+        return null;
+    }
+
+    /**
+     * True when both operands are typed native-long and name the same alloca or
+     * SSA value (two Operand wrappers → one payload).
+     */
+    private static function nativeLongOperandsAreSame(Variable $left, Variable $right): bool
+    {
+        if (Variable::TYPE_NATIVE_LONG !== $left->type || $left->type !== $right->type) {
+            return false;
+        }
+        if ($left === $right) {
+            return true;
+        }
+
+        return $left->value === $right->value;
     }
 
     /**
