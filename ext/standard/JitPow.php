@@ -138,7 +138,8 @@ final class JitPow
      * Compile-time exponent {@code 0} → {@code 1}, {@code 1} → identity,
      * {@code 2} → {@code base * base}, {@code 3} → {@code base^3},
      * {@code 4} → {@code (base*base)^2}, {@code 5} → {@code base^3 * base^2},
-     * {@code 6} → {@code (base^3)^2}, and {@code 7} → {@code (base^3)^2 * base}
+     * {@code 6} → {@code (base^3)^2}, {@code 7} → {@code (base^3)^2 * base},
+     * and {@code 8} → {@code ((base*base)^2)^2}
      * with chained smul overflow→float omit {@code llvm.pow.f64}
      * (#36386; php-src {@code pow_function} / {@code zend_pow} /
      * {@code mul_function}).
@@ -553,6 +554,86 @@ final class JitPow
                 OpCode::TYPE_MUL,
                 $sixthLong,
                 $n,
+                $slotPtr
+            );
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($doneBlock);
+
+            return;
+        }
+        if ('eighth' === $expFold) {
+            // n^8 = ((n*n)*(n*n))*((n*n)*(n*n)): sq=n*n, fourth=sq*sq, then
+            // fourth*fourth. Overflow arms finish in float (sqF^4 or
+            // fourthF*fourthF).
+            $baseL = JitLongArg::lower($context, $base, 'pow() base');
+            $i64 = $context->getTypeFromString('int64');
+            $n = $context->builder->intCast($baseL, $i64);
+            $sqVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $n,
+                $n
+            );
+            $ov1 = $sqVar->longArithOverflowFlag;
+            if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **8 expected smul overflow metadata (sq)');
+            }
+            $sqLong = JITVariable::KIND_VARIABLE === $sqVar->kind
+                ? $context->builder->load($sqVar->value)
+                : $sqVar->value;
+            $ov1Block = BasicBlockHelper::append($context, 'pow_eighth_sq_ov');
+            $ok1Block = BasicBlockHelper::append($context, 'pow_eighth_sq_ok');
+            $doneBlock = BasicBlockHelper::append($context, 'pow_eighth_done');
+            $context->builder->branchIf($ov1, $ov1Block, $ok1Block);
+
+            $context->builder->positionAtEnd($ov1Block);
+            $sqF = $context->builder->load($sqVar->longArithOverflowDoubleSlot);
+            $sq2F = $context->builder->fmul($sqF, $sqF);
+            $eighthF = $context->builder->fmul($sq2F, $sq2F);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eighthF
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok1Block);
+            $fourthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $sqLong,
+                $sqLong
+            );
+            $ov2 = $fourthVar->longArithOverflowFlag;
+            if (null === $ov2 || null === $fourthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **8 expected smul overflow metadata (fourth)');
+            }
+            $fourthLong = JITVariable::KIND_VARIABLE === $fourthVar->kind
+                ? $context->builder->load($fourthVar->value)
+                : $fourthVar->value;
+            $ov2Block = BasicBlockHelper::append($context, 'pow_eighth_fourth_ov');
+            $ok2Block = BasicBlockHelper::append($context, 'pow_eighth_fourth_ok');
+            $context->builder->branchIf($ov2, $ov2Block, $ok2Block);
+
+            $context->builder->positionAtEnd($ov2Block);
+            $fourthF = $context->builder->load($fourthVar->longArithOverflowDoubleSlot);
+            $eighthF2 = $context->builder->fmul($fourthF, $fourthF);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eighthF2
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok2Block);
+            JitLongArithOverflow::writeBoxedBinary(
+                $context,
+                OpCode::TYPE_MUL,
+                $fourthLong,
+                $fourthLong,
                 $slotPtr
             );
             $context->builder->branch($doneBlock);
