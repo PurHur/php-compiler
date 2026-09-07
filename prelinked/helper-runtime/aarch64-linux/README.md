@@ -13,7 +13,7 @@ non-native link.
 
 ## Seed corpus (VM_* + lib_VM_* + ext/standard tiers)
 
-**152** committed `unit.o` files:
+**162** committed `unit.o` files:
 
 - full `VM_*` (13) and `lib_VM_*` (9) sets from `x86_64-linux`
 - first `ext/standard` tier (10): ArrayChunk / ArrayIsList / ArraySlice / Bin2hex /
@@ -49,6 +49,9 @@ non-native link.
 - env / error / ini / execution (10): EnvLocal / EnvironMirrorNative / ErrorLast /
   ErrorLog / ErrorSilence / ExecutionLimits / IniIntrospection / IniParseQuantity /
   ParseIniNative / ProcNice
+- math / random / memory / soundex / sys / version / uniqid (10): MathBaseConvert /
+  Lcg / Rand / RandomBytes / Memory / Soundex / Uniqid / VersionCompare /
+  SysGetTempDir / SysGetloadavg
 
 Refresh / expand via:
 
