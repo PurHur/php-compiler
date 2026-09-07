@@ -243,7 +243,10 @@ use PHPCompiler\VM\Variable as VmVariable;
  * {@see bitShiftCountIsCompileTimeZero}). Typed {@code |}/{@code ^} with a
  * compile-time {@code 0} operand and {@code &} with {@code -1} are bitwise
  * identities (no {@code and}/{@code or}/{@code xor};
- * {@see bitwiseLogicIsCompileTimeIdentity}). Compile-time divisors ≠
+ * {@see bitwiseLogicIsCompileTimeIdentity}). Typed {@code & 0} folds to
+ * {@code 0}, {@code | -1} to {@code -1}, and {@code ^ -1} to {@code not}
+ * (omit {@code and}/{@code or}/{@code xor}; peer identity folds;
+ * {@see bitwiseLogicIsCompileTimeConstantResult}). Compile-time divisors ≠
  * {@code -1} skip the typed {@code /} {@code PHP_INT_MIN}/{-1} promote arm
  * ({@see nativeLongDivisorCanSkipNegOneModuloBranch}). Typed {@code / 1} is
  * identity (no {@code sdiv}/{@code srem}/exactness promote;
@@ -4182,6 +4185,61 @@ final class DiscardedPureCallElision
             }
             if (-1 === $b) {
                 return 'left';
+            }
+
+            return null;
+        }
+
+        return null;
+    }
+
+    /**
+     * Typed native-long bitwise constant results when one operand is a
+     * compile-time long that forces the outcome:
+     * {@code & 0} → {@code 0}, {@code | -1} → {@code -1}, {@code ^ -1} →
+     * {@code ~} of the other operand (and the mirrored forms).
+     *
+     * php-src: Zend/zend_operators.c bitwise_and/or/xor_function after
+     * {@code convert_to_long}. Peer identity folds ({@see bitwiseLogicIsCompileTimeIdentity}).
+     *
+     * @return array{kind: 'zero'|'all_ones'|'not', keep: 'left'|'right'}|null
+     *   {@code keep} is the surviving operand for {@code not}; unused for
+     *   {@code zero}/{@code all_ones} (still names which side was non-const).
+     */
+    public static function bitwiseLogicIsCompileTimeConstantResult(
+        int $opType,
+        Variable $left,
+        Variable $right
+    ): ?array {
+        $a = self::compileTimeLongScalar($left);
+        $b = self::compileTimeLongScalar($right);
+        if (\PHPCompiler\OpCode::TYPE_BITWISE_AND === $opType) {
+            if (0 === $a) {
+                return ['kind' => 'zero', 'keep' => 'right'];
+            }
+            if (0 === $b) {
+                return ['kind' => 'zero', 'keep' => 'left'];
+            }
+
+            return null;
+        }
+        if (\PHPCompiler\OpCode::TYPE_BITWISE_OR === $opType) {
+            if (-1 === $a) {
+                return ['kind' => 'all_ones', 'keep' => 'right'];
+            }
+            if (-1 === $b) {
+                return ['kind' => 'all_ones', 'keep' => 'left'];
+            }
+
+            return null;
+        }
+        if (\PHPCompiler\OpCode::TYPE_BITWISE_XOR === $opType) {
+            // {@code n ^ -1} ≡ {@code ~n} (two's complement zend_long).
+            if (-1 === $a) {
+                return ['kind' => 'not', 'keep' => 'right'];
+            }
+            if (-1 === $b) {
+                return ['kind' => 'not', 'keep' => 'left'];
             }
 
             return null;

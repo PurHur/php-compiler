@@ -780,6 +780,29 @@ restart:
                                 $this->context->getTypeFromString('int64')->constInt($folded, false)
                             );
                         }
+                        // Compile-time &0 → 0 / |-1 → -1 / ^-1 → not (peer |0; #36386).
+                        $constFold = DiscardedPureCallElision::bitwiseLogicIsCompileTimeConstantResult(
+                            $opcode->type,
+                            $left,
+                            $right
+                        );
+                        if (null !== $constFold) {
+                            $i64 = $this->context->getTypeFromString('int64');
+                            if ('zero' === $constFold['kind']) {
+                                $result = $i64->constInt(0, false);
+                                goto return_long;
+                            }
+                            if ('all_ones' === $constFold['kind']) {
+                                $result = $i64->constInt(-1, true);
+                                goto return_long;
+                            }
+                            // kind === 'not'
+                            $src = 'left' === $constFold['keep']
+                                ? $leftValue
+                                : $this->context->builder->intCast($rightValue, $leftValue->typeOf());
+                            $result = $this->context->builder->not($src);
+                            goto return_long;
+                        }
                         // Compile-time |0 / ^0 / &-1 → identity (peer <<0; #36386).
                         $keep = DiscardedPureCallElision::bitwiseLogicIsCompileTimeIdentity(
                             $opcode->type,
