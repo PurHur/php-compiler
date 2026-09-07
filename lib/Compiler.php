@@ -145,6 +145,7 @@ require_once __DIR__.'/Compiler/Concern/HoistedEnumAndChainedInlineCallArgProduc
 require_once __DIR__.'/Compiler/Concern/ExactHoistedAndInlineNewCallArgProducers.php';
 require_once __DIR__.'/Compiler/Concern/InlineNewCallArgProducers.php';
 require_once __DIR__.'/Compiler/Concern/ExpressionPreludeDimFetchAndHoistedConstCallArgSlots.php';
+require_once __DIR__.'/Compiler/Concern/ArrayDimFetchCallArgSlots.php';
 require_once __DIR__.'/Compiler/Concern/HoistedConstCallArgSlots.php';
 require_once __DIR__.'/Compiler/Concern/CfgProducerIndexAndRematerialize.php';
 require_once __DIR__.'/Compiler/Concern/InlineCallArgClosureFeedsAndReturnProducers.php';
@@ -387,6 +388,7 @@ use PHPCompiler\Compiler\Concern\HoistedEnumAndChainedInlineCallArgProducers;
 use PHPCompiler\Compiler\Concern\ExactHoistedAndInlineNewCallArgProducers;
 use PHPCompiler\Compiler\Concern\InlineNewCallArgProducers;
 use PHPCompiler\Compiler\Concern\ExpressionPreludeDimFetchAndHoistedConstCallArgSlots;
+use PHPCompiler\Compiler\Concern\ArrayDimFetchCallArgSlots;
 use PHPCompiler\Compiler\Concern\HoistedConstCallArgSlots;
 use PHPCompiler\Compiler\Concern\CfgProducerIndexAndRematerialize;
 use PHPCompiler\Compiler\Concern\InlineCallArgClosureFeedsAndReturnProducers;
@@ -539,6 +541,7 @@ class Compiler {
     use ExactHoistedAndInlineNewCallArgProducers;
     use InlineNewCallArgProducers;
     use ExpressionPreludeDimFetchAndHoistedConstCallArgSlots;
+    use ArrayDimFetchCallArgSlots;
     use HoistedConstCallArgSlots;
     use CfgProducerIndexAndRematerialize;
     use InlineCallArgClosureFeedsAndReturnProducers;

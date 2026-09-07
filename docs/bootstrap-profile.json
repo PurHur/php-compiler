@@ -5554,6 +5554,7 @@
         "lib/AOT/CompileTarget.php",
         "lib/AOT/ComposerVendorMap.php",
         "lib/AOT/ExternalMethodBind.php",
+        "lib/AOT/HelperRuntimeBind.php",
         "lib/AOT/HelperRuntimeCache.php",
         "lib/AOT/HelperRuntimeCommon.php",
         "lib/AOT/HelperRuntimeFingerprint.php",
@@ -5651,6 +5652,7 @@
         "lib/Compiler/CompileTimeEnumCase.php",
         "lib/Compiler/CompileTimeNew.php",
         "lib/Compiler/Concern/AdjacentNestedCallArgSlots.php",
+        "lib/Compiler/Concern/ArrayDimFetchCallArgSlots.php",
         "lib/Compiler/Concern/ArrayPadUnpackExtractAndDateSunCallArgSends.php",
         "lib/Compiler/Concern/AssignInCallRhsAndDeadInlineNestedFuncCallFeedSlots.php",
         "lib/Compiler/Concern/CallAndArrayLiteralCompile.php",
@@ -8157,6 +8159,7 @@
         "lib/VM/Concern/BuiltinHostExceptionDispatch.php",
         "lib/VM/Concern/ClassConstAndPropertyDefaultMaterialize.php",
         "lib/VM/Concern/ClassInheritDefineAndConstDeclare.php",
+        "lib/VM/Concern/ClassScopeAndStaticPropertyResolve.php",
         "lib/VM/Concern/ClassTraitComposition.php",
         "lib/VM/Concern/ClosureBindAndFunctionStatic.php",
         "lib/VM/Concern/DeprecationNoticeEmit.php",
@@ -8664,9 +8667,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8429,
+        "inventory_files": 8433,
         "excluded": 0,
-        "eligible": 8429,
+        "eligible": 8433,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

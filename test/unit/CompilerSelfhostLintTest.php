@@ -52,6 +52,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/Block.php',
             'lib/Compiler.php',
             'lib/Compiler/Concern/AdjacentNestedCallArgSlots.php',
+            'lib/Compiler/Concern/ArrayDimFetchCallArgSlots.php',
             'lib/Compiler/Concern/ArrayPadUnpackExtractAndDateSunCallArgSends.php',
             'lib/Compiler/Concern/AssignInCallRhsAndDeadInlineNestedFuncCallFeedSlots.php',
             'lib/Compiler/Concern/CallAndArrayLiteralCompile.php',
