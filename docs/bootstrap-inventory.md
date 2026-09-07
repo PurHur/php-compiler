@@ -42106,8 +42106,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/intdiv.php`
 
 **Warnings** (review for bootstrap subset):
-- new DivisionByZeroError (line 49)
-- new ArithmeticError (line 52)
+- new DivisionByZeroError (line 50)
+- new ArithmeticError (line 53)
 - 2 class method(s)
 
 ### `ext/standard/interface_exists_.php`
@@ -59689,7 +59689,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/DiscardedPureCallElision.php`
 
 **Warnings** (review for bootstrap subset):
-- 143 class method(s)
+- 146 class method(s)
 
 ### `lib/JIT/DnfParamCheck.php`
 
@@ -60829,7 +60829,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/NoThrowCallElision.php`
 
 **Warnings** (review for bootstrap subset):
-- new Operand\Literal (line 3180)
+- new Operand\Literal (line 3190)
 - 101 class method(s)
 
 ### `lib/JIT/NonObjectPropertyFetchHelper.php`

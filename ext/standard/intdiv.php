@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\DiscardedPureCallElision;
 use PHPCompiler\JIT\JitNumericDivisionGuard;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -71,13 +72,20 @@ final class intdiv extends Internal
             return $folded;
         }
         [$left, $right] = JitIntdiv::lowerOperands($context, $args[0], $args[1]);
-        JitNumericDivisionGuard::emitZeroLongDivisorGuard($context, $right, 'Division by zero');
-        JitNumericDivisionGuard::emitIntMinNegOneOverflowGuard(
-            $context,
-            $left,
-            $right,
-            'Division of PHP_INT_MIN by -1 is not an integer'
-        );
+        // Skip DivisionByZeroError / ArithmeticError branches when the divisor
+        // (and, for -1, the dividend) are compile-time proven safe — peer
+        // discarded-elision proofs (#36386 / #37153). php-src math.c intdiv.
+        if (!DiscardedPureCallElision::intdivCanSkipZeroDivisorGuard($args[1])) {
+            JitNumericDivisionGuard::emitZeroLongDivisorGuard($context, $right, 'Division by zero');
+        }
+        if (!DiscardedPureCallElision::intdivCanSkipIntMinNegOneGuard($args[0], $args[1])) {
+            JitNumericDivisionGuard::emitIntMinNegOneOverflowGuard(
+                $context,
+                $left,
+                $right,
+                'Division of PHP_INT_MIN by -1 is not an integer'
+            );
+        }
 
         return $context->builder->signedDiv($left, $right);
     }
