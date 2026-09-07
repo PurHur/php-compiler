@@ -114,6 +114,8 @@ final class HelperRuntimeCacheFingerprintTest extends TestCase
         );
         $hub = (string) file_get_contents($root.'/lib/AOT/HelperRuntimeCache.php');
         $this->assertStringContainsString('HelperRuntimeFingerprint::coreFingerprint', $hub);
+        $this->assertStringContainsString('HelperRuntimeLink::linkObjects', $hub);
+        $this->assertFileExists($root.'/lib/AOT/HelperRuntimeLink.php');
         $this->assertNotSame(
             HelperRuntimeCache::coreFingerprint(),
             HelperRuntimeCache::legacyLoweringFingerprint(),
