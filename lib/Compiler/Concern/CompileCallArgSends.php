@@ -37,6 +37,8 @@ use PHPTypes\Type;
  * {@see CallArgResidualDimCoalesceNewHoistedFoldAndAdjacentProducerValueSlots};
  * closure / dead-temp / producer-remap / eval / prefer-named-local slots in
  * {@see CallArgClosureDeadTempProducerEvalAndPreferNamedLocalValueSlots};
+ * post-tookDim multi-producer / named-local / ConstFetch rematch in
+ * {@see CallArgMultiProducerNamedLocalAndConstFetchRematch};
  * inline Array_ unpack / array_reduce / family resolve in
  * {@see CallArgInlineArrayUnpackReduceAndFamilyResolve}.
  *
@@ -307,83 +309,16 @@ trait CompileCallArgSends
                 $sends = array_merge($sends, $prefetchOps);
             }
             if (null !== $cfgCallOp && null !== $block->orig) {
-                $producers = $this->precedingInlineCallArgProducersBeforeCfgOp(
-                    $block->orig->children,
-                    $cfgCallOp
+                $this->resolveCallArgMultiProducerNamedLocalAndConstFetchRematch(
+                    $arg,
+                    (int) $argIndex,
+                    $block,
+                    $calleeName,
+                    $cfgCallOp,
+                    $sends,
+                    $valueSlot,
+                    $assignedNamedLocal
                 );
-                $namedLocalSlot = $this->namedLocalCallArgSlotIfBound($arg, $block, $cfgCallOp, (int) $argIndex);
-                if (null === $namedLocalSlot && null === $assignedNamedLocal) {
-                    $assignedNamedLocal = $this->slotForNamedLocalFromAssignVarOperand($arg, $block);
-                }
-                $callArgNamed = Block::resolveVariableName($cfgCallOp->args[(int) $argIndex] ?? $arg);
-                if (
-                    \count($producers) >= 2
-                    && null === $namedLocalSlot
-                    && null === $assignedNamedLocal
-                    && (null === $callArgNamed || '' === $callArgNamed)
-                ) {
-                    $matched = $this->matchInlineCallArgProducer(
-                        $producers,
-                        $cfgCallOp->args ?? [],
-                        (int) $argIndex,
-                        $cfgCallOp,
-                        $block,
-                        $calleeName
-                    );
-                    if ($matched instanceof Op\Expr) {
-                        $callArgProbe = $cfgCallOp->args[(int) $argIndex] ?? $arg;
-                        $matched = $this->preferSiblingCallOverNestedArrayInlineMatch(
-                            $matched,
-                            $producers,
-                            $callArgProbe
-                        );
-                    }
-                    if (
-                        ($matched instanceof Op\Expr\ConstFetch || $matched instanceof Op\Expr\ClassConstFetch)
-                        && null !== $cfgCallOp
-                        && $this->shouldRemapHoistedConstFetchToAdjacentNestedCall(
-                            $matched,
-                            $cfgCallOp,
-                            (int) $argIndex,
-                            $block
-                        )
-                    ) {
-                        $adjacentSlot = $this->resolveAdjacentNestedFuncCallArgSlot(
-                            $block,
-                            $cfgCallOp,
-                            (int) $argIndex
-                        );
-                        if (null !== $adjacentSlot) {
-                            $valueSlot = $adjacentSlot;
-                            $matched = null;
-                        }
-                    }
-                    if ($matched instanceof Op\Expr) {
-                        if (null === $block->slotForOperand($matched->result)) {
-                            foreach ($this->compileExpr($matched, $block) as $op) {
-                                $sends[] = $op;
-                            }
-                        }
-                        $matchedSlot = $this->slotForEmittedIssetOrEmptyProducer($block, $matched)
-                            ?? (
-                                $matched instanceof Op\Expr\New_
-                                    ? $this->slotForInlineNewProducer($block, $matched, $sends)
-                                    : $this->slotForInlineCallArgProducerResult(
-                                        $block,
-                                        $matched,
-                                        $cfgCallOp,
-                                        $block->orig->children
-                                    )
-                            );
-                        if (null !== $matchedSlot && null === $valueSlot) {
-                            $valueSlot = $matchedSlot;
-                        }
-                    }
-                } elseif (null !== $namedLocalSlot) {
-                    $valueSlot = $namedLocalSlot;
-                } elseif (null !== $assignedNamedLocal) {
-                    $valueSlot = (string) $assignedNamedLocal;
-                }
                 if ('array_column' === strtolower($calleeName ?? '')) {
                     if (0 === $argIndex) {
                         $arrayExpr = $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block);
