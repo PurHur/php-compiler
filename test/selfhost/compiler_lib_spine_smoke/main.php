@@ -5444,7 +5444,6 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/IssetEmptyUnsetAndDimFetchC
 require_once __DIR__.'/../../../lib/Compiler/Concern/PropertyAndDimFetchCompile.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/InlineCallArgCompileTimeFold.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/InlineCallArgConcatArithmeticFold.php';
-require_once __DIR__.'/../../../lib/Compiler/Concern/InlineCallArgUnaryBitmaskResolve.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CallArgCompileTimeValueAndProcOpenFold.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/EchoCoalesceCallArgCompile.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/StmtCoalesceFuncCallArgSyncCompile.php';
@@ -6918,6 +6917,7 @@ require_once __DIR__.'/../../../lib/JIT/ClosureHelper.php';
 require_once __DIR__.'/../../../lib/JIT/CoalesceHelper.php';
 require_once __DIR__.'/../../../lib/JIT/CompileCacheSemanticHash.php';
 require_once __DIR__.'/../../../lib/JIT/CompileCachePartialEmitDemote.php';
+require_once __DIR__.'/../../../lib/JIT/CompileCacheEditScaffold.php';
 require_once __DIR__.'/../../../lib/JIT/CompileCache.php';
 require_once __DIR__.'/../../../lib/JIT/CompilerOperandChainNative.php';
 require_once __DIR__.'/../../../lib/JIT/Context.php';
