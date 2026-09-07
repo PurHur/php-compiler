@@ -8,6 +8,8 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringStrIncdec;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\DiscardedPureCallElision;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -48,6 +50,13 @@ final class str_increment extends Internal
             return $context->getTypeFromString('__string__*')->constNull();
         }
 
+        // Proven-safe compile-time literal → immortal result (no helper / ValueError)
+        // — peer intdiv fold + discarded-elision proofs (#36386 / #37168).
+        $folded = self::tryFoldCompileTime($context, $args[0]);
+        if (null !== $folded) {
+            return $folded;
+        }
+
         $input = self::jitStringArg($context, $args[0]);
         // Empty after soft-null (or '') → ValueError before helper (#26264; php-src string.c).
         JitStringBuiltinArg::rejectEmpty(
@@ -58,6 +67,25 @@ final class str_increment extends Internal
         );
 
         return StringStrIncdec::invokeIncrement($context, $input);
+    }
+
+    /**
+     * Fold when {@see DiscardedPureCallElision::strIncDecArgsCannotThrow} —
+     * php-src string.c cannot ValueError on this literal.
+     */
+    private static function tryFoldCompileTime(Context $context, JITVariable $arg): ?Value
+    {
+        if (!DiscardedPureCallElision::strIncDecArgsCannotThrow('str_increment', [$arg])) {
+            return null;
+        }
+        $lit = JitStringArg::compileTimeLiteral($arg);
+        if (null === $lit) {
+            return null;
+        }
+
+        return $context->builder->load(
+            $context->constantStringFromString(VmString::strIncrement($lit))
+        );
     }
 
     /** Z_PARAM_STR — soft-null DEP+coerce on PROFILE≥8.4 (#26264; php-src string.c). */

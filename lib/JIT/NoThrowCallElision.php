@@ -36,15 +36,18 @@ use PHPCompiler\JIT\Call\Vararg;
  * {@code strpos} / {@code strstr} / {@code str_contains} /
  * {@code str_starts_with} / {@code str_ends_with} / …), and pure math
  * ({@code sqrt} / {@code abs} / {@code pow} / {@code fdiv} / …) on native
- * numeric scalars, and {@code intdiv} when the divisor is a compile-time long
- * proven not to {@code DivisionByZeroError} / {@code ArithmeticError} (php-src
+ * numeric scalars, {@code intdiv} when the divisor is a compile-time long
+ * proven not to {@code DivisionByZeroError} / {@code ArithmeticError}, and
+ * {@code str_increment}/{@code str_decrement} when the arg is a compile-time
+ * ASCII-alphanumeric literal proven not to {@code ValueError} (php-src
  * {@code ext/standard/string.c}
  * {@code PHP_FUNCTION(strlen)} / {@code ord} / {@code chr} / {@code ucwords} /
- * {@code substr} / {@code strcmp} / {@code strpos} / {@code str_contains};
- * {@code ext/standard/url.c} {@code urlencode}; {@code ext/standard/crc32.c} /
- * {@code md5.c} / {@code base64.c}; {@code ext/standard/type.c}
- * {@code is_*}; {@code ext/standard/math.c} {@code PHP_FUNCTION(sqrt)} /
- * {@code pow} / {@code intdiv} etc.; throwing {@code __toString} needs an object/value box).
+ * {@code substr} / {@code strcmp} / {@code strpos} / {@code str_contains} /
+ * {@code str_increment}; {@code ext/standard/url.c} {@code urlencode};
+ * {@code ext/standard/crc32.c} / {@code md5.c} / {@code base64.c};
+ * {@code ext/standard/type.c} {@code is_*}; {@code ext/standard/math.c}
+ * {@code PHP_FUNCTION(sqrt)} / {@code pow} / {@code intdiv} etc.; throwing
+ * {@code __toString} needs an object/value box).
  * Discarded calls with the same arg proofs are dropped entirely by
  * {@see DiscardedPureCallElision}.
  *
@@ -470,6 +473,12 @@ final class NoThrowCallElision
             // unless the divisor (and INT_MIN/-1 pair) are compile-time proven
             // safe and both args are already numeric (#36386 / peer discarded).
             return DiscardedPureCallElision::intdivArgsCannotThrow($callArgs);
+        }
+        if ('str_increment' === $name || 'str_decrement' === $name) {
+            // string.c str_increment/str_decrement — ValueError stays live
+            // unless the arg is a compile-time ASCII-alphanumeric literal
+            // proven safe (#36386 / peer discarded #37168).
+            return DiscardedPureCallElision::strIncDecArgsCannotThrow($name, $callArgs);
         }
 
         return false;
