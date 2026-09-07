@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8383 |
-| Phase A inventory files (M2 ratio SSOT) | 8383 |
+| PHP files on vm.php path | 8384 |
+| Phase A inventory files (M2 ratio SSOT) | 8384 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26386 |
+| Source constructs flagged (warnings) | 26388 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5570,13 +5570,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/CallArgEarlyFastPathAndMixedPropertyFetchSends.php` | 0 | 9 |
 | `lib/Compiler/Concern/CallArgInlineEnumCastErrorSuppressAndFccSends.php` | 0 | 17 |
 | `lib/Compiler/Concern/CallArgNullMergePropertyFetchAndHoistedPreludeSends.php` | 0 | 23 |
+| `lib/Compiler/Concern/CallArgPostFccDimCoalesceExprPreludeAndNestedNewSends.php` | 0 | 6 |
 | `lib/Compiler/Concern/CfgProducerIndexAndRematerialize.php` | 0 | 2 |
 | `lib/Compiler/Concern/CfgTypeShapeAndDeclaredAssert.php` | 0 | 11 |
 | `lib/Compiler/Concern/ClassLikeAndStmtCompile.php` | 0 | 1 |
 | `lib/Compiler/Concern/CoalesceAndNullsafe.php` | 0 | 17 |
 | `lib/Compiler/Concern/CoalesceLeftAndEchoConcatPreludes.php` | 0 | 9 |
 | `lib/Compiler/Concern/CompileAnonymousFunctionGeneratorAndNever.php` | 0 | 5 |
-| `lib/Compiler/Concern/CompileCallArgSends.php` | 0 | 17 |
+| `lib/Compiler/Concern/CompileCallArgSends.php` | 0 | 13 |
 | `lib/Compiler/Concern/CompileClassBodyAndTraitAdaptations.php` | 0 | 9 |
 | `lib/Compiler/Concern/CompileClassConstFoldAndTypedReject.php` | 0 | 15 |
 | `lib/Compiler/Concern/CompileClassLikeDeclAndScope.php` | 0 | 8 |
@@ -49172,13 +49173,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 997)
-- new CompileFatal (line 1031)
-- new CompileError (line 1034)
-- new ClassCompileRegistry (line 1075)
-- new AttributeClassRegistry (line 1076)
-- new ClassCompileRegistry (line 1184)
-- new AttributeClassRegistry (line 1185)
+- new CompileFatal (line 1000)
+- new CompileFatal (line 1034)
+- new CompileError (line 1037)
+- new ClassCompileRegistry (line 1078)
+- new AttributeClassRegistry (line 1079)
+- new ClassCompileRegistry (line 1187)
+- new AttributeClassRegistry (line 1188)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -49414,6 +49415,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new OpCode (line 598)
 - 1 class method(s)
 
+### `lib/Compiler/Concern/CallArgPostFccDimCoalesceExprPreludeAndNestedNewSends.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CallArgPostFccDimCoalesceExprPreludeAndNestedNewSends (line 21)
+- new OpCode (line 44)
+- new OpCode (line 79)
+- new OpCode (line 121)
+- new OpCode (line 213)
+- 1 class method(s)
+
 ### `lib/Compiler/Concern/CfgProducerIndexAndRematerialize.php`
 
 **Warnings** (review for bootstrap subset):
@@ -49487,20 +49498,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - trait CompileCallArgSends (line 34)
-- new OpCode (line 198)
-- new OpCode (line 233)
-- new OpCode (line 275)
-- new OpCode (line 367)
-- new OpCode (line 421)
-- new OpCode (line 443)
-- new Operand\Temporary (line 2255)
-- new Operand\Temporary (line 2786)
-- new Operand\Temporary (line 2972)
-- new Operand\Temporary (line 3004)
-- new Operand\Temporary (line 3101)
-- new Operand\Temporary (line 3230)
-- new OpCode (line 3232)
-- new OpCode (line 4888)
+- new OpCode (line 250)
+- new OpCode (line 272)
+- new Operand\Temporary (line 2084)
+- new Operand\Temporary (line 2615)
+- new Operand\Temporary (line 2801)
+- new Operand\Temporary (line 2833)
+- new Operand\Temporary (line 2930)
+- new Operand\Temporary (line 3059)
+- new OpCode (line 3061)
+- new OpCode (line 4717)
 - 1 class method(s)
 - 4 closure(s)
 
