@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8400 |
-| Phase A inventory files (M2 ratio SSOT) | 8400 |
+| PHP files on vm.php path | 8401 |
+| Phase A inventory files (M2 ratio SSOT) | 8401 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26423 |
+| Source constructs flagged (warnings) | 26425 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5632,6 +5632,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/FirstSiblingInlineFuncCallProducerIndex.php` | 0 | 2 |
 | `lib/Compiler/Concern/FunctionStaticAndCompileTimeLiterals.php` | 0 | 15 |
 | `lib/Compiler/Concern/HoistedEnumAndChainedInlineCallArgProducers.php` | 0 | 2 |
+| `lib/Compiler/Concern/HoistedMultiArgContiguousLiteralPreludeAndConsumerFeed.php` | 0 | 2 |
 | `lib/Compiler/Concern/HoistedMultiArgSiblingFuncCallChain.php` | 0 | 2 |
 | `lib/Compiler/Concern/HoistedSiblingFeedAndArrayKeysArgSendRewire.php` | 0 | 2 |
 | `lib/Compiler/Concern/HoistedUnaryAssignAndInlineProducerCallArgSlots.php` | 0 | 3 |
@@ -49195,13 +49196,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 1036)
-- new CompileFatal (line 1070)
-- new CompileError (line 1073)
-- new ClassCompileRegistry (line 1114)
-- new AttributeClassRegistry (line 1115)
-- new ClassCompileRegistry (line 1223)
-- new AttributeClassRegistry (line 1224)
+- new CompileFatal (line 1039)
+- new CompileFatal (line 1073)
+- new CompileError (line 1076)
+- new ClassCompileRegistry (line 1117)
+- new AttributeClassRegistry (line 1118)
+- new ClassCompileRegistry (line 1226)
+- new AttributeClassRegistry (line 1227)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -50142,11 +50143,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - trait HoistedEnumAndChainedInlineCallArgProducers (line 25)
 - 21 class method(s)
 
+### `lib/Compiler/Concern/HoistedMultiArgContiguousLiteralPreludeAndConsumerFeed.php`
+
+**Warnings** (review for bootstrap subset):
+- trait HoistedMultiArgContiguousLiteralPreludeAndConsumerFeed (line 24)
+- 6 class method(s)
+
 ### `lib/Compiler/Concern/HoistedMultiArgSiblingFuncCallChain.php`
 
 **Warnings** (review for bootstrap subset):
-- trait HoistedMultiArgSiblingFuncCallChain (line 25)
-- 11 class method(s)
+- trait HoistedMultiArgSiblingFuncCallChain (line 26)
+- 5 class method(s)
 
 ### `lib/Compiler/Concern/HoistedSiblingFeedAndArrayKeysArgSendRewire.php`
 
