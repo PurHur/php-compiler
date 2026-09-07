@@ -14,6 +14,7 @@ require_once __DIR__.'/CompileCacheEditScaffold.php';
 require_once __DIR__.'/CompileCacheProjectIndex.php';
 require_once __DIR__.'/CompileCacheKeyLayout.php';
 require_once __DIR__.'/CompileCacheBitcodePersist.php';
+require_once __DIR__.'/CompileCacheEditPlan.php';
 
 /**
  * On-disk MCJIT bitcode cache (issue #153).
@@ -30,13 +31,15 @@ require_once __DIR__.'/CompileCacheBitcodePersist.php';
  * edit-scaffold restore/strip/rebind lives in {@see CompileCacheEditScaffold};
  * multi-file project index / entry→members map lives in {@see CompileCacheProjectIndex};
  * cache-entry paths / freshness / fingerprint live in {@see CompileCacheKeyLayout};
- * MCJIT bitcode restore/persist lives in {@see CompileCacheBitcodePersist}
+ * MCJIT bitcode restore/persist lives in {@see CompileCacheBitcodePersist};
+ * project members / bundled source / edit-changed maps live in {@see CompileCacheEditPlan}
  * (#36387 one-file-edit Done-when / #36403 size-budget split-TU).
  */
 final class CompileCache
 {
     use CompileCacheEditScaffold;
     use CompileCacheBitcodePersist;
+    use CompileCacheEditPlan;
 
     /** @var list<array{llvm: string, signature: string, scoped: string}>|null */
     private static ?array $recordingExports = null;
@@ -46,12 +49,6 @@ final class CompileCache
 
     /** @var array<string, string>|null logical lc → LLVM name for NestedJIT helpers (#36387). */
     private static ?array $recordingHelperSymbols = null;
-
-    /** @var list<string>|null absolute member paths for multi-file project index (#36387). */
-    private static ?array $projectMembers = null;
-
-    /** Absolute entry script path (before setProjectMembers sort) (#36387). */
-    private static ?string $projectEntry = null;
 
     private static ?string $recordingKey = null;
 
@@ -85,24 +82,6 @@ final class CompileCache
      * @var array<string, array<string, list<string>>>
      */
     private static array $editScaffoldByFunction = [];
-
-    private static ?string $bundledSource = null;
-
-    /**
-     * Absolute paths whose *semantic* content changed vs the scaffold project index
-     * (comments/whitespace-only edits do not strip that member's LLVM bodies) (#36387).
-     *
-     * @var list<string>
-     */
-    private static array $editChangedMembers = [];
-
-    /**
-     * Within a semantically-changed member: scoped names (lc) whose bodies changed.
-     * Absent path ⇒ full member strip; non-empty ⇒ keep sibling functions (#36387).
-     *
-     * @var array<string, array<string, true>>
-     */
-    private static array $editChangedFunctions = [];
 
     /**
      * LLVM names of user symbols left in the module after edit-scaffold partial strip (#36387).
@@ -285,39 +264,6 @@ final class CompileCache
         return self::$editScaffoldActive || self::$editScaffoldBitcodeBound;
     }
 
-    /**
-     * Record absolute source paths that make up a multi-file AOT project (#36387).
-     *
-     * @param list<string> $absolutePaths entry + includes (pre-bundle)
-     */
-    public static function setProjectMembers(array $absolutePaths): void
-    {
-        $clean = [];
-        foreach ($absolutePaths as $path) {
-            if (!is_string($path) || '' === $path) {
-                continue;
-            }
-            $resolved = realpath($path);
-            $clean[] = false !== $resolved ? $resolved : $path;
-        }
-        // First path is the compile entry (compile.php merges entry + includes) (#36387).
-        self::$projectEntry = $clean[0] ?? null;
-        $clean = array_values(array_unique($clean));
-        sort($clean);
-        self::$projectMembers = $clean;
-    }
-
-    /** @return list<string> */
-    public static function projectMembers(): array
-    {
-        return self::$projectMembers ?? [];
-    }
-
-    /** Compile entry path captured by {@see setProjectMembers()} (#36387). */
-    public static function projectEntry(): ?string
-    {
-        return self::$projectEntry;
-    }
 
     /**
      * Compiler fingerprint for project-index / meta durability (#36387).
@@ -479,67 +425,6 @@ final class CompileCache
         self::$recordingUserSymbolsByFunction = [];
     }
 
-    public static function setBundledSource(string $source): void
-    {
-        self::$bundledSource = $source;
-    }
-
-    /**
-     * @param list<string> $paths
-     */
-    public static function setEditChangedMembers(array $paths): void
-    {
-        $clean = [];
-        foreach ($paths as $path) {
-            if (!is_string($path) || '' === $path) {
-                continue;
-            }
-            $resolved = realpath($path);
-            $clean[] = false !== $resolved ? $resolved : $path;
-        }
-        self::$editChangedMembers = array_values(array_unique($clean));
-    }
-
-    /** @return list<string> */
-    public static function editChangedMembers(): array
-    {
-        return self::$editChangedMembers;
-    }
-
-    /**
-     * @param array<string, array<string, true|int|string>> $pathToScoped
-     */
-    public static function setEditChangedFunctions(array $pathToScoped): void
-    {
-        $clean = [];
-        foreach ($pathToScoped as $path => $scopedMap) {
-            if (!is_string($path) || '' === $path || !is_array($scopedMap)) {
-                continue;
-            }
-            $resolved = realpath($path);
-            $key = false !== $resolved ? $resolved : $path;
-            $funcs = [];
-            foreach ($scopedMap as $scoped => $flag) {
-                if (!is_string($scoped) || '' === $scoped) {
-                    continue;
-                }
-                if (false === $flag || null === $flag) {
-                    continue;
-                }
-                $funcs[strtolower($scoped)] = true;
-            }
-            if ([] !== $funcs) {
-                $clean[$key] = $funcs;
-            }
-        }
-        self::$editChangedFunctions = $clean;
-    }
-
-    /** @return array<string, array<string, true>> */
-    public static function editChangedFunctions(): array
-    {
-        return self::$editChangedFunctions;
-    }
 
     /**
      * @param array<string, string> $previous
@@ -894,9 +779,7 @@ final class CompileCache
         self::$recordingUserSymbolsByMember = null;
         self::$recordingUserSymbolsByFunction = null;
         self::$editScaffoldByFunction = [];
-        self::$bundledSource = null;
-        self::$editChangedMembers = [];
-        self::$editChangedFunctions = [];
+        self::clearEditPlan();
         self::$keptUserSymbols = [];
         self::$strippedUserSymbols = [];
         self::$skipModuleFuncCompile = false;
@@ -905,8 +788,6 @@ final class CompileCache
         self::$partialEmitBaseObject = null;
         self::$editScaffoldBitcodeBound = false;
         self::$pendingEditScaffoldKey = null;
-        self::$projectMembers = null;
-        self::$projectEntry = null;
     }
 
     private static function blockScopedName(Block $block): string
