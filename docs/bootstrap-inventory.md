@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8395 |
-| Phase A inventory files (M2 ratio SSOT) | 8395 |
+| PHP files on vm.php path | 8396 |
+| Phase A inventory files (M2 ratio SSOT) | 8396 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26412 |
+| Source constructs flagged (warnings) | 26414 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5577,6 +5577,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/CallArgNullLiteralHoistedPropertyConstAndCoalesceValueSlots.php` | 0 | 2 |
 | `lib/Compiler/Concern/CallArgNullMergePropertyFetchAndHoistedPreludeSends.php` | 0 | 23 |
 | `lib/Compiler/Concern/CallArgPostFccDimCoalesceExprPreludeAndNestedNewSends.php` | 0 | 6 |
+| `lib/Compiler/Concern/CallArgResidualDimCoalesceNewHoistedFoldAndAdjacentProducerValueSlots.php` | 0 | 2 |
 | `lib/Compiler/Concern/CfgProducerIndexAndRematerialize.php` | 0 | 2 |
 | `lib/Compiler/Concern/CfgTypeShapeAndDeclaredAssert.php` | 0 | 11 |
 | `lib/Compiler/Concern/ClassLikeAndStmtCompile.php` | 0 | 1 |
@@ -49190,13 +49191,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 1021)
-- new CompileFatal (line 1055)
-- new CompileError (line 1058)
-- new ClassCompileRegistry (line 1099)
-- new AttributeClassRegistry (line 1100)
-- new ClassCompileRegistry (line 1208)
-- new AttributeClassRegistry (line 1209)
+- new CompileFatal (line 1024)
+- new CompileFatal (line 1058)
+- new CompileError (line 1061)
+- new ClassCompileRegistry (line 1102)
+- new AttributeClassRegistry (line 1103)
+- new ClassCompileRegistry (line 1211)
+- new AttributeClassRegistry (line 1212)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -49475,6 +49476,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new OpCode (line 213)
 - 1 class method(s)
 
+### `lib/Compiler/Concern/CallArgResidualDimCoalesceNewHoistedFoldAndAdjacentProducerValueSlots.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CallArgResidualDimCoalesceNewHoistedFoldAndAdjacentProducerValueSlots (line 21)
+- 1 class method(s)
+
 ### `lib/Compiler/Concern/CfgProducerIndexAndRematerialize.php`
 
 **Warnings** (review for bootstrap subset):
@@ -49547,15 +49554,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/CompileCallArgSends.php`
 
 **Warnings** (review for bootstrap subset):
-- trait CompileCallArgSends (line 42)
-- new Operand\Temporary (line 1262)
-- new Operand\Temporary (line 1793)
-- new Operand\Temporary (line 1979)
-- new Operand\Temporary (line 2011)
-- new Operand\Temporary (line 2108)
-- new Operand\Temporary (line 2237)
-- new OpCode (line 2239)
-- new OpCode (line 3895)
+- trait CompileCallArgSends (line 44)
+- new Operand\Temporary (line 1025)
+- new Operand\Temporary (line 1556)
+- new Operand\Temporary (line 1742)
+- new Operand\Temporary (line 1774)
+- new Operand\Temporary (line 1871)
+- new Operand\Temporary (line 2000)
+- new OpCode (line 2002)
+- new OpCode (line 3658)
 - 1 class method(s)
 - 3 closure(s)
 
