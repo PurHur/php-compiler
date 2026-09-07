@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPLLVM\Value;
 
@@ -45,8 +46,9 @@ final class ReflectionClassGetConstants implements Call
         if (1 === $userArgCount) {
             $resolved = self::compileTimeFilter($context, $args[1]);
             if (null === $resolved) {
-                throw new \LogicException(
-                    'ReflectionClass::getConstants() filter must be a compile-time int in this compiler build'
+                UnsupportedFeature::raise(
+                    'reflection-constants-filter',
+                    'ReflectionClass::getConstants() filter must be a compile-time int'
                 );
             }
             $filter = $resolved;

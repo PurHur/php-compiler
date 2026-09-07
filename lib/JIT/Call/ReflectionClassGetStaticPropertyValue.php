@@ -13,6 +13,7 @@ use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -52,8 +53,9 @@ final class ReflectionClassGetStaticPropertyValue implements Call
 
         $propLit = JitStringArg::compileTimeLiteral($args[1]);
         if (null === $propLit) {
-            throw new \LogicException(
-                'ReflectionClass::getStaticPropertyValue() name must be a string literal in this compiler build'
+            UnsupportedFeature::raise(
+                'reflection-static-property-name-literal',
+                'ReflectionClass::getStaticPropertyValue() name must be a string literal'
             );
         }
 

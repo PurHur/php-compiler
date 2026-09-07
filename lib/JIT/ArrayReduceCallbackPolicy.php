@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\Lint\UnsupportedFeature;
+use PHPCompiler\Lint\UnsupportedRegistry;
 use PHPCompiler\VM\Variable as VMVariable;
 
 /**
@@ -53,8 +55,14 @@ final class ArrayReduceCallbackPolicy
 
     public static function jitRejectionMessage(): string
     {
-        return 'array_reduce() callback must be '.self::JIT_SUBSET
-            .' for JIT/AOT in this compiler build; '.self::DEFERRED_KINDS.' are deferred (#142)';
+        $row = UnsupportedRegistry::feature('array-reduce-callback-deferred');
+
+        return UnsupportedFeature::format(
+            $row['feature'],
+            $row['matrixRow'],
+            $row['issue'],
+            $row['alternative']
+        );
     }
 
     /**
@@ -68,8 +76,14 @@ final class ArrayReduceCallbackPolicy
 
     public static function vmRejectionMessage(): string
     {
-        return 'array_reduce() callback must be a string user-function name in this compiler build; '
-            .self::DEFERRED_KINDS.' are deferred';
+        $row = UnsupportedRegistry::feature('array-reduce-callback-deferred');
+
+        return UnsupportedFeature::format(
+            'array_reduce() callback must be a string user-function name',
+            $row['matrixRow'],
+            $row['issue'],
+            $row['alternative']
+        );
     }
 
     /**

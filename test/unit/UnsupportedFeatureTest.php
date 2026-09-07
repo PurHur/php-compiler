@@ -114,6 +114,40 @@ final class UnsupportedFeatureTest extends TestCase
         }
     }
 
+    public function testCallbackAndReflectionSitesUseCatalog(): void
+    {
+        foreach ([
+            'usort-callback-deferred' => \PHPCompiler\JIT\UsortCallbackPolicy::jitRejectionMessage(),
+            'array-reduce-callback-deferred' => \PHPCompiler\JIT\ArrayReduceCallbackPolicy::jitRejectionMessage(),
+            'spl-autoload-callback-deferred' => \PHPCompiler\JIT\SplAutoloadCallbackPolicy::jitRejectionMessage(),
+            'preg-replace-callback-deferred' => \PHPCompiler\JIT\PregReplaceCallbackPolicy::jitRejectionMessage(),
+            'array-filter-callback-deferred' => \PHPCompiler\JIT\ArrayFilterCallbackPolicy::jitRejectionMessage(),
+        ] as $id => $msg) {
+            $this->assertStringStartsWith('phpc: unsupported: ', $msg, $id);
+            $row = UnsupportedRegistry::feature($id);
+            $this->assertStringContainsString('#'.$row['issue'], $msg, $id);
+            $this->assertStringContainsString($row['matrixRow'], $msg, $id);
+        }
+
+        try {
+            UnsupportedFeature::raise('closure-from-callable-literal');
+            $this->fail('expected UnsupportedFeature');
+        } catch (UnsupportedFeature $e) {
+            $this->assertSame(26788, $e->issue);
+        }
+
+        try {
+            UnsupportedFeature::raise('attribute-non-constant-arg');
+            $this->fail('expected UnsupportedFeature');
+        } catch (UnsupportedFeature $e) {
+            $this->assertSame(3206, $e->issue);
+            $this->assertStringContainsString(
+                'Attribute constructor arguments must be compile-time constant expressions',
+                $e->getMessage()
+            );
+        }
+    }
+
     /**
      * Sites routed in this slice must not keep the legacy bare LogicException wording.
      */
@@ -131,6 +165,22 @@ final class UnsupportedFeatureTest extends TestCase
             dirname(__DIR__, 2).'/lib/JIT/HashTableReadLlvm.php',
             dirname(__DIR__, 2).'/lib/JIT/HashTableWriteLlvm.php',
             dirname(__DIR__, 2).'/lib/JIT/IssetHelperLlvm.php',
+            dirname(__DIR__, 2).'/lib/JIT/JitStringArg.php',
+            dirname(__DIR__, 2).'/lib/JIT/JitLongArg.php',
+            dirname(__DIR__, 2).'/lib/JIT/UnsetHelperLlvm.php',
+            dirname(__DIR__, 2).'/lib/JIT/Call/ClosureFromCallable.php',
+            dirname(__DIR__, 2).'/lib/JIT/Call/ReflectionClassGetStaticPropertyValue.php',
+            dirname(__DIR__, 2).'/lib/JIT/Call/ReflectionClassSetStaticPropertyValue.php',
+            dirname(__DIR__, 2).'/lib/JIT/Call/ReflectionClassGetConstant.php',
+            dirname(__DIR__, 2).'/lib/JIT/Call/ReflectionClassGetConstants.php',
+            dirname(__DIR__, 2).'/lib/JIT/Call/DatePeriodConstruct.php',
+            dirname(__DIR__, 2).'/lib/JIT/UsortCallbackPolicy.php',
+            dirname(__DIR__, 2).'/lib/JIT/ArrayReduceCallbackPolicy.php',
+            dirname(__DIR__, 2).'/lib/JIT/SplAutoloadCallbackPolicy.php',
+            dirname(__DIR__, 2).'/lib/JIT/PregReplaceCallbackPolicy.php',
+            dirname(__DIR__, 2).'/lib/JIT/ArrayFilterCallbackPolicy.php',
+            dirname(__DIR__, 2).'/lib/Compiler/AttributeConstantEvaluator.php',
+            dirname(__DIR__, 2).'/lib/Func/Internal.php',
         ];
         $legacy = [
             'range() step must be an integer in this compiler build',
@@ -143,6 +193,17 @@ final class UnsupportedFeatureTest extends TestCase
             'Array fetch only supports integer or string indices in this compiler build',
             'unset() array offset requires int or string index in this compiler build',
             'isset() with array offset on object containers only supports SplObjectStorage or typed object properties in this compiler build',
+            'must be a string in this compiler build',
+            'must be an integer in this compiler build',
+            'unset() offset only supports arrays and objects in this compiler build',
+            'Closure::fromCallable() requires a compile-time string callable in this compiler build',
+            'ReflectionClass::getStaticPropertyValue() name must be a string literal in this compiler build',
+            'ReflectionClass::setStaticPropertyValue() name must be a string literal in this compiler build',
+            'ReflectionClass::getConstant() name must be a string literal in this compiler build',
+            'ReflectionClass::getConstants() filter must be a compile-time int in this compiler build',
+            'or VM path in this compiler build (#26772)',
+            'for JIT/AOT in this compiler build; array callables and invokable objects are deferred',
+            'Attribute constructor arguments must be compile-time constant expressions in this compiler build',
         ];
         foreach ($roots as $path) {
             $this->assertFileExists($path);

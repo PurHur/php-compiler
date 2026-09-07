@@ -19,6 +19,7 @@ use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPCompiler\VM\Context;
 use PHPLLVM\Value;
 
@@ -104,7 +105,10 @@ abstract class Internal extends Func implements Handler, Call
             ], true)) {
                 continue;
             }
-            throw new \LogicException("{$contextLabel} argument #".($i + 1).' must be a string in this compiler build');
+            UnsupportedFeature::raise(
+                'jit-string-arg',
+                "{$contextLabel} argument #".($i + 1).' must be a string'
+            );
         }
     }
 

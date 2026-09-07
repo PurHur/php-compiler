@@ -13,6 +13,7 @@ use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPLLVM\Value;
 
@@ -51,8 +52,9 @@ final class ReflectionClassGetConstant implements Call
 
         $constLit = JitStringArg::compileTimeLiteral($args[1]);
         if (null === $constLit) {
-            throw new \LogicException(
-                'ReflectionClass::getConstant() name must be a string literal in this compiler build'
+            UnsupportedFeature::raise(
+                'reflection-constant-name-literal',
+                'ReflectionClass::getConstant() name must be a string literal'
             );
         }
 

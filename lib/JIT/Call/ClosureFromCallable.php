@@ -13,6 +13,7 @@ use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\VmFromCallable;
 use PHPLLVM\Value;
@@ -49,9 +50,7 @@ final class ClosureFromCallable implements Call
         }
         $name = JitStringBuiltinArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString;
         if (null === $name || '' === $name) {
-            throw new \LogicException(
-                'Closure::fromCallable() requires a compile-time string callable in this compiler build (#26788)'
-            );
+            UnsupportedFeature::raise('closure-from-callable-literal');
         }
         $closure = VmFromCallable::fromCallableString($context, $name, new Block());
 

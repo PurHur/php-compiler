@@ -174,6 +174,90 @@ final class UnsupportedRegistry
             'issue' => 13735,
             'alternative' => 'use an integer key, or assign the array to a hashtable variable first',
         ],
+        'jit-string-arg' => [
+            'feature' => 'JIT/AOT string argument that cannot be lowered to __string__*',
+            'matrixRow' => 'docs/capabilities-syntax.md#strings',
+            'issue' => 816,
+            'alternative' => 'pass a string, concat path, boxed string value, or hashtable-backed string (php-src Z_PARAM_STR)',
+        ],
+        'jit-long-arg' => [
+            'feature' => 'JIT/AOT integer argument that cannot be lowered to i64',
+            'matrixRow' => 'docs/capabilities-syntax.md#integers',
+            'issue' => 36396,
+            'alternative' => 'pass int/float/bool/null/string/object or a boxed numeric value (php-src Z_PARAM_LONG)',
+        ],
+        'unset-offset-container' => [
+            'feature' => 'unset() offset on a container that is not an array or object',
+            'matrixRow' => 'docs/capabilities-syntax.md#unset',
+            'issue' => 30065,
+            'alternative' => 'unset on a hashtable/array or object property (php-src ZEND_UNSET_DIM / ZEND_UNSET_OBJ)',
+        ],
+        'closure-from-callable-literal' => [
+            'feature' => 'Closure::fromCallable() without a compile-time string callable',
+            'matrixRow' => 'docs/capabilities.md#closure-fromcallable',
+            'issue' => 26788,
+            'alternative' => 'pass a compile-time string function/Class::method name (php-src Zend/zend_closures.c)',
+        ],
+        'reflection-static-property-name-literal' => [
+            'feature' => 'ReflectionClass::{get,set}StaticPropertyValue() name not a string literal',
+            'matrixRow' => 'docs/capabilities.md#reflectionclass',
+            'issue' => 34125,
+            'alternative' => 'pass a compile-time string property name (php-src ext/reflection/php_reflection.c)',
+        ],
+        'reflection-constant-name-literal' => [
+            'feature' => 'ReflectionClass::getConstant() name not a string literal',
+            'matrixRow' => 'docs/capabilities.md#reflectionclass',
+            'issue' => 34093,
+            'alternative' => 'pass a compile-time string constant name (php-src zim_ReflectionClass_getConstant)',
+        ],
+        'reflection-constants-filter' => [
+            'feature' => 'ReflectionClass::getConstants() filter not a compile-time int',
+            'matrixRow' => 'docs/capabilities.md#reflectionclass',
+            'issue' => 34093,
+            'alternative' => 'omit the filter or pass a compile-time int (php-src zim_ReflectionClass_getConstants)',
+        ],
+        'date-period-iso-construct' => [
+            'feature' => 'DatePeriod::__construct(string $isostr) under JIT/AOT',
+            'matrixRow' => 'docs/capabilities.md#dateperiod',
+            'issue' => 26772,
+            'alternative' => 'use DatePeriod::createFromISO8601String() or the end-date/recurrence constructors (php-src date_period_construct)',
+        ],
+        'usort-callback-deferred' => [
+            'feature' => 'usort()/uksort()/uasort() callback form not lowerable for JIT/AOT',
+            'matrixRow' => 'docs/capabilities.md#usort',
+            'issue' => 23550,
+            'alternative' => 'use compile-time strcmp or a closure/arrow comparator; array/invokable callables are deferred',
+        ],
+        'array-reduce-callback-deferred' => [
+            'feature' => 'array_reduce() callback form not lowerable for JIT/AOT',
+            'matrixRow' => 'docs/capabilities.md#array_reduce',
+            'issue' => 142,
+            'alternative' => 'use a compile-time string user-function name or a closure/arrow; array callables are deferred',
+        ],
+        'spl-autoload-callback-deferred' => [
+            'feature' => 'spl_autoload_register() callback form not lowerable for JIT/AOT',
+            'matrixRow' => 'docs/capabilities.md#spl_autoload_register',
+            'issue' => 1776,
+            'alternative' => 'use a compile-time function name, Class::method, or closure (#4744); array/invokable callables are deferred',
+        ],
+        'preg-replace-callback-deferred' => [
+            'feature' => 'preg_replace_callback() callback form not lowerable for JIT/AOT',
+            'matrixRow' => 'docs/capabilities.md#preg_replace_callback',
+            'issue' => 1177,
+            'alternative' => 'use a compile-time string function name or a closure; array/invokable callables are deferred (#142, #36382)',
+        ],
+        'array-filter-callback-deferred' => [
+            'feature' => 'array_filter() callback form not lowerable for JIT/AOT',
+            'matrixRow' => 'docs/capabilities.md#array_filter',
+            'issue' => 32672,
+            'alternative' => 'use null or a closure/arrow with ARRAY_FILTER_USE_VALUE; string/array callables are deferred',
+        ],
+        'attribute-non-constant-arg' => [
+            'feature' => 'Attribute constructor arguments must be compile-time constant expressions',
+            'matrixRow' => 'docs/capabilities-syntax.md#attributes',
+            'issue' => 3206,
+            'alternative' => 'use literals, consts, or constant expressions (php-src zend_compile_attribute / zend_ast_evaluate)',
+        ],
     ];
 
     /**
