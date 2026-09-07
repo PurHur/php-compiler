@@ -4,9 +4,9 @@
     "done_when_ceiling": 25000,
     "files": {
         "lib/Compiler.php": {
-            "budget": 1313,
+            "budget": 1316,
             "target": 20000,
-            "note": "Concern trait splits (#36230/#36387/#36403); InlineCallArgConcatArithmeticFold + CfgTypeShapeQueries + CfgDeclaredTypeAssertAndParamApply + peers"
+            "note": "Concern trait splits (#36230/#36387/#36403); InlineCallArgUnaryBitmaskResolve + InlineCallArgConcatArithmeticFold + CfgTypeShapeQueries + peers"
         },
         "lib/JIT.php": {
             "budget": 274,
