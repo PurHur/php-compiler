@@ -249,6 +249,7 @@ final class Issue36388StringCallResultFreeTest extends TestCase
             'number_format_lit' => ['test/repro/issue_36388_number_format_lit_free.php', 'number_format_lit delta='],
             'str_replace_hit' => ['test/repro/issue_36388_str_replace_hit_free.php', 'str_replace_hit delta='],
             'str_replace_miss' => ['test/repro/issue_36388_str_replace_miss_free.php', 'str_replace_miss delta='],
+            'str_replace_local' => ['test/repro/issue_36388_str_replace_local_free.php', 'str_replace_local delta='],
             'dead_inplace_concat' => ['test/repro/issue_36388_dead_inplace_concat_free.php', 'dead_inplace_concat delta='],
         ];
     }

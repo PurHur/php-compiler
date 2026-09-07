@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 require_once __DIR__.'/../LlvmToolchain.php';
 
 /**
- * AOT: str_replace/str_ireplace must match Zend (#36002 NestedJIT findAt).
+ * AOT: str_replace/str_ireplace must match Zend (#36002 / #36388 native r1).
  *
  * @see php-src ext/standard/string.c php_str_replace
  *
@@ -39,9 +39,11 @@ final class AotStrReplaceFindAt36002Test extends TestCase
         $root = dirname(__DIR__, 2);
         $src = $root.'/test/repro/aot_str_replace_findat.php';
         $bin = sys_get_temp_dir().'/phpc_aot_sr_'.getmypid().'.bin';
-        $compile = 'env PHP_COMPILER_HELPER_RUNTIME_O=0 '.escapeshellarg(PHP_BINARY).' '
+        // Native phpc_str_replace_r1 (#36388) — default helper-runtime link (O=0 NestedJIT
+        // path is a separate legacy probe and is red on tip without helper .o).
+        $compile = escapeshellarg(PHP_BINARY).' '
             .escapeshellarg($root.'/bin/compile.php')
-            .' -o '.escapeshellarg($bin).' '.escapeshellarg($src).' 2>&1';
+            .' --no-cache -o '.escapeshellarg($bin).' '.escapeshellarg($src).' 2>&1';
         exec($compile, $compileOut, $compileRc);
         $this->assertSame(0, $compileRc, implode("\n", $compileOut));
         $this->assertFileExists($bin);
