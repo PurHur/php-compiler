@@ -366,6 +366,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/VM/ClassEntry.php',
             'lib/VM/ClassProperty.php',
             'lib/VM/Concern/BuiltinHostExceptionDispatch.php',
+            'lib/VM/Concern/ClassConstAndPropertyDefaultMaterialize.php',
             'lib/VM/Concern/ClassInheritDefineAndConstDeclare.php',
             'lib/VM/Concern/ClassTraitComposition.php',
             'lib/VM/Concern/DeprecationNoticeEmit.php',
