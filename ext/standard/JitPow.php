@@ -135,10 +135,10 @@ final class JitPow
     /**
      * Integer ** via MathFpow — avoids broken __phpc_pow_int on boxed operands (#35978).
      *
-     * Compile-time exponent {@code 0} → {@code 1}, {@code 1} → identity, and
-     * {@code 2} → {@code base * base} with smul overflow→float omit
-     * {@code llvm.pow.f64} (#36386; php-src {@code pow_function} /
-     * {@code zend_pow} / {@code mul_function}).
+     * Compile-time exponent {@code 0} → {@code 1}, {@code 1} → identity,
+     * {@code 2} → {@code base * base}, and {@code 3} → {@code base^3} with
+     * chained smul overflow→float omit {@code llvm.pow.f64} (#36386; php-src
+     * {@code pow_function} / {@code zend_pow} / {@code mul_function}).
      */
     private static function emitIntegerPowViaMathFpow(
         Context $context,
@@ -179,6 +179,56 @@ final class JitPow
                 $baseI64,
                 $slotPtr
             );
+
+            return;
+        }
+        if ('cube' === $expFold) {
+            // n*n*n: first smul n*n; on overflow finish in float; else smul ×n.
+            $baseL = JitLongArg::lower($context, $base, 'pow() base');
+            $i64 = $context->getTypeFromString('int64');
+            $f64 = $context->getTypeFromString('double');
+            $n = $context->builder->intCast($baseL, $i64);
+            $sqVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $n,
+                $n
+            );
+            $ov1 = $sqVar->longArithOverflowFlag;
+            if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **3 expected smul overflow metadata');
+            }
+            $sqLong = JITVariable::KIND_VARIABLE === $sqVar->kind
+                ? $context->builder->load($sqVar->value)
+                : $sqVar->value;
+            $ovBlock = BasicBlockHelper::append($context, 'pow_cube_sq_ov');
+            $okBlock = BasicBlockHelper::append($context, 'pow_cube_sq_ok');
+            $doneBlock = BasicBlockHelper::append($context, 'pow_cube_done');
+            $context->builder->branchIf($ov1, $ovBlock, $okBlock);
+
+            $context->builder->positionAtEnd($ovBlock);
+            $sqF = $context->builder->load($sqVar->longArithOverflowDoubleSlot);
+            $nF = $context->builder->siToFp($n, $f64);
+            $cuF = $context->builder->fmul($sqF, $nF);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $cuF
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($okBlock);
+            JitLongArithOverflow::writeBoxedBinary(
+                $context,
+                OpCode::TYPE_MUL,
+                $sqLong,
+                $n,
+                $slotPtr
+            );
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($doneBlock);
 
             return;
         }
