@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8373 |
-| Phase A inventory files (M2 ratio SSOT) | 8373 |
+| PHP files on vm.php path | 8374 |
+| Phase A inventory files (M2 ratio SSOT) | 8374 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26361 |
+| Source constructs flagged (warnings) | 26363 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5625,6 +5625,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/InlineCallArgCompileTimeFold.php` | 0 | 4 |
 | `lib/Compiler/Concern/InlineCallArgProducerMatch.php` | 0 | 3 |
 | `lib/Compiler/Concern/InlineCallArgSlotResolvers.php` | 0 | 2 |
+| `lib/Compiler/Concern/InlineCallArgUnionSiblingCastAndComparisonMatchers.php` | 0 | 2 |
 | `lib/Compiler/Concern/InstanceOfInAndClassConstCompile.php` | 0 | 12 |
 | `lib/Compiler/Concern/IssetEmptyCallArgAndMultiCompile.php` | 0 | 26 |
 | `lib/Compiler/Concern/IssetEmptyUnsetAndDimFetchCompile.php` | 0 | 6 |
@@ -49162,13 +49163,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 970)
-- new CompileFatal (line 1004)
-- new CompileError (line 1007)
-- new ClassCompileRegistry (line 1048)
-- new AttributeClassRegistry (line 1049)
-- new ClassCompileRegistry (line 1157)
-- new AttributeClassRegistry (line 1158)
+- new CompileFatal (line 973)
+- new CompileFatal (line 1007)
+- new CompileError (line 1010)
+- new ClassCompileRegistry (line 1051)
+- new AttributeClassRegistry (line 1052)
+- new ClassCompileRegistry (line 1160)
+- new AttributeClassRegistry (line 1161)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -50072,8 +50073,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/InlineCallArgSlotResolvers.php`
 
 **Warnings** (review for bootstrap subset):
-- trait InlineCallArgSlotResolvers (line 24)
-- 24 class method(s)
+- trait InlineCallArgSlotResolvers (line 25)
+- 8 class method(s)
+
+### `lib/Compiler/Concern/InlineCallArgUnionSiblingCastAndComparisonMatchers.php`
+
+**Warnings** (review for bootstrap subset):
+- trait InlineCallArgUnionSiblingCastAndComparisonMatchers (line 21)
+- 16 class method(s)
 
 ### `lib/Compiler/Concern/InstanceOfInAndClassConstCompile.php`
 

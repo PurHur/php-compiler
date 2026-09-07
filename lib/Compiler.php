@@ -71,6 +71,7 @@ require_once __DIR__.'/Compiler/Concern/InitArraySpreadArithmeticAndNestedInline
 require_once __DIR__.'/Compiler/Concern/SlotForPropertyClassConstAndClosureBindCallArgResolvers.php';
 require_once __DIR__.'/Compiler/Concern/SlotForInlineClosureAndFirstClassCallableCallArgResolvers.php';
 require_once __DIR__.'/Compiler/Concern/InlineCallArgSlotResolvers.php';
+require_once __DIR__.'/Compiler/Concern/InlineCallArgUnionSiblingCastAndComparisonMatchers.php';
 require_once __DIR__.'/Compiler/Concern/HoistedSiblingFeedAndArrayKeysArgSendRewire.php';
 require_once __DIR__.'/Compiler/Concern/RewireArithmeticBranchSubstrEnumAndSiblingMultiArgCallArgSendSlots.php';
 require_once __DIR__.'/Compiler/Concern/RewireInlineCallArgSendSlots.php';
@@ -271,6 +272,7 @@ use PHPCompiler\Compiler\Concern\InitArraySpreadArithmeticAndNestedInlineCallArg
 use PHPCompiler\Compiler\Concern\SlotForPropertyClassConstAndClosureBindCallArgResolvers;
 use PHPCompiler\Compiler\Concern\SlotForInlineClosureAndFirstClassCallableCallArgResolvers;
 use PHPCompiler\Compiler\Concern\InlineCallArgSlotResolvers;
+use PHPCompiler\Compiler\Concern\InlineCallArgUnionSiblingCastAndComparisonMatchers;
 use PHPCompiler\Compiler\Concern\HoistedSiblingFeedAndArrayKeysArgSendRewire;
 use PHPCompiler\Compiler\Concern\RewireArithmeticBranchSubstrEnumAndSiblingMultiArgCallArgSendSlots;
 use PHPCompiler\Compiler\Concern\RewireInlineCallArgSendSlots;
@@ -381,6 +383,7 @@ class Compiler {
     use SlotForPropertyClassConstAndClosureBindCallArgResolvers;
     use SlotForInlineClosureAndFirstClassCallableCallArgResolvers;
     use InlineCallArgSlotResolvers;
+    use InlineCallArgUnionSiblingCastAndComparisonMatchers;
     use HoistedSiblingFeedAndArrayKeysArgSendRewire;
     use RewireArithmeticBranchSubstrEnumAndSiblingMultiArgCallArgSendSlots;
     use RewireInlineCallArgSendSlots;
