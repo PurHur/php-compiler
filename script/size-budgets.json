@@ -4,9 +4,9 @@
     "done_when_ceiling": 25000,
     "files": {
         "lib/Compiler.php": {
-            "budget": 1241,
+            "budget": 1244,
             "target": 20000,
-            "note": "Concern trait splits (#36230/#36387/#36403); RewireSiblingMultiArgInlineCallArgSendSlots + CallArgNullLiteralHoistedPropertyConstAndCoalesceValueSlots + RewireVarExportNestedInlineCallArgSendSlots + peers"
+            "note": "Concern trait splits (#36230/#36387/#36403); AssignInCallRhsAndDeadInlineNestedFuncCallFeedSlots + RewireSiblingMultiArgInlineCallArgSendSlots + CallArgNullLiteralHoistedPropertyConstAndCoalesceValueSlots + peers"
         },
         "lib/JIT.php": {
             "budget": 274,
