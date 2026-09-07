@@ -183,6 +183,7 @@ use PHPCompiler\ext\standard\quotemeta;
 use PHPCompiler\ext\standard\range;
 use PHPCompiler\ext\standard\rawurldecode;
 use PHPCompiler\ext\standard\rawurlencode;
+use PHPCompiler\ext\standard\round;
 use PHPCompiler\ext\standard\session_status_;
 use PHPCompiler\ext\standard\sha1;
 use PHPCompiler\ext\standard\similar_text;
@@ -192,6 +193,7 @@ use PHPCompiler\ext\standard\spl_object_hash;
 use PHPCompiler\ext\standard\spl_object_id;
 use PHPCompiler\ext\standard\sprintf_;
 use PHPCompiler\ext\standard\sqrt;
+use PHPCompiler\ext\standard\StdlibConstants;
 use PHPCompiler\ext\standard\stream_get_filters;
 use PHPCompiler\ext\standard\stream_get_transports;
 use PHPCompiler\ext\standard\stream_get_wrappers;
@@ -940,6 +942,78 @@ final class DiscardedPureCallElisionTest extends TestCase
         $arg = $this->makeNativeDoubleVar();
 
         $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$arg]));
+    }
+
+    public function testElidesDiscardedRoundWithPrecisionAndProvenMode(): void
+    {
+        // round(num [, precision [, mode]]) — unary-only argc left multi-arg live (#36386).
+        // php-src ext/standard/math.c PHP_FUNCTION(round).
+        $context = $this->makeContext();
+        $builtin = new round();
+        $num = $this->makeNativeDoubleVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$num]));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            $builtin,
+            [$num, $this->makeCompileTimeLongVar(2)]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            $builtin,
+            [$num, $this->makeNativeLongVar()]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            $builtin,
+            [
+                $num,
+                $this->makeCompileTimeLongVar(0),
+                $this->makeCompileTimeLongVar(StdlibConstants::PHP_ROUND_HALF_UP),
+            ]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            $builtin,
+            [
+                $this->makeCompileTimeFloatVar(1.5),
+                $this->makeCompileTimeLongVar(0),
+                $this->makeCompileTimeLongVar(StdlibConstants::PHP_ROUND_HALF_EVEN),
+            ]
+        ));
+
+        // Soft-null num/precision stay live (deprecate).
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            $builtin,
+            [$this->makeNullVar()]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            $builtin,
+            [$num, $this->makeNullVar()]
+        ));
+        // Soft-null mode stays live (deprecate / ValueError).
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            $builtin,
+            [
+                $num,
+                $this->makeCompileTimeLongVar(0),
+                $this->makeNullVar(),
+            ]
+        ));
+        // Excess argc stays live (ArgumentCountError).
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            $builtin,
+            [
+                $num,
+                $this->makeCompileTimeLongVar(0),
+                $this->makeCompileTimeLongVar(StdlibConstants::PHP_ROUND_HALF_UP),
+                $this->makeCompileTimeLongVar(1),
+            ]
+        ));
     }
 
     public function testDoesNotElideAbsOnNull(): void
