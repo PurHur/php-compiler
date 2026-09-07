@@ -573,12 +573,20 @@ restart:
                             return $folded;
                         }
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
+                        // Compile-time *0/*1/*−1(proven) → bare mul (#36386).
+                        $skipOv = JitLongArithOverflow::canSkipOverflowPromote(
+                            $this->context,
+                            $opcode->type,
+                            $left,
+                            $right
+                        );
 
                         return JitLongArithOverflow::binaryNativeLong(
                             $this->context,
                             $opcode->type,
                             $leftValue,
-                            $__right
+                            $__right,
+                            $skipOv
                         );
                     case OpCode::TYPE_PLUS:
                         $folded = JitLongArithOverflow::tryFoldBinary($this->context, $opcode->type, $left, $right);
@@ -586,12 +594,20 @@ restart:
                             return $folded;
                         }
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
+                        // Compile-time +0 → bare add (#36386).
+                        $skipOv = JitLongArithOverflow::canSkipOverflowPromote(
+                            $this->context,
+                            $opcode->type,
+                            $left,
+                            $right
+                        );
 
                         return JitLongArithOverflow::binaryNativeLong(
                             $this->context,
                             $opcode->type,
                             $leftValue,
-                            $__right
+                            $__right,
+                            $skipOv
                         );
                     case OpCode::TYPE_MINUS:
                         $folded = JitLongArithOverflow::tryFoldBinary($this->context, $opcode->type, $left, $right);
@@ -599,12 +615,20 @@ restart:
                             return $folded;
                         }
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
+                        // Compile-time −0 → bare sub (#36386).
+                        $skipOv = JitLongArithOverflow::canSkipOverflowPromote(
+                            $this->context,
+                            $opcode->type,
+                            $left,
+                            $right
+                        );
 
                         return JitLongArithOverflow::binaryNativeLong(
                             $this->context,
                             $opcode->type,
                             $leftValue,
-                            $__right
+                            $__right,
+                            $skipOv
                         );
                     case OpCode::TYPE_DIV:
                         // php-src div_function: exact long/long → int, else double (#35337).

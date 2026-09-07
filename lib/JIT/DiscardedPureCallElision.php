@@ -240,7 +240,10 @@ use PHPCompiler\VM\Variable as VmVariable;
  * counts skip the negative-count {@code ArithmeticError} blocks
  * ({@see bitShiftCountCanSkipNegativeGuard}). Compile-time divisors ≠
  * {@code -1} skip the typed {@code /} {@code PHP_INT_MIN}/{-1} promote arm
- * ({@see nativeLongDivisorCanSkipNegOneModuloBranch}). Proven-safe {@code str_increment}/
+ * ({@see nativeLongDivisorCanSkipNegOneModuloBranch}). Compile-time identity/zero
+ * operands on typed {@code +}/{@code -}/{@code *} skip
+ * {@code llvm.s{add,sub,mul}.with.overflow} ({@see \PHPCompiler\JIT\JitLongArithOverflow::canSkipOverflowPromote}).
+ * Proven-safe {@code str_increment}/
  * {@code str_decrement} literals likewise fold at the call site and skip
  * after-call throw-pending ({@see strIncDecArgsCannotThrow}). {@code hex2bin}/
  * {@code base64_decode}/{@code convert_uudecode} stay live (invalid-input
