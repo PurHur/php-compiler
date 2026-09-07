@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8408 |
-| Phase A inventory files (M2 ratio SSOT) | 8408 |
+| PHP files on vm.php path | 8409 |
+| Phase A inventory files (M2 ratio SSOT) | 8409 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26442 |
+| Source constructs flagged (warnings) | 26444 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5658,6 +5658,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/IssetEmptyCallArgAndMultiCompile.php` | 0 | 26 |
 | `lib/Compiler/Concern/IssetEmptyUnsetAndDimFetchCompile.php` | 0 | 6 |
 | `lib/Compiler/Concern/ListDestructAndForeach.php` | 0 | 7 |
+| `lib/Compiler/Concern/MatchInlineCallArgProducerEmbeddedLiteralsResolve.php` | 0 | 2 |
 | `lib/Compiler/Concern/MatchInlineCallArgProducerWithEmbeddedLiterals.php` | 0 | 3 |
 | `lib/Compiler/Concern/NestedArrayAndLeadingConstCallArgProducers.php` | 0 | 3 |
 | `lib/Compiler/Concern/NestedArrayOutermostAndByRefCallArgHelpers.php` | 0 | 4 |
@@ -49203,13 +49204,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 1060)
-- new CompileFatal (line 1094)
-- new CompileError (line 1097)
-- new ClassCompileRegistry (line 1138)
-- new AttributeClassRegistry (line 1139)
-- new ClassCompileRegistry (line 1247)
-- new AttributeClassRegistry (line 1248)
+- new CompileFatal (line 1063)
+- new CompileFatal (line 1097)
+- new CompileError (line 1100)
+- new ClassCompileRegistry (line 1141)
+- new AttributeClassRegistry (line 1142)
+- new ClassCompileRegistry (line 1250)
+- new AttributeClassRegistry (line 1251)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -50357,11 +50358,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new CompileFatal (line 830)
 - 33 class method(s)
 
+### `lib/Compiler/Concern/MatchInlineCallArgProducerEmbeddedLiteralsResolve.php`
+
+**Warnings** (review for bootstrap subset):
+- trait MatchInlineCallArgProducerEmbeddedLiteralsResolve (line 19)
+- 1 class method(s)
+
 ### `lib/Compiler/Concern/MatchInlineCallArgProducerWithEmbeddedLiterals.php`
 
 **Warnings** (review for bootstrap subset):
-- trait MatchInlineCallArgProducerWithEmbeddedLiterals (line 33)
-- 4 class method(s)
+- trait MatchInlineCallArgProducerWithEmbeddedLiterals (line 34)
+- 3 class method(s)
 - 2 closure(s)
 
 ### `lib/Compiler/Concern/NestedArrayAndLeadingConstCallArgProducers.php`
