@@ -57,6 +57,8 @@ final class lcfirst extends Internal
         }
         $str = self::jitStringArg($context, $args[0]);
         $copy = $context->builder->call($context->lookupFunction('__string__separate'), $str);
+        // Input may be ephemeral concat — separate copied; release temp (#36388).
+        JitStringBuiltinArg::releaseEphemeralArgAfterCopy($context, $args[0], $str);
         self::transformFirstAscii($context, $copy, ord('A'), ord('Z'), 32);
 
         return $copy;

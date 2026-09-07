@@ -84,8 +84,23 @@ final class Issue36388StringCallResultFreeTest extends TestCase
         $this->assertStringContainsString("'substr' => true", $src);
         $this->assertStringContainsString("'trim' => true", $src);
         $this->assertStringContainsString("'strtoupper' => true", $src);
+        $this->assertStringContainsString("'strrev' => true", $src);
+        $this->assertStringContainsString("'str_rot13' => true", $src);
+        $this->assertStringContainsString("'ucfirst' => true", $src);
         $this->assertStringContainsString('releaseEphemeralArgAfterCopy', (string) file_get_contents(
             dirname(__DIR__, 2).'/lib/JIT/JitStringBuiltinArg.php'
+        ));
+        $this->assertStringContainsString('releaseEphemeralArgAfterCopy', (string) file_get_contents(
+            dirname(__DIR__, 2).'/ext/standard/strrev.php'
+        ));
+        $this->assertStringContainsString('reverseBytesInPlace', (string) file_get_contents(
+            dirname(__DIR__, 2).'/ext/standard/strrev.php'
+        ));
+        $this->assertStringContainsString('transformRot13InPlace', (string) file_get_contents(
+            dirname(__DIR__, 2).'/ext/standard/str_rot13.php'
+        ));
+        $this->assertStringContainsString('releaseEphemeralArgAfterCopy', (string) file_get_contents(
+            dirname(__DIR__, 2).'/ext/standard/ucfirst.php'
         ));
     }
 
@@ -188,6 +203,13 @@ final class Issue36388StringCallResultFreeTest extends TestCase
             'substr_lit' => ['test/repro/issue_36388_substr_lit_free.php', 'substr_lit delta='],
             'trim_lit' => ['test/repro/issue_36388_trim_lit_free.php', 'trim_lit delta='],
             'strtoupper_lit' => ['test/repro/issue_36388_strtoupper_lit_free.php', 'strtoupper_lit delta='],
+            'strrev' => ['test/repro/issue_36388_strrev_local_free.php', 'strrev_local delta='],
+            'strrev_lit' => ['test/repro/issue_36388_strrev_lit_free.php', 'strrev_lit delta='],
+            'str_rot13' => ['test/repro/issue_36388_str_rot13_local_free.php', 'str_rot13_local delta='],
+            'str_rot13_lit' => ['test/repro/issue_36388_str_rot13_lit_free.php', 'str_rot13_lit delta='],
+            'ucfirst' => ['test/repro/issue_36388_ucfirst_local_free.php', 'ucfirst_local delta='],
+            'ucfirst_lit' => ['test/repro/issue_36388_ucfirst_lit_free.php', 'ucfirst_lit delta='],
+            'lcfirst' => ['test/repro/issue_36388_lcfirst_local_free.php', 'lcfirst_local delta='],
         ];
     }
 }

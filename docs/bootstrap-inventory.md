@@ -43834,7 +43834,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/str_rot13.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/str_shuffle.php`
@@ -44278,7 +44278,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/strrev.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `ext/standard/strripos.php`
 
@@ -58691,21 +58691,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - trait CallResultOperandAssign (line 25)
-- new Variable (line 302)
-- new Variable (line 325)
-- new Variable (line 354)
-- new Variable (line 380)
-- new Variable (line 405)
-- new Variable (line 450)
-- new Type (line 458)
-- new Variable (line 478)
-- new Type (line 487)
-- new Variable (line 506)
-- new Type (line 514)
-- new Variable (line 540)
-- new Type (line 548)
-- new Variable (line 571)
-- new Variable (line 595)
+- new Variable (line 319)
+- new Variable (line 342)
+- new Variable (line 371)
+- new Variable (line 397)
+- new Variable (line 422)
+- new Variable (line 467)
+- new Type (line 475)
+- new Variable (line 495)
+- new Type (line 504)
+- new Variable (line 523)
+- new Type (line 531)
+- new Variable (line 557)
+- new Type (line 565)
+- new Variable (line 588)
+- new Variable (line 612)
 - 6 class method(s)
 
 ### `lib/JIT/Concern/ClassConstEnumAndFunctionStatic.php`
@@ -60602,7 +60602,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 544)
-- 28 class method(s)
+- 29 class method(s)
 
 ### `lib/JIT/JitStringCompare.php`
 
