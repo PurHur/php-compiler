@@ -258,7 +258,10 @@ use PHPCompiler\VM\Variable as VmVariable;
  * {@code sdiv}/{@code srem}/exactness; keep {@code DivisionByZeroError} when
  * {@code n == 0}; {@see nativeLongArithSameOperandFold}). Same-operand typed
  * comparisons fold to a constant bool / spaceship 0 (omit {@code icmp} /
- * resource-identity CFG; {@see nativeLongCompareSameOperandFold}). Compile-time
+ * resource-identity CFG; {@see nativeLongCompareSameOperandFold}). Distinct
+ * compile-time long literals ({@code 7 === 7}, {@code 3 <=> 5}) likewise fold
+ * (same-operand misses different Value wrappers;
+ * {@see nativeLongCompareCompileTimeFold}). Compile-time
  * divisors ≠ {@code -1} skip the typed {@code /} {@code PHP_INT_MIN}/{-1}
  * promote arm ({@see nativeLongDivisorCanSkipNegOneModuloBranch}). Typed
  * {@code / 1} is identity (no {@code sdiv}/{@code srem}/exactness promote;
@@ -4392,6 +4395,85 @@ final class DiscardedPureCallElision
         }
 
         return null;
+    }
+
+    /**
+     * Typed native-long relational / equality / spaceship when both operands
+     * are compile-time longs (distinct SSA temps / literals that
+     * {@see nativeLongCompareSameOperandFold} misses because Value wrappers
+     * differ):
+     * - {@code 7 === 7} / {@code 7 == 7} / {@code 3 <= 7} / {@code 7 >= 3} → true
+     * - {@code 7 === 3} / {@code 7 != 3} / {@code 7 < 3} / {@code 3 > 7} → false
+     * - {@code 7 <=> 3} → {@code 1}, {@code 3 <=> 7} → {@code -1},
+     *   {@code 7 <=> 7} → {@code 0}
+     *
+     * Omits {@code icmp} and the resource-identity equal CFG
+     * ({@see \PHPCompiler\JIT\JitValueCompare::nativeLongEqualWithResourceIdentity}).
+     *
+     * Peer same-operand compare ({@see nativeLongCompareSameOperandFold}) /
+     * compile-time arith ({@see \PHPCompiler\JIT\JitLongArithOverflow::tryFoldBinary}).
+     *
+     * php-src: Zend/zend_operators.c compare_function /
+     * is_identical_function / is_equal_function / zend_compare_longs.
+     *
+     * @return 'true'|'false'|int|null  int is spaceship −1|0|1
+     */
+    public static function nativeLongCompareCompileTimeFold(
+        int $opType,
+        Variable $left,
+        Variable $right
+    ): string|int|null {
+        $a = self::compileTimeLongScalar($left);
+        $b = self::compileTimeLongScalar($right);
+        if (null === $a || null === $b) {
+            return null;
+        }
+        $cmp = $a <=> $b;
+        if (\PHPCompiler\OpCode::TYPE_SPACESHIP === $opType) {
+            return $cmp;
+        }
+        if (\PHPCompiler\OpCode::TYPE_IDENTICAL === $opType
+            || \PHPCompiler\OpCode::TYPE_EQUAL === $opType
+        ) {
+            return 0 === $cmp ? 'true' : 'false';
+        }
+        if (\PHPCompiler\OpCode::TYPE_NOT_IDENTICAL === $opType
+            || \PHPCompiler\OpCode::TYPE_NOT_EQUAL === $opType
+        ) {
+            return 0 !== $cmp ? 'true' : 'false';
+        }
+        if (\PHPCompiler\OpCode::TYPE_SMALLER === $opType) {
+            return $cmp < 0 ? 'true' : 'false';
+        }
+        if (\PHPCompiler\OpCode::TYPE_GREATER === $opType) {
+            return $cmp > 0 ? 'true' : 'false';
+        }
+        if (\PHPCompiler\OpCode::TYPE_SMALLER_OR_EQUAL === $opType) {
+            return $cmp <= 0 ? 'true' : 'false';
+        }
+        if (\PHPCompiler\OpCode::TYPE_GREATER_OR_EQUAL === $opType) {
+            return $cmp >= 0 ? 'true' : 'false';
+        }
+
+        return null;
+    }
+
+    /**
+     * Same-operand or both-compile-time typed native-long compare fold.
+     *
+     * @return 'true'|'false'|int|null  int is spaceship −1|0|1
+     */
+    public static function nativeLongCompareFold(
+        int $opType,
+        Variable $left,
+        Variable $right
+    ): string|int|null {
+        $same = self::nativeLongCompareSameOperandFold($opType, $left, $right);
+        if (null !== $same) {
+            return 'zero' === $same ? 0 : $same;
+        }
+
+        return self::nativeLongCompareCompileTimeFold($opType, $left, $right);
     }
 
     /**
