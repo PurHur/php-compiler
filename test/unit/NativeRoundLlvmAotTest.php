@@ -430,4 +430,76 @@ final class NativeRoundLlvmAotTest extends TestCase
             @unlink($bin);
         }
     }
+
+    public function testRoundRuntimePlacesKnownModeUsesLlvmPowWithoutHelperBridge(): void
+    {
+        // Runtime $places + known HALF_UP: llvm.pow.f64 scale → llvm.round.f64 (#36386).
+        $src = <<<'PHP'
+        <?php
+        declare(strict_types=1);
+        function work(float $x, int $p): void {
+            echo round($x, $p), "\n";
+            echo round($x, $p, PHP_ROUND_HALF_UP), "\n";
+            echo round($x, $p, PHP_ROUND_HALF_DOWN), "\n";
+        }
+        work(2.675, 2);
+        work(1.25, 1);
+        work(1.5, 0);
+        work(-1.55, 1);
+        PHP;
+        $path = sys_get_temp_dir().'/phpc_round_rt_p_'.getmypid().'.php';
+        $bin = sys_get_temp_dir().'/phpc_round_rt_p_'.getmypid().'.bin';
+        file_put_contents($path, $src);
+        try {
+            putenv('PHP_COMPILER_DUMP_IR=1');
+            putenv('PHP_COMPILER_CACHE=0');
+            $cmd = escapeshellarg(PHP_BINARY).' '
+                .escapeshellarg(__DIR__.'/../../bin/compile.php').' -o '
+                .escapeshellarg($bin).' '.escapeshellarg($path).' 2>&1';
+            exec($cmd, $out, $rc);
+            $this->assertSame(0, $rc, implode("\n", $out));
+            $ll = (string) file_get_contents('/tmp/phpc-last.ll');
+
+            $sig = null;
+            if (preg_match('/define void @work\([^\)]*\)/', $ll, $m)) {
+                $sig = $m[0];
+            }
+            $this->assertNotNull($sig, 'missing define void @work');
+            $fnStart = strpos($ll, $sig);
+            $this->assertNotFalse($fnStart);
+            $fnEnd = strpos($ll, "\ndefine ", $fnStart + 1);
+            $body = false === $fnEnd ? substr($ll, $fnStart) : substr($ll, $fnStart, $fnEnd - $fnStart);
+
+            $this->assertMatchesRegularExpression('/call double @llvm\.pow\.f64\(/', $body);
+            $this->assertMatchesRegularExpression('/call double @llvm\.round\.f64\(/', $body);
+            $this->assertStringNotContainsString('round_bridge_entry', $body);
+            $this->assertStringNotContainsString('RoundJitHelper', $body);
+            $this->assertStringNotContainsString('call double @phpc_round(', $body);
+
+            exec(escapeshellarg($bin), $runOut, $runRc);
+            $this->assertSame(0, $runRc, 'AOT binary must not segfault');
+            $this->assertCount(12, $runOut);
+            // 2.675 @2 HALF_UP/HALF_UP/HALF_DOWN → 2.68 / 2.68 / 2.67
+            $this->assertEqualsWithDelta(2.68, (float) $runOut[0], 1e-12);
+            $this->assertEqualsWithDelta(2.68, (float) $runOut[1], 1e-12);
+            $this->assertEqualsWithDelta(2.67, (float) $runOut[2], 1e-12);
+            // 1.25 @1 → 1.3 / 1.3 / 1.2
+            $this->assertEqualsWithDelta(1.3, (float) $runOut[3], 1e-12);
+            $this->assertEqualsWithDelta(1.3, (float) $runOut[4], 1e-12);
+            $this->assertEqualsWithDelta(1.2, (float) $runOut[5], 1e-12);
+            // 1.5 @0 → 2 / 2 / 1 (half-tie distinguishes HALF_UP vs HALF_DOWN)
+            $this->assertEqualsWithDelta(2.0, (float) $runOut[6], 1e-12);
+            $this->assertEqualsWithDelta(2.0, (float) $runOut[7], 1e-12);
+            $this->assertEqualsWithDelta(1.0, (float) $runOut[8], 1e-12);
+            // -1.55 @1 → -1.6 / -1.6 / -1.5
+            $this->assertEqualsWithDelta(-1.6, (float) $runOut[9], 1e-12);
+            $this->assertEqualsWithDelta(-1.6, (float) $runOut[10], 1e-12);
+            $this->assertEqualsWithDelta(-1.5, (float) $runOut[11], 1e-12);
+        } finally {
+            putenv('PHP_COMPILER_DUMP_IR');
+            putenv('PHP_COMPILER_CACHE');
+            @unlink($path);
+            @unlink($bin);
+        }
+    }
 }

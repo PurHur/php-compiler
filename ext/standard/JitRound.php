@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Builtin\MathAbs;
+use PHPCompiler\JIT\Builtin\MathFpow;
 use PHPCompiler\JIT\Builtin\MathRound;
 use PHPCompiler\JIT\Builtin\RoundingModeJit;
 use PHPCompiler\JIT\Context;
@@ -31,7 +32,11 @@ use PHPLLVM\Value;
  * LLVM, then unscale — same algorithm as RoundJitHelper / php-src
  * {@code _php_math_round} (#36386). Replaces the prior user-TU sprintf+strtod
  * HALF_UP path (#35741), which drifted from Zend on several half-away cases.
- * Runtime (unknown) places keep the RoundJitHelper NestedJIT bridge.
+ *
+ * Runtime (unknown) places + known PHP_ROUND_* mode (incl. default HALF_UP) scale
+ * via {@code llvm.pow.f64}(10, |places|) then the same places=0 LLVM path —
+ * matching php-src {@code pow(10.0, (double) places)} (#36386). Only unknown mode
+ * still uses the RoundJitHelper NestedJIT bridge.
  */
 final class JitRound
 {
@@ -70,6 +75,21 @@ final class JitRound
             );
             if (null !== $viaScaled) {
                 return $viaScaled;
+            }
+        }
+        // Runtime places + known mode: llvm.pow.f64 scale → places=0 LLVM → unscale (#36386).
+        if (null === $knownPlaces && null !== $knownMode) {
+            $placesVal = null !== $precisionArg
+                ? self::lowerPrecisionArg($context, $precisionArg)
+                : $context->getTypeFromString('int64')->constInt(0, false);
+            $viaRuntimePlaces = self::tryLowerRuntimePlacesScaledIntrinsic(
+                $context,
+                $number,
+                $placesVal,
+                $knownMode
+            );
+            if (null !== $viaRuntimePlaces) {
+                return $viaRuntimePlaces;
             }
         }
 
@@ -127,6 +147,20 @@ final class JitRound
             );
             if (null !== $viaScaled) {
                 return $viaScaled;
+            }
+        }
+        if (null === $knownPlaces) {
+            $placesVal = null !== $precision
+                ? self::lowerPrecisionArg($context, $precision)
+                : $context->getTypeFromString('int64')->constInt(0, false);
+            $viaRuntimePlaces = self::tryLowerRuntimePlacesScaledIntrinsic(
+                $context,
+                $number,
+                $placesVal,
+                $mode
+            );
+            if (null !== $viaRuntimePlaces) {
+                return $viaRuntimePlaces;
             }
         }
 
@@ -315,6 +349,70 @@ final class JitRound
             : $context->builder->fmul($rounded, $expVal);
 
         return $context->builder->select($tooBig, $number, $unscaled);
+    }
+
+    /**
+     * round($runtimeNum, $runtimePlaces, known mode) — clamp places, scale by
+     * {@code llvm.pow.f64}(10, |places|), places=0 LLVM intrinsic, unscale.
+     * Matches php-src {@code _php_math_round} / {@code pow(10.0, (double) places)} (#36386).
+     */
+    private static function tryLowerRuntimePlacesScaledIntrinsic(
+        Context $context,
+        Value $number,
+        Value $places,
+        int $mode
+    ): ?Value {
+        if (!self::isKnownRoundMode($mode)) {
+            return null;
+        }
+
+        $i64 = $context->getTypeFromString('int64');
+        $double = $context->getTypeFromString('double');
+        // Match RoundJitHelper / php-src: clamp places into [-308, 308].
+        $lo = $i64->constInt(-308, true);
+        $hi = $i64->constInt(308, false);
+        $below = $context->builder->icmp(Builder::INT_SLT, $places, $lo);
+        $above = $context->builder->icmp(Builder::INT_SGT, $places, $hi);
+        $clamped = $context->builder->select($below, $lo, $places);
+        $clamped = $context->builder->select($above, $hi, $clamped);
+
+        $zero = $i64->constInt(0, false);
+        $isZeroPlaces = $context->builder->icmp(Builder::INT_EQ, $clamped, $zero);
+        $direct = self::tryInvokePlacesZeroIntrinsic($context, $number, $mode);
+        if (null === $direct) {
+            return null;
+        }
+
+        $isNeg = $context->builder->icmp(Builder::INT_SLT, $clamped, $zero);
+        $negated = $context->builder->sub($zero, $clamped);
+        $absPlaces = $context->builder->select($isNeg, $negated, $clamped);
+        $absPlacesF = $context->builder->sitofp($absPlaces, $double);
+        MathFpow::ensureLinked($context);
+        $expVal = MathFpow::invoke($context, $double->constReal(10.0), $absPlacesF);
+
+        $positivePlaces = $context->builder->icmp(Builder::INT_SGT, $clamped, $zero);
+        $scaledMul = $context->builder->fmul($number, $expVal);
+        $scaledDiv = $context->builder->fdiv($number, $expVal);
+        $scaled = $context->builder->select($positivePlaces, $scaledMul, $scaledDiv);
+
+        // RoundJitHelper: |scaled| >= 1e16 → return original (precision cliff).
+        $absScaled = MathAbs::invokeDouble($context, $scaled);
+        $tooBig = $context->builder->fcmp(
+            Builder::REAL_OGE,
+            $absScaled,
+            $double->constReal(1.0e16)
+        );
+        $rounded = self::tryInvokePlacesZeroIntrinsic($context, $scaled, $mode);
+        if (null === $rounded) {
+            return null;
+        }
+        $unscaledDiv = $context->builder->fdiv($rounded, $expVal);
+        $unscaledMul = $context->builder->fmul($rounded, $expVal);
+        $unscaled = $context->builder->select($positivePlaces, $unscaledDiv, $unscaledMul);
+        $scaledPath = $context->builder->select($tooBig, $number, $unscaled);
+
+        // places==0 must not apply the non-zero-places 1e16 cliff (RoundJitHelper early path).
+        return $context->builder->select($isZeroPlaces, $direct, $scaledPath);
     }
 
     /** Modes with places=0 LLVM lowering (all PHP_ROUND_* ints). */
