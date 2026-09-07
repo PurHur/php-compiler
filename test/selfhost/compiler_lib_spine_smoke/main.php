@@ -5368,6 +5368,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/CallArgEarlyFastPathAndMixe
 require_once __DIR__.'/../../../lib/Compiler/Concern/CallArgNullMergePropertyFetchAndHoistedPreludeSends.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CallArgInlineEnumCastErrorSuppressAndFccSends.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CallArgPostFccDimCoalesceExprPreludeAndNestedNewSends.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/CallArgInlineArrayUnpackReduceAndFamilyResolve.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompileCallArgSends.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompileInlineSpecializedCallArgSends.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/ArrayPadUnpackExtractAndDateSunCallArgSends.php';

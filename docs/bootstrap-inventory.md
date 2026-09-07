@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8385 |
-| Phase A inventory files (M2 ratio SSOT) | 8385 |
+| PHP files on vm.php path | 8386 |
+| Phase A inventory files (M2 ratio SSOT) | 8386 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26391 |
+| Source constructs flagged (warnings) | 26394 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5568,6 +5568,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/CallAndArrayLiteralCompile.php` | 0 | 20 |
 | `lib/Compiler/Concern/CallArgCompileTimeValueAndProcOpenFold.php` | 0 | 8 |
 | `lib/Compiler/Concern/CallArgEarlyFastPathAndMixedPropertyFetchSends.php` | 0 | 9 |
+| `lib/Compiler/Concern/CallArgInlineArrayUnpackReduceAndFamilyResolve.php` | 0 | 5 |
 | `lib/Compiler/Concern/CallArgInlineEnumCastErrorSuppressAndFccSends.php` | 0 | 17 |
 | `lib/Compiler/Concern/CallArgNullMergePropertyFetchAndHoistedPreludeSends.php` | 0 | 23 |
 | `lib/Compiler/Concern/CallArgPostFccDimCoalesceExprPreludeAndNestedNewSends.php` | 0 | 6 |
@@ -5577,7 +5578,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/CoalesceAndNullsafe.php` | 0 | 17 |
 | `lib/Compiler/Concern/CoalesceLeftAndEchoConcatPreludes.php` | 0 | 9 |
 | `lib/Compiler/Concern/CompileAnonymousFunctionGeneratorAndNever.php` | 0 | 5 |
-| `lib/Compiler/Concern/CompileCallArgSends.php` | 0 | 13 |
+| `lib/Compiler/Concern/CompileCallArgSends.php` | 0 | 11 |
 | `lib/Compiler/Concern/CompileClassBodyAndTraitAdaptations.php` | 0 | 9 |
 | `lib/Compiler/Concern/CompileClassConstFoldAndTypedReject.php` | 0 | 15 |
 | `lib/Compiler/Concern/CompileClassLikeDeclAndScope.php` | 0 | 8 |
@@ -49174,13 +49175,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 1000)
-- new CompileFatal (line 1034)
-- new CompileError (line 1037)
-- new ClassCompileRegistry (line 1078)
-- new AttributeClassRegistry (line 1079)
-- new ClassCompileRegistry (line 1187)
-- new AttributeClassRegistry (line 1188)
+- new CompileFatal (line 1003)
+- new CompileFatal (line 1037)
+- new CompileError (line 1040)
+- new ClassCompileRegistry (line 1081)
+- new AttributeClassRegistry (line 1082)
+- new ClassCompileRegistry (line 1190)
+- new AttributeClassRegistry (line 1191)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -49368,6 +49369,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new OpCode (line 543)
 - 1 class method(s)
 
+### `lib/Compiler/Concern/CallArgInlineArrayUnpackReduceAndFamilyResolve.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CallArgInlineArrayUnpackReduceAndFamilyResolve (line 23)
+- new OpCode (line 89)
+- new OpCode (line 111)
+- 1 class method(s)
+- 1 closure(s)
+
 ### `lib/Compiler/Concern/CallArgInlineEnumCastErrorSuppressAndFccSends.php`
 
 **Warnings** (review for bootstrap subset):
@@ -49498,19 +49508,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/CompileCallArgSends.php`
 
 **Warnings** (review for bootstrap subset):
-- trait CompileCallArgSends (line 34)
-- new OpCode (line 250)
-- new OpCode (line 272)
-- new Operand\Temporary (line 2084)
-- new Operand\Temporary (line 2615)
-- new Operand\Temporary (line 2801)
-- new Operand\Temporary (line 2833)
-- new Operand\Temporary (line 2930)
-- new Operand\Temporary (line 3059)
-- new OpCode (line 3061)
-- new OpCode (line 4717)
+- trait CompileCallArgSends (line 36)
+- new Operand\Temporary (line 1795)
+- new Operand\Temporary (line 2326)
+- new Operand\Temporary (line 2512)
+- new Operand\Temporary (line 2544)
+- new Operand\Temporary (line 2641)
+- new Operand\Temporary (line 2770)
+- new OpCode (line 2772)
+- new OpCode (line 4428)
 - 1 class method(s)
-- 4 closure(s)
+- 3 closure(s)
 
 ### `lib/Compiler/Concern/CompileClassBodyAndTraitAdaptations.php`
 
