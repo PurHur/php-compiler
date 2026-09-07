@@ -5420,6 +5420,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/InstanceOfInAndClassConstCo
 require_once __DIR__.'/../../../lib/Compiler/Concern/OuterSiblingAndBuiltinWireCallArgSlots.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CallAndArrayLiteralCompile.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/StaticMethodAndFuncCallCompile.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/SiblingInlineReturnSlotAndMethodDeadTempDetect.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/SiblingInlineFuncCallAndDeadArrayProducers.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/NestedArrayAndLeadingConstCallArgProducers.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/DeferredSiblingAndArrayMapNullCallArgProducers.php';
