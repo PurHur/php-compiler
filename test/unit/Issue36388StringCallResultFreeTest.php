@@ -81,6 +81,12 @@ final class Issue36388StringCallResultFreeTest extends TestCase
         $this->assertStringContainsString('ephemeralStringTemp = true', $src);
         $this->assertStringContainsString("'sprintf' => true", $src);
         $this->assertStringContainsString("'vsprintf' => true", $src);
+        $this->assertStringContainsString("'substr' => true", $src);
+        $this->assertStringContainsString("'trim' => true", $src);
+        $this->assertStringContainsString("'strtoupper' => true", $src);
+        $this->assertStringContainsString('releaseEphemeralArgAfterCopy', (string) file_get_contents(
+            dirname(__DIR__, 2).'/lib/JIT/JitStringBuiltinArg.php'
+        ));
     }
 
     public function testSprintfCompileTimeFormatUsesModuleCStringNotHeapInit(): void
@@ -141,5 +147,47 @@ final class Issue36388StringCallResultFreeTest extends TestCase
         $this->assertStringContainsString('sprintf_key delta=', $text);
         $this->assertStringNotContainsString('LEAK', $text);
         $this->assertStringContainsString(' ok', $text);
+    }
+
+    /**
+     * @dataProvider providingStringBuiltinLocalFreeRepros
+     */
+    public function testStringBuiltinLocalUnsetFreesUnderAot(string $reproRelative, string $needle): void
+    {
+        if (!\PHPCompiler\LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $root = dirname(__DIR__, 2);
+        $src = $root.'/'.$reproRelative;
+        $bin = sys_get_temp_dir().'/phpc_36388_sbf_'.getmypid().'_'.md5($reproRelative);
+        $compile = escapeshellarg(PHP_BINARY).' '
+            .escapeshellarg($root.'/bin/compile.php').' -o '
+            .escapeshellarg($bin).' '
+            .escapeshellarg($src);
+        $cwd = getcwd();
+        chdir($root);
+        exec($compile.' 2>&1', $out, $rc);
+        chdir($cwd);
+        $this->assertSame(0, $rc, implode("\n", $out));
+        exec(escapeshellarg($bin).' 2000 2>&1', $runOut, $runRc);
+        @unlink($bin);
+        $this->assertSame(0, $runRc, implode("\n", $runOut));
+        $text = implode("\n", $runOut);
+        $this->assertStringContainsString($needle, $text);
+        $this->assertStringNotContainsString('LEAK', $text);
+        $this->assertStringContainsString(' ok', $text);
+    }
+
+    /** @return array<string, array{0: string, 1: string}> */
+    public static function providingStringBuiltinLocalFreeRepros(): array
+    {
+        return [
+            'substr' => ['test/repro/issue_36388_substr_local_free.php', 'substr_local delta='],
+            'trim' => ['test/repro/issue_36388_trim_local_free.php', 'trim_local delta='],
+            'strtoupper' => ['test/repro/issue_36388_strtoupper_local_free.php', 'strtoupper_local delta='],
+            'substr_lit' => ['test/repro/issue_36388_substr_lit_free.php', 'substr_lit delta='],
+            'trim_lit' => ['test/repro/issue_36388_trim_lit_free.php', 'trim_lit delta='],
+            'strtoupper_lit' => ['test/repro/issue_36388_strtoupper_lit_free.php', 'strtoupper_lit delta='],
+        ];
     }
 }

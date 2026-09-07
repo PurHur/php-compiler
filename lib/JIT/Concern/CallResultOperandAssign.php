@@ -134,8 +134,9 @@ trait CallResultOperandAssign
 
     /**
      * True when the current call returns a freshly allocated `__string__*` the caller owns
-     * (str_repeat / sprintf / NestedJIT StrRepeat helper / user `: string` returns). Borrowed
-     * `__string__*` results must stay KIND_VALUE so freeDeadVariables is a no-op (#36388).
+     * (str_repeat / sprintf / substr / trim / NestedJIT string helpers / user `: string`
+     * returns). Borrowed `__string__*` results must stay KIND_VALUE so freeDeadVariables is a
+     * no-op (#36388).
      */
     private function callResultOwnsFreshString(): bool
     {
@@ -174,13 +175,29 @@ trait CallResultOperandAssign
 
     private function isOwningStringInternalName(string $name): bool
     {
-        // Fresh heap strings from Internal::call — php-src zend_string_init / formatted_print.
-        // sprintf/vsprintf were missing: KIND_VALUE left them immortal across unset (#36388).
+        // Fresh heap strings from Internal::call — php-src zend_string_init / php_substr /
+        // php_trim / php_strtoupper / formatted_print (and peers that always allocate).
+        // Do not list str_replace/strtr: php_str_to_str_ex may return the subject (#36388).
+        // Immortal constant folds delref as no-ops.
         static $owning = [
             'str_repeat' => true,
             'str_pad' => true,
             'sprintf' => true,
             'vsprintf' => true,
+            'substr' => true,
+            'trim' => true,
+            'ltrim' => true,
+            'rtrim' => true,
+            'chop' => true,
+            'strtoupper' => true,
+            'strtolower' => true,
+            'ucfirst' => true,
+            'lcfirst' => true,
+            'ucwords' => true,
+            'strrev' => true,
+            'str_rot13' => true,
+            'str_increment' => true,
+            'str_decrement' => true,
         ];
 
         return isset($owning[strtolower($name)]);

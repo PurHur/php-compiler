@@ -1110,4 +1110,18 @@ final class JitStringBuiltinArg
             $errorMessage
         );
     }
+
+    /**
+     * After a builtin copies {@see $argPtr} via {@code __string__separate} / slice, release
+     * ephemeral concat / FUNCCALL string temps (php-src temporary zval release after Z_PARAM_STR).
+     *
+     * Named CVs stay live. Immortal literals delref as no-ops (#36388).
+     */
+    public static function releaseEphemeralArgAfterCopy(
+        Context $context,
+        Variable $arg,
+        Value $argPtr
+    ): void {
+        HashTableWriteLlvm::releaseEphemeralStringKeyAfterHashInsert($context, $arg, $argPtr);
+    }
 }
