@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8395 |
-| Phase A inventory files (M2 ratio SSOT) | 8395 |
+| PHP files on vm.php path | 8396 |
+| Phase A inventory files (M2 ratio SSOT) | 8396 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26412 |
+| Source constructs flagged (warnings) | 26414 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5570,6 +5570,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/CallAndArrayLiteralCompile.php` | 0 | 20 |
 | `lib/Compiler/Concern/CallArgCompileTimeValueAndProcOpenFold.php` | 0 | 8 |
 | `lib/Compiler/Concern/CallArgDimFetchAndInlineArrayLiteralValueSlotWire.php` | 0 | 2 |
+| `lib/Compiler/Concern/CallArgDirectDimCoalesceNewFoldEnumAndMatchedProducerValueSlots.php` | 0 | 2 |
 | `lib/Compiler/Concern/CallArgEarlyFastPathAndMixedPropertyFetchSends.php` | 0 | 9 |
 | `lib/Compiler/Concern/CallArgEncapsedConcatArithmeticNamedLocalAndPrecedingProducerValueSlots.php` | 0 | 2 |
 | `lib/Compiler/Concern/CallArgInlineArrayUnpackReduceAndFamilyResolve.php` | 0 | 5 |
@@ -49190,13 +49191,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 1021)
-- new CompileFatal (line 1055)
-- new CompileError (line 1058)
-- new ClassCompileRegistry (line 1099)
-- new AttributeClassRegistry (line 1100)
-- new ClassCompileRegistry (line 1208)
-- new AttributeClassRegistry (line 1209)
+- new CompileFatal (line 1024)
+- new CompileFatal (line 1058)
+- new CompileError (line 1061)
+- new ClassCompileRegistry (line 1102)
+- new AttributeClassRegistry (line 1103)
+- new ClassCompileRegistry (line 1211)
+- new AttributeClassRegistry (line 1212)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -49383,6 +49384,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - trait CallArgDimFetchAndInlineArrayLiteralValueSlotWire (line 22)
 - 1 class method(s)
 
+### `lib/Compiler/Concern/CallArgDirectDimCoalesceNewFoldEnumAndMatchedProducerValueSlots.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CallArgDirectDimCoalesceNewFoldEnumAndMatchedProducerValueSlots (line 25)
+- 1 class method(s)
+
 ### `lib/Compiler/Concern/CallArgEarlyFastPathAndMixedPropertyFetchSends.php`
 
 **Warnings** (review for bootstrap subset):
@@ -49547,15 +49554,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/CompileCallArgSends.php`
 
 **Warnings** (review for bootstrap subset):
-- trait CompileCallArgSends (line 42)
-- new Operand\Temporary (line 1262)
-- new Operand\Temporary (line 1793)
-- new Operand\Temporary (line 1979)
-- new Operand\Temporary (line 2011)
-- new Operand\Temporary (line 2108)
-- new Operand\Temporary (line 2237)
-- new OpCode (line 2239)
-- new OpCode (line 3895)
+- trait CompileCallArgSends (line 44)
+- new Operand\Temporary (line 1047)
+- new Operand\Temporary (line 1578)
+- new Operand\Temporary (line 1764)
+- new Operand\Temporary (line 1796)
+- new Operand\Temporary (line 1893)
+- new Operand\Temporary (line 2022)
+- new OpCode (line 2024)
+- new OpCode (line 3680)
 - 1 class method(s)
 - 3 closure(s)
 
