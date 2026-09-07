@@ -572,8 +572,29 @@ restart:
                         if (null !== $folded) {
                             return $folded;
                         }
+                        // Compile-time *1 → identity; *0 → 0 (peer /1 |0; #36386).
+                        $arithKeep = DiscardedPureCallElision::nativeLongArithIsCompileTimeIdentityOrZero(
+                            $opcode->type,
+                            $left,
+                            $right
+                        );
+                        if ('left' === $arithKeep) {
+                            $result = $leftValue;
+                            goto return_long;
+                        }
+                        if ('right' === $arithKeep) {
+                            $result = $this->context->builder->intCast(
+                                $rightValue,
+                                $leftValue->typeOf()
+                            );
+                            goto return_long;
+                        }
+                        if ('zero' === $arithKeep) {
+                            $result = $this->context->getTypeFromString('int64')->constInt(0, false);
+                            goto return_long;
+                        }
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
-                        // Compile-time *0/*1/*−1(proven) → bare mul (#36386).
+                        // Compile-time *−1(proven) → bare mul (#36386).
                         $skipOv = JitLongArithOverflow::canSkipOverflowPromote(
                             $this->context,
                             $opcode->type,
@@ -593,8 +614,24 @@ restart:
                         if (null !== $folded) {
                             return $folded;
                         }
+                        // Compile-time +0 → identity (peer /1 |0; #36386).
+                        $arithKeep = DiscardedPureCallElision::nativeLongArithIsCompileTimeIdentityOrZero(
+                            $opcode->type,
+                            $left,
+                            $right
+                        );
+                        if ('left' === $arithKeep) {
+                            $result = $leftValue;
+                            goto return_long;
+                        }
+                        if ('right' === $arithKeep) {
+                            $result = $this->context->builder->intCast(
+                                $rightValue,
+                                $leftValue->typeOf()
+                            );
+                            goto return_long;
+                        }
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
-                        // Compile-time +0 → bare add (#36386).
                         $skipOv = JitLongArithOverflow::canSkipOverflowPromote(
                             $this->context,
                             $opcode->type,
@@ -614,8 +651,17 @@ restart:
                         if (null !== $folded) {
                             return $folded;
                         }
+                        // Compile-time −0 → identity (peer /1; #36386).
+                        $arithKeep = DiscardedPureCallElision::nativeLongArithIsCompileTimeIdentityOrZero(
+                            $opcode->type,
+                            $left,
+                            $right
+                        );
+                        if ('left' === $arithKeep) {
+                            $result = $leftValue;
+                            goto return_long;
+                        }
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
-                        // Compile-time −0 → bare sub (#36386).
                         $skipOv = JitLongArithOverflow::canSkipOverflowPromote(
                             $this->context,
                             $opcode->type,
