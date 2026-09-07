@@ -675,6 +675,23 @@ restart:
                                 $this->context->getTypeFromString('int64')->constInt($folded, false)
                             );
                         }
+                        // Compile-time |0 / ^0 / &-1 → identity (peer <<0; #36386).
+                        $keep = DiscardedPureCallElision::bitwiseLogicIsCompileTimeIdentity(
+                            $opcode->type,
+                            $left,
+                            $right
+                        );
+                        if ('left' === $keep) {
+                            $result = $leftValue;
+                            goto return_long;
+                        }
+                        if ('right' === $keep) {
+                            $result = $this->context->builder->intCast(
+                                $rightValue,
+                                $leftValue->typeOf()
+                            );
+                            goto return_long;
+                        }
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
                         if (OpCode::TYPE_BITWISE_AND === $opcode->type) {
                             $result = $this->context->builder->bitwiseAnd($leftValue, $__right);

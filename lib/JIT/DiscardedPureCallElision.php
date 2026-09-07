@@ -240,7 +240,10 @@ use PHPCompiler\VM\Variable as VmVariable;
  * counts skip the negative-count {@code ArithmeticError} blocks
  * ({@see bitShiftCountCanSkipNegativeGuard}). Compile-time shift count
  * {@code 0} is a typed {@code <<}/{@code >>} identity (no {@code shl}/{@code ashr};
- * {@see bitShiftCountIsCompileTimeZero}). Compile-time divisors ≠
+ * {@see bitShiftCountIsCompileTimeZero}). Typed {@code |}/{@code ^} with a
+ * compile-time {@code 0} operand and {@code &} with {@code -1} are bitwise
+ * identities (no {@code and}/{@code or}/{@code xor};
+ * {@see bitwiseLogicIsCompileTimeIdentity}). Compile-time divisors ≠
  * {@code -1} skip the typed {@code /} {@code PHP_INT_MIN}/{-1} promote arm
  * ({@see nativeLongDivisorCanSkipNegOneModuloBranch}). Compile-time identity/zero
  * operands on typed {@code +}/{@code -}/{@code *} skip
@@ -4081,6 +4084,51 @@ final class DiscardedPureCallElision
         $c = self::compileTimeLongScalar($count);
 
         return null !== $c && 0 === $c;
+    }
+
+    /**
+     * Typed native-long {@code &}|{@code ^} identity when one operand is a
+     * compile-time long that does not change the other:
+     * {@code | 0}, {@code ^ 0}, {@code & -1} (and the mirrored forms).
+     * Emit the non-identity operand (no {@code and}/{@code or}/{@code xor}).
+     *
+     * php-src: Zend/zend_operators.c bitwise_and/or/xor_function after
+     * {@code convert_to_long}. Peer shift-count {@code 0} (#37208 / #36386).
+     *
+     * @return 'left'|'right'|null which operand to keep, or null when not identity
+     */
+    public static function bitwiseLogicIsCompileTimeIdentity(
+        int $opType,
+        Variable $left,
+        Variable $right
+    ): ?string {
+        $a = self::compileTimeLongScalar($left);
+        $b = self::compileTimeLongScalar($right);
+        if (\PHPCompiler\OpCode::TYPE_BITWISE_OR === $opType
+            || \PHPCompiler\OpCode::TYPE_BITWISE_XOR === $opType
+        ) {
+            if (0 === $a) {
+                return 'right';
+            }
+            if (0 === $b) {
+                return 'left';
+            }
+
+            return null;
+        }
+        if (\PHPCompiler\OpCode::TYPE_BITWISE_AND === $opType) {
+            // All-bits-set mask is identity for signed zend_long (two's complement).
+            if (-1 === $a) {
+                return 'right';
+            }
+            if (-1 === $b) {
+                return 'left';
+            }
+
+            return null;
+        }
+
+        return null;
     }
 
     /**
