@@ -396,6 +396,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/VM/Concern/FrameObjectRefAndDeadTempRelease.php',
             'lib/VM/Concern/GeneratorForeachAndYieldFrom.php',
             'lib/VM/Concern/InheritanceFinalVarianceAndConstFetch.php',
+            'lib/VM/Concern/InternalHandlerExecuteAndAssignCopy.php',
             'lib/VM/Concern/MethodCallAndStaticCallableInit.php',
             'lib/VM/Concern/ObjectPropertyCollectAndSerialize.php',
             'lib/VM/Concern/ObjectPropertyHooks.php',
