@@ -269,7 +269,10 @@ use PHPCompiler\VM\Variable as VmVariable;
  * identity at the builtin call site; {@code intdiv($n, $n)} folds to {@code 1}
  * (omit {@code sdiv} / {@code INT_MIN}/{-1} {@code ArithmeticError}; keep
  * {@code DivisionByZeroError} when {@code n == 0}; peer typed {@code $n / $n};
- * {@see intdivSameOperandFoldsToOne}). {@code intdiv($n, -1)} and typed
+ * {@see intdivSameOperandFoldsToOne}). Typed {@code $n ** 0} / {@code pow($n, 0)}
+ * folds to {@code 1} and {@code $n ** 1} / {@code pow($n, 1)} is identity
+ * (omit {@code llvm.pow.f64} / float round-trip;
+ * {@see nativeLongPowCompileTimeExponentFold}). {@code intdiv($n, -1)} and typed
  * {@code / -1} lower to {@code negate} with the {@code INT_MIN} guard /
  * float promote only when needed ({@see nativeLongDivisorIsCompileTimeNegOne}).
  * Typed {@code % 1} folds to {@code 0} (peer {@code % -1};
@@ -4366,6 +4369,41 @@ final class DiscardedPureCallElision
         Variable $right
     ): bool {
         return self::nativeLongOperandsAreSame($left, $right);
+    }
+
+    /**
+     * Typed integer {@code **} / {@code pow()} when the exponent is a
+     * compile-time long:
+     * - {@code $n ** 0} / {@code pow($n, 0)} → {@code 1} (incl. {@code 0 ** 0})
+     * - {@code $n ** 1} / {@code pow($n, 1)} → {@code $n} (identity)
+     *
+     * Omits {@code llvm.pow.f64} and the siToFp/fpToSi round-trip on the
+     * integer fast path ({@see \PHPCompiler\ext\standard\JitPow}). Peer
+     * compile-time {@code * 1} identity ({@see nativeLongArithIsCompileTimeIdentityOrZero}).
+     *
+     * Float exponents ({@code 0.0}/{@code 1.0}) stay on the float path —
+     * Zend returns {@code float} for those shapes.
+     *
+     * php-src: Zend/zend_operators.c {@code pow_function} /
+     * {@code zend_pow}; ext/standard/math.c {@code PHP_FUNCTION(pow)}.
+     *
+     * @return 'one'|'identity'|null fold to 1, keep base, or null when N/A
+     */
+    public static function nativeLongPowCompileTimeExponentFold(
+        Variable $exponent
+    ): ?string {
+        $e = self::compileTimeLongScalar($exponent);
+        if (null === $e) {
+            return null;
+        }
+        if (0 === $e) {
+            return 'one';
+        }
+        if (1 === $e) {
+            return 'identity';
+        }
+
+        return null;
     }
 
     /**
