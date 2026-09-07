@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8419 |
-| Phase A inventory files (M2 ratio SSOT) | 8419 |
+| PHP files on vm.php path | 8420 |
+| Phase A inventory files (M2 ratio SSOT) | 8420 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26467 |
+| Source constructs flagged (warnings) | 26468 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7148,6 +7148,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/ClosureHelper.php` | 0 | 1 |
 | `lib/JIT/CoalesceHelper.php` | 0 | 1 |
 | `lib/JIT/CompileCache.php` | 0 | 2 |
+| `lib/JIT/CompileCachePartialEmitDemote.php` | 0 | 1 |
 | `lib/JIT/CompileCacheSemanticHash.php` | 0 | 1 |
 | `lib/JIT/CompilerOperandChainNative.php` | 0 | 3 |
 | `lib/JIT/Concern/AdaptByRefCallArgs.php` | 0 | 2 |
@@ -58679,8 +58680,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/CompileCache.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\Native (line 1838)
-- 90 class method(s)
+- new Call\Native (line 1552)
+- 84 class method(s)
+
+### `lib/JIT/CompileCachePartialEmitDemote.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s)
 
 ### `lib/JIT/CompileCacheSemanticHash.php`
 
