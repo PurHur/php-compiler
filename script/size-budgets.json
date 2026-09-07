@@ -1,51 +1,51 @@
 {
-  "version": 1,
-  "role": "size budgets + ratchet (#36403)",
-  "done_when_ceiling": 25000,
-  "files": {
-    "lib/Compiler.php": {
-      "budget": 1334,
-      "target": 20000,
-      "note": "Concern trait splits (#36230/#36387/#36403); PreferNamedLocalAndAdjacentAssignCallArgSlots + FinalizeArrayCombineColumnCallArgSlots + peers"
+    "version": 1,
+    "role": "size budgets + ratchet (#36403)",
+    "done_when_ceiling": 25000,
+    "files": {
+        "lib/Compiler.php": {
+            "budget": 1334,
+            "target": 20000,
+            "note": "Concern trait splits (#36230/#36387/#36403); PreferNamedLocalAndAdjacentAssignCallArgSlots + FinalizeArrayCombineColumnCallArgSlots + peers"
+        },
+        "lib/JIT.php": {
+            "budget": 278,
+            "target": 20000,
+            "note": "Concern trait splits (#36387/#36403); DateTimeMutationAndUnserializeMeta + TernaryPhiReturnMerge + peers; CfgParamReturnTypeAndCalleeByRef + OpCodeArgSlotAndAssignRhs (#36387)"
+        },
+        "lib/VM.php": {
+            "budget": 7107,
+            "target": 15000,
+            "note": "PropertyHookFrameAndStaticLink + IteratorToArrayConvert + IncludePathAndClassPseudoConst + ClassScopeAndStaticPropertyResolve + ClosureBindAndFunctionStatic + InternalHandlerExecuteAndAssignCopy + OutgoingCallArgResolve + ClassConstAndPropertyDefaultMaterialize + InheritanceFinalVarianceAndConstFetch + MethodCallAndStaticCallableInit + VirtualPropertyHookEnforce + ReturnTypeEnforce + DeprecationNoticeEmit + FrameActivationThisAndIncludeScope + FiberStartResumeAndThrow + GeneratorForeachAndYieldFrom + FrameObjectRefAndDeadTempRelease + UserInvokeArrayAccessAndClosureCall + BuiltinHostExceptionDispatch + ClassInheritDefineAndConstDeclare + TryCatchFinallyAndUncaughtDispatch + ExecuteIncDecAndScopeOperandRead + TypedIntRecursiveAndCountedLoopFastPath + PropertyFetchDestAndHookedDimWrite + ObjectPropertyMagicAndClone + ClassTraitComposition + ObjectPropertyReadonlyAndVisibility + Hooks + CollectAndSerialize + IssetEmptyUnset Concern extracts (#36403); under 15k target"
+        },
+        "script/apply-patches.sh": {
+            "budget": 7637,
+            "target": 4000,
+            "note": "prefer patches/ + short idempotent guards"
+        },
+        "lib/AOT/Linker.php": {
+            "budget": 1008,
+            "target": 8000,
+            "note": "already under target; output helpers in LinkerOutputArtifacts (#36403); ASAN via clang/gcc (#36397)"
+        },
+        "lib/AOT/HelperRuntimeCache.php": {
+            "budget": 577,
+            "target": 1200,
+            "note": "helper-cache granularity; Fingerprint+Link+Bind extracts (#36387/#36403); sorted linkObjects (#36399); refusePrelinkGcMixReason (#36401)"
+        },
+        "lib/JIT/CompileCache.php": {
+            "budget": 1231,
+            "target": 2000,
+            "note": "MCJIT/AOT warm cache; SemanticHash + PartialEmitDemote + ArtifactPersist + EditScaffold + ProjectIndex extracts (#36387/#36403)"
+        }
     },
-    "lib/JIT.php": {
-      "budget": 278,
-      "target": 20000,
-      "note": "Concern trait splits (#36387/#36403); DateTimeMutationAndUnserializeMeta + TernaryPhiReturnMerge + peers; CfgParamReturnTypeAndCalleeByRef + OpCodeArgSlotAndAssignRhs (#36387)"
+    "script_file_count": {
+        "budget": 284,
+        "target": 150,
+        "note": "script/ top-level *.sh/*.php; ASAN/valgrind under script/runtime-assert/; bench nightly under script/bench/ (#36403/#36385/#36397); do not add top-level scripts without removing another"
     },
-    "lib/VM.php": {
-      "budget": 7248,
-      "target": 15000,
-      "note": "IteratorToArrayConvert + IncludePathAndClassPseudoConst + ClassScopeAndStaticPropertyResolve + ClosureBindAndFunctionStatic + InternalHandlerExecuteAndAssignCopy + OutgoingCallArgResolve + ClassConstAndPropertyDefaultMaterialize + InheritanceFinalVarianceAndConstFetch + MethodCallAndStaticCallableInit + VirtualPropertyHookEnforce + ReturnTypeEnforce + DeprecationNoticeEmit + FrameActivationThisAndIncludeScope + FiberStartResumeAndThrow + GeneratorForeachAndYieldFrom + FrameObjectRefAndDeadTempRelease + UserInvokeArrayAccessAndClosureCall + BuiltinHostExceptionDispatch + ClassInheritDefineAndConstDeclare + TryCatchFinallyAndUncaughtDispatch + ExecuteIncDecAndScopeOperandRead + TypedIntRecursiveAndCountedLoopFastPath + PropertyFetchDestAndHookedDimWrite + ObjectPropertyMagicAndClone + ClassTraitComposition + ObjectPropertyReadonlyAndVisibility + Hooks + CollectAndSerialize + IssetEmptyUnset Concern extracts (#36403); under 15k target"
-    },
-    "script/apply-patches.sh": {
-      "budget": 7637,
-      "target": 4000,
-      "note": "prefer patches/ + short idempotent guards"
-    },
-    "lib/AOT/Linker.php": {
-      "budget": 1008,
-      "target": 8000,
-      "note": "already under target; output helpers in LinkerOutputArtifacts (#36403); ASAN via clang/gcc (#36397)"
-    },
-    "lib/AOT/HelperRuntimeCache.php": {
-      "budget": 577,
-      "target": 1200,
-      "note": "helper-cache granularity; Fingerprint+Link+Bind extracts (#36387/#36403); sorted linkObjects (#36399); refusePrelinkGcMixReason (#36401)"
-    },
-    "lib/JIT/CompileCache.php": {
-      "budget": 1134,
-      "target": 2000,
-      "note": "MCJIT/AOT warm cache; SemanticHash + PartialEmitDemote + ArtifactPersist + EditScaffold + ProjectIndex + KeyLayout extracts (#36387/#36403)"
+    "ci_defaults_exports": {
+        "budget": 141,
+        "target": 60
     }
-  },
-  "script_file_count": {
-    "budget": 284,
-    "target": 150,
-    "note": "script/ top-level *.sh/*.php; ASAN/valgrind under script/runtime-assert/; bench nightly under script/bench/ (#36403/#36385/#36397); do not add top-level scripts without removing another"
-  },
-  "ci_defaults_exports": {
-    "budget": 141,
-    "target": 60
-  }
 }
