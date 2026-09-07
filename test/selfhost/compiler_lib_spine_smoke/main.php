@@ -5380,6 +5380,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/CallArgSiblingMergeEmbedded
 require_once __DIR__.'/../../../lib/Compiler/Concern/CallArgDeadArrayComparisonConcatPointerValueSlots.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CallArgFilterJsonDecodeMergeMapFilterSplitExplodeValueSlots.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CallArgDimAdjacentFilterInputMapMergeLogicalMultisortValueSlots.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/CallArgAssignProcOpenTernaryHaystackSliceChainedMergeIifeValueSlots.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompileCallArgSends.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompileInlineSpecializedCallArgSends.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/ArrayPadUnpackExtractAndDateSunCallArgSends.php';
