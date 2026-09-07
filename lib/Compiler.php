@@ -92,6 +92,7 @@ require_once __DIR__.'/Compiler/Concern/RewireVarExportNestedInlineCallArgSendSl
 require_once __DIR__.'/Compiler/Concern/RewireInlineBitmaskNestedFileAndVarExportFlagCallArgSendSlots.php';
 require_once __DIR__.'/Compiler/Concern/StmtLevelSideEffectAndEmittedCallGuards.php';
 require_once __DIR__.'/Compiler/Concern/AdjacentNestedCallArgSlots.php';
+require_once __DIR__.'/Compiler/Concern/AssignInCallRhsAndDeadInlineNestedFuncCallFeedSlots.php';
 require_once __DIR__.'/Compiler/Concern/HoistedUnaryAssignAndInlineProducerCallArgSlots.php';
 require_once __DIR__.'/Compiler/Concern/ListDestructAndForeach.php';
 require_once __DIR__.'/Compiler/Concern/DimAndPropertyWriteContext.php';
@@ -306,6 +307,7 @@ use PHPCompiler\Compiler\Concern\RewireVarExportNestedInlineCallArgSendSlots;
 use PHPCompiler\Compiler\Concern\RewireInlineBitmaskNestedFileAndVarExportFlagCallArgSendSlots;
 use PHPCompiler\Compiler\Concern\StmtLevelSideEffectAndEmittedCallGuards;
 use PHPCompiler\Compiler\Concern\AdjacentNestedCallArgSlots;
+use PHPCompiler\Compiler\Concern\AssignInCallRhsAndDeadInlineNestedFuncCallFeedSlots;
 use PHPCompiler\Compiler\Concern\HoistedUnaryAssignAndInlineProducerCallArgSlots;
 use PHPCompiler\Compiler\Concern\ListDestructAndForeach;
 use PHPCompiler\Compiler\Concern\DimAndPropertyWriteContext;
@@ -430,6 +432,7 @@ class Compiler {
     use RewireInlineBitmaskNestedFileAndVarExportFlagCallArgSendSlots;
     use StmtLevelSideEffectAndEmittedCallGuards;
     use AdjacentNestedCallArgSlots;
+    use AssignInCallRhsAndDeadInlineNestedFuncCallFeedSlots;
     use HoistedUnaryAssignAndInlineProducerCallArgSlots;
     use ListDestructAndForeach;
     use DimAndPropertyWriteContext;

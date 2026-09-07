@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8390 |
-| Phase A inventory files (M2 ratio SSOT) | 8390 |
+| PHP files on vm.php path | 8391 |
+| Phase A inventory files (M2 ratio SSOT) | 8391 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26403 |
+| Source constructs flagged (warnings) | 26405 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5565,6 +5565,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/CompileFatal.php` | 0 | 2 |
 | `lib/Compiler/Concern/AdjacentNestedCallArgSlots.php` | 0 | 2 |
 | `lib/Compiler/Concern/ArrayPadUnpackExtractAndDateSunCallArgSends.php` | 0 | 12 |
+| `lib/Compiler/Concern/AssignInCallRhsAndDeadInlineNestedFuncCallFeedSlots.php` | 0 | 2 |
 | `lib/Compiler/Concern/CallAndArrayLiteralCompile.php` | 0 | 20 |
 | `lib/Compiler/Concern/CallArgCompileTimeValueAndProcOpenFold.php` | 0 | 8 |
 | `lib/Compiler/Concern/CallArgEarlyFastPathAndMixedPropertyFetchSends.php` | 0 | 9 |
@@ -49179,13 +49180,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 1012)
-- new CompileFatal (line 1046)
-- new CompileError (line 1049)
-- new ClassCompileRegistry (line 1090)
-- new AttributeClassRegistry (line 1091)
-- new ClassCompileRegistry (line 1199)
-- new AttributeClassRegistry (line 1200)
+- new CompileFatal (line 1015)
+- new CompileFatal (line 1049)
+- new CompileError (line 1052)
+- new ClassCompileRegistry (line 1093)
+- new AttributeClassRegistry (line 1094)
+- new ClassCompileRegistry (line 1202)
+- new AttributeClassRegistry (line 1203)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -49305,8 +49306,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/AdjacentNestedCallArgSlots.php`
 
 **Warnings** (review for bootstrap subset):
-- trait AdjacentNestedCallArgSlots (line 28)
-- 17 class method(s)
+- trait AdjacentNestedCallArgSlots (line 30)
+- 8 class method(s)
 
 ### `lib/Compiler/Concern/ArrayPadUnpackExtractAndDateSunCallArgSends.php`
 
@@ -49323,6 +49324,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Operand\Temporary (line 634)
 - new OpCode (line 694)
 - 7 class method(s)
+
+### `lib/Compiler/Concern/AssignInCallRhsAndDeadInlineNestedFuncCallFeedSlots.php`
+
+**Warnings** (review for bootstrap subset):
+- trait AssignInCallRhsAndDeadInlineNestedFuncCallFeedSlots (line 35)
+- 9 class method(s)
 
 ### `lib/Compiler/Concern/CallAndArrayLiteralCompile.php`
 

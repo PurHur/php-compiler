@@ -5415,6 +5415,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/RewireVarExportNestedInline
 require_once __DIR__.'/../../../lib/Compiler/Concern/RewireInlineBitmaskNestedFileAndVarExportFlagCallArgSendSlots.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/StmtLevelSideEffectAndEmittedCallGuards.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/AdjacentNestedCallArgSlots.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/AssignInCallRhsAndDeadInlineNestedFuncCallFeedSlots.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/HoistedUnaryAssignAndInlineProducerCallArgSlots.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/ListDestructAndForeach.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/DimAndPropertyWriteContext.php';
