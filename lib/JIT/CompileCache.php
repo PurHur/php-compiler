@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
-use PHPCompiler\AOT\HelperRuntimeCache;
 use PHPCompiler\Block;
 use PHPCompiler\Config;
 
@@ -13,6 +12,7 @@ require_once __DIR__.'/CompileCachePartialEmitDemote.php';
 require_once __DIR__.'/CompileCacheArtifactPersist.php';
 require_once __DIR__.'/CompileCacheEditScaffold.php';
 require_once __DIR__.'/CompileCacheProjectIndex.php';
+require_once __DIR__.'/CompileCacheKeyLayout.php';
 
 /**
  * On-disk MCJIT bitcode cache (issue #153).
@@ -27,14 +27,13 @@ require_once __DIR__.'/CompileCacheProjectIndex.php';
  * partial-emit demote lives in {@see CompileCachePartialEmitDemote};
  * linked-binary / user-object mid-tier warm restore lives in {@see CompileCacheArtifactPersist};
  * edit-scaffold restore/strip/rebind lives in {@see CompileCacheEditScaffold};
- * multi-file project index / entry→members map lives in {@see CompileCacheProjectIndex}
+ * multi-file project index / entry→members map lives in {@see CompileCacheProjectIndex};
+ * cache-entry paths / freshness / fingerprint live in {@see CompileCacheKeyLayout}
  * (#36387 one-file-edit Done-when / #36403 size-budget split-TU).
  */
 final class CompileCache
 {
     use CompileCacheEditScaffold;
-
-    private const META_VERSION = 1;
 
     /** @var list<array{llvm: string, signature: string, scoped: string}>|null */
     private static ?array $recordingExports = null;
@@ -320,151 +319,87 @@ final class CompileCache
     /**
      * Compiler fingerprint for project-index / meta durability (#36387).
      *
-     * Public so {@see CompileCacheProjectIndex} can key JSON without duplicating the hash.
+     * @see CompileCacheKeyLayout::compilerFingerprint()
      */
     public static function compilerFingerprint(): string
     {
-        return self::fingerprint();
+        return CompileCacheKeyLayout::compilerFingerprint();
     }
 
+    /** @see CompileCacheKeyLayout::cacheRoot() */
     public static function cacheRoot(): string
     {
-        $override = Config::getenv('PHP_COMPILER_CACHE_DIR');
-        if (is_string($override) && '' !== $override) {
-            return rtrim($override, '/');
-        }
-
-        return dirname(__DIR__, 2).'/.php-compiler-cache';
+        return CompileCacheKeyLayout::cacheRoot();
     }
 
+    /** @see CompileCacheKeyLayout::computeKey() */
     public static function computeKey(string $sourcePath, string $sourceCode): string
     {
-        $resolved = realpath($sourcePath);
-        $pathPart = false !== $resolved ? $resolved : $sourcePath;
-        $mtime = is_file($pathPart) ? (string) filemtime($pathPart) : '0';
-
-        return hash('sha256', implode("\0", [
-            $pathPart,
-            $mtime,
-            strlen($sourceCode),
-            hash('sha256', $sourceCode),
-            self::fingerprint(),
-        ]));
+        return CompileCacheKeyLayout::computeKey($sourcePath, $sourceCode);
     }
 
+    /** @see CompileCacheKeyLayout::entryDir() */
     public static function entryDir(string $key): string
     {
-        return self::cacheRoot().'/'.$key;
+        return CompileCacheKeyLayout::entryDir($key);
     }
 
+    /** @see CompileCacheKeyLayout::bitcodePath() */
     public static function bitcodePath(string $key): string
     {
-        return self::entryDir($key).'/module.bc';
+        return CompileCacheKeyLayout::bitcodePath($key);
     }
 
-    /**
-     * AOT freshness marker when full-module bitcode cannot round-trip (#36387).
-     */
+    /** @see CompileCacheKeyLayout::stampPath() */
     public static function stampPath(string $key): string
     {
-        return self::entryDir($key).'/fresh.stamp';
+        return CompileCacheKeyLayout::stampPath($key);
     }
 
-    /**
-     * Linked AOT executable bytes for an unchanged-source rebuild (#36387 / #36199).
-     *
-     * Bitcode restore still re-runs loadJitContext + object emit + link (~5 s for hello).
-     * Caching the final binary lets warm `phpc build` skip that path entirely.
-     */
+    /** @see CompileCacheKeyLayout::artifactPath() */
     public static function artifactPath(string $key): string
     {
-        return self::entryDir($key).'/aot.bin';
+        return CompileCacheKeyLayout::artifactPath($key);
     }
 
-    /**
-     * Emitted user-script object for mid-tier restore (#36387 / #36199).
-     *
-     * When `aot.bin` is missing but this `.o` is fresh, {@see tryRestoreObjectAndLink()}
-     * skips LLVM Context / emitToFile and only re-runs the system link with the recorded
-     * helper-runtime unit slugs.
-     */
+    /** @see CompileCacheKeyLayout::objectPath() */
     public static function objectPath(string $key): string
     {
-        return self::entryDir($key).'/aot.o';
+        return CompileCacheKeyLayout::objectPath($key);
     }
 
-    /** Sidecar listing helper-runtime unit slugs needed to link {@see objectPath()}. */
+    /** @see CompileCacheKeyLayout::linkManifestPath() */
     public static function linkManifestPath(string $key): string
     {
-        return self::entryDir($key).'/link.json';
+        return CompileCacheKeyLayout::linkManifestPath($key);
     }
 
+    /** @see CompileCacheKeyLayout::metaPath() */
     public static function metaPath(string $key): string
     {
-        return self::entryDir($key).'/meta.json';
+        return CompileCacheKeyLayout::metaPath($key);
     }
 
     /**
      * @return array{version: int, fingerprint: string, exports: list<array{llvm: string, signature: string, scoped: string}>}|null
+     *
+     * @see CompileCacheKeyLayout::readMeta()
      */
     public static function readMeta(string $key): ?array
     {
-        $path = self::metaPath($key);
-        if (!is_file($path)) {
-            return null;
-        }
-        $raw = file_get_contents($path);
-        if (false === $raw) {
-            return null;
-        }
-        $decoded = json_decode($raw, true);
-        if (!is_array($decoded)) {
-            return null;
-        }
-        if ((int) ($decoded['version'] ?? 0) !== self::META_VERSION) {
-            return null;
-        }
-        if (($decoded['fingerprint'] ?? '') !== self::fingerprint()) {
-            return null;
-        }
-        if (!isset($decoded['exports']) || !is_array($decoded['exports'])) {
-            return null;
-        }
-
-        return $decoded;
+        return CompileCacheKeyLayout::readMeta($key);
     }
 
+    /** @see CompileCacheKeyLayout::isFresh() */
     public static function isFresh(string $key, string $sourcePath, string $sourceCode): bool
     {
-        if (!self::isEnabled()) {
-            return false;
-        }
-        if (self::computeKey($sourcePath, $sourceCode) !== $key) {
-            return false;
-        }
-        if (null === self::readMeta($key)) {
-            return false;
-        }
-
-        // JIT: module.bc. AOT: fresh.stamp and/or module.bc (void*→i8* makes bitcode legal).
-        // Artifact / object alone also count so mid-tier restore stays valid (#36387).
-        return self::hasDurableMarker($key);
+        return CompileCacheKeyLayout::isFresh($key, $sourcePath, $sourceCode);
     }
 
-    /** True when the cache entry has a durable on-disk marker for this key. */
+    /** @see CompileCacheKeyLayout::hasDurableMarker() */
     public static function hasDurableMarker(string $key): bool
     {
-        if (is_file(self::stampPath($key))) {
-            return true;
-        }
-        if (is_file(self::bitcodePath($key))) {
-            return true;
-        }
-        if (is_file(self::artifactPath($key)) && filesize(self::artifactPath($key)) > 0) {
-            return true;
-        }
-
-        return is_file(self::objectPath($key)) && filesize(self::objectPath($key)) > 0;
+        return CompileCacheKeyLayout::hasDurableMarker($key);
     }
 
     /** @see CompileCacheArtifactPersist::hasFreshArtifact() */
@@ -1029,8 +964,8 @@ final class CompileCache
         try {
             $context->module->writeBitcodeToFile(self::bitcodePath($key));
             $payload = json_encode([
-                'version' => self::META_VERSION,
-                'fingerprint' => self::fingerprint(),
+                'version' => CompileCacheKeyLayout::META_VERSION,
+                'fingerprint' => CompileCacheKeyLayout::fingerprint(),
                 'exports' => self::$recordingExports,
             ], JSON_PRETTY_PRINT);
             if (false !== $payload) {
@@ -1088,8 +1023,8 @@ final class CompileCache
                 }
             }
             $payload = json_encode([
-                'version' => self::META_VERSION,
-                'fingerprint' => self::fingerprint(),
+                'version' => CompileCacheKeyLayout::META_VERSION,
+                'fingerprint' => CompileCacheKeyLayout::fingerprint(),
                 'exports' => self::$recordingExports,
                 'user_symbols' => $userSymbols,
                 'user_symbols_by_member' => self::$recordingUserSymbolsByMember ?? [],
@@ -1196,36 +1131,4 @@ final class CompileCache
         return '{main}';
     }
 
-    private static function fingerprint(): string
-    {
-        static $cached = null;
-        if (null !== $cached) {
-            return $cached;
-        }
-
-        $parts = [];
-        $lock = dirname(__DIR__, 2).'/composer.lock';
-        if (is_file($lock)) {
-            $parts[] = hash_file('sha256', $lock) ?: '';
-        }
-        $parts[] = HelperRuntimeCache::llvmIdentityToken();
-        $parts[] = hash_file('sha256', __DIR__.'/../JIT/Context.php') ?: '';
-        $parts[] = hash_file('sha256', __DIR__.'/../JIT.php') ?: '';
-        // Hashtable string-key DJB index / unset (#36191 / #36732) — artifact restore
-        // must not keep pre-fix binaries when only Type/HashTable.php changed.
-        $parts[] = hash_file('sha256', __DIR__.'/Builtin/Type/HashTable.php') ?: '';
-        $parts[] = hash_file('sha256', __DIR__.'/Builtin/AttributeRegistryLowering.php') ?: '';
-        $parts[] = hash_file('sha256', __DIR__.'/../Runtime.php') ?: '';
-        $parts[] = LazyBuiltins::fingerprintSegment();
-        $parts[] = HelperRuntimeCache::coreFingerprint();
-        $parts[] = HelperRuntimeCache::cacheKeySegment();
-        foreach (['PHP_COMPILER_AOT_USER_SCRIPT', 'PHP_COMPILER_HELPER_RUNTIME_O'] as $envKey) {
-            $flag = getenv($envKey);
-            $parts[] = $envKey.'='.(false === $flag ? '' : $flag);
-        }
-
-        $cached = hash('sha256', implode("\0", $parts));
-
-        return $cached;
-    }
 }
