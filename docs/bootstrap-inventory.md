@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8362 |
-| Phase A inventory files (M2 ratio SSOT) | 8362 |
+| PHP files on vm.php path | 8363 |
+| Phase A inventory files (M2 ratio SSOT) | 8363 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26322 |
+| Source constructs flagged (warnings) | 26324 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5656,6 +5656,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/StmtLevelSideEffectAndEmittedCallGuards.php` | 0 | 2 |
 | `lib/Compiler/Concern/SubstrNestedHaystackAndMethodOrStaticCallInitSlots.php` | 0 | 2 |
 | `lib/Compiler/Concern/TernaryAndLogicalShortCircuit.php` | 0 | 5 |
+| `lib/Compiler/Concern/TernaryMergeVarSlotCompile.php` | 0 | 2 |
 | `lib/Compiler/Concern/TryFinallyCatchAndOperandLookup.php` | 0 | 4 |
 | `lib/Compiler/Concern/VarExportNestedAndArrayMergeFamilyCallArgSlots.php` | 0 | 3 |
 | `lib/Compiler/Concern/WriteContextRejects.php` | 0 | 2 |
@@ -49151,13 +49152,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 949)
-- new CompileFatal (line 983)
-- new CompileError (line 986)
-- new ClassCompileRegistry (line 1027)
-- new AttributeClassRegistry (line 1028)
-- new ClassCompileRegistry (line 1136)
-- new AttributeClassRegistry (line 1137)
+- new CompileFatal (line 952)
+- new CompileFatal (line 986)
+- new CompileError (line 989)
+- new ClassCompileRegistry (line 1030)
+- new AttributeClassRegistry (line 1031)
+- new ClassCompileRegistry (line 1139)
+- new AttributeClassRegistry (line 1140)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -50358,11 +50359,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/TernaryAndLogicalShortCircuit.php`
 
 **Warnings** (review for bootstrap subset):
-- trait TernaryAndLogicalShortCircuit (line 24)
-- new Literal (line 431)
-- new Op\Expr\BinaryOp\Coalesce (line 440)
-- new OpCode (line 442)
-- 51 class method(s)
+- trait TernaryAndLogicalShortCircuit (line 26)
+- new Literal (line 433)
+- new Op\Expr\BinaryOp\Coalesce (line 442)
+- new OpCode (line 444)
+- 36 class method(s)
+
+### `lib/Compiler/Concern/TernaryMergeVarSlotCompile.php`
+
+**Warnings** (review for bootstrap subset):
+- trait TernaryMergeVarSlotCompile (line 26)
+- 15 class method(s)
 
 ### `lib/Compiler/Concern/TryFinallyCatchAndOperandLookup.php`
 
