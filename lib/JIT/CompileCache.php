@@ -12,6 +12,7 @@ require_once __DIR__.'/CompileCacheSemanticHash.php';
 require_once __DIR__.'/CompileCachePartialEmitDemote.php';
 require_once __DIR__.'/CompileCacheArtifactPersist.php';
 require_once __DIR__.'/CompileCacheEditScaffold.php';
+require_once __DIR__.'/CompileCacheProjectIndex.php';
 
 /**
  * On-disk MCJIT bitcode cache (issue #153).
@@ -25,7 +26,8 @@ require_once __DIR__.'/CompileCacheEditScaffold.php';
  * Semantic hash / edit-strip planning lives in {@see CompileCacheSemanticHash};
  * partial-emit demote lives in {@see CompileCachePartialEmitDemote};
  * linked-binary / user-object mid-tier warm restore lives in {@see CompileCacheArtifactPersist};
- * edit-scaffold restore/strip/rebind lives in {@see CompileCacheEditScaffold}
+ * edit-scaffold restore/strip/rebind lives in {@see CompileCacheEditScaffold};
+ * multi-file project index / entry→members map lives in {@see CompileCacheProjectIndex}
  * (#36387 one-file-edit Done-when / #36403 size-budget split-TU).
  */
 final class CompileCache
@@ -307,6 +309,22 @@ final class CompileCache
     public static function projectMembers(): array
     {
         return self::$projectMembers ?? [];
+    }
+
+    /** Compile entry path captured by {@see setProjectMembers()} (#36387). */
+    public static function projectEntry(): ?string
+    {
+        return self::$projectEntry;
+    }
+
+    /**
+     * Compiler fingerprint for project-index / meta durability (#36387).
+     *
+     * Public so {@see CompileCacheProjectIndex} can key JSON without duplicating the hash.
+     */
+    public static function compilerFingerprint(): string
+    {
+        return self::fingerprint();
     }
 
     public static function cacheRoot(): string
@@ -881,228 +899,84 @@ final class CompileCache
      * Project identity = sorted member realpaths (content-independent) (#36387).
      *
      * @param list<string> $memberPaths
+     *
+     * @see CompileCacheProjectIndex::projectId()
      */
     public static function projectId(array $memberPaths): string
     {
-        $clean = [];
-        foreach ($memberPaths as $path) {
-            if (!is_string($path) || '' === $path) {
-                continue;
-            }
-            $resolved = realpath($path);
-            $clean[] = false !== $resolved ? $resolved : $path;
-        }
-        $clean = array_values(array_unique($clean));
-        sort($clean);
-
-        return hash('sha256', implode("\0", $clean)."\0".self::fingerprint());
+        return CompileCacheProjectIndex::projectId($memberPaths);
     }
 
     /**
      * @param list<string> $memberPaths
      *
      * @return array<string, string> path → sha256 of file bytes
+     *
+     * @see CompileCacheProjectIndex::memberHashes()
      */
     public static function memberHashes(array $memberPaths): array
     {
-        $out = [];
-        foreach ($memberPaths as $path) {
-            if (!is_string($path) || !is_file($path)) {
-                continue;
-            }
-            $resolved = realpath($path) ?: $path;
-            $hash = hash_file('sha256', $resolved);
-            if (is_string($hash)) {
-                $out[$resolved] = $hash;
-            }
-        }
-        ksort($out);
-
-        return $out;
+        return CompileCacheProjectIndex::memberHashes($memberPaths);
     }
 
+    /** @see CompileCacheProjectIndex::projectIndexPath() */
     public static function projectIndexPath(string $projectId): string
     {
-        return self::cacheRoot().'/projects/'.$projectId.'.json';
+        return CompileCacheProjectIndex::projectIndexPath($projectId);
     }
 
     /**
      * Entry → member-path list so warm/edit boots skip Runtime include discovery (#36387).
+     *
+     * @see CompileCacheProjectIndex::entryMembersPath()
      */
     public static function entryMembersPath(string $entryPath): string
     {
-        $resolved = realpath($entryPath);
-        $key = hash('sha256', false !== $resolved ? $resolved : $entryPath);
-
-        return self::cacheRoot().'/projects/entry/'.$key.'.json';
+        return CompileCacheProjectIndex::entryMembersPath($entryPath);
     }
 
     /**
      * @param list<string> $memberPaths
+     *
+     * @see CompileCacheProjectIndex::rememberEntryMembers()
      */
     public static function rememberEntryMembers(string $entryPath, array $memberPaths): void
     {
-        if ('' === $entryPath || [] === $memberPaths || !is_file($entryPath)) {
-            return;
-        }
-        $resolved = realpath($entryPath);
-        $entry = false !== $resolved ? $resolved : $entryPath;
-        $entryHash = hash_file('sha256', $entry);
-        if (!is_string($entryHash)) {
-            return;
-        }
-        $clean = [];
-        foreach ($memberPaths as $path) {
-            if (!is_string($path) || '' === $path) {
-                continue;
-            }
-            $r = realpath($path);
-            $clean[] = false !== $r ? $r : $path;
-        }
-        $clean = array_values(array_unique($clean));
-        if ([] === $clean) {
-            return;
-        }
-        $dir = self::cacheRoot().'/projects/entry';
-        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
-            return;
-        }
-        $payload = json_encode([
-            'version' => 1,
-            'fingerprint' => self::fingerprint(),
-            'entry' => $entry,
-            'entry_hash' => $entryHash,
-            'members' => $clean,
-            'updated_at' => gmdate('c'),
-        ], JSON_PRETTY_PRINT);
-        if (false === $payload) {
-            return;
-        }
-        file_put_contents(self::entryMembersPath($entry), $payload."\n");
+        CompileCacheProjectIndex::rememberEntryMembers($entryPath, $memberPaths);
     }
 
     /**
      * Prior member list for this entry when the entry bytes are unchanged (#36387).
      *
      * @return list<string>|null
+     *
+     * @see CompileCacheProjectIndex::lookupEntryMembers()
      */
     public static function lookupEntryMembers(string $entryPath): ?array
     {
-        if ('' === $entryPath || !is_file($entryPath)) {
-            return null;
-        }
-        $path = self::entryMembersPath($entryPath);
-        if (!is_file($path)) {
-            return null;
-        }
-        $raw = file_get_contents($path);
-        if (false === $raw) {
-            return null;
-        }
-        $decoded = json_decode($raw, true);
-        if (!is_array($decoded) || (int) ($decoded['version'] ?? 0) !== 1) {
-            return null;
-        }
-        if (($decoded['fingerprint'] ?? '') !== self::fingerprint()) {
-            return null;
-        }
-        $entryHash = hash_file('sha256', $entryPath);
-        if (!is_string($entryHash) || ($decoded['entry_hash'] ?? null) !== $entryHash) {
-            // Entry changed — may have gained/lost requires; force rediscovery.
-            return null;
-        }
-        $members = $decoded['members'] ?? null;
-        if (!is_array($members) || [] === $members) {
-            return null;
-        }
-        $out = [];
-        foreach ($members as $member) {
-            if (!is_string($member) || '' === $member || !is_file($member)) {
-                return null;
-            }
-            $r = realpath($member);
-            $out[] = false !== $r ? $r : $member;
-        }
-
-        return array_values(array_unique($out));
+        return CompileCacheProjectIndex::lookupEntryMembers($entryPath);
     }
 
     /**
      * @param array<string, string> $memberHashes
+     *
+     * @see CompileCacheProjectIndex::rememberProject()
      */
     public static function rememberProject(string $projectId, string $key, array $memberHashes): void
     {
-        if ('' === $projectId || '' === $key) {
-            return;
-        }
-        $dir = self::cacheRoot().'/projects';
-        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
-            return;
-        }
-        $payload = json_encode([
-            'version' => 1,
-            'key' => $key,
-            'fingerprint' => self::fingerprint(),
-            'members' => $memberHashes,
-            // Comment/whitespace-stable hashes for strip planning (#36387).
-            'semantic_members' => self::memberSemanticHashes(array_keys($memberHashes)),
-            // Per-function + glue hashes so one-method edits keep sibling bodies (#36387).
-            'semantic_parts' => self::memberSemanticParts(array_keys($memberHashes)),
-            'updated_at' => gmdate('c'),
-        ], JSON_PRETTY_PRINT);
-        if (false === $payload) {
-            return;
-        }
-        file_put_contents(self::projectIndexPath($projectId), $payload."\n");
-        $entry = self::$projectEntry;
-        if (is_string($entry) && '' !== $entry) {
-            self::rememberEntryMembers($entry, array_keys($memberHashes));
-        }
+        CompileCacheProjectIndex::rememberProject($projectId, $key, $memberHashes);
     }
 
     /**
      * Prior cache key for this project when at least one member changed (#36387).
      *
      * @param array<string, string> $memberHashes
+     *
+     * @see CompileCacheProjectIndex::findEditScaffoldKey()
      */
     public static function findEditScaffoldKey(string $projectId, array $memberHashes): ?string
     {
-        $path = self::projectIndexPath($projectId);
-        if (!is_file($path)) {
-            return null;
-        }
-        $raw = file_get_contents($path);
-        if (false === $raw) {
-            return null;
-        }
-        $decoded = json_decode($raw, true);
-        if (!is_array($decoded) || (int) ($decoded['version'] ?? 0) !== 1) {
-            return null;
-        }
-        if (($decoded['fingerprint'] ?? '') !== self::fingerprint()) {
-            return null;
-        }
-        $prevKey = $decoded['key'] ?? '';
-        if (!is_string($prevKey) || '' === $prevKey) {
-            return null;
-        }
-        if (!is_file(self::bitcodePath($prevKey))) {
-            return null;
-        }
-        $prevMembers = $decoded['members'] ?? null;
-        if (!is_array($prevMembers) || [] === $prevMembers) {
-            return null;
-        }
-        // Identical members → exact warm path should have hit already; no scaffold.
-        if ($prevMembers === $memberHashes) {
-            return null;
-        }
-        // Require same path set (add/remove file → full rebuild).
-        if (array_keys($prevMembers) !== array_keys($memberHashes)) {
-            return null;
-        }
-
-        return $prevKey;
+        return CompileCacheProjectIndex::findEditScaffoldKey($projectId, $memberHashes);
     }
 
     /**
