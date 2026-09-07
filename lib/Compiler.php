@@ -70,6 +70,7 @@ require_once __DIR__.'/Compiler/Concern/InlineCallArgChainedDimUnionNewAndExtraP
 require_once __DIR__.'/Compiler/Concern/InlineCallArgEqualCountProducers.php';
 require_once __DIR__.'/Compiler/Concern/InlineCallArgProducerMatch.php';
 require_once __DIR__.'/Compiler/Concern/MatchInlineCallArgProducerWithEmbeddedLiterals.php';
+require_once __DIR__.'/Compiler/Concern/MatchInlineCallArgProducerEmbeddedLiteralsResolve.php';
 require_once __DIR__.'/Compiler/Concern/FindInlineCallArgProducerSlot.php';
 require_once __DIR__.'/Compiler/Concern/DeadTempInlineArrayAndHaystackCallArgHelpers.php';
 require_once __DIR__.'/Compiler/Concern/FindInlineCoalesceAndNullsafeCallArgSlots.php';
@@ -300,6 +301,7 @@ use PHPCompiler\Compiler\Concern\InlineCallArgChainedDimUnionNewAndExtraProducer
 use PHPCompiler\Compiler\Concern\InlineCallArgEqualCountProducers;
 use PHPCompiler\Compiler\Concern\InlineCallArgProducerMatch;
 use PHPCompiler\Compiler\Concern\MatchInlineCallArgProducerWithEmbeddedLiterals;
+use PHPCompiler\Compiler\Concern\MatchInlineCallArgProducerEmbeddedLiteralsResolve;
 use PHPCompiler\Compiler\Concern\FindInlineCallArgProducerSlot;
 use PHPCompiler\Compiler\Concern\DeadTempInlineArrayAndHaystackCallArgHelpers;
 use PHPCompiler\Compiler\Concern\FindInlineCoalesceAndNullsafeCallArgSlots;
@@ -440,6 +442,7 @@ class Compiler {
     use InlineCallArgEqualCountProducers;
     use InlineCallArgProducerMatch;
     use MatchInlineCallArgProducerWithEmbeddedLiterals;
+    use MatchInlineCallArgProducerEmbeddedLiteralsResolve;
     use FindInlineCallArgProducerSlot;
     use DeadTempInlineArrayAndHaystackCallArgHelpers;
     use FindInlineCoalesceAndNullsafeCallArgSlots;
