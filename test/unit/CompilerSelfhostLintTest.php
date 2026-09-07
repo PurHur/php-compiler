@@ -67,6 +67,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/Compiler/Concern/CompileClassLikeDeclAndScope.php',
             'lib/Compiler/Concern/CompileErrorSuppressEndBlockAndSlotInherit.php',
             'lib/Compiler/Concern/CompileExprAndOpcodeTypes.php',
+            'lib/Compiler/Concern/CompileExprDispatch.php',
             'lib/Compiler/Concern/CompileFuncCfgReturnAndGlobalImport.php',
             'lib/Compiler/Concern/CompileInlineSpecializedCallArgSends.php',
             'lib/Compiler/Concern/CompileInterfaceTraitEnumAndMethodDecl.php',
