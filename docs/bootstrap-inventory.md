@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8423 |
-| Phase A inventory files (M2 ratio SSOT) | 8423 |
+| PHP files on vm.php path | 8424 |
+| Phase A inventory files (M2 ratio SSOT) | 8424 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26473 |
+| Source constructs flagged (warnings) | 26475 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7163,6 +7163,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/ByRefFormalAssignAndCallArgAdapt.php` | 0 | 2 |
 | `lib/JIT/Concern/CallResultCompileTimePropagate.php` | 0 | 7 |
 | `lib/JIT/Concern/CallResultOperandAssign.php` | 0 | 17 |
+| `lib/JIT/Concern/CfgParamReturnTypeAndCalleeByRef.php` | 0 | 2 |
 | `lib/JIT/Concern/ClassConstEnumAndFunctionStatic.php` | 0 | 9 |
 | `lib/JIT/Concern/ClosureThisAndStaticScopeResolve.php` | 0 | 2 |
 | `lib/JIT/Concern/CoerceReturnPropertyDeclaringAndByRef.php` | 0 | 2 |
@@ -58837,6 +58838,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 634)
 - 6 class method(s)
 
+### `lib/JIT/Concern/CfgParamReturnTypeAndCalleeByRef.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CfgParamReturnTypeAndCalleeByRef (line 21)
+- 10 class method(s)
+
 ### `lib/JIT/Concern/ClassConstEnumAndFunctionStatic.php`
 
 **Warnings** (review for bootstrap subset):
@@ -58859,8 +58866,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Concern/CoerceReturnPropertyDeclaringAndByRef.php`
 
 **Warnings** (review for bootstrap subset):
-- trait CoerceReturnPropertyDeclaringAndByRef (line 20)
-- 31 class method(s)
+- trait CoerceReturnPropertyDeclaringAndByRef (line 21)
+- 21 class method(s)
 
 ### `lib/JIT/Concern/CompileArgRecv.php`
 
