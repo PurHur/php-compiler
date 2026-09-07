@@ -59788,7 +59788,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/DiscardedPureCallElision.php`
 
 **Warnings** (review for bootstrap subset):
-- 154 class method(s)
+- 156 class method(s)
 
 ### `lib/JIT/DnfParamCheck.php`
 
@@ -60330,17 +60330,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 252)
 - new Variable (line 256)
 - new Variable (line 258)
-- new Variable (line 2688)
-- new Variable (line 2692)
-- new Variable (line 2928)
-- new Variable (line 2940)
-- new Variable (line 3090)
-- new Variable (line 3181)
-- new Variable (line 3235)
-- new Variable (line 3477)
-- new Variable (line 3493)
-- new Variable (line 3515)
-- new Variable (line 3526)
+- new Variable (line 2693)
+- new Variable (line 2697)
+- new Variable (line 2933)
+- new Variable (line 2945)
+- new Variable (line 3095)
+- new Variable (line 3186)
+- new Variable (line 3240)
+- new Variable (line 3482)
+- new Variable (line 3498)
+- new Variable (line 3520)
+- new Variable (line 3531)
 - 24 class method(s)
 - 8 closure(s)
 

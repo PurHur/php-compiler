@@ -245,9 +245,13 @@ use PHPCompiler\VM\Variable as VmVariable;
  * identities (no {@code and}/{@code or}/{@code xor};
  * {@see bitwiseLogicIsCompileTimeIdentity}). Compile-time divisors ≠
  * {@code -1} skip the typed {@code /} {@code PHP_INT_MIN}/{-1} promote arm
- * ({@see nativeLongDivisorCanSkipNegOneModuloBranch}). Compile-time identity/zero
- * operands on typed {@code +}/{@code -}/{@code *} skip
- * {@code llvm.s{add,sub,mul}.with.overflow} ({@see \PHPCompiler\JIT\JitLongArithOverflow::canSkipOverflowPromote}).
+ * ({@see nativeLongDivisorCanSkipNegOneModuloBranch}). Typed {@code / 1} is
+ * identity (no {@code sdiv}/{@code srem}/exactness promote;
+ * {@see nativeLongDivisorIsCompileTimeOne}). Typed {@code % 1} folds to
+ * {@code 0} (peer {@code % -1}; {@see nativeLongModuloDivisorFoldsToZero}).
+ * Compile-time identity/zero operands on typed {@code +}/{@code -}/{@code *}
+ * skip {@code llvm.s{add,sub,mul}.with.overflow}
+ * ({@see \PHPCompiler\JIT\JitLongArithOverflow::canSkipOverflowPromote}).
  * Proven-safe {@code str_increment}/
  * {@code str_decrement} literals likewise fold at the call site and skip
  * after-call throw-pending ({@see strIncDecArgsCannotThrow}). {@code hex2bin}/
@@ -4057,6 +4061,33 @@ final class DiscardedPureCallElision
         $d = self::compileTimeLongScalar($divisor);
 
         return null !== $d && -1 !== $d;
+    }
+
+    /**
+     * Typed native-long {@code /} with compile-time divisor {@code 1} is identity —
+     * emit the dividend (no {@code sdiv}/{@code srem}, no zero-guard, no
+     * exactness/promote CFG). {@code 1 / $n} is not identity.
+     *
+     * php-src: Zend/zend_operators.c div_function after convert_to_long.
+     * Peer {@code | 0} / {@code << 0} / {@code + 0} (#37212 / #37208 / #37200).
+     */
+    public static function nativeLongDivisorIsCompileTimeOne(Variable $divisor): bool
+    {
+        $d = self::compileTimeLongScalar($divisor);
+
+        return null !== $d && 1 === $d;
+    }
+
+    /**
+     * Typed native-long {@code %} with compile-time divisor {@code ±1} is always
+     * {@code 0} (php-src {@code mod_function}; {@code n % -1} and {@code n % 1}).
+     * Emit constant {@code 0} without {@code srem} / zero-guard / neg-one PHI.
+     */
+    public static function nativeLongModuloDivisorFoldsToZero(Variable $divisor): bool
+    {
+        $d = self::compileTimeLongScalar($divisor);
+
+        return null !== $d && (1 === $d || -1 === $d);
     }
 
     /**

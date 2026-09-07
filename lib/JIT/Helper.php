@@ -636,6 +636,11 @@ restart:
                         if (null !== $folded) {
                             return $folded;
                         }
+                        // Compile-time / 1 → identity (peer |0 / <<0; #36386).
+                        if (DiscardedPureCallElision::nativeLongDivisorIsCompileTimeOne($right)) {
+                            $result = $leftValue;
+                            goto return_long;
+                        }
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
                         // Compile-time nonzero divisor → skip DivisionByZeroError (#36386).
                         $skipZero = DiscardedPureCallElision::intdivCanSkipZeroDivisorGuard($right);
@@ -650,8 +655,8 @@ restart:
                             $skipIntMinNegOne
                         );
                     case OpCode::TYPE_MODULO:
-                        // Compile-time -1 → 0 without srem / zero guard (mod_function).
-                        if (null !== $right->compileTimeLong && -1 === (int) $right->compileTimeLong) {
+                        // Compile-time ±1 → 0 without srem / zero guard (mod_function).
+                        if (DiscardedPureCallElision::nativeLongModuloDivisorFoldsToZero($right)) {
                             $result = $this->context->getTypeFromString('int64')->constInt(0, false);
                             goto return_long;
                         }
