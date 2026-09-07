@@ -18,6 +18,7 @@ use PHPCompiler\ext\standard\StdlibConstants;
 use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\OpCode;
+use PHPCompiler\VM\VmUnaryMinus;
 use function PHPCompiler\opcode_type_name;
 use PHPLLVM;
 use PHPLLVM\Builder;
@@ -593,8 +594,29 @@ restart:
                             $result = $this->context->getTypeFromString('int64')->constInt(0, false);
                             goto return_long;
                         }
+                        // Compile-time * −1 → negate (peer intdiv($n,-1); #36386).
+                        $negKeep = DiscardedPureCallElision::nativeLongMulIsCompileTimeNegOne(
+                            $left,
+                            $right
+                        );
+                        if (null !== $negKeep) {
+                            $src = 'left' === $negKeep
+                                ? $leftValue
+                                : $this->context->builder->intCast($rightValue, $leftValue->typeOf());
+                            $skipOv = JitLongArithOverflow::canSkipOverflowPromote(
+                                $this->context,
+                                $opcode->type,
+                                $left,
+                                $right
+                            );
+                            if ($skipOv) {
+                                $result = $this->context->builder->negate($src);
+                                goto return_long;
+                            }
+
+                            return VmUnaryMinus::negateLongWithIntMinPromote($this->context, $src);
+                        }
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
-                        // Compile-time *−1(proven) → bare mul (#36386).
                         $skipOv = JitLongArithOverflow::canSkipOverflowPromote(
                             $this->context,
                             $opcode->type,
