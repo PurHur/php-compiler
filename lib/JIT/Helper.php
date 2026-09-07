@@ -709,6 +709,22 @@ restart:
                             $result = $leftValue;
                             goto return_long;
                         }
+                        // Compile-time / −1 → negate (peer * −1 / intdiv($n,-1); #36386).
+                        if (DiscardedPureCallElision::nativeLongDivisorIsCompileTimeNegOne($right)) {
+                            $skipOv = DiscardedPureCallElision::intdivCanSkipIntMinNegOneGuard(
+                                $left,
+                                $right
+                            );
+                            if ($skipOv) {
+                                $result = $this->context->builder->negate($leftValue);
+                                goto return_long;
+                            }
+
+                            return VmUnaryMinus::negateLongWithIntMinPromote(
+                                $this->context,
+                                $leftValue
+                            );
+                        }
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
                         // Compile-time nonzero divisor → skip DivisionByZeroError (#36386).
                         $skipZero = DiscardedPureCallElision::intdivCanSkipZeroDivisorGuard($right);
