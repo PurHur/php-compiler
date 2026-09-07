@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8445 |
-| Phase A inventory files (M2 ratio SSOT) | 8445 |
+| PHP files on vm.php path | 8446 |
+| Phase A inventory files (M2 ratio SSOT) | 8446 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26511 |
+| Source constructs flagged (warnings) | 26513 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7168,6 +7168,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/CompileCacheKeyLayout.php` | 0 | 1 |
 | `lib/JIT/CompileCachePartialEmitDemote.php` | 0 | 1 |
 | `lib/JIT/CompileCacheProjectIndex.php` | 0 | 1 |
+| `lib/JIT/CompileCacheRecording.php` | 0 | 2 |
 | `lib/JIT/CompileCacheSemanticHash.php` | 0 | 1 |
 | `lib/JIT/CompilerOperandChainNative.php` | 0 | 3 |
 | `lib/JIT/Concern/AdaptByRefCallArgs.php` | 0 | 2 |
@@ -58783,7 +58784,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/CompileCache.php`
 
 **Warnings** (review for bootstrap subset):
-- 68 class method(s)
+- 54 class method(s)
 
 ### `lib/JIT/CompileCacheArtifactPersist.php`
 
@@ -58817,6 +58818,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 8 class method(s)
+
+### `lib/JIT/CompileCacheRecording.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CompileCacheRecording (line 25)
+- 14 class method(s)
 
 ### `lib/JIT/CompileCacheSemanticHash.php`
 
