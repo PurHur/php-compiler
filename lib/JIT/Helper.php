@@ -917,6 +917,16 @@ restart:
                         );
                         goto return_long;
                     case OpCode::TYPE_GREATER_OR_EQUAL:
+                        // Same-operand compare fold (#36386).
+                        $sameCmp = DiscardedPureCallElision::nativeLongCompareSameOperandFold(
+                            $opcode->type,
+                            $left,
+                            $right
+                        );
+                        if ('true' === $sameCmp) {
+                            $result = $this->context->getTypeFromString('int1')->constInt(1, false);
+                            goto return_bool;
+                        }
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
                             
                             
@@ -951,6 +961,16 @@ restart:
     
                         goto return_bool;
                     case OpCode::TYPE_SMALLER_OR_EQUAL:
+                        // Same-operand compare fold (#36386).
+                        $sameCmp = DiscardedPureCallElision::nativeLongCompareSameOperandFold(
+                            $opcode->type,
+                            $left,
+                            $right
+                        );
+                        if ('true' === $sameCmp) {
+                            $result = $this->context->getTypeFromString('int1')->constInt(1, false);
+                            goto return_bool;
+                        }
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
                             
                             
@@ -981,6 +1001,16 @@ restart:
     
                         goto return_bool;
                     case OpCode::TYPE_GREATER:
+                        // Same-operand compare fold (#36386).
+                        $sameCmp = DiscardedPureCallElision::nativeLongCompareSameOperandFold(
+                            $opcode->type,
+                            $left,
+                            $right
+                        );
+                        if ('false' === $sameCmp) {
+                            $result = $this->context->getTypeFromString('int1')->constInt(0, false);
+                            goto return_bool;
+                        }
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
                             
                             
@@ -1013,6 +1043,16 @@ restart:
     
                         goto return_bool;
                     case OpCode::TYPE_SMALLER:
+                        // Same-operand compare fold (#36386).
+                        $sameCmp = DiscardedPureCallElision::nativeLongCompareSameOperandFold(
+                            $opcode->type,
+                            $left,
+                            $right
+                        );
+                        if ('false' === $sameCmp) {
+                            $result = $this->context->getTypeFromString('int1')->constInt(0, false);
+                            goto return_bool;
+                        }
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
                             
                             
@@ -1042,6 +1082,16 @@ restart:
                         goto return_bool;
                     case OpCode::TYPE_IDENTICAL:
                     case OpCode::TYPE_EQUAL:
+                        // Same-operand compare fold (#36386).
+                        $sameCmp = DiscardedPureCallElision::nativeLongCompareSameOperandFold(
+                            $opcode->type,
+                            $left,
+                            $right
+                        );
+                        if ('true' === $sameCmp) {
+                            $result = $this->context->getTypeFromString('int1')->constInt(1, false);
+                            goto return_bool;
+                        }
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
                             
                             
@@ -1080,6 +1130,16 @@ restart:
                         goto return_bool;
                     case OpCode::TYPE_NOT_IDENTICAL:
                     case OpCode::TYPE_NOT_EQUAL:
+                        // Same-operand compare fold (#36386).
+                        $sameCmp = DiscardedPureCallElision::nativeLongCompareSameOperandFold(
+                            $opcode->type,
+                            $left,
+                            $right
+                        );
+                        if ('false' === $sameCmp) {
+                            $result = $this->context->getTypeFromString('int1')->constInt(0, false);
+                            goto return_bool;
+                        }
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
                             
                             
@@ -1130,6 +1190,16 @@ restart:
                         $result = $this->context->builder->icmp(\PHPLLVM\Builder::INT_NE, $leftValue, $__right);
                         goto return_bool;
                     case OpCode::TYPE_SPACESHIP:
+                        // Same-operand compare fold (#36386).
+                        $sameCmp = DiscardedPureCallElision::nativeLongCompareSameOperandFold(
+                            $opcode->type,
+                            $left,
+                            $right
+                        );
+                        if ('zero' === $sameCmp) {
+                            $result = $this->context->getTypeFromString('int64')->constInt(0, false);
+                            goto return_long;
+                        }
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
                         $lt = $this->context->builder->icmp(\PHPLLVM\Builder::INT_SLT, $leftValue, $__right);
                         $gt = $this->context->builder->icmp(\PHPLLVM\Builder::INT_SGT, $leftValue, $__right);

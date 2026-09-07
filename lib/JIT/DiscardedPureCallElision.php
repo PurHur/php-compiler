@@ -256,7 +256,9 @@ use PHPCompiler\VM\Variable as VmVariable;
  * {@code * 2}; {@see nativeLongArithSameOperandFold}). Same-operand typed
  * {@code $n / $n} folds to {@code 1} and {@code $n % $n} to {@code 0} (omit
  * {@code sdiv}/{@code srem}/exactness; keep {@code DivisionByZeroError} when
- * {@code n == 0}; {@see nativeLongArithSameOperandFold}). Compile-time
+ * {@code n == 0}; {@see nativeLongArithSameOperandFold}). Same-operand typed
+ * comparisons fold to a constant bool / spaceship 0 (omit {@code icmp} /
+ * resource-identity CFG; {@see nativeLongCompareSameOperandFold}). Compile-time
  * divisors ≠ {@code -1} skip the typed {@code /} {@code PHP_INT_MIN}/{-1}
  * promote arm ({@see nativeLongDivisorCanSkipNegOneModuloBranch}). Typed
  * {@code / 1} is identity (no {@code sdiv}/{@code srem}/exactness promote;
@@ -4337,6 +4339,56 @@ final class DiscardedPureCallElision
         }
         if (\PHPCompiler\OpCode::TYPE_DIV === $opType) {
             return 'one';
+        }
+
+        return null;
+    }
+
+    /**
+     * Typed native-long relational / equality / spaceship when both operands
+     * are the same storage / SSA payload:
+     * - {@code $n === $n} / {@code $n == $n} → {@code true}
+     * - {@code $n !== $n} / {@code $n != $n} → {@code false}
+     * - {@code $n < $n} / {@code $n > $n} → {@code false}
+     * - {@code $n <= $n} / {@code $n >= $n} → {@code true}
+     * - {@code $n <=> $n} → {@code 0}
+     *
+     * Omits {@code icmp} and the resource-identity equal CFG
+     * ({@see \PHPCompiler\JIT\JitValueCompare::nativeLongEqualWithResourceIdentity}).
+     * Same-handle resource {@code ===} is still true (left ≡ right).
+     *
+     * Peer same-operand arith/bitwise ({@see nativeLongArithSameOperandFold} /
+     * {@see bitwiseLogicSameOperandFold}).
+     *
+     * php-src: Zend/zend_operators.c compare_function /
+     * is_identical_function / is_equal_function / zend_compare_longs.
+     *
+     * @return 'true'|'false'|'zero'|null const bool, spaceship 0, or null when N/A
+     */
+    public static function nativeLongCompareSameOperandFold(
+        int $opType,
+        Variable $left,
+        Variable $right
+    ): ?string {
+        if (!self::nativeLongOperandsAreSame($left, $right)) {
+            return null;
+        }
+        if (\PHPCompiler\OpCode::TYPE_IDENTICAL === $opType
+            || \PHPCompiler\OpCode::TYPE_EQUAL === $opType
+            || \PHPCompiler\OpCode::TYPE_SMALLER_OR_EQUAL === $opType
+            || \PHPCompiler\OpCode::TYPE_GREATER_OR_EQUAL === $opType
+        ) {
+            return 'true';
+        }
+        if (\PHPCompiler\OpCode::TYPE_NOT_IDENTICAL === $opType
+            || \PHPCompiler\OpCode::TYPE_NOT_EQUAL === $opType
+            || \PHPCompiler\OpCode::TYPE_SMALLER === $opType
+            || \PHPCompiler\OpCode::TYPE_GREATER === $opType
+        ) {
+            return 'false';
+        }
+        if (\PHPCompiler\OpCode::TYPE_SPACESHIP === $opType) {
+            return 'zero';
         }
 
         return null;
