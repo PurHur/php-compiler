@@ -115,14 +115,20 @@ final class string_trim extends Internal
             StringTrimMask::ensureLinked($context);
             $maskStr = JitStringBuiltinArg::lower($context, $optional[0], 'trim', 1, 'characters');
         }
-        $str = self::jitStringArg($context, $args[0], 0, 'string');
-        $early = self::jitReturnIfCoercedEmptyTrimInput($context, $args[0], $str);
+        $strIn = self::jitStringArg($context, $args[0], 0, 'string');
+        $early = self::jitReturnIfCoercedEmptyTrimInput($context, $args[0], $strIn);
         if (null !== $early) {
             return $early;
         }
-        $str = $context->builder->call($context->lookupFunction('__string__separate'), $str);
+        $str = $context->builder->call($context->lookupFunction('__string__separate'), $strIn);
+        // Ephemeral concat haystack — separate owns a copy (#36388).
+        JitStringBuiltinArg::releaseEphemeralArgAfterCopy($context, $args[0], $strIn);
         if (null !== $maskStr) {
-            $maskStr = $context->builder->call($context->lookupFunction('__string__separate'), $maskStr);
+            $maskIn = $maskStr;
+            $maskStr = $context->builder->call($context->lookupFunction('__string__separate'), $maskIn);
+            if (1 === $optCount) {
+                JitStringBuiltinArg::releaseEphemeralArgAfterCopy($context, $optional[0], $maskIn);
+            }
         }
         $map = $context->structFieldsFor($str);
         $len = $context->builder->load(
@@ -148,7 +154,24 @@ final class string_trim extends Internal
         $end = $context->builder->load($endSlot);
         $newLen = $context->builder->sub($end, $start);
 
-        return self::jitCopySlice($context, $str, $charPtr, $start, $newLen, 'trim');
+        $result = self::jitCopySlice($context, $str, $charPtr, $start, $newLen, 'trim');
+        // Intermediate separate() copy is not the return value (#36388).
+        $context->refcount->delref(
+            $context->builder->pointerCast(
+                $str,
+                $context->getTypeFromString('__ref__virtual*')
+            )
+        );
+        if (null !== $maskStr) {
+            $context->refcount->delref(
+                $context->builder->pointerCast(
+                    $maskStr,
+                    $context->getTypeFromString('__ref__virtual*')
+                )
+            );
+        }
+
+        return $result;
     }
 
     public static function jitCopySlice(

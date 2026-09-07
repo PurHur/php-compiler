@@ -168,7 +168,11 @@ final class substr extends Internal
             $sliceLen = JitStringIndex::max($context, $sliceLen, $zero);
         }
 
-        return string_trim::jitCopySlice($context, $str, $charPtr, $start, $sliceLen);
+        $result = string_trim::jitCopySlice($context, $str, $charPtr, $start, $sliceLen);
+        // Haystack may be ephemeral concat — slice copied; release temp (#36388).
+        JitStringBuiltinArg::releaseEphemeralArgAfterCopy($context, $args[0], $str);
+
+        return $result;
     }
 
     private static function compileTimeSignedLong(Context $context, JITVariable $arg): ?int
