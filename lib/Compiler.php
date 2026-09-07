@@ -126,6 +126,7 @@ require_once __DIR__.'/Compiler/Concern/NestedArrayAndLeadingConstCallArgProduce
 require_once __DIR__.'/Compiler/Concern/DeferredSiblingAndArrayMapNullCallArgProducers.php';
 require_once __DIR__.'/Compiler/Concern/HoistedEnumAndChainedInlineCallArgProducers.php';
 require_once __DIR__.'/Compiler/Concern/ExactHoistedAndInlineNewCallArgProducers.php';
+require_once __DIR__.'/Compiler/Concern/InlineNewCallArgProducers.php';
 require_once __DIR__.'/Compiler/Concern/ExpressionPreludeDimFetchAndHoistedConstCallArgSlots.php';
 require_once __DIR__.'/Compiler/Concern/CfgProducerIndexAndRematerialize.php';
 require_once __DIR__.'/Compiler/Concern/InlineCallArgClosureFeedsAndReturnProducers.php';
@@ -349,6 +350,7 @@ use PHPCompiler\Compiler\Concern\NestedArrayAndLeadingConstCallArgProducers;
 use PHPCompiler\Compiler\Concern\DeferredSiblingAndArrayMapNullCallArgProducers;
 use PHPCompiler\Compiler\Concern\HoistedEnumAndChainedInlineCallArgProducers;
 use PHPCompiler\Compiler\Concern\ExactHoistedAndInlineNewCallArgProducers;
+use PHPCompiler\Compiler\Concern\InlineNewCallArgProducers;
 use PHPCompiler\Compiler\Concern\ExpressionPreludeDimFetchAndHoistedConstCallArgSlots;
 use PHPCompiler\Compiler\Concern\CfgProducerIndexAndRematerialize;
 use PHPCompiler\Compiler\Concern\InlineCallArgClosureFeedsAndReturnProducers;
@@ -482,6 +484,7 @@ class Compiler {
     use DeferredSiblingAndArrayMapNullCallArgProducers;
     use HoistedEnumAndChainedInlineCallArgProducers;
     use ExactHoistedAndInlineNewCallArgProducers;
+    use InlineNewCallArgProducers;
     use ExpressionPreludeDimFetchAndHoistedConstCallArgSlots;
     use CfgProducerIndexAndRematerialize;
     use InlineCallArgClosureFeedsAndReturnProducers;
