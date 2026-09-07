@@ -217,6 +217,17 @@ SEED_UNITS=(
   /ext/standard/StreamLibcHandleJitHelper.php
   /ext/standard/StreamLifecycleJitHelper.php
   /ext/standard/StreamMetaJitHelper.php
+  # Stream mode / path / socket + include / mime / vardump / strrot13 (#36391 after #37232)
+  /ext/standard/StreamModeJitHelper.php
+  /ext/standard/StreamNotificationJitHelper.php
+  /ext/standard/StreamPathJitHelper.php
+  /ext/standard/StreamSocketAcceptJitHelper.php
+  /ext/standard/StreamSocketGetNameJitHelper.php
+  /ext/standard/StreamSocketPairJitHelper.php
+  /ext/standard/IncludePathResolverJitHelper.php
+  /ext/standard/MimeContentTypeJitHelper.php
+  /ext/standard/VarDumpJitHelper.php
+  /ext/standard/StrRot13JitHelper.php
 )
 
 MIN_SEED=${#SEED_UNITS[@]}

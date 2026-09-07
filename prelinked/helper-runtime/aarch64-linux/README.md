@@ -13,7 +13,7 @@ non-native link.
 
 ## Seed corpus (VM_* + lib_VM_* + ext/standard tiers)
 
-**182** committed `unit.o` files:
+**192** committed `unit.o` files:
 
 - full `VM_*` (13) and `lib_VM_*` (9) sets from `x86_64-linux`
 - first `ext/standard` tier (10): ArrayChunk / ArrayIsList / ArraySlice / Bin2hex /
@@ -57,6 +57,10 @@ non-native link.
 - stream core / fopen / filter / path (10): StreamBucket / StreamBuffer /
   StreamCaps / StreamErrorStore / StreamFilter / StreamIncludeOpen / StreamIo /
   StreamLibcHandle / StreamLifecycle / StreamMeta
+- stream mode / path / socket + include / mime / vardump / strrot13 (10):
+  StreamMode / StreamNotification / StreamPath / StreamSocketAccept /
+  StreamSocketGetName / StreamSocketPair / IncludePathResolver / MimeContentType /
+  VarDump / StrRot13
 
 Refresh / expand via:
 
