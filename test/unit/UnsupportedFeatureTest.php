@@ -148,6 +148,33 @@ final class UnsupportedFeatureTest extends TestCase
         }
     }
 
+    public function testJitHandlerLimitationSitesUseCatalog(): void
+    {
+        foreach ([
+            'backed-enum-from-jit' => 3114,
+            'new-first-class-callable-jit' => 9767,
+            'isset-static-property-dynamic-name' => 10170,
+            'empty-static-property-dynamic-name' => 23983,
+            'yield-script-scope-aot' => 3115,
+            'reflection-class-name-literal' => 1214,
+            'get-class-object-arg' => 1214,
+            'get-debug-type-object-arg' => 1214,
+            'spl-object-storage-key-type' => 601,
+            'foreach-object-container' => 3331,
+            'foreach-generator-value' => 167,
+        ] as $id => $issue) {
+            try {
+                UnsupportedFeature::raise($id);
+                $this->fail('expected UnsupportedFeature for '.$id);
+            } catch (UnsupportedFeature $e) {
+                $this->assertSame($issue, $e->issue, $id);
+                $this->assertStringStartsWith('phpc: unsupported: ', $e->getMessage(), $id);
+                $row = UnsupportedRegistry::feature($id);
+                $this->assertStringContainsString($row['matrixRow'], $e->getMessage(), $id);
+            }
+        }
+    }
+
     /**
      * Sites routed in this slice must not keep the legacy bare LogicException wording.
      */
@@ -181,6 +208,14 @@ final class UnsupportedFeatureTest extends TestCase
             dirname(__DIR__, 2).'/lib/JIT/ArrayFilterCallbackPolicy.php',
             dirname(__DIR__, 2).'/lib/Compiler/AttributeConstantEvaluator.php',
             dirname(__DIR__, 2).'/lib/Func/Internal.php',
+            dirname(__DIR__, 2).'/lib/VM/EnumFromHandler.php',
+            dirname(__DIR__, 2).'/lib/VM/NewCallableHandler.php',
+            dirname(__DIR__, 2).'/lib/JIT/IssetHelper.php',
+            dirname(__DIR__, 2).'/lib/JIT/EmptyStaticPropertyHelper.php',
+            dirname(__DIR__, 2).'/lib/Runtime.php',
+            dirname(__DIR__, 2).'/lib/JIT/ReflectionBuiltinHelper.php',
+            dirname(__DIR__, 2).'/lib/VM/VmIteratorForeach.php',
+            dirname(__DIR__, 2).'/lib/VM/GeneratorIteratorJitHelper.php',
         ];
         $legacy = [
             'range() step must be an integer in this compiler build',
@@ -204,6 +239,17 @@ final class UnsupportedFeatureTest extends TestCase
             'or VM path in this compiler build (#26772)',
             'for JIT/AOT in this compiler build; array callables and invokable objects are deferred',
             'Attribute constructor arguments must be compile-time constant expressions in this compiler build',
+            'is not supported in JIT in this compiler build',
+            'new(...) first-class callable is not supported in JIT in this compiler build',
+            'isset() on static property with dynamic name is not supported in JIT',
+            'empty() on static property with dynamic name is not supported in JIT',
+            'yield in the main script is not supported in AOT yet (issue #3115).',
+            'must be a string literal in this compiler build',
+            'get_class() argument must be an object in this compiler build',
+            'get_debug_type() argument must be an object in this compiler build',
+            'SplObjectStorage keys must be objects in this compiler build',
+            'foreach over objects is only supported for SplObjectStorage in this compiler build',
+            'foreach requires a Generator value in this compiler build',
         ];
         foreach ($roots as $path) {
             $this->assertFileExists($path);

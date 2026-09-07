@@ -62,6 +62,7 @@ use PHPCompiler\Visitor\VoidCastResolver;
 use PHPCompiler\Web\ServeCompileCache;
 use PHPCompiler\Web\Superglobals;
 use PHPCompiler\Lint\LintCompiler;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPCompiler\Compiler\CompileFatal;
 use PHPCompiler\VM\MemoryAccounting;
 use PHPCompiler\VM\OutputBuffer;
@@ -1065,7 +1066,7 @@ class Runtime {
         \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_loadjitcontext_done');
         // Generator bodies use GeneratorHelper resume lowering; script-scope yield still blocked (#3115).
         if (null !== $block && Block::containsGeneratorOpcodesInScriptScope($block)) {
-            throw new \LogicException('yield in the main script is not supported in AOT yet (issue #3115).');
+            UnsupportedFeature::raise('yield-script-scope-aot');
         }
         if ($needsPregPrelink) {
             // User-script AOT NestedJITs PregJitHelper via PregMatchRuntime (#21212 / #21200 shape).

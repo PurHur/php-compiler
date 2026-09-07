@@ -2998,7 +2998,7 @@ final class HashTableWriteLlvm
     public static function objectPointerAsStringKey(Context $context, Variable $keyObject): Variable
     {
         if (Variable::TYPE_OBJECT !== $keyObject->type) {
-            throw new \LogicException('SplObjectStorage keys must be objects in this compiler build');
+            UnsupportedFeature::raise('spl-object-storage-key-type');
         }
         $objPtr = $context->helper->loadValue($keyObject);
         $sizeT = $context->getTypeFromString('size_t');

@@ -10,6 +10,7 @@ namespace PHPCompiler\JIT;
 
 use PHPCfg\Operand;
 use PHPCfg\Operand\Literal;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPLLVM\Value;
 
 final class IssetHelper
@@ -38,7 +39,7 @@ final class IssetHelper
         ?Operand $nameOp
     ): Value {
         if (!$nameOp instanceof Literal || !is_string($nameOp->value)) {
-            throw new \LogicException('isset() on static property with dynamic name is not supported in JIT');
+            UnsupportedFeature::raise('isset-static-property-dynamic-name');
         }
 
         return $context->type->object->compileStaticPropertyIsSet(
