@@ -153,21 +153,33 @@ final class str_replace extends Internal
                     $countSlot
                 );
             } else {
-                $search = JitStringBuiltinArg::lower($context, $args[0], 'str_replace', 0, 'search', 'array|string');
-                $replace = JitStringBuiltinArg::lower($context, $args[1], 'str_replace', 1, 'replace', 'array|string');
-                $subject = JitStringBuiltinArg::lower($context, $args[2], 'str_replace', 2, 'subject', 'array|string', null, false);
-                $result = JitStrReplace::replace(
+                $folded = JitStrReplace::tryFoldLiteralReplace(
                     $context,
-                    $search,
-                    $replace,
-                    $subject,
+                    $args[0],
+                    $args[1],
+                    $args[2],
                     false,
                     $countSlot
                 );
-                // NestedJIT result owns a fresh string — release ephemeral concat args (#36388).
-                JitStringBuiltinArg::releaseEphemeralArgAfterCopy($context, $args[0], $search);
-                JitStringBuiltinArg::releaseEphemeralArgAfterCopy($context, $args[1], $replace);
-                JitStringBuiltinArg::releaseEphemeralArgAfterCopy($context, $args[2], $subject);
+                if (null !== $folded) {
+                    $result = $folded;
+                } else {
+                    $search = JitStringBuiltinArg::lower($context, $args[0], 'str_replace', 0, 'search', 'array|string');
+                    $replace = JitStringBuiltinArg::lower($context, $args[1], 'str_replace', 1, 'replace', 'array|string');
+                    $subject = JitStringBuiltinArg::lower($context, $args[2], 'str_replace', 2, 'subject', 'array|string', null, false);
+                    $result = JitStrReplace::replace(
+                        $context,
+                        $search,
+                        $replace,
+                        $subject,
+                        false,
+                        $countSlot
+                    );
+                    // NestedJIT result owns a fresh string — release ephemeral concat args (#36388).
+                    JitStringBuiltinArg::releaseEphemeralArgAfterCopy($context, $args[0], $search);
+                    JitStringBuiltinArg::releaseEphemeralArgAfterCopy($context, $args[1], $replace);
+                    JitStringBuiltinArg::releaseEphemeralArgAfterCopy($context, $args[2], $subject);
+                }
             }
         } else {
             if (self::isArrayReplaceArg($args[0]) || self::isArrayReplaceArg($args[1])) {

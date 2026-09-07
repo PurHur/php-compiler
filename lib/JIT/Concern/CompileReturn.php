@@ -308,6 +308,11 @@ trait CompileReturn
                             } else {
                                 $this->context->refcount->delref($retval);
                             }
+                            $this->context->builder->returnValue(
+                                $this->alignRetvalToLlvmFnReturn($retval, $func)
+                            );
+
+                            return $origBasicBlock;
                         } elseif (Variable::TYPE_VALUE === $return->type) {
                             $str = \PHPCompiler\JIT\JitValueBox::readStringOrNull(
                                 $this->context,

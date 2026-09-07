@@ -193,6 +193,24 @@ trait CompileConcat
                         $this->maybeRefreshIncludeBindingsBeforeUse();
                         break;
                     }
+                    // Dead in-place `$out = $out . …` / `$out .= …`: append into the left
+                    // CV — ephemeral rebind leaks the prior buffer (#36388 NestedJIT
+                    // str_replace / typed string builders). Skip `$s .= $s`.
+                    if (
+                        (int) $op->arg1 === (int) $op->arg2
+                        && (int) $op->arg2 !== (int) $op->arg3
+                        && $this->tryDeadInPlaceConcatAppend(
+                            $block,
+                            $destOp,
+                            $left,
+                            $right,
+                            $func,
+                            $rightOp
+                        )
+                    ) {
+                        $this->maybeRefreshIncludeBindingsBeforeUse();
+                        break;
+                    }
                     // Always use entry-alloca for dead-operand concat results.
                     // assignOperand creates KIND_VALUE variables whose free() is a
                     // no-op, leaking the allocated string and corrupting the heap on
