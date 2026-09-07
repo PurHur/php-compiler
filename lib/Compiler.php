@@ -52,6 +52,7 @@ require_once __DIR__.'/Compiler/Concern/CallArgEncapsedConcatArithmeticNamedLoca
 require_once __DIR__.'/Compiler/Concern/CallArgResidualDimCoalesceNewHoistedFoldAndAdjacentProducerValueSlots.php';
 require_once __DIR__.'/Compiler/Concern/CallArgClosureDeadTempProducerEvalAndPreferNamedLocalValueSlots.php';
 require_once __DIR__.'/Compiler/Concern/CallArgMultiProducerNamedLocalArrayColumnSearchPadValueSlots.php';
+require_once __DIR__.'/Compiler/Concern/CallArgSiblingMergeEmbeddedIssetLogicalNamedAssignValueSlots.php';
 require_once __DIR__.'/Compiler/Concern/CompileCallArgSends.php';
 require_once __DIR__.'/Compiler/Concern/CompileInlineSpecializedCallArgSends.php';
 require_once __DIR__.'/Compiler/Concern/ArrayPadUnpackExtractAndDateSunCallArgSends.php';
@@ -272,6 +273,7 @@ use PHPCompiler\Compiler\Concern\CallArgEncapsedConcatArithmeticNamedLocalAndPre
 use PHPCompiler\Compiler\Concern\CallArgResidualDimCoalesceNewHoistedFoldAndAdjacentProducerValueSlots;
 use PHPCompiler\Compiler\Concern\CallArgClosureDeadTempProducerEvalAndPreferNamedLocalValueSlots;
 use PHPCompiler\Compiler\Concern\CallArgMultiProducerNamedLocalArrayColumnSearchPadValueSlots;
+use PHPCompiler\Compiler\Concern\CallArgSiblingMergeEmbeddedIssetLogicalNamedAssignValueSlots;
 use PHPCompiler\Compiler\Concern\CompileCallArgSends;
 use PHPCompiler\Compiler\Concern\CompileInlineSpecializedCallArgSends;
 use PHPCompiler\Compiler\Concern\ArrayPadUnpackExtractAndDateSunCallArgSends;
@@ -402,6 +404,7 @@ class Compiler {
     use CallArgResidualDimCoalesceNewHoistedFoldAndAdjacentProducerValueSlots;
     use CallArgClosureDeadTempProducerEvalAndPreferNamedLocalValueSlots;
     use CallArgMultiProducerNamedLocalArrayColumnSearchPadValueSlots;
+    use CallArgSiblingMergeEmbeddedIssetLogicalNamedAssignValueSlots;
     use CompileCallArgSends;
     use CompileInlineSpecializedCallArgSends;
     use ArrayPadUnpackExtractAndDateSunCallArgSends;
