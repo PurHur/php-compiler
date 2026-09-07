@@ -139,7 +139,7 @@ When `vendor/composer/` exists, `phpc build --project` reads Composer’s genera
 
 `phpc.json` knobs: `"autoload": "composer"` (default when `vendor/composer` exists), `"autoload": "none"` to skip, and `"include_roots": ["lib/…"]` for extra trees. Literal includes outside the project file map fail at compile time with the path. Computed `include $path` / `require $path` resolve against the same map at runtime: in-map paths are accepted (units already linked via the graph); out-of-map paths raise `Error` with the path (never a silent no-op).
 
-Graphs with ≥32 `--include` units skip SourceBundler mega-concat and fold files via IncludeHelper; `phpc build` raises `memory_limit` to `PHP_COMPILER_LLVM_MEMORY_LIMIT` (default 8192M) ([#36382](https://github.com/PurHur/php-compiler/issues/36382)). Slim+nyholm handle+emit (~73 units after stripping unused `App::run()` / AppFactory probe / unused add*Middleware) IncludeHelper peaks around **~350 MiB RSS** for user IR; NestedJIT of `UriRawurlencodeReplaceJitHelper` + `ParseUrlJitHelper` is done **eagerly** at compile start (while the entry is still only `require_once`) so Nyholm `Uri::withUserInfo` / constructors do not NestedJIT into a fat module. Eager thin-preg NestedJIT is intentionally off for these graphs — it fattens the module and stalls Uri lowering. NestedJIT of `SprintfJitHelper` must not call `unpack()` (that pulled `UnpackEngine` into the user module and OOMed under 8g). FastRoute `RouteCollector::addRoute` must not use `foreach ((array) $httpMethod)` — mid-graph `TYPE_CAST_ARRAY` inlines `JitGetObjectVarsNative` class-id dispatch and stalls Slim AOT for minutes (`patch-fastroute-array-cast-36382.php`). Use `./script/composer/slim-hello-36382-smoke.sh` for the AOT+fcgi hello gate.
+Graphs with ≥32 `--include` units skip SourceBundler mega-concat and fold files via IncludeHelper; `phpc build` raises `memory_limit` to `PHP_COMPILER_LLVM_MEMORY_LIMIT` (default 8192M) ([#36382](https://github.com/PurHur/php-compiler/issues/36382)). Slim+nyholm handle+emit (~74 units after stripping unused `App::run()` / AppFactory probe / unused add*Middleware + `AotStringStream36382`) IncludeHelper peaks around **~350 MiB RSS** for user IR; NestedJIT of `UriRawurlencodeReplaceJitHelper` + `ParseUrlJitHelper` is done **eagerly** at compile start (while the entry is still only `require_once`) so Nyholm `Uri::withUserInfo` / constructors do not NestedJIT into a fat module. Eager thin-preg NestedJIT is intentionally off for these graphs — it fattens the module and stalls Uri lowering. NestedJIT of `SprintfJitHelper` must not call `unpack()` (that pulled `UnpackEngine` into the user module and OOMed under 8g). FastRoute `RouteCollector::addRoute` must not use `foreach ((array) $httpMethod)` — mid-graph `TYPE_CAST_ARRAY` inlines `JitGetObjectVarsNative` class-id dispatch and stalls Slim AOT for minutes (`patch-fastroute-array-cast-36382.php`). Nyholm `Stream::create($string)` is patched to `AotStringStream36382` (no `php://memory` fopen — thin-AOT `is_resource` gap [#23777](https://github.com/PurHur/php-compiler/issues/23777)). The hello entry skips `foreach ($response->getHeaders())` after `handle()` (that loop aborts before body echo under IncludeHelper). Use `./script/composer/slim-hello-36382-smoke.sh` for the AOT+CGI hello gate (green: `Status: 200` + `hello`).
 
 ```bash
 # Fixture: PSR-4 + classmap + files (green today)
@@ -147,9 +147,9 @@ Graphs with ≥32 `--include` units skip SourceBundler mega-concat and fold file
 ./test/fixtures/aot/projects/composer_mini/.phpc/bin/app
 # expect: hello world|legacy|stamp
 
-# Slim+nyholm graph (eager thin preg NestedJIT + IncludeHelper; full: slim-hello-36382-smoke.sh)
+# Slim+nyholm graph (string-body stream + IncludeHelper; full: slim-hello-36382-smoke.sh)
 ./script/composer/setup-slim-hello-36382.sh
-./phpc build --project test/fixtures/aot/projects/slim_hello_36382 --dry-run   # ~73 units
+./phpc build --project test/fixtures/aot/projects/slim_hello_36382 --dry-run   # ~74 units
 # full emit: ./script/composer/slim-hello-36382-smoke.sh
 ```
 
