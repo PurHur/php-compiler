@@ -75,6 +75,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/Compiler/Concern/CallArgPostNestedFinalLiteralNamedLocalHaystackDimExactValueSlots.php',
             'lib/Compiler/Concern/CallArgResidualDimCoalesceNewHoistedFoldAndAdjacentProducerValueSlots.php',
             'lib/Compiler/Concern/CallArgSiblingMergeEmbeddedIssetLogicalNamedAssignValueSlots.php',
+            'lib/Compiler/Concern/CfgDeclaredTypeAssertAndParamApply.php',
             'lib/Compiler/Concern/CfgProducerIndexAndRematerialize.php',
             'lib/Compiler/Concern/CfgTypeShapeAndDeclaredAssert.php',
             'lib/Compiler/Concern/ClassLikeAndStmtCompile.php',
