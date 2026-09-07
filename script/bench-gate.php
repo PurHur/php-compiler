@@ -144,7 +144,9 @@ function measureCase(string $name, string $path, string $zend, string $llvmEnv, 
         }
     }
     $expected = trim(capture(escapeshellcmd($zend).' '.escapeshellarg($path)));
-    $buildCmd = $llvmEnv.' '.escapeshellcmd($root.'/phpc').' build -o '.escapeshellarg($binary).' '.escapeshellarg($compileSrc);
+    // Cold build: mid-tier compile cache keys by git tip and can restore a .o from
+    // before a lib/ fix on the same SHA (stale wrong output → false gate red).
+    $buildCmd = 'PHP_COMPILER_CACHE=0 '.$llvmEnv.' '.escapeshellcmd($root.'/phpc').' build -o '.escapeshellarg($binary).' '.escapeshellarg($compileSrc);
     capture($buildCmd.' 2>&1', $buildRc, buildCapSeconds());
     $outputOk = 0 === $buildRc
         && is_executable($binary)

@@ -38,13 +38,22 @@ trait AssignOperand
         // Named locals must not keep the i64 phi alone (dummy 0 on promote) — box before
         // binding. Unnamed SSA temps (e.g. fibo_r `$n-1`) keep the flag and stay native
         // (#36386 / leftover of #37051).
+        // Exception: dest already lives in an i64 alloca (loop-carried `$s += …`). Boxing
+        // replaces the Variable with TYPE_VALUE so a second `+=` in the same block takes
+        // the vbox arith path and drops the update — call-heavy / dual `+= 1` (#36385).
         if (
             null !== $value->longArithOverflowFlag
             && (null !== $value->longArithOverflowDoubleSlot || null !== $value->longArithOverflowPromoted)
             && Variable::TYPE_NATIVE_LONG === $value->type
         ) {
             $assignName = \PHPCompiler\JIT\OperandName::resolve($resultOp);
-            if (null !== $assignName && '' !== $assignName) {
+            $keepNativeAlloca = false;
+            if ($this->context->hasVariableOp($resultOp)) {
+                $destExisting = $this->context->getVariableFromOp($resultOp);
+                $keepNativeAlloca = Variable::TYPE_NATIVE_LONG === $destExisting->type
+                    && Variable::KIND_VARIABLE === $destExisting->kind;
+            }
+            if (null !== $assignName && '' !== $assignName && !$keepNativeAlloca) {
                 $value = \PHPCompiler\JIT\JitLongArithOverflow::materializeOverflowableNativeLong(
                     $this->context,
                     $value

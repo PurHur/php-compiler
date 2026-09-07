@@ -64,6 +64,15 @@ rebuild-examples:
 bench:
 	./script/php-local.sh script/rebuild-examples.php
 
+# Nightly v2 measure + history JSON + chart + bench-gate (#36385)
+.PHONY: bench-nightly
+bench-nightly:
+	./script/bench-nightly.sh
+
+.PHONY: bench-nightly-publish
+bench-nightly-publish:
+	./script/bench-nightly.sh --publish-only
+
 .PHONY: fix
 fix:
 	docker run -v $(shell pwd):/compiler ircmaxell/php-compiler:16.04-dev php vendor/bin/php-cs-fixer fix --allow-risky=yes

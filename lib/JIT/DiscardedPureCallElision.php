@@ -4546,9 +4546,21 @@ final class DiscardedPureCallElision
     /**
      * Compile-time int / finite-in-range float / numeric-string → zend_long
      * truncation for intdiv proofs (php-src {@code Z_PARAM_LONG}).
+     *
+     * KIND_VARIABLE (alloca) and boxed {@code __value__} slots are mutable at
+     * runtime — {@see Variable::$compileTimeLong} is set on the first assign and
+     * goes stale in loops. Folding {@code $s += $i} as {@code 0 + $i} made AOT
+     * print the last {@code $i} (call-heavy / #36385 bench-gate; peer #32605).
      */
     private static function compileTimeLongScalar(Variable $arg): ?int
     {
+        // Mutable storage: never treat as a foldable compile-time long.
+        if (Variable::KIND_VARIABLE === $arg->kind) {
+            return null;
+        }
+        if (JitValueBox::isValueOperand($arg)) {
+            return null;
+        }
         if (null !== $arg->compileTimeLong) {
             return $arg->compileTimeLong;
         }
@@ -4579,9 +4591,18 @@ final class DiscardedPureCallElision
 
     /**
      * Compile-time int/float/numeric-string scalar for clamp bound proofs.
+     *
+     * Same KIND_VARIABLE / boxed-value guard as {@see compileTimeLongScalar}
+     * (#36385 / peer #32605).
      */
     private static function compileTimeNumericScalar(Variable $arg): ?float
     {
+        if (Variable::KIND_VARIABLE === $arg->kind) {
+            return null;
+        }
+        if (JitValueBox::isValueOperand($arg)) {
+            return null;
+        }
         if (null !== $arg->compileTimeLong) {
             return (float) $arg->compileTimeLong;
         }
