@@ -4,8 +4,6 @@
     "done_when_ceiling": 25000,
     "files": {
         "lib/Compiler.php": {
-            "budget": 1202,
-            "target": 20000,
             "budget": 1205,
             "target": 20000,
             "note": "Concern trait splits (#36230/#36387/#36403); CallArgEarlyFastPathAndMixedPropertyFetchSends + InlineCallArgUnionSiblingCastAndComparisonMatchers + peers"
