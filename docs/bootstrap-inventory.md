@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8407 |
-| Phase A inventory files (M2 ratio SSOT) | 8407 |
+| PHP files on vm.php path | 8408 |
+| Phase A inventory files (M2 ratio SSOT) | 8408 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26440 |
+| Source constructs flagged (warnings) | 26442 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5581,6 +5581,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/CallArgInlineArrayUnpackReduceAndFamilyResolve.php` | 0 | 5 |
 | `lib/Compiler/Concern/CallArgInlineEnumCastErrorSuppressAndFccSends.php` | 0 | 17 |
 | `lib/Compiler/Concern/CallArgMultiProducerNamedLocalArrayColumnSearchPadValueSlots.php` | 0 | 2 |
+| `lib/Compiler/Concern/CallArgNestedAdjacentSiblingVarExportMergeForceConstPreludeValueSlots.php` | 0 | 2 |
 | `lib/Compiler/Concern/CallArgNullLiteralHoistedPropertyConstAndCoalesceValueSlots.php` | 0 | 2 |
 | `lib/Compiler/Concern/CallArgNullMergePropertyFetchAndHoistedPreludeSends.php` | 0 | 23 |
 | `lib/Compiler/Concern/CallArgPostFccDimCoalesceExprPreludeAndNestedNewSends.php` | 0 | 6 |
@@ -49202,13 +49203,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 1057)
-- new CompileFatal (line 1091)
-- new CompileError (line 1094)
-- new ClassCompileRegistry (line 1135)
-- new AttributeClassRegistry (line 1136)
-- new ClassCompileRegistry (line 1244)
-- new AttributeClassRegistry (line 1245)
+- new CompileFatal (line 1060)
+- new CompileFatal (line 1094)
+- new CompileError (line 1097)
+- new ClassCompileRegistry (line 1138)
+- new AttributeClassRegistry (line 1139)
+- new ClassCompileRegistry (line 1247)
+- new AttributeClassRegistry (line 1248)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -49494,6 +49495,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - trait CallArgMultiProducerNamedLocalArrayColumnSearchPadValueSlots (line 23)
 - 1 class method(s)
 
+### `lib/Compiler/Concern/CallArgNestedAdjacentSiblingVarExportMergeForceConstPreludeValueSlots.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CallArgNestedAdjacentSiblingVarExportMergeForceConstPreludeValueSlots (line 24)
+- 1 class method(s)
+
 ### `lib/Compiler/Concern/CallArgNullLiteralHoistedPropertyConstAndCoalesceValueSlots.php`
 
 **Warnings** (review for bootstrap subset):
@@ -49622,8 +49629,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/CompileCallArgSends.php`
 
 **Warnings** (review for bootstrap subset):
-- trait CompileCallArgSends (line 62)
-- new OpCode (line 1339)
+- trait CompileCallArgSends (line 65)
+- new OpCode (line 971)
 - 1 class method(s)
 
 ### `lib/Compiler/Concern/CompileClassBodyAndTraitAdaptations.php`

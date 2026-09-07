@@ -4,9 +4,9 @@
     "done_when_ceiling": 25000,
     "files": {
         "lib/Compiler.php": {
-            "budget": 1286,
+            "budget": 1289,
             "target": 20000,
-            "note": "Concern trait splits (#36230/#36387/#36403); CallArgColumnCombineCoalesceStreamFilterSpaceshipAndFilterFamilyValueSlots + CallArgAssignProcOpenTernaryHaystackSliceChainedMergeIifeValueSlots + peers"
+            "note": "Concern trait splits (#36230/#36387/#36403); CallArgNestedAdjacentSiblingVarExportMergeForceConstPreludeValueSlots + CallArgColumnCombineCoalesceStreamFilterSpaceshipAndFilterFamilyValueSlots + peers"
         },
         "lib/JIT.php": {
             "budget": 274,

@@ -5382,6 +5382,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/CallArgFilterJsonDecodeMerg
 require_once __DIR__.'/../../../lib/Compiler/Concern/CallArgDimAdjacentFilterInputMapMergeLogicalMultisortValueSlots.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CallArgAssignProcOpenTernaryHaystackSliceChainedMergeIifeValueSlots.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CallArgColumnCombineCoalesceStreamFilterSpaceshipAndFilterFamilyValueSlots.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/CallArgNestedAdjacentSiblingVarExportMergeForceConstPreludeValueSlots.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompileCallArgSends.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompileInlineSpecializedCallArgSends.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/ArrayPadUnpackExtractAndDateSunCallArgSends.php';
