@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8397 |
-| Phase A inventory files (M2 ratio SSOT) | 8397 |
+| PHP files on vm.php path | 8398 |
+| Phase A inventory files (M2 ratio SSOT) | 8398 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26416 |
+| Source constructs flagged (warnings) | 26419 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5575,6 +5575,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/CallArgEncapsedConcatArithmeticNamedLocalAndPrecedingProducerValueSlots.php` | 0 | 2 |
 | `lib/Compiler/Concern/CallArgInlineArrayUnpackReduceAndFamilyResolve.php` | 0 | 5 |
 | `lib/Compiler/Concern/CallArgInlineEnumCastErrorSuppressAndFccSends.php` | 0 | 17 |
+| `lib/Compiler/Concern/CallArgMultiProducerNamedLocalArrayColumnSearchPadValueSlots.php` | 0 | 2 |
 | `lib/Compiler/Concern/CallArgNullLiteralHoistedPropertyConstAndCoalesceValueSlots.php` | 0 | 2 |
 | `lib/Compiler/Concern/CallArgNullMergePropertyFetchAndHoistedPreludeSends.php` | 0 | 23 |
 | `lib/Compiler/Concern/CallArgPostFccDimCoalesceExprPreludeAndNestedNewSends.php` | 0 | 6 |
@@ -7413,7 +7414,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/RuntimeParseM5PhpCfgParser.php` | 0 | 2 |
 | `lib/JIT/RuntimePrepareSpineIdentity.php` | 0 | 1 |
 | `lib/JIT/ScalarDimFetchHelper.php` | 0 | 2 |
-| `lib/JIT/ScalarReturnCheck.php` | 0 | 15 |
+| `lib/JIT/ScalarReturnCheck.php` | 0 | 16 |
 | `lib/JIT/ScopeBuiltinDefinedLlvm.php` | 0 | 2 |
 | `lib/JIT/ScopeBuiltinEmitHelper.php` | 0 | 4 |
 | `lib/JIT/ScopeBuiltinHelper.php` | 0 | 1 |
@@ -49192,13 +49193,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 1027)
-- new CompileFatal (line 1061)
-- new CompileError (line 1064)
-- new ClassCompileRegistry (line 1105)
-- new AttributeClassRegistry (line 1106)
-- new ClassCompileRegistry (line 1214)
-- new AttributeClassRegistry (line 1215)
+- new CompileFatal (line 1030)
+- new CompileFatal (line 1064)
+- new CompileError (line 1067)
+- new ClassCompileRegistry (line 1108)
+- new AttributeClassRegistry (line 1109)
+- new ClassCompileRegistry (line 1217)
+- new AttributeClassRegistry (line 1218)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -49440,6 +49441,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 - 1 closure(s)
 
+### `lib/Compiler/Concern/CallArgMultiProducerNamedLocalArrayColumnSearchPadValueSlots.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CallArgMultiProducerNamedLocalArrayColumnSearchPadValueSlots (line 23)
+- 1 class method(s)
+
 ### `lib/Compiler/Concern/CallArgNullLiteralHoistedPropertyConstAndCoalesceValueSlots.php`
 
 **Warnings** (review for bootstrap subset):
@@ -49561,15 +49568,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/CompileCallArgSends.php`
 
 **Warnings** (review for bootstrap subset):
-- trait CompileCallArgSends (line 46)
-- new Operand\Temporary (line 1027)
-- new Operand\Temporary (line 1558)
-- new Operand\Temporary (line 1744)
-- new Operand\Temporary (line 1776)
-- new Operand\Temporary (line 1873)
-- new Operand\Temporary (line 2002)
-- new OpCode (line 2004)
-- new OpCode (line 3660)
+- trait CompileCallArgSends (line 48)
+- new Operand\Temporary (line 383)
+- new Operand\Temporary (line 914)
+- new Operand\Temporary (line 1100)
+- new Operand\Temporary (line 1132)
+- new Operand\Temporary (line 1229)
+- new Operand\Temporary (line 1358)
+- new OpCode (line 1360)
+- new OpCode (line 3016)
 - 1 class method(s)
 - 3 closure(s)
 
@@ -52819,7 +52826,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/MathLog.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 7 class method(s)
 
 ### `lib/JIT/Builtin/MathLog10.php`
 
@@ -59709,7 +59716,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/DiscardedPureCallElision.php`
 
 **Warnings** (review for bootstrap subset):
-- 147 class method(s)
+- 149 class method(s)
 
 ### `lib/JIT/DnfParamCheck.php`
 
@@ -61060,19 +61067,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 129)
-- new Variable (line 258)
-- new Variable (line 268)
-- new Variable (line 313)
-- new Variable (line 329)
-- new Variable (line 336)
-- new Variable (line 425)
-- new Variable (line 446)
-- new Variable (line 461)
+- new Variable (line 272)
+- new Variable (line 282)
+- new Variable (line 327)
+- new Variable (line 343)
+- new Variable (line 358)
+- new Variable (line 444)
+- new Variable (line 465)
 - new Variable (line 480)
-- new Variable (line 488)
-- new Variable (line 495)
-- new Variable (line 523)
-- new Variable (line 543)
+- new Variable (line 499)
+- new Variable (line 507)
+- new Variable (line 514)
+- new Variable (line 540)
+- new Variable (line 568)
+- new Variable (line 588)
 - 12 class method(s)
 
 ### `lib/JIT/ScopeBuiltinDefinedLlvm.php`
