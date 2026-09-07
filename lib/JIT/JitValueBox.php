@@ -27,6 +27,28 @@ final class JitValueBox
         return $slot;
     }
 
+    /**
+     * Heap {@see __value__} for ABI returns of {@code __value__*} (nullable scalars).
+     *
+     * {@see alloc} is entry-stack alloca — returning that pointer from {@code : ?string}
+     * (etc.) dangles after the callee frame is popped (AOT reads as int(0) / SEGV; #36382
+     * Slim RoutingResults::getRouteIdentifier).
+     *
+     * php-src: Zend/zend_execute.c ZEND_RETURN / ZVAL_COPY onto the caller's stack.
+     */
+    public static function allocHeap(Context $context): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'value_box_heap_alloc_cont');
+        $heapVal = $context->memory->malloc($context->getTypeFromString('__value__'));
+        $valueMap = $context->structFieldMap['__value__'];
+        $context->builder->store(
+            $context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),
+            $context->builder->structGep($heapVal, $valueMap['type'])
+        );
+
+        return $heapVal;
+    }
+
     public static function pointer(Context $context, Value $slot): Value
     {
         return $context->builder->pointerCast(

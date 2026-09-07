@@ -76,8 +76,9 @@ trait CoerceReturnPropertyDeclaringAndByRef
             );
         }
         if ('__value__*' === $expected) {
+            // Heap boxes only — stack alloca's dangle after ret (#36382 / #8555 leftovers).
             if (null !== $return->nestedHelperValueSlot) {
-                $slot = JIT\JitValueBox::alloc($this->context);
+                $slot = JIT\JitValueBox::allocHeap($this->context);
                 JIT\JitValueBox::copyFromPointer(
                     $this->context,
                     $slot,
@@ -87,9 +88,9 @@ trait CoerceReturnPropertyDeclaringAndByRef
                 return JIT\JitValueBox::pointer($this->context, $slot);
             }
             if (Variable::TYPE_VALUE === $return->type) {
-                // Nullable returns use __value__*; copy merge/ternary slots into a fresh
-                // return slot instead of returning an interior pointer (#8555).
-                $slot = JIT\JitValueBox::alloc($this->context);
+                // Nullable returns use __value__*; copy merge/ternary / property slots into a
+                // heap return box instead of returning a stack interior pointer (#8555 / #36382).
+                $slot = JIT\JitValueBox::allocHeap($this->context);
                 JIT\JitValueBox::copyFromPointer(
                     $this->context,
                     $slot,
@@ -102,7 +103,7 @@ trait CoerceReturnPropertyDeclaringAndByRef
                 return $this->context->getTypeFromString('__value__*')->constNull();
             }
             if (Variable::TYPE_OBJECT === $return->type) {
-                $slot = JIT\JitValueBox::alloc($this->context);
+                $slot = JIT\JitValueBox::allocHeap($this->context);
                 $this->context->builder->call(
                     $this->context->lookupFunction('__value__writeObject'),
                     JIT\JitValueBox::pointer($this->context, $slot),
@@ -112,7 +113,7 @@ trait CoerceReturnPropertyDeclaringAndByRef
                 return JIT\JitValueBox::pointer($this->context, $slot);
             }
             if (Variable::TYPE_STRING === $return->type) {
-                $slot = JIT\JitValueBox::alloc($this->context);
+                $slot = JIT\JitValueBox::allocHeap($this->context);
                 $owned = $this->context->builder->call(
                     $this->context->lookupFunction('__string__separate'),
                     $retval
@@ -127,7 +128,7 @@ trait CoerceReturnPropertyDeclaringAndByRef
             }
             // mixed / NestedJIT scalar returns must box into `__value__*` (#20785).
             if (Variable::TYPE_NATIVE_LONG === $return->type) {
-                $slot = JIT\JitValueBox::alloc($this->context);
+                $slot = JIT\JitValueBox::allocHeap($this->context);
                 $this->context->builder->call(
                     $this->context->lookupFunction('__value__writeLong'),
                     JIT\JitValueBox::pointer($this->context, $slot),
@@ -137,7 +138,7 @@ trait CoerceReturnPropertyDeclaringAndByRef
                 return JIT\JitValueBox::pointer($this->context, $slot);
             }
             if (Variable::TYPE_NATIVE_BOOL === $return->type) {
-                $slot = JIT\JitValueBox::alloc($this->context);
+                $slot = JIT\JitValueBox::allocHeap($this->context);
                 JIT\JitValueBox::writeBool(
                     $this->context,
                     JIT\JitValueBox::pointer($this->context, $slot),
@@ -147,7 +148,7 @@ trait CoerceReturnPropertyDeclaringAndByRef
                 return JIT\JitValueBox::pointer($this->context, $slot);
             }
             if (Variable::TYPE_NATIVE_DOUBLE === $return->type) {
-                $slot = JIT\JitValueBox::alloc($this->context);
+                $slot = JIT\JitValueBox::allocHeap($this->context);
                 $this->context->builder->call(
                     $this->context->lookupFunction('__value__writeDouble'),
                     JIT\JitValueBox::pointer($this->context, $slot),
