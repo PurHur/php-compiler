@@ -6893,6 +6893,7 @@ require_once __DIR__.'/../../../lib/JIT/CloneOperandHelper.php';
 require_once __DIR__.'/../../../lib/JIT/ClosureBindHelper.php';
 require_once __DIR__.'/../../../lib/JIT/ClosureHelper.php';
 require_once __DIR__.'/../../../lib/JIT/CoalesceHelper.php';
+require_once __DIR__.'/../../../lib/JIT/CompileCacheSemanticHash.php';
 require_once __DIR__.'/../../../lib/JIT/CompileCache.php';
 require_once __DIR__.'/../../../lib/JIT/CompilerOperandChainNative.php';
 require_once __DIR__.'/../../../lib/JIT/Context.php';
