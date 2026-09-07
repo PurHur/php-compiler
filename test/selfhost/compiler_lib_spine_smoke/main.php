@@ -5373,6 +5373,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/ArrayPadUnpackExtractAndDat
 require_once __DIR__.'/../../../lib/Compiler/Concern/ExplodeIteratorChunkWalkAndTrailingComparatorCallArgSends.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/InlineCallArgDeadTempAndSiblingNewProducers.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/InlineCallArgArrayColumnMbstringAndCallbackProducers.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/InlineCallArgMergeFamilyAndHoistedAssignProducers.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/InlineCallArgProducerMatch.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/MatchInlineCallArgProducerWithEmbeddedLiterals.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/FindInlineCallArgProducerSlot.php';
