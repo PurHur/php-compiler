@@ -57,6 +57,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/Compiler/Concern/CallAndArrayLiteralCompile.php',
             'lib/Compiler/Concern/CallArgAssignProcOpenTernaryHaystackSliceChainedMergeIifeValueSlots.php',
             'lib/Compiler/Concern/CallArgClosureDeadTempProducerEvalAndPreferNamedLocalValueSlots.php',
+            'lib/Compiler/Concern/CallArgColumnCombineCoalesceStreamFilterSpaceshipAndFilterFamilyValueSlots.php',
             'lib/Compiler/Concern/CallArgCompileTimeValueAndProcOpenFold.php',
             'lib/Compiler/Concern/CallArgDeadArrayComparisonConcatPointerValueSlots.php',
             'lib/Compiler/Concern/CallArgDimAdjacentFilterInputMapMergeLogicalMultisortValueSlots.php',
