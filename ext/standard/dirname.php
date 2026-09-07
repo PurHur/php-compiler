@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -56,8 +57,10 @@ final class dirname extends Internal
         }
         if (1 === $argc) {
             $path = JitFilestatArg::lowerPathComponentFilename($context, $args[0], 'dirname', 0, 'path');
+            $result = JitPath::dirname($context, $path);
+            JitStringBuiltinArg::releaseEphemeralArgAfterCopy($context, $args[0], $path);
 
-            return JitPath::dirname($context, $path);
+            return $result;
         }
         // Soft-null outside strict_types; strict → TypeError (#31210).
         // Early return after compile-time null TypeError — open a dead insert block so the
@@ -73,7 +76,9 @@ final class dirname extends Internal
         $path = JitFilestatArg::lowerPathComponentFilename($context, $args[0], 'dirname', 0, 'path');
         // Z_PARAM_LONG with caller strict_types parity (#31210 / explode $limit).
         $levels = JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[1], 'dirname', 2, 'levels');
+        $result = JitPath::dirnameWithLevels($context, $path, $levels);
+        JitStringBuiltinArg::releaseEphemeralArgAfterCopy($context, $args[0], $path);
 
-        return JitPath::dirnameWithLevels($context, $path, $levels);
+        return $result;
     }
 }

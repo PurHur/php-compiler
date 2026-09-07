@@ -198,6 +198,8 @@ trait CallResultOperandAssign
             'str_rot13' => true,
             'str_increment' => true,
             'str_decrement' => true,
+            'basename' => true,
+            'dirname' => true,
         ];
 
         return isset($owning[strtolower($name)]);

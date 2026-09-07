@@ -1,0 +1,13 @@
+<?php
+/**
+ * Thin AOT: basename() of a literal path must not grow RSS (#36388).
+ * php-src: ext/standard/string.c php_basename.
+ */
+$n = (int) ($argv[1] ?? 2000);
+$u0 = memory_get_usage(false);
+for ($i = 0; $i < $n; $i++) {
+    $s = basename('/tmp/hello.txt');
+    unset($s);
+}
+$d = memory_get_usage(false) - $u0;
+echo 'basename_lit delta=', $d, ' ', ($d === 0 ? 'ok' : 'LEAK'), "\n";

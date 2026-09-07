@@ -51,10 +51,17 @@ final class basename extends Internal
         if (2 === $argc) {
             // Soft-null DEP+coerce on 8.4 (not typed TypeError) — #29705 / php-src basename.c.
             $suffix = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], 'basename', 1, 'suffix');
+            $result = JitPath::basenameWithSuffix($context, $path, $suffix);
+            // Path/suffix may be ephemeral concat — basename copied slices (#36388).
+            JitStringBuiltinArg::releaseEphemeralArgAfterCopy($context, $args[0], $path);
+            JitStringBuiltinArg::releaseEphemeralArgAfterCopy($context, $args[1], $suffix);
 
-            return JitPath::basenameWithSuffix($context, $path, $suffix);
+            return $result;
         }
 
-        return JitPath::basename($context, $path);
+        $result = JitPath::basename($context, $path);
+        JitStringBuiltinArg::releaseEphemeralArgAfterCopy($context, $args[0], $path);
+
+        return $result;
     }
 }
