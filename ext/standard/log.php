@@ -15,6 +15,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\MathLog;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\DiscardedPureCallElision;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -62,9 +63,16 @@ final class log extends Internal
         }
         $asFloat = JitFdiv::lowerSingleOperand($context, $args[0], 1, 'num', 'log', 'float');
         if (isset($args[1])) {
+            // Compile-time base: specialize php-src 2/10/1/else paths and skip
+            // the ≤0 ValueError branch when proven safe (#36386 / peer intdiv).
+            $ctBase = DiscardedPureCallElision::compileTimeLogBase($args[1]);
+            if (null !== $ctBase && DiscardedPureCallElision::logBaseCanSkipValueErrorGuard($args[1])) {
+                return MathLog::invokeWithCompileTimeBase($context, $asFloat, $ctBase);
+            }
             $base = JitFdiv::lowerSingleOperand($context, $args[1], 2, 'base', 'log', 'float');
+            $skipGuard = DiscardedPureCallElision::logBaseCanSkipValueErrorGuard($args[1]);
 
-            return MathLog::invokeWithBase($context, $asFloat, $base);
+            return MathLog::invokeWithBase($context, $asFloat, $base, $skipGuard);
         }
 
         return MathLog::invoke($context, $asFloat);

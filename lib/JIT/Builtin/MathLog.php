@@ -48,9 +48,17 @@ final class MathLog
 
     /**
      * log($num, $base) — php-src math.c order: base 2 / 10 / 1 / ≤0 / else.
+     *
+     * When {@code $skipBaseGt0Guard} is true the compile-time base is already
+     * proven {@code > 0} or {@code NAN} (php-src: NAN is not ≤ 0), so omit the
+     * ValueError branch (#36386 / peer intdiv proven-divisor).
      */
-    public static function invokeWithBase(Context $context, Value $num, Value $base): Value
-    {
+    public static function invokeWithBase(
+        Context $context,
+        Value $num,
+        Value $base,
+        bool $skipBaseGt0Guard = false
+    ): Value {
         self::ensureLinked($context);
         MathLog10::ensureLinked($context);
 
@@ -63,14 +71,16 @@ final class MathLog
         $nan = $double->constReal(\NAN);
 
         // php-src: after base==1 fast path, base ≤ 0 → ValueError. NAN base is not ≤ 0.
-        $tooSmall = $context->builder->fcmp(Builder::REAL_OLE, $base, $zero);
-        $okBase = $context->builder->not($tooSmall);
-        TypeErrorRaise::emitBranchOrAbortOnValueErrorFailure(
-            $context,
-            $okBase,
-            'log_base_gt0_'.(++self::$seq),
-            'log(): Argument #2 ($base) must be greater than 0'
-        );
+        if (!$skipBaseGt0Guard) {
+            $tooSmall = $context->builder->fcmp(Builder::REAL_OLE, $base, $zero);
+            $okBase = $context->builder->not($tooSmall);
+            TypeErrorRaise::emitBranchOrAbortOnValueErrorFailure(
+                $context,
+                $okBase,
+                'log_base_gt0_'.(++self::$seq),
+                'log(): Argument #2 ($base) must be greater than 0'
+            );
+        }
 
         $is2 = $context->builder->fcmp(Builder::REAL_OEQ, $base, $two);
         $is10 = $context->builder->fcmp(Builder::REAL_OEQ, $base, $ten);
@@ -87,6 +97,44 @@ final class MathLog
         $afterTen = $context->builder->select($is10, $asLog10, $afterOne);
 
         return $context->builder->select($is2, $asLog2, $afterTen);
+    }
+
+    /**
+     * log($num, $base) when {@code $base} is a compile-time float proven safe
+     * for the ValueError gate (php-src math.c: base 2 / 10 / 1 / else).
+     * Emits only the matching hot path — no dead select tree / fail block (#36386).
+     */
+    public static function invokeWithCompileTimeBase(Context $context, Value $num, float $base): Value
+    {
+        self::ensureLinked($context);
+        $double = $context->getTypeFromString('double');
+
+        // php-src: NAN base skips ≤0 ValueError and falls through to general.
+        if ($base !== $base) {
+            $logNum = self::invoke($context, $num);
+            $logBase = self::invoke($context, $double->constReal(\NAN));
+
+            return $context->builder->fdiv($logNum, $logBase);
+        }
+        if (2.0 === $base) {
+            $ln2 = $double->constReal(\M_LN2);
+
+            return $context->builder->fdiv(self::invoke($context, $num), $ln2);
+        }
+        if (10.0 === $base) {
+            MathLog10::ensureLinked($context);
+
+            return MathLog10::invoke($context, $num);
+        }
+        if (1.0 === $base) {
+            return $double->constReal(\NAN);
+        }
+
+        // Proven > 0 (caller) — general log(num)/log(base).
+        $logNum = self::invoke($context, $num);
+        $logBase = self::invoke($context, $double->constReal($base));
+
+        return $context->builder->fdiv($logNum, $logBase);
     }
 
     private static function llvmLogIntrinsic(Context $context): LlvmFunction

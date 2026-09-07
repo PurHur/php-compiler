@@ -74,6 +74,7 @@ final class LogRuntimeShrinkTest extends TestCase
     {
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathLog.php');
         $this->assertStringContainsString('invokeWithBase', $bridge);
+        $this->assertStringContainsString('invokeWithCompileTimeBase', $bridge);
         $this->assertStringContainsString('MathLog10::invoke', $bridge);
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/log.php');
         $this->assertStringContainsString('invokeWithBase', $builtin);
