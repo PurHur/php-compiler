@@ -236,7 +236,9 @@ use PHPCompiler\VM\Variable as VmVariable;
  * ({@code DivisionByZeroError} / {@code ArithmeticError} otherwise stay live).
  * The same proofs skip the LLVM zero/overflow guards and after-call
  * throw-pending checks when the result is used ({@see intdivArgsCannotThrow} /
- * {@see intdivCanSkipZeroDivisorGuard}). Proven-safe {@code str_increment}/
+ * {@see intdivCanSkipZeroDivisorGuard}). Compile-time non-negative bit-shift
+ * counts skip the negative-count {@code ArithmeticError} blocks
+ * ({@see bitShiftCountCanSkipNegativeGuard}). Proven-safe {@code str_increment}/
  * {@code str_decrement} literals likewise fold at the call site and skip
  * after-call throw-pending ({@see strIncDecArgsCannotThrow}). {@code hex2bin}/
  * {@code base64_decode}/{@code convert_uudecode} stay live (invalid-input
@@ -4042,6 +4044,19 @@ final class DiscardedPureCallElision
         $d = self::compileTimeLongScalar($divisor);
 
         return null !== $d && -1 !== $d;
+    }
+
+    /**
+     * Skip the LLVM negative bit-shift {@code ArithmeticError} when the count
+     * truncates to a compile-time long {@code ≥ 0} (php-src
+     * {@code shift_left_function} / {@code shift_right_function}; peer typed
+     * {@code /}/{@code %} proven-divisor, #36386).
+     */
+    public static function bitShiftCountCanSkipNegativeGuard(Variable $count): bool
+    {
+        $c = self::compileTimeLongScalar($count);
+
+        return null !== $c && $c >= 0;
     }
 
     /**
