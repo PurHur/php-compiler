@@ -252,6 +252,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/JIT/Concern/ByRefFormalAssignAndCallArgAdapt.php',
             'lib/JIT/Concern/CallResultCompileTimePropagate.php',
             'lib/JIT/Concern/CallResultOperandAssign.php',
+            'lib/JIT/Concern/CfgParamReturnTypeAndCalleeByRef.php',
             'lib/JIT/Concern/ClassConstEnumAndFunctionStatic.php',
             'lib/JIT/Concern/ClosureThisAndStaticScopeResolve.php',
             'lib/JIT/Concern/CoerceReturnPropertyDeclaringAndByRef.php',
