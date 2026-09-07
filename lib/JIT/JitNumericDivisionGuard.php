@@ -27,10 +27,24 @@ final class JitNumericDivisionGuard
 
     /**
      * Integer `%` with Zend LONG_MIN/-1 → 0 (#32285).
+     *
+     * {@code $skipZeroGuard} / {@code $skipNegOneBranch}: compile-time divisor
+     * proofs (#36386 / peer intdiv proven-divisor).
      */
-    public static function signedModulo(Context $context, Value $dividend, Value $divisor): Value
-    {
-        return VmNumericDivisionGuard::signedModulo($context, $dividend, $divisor);
+    public static function signedModulo(
+        Context $context,
+        Value $dividend,
+        Value $divisor,
+        bool $skipZeroGuard = false,
+        bool $skipNegOneBranch = false
+    ): Value {
+        return VmNumericDivisionGuard::signedModulo(
+            $context,
+            $dividend,
+            $divisor,
+            $skipZeroGuard,
+            $skipNegOneBranch
+        );
     }
 
     /** op2 == -1 → 0 before dividend float→long conversion (#32285). */

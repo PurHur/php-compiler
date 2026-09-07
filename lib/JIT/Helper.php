@@ -485,19 +485,23 @@ restart:
                         $result = $this->context->builder->fsub($leftValue, $rightValue);
                         goto return_double;
                     case OpCode::TYPE_DIV:
-                        JitNumericDivisionGuard::emitZeroDoubleDivisorGuard(
-                            $this->context,
-                            $rightValue,
-                            'Division by zero'
-                        );
+                        if (!DiscardedPureCallElision::doubleDivisorCanSkipZeroGuard($right)) {
+                            JitNumericDivisionGuard::emitZeroDoubleDivisorGuard(
+                                $this->context,
+                                $rightValue,
+                                'Division by zero'
+                            );
+                        }
                         $result = $this->context->builder->fdiv($leftValue, $rightValue);
                         goto return_double;
                     case OpCode::TYPE_MODULO:
-                        JitNumericDivisionGuard::emitZeroDoubleDivisorGuard(
-                            $this->context,
-                            $rightValue,
-                            'Modulo by zero'
-                        );
+                        if (!DiscardedPureCallElision::doubleDivisorCanSkipZeroGuard($right)) {
+                            JitNumericDivisionGuard::emitZeroDoubleDivisorGuard(
+                                $this->context,
+                                $rightValue,
+                                'Modulo by zero'
+                            );
+                        }
                         $result = JitNumericDivisionGuard::moduloWithNegOneShortCircuit(
                             $this->context,
                             $right,
@@ -595,10 +599,30 @@ restart:
                             return $folded;
                         }
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
+                        // Compile-time nonzero divisor → skip DivisionByZeroError (#36386).
+                        $skipZero = DiscardedPureCallElision::intdivCanSkipZeroDivisorGuard($right);
 
-                        return JitLongDiv::binaryNativeLong($this->context, $leftValue, $__right);
+                        return JitLongDiv::binaryNativeLong(
+                            $this->context,
+                            $leftValue,
+                            $__right,
+                            $skipZero
+                        );
                     case OpCode::TYPE_MODULO:
-                        $result = JitNumericDivisionGuard::signedModulo($this->context, $leftValue, $rightValue);
+                        // Compile-time -1 → 0 without srem / zero guard (mod_function).
+                        if (null !== $right->compileTimeLong && -1 === (int) $right->compileTimeLong) {
+                            $result = $this->context->getTypeFromString('int64')->constInt(0, false);
+                            goto return_long;
+                        }
+                        $skipZero = DiscardedPureCallElision::intdivCanSkipZeroDivisorGuard($right);
+                        $skipNeg1 = DiscardedPureCallElision::nativeLongDivisorCanSkipNegOneModuloBranch($right);
+                        $result = JitNumericDivisionGuard::signedModulo(
+                            $this->context,
+                            $leftValue,
+                            $rightValue,
+                            $skipZero,
+                            $skipNeg1
+                        );
                         goto return_long;
                     case OpCode::TYPE_BITWISE_AND:
                     case OpCode::TYPE_BITWISE_OR:

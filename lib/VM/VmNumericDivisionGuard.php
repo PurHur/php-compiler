@@ -6,6 +6,7 @@ namespace PHPCompiler\VM;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\DiscardedPureCallElision;
 use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Builder;
@@ -68,7 +69,11 @@ final class VmNumericDivisionGuard
         BasicBlockHelper::ensureOpenInsertBlock($context, 'mod_neg1_sc_cont');
         $i64 = $context->getTypeFromString('int64');
         $divisor = $context->builder->intCast($emitDivisorLong(), $i64);
-        self::emitZeroLongDivisorGuard($context, $divisor, 'Modulo by zero');
+        // Skip when compile-time long truncation ≠ 0 (peer intdiv / typed `%`, #36386).
+        // Float 0.5 truncates to 0 — keep the guard (do not use double proofs here).
+        if (!DiscardedPureCallElision::intdivCanSkipZeroDivisorGuard($divisorVar)) {
+            self::emitZeroLongDivisorGuard($context, $divisor, 'Modulo by zero');
+        }
 
         $negOne = $i64->constInt(-1, true);
         $isNegOne = $context->builder->icmp(Builder::INT_EQ, $divisor, $negOne);
@@ -99,14 +104,29 @@ final class VmNumericDivisionGuard
 
     /**
      * zend_operators.c mod_function: n % -1 is 0. LLVM srem(INT_MIN, -1) is poison (#32285).
+     *
+     * When {@code $skipZeroGuard} is true the divisor is compile-time ≠ 0.
+     * When {@code $skipNegOneBranch} is true the divisor is compile-time ≠ -1 —
+     * emit bare {@code srem} (no PHI / dead error blocks) (#36386).
      */
-    public static function signedModulo(Context $context, Value $dividend, Value $divisor): Value
-    {
+    public static function signedModulo(
+        Context $context,
+        Value $dividend,
+        Value $divisor,
+        bool $skipZeroGuard = false,
+        bool $skipNegOneBranch = false
+    ): Value {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'mod_srem_cont');
         $i64 = $context->getTypeFromString('int64');
         $left = $context->builder->intCast($dividend, $i64);
         $right = $context->builder->intCast($divisor, $i64);
-        self::emitZeroLongDivisorGuard($context, $right, 'Modulo by zero');
+        if (!$skipZeroGuard) {
+            self::emitZeroLongDivisorGuard($context, $right, 'Modulo by zero');
+        }
+        if ($skipNegOneBranch) {
+            // Proven ≠ -1 — bare srem; INT_MIN/-1 poison path is unreachable.
+            return $context->builder->signedRem($left, $right);
+        }
         $negOne = $i64->constInt(-1, true);
         $isNegOne = $context->builder->icmp(Builder::INT_EQ, $right, $negOne);
         $neg1Block = BasicBlockHelper::append($context, 'mod_neg1_zero');
