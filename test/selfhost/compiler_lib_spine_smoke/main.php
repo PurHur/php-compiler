@@ -5375,6 +5375,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/InlineCallArgDeadTempAndSib
 require_once __DIR__.'/../../../lib/Compiler/Concern/InlineCallArgArrayColumnMbstringAndCallbackProducers.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/InlineCallArgMergeFamilyAndHoistedAssignProducers.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/InlineCallArgChainedDimUnionNewAndExtraProducers.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/InlineCallArgEqualCountProducers.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/InlineCallArgProducerMatch.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/MatchInlineCallArgProducerWithEmbeddedLiterals.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/FindInlineCallArgProducerSlot.php';

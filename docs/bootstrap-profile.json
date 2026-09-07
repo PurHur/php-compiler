@@ -5709,9 +5709,11 @@
         "lib/Compiler/Concern/HoistedUnaryAssignAndInlineProducerCallArgSlots.php",
         "lib/Compiler/Concern/InitArraySpreadArithmeticAndNestedInlineCallArgResolvers.php",
         "lib/Compiler/Concern/InlineCallArgArrayColumnMbstringAndCallbackProducers.php",
+        "lib/Compiler/Concern/InlineCallArgChainedDimUnionNewAndExtraProducers.php",
         "lib/Compiler/Concern/InlineCallArgClosureFeedsAndReturnProducers.php",
         "lib/Compiler/Concern/InlineCallArgCompileTimeFold.php",
         "lib/Compiler/Concern/InlineCallArgDeadTempAndSiblingNewProducers.php",
+        "lib/Compiler/Concern/InlineCallArgEqualCountProducers.php",
         "lib/Compiler/Concern/InlineCallArgMergeFamilyAndHoistedAssignProducers.php",
         "lib/Compiler/Concern/InlineCallArgProducerMatch.php",
         "lib/Compiler/Concern/InlineCallArgSlotResolvers.php",
@@ -8119,6 +8121,7 @@
         "lib/VM/Concern/FrameActivationThisAndIncludeScope.php",
         "lib/VM/Concern/FrameObjectRefAndDeadTempRelease.php",
         "lib/VM/Concern/GeneratorForeachAndYieldFrom.php",
+        "lib/VM/Concern/MethodCallAndStaticCallableInit.php",
         "lib/VM/Concern/ObjectPropertyCollectAndSerialize.php",
         "lib/VM/Concern/ObjectPropertyHooks.php",
         "lib/VM/Concern/ObjectPropertyIssetEmptyUnset.php",
@@ -8614,9 +8617,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8380,
+        "inventory_files": 8383,
         "excluded": 0,
-        "eligible": 8380,
+        "eligible": 8383,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
