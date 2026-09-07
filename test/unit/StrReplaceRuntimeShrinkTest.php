@@ -11,10 +11,17 @@ use PHPUnit\Framework\TestCase;
 /** str_replace() subject routing + StrReplaceJitHelper NestedJIT path (#14779, #23912). */
 final class StrReplaceRuntimeShrinkTest extends TestCase
 {
-    public function testStringStrReplaceUsesJitHelperNotInlineLlvm(): void
+    public function testStringStrReplaceUsesNativeR1Runtime(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringStrReplace.php');
-        $this->assertStringContainsString('StrReplaceJitHelper', $source);
+        $this->assertStringContainsString('StrReplaceRuntime', $source);
+        $this->assertStringContainsString('StrReplaceRuntime::ABI_REPLACE', $source);
+        $this->assertStringNotContainsString('StrReplaceJitHelper::replaceArgv', $source);
+
+        $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StrReplaceRuntime.php');
+        $this->assertStringContainsString('phpc_str_replace_r1', $runtime);
+        $this->assertStringContainsString('emitBridgeBody', $runtime);
+        $this->assertStringContainsString('__string__separate', $runtime);
 
         $jit = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStrReplace.php');
         $this->assertStringContainsString('StringStrReplace::invoke', $jit);
@@ -53,5 +60,6 @@ final class StrReplaceRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StrReplaceJitHelper.php', $spine);
         $this->assertStringContainsString('JitStrReplaceSubject.php', $spine);
         $this->assertStringContainsString('StringStrReplace.php', $spine);
+        $this->assertStringContainsString('StrReplaceRuntime.php', $spine);
     }
 }

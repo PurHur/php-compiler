@@ -6340,6 +6340,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrGetcsv.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrIncdec.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrPad.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrRepeat.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StrReplaceRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrReplace.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrRot13.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrWordCount.php';

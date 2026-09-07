@@ -4,51 +4,27 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for phpc_str_replace/phpc_str_ireplace via StrReplaceJitHelper PHP (#14779, #23912, #35160).
+ * JIT/AOT link for phpc_str_replace_r1 / phpc_str_ireplace_r1 (#14779, #23912, #35160, #36388).
  *
- * Nested helper compile: {@see JitVmHelperLink::ensureBridge} (HelperRuntimeCache + user-script
- * env clear — no hand-rolled NestedJit compile loop). Peer: StringStrPad #23911 / #23204.
- * {@see Context::ensureFullStandaloneBodies} must not NestedJIT this during init (#35160) —
- * peer #35143 / #32122 `.1` mint class; {@see invoke} / JitStrReplace ensure via
- * {@see ensureLinked} before lookup. Skip-bundle compile_driver still gets helper-runtime .o
- * from `bin/compile.php` (#23970) — cache-on NestedJIT can ensureLinked without an early bind.
- * SSOT: {@see \PHPCompiler\ext\standard\VmString}.
+ * Thin AOT uses native {@see StrReplaceRuntime} (no NestedJIT StrReplaceJitHelper) so
+ * FUNCCALL results free on unset — peer {@see StringFormat} number_format_r1.
+ * {@see Context::ensureFullStandaloneBodies} must not NestedJIT this during init (#35160).
+ * SSOT behaviour: {@see \PHPCompiler\ext\standard\VmString}.
  * php-src: ext/standard/string.c — php_str_replace
  */
 final class StringStrReplace
 {
-    private const ABI_REPLACE = 'phpc_str_replace';
+    private const ABI_REPLACE = StrReplaceRuntime::ABI_REPLACE;
 
-    private const ABI_IREPLACE = 'phpc_str_ireplace';
+    private const ABI_IREPLACE = StrReplaceRuntime::ABI_IREPLACE;
 
-    private const ABI_TAKE_COUNT = 'phpc_str_replace_take_count';
-
-    private const HELPER_PATH = '/ext/standard/StrReplaceJitHelper.php';
-
-    private const REPLACE_HELPER = 'PHPCompiler\\ext\\standard\\StrReplaceJitHelper::replaceArgv';
-
-    private const IREPLACE_HELPER = 'PHPCompiler\\ext\\standard\\StrReplaceJitHelper::ireplaceArgv';
-
-    private const TAKE_COUNT_HELPER = 'PHPCompiler\\ext\\standard\\StrReplaceJitHelper::takeLastCount';
-
-    private const BRIDGE_REPLACE = 'str_replace_bridge_entry';
-
-    private const BRIDGE_IREPLACE = 'str_ireplace_bridge_entry';
-
-    private const BRIDGE_TAKE_COUNT = 'str_replace_take_count_bridge_entry';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::REPLACE_HELPER,
-        self::IREPLACE_HELPER,
-        self::TAKE_COUNT_HELPER,
-    ];
+    private const ABI_TAKE_COUNT = StrReplaceRuntime::ABI_TAKE_COUNT;
 
     public static function ensureLinked(Context $context): void
     {
@@ -88,83 +64,76 @@ final class StringStrReplace
 
     private static function implementReplace(Context $context): void
     {
-        // NestedJIT must not recurse into StrReplaceJitHelper; helper-runtime .o is OK (#23970).
-        if (NestedJitCompileScope::isActive() && !\PHPCompiler\AOT\HelperRuntimeCache::enabled()) {
-            return;
-        }
-
-        $probe = $context->module->getNamedFunction(self::ABI_REPLACE);
-        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_REPLACE)) {
-            $context->registerFunction(self::ABI_REPLACE, $probe);
-
-            return;
-        }
-
-        $strPtr = $context->getTypeFromString('__string__*');
-        JitVmHelperLink::ensureBridge(
+        self::implementNativeBridge(
             $context,
             self::ABI_REPLACE,
-            self::BRIDGE_REPLACE,
-            [$strPtr, $strPtr, $strPtr],
-            $strPtr,
-            self::REPLACE_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#23912'
+            StrReplaceRuntime::BRIDGE_REPLACE,
+            false
         );
     }
 
     private static function implementIreplace(Context $context): void
     {
-        if (NestedJitCompileScope::isActive() && !\PHPCompiler\AOT\HelperRuntimeCache::enabled()) {
-            return;
-        }
-
-        $probe = $context->module->getNamedFunction(self::ABI_IREPLACE);
-        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_IREPLACE)) {
-            $context->registerFunction(self::ABI_IREPLACE, $probe);
-
-            return;
-        }
-
-        $strPtr = $context->getTypeFromString('__string__*');
-        JitVmHelperLink::ensureBridge(
+        self::implementNativeBridge(
             $context,
             self::ABI_IREPLACE,
-            self::BRIDGE_IREPLACE,
-            [$strPtr, $strPtr, $strPtr],
-            $strPtr,
-            self::IREPLACE_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#23912'
+            StrReplaceRuntime::BRIDGE_IREPLACE,
+            true
         );
+    }
+
+    private static function implementNativeBridge(
+        Context $context,
+        string $abiName,
+        string $entryName,
+        bool $caseInsensitive
+    ): void {
+        // Native emit does not NestedJIT StrReplaceJitHelper — safe under NestedJIT scope.
+        $probe = $context->module->getNamedFunction($abiName);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, $entryName)) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        $strPtr = $context->getTypeFromString('__string__*');
+        $ft = $context->context->functionType($strPtr, false, $strPtr, $strPtr, $strPtr);
+        $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
+        $entry = $fn->appendBasicBlock($entryName);
+        $context->builder->positionAtEnd($entry);
+        StrReplaceRuntime::emitBridgeBody($context, $fn, $caseInsensitive);
+        $context->registerFunction($abiName, $fn);
+        BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
     }
 
     private static function implementTakeCount(Context $context): void
     {
-        if (NestedJitCompileScope::isActive() && !\PHPCompiler\AOT\HelperRuntimeCache::enabled()) {
+        $probe = $context->module->getNamedFunction(self::ABI_TAKE_COUNT);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, StrReplaceRuntime::BRIDGE_TAKE_COUNT)) {
+            $context->registerFunction(self::ABI_TAKE_COUNT, $probe);
+
             return;
         }
-
-        $probe = $context->module->getNamedFunction(self::ABI_TAKE_COUNT);
-        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_TAKE_COUNT)) {
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction(self::ABI_TAKE_COUNT, $probe);
 
             return;
         }
 
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         $i64 = $context->getTypeFromString('int64');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_TAKE_COUNT,
-            self::BRIDGE_TAKE_COUNT,
-            [],
-            $i64,
-            self::TAKE_COUNT_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#23912'
-        );
+        $ft = $context->context->functionType($i64, false);
+        $fn = null !== $probe ? $probe : $context->module->addFunction(self::ABI_TAKE_COUNT, $ft);
+        $entry = $fn->appendBasicBlock(StrReplaceRuntime::BRIDGE_TAKE_COUNT);
+        $context->builder->positionAtEnd($entry);
+        StrReplaceRuntime::emitTakeCountBody($context, $fn);
+        $context->registerFunction(self::ABI_TAKE_COUNT, $fn);
+        BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
     }
 }
