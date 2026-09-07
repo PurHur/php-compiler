@@ -97,7 +97,7 @@ final class HelperRuntimeCacheFingerprintTest extends TestCase
     public function testCoreFingerprintIgnoresJitPhpContent(): void
     {
         $root = \dirname(__DIR__, 3);
-        $src = (string) file_get_contents($root.'/lib/AOT/HelperRuntimeCache.php');
+        $src = (string) file_get_contents($root.'/lib/AOT/HelperRuntimeFingerprint.php');
         $this->assertStringContainsString('Global inputs (#23458 / #24381)', $src);
         $this->assertStringContainsString('llvmIdentityToken', $src);
         $this->assertStringContainsString('equivalentCoreFingerprints', $src);
@@ -112,6 +112,8 @@ final class HelperRuntimeCacheFingerprintTest extends TestCase
             $src,
             'coreFingerprint must not hash lib/JIT.php'
         );
+        $hub = (string) file_get_contents($root.'/lib/AOT/HelperRuntimeCache.php');
+        $this->assertStringContainsString('HelperRuntimeFingerprint::coreFingerprint', $hub);
         $this->assertNotSame(
             HelperRuntimeCache::coreFingerprint(),
             HelperRuntimeCache::legacyLoweringFingerprint(),
@@ -210,7 +212,7 @@ final class HelperRuntimeCacheFingerprintTest extends TestCase
     {
         $root = \dirname(__DIR__, 3);
         $unit = $root.'/ext/standard/StrposJitHelper.php';
-        $ref = new \ReflectionClass(HelperRuntimeCache::class);
+        $ref = new \ReflectionClass(HelperRuntimeFingerprint::class);
         $m = $ref->getMethod('fingerprintV1Legacy');
         $m->setAccessible(true);
         $legacyFp = (string) $m->invoke(null, $unit);
@@ -370,7 +372,7 @@ final class HelperRuntimeCacheFingerprintTest extends TestCase
 
         $code = 'chdir('.$rootArg.');'
             .'putenv("PHP_COMPILER_LLVM_PATH=" . '.$llvmLiteral.');'
-            .'require "lib/AOT/HelperRuntimeCache.php";'
+            .'require "vendor/autoload.php";'
             .'echo \\PHPCompiler\\AOT\\HelperRuntimeCache::unitFingerprint('.$unitArg.');';
         $cmd = $php.' -r '.escapeshellarg($code);
         $out = (string) @shell_exec($cmd);
