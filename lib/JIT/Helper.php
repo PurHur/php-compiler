@@ -820,6 +820,20 @@ restart:
                             );
                             goto return_long;
                         }
+                        // Same-operand $n&$n / $n|$n → $n; $n^$n → 0 (#36386).
+                        $same = DiscardedPureCallElision::bitwiseLogicSameOperandFold(
+                            $opcode->type,
+                            $left,
+                            $right
+                        );
+                        if ('left' === $same) {
+                            $result = $leftValue;
+                            goto return_long;
+                        }
+                        if ('zero' === $same) {
+                            $result = $this->context->getTypeFromString('int64')->constInt(0, false);
+                            goto return_long;
+                        }
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
                         if (OpCode::TYPE_BITWISE_AND === $opcode->type) {
                             $result = $this->context->builder->bitwiseAnd($leftValue, $__right);
