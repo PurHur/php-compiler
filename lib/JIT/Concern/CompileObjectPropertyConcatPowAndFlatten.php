@@ -223,6 +223,127 @@ trait CompileObjectPropertyConcatPowAndFlatten
     }
 
     /**
+     * Dead in-place `$out = $out . …` / `$out .= …`: reuse the left CV and
+     * {@see String_::appendInPlace} instead of {@see assignEphemeralConcatOperand}.
+     *
+     * php-cfg marks the accumulator dead even when the next statement still reads it
+     * (NestedJIT {@see StrReplaceJitHelper} / typed string builders). Ephemeral rebind
+     * allocates a fresh `__string__**` and drops the prior buffer without free (#36388).
+     * php-src: Zend/zend_operators.c ZEND_ASSIGN_CONCAT / zend_string_extend.
+     *
+     * @return bool true when lowered (caller must break)
+     */
+    private function tryDeadInPlaceConcatAppend(
+        Block $block,
+        Operand $destOp,
+        Variable $left,
+        Variable $right,
+        \PHPLLVM\Value\Function_ $func,
+        ?\PHPCfg\Operand $rightOp = null
+    ): bool {
+        if (
+            null !== $left->objectPropertySlot
+            || null !== $left->writableHt
+            || null !== $left->staticPropertyGlobal
+            || $left->functionStaticGlobal
+        ) {
+            return false;
+        }
+
+        $dest = $left;
+        $destSlot = $left->value;
+        $destSlotTy = null !== $destSlot
+            ? $this->context->getStringFromType($destSlot->typeOf())
+            : '';
+        $hasStringAlloca = Variable::TYPE_STRING === $left->type
+            && Variable::KIND_VARIABLE === $left->kind
+            && ('__string__**' === $destSlotTy || 'ptr' === $destSlotTy);
+
+        if (
+            !$hasStringAlloca
+            && (
+                Variable::TYPE_VALUE === $left->type
+                || JIT\JitValueBox::isValueOperand($left)
+            )
+            && (
+                Variable::KIND_VARIABLE === $left->kind
+                || Variable::KIND_VALUE === $left->kind
+            )
+        ) {
+            $destSlot = JIT\BasicBlockHelper::entryAllocaForFunction(
+                $this->context,
+                $func,
+                $this->context->getTypeFromString('__string__*')
+            );
+            $dest = new Variable(
+                $this->context,
+                Variable::TYPE_STRING,
+                Variable::KIND_VARIABLE,
+                $destSlot
+            );
+            JIT\BasicBlockHelper::storeAtFunctionEntry(
+                $this->context,
+                $func,
+                $this->context->type->string->pointer->constNull(),
+                $destSlot
+            );
+            $this->seedNativeStringSlotFromValueBox($left, $destSlot);
+            $this->dropValueBoxStringAliasIfSame($left, $destSlot);
+            $hasStringAlloca = true;
+        } elseif (
+            !$hasStringAlloca
+            && Variable::TYPE_STRING === $left->type
+        ) {
+            // KIND_VALUE / missing alloca: promote once, seed from the loaded pointer.
+            $destSlot = JIT\BasicBlockHelper::entryAllocaForFunction(
+                $this->context,
+                $func,
+                $this->context->getTypeFromString('__string__*')
+            );
+            $dest = new Variable(
+                $this->context,
+                Variable::TYPE_STRING,
+                Variable::KIND_VARIABLE,
+                $destSlot
+            );
+            $seed = null !== $left->value && Variable::KIND_VALUE === $left->kind
+                ? $left->value
+                : $this->context->type->string->pointer->constNull();
+            JIT\BasicBlockHelper::storeAtFunctionEntry(
+                $this->context,
+                $func,
+                $seed,
+                $destSlot
+            );
+            $hasStringAlloca = true;
+        }
+
+        if (!$hasStringAlloca || null === $destSlot) {
+            return false;
+        }
+
+        $this->context->setVariableOp($destOp, $dest);
+        $this->bindPromotedStringConcatDest($block, $destOp, $dest);
+        $this->dropMainScriptStringAliasIfSame($block, $destOp, $destSlot);
+        $rightIn = $right;
+        $rightCoerced = JIT\JitNativeString::coerce($this->context, $right, $rightOp);
+        $this->context->type->string->appendInPlace($dest, $rightCoerced);
+        $rightLoaded = $this->context->helper->loadValue($rightCoerced);
+        $this->releaseCoercedConcatOperandIfNew($rightIn, $rightCoerced, $rightLoaded);
+        if (
+            null !== ($left->compileTimeString ?? null)
+            && null !== ($right->compileTimeString ?? null)
+        ) {
+            $dest->compileTimeString = $left->compileTimeString.$right->compileTimeString;
+        } else {
+            $dest->compileTimeString = null;
+        }
+        $this->markScopeVariableAssignedIfTracked($destOp, $dest);
+
+        return true;
+    }
+
+    /**
      * Seed a promoted `__string__**` from a boxed CV when the slot is still null.
      *
      * Emitted into the CONCAT block so the first `$buf .= …` after `$buf = '…'` copies the

@@ -23,7 +23,7 @@ final class Issue36388StringCallResultFreeTest extends TestCase
         $src = $root.'/test/repro/issue_36388_str_repeat_local_free.php';
         $bin = sys_get_temp_dir().'/phpc_36388_srlf_'.getmypid();
         $compile = escapeshellarg(PHP_BINARY).' '
-            .escapeshellarg($root.'/bin/compile.php').' -o '
+            .escapeshellarg($root.'/bin/compile.php').' --no-cache -o '
             .escapeshellarg($bin).' '
             .escapeshellarg($src);
         $cwd = getcwd();
@@ -49,7 +49,7 @@ final class Issue36388StringCallResultFreeTest extends TestCase
         $src = $root.'/test/repro/issue_36388_typed_string_return_free.php';
         $bin = sys_get_temp_dir().'/phpc_36388_tsrf_'.getmypid();
         $compile = escapeshellarg(PHP_BINARY).' '
-            .escapeshellarg($root.'/bin/compile.php').' -o '
+            .escapeshellarg($root.'/bin/compile.php').' --no-cache -o '
             .escapeshellarg($bin).' '
             .escapeshellarg($src);
         $cwd = getcwd();
@@ -92,6 +92,18 @@ final class Issue36388StringCallResultFreeTest extends TestCase
         $this->assertStringContainsString("'number_format' => true", $src);
         $this->assertStringContainsString("'str_replace' => true", $src);
         $this->assertStringContainsString("'str_ireplace' => true", $src);
+        $concat = (string) file_get_contents(
+            dirname(__DIR__, 2).'/lib/JIT/Concern/CompileConcat.php'
+        );
+        $this->assertStringContainsString('tryDeadInPlaceConcatAppend', $concat);
+        $helper = (string) file_get_contents(
+            dirname(__DIR__, 2).'/lib/JIT/Concern/CompileObjectPropertyConcatPowAndFlatten.php'
+        );
+        $this->assertStringContainsString('tryDeadInPlaceConcatAppend', $helper);
+        $fold = (string) file_get_contents(
+            dirname(__DIR__, 2).'/ext/standard/JitStrReplace.php'
+        );
+        $this->assertStringContainsString('tryFoldLiteralReplace', $fold);
         $this->assertStringContainsString('releaseEphemeralArgAfterCopy', (string) file_get_contents(
             dirname(__DIR__, 2).'/lib/JIT/JitStringBuiltinArg.php'
         ));
@@ -142,7 +154,7 @@ final class Issue36388StringCallResultFreeTest extends TestCase
         $src = $root.'/test/repro/issue_36388_sprintf_local_free.php';
         $bin = sys_get_temp_dir().'/phpc_36388_splf_'.getmypid();
         $compile = escapeshellarg(PHP_BINARY).' '
-            .escapeshellarg($root.'/bin/compile.php').' -o '
+            .escapeshellarg($root.'/bin/compile.php').' --no-cache -o '
             .escapeshellarg($bin).' '
             .escapeshellarg($src);
         $cwd = getcwd();
@@ -168,7 +180,7 @@ final class Issue36388StringCallResultFreeTest extends TestCase
         $src = $root.'/test/repro/issue_36388_sprintf_key_leak.php';
         $bin = sys_get_temp_dir().'/phpc_36388_spkl_'.getmypid();
         $compile = escapeshellarg(PHP_BINARY).' '
-            .escapeshellarg($root.'/bin/compile.php').' -o '
+            .escapeshellarg($root.'/bin/compile.php').' --no-cache -o '
             .escapeshellarg($bin).' '
             .escapeshellarg($src);
         $cwd = getcwd();
@@ -197,7 +209,7 @@ final class Issue36388StringCallResultFreeTest extends TestCase
         $src = $root.'/'.$reproRelative;
         $bin = sys_get_temp_dir().'/phpc_36388_sbf_'.getmypid().'_'.md5($reproRelative);
         $compile = escapeshellarg(PHP_BINARY).' '
-            .escapeshellarg($root.'/bin/compile.php').' -o '
+            .escapeshellarg($root.'/bin/compile.php').' --no-cache -o '
             .escapeshellarg($bin).' '
             .escapeshellarg($src);
         $cwd = getcwd();
@@ -235,6 +247,9 @@ final class Issue36388StringCallResultFreeTest extends TestCase
             'basename_lit' => ['test/repro/issue_36388_basename_lit_free.php', 'basename_lit delta='],
             'number_format' => ['test/repro/issue_36388_number_format_local_free.php', 'number_format_local delta='],
             'number_format_lit' => ['test/repro/issue_36388_number_format_lit_free.php', 'number_format_lit delta='],
+            'str_replace_hit' => ['test/repro/issue_36388_str_replace_hit_free.php', 'str_replace_hit delta='],
+            'str_replace_miss' => ['test/repro/issue_36388_str_replace_miss_free.php', 'str_replace_miss delta='],
+            'dead_inplace_concat' => ['test/repro/issue_36388_dead_inplace_concat_free.php', 'dead_inplace_concat delta='],
         ];
     }
 }
