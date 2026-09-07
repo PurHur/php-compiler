@@ -7323,6 +7323,7 @@
         "lib/JIT/Concern/M3EmitTuSpineNativeTryAndCfgParamTypes.php",
         "lib/JIT/Concern/M3M4M5CompileDriverEmitPolicy.php",
         "lib/JIT/Concern/NestedVmHelperAndThisResolve.php",
+        "lib/JIT/Concern/OpCodeArgSlotAndAssignRhs.php",
         "lib/JIT/Concern/ParamConstraintsAndRuntimeNewInit.php",
         "lib/JIT/Concern/PropertyDeclaringClassResolve.php",
         "lib/JIT/Concern/PropertyFetchCoalesceAndCompileTimeString.php",
@@ -8658,9 +8659,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8424,
+        "inventory_files": 8425,
         "excluded": 0,
-        "eligible": 8424,
+        "eligible": 8425,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

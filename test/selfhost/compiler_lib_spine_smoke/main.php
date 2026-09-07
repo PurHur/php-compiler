@@ -5533,6 +5533,7 @@ require_once __DIR__.'/../../../lib/JIT/Concern/DomCompileTimeTagMeta.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/PropertyDeclaringClassResolve.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CoerceReturnPropertyDeclaringAndByRef.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CfgParamReturnTypeAndCalleeByRef.php';
+require_once __DIR__.'/../../../lib/JIT/Concern/OpCodeArgSlotAndAssignRhs.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/PropertyIncDecCompile.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CallResultCompileTimePropagate.php';
 require_once __DIR__.'/../../../lib/JIT/Concern/CompileTimeStringFoldAndPromote.php';
