@@ -45,6 +45,7 @@ use PHPCompiler\ext\standard\bindec;
 use PHPCompiler\ext\standard\checkdate;
 use PHPCompiler\ext\standard\chr;
 use PHPCompiler\ext\standard\chunk_split;
+use PHPCompiler\ext\standard\clamp;
 use PHPCompiler\ext\standard\class_exists_;
 use PHPCompiler\ext\standard\class_implements_;
 use PHPCompiler\ext\standard\class_parents_;
@@ -152,6 +153,7 @@ use PHPCompiler\ext\standard\metaphone;
 use PHPCompiler\ext\standard\microtime;
 use PHPCompiler\ext\standard\mktime;
 use PHPCompiler\ext\standard\mt_getrandmax;
+use PHPCompiler\ext\standard\nextafter;
 use PHPCompiler\ext\standard\nl2br;
 use PHPCompiler\ext\standard\number_format;
 use PHPCompiler\ext\standard\ob_get_contents;
@@ -494,6 +496,135 @@ final class DiscardedPureCallElisionTest extends TestCase
         $den = $this->makeNativeDoubleVar();
 
         $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$num, $den]));
+    }
+
+    public function testElidesDiscardedNextafterOnNativeDoubles(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new nextafter();
+        $num = $this->makeNativeDoubleVar();
+        $toward = $this->makeNativeDoubleVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide($context, $builtin, [$num, $toward]));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            $builtin,
+            [
+                $this->makeCompileTimeFloatVar(1.0),
+                $this->makeCompileTimeFloatVar(2.0),
+            ]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            $builtin,
+            [$this->makeNullVar(), $toward]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            $builtin,
+            [$num]
+        ));
+    }
+
+    public function testElidesDiscardedClampWithProvenCompileTimeBounds(): void
+    {
+        $context = $this->makeContext();
+        $builtin = new clamp();
+        $value = $this->makeNativeLongVar();
+
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            $builtin,
+            [
+                $value,
+                $this->makeCompileTimeLongVar(1),
+                $this->makeCompileTimeLongVar(3),
+            ]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            $builtin,
+            [
+                $this->makeNativeDoubleVar(),
+                $this->makeCompileTimeFloatVar(1.0),
+                $this->makeCompileTimeFloatVar(3.0),
+            ]
+        ));
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            $builtin,
+            [
+                $value,
+                $this->makeCompileTimeLongVar(2),
+                $this->makeCompileTimeLongVar(2),
+            ]
+        ));
+        // Mixed int/float compile-time bounds with min <= max.
+        $this->assertTrue(DiscardedPureCallElision::tryElide(
+            $context,
+            $builtin,
+            [
+                $value,
+                $this->makeCompileTimeLongVar(1),
+                $this->makeCompileTimeFloatVar(3.5),
+            ]
+        ));
+
+        // Runtime bounds can still ValueError.
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            $builtin,
+            [
+                $value,
+                $this->makeNativeLongVar(),
+                $this->makeNativeLongVar(),
+            ]
+        ));
+        // min > max → ValueError stays live.
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            $builtin,
+            [
+                $value,
+                $this->makeCompileTimeLongVar(3),
+                $this->makeCompileTimeLongVar(1),
+            ]
+        ));
+        // NAN min/max → ValueError stays live.
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            $builtin,
+            [
+                $this->makeNativeDoubleVar(),
+                $this->makeCompileTimeFloatVar(\NAN),
+                $this->makeCompileTimeFloatVar(2.0),
+            ]
+        ));
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            $builtin,
+            [
+                $this->makeNativeDoubleVar(),
+                $this->makeCompileTimeFloatVar(0.0),
+                $this->makeCompileTimeFloatVar(\NAN),
+            ]
+        ));
+        // Soft-null value stays live (deprecate).
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            $builtin,
+            [
+                $this->makeNullVar(),
+                $this->makeCompileTimeLongVar(1),
+                $this->makeCompileTimeLongVar(3),
+            ]
+        ));
+        // Wrong arity stays live.
+        $this->assertFalse(DiscardedPureCallElision::tryElide(
+            $context,
+            $builtin,
+            [$value, $this->makeCompileTimeLongVar(1)]
+        ));
     }
 
     public function testDoesNotElidePowOnNull(): void
@@ -5695,6 +5826,14 @@ final class DiscardedPureCallElisionTest extends TestCase
         $kindProp = $ref->getProperty('kind');
         $kindProp->setAccessible(true);
         $kindProp->setValue($var, Variable::KIND_VARIABLE);
+
+        return $var;
+    }
+
+    private function makeCompileTimeFloatVar(float $value): Variable
+    {
+        $var = $this->makeNativeDoubleVar();
+        $var->compileTimeFloat = $value;
 
         return $var;
     }

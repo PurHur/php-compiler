@@ -2878,6 +2878,9 @@ final class NoThrowCallElision
             case 'atan2':
             case 'deg2rad':
             case 'rad2deg':
+            // math.c nextafter — IEEE next float; no user handlers / no ValueError
+            // on typed numeric args (peer hypot / fmod; #36386).
+            case 'nextafter':
             // math.c pow / fpow / fdiv — no user handlers; domain errors are
             // NAN/INF (fdiv ÷0 → INF). intdiv stays out (DivisionByZeroError).
             case 'pow':
