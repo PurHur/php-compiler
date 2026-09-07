@@ -687,6 +687,11 @@ restart:
                         goto return_long;
                     case OpCode::TYPE_SHIFT_LEFT:
                     case OpCode::TYPE_SHIFT_RIGHT:
+                        // Compile-time count 0 → identity (peer +0/-0; #36386).
+                        if (DiscardedPureCallElision::bitShiftCountIsCompileTimeZero($right)) {
+                            $result = $leftValue;
+                            goto return_long;
+                        }
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
                         $result = $this->emitGuardedIntShift(
                             $opcode->type,
@@ -3283,6 +3288,8 @@ return_bool:
      * Zend shift_left/right_function: negative count → catchable ArithmeticError (#21912).
      *
      * {@code $skipNegativeGuard}: compile-time count {@code ≥ 0} (#36386).
+     * Compile-time count {@code 0} identity is handled at the typed long×long
+     * call site ({@see DiscardedPureCallElision::bitShiftCountIsCompileTimeZero}).
      */
     private function emitGuardedIntShift(int $opType, $leftLong, $rightLong, bool $skipNegativeGuard = false)
     {
