@@ -6,7 +6,9 @@
         "lib/Compiler.php": {
             "budget": 1202,
             "target": 20000,
-            "note": "Concern trait splits (#36230/#36387/#36403); InlineCallArgUnionSiblingCastAndComparisonMatchers + SiblingInlineReturnSlotAndMethodDeadTempDetect + CompileExprDispatch + peers"
+            "budget": 1205,
+            "target": 20000,
+            "note": "Concern trait splits (#36230/#36387/#36403); CallArgEarlyFastPathAndMixedPropertyFetchSends + InlineCallArgUnionSiblingCastAndComparisonMatchers + peers"
         },
         "lib/JIT.php": {
             "budget": 274,
