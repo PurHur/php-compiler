@@ -13,7 +13,8 @@ use PHPUnit\Framework\TestCase;
  * round() places=0 modes AOT use LLVM f64 ops (#36386);
  * places≠0 + known modes (incl. HALF_UP) scale via LLVM (JitRound);
  * runtime places + known mode scale via llvm.pow.f64 (JitRound);
- * RoundJitHelper remains for unknown mode (peer MathFloor / FloorJitHelper).
+ * runtime mode selects among places=0 LLVM paths (icmp+select);
+ * RoundJitHelper remains for exotic compile-time mode ints (peer MathFloor).
  *
  * php-src: ext/standard/math.c _php_math_round / PHP_FUNCTION(round).
  */
@@ -33,6 +34,7 @@ final class RoundRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('tryInvokePlacesZeroIntrinsic', $jitRound);
         $this->assertStringContainsString('tryLowerRuntimeRoundScaledIntrinsic', $jitRound);
         $this->assertStringContainsString('tryLowerRuntimePlacesScaledIntrinsic', $jitRound);
+        $this->assertStringContainsString('selectPlacesZeroByRuntimeMode', $jitRound);
         $this->assertStringContainsString('MathFpow::invoke', $jitRound);
         $this->assertStringContainsString('isKnownRoundMode', $jitRound);
         $this->assertStringNotContainsString('lowerRuntimeRoundHalfUpSprintf', $jitRound);

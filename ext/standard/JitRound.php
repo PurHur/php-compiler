@@ -35,8 +35,12 @@ use PHPLLVM\Value;
  *
  * Runtime (unknown) places + known PHP_ROUND_* mode (incl. default HALF_UP) scale
  * via {@code llvm.pow.f64}(10, |places|) then the same places=0 LLVM path —
- * matching php-src {@code pow(10.0, (double) places)} (#36386). Only unknown mode
- * still uses the RoundJitHelper NestedJIT bridge.
+ * matching php-src {@code pow(10.0, (double) places)} (#36386).
+ *
+ * Runtime mode (int formal / variable) selects among the places=0 LLVM paths
+ * with icmp+select (default HALF_UP = RoundJitHelper unknown-mode fallthrough) —
+ * no NestedJIT {@see RoundJitHelper} bridge when places+mode are int-typed (#36386).
+ * Exotic compile-time mode ints outside PHP_ROUND_* still use the bridge.
  */
 final class JitRound
 {
@@ -90,6 +94,38 @@ final class JitRound
             );
             if (null !== $viaRuntimePlaces) {
                 return $viaRuntimePlaces;
+            }
+        }
+        // Runtime mode: icmp+select among places=0 LLVM paths (no NestedJIT) (#36386).
+        if (null === $knownMode && null !== $modeArg) {
+            $modeVal = JitRoundModeArg::lower($context, $modeArg, 'round');
+            if (null !== $knownPlaces && 0 === $knownPlaces) {
+                return self::selectPlacesZeroByRuntimeMode($context, $number, $modeVal);
+            }
+            if (null !== $knownPlaces && 0 !== $knownPlaces) {
+                $viaScaled = self::tryLowerRuntimeRoundScaledIntrinsic(
+                    $context,
+                    $number,
+                    $knownPlaces,
+                    $modeVal
+                );
+                if (null !== $viaScaled) {
+                    return $viaScaled;
+                }
+            }
+            if (null === $knownPlaces) {
+                $placesVal = null !== $precisionArg
+                    ? self::lowerPrecisionArg($context, $precisionArg)
+                    : $context->getTypeFromString('int64')->constInt(0, false);
+                $viaRuntimePlaces = self::tryLowerRuntimePlacesScaledIntrinsic(
+                    $context,
+                    $number,
+                    $placesVal,
+                    $modeVal
+                );
+                if (null !== $viaRuntimePlaces) {
+                    return $viaRuntimePlaces;
+                }
             }
         }
 
@@ -300,17 +336,68 @@ final class JitRound
     }
 
     /**
-     * round($runtime, literal places≠0, known mode) — scale by 10^|places|,
+     * Runtime mode int → places=0 LLVM via icmp+select.
+     *
+     * Default arm is HALF_UP — matches {@see RoundJitHelper::roundPlacesZero}
+     * unknown-mode fallthrough (php-src treats non-PHP_ROUND_* as half-up).
+     */
+    private static function selectPlacesZeroByRuntimeMode(
+        Context $context,
+        Value $number,
+        Value $mode
+    ): Value {
+        $i64 = $context->getTypeFromString('int64');
+        $result = MathRound::invokeHalfUpPlacesZero($context, $number);
+        foreach (
+            [
+                StdlibConstants::PHP_ROUND_HALF_DOWN => MathRound::invokeHalfDownPlacesZero($context, $number),
+                StdlibConstants::PHP_ROUND_HALF_EVEN => MathRound::invokeHalfEvenPlacesZero($context, $number),
+                StdlibConstants::PHP_ROUND_HALF_ODD => MathRound::invokeHalfOddPlacesZero($context, $number),
+                StdlibConstants::PHP_ROUND_CEILING => MathRound::invokeCeilingPlacesZero($context, $number),
+                StdlibConstants::PHP_ROUND_FLOOR => MathRound::invokeFloorPlacesZero($context, $number),
+                StdlibConstants::PHP_ROUND_TOWARD_ZERO => MathRound::invokeTowardZeroPlacesZero($context, $number),
+                StdlibConstants::PHP_ROUND_AWAY_FROM_ZERO => MathRound::invokeAwayFromZeroPlacesZero($context, $number),
+            ] as $modeInt => $candidate
+        ) {
+            $eq = $context->builder->icmp(
+                Builder::INT_EQ,
+                $mode,
+                $i64->constInt($modeInt, false)
+            );
+            $result = $context->builder->select($eq, $candidate, $result);
+        }
+
+        return $result;
+    }
+
+    /**
+     * places=0 lowering for a compile-time mode int or runtime mode Value.
+     *
+     * @param int|Value $mode
+     */
+    private static function placesZeroForMode(Context $context, Value $number, $mode): ?Value
+    {
+        if ($mode instanceof Value) {
+            return self::selectPlacesZeroByRuntimeMode($context, $number, $mode);
+        }
+
+        return self::tryInvokePlacesZeroIntrinsic($context, $number, $mode);
+    }
+
+    /**
+     * round($runtime, literal places≠0, known or runtime mode) — scale by 10^|places|,
      * places=0 LLVM intrinsic (incl. HALF_UP → {@code llvm.round.f64}), unscale.
      * Matches RoundJitHelper / php-src {@code _php_math_round} (#36386).
+     *
+     * @param int|Value $mode
      */
     private static function tryLowerRuntimeRoundScaledIntrinsic(
         Context $context,
         Value $number,
         int $places,
-        int $mode
+        $mode
     ): ?Value {
-        if (!self::isKnownRoundMode($mode)) {
+        if (\is_int($mode) && !self::isKnownRoundMode($mode)) {
             return null;
         }
 
@@ -340,7 +427,7 @@ final class JitRound
             $absScaled,
             $double->constReal(1.0e16)
         );
-        $rounded = self::tryInvokePlacesZeroIntrinsic($context, $scaled, $mode);
+        $rounded = self::placesZeroForMode($context, $scaled, $mode);
         if (null === $rounded) {
             return null;
         }
@@ -352,17 +439,19 @@ final class JitRound
     }
 
     /**
-     * round($runtimeNum, $runtimePlaces, known mode) — clamp places, scale by
+     * round($runtimeNum, $runtimePlaces, known or runtime mode) — clamp places, scale by
      * {@code llvm.pow.f64}(10, |places|), places=0 LLVM intrinsic, unscale.
      * Matches php-src {@code _php_math_round} / {@code pow(10.0, (double) places)} (#36386).
+     *
+     * @param int|Value $mode
      */
     private static function tryLowerRuntimePlacesScaledIntrinsic(
         Context $context,
         Value $number,
         Value $places,
-        int $mode
+        $mode
     ): ?Value {
-        if (!self::isKnownRoundMode($mode)) {
+        if (\is_int($mode) && !self::isKnownRoundMode($mode)) {
             return null;
         }
 
@@ -378,7 +467,7 @@ final class JitRound
 
         $zero = $i64->constInt(0, false);
         $isZeroPlaces = $context->builder->icmp(Builder::INT_EQ, $clamped, $zero);
-        $direct = self::tryInvokePlacesZeroIntrinsic($context, $number, $mode);
+        $direct = self::placesZeroForMode($context, $number, $mode);
         if (null === $direct) {
             return null;
         }
@@ -402,7 +491,7 @@ final class JitRound
             $absScaled,
             $double->constReal(1.0e16)
         );
-        $rounded = self::tryInvokePlacesZeroIntrinsic($context, $scaled, $mode);
+        $rounded = self::placesZeroForMode($context, $scaled, $mode);
         if (null === $rounded) {
             return null;
         }
