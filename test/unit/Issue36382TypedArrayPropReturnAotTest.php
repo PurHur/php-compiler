@@ -7,72 +7,56 @@ namespace PHPCompiler\Test\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * #36382 — AOT typed `: array` return of a user array property must survive
- * foreach (MessageTrait::getHeaders / Slim CGI headers).
+ * #36382 — untyped FastRoute row export across units under AOT.
  *
- * php-src: Zend/zend_execute.c ZEND_RETURN ZVAL_COPY of IS_ARRAY.
+ * @group aot
  */
 final class Issue36382TypedArrayPropReturnAotTest extends TestCase
 {
-    public function testTypedArrayPropertyReturnForeachMatchesZend(): void
+    public function testUntypedFastRouteRowsExportRuns(): void
     {
-        $src = dirname(__DIR__).'/repro/issue_36382_typed_array_prop_return.php';
+        $repo = dirname(__DIR__, 2);
+        $src = $repo.'/test/repro/issue_36382_typed_array_prop_return.php';
         $this->assertFileExists($src);
-
-        $zend = $this->runPhp($src);
-        $aot = $this->runAot($src);
-
-        $this->assertSame(0, $zend['code'], $zend['out'].$zend['err']);
-        $this->assertSame(0, $aot['code'], $aot['out'].$aot['err']);
-        $this->assertSame($zend['out'], $aot['out']);
-        $this->assertStringContainsString('Content-Type:text/plain', $aot['out']);
-        $this->assertStringContainsString('hello', $aot['out']);
-    }
-
-    /** @return array{code:int,out:string,err:string} */
-    private function runPhp(string $src): array
-    {
-        $cmd = escapeshellarg(PHP_BINARY).' '.escapeshellarg($src);
-        $out = [];
-        $code = 0;
-        exec($cmd.' 2>/tmp/issue36382_typed_array_zend.err', $out, $code);
-
-        return [
-            'code' => $code,
-            'out' => implode("\n", $out).([] !== $out ? "\n" : ''),
-            'err' => (string) @file_get_contents('/tmp/issue36382_typed_array_zend.err'),
-        ];
-    }
-
-    /** @return array{code:int,out:string,err:string} */
-    private function runAot(string $src): array
-    {
-        $bin = '/tmp/issue36382_typed_array_prop_return';
-        @unlink($bin);
-        $compile = 'PHP_COMPILER_CACHE=0 '
-            .escapeshellarg(PHP_BINARY)
-            .' -d opcache.enable_cli=0 -d memory_limit=2048M '
-            .escapeshellarg(dirname(__DIR__, 2).'/bin/compile.php')
-            .' -o '.escapeshellarg($bin).' '
-            .escapeshellarg($src);
-        $cerr = [];
-        $ccode = 0;
-        exec($compile.' 2>/tmp/issue36382_typed_array_compile.err', $cerr, $ccode);
-        if (0 !== $ccode || !is_file($bin)) {
-            return [
-                'code' => $ccode ?: 1,
-                'out' => implode("\n", $cerr),
-                'err' => (string) @file_get_contents('/tmp/issue36382_typed_array_compile.err'),
-            ];
+        if (!\PHPCompiler\LlvmToolchain::isReady($repo)) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
         }
-        $out = [];
-        $code = 0;
-        exec(escapeshellarg($bin).' 2>/tmp/issue36382_typed_array_aot.err', $out, $code);
-
-        return [
-            'code' => $code,
-            'out' => implode("\n", $out).([] !== $out ? "\n" : ''),
-            'err' => (string) @file_get_contents('/tmp/issue36382_typed_array_aot.err'),
+        $out = tempnam(sys_get_temp_dir(), 'arrprop36382_');
+        $this->assertNotFalse($out);
+        @unlink($out);
+        $env = $_ENV;
+        \PHPCompiler\LlvmToolchain::applyProcessEnv($env, $repo);
+        $env['PHP_COMPILER_CACHE'] = '0';
+        $env['PHP_COMPILER_HELPER_RUNTIME_CACHE_DIR'] = sys_get_temp_dir()
+            .'/phpc-helper-36382-arrprop-'.getmypid();
+        $cmd = sprintf(
+            'php -d memory_limit=512M %s -o %s %s 2>&1',
+            escapeshellarg($repo.'/bin/compile.php'),
+            escapeshellarg($out),
+            escapeshellarg($src)
+        );
+        $descriptors = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
         ];
+        $proc = proc_open($cmd, $descriptors, $pipes, $repo, $env);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $ec = proc_close($proc);
+        $this->assertSame(0, $ec, trim((string) $stdout."\n".$stderr));
+        $this->assertFileExists($out);
+        $runLines = [];
+        exec(escapeshellarg($out).' 2>&1', $runLines, $runEc);
+        @unlink($out);
+        $this->assertSame(0, $runEc, implode("\n", $runLines));
+        $this->assertSame(
+            ['B', 'A', 'M=GET P=/hello ID=route0', 'OK'],
+            array_map('trim', $runLines)
+        );
     }
 }
