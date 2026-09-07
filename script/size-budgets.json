@@ -4,9 +4,9 @@
     "done_when_ceiling": 25000,
     "files": {
         "lib/Compiler.php": {
-            "budget": 1292,
+            "budget": 1295,
             "target": 20000,
-            "note": "Concern trait splits (#36230/#36387/#36403); MatchInlineCallArgProducerEmbeddedLiteralsResolve + CallArgNestedAdjacentSiblingVarExportMergeForceConstPreludeValueSlots + peers"
+            "note": "Concern trait splits (#36230/#36387/#36403); CallArgPostNestedFinalLiteralNamedLocalHaystackDimExactValueSlots + MatchInlineCallArgProducerEmbeddedLiteralsResolve + peers"
         },
         "lib/JIT.php": {
             "budget": 274,
