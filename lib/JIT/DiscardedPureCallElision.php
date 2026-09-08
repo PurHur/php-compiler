@@ -285,9 +285,11 @@ use PHPCompiler\VM\Variable as VmVariable;
  * {@code $n ** 9} / {@code pow($n, 9)} to
  * {@code (($n*$n*$n)*($n*$n*$n))*($n*$n*$n)} with chained smul,
  * {@code $n ** 10} / {@code pow($n, 10)} to
- * {@code (($n*$n*$n)*($n*$n))*(($n*$n*$n)*($n*$n))} with chained smul, and
+ * {@code (($n*$n*$n)*($n*$n))*(($n*$n*$n)*($n*$n))} with chained smul,
  * {@code $n ** 11} / {@code pow($n, 11)} to
- * {@code ((($n*$n*$n)*($n*$n))*(($n*$n*$n)*($n*$n)))*$n} with chained smul (omit
+ * {@code ((($n*$n*$n)*($n*$n))*(($n*$n*$n)*($n*$n)))*$n} with chained smul, and
+ * {@code $n ** 12} / {@code pow($n, 12)} to
+ * {@code (($n*$n*$n)*($n*$n*$n))*(($n*$n*$n)*($n*$n*$n))} with chained smul (omit
  * {@code llvm.pow.f64} / float round-trip;
  * {@see nativeLongPowCompileTimeExponentFold}). {@code intdiv($n, -1)} and typed
  * {@code / -1} lower to {@code negate} with the {@code INT_MIN} guard /
@@ -4414,20 +4416,22 @@ final class DiscardedPureCallElision
      *   with chained smul overflow→float (fifth × fifth)
      * - {@code $n ** 11} / {@code pow($n, 11)} → {@code ((($n*$n*$n)*($n*$n))*(($n*$n*$n)*($n*$n)))*$n}
      *   with chained smul overflow→float (tenth × n)
+     * - {@code $n ** 12} / {@code pow($n, 12)} → {@code (($n*$n*$n)*($n*$n*$n))*(($n*$n*$n)*($n*$n*$n))}
+     *   with chained smul overflow→float (sixth × sixth)
      *
      * Omits {@code llvm.pow.f64} and the siToFp/fpToSi round-trip on the
      * integer fast path ({@see \PHPCompiler\ext\standard\JitPow}). Peer
      * compile-time {@code * 1} identity ({@see nativeLongArithIsCompileTimeIdentityOrZero})
      * and {@code * 2^k} shl ({@see nativeLongMulCompileTimePowerOfTwoShift}).
      *
-     * Float exponents ({@code 0.0}/{@code 1.0}/{@code 2.0}/{@code 3.0}/{@code 4.0}/{@code 5.0}/{@code 6.0}/{@code 7.0}/{@code 8.0}/{@code 9.0}/{@code 10.0}/{@code 11.0}) stay
+     * Float exponents ({@code 0.0}/{@code 1.0}/{@code 2.0}/{@code 3.0}/{@code 4.0}/{@code 5.0}/{@code 6.0}/{@code 7.0}/{@code 8.0}/{@code 9.0}/{@code 10.0}/{@code 11.0}/{@code 12.0}) stay
      * on the float path — Zend returns {@code float} for those shapes.
      *
      * php-src: Zend/zend_operators.c {@code pow_function} /
      * {@code zend_pow} / {@code mul_function}; ext/standard/math.c
      * {@code PHP_FUNCTION(pow)}.
      *
-     * @return 'one'|'identity'|'square'|'cube'|'fourth'|'fifth'|'sixth'|'seventh'|'eighth'|'ninth'|'tenth'|'eleventh'|null fold to 1, keep base, mul square/cube/fourth/fifth/sixth/seventh/eighth/ninth/tenth/eleventh, or null
+     * @return 'one'|'identity'|'square'|'cube'|'fourth'|'fifth'|'sixth'|'seventh'|'eighth'|'ninth'|'tenth'|'eleventh'|'twelfth'|null fold to 1, keep base, mul square/cube/fourth/fifth/sixth/seventh/eighth/ninth/tenth/eleventh/twelfth, or null
      */
     public static function nativeLongPowCompileTimeExponentFold(
         Variable $exponent
@@ -4471,6 +4475,9 @@ final class DiscardedPureCallElision
         }
         if (11 === $e) {
             return 'eleventh';
+        }
+        if (12 === $e) {
+            return 'twelfth';
         }
 
         return null;
