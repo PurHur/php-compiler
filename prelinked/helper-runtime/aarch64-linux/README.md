@@ -13,7 +13,7 @@ non-native link.
 
 ## Seed corpus (VM_* + lib_VM_* + ext/standard tiers)
 
-**212** committed `unit.o` files:
+**222** committed `unit.o` files:
 
 - full `VM_*` (13) and `lib_VM_*` (9) sets from `x86_64-linux`
 - first `ext/standard` tier (10): ArrayChunk / ArrayIsList / ArraySlice / Bin2hex /
@@ -67,6 +67,9 @@ non-native link.
 - unserialize / hash-crypt / syslog / gzip-zlib / session (10): Unserialize /
   UnserializeObjectNested / HashCrypto / Libcrypt / Syslog / GzStream / Zlib /
   SessionName / SessionCreateId / SessionStorage
+- session leftovers / GC / spl_autoload / string (10): SessionGc /
+  SessionStartOptionsAot / GcToggle / GcCollectCycles / GcCollectCyclesRegistry /
+  SplAutoload / SplAutoloadDefault / StripWhitespace / StrIncdec / SuperglobalName
 
 Refresh / expand via:
 

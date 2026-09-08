@@ -252,6 +252,20 @@ SEED_UNITS=(
   /ext/standard/SessionNameJitHelper.php
   /ext/standard/SessionCreateIdJitHelper.php
   /ext/standard/SessionStorageJitHelper.php
+  # Session leftovers / GC / spl_autoload / string (#36391 after #37331)
+  # Frexp/Ldexp/Modf/Nextafter/Shuffle still skipped (algorithm SSOT, no HELPER_PATH).
+  # Preg* still skipped: tip nested compile misses Compiler\Concern\OpCode.
+  # Sscanf skipped: __init__ sealed during NestedJIT (prop_ht_done / ZendDoubleStringRuntime).
+  /ext/standard/SessionGcJitHelper.php
+  /ext/standard/SessionStartOptionsAotJitHelper.php
+  /ext/standard/GcToggleJitHelper.php
+  /ext/standard/GcCollectCyclesJitHelper.php
+  /ext/standard/GcCollectCyclesRegistryJitHelper.php
+  /ext/standard/SplAutoloadJitHelper.php
+  /ext/standard/SplAutoloadDefaultJitHelper.php
+  /ext/standard/StripWhitespaceJitHelper.php
+  /ext/standard/StrIncdecJitHelper.php
+  /ext/standard/SuperglobalNameJitHelper.php
 )
 
 MIN_SEED=${#SEED_UNITS[@]}
