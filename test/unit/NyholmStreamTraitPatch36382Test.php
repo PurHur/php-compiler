@@ -84,6 +84,10 @@ PHP;
         $this->assertStringContainsString('AOT (#36382): collapse PHP_VERSION_ID StreamTrait if/else', $patched);
         $this->assertStringNotContainsString('PHP_VERSION_ID >= 70400', $patched);
         $this->assertStringContainsString('public function __toString(): string', $patched);
+        $this->assertStringContainsString('\\rewind($this->stream)', $patched);
+        $this->assertStringContainsString('prefer rewind over Stream::seek()', $patched);
+        $this->assertStringNotContainsString('$this->seek(0)', $patched);
+        $this->assertStringNotContainsString('isSeekable()', $patched);
         $this->assertStringNotContainsString('SymfonyLegacyErrorHandler', $patched);
         $this->assertStringNotContainsString('use Psr\\Http\\Message\\StreamInterface;', $patched);
 
