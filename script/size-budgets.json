@@ -179,9 +179,9 @@
             "note": "TYPE_CLASS_CONST_FETCH runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/Context.php": {
-            "budget": 922,
+            "budget": 924,
             "target": 3500,
-            "note": "FunctionProxyRegistration + ExternalMethodStubReport + ArrayIteratorAndObject + NestedJitKernelRegistry + ReflectionMembers + FiberGeneratorAndClosure + ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml proxies wiring + VariableOperandLookup + VariableOperandAlias + ScopeLifecycle peers (#36387/#36199); continue toward \u22643.5k + ModuleOptimizationPasses + ModuleVerify (#36387)"
+            "note": "FunctionProxyRegistration + ExternalMethodStubReport + ArrayIteratorAndObject + NestedJitKernelRegistry + ReflectionMembers + FiberGeneratorAndClosure + ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml proxies wiring + VariableOperandLookup + VariableOperandAlias + ScopeLifecycle peers (#36387/#36199); continue toward \u22643.5k + ModuleOptimizationPasses + ModuleVerify + ConstantFetch (#36387)"
         },
         "lib/JIT/ContextEditScaffoldModuleRebind.php": {
             "budget": 315,
@@ -224,9 +224,9 @@
             "note": "TYPE_NEW runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/ContextVariableOperandBinding.php": {
-            "budget": 263,
+            "budget": 264,
             "target": 500,
-            "note": "makeVariableFromOp + constant-slot/object-mirror bind; alias cluster in ContextVariableOperandAlias; getVariableFromOp in Lookup; freeDead/CONST_FETCH in ContextFreeDeadAndConstantFetch (#36387)"
+            "note": "makeVariableFromOp + constant-slot/object-mirror bind; alias cluster in ContextVariableOperandAlias; getVariableFromOp in Lookup; freeDead in ContextFreeDeadAndConstantFetch; CONST_FETCH in ContextConstantFetch (#36387)"
         },
         "lib/JIT/ContextVariableOperandAlias.php": {
             "budget": 247,
@@ -274,9 +274,14 @@
             "note": "lookupFunction / registerType / namedStructType / constantFrom* / constantArray|ObjectFromVm extracted from Context (#36387)"
         },
         "lib/JIT/ContextFreeDeadAndConstantFetch.php": {
-            "budget": 417,
-            "target": 500,
-            "note": "freeDeadVariables + constantFetch / stdio/zend/enum helpers extracted from ContextVariableOperandBinding (#36387)"
+            "budget": 198,
+            "target": 250,
+            "note": "freeDeadVariables only; CONST_FETCH moved to ContextConstantFetch (#36387)"
+        },
+        "lib/JIT/ContextConstantFetch.php": {
+            "budget": 245,
+            "target": 300,
+            "note": "constantFetch + stdio/zend/enum helpers extracted from ContextFreeDeadAndConstantFetch (#36387); php-src Zend/zend_constants.c + Zend/zend_enum.c"
         },
         "lib/JIT/ContextScopeLifecycleAndInitEmit.php": {
             "budget": 180,

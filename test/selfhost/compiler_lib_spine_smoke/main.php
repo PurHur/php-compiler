@@ -6988,6 +6988,7 @@ require_once __DIR__.'/../../../lib/JIT/ContextVariableOperandBinding.php';
 require_once __DIR__.'/../../../lib/JIT/ContextVariableOperandAlias.php';
 require_once __DIR__.'/../../../lib/JIT/ContextVariableOperandLookup.php';
 require_once __DIR__.'/../../../lib/JIT/ContextFreeDeadAndConstantFetch.php';
+require_once __DIR__.'/../../../lib/JIT/ContextConstantFetch.php';
 require_once __DIR__.'/../../../lib/JIT/ContextFunctionProxyNestedJitKernelRegistry.php';
 require_once __DIR__.'/../../../lib/JIT/ContextFunctionProxyExternalMethodStubReport.php';
 require_once __DIR__.'/../../../lib/JIT/ContextFunctionProxyRegistration.php';

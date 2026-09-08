@@ -46,6 +46,7 @@ require_once __DIR__.'/ContextVariableOperandBinding.php';
 require_once __DIR__.'/ContextVariableOperandAlias.php';
 require_once __DIR__.'/ContextVariableOperandLookup.php';
 require_once __DIR__.'/ContextFreeDeadAndConstantFetch.php';
+require_once __DIR__.'/ContextConstantFetch.php';
 require_once __DIR__.'/ContextFunctionProxyNestedJitKernelRegistry.php';
 require_once __DIR__.'/ContextFunctionProxyExternalMethodStubReport.php';
 require_once __DIR__.'/ContextFunctionProxyRegistration.php';
@@ -79,6 +80,7 @@ class Context {
     use ContextVariableOperandAlias;
     use ContextVariableOperandLookup;
     use ContextFreeDeadAndConstantFetch;
+    use ContextConstantFetch;
     use ContextFunctionProxyNestedJitKernelRegistry;
     use ContextFunctionProxyExternalMethodStubReport;
     use ContextFunctionProxyRegistration;
