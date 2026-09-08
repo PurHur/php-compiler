@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8537 |
-| Phase A inventory files (M2 ratio SSOT) | 8537 |
+| PHP files on vm.php path | 8538 |
+| Phase A inventory files (M2 ratio SSOT) | 8538 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26679 |
+| Source constructs flagged (warnings) | 26681 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7326,6 +7326,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/ContextScopeLifecycleAndInitEmit.php` | 0 | 3 |
 | `lib/JIT/ContextScriptGlobalsAndIncludeTracking.php` | 0 | 3 |
 | `lib/JIT/ContextStandaloneBodies.php` | 0 | 2 |
+| `lib/JIT/ContextStructFieldMap.php` | 0 | 2 |
 | `lib/JIT/ContextTypeAndStructMap.php` | 0 | 2 |
 | `lib/JIT/ContextVariableOperandAlias.php` | 0 | 3 |
 | `lib/JIT/ContextVariableOperandBinding.php` | 0 | 2 |
@@ -59896,16 +59897,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Context.php`
 
 **Warnings** (review for bootstrap subset):
-- new ExtensionLoweringHooks (line 883)
-- new Scope (line 884)
-- new Analyzer (line 913)
-- new Helper (line 914)
-- new Builtin\Refcount (line 915)
-- new Builtin\Output (line 917)
-- new Builtin\Type (line 918)
-- new Builtin\Internal (line 919)
-- new Builtin\VarArg (line 920)
-- new Builtin\ErrorHandler (line 921)
+- new ExtensionLoweringHooks (line 885)
+- new Scope (line 886)
+- new Analyzer (line 915)
+- new Helper (line 916)
+- new Builtin\Refcount (line 917)
+- new Builtin\Output (line 919)
+- new Builtin\Type (line 920)
+- new Builtin\Internal (line 921)
+- new Builtin\VarArg (line 922)
+- new Builtin\ErrorHandler (line 923)
 
 ### `lib/JIT/ContextCompileToFile.php`
 
@@ -60403,11 +60404,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - trait ContextStandaloneBodies (line 22)
 - 8 class method(s)
 
+### `lib/JIT/ContextStructFieldMap.php`
+
+**Warnings** (review for bootstrap subset):
+- trait ContextStructFieldMap (line 24)
+- 7 class method(s)
+
 ### `lib/JIT/ContextTypeAndStructMap.php`
 
 **Warnings** (review for bootstrap subset):
-- trait ContextTypeAndStructMap (line 23)
-- 13 class method(s)
+- trait ContextTypeAndStructMap (line 25)
+- 6 class method(s)
 
 ### `lib/JIT/ContextVariableOperandAlias.php`
 

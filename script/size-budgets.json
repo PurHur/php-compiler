@@ -184,9 +184,9 @@
             "note": "TYPE_CLASS_CONST_FETCH runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/Context.php": {
-            "budget": 926,
+            "budget": 928,
             "target": 3500,
-            "note": "FunctionProxyRegistration + ExternalMethodStubReport + ArrayIteratorAndObject + NestedJitKernelRegistry + ReflectionMembers + FiberGeneratorAndClosure + ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml proxies wiring + VariableOperandLookup + VariableOperandAlias + ModuleVerify + ConstantFetch + LlvmConstantEmit + ScopeLifecycle peers (#36387/#36199); continue toward \u22643.5k + ModuleOptimizationPasses (#36387)"
+            "note": "FunctionProxyRegistration + ExternalMethodStubReport + ArrayIteratorAndObject + NestedJitKernelRegistry + ReflectionMembers + FiberGeneratorAndClosure + ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml proxies wiring + VariableOperandLookup + VariableOperandAlias + ModuleVerify + ConstantFetch + StructFieldMap + LlvmConstantEmit + ScopeLifecycle peers (#36387/#36199); continue toward \u22643.5k + ModuleOptimizationPasses (#36387)"
         },
         "lib/JIT/ContextEditScaffoldModuleRebind.php": {
             "budget": 315,
@@ -254,9 +254,14 @@
             "note": "functionIsRegistered / builtin-name cache / registerModule|Builtin extracted from FunctionProxyAndNestedJitKernel (#36387)"
         },
         "lib/JIT/ContextTypeAndStructMap.php": {
-            "budget": 407,
-            "target": 500,
-            "note": "castToBool / type\u2194LLVM map / structField* extracted from Context (#36387)"
+            "budget": 271,
+            "target": 400,
+            "note": "castToBool / type\u2194LLVM map only; structField* in ContextStructFieldMap (#36387)"
+        },
+        "lib/JIT/ContextStructFieldMap.php": {
+            "budget": 163,
+            "target": 250,
+            "note": "structField*/resolveStructMapName/stripLlvmUniquifySuffix extracted from ContextTypeAndStructMap (#36387); php-src Zend/zend_object_handlers.c + Zend/zend_types.h"
         },
         "lib/JIT/ContextStandaloneBodies.php": {
             "budget": 289,
