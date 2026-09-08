@@ -179,9 +179,9 @@
             "note": "TYPE_CLASS_CONST_FETCH runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/Context.php": {
-            "budget": 914,
+            "budget": 916,
             "target": 3500,
-            "note": "ExternalMethodStubReport + ArrayIteratorAndObject + NestedJitKernelRegistry + ReflectionMembers + FiberGeneratorAndClosure + ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml proxies wiring + ScopeLifecycle peers (#36387/#36199); continue toward \u22643.5k + ModuleOptimizationPasses (#36387)"
+            "note": "FunctionProxyRegistration + ExternalMethodStubReport + ArrayIteratorAndObject + NestedJitKernelRegistry + ReflectionMembers + FiberGeneratorAndClosure + ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml proxies wiring + ScopeLifecycle peers (#36387/#36199); continue toward \u22643.5k + ModuleOptimizationPasses (#36387)"
         },
         "lib/JIT/ContextEditScaffoldModuleRebind.php": {
             "budget": 315,
@@ -229,14 +229,19 @@
             "note": "Operand\u2192Variable binding extracted from Context; freeDead/CONST_FETCH in ContextFreeDeadAndConstantFetch (#36387)"
         },
         "lib/JIT/ContextFunctionProxyAndNestedJitKernel.php": {
-            "budget": 324,
-            "target": 350,
-            "note": "Function-proxy resolve + registerModule; NestedJIT whitelist in NestedJitKernelRegistry; stub report in ExternalMethodStubReport (#36387)"
+            "budget": 230,
+            "target": 280,
+            "note": "Function-proxy resolve only; registration in FunctionProxyRegistration; NestedJIT whitelist in NestedJitKernelRegistry; stub report in ExternalMethodStubReport (#36387)"
         },
         "lib/JIT/ContextFunctionProxyNestedJitKernelRegistry.php": {
             "budget": 297,
             "target": 400,
             "note": "NestedJIT / SPINE_CHUNK kernel whitelist + VM-registry helpers extracted from FunctionProxyAndNestedJitKernel (#36387)"
+        },
+        "lib/JIT/ContextFunctionProxyRegistration.php": {
+            "budget": 116,
+            "target": 200,
+            "note": "functionIsRegistered / builtin-name cache / registerModule|Builtin extracted from FunctionProxyAndNestedJitKernel (#36387)"
         },
         "lib/JIT/ContextTypeAndStructMap.php": {
             "budget": 407,

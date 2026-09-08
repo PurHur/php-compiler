@@ -5,15 +5,15 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\Func\Internal as FuncInternal;
-use PHPCompiler\Module;
 
 /**
- * Function-proxy resolve + module/builtin registration for {@see Context} (#36387).
+ * Function-proxy resolve for {@see Context} (#36387).
  *
  * NestedJIT / SPINE_CHUNK kernel whitelist helpers live in
  * {@see ContextFunctionProxyNestedJitKernelRegistry}; external-stub report + chunk
- * method-manifest export live in {@see ContextFunctionProxyExternalMethodStubReport}
- * (split-TU / size-budget ratchet toward ≤ 320 lines, #36199 / #36403).
+ * method-manifest export live in {@see ContextFunctionProxyExternalMethodStubReport};
+ * registration / name-lookup helpers live in {@see ContextFunctionProxyRegistration}
+ * (split-TU / size-budget ratchet toward ≤ 250 lines, #36199 / #36403).
  *
  * Used via {@code use ContextFunctionProxyAndNestedJitKernel;} on {@see Context}.
  *
@@ -227,98 +227,4 @@ trait ContextFunctionProxyAndNestedJitKernel
 
         return null;
     }
-
-    /**
-     * Whether a function name resolves to a builtin or user function in this compile unit (issue #1216).
-     */
-    public function functionIsRegistered(string $name): bool
-    {
-        $normalized = ltrim($name, '\\');
-        $lc = strtolower($normalized);
-        if (DomInstanceMethodJit::isDomInstanceMethodProxy($lc)) {
-            DomInstanceMethodJit::ensureProxy($this, $lc);
-        }
-        if (SimpleXmlInstanceMethodJit::isSimpleXmlInstanceMethodProxy($lc)
-            && UserScriptAotEnv::isActive()
-        ) {
-            SimpleXmlInstanceMethodJit::ensureProxy($this, $lc);
-        }
-        if (XmlReaderInstanceMethodJit::isXmlReaderInstanceMethodProxy($lc)
-            && XmlReaderInstanceMethodJit::isUserScriptAot()
-        ) {
-            XmlReaderInstanceMethodJit::ensureProxy($this, $lc);
-        }
-        if (XmlWriterInstanceMethodJit::isXmlWriterInstanceMethodProxy($lc)
-            && XmlWriterInstanceMethodJit::isUserScriptAot()
-        ) {
-            XmlWriterInstanceMethodJit::ensureProxy($this, $lc);
-        }
-        if ($this->functionProxyIsCallable($lc)) {
-            return true;
-        }
-        $short = SelfHostBuiltinPolicy::normalizeName($name);
-        if ($short !== $lc && $this->functionProxyIsCallable($short)) {
-            return true;
-        }
-        if (isset($this->registeredBuiltinNames()[$lc]) || ($short !== $lc && isset($this->registeredBuiltinNames()[$short]))) {
-            return true;
-        }
-
-        return isset($this->functions[$lc]) || ($short !== $lc && isset($this->functions[$short]));
-    }
-
-    /** @return array<string, true> */
-    private function registeredBuiltinNames(): array
-    {
-        if (null !== $this->registeredBuiltinLookup) {
-            return $this->registeredBuiltinLookup;
-        }
-        $this->registeredBuiltinLookup = [];
-        foreach ($this->modules as $module) {
-            foreach ($module->getFunctions() as $func) {
-                $this->registeredBuiltinLookup[strtolower($func->getName())] = true;
-            }
-        }
-
-        return $this->registeredBuiltinLookup;
-    }
-
-    /**
-     * @return list<string> Lowercase user-defined function names compiled into this unit.
-     */
-    public function userFunctionNames(): array
-    {
-        $names = [];
-        foreach ($this->functionProxies as $lc => $proxy) {
-            if ($proxy instanceof Call\ExternalMethod || $proxy instanceof FuncInternal) {
-                continue;
-            }
-            if ($proxy instanceof Call\Native || $proxy instanceof Call\Vararg) {
-                $names[] = $lc;
-            }
-        }
-
-        return array_values(array_unique($names));
-    }
-
-    private function functionProxyIsCallable(string $lc): bool
-    {
-        if (!isset($this->functionProxies[$lc])) {
-            return false;
-        }
-
-        return !($this->functionProxies[$lc] instanceof Call\ExternalMethod);
-    }
-
-    public function registerModule(Module $module): void {
-        $this->modules[] = $module;
-        $this->registeredBuiltinLookup = null;
-        $module->jitInit($this);
-    }
-
-    public function registerBuiltin(Builtin $builtin): void {
-        $this->builtins[] = $builtin;
-    }
-
-    /** User examples or bootstrap-aot-link: thin standalone main without session/header reset LLVM (#13571, #14459). */
 }

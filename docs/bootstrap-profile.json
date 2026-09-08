@@ -7406,6 +7406,7 @@
         "lib/JIT/ContextFunctionProxyAndNestedJitKernel.php",
         "lib/JIT/ContextFunctionProxyExternalMethodStubReport.php",
         "lib/JIT/ContextFunctionProxyNestedJitKernelRegistry.php",
+        "lib/JIT/ContextFunctionProxyRegistration.php",
         "lib/JIT/ContextLlvmConstantsAndRegistry.php",
         "lib/JIT/ContextModuleCompileAndOptimize.php",
         "lib/JIT/ContextModuleOptimizationPasses.php",
@@ -8761,9 +8762,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8527,
+        "inventory_files": 8528,
         "excluded": 0,
-        "eligible": 8527,
+        "eligible": 8528,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
