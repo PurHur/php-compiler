@@ -17,6 +17,7 @@ require_once __DIR__.'/CompileCacheBitcodePersist.php';
 require_once __DIR__.'/CompileCacheRecording.php';
 require_once __DIR__.'/CompileCacheEditSession.php';
 require_once __DIR__.'/CompileCacheProjectMembers.php';
+require_once __DIR__.'/CompileCacheArtifactFacade.php';
 
 /**
  * On-disk MCJIT bitcode cache (issue #153).
@@ -36,7 +37,8 @@ require_once __DIR__.'/CompileCacheProjectMembers.php';
  * MCJIT bitcode restore/persist lives in {@see CompileCacheBitcodePersist};
  * cold-emit recording / symbol membership maps live in {@see CompileCacheRecording};
  * edit-scaffold session arm / state live in {@see CompileCacheEditSession};
- * project member path list / compile entry live in {@see CompileCacheProjectMembers}
+ * project member path list / compile entry live in {@see CompileCacheProjectMembers};
+ * artifact / object mid-tier warm restore live in {@see CompileCacheArtifactFacade}
  * (#36387 one-file-edit Done-when / #36403 size-budget split-TU).
  */
 final class CompileCache
@@ -46,6 +48,7 @@ final class CompileCache
     use CompileCacheRecording;
     use CompileCacheEditSession;
     use CompileCacheProjectMembers;
+    use CompileCacheArtifactFacade;
     /** @var list<array{llvm: string, signature: string, scoped: string}>|null */
     private static ?array $recordingExports = null;
 
@@ -234,69 +237,6 @@ final class CompileCache
         return CompileCacheKeyLayout::hasDurableMarker($key);
     }
 
-    /** @see CompileCacheArtifactPersist::hasFreshArtifact() */
-    public static function hasFreshArtifact(string $key, string $sourcePath, string $sourceCode): bool
-    {
-        return CompileCacheArtifactPersist::hasFreshArtifact($key, $sourcePath, $sourceCode);
-    }
-
-    /** @see CompileCacheArtifactPersist::tryRestoreArtifact() */
-    public static function tryRestoreArtifact(
-        string $key,
-        string $outfile,
-        string $sourcePath,
-        string $sourceCode
-    ): bool {
-        return CompileCacheArtifactPersist::tryRestoreArtifact($key, $outfile, $sourcePath, $sourceCode);
-    }
-
-    /** @see CompileCacheArtifactPersist::tryRestoreArtifactByKey() */
-    public static function tryRestoreArtifactByKey(string $key, string $outfile): bool
-    {
-        return CompileCacheArtifactPersist::tryRestoreArtifactByKey($key, $outfile);
-    }
-
-    /** @see CompileCacheArtifactPersist::saveArtifact() */
-    public static function saveArtifact(string $key, string $outfile): void
-    {
-        CompileCacheArtifactPersist::saveArtifact($key, $outfile);
-    }
-
-    /** @see CompileCacheArtifactPersist::hasFreshObject() */
-    public static function hasFreshObject(string $key, string $sourcePath, string $sourceCode): bool
-    {
-        return CompileCacheArtifactPersist::hasFreshObject($key, $sourcePath, $sourceCode);
-    }
-
-    /**
-     * @return array{version: int, helper_slugs: list<string>}|null
-     *
-     * @see CompileCacheArtifactPersist::readLinkManifest()
-     */
-    public static function readLinkManifest(string $key): ?array
-    {
-        return CompileCacheArtifactPersist::readLinkManifest($key);
-    }
-
-    /**
-     * @param list<string> $helperSlugs basenames under helper-runtime units/
-     *
-     * @see CompileCacheArtifactPersist::saveObject()
-     */
-    public static function saveObject(string $key, string $objectFile, array $helperSlugs): void
-    {
-        CompileCacheArtifactPersist::saveObject($key, $objectFile, $helperSlugs);
-    }
-
-    /** @see CompileCacheArtifactPersist::tryRestoreObjectAndLink() */
-    public static function tryRestoreObjectAndLink(
-        string $key,
-        string $outfile,
-        string $sourcePath,
-        string $sourceCode
-    ): bool {
-        return CompileCacheArtifactPersist::tryRestoreObjectAndLink($key, $outfile, $sourcePath, $sourceCode);
-    }
 
     /**
      * @param array<string, string> $previous
