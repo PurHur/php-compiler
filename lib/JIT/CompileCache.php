@@ -33,7 +33,7 @@ require_once __DIR__.'/CompileCacheKeyLayoutFacade.php';
  * (public hub delegates in {@see CompileCacheSemanticHashFacade});
  * partial-emit demote lives in {@see CompileCachePartialEmitDemote};
  * linked-binary / user-object mid-tier warm restore lives in {@see CompileCacheArtifactPersist};
- * edit-scaffold restore/plan + LLVM strip live in {@see CompileCacheEditScaffold} / {@see CompileCacheEditScaffoldStrip};
+ * edit-scaffold restore + plan + LLVM strip live in {@see CompileCacheEditScaffold} / {@see CompileCacheEditScaffoldPlan} / {@see CompileCacheEditScaffoldStrip};
  * multi-file project index / entry→members map lives in {@see CompileCacheProjectIndex}
  * (public hub delegates in {@see CompileCacheProjectIndexFacade});
  * cache-entry paths / freshness / fingerprint live in {@see CompileCacheKeyLayout};
