@@ -1,0 +1,2 @@
+<?php
+echo "GEN0_FUNCTIONAL_OK gen0fw20260908125938_5138\n";

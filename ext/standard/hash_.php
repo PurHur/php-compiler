@@ -6,6 +6,8 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringHash;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitBoolArg;
@@ -16,9 +18,13 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** hash() — sha256, sha1, md5, crc32*, adler32, fnv*, xxh3/xxh128 (VM + JIT/AOT via __compiler_hash). */
+/**
+ * hash() — sha256, sha1, md5, crc32, adler32, fnv (VM + thin AOT via {@code phpc_hash_r1}, #36388).
+ * php-src: ext/hash/hash.c — PHP_FUNCTION(hash)
+ */
 final class hash_ extends Internal
 {
     public function __construct()
@@ -93,12 +99,31 @@ final class hash_ extends Internal
             $raw = JitBoolArg::lowerCoerceZParamBool($context, $args[2], 'hash', 'binary', 3);
         }
 
-        return JitHash::hash(
-            $context,
-            self::jitAlgoArg($context, $args[0]),
-            self::jitDataArg($context, $args[1]),
-            $raw
-        );
+        $algo = self::jitAlgoArg($context, $args[0]);
+        $data = self::jitDataArg($context, $args[1]);
+        // Native phpc_hash_r1 — no NestedJIT HashCryptoJitHelper (#36388). Peer md5/sha1.
+        $rawI32 = $context->builder->zExt($raw, $context->getTypeFromString('int32'));
+        $digest = StringHash::invoke($context, $algo, $data, $rawI32);
+        $result = self::rejectNullHashDigest($context, $digest);
+        JitStringBuiltinArg::releaseEphemeralArgAfterCopy($context, $args[0], $algo);
+        JitStringBuiltinArg::releaseEphemeralArgAfterCopy($context, $args[1], $data);
+
+        return $result;
+    }
+
+    /** ValueError on null digest; return owning {@code __string__*} (#36388). */
+    private static function rejectNullHashDigest(Context $context, Value $digest): Value
+    {
+        $strPtr = $context->getTypeFromString('__string__*');
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $digest, $strPtr->constNull());
+        $fail = BasicBlockHelper::append($context, 'hash_r1_fail');
+        $ok = BasicBlockHelper::append($context, 'hash_r1_ok');
+        $context->builder->branchIf($isNull, $fail, $ok);
+        $context->builder->positionAtEnd($fail);
+        ExceptionBridge::emitValueErrorAndAbort($context, VmHash::unknownDigestAlgoMessage('hash'));
+        $context->builder->positionAtEnd($ok);
+
+        return $digest;
     }
 
     /** Z_PARAM_STR $algo — soft-null then ValueError on empty/unknown (#21490, ext/hash/hash.c). */

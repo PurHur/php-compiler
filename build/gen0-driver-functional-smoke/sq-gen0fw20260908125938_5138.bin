@@ -1,0 +1,2 @@
+#!/bin/sh
+printf '%s' 'GEN0_SQ_OK'

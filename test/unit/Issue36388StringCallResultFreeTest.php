@@ -94,6 +94,7 @@ final class Issue36388StringCallResultFreeTest extends TestCase
         $this->assertStringContainsString("'str_ireplace' => true", $src);
         $this->assertStringContainsString("'str_pad' => true", $src);
         $this->assertStringContainsString("'md5' => true", $src);
+        $this->assertStringContainsString("'hash' => true", $src);
         $concat = (string) file_get_contents(
             dirname(__DIR__, 2).'/lib/JIT/Concern/CompileConcat.php'
         );
@@ -154,6 +155,12 @@ final class Issue36388StringCallResultFreeTest extends TestCase
         ));
         $this->assertStringContainsString('StringSha1::invoke', (string) file_get_contents(
             dirname(__DIR__, 2).'/ext/standard/JitSha1.php'
+        ));
+        $this->assertStringContainsString('phpc_hash_r1', (string) file_get_contents(
+            dirname(__DIR__, 2).'/lib/JIT/Builtin/HashRuntime.php'
+        ));
+        $this->assertStringContainsString('StringHash::invoke', (string) file_get_contents(
+            dirname(__DIR__, 2).'/ext/standard/hash_.php'
         ));
     }
 
@@ -273,6 +280,9 @@ final class Issue36388StringCallResultFreeTest extends TestCase
             'str_pad_local' => ['test/repro/issue_36388_str_pad_local_free.php', 'str_pad_local delta='],
             'str_pad_lit' => ['test/repro/issue_36388_str_pad_lit_free.php', 'str_pad_lit delta='],
             'str_pad_sides' => ['test/repro/issue_36388_str_pad_sides_free.php', 'str_pad_sides delta='],
+            'hash_local' => ['test/repro/issue_36388_hash_local_free.php', 'hash_local delta='],
+            'hash_lit' => ['test/repro/issue_36388_hash_lit_free.php', 'hash_lit delta='],
+            'hash_raw' => ['test/repro/issue_36388_hash_raw_free.php', 'hash_raw delta='],
             'dead_inplace_concat' => ['test/repro/issue_36388_dead_inplace_concat_free.php', 'dead_inplace_concat delta='],
         ];
     }
