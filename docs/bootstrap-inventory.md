@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8490 |
-| Phase A inventory files (M2 ratio SSOT) | 8490 |
+| PHP files on vm.php path | 8492 |
+| Phase A inventory files (M2 ratio SSOT) | 8492 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26591 |
+| Source constructs flagged (warnings) | 26596 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7290,11 +7290,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/ValueBoxCoalesceAndConcatHelpers.php` | 0 | 7 |
 | `lib/JIT/Concern/VarFetchDestLvalueContext.php` | 0 | 2 |
 | `lib/JIT/Concern/VmSmokeAndRuntimeM3NativeStubs.php` | 0 | 10 |
-| `lib/JIT/Context.php` | 0 | 17 |
+| `lib/JIT/Context.php` | 0 | 15 |
 | `lib/JIT/ContextCompileToFile.php` | 0 | 3 |
 | `lib/JIT/ContextDefineBuiltins.php` | 0 | 306 |
 | `lib/JIT/ContextEditScaffoldModuleRebind.php` | 0 | 2 |
 | `lib/JIT/ContextFunctionProxyAndNestedJitKernel.php` | 0 | 4 |
+| `lib/JIT/ContextModuleCompileAndOptimize.php` | 0 | 5 |
+| `lib/JIT/ContextStandaloneBodies.php` | 0 | 2 |
 | `lib/JIT/ContextTypeAndStructMap.php` | 0 | 2 |
 | `lib/JIT/ContextVariableOperandBinding.php` | 0 | 13 |
 | `lib/JIT/DatePeriodForeachSnapshot.php` | 0 | 3 |
@@ -59819,23 +59821,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Context.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 1000)
-- new ExtensionLoweringHooks (line 1097)
-- new Scope (line 1098)
-- new Analyzer (line 1129)
-- new Helper (line 1130)
-- new Builtin\Refcount (line 1132)
-- new Builtin\Output (line 1134)
-- new Builtin\Type (line 1135)
-- new Builtin\Internal (line 1136)
-- new Builtin\VarArg (line 1137)
-- new Builtin\ErrorHandler (line 1138)
-- new Scope (line 1166)
-- new Result (line 1485)
-- new Result (line 1506)
-- new Variable (line 2407)
-- 77 class method(s)
-- 2 closure(s)
+- new Variable (line 1004)
+- new ExtensionLoweringHooks (line 1101)
+- new Scope (line 1102)
+- new Analyzer (line 1133)
+- new Helper (line 1134)
+- new Builtin\Refcount (line 1136)
+- new Builtin\Output (line 1138)
+- new Builtin\Type (line 1139)
+- new Builtin\Internal (line 1140)
+- new Builtin\VarArg (line 1141)
+- new Builtin\ErrorHandler (line 1142)
+- new Scope (line 1170)
+- new Variable (line 1634)
+- 51 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/ContextCompileToFile.php`
 
@@ -60167,6 +60167,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\ExternalMethod (line 80)
 - new ReflectionMethod (line 287)
 - 18 class method(s)
+
+### `lib/JIT/ContextModuleCompileAndOptimize.php`
+
+**Warnings** (review for bootstrap subset):
+- trait ContextModuleCompileAndOptimize (line 24)
+- new Result (line 38)
+- new Result (line 59)
+- 18 class method(s)
+- 1 closure(s)
+
+### `lib/JIT/ContextStandaloneBodies.php`
+
+**Warnings** (review for bootstrap subset):
+- trait ContextStandaloneBodies (line 22)
+- 8 class method(s)
 
 ### `lib/JIT/ContextTypeAndStructMap.php`
 
