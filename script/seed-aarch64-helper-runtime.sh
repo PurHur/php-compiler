@@ -296,6 +296,23 @@ SEED_UNITS=(
   /ext/standard/CloneWithJitHelper.php
   /ext/standard/WeakRefRegistryJitHelper.php
   /ext/standard/ListSpreadTailJitHelper.php
+  # Apache / highlight / headers / phpinfo / readonly / request body / scope / upload / net lookup (#36391 after 242)
+  # Frexp/Ldexp/Modf/Nextafter/Shuffle still skipped (algorithm SSOT, no HELPER_PATH).
+  # Preg* still skipped: tip nested compile misses Compiler\Concern\OpCode.
+  # Sscanf still skipped: __init__ sealed during NestedJIT.
+  # Gethostbynamel skipped: NestedJIT missing __compiler_stream_resolve_include_path.
+  # Ini skipped: IniGetLeafJitHelper not compiled under helper-runtime-emit NestedJIT.
+  # Progress skipped: NestedJIT ContextLlvmConstantsAndRegistry seal during helper emit.
+  /ext/standard/ApacheNoteJitHelper.php
+  /ext/standard/HighlightJitHelper.php
+  /ext/standard/PendingHeadersJitHelper.php
+  /ext/standard/PhpinfoJitHelper.php
+  /ext/standard/ReadonlyRaiseJitHelper.php
+  /ext/standard/RequestParseBodyJitHelper.php
+  /ext/standard/RequestParseBodyNativeJitHelper.php
+  /ext/standard/ScopeBuiltinJitHelper.php
+  /ext/standard/UploadTempJitHelper.php
+  /ext/standard/NetworkServicesNameLookupThinAot.php
 )
 
 MIN_SEED=${#SEED_UNITS[@]}
