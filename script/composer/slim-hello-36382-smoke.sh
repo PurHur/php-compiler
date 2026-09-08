@@ -41,7 +41,7 @@ for arg in "$@"; do
   esac
 done
 
-if [[ "$SKIP_SETUP" -eq 0 ]] || [[ ! -f "$DEST/vendor/autoload.php" ]]; then
+if [[ "$SKIP_SETUP" -eq 0 ]] || [[ ! -f "$DEST/vendor/autoload.php" ]] || [[ ! -f "$DEST/phpc.json" ]]; then
   echo "slim-hello-36382-smoke: ensuring fixture at $DEST"
   "$ROOT/script/composer/setup-slim-hello-36382.sh" "$DEST"
 fi
@@ -54,6 +54,7 @@ test -x "$BIN"
 LISTEN="${SLIM_HELLO_FCGI_LISTEN:-127.0.0.1:19082}"
 HOST="${LISTEN%:*}"
 PORT="${LISTEN##*:}"
+PROBE_ERR="$(mktemp)"
 
 echo "slim-hello-36382-smoke: phpc fcgi --listen $LISTEN"
 php -d "memory_limit=${PHP_COMPILER_MEMORY_LIMIT}" bin/phpc.php fcgi \
@@ -64,6 +65,7 @@ FCGI_PID=$!
 cleanup() {
   kill "$FCGI_PID" 2>/dev/null || true
   wait "$FCGI_PID" 2>/dev/null || true
+  rm -f "$PROBE_ERR"
 }
 trap cleanup EXIT
 
@@ -75,15 +77,39 @@ for _ in $(seq 1 50); do
   sleep 0.1
 done
 
-# Minimal FastCGI GET /hello via php-cgi client when available; else CGI env on the binary.
+# Prefer in-tree FastCGI TCP probe (no cgi-fcgi package — #36382 Done-when under phpc fcgi).
+# Falls back to cgi-fcgi; CGI-only on the binary is reported then fails (Done-when is FastCGI).
+DOCROOT="$DEST/public"
 BODY=""
-if command -v cgi-fcgi >/dev/null 2>&1; then
-  BODY="$(SCRIPT_NAME=/index.php REQUEST_URI=/hello REQUEST_METHOD=GET \
-    cgi-fcgi -bind -connect "$LISTEN" 2>/dev/null | tr -d '\r' || true)"
+
+if [[ -f "$ROOT/script/composer/slim-hello-fcgi-probe.php" ]]; then
+  echo "slim-hello-36382-smoke: FastCGI probe → $LISTEN /hello"
+  BODY="$(
+    php -d "memory_limit=${PHP_COMPILER_MEMORY_LIMIT}" \
+      "$ROOT/script/composer/slim-hello-fcgi-probe.php" \
+      --connect "$LISTEN" \
+      --docroot "$DOCROOT" \
+      --uri /hello \
+      2>"$PROBE_ERR" || true
+  )"
 fi
 
 if [[ -z "$BODY" ]] || ! grep -q 'hello' <<<"$BODY"; then
-  echo "slim-hello-36382-smoke: cgi-fcgi unavailable/empty — probing binary via CGI env"
+  if command -v cgi-fcgi >/dev/null 2>&1; then
+    echo "slim-hello-36382-smoke: in-tree probe missed — trying cgi-fcgi"
+    BODY="$(SCRIPT_NAME=/index.php REQUEST_URI=/hello REQUEST_METHOD=GET \
+      cgi-fcgi -bind -connect "$LISTEN" 2>/dev/null | tr -d '\r' || true)"
+  fi
+fi
+
+if [[ -n "$BODY" ]] && grep -q 'hello' <<<"$BODY"; then
+  echo "slim-hello-36382-smoke: FastCGI hello OK"
+else
+  echo "slim-hello-36382-smoke: FastCGI empty — probing binary via CGI env (diagnostic)"
+  if [[ -s "$PROBE_ERR" ]]; then
+    echo "slim-hello-36382-smoke: probe stderr:" >&2
+    cat "$PROBE_ERR" >&2 || true
+  fi
   OUT="$(
     REQUEST_METHOD=GET \
     SCRIPT_NAME=/index.php \
@@ -95,13 +121,13 @@ if [[ -z "$BODY" ]] || ! grep -q 'hello' <<<"$BODY"; then
     "$BIN" 2>&1 || true
   )"
   if ! grep -q 'hello' <<<"$OUT"; then
-    echo "slim-hello-36382-smoke: FAIL — no 'hello' in response:" >&2
+    echo "slim-hello-36382-smoke: FAIL — no 'hello' in FastCGI or CGI response:" >&2
     printf '%s\n' "$OUT" >&2
     exit 1
   fi
-  echo "slim-hello-36382-smoke: CGI hello OK"
-else
-  echo "slim-hello-36382-smoke: FastCGI hello OK"
+  # Done-when requires phpc fcgi framing; CGI-only must not green-wash the gate.
+  echo "slim-hello-36382-smoke: FAIL — CGI hello OK but FastCGI probe did not return hello" >&2
+  exit 1
 fi
 
 echo "slim-hello-36382-smoke: OK"
