@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8498 |
-| Phase A inventory files (M2 ratio SSOT) | 8498 |
+| PHP files on vm.php path | 8500 |
+| Phase A inventory files (M2 ratio SSOT) | 8500 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26604 |
+| Source constructs flagged (warnings) | 26607 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7294,17 +7294,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/ValueBoxCoalesceAndConcatHelpers.php` | 0 | 7 |
 | `lib/JIT/Concern/VarFetchDestLvalueContext.php` | 0 | 2 |
 | `lib/JIT/Concern/VmSmokeAndRuntimeM3NativeStubs.php` | 0 | 10 |
-| `lib/JIT/Context.php` | 0 | 12 |
+| `lib/JIT/Context.php` | 0 | 10 |
 | `lib/JIT/ContextCompileToFile.php` | 0 | 3 |
 | `lib/JIT/ContextDefineBuiltins.php` | 0 | 306 |
 | `lib/JIT/ContextEditScaffoldModuleRebind.php` | 0 | 2 |
+| `lib/JIT/ContextFreeDeadAndConstantFetch.php` | 0 | 10 |
 | `lib/JIT/ContextFunctionProxyAndNestedJitKernel.php` | 0 | 4 |
 | `lib/JIT/ContextLlvmConstantsAndRegistry.php` | 0 | 4 |
 | `lib/JIT/ContextModuleCompileAndOptimize.php` | 0 | 5 |
+| `lib/JIT/ContextScopeLifecycleAndInitEmit.php` | 0 | 3 |
 | `lib/JIT/ContextScriptGlobalsAndIncludeTracking.php` | 0 | 3 |
 | `lib/JIT/ContextStandaloneBodies.php` | 0 | 2 |
 | `lib/JIT/ContextTypeAndStructMap.php` | 0 | 2 |
-| `lib/JIT/ContextVariableOperandBinding.php` | 0 | 13 |
+| `lib/JIT/ContextVariableOperandBinding.php` | 0 | 5 |
 | `lib/JIT/DatePeriodForeachSnapshot.php` | 0 | 3 |
 | `lib/JIT/DeprecatedCallGuard.php` | 0 | 1 |
 | `lib/JIT/DiscardedPureCallElision.php` | 0 | 1 |
@@ -59847,18 +59849,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Context.php`
 
 **Warnings** (review for bootstrap subset):
-- new ExtensionLoweringHooks (line 835)
-- new Scope (line 836)
-- new Analyzer (line 867)
-- new Helper (line 868)
-- new Builtin\Refcount (line 870)
-- new Builtin\Output (line 872)
-- new Builtin\Type (line 873)
-- new Builtin\Internal (line 874)
-- new Builtin\VarArg (line 875)
-- new Builtin\ErrorHandler (line 876)
-- new Scope (line 904)
-- 15 class method(s)
+- new ExtensionLoweringHooks (line 842)
+- new Scope (line 843)
+- new Analyzer (line 874)
+- new Helper (line 875)
+- new Builtin\Refcount (line 877)
+- new Builtin\Output (line 879)
+- new Builtin\Type (line 880)
+- new Builtin\Internal (line 881)
+- new Builtin\VarArg (line 882)
+- new Builtin\ErrorHandler (line 883)
 
 ### `lib/JIT/ContextCompileToFile.php`
 
@@ -60183,6 +60183,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - trait ContextEditScaffoldModuleRebind (line 22)
 - 8 class method(s)
 
+### `lib/JIT/ContextFreeDeadAndConstantFetch.php`
+
+**Warnings** (review for bootstrap subset):
+- trait ContextFreeDeadAndConstantFetch (line 29)
+- new VMVariable (line 217)
+- new VMVariable (line 233)
+- new VMVariable (line 239)
+- new VMVariable (line 245)
+- new VMVariable (line 256)
+- new Variable (line 320)
+- new Variable (line 340)
+- new Variable (line 385)
+- 6 class method(s)
+
 ### `lib/JIT/ContextFunctionProxyAndNestedJitKernel.php`
 
 **Warnings** (review for bootstrap subset):
@@ -60207,6 +60221,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Result (line 59)
 - 18 class method(s)
 - 1 closure(s)
+
+### `lib/JIT/ContextScopeLifecycleAndInitEmit.php`
+
+**Warnings** (review for bootstrap subset):
+- trait ContextScopeLifecycleAndInitEmit (line 24)
+- new Scope (line 44)
+- 15 class method(s)
 
 ### `lib/JIT/ContextScriptGlobalsAndIncludeTracking.php`
 
@@ -60234,15 +60255,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 287)
 - new Variable (line 580)
 - new Variable (line 707)
-- new VMVariable (line 955)
-- new VMVariable (line 971)
-- new VMVariable (line 977)
-- new VMVariable (line 983)
-- new VMVariable (line 994)
-- new Variable (line 1058)
-- new Variable (line 1078)
-- new Variable (line 1123)
-- 25 class method(s)
+- 19 class method(s)
 
 ### `lib/JIT/DatePeriodForeachSnapshot.php`
 
