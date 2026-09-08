@@ -369,6 +369,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/JIT/ContextFunctionProxyExternalMethodStubReport.php',
             'lib/JIT/ContextFunctionProxyNestedJitKernelRegistry.php',
             'lib/JIT/ContextFunctionProxyRegistration.php',
+            'lib/JIT/ContextLlvmConstantEmit.php',
             'lib/JIT/ContextLlvmConstantsAndRegistry.php',
             'lib/JIT/ContextModuleCompileAndOptimize.php',
             'lib/JIT/ContextModuleOptimizationPasses.php',

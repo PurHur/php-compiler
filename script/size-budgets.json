@@ -179,9 +179,9 @@
             "note": "TYPE_CLASS_CONST_FETCH runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/Context.php": {
-            "budget": 924,
+            "budget": 926,
             "target": 3500,
-            "note": "FunctionProxyRegistration + ExternalMethodStubReport + ArrayIteratorAndObject + NestedJitKernelRegistry + ReflectionMembers + FiberGeneratorAndClosure + ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml proxies wiring + VariableOperandLookup + VariableOperandAlias + ScopeLifecycle peers (#36387/#36199); continue toward \u22643.5k + ModuleOptimizationPasses + ModuleVerify + ConstantFetch (#36387)"
+            "note": "FunctionProxyRegistration + ExternalMethodStubReport + ArrayIteratorAndObject + NestedJitKernelRegistry + ReflectionMembers + FiberGeneratorAndClosure + ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml proxies wiring + VariableOperandLookup + VariableOperandAlias + ModuleVerify + ConstantFetch + LlvmConstantEmit + ScopeLifecycle peers (#36387/#36199); continue toward \u22643.5k + ModuleOptimizationPasses (#36387)"
         },
         "lib/JIT/ContextEditScaffoldModuleRebind.php": {
             "budget": 315,
@@ -269,9 +269,14 @@
             "note": "Script-global slots + JIT include/helper-TU compile tracking extracted from Context (#36387)"
         },
         "lib/JIT/ContextLlvmConstantsAndRegistry.php": {
-            "budget": 433,
-            "target": 500,
-            "note": "lookupFunction / registerType / namedStructType / constantFrom* / constantArray|ObjectFromVm extracted from Context (#36387)"
+            "budget": 163,
+            "target": 300,
+            "note": "lookupFunction / registerType / namedStructType only; constantFrom* cluster in ContextLlvmConstantEmit (#36387)"
+        },
+        "lib/JIT/ContextLlvmConstantEmit.php": {
+            "budget": 293,
+            "target": 400,
+            "note": "constantFrom* / constantString* / constantArray|ObjectFromVm extracted from ContextLlvmConstantsAndRegistry (#36387)"
         },
         "lib/JIT/ContextFreeDeadAndConstantFetch.php": {
             "budget": 198,
