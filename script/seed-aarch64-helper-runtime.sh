@@ -241,6 +241,17 @@ SEED_UNITS=(
   /ext/standard/SleepJitHelper.php
   /ext/standard/ProcessIdentityJitHelper.php
   /ext/standard/ProcessSlotJitHelper.php
+  # Unserialize / hash-crypt / syslog / gzip-zlib / session (#36391 after #37323)
+  /ext/standard/UnserializeJitHelper.php
+  /ext/standard/UnserializeObjectNestedJitHelper.php
+  /ext/standard/HashCryptoJitHelper.php
+  /ext/standard/LibcryptJitHelper.php
+  /ext/standard/SyslogJitHelper.php
+  /ext/standard/GzStreamJitHelper.php
+  /ext/standard/ZlibJitHelper.php
+  /ext/standard/SessionNameJitHelper.php
+  /ext/standard/SessionCreateIdJitHelper.php
+  /ext/standard/SessionStorageJitHelper.php
 )
 
 MIN_SEED=${#SEED_UNITS[@]}
