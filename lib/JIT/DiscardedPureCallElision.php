@@ -4473,7 +4473,7 @@ final class DiscardedPureCallElision
      * {@code zend_pow} / {@code mul_function}; ext/standard/math.c
      * {@code PHP_FUNCTION(pow)}.
      *
-     * @return 'one'|'identity'|'square'|'cube'|'fourth'|'fifth'|'sixth'|'seventh'|'eighth'|'ninth'|'tenth'|'eleventh'|'twelfth'|'thirteenth'|'fourteenth'|'fifteenth'|'sixteenth'|'seventeenth'|'eighteenth'|'nineteenth'|'twentieth'|'twentyfirst'|'twentysecond'|'twentythird'|'twentyfourth'|'twentyfifth'|'twentysixth'|'twentyseventh'|'twentyeighth'|null fold to 1, keep base, mul square/cube/fourth/fifth/sixth/seventh/eighth/ninth/tenth/eleventh/twelfth/thirteenth/fourteenth/fifteenth/sixteenth/seventeenth/eighteenth/nineteenth/twentieth/twentyfirst/twentysecond/twentythird/twentyfourth/twentyfifth/twentysixth/twentyseventh/twentyeighth, or null
+     * @return 'one'|'identity'|'square'|'cube'|'fourth'|'fifth'|'sixth'|'seventh'|'eighth'|'ninth'|'tenth'|'eleventh'|'twelfth'|'thirteenth'|'fourteenth'|'fifteenth'|'sixteenth'|'seventeenth'|'eighteenth'|'nineteenth'|'twentieth'|'twentyfirst'|'twentysecond'|'twentythird'|'twentyfourth'|'twentyfifth'|'twentysixth'|'twentyseventh'|'twentyeighth'|'twentyninth'|null fold to 1, keep base, mul square/cube/fourth/fifth/sixth/seventh/eighth/ninth/tenth/eleventh/twelfth/thirteenth/fourteenth/fifteenth/sixteenth/seventeenth/eighteenth/nineteenth/twentieth/twentyfirst/twentysecond/twentythird/twentyfourth/twentyfifth/twentysixth/twentyseventh/twentyeighth/twentyninth, or null
     */
     public static function nativeLongPowCompileTimeExponentFold(
         Variable $exponent
@@ -4568,6 +4568,9 @@ final class DiscardedPureCallElision
         }
         if (28 === $e) {
             return 'twentyeighth';
+        }
+        if (29 === $e) {
+            return 'twentyninth';
         }
 
         return null;
