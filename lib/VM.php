@@ -66,6 +66,7 @@ require_once __DIR__.'/VM/Concern/ArgSendDispatch.php';
 require_once __DIR__.'/VM/Concern/VarFetchGlobalAndFunctionStaticDispatch.php';
 require_once __DIR__.'/VM/Concern/ListUnpackAndSpreadAssignDispatch.php';
 require_once __DIR__.'/VM/Concern/FromCallableAndClosureDispatch.php';
+require_once __DIR__.'/VM/Concern/EmptyAndBooleanNotDispatch.php';
 
 use PHPCompiler\BuiltinByRefParams;
 use PHPCompiler\Compiler\AttributeNames;
@@ -161,6 +162,7 @@ class VM {
     use VarFetchGlobalAndFunctionStaticDispatch;
     use ListUnpackAndSpreadAssignDispatch;
     use FromCallableAndClosureDispatch;
+    use EmptyAndBooleanNotDispatch;
     const SUCCESS = 1;
     const FAILURE = 2;
 
@@ -1269,110 +1271,17 @@ restart:
                     $result->object($cloned);
                     break;
                 case OpCode::TYPE_BOOLEAN_NOT:
-                    $value = !($frame->scope[$op->arg2]->toBool());
-                    $dst = $frame->scope[$op->arg1];
-                    $dst->bool($value);
-                    break;
                 case OpCode::TYPE_EMPTY:
-                    if ($this->isUnboundThisSlot($frame, (int) $op->arg2)) {
-                        $frame->scope[$op->arg1]->bool(true);
-                        break;
-                    }
-                    $v = $frame->scope[$op->arg2]->resolveIndirect();
-                    if (VM\TypedPropertyCheck::isUninitialized($v)) {
-                        $frame->scope[$op->arg1]->bool(true);
-                        break;
-                    }
-                    $frame->scope[$op->arg1]->bool(!ext\standard\boolval::isTruthy($v));
-                    break;
                 case OpCode::TYPE_EMPTY_OBJECT_PROPERTY:
-                    $dst = $frame->scope[$op->arg1];
-                    $container = $frame->scope[$op->arg2]->resolveIndirect();
-                    [$propName, $catchFrame] = $this->coerceRuntimeOperandToString($frame->scope[$op->arg3], $frame);
-                    if (null !== $catchFrame) {
-                        $frame = $catchFrame;
-                        goto restart;
-                    }
-                    $catchFrame = $this->enforcePropertyName($propName, $frame);
-                    if (null !== $catchFrame) {
-                        $frame = $catchFrame;
-                        goto restart;
-                    }
-                    if (Variable::TYPE_ENUM_CASE === $container->type) {
-                        $dst->bool(VM\EnumCaseSupport::emptyPropertyOnCase(
-                            $container->toEnumCase(),
-                            $propName,
-                            $this->context,
-                            $frame
-                        ));
-                        break;
-                    }
-                    if (Variable::TYPE_OBJECT !== $container->type) {
-                        $dst->bool(true);
-                        break;
-                    }
-                    $object = $container->toObject();
-                    if (VM\EnumCaseSupport::isEnumCase($object)) {
-                        $enum = $object->class;
-                        if (!VM\EnumCaseSupport::propertyExistsOnCase($enum, $propName)) {
-                            $dst->bool(true);
-                            break;
-                        }
-                        $prop = VM\EnumCaseSupport::getProperty($object, $propName, $this->context, $frame);
-                        $dst->bool(!ext\standard\boolval::isTruthy($prop));
-                        break;
-                    }
-                    $catchFrame = $this->ensureLazyObjectInitialized($object, $frame);
-                    if (null !== $catchFrame) {
-                        $frame = $catchFrame;
-                        goto restart;
-                    }
-                    $object = VM\LazyObjectSupport::getLazyInstance($object);
-                    $catchFrame = $this->emptyObjectProperty(
-                        $object,
-                        $propName,
-                        $frame,
-                        $dst
-                    );
-                    if (null !== $catchFrame) {
-                        $frame = $catchFrame;
-                        goto restart;
-                    }
-                    break;
                 case OpCode::TYPE_EMPTY_STATIC_PROPERTY:
-                    $dst = $frame->scope[$op->arg1];
-                    $lcClass = $this->resolveStaticPropertyClassLc($frame->scope[$op->arg2], $frame);
-                    if (!isset($this->context->classes[$lcClass])) {
-                        $classOperand = $frame->scope[$op->arg2]->resolveIndirect();
-                        $rawClass = Variable::TYPE_OBJECT === $classOperand->type
-                            ? $classOperand->toObject()->class->name
-                            : $classOperand->toString();
-                        if ('self' !== strtolower($rawClass) && 'static' !== strtolower($rawClass)) {
-                            $this->context->autoloadClass($rawClass);
-                        }
-                    }
-                    if (!isset($this->context->classes[$lcClass])) {
-                        $dst->bool(true);
-                        break;
-                    }
-                    $propNameRaw = $frame->scope[$op->arg3]->toString();
-                    $catchFrame = $this->emptyStaticProperty($lcClass, $propNameRaw, $frame, $dst);
-                    if (null !== $catchFrame) {
-                        $frame = $catchFrame;
-                        goto restart;
-                    }
-                    break;
                 case OpCode::TYPE_EMPTY_DIMENSION:
-                    $dst = $frame->scope[$op->arg1];
-                    $catchFrame = $this->evaluateEmptyDimension(
-                        $frame->scope[$op->arg2],
-                        $frame->scope[$op->arg3],
-                        $frame,
-                        $dst
-                    );
-                    if (null !== $catchFrame) {
-                        $frame = $catchFrame;
+                    $emptyBoolOutcome = $this->executeEmptyAndBooleanNotDispatch($frame, $op);
+                    if ($emptyBoolOutcome instanceof Frame) {
+                        $frame = $emptyBoolOutcome;
                         goto restart;
+                    }
+                    if (is_int($emptyBoolOutcome)) {
+                        return $emptyBoolOutcome;
                     }
                     break;
                 case OpCode::TYPE_ISSET:

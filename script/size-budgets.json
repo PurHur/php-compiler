@@ -14,9 +14,9 @@
             "note": "Concern trait splits (#36387/#36403); DateTimeMutationAndUnserializeMeta + TernaryPhiReturnMerge + peers; CfgParamReturnTypeAndCalleeByRef + OpCodeArgSlotAndAssignRhs (#36387)"
         },
         "lib/VM.php": {
-            "budget": 2171,
+            "budget": 2080,
             "target": 15000,
-            "note": "FromCallableAndClosureDispatch + ListUnpackAndSpreadAssignDispatch + VarFetchGlobalAndFunctionStaticDispatch + ArgSendDispatch + DeclareClassLikeDispatch + ConstFetchStaticCallInstanceofDispatch + JumpCaseDispatch + CoalesceNullsafeSilenceExitDispatch + ForeachIterDispatch + EchoPrintEvalDispatch + MethodCallInitDispatch + NewDispatch + FuncCallInitDispatch + IncludeDispatch + IssetDispatch + ClassConstFetchDispatch + ScalarCastCompareArithConcatDispatch + ArgRecvDispatch + FuncCallExecDispatch + AssignDispatch + UnsetDispatch + StaticPropertyFetchDispatch + ArrayDimFetchDispatch + ObjectPropertyFetchDispatch + ConstructMarkAndPendingOutboundCall + PropertyHookFrameAndStaticLink + IteratorToArrayConvert + IncludePathAndClassPseudoConst + ClassScopeAndStaticPropertyResolve + ClosureBindAndFunctionStatic + InternalHandlerExecuteAndAssignCopy + OutgoingCallArgResolve + ClassConstAndPropertyDefaultMaterialize + InheritanceFinalVarianceAndConstFetch + MethodCallAndStaticCallableInit + VirtualPropertyHookEnforce + ReturnTypeEnforce + DeprecationNoticeEmit + FrameActivationThisAndIncludeScope + FiberStartResumeAndThrow + GeneratorForeachAndYieldFrom + FrameObjectRefAndDeadTempRelease + UserInvokeArrayAccessAndClosureCall + BuiltinHostExceptionDispatch + ClassInheritDefineAndConstDeclare + TryCatchFinallyAndUncaughtDispatch + ExecuteIncDecAndScopeOperandRead + TypedIntRecursiveAndCountedLoopFastPath + PropertyFetchDestAndHookedDimWrite + ObjectPropertyMagicAndClone + ClassTraitComposition + ObjectPropertyReadonlyAndVisibility + Hooks + CollectAndSerialize + IssetEmptyUnset Concern extracts (#36403); under 15k target"
+            "note": "EmptyAndBooleanNotDispatch + FromCallableAndClosureDispatch + ListUnpackAndSpreadAssignDispatch + VarFetchGlobalAndFunctionStaticDispatch + ArgSendDispatch + DeclareClassLikeDispatch + ConstFetchStaticCallInstanceofDispatch + JumpCaseDispatch + CoalesceNullsafeSilenceExitDispatch + ForeachIterDispatch + EchoPrintEvalDispatch + MethodCallInitDispatch + NewDispatch + FuncCallInitDispatch + IncludeDispatch + IssetDispatch + ClassConstFetchDispatch + ScalarCastCompareArithConcatDispatch + ArgRecvDispatch + FuncCallExecDispatch + AssignDispatch + UnsetDispatch + StaticPropertyFetchDispatch + ArrayDimFetchDispatch + ObjectPropertyFetchDispatch + ConstructMarkAndPendingOutboundCall + PropertyHookFrameAndStaticLink + IteratorToArrayConvert + IncludePathAndClassPseudoConst + ClassScopeAndStaticPropertyResolve + ClosureBindAndFunctionStatic + InternalHandlerExecuteAndAssignCopy + OutgoingCallArgResolve + ClassConstAndPropertyDefaultMaterialize + InheritanceFinalVarianceAndConstFetch + MethodCallAndStaticCallableInit + VirtualPropertyHookEnforce + ReturnTypeEnforce + DeprecationNoticeEmit + FrameActivationThisAndIncludeScope + FiberStartResumeAndThrow + GeneratorForeachAndYieldFrom + FrameObjectRefAndDeadTempRelease + UserInvokeArrayAccessAndClosureCall + BuiltinHostExceptionDispatch + ClassInheritDefineAndConstDeclare + TryCatchFinallyAndUncaughtDispatch + ExecuteIncDecAndScopeOperandRead + TypedIntRecursiveAndCountedLoopFastPath + PropertyFetchDestAndHookedDimWrite + ObjectPropertyMagicAndClone + ClassTraitComposition + ObjectPropertyReadonlyAndVisibility + Hooks + CollectAndSerialize + IssetEmptyUnset Concern extracts (#36403); under 15k target"
         },
         "script/apply-patches.sh": {
             "budget": 7637,
@@ -397,6 +397,11 @@
             "budget": 134,
             "target": 200,
             "note": "TYPE_FROM_CALLABLE/TYPE_CLOSURE runFramesInner body extracted from VM.php (#36403); php-src zend_closures.c"
+        },
+        "lib/VM/Concern/EmptyAndBooleanNotDispatch.php": {
+            "budget": 137,
+            "target": 200,
+            "note": "TYPE_BOOLEAN_NOT/EMPTY/EMPTY_* runFramesInner body extracted from VM.php (#36403); php-src ZEND_BOOL_NOT / ZEND_ISSET_ISEMPTY_*"
         }
     },
     "script_file_count": {
