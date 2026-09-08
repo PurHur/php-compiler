@@ -26,7 +26,8 @@ final class UndefinedVariableScriptGlobalAotTest extends TestCase
         $root = dirname(__DIR__, 2);
         $src = $root.'/test/repro/maintainer_gap_undefined_var_warning_line.php';
         $bin = sys_get_temp_dir().'/phpc_script_global_undef_'.getmypid().'.bin';
-        $compile = 'env PHP_COMPILER_HELPER_RUNTIME_O=0 '
+        // Default helper-runtime (O=1): thin O=0 still dumps core on this shape (#24115).
+        $compile = 'env PHP_COMPILER_CACHE=0 '
             .escapeshellarg(PHP_BINARY).' '
             .escapeshellarg($root.'/bin/compile.php')
             .' -o '.escapeshellarg($bin).' '.escapeshellarg($src).' 2>&1';
@@ -56,7 +57,7 @@ final class UndefinedVariableScriptGlobalAotTest extends TestCase
         $root = dirname(__DIR__, 2);
         $src = $root.'/test/repro/issue_36081_script_global_undef_reads.php';
         $bin = sys_get_temp_dir().'/phpc_script_global_undef2_'.getmypid().'.bin';
-        $compile = 'env PHP_COMPILER_HELPER_RUNTIME_O=0 '
+        $compile = 'env PHP_COMPILER_CACHE=0 '
             .escapeshellarg(PHP_BINARY).' '
             .escapeshellarg($root.'/bin/compile.php')
             .' -o '.escapeshellarg($bin).' '.escapeshellarg($src).' 2>&1';
@@ -86,7 +87,8 @@ final class UndefinedVariableScriptGlobalAotTest extends TestCase
         $root = dirname(__DIR__, 2);
         $src = $root.'/test/differential/cases/j08_preg.php';
         $bin = sys_get_temp_dir().'/phpc_j08_preg_'.getmypid().'.bin';
-        $compile = 'env PHP_COMPILER_HELPER_RUNTIME_O=0 '
+        // Default helper-runtime: ZEND_SEND_REF must not ZEND_CHECK_UNDEFINED_VAR (#36081).
+        $compile = 'env PHP_COMPILER_CACHE=0 '
             .escapeshellarg(PHP_BINARY).' '
             .escapeshellarg($root.'/bin/compile.php')
             .' -o '.escapeshellarg($bin).' '.escapeshellarg($src).' 2>&1';
