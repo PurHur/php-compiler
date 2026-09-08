@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
-use PHPCompiler\Block;
-use PHPCompiler\Config;
-
 require_once __DIR__.'/CompileCacheSemanticHash.php';
 require_once __DIR__.'/CompileCachePartialEmitDemote.php';
 require_once __DIR__.'/CompileCacheArtifactPersist.php';
@@ -21,6 +18,7 @@ require_once __DIR__.'/CompileCacheArtifactFacade.php';
 require_once __DIR__.'/CompileCacheSemanticHashFacade.php';
 require_once __DIR__.'/CompileCacheProjectIndexFacade.php';
 require_once __DIR__.'/CompileCacheHubState.php';
+require_once __DIR__.'/CompileCacheKeyLayoutFacade.php';
 
 /**
  * On-disk MCJIT bitcode cache (issue #153).
@@ -50,6 +48,7 @@ require_once __DIR__.'/CompileCacheHubState.php';
 final class CompileCache
 {
     use CompileCacheHubState;
+    use CompileCacheKeyLayoutFacade;
     use CompileCacheEditScaffold;
     use CompileCacheBitcodePersist;
     use CompileCacheRecording;
@@ -58,108 +57,5 @@ final class CompileCache
     use CompileCacheArtifactFacade;
     use CompileCacheSemanticHashFacade;
     use CompileCacheProjectIndexFacade;
-
-    public static function isEnabled(): bool
-    {
-        $flag = Config::getenv('PHP_COMPILER_CACHE');
-        if (false !== $flag && ('0' === $flag || 'false' === strtolower($flag))) {
-            return false;
-        }
-        if (Config::getenv('PHP_COMPILER_SELFHOST_AOT') === '1') {
-            return false;
-        }
-        if (EmitTuMode::isMinimalRuntime()) {
-            return false;
-        }
-
-        return true;
-    }
-
-
-    /**
-     * Compiler fingerprint for project-index / meta durability (#36387).
-     *
-     * @see CompileCacheKeyLayout::compilerFingerprint()
-     */
-    public static function compilerFingerprint(): string
-    {
-        return CompileCacheKeyLayout::compilerFingerprint();
-    }
-
-    /** @see CompileCacheKeyLayout::cacheRoot() */
-    public static function cacheRoot(): string
-    {
-        return CompileCacheKeyLayout::cacheRoot();
-    }
-
-    /** @see CompileCacheKeyLayout::computeKey() */
-    public static function computeKey(string $sourcePath, string $sourceCode): string
-    {
-        return CompileCacheKeyLayout::computeKey($sourcePath, $sourceCode);
-    }
-
-    /** @see CompileCacheKeyLayout::entryDir() */
-    public static function entryDir(string $key): string
-    {
-        return CompileCacheKeyLayout::entryDir($key);
-    }
-
-    /** @see CompileCacheKeyLayout::bitcodePath() */
-    public static function bitcodePath(string $key): string
-    {
-        return CompileCacheKeyLayout::bitcodePath($key);
-    }
-
-    /** @see CompileCacheKeyLayout::stampPath() */
-    public static function stampPath(string $key): string
-    {
-        return CompileCacheKeyLayout::stampPath($key);
-    }
-
-    /** @see CompileCacheKeyLayout::artifactPath() */
-    public static function artifactPath(string $key): string
-    {
-        return CompileCacheKeyLayout::artifactPath($key);
-    }
-
-    /** @see CompileCacheKeyLayout::objectPath() */
-    public static function objectPath(string $key): string
-    {
-        return CompileCacheKeyLayout::objectPath($key);
-    }
-
-    /** @see CompileCacheKeyLayout::linkManifestPath() */
-    public static function linkManifestPath(string $key): string
-    {
-        return CompileCacheKeyLayout::linkManifestPath($key);
-    }
-
-    /** @see CompileCacheKeyLayout::metaPath() */
-    public static function metaPath(string $key): string
-    {
-        return CompileCacheKeyLayout::metaPath($key);
-    }
-
-    /**
-     * @return array{version: int, fingerprint: string, exports: list<array{llvm: string, signature: string, scoped: string}>}|null
-     *
-     * @see CompileCacheKeyLayout::readMeta()
-     */
-    public static function readMeta(string $key): ?array
-    {
-        return CompileCacheKeyLayout::readMeta($key);
-    }
-
-    /** @see CompileCacheKeyLayout::isFresh() */
-    public static function isFresh(string $key, string $sourcePath, string $sourceCode): bool
-    {
-        return CompileCacheKeyLayout::isFresh($key, $sourcePath, $sourceCode);
-    }
-
-    /** @see CompileCacheKeyLayout::hasDurableMarker() */
-    public static function hasDurableMarker(string $key): bool
-    {
-        return CompileCacheKeyLayout::hasDurableMarker($key);
-    }
 
 }
