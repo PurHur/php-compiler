@@ -28,6 +28,7 @@ use PHPCompiler\Web\Superglobals;
 use PHPCompiler\Config;
 
 require_once __DIR__.'/ContextEditScaffoldModuleRebind.php';
+require_once __DIR__.'/ContextDefineBuiltinFunctionProxiesDateAndXml.php';
 require_once __DIR__.'/ContextDefineBuiltinFunctionProxies.php';
 require_once __DIR__.'/ContextDefineBuiltins.php';
 require_once __DIR__.'/ContextCompileToFile.php';
@@ -43,6 +44,7 @@ require_once __DIR__.'/ContextScopeLifecycleAndInitEmit.php';
 
 class Context {
     use ContextEditScaffoldModuleRebind;
+    use ContextDefineBuiltinFunctionProxiesDateAndXml;
     use ContextDefineBuiltinFunctionProxies;
     use ContextDefineBuiltins;
     use ContextCompileToFile;
@@ -869,13 +871,11 @@ class Context {
             'readonly' => $this->context->createEnumAttribute($this->context->getEnumAttributeKindForName('readonly'), 0),
             'writeonly' => $this->context->createEnumAttribute($this->context->getEnumAttributeKindForName('writeonly'), 0),
         ];
-
         // Parse prior module.bc before namedStructType / Helper holds the live module (#36387).
         $this->tryBindEditScaffoldBitcodeBeforeBuiltins();
 
         $this->analyzer = new Analyzer;
         $this->helper = new Helper($this);
-        
         $this->refcount = new Builtin\Refcount($this, $loadType);
         $this->memory = Builtin\MemoryManager::load($this, $loadType);
         $this->output = new Builtin\Output($this, $loadType);
