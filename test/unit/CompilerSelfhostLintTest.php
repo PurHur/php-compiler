@@ -347,6 +347,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/JIT/Concern/ValueBoxCoalesceAndConcatHelpers.php',
             'lib/JIT/Concern/VarFetchDestLvalueContext.php',
             'lib/JIT/Concern/VmSmokeAndRuntimeM3NativeStubs.php',
+            'lib/JIT/ContextEditScaffoldModuleRebind.php',
             'lib/JIT/Context.php',
             'lib/JIT/HashTableHelper.php',
             'lib/JIT/Helper.php',

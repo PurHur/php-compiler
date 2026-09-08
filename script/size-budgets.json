@@ -177,6 +177,16 @@
             "budget": 240,
             "target": 400,
             "note": "TYPE_CLASS_CONST_FETCH runFramesInner body extracted from VM.php (#36403)"
+        },
+        "lib/JIT/Context.php": {
+            "budget": 5911,
+            "target": 4000,
+            "note": "Edit-scaffold module rebind extracted to ContextEditScaffoldModuleRebind (#36387/#36199); continue Context splits"
+        },
+        "lib/JIT/ContextEditScaffoldModuleRebind.php": {
+            "budget": 315,
+            "target": 400,
+            "note": "Thin-boot bind + core-type seed + init/shutdown/function-scope/intrinsic rebind after bitcode replace (#36387/#36199)"
         }
     },
     "script_file_count": {
