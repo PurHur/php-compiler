@@ -36,7 +36,7 @@
         "lib/JIT/CompileCache.php": {
             "budget": 61,
             "target": 2000,
-            "note": "MCJIT/AOT warm cache; SemanticHashFacades + PartialEmitDemote + ArtifactPersist + EditScaffold(+Strip) + ProjectIndexFacade + KeyLayoutFacade + HubState + BitcodePersist + Recording + EditSession + ProjectMembers + ArtifactFacade extracts (#36387/#36403)"
+            "note": "MCJIT/AOT warm cache; SemanticHashFacades + PartialEmitDemote + ArtifactPersist + EditScaffold(+Strip) + ProjectIndexFacade + KeyLayoutFacade + HubState + BitcodePersist + Recording + EditSession + ProjectMembers + ArtifactFacade extracts (#36387/#36403) + EditScaffoldPlan (#36387)"
         },
         "lib/JIT/CompileCacheRecording.php": {
             "budget": 276,
@@ -66,7 +66,7 @@
         "lib/JIT/CompileCacheProjectIndexFacade.php": {
             "budget": 104,
             "target": 200,
-            "note": "Project index / entry\u2192members public delegates extracted from CompileCache (#36387)"
+            "note": "Project index / entry→members public delegates extracted from CompileCache (#36387)"
         },
         "lib/JIT/CompileCacheHubState.php": {
             "budget": 106,
@@ -79,14 +79,19 @@
             "note": "KeyLayout enable/path/freshness public delegates extracted from CompileCache (#36387)"
         },
         "lib/JIT/CompileCacheEditScaffold.php": {
-            "budget": 330,
-            "target": 500,
-            "note": "Edit-scaffold restore + keep/strip planning; LLVM strip/rebind in EditScaffoldStrip (#36387)"
+            "budget": 107,
+            "target": 200,
+            "note": "Edit-scaffold restore hub; Plan+Strip extracts (#36387)"
         },
         "lib/JIT/CompileCacheEditScaffoldStrip.php": {
             "budget": 205,
             "target": 300,
             "note": "Edit-scaffold LLVM strip/rebind/rebase extracted from EditScaffold (#36387)"
+        },
+        "lib/JIT/CompileCacheEditScaffoldPlan.php": {
+            "budget": 246,
+            "target": 350,
+            "note": "Changed-member / kept-symbol strip planning extracted from EditScaffold (#36387)"
         }
     },
     "script_file_count": {
