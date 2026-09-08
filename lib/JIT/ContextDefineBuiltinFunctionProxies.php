@@ -10,6 +10,7 @@ namespace PHPCompiler\JIT;
  * Extracted from {@see ContextDefineBuiltins} so proxy wiring stays a separate
  * TU from builtin register/implement/initialize (split-TU / size-budget ratchet).
  * Peer catalogs: {@see ContextDefineBuiltinFunctionProxiesSplContainers},
+ * {@see ContextDefineBuiltinFunctionProxiesArrayIteratorAndObject},
  * {@see ContextDefineBuiltinFunctionProxiesSplIterators},
  * {@see ContextDefineBuiltinFunctionProxiesDirectoryAndFile},
  * {@see ContextDefineBuiltinFunctionProxiesWeakAndPhpToken},
@@ -35,7 +36,10 @@ trait ContextDefineBuiltinFunctionProxies
         $this->functionProxies['phpcompiler\\is_null'] = new Builtin\IsNullFn();
         // SplObjectStorage / PriorityQueue / Dllist / FixedArray — ContextDefineBuiltinFunctionProxiesSplContainers (#36387).
         $this->defineBuiltinFunctionProxiesSplContainers();
-        // ArrayIterator / ArrayObject / LimitIterator family — ContextDefineBuiltinFunctionProxiesSplIterators (#36387).
+        // ArrayIterator / RecursiveArrayIterator / ArrayObject —
+        // ContextDefineBuiltinFunctionProxiesArrayIteratorAndObject (#36387).
+        $this->defineBuiltinFunctionProxiesArrayIteratorAndObject();
+        // LimitIterator / FilterIterator family — ContextDefineBuiltinFunctionProxiesSplIterators (#36387).
         $this->defineBuiltinFunctionProxiesSplIterators();
         // Directory / SplFile* / GlobIterator — ContextDefineBuiltinFunctionProxiesDirectoryAndFile (#36387).
         $this->defineBuiltinFunctionProxiesDirectoryAndFile();
