@@ -7,11 +7,11 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT: chunk_split() must match Zend without segfault (#30859 / re-#26992 / #33894).
+ * AOT: chunk_split() must match Zend without segfault (#30859 / re-#26992 / #33894 / #36388).
  *
  * Root cause: NestedJIT string-index / isset-length helpers abort under thin AOT;
  * recursive strlen/substr walk then silent-wrong (#33894: abcd:cd: vs ab:cd:).
- * Helpers use str_split+implode (Zend-equivalent) like peer string builtins.
+ * Native {@code phpc_chunk_split_r1} replaces NestedJIT (peer str_pad_r1 / #36388).
  *
  * php-src: ext/standard/string.c — PHP_FUNCTION(chunk_split)
  *
@@ -42,9 +42,10 @@ PHP,
         $src = sys_get_temp_dir().'/phpc_30859_'.getmypid().'_'.mt_rand(1000, 9999).'.php';
         $bin = sys_get_temp_dir().'/phpc_30859_'.getmypid().'_'.mt_rand(1000, 9999).'.bin';
         file_put_contents($src, $code);
-        $compile = 'PHP_COMPILER_HELPER_RUNTIME_O=0 '.escapeshellarg(PHP_BINARY).' '
+        // Native phpc_chunk_split_r1 — default helper-runtime link (O=0 NestedJIT path retired; #36388).
+        $compile = escapeshellarg(PHP_BINARY).' '
             .escapeshellarg($root.'/bin/compile.php')
-            .' -o '.escapeshellarg($bin).' '.escapeshellarg($src).' 2>&1';
+            .' --no-cache -o '.escapeshellarg($bin).' '.escapeshellarg($src).' 2>&1';
         exec($compile, $compileOut, $compileRc);
         $this->assertSame(0, $compileRc, 'compile: '.implode("\n", $compileOut));
         $this->assertFileExists($bin);

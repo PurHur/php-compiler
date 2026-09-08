@@ -182,6 +182,7 @@ trait CallResultOperandAssign
         static $owning = [
             'str_repeat' => true,
             'str_pad' => true,
+            'chunk_split' => true,
             'sprintf' => true,
             'vsprintf' => true,
             'substr' => true,

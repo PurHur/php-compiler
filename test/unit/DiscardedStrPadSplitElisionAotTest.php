@@ -60,7 +60,7 @@ final class DiscardedStrPadSplitElisionAotTest extends TestCase
 
             $this->assertSame(
                 0,
-                preg_match_all('/padArgv|chunkSplitArgv|wordwrapArgv|StrPadJitHelper|ChunkSplitJitHelper|WordwrapJitHelper|ExplodeJitHelper|__compiler_str_pad|phpc_str_pad_r1|__compiler_chunk_split/', $body),
+                preg_match_all('/padArgv|chunkSplitArgv|wordwrapArgv|StrPadJitHelper|ChunkSplitJitHelper|WordwrapJitHelper|ExplodeJitHelper|__compiler_str_pad|phpc_str_pad_r1|__compiler_chunk_split|phpc_chunk_split_r1/', $body),
                 'discarded str_pad/chunk_split/wordwrap/str_split/explode must be elided'
             );
 
