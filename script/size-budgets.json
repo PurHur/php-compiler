@@ -14,9 +14,9 @@
             "note": "Concern trait splits (#36387/#36403); DateTimeMutationAndUnserializeMeta + TernaryPhiReturnMerge + peers; CfgParamReturnTypeAndCalleeByRef + OpCodeArgSlotAndAssignRhs (#36387)"
         },
         "lib/VM.php": {
-            "budget": 5803,
+            "budget": 5577,
             "target": 15000,
-            "note": "StaticPropertyFetchDispatch + ArrayDimFetchDispatch + ObjectPropertyFetchDispatch + ConstructMarkAndPendingOutboundCall + PropertyHookFrameAndStaticLink + IteratorToArrayConvert + IncludePathAndClassPseudoConst + ClassScopeAndStaticPropertyResolve + ClosureBindAndFunctionStatic + InternalHandlerExecuteAndAssignCopy + OutgoingCallArgResolve + ClassConstAndPropertyDefaultMaterialize + InheritanceFinalVarianceAndConstFetch + MethodCallAndStaticCallableInit + VirtualPropertyHookEnforce + ReturnTypeEnforce + DeprecationNoticeEmit + FrameActivationThisAndIncludeScope + FiberStartResumeAndThrow + GeneratorForeachAndYieldFrom + FrameObjectRefAndDeadTempRelease + UserInvokeArrayAccessAndClosureCall + BuiltinHostExceptionDispatch + ClassInheritDefineAndConstDeclare + TryCatchFinallyAndUncaughtDispatch + ExecuteIncDecAndScopeOperandRead + TypedIntRecursiveAndCountedLoopFastPath + PropertyFetchDestAndHookedDimWrite + ObjectPropertyMagicAndClone + ClassTraitComposition + ObjectPropertyReadonlyAndVisibility + Hooks + CollectAndSerialize + IssetEmptyUnset Concern extracts (#36403); under 15k target"
+            "note": "UnsetDispatch + StaticPropertyFetchDispatch + ArrayDimFetchDispatch + ObjectPropertyFetchDispatch + ConstructMarkAndPendingOutboundCall + PropertyHookFrameAndStaticLink + IteratorToArrayConvert + IncludePathAndClassPseudoConst + ClassScopeAndStaticPropertyResolve + ClosureBindAndFunctionStatic + InternalHandlerExecuteAndAssignCopy + OutgoingCallArgResolve + ClassConstAndPropertyDefaultMaterialize + InheritanceFinalVarianceAndConstFetch + MethodCallAndStaticCallableInit + VirtualPropertyHookEnforce + ReturnTypeEnforce + DeprecationNoticeEmit + FrameActivationThisAndIncludeScope + FiberStartResumeAndThrow + GeneratorForeachAndYieldFrom + FrameObjectRefAndDeadTempRelease + UserInvokeArrayAccessAndClosureCall + BuiltinHostExceptionDispatch + ClassInheritDefineAndConstDeclare + TryCatchFinallyAndUncaughtDispatch + ExecuteIncDecAndScopeOperandRead + TypedIntRecursiveAndCountedLoopFastPath + PropertyFetchDestAndHookedDimWrite + ObjectPropertyMagicAndClone + ClassTraitComposition + ObjectPropertyReadonlyAndVisibility + Hooks + CollectAndSerialize + IssetEmptyUnset Concern extracts (#36403); under 15k target"
         },
         "script/apply-patches.sh": {
             "budget": 7637,
@@ -34,9 +34,9 @@
             "note": "helper-cache granularity; Fingerprint+Link+Bind extracts (#36387/#36403); sorted linkObjects (#36399); refusePrelinkGcMixReason (#36401)"
         },
         "lib/JIT/CompileCache.php": {
-            "budget": 65,
+            "budget": 55,
             "target": 2000,
-            "note": "MCJIT/AOT warm cache; SemanticFileParts + SemanticHashFacades + PartialEmitDemote(+Llvm) + ArtifactPersist + EditScaffold(+Plan+Strip+Restore) + ProjectIndexFacade + KeyLayoutFacade + HubState + BitcodePersist + Recording + EditSession + ProjectMembers + ArtifactFacade extracts (#36387/#36403) "
+            "note": "docblock compact after SemanticFunctionConsume hub require (#36403); MCJIT/AOT warm cache; SemanticFileParts + SemanticHashFacades + PartialEmitDemote(+Llvm) + ArtifactPersist + EditScaffold(+Plan+Strip+Restore) + ProjectIndexFacade + KeyLayoutFacade + HubState + BitcodePersist + Recording + EditSession + ProjectMembers + ArtifactFacade extracts (#36387/#36403) "
         },
         "lib/JIT/CompileCachePartialEmitDemote.php": {
             "budget": 140,

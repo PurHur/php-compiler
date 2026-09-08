@@ -7270,6 +7270,7 @@
         "lib/JIT/CompileCacheProjectMembers.php",
         "lib/JIT/CompileCacheRecording.php",
         "lib/JIT/CompileCacheSemanticFileParts.php",
+        "lib/JIT/CompileCacheSemanticFunctionConsume.php",
         "lib/JIT/CompileCacheSemanticHash.php",
         "lib/JIT/CompileCacheSemanticHashFacade.php",
         "lib/JIT/CompilerOperandChainNative.php",
@@ -8211,6 +8212,7 @@
         "lib/VM/Concern/StaticPropertyFetchDispatch.php",
         "lib/VM/Concern/TryCatchFinallyAndUncaughtDispatch.php",
         "lib/VM/Concern/TypedIntRecursiveAndCountedLoopFastPath.php",
+        "lib/VM/Concern/UnsetDispatch.php",
         "lib/VM/Concern/UserInvokeArrayAccessAndClosureCall.php",
         "lib/VM/Concern/VirtualPropertyHookEnforce.php",
         "lib/VM/Context.php",
@@ -8697,9 +8699,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8463,
+        "inventory_files": 8465,
         "excluded": 0,
-        "eligible": 8463,
+        "eligible": 8465,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
