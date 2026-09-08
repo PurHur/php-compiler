@@ -179,9 +179,9 @@
             "note": "TYPE_CLASS_CONST_FETCH runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/Context.php": {
-            "budget": 1043,
+            "budget": 888,
             "target": 3500,
-            "note": "ModuleCompileAndOptimize + ScriptGlobalsAndIncludeTracking + LlvmConstantsAndRegistry + FreeDeadAndConstantFetch + StandaloneBodies + peers (#36387/#36199); continue toward \u22643.5k"
+            "note": "ScopeLifecycleAndInitEmit + LlvmConstantsAndRegistry + FreeDeadAndConstantFetch + ScriptGlobals + peers (#36387/#36199); continue toward \u22643.5k"
         },
         "lib/JIT/ContextEditScaffoldModuleRebind.php": {
             "budget": 315,
@@ -262,6 +262,11 @@
             "budget": 417,
             "target": 500,
             "note": "freeDeadVariables + constantFetch / stdio/zend/enum helpers extracted from ContextVariableOperandBinding (#36387)"
+        },
+        "lib/JIT/ContextScopeLifecycleAndInitEmit.php": {
+            "budget": 180,
+            "target": 300,
+            "note": "setMain / scope push-pop / debug+aot setters / emitInInit|Shutdown|HeaderPreFlush extracted from Context (#36387)"
         }
     },
     "script_file_count": {
