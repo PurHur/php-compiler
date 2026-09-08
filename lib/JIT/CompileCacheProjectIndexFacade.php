@@ -7,10 +7,11 @@ namespace PHPCompiler\JIT;
 /**
  * Project index / entry→members facade for AOT CompileCache (#36387).
  *
- * Thin public delegates onto {@see CompileCacheProjectIndex} so the hub keeps
- * ratcheting under the size-budget split-TU program. Distinct from ProjectMembers
- * (in-memory member list), KeyLayout path helpers, SemanticHashFacade planning,
- * and ArtifactPersist mid-tier restore.
+ * Thin public delegates onto {@see CompileCacheProjectIndex} (identity / hashes /
+ * scaffold key) and {@see CompileCacheProjectEntryMembers} (entry→members durability)
+ * so the hub keeps ratcheting under the size-budget split-TU program. Distinct from
+ * ProjectMembers (in-memory member list), KeyLayout path helpers, SemanticHashFacade
+ * planning, and ArtifactPersist mid-tier restore.
  *
  * Move-only — no new C ABI. php-src analogy: Zend opcache project/script identity
  * hashing and accelerator hash tables (Zend/zend_accelerator_hash.c) separate from
@@ -51,21 +52,21 @@ trait CompileCacheProjectIndexFacade
     /**
      * Entry → member-path list so warm/edit boots skip Runtime include discovery (#36387).
      *
-     * @see CompileCacheProjectIndex::entryMembersPath()
+     * @see CompileCacheProjectEntryMembers::entryMembersPath()
      */
     public static function entryMembersPath(string $entryPath): string
     {
-        return CompileCacheProjectIndex::entryMembersPath($entryPath);
+        return CompileCacheProjectEntryMembers::entryMembersPath($entryPath);
     }
 
     /**
      * @param list<string> $memberPaths
      *
-     * @see CompileCacheProjectIndex::rememberEntryMembers()
+     * @see CompileCacheProjectEntryMembers::rememberEntryMembers()
      */
     public static function rememberEntryMembers(string $entryPath, array $memberPaths): void
     {
-        CompileCacheProjectIndex::rememberEntryMembers($entryPath, $memberPaths);
+        CompileCacheProjectEntryMembers::rememberEntryMembers($entryPath, $memberPaths);
     }
 
     /**
@@ -73,11 +74,11 @@ trait CompileCacheProjectIndexFacade
      *
      * @return list<string>|null
      *
-     * @see CompileCacheProjectIndex::lookupEntryMembers()
+     * @see CompileCacheProjectEntryMembers::lookupEntryMembers()
      */
     public static function lookupEntryMembers(string $entryPath): ?array
     {
-        return CompileCacheProjectIndex::lookupEntryMembers($entryPath);
+        return CompileCacheProjectEntryMembers::lookupEntryMembers($entryPath);
     }
 
     /**
