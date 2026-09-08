@@ -7410,11 +7410,13 @@
         "lib/JIT/ContextLlvmConstantsAndRegistry.php",
         "lib/JIT/ContextModuleCompileAndOptimize.php",
         "lib/JIT/ContextModuleOptimizationPasses.php",
+        "lib/JIT/ContextModuleVerify.php",
         "lib/JIT/ContextScopeLifecycleAndInitEmit.php",
         "lib/JIT/ContextScriptGlobalsAndIncludeTracking.php",
         "lib/JIT/ContextStandaloneBodies.php",
         "lib/JIT/ContextTypeAndStructMap.php",
         "lib/JIT/ContextVariableOperandBinding.php",
+        "lib/JIT/ContextVariableOperandLookup.php",
         "lib/JIT/DatePeriodForeachSnapshot.php",
         "lib/JIT/DeprecatedCallGuard.php",
         "lib/JIT/DiscardedPureCallElision.php",
@@ -8280,6 +8282,7 @@
         "lib/VM/Concern/UserInvokeArrayAccessAndClosureCall.php",
         "lib/VM/Concern/VarFetchGlobalAndFunctionStaticDispatch.php",
         "lib/VM/Concern/VirtualPropertyHookEnforce.php",
+        "lib/VM/Concern/YieldAndYieldFromDispatch.php",
         "lib/VM/Context.php",
         "lib/VM/CycleCollector.php",
         "lib/VM/DateIntervalSupport.php",
@@ -8764,9 +8767,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8530,
+        "inventory_files": 8533,
         "excluded": 0,
-        "eligible": 8530,
+        "eligible": 8533,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

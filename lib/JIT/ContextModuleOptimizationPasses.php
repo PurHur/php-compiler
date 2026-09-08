@@ -11,7 +11,7 @@ use PHPLLVM;
  * LLVM IR optimization pipeline for {@see Context} (#36387).
  *
  * Extracted from {@see ContextModuleCompileAndOptimize} so light/heavy
- * PassManager runs stay a separate TU from compileInPlace / verify
+ * PassManager runs stay a separate TU from compileInPlace / {@see ContextModuleVerify}
  * (split-TU / size-budget ratchet, #36199 / #36403). Invoked from
  * compileInPlace and {@see ContextCompileToFile} via
  * {@see runModuleOptimizationPasses()}.
