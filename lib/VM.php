@@ -44,6 +44,7 @@ require_once __DIR__.'/VM/Concern/PropertyHookFrameAndStaticLink.php';
 require_once __DIR__.'/VM/Concern/ConstructMarkAndPendingOutboundCall.php';
 require_once __DIR__.'/VM/Concern/ObjectPropertyFetchDispatch.php';
 require_once __DIR__.'/VM/Concern/ArrayDimFetchDispatch.php';
+require_once __DIR__.'/VM/Concern/ArrayInitSpreadDispatch.php';
 require_once __DIR__.'/VM/Concern/StaticPropertyFetchDispatch.php';
 require_once __DIR__.'/VM/Concern/UnsetDispatch.php';
 require_once __DIR__.'/VM/Concern/AssignDispatch.php';
@@ -140,6 +141,7 @@ class VM {
     use ConstructMarkAndPendingOutboundCall;
     use ObjectPropertyFetchDispatch;
     use ArrayDimFetchDispatch;
+    use ArrayInitSpreadDispatch;
     use StaticPropertyFetchDispatch;
     use UnsetDispatch;
     use AssignDispatch;
@@ -1135,78 +1137,15 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_INIT_ARRAY:
-                    $result = $frame->scope[$op->arg1];
-                    $result->newArray();
-                    if (is_null($op->arg2)) {
-                        break;
-                    }
-                    // Fall through intentional
                 case OpCode::TYPE_ADD_ARRAY_ELEMENT:
-                    try {
-                        $result = $frame->scope[$op->arg1];
-                        $catchFrame = $this->rejectMagicGetIndirectModify($result, true, $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                        $ht = $result->toArray();
-                        if (is_null($op->arg3)) {
-                            $ht->append($this->materializeArrayElementForStorage(
-                                $this->resolveOutgoingCallArgValue($frame, $op->arg2)
-                            ));
-                            break;
-                        }
-                        $key = $this->resolveOutgoingCallArgValue($frame, $op->arg3)->resolveIndirect();
-                        $value = $this->materializeArrayElementForStorage(
-                            $this->resolveOutgoingCallArgValue($frame, $op->arg2)
-                        );
-                        // Array-literal keys share assignment's typed TypeError (#28628 / zend_illegal_container_offset).
-                        // Resource keys warn+cast (#29550); float precision via normalizeIndexKeyForWrite.
-                        $key = VM\HashTable::normalizeIndexKeyForWrite($key, $this->context, $frame);
-                        if ($key->is(Variable::TYPE_INTEGER) || $key->is(Variable::TYPE_FLOAT)) {
-                            $ht->updateIndex(
-                                $key->is(Variable::TYPE_FLOAT)
-                                    ? \PHPCompiler\ext\standard\VmMath::floatToZendLong($key->toFloat())
-                                    : $key->toInt(),
-                                $value
-                            );
-                        } elseif ($key->is(Variable::TYPE_STRING)) {
-                            $ht->update($key->toString(), $value);
-                        } else {
-                            throw new \TypeError(VM\EnumCaseSupport::illegalArrayOffsetMessage($key));
-                        }
-                    } catch (\TypeError $e) {
-                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                    }
-                    break;
                 case OpCode::TYPE_ARRAY_SPREAD:
-                    try {
-                        $result = $frame->scope[$op->arg1];
-                        $source = $frame->scope[$op->arg2];
-                        VM\ArraySpread::spreadInto(
-                            $this,
-                            $frame,
-                            $result->toArray(),
-                            $source,
-                            (int) ($op->arg3 ?? 0)
-                        );
-                    } catch (\TypeError $e) {
-                        // TypeError extends Error — must precede catch (\Error) (#27952).
-                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                    } catch (\Error $e) {
-                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
+                    $arrayInitSpreadOutcome = $this->executeArrayInitSpreadDispatch($frame, $op);
+                    if ($arrayInitSpreadOutcome instanceof Frame) {
+                        $frame = $arrayInitSpreadOutcome;
+                        goto restart;
+                    }
+                    if (is_int($arrayInitSpreadOutcome)) {
+                        return $arrayInitSpreadOutcome;
                     }
                     break;
                 case OpCode::TYPE_CLONE:
