@@ -15,6 +15,7 @@ namespace PHPCompiler\JIT;
  * {@see ContextDefineBuiltinFunctionProxiesWeakAndPhpToken},
  * {@see ContextDefineBuiltinFunctionProxiesReflectionAndException},
  * {@see ContextDefineBuiltinFunctionProxiesExceptionAndError},
+ * {@see ContextDefineBuiltinFunctionProxiesFiberGeneratorAndClosure},
  * {@see ContextDefineBuiltinFunctionProxiesDateAndXml},
  * {@see ContextDefineBuiltinFunctionProxiesFinfoPdoAndXml} (#36387 / #36199 / #36403).
  *
@@ -48,9 +49,8 @@ trait ContextDefineBuiltinFunctionProxies
         // Exception / Throwable / Error — ContextDefineBuiltinFunctionProxiesExceptionAndError (#36387).
         $this->defineBuiltinFunctionProxiesExceptionAndError();
 
-        FiberHelper::registerJitMethods($this);
-        GeneratorHelper::registerJitMethods($this);
-        ClosureBindHelper::registerJitMethods($this);
+        // Fiber / Generator / ClosureBind — ContextDefineBuiltinFunctionProxiesFiberGeneratorAndClosure (#36387).
+        $this->defineBuiltinFunctionProxiesFiberGeneratorAndClosure();
         $this->defineBuiltinFunctionProxiesDateAndXml();
         // finfo / PDO / XMLReader / XMLWriter / Dom\TokenList —
         // ContextDefineBuiltinFunctionProxiesFinfoPdoAndXml (#36387).

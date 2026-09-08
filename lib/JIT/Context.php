@@ -32,6 +32,7 @@ require_once __DIR__.'/ContextDefineBuiltinFunctionProxiesDateAndXml.php';
 require_once __DIR__.'/ContextDefineBuiltinFunctionProxiesFinfoPdoAndXml.php';
 require_once __DIR__.'/ContextDefineBuiltinFunctionProxiesReflectionAndException.php';
 require_once __DIR__.'/ContextDefineBuiltinFunctionProxiesExceptionAndError.php';
+require_once __DIR__.'/ContextDefineBuiltinFunctionProxiesFiberGeneratorAndClosure.php';
 require_once __DIR__.'/ContextDefineBuiltinFunctionProxiesDirectoryAndFile.php';
 require_once __DIR__.'/ContextDefineBuiltinFunctionProxiesSplIterators.php';
 require_once __DIR__.'/ContextDefineBuiltinFunctionProxiesSplContainers.php';
@@ -55,6 +56,7 @@ class Context {
     use ContextDefineBuiltinFunctionProxiesFinfoPdoAndXml;
     use ContextDefineBuiltinFunctionProxiesReflectionAndException;
     use ContextDefineBuiltinFunctionProxiesExceptionAndError;
+    use ContextDefineBuiltinFunctionProxiesFiberGeneratorAndClosure;
     use ContextDefineBuiltinFunctionProxiesDirectoryAndFile;
     use ContextDefineBuiltinFunctionProxiesSplIterators;
     use ContextDefineBuiltinFunctionProxiesSplContainers;

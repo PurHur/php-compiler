@@ -6974,6 +6974,7 @@ require_once __DIR__.'/../../../lib/JIT/ContextDefineBuiltinFunctionProxiesDateA
 require_once __DIR__.'/../../../lib/JIT/ContextDefineBuiltinFunctionProxiesFinfoPdoAndXml.php';
 require_once __DIR__.'/../../../lib/JIT/ContextDefineBuiltinFunctionProxiesReflectionAndException.php';
 require_once __DIR__.'/../../../lib/JIT/ContextDefineBuiltinFunctionProxiesExceptionAndError.php';
+require_once __DIR__.'/../../../lib/JIT/ContextDefineBuiltinFunctionProxiesFiberGeneratorAndClosure.php';
 require_once __DIR__.'/../../../lib/JIT/ContextDefineBuiltinFunctionProxiesDirectoryAndFile.php';
 require_once __DIR__.'/../../../lib/JIT/ContextDefineBuiltinFunctionProxiesSplIterators.php';
 require_once __DIR__.'/../../../lib/JIT/ContextDefineBuiltinFunctionProxiesSplContainers.php';
