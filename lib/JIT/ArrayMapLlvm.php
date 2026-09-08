@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT;
 use PHPCompiler\ext\standard\VmInternalCall;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Call;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -63,7 +64,7 @@ final class ArrayMapLlvm
     public static function mapNullZipMultiple(Context $context, array $sources): Value
     {
         if (\count($sources) < 2) {
-            throw new \LogicException('array_map(null) multi-zip requires ≥2 source hashtables (#34978)');
+            UnsupportedFeature::raise('array-map-null-zip-arity');
         }
         $sizeT = $context->getTypeFromString('size_t');
         $zero = $sizeT->constInt(0, false);
@@ -402,7 +403,8 @@ final class ArrayMapLlvm
                 );
                 break;
             default:
-                throw new \LogicException(
+                UnsupportedFeature::raise(
+                    'array-map-mapped-value-type',
                     'array_map() mapped value type not supported for JIT: '
                     .Variable::getStringType($resultType)
                 );

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Web;
 
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -118,7 +119,7 @@ final class Params
     private static function readStringValue(Variable $source, string $key): ?Variable
     {
         if (Variable::TYPE_ARRAY !== $source->type) {
-            throw new \LogicException('web_*() first argument must be an array in this compiler build');
+            UnsupportedFeature::raise('web-params-source-array');
         }
         $ht = $source->toArray();
         $keyVar = new Variable();
@@ -150,7 +151,7 @@ final class Params
             case Variable::TYPE_BOOLEAN:
                 return $v->toBool() ? 1 : 0;
             default:
-                throw new \LogicException('web_int() value must be numeric in this compiler build');
+                UnsupportedFeature::raise('web-int-numeric-value');
         }
     }
 }

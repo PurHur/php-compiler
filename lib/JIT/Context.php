@@ -13,6 +13,7 @@ use PHPCfg\Operand;
 use PHPCompiler\AOT\Linker;
 use PHPCompiler\AOT\CompileTarget;
 use PHPCompiler\CompilerVersion;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPCompiler\Runtime;
 use PHPCompiler\Block;
 use PHPCompiler\Module;
@@ -6074,7 +6075,7 @@ class Context {
         if ($op instanceof Operand\Literal) {
             $name = $op->value;
         } else {
-            throw new \LogicException("Variable constant fetch not supported yet");
+            UnsupportedFeature::raise('variable-constant-fetch-jit');
         }
         if (!isset($this->constants[$name])) {
             $phpVar = $this->runtime->vmContext->constantFetch($name);

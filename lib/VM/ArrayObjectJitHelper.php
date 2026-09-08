@@ -18,6 +18,7 @@ use PHPCompiler\JIT\HashTableWriteLlvm;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPCompiler\ext\standard\StdlibConstants;
 use PHPCompiler\ext\standard\VmInternalCompare;
 use PHPLLVM\Builder;
@@ -467,9 +468,7 @@ final class ArrayObjectJitHelper
             return;
         }
         if (StdlibConstants::SORT_NUMERIC === $sortType || StdlibConstants::SORT_NATURAL === $sortType) {
-            throw new \LogicException(
-                'ksort() flags are not supported in JIT/AOT in this compiler build'
-            );
+            UnsupportedFeature::raise('ksort-flags-numeric-natural');
         }
         KeySortRuntime::ksortByKey($context, $array);
     }
@@ -1261,7 +1260,8 @@ final class ArrayObjectJitHelper
                 $context->builder->call($context->lookupFunction('__value__writeNull'), $ptr);
                 break;
             default:
-                throw new \LogicException(
+                UnsupportedFeature::raise(
+                    'arrayobject-offset-key-type',
                     'ArrayObject offset key type '.JITVariable::getStringType($key->type).' unsupported in thin AOT'
                 );
         }

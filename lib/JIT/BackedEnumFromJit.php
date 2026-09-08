@@ -8,6 +8,7 @@ use PHPCompiler\JIT\Builtin\BackedEnumFromRuntime;
 use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectBuiltin;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\JitStringCompare;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -81,7 +82,10 @@ final class BackedEnumFromJit
             } elseif ('int' === $backedType) {
                 self::emitIntBackedBody($context, $object, $classId, $className, $caseKeys, $arg, $isTry);
             } else {
-                throw new \LogicException('Unsupported enum backing type for JIT from(): '.$backedType);
+                UnsupportedFeature::raise(
+                    'backed-enum-backing-type-jit',
+                    'Unsupported enum backing type for JIT from(): '.$backedType
+                );
             }
         } finally {
             $context->activeFunction = $savedActive;
