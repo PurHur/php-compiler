@@ -4,82 +4,21 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
-use PHPCompiler\Block;
-
 /**
- * MCJIT bitcode warm restore + meta/stamp persist for CompileCache (#36387 / #36199).
+ * MCJIT bitcode meta/stamp persist for CompileCache (#36387 / #36199).
  *
- * Extracted from {@see CompileCache} so module.bc tryRestore / save / saveAotStamp
- * stay a separate TU (split-TU / size-budget ratchet) while the hub keeps
- * {@see CompileCacheEditScaffold} and {@see CompileCacheKeyLayout}. Distinct from
+ * Extracted from {@see CompileCache} so save / saveAotStamp stay a separate TU
+ * (split-TU / size-budget ratchet) while warm tryRestore lives in
+ * {@see CompileCacheBitcodeRestore}. Distinct from
  * {@see CompileCacheArtifactPersist} (aot.bin / aot.o mid-tier) and from the
  * recording symbol-map cluster (beginRecording / record*).
  *
- * No new C ABI. php-src analogy: Zend opcache file-cache restore of a compiled
- * script image without re-parsing (Zend/zend_file_cache.c) — attach prior
- * bitcode + export meta and skip LLVM IR lowering.
+ * No new C ABI. php-src analogy: Zend opcache writing a compiled script image
+ * for later restore (Zend/zend_file_cache.c) — persist bitcode + export meta
+ * so the next process can skip LLVM IR lowering.
  */
 trait CompileCacheBitcodePersist
 {
-
-    /**
-     * @return bool true when bitcode was loaded and exports restored
-     */
-    public static function tryRestore(Context $context, Block $block, string $key): bool
-    {
-        $meta = self::readMeta($key);
-        if (null === $meta) {
-            return false;
-        }
-        $bcPath = self::bitcodePath($key);
-        if (!is_file($bcPath)) {
-            return false;
-        }
-
-        try {
-            $context->replaceModuleFromBitcodeFile($bcPath);
-        } catch (\Throwable $e) {
-            return false;
-        }
-
-        SuperglobalInit::rebindGlobalsFromModule($context);
-        self::restoreExports($context, $block, $meta['exports']);
-        $context->rebindFunctionScopeFromModule();
-        $context->rebindInitShutdownAfterModuleReplace();
-        $context->refreshIntrinsicAfterModuleReplace();
-        $context->syncIntrinsicBuilder();
-        self::$skipModuleFuncCompile = true;
-        self::$editScaffoldActive = false;
-
-        return true;
-    }
-
-    /**
-     * User-script main LLVM function after {@see tryRestore()} (#36199).
-     */
-    public static function resolveRestoredMainFunction(Context $context, string $key): ?\PHPLLVM\Value\Function_
-    {
-        $meta = self::readMeta($key);
-        if (null === $meta) {
-            return null;
-        }
-        foreach ($meta['exports'] as $entry) {
-            if (($entry['scoped'] ?? '') !== '{main}') {
-                continue;
-            }
-            $llvm = (string) ($entry['llvm'] ?? '');
-            if ('' === $llvm) {
-                continue;
-            }
-            $func = $context->module->getNamedFunction($llvm);
-            if ($func instanceof \PHPLLVM\Value\Function_) {
-                return $func;
-            }
-        }
-
-        return null;
-    }
-
     public static function save(Context $context, string $key): void
     {
         if (null === self::$recordingExports) {
@@ -194,47 +133,5 @@ trait CompileCacheBitcodePersist
             flock($lock, LOCK_UN);
             fclose($lock);
         }
-    }
-
-    /**
-     * @param list<array{llvm?: string, signature?: string, scoped?: string}> $exports
-     */
-    private static function restoreExports(Context $context, Block $block, array $exports): void
-    {
-        $blocksByScoped = self::collectBlocksByScopedName($block);
-        foreach ($exports as $entry) {
-            $llvm = $entry['llvm'] ?? '';
-            $signature = $entry['signature'] ?? '';
-            $scoped = $entry['scoped'] ?? '';
-            if ('' === $llvm || '' === $signature || '' === $scoped) {
-                continue;
-            }
-            if (!isset($blocksByScoped[$scoped])) {
-                continue;
-            }
-            $context->addExport($llvm, $signature, $blocksByScoped[$scoped]);
-        }
-    }
-
-    /**
-     * @return array<string, Block>
-     */
-    private static function collectBlocksByScopedName(Block $root): array
-    {
-        $map = [];
-        $queue = [$root];
-        while ([] !== $queue) {
-            $current = array_shift($queue);
-            if (null !== $current->func) {
-                $map[$current->func->getScopedName()] = $current;
-            } else {
-                $map['{main}'] = $current;
-            }
-            foreach ($current->blocks as $child) {
-                $queue[] = $child;
-            }
-        }
-
-        return $map;
     }
 }
