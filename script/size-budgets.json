@@ -34,9 +34,9 @@
             "note": "helper-cache granularity; Fingerprint+Link+Bind extracts (#36387/#36403); sorted linkObjects (#36399); refusePrelinkGcMixReason (#36401)"
         },
         "lib/JIT/CompileCache.php": {
-            "budget": 165,
+            "budget": 61,
             "target": 2000,
-            "note": "MCJIT/AOT warm cache; SemanticHash + SemanticHashFacade + PartialEmitDemote + ArtifactPersist + EditScaffold + ProjectIndex + ProjectIndexFacade + KeyLayout + BitcodePersist + Recording + EditSession + ProjectMembers + ArtifactFacade + HubState extracts (#36387/#36403)"
+            "note": "MCJIT/AOT warm cache hub; HubState + Artifact/SemanticHash/ProjectIndex/KeyLayout facades (#36387/#36403)"
         },
         "lib/JIT/CompileCacheRecording.php": {
             "budget": 276,
@@ -72,6 +72,11 @@
             "budget": 106,
             "target": 250,
             "note": "Shared recording/edit-scaffold/partial-emit static fields extracted from CompileCache (#36387)"
+        },
+        "lib/JIT/CompileCacheKeyLayoutFacade.php": {
+            "budget": 125,
+            "target": 250,
+            "note": "KeyLayout enable/path/freshness public delegates extracted from CompileCache (#36387)"
         }
     },
     "script_file_count": {

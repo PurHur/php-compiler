@@ -6944,6 +6944,7 @@ require_once __DIR__.'/../../../lib/JIT/CompileCacheArtifactFacade.php';
 require_once __DIR__.'/../../../lib/JIT/CompileCacheSemanticHashFacade.php';
 require_once __DIR__.'/../../../lib/JIT/CompileCacheProjectIndexFacade.php';
 require_once __DIR__.'/../../../lib/JIT/CompileCacheHubState.php';
+require_once __DIR__.'/../../../lib/JIT/CompileCacheKeyLayoutFacade.php';
 require_once __DIR__.'/../../../lib/JIT/CompileCache.php';
 require_once __DIR__.'/../../../lib/JIT/CompilerOperandChainNative.php';
 require_once __DIR__.'/../../../lib/JIT/Context.php';

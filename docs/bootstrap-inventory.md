@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8454 |
-| Phase A inventory files (M2 ratio SSOT) | 8454 |
+| PHP files on vm.php path | 8455 |
+| Phase A inventory files (M2 ratio SSOT) | 8455 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26528 |
+| Source constructs flagged (warnings) | 26529 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7161,7 +7161,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/ClosureBindHelper.php` | 0 | 25 |
 | `lib/JIT/ClosureHelper.php` | 0 | 1 |
 | `lib/JIT/CoalesceHelper.php` | 0 | 1 |
-| `lib/JIT/CompileCache.php` | 0 | 1 |
 | `lib/JIT/CompileCacheArtifactFacade.php` | 0 | 2 |
 | `lib/JIT/CompileCacheArtifactPersist.php` | 0 | 1 |
 | `lib/JIT/CompileCacheBitcodePersist.php` | 0 | 2 |
@@ -7169,6 +7168,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/CompileCacheEditSession.php` | 0 | 2 |
 | `lib/JIT/CompileCacheHubState.php` | 0 | 1 |
 | `lib/JIT/CompileCacheKeyLayout.php` | 0 | 1 |
+| `lib/JIT/CompileCacheKeyLayoutFacade.php` | 0 | 2 |
 | `lib/JIT/CompileCachePartialEmitDemote.php` | 0 | 1 |
 | `lib/JIT/CompileCacheProjectIndex.php` | 0 | 1 |
 | `lib/JIT/CompileCacheProjectIndexFacade.php` | 0 | 2 |
@@ -58789,11 +58789,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
 
-### `lib/JIT/CompileCache.php`
-
-**Warnings** (review for bootstrap subset):
-- 14 class method(s)
-
 ### `lib/JIT/CompileCacheArtifactFacade.php`
 
 **Warnings** (review for bootstrap subset):
@@ -58832,6 +58827,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/CompileCacheKeyLayout.php`
 
 **Warnings** (review for bootstrap subset):
+- 14 class method(s)
+
+### `lib/JIT/CompileCacheKeyLayoutFacade.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CompileCacheKeyLayoutFacade (line 22)
 - 14 class method(s)
 
 ### `lib/JIT/CompileCachePartialEmitDemote.php`
