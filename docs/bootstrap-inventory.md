@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8485 |
-| Phase A inventory files (M2 ratio SSOT) | 8485 |
+| PHP files on vm.php path | 8486 |
+| Phase A inventory files (M2 ratio SSOT) | 8486 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26583 |
+| Source constructs flagged (warnings) | 26585 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -8120,6 +8120,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/Concern/IssetDispatch.php` | 0 | 4 |
 | `lib/VM/Concern/IteratorToArrayConvert.php` | 0 | 10 |
 | `lib/VM/Concern/MethodCallAndStaticCallableInit.php` | 0 | 7 |
+| `lib/VM/Concern/MethodCallInitDispatch.php` | 0 | 2 |
 | `lib/VM/Concern/NewDispatch.php` | 0 | 3 |
 | `lib/VM/Concern/ObjectPropertyCollectAndSerialize.php` | 0 | 25 |
 | `lib/VM/Concern/ObjectPropertyFetchDispatch.php` | 0 | 7 |
@@ -59306,10 +59307,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Concern/CompileFuncCallExecReturn.php`
 
 **Warnings** (review for bootstrap subset):
-- trait CompileFuncCallExecReturn (line 22)
-- new Variable (line 73)
-- new Variable (line 87)
-- new Variable (line 111)
+- trait CompileFuncCallExecReturn (line 23)
+- new Variable (line 74)
+- new Variable (line 88)
+- new Variable (line 112)
 - 1 class method(s)
 
 ### `lib/JIT/Concern/CompileFuncCallInit.php`
@@ -59557,9 +59558,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Concern/JitConstructAssignedAndNativeLongLocal.php`
 
 **Warnings** (review for bootstrap subset):
-- trait JitConstructAssignedAndNativeLongLocal (line 23)
-- new JIT\Variable (line 395)
-- new JIT\Variable (line 458)
+- trait JitConstructAssignedAndNativeLongLocal (line 24)
+- new JIT\Variable (line 396)
+- new JIT\Variable (line 459)
 - 12 class method(s)
 
 ### `lib/JIT/Concern/ListUnpackClassDeclareAndIncludeAssign.php`
@@ -59622,11 +59623,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Concern/M3EmitTuRuntimeSpineStubNative.php`
 
 **Warnings** (review for bootstrap subset):
-- trait M3EmitTuRuntimeSpineStubNative (line 21)
-- new JIT\Call\Native (line 105)
-- new JIT\Call\Native (line 143)
-- new JIT\Call\Native (line 177)
-- new JIT\Call\Native (line 298)
+- trait M3EmitTuRuntimeSpineStubNative (line 22)
+- new JIT\Call\Native (line 106)
+- new JIT\Call\Native (line 144)
+- new JIT\Call\Native (line 178)
+- new JIT\Call\Native (line 299)
 - 6 class method(s)
 
 ### `lib/JIT/Concern/M3EmitTuSidecarLinktime.php`
@@ -59652,10 +59653,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Concern/NestedVmHelperAndThisResolve.php`
 
 **Warnings** (review for bootstrap subset):
-- trait NestedVmHelperAndThisResolve (line 22)
-- new Variable (line 30)
-- new JIT\Call\VmCoerceVariableToString (line 179)
-- new JIT\Call\NoOpConstruct (line 466)
+- trait NestedVmHelperAndThisResolve (line 23)
+- new Variable (line 31)
+- new JIT\Call\VmCoerceVariableToString (line 180)
+- new JIT\Call\NoOpConstruct (line 467)
 - 14 class method(s)
 
 ### `lib/JIT/Concern/OpCodeArgSlotAndAssignRhs.php`
@@ -62359,41 +62360,41 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 293)
-- new ObjectEntry (line 417)
-- new Variable (line 426)
-- new Variable (line 455)
-- new VM\GeneratorUncaughtThrow (line 470)
-- new VM\FiberUncaughtThrow (line 484)
-- new VM\DestructorThrowCatchSignal (line 489)
-- new Variable (line 639)
-- new Variable (line 655)
-- new Error (line 775)
-- new Func\PHP (line 1358)
-- new ClosureState (line 1370)
-- new Variable (line 1405)
-- new CompileError (line 1498)
-- new Func\PHP (line 1508)
-- new Variable (line 1641)
-- new Variable (line 1650)
-- new VM\ClassEntry (line 1701)
-- new ClassEntry (line 1737)
-- new Variable (line 1751)
-- new Variable (line 1754)
-- new ClassEntry (line 1792)
-- new CompileError (line 1837)
-- new ClassEntry (line 1864)
-- new CompileError (line 1929)
-- new WeakMapIterator (line 2506)
-- new ObjectPropertyIterator (line 2511)
-- new Variable (line 2766)
-- new Error (line 3226)
-- new ClassEntry (line 3262)
-- new Variable (line 3263)
-- new VM\ClassProperty (line 3264)
-- new ObjectEntry (line 3267)
-- new Variable (line 3270)
-- new Variable (line 3296)
+- new Variable (line 295)
+- new ObjectEntry (line 419)
+- new Variable (line 428)
+- new Variable (line 457)
+- new VM\GeneratorUncaughtThrow (line 472)
+- new VM\FiberUncaughtThrow (line 486)
+- new VM\DestructorThrowCatchSignal (line 491)
+- new Variable (line 641)
+- new Variable (line 657)
+- new Error (line 777)
+- new Func\PHP (line 1360)
+- new ClosureState (line 1372)
+- new Variable (line 1407)
+- new CompileError (line 1500)
+- new Func\PHP (line 1510)
+- new Variable (line 1583)
+- new Variable (line 1592)
+- new VM\ClassEntry (line 1643)
+- new ClassEntry (line 1679)
+- new Variable (line 1693)
+- new Variable (line 1696)
+- new ClassEntry (line 1734)
+- new CompileError (line 1779)
+- new ClassEntry (line 1806)
+- new CompileError (line 1871)
+- new WeakMapIterator (line 2448)
+- new ObjectPropertyIterator (line 2453)
+- new Variable (line 2708)
+- new Error (line 3168)
+- new ClassEntry (line 3204)
+- new Variable (line 3205)
+- new VM\ClassProperty (line 3206)
+- new ObjectEntry (line 3209)
+- new Variable (line 3212)
+- new Variable (line 3238)
 - 28 class method(s)
 
 ### `lib/VM/AbstractPropertyHookCheck.php`
@@ -66145,6 +66146,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new VM\EnumFromHandler (line 242)
 - 9 class method(s)
 - 3 closure(s)
+
+### `lib/VM/Concern/MethodCallInitDispatch.php`
+
+**Warnings** (review for bootstrap subset):
+- trait MethodCallInitDispatch (line 22)
+- 1 class method(s)
 
 ### `lib/VM/Concern/NewDispatch.php`
 
