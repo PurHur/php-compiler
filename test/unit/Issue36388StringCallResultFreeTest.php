@@ -93,6 +93,7 @@ final class Issue36388StringCallResultFreeTest extends TestCase
         $this->assertStringContainsString("'str_replace' => true", $src);
         $this->assertStringContainsString("'str_ireplace' => true", $src);
         $this->assertStringContainsString("'str_pad' => true", $src);
+        $this->assertStringContainsString("'chunk_split' => true", $src);
         $this->assertStringContainsString("'md5' => true", $src);
         $this->assertStringContainsString("'hash' => true", $src);
         $this->assertStringContainsString("'hash_hmac' => true", $src);
@@ -144,6 +145,12 @@ final class Issue36388StringCallResultFreeTest extends TestCase
         ));
         $this->assertStringContainsString('StringStrPad::invoke', (string) file_get_contents(
             dirname(__DIR__, 2).'/ext/standard/str_pad.php'
+        ));
+        $this->assertStringContainsString('phpc_chunk_split_r1', (string) file_get_contents(
+            dirname(__DIR__, 2).'/lib/JIT/Builtin/ChunkSplitRuntime.php'
+        ));
+        $this->assertStringContainsString('StringChunkSplit::invoke', (string) file_get_contents(
+            dirname(__DIR__, 2).'/ext/standard/chunk_split.php'
         ));
         $this->assertStringContainsString('phpc_md5_r1', (string) file_get_contents(
             dirname(__DIR__, 2).'/lib/JIT/Builtin/Md5Runtime.php'
@@ -287,6 +294,9 @@ final class Issue36388StringCallResultFreeTest extends TestCase
             'str_pad_local' => ['test/repro/issue_36388_str_pad_local_free.php', 'str_pad_local delta='],
             'str_pad_lit' => ['test/repro/issue_36388_str_pad_lit_free.php', 'str_pad_lit delta='],
             'str_pad_sides' => ['test/repro/issue_36388_str_pad_sides_free.php', 'str_pad_sides delta='],
+            'chunk_split_local' => ['test/repro/issue_36388_chunk_split_local_free.php', 'chunk_local delta='],
+            'chunk_split_lit' => ['test/repro/issue_36388_chunk_split_lit_free.php', 'chunk_lit delta='],
+            'chunk_split_default_sep' => ['test/repro/issue_36388_chunk_split_default_sep_free.php', 'chunk_default_sep delta='],
             'hash_local' => ['test/repro/issue_36388_hash_local_free.php', 'hash_local delta='],
             'hash_lit' => ['test/repro/issue_36388_hash_lit_free.php', 'hash_lit delta='],
             'hash_raw' => ['test/repro/issue_36388_hash_raw_free.php', 'hash_raw delta='],

@@ -15,7 +15,15 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
-/** chunk_split() — insert a separator every N bytes (subset of PHP). */
+/**
+ * chunk_split() — insert a separator every N bytes (subset of PHP).
+ *
+ * VM: {@see VmString::chunkSplit()}; JIT/AOT: native {@see StringChunkSplit} /
+ * {@see \PHPCompiler\JIT\Builtin\ChunkSplitRuntime} {@code phpc_chunk_split_r1} (#36388;
+ * NestedJIT ChunkSplitJitHelper leaked under thin AOT — peer str_pad_r1).
+ *
+ * php-src: ext/standard/string.c — PHP_FUNCTION(chunk_split)
+ */
 final class chunk_split extends Internal
 {
     public function __construct()
@@ -55,8 +63,6 @@ final class chunk_split extends Internal
         $workBlock = BasicBlockHelper::append($context, 'chunksplit_call_work');
         $context->builder->branch($workBlock);
         $context->builder->positionAtEnd($workBlock);
-        StringChunkSplit::ensureLinked($context);
-        $context->builder->positionAtEnd($workBlock);
         $i64 = $context->getTypeFromString('int64');
         $chunkLen = $i64->constInt(76, false);
         if ($argc >= 2) {
@@ -69,13 +75,14 @@ final class chunk_split extends Internal
         } else {
             $separator = $context->builder->load($context->constantStringFromString("\r\n"));
         }
+        // Native phpc_chunk_split_r1 — no NestedJIT ChunkSplitJitHelper (#36388).
+        $result = StringChunkSplit::invoke($context, $input, $chunkLen, $separator);
+        JitStringBuiltinArg::releaseEphemeralArgAfterCopy($context, $args[0], $input);
+        if ($argc >= 3) {
+            JitStringBuiltinArg::releaseEphemeralArgAfterCopy($context, $args[2], $separator);
+        }
 
-        return $context->builder->call(
-            $context->lookupFunction('__compiler_chunk_split'),
-            $input,
-            $chunkLen,
-            $separator
-        );
+        return $result;
     }
 
     private static function jitStringArg(

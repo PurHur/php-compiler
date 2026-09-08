@@ -10,46 +10,48 @@ use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
 /**
- * chunk_split() JIT routes through ChunkSplitJitHelper + VmChunkSplit
- * (#14626, #21399, #26992, #30859, #33894).
+ * chunk_split() thin AOT uses native phpc_chunk_split_r1 (#36388); helper remains SSOT peer.
  */
 final class ChunkSplitRuntimeShrinkTest extends TestCase
 {
-    public function testStringChunkSplitUsesJitHelperBundle(): void
+    public function testStringChunkSplitUsesNativeR1NotNestedJit(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringChunkSplit.php');
-        $this->assertStringContainsString('ChunkSplitJitHelper', $source);
-        $this->assertStringContainsString('VmChunkSplit.php', $source);
-        $this->assertStringContainsString('HELPER_BUNDLE', $source);
-        $this->assertStringContainsString('ensureCompiledBundle', $source);
-        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
+        $this->assertStringContainsString('ChunkSplitRuntime', $source);
+        $this->assertStringContainsString('phpc_chunk_split_r1', $source);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureBridge', $source);
+        $this->assertStringNotContainsString('ensureCompiledBundle', $source);
+        $this->assertStringNotContainsString('HELPER_BUNDLE', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString('new JIT(', $source);
-        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+
+        $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ChunkSplitRuntime.php');
+        $this->assertStringContainsString('phpc_chunk_split_r1', $runtime);
+        $this->assertStringContainsString('__string__alloc', $runtime);
+        $this->assertStringContainsString('memcpy', $runtime);
 
         $jitChunk = (string) file_get_contents(__DIR__.'/../../ext/standard/JitChunkSplit.php');
         $this->assertStringNotContainsString('chunksplit_head', $jitChunk);
         $this->assertStringNotContainsString('function split', $jitChunk);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/chunk_split.php');
-        $this->assertStringContainsString('StringChunkSplit::ensureLinked', $builtin);
-        $this->assertStringContainsString('__compiler_chunk_split', $builtin);
+        $this->assertStringContainsString('StringChunkSplit::invoke', $builtin);
+        $this->assertStringContainsString('phpc_chunk_split_r1', $builtin);
+        $this->assertStringContainsString('releaseEphemeralArgAfterCopy', $builtin);
+        $this->assertStringNotContainsString('__compiler_chunk_split', $builtin);
         $this->assertStringNotContainsString('JitChunkSplit::split', $builtin);
     }
 
-    public function testUserScriptAotForcesNestedJitOfChunkSplitHelper(): void
+    public function testOwningCallResultListsChunkSplit(): void
     {
-        $cache = (string) file_get_contents(__DIR__.'/../../lib/AOT/HelperRuntimeCache.php');
-        $this->assertStringContainsString(
-            "phpcompiler\\\\ext\\\\standard\\\\chunksplitjithelper::chunksplitargv",
-            $cache,
-            'USER_SCRIPT_INLINE_ONLY must NestedJIT chunkSplitArgv — prelinked unit.o SIGSEGVs (#30859)'
+        $src = (string) file_get_contents(
+            __DIR__.'/../../lib/JIT/Concern/CallResultOperandAssign.php'
         );
+        $this->assertStringContainsString("'chunk_split' => true", $src);
     }
 
     /**
-     * #30859 / #33894: NestedJIT-safe VmChunkSplit — str_split+implode (not recursive
-     * substr walk / $s[$i]); recursive chunkFrom miscompiled under thin AOT.
+     * #30859 / #33894: NestedJIT-safe VmChunkSplit remains SSOT for VM / helper parity.
      */
     public function testChunkSplitJitHelperDelegatesToVmChunkSplit(): void
     {
@@ -85,9 +87,10 @@ final class ChunkSplitRuntimeShrinkTest extends TestCase
         $this->assertSame('ab:cd:', ChunkSplitJitHelper::chunkSplitArgv('abcd', 2, ':'));
     }
 
-    public function testSpineBundleIncludesVmChunkSplit(): void
+    public function testSpineBundleIncludesChunkSplitRuntime(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('ChunkSplitRuntime.php', $spine);
         $this->assertStringContainsString('VmChunkSplit.php', $spine);
         $this->assertStringContainsString('ChunkSplitJitHelper.php', $spine);
         $this->assertStringContainsString('StringChunkSplit.php', $spine);
