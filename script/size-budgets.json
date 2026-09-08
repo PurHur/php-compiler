@@ -179,9 +179,9 @@
             "note": "TYPE_CLASS_CONST_FETCH runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/Context.php": {
-            "budget": 5911,
+            "budget": 4992,
             "target": 4000,
-            "note": "Edit-scaffold module rebind extracted to ContextEditScaffoldModuleRebind (#36387/#36199); continue Context splits"
+            "note": "DefineBuiltins + EditScaffoldModuleRebind extracted (#36387/#36199); continue Context splits toward \u22644k"
         },
         "lib/JIT/ContextEditScaffoldModuleRebind.php": {
             "budget": 315,
@@ -197,6 +197,11 @@
             "budget": 96,
             "target": 150,
             "note": "Shared-runtime demote candidacy + LLVM name + nm objectDefinedSymbols extracted from PartialEmitLlvm (#36387/#36199)"
+        },
+        "lib/JIT/ContextDefineBuiltins.php": {
+            "budget": 946,
+            "target": 1000,
+            "note": "Builtin register/implement + functionProxies catalog extracted from Context (#36387)"
         }
     },
     "script_file_count": {
