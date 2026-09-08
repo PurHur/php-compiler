@@ -186,6 +186,17 @@ final class CompileCacheKeyLayout
         $parts[] = HelperRuntimeCache::llvmIdentityToken();
         $parts[] = hash_file('sha256', __DIR__.'/../JIT/Context.php') ?: '';
         $parts[] = hash_file('sha256', __DIR__.'/../JIT.php') ?: '';
+        // Split-TU Concern extracts (#36387): JIT.php alone does not change when a
+        // Concern gains/loses `use PHPCompiler\Func as CoreFunc` — stale aot.bin then
+        // keeps false undef warnings on ZEND_SEND_REF (j08_preg / #36081 class).
+        $concernDir = __DIR__.'/Concern';
+        if (is_dir($concernDir)) {
+            $concernFiles = glob($concernDir.'/*.php') ?: [];
+            sort($concernFiles);
+            foreach ($concernFiles as $concernFile) {
+                $parts[] = basename($concernFile).'='.(hash_file('sha256', $concernFile) ?: '');
+            }
+        }
         // Hashtable string-key DJB index / unset (#36191 / #36732) — artifact restore
         // must not keep pre-fix binaries when only Type/HashTable.php changed.
         $parts[] = hash_file('sha256', __DIR__.'/Builtin/Type/HashTable.php') ?: '';

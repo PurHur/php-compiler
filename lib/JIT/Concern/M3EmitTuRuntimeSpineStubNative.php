@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler;
 
 use PHPCompiler\Block;
+use PHPCompiler\Func as CoreFunc;
 use PHPLLVM;
 
 /**

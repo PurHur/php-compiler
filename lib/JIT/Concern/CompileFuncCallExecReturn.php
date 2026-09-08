@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler;
 
 use PHPCfg\Operand;
+use PHPCompiler\Func as CoreFunc;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM;
 

@@ -6,6 +6,7 @@ namespace PHPCompiler;
 
 use PHPCfg\Operand;
 use PHPCompiler\Block;
+use PHPCompiler\Func as CoreFunc;
 use PHPCompiler\JIT\Variable;
 
 /**
