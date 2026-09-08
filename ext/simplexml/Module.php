@@ -174,6 +174,18 @@ class Module extends ModuleAbstract
                 return VmSimpleXml::dimensionIsEmpty($object, $dim);
             }
         );
+        // unset($sxe->child) — lib/VM/Concern/UnsetDispatch must not import VmSimpleXml (#36204).
+        \PHPCompiler\VM\SimpleXmlVmRuntimeSupport::setIsUnsetChildPropertySubject(
+            static function (\PHPCompiler\VM\ObjectEntry $object): bool {
+                return VmSimpleXml::CLASS_LC === strtolower($object->class->name)
+                    && SimpleXmlRegistry::has($object);
+            }
+        );
+        \PHPCompiler\VM\SimpleXmlVmRuntimeSupport::setUnsetChildProperty(
+            static function (\PHPCompiler\VM\ObjectEntry $object, string $propName): void {
+                VmSimpleXml::unsetChildProperty($object, $propName);
+            }
+        );
     }
 
     public function getFunctions(): array

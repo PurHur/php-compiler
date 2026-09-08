@@ -32,17 +32,13 @@ final class GmpExtensionPolicy
     /** Compliance filenames that exercise gmp_* / GMP. */
     public static function isGmpComplianceCase(string $testFileName): bool
     {
-        return str_starts_with($testFileName, 'gmp/')
-            || str_contains($testFileName, 'gmp_')
-            || str_contains($testFileName, '/gmp/')
-            || str_contains($testFileName, 'extension_loaded_gmp');
+        return ReleaseUnsupportedExtensions::isGmpComplianceCase($testFileName);
     }
 
     /** Phantom-registration guards that assert gmp is withheld (#22860). */
     public static function isGmpPhantomComplianceCase(string $testFileName): bool
     {
-        return str_contains($testFileName, 'gmp_phantom')
-            || str_contains($testFileName, 'extension_loaded_gmp_phantom');
+        return ReleaseUnsupportedExtensions::isGmpPhantomComplianceCase($testFileName);
     }
 
     /**

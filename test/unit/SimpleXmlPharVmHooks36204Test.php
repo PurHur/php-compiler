@@ -25,14 +25,20 @@ final class SimpleXmlPharVmHooks36204Test extends TestCase
             'lib/VM/Variable.php',
             'lib/VM/VmEmptyDimension.php',
             'lib/VM/Builtin/PharRunning.php',
+            'lib/VM/Concern/UnsetDispatch.php',
         ] as $rel) {
             $src = (string) file_get_contents($root.'/'.$rel);
             self::assertStringNotContainsString('PHPCompiler\\ext\\simplexml', $src, $rel);
+            self::assertStringNotContainsString('ext\\simplexml', $src, $rel);
             self::assertStringNotContainsString('PHPCompiler\\ext\\phar', $src, $rel);
         }
         self::assertStringContainsString(
             'SimpleXmlVmRuntimeSupport',
             (string) file_get_contents($root.'/lib/VM/CastSupport.php')
+        );
+        self::assertStringContainsString(
+            'SimpleXmlVmRuntimeSupport',
+            (string) file_get_contents($root.'/lib/VM/Concern/UnsetDispatch.php')
         );
         self::assertStringContainsString(
             'PharVmRuntimeSupport',

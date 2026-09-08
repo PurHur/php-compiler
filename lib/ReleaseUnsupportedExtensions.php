@@ -64,13 +64,32 @@ final class ReleaseUnsupportedExtensions
      */
     public static function applyComplianceEnv(string $testFileName, array &$env): void
     {
-        if (ext\gmp\GmpExtensionPolicy::isGmpComplianceCase($testFileName)
-            && !ext\gmp\GmpExtensionPolicy::isGmpPhantomComplianceCase($testFileName)) {
+        if (self::isGmpComplianceCase($testFileName)
+            && !self::isGmpPhantomComplianceCase($testFileName)) {
             $env['PHP_COMPILER_ENABLE_GMP'] = '1';
         }
         if (self::isIntlFunctionalComplianceCase($testFileName)) {
             $env['PHP_COMPILER_ENABLE_INTL'] = '1';
         }
+    }
+
+    /**
+     * Compliance filenames that exercise gmp_* / GMP — kept in lib so core does not import
+     * {@code ext\gmp} (#36204). Peer: php-src ext/gmp/gmp.c registration surface.
+     */
+    public static function isGmpComplianceCase(string $testFileName): bool
+    {
+        return str_starts_with($testFileName, 'gmp/')
+            || str_contains($testFileName, 'gmp_')
+            || str_contains($testFileName, '/gmp/')
+            || str_contains($testFileName, 'extension_loaded_gmp');
+    }
+
+    /** Phantom-registration guards that assert gmp is withheld (#22860). */
+    public static function isGmpPhantomComplianceCase(string $testFileName): bool
+    {
+        return str_contains($testFileName, 'gmp_phantom')
+            || str_contains($testFileName, 'extension_loaded_gmp_phantom');
     }
 
     private static function isIntlFunctionalComplianceCase(string $testFileName): bool
