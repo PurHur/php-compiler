@@ -179,9 +179,9 @@
             "note": "TYPE_CLASS_CONST_FETCH runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/Context.php": {
-            "budget": 890,
+            "budget": 892,
             "target": 3500,
-            "note": "ReflectionAndException + DateAndXml proxies wiring + ScopeLifecycle/LlvmConstants/FreeDead/ScriptGlobals peers (#36387/#36199); continue toward \u22643.5k"
+            "note": "DirectoryAndFile + ReflectionAndException + DateAndXml proxies wiring + ScopeLifecycle/LlvmConstants/FreeDead/ScriptGlobals peers (#36387/#36199); continue toward ≤3.5k"
         },
         "lib/JIT/ContextEditScaffoldModuleRebind.php": {
             "budget": 315,
@@ -274,9 +274,14 @@
             "note": "TYPE_ECHO/PRINT/EVAL runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/ContextDefineBuiltinFunctionProxies.php": {
-            "budget": 403,
-            "target": 450,
-            "note": "SPL iterator/SplFile* thin-AOT functionProxies; Reflection/Exception in ContextDefineBuiltinFunctionProxiesReflectionAndException; DateTime/PDO/XML in DateAndXml (#36387)"
+            "budget": 287,
+            "target": 350,
+            "note": "SPL iterator/container thin-AOT functionProxies; Directory/SplFile*/GlobIterator in DirectoryAndFile; Reflection/Exception in ReflectionAndException; DateTime/PDO/XML in DateAndXml (#36387)"
+        },
+        "lib/JIT/ContextDefineBuiltinFunctionProxiesDirectoryAndFile.php": {
+            "budget": 151,
+            "target": 200,
+            "note": "Directory/DirectoryIterator/FilesystemIterator/RecursiveDirectoryIterator/SplFileInfo/SplFileObject/SplTempFileObject/GlobIterator proxies extracted from FunctionProxies (#36387)"
         },
         "lib/JIT/ContextDefineBuiltinFunctionProxiesReflectionAndException.php": {
             "budget": 324,
