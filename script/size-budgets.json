@@ -179,9 +179,9 @@
             "note": "TYPE_CLASS_CONST_FETCH runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/Context.php": {
-            "budget": 898,
+            "budget": 902,
             "target": 3500,
-            "note": "WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml proxies wiring + ScopeLifecycle/LlvmConstants/FreeDead/ScriptGlobals peers (#36387/#36199); continue toward ≤3.5k"
+            "note": "ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml proxies wiring + ScopeLifecycle peers (#36387/#36199); continue toward \u22643.5k"
         },
         "lib/JIT/ContextEditScaffoldModuleRebind.php": {
             "budget": 315,
@@ -274,9 +274,9 @@
             "note": "TYPE_ECHO/PRINT/EVAL runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/ContextDefineBuiltinFunctionProxies.php": {
-            "budget": 52,
-            "target": 80,
-            "note": "is_null + peer dispatch hub; WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml peers (#36387)"
+            "budget": 59,
+            "target": 200,
+            "note": "is_null + peer dispatch hub; ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml peers (#36387)"
         },
         "lib/JIT/ContextDefineBuiltinFunctionProxiesDirectoryAndFile.php": {
             "budget": 151,
@@ -299,14 +299,19 @@
             "note": "ArrayIterator/ArrayObject/LimitIterator/FilterIterator family thin-AOT proxies extracted from FunctionProxies (#36387)"
         },
         "lib/JIT/ContextDefineBuiltinFunctionProxiesReflectionAndException.php": {
-            "budget": 324,
-            "target": 400,
-            "note": "Reflection* / Exception / Throwable / Error thin-AOT proxies extracted from FunctionProxies (#36387)"
+            "budget": 252,
+            "target": 260,
+            "note": "Reflection* thin-AOT proxies; Exception/Throwable/Error moved to ExceptionAndError (#36387)"
+        },
+        "lib/JIT/ContextDefineBuiltinFunctionProxiesExceptionAndError.php": {
+            "budget": 100,
+            "target": 150,
+            "note": "Exception/Throwable/Error thin-AOT proxies extracted from ReflectionAndException (#36387)"
         },
         "lib/JIT/ContextDefineBuiltinFunctionProxiesDateAndXml.php": {
-            "budget": 203,
-            "target": 250,
-            "note": "DateTime/DateInterval/DatePeriod/finfo/PDO/XMLReader/XMLWriter/Dom TokenList proxies extracted from FunctionProxies (#36387)"
+            "budget": 137,
+            "target": 150,
+            "note": "DateTime/DateInterval/DatePeriod proxies; finfo/PDO/XML moved to FinfoPdoAndXml (#36387)"
         },
         "lib/VM/Concern/ForeachIterDispatch.php": {
             "budget": 374,
@@ -342,6 +347,11 @@
             "budget": 187,
             "target": 300,
             "note": "TYPE_VAR_FETCH/DECLARE_GLOBAL/function-static runFramesInner body extracted from VM.php (#36403)"
+        },
+        "lib/JIT/ContextDefineBuiltinFunctionProxiesFinfoPdoAndXml.php": {
+            "budget": 99,
+            "target": 150,
+            "note": "finfo/PDO/XMLReader/XMLWriter/Dom TokenList proxies extracted from DateAndXml (#36387)"
         }
     },
     "script_file_count": {
