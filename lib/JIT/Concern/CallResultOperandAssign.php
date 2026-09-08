@@ -208,6 +208,8 @@ trait CallResultOperandAssign
             'sha1' => true,
             'hash' => true,
             'hash_hmac' => true,
+            'htmlspecialchars' => true,
+            'htmlentities' => true,
         ];
 
         return isset($owning[strtolower($name)]);

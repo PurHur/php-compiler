@@ -6348,6 +6348,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrGetcsv.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrIncdec.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StrPadRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ChunkSplitRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/HtmlspecialcharsRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrPad.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/Md5Runtime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringMd5.php';

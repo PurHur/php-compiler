@@ -16,9 +16,17 @@ final class ContextMinimalStandaloneLazyHtmlspecialcharsRuntimeShrinkTest extend
 {
     public function testEnsureMinimalDropsEagerHtmlspecialchars(): void
     {
+        // Comment lives on ContextStandaloneBodies after trait extract (#34642).
+        $bodies = (string) file_get_contents(__DIR__.'/../../lib/JIT/ContextStandaloneBodies.php');
+        $this->assertStringContainsString('#34642', $bodies);
+
         $context = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
-        $this->assertStringContainsString('#34642', $context);
         $minimalPos = strpos($context, 'private function ensureMinimalUserStandaloneBodies');
+        if (false === $minimalPos) {
+            // Method may live on the trait after split-TU.
+            $context = $bodies;
+            $minimalPos = strpos($context, 'private function ensureMinimalUserStandaloneBodies');
+        }
         $this->assertNotFalse($minimalPos);
         $minimalEnd = strpos($context, 'private function ensureBootstrapAotStandaloneBodies', $minimalPos);
         $this->assertNotFalse($minimalEnd);
