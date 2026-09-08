@@ -14,6 +14,7 @@ namespace PHPCompiler\JIT;
  * {@see ContextDefineBuiltinFunctionProxiesDirectoryAndFile},
  * {@see ContextDefineBuiltinFunctionProxiesWeakAndPhpToken},
  * {@see ContextDefineBuiltinFunctionProxiesReflectionAndException},
+ * {@see ContextDefineBuiltinFunctionProxiesReflectionMembers},
  * {@see ContextDefineBuiltinFunctionProxiesExceptionAndError},
  * {@see ContextDefineBuiltinFunctionProxiesFiberGeneratorAndClosure},
  * {@see ContextDefineBuiltinFunctionProxiesDateAndXml},
@@ -44,8 +45,11 @@ trait ContextDefineBuiltinFunctionProxies
 
         // BcMath\Number thin-AOT Call proxies: registered by ext/bcmath Module::jitInit (#36204).
 
-        // Reflection* — ContextDefineBuiltinFunctionProxiesReflectionAndException (#36387).
+        // ReflectionClass* — ContextDefineBuiltinFunctionProxiesReflectionAndException (#36387).
         $this->defineBuiltinFunctionProxiesReflectionAndException();
+        // ReflectionProperty/Method/Parameter/Function/Extension/Attribute/Enum/types —
+        // ContextDefineBuiltinFunctionProxiesReflectionMembers (#36387).
+        $this->defineBuiltinFunctionProxiesReflectionMembers();
         // Exception / Throwable / Error — ContextDefineBuiltinFunctionProxiesExceptionAndError (#36387).
         $this->defineBuiltinFunctionProxiesExceptionAndError();
 
