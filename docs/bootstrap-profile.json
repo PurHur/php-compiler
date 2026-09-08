@@ -7268,6 +7268,7 @@
         "lib/JIT/CompileCacheProjectIndexFacade.php",
         "lib/JIT/CompileCacheProjectMembers.php",
         "lib/JIT/CompileCacheRecording.php",
+        "lib/JIT/CompileCacheSemanticFileParts.php",
         "lib/JIT/CompileCacheSemanticHash.php",
         "lib/JIT/CompileCacheSemanticHashFacade.php",
         "lib/JIT/CompilerOperandChainNative.php",
@@ -8694,9 +8695,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8460,
+        "inventory_files": 8461,
         "excluded": 0,
-        "eligible": 8460,
+        "eligible": 8461,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

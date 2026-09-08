@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8460 |
-| Phase A inventory files (M2 ratio SSOT) | 8460 |
+| PHP files on vm.php path | 8461 |
+| Phase A inventory files (M2 ratio SSOT) | 8461 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26538 |
+| Source constructs flagged (warnings) | 26539 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7178,6 +7178,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/CompileCacheProjectIndexFacade.php` | 0 | 2 |
 | `lib/JIT/CompileCacheProjectMembers.php` | 0 | 2 |
 | `lib/JIT/CompileCacheRecording.php` | 0 | 2 |
+| `lib/JIT/CompileCacheSemanticFileParts.php` | 0 | 1 |
 | `lib/JIT/CompileCacheSemanticHash.php` | 0 | 1 |
 | `lib/JIT/CompileCacheSemanticHashFacade.php` | 0 | 2 |
 | `lib/JIT/CompilerOperandChainNative.php` | 0 | 3 |
@@ -58891,15 +58892,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - trait CompileCacheRecording (line 25)
 - 14 class method(s)
 
+### `lib/JIT/CompileCacheSemanticFileParts.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
 ### `lib/JIT/CompileCacheSemanticHash.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 7 class method(s)
 
 ### `lib/JIT/CompileCacheSemanticHashFacade.php`
 
 **Warnings** (review for bootstrap subset):
-- trait CompileCacheSemanticHashFacade (line 18)
+- trait CompileCacheSemanticHashFacade (line 19)
 - 7 class method(s)
 
 ### `lib/JIT/CompilerOperandChainNative.php`
