@@ -69,6 +69,7 @@ GATE_STATUSES=()
 GATE_MESSAGES=()
 HONEST_COMPILE_JSON=""
 GEN0_PROVENANCE_JSON=""
+PHP_SRC_PHPT_JSON=""
 
 log() {
   if [[ "${JSON_OUT}" -eq 1 ]]; then
@@ -285,6 +286,58 @@ release_readiness_collect_gen0_provenance() {
   return 0
 }
 
+# php-src-shaped sample corpus pass % for release-readiness --json (#36381).
+# Prefer the summary.json written by the php-src-phpt-sample gate (no second run).
+release_readiness_collect_php_src_phpt() {
+  if [[ "${DRY_RUN}" -eq 1 ]]; then
+    PHP_SRC_PHPT_JSON='{"status":"skip","message":"dry-run","corpus":"sample","backend":"vm","pass_pct":0}'
+    return 0
+  fi
+  local summary_file="${_CI_REPO_ROOT}/build/php-src-phpt/corpus_sample-vm/summary.json"
+  local gate_status="unknown"
+  local i
+  for i in "${!GATE_NAMES[@]}"; do
+    if [[ "${GATE_NAMES[$i]}" == "php-src-phpt-sample" ]]; then
+      gate_status="${GATE_STATUSES[$i]}"
+      break
+    fi
+  done
+  if [[ -f "${summary_file}" ]]; then
+    PHP_SRC_PHPT_JSON="$(php -r '
+      $d = json_decode((string) file_get_contents($argv[1]), true);
+      if (!is_array($d)) { fwrite(STDERR, "bad summary\n"); exit(1); }
+      $d["status"] = $argv[2];
+      $d["gate"] = "sample-vm-diff";
+      if (!isset($d["pass_pct"])) {
+        $ex = (int) ($d["executed"] ?? 0);
+        $pass = (int) ($d["pass"] ?? 0);
+        $d["pass_pct"] = $ex > 0 ? round(100.0 * $pass / $ex, 1) : 0.0;
+      }
+      echo json_encode($d, JSON_UNESCAPED_SLASHES);
+    ' "${summary_file}" "${gate_status}")" || true
+    if [[ -n "${PHP_SRC_PHPT_JSON}" ]] && php -r 'exit(json_decode($argv[1], true) === null ? 1 : 0);' "${PHP_SRC_PHPT_JSON}"; then
+      return 0
+    fi
+  fi
+  # Fallback: run once with --json if the gate did not leave a summary (e.g. dry paths).
+  local out rc
+  set +e
+  out="$("${_CI_SCRIPT_DIR}/php-src/php-src-phpt.sh" --corpus=sample --backend=vm --diff --json 2>/dev/null)"
+  rc=$?
+  set -e
+  if [[ -n "${out}" ]] && php -r 'exit(json_decode($argv[1], true) === null ? 1 : 0);' "${out}"; then
+    PHP_SRC_PHPT_JSON="$(php -r '
+      $d = json_decode($argv[1], true);
+      $d["status"] = ((int)$argv[2] === 0) ? "ok" : "fail";
+      $d["gate"] = "sample-vm-diff";
+      echo json_encode($d, JSON_UNESCAPED_SLASHES);
+    ' "${out}" "${rc}")"
+    return 0
+  fi
+  PHP_SRC_PHPT_JSON='{"status":"unknown","message":"php-src-phpt sample summary unavailable","corpus":"sample","backend":"vm","pass_pct":0}'
+  return 0
+}
+
 FAILED=0
 
 # --- Quick bundle ---
@@ -325,6 +378,13 @@ run_gate gen0-driver-functional "bootstrap-gen0-driver-functional-smoke (#36218)
   make -C "${_CI_REPO_ROOT}" bootstrap-gen0-driver-functional-smoke \
   || FAILED=1
 
+# Sample php-src-shaped .phpt corpus under VM — failing-name set diff (#36381).
+# Full Zend/tests + ext/standard/tests baselines are a later slice; this gate keeps
+# the harness honest and surfaces pass_pct in --json.
+run_gate php-src-phpt-sample "php-src-phpt sample --diff (VM, #36381)" \
+  "${_CI_SCRIPT_DIR}/php-src/php-src-phpt.sh" --corpus=sample --backend=vm --diff \
+  || FAILED=1
+
 if [[ "${RELEASE_READINESS_CI_FAST:-0}" == "1" ]]; then
   run_gate ci-fast-subset "ci-fast inventory/doc subset (RELEASE_READINESS_CI_FAST=1)" \
     release_readiness_ci_fast_subset \
@@ -348,10 +408,16 @@ if [[ "${FULL_MODE}" -eq 1 ]]; then
   run_gate changelog-stub "CHANGELOG v1.1.0 stub" \
     release_readiness_check_changelog_stub \
     || FAILED=1
+
+  # AOT sample corpus (same cases as VM; compile+run). Not the full php-src tree.
+  run_gate php-src-phpt-sample-aot "php-src-phpt sample --diff (AOT, #36381)" \
+    "${_CI_SCRIPT_DIR}/php-src/php-src-phpt.sh" --corpus=sample --backend=aot --diff \
+    || FAILED=1
 fi
 
 release_readiness_collect_honest_compile_metric
 release_readiness_collect_gen0_provenance
+release_readiness_collect_php_src_phpt
 
 # Committed local CI streak (#36401). Read-only here — advance with:
 #   php script/status/ci-streak.php --record-green --sha=$(git rev-parse HEAD) --day=$(date -u +%F) --write
@@ -388,6 +454,7 @@ if [[ "${JSON_OUT}" -eq 1 ]]; then
   export _RR_READY="${USER_RELEASE_READY}"
   export _RR_HONEST_COMPILE_JSON="${HONEST_COMPILE_JSON}"
   export _RR_GEN0_PROVENANCE_JSON="${GEN0_PROVENANCE_JSON}"
+  export _RR_PHP_SRC_PHPT_JSON="${PHP_SRC_PHPT_JSON}"
   export _RR_CI_STREAK_JSON="${CI_STREAK_JSON}"
   export _RR_GATE_COUNT="${#GATE_NAMES[@]}"
   for i in "${!GATE_NAMES[@]}"; do
@@ -399,6 +466,9 @@ if [[ "${JSON_OUT}" -eq 1 ]]; then
 else
   log "mode=${MODE} user_release_ready=${USER_RELEASE_READY}"
   log "ci_green_streak_days=$(php -r 'echo json_decode($argv[1], true)["ci_green_streak_days"] ?? 0;' "${CI_STREAK_JSON}") last_green_master_sha=$(php -r 'echo json_decode($argv[1], true)["last_green_master_sha"] ?? "";' "${CI_STREAK_JSON}")"
+  if [[ -n "${PHP_SRC_PHPT_JSON}" ]]; then
+    log "php_src_phpt_pass_pct=$(php -r 'echo json_decode($argv[1], true)["pass_pct"] ?? 0;' "${PHP_SRC_PHPT_JSON}")"
+  fi
 fi
 
 if [[ "${FAILED}" -ne 0 ]]; then
