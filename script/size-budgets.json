@@ -179,9 +179,9 @@
             "note": "TYPE_CLASS_CONST_FETCH runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/Context.php": {
-            "budget": 894,
+            "budget": 896,
             "target": 3500,
-            "note": "SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml proxies wiring + ScopeLifecycle/LlvmConstants/FreeDead/ScriptGlobals peers (#36387/#36199); continue toward \u22643.5k"
+            "note": "SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml proxies wiring + ScopeLifecycle/LlvmConstants/FreeDead/ScriptGlobals peers (#36387/#36199); continue toward ≤3.5k"
         },
         "lib/JIT/ContextEditScaffoldModuleRebind.php": {
             "budget": 315,
@@ -274,14 +274,19 @@
             "note": "TYPE_ECHO/PRINT/EVAL runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/ContextDefineBuiltinFunctionProxies.php": {
-            "budget": 142,
+            "budget": 63,
             "target": 200,
-            "note": "SPL SplObjectStorage/container thin-AOT functionProxies hub; SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml peers (#36387)"
+            "note": "is_null + Weak*/PhpToken + Fiber/Generator/ClosureBind hub; SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml peers (#36387)"
         },
         "lib/JIT/ContextDefineBuiltinFunctionProxiesDirectoryAndFile.php": {
             "budget": 151,
             "target": 200,
             "note": "Directory/DirectoryIterator/FilesystemIterator/RecursiveDirectoryIterator/SplFileInfo/SplFileObject/SplTempFileObject/GlobIterator proxies extracted from FunctionProxies (#36387)"
+        },
+        "lib/JIT/ContextDefineBuiltinFunctionProxiesSplContainers.php": {
+            "budget": 109,
+            "target": 200,
+            "note": "SplObjectStorage/SplPriorityQueue/SplDllist/SplFixedArray thin-AOT proxies extracted from FunctionProxies (#36387)"
         },
         "lib/JIT/ContextDefineBuiltinFunctionProxiesSplIterators.php": {
             "budget": 182,
