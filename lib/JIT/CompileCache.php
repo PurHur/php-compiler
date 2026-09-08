@@ -16,6 +16,7 @@ require_once __DIR__.'/CompileCacheProjectEntryMembers.php';
 require_once __DIR__.'/CompileCacheProjectIndex.php';
 require_once __DIR__.'/CompileCacheKeyLayout.php';
 require_once __DIR__.'/CompileCacheBitcodePersist.php';
+require_once __DIR__.'/CompileCacheRecordingMemberPath.php';
 require_once __DIR__.'/CompileCacheRecording.php';
 require_once __DIR__.'/CompileCacheEditSession.php';
 require_once __DIR__.'/CompileCacheProjectMembers.php';
@@ -39,7 +40,7 @@ require_once __DIR__.'/CompileCacheKeyLayoutFacade.php';
  * + {@see CompileCachePartialEmitLlvm}. Artifact mid-tier: {@see CompileCacheArtifactPersist}
  * / {@see CompileCacheObjectLinkPersist} / {@see CompileCacheArtifactFacade}. Edit-scaffold:
  * EditScaffold{,Plan,Restore,Strip} + EditSession. Project index + entry→members +
- * KeyLayout + BitcodePersist + Recording + HubState (#36387 / #36403).
+ * KeyLayout + BitcodePersist + Recording (+ MemberPath) + HubState (#36387 / #36403).
  */
 final class CompileCache
 {
@@ -47,6 +48,7 @@ final class CompileCache
     use CompileCacheKeyLayoutFacade;
     use CompileCacheEditScaffold;
     use CompileCacheBitcodePersist;
+    use CompileCacheRecordingMemberPath;
     use CompileCacheRecording;
     use CompileCacheEditSession;
     use CompileCacheProjectMembers;
