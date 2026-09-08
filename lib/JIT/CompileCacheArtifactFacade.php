@@ -7,12 +7,11 @@ namespace PHPCompiler\JIT;
 /**
  * Artifact / object mid-tier warm restore facade for AOT CompileCache (#36387).
  *
- * Thin public delegates onto {@see CompileCacheArtifactPersist} so the hub keeps
- * ratcheting under the size-budget split-TU program. Distinct from KeyLayout path
- * helpers, SemanticHash planning, and ProjectIndex remember/lookup.
+ * Thin public delegates onto {@see CompileCacheArtifactPersist} (`aot.bin`) and
+ * {@see CompileCacheObjectLinkPersist} (`.o` + helper link manifest). Distinct from
+ * KeyLayout, SemanticHash, and ProjectIndex facades.
  *
- * Move-only — no new C ABI. php-src analogy: Zend opcache file cache load/store
- * for a script image (Zend/zend_file_cache.c) separate from key identity hashing.
+ * Move-only — no new C ABI. php-src: Zend/zend_file_cache.c load/store shape.
  */
 trait CompileCacheArtifactFacade
 {
@@ -44,39 +43,39 @@ trait CompileCacheArtifactFacade
         CompileCacheArtifactPersist::saveArtifact($key, $outfile);
     }
 
-    /** @see CompileCacheArtifactPersist::hasFreshObject() */
+    /** @see CompileCacheObjectLinkPersist::hasFreshObject() */
     public static function hasFreshObject(string $key, string $sourcePath, string $sourceCode): bool
     {
-        return CompileCacheArtifactPersist::hasFreshObject($key, $sourcePath, $sourceCode);
+        return CompileCacheObjectLinkPersist::hasFreshObject($key, $sourcePath, $sourceCode);
     }
 
     /**
      * @return array{version: int, helper_slugs: list<string>}|null
      *
-     * @see CompileCacheArtifactPersist::readLinkManifest()
+     * @see CompileCacheObjectLinkPersist::readLinkManifest()
      */
     public static function readLinkManifest(string $key): ?array
     {
-        return CompileCacheArtifactPersist::readLinkManifest($key);
+        return CompileCacheObjectLinkPersist::readLinkManifest($key);
     }
 
     /**
      * @param list<string> $helperSlugs basenames under helper-runtime units/
      *
-     * @see CompileCacheArtifactPersist::saveObject()
+     * @see CompileCacheObjectLinkPersist::saveObject()
      */
     public static function saveObject(string $key, string $objectFile, array $helperSlugs): void
     {
-        CompileCacheArtifactPersist::saveObject($key, $objectFile, $helperSlugs);
+        CompileCacheObjectLinkPersist::saveObject($key, $objectFile, $helperSlugs);
     }
 
-    /** @see CompileCacheArtifactPersist::tryRestoreObjectAndLink() */
+    /** @see CompileCacheObjectLinkPersist::tryRestoreObjectAndLink() */
     public static function tryRestoreObjectAndLink(
         string $key,
         string $outfile,
         string $sourcePath,
         string $sourceCode
     ): bool {
-        return CompileCacheArtifactPersist::tryRestoreObjectAndLink($key, $outfile, $sourcePath, $sourceCode);
+        return CompileCacheObjectLinkPersist::tryRestoreObjectAndLink($key, $outfile, $sourcePath, $sourceCode);
     }
 }
