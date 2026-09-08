@@ -8241,6 +8241,7 @@
         "lib/VM/Concern/DeclareClassLikeDispatch.php",
         "lib/VM/Concern/DeprecationNoticeEmit.php",
         "lib/VM/Concern/EchoPrintEvalDispatch.php",
+        "lib/VM/Concern/EmptyAndBooleanNotDispatch.php",
         "lib/VM/Concern/ExecuteIncDecAndScopeOperandRead.php",
         "lib/VM/Concern/FiberStartResumeAndThrow.php",
         "lib/VM/Concern/ForeachIterDispatch.php",
@@ -8763,9 +8764,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8529,
+        "inventory_files": 8530,
         "excluded": 0,
-        "eligible": 8529,
+        "eligible": 8530,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
