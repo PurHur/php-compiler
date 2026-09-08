@@ -10,6 +10,7 @@ use PHPCompiler\Config;
 require_once __DIR__.'/HelperRuntimeFingerprint.php';
 require_once __DIR__.'/HelperRuntimeLink.php';
 require_once __DIR__.'/HelperRuntimeBind.php';
+require_once __DIR__.'/HelperRuntimeIndex.php';
 
 /**
  * Incremental split-compilation cache for php-in-PHP JIT helpers (#15889).
@@ -43,7 +44,8 @@ require_once __DIR__.'/HelperRuntimeBind.php';
  *
  * Fingerprint / identity / unit-deps hashing lives in {@see HelperRuntimeFingerprint};
  * link selection + unit.o safety gates live in {@see HelperRuntimeLink};
- * bitcode bind / type localize / lifecycle live in {@see HelperRuntimeBind}
+ * bitcode bind / type localize / lifecycle live in {@see HelperRuntimeBind};
+ * unit manifest / helperIndex scan lives in {@see HelperRuntimeIndex}
  * (#36387 / #36403 size-budget ratchet).
  */
 final class HelperRuntimeCache
@@ -57,9 +59,6 @@ final class HelperRuntimeCache
 
     /** Marker for a warmed cache at a given core fingerprint (#15889). */
     private const CORE_MARKER_PREFIX = 'core-';
-
-    /** @var array<string, array{symbol: string, dir: string}>|null logical(lower) → binding */
-    private static ?array $helperIndex = null;
 
     public static function enabled(): bool
     {
@@ -134,7 +133,7 @@ final class HelperRuntimeCache
             @mkdir(\dirname($marker), 0755, true);
             @file_put_contents($marker, 'ok '.gmdate('c')."\n");
             // Any new units should be visible immediately.
-            self::$helperIndex = null;
+            HelperRuntimeIndex::invalidate();
         }
     }
 
@@ -351,99 +350,42 @@ final class HelperRuntimeCache
     }
 
 
-    /** @return array{fingerprint: string, unit: string, helpers: array<string,string>}|null */
+    /**
+     * @see HelperRuntimeIndex::unitManifest()
+     *
+     * @return array{fingerprint: string, unit: string, helpers: array<string,string>}|null
+     */
     public static function unitManifest(string $slug, ?string $unitDir = null): ?array
     {
-        $path = ($unitDir ?? self::unitDir($slug)).'/manifest.json';
-        if (!is_readable($path)) {
-            return null;
-        }
-        $decoded = json_decode((string) file_get_contents($path), true);
-        if (!\is_array($decoded) || !isset($decoded['fingerprint'], $decoded['helpers']) || !\is_array($decoded['helpers'])) {
-            return null;
-        }
-
-        return $decoded;
+        return HelperRuntimeIndex::unitManifest($slug, $unitDir);
     }
 
-    /** @return array{fingerprint: string, rc: int}|null persisted crash marker */
+    /**
+     * @see HelperRuntimeIndex::unitFailure()
+     *
+     * @return array{fingerprint: string, rc: int}|null persisted crash marker
+     */
     public static function unitFailure(string $slug): ?array
     {
-        $path = self::unitDir($slug).'/failed.json';
-        if (!is_readable($path)) {
-            return null;
-        }
-        $decoded = json_decode((string) file_get_contents($path), true);
-
-        return \is_array($decoded) && isset($decoded['fingerprint']) ? $decoded : null;
+        return HelperRuntimeIndex::unitFailure($slug);
     }
 
     /**
      * logical(lower) → {symbol, dir} across all FRESH unit manifests.
-     * Built lazily once per process; adding a unit invalidates nothing else.
      *
-     * The local build cache is scanned first and wins; the committed per-arch
-     * prelinked cache (a fresh clone's warm start) fills the gaps. Stale
-     * entries in either tier are skipped per unit — a stale committed cache
-     * can only make a build slower, never wrong.
+     * @see HelperRuntimeIndex::helperIndex()
      *
      * @return array<string, array{symbol: string, dir: string}>
      */
     public static function helperIndex(): array
     {
-        if (null !== self::$helperIndex) {
-            return self::$helperIndex;
-        }
-        $index = [];
-        $root = \dirname(__DIR__, 2);
-        foreach ([self::unitsDir(), self::prelinkedUnitsDir()] as $unitsRoot) {
-            foreach (glob($unitsRoot.'/*/manifest.json') ?: [] as $manifestPath) {
-                $unitDir = \dirname($manifestPath);
-                $slug = basename($unitDir);
-                $manifest = self::unitManifest($slug, $unitDir);
-                if (null === $manifest) {
-                    continue;
-                }
-                $sourceAbs = self::resolveUnitSource($root, (string) $manifest['unit']);
-                if (null === $sourceAbs || !self::manifestFingerprintMatches($manifest, $sourceAbs)) {
-                    continue; // stale — emitter will refresh it
-                }
-                if (!self::unitObjectIsSafeToLink($unitDir) || !is_file($unitDir.'/unit.bc')) {
-                    continue;
-                }
-                if (!isset($manifest['init_symbol']) || '' === (string) $manifest['init_symbol']) {
-                    continue; // pre-init-era unit: its module state never runs — unusable (#16075 step 4)
-                }
-                if (isset($manifest['runtime_safe']) && false === $manifest['runtime_safe']) {
-                    continue; // known cross-module ABI hazard (baked class ids) — see emitter blocklist
-                }
-                foreach ($manifest['helpers'] as $logical => $symbol) {
-                    if (isset($index[$logical])) {
-                        continue; // build cache outranks prelinked
-                    }
-                    $index[$logical] = [
-                        'symbol' => (string) $symbol,
-                        'dir' => $unitDir,
-                        'init' => (string) $manifest['init_symbol'],
-                        'shutdown' => isset($manifest['shutdown_symbol']) ? (string) $manifest['shutdown_symbol'] : null,
-                        'init_via_global_ctor' => !empty($manifest['init_via_global_ctor']),
-                    ];
-                }
-            }
-        }
-
-        return self::$helperIndex = $index;
+        return HelperRuntimeIndex::helperIndex();
     }
 
+    /** @see HelperRuntimeIndex::resolveUnitSource() */
     public static function resolveUnitSource(string $root, string $unitPath): ?string
     {
-        if (str_starts_with($unitPath, '/ext/') || str_starts_with($unitPath, '/lib/')) {
-            $abs = $root.$unitPath;
-        } else {
-            $abs = $root.'/lib'.$unitPath;
-        }
-
-        return is_file($abs) ? $abs : null;
+        return HelperRuntimeIndex::resolveUnitSource($root, $unitPath);
     }
 
     /**

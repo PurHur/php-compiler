@@ -118,6 +118,8 @@ final class HelperRuntimeCacheFingerprintTest extends TestCase
         $this->assertFileExists($root.'/lib/AOT/HelperRuntimeLink.php');
         $this->assertStringContainsString('HelperRuntimeBind::tryProvide', $hub);
         $this->assertFileExists($root.'/lib/AOT/HelperRuntimeBind.php');
+        $this->assertStringContainsString('HelperRuntimeIndex::helperIndex', $hub);
+        $this->assertFileExists($root.'/lib/AOT/HelperRuntimeIndex.php');
         $this->assertNotSame(
             HelperRuntimeCache::coreFingerprint(),
             HelperRuntimeCache::legacyLoweringFingerprint(),
@@ -327,13 +329,10 @@ final class HelperRuntimeCacheFingerprintTest extends TestCase
             copy($prelinkedDir.'/unit.bc', $buildDir.'/unit.bc');
             touch($buildDir.'/unit.o');
 
-            $ref = new \ReflectionClass(HelperRuntimeCache::class);
+            $ref = new \ReflectionClass(HelperRuntimeIndex::class);
             $unitsProp = $ref->getProperty('helperIndex');
             $unitsProp->setAccessible(true);
             $unitsProp->setValue(null, null);
-
-            $scan = $ref->getMethod('helperIndex');
-            $scan->setAccessible(true);
 
             // Mirror helperIndex scan: empty build unit.o must not win over prelinked.
             $index = [];
