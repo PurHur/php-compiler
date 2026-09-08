@@ -34,9 +34,9 @@
             "note": "helper-cache granularity; Fingerprint+Link+Bind extracts (#36387/#36403); sorted linkObjects (#36399); refusePrelinkGcMixReason (#36401)"
         },
         "lib/JIT/CompileCache.php": {
-            "budget": 56,
+            "budget": 57,
             "target": 2000,
-            "note": "docblock compact + ObjectLinkPersist hub require (#36387/#36403); MCJIT/AOT warm cache extracts"
+            "note": "docblock compact + ProjectEntryMembers hub require (#36387/#36403); MCJIT/AOT warm cache extracts"
         },
         "lib/JIT/CompileCacheArtifactPersist.php": {
             "budget": 136,
@@ -84,9 +84,9 @@
             "note": "SemanticHash + SemanticFileParts public delegates extracted from CompileCache (#36387)"
         },
         "lib/JIT/CompileCacheProjectIndexFacade.php": {
-            "budget": 104,
+            "budget": 105,
             "target": 200,
-            "note": "Project index / entry\u2192members public delegates extracted from CompileCache (#36387)"
+            "note": "Project index + entry\u2192members public delegates extracted from CompileCache (#36387)"
         },
         "lib/JIT/CompileCacheHubState.php": {
             "budget": 106,
@@ -127,6 +127,16 @@
             "budget": 211,
             "target": 400,
             "note": "Glue + per-function semantic parts / diffFunctionsForStrip; consume in SemanticFunctionConsume (#36387)"
+        },
+        "lib/JIT/CompileCacheProjectIndex.php": {
+            "budget": 150,
+            "target": 250,
+            "note": "Project identity / member hashes / edit-scaffold key; entry\u2192members in CompileCacheProjectEntryMembers (#36387)"
+        },
+        "lib/JIT/CompileCacheProjectEntryMembers.php": {
+            "budget": 124,
+            "target": 200,
+            "note": "Entry\u2192member-path durability for warm/edit boots extracted from ProjectIndex (#36387/#36199)"
         }
     },
     "script_file_count": {
