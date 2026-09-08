@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8483 |
-| Phase A inventory files (M2 ratio SSOT) | 8483 |
+| PHP files on vm.php path | 8484 |
+| Phase A inventory files (M2 ratio SSOT) | 8484 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26579 |
+| Source constructs flagged (warnings) | 26581 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7589,7 +7589,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/TraitMethodFunctionStatic.php` | 0 | 4 |
 | `lib/TryCatchElseSyntaxRejector.php` | 0 | 2 |
 | `lib/TypedFunctionStaticSyntaxRejector.php` | 0 | 2 |
-| `lib/VM.php` | 0 | 37 |
+| `lib/VM.php` | 0 | 36 |
 | `lib/VM/AbstractPropertyHookCheck.php` | 0 | 1 |
 | `lib/VM/ArrayAccessDimension.php` | 0 | 3 |
 | `lib/VM/ArrayObjectJitHelper.php` | 0 | 23 |
@@ -8119,6 +8119,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/Concern/IssetDispatch.php` | 0 | 4 |
 | `lib/VM/Concern/IteratorToArrayConvert.php` | 0 | 10 |
 | `lib/VM/Concern/MethodCallAndStaticCallableInit.php` | 0 | 7 |
+| `lib/VM/Concern/NewDispatch.php` | 0 | 3 |
 | `lib/VM/Concern/ObjectPropertyCollectAndSerialize.php` | 0 | 25 |
 | `lib/VM/Concern/ObjectPropertyFetchDispatch.php` | 0 | 7 |
 | `lib/VM/Concern/ObjectPropertyHooks.php` | 0 | 35 |
@@ -62351,42 +62352,41 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 291)
-- new ObjectEntry (line 415)
-- new Variable (line 424)
-- new Variable (line 453)
-- new VM\GeneratorUncaughtThrow (line 468)
-- new VM\FiberUncaughtThrow (line 482)
-- new VM\DestructorThrowCatchSignal (line 487)
-- new Variable (line 637)
-- new Variable (line 653)
-- new Error (line 773)
-- new Func\PHP (line 1356)
-- new ClosureState (line 1368)
-- new Variable (line 1403)
-- new CompileError (line 1496)
-- new Func\PHP (line 1506)
-- new Variable (line 1639)
-- new Variable (line 1648)
-- new VM\ClassEntry (line 1699)
-- new ClassEntry (line 1735)
-- new Variable (line 1749)
-- new Variable (line 1752)
-- new ClassEntry (line 1790)
-- new CompileError (line 1835)
-- new ClassEntry (line 1862)
-- new CompileError (line 1927)
-- new ObjectEntry (line 2066)
-- new WeakMapIterator (line 2613)
-- new ObjectPropertyIterator (line 2618)
-- new Variable (line 2873)
-- new Error (line 3333)
-- new ClassEntry (line 3369)
-- new Variable (line 3370)
-- new VM\ClassProperty (line 3371)
-- new ObjectEntry (line 3374)
-- new Variable (line 3377)
-- new Variable (line 3403)
+- new Variable (line 293)
+- new ObjectEntry (line 417)
+- new Variable (line 426)
+- new Variable (line 455)
+- new VM\GeneratorUncaughtThrow (line 470)
+- new VM\FiberUncaughtThrow (line 484)
+- new VM\DestructorThrowCatchSignal (line 489)
+- new Variable (line 639)
+- new Variable (line 655)
+- new Error (line 775)
+- new Func\PHP (line 1358)
+- new ClosureState (line 1370)
+- new Variable (line 1405)
+- new CompileError (line 1498)
+- new Func\PHP (line 1508)
+- new Variable (line 1641)
+- new Variable (line 1650)
+- new VM\ClassEntry (line 1701)
+- new ClassEntry (line 1737)
+- new Variable (line 1751)
+- new Variable (line 1754)
+- new ClassEntry (line 1792)
+- new CompileError (line 1837)
+- new ClassEntry (line 1864)
+- new CompileError (line 1929)
+- new WeakMapIterator (line 2506)
+- new ObjectPropertyIterator (line 2511)
+- new Variable (line 2766)
+- new Error (line 3226)
+- new ClassEntry (line 3262)
+- new Variable (line 3263)
+- new VM\ClassProperty (line 3264)
+- new ObjectEntry (line 3267)
+- new Variable (line 3270)
+- new Variable (line 3296)
 - 28 class method(s)
 
 ### `lib/VM/AbstractPropertyHookCheck.php`
@@ -66138,6 +66138,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new VM\EnumFromHandler (line 242)
 - 9 class method(s)
 - 3 closure(s)
+
+### `lib/VM/Concern/NewDispatch.php`
+
+**Warnings** (review for bootstrap subset):
+- trait NewDispatch (line 21)
+- new ObjectEntry (line 122)
+- 1 class method(s)
 
 ### `lib/VM/Concern/ObjectPropertyCollectAndSerialize.php`
 
