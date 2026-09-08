@@ -34,9 +34,9 @@
             "note": "helper-cache granularity; Fingerprint+Link+Bind extracts (#36387/#36403); sorted linkObjects (#36399); refusePrelinkGcMixReason (#36401)"
         },
         "lib/JIT/CompileCache.php": {
-            "budget": 59,
+            "budget": 61,
             "target": 2000,
-            "note": "docblock compact + RecordingMemberPath hub require (#36387/#36403); MCJIT/AOT warm cache extracts"
+            "note": "docblock compact + BitcodeRestore hub require (#36387/#36403); MCJIT/AOT warm cache extracts"
         },
         "lib/JIT/CompileCacheArtifactPersist.php": {
             "budget": 136,
@@ -147,6 +147,16 @@
             "budget": 100,
             "target": 200,
             "note": "LLVM-symbol \u2192 project-member path attribution extracted from Recording (#36387/#36199)"
+        },
+        "lib/JIT/CompileCacheBitcodePersist.php": {
+            "budget": 137,
+            "target": 250,
+            "note": "MCJIT bitcode meta/stamp persist; warm tryRestore in CompileCacheBitcodeRestore (#36387/#36199)"
+        },
+        "lib/JIT/CompileCacheBitcodeRestore.php": {
+            "budget": 121,
+            "target": 200,
+            "note": "MCJIT bitcode warm tryRestore / export rebind extracted from BitcodePersist (#36387/#36199)"
         }
     },
     "script_file_count": {

@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8471 |
-| Phase A inventory files (M2 ratio SSOT) | 8471 |
+| PHP files on vm.php path | 8472 |
+| Phase A inventory files (M2 ratio SSOT) | 8472 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26556 |
+| Source constructs flagged (warnings) | 26558 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7165,6 +7165,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/CompileCacheArtifactFacade.php` | 0 | 2 |
 | `lib/JIT/CompileCacheArtifactPersist.php` | 0 | 1 |
 | `lib/JIT/CompileCacheBitcodePersist.php` | 0 | 2 |
+| `lib/JIT/CompileCacheBitcodeRestore.php` | 0 | 2 |
 | `lib/JIT/CompileCacheEditScaffold.php` | 0 | 1 |
 | `lib/JIT/CompileCacheEditScaffoldPlan.php` | 0 | 2 |
 | `lib/JIT/CompileCacheEditScaffoldRestore.php` | 0 | 2 |
@@ -58825,8 +58826,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/CompileCacheBitcodePersist.php`
 
 **Warnings** (review for bootstrap subset):
-- trait CompileCacheBitcodePersist (line 22)
-- 6 class method(s)
+- trait CompileCacheBitcodePersist (line 20)
+- 2 class method(s)
+
+### `lib/JIT/CompileCacheBitcodeRestore.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CompileCacheBitcodeRestore (line 20)
+- 4 class method(s)
 
 ### `lib/JIT/CompileCacheEditScaffold.php`
 
@@ -63165,7 +63172,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/ReflectionClassGetConstant.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 42)
+- new Variable (line 43)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/ReflectionClassGetConstants.php`
@@ -63261,8 +63268,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/ReflectionClassGetMethod.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 41)
-- new Variable (line 47)
+- new ObjectEntry (line 42)
+- new Variable (line 48)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/ReflectionClassGetMethods.php`
@@ -63299,8 +63306,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/ReflectionClassGetProperty.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
-- new Variable (line 44)
+- new ArgumentCountError (line 25)
+- new Variable (line 45)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/ReflectionClassGetReadOnlyProperties.php`
@@ -63311,8 +63318,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/ReflectionClassGetReflectionConstant.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 46)
-- new Variable (line 58)
+- new ObjectEntry (line 47)
+- new Variable (line 59)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/ReflectionClassGetReflectionConstants.php`
@@ -63694,19 +63701,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/ReflectionEnumGetBackingType.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 25)
+- new ArgumentCountError (line 26)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/ReflectionEnumGetCase.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
+- new ArgumentCountError (line 25)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/ReflectionEnumGetCases.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
+- new ArgumentCountError (line 25)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/ReflectionEnumGetName.php`
@@ -63717,13 +63724,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/ReflectionEnumHasCase.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
+- new ArgumentCountError (line 25)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/ReflectionEnumIsBacked.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
+- new ArgumentCountError (line 25)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/ReflectionEnumUnitCaseConstruct.php`
@@ -63958,8 +63965,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/ReflectionFunctionGetNamedArguments.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 40)
-- new Variable (line 44)
+- new Variable (line 41)
+- new Variable (line 45)
 - 3 class method(s)
 
 ### `lib/VM/Builtin/ReflectionFunctionGetNamespaceName.php`
@@ -64266,15 +64273,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/ReflectionMethodGetParameters.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 37)
-- new ObjectEntry (line 41)
-- new Variable (line 49)
+- new Variable (line 38)
+- new ObjectEntry (line 42)
+- new Variable (line 50)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/ReflectionMethodGetPrototype.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 42)
+- new Variable (line 43)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/ReflectionMethodGetReturnType.php`
@@ -64565,20 +64572,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/ReflectionPropertyAccessProbe.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 29)
-- new self (line 34)
-- new ArgumentCountError (line 49)
-- new Error (line 172)
+- new self (line 30)
+- new self (line 35)
+- new ArgumentCountError (line 50)
+- new Error (line 173)
 - 8 class method(s)
 
 ### `lib/VM/Builtin/ReflectionPropertyAsymmetricProbe.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 27)
-- new self (line 32)
-- new self (line 37)
-- new self (line 42)
-- new self (line 47)
+- new self (line 28)
+- new self (line 33)
+- new self (line 38)
+- new self (line 43)
+- new self (line 48)
 - 6 class method(s)
 
 ### `lib/VM/Builtin/ReflectionPropertyConstruct.php`
@@ -64589,8 +64596,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/ReflectionPropertyGetAsymmetricVisibility.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 59)
-- new Variable (line 63)
+- new Variable (line 60)
+- new Variable (line 64)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/ReflectionPropertyGetAttributes.php`
@@ -64643,7 +64650,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/ReflectionPropertyGetRawValue.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 38)
+- new Error (line 39)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/ReflectionPropertyGetReadableType.php`
@@ -64770,21 +64777,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/ReflectionPropertySetRawValue.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
-- new Error (line 39)
+- new ArgumentCountError (line 25)
+- new Error (line 40)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/ReflectionPropertySetRawValueWithoutLazyInitialization.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 39)
+- new Error (line 40)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/ReflectionPropertySetValue.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 25)
-- new ArgumentCountError (line 52)
+- new ArgumentCountError (line 26)
+- new ArgumentCountError (line 53)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/ReflectionPropertySkipLazyInitialization.php`
@@ -64816,7 +64823,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/ReflectionSourceGetter.php`
 
 **Warnings** (review for bootstrap subset):
-- new SourceLocation (line 37)
+- new SourceLocation (line 38)
 - 5 class method(s)
 
 ### `lib/VM/Builtin/ReflectionTypeAllowsNull.php`
@@ -66374,15 +66381,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/DateIntervalSupport.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 210)
-- new Variable (line 319)
-- new Variable (line 321)
-- new Variable (line 332)
-- new Variable (line 336)
-- new Variable (line 339)
-- new Variable (line 342)
-- new Variable (line 349)
-- new Error (line 449)
+- new ObjectEntry (line 211)
+- new Variable (line 320)
+- new Variable (line 322)
+- new Variable (line 333)
+- new Variable (line 337)
+- new Variable (line 340)
+- new Variable (line 343)
+- new Variable (line 350)
+- new Error (line 450)
 - 23 class method(s)
 
 ### `lib/VM/DatePeriodIteratorJitHelper.php`
@@ -66400,30 +66407,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/DatePeriodSupport.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 68)
-- new Error (line 89)
-- new Exception (line 171)
-- new DatePeriodIteratorState (line 215)
-- new ObjectEntry (line 356)
-- new ObjectEntry (line 491)
-- new NativeDateMalformedPeriodStringException (line 502)
-- new Variable (line 745)
-- new Variable (line 749)
-- new Variable (line 754)
-- new Variable (line 757)
-- new Error (line 774)
-- new Error (line 780)
-- new Error (line 784)
-- new Error (line 788)
-- new Error (line 792)
-- new Error (line 796)
-- new Error (line 801)
-- new Error (line 805)
-- new Error (line 809)
-- new Error (line 813)
-- new Error (line 817)
-- new ObjectEntry (line 827)
-- new Error (line 860)
+- new Variable (line 69)
+- new Error (line 90)
+- new Exception (line 172)
+- new DatePeriodIteratorState (line 216)
+- new ObjectEntry (line 357)
+- new ObjectEntry (line 492)
+- new NativeDateMalformedPeriodStringException (line 503)
+- new Variable (line 746)
+- new Variable (line 750)
+- new Variable (line 755)
+- new Variable (line 758)
+- new Error (line 775)
+- new Error (line 781)
+- new Error (line 785)
+- new Error (line 789)
+- new Error (line 793)
+- new Error (line 797)
+- new Error (line 802)
+- new Error (line 806)
+- new Error (line 810)
+- new Error (line 814)
+- new Error (line 818)
+- new ObjectEntry (line 828)
+- new Error (line 861)
 - 48 class method(s)
 
 ### `lib/VM/DateTimeFormatJitHelper.php`
@@ -67261,10 +67268,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/ReflectionPropertyHookSupport.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassProperty (line 111)
-- new Variable (line 111)
-- new ObjectEntry (line 200)
-- new Variable (line 204)
+- new ClassProperty (line 112)
+- new Variable (line 112)
+- new ObjectEntry (line 201)
+- new Variable (line 205)
 - 11 class method(s)
 
 ### `lib/VM/ReflectionPropertyTypeSupport.php`
@@ -67282,59 +67289,59 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/ReflectionSupport.php`
 
 **Warnings** (review for bootstrap subset):
-- new ReflectionException (line 265)
-- new ArgumentCountError (line 283)
-- new AttributeEntry (line 300)
-- new Variable (line 320)
-- new ObjectEntry (line 327)
-- new Variable (line 336)
-- new Variable (line 349)
-- new Variable (line 353)
-- new Variable (line 356)
-- new Variable (line 377)
-- new Variable (line 413)
-- new Variable (line 432)
-- new Variable (line 451)
-- new Error (line 477)
-- new Error (line 481)
-- new Error (line 484)
-- new Error (line 487)
-- new Error (line 490)
-- new ObjectEntry (line 492)
-- new Variable (line 493)
-- new Variable (line 504)
-- new Error (line 522)
-- new Variable (line 528)
-- new Error (line 534)
-- new Error (line 552)
-- new Error (line 558)
-- new Variable (line 560)
-- new Error (line 827)
-- new Error (line 860)
-- new Error (line 880)
-- new Error (line 912)
-- new Error (line 954)
-- new ObjectEntry (line 1388)
-- new Variable (line 1390)
-- new AttributeEntry (line 2029)
-- new Variable (line 2597)
-- new ParameterMetadata (line 2603)
-- new CfgType\Nullable (line 2704)
-- new Variable (line 3678)
-- new Variable (line 3726)
-- new Variable (line 3785)
-- new ObjectEntry (line 4044)
-- new SourceLocation (line 4072)
-- new ParameterMetadata (line 4548)
-- new ObjectEntry (line 4620)
-- new ObjectEntry (line 4637)
-- new ObjectEntry (line 4862)
-- new ObjectEntry (line 4875)
-- new Variable (line 4955)
-- new ObjectEntry (line 5080)
-- new ObjectEntry (line 5100)
-- new Variable (line 5308)
-- new Variable (line 5506)
+- new ReflectionException (line 266)
+- new ArgumentCountError (line 284)
+- new AttributeEntry (line 301)
+- new Variable (line 321)
+- new ObjectEntry (line 328)
+- new Variable (line 337)
+- new Variable (line 350)
+- new Variable (line 354)
+- new Variable (line 357)
+- new Variable (line 378)
+- new Variable (line 414)
+- new Variable (line 433)
+- new Variable (line 452)
+- new Error (line 478)
+- new Error (line 482)
+- new Error (line 485)
+- new Error (line 488)
+- new Error (line 491)
+- new ObjectEntry (line 493)
+- new Variable (line 494)
+- new Variable (line 505)
+- new Error (line 523)
+- new Variable (line 529)
+- new Error (line 535)
+- new Error (line 553)
+- new Error (line 559)
+- new Variable (line 561)
+- new Error (line 828)
+- new Error (line 861)
+- new Error (line 881)
+- new Error (line 913)
+- new Error (line 955)
+- new ObjectEntry (line 1389)
+- new Variable (line 1391)
+- new AttributeEntry (line 2030)
+- new Variable (line 2598)
+- new ParameterMetadata (line 2604)
+- new CfgType\Nullable (line 2705)
+- new Variable (line 3679)
+- new Variable (line 3727)
+- new Variable (line 3786)
+- new ObjectEntry (line 4045)
+- new SourceLocation (line 4073)
+- new ParameterMetadata (line 4549)
+- new ObjectEntry (line 4621)
+- new ObjectEntry (line 4638)
+- new ObjectEntry (line 4863)
+- new ObjectEntry (line 4876)
+- new Variable (line 4956)
+- new ObjectEntry (line 5081)
+- new ObjectEntry (line 5101)
+- new Variable (line 5309)
+- new Variable (line 5507)
 - 271 class method(s)
 - 4 closure(s)
 
