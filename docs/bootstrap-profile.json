@@ -7386,6 +7386,8 @@
         "lib/JIT/ContextEditScaffoldModuleRebind.php",
         "lib/JIT/ContextFunctionProxyAndNestedJitKernel.php",
         "lib/JIT/ContextModuleCompileAndOptimize.php",
+        "lib/JIT/ContextStandaloneBodies.php",
+        "lib/JIT/ContextTypeAndStructMap.php",
         "lib/JIT/ContextVariableOperandBinding.php",
         "lib/JIT/DatePeriodForeachSnapshot.php",
         "lib/JIT/DeprecatedCallGuard.php",
@@ -8724,9 +8726,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8490,
+        "inventory_files": 8492,
         "excluded": 0,
-        "eligible": 8490,
+        "eligible": 8492,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
