@@ -23,9 +23,9 @@ final class ExternalMethodStubReportTest extends TestCase
 
     public function testExternalMethodRecordsAndReportsStubs(): void
     {
-        // reportExternalMethodStubs lives on ContextFunctionProxyAndNestedJitKernel (#36387 / #37401).
+        // reportExternalMethodStubs lives on ContextFunctionProxyExternalMethodStubReport (#36387).
         $source = (string) file_get_contents(
-            \dirname(__DIR__, 2).'/lib/JIT/ContextFunctionProxyAndNestedJitKernel.php'
+            \dirname(__DIR__, 2).'/lib/JIT/ContextFunctionProxyExternalMethodStubReport.php'
         );
 
         $this->assertStringContainsString(
@@ -68,7 +68,9 @@ final class ExternalMethodStubReportTest extends TestCase
         $this->assertFalse(getenv('PHP_COMPILER_REPORT_EXTERNAL_STUBS'));
         $this->assertFalse(getenv('PHP_COMPILER_FAIL_ON_EXTERNAL_STUBS'));
 
-        $source = (string) file_get_contents(\dirname(__DIR__, 2).'/lib/JIT/ContextFunctionProxyAndNestedJitKernel.php');
+        $source = (string) file_get_contents(
+            \dirname(__DIR__, 2).'/lib/JIT/ContextFunctionProxyExternalMethodStubReport.php'
+        );
         $body = substr(
             $source,
             (int) strpos($source, 'public function reportExternalMethodStubs(): void')
