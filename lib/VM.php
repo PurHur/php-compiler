@@ -51,6 +51,7 @@ require_once __DIR__.'/VM/Concern/FuncCallExecDispatch.php';
 require_once __DIR__.'/VM/Concern/ArgRecvDispatch.php';
 require_once __DIR__.'/VM/Concern/ScalarCastCompareArithConcatDispatch.php';
 require_once __DIR__.'/VM/Concern/ClassConstFetchDispatch.php';
+require_once __DIR__.'/VM/Concern/IssetDispatch.php';
 
 use PHPCompiler\BuiltinByRefParams;
 use PHPCompiler\Compiler\AttributeNames;
@@ -141,6 +142,7 @@ class VM {
     use ArgRecvDispatch;
     use ScalarCastCompareArithConcatDispatch;
     use ClassConstFetchDispatch;
+    use IssetDispatch;
     const SUCCESS = 1;
     const FAILURE = 2;
 
@@ -2470,213 +2472,14 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_ISSET:
-                    // Never mutate a hash-table bucket (or a stale FETCH_DIM read indirect)
-                    // in place when materialising the isset bool — slot reuse after
-                    // FETCH_DIM_IS left `$m[0]` as bool true for multi-arg nested isset (#36398 /
-                    // same class as #36380 Parsedown).
-                    $issetDstSlot = (int) $op->arg1;
-                    $dst = $frame->scope[$issetDstSlot];
-                    if (
-                        $dst->hashTableBucketCell
-                        || ($dst->isIndirect() && !$dst->phpReference && !$dst->propertyAssignLvalue)
-                    ) {
-                        $fresh = new Variable();
-                        $frame->scope[$issetDstSlot] = $fresh;
-                        $dst = $fresh;
+                    $issetOutcome = $this->executeIssetDispatch($frame, $op);
+                    if ($issetOutcome instanceof Frame) {
+                        $frame = $issetOutcome;
+                        goto restart;
                     }
-                    if (null === $op->arg3 && $this->isUnboundThisSlot($frame, (int) $op->arg2)) {
-                        $dst->bool(false);
-                        break;
+                    if (is_int($issetOutcome)) {
+                        return $issetOutcome;
                     }
-                    if (null !== $op->arg3) {
-                        if ($op->issetOnStaticProperty) {
-                            $lcClass = $this->resolveStaticPropertyClassLc($frame->scope[$op->arg2], $frame);
-                            $propNameRaw = $frame->scope[$op->arg3]->toString();
-                            $dst->bool($this->staticPropertyIsSetForCoalesceAssign($lcClass, $propNameRaw));
-                            break;
-                        }
-                        $container = $frame->scope[$op->arg2]->resolveIndirect();
-                        if (Variable::TYPE_ENUM_CASE === $container->type) {
-                            [$propName, $catchFrame] = $this->coerceRuntimeOperandToString(
-                                $frame->scope[$op->arg3],
-                                $frame
-                            );
-                            if (null !== $catchFrame) {
-                                $frame = $catchFrame;
-                                goto restart;
-                            }
-                            $catchFrame = $this->enforcePropertyName($propName, $frame);
-                            if (null !== $catchFrame) {
-                                $frame = $catchFrame;
-                                goto restart;
-                            }
-                            $dst->bool(EnumCaseSupport::propertyExistsOnCase(
-                                $container->toEnumCase()->enumClass,
-                                $propName
-                            ));
-                            break;
-                        }
-                        if (Variable::TYPE_ARRAY === $container->type) {
-                            if ($this->context->isGlobalsTable($container)) {
-                                $dst->bool($this->context->globalsTableOffsetIsSet($frame->scope[$op->arg3]));
-                                break;
-                            }
-                            if ($op->issetOnProperty) {
-                                $dst->bool(false);
-                                break;
-                            }
-                            try {
-                                $dst->bool($container->toArray()->offsetIsSet($frame->scope[$op->arg3], $frame));
-                            } catch (\TypeError $e) {
-                                $catchFrame = $this->dispatchVmTypeError($e, $frame);
-                                if (null !== $catchFrame) {
-                                    $frame = $catchFrame;
-                                    goto restart;
-                                }
-                            }
-                            break;
-                        }
-                        if (Variable::TYPE_OBJECT === $container->type) {
-                            $object = $container->toObject();
-                            if (EnumCaseSupport::isEnumCase($object)) {
-                                [$propName, $catchFrame] = $this->coerceRuntimeOperandToString(
-                                    $frame->scope[$op->arg3],
-                                    $frame
-                                );
-                                if (null !== $catchFrame) {
-                                    $frame = $catchFrame;
-                                    goto restart;
-                                }
-                                $catchFrame = $this->enforcePropertyName($propName, $frame);
-                                if (null !== $catchFrame) {
-                                    $frame = $catchFrame;
-                                    goto restart;
-                                }
-                                $dst->bool(EnumCaseSupport::propertyExistsOnCase($object->class, $propName));
-                                break;
-                            }
-                            if (
-                                !$op->issetOnProperty
-                                && null !== ($dimHandler = $this->context->findObjectDimensionHandler($object))
-                                && null !== $dimHandler->has
-                            ) {
-                                // isset($list[$i]) via extension has_dimension (php-src php_dom.c; #20311 / #36204).
-                                // TokenList illegal offsets TypeError (token_list.c; #23006).
-                                try {
-                                    $dst->bool(($dimHandler->has)(
-                                        $object,
-                                        $frame->scope[$op->arg3]
-                                    ));
-                                } catch (\TypeError $e) {
-                                    $catchFrame = $this->dispatchVmTypeError($e, $frame);
-                                    if (null !== $catchFrame) {
-                                        $frame = $catchFrame;
-                                        goto restart;
-                                    }
-                                }
-                                break;
-                            }
-                            if (
-                                !$op->issetOnProperty
-                                && $this->objectImplementsArrayAccess($object)
-                            ) {
-                                // ArrayObject/ArrayIterator native has_dimension(isset): null ≠ set (#24251).
-                                // User offsetExists overrides keep ArrayAccess isset == offsetExists (php-src).
-                                $nativeSplIsset = $this->nativeSplArrayDimensionIsSet(
-                                    $object,
-                                    $frame->scope[$op->arg3]
-                                );
-                                if (null !== $nativeSplIsset) {
-                                    $dst->bool($nativeSplIsset);
-                                    break;
-                                }
-                                // isset($obj[$k]) via ArrayAccess::offsetExists — not isset($obj->prop) (#19707).
-                                $existsOut = new Variable();
-                                $catchFrame = $this->invokeArrayAccessOffsetExists(
-                                    $object,
-                                    $frame->scope[$op->arg3],
-                                    $frame,
-                                    $existsOut
-                                );
-                                if (null !== $catchFrame) {
-                                    $frame = $catchFrame;
-                                    goto restart;
-                                }
-                                $dst->bool($existsOut->toBool());
-                                break;
-                            }
-                            if (!$op->issetOnProperty) {
-                                // Resource as array subject — isset soft-false like scalars (zend_execute.c, #30028).
-                                if (VM\ResourceSupport::isResourceObject($object)) {
-                                    $dst->bool(false);
-                                    break;
-                                }
-                                // isset($obj[$k]) without has_dimension / ArrayAccess — Zend Error
-                                // (ResourceBundle has read_dimension only; #25145).
-                                $catchFrame = $this->dispatchVmError(
-                                    'Cannot use object of type ' . $object->class->name . ' as array',
-                                    $frame
-                                );
-                                if (null !== $catchFrame) {
-                                    $frame = $catchFrame;
-                                    goto restart;
-                                }
-                                break;
-                            }
-                            [$propName, $catchFrame] = $this->coerceRuntimeOperandToString($frame->scope[$op->arg3], $frame);
-                            if (null !== $catchFrame) {
-                                $frame = $catchFrame;
-                                goto restart;
-                            }
-                            $catchFrame = $this->enforcePropertyName($propName, $frame);
-                            if (null !== $catchFrame) {
-                                $frame = $catchFrame;
-                                goto restart;
-                            }
-                            $catchFrame = $this->ensureLazyObjectInitialized($object, $frame);
-                            if (null !== $catchFrame) {
-                                $frame = $catchFrame;
-                                goto restart;
-                            }
-                            $object = VM\LazyObjectSupport::getLazyInstance($object);
-                            if (!$op->issetForCoalesceAssign) {
-                                $catchFrame = $this->enforceWriteOnlyVirtualPropertyRead($object, $propName, $frame);
-                                if (null !== $catchFrame) {
-                                    $frame = $catchFrame;
-                                    goto restart;
-                                }
-                            }
-                            $dst->bool(
-                                $op->issetForCoalesceAssign
-                                    ? $this->objectPropertyIsSetForCoalesceAssign($object, $propName, $frame)
-                                    : $this->objectPropertyIsSet($object, $propName, $frame)
-                            );
-                            break;
-                        }
-                        if (Variable::TYPE_STRING === $container->type) {
-                            if ($op->issetOnProperty) {
-                                $dst->bool(false);
-                                break;
-                            }
-                            $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
-                            $dst->bool(Variable::stringOffsetIsSetFromDim(
-                                $container,
-                                $frame->scope[$op->arg3],
-                                $this->context->errors,
-                                $this->context,
-                                $frame,
-                                $scriptFile
-                            ));
-                            break;
-                        }
-                        $dst->bool(false);
-                        break;
-                    }
-                    $value = $frame->scope[$op->arg2]->resolveIndirect();
-                    $dst->bool(
-                        !$value->isUndefined()
-                        && Variable::TYPE_NULL !== $value->type
-                    );
                     break;
                 case OpCode::TYPE_SCRIPT_MAGIC:
                     $dst = $frame->scope[$op->arg1];
