@@ -13,7 +13,7 @@ non-native link.
 
 ## Seed corpus (VM_* + lib_VM_* + ext/standard tiers)
 
-**192** committed `unit.o` files:
+**202** committed `unit.o` files:
 
 - full `VM_*` (13) and `lib_VM_*` (9) sets from `x86_64-linux`
 - first `ext/standard` tier (10): ArrayChunk / ArrayIsList / ArraySlice / Bin2hex /
@@ -61,6 +61,9 @@ non-native link.
   StreamMode / StreamNotification / StreamPath / StreamSocketAccept /
   StreamSocketGetName / StreamSocketPair / IncludePathResolver / MimeContentType /
   VarDump / StrRot13
+- OB / serialize / password / sleep / process (10): ObOutput / ObStatus /
+  ObGzhandler / ObOutputExecCapture / SerializeNested / SerializeObjectNested /
+  Password / Sleep / ProcessIdentity / ProcessSlot
 
 Refresh / expand via:
 

@@ -228,6 +228,19 @@ SEED_UNITS=(
   /ext/standard/MimeContentTypeJitHelper.php
   /ext/standard/VarDumpJitHelper.php
   /ext/standard/StrRot13JitHelper.php
+  # OB / serialize / password / sleep / process (#36391 after #37246)
+  # Preg* skipped: tip nested compile misses Compiler\Concern\OpCode (see #37246).
+  # Shuffle skipped: algorithm SSOT only (no HELPER_PATH) — same class as Frexp.
+  /ext/standard/ObOutputJitHelper.php
+  /ext/standard/ObStatusJitHelper.php
+  /ext/standard/ObGzhandlerJitHelper.php
+  /ext/standard/ObOutputExecCaptureJitHelper.php
+  /ext/standard/SerializeNestedJitHelper.php
+  /ext/standard/SerializeObjectNestedJitHelper.php
+  /ext/standard/PasswordJitHelper.php
+  /ext/standard/SleepJitHelper.php
+  /ext/standard/ProcessIdentityJitHelper.php
+  /ext/standard/ProcessSlotJitHelper.php
 )
 
 MIN_SEED=${#SEED_UNITS[@]}
