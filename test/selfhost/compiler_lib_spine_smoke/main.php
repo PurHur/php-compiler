@@ -7873,6 +7873,8 @@ require_once __DIR__.'/../../../lib/VM/Concern/NewDispatch.php';
 require_once __DIR__.'/../../../lib/VM/Concern/MethodCallInitDispatch.php';
 require_once __DIR__.'/../../../lib/VM/Concern/EchoPrintEvalDispatch.php';
 require_once __DIR__.'/../../../lib/VM/Concern/ForeachIterDispatch.php';
+require_once __DIR__.'/../../../lib/VM/Concern/CoalesceNullsafeSilenceExitDispatch.php';
+require_once __DIR__.'/../../../lib/VM/Concern/JumpCaseDispatch.php';
 require_once __DIR__.'/../../../lib/VM/ObjectPropertyIterator.php';
 require_once __DIR__.'/../../../lib/VM/ObjectReadonlySupport.php';
 require_once __DIR__.'/../../../lib/VM/ObjectRegistry.php';
