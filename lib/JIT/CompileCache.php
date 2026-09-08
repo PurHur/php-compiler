@@ -15,6 +15,7 @@ require_once __DIR__.'/CompileCacheProjectIndex.php';
 require_once __DIR__.'/CompileCacheKeyLayout.php';
 require_once __DIR__.'/CompileCacheBitcodePersist.php';
 require_once __DIR__.'/CompileCacheRecording.php';
+require_once __DIR__.'/CompileCacheEditSession.php';
 
 /**
  * On-disk MCJIT bitcode cache (issue #153).
@@ -32,7 +33,8 @@ require_once __DIR__.'/CompileCacheRecording.php';
  * multi-file project index / entry→members map lives in {@see CompileCacheProjectIndex};
  * cache-entry paths / freshness / fingerprint live in {@see CompileCacheKeyLayout};
  * MCJIT bitcode restore/persist lives in {@see CompileCacheBitcodePersist};
- * cold-emit recording / symbol membership maps live in {@see CompileCacheRecording}
+ * cold-emit recording / symbol membership maps live in {@see CompileCacheRecording};
+ * edit-scaffold session arm / state live in {@see CompileCacheEditSession}
  * (#36387 one-file-edit Done-when / #36403 size-budget split-TU).
  */
 final class CompileCache
@@ -40,6 +42,7 @@ final class CompileCache
     use CompileCacheEditScaffold;
     use CompileCacheBitcodePersist;
     use CompileCacheRecording;
+    use CompileCacheEditSession;
     /** @var list<array{llvm: string, signature: string, scoped: string}>|null */
     private static ?array $recordingExports = null;
 
@@ -144,147 +147,6 @@ final class CompileCache
         }
 
         return true;
-    }
-
-    public static function shouldSkipModuleFuncCompile(): bool
-    {
-        return self::$skipModuleFuncCompile;
-    }
-
-    public static function isEditScaffoldActive(): bool
-    {
-        return self::$editScaffoldActive;
-    }
-
-    /** True when edit-scaffold kept unchanged member bodies (#36387). */
-    public static function isEditScaffoldPartial(): bool
-    {
-        return self::$editScaffoldPartial;
-    }
-
-    /** True when edit-scaffold left this user LLVM body in the module (#36387). */
-    public static function isKeptUserSymbol(string $llvmName): bool
-    {
-        return '' !== $llvmName && isset(self::$keptUserSymbols[$llvmName]);
-    }
-
-    /**
-     * Prior `aot.o` for partial delta link, or null when full emit is required (#36387).
-     */
-    public static function peekPartialEmitBaseObject(): ?string
-    {
-        $path = self::$partialEmitBaseObject;
-        if (!is_string($path) || '' === $path || !is_file($path) || filesize($path) < 1) {
-            return null;
-        }
-
-        return $path;
-    }
-
-    /**
-     * Consume the base object path once (Linker inserts it after the delta `.o`) (#36387).
-     */
-    public static function consumePartialEmitBaseObject(): ?string
-    {
-        $path = self::peekPartialEmitBaseObject();
-        self::$partialEmitBaseObject = null;
-
-        return $path;
-    }
-
-    /**
-     * Before TargetMachine emit on partial keep: drop bodies that already exist in the
-     * prior `aot.o`, leaving declarations (#36387).
-     *
-     * @see CompileCachePartialEmitDemote::demoteBodiesForPartialObjectEmit()
-     *
-     * @return int number of functions demoted to declarations
-     */
-    public static function demoteBodiesForPartialObjectEmit(Context $context): int
-    {
-        return CompileCachePartialEmitDemote::demoteBodiesForPartialObjectEmit(
-            $context,
-            self::peekPartialEmitBaseObject(),
-            self::$editScaffoldPartial,
-            self::$strippedUserSymbols,
-            self::$keptUserSymbols
-        );
-    }
-
-    public static function isEditScaffoldBitcodeBound(): bool
-    {
-        return self::$editScaffoldBitcodeBound;
-    }
-
-    /**
-     * Context parsed prior module.bc before CreateNamed — register() may early-return (#36387).
-     */
-    public static function markEditScaffoldBitcodeBound(): void
-    {
-        self::$editScaffoldBitcodeBound = true;
-        self::$editScaffoldActive = true;
-        self::$skipModuleFuncCompile = true;
-    }
-
-    /**
-     * True when prior cache entry has module.bc + user_symbols (safe to thin-boot) (#36387).
-     */
-    public static function canUseEditScaffold(string $previousKey): bool
-    {
-        if ('' === $previousKey || !is_file(self::bitcodePath($previousKey))) {
-            return false;
-        }
-        $raw = json_decode((string) file_get_contents(self::metaPath($previousKey)), true);
-        if (!is_array($raw)) {
-            return false;
-        }
-        $user = $raw['user_symbols'] ?? null;
-        if (!is_array($user) || [] === $user) {
-            return false;
-        }
-
-        return null !== self::readLinkManifest($previousKey);
-    }
-
-    /**
-     * Arm edit-scaffold before Context construct (#36387).
-     *
-     * Thin boot loads prior module.bc first, then {@see Context::seedCoreTypesFromModuleForEditScaffold()}
-     * + type register early-returns bind PHP-side maps without CreateNamed collisions.
-     */
-    public static function armEditScaffold(string $previousKey): void
-    {
-        if ('' === $previousKey) {
-            return;
-        }
-        self::$pendingEditScaffoldKey = $previousKey;
-    }
-
-    public static function pendingEditScaffoldKey(): ?string
-    {
-        return self::$pendingEditScaffoldKey;
-    }
-
-    public static function takePendingEditScaffoldKey(): ?string
-    {
-        $key = self::$pendingEditScaffoldKey;
-        self::$pendingEditScaffoldKey = null;
-
-        return $key;
-    }
-
-    /**
-     * True while Context should register decls/types only (no implement IR) (#36387).
-     *
-     * Pending alone is not enough: {@see Context::tryBindEditScaffoldBitcodeBeforeBuiltins()}
-     * may fail to load module.bc while {@see armEditScaffold()} left a pending key. Skipping
-     * {@see SuperglobalInit::initialize()} in that case leaves {@see SuperglobalInit::$globals}
-     * empty and Slim/Composer rebuilds throw "Superglobal not initialized for JIT: _SERVER"
-     * (#36382). Only skip after thin-boot bound the prior module (or restore completed).
-     */
-    public static function shouldSkipBuiltinImplement(): bool
-    {
-        return self::$editScaffoldActive || self::$editScaffoldBitcodeBound;
     }
 
     /**
