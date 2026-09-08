@@ -32,24 +32,12 @@ require_once __DIR__.'/CompileCacheKeyLayoutFacade.php';
  * AOT warm rebuilds use {@see artifactPath()} / {@see objectPath()} for the fast path.
  * Full-module {@see bitcodePath()} also round-trips once void* lowers as i8* (#36387).
  *
- * Semantic hash / edit-strip planning lives in {@see CompileCacheSemanticHash}
- * (per-function parts in {@see CompileCacheSemanticFileParts} /
- * {@see CompileCacheSemanticFunctionConsume};
- * public hub delegates in {@see CompileCacheSemanticHashFacade});
- * partial-emit demote orchestration lives in {@see CompileCachePartialEmitDemote}
- * with LLVM surgery helpers in {@see CompileCachePartialEmitLlvm};
- * linked-binary / user-object mid-tier warm restore lives in {@see CompileCacheArtifactPersist};
- * edit-scaffold hub + plan + restore + LLVM strip live in {@see CompileCacheEditScaffold} / {@see CompileCacheEditScaffoldPlan} / {@see CompileCacheEditScaffoldRestore} / {@see CompileCacheEditScaffoldStrip};
- * multi-file project index / entry→members map lives in {@see CompileCacheProjectIndex}
- * (public hub delegates in {@see CompileCacheProjectIndexFacade});
- * cache-entry paths / freshness / fingerprint live in {@see CompileCacheKeyLayout};
- * MCJIT bitcode restore/persist lives in {@see CompileCacheBitcodePersist};
- * cold-emit recording / symbol membership maps live in {@see CompileCacheRecording};
- * edit-scaffold session arm / state live in {@see CompileCacheEditSession};
- * project member path list / compile entry live in {@see CompileCacheProjectMembers};
- * artifact / object mid-tier warm restore live in {@see CompileCacheArtifactFacade};
- * shared recording / edit-scaffold / partial-emit fields live in {@see CompileCacheHubState}
- * (#36387 one-file-edit Done-when / #36403 size-budget split-TU).
+ * Semantic hash / edit-strip: {@see CompileCacheSemanticHash} (+ FileParts /
+ * FunctionConsume / HashFacade). Partial-emit: {@see CompileCachePartialEmitDemote}
+ * + {@see CompileCachePartialEmitLlvm}. Artifact mid-tier: {@see CompileCacheArtifactPersist}
+ * / {@see CompileCacheArtifactFacade}. Edit-scaffold: EditScaffold{,Plan,Restore,Strip}
+ * + EditSession. Project index/members + KeyLayout + BitcodePersist + Recording +
+ * HubState (#36387 one-file-edit Done-when / #36403 size-budget split-TU).
  */
 final class CompileCache
 {
