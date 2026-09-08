@@ -10,6 +10,7 @@ require_once __DIR__.'/CompileCacheSemanticHash.php';
 require_once __DIR__.'/CompileCachePartialEmitLlvm.php';
 require_once __DIR__.'/CompileCachePartialEmitDemote.php';
 require_once __DIR__.'/CompileCacheArtifactPersist.php';
+require_once __DIR__.'/CompileCacheObjectLinkPersist.php';
 require_once __DIR__.'/CompileCacheEditScaffold.php';
 require_once __DIR__.'/CompileCacheProjectIndex.php';
 require_once __DIR__.'/CompileCacheKeyLayout.php';
@@ -35,9 +36,9 @@ require_once __DIR__.'/CompileCacheKeyLayoutFacade.php';
  * Semantic hash / edit-strip: {@see CompileCacheSemanticHash} (+ FileParts /
  * FunctionConsume / HashFacade). Partial-emit: {@see CompileCachePartialEmitDemote}
  * + {@see CompileCachePartialEmitLlvm}. Artifact mid-tier: {@see CompileCacheArtifactPersist}
- * / {@see CompileCacheArtifactFacade}. Edit-scaffold: EditScaffold{,Plan,Restore,Strip}
- * + EditSession. Project index/members + KeyLayout + BitcodePersist + Recording +
- * HubState (#36387 one-file-edit Done-when / #36403 size-budget split-TU).
+ * / {@see CompileCacheObjectLinkPersist} / {@see CompileCacheArtifactFacade}. Edit-scaffold:
+ * EditScaffold{,Plan,Restore,Strip} + EditSession. Project index/members + KeyLayout +
+ * BitcodePersist + Recording + HubState (#36387 one-file-edit / #36403 size-budget).
  */
 final class CompileCache
 {

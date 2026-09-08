@@ -34,9 +34,19 @@
             "note": "helper-cache granularity; Fingerprint+Link+Bind extracts (#36387/#36403); sorted linkObjects (#36399); refusePrelinkGcMixReason (#36401)"
         },
         "lib/JIT/CompileCache.php": {
-            "budget": 55,
+            "budget": 56,
             "target": 2000,
-            "note": "docblock compact after SemanticFunctionConsume hub require (#36403); MCJIT/AOT warm cache; SemanticFileParts + SemanticHashFacades + PartialEmitDemote(+Llvm) + ArtifactPersist + EditScaffold(+Plan+Strip+Restore) + ProjectIndexFacade + KeyLayoutFacade + HubState + BitcodePersist + Recording + EditSession + ProjectMembers + ArtifactFacade extracts (#36387/#36403) "
+            "note": "docblock compact + ObjectLinkPersist hub require (#36387/#36403); MCJIT/AOT warm cache extracts"
+        },
+        "lib/JIT/CompileCacheArtifactPersist.php": {
+            "budget": 136,
+            "target": 250,
+            "note": "Linked aot.bin warm restore; object/link mid-tier in CompileCacheObjectLinkPersist (#36387)"
+        },
+        "lib/JIT/CompileCacheObjectLinkPersist.php": {
+            "budget": 163,
+            "target": 250,
+            "note": "User .o + helper-slug link-manifest mid-tier warm restore extracted from ArtifactPersist (#36387/#36199)"
         },
         "lib/JIT/CompileCachePartialEmitDemote.php": {
             "budget": 140,
@@ -114,9 +124,9 @@
             "note": "File-level semantic hash + strip member diff; per-function parts extracted (#36387)"
         },
         "lib/JIT/CompileCacheSemanticFileParts.php": {
-            "budget": 326,
+            "budget": 211,
             "target": 400,
-            "note": "Glue + per-function semantic parts / diffFunctionsForStrip extracted from SemanticHash (#36387)"
+            "note": "Glue + per-function semantic parts / diffFunctionsForStrip; consume in SemanticFunctionConsume (#36387)"
         }
     },
     "script_file_count": {

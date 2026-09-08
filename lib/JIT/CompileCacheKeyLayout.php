@@ -80,7 +80,7 @@ final class CompileCacheKeyLayout
     /**
      * Emitted user-script object for mid-tier restore (#36387 / #36199).
      *
-     * When `aot.bin` is missing but this `.o` is fresh, {@see CompileCacheArtifactPersist::tryRestoreObjectAndLink()}
+     * When `aot.bin` is missing but this `.o` is fresh, {@see CompileCacheObjectLinkPersist::tryRestoreObjectAndLink()}
      * skips LLVM Context / emitToFile and only re-runs the system link with the recorded
      * helper-runtime unit slugs.
      */
