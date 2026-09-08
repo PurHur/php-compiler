@@ -8252,6 +8252,7 @@
         "lib/VM/Concern/IssetDispatch.php",
         "lib/VM/Concern/IteratorToArrayConvert.php",
         "lib/VM/Concern/JumpCaseDispatch.php",
+        "lib/VM/Concern/ListUnpackAndSpreadAssignDispatch.php",
         "lib/VM/Concern/MethodCallAndStaticCallableInit.php",
         "lib/VM/Concern/MethodCallInitDispatch.php",
         "lib/VM/Concern/NewDispatch.php",
@@ -8757,9 +8758,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8523,
+        "inventory_files": 8524,
         "excluded": 0,
-        "eligible": 8523,
+        "eligible": 8524,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
