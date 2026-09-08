@@ -58,12 +58,22 @@ trait HoistedUnaryAssignAndInlineProducerCallArgSlots
         if (null === $unaryArg || $argIndex !== $unaryArg) {
             return null;
         }
+        // Only rewrite dead inline temps. Named locals / params must keep their slot —
+        // otherwise `-1 === fseek($stream, $offset)` steals the compare UnaryMinus as
+        // the seek offset (IR: fseek(handle, -1, SEEK_SET) → always fails) (#36382).
+        $callArg = $cfgCallOp->args[$argIndex] ?? null;
+        if (!$this->callArgIsDeadInlineTemporary($callArg)) {
+            return null;
+        }
         $callIndex = $this->cfgCallOpIndexInChildren($block->orig->children, $cfgCallOp, $block->orig);
         if (null === $callIndex || $callIndex < 1) {
             return null;
         }
         $immediate = $block->orig->children[$callIndex - 1] ?? null;
-        if ('fseek' === $name && 1 === $argIndex) {
+        // fseek($s, -N, SEEK_*) — UnaryMinus sits before ConstFetch whence (#16523).
+        // Only skip the whence prelude when it is actually ConstFetch; bare 2-arg
+        // fseek($s, -N) keeps callIndex-1 as the UnaryMinus.
+        if ('fseek' === $name && 1 === $argIndex && $immediate instanceof Op\Expr\ConstFetch) {
             $immediate = $block->orig->children[$callIndex - 2] ?? null;
         }
         if (!$immediate instanceof Op\Expr\UnaryMinus && !$immediate instanceof Op\Expr\UnaryPlus) {

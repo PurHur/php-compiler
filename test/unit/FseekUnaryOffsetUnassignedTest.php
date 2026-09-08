@@ -12,7 +12,9 @@ final class FseekUnaryOffsetUnassignedTest extends TestCase
     public function testFseekNegativeSeekEndOffsetWithoutAssignment(): void
     {
         $root = dirname(__DIR__, 2);
-        $path = $root.'/test/repro/maintainer_gap_var_dump_ftell_fgetc_regression.php';
+        // Was maintainer_gap_var_dump_ftell_fgetc_regression.php (dropped in #16681);
+        // same shape kept as maintainer_gap_fseek_var_dump.php.
+        $path = $root.'/test/repro/maintainer_gap_fseek_var_dump.php';
         $cmd = 'php '.escapeshellarg($root.'/bin/vm.php').' '.escapeshellarg($path).' 2>/dev/null';
         $out = shell_exec($cmd);
         self::assertSame("int(2)\nstring(1) \"c\"\n", $out);
