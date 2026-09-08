@@ -41,6 +41,7 @@ require_once __DIR__.'/VM/Concern/ClassScopeAndStaticPropertyResolve.php';
 require_once __DIR__.'/VM/Concern/IncludePathAndClassPseudoConst.php';
 require_once __DIR__.'/VM/Concern/IteratorToArrayConvert.php';
 require_once __DIR__.'/VM/Concern/PropertyHookFrameAndStaticLink.php';
+require_once __DIR__.'/VM/Concern/ConstructMarkAndPendingOutboundCall.php';
 
 use PHPCompiler\BuiltinByRefParams;
 use PHPCompiler\Compiler\AttributeNames;
@@ -121,6 +122,7 @@ class VM {
     use IncludePathAndClassPseudoConst;
     use IteratorToArrayConvert;
     use PropertyHookFrameAndStaticLink;
+    use ConstructMarkAndPendingOutboundCall;
     const SUCCESS = 1;
     const FAILURE = 2;
 
@@ -7025,75 +7027,6 @@ restart:
 
         return false;
     }
-
-    private function markObjectConstructedIfLeavingConstruct(Frame $frame): void
-    {
-        if (!$this->isConstructFrame($frame)) {
-            return;
-        }
-        if (empty($frame->calledArgs)) {
-            return;
-        }
-        $thisArg = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_OBJECT !== $thisArg->type) {
-            return;
-        }
-        $thisArg->toObject()->constructed = true;
-    }
-
-    private function markPendingNewObjectConstructed(Frame $frame): void
-    {
-        if (empty($frame->callArgs)) {
-            return;
-        }
-        $objVar = $frame->callArgs[0]->resolveIndirect();
-        if (Variable::TYPE_OBJECT !== $objVar->type) {
-            return;
-        }
-        $objVar->toObject()->constructed = true;
-    }
-
-    private function isConstructFrame(Frame $frame): bool
-    {
-        $func = $frame->block->func ?? null;
-        if (null === $func) {
-            return false;
-        }
-        $name = strtolower($func->name);
-
-        return '__construct' === $name || str_ends_with($name, '::__construct');
-    }
-
-    /**
-     * Inline `new` or nested FUNCCALL_INIT in a call arg overwrites pending outbound call state (#15217, #17970).
-     */
-    private function savePendingOutboundCallForInlineNew(Frame $frame): void
-    {
-        if (null === $frame->call) {
-            return;
-        }
-        $frame->pendingOutboundCallRestore[] = [
-            'call' => $frame->call,
-            'callArgs' => $frame->callArgs,
-            'callArgEntries' => $frame->callArgEntries,
-            'callSiteLine' => $frame->callSiteLine,
-            'builtinCalleeQualifiedMethod' => $frame->builtinCalleeQualifiedMethod,
-        ];
-    }
-
-    private function restorePendingOutboundCallAfterInlineNew(Frame $frame): void
-    {
-        if ([] === $frame->pendingOutboundCallRestore) {
-            return;
-        }
-        $saved = array_pop($frame->pendingOutboundCallRestore);
-        $frame->call = $saved['call'];
-        $frame->callArgs = $saved['callArgs'];
-        $frame->callArgEntries = $saved['callArgEntries'];
-        $frame->callSiteLine = $saved['callSiteLine'];
-        $frame->builtinCalleeQualifiedMethod = $saved['builtinCalleeQualifiedMethod'];
-    }
-
 
     protected function scopeSlot(Frame $frame, int $slot): Variable
     {
