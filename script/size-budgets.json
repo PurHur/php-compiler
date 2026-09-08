@@ -34,9 +34,9 @@
             "note": "helper-cache granularity; Fingerprint+Link+Bind extracts (#36387/#36403); sorted linkObjects (#36399); refusePrelinkGcMixReason (#36401)"
         },
         "lib/JIT/CompileCache.php": {
-            "budget": 57,
+            "budget": 59,
             "target": 2000,
-            "note": "docblock compact + ProjectEntryMembers hub require (#36387/#36403); MCJIT/AOT warm cache extracts"
+            "note": "docblock compact + RecordingMemberPath hub require (#36387/#36403); MCJIT/AOT warm cache extracts"
         },
         "lib/JIT/CompileCacheArtifactPersist.php": {
             "budget": 136,
@@ -59,9 +59,9 @@
             "note": "Partial-edit LLVM rename+declaration demote + const-global prune + nm symbol probe (#36387)"
         },
         "lib/JIT/CompileCacheRecording.php": {
-            "budget": 276,
-            "target": 400,
-            "note": "Cold-emit recording / symbol membership maps extracted from CompileCache (#36387)"
+            "budget": 196,
+            "target": 300,
+            "note": "Cold-emit recording / symbol maps; member-path attribution in CompileCacheRecordingMemberPath (#36387)"
         },
         "lib/JIT/CompileCacheEditSession.php": {
             "budget": 161,
@@ -142,6 +142,11 @@
             "budget": 336,
             "target": 500,
             "note": "TYPE_FUNCCALL_EXEC_RETURN/NORETURN runFramesInner body extracted from VM.php (#36403)"
+        },
+        "lib/JIT/CompileCacheRecordingMemberPath.php": {
+            "budget": 100,
+            "target": 200,
+            "note": "LLVM-symbol \u2192 project-member path attribution extracted from Recording (#36387/#36199)"
         }
     },
     "script_file_count": {
