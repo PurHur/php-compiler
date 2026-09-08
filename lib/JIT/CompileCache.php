@@ -18,6 +18,7 @@ require_once __DIR__.'/CompileCacheRecording.php';
 require_once __DIR__.'/CompileCacheEditSession.php';
 require_once __DIR__.'/CompileCacheProjectMembers.php';
 require_once __DIR__.'/CompileCacheArtifactFacade.php';
+require_once __DIR__.'/CompileCacheSemanticHashFacade.php';
 
 /**
  * On-disk MCJIT bitcode cache (issue #153).
@@ -28,7 +29,8 @@ require_once __DIR__.'/CompileCacheArtifactFacade.php';
  * AOT warm rebuilds use {@see artifactPath()} / {@see objectPath()} for the fast path.
  * Full-module {@see bitcodePath()} also round-trips once void* lowers as i8* (#36387).
  *
- * Semantic hash / edit-strip planning lives in {@see CompileCacheSemanticHash};
+ * Semantic hash / edit-strip planning lives in {@see CompileCacheSemanticHash}
+ * (public hub delegates in {@see CompileCacheSemanticHashFacade});
  * partial-emit demote lives in {@see CompileCachePartialEmitDemote};
  * linked-binary / user-object mid-tier warm restore lives in {@see CompileCacheArtifactPersist};
  * edit-scaffold restore/strip/rebind lives in {@see CompileCacheEditScaffold};
@@ -49,6 +51,7 @@ final class CompileCache
     use CompileCacheEditSession;
     use CompileCacheProjectMembers;
     use CompileCacheArtifactFacade;
+    use CompileCacheSemanticHashFacade;
     /** @var list<array{llvm: string, signature: string, scoped: string}>|null */
     private static ?array $recordingExports = null;
 
@@ -236,122 +239,6 @@ final class CompileCache
     {
         return CompileCacheKeyLayout::hasDurableMarker($key);
     }
-
-
-    /**
-     * @param array<string, string> $previous
-     * @param array<string, string> $current
-     *
-     * @return list<string>
-     *
-     * @see CompileCacheSemanticHash::diffMemberHashes()
-     */
-    public static function diffMemberHashes(array $previous, array $current): array
-    {
-        return CompileCacheSemanticHash::diffMemberHashes($previous, $current);
-    }
-
-    /**
-     * SHA-256 of PHP tokens with comments and whitespace removed (#36387).
-     *
-     * @see CompileCacheSemanticHash::semanticFileHash()
-     */
-    public static function semanticFileHash(string $path): ?string
-    {
-        return CompileCacheSemanticHash::semanticFileHash($path);
-    }
-
-    /**
-     * Split a PHP file into glue (non-function) + per-function semantic hashes (#36387).
-     *
-     * @return array{glue: string, functions: array<string, string>}|null
-     *
-     * @see CompileCacheSemanticHash::semanticFileParts()
-     */
-    public static function semanticFileParts(string $path): ?array
-    {
-        return CompileCacheSemanticHash::semanticFileParts($path);
-    }
-
-    /**
-     * @param list<string> $memberPaths
-     *
-     * @return array{functions: array<string, array<string, string>>, glue: array<string, string>}
-     *
-     * @see CompileCacheSemanticHash::memberSemanticParts()
-     */
-    public static function memberSemanticParts(array $memberPaths): array
-    {
-        return CompileCacheSemanticHash::memberSemanticParts($memberPaths);
-    }
-
-    /**
-     * Per-function strip plan for members that already failed the file-level semantic check.
-     *
-     * @param array<string, array<string, string>>|null $previousFunctions
-     * @param array<string, array<string, string>>|null $currentFunctions
-     * @param array<string, string>|null               $previousGlue
-     * @param array<string, string>|null               $currentGlue
-     * @param list<string>                             $stripMembers
-     *
-     * @return array<string, array<string, true>>
-     *
-     * @see CompileCacheSemanticHash::diffFunctionsForStrip()
-     */
-    public static function diffFunctionsForStrip(
-        ?array $previousFunctions,
-        ?array $currentFunctions,
-        ?array $previousGlue,
-        ?array $currentGlue,
-        array $stripMembers
-    ): array {
-        return CompileCacheSemanticHash::diffFunctionsForStrip(
-            $previousFunctions,
-            $currentFunctions,
-            $previousGlue,
-            $currentGlue,
-            $stripMembers
-        );
-    }
-
-    /**
-     * @param list<string> $memberPaths
-     *
-     * @return array<string, string> path → semantic sha256
-     *
-     * @see CompileCacheSemanticHash::memberSemanticHashes()
-     */
-    public static function memberSemanticHashes(array $memberPaths): array
-    {
-        return CompileCacheSemanticHash::memberSemanticHashes($memberPaths);
-    }
-
-    /**
-     * Members that must strip LLVM bodies: byte-changed AND semantically changed (#36387).
-     *
-     * @param array<string, string>      $previousBytes
-     * @param array<string, string>      $currentBytes
-     * @param array<string, string>|null $previousSemantic
-     * @param array<string, string>|null $currentSemantic
-     *
-     * @return list<string>
-     *
-     * @see CompileCacheSemanticHash::diffMembersForStrip()
-     */
-    public static function diffMembersForStrip(
-        array $previousBytes,
-        array $currentBytes,
-        ?array $previousSemantic,
-        ?array $currentSemantic
-    ): array {
-        return CompileCacheSemanticHash::diffMembersForStrip(
-            $previousBytes,
-            $currentBytes,
-            $previousSemantic,
-            $currentSemantic
-        );
-    }
-
     /**
      * Project identity = sorted member realpaths (content-independent) (#36387).
      *

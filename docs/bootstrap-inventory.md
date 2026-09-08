@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8449 |
-| Phase A inventory files (M2 ratio SSOT) | 8449 |
+| PHP files on vm.php path | 8450 |
+| Phase A inventory files (M2 ratio SSOT) | 8450 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26519 |
+| Source constructs flagged (warnings) | 26521 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7173,6 +7173,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/CompileCacheProjectMembers.php` | 0 | 2 |
 | `lib/JIT/CompileCacheRecording.php` | 0 | 2 |
 | `lib/JIT/CompileCacheSemanticHash.php` | 0 | 1 |
+| `lib/JIT/CompileCacheSemanticHashFacade.php` | 0 | 2 |
 | `lib/JIT/CompilerOperandChainNative.php` | 0 | 3 |
 | `lib/JIT/Concern/AdaptByRefCallArgs.php` | 0 | 2 |
 | `lib/JIT/Concern/AssignOperand.php` | 0 | 24 |
@@ -49481,10 +49482,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/CallArgDimAdjacentFilterInputMapMergeLogicalMultisortValueSlots.php`
 
 **Warnings** (review for bootstrap subset):
-- trait CallArgDimAdjacentFilterInputMapMergeLogicalMultisortValueSlots (line 25)
-- new Operand\Temporary (line 123)
-- new Operand\Temporary (line 252)
-- new OpCode (line 254)
+- trait CallArgDimAdjacentFilterInputMapMergeLogicalMultisortValueSlots (line 26)
+- new Operand\Temporary (line 124)
+- new Operand\Temporary (line 253)
+- new OpCode (line 255)
 - 1 class method(s)
 - 2 closure(s)
 
@@ -49561,7 +49562,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/CallArgNestedAdjacentSiblingVarExportMergeForceConstPreludeValueSlots.php`
 
 **Warnings** (review for bootstrap subset):
-- trait CallArgNestedAdjacentSiblingVarExportMergeForceConstPreludeValueSlots (line 24)
+- trait CallArgNestedAdjacentSiblingVarExportMergeForceConstPreludeValueSlots (line 25)
 - 1 class method(s)
 
 ### `lib/Compiler/Concern/CallArgNullLiteralHoistedPropertyConstAndCoalesceValueSlots.php`
@@ -58787,7 +58788,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/CompileCache.php`
 
 **Warnings** (review for bootstrap subset):
-- 29 class method(s)
+- 22 class method(s)
 
 ### `lib/JIT/CompileCacheArtifactFacade.php`
 
@@ -58850,6 +58851,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 8 class method(s)
+
+### `lib/JIT/CompileCacheSemanticHashFacade.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CompileCacheSemanticHashFacade (line 18)
+- 7 class method(s)
 
 ### `lib/JIT/CompilerOperandChainNative.php`
 
