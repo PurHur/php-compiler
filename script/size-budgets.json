@@ -179,9 +179,9 @@
             "note": "TYPE_CLASS_CONST_FETCH runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/Context.php": {
-            "budget": 1445,
+            "budget": 1041,
             "target": 3500,
-            "note": "DefineBuiltins + CompileToFile + EditScaffold + VariableOperandBinding + FunctionProxyAndNestedJitKernel + TypeAndStructMap + StandaloneBodies + ModuleCompileAndOptimize + ScriptGlobalsAndIncludeTracking extracted (#36387); continue toward ≤3.5k"
+            "note": "ModuleCompileAndOptimize + ScriptGlobalsAndIncludeTracking + LlvmConstantsAndRegistry + StandaloneBodies + peers (#36387/#36199); continue toward ≤3.5k"
         },
         "lib/JIT/ContextEditScaffoldModuleRebind.php": {
             "budget": 315,
@@ -252,6 +252,11 @@
             "budget": 296,
             "target": 400,
             "note": "Script-global slots + JIT include/helper-TU compile tracking extracted from Context (#36387)"
+        },
+        "lib/JIT/ContextLlvmConstantsAndRegistry.php": {
+            "budget": 433,
+            "target": 500,
+            "note": "lookupFunction / registerType / namedStructType / constantFrom* / constantArray|ObjectFromVm extracted from Context (#36387)"
         }
     },
     "script_file_count": {
