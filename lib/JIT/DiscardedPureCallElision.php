@@ -4460,20 +4460,24 @@ final class DiscardedPureCallElision
      *   with chained smul overflow→float (twentysixth × n)
      * - {@code $n ** 28} / {@code pow($n, 28)} → {@code (((((($n*$n*$n)*($n*$n*$n))*n)*((($n*$n*$n)*($n*$n*$n))*n))*(((($n*$n*$n)*($n*$n*$n))*n)*((($n*$n*$n)*($n*$n*$n))*n)))}
      *   with chained smul overflow→float (fourteenth × fourteenth)
+     * - {@code $n ** 29} / {@code pow($n, 29)} → {@code ((((((($n*$n*$n)*($n*$n*$n))*n)*((($n*$n*$n)*($n*$n*$n))*n))*(((($n*$n*$n)*($n*$n*$n))*n)*((($n*$n*$n)*($n*$n*$n))*n)))*$n}
+     *   with chained smul overflow→float (twentyeighth × n)
+     * - {@code $n ** 30} / {@code pow($n, 30)} → {@code (((((($n*$n*$n)*($n*$n*$n))*n)*((($n*$n*$n)*($n*$n*$n))*n))*$n)*((((($n*$n*$n)*($n*$n*$n))*n)*((($n*$n*$n)*($n*$n*$n))*n))*$n)}
+     *   with chained smul overflow→float (fifteenth × fifteenth)
      *
      * Omits {@code llvm.pow.f64} and the siToFp/fpToSi round-trip on the
      * integer fast path ({@see \PHPCompiler\ext\standard\JitPow}). Peer
      * compile-time {@code * 1} identity ({@see nativeLongArithIsCompileTimeIdentityOrZero})
      * and {@code * 2^k} shl ({@see nativeLongMulCompileTimePowerOfTwoShift}).
      *
-     * Float exponents ({@code 0.0}/{@code 1.0}/{@code 2.0}/{@code 3.0}/{@code 4.0}/{@code 5.0}/{@code 6.0}/{@code 7.0}/{@code 8.0}/{@code 9.0}/{@code 10.0}/{@code 11.0}/{@code 12.0}/{@code 13.0}/{@code 14.0}/{@code 15.0}/{@code 16.0}/{@code 17.0}/{@code 18.0}/{@code 19.0}/{@code 20.0}/{@code 21.0}/{@code 22.0}/{@code 23.0}/{@code 24.0}/{@code 25.0}/{@code 26.0}/{@code 27.0}/{@code 28.0}) stay
+     * Float exponents ({@code 0.0}/{@code 1.0}/{@code 2.0}/{@code 3.0}/{@code 4.0}/{@code 5.0}/{@code 6.0}/{@code 7.0}/{@code 8.0}/{@code 9.0}/{@code 10.0}/{@code 11.0}/{@code 12.0}/{@code 13.0}/{@code 14.0}/{@code 15.0}/{@code 16.0}/{@code 17.0}/{@code 18.0}/{@code 19.0}/{@code 20.0}/{@code 21.0}/{@code 22.0}/{@code 23.0}/{@code 24.0}/{@code 25.0}/{@code 26.0}/{@code 27.0}/{@code 28.0}/{@code 29.0}/{@code 30.0}) stay
      * on the float path — Zend returns {@code float} for those shapes.
      *
      * php-src: Zend/zend_operators.c {@code pow_function} /
      * {@code zend_pow} / {@code mul_function}; ext/standard/math.c
      * {@code PHP_FUNCTION(pow)}.
      *
-     * @return 'one'|'identity'|'square'|'cube'|'fourth'|'fifth'|'sixth'|'seventh'|'eighth'|'ninth'|'tenth'|'eleventh'|'twelfth'|'thirteenth'|'fourteenth'|'fifteenth'|'sixteenth'|'seventeenth'|'eighteenth'|'nineteenth'|'twentieth'|'twentyfirst'|'twentysecond'|'twentythird'|'twentyfourth'|'twentyfifth'|'twentysixth'|'twentyseventh'|'twentyeighth'|'twentyninth'|null fold to 1, keep base, mul square/cube/fourth/fifth/sixth/seventh/eighth/ninth/tenth/eleventh/twelfth/thirteenth/fourteenth/fifteenth/sixteenth/seventeenth/eighteenth/nineteenth/twentieth/twentyfirst/twentysecond/twentythird/twentyfourth/twentyfifth/twentysixth/twentyseventh/twentyeighth/twentyninth, or null
+     * @return 'one'|'identity'|'square'|'cube'|'fourth'|'fifth'|'sixth'|'seventh'|'eighth'|'ninth'|'tenth'|'eleventh'|'twelfth'|'thirteenth'|'fourteenth'|'fifteenth'|'sixteenth'|'seventeenth'|'eighteenth'|'nineteenth'|'twentieth'|'twentyfirst'|'twentysecond'|'twentythird'|'twentyfourth'|'twentyfifth'|'twentysixth'|'twentyseventh'|'twentyeighth'|'twentyninth'|'thirtieth'|null fold to 1, keep base, mul square/cube/fourth/fifth/sixth/seventh/eighth/ninth/tenth/eleventh/twelfth/thirteenth/fourteenth/fifteenth/sixteenth/seventeenth/eighteenth/nineteenth/twentieth/twentyfirst/twentysecond/twentythird/twentyfourth/twentyfifth/twentysixth/twentyseventh/twentyeighth/twentyninth/thirtieth, or null
     */
     public static function nativeLongPowCompileTimeExponentFold(
         Variable $exponent
@@ -4571,6 +4575,9 @@ final class DiscardedPureCallElision
         }
         if (29 === $e) {
             return 'twentyninth';
+        }
+        if (30 === $e) {
+            return 'thirtieth';
         }
 
         return null;
