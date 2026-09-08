@@ -52,6 +52,7 @@ require_once __DIR__.'/ContextFunctionProxyExternalMethodStubReport.php';
 require_once __DIR__.'/ContextFunctionProxyRegistration.php';
 require_once __DIR__.'/ContextFunctionProxyAndNestedJitKernel.php';
 require_once __DIR__.'/ContextTypeAndStructMap.php';
+require_once __DIR__.'/ContextStructFieldMap.php';
 require_once __DIR__.'/ContextStandaloneBodies.php';
 require_once __DIR__.'/ContextModuleCompileAndOptimize.php';
 require_once __DIR__.'/ContextModuleVerify.php';
@@ -87,6 +88,7 @@ class Context {
     use ContextFunctionProxyRegistration;
     use ContextFunctionProxyAndNestedJitKernel;
     use ContextTypeAndStructMap;
+    use ContextStructFieldMap;
     use ContextStandaloneBodies;
     use ContextModuleCompileAndOptimize;
     use ContextModuleVerify;
