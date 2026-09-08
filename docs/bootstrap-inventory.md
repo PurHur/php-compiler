@@ -7298,10 +7298,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/VmSmokeAndRuntimeM3NativeStubs.php` | 0 | 10 |
 | `lib/JIT/Context.php` | 0 | 10 |
 | `lib/JIT/ContextCompileToFile.php` | 0 | 3 |
-| `lib/JIT/ContextDefineBuiltinFunctionProxies.php` | 0 | 40 |
+| `lib/JIT/ContextDefineBuiltinFunctionProxies.php` | 0 | 16 |
 | `lib/JIT/ContextDefineBuiltinFunctionProxiesDateAndXml.php` | 0 | 67 |
 | `lib/JIT/ContextDefineBuiltinFunctionProxiesDirectoryAndFile.php` | 0 | 10 |
 | `lib/JIT/ContextDefineBuiltinFunctionProxiesReflectionAndException.php` | 0 | 165 |
+| `lib/JIT/ContextDefineBuiltinFunctionProxiesSplContainers.php` | 0 | 26 |
 | `lib/JIT/ContextDefineBuiltinFunctionProxiesSplIterators.php` | 0 | 32 |
 | `lib/JIT/ContextDefineBuiltins.php` | 0 | 2 |
 | `lib/JIT/ContextEditScaffoldModuleRebind.php` | 0 | 2 |
@@ -59874,16 +59875,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Context.php`
 
 **Warnings** (review for bootstrap subset):
-- new ExtensionLoweringHooks (line 851)
-- new Scope (line 852)
-- new Analyzer (line 881)
-- new Helper (line 882)
-- new Builtin\Refcount (line 883)
-- new Builtin\Output (line 885)
-- new Builtin\Type (line 886)
-- new Builtin\Internal (line 887)
-- new Builtin\VarArg (line 888)
-- new Builtin\ErrorHandler (line 889)
+- new ExtensionLoweringHooks (line 853)
+- new Scope (line 854)
+- new Analyzer (line 883)
+- new Helper (line 884)
+- new Builtin\Refcount (line 885)
+- new Builtin\Output (line 887)
+- new Builtin\Type (line 888)
+- new Builtin\Internal (line 889)
+- new Builtin\VarArg (line 890)
+- new Builtin\ErrorHandler (line 891)
 
 ### `lib/JIT/ContextCompileToFile.php`
 
@@ -59895,45 +59896,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ContextDefineBuiltinFunctionProxies.php`
 
 **Warnings** (review for bootstrap subset):
-- trait ContextDefineBuiltinFunctionProxies (line 28)
-- new Builtin\IsNullFn (line 32)
-- new Builtin\IsNullFn (line 33)
-- new Call\SplObjectStorageMethod (line 34)
-- new Call\SplObjectStorageMethod (line 35)
-- new Call\SplObjectStorageMethod (line 36)
-- new Call\SplObjectStorageMethod (line 37)
-- new Call\SplObjectStorageMethod (line 38)
-- new Call\SplObjectStorageMethod (line 39)
-- new Call\SplObjectStorageMethod (line 41)
-- new Call\SplObjectStorageMethod (line 42)
-- new Call\SplObjectStorageMethod (line 44)
-- new Call\SplObjectStorageMethod (line 45)
-- new Call\SplObjectStorageMethod (line 46)
-- new Call\SplObjectStorageMethod (line 48)
-- new Call\SplObjectStorageMethod (line 49)
-- new Call\SplObjectStorageMethod (line 50)
-- new Call\SplObjectStorageMethod (line 51)
-- new Call\SplObjectStorageMethod (line 52)
-- new Call\SplObjectStorageMethod (line 53)
-- new Call\SplObjectStorageMethod (line 54)
-- new Call\SplObjectStorageMethod (line 56)
-- new Call\SplObjectStorageMethod (line 58)
-- new Call\SplObjectStorageMethod (line 59)
-- new Call\SplPriorityQueueMethod (line 74)
-- new Call\SplDllistMethod (line 100)
-- new Call\SplFixedArrayMethod (line 114)
-- new Call\WeakReferenceCreate (line 117)
-- new Call\WeakReferenceGet (line 118)
-- new Call\SensitiveParameterValueConstruct (line 119)
-- new Call\SensitiveParameterValueGetValue (line 120)
-- new Call\WeakMapMethod (line 121)
-- new Call\WeakMapMethod (line 122)
-- new Call\WeakMapMethod (line 123)
-- new Call\WeakMapMethod (line 124)
-- new Call\WeakMapMethod (line 125)
-- new Call\PhpTokenConstruct (line 128)
-- new Call\PhpTokenTokenize (line 129)
-- new Call\PhpTokenGetTokenName (line 130)
+- trait ContextDefineBuiltinFunctionProxies (line 25)
+- new Builtin\IsNullFn (line 29)
+- new Builtin\IsNullFn (line 30)
+- new Call\WeakReferenceCreate (line 38)
+- new Call\WeakReferenceGet (line 39)
+- new Call\SensitiveParameterValueConstruct (line 40)
+- new Call\SensitiveParameterValueGetValue (line 41)
+- new Call\WeakMapMethod (line 42)
+- new Call\WeakMapMethod (line 43)
+- new Call\WeakMapMethod (line 44)
+- new Call\WeakMapMethod (line 45)
+- new Call\WeakMapMethod (line 46)
+- new Call\PhpTokenConstruct (line 49)
+- new Call\PhpTokenTokenize (line 50)
+- new Call\PhpTokenGetTokenName (line 51)
 - 1 class method(s)
 
 ### `lib/JIT/ContextDefineBuiltinFunctionProxiesDateAndXml.php`
@@ -60188,6 +60165,36 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\ExceptionGetFile (line 320)
 - new Call\ExceptionGetLine (line 321)
 - new Call\ExceptionGetPrevious (line 322)
+- 1 class method(s)
+
+### `lib/JIT/ContextDefineBuiltinFunctionProxiesSplContainers.php`
+
+**Warnings** (review for bootstrap subset):
+- trait ContextDefineBuiltinFunctionProxiesSplContainers (line 26)
+- new Call\SplObjectStorageMethod (line 30)
+- new Call\SplObjectStorageMethod (line 31)
+- new Call\SplObjectStorageMethod (line 32)
+- new Call\SplObjectStorageMethod (line 33)
+- new Call\SplObjectStorageMethod (line 34)
+- new Call\SplObjectStorageMethod (line 35)
+- new Call\SplObjectStorageMethod (line 37)
+- new Call\SplObjectStorageMethod (line 38)
+- new Call\SplObjectStorageMethod (line 40)
+- new Call\SplObjectStorageMethod (line 41)
+- new Call\SplObjectStorageMethod (line 42)
+- new Call\SplObjectStorageMethod (line 44)
+- new Call\SplObjectStorageMethod (line 45)
+- new Call\SplObjectStorageMethod (line 46)
+- new Call\SplObjectStorageMethod (line 47)
+- new Call\SplObjectStorageMethod (line 48)
+- new Call\SplObjectStorageMethod (line 49)
+- new Call\SplObjectStorageMethod (line 50)
+- new Call\SplObjectStorageMethod (line 52)
+- new Call\SplObjectStorageMethod (line 54)
+- new Call\SplObjectStorageMethod (line 55)
+- new Call\SplPriorityQueueMethod (line 66)
+- new Call\SplDllistMethod (line 92)
+- new Call\SplFixedArrayMethod (line 106)
 - 1 class method(s)
 
 ### `lib/JIT/ContextDefineBuiltinFunctionProxiesSplIterators.php`

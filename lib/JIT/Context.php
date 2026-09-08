@@ -32,6 +32,7 @@ require_once __DIR__.'/ContextDefineBuiltinFunctionProxiesDateAndXml.php';
 require_once __DIR__.'/ContextDefineBuiltinFunctionProxiesReflectionAndException.php';
 require_once __DIR__.'/ContextDefineBuiltinFunctionProxiesDirectoryAndFile.php';
 require_once __DIR__.'/ContextDefineBuiltinFunctionProxiesSplIterators.php';
+require_once __DIR__.'/ContextDefineBuiltinFunctionProxiesSplContainers.php';
 require_once __DIR__.'/ContextDefineBuiltinFunctionProxies.php';
 require_once __DIR__.'/ContextDefineBuiltins.php';
 require_once __DIR__.'/ContextCompileToFile.php';
@@ -51,6 +52,7 @@ class Context {
     use ContextDefineBuiltinFunctionProxiesReflectionAndException;
     use ContextDefineBuiltinFunctionProxiesDirectoryAndFile;
     use ContextDefineBuiltinFunctionProxiesSplIterators;
+    use ContextDefineBuiltinFunctionProxiesSplContainers;
     use ContextDefineBuiltinFunctionProxies;
     use ContextDefineBuiltins;
     use ContextCompileToFile;
