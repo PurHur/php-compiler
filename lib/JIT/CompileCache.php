@@ -8,6 +8,7 @@ require_once __DIR__.'/CompileCacheSemanticFunctionConsume.php';
 require_once __DIR__.'/CompileCacheSemanticFileParts.php';
 require_once __DIR__.'/CompileCacheSemanticHash.php';
 require_once __DIR__.'/CompileCachePartialEmitPruneGlobals.php';
+require_once __DIR__.'/CompileCachePartialEmitSymbolProbe.php';
 require_once __DIR__.'/CompileCachePartialEmitLlvm.php';
 require_once __DIR__.'/CompileCachePartialEmitDemote.php';
 require_once __DIR__.'/CompileCacheArtifactPersist.php';
@@ -40,7 +41,8 @@ require_once __DIR__.'/CompileCacheKeyLayoutFacade.php';
  *
  * Semantic hash / edit-strip: {@see CompileCacheSemanticHash} (+ FileParts /
  * FunctionConsume / HashFacade). Partial-emit: {@see CompileCachePartialEmitDemote}
- * + {@see CompileCachePartialEmitLlvm} + {@see CompileCachePartialEmitPruneGlobals}.
+ * + {@see CompileCachePartialEmitLlvm} + {@see CompileCachePartialEmitSymbolProbe}
+ * + {@see CompileCachePartialEmitPruneGlobals}.
  * Artifact mid-tier: {@see CompileCacheArtifactPersist}
  * / {@see CompileCacheObjectLinkPersist} / {@see CompileCacheArtifactFacade}. Edit-scaffold:
  * EditScaffold{,Plan,Restore,Strip} + EditSession. Project index + entry→members +

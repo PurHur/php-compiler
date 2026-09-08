@@ -6935,6 +6935,7 @@ require_once __DIR__.'/../../../lib/JIT/CompileCacheSemanticFunctionConsume.php'
 require_once __DIR__.'/../../../lib/JIT/CompileCacheSemanticFileParts.php';
 require_once __DIR__.'/../../../lib/JIT/CompileCacheSemanticHash.php';
 require_once __DIR__.'/../../../lib/JIT/CompileCachePartialEmitPruneGlobals.php';
+require_once __DIR__.'/../../../lib/JIT/CompileCachePartialEmitSymbolProbe.php';
 require_once __DIR__.'/../../../lib/JIT/CompileCachePartialEmitLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/CompileCachePartialEmitDemote.php';
 require_once __DIR__.'/../../../lib/JIT/CompileCacheArtifactPersist.php';

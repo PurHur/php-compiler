@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+require_once __DIR__.'/CompileCachePartialEmitSymbolProbe.php';
+
 /**
  * LLVM IR surgery helpers for AOT partial-edit demote (#36387 / #36199).
  *
  * Extracted from {@see CompileCachePartialEmitDemote} so rename+declaration demote
- * and prior-object symbol probes stay a separate TU from keep/strip orchestration
- * (size-budget / split-TU ratchet). Unused const-global prune lives in
+ * stays a separate TU from keep/strip orchestration (size-budget / split-TU ratchet).
+ * Shared-runtime candidacy / LLVM name / prior-object nm probes live in
+ * {@see CompileCachePartialEmitSymbolProbe}; unused const-global prune in
  * {@see CompileCachePartialEmitPruneGlobals}. Called only from the demote hub —
  * no new C ABI.
  *
@@ -19,51 +22,6 @@ namespace PHPCompiler\JIT;
 final class CompileCachePartialEmitLlvm
 {
     /**
-     * Runtime / NestedJIT symbols safe to take from prior aot.o on partial edit (#36387).
-     */
-    public static function isSharedRuntimeDemoteCandidate(string $name): bool
-    {
-        if ('' === $name) {
-            return false;
-        }
-        // NestedJIT helpers already linked into prior aot.o — demote via safe rename+delete.
-        if (str_starts_with($name, 'PHPCompiler_')) {
-            return true;
-        }
-
-        return str_starts_with($name, '__value__')
-            || str_starts_with($name, '__string__')
-            || str_starts_with($name, '__hashtable__')
-            || str_starts_with($name, '__ref__')
-            || str_starts_with($name, '__object__')
-            || str_starts_with($name, 'phpc_')
-            || str_starts_with($name, '__compiler_')
-            || str_starts_with($name, '__phpc_')
-            || str_starts_with($name, '__superglobals__')
-            || str_starts_with($name, 'internal_');
-    }
-
-    public static function llvmFunctionName(Context $context, object $fn): string
-    {
-        if (!isset($fn->value)) {
-            return '';
-        }
-        try {
-            $raw = $context->llvm->lib->LLVMGetValueName($fn->value);
-        } catch (\Throwable $e) {
-            return '';
-        }
-        if (null === $raw) {
-            return '';
-        }
-        if (is_object($raw) && method_exists($raw, 'toString')) {
-            return (string) $raw->toString();
-        }
-
-        return is_string($raw) ? $raw : '';
-    }
-
-    /**
      * Turn a defined function into an extern declaration without walking BBs (#36387).
      *
      * BB-delete demote SIGSEGVs on some NestedJIT bodies (e.g. IniJitHelper::__iniget).
@@ -72,7 +30,7 @@ final class CompileCachePartialEmitLlvm
      */
     public static function demoteFunctionBodyToDeclaration(Context $context, \PHPLLVM\Value\Function_ $fn): bool
     {
-        $name = self::llvmFunctionName($context, $fn);
+        $name = CompileCachePartialEmitSymbolProbe::llvmFunctionName($context, $fn);
         if ('' === $name) {
             return false;
         }
@@ -117,36 +75,5 @@ final class CompileCachePartialEmitLlvm
         } catch (\Throwable $e) {
             return false;
         }
-    }
-
-    /**
-     * Defined ELF symbol names in an object file (nm -g --defined-only) (#36387).
-     *
-     * @return array<string, true>
-     */
-    public static function objectDefinedSymbols(string $objectPath): array
-    {
-        if (!is_file($objectPath) || filesize($objectPath) < 1) {
-            return [];
-        }
-        $out = [];
-        $rc = 1;
-        exec('nm -g --defined-only '.escapeshellarg($objectPath).' 2>/dev/null', $out, $rc);
-        if (0 !== $rc) {
-            return [];
-        }
-        $defs = [];
-        foreach ($out as $line) {
-            $parts = preg_split('/\s+/', trim((string) $line));
-            if (!is_array($parts) || count($parts) < 3) {
-                continue;
-            }
-            $name = $parts[count($parts) - 1];
-            if (is_string($name) && '' !== $name && !str_starts_with($name, '.')) {
-                $defs[$name] = true;
-            }
-        }
-
-        return $defs;
     }
 }
