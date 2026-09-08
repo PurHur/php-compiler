@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8473 |
-| Phase A inventory files (M2 ratio SSOT) | 8473 |
+| PHP files on vm.php path | 8474 |
+| Phase A inventory files (M2 ratio SSOT) | 8474 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26560 |
+| Source constructs flagged (warnings) | 26561 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7177,6 +7177,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/CompileCacheObjectLinkPersist.php` | 0 | 1 |
 | `lib/JIT/CompileCachePartialEmitDemote.php` | 0 | 1 |
 | `lib/JIT/CompileCachePartialEmitLlvm.php` | 0 | 1 |
+| `lib/JIT/CompileCachePartialEmitPruneGlobals.php` | 0 | 1 |
 | `lib/JIT/CompileCacheProjectEntryMembers.php` | 0 | 1 |
 | `lib/JIT/CompileCacheProjectIndex.php` | 0 | 1 |
 | `lib/JIT/CompileCacheProjectIndexFacade.php` | 0 | 2 |
@@ -58895,7 +58896,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/CompileCachePartialEmitLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 4 class method(s)
+
+### `lib/JIT/CompileCachePartialEmitPruneGlobals.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `lib/JIT/CompileCacheProjectEntryMembers.php`
 

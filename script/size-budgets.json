@@ -34,9 +34,9 @@
             "note": "helper-cache granularity; Fingerprint+Link+Bind extracts (#36387/#36403); sorted linkObjects (#36399); refusePrelinkGcMixReason (#36401)"
         },
         "lib/JIT/CompileCache.php": {
-            "budget": 61,
+            "budget": 63,
             "target": 2000,
-            "note": "docblock compact + BitcodeRestore hub require (#36387/#36403); MCJIT/AOT warm cache extracts"
+            "note": "docblock compact + PartialEmitPruneGlobals hub require (#36387/#36403); MCJIT/AOT warm cache extracts"
         },
         "lib/JIT/CompileCacheArtifactPersist.php": {
             "budget": 136,
@@ -54,9 +54,14 @@
             "note": "Partial-edit demote orchestration; LLVM surgery in CompileCachePartialEmitLlvm (#36387)"
         },
         "lib/JIT/CompileCachePartialEmitLlvm.php": {
-            "budget": 230,
-            "target": 350,
-            "note": "Partial-edit LLVM rename+declaration demote + const-global prune + nm symbol probe (#36387)"
+            "budget": 152,
+            "target": 250,
+            "note": "Partial-edit LLVM rename+declaration demote + nm symbol probe; prune in PartialEmitPruneGlobals (#36387)"
+        },
+        "lib/JIT/CompileCachePartialEmitPruneGlobals.php": {
+            "budget": 92,
+            "target": 200,
+            "note": "Unused const-global prune after partial demote extracted from PartialEmitLlvm (#36387/#36199)"
         },
         "lib/JIT/CompileCacheRecording.php": {
             "budget": 196,
