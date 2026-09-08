@@ -65,6 +65,7 @@ require_once __DIR__.'/VM/Concern/DeclareClassLikeDispatch.php';
 require_once __DIR__.'/VM/Concern/ArgSendDispatch.php';
 require_once __DIR__.'/VM/Concern/VarFetchGlobalAndFunctionStaticDispatch.php';
 require_once __DIR__.'/VM/Concern/ListUnpackAndSpreadAssignDispatch.php';
+require_once __DIR__.'/VM/Concern/FromCallableAndClosureDispatch.php';
 
 use PHPCompiler\BuiltinByRefParams;
 use PHPCompiler\Compiler\AttributeNames;
@@ -79,19 +80,13 @@ use PHPCompiler\VM\Context;
 use PHPCompiler\VM\CastSupport;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\DnfCheck;
-use PHPCompiler\VM\ClosureState;
-use PHPCompiler\VM\ClosureRichDisplayName;
+use PHPCompiler\VM\CallableCheck;
 use PHPCompiler\VM\CycleCollector;
-use PHPCompiler\VM\DateIntervalSupport;
-use PHPCompiler\VM\DatePeriodSupport;
-use PHPCompiler\VM\DateTimeSupport;
-use PHPCompiler\VM\EnumCaseEntry;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\FiberState;
 use PHPCompiler\VM\GeneratorState;
 use PHPCompiler\VM\HashTable;
-use PHPCompiler\VM\CallableCheck;
 use PHPCompiler\VM\IterableCheck;
 use PHPCompiler\VM\NamedArgs;
 use PHPCompiler\VM\ObjectEntry;
@@ -165,6 +160,7 @@ class VM {
     use ArgSendDispatch;
     use VarFetchGlobalAndFunctionStaticDispatch;
     use ListUnpackAndSpreadAssignDispatch;
+    use FromCallableAndClosureDispatch;
     const SUCCESS = 1;
     const FAILURE = 2;
 
@@ -867,99 +863,15 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_FROM_CALLABLE:
-                    if (isset($frame->scope[$op->arg2])) {
-                        $callable = $frame->scope[$op->arg2]->resolveIndirect();
-                    } elseif (isset($frame->block->constants[$op->arg2])) {
-                        $callable = $frame->block->constants[$op->arg2];
-                    } else {
-                        throw new \LogicException('TYPE_FROM_CALLABLE missing callable slot');
-                    }
-                    try {
-                        $entry = VM\ClosureSupport::fromCallable(
-                            $this->context,
-                            $frame,
-                            $callable,
-                            $op->fromCallableScope,
-                            $op->fromCallableApi
-                        );
-                        $frame->scope[$op->arg1]->object($entry);
-                    } catch (\TypeError $e) {
-                        // TypeError extends Error — must precede catch (\Error) (#27138).
-                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                    } catch (\Error $e) {
-                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                    }
-                    break;
                 case OpCode::TYPE_CLOSURE:
-                    if (null === $op->block1) {
-                        $frame->scope[$op->arg1]->null();
-                        break;
+                    $fromCallableClosureOutcome = $this->executeFromCallableAndClosureDispatch($frame, $op);
+                    if ($fromCallableClosureOutcome instanceof Frame) {
+                        $frame = $fromCallableClosureOutcome;
+                        goto restart;
                     }
-                    $funcName = null !== $op->block1->func
-                        ? $op->block1->func->name
-                        : '{closure}';
-                    $closureFunc = new Func\PHP($funcName, $op->block1);
-                    $closureFunc->sourceLocation = $op->sourceLocation;
-                    if ([] !== $op->parameterMetadata) {
-                        $closureFunc->parameterMetadata = $op->parameterMetadata;
+                    if (is_int($fromCallableClosureOutcome)) {
+                        return $fromCallableClosureOutcome;
                     }
-                    if ([] !== $op->attributeNames) {
-                        $closureFunc->attributeNames = $op->attributeNames;
-                    }
-                    if ([] !== $op->attributeEntries) {
-                        $closureFunc->attributeEntries = $op->attributeEntries;
-                    }
-                    $captures = $this->bindClosureCaptures($frame, $op->closureCaptures);
-                    $state = new ClosureState($closureFunc, $captures);
-                    $state->applyDefinitionSite($op->sourceLocation, $op->block1);
-                    $rich = ClosureRichDisplayName::preferFromOp($op, $op->block1);
-                    if (null !== $rich && '' !== $rich) {
-                        $state->richDisplayName = $rich;
-                    }
-                    if (
-                        (null === $state->boundScopeClass || '' === $state->boundScopeClass)
-                        && null !== $op->closureDeclaringClass
-                        && '' !== $op->closureDeclaringClass
-                    ) {
-                        $state->boundScopeClass = $op->closureDeclaringClass;
-                    }
-                    if (
-                        null !== $frame->block->func
-                        && null !== $frame->block->func->class
-                        && null !== $frame->block->func->class->value
-                        && '' !== $frame->block->func->class->value
-                    ) {
-                        // Scope (ce) = declaring class; called_scope (LSB) = creation called class
-                        // (#25793, zend_closures.c / zend_object_handlers.c).
-                        $declaring = $frame->block->func->class->value;
-                        if (null !== $op->block1->func) {
-                            $op->block1->func->class = $frame->block->func->class;
-                        }
-                        $state->boundScopeClass = $declaring;
-                        $called = $this->inferCalledClass($frame);
-                        if (null !== $called && '' !== $called) {
-                            $state->boundCalledScopeClass = $called;
-                        }
-                        $isStaticClosure = null !== $op->block1->func
-                            && (($op->block1->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) !== 0;
-                        if (!$isStaticClosure) {
-                            $thisVar = $this->resolveCallerThis($frame);
-                            if (null !== $thisVar) {
-                                $bound = new Variable();
-                                $bound->copyFrom($thisVar->resolveIndirect());
-                                $state->boundThis = $bound;
-                            }
-                        }
-                    }
-                    $frame->scope[$op->arg1]->object($state->wrapObject($this->context));
                     break;
                 case OpCode::TYPE_RETURN_VOID:
                     $frame->returnSiteLine = (int) ($op->arg1 ?? 0);
