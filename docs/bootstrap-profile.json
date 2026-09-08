@@ -8687,7 +8687,7 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8453,
+        "inventory_files": 8452,
         "excluded": 0,
         "eligible": 8453,
         "aot_lint_targets": 113,
