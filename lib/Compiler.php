@@ -133,6 +133,7 @@ require_once __DIR__.'/Compiler/Concern/FinalizeArrayCombineColumnCallArgSlots.p
 require_once __DIR__.'/Compiler/Concern/PreferNamedLocalAndAdjacentAssignCallArgSlots.php';
 require_once __DIR__.'/Compiler/Concern/FunctionStaticAndCompileTimeLiterals.php';
 require_once __DIR__.'/Compiler/Concern/IssetEmptyCallArgAndMultiCompile.php';
+require_once __DIR__.'/Compiler/Concern/CoalesceIssetTargetAndMultiCompile.php';
 require_once __DIR__.'/Compiler/Concern/CoalesceLeftAndEchoConcatPreludes.php';
 require_once __DIR__.'/Compiler/Concern/EchoConcatPreludes.php';
 require_once __DIR__.'/Compiler/Concern/InstanceOfInAndClassConstCompile.php';
@@ -378,6 +379,7 @@ use PHPCompiler\Compiler\Concern\FinalizeArrayCombineColumnCallArgSlots;
 use PHPCompiler\Compiler\Concern\PreferNamedLocalAndAdjacentAssignCallArgSlots;
 use PHPCompiler\Compiler\Concern\FunctionStaticAndCompileTimeLiterals;
 use PHPCompiler\Compiler\Concern\IssetEmptyCallArgAndMultiCompile;
+use PHPCompiler\Compiler\Concern\CoalesceIssetTargetAndMultiCompile;
 use PHPCompiler\Compiler\Concern\CoalesceLeftAndEchoConcatPreludes;
 use PHPCompiler\Compiler\Concern\EchoConcatPreludes;
 use PHPCompiler\Compiler\Concern\InstanceOfInAndClassConstCompile;
@@ -533,6 +535,7 @@ class Compiler {
     use PreferNamedLocalAndAdjacentAssignCallArgSlots;
     use FunctionStaticAndCompileTimeLiterals;
     use IssetEmptyCallArgAndMultiCompile;
+    use CoalesceIssetTargetAndMultiCompile;
     use CoalesceLeftAndEchoConcatPreludes;
     use EchoConcatPreludes;
     use InstanceOfInAndClassConstCompile;

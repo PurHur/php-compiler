@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8459 |
-| Phase A inventory files (M2 ratio SSOT) | 8459 |
+| PHP files on vm.php path | 8460 |
+| Phase A inventory files (M2 ratio SSOT) | 8460 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26536 |
+| Source constructs flagged (warnings) | 26538 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5598,6 +5598,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/CfgTypeShapeQueries.php` | 0 | 2 |
 | `lib/Compiler/Concern/ClassLikeAndStmtCompile.php` | 0 | 1 |
 | `lib/Compiler/Concern/CoalesceAndNullsafe.php` | 0 | 17 |
+| `lib/Compiler/Concern/CoalesceIssetTargetAndMultiCompile.php` | 0 | 25 |
 | `lib/Compiler/Concern/CoalesceLeftAndEchoConcatPreludes.php` | 0 | 2 |
 | `lib/Compiler/Concern/CompileAnonymousFunctionGeneratorAndNever.php` | 0 | 5 |
 | `lib/Compiler/Concern/CompileCallArgSends.php` | 0 | 3 |
@@ -5670,7 +5671,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/InlineNewCallArgProducers.php` | 0 | 2 |
 | `lib/Compiler/Concern/InstanceOfInAndClassConstCompile.php` | 0 | 12 |
 | `lib/Compiler/Concern/InvokableReceiverAndClosureDetect.php` | 0 | 2 |
-| `lib/Compiler/Concern/IssetEmptyCallArgAndMultiCompile.php` | 0 | 26 |
+| `lib/Compiler/Concern/IssetEmptyCallArgAndMultiCompile.php` | 0 | 3 |
 | `lib/Compiler/Concern/IssetEmptyUnsetAndDimFetchCompile.php` | 0 | 6 |
 | `lib/Compiler/Concern/ListDestructAndForeach.php` | 0 | 7 |
 | `lib/Compiler/Concern/MatchInlineCallArgProducerEmbeddedLiteralsResolve.php` | 0 | 2 |
@@ -49268,13 +49269,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 1105)
-- new CompileFatal (line 1139)
-- new CompileError (line 1142)
-- new ClassCompileRegistry (line 1183)
-- new AttributeClassRegistry (line 1184)
-- new ClassCompileRegistry (line 1292)
-- new AttributeClassRegistry (line 1293)
+- new CompileFatal (line 1108)
+- new CompileFatal (line 1142)
+- new CompileError (line 1145)
+- new ClassCompileRegistry (line 1186)
+- new AttributeClassRegistry (line 1187)
+- new ClassCompileRegistry (line 1295)
+- new AttributeClassRegistry (line 1296)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -49693,6 +49694,35 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new OpCode (line 410)
 - new OpCode (line 421)
 - 7 class method(s)
+
+### `lib/Compiler/Concern/CoalesceIssetTargetAndMultiCompile.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CoalesceIssetTargetAndMultiCompile (line 25)
+- new OpCode (line 152)
+- new Block (line 198)
+- new Block (line 201)
+- new OpCode (line 204)
+- new OpCode (line 210)
+- new OpCode (line 259)
+- new OpCode (line 284)
+- new Block (line 290)
+- new OpCode (line 293)
+- new OpCode (line 303)
+- new Block (line 320)
+- new Block (line 323)
+- new OpCode (line 326)
+- new OpCode (line 332)
+- new Temporary (line 341)
+- new Op\Expr\Isset_ (line 344)
+- new Block (line 352)
+- new OpCode (line 355)
+- new OpCode (line 363)
+- new OpCode (line 372)
+- new Temporary (line 382)
+- new Variable (line 392)
+- new Operand\Temporary (line 394)
+- 12 class method(s)
 
 ### `lib/Compiler/Concern/CoalesceLeftAndEchoConcatPreludes.php`
 
@@ -50433,31 +50463,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/IssetEmptyCallArgAndMultiCompile.php`
 
 **Warnings** (review for bootstrap subset):
-- trait IssetEmptyCallArgAndMultiCompile (line 28)
-- new OpCode (line 615)
-- new Block (line 661)
-- new Block (line 664)
-- new OpCode (line 667)
-- new OpCode (line 673)
-- new OpCode (line 722)
-- new OpCode (line 747)
-- new Block (line 753)
-- new OpCode (line 756)
-- new OpCode (line 766)
-- new Block (line 783)
-- new Block (line 786)
-- new OpCode (line 789)
-- new OpCode (line 795)
-- new Temporary (line 804)
-- new Op\Expr\Isset_ (line 807)
-- new Block (line 815)
-- new OpCode (line 818)
-- new OpCode (line 826)
-- new OpCode (line 835)
-- new Temporary (line 845)
-- new Variable (line 855)
-- new Operand\Temporary (line 857)
-- 29 class method(s)
+- trait IssetEmptyCallArgAndMultiCompile (line 26)
+- 17 class method(s)
 - 1 closure(s)
 
 ### `lib/Compiler/Concern/IssetEmptyUnsetAndDimFetchCompile.php`
