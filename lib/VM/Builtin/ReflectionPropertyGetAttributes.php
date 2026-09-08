@@ -8,6 +8,7 @@ use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\AttributeRegistry;
 use PHPCompiler\VM\ReflectionSupport;
+use PHPCompiler\Lint\UnsupportedFeature;
 
 /** ReflectionProperty::getAttributes() — VM read path (#4136). */
 final class ReflectionPropertyGetAttributes extends VmClassMethod
@@ -25,7 +26,7 @@ final class ReflectionPropertyGetAttributes extends VmClassMethod
         $property = ReflectionSupport::propertyNameFromReflection($receiver);
         $entry = VmReflection::resolveClassEntry($ctx, $className);
         if (null === $entry) {
-            throw new \LogicException('ReflectionProperty refers to unknown class in this compiler build');
+            UnsupportedFeature::raise('reflection-property-unknown-class');
         }
         [$filter, $flags] = ReflectionSupport::getAttributesFilterArgs($frame, 'ReflectionProperty::getAttributes()');
         if (null !== $frame->returnVar) {

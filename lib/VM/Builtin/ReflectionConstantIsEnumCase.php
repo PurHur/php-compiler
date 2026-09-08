@@ -9,6 +9,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\EnumSupport;
 use PHPCompiler\VM\ReflectionSupport;
+use PHPCompiler\Lint\UnsupportedFeature;
 
 /** ReflectionConstant::isEnumCase() — globals are never enum cases (#21255). */
 final class ReflectionConstantIsEnumCase extends VmClassMethod
@@ -32,7 +33,7 @@ final class ReflectionConstantIsEnumCase extends VmClassMethod
         $className = ReflectionSupport::classNameFromReflection($receiver);
         $entry = VmReflection::resolveClassEntry($ctx, $className);
         if (null === $entry) {
-            throw new \LogicException('ReflectionConstant refers to unknown class in this compiler build');
+            UnsupportedFeature::raise('reflection-constant-unknown-class');
         }
         $constant = ReflectionSupport::constantNameFromReflection($receiver);
         $key = VmReflection::findClassConstantKey($entry, $constant, $ctx);

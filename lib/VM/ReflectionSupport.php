@@ -35,6 +35,7 @@ use PHPCompiler\VM\Builtin\NoDiscardConstruct;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ObjectHandleSupport;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\Lint\UnsupportedFeature;
 
 /**
  * Build ReflectionAttribute stubs from compile-time metadata (#1936, #3206, #3340, #3800).
@@ -1300,7 +1301,7 @@ final class ReflectionSupport
         $className = self::classNameFromReflection($obj);
         $entry = VmReflection::resolveClassEntry($ctx, $className);
         if (null === $entry) {
-            throw new \LogicException('ReflectionClass refers to unknown class in this compiler build');
+            UnsupportedFeature::raise('reflection-class-unknown');
         }
 
         return [$obj, $entry, $ctx];
@@ -1592,7 +1593,7 @@ final class ReflectionSupport
         $property = self::propertyNameFromReflection($reflection);
         $entry = VmReflection::resolveClassEntry($ctx, $className);
         if (null === $entry) {
-            throw new \LogicException('ReflectionProperty refers to unknown class in this compiler build');
+            UnsupportedFeature::raise('reflection-property-unknown-class');
         }
 
         return VmReflection::declaringClassNameForPropertyLookup($entry, $property, $ctx);
@@ -1652,7 +1653,7 @@ final class ReflectionSupport
         $methodName = self::methodNameFromReflection($reflection);
         $entry = VmReflection::resolveClassEntry($ctx, $className);
         if (null === $entry) {
-            throw new \LogicException('ReflectionMethod refers to unknown class in this compiler build');
+            UnsupportedFeature::raise('reflection-method-unknown-class');
         }
 
         return self::declaringClassNameForMethod($ctx, $entry, $methodName);
@@ -2080,12 +2081,12 @@ final class ReflectionSupport
             $method = self::methodNameFromReflection($reflection);
             $entry = VmReflection::resolveClassEntry($ctx, $className);
             if (null === $entry) {
-                throw new \LogicException('ReflectionParameter refers to unknown class in this compiler build');
+                UnsupportedFeature::raise('reflection-parameter-unknown-class');
             }
             $methodLc = strtolower($method);
             $func = $entry->methods[$methodLc] ?? null;
             if (!$func instanceof \PHPCompiler\Func\PHP) {
-                throw new \LogicException('ReflectionParameter refers to unknown method in this compiler build');
+                UnsupportedFeature::raise('reflection-parameter-unknown-method');
             }
 
             return $func->block;
@@ -3243,7 +3244,7 @@ final class ReflectionSupport
     {
         $func = $entry->methods[$methodLc] ?? null;
         if (!$func instanceof PhpFunc) {
-            throw new \LogicException('ReflectionMethod refers to unknown method in this compiler build');
+            UnsupportedFeature::raise('reflection-method-unknown-method');
         }
 
         return $func->block;

@@ -8,6 +8,7 @@ use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\AttributeRegistry;
 use PHPCompiler\VM\ReflectionSupport;
+use PHPCompiler\Lint\UnsupportedFeature;
 
 /** ReflectionEnumUnitCase::getAttributes() — VM (#3800). */
 final class ReflectionEnumUnitCaseGetAttributes extends VmClassMethod
@@ -25,7 +26,7 @@ final class ReflectionEnumUnitCaseGetAttributes extends VmClassMethod
         $caseName = ReflectionSupport::enumCaseNameFromReflection($receiver);
         $entry = VmReflection::resolveClassEntry($ctx, $enumName);
         if (null === $entry || !$entry->isEnum) {
-            throw new \LogicException('ReflectionEnumUnitCase refers to unknown enum in this compiler build');
+            UnsupportedFeature::raise('reflection-enum-unit-case-unknown');
         }
         [$filter, $flags] = ReflectionSupport::getAttributesFilterArgs($frame, 'ReflectionEnumUnitCase::getAttributes()');
         if (null !== $frame->returnVar) {

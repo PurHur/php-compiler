@@ -7,6 +7,7 @@ namespace PHPCompiler\VM\Builtin;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ReflectionSupport;
+use PHPCompiler\Lint\UnsupportedFeature;
 
 /** ReflectionEnum::getCase($name) — VM (#4121). */
 final class ReflectionEnumGetCase extends VmClassMethod
@@ -31,7 +32,7 @@ final class ReflectionEnumGetCase extends VmClassMethod
         $enumName = ReflectionSupport::classNameFromReflection($receiver);
         $entry = VmReflection::resolveClassEntry($ctx, $enumName);
         if (null === $entry || !$entry->isEnum) {
-            throw new \LogicException('ReflectionEnum refers to unknown enum in this compiler build');
+            UnsupportedFeature::raise('reflection-enum-unknown');
         }
         $caseName = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionEnum::getCase() case', 1);
         $obj = VmReflection::newReflectionEnumCase($ctx, $entry, $caseName);

@@ -7,6 +7,7 @@ namespace PHPCompiler\VM\Builtin;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ReflectionSupport;
+use PHPCompiler\Lint\UnsupportedFeature;
 
 /** ReflectionClassConstant::getModifiers() — VM (#17360, ext/reflection/php_reflection.c). */
 final class ReflectionClassConstantGetModifiers extends VmClassMethod
@@ -23,7 +24,7 @@ final class ReflectionClassConstantGetModifiers extends VmClassMethod
         $className = ReflectionSupport::classNameFromReflection($receiver);
         $entry = VmReflection::resolveClassEntry($ctx, $className);
         if (null === $entry) {
-            throw new \LogicException('ReflectionClassConstant refers to unknown class in this compiler build');
+            UnsupportedFeature::raise('reflection-class-constant-unknown-class');
         }
         $constant = ReflectionSupport::constantNameFromReflection($receiver);
         $key = VmReflection::findClassConstantKey($entry, $constant, $ctx);

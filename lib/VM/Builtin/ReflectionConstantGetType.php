@@ -8,6 +8,7 @@ use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ReflectionSupport;
 use PHPCompiler\VM\ReflectionTypeSupport;
+use PHPCompiler\Lint\UnsupportedFeature;
 
 /**
  * ReflectionConstant::getType() — globals have no declared type (#21255);
@@ -34,7 +35,7 @@ final class ReflectionConstantGetType extends VmClassMethod
         $className = ReflectionSupport::classNameFromReflection($receiver);
         $entry = VmReflection::resolveClassEntry($ctx, $className);
         if (null === $entry) {
-            throw new \LogicException('ReflectionConstant refers to unknown class in this compiler build');
+            UnsupportedFeature::raise('reflection-constant-unknown-class');
         }
         $constant = ReflectionSupport::constantNameFromReflection($receiver);
         $key = VmReflection::findClassConstantKey($entry, $constant, $ctx);

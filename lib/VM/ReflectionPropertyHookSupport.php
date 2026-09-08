@@ -7,6 +7,7 @@ namespace PHPCompiler\VM;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\Lint\UnsupportedFeature;
 
 /**
  * ReflectionProperty PHP 8.4 hook introspection (#7295, ext/reflection/php_reflection.c).
@@ -23,7 +24,7 @@ final class ReflectionPropertyHookSupport
         $className = ReflectionSupport::classNameFromReflection($receiver);
         $entry = VmReflection::resolveClassEntry($ctx, $className);
         if (null === $entry) {
-            throw new \LogicException('ReflectionProperty refers to unknown class in this compiler build');
+            UnsupportedFeature::raise('reflection-property-unknown-class');
         }
         $property = ReflectionSupport::propertyNameFromReflection($receiver);
         if (ReflectionSupport::isDynamicReflectionProperty($receiver)) {

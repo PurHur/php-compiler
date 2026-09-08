@@ -9,6 +9,7 @@ use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ReflectionSupport;
+use PHPCompiler\Lint\UnsupportedFeature;
 
 /** ReflectionProperty::getDocComment() — VM (#11464, ext/reflection/php_reflection.c). */
 final class ReflectionPropertyGetDocComment extends ReflectionSourceGetter
@@ -44,7 +45,7 @@ final class ReflectionPropertyGetDocComment extends ReflectionSourceGetter
         $property = ReflectionSupport::propertyNameFromReflection($receiver);
         $entry = VmReflection::resolveClassEntry($ctx, $className);
         if (null === $entry) {
-            throw new \LogicException('ReflectionProperty refers to unknown class in this compiler build');
+            UnsupportedFeature::raise('reflection-property-unknown-class');
         }
 
         return [$entry, $property];

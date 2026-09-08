@@ -7,6 +7,7 @@ namespace PHPCompiler\VM\Builtin;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ReflectionSupport;
+use PHPCompiler\Lint\UnsupportedFeature;
 
 /** ReflectionClass::getStaticProperties() — VM (#6948, ext/reflection/php_reflection.c). */
 final class ReflectionClassGetStaticProperties extends VmClassMethod
@@ -23,7 +24,7 @@ final class ReflectionClassGetStaticProperties extends VmClassMethod
         $className = ReflectionSupport::classNameFromReflection($receiver);
         $entry = VmReflection::resolveClassEntry($ctx, $className);
         if (null === $entry) {
-            throw new \LogicException('ReflectionClass refers to unknown class in this compiler build');
+            UnsupportedFeature::raise('reflection-class-unknown');
         }
         if (null !== $frame->returnVar) {
             $frame->returnVar->copyFrom(VmReflection::staticPropertiesValuesArray($entry));

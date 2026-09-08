@@ -11,6 +11,7 @@ use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\ReflectionSupport;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\Lint\UnsupportedFeature;
 
 /** ReflectionFunctionAbstract::getNamedArguments() — VM (#17658, ext/reflection/php_reflection.c). */
 final class ReflectionFunctionGetNamedArguments extends VmClassMethod
@@ -67,7 +68,7 @@ final class ReflectionFunctionGetNamedArguments extends VmClassMethod
         $method = ReflectionSupport::methodNameFromReflection($receiver);
         $entry = VmReflection::resolveClassEntry($ctx, $className);
         if (null === $entry) {
-            throw new \LogicException('ReflectionMethod refers to unknown class in this compiler build');
+            UnsupportedFeature::raise('reflection-method-unknown-class');
         }
         $methodLc = strtolower($method);
         $params = $entry->methodParameterMetadata[$methodLc] ?? [];

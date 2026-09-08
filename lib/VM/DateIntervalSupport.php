@@ -6,6 +6,7 @@ namespace PHPCompiler\VM;
 
 use PHPCompiler\ext\standard\VmDateInterval;
 use PHPCompiler\ext\standard\VmSerialize;
+use PHPCompiler\Lint\UnsupportedFeature;
 
 /**
  * Shared helpers for DateInterval VM builtins (issue #7278, php-src ext/date/php_date.c).
@@ -98,7 +99,7 @@ final class DateIntervalSupport
         if (Variable::TYPE_INTEGER === $days->type) {
             $daysValue = $days->toInt();
         } elseif (Variable::TYPE_BOOLEAN !== $days->type || $days->toBool()) {
-            throw new \LogicException('DateInterval days property is missing in this compiler build');
+            UnsupportedFeature::raise('dateinterval-property-missing', 'DateInterval days property is missing');
         }
 
         return [
@@ -144,7 +145,7 @@ final class DateIntervalSupport
     {
         $var = $obj->getProperty($name)->resolveIndirect();
         if (Variable::TYPE_INTEGER !== $var->type) {
-            throw new \LogicException("DateInterval property {$name} is missing in this compiler build");
+            UnsupportedFeature::raise('dateinterval-property-missing', "DateInterval property {$name} is missing");
         }
 
         return $var;
@@ -154,7 +155,7 @@ final class DateIntervalSupport
     {
         $var = $obj->getProperty($name)->resolveIndirect();
         if (Variable::TYPE_FLOAT !== $var->type) {
-            throw new \LogicException("DateInterval property {$name} is missing in this compiler build");
+            UnsupportedFeature::raise('dateinterval-property-missing', "DateInterval property {$name} is missing");
         }
 
         return $var;
@@ -164,7 +165,7 @@ final class DateIntervalSupport
     {
         $var = $obj->getProperty($name)->resolveIndirect();
         if (Variable::TYPE_BOOLEAN !== $var->type) {
-            throw new \LogicException("DateInterval property {$name} is missing in this compiler build");
+            UnsupportedFeature::raise('dateinterval-property-missing', "DateInterval property {$name} is missing");
         }
 
         return $var;
@@ -205,7 +206,7 @@ final class DateIntervalSupport
     {
         $class = $ctx->classes[self::CLASS_DATEINTERVAL] ?? null;
         if (null === $class) {
-            throw new \LogicException('DateInterval is not registered in this compiler build');
+            UnsupportedFeature::raise('dateinterval-not-registered');
         }
         $interval = new ObjectEntry($class);
         self::writeState($interval, $state);

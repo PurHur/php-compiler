@@ -9,6 +9,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumSupport;
 use PHPCompiler\VM\ReflectionSupport;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\Lint\UnsupportedFeature;
 
 /** ReflectionEnumUnitCase::getValue() — enum case object (#3800, #9537, #16178, php_reflection.c). */
 final class ReflectionEnumUnitCaseGetValue extends VmClassMethod
@@ -26,7 +27,7 @@ final class ReflectionEnumUnitCaseGetValue extends VmClassMethod
         $caseName = ReflectionSupport::enumCaseNameFromReflection($receiver);
         $entry = VmReflection::resolveClassEntry($ctx, $enumName);
         if (null === $entry || !$entry->isEnum) {
-            throw new \LogicException('ReflectionEnumUnitCase refers to unknown enum in this compiler build');
+            UnsupportedFeature::raise('reflection-enum-unit-case-unknown');
         }
         $enum = EnumSupport::resolveRuntimeEnumClass($ctx, $entry);
         if (null !== $enum->backedType) {
