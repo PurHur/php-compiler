@@ -9,6 +9,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ReflectionSupport;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\Lint\UnsupportedFeature;
 
 /** ReflectionProperty::getValue($object) — VM (#3354). */
 final class ReflectionPropertyGetValue extends VmClassMethod
@@ -31,7 +32,7 @@ final class ReflectionPropertyGetValue extends VmClassMethod
         $className = ReflectionSupport::classNameFromReflection($receiver);
         $entry = VmReflection::resolveClassEntry($ctx, $className);
         if (null === $entry) {
-            throw new \LogicException('ReflectionProperty refers to unknown class in this compiler build');
+            UnsupportedFeature::raise('reflection-property-unknown-class');
         }
         $property = ReflectionSupport::propertyNameFromReflection($receiver);
         $staticKey = VmReflection::findStaticPropertyKey($entry, $property, $ctx);

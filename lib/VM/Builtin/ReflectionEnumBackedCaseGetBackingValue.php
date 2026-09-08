@@ -7,6 +7,7 @@ namespace PHPCompiler\VM\Builtin;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ReflectionSupport;
+use PHPCompiler\Lint\UnsupportedFeature;
 
 /** ReflectionEnumBackedCase::getBackingValue() — VM (#5675). */
 final class ReflectionEnumBackedCaseGetBackingValue extends VmClassMethod
@@ -24,7 +25,7 @@ final class ReflectionEnumBackedCaseGetBackingValue extends VmClassMethod
         $caseName = ReflectionSupport::enumCaseNameFromReflection($receiver);
         $entry = VmReflection::resolveClassEntry($ctx, $enumName);
         if (null === $entry || !$entry->isEnum || null === $entry->backedType) {
-            throw new \LogicException('ReflectionEnumBackedCase refers to unknown backed enum in this compiler build');
+            UnsupportedFeature::raise('reflection-enum-backed-case-unknown');
         }
         $caseKey = \PHPCompiler\ClassConstName::key($caseName);
         foreach ($entry->enumCases as $case) {

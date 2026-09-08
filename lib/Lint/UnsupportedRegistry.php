@@ -438,6 +438,84 @@ final class UnsupportedRegistry
             'issue' => 1214,
             'alternative' => 'reflect a compile-time declared enum case (php-src ext/reflection/php_reflection.c)',
         ],
+        'reflection-enum-backed-case-unknown' => [
+            'feature' => 'ReflectionEnumBackedCase refers to a backed enum not declared in this compile',
+            'matrixRow' => 'docs/capabilities.md#reflectionenumbackedcase',
+            'issue' => 1214,
+            'alternative' => 'reflect a compile-time declared backed enum case (php-src ext/reflection/php_reflection.c)',
+        ],
+        'reflection-class-unknown' => [
+            'feature' => 'ReflectionClass refers to a class not declared in this compile',
+            'matrixRow' => 'docs/capabilities.md#reflectionclass',
+            'issue' => 1214,
+            'alternative' => 'reflect a compile-time declared class (php-src ext/reflection/php_reflection.c)',
+        ],
+        'reflection-method-unknown-class' => [
+            'feature' => 'ReflectionMethod refers to a class not declared in this compile',
+            'matrixRow' => 'docs/capabilities.md#reflectionmethod',
+            'issue' => 1214,
+            'alternative' => 'reflect a method on a compile-time declared class (php-src ext/reflection/php_reflection.c)',
+        ],
+        'reflection-method-unknown-method' => [
+            'feature' => 'ReflectionMethod refers to a method not declared in this compile',
+            'matrixRow' => 'docs/capabilities.md#reflectionmethod',
+            'issue' => 1214,
+            'alternative' => 'reflect a compile-time declared method (php-src ext/reflection/php_reflection.c)',
+        ],
+        'reflection-property-unknown-class' => [
+            'feature' => 'ReflectionProperty refers to a class not declared in this compile',
+            'matrixRow' => 'docs/capabilities.md#reflectionproperty',
+            'issue' => 1214,
+            'alternative' => 'reflect a property on a compile-time declared class (php-src ext/reflection/php_reflection.c)',
+        ],
+        'reflection-constant-unknown-class' => [
+            'feature' => 'ReflectionConstant refers to a class not declared in this compile',
+            'matrixRow' => 'docs/capabilities.md#reflectionclassconstant',
+            'issue' => 1214,
+            'alternative' => 'reflect a constant on a compile-time declared class (php-src ext/reflection/php_reflection.c)',
+        ],
+        'reflection-class-constant-unknown-class' => [
+            'feature' => 'ReflectionClassConstant refers to a class not declared in this compile',
+            'matrixRow' => 'docs/capabilities.md#reflectionclassconstant',
+            'issue' => 1214,
+            'alternative' => 'reflect a class constant on a compile-time declared class (php-src ext/reflection/php_reflection.c)',
+        ],
+        'reflection-parameter-unknown-class' => [
+            'feature' => 'ReflectionParameter refers to a class not declared in this compile',
+            'matrixRow' => 'docs/capabilities.md#reflectionparameter',
+            'issue' => 1214,
+            'alternative' => 'reflect a parameter on a compile-time declared class method (php-src ext/reflection/php_reflection.c)',
+        ],
+        'reflection-parameter-unknown-method' => [
+            'feature' => 'ReflectionParameter refers to a method not declared in this compile',
+            'matrixRow' => 'docs/capabilities.md#reflectionparameter',
+            'issue' => 1214,
+            'alternative' => 'reflect a parameter on a compile-time declared method (php-src ext/reflection/php_reflection.c)',
+        ],
+        'dateinterval-not-registered' => [
+            'feature' => 'DateInterval class is not registered in this compile',
+            'matrixRow' => 'docs/capabilities.md#dateinterval::__construct',
+            'issue' => 7278,
+            'alternative' => 'ensure ext/date is loaded before constructing DateInterval (php-src ext/date/php_date.c)',
+        ],
+        'dateperiod-not-registered' => [
+            'feature' => 'DatePeriod class is not registered in this compile',
+            'matrixRow' => 'docs/capabilities.md#dateperiod::__construct',
+            'issue' => 14144,
+            'alternative' => 'ensure ext/date is loaded before constructing DatePeriod (php-src ext/date/php_date.c)',
+        ],
+        'dateinterval-property-missing' => [
+            'feature' => 'DateInterval property missing or wrong type in this compile',
+            'matrixRow' => 'docs/capabilities.md#dateinterval::__construct',
+            'issue' => 7278,
+            'alternative' => 'construct DateInterval via DateInterval::__construct / createFromDateString (php-src ext/date/php_date.c)',
+        ],
+        'dateperiod-property-missing' => [
+            'feature' => 'DatePeriod property missing or wrong type in this compile',
+            'matrixRow' => 'docs/capabilities.md#dateperiod::__construct',
+            'issue' => 14144,
+            'alternative' => 'construct DatePeriod via DatePeriod::__construct / createFromISO8601String (php-src ext/date/php_date.c)',
+        ],
     ];
 
     /**

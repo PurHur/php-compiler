@@ -8,6 +8,7 @@ use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ReflectionSupport;
+use PHPCompiler\Lint\UnsupportedFeature;
 
 /** ReflectionMethod::isDeprecated() — VM (#6803, ext/reflection/php_reflection.c). */
 final class ReflectionMethodIsDeprecated extends VmClassMethod
@@ -25,7 +26,7 @@ final class ReflectionMethodIsDeprecated extends VmClassMethod
         $methodName = ReflectionSupport::methodNameFromReflection($receiver);
         $entry = VmReflection::resolveClassEntry($ctx, $className);
         if (null === $entry) {
-            throw new \LogicException('ReflectionMethod refers to unknown class in this compiler build');
+            UnsupportedFeature::raise('reflection-method-unknown-class');
         }
         $methodLc = strtolower($methodName);
         if (null === $frame->returnVar) {

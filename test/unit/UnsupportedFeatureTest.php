@@ -233,6 +233,42 @@ final class UnsupportedFeatureTest extends TestCase
         $this->assertStringStartsWith('phpc: unsupported: ', $fiberMsg);
     }
 
+    public function testReflectionDateUnknownSitesUseCatalog(): void
+    {
+        foreach ([
+            'reflection-enum-backed-case-unknown' => 1214,
+            'reflection-class-unknown' => 1214,
+            'reflection-method-unknown-class' => 1214,
+            'reflection-method-unknown-method' => 1214,
+            'reflection-property-unknown-class' => 1214,
+            'reflection-constant-unknown-class' => 1214,
+            'reflection-class-constant-unknown-class' => 1214,
+            'reflection-parameter-unknown-class' => 1214,
+            'reflection-parameter-unknown-method' => 1214,
+            'dateinterval-not-registered' => 7278,
+            'dateperiod-not-registered' => 14144,
+            'dateinterval-property-missing' => 7278,
+            'dateperiod-property-missing' => 14144,
+        ] as $id => $issue) {
+            try {
+                UnsupportedFeature::raise($id);
+                $this->fail('expected UnsupportedFeature for '.$id);
+            } catch (UnsupportedFeature $e) {
+                $this->assertSame($issue, $e->issue, $id);
+                $this->assertStringStartsWith('phpc: unsupported: ', $e->getMessage(), $id);
+                $row = UnsupportedRegistry::feature($id);
+                $this->assertStringContainsString($row['matrixRow'], $e->getMessage(), $id);
+            }
+        }
+
+        $override = UnsupportedFeature::message(
+            'dateinterval-property-missing',
+            'DateInterval property y is missing'
+        );
+        $this->assertStringContainsString('DateInterval property y is missing', $override);
+        $this->assertStringContainsString('#7278', $override);
+    }
+
     /**
      * Sites routed in this slice must not keep the legacy bare LogicException wording.
      */
@@ -288,6 +324,22 @@ final class UnsupportedFeatureTest extends TestCase
             dirname(__DIR__, 2).'/lib/JIT/Builtin/Type/Object_.php',
             dirname(__DIR__, 2).'/lib/JIT/FiberHelperLlvm.php',
             dirname(__DIR__, 2).'/lib/JIT/Builtin/ReflectionEnumJitHelper.php',
+            dirname(__DIR__, 2).'/lib/VM/ReflectionSupport.php',
+            dirname(__DIR__, 2).'/lib/VM/ReflectionPropertyHookSupport.php',
+            dirname(__DIR__, 2).'/lib/VM/DateIntervalSupport.php',
+            dirname(__DIR__, 2).'/lib/VM/DatePeriodSupport.php',
+            dirname(__DIR__, 2).'/lib/VM/Builtin/ReflectionEnumGetBackingType.php',
+            dirname(__DIR__, 2).'/lib/VM/Builtin/ReflectionEnumGetCase.php',
+            dirname(__DIR__, 2).'/lib/VM/Builtin/ReflectionEnumGetCases.php',
+            dirname(__DIR__, 2).'/lib/VM/Builtin/ReflectionEnumHasCase.php',
+            dirname(__DIR__, 2).'/lib/VM/Builtin/ReflectionEnumIsBacked.php',
+            dirname(__DIR__, 2).'/lib/VM/Builtin/ReflectionEnumUnitCaseIsDeprecated.php',
+            dirname(__DIR__, 2).'/lib/VM/Builtin/ReflectionEnumBackedCaseGetBackingValue.php',
+            dirname(__DIR__, 2).'/lib/VM/Builtin/ReflectionClassIsInternal.php',
+            dirname(__DIR__, 2).'/lib/VM/Builtin/ReflectionPropertyIsStatic.php',
+            dirname(__DIR__, 2).'/lib/VM/Builtin/ReflectionMethodGetParameters.php',
+            dirname(__DIR__, 2).'/lib/VM/Builtin/ReflectionConstantGetValue.php',
+            dirname(__DIR__, 2).'/lib/VM/Builtin/ReflectionClassConstantIsFinal.php',
         ];
         $legacy = [
             'range() step must be an integer in this compiler build',
@@ -337,6 +389,22 @@ final class UnsupportedFeatureTest extends TestCase
             'Unsupported fiber value type in JIT (issue #4019)',
             'ReflectionEnum refers to unknown enum in this compiler build',
             'ReflectionEnumUnitCase refers to unknown enum in this compiler build',
+            'ReflectionEnumBackedCase refers to unknown backed enum in this compiler build',
+            'ReflectionClass refers to unknown class in this compiler build',
+            'ReflectionMethod refers to unknown class in this compiler build',
+            'ReflectionMethod refers to unknown method in this compiler build',
+            'ReflectionProperty refers to unknown class in this compiler build',
+            'ReflectionConstant refers to unknown class in this compiler build',
+            'ReflectionClassConstant refers to unknown class in this compiler build',
+            'ReflectionParameter refers to unknown class in this compiler build',
+            'ReflectionParameter refers to unknown method in this compiler build',
+            'DateInterval is not registered in this compiler build',
+            'DatePeriod is not registered in this compiler build',
+            'DateInterval days property is missing in this compiler build',
+            'DateInterval property {$name} is missing in this compiler build',
+            'DatePeriod property {$name} is missing in this compiler build',
+            'DatePeriod start property is missing in this compiler build',
+            'DatePeriod interval property is missing in this compiler build',
         ];
         foreach ($roots as $path) {
             $this->assertFileExists($path);
@@ -359,6 +427,12 @@ final class UnsupportedFeatureTest extends TestCase
             dirname(__DIR__, 2).'/lib/JIT/Builtin/Type/Object_.php' => 'class-const-type-jit',
             dirname(__DIR__, 2).'/lib/JIT/FiberHelperLlvm.php' => 'fiber-value-type-jit',
             dirname(__DIR__, 2).'/lib/JIT/Builtin/ReflectionEnumJitHelper.php' => 'reflection-enum-unknown',
+            dirname(__DIR__, 2).'/lib/VM/Builtin/ReflectionEnumGetBackingType.php' => 'reflection-enum-unknown',
+            dirname(__DIR__, 2).'/lib/VM/Builtin/ReflectionClassIsInternal.php' => 'reflection-class-unknown',
+            dirname(__DIR__, 2).'/lib/VM/Builtin/ReflectionPropertyIsStatic.php' => 'reflection-property-unknown-class',
+            dirname(__DIR__, 2).'/lib/VM/DateIntervalSupport.php' => 'dateinterval-not-registered',
+            dirname(__DIR__, 2).'/lib/VM/DatePeriodSupport.php' => 'dateperiod-not-registered',
+            dirname(__DIR__, 2).'/lib/VM/ReflectionSupport.php' => 'reflection-class-unknown',
         ] as $path => $featureId) {
             $src = file_get_contents($path);
             $this->assertNotFalse($src);

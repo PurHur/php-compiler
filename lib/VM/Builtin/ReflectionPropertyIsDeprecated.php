@@ -7,6 +7,7 @@ namespace PHPCompiler\VM\Builtin;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ReflectionSupport;
+use PHPCompiler\Lint\UnsupportedFeature;
 
 /** ReflectionProperty::isDeprecated() — VM (#9768, ext/reflection/php_reflection.c). */
 final class ReflectionPropertyIsDeprecated extends VmClassMethod
@@ -23,7 +24,7 @@ final class ReflectionPropertyIsDeprecated extends VmClassMethod
         $declaringName = ReflectionSupport::declaringClassNameFromReflectionProperty($receiver, $ctx);
         $entry = VmReflection::resolveClassEntry($ctx, $declaringName);
         if (null === $entry) {
-            throw new \LogicException('ReflectionProperty refers to unknown class in this compiler build');
+            UnsupportedFeature::raise('reflection-property-unknown-class');
         }
         $property = ReflectionSupport::propertyNameFromReflection($receiver);
         $propLc = strtolower($property);

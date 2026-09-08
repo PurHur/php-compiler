@@ -9,6 +9,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\MethodVisibility;
 use PHPCfg\Func as CfgFunc;
 use PHPCompiler\VM\ReflectionSupport;
+use PHPCompiler\Lint\UnsupportedFeature;
 
 /**
  * Shared visibility resolution for ReflectionClassConstant::{isPublic,isProtected,isPrivate}
@@ -23,7 +24,7 @@ final class ReflectionClassConstantVisibility
         $className = ReflectionSupport::classNameFromReflection($receiver);
         $entry = VmReflection::resolveClassEntry($ctx, $className);
         if (null === $entry) {
-            throw new \LogicException('ReflectionClassConstant refers to unknown class in this compiler build');
+            UnsupportedFeature::raise('reflection-class-constant-unknown-class');
         }
         $constant = ReflectionSupport::constantNameFromReflection($receiver);
         $decl = VmReflection::findClassConstantDecl($entry, $constant, $ctx);

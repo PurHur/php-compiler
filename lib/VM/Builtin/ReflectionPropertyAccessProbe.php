@@ -13,6 +13,7 @@ use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\ReflectionSupport;
 use PHPCompiler\VM\Variable;
 use PHPCfg\Func as CfgFunc;
+use PHPCompiler\Lint\UnsupportedFeature;
 
 /**
  * ReflectionProperty::{isReadable,isWritable} — PHP 8.5 probes (ext/reflection/php_reflection.stub.php; #28533).
@@ -54,7 +55,7 @@ final class ReflectionPropertyAccessProbe extends VmClassMethod
         $className = ReflectionSupport::classNameFromReflection($receiver);
         $entry = VmReflection::resolveClassEntry($ctx, $className);
         if (null === $entry) {
-            throw new \LogicException('ReflectionProperty refers to unknown class in this compiler build');
+            UnsupportedFeature::raise('reflection-property-unknown-class');
         }
         $property = ReflectionSupport::propertyNameFromReflection($receiver);
         if (VmReflection::isEnumReflectionPseudoProperty($entry, $property)) {

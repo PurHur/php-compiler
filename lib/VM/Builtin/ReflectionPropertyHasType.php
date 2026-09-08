@@ -8,6 +8,7 @@ use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ReflectionPropertyTypeSupport;
 use PHPCompiler\VM\ReflectionSupport;
+use PHPCompiler\Lint\UnsupportedFeature;
 
 /** ReflectionProperty::hasType() — VM (#22063, ext/reflection/php_reflection.c). */
 final class ReflectionPropertyHasType extends VmClassMethod
@@ -24,7 +25,7 @@ final class ReflectionPropertyHasType extends VmClassMethod
         $className = ReflectionSupport::classNameFromReflection($receiver);
         $entry = VmReflection::resolveClassEntry($ctx, $className);
         if (null === $entry) {
-            throw new \LogicException('ReflectionProperty refers to unknown class in this compiler build');
+            UnsupportedFeature::raise('reflection-property-unknown-class');
         }
         $property = ReflectionSupport::propertyNameFromReflection($receiver);
         $meta = VmReflection::findClassProperty($entry, $property, $ctx);

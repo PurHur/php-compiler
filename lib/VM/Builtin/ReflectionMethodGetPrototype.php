@@ -8,6 +8,7 @@ use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ReflectionSupport;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\Lint\UnsupportedFeature;
 
 /** ReflectionMethod::getPrototype() — VM (#7262, ext/reflection/php_reflection.c). */
 final class ReflectionMethodGetPrototype extends VmClassMethod
@@ -27,7 +28,7 @@ final class ReflectionMethodGetPrototype extends VmClassMethod
         $methodName = ReflectionSupport::methodNameFromReflection($receiver);
         $entry = VmReflection::resolveClassEntry($ctx, $className);
         if (null === $entry) {
-            throw new \LogicException('ReflectionMethod refers to unknown class in this compiler build');
+            UnsupportedFeature::raise('reflection-method-unknown-class');
         }
         $methodLc = strtolower($methodName);
         $proto = ReflectionSupport::methodPrototypeClassEntry($ctx, $entry, $methodLc);

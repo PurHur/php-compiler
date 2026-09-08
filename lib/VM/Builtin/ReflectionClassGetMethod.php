@@ -9,6 +9,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\ReflectionSupport;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\Lint\UnsupportedFeature;
 
 /** ReflectionClass::getMethod() — VM (#1936). */
 final class ReflectionClassGetMethod extends VmClassMethod
@@ -26,7 +27,7 @@ final class ReflectionClassGetMethod extends VmClassMethod
         $ctx = VmReflection::requireContext($frame);
         $className = ReflectionSupport::classNameFromReflection($receiver);
         if (null === VmReflection::resolveClassEntry($ctx, $className)) {
-            throw new \LogicException('ReflectionClass refers to unknown class in this compiler build');
+            UnsupportedFeature::raise('reflection-class-unknown');
         }
         $method = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionClass::getMethod() name', 1);
         [$declEntry, $canonical] = ReflectionSupport::reflectionMethodFromClassAndMethod(

@@ -9,6 +9,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ReflectionSupport;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\Lint\UnsupportedFeature;
 
 /** ReflectionClass::getConstant() — VM (#6950, php-src ext/reflection/php_reflection.c). */
 final class ReflectionClassGetConstant extends VmClassMethod
@@ -27,7 +28,7 @@ final class ReflectionClassGetConstant extends VmClassMethod
         $className = ReflectionSupport::classNameFromReflection($receiver);
         $entry = VmReflection::resolveClassEntry($ctx, $className);
         if (null === $entry) {
-            throw new \LogicException('ReflectionClass refers to unknown class in this compiler build');
+            UnsupportedFeature::raise('reflection-class-unknown');
         }
         $constant = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionClass::getConstant() name', 1);
         $decl = VmReflection::findClassConstantDecl($entry, $constant, $ctx);

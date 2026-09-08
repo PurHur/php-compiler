@@ -8,6 +8,7 @@ use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\MethodVisibility;
 use PHPCompiler\VM\ReflectionSupport;
+use PHPCompiler\Lint\UnsupportedFeature;
 
 /** ReflectionProperty::isPublic() — VM (#4395). */
 final class ReflectionPropertyIsPublic extends VmClassMethod
@@ -24,7 +25,7 @@ final class ReflectionPropertyIsPublic extends VmClassMethod
         $className = ReflectionSupport::classNameFromReflection($receiver);
         $entry = VmReflection::resolveClassEntry($ctx, $className);
         if (null === $entry) {
-            throw new \LogicException('ReflectionProperty refers to unknown class in this compiler build');
+            UnsupportedFeature::raise('reflection-property-unknown-class');
         }
         $property = ReflectionSupport::propertyNameFromReflection($receiver);
         if (VmReflection::isEnumReflectionPseudoProperty($entry, $property)) {

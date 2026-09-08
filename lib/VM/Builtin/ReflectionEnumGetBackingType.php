@@ -8,6 +8,7 @@ use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ReflectionSupport;
 use PHPCompiler\VM\ReflectionTypeSupport;
+use PHPCompiler\Lint\UnsupportedFeature;
 
 /** ReflectionEnum::getBackingType() — VM (#9886, ext/reflection/php_reflection.c). */
 final class ReflectionEnumGetBackingType extends VmClassMethod
@@ -36,7 +37,7 @@ final class ReflectionEnumGetBackingType extends VmClassMethod
         $enumName = ReflectionSupport::classNameFromReflection($receiver);
         $entry = VmReflection::resolveClassEntry($ctx, $enumName);
         if (null === $entry || !$entry->isEnum) {
-            throw new \LogicException('ReflectionEnum refers to unknown enum in this compiler build');
+            UnsupportedFeature::raise('reflection-enum-unknown');
         }
         if (null === $entry->backedType) {
             $frame->returnVar->null();

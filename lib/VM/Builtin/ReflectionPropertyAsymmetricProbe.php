@@ -10,6 +10,7 @@ use PHPCompiler\MethodVisibility;
 use PHPCompiler\PropertyVisibility;
 use PHPCompiler\VM\ReflectionSupport;
 use PHPCfg\Func as CfgFunc;
+use PHPCompiler\Lint\UnsupportedFeature;
 
 /**
  * ReflectionProperty::{isPrivateSet,isProtectedSet,isPrivateGet,isProtectedGet,isPublicGet}
@@ -62,7 +63,7 @@ final class ReflectionPropertyAsymmetricProbe extends VmClassMethod
         $className = ReflectionSupport::classNameFromReflection($receiver);
         $entry = VmReflection::resolveClassEntry($ctx, $className);
         if (null === $entry) {
-            throw new \LogicException('ReflectionProperty refers to unknown class in this compiler build');
+            UnsupportedFeature::raise('reflection-property-unknown-class');
         }
         $property = ReflectionSupport::propertyNameFromReflection($receiver);
         $meta = VmReflection::propertyVisibilityMeta($entry, $property, $ctx);

@@ -9,6 +9,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\AttributeRegistry;
 use PHPCompiler\VM\AttributeSupport;
 use PHPCompiler\VM\ReflectionSupport;
+use PHPCompiler\Lint\UnsupportedFeature;
 
 /** ReflectionConstant::getAttributes() — VM read path (#4136, #21255, #25963). */
 final class ReflectionConstantGetAttributes extends VmClassMethod
@@ -44,7 +45,7 @@ final class ReflectionConstantGetAttributes extends VmClassMethod
         $constant = ReflectionSupport::constantNameFromReflection($receiver);
         $entry = VmReflection::resolveClassEntry($ctx, $className);
         if (null === $entry) {
-            throw new \LogicException('ReflectionConstant refers to unknown class in this compiler build');
+            UnsupportedFeature::raise('reflection-constant-unknown-class');
         }
         if (null !== $frame->returnVar) {
             // Class const attribute maps use ClassConstName::key (case-sensitive, #25910/#25963).

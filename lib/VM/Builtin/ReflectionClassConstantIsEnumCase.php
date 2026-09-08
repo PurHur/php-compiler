@@ -9,6 +9,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\EnumSupport;
 use PHPCompiler\VM\ReflectionSupport;
+use PHPCompiler\Lint\UnsupportedFeature;
 
 /** ReflectionClassConstant::isEnumCase() — VM (#9824, ext/reflection/php_reflection.c). */
 final class ReflectionClassConstantIsEnumCase extends VmClassMethod
@@ -25,7 +26,7 @@ final class ReflectionClassConstantIsEnumCase extends VmClassMethod
         $className = ReflectionSupport::classNameFromReflection($receiver);
         $entry = VmReflection::resolveClassEntry($ctx, $className);
         if (null === $entry) {
-            throw new \LogicException('ReflectionClassConstant refers to unknown class in this compiler build');
+            UnsupportedFeature::raise('reflection-class-constant-unknown-class');
         }
         $constant = ReflectionSupport::constantNameFromReflection($receiver);
         $key = VmReflection::findClassConstantKey($entry, $constant, $ctx);

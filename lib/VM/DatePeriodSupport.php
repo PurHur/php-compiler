@@ -7,6 +7,7 @@ namespace PHPCompiler\VM;
 use PHPCompiler\ext\standard\VmDateInterval;
 use PHPCompiler\ext\standard\VmDateTimeNative;
 use PHPCompiler\Frame;
+use PHPCompiler\Lint\UnsupportedFeature;
 
 /**
  * Shared helpers for DatePeriod VM builtins (issue #14144, php-src ext/date/php_date.c).
@@ -350,7 +351,7 @@ final class DatePeriodSupport
     {
         $class = $ctx->classes[self::CLASS_DATEPERIOD] ?? null;
         if (null === $class) {
-            throw new \LogicException('DatePeriod is not registered in this compiler build');
+            UnsupportedFeature::raise('dateperiod-not-registered');
         }
 
         $period = new ObjectEntry($class);
@@ -486,7 +487,7 @@ final class DatePeriodSupport
 
         $class = $ctx->classes[DateIntervalSupport::CLASS_DATEINTERVAL] ?? null;
         if (null === $class) {
-            throw new \LogicException('DateInterval is not registered in this compiler build');
+            UnsupportedFeature::raise('dateinterval-not-registered');
         }
         $interval = new ObjectEntry($class);
         DateIntervalSupport::initDateInterval($interval, $intervalSpec);
@@ -544,7 +545,7 @@ final class DatePeriodSupport
     {
         $obj = self::objectProperty($period, $name);
         if (null === $obj) {
-            throw new \LogicException("DatePeriod property {$name} is missing in this compiler build");
+            UnsupportedFeature::raise('dateperiod-property-missing', "DatePeriod property {$name} is missing");
         }
 
         return $obj;
@@ -822,7 +823,7 @@ final class DatePeriodSupport
         } else {
             $class = $ctx->classes[self::CLASS_DATEPERIOD] ?? null;
             if (null === $class) {
-                throw new \LogicException('DatePeriod is not registered in this compiler build');
+                UnsupportedFeature::raise('dateperiod-not-registered');
             }
             $period = new ObjectEntry($class);
         }
@@ -911,12 +912,12 @@ final class DatePeriodSupport
     {
         $startVar = self::requireProperty($period, 'start')->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $startVar->type) {
-            throw new \LogicException('DatePeriod start property is missing in this compiler build');
+            UnsupportedFeature::raise('dateperiod-property-missing', 'DatePeriod start property is missing');
         }
         $start = $startVar->toObject();
         $intervalVar = self::requireProperty($period, 'interval')->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $intervalVar->type) {
-            throw new \LogicException('DatePeriod interval property is missing in this compiler build');
+            UnsupportedFeature::raise('dateperiod-property-missing', 'DatePeriod interval property is missing');
         }
 
         $endVar = self::requireProperty($period, 'end')->resolveIndirect();
@@ -994,7 +995,7 @@ final class DatePeriodSupport
         $var = $obj->getProperty($name)->resolveIndirect();
         // Typed prototypes start UNDEFINED until construct assigns (#26170).
         if (Variable::TYPE_INTEGER !== $var->type && Variable::TYPE_UNDEFINED !== $var->type) {
-            throw new \LogicException("DatePeriod property {$name} is missing in this compiler build");
+            UnsupportedFeature::raise('dateperiod-property-missing', "DatePeriod property {$name} is missing");
         }
 
         return $var;
@@ -1004,7 +1005,7 @@ final class DatePeriodSupport
     {
         $var = $obj->getProperty($name)->resolveIndirect();
         if (Variable::TYPE_BOOLEAN !== $var->type && Variable::TYPE_UNDEFINED !== $var->type) {
-            throw new \LogicException("DatePeriod property {$name} is missing in this compiler build");
+            UnsupportedFeature::raise('dateperiod-property-missing', "DatePeriod property {$name} is missing");
         }
 
         return $var;

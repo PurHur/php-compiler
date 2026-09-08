@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ReflectionSupport;
 use PHPLLVM\Value;
+use PHPCompiler\Lint\UnsupportedFeature;
 
 /** ReflectionClass::isReadOnly() — VM (#5221, ext/reflection/php_reflection.c). */
 final class ReflectionClassIsReadOnly extends VmClassMethod
@@ -29,7 +30,7 @@ final class ReflectionClassIsReadOnly extends VmClassMethod
         $className = ReflectionSupport::classNameFromReflection($receiver);
         $entry = VmReflection::resolveClassEntry($ctx, $className);
         if (null === $entry) {
-            throw new \LogicException('ReflectionClass refers to unknown class in this compiler build');
+            UnsupportedFeature::raise('reflection-class-unknown');
         }
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($entry->readonly);

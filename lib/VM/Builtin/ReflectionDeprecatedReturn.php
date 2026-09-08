@@ -9,6 +9,7 @@ use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ReflectionSupport;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\Lint\UnsupportedFeature;
 
 /** Shared return helpers for Reflection*::getDeprecatedMessage/Version (#6917). */
 final class ReflectionDeprecatedReturn
@@ -86,7 +87,7 @@ final class ReflectionDeprecatedReturn
         $className = ReflectionSupport::classNameFromReflection($receiver);
         $entry = VmReflection::resolveClassEntry($ctx, $className);
         if (null === $entry) {
-            throw new \LogicException('ReflectionClass refers to unknown class in this compiler build');
+            UnsupportedFeature::raise('reflection-class-unknown');
         }
 
         return $entry;
@@ -100,7 +101,7 @@ final class ReflectionDeprecatedReturn
         $methodName = ReflectionSupport::methodNameFromReflection($receiver);
         $entry = VmReflection::resolveClassEntry($ctx, $className);
         if (null === $entry) {
-            throw new \LogicException('ReflectionMethod refers to unknown class in this compiler build');
+            UnsupportedFeature::raise('reflection-method-unknown-class');
         }
         $methodLc = strtolower($methodName);
 
@@ -114,7 +115,7 @@ final class ReflectionDeprecatedReturn
         $className = ReflectionSupport::classNameFromReflection($receiver);
         $entry = VmReflection::resolveClassEntry($ctx, $className);
         if (null === $entry) {
-            throw new \LogicException('ReflectionClassConstant refers to unknown class in this compiler build');
+            UnsupportedFeature::raise('reflection-class-constant-unknown-class');
         }
         $constant = ReflectionSupport::constantNameFromReflection($receiver);
         $key = VmReflection::findClassConstantKey($entry, $constant, $ctx);
