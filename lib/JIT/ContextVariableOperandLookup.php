@@ -12,9 +12,9 @@ use PHPLLVM;
  * Operand→Variable lookup for {@see Context} (#36387).
  *
  * Extracted from {@see ContextVariableOperandBinding} so getVariableFromOp /
- * $this seeding / scope-stack lookup stay a separate TU from make/alias/bind
- * helpers (split-TU / size-budget ratchet toward ContextVariableOperandBinding
- * ≤ 500 lines, #36199 / #36403).
+ * $this seeding / scope-stack lookup stay a separate TU from makeVariableFromOp
+ * and from alias helpers in {@see ContextVariableOperandAlias} (split-TU /
+ * size-budget ratchet toward Binding ≤ 500 lines, #36199 / #36403).
  *
  * Used via {@code use ContextVariableOperandLookup;} on {@see Context}.
  *
