@@ -7394,6 +7394,7 @@
         "lib/JIT/ContextDefineBuiltinFunctionProxiesReflectionAndException.php",
         "lib/JIT/ContextDefineBuiltinFunctionProxiesSplContainers.php",
         "lib/JIT/ContextDefineBuiltinFunctionProxiesSplIterators.php",
+        "lib/JIT/ContextDefineBuiltinFunctionProxiesWeakAndPhpToken.php",
         "lib/JIT/ContextDefineBuiltins.php",
         "lib/JIT/ContextEditScaffoldModuleRebind.php",
         "lib/JIT/ContextFreeDeadAndConstantFetch.php",
@@ -8750,9 +8751,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8516,
+        "inventory_files": 8517,
         "excluded": 0,
-        "eligible": 8516,
+        "eligible": 8517,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
