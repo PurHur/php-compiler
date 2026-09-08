@@ -149,6 +149,12 @@ final class Issue36388StringCallResultFreeTest extends TestCase
         $this->assertStringContainsString('StringMd5::invoke', (string) file_get_contents(
             dirname(__DIR__, 2).'/ext/standard/JitMd5.php'
         ));
+        $this->assertStringContainsString('phpc_sha1_r1', (string) file_get_contents(
+            dirname(__DIR__, 2).'/lib/JIT/Builtin/Sha1Runtime.php'
+        ));
+        $this->assertStringContainsString('StringSha1::invoke', (string) file_get_contents(
+            dirname(__DIR__, 2).'/ext/standard/JitSha1.php'
+        ));
     }
 
     public function testSprintfCompileTimeFormatUsesModuleCStringNotHeapInit(): void

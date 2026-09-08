@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM helpers for md5_file() / sha1_file() — read path then __compiler_hash (issue #3590). */
+/** LLVM helpers for md5_file() / sha1_file() — read path then digest (#3590 / #36388). */
 final class JitHashFile
 {
     private static int $blockSerial = 0;
@@ -44,7 +44,19 @@ final class JitHashFile
             $context,
             $path,
             $raw,
-            static fn (Context $ctx, Value $data, Value $r) => JitSha1::digest($ctx, $data, $r)
+            // JitSha1 returns owning __string__*; sha1_file phi needs __value__* (#36388).
+            static function (Context $ctx, Value $data, Value $r): Value {
+                $digest = JitSha1::digest($ctx, $data, $r);
+                $slot = JitValueBox::alloc($ctx);
+                $ptr = JitValueBox::pointer($ctx, $slot);
+                $ctx->builder->call(
+                    $ctx->lookupFunction('__value__writeString'),
+                    $ptr,
+                    $digest
+                );
+
+                return $ptr;
+            }
         );
     }
 

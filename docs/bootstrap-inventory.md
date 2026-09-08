@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8486 |
-| Phase A inventory files (M2 ratio SSOT) | 8486 |
+| PHP files on vm.php path | 8488 |
+| Phase A inventory files (M2 ratio SSOT) | 8488 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26585 |
+| Source constructs flagged (warnings) | 26587 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -6325,6 +6325,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/SessionUnset.php` | 0 | 1 |
 | `lib/JIT/Builtin/SessionWriteClose.php` | 0 | 1 |
 | `lib/JIT/Builtin/SettypeRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/Sha1Runtime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ShmopRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ShuffleRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SilenceRuntime.php` | 0 | 1 |
@@ -6548,6 +6549,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringRmdir.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSem.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSerialize.php` | 0 | 2 |
+| `lib/JIT/Builtin/StringSha1.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringShmop.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSimilarText.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSimilarTextJit.php` | 0 | 1 |
@@ -54355,6 +54357,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
 
+### `lib/JIT/Builtin/Sha1Runtime.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Builtin/ShmopRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -55484,6 +55491,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 12 class method(s)
 - 2 closure(s)
+
+### `lib/JIT/Builtin/StringSha1.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/StringShmop.php`
 
@@ -59088,21 +59100,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - trait CallResultOperandAssign (line 25)
-- new Variable (line 342)
-- new Variable (line 365)
-- new Variable (line 394)
-- new Variable (line 420)
-- new Variable (line 445)
-- new Variable (line 490)
-- new Type (line 498)
-- new Variable (line 518)
-- new Type (line 527)
-- new Variable (line 546)
-- new Type (line 554)
-- new Variable (line 580)
-- new Type (line 588)
-- new Variable (line 611)
-- new Variable (line 635)
+- new Variable (line 343)
+- new Variable (line 366)
+- new Variable (line 395)
+- new Variable (line 421)
+- new Variable (line 446)
+- new Variable (line 491)
+- new Type (line 499)
+- new Variable (line 519)
+- new Type (line 528)
+- new Variable (line 547)
+- new Type (line 555)
+- new Variable (line 581)
+- new Type (line 589)
+- new Variable (line 612)
+- new Variable (line 636)
 - 6 class method(s)
 
 ### `lib/JIT/Concern/CfgParamReturnTypeAndCalleeByRef.php`
