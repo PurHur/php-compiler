@@ -34,9 +34,9 @@
             "note": "helper-cache granularity; Fingerprint+Link+Bind extracts (#36387/#36403); sorted linkObjects (#36399); refusePrelinkGcMixReason (#36401)"
         },
         "lib/JIT/CompileCache.php": {
-            "budget": 61,
+            "budget": 63,
             "target": 2000,
-            "note": "MCJIT/AOT warm cache; SemanticHashFacades + PartialEmitDemote + ArtifactPersist + EditScaffold(+Plan+Strip+Restore) + ProjectIndexFacade + KeyLayoutFacade + HubState + BitcodePersist + Recording + EditSession + ProjectMembers + ArtifactFacade extracts (#36387/#36403) "
+            "note": "MCJIT/AOT warm cache; SemanticFileParts + SemanticHashFacades + PartialEmitDemote + ArtifactPersist + EditScaffold(+Plan+Strip+Restore) + ProjectIndexFacade + KeyLayoutFacade + HubState + BitcodePersist + Recording + EditSession + ProjectMembers + ArtifactFacade extracts (#36387/#36403) "
         },
         "lib/JIT/CompileCacheRecording.php": {
             "budget": 276,
@@ -59,14 +59,14 @@
             "note": "Artifact/object mid-tier warm restore delegates extracted from CompileCache (#36387)"
         },
         "lib/JIT/CompileCacheSemanticHashFacade.php": {
-            "budget": 133,
+            "budget": 134,
             "target": 250,
-            "note": "SemanticHash public delegates extracted from CompileCache (#36387)"
+            "note": "SemanticHash + SemanticFileParts public delegates extracted from CompileCache (#36387)"
         },
         "lib/JIT/CompileCacheProjectIndexFacade.php": {
             "budget": 104,
             "target": 200,
-            "note": "Project index / entry→members public delegates extracted from CompileCache (#36387)"
+            "note": "Project index / entry\u2192members public delegates extracted from CompileCache (#36387)"
         },
         "lib/JIT/CompileCacheHubState.php": {
             "budget": 106,
@@ -97,6 +97,16 @@
             "budget": 210,
             "target": 350,
             "note": "Changed-member / kept-symbol strip planning extracted from EditScaffold (#36387)"
+        },
+        "lib/JIT/CompileCacheSemanticHash.php": {
+            "budget": 203,
+            "target": 250,
+            "note": "File-level semantic hash + strip member diff; per-function parts extracted (#36387)"
+        },
+        "lib/JIT/CompileCacheSemanticFileParts.php": {
+            "budget": 326,
+            "target": 400,
+            "note": "Glue + per-function semantic parts / diffFunctionsForStrip extracted from SemanticHash (#36387)"
         }
     },
     "script_file_count": {

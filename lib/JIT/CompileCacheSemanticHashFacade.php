@@ -7,9 +7,10 @@ namespace PHPCompiler\JIT;
 /**
  * Semantic-hash / edit-strip planning facade for AOT CompileCache (#36387).
  *
- * Thin public delegates onto {@see CompileCacheSemanticHash} so the hub keeps
- * ratcheting under the size-budget split-TU program. Distinct from KeyLayout
- * path helpers, ArtifactPersist mid-tier restore, and ProjectIndex remember/lookup.
+ * Thin public delegates onto {@see CompileCacheSemanticHash} /
+ * {@see CompileCacheSemanticFileParts} so the hub keeps ratcheting under the
+ * size-budget split-TU program. Distinct from KeyLayout path helpers,
+ * ArtifactPersist mid-tier restore, and ProjectIndex remember/lookup.
  *
  * Move-only — no new C ABI. php-src analogy: Zend opcache invalidates a script
  * image when the source checksum changes (Zend/zend_accelerator_hash.c shape),

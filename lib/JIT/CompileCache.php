@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+require_once __DIR__.'/CompileCacheSemanticFileParts.php';
 require_once __DIR__.'/CompileCacheSemanticHash.php';
 require_once __DIR__.'/CompileCachePartialEmitDemote.php';
 require_once __DIR__.'/CompileCacheArtifactPersist.php';
@@ -30,7 +31,8 @@ require_once __DIR__.'/CompileCacheKeyLayoutFacade.php';
  * Full-module {@see bitcodePath()} also round-trips once void* lowers as i8* (#36387).
  *
  * Semantic hash / edit-strip planning lives in {@see CompileCacheSemanticHash}
- * (public hub delegates in {@see CompileCacheSemanticHashFacade});
+ * (per-function parts in {@see CompileCacheSemanticFileParts};
+ * public hub delegates in {@see CompileCacheSemanticHashFacade});
  * partial-emit demote lives in {@see CompileCachePartialEmitDemote};
  * linked-binary / user-object mid-tier warm restore lives in {@see CompileCacheArtifactPersist};
  * edit-scaffold hub + plan + restore + LLVM strip live in {@see CompileCacheEditScaffold} / {@see CompileCacheEditScaffoldPlan} / {@see CompileCacheEditScaffoldRestore} / {@see CompileCacheEditScaffoldStrip};
