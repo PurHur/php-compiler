@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8481 |
-| Phase A inventory files (M2 ratio SSOT) | 8481 |
+| PHP files on vm.php path | 8483 |
+| Phase A inventory files (M2 ratio SSOT) | 8483 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26574 |
+| Source constructs flagged (warnings) | 26579 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7289,6 +7289,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/VarFetchDestLvalueContext.php` | 0 | 2 |
 | `lib/JIT/Concern/VmSmokeAndRuntimeM3NativeStubs.php` | 0 | 10 |
 | `lib/JIT/Context.php` | 0 | 30 |
+| `lib/JIT/ContextCompileToFile.php` | 0 | 3 |
 | `lib/JIT/ContextDefineBuiltins.php` | 0 | 306 |
 | `lib/JIT/ContextEditScaffoldModuleRebind.php` | 0 | 2 |
 | `lib/JIT/DatePeriodForeachSnapshot.php` | 0 | 3 |
@@ -59801,36 +59802,43 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Context.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 992)
-- new ExtensionLoweringHooks (line 1089)
-- new Scope (line 1090)
-- new Analyzer (line 1121)
-- new Helper (line 1122)
-- new Builtin\Refcount (line 1124)
-- new Builtin\Output (line 1126)
-- new Builtin\Type (line 1127)
-- new Builtin\Internal (line 1128)
-- new Builtin\VarArg (line 1129)
-- new Builtin\ErrorHandler (line 1130)
-- new Scope (line 1158)
-- new Call\ExternalMethod (line 1241)
-- new ReflectionMethod (line 1448)
-- new Result (line 2483)
-- new Result (line 2504)
-- new Variable (line 3788)
-- new Variable (line 4123)
-- new Variable (line 4416)
-- new Variable (line 4543)
-- new VMVariable (line 4791)
-- new VMVariable (line 4807)
-- new VMVariable (line 4813)
-- new VMVariable (line 4819)
-- new VMVariable (line 4830)
-- new Variable (line 4894)
-- new Variable (line 4914)
-- new Variable (line 4959)
-- 135 class method(s)
-- 37 closure(s)
+- new Variable (line 994)
+- new ExtensionLoweringHooks (line 1091)
+- new Scope (line 1092)
+- new Analyzer (line 1123)
+- new Helper (line 1124)
+- new Builtin\Refcount (line 1126)
+- new Builtin\Output (line 1128)
+- new Builtin\Type (line 1129)
+- new Builtin\Internal (line 1130)
+- new Builtin\VarArg (line 1131)
+- new Builtin\ErrorHandler (line 1132)
+- new Scope (line 1160)
+- new Call\ExternalMethod (line 1243)
+- new ReflectionMethod (line 1450)
+- new Result (line 2158)
+- new Result (line 2179)
+- new Variable (line 3463)
+- new Variable (line 3798)
+- new Variable (line 4091)
+- new Variable (line 4218)
+- new VMVariable (line 4466)
+- new VMVariable (line 4482)
+- new VMVariable (line 4488)
+- new VMVariable (line 4494)
+- new VMVariable (line 4505)
+- new Variable (line 4569)
+- new Variable (line 4589)
+- new Variable (line 4634)
+- 133 class method(s)
+- 2 closure(s)
+
+### `lib/JIT/ContextCompileToFile.php`
+
+**Warnings** (review for bootstrap subset):
+- trait ContextCompileToFile (line 25)
+- 2 class method(s)
+- 35 closure(s)
 
 ### `lib/JIT/ContextDefineBuiltins.php`
 
