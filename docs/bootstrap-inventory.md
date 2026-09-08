@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8534 |
-| Phase A inventory files (M2 ratio SSOT) | 8534 |
+| PHP files on vm.php path | 8535 |
+| Phase A inventory files (M2 ratio SSOT) | 8535 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26673 |
+| Source constructs flagged (warnings) | 26675 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7298,6 +7298,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/VmSmokeAndRuntimeM3NativeStubs.php` | 0 | 10 |
 | `lib/JIT/Context.php` | 0 | 10 |
 | `lib/JIT/ContextCompileToFile.php` | 0 | 3 |
+| `lib/JIT/ContextConstantFetch.php` | 0 | 10 |
 | `lib/JIT/ContextDefineBuiltinFunctionProxies.php` | 0 | 4 |
 | `lib/JIT/ContextDefineBuiltinFunctionProxiesArrayIteratorAndObject.php` | 0 | 8 |
 | `lib/JIT/ContextDefineBuiltinFunctionProxiesDateAndXml.php` | 0 | 60 |
@@ -7312,7 +7313,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/ContextDefineBuiltinFunctionProxiesWeakAndPhpToken.php` | 0 | 14 |
 | `lib/JIT/ContextDefineBuiltins.php` | 0 | 2 |
 | `lib/JIT/ContextEditScaffoldModuleRebind.php` | 0 | 2 |
-| `lib/JIT/ContextFreeDeadAndConstantFetch.php` | 0 | 10 |
+| `lib/JIT/ContextFreeDeadAndConstantFetch.php` | 0 | 2 |
 | `lib/JIT/ContextFunctionProxyAndNestedJitKernel.php` | 0 | 3 |
 | `lib/JIT/ContextFunctionProxyExternalMethodStubReport.php` | 0 | 2 |
 | `lib/JIT/ContextFunctionProxyNestedJitKernelRegistry.php` | 0 | 3 |
@@ -59893,16 +59894,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Context.php`
 
 **Warnings** (review for bootstrap subset):
-- new ExtensionLoweringHooks (line 879)
-- new Scope (line 880)
-- new Analyzer (line 909)
-- new Helper (line 910)
-- new Builtin\Refcount (line 911)
-- new Builtin\Output (line 913)
-- new Builtin\Type (line 914)
-- new Builtin\Internal (line 915)
-- new Builtin\VarArg (line 916)
-- new Builtin\ErrorHandler (line 917)
+- new ExtensionLoweringHooks (line 881)
+- new Scope (line 882)
+- new Analyzer (line 911)
+- new Helper (line 912)
+- new Builtin\Refcount (line 913)
+- new Builtin\Output (line 915)
+- new Builtin\Type (line 916)
+- new Builtin\Internal (line 917)
+- new Builtin\VarArg (line 918)
+- new Builtin\ErrorHandler (line 919)
 
 ### `lib/JIT/ContextCompileToFile.php`
 
@@ -59910,6 +59911,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - trait ContextCompileToFile (line 25)
 - 2 class method(s)
 - 35 closure(s)
+
+### `lib/JIT/ContextConstantFetch.php`
+
+**Warnings** (review for bootstrap subset):
+- trait ContextConstantFetch (line 27)
+- new VMVariable (line 45)
+- new VMVariable (line 61)
+- new VMVariable (line 67)
+- new VMVariable (line 73)
+- new VMVariable (line 84)
+- new Variable (line 148)
+- new Variable (line 168)
+- new Variable (line 213)
+- 5 class method(s)
 
 ### `lib/JIT/ContextDefineBuiltinFunctionProxies.php`
 
@@ -60302,16 +60317,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ContextFreeDeadAndConstantFetch.php`
 
 **Warnings** (review for bootstrap subset):
-- trait ContextFreeDeadAndConstantFetch (line 29)
-- new VMVariable (line 217)
-- new VMVariable (line 233)
-- new VMVariable (line 239)
-- new VMVariable (line 245)
-- new VMVariable (line 256)
-- new Variable (line 320)
-- new Variable (line 340)
-- new Variable (line 385)
-- 6 class method(s)
+- trait ContextFreeDeadAndConstantFetch (line 27)
+- 1 class method(s)
 
 ### `lib/JIT/ContextFunctionProxyAndNestedJitKernel.php`
 
@@ -60404,7 +60411,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ContextVariableOperandBinding.php`
 
 **Warnings** (review for bootstrap subset):
-- trait ContextVariableOperandBinding (line 28)
+- trait ContextVariableOperandBinding (line 29)
 - 5 class method(s)
 
 ### `lib/JIT/ContextVariableOperandLookup.php`
