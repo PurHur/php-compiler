@@ -406,6 +406,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/VM/Concern/ClassScopeAndStaticPropertyResolve.php',
             'lib/VM/Concern/ClassTraitComposition.php',
             'lib/VM/Concern/ClosureBindAndFunctionStatic.php',
+            'lib/VM/Concern/ConstructMarkAndPendingOutboundCall.php',
             'lib/VM/Concern/DeprecationNoticeEmit.php',
             'lib/VM/Concern/ExecuteIncDecAndScopeOperandRead.php',
             'lib/VM/Concern/FiberStartResumeAndThrow.php',
