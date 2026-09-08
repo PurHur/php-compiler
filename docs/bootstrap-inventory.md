@@ -7164,7 +7164,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/CompileCacheArtifactFacade.php` | 0 | 2 |
 | `lib/JIT/CompileCacheArtifactPersist.php` | 0 | 1 |
 | `lib/JIT/CompileCacheBitcodePersist.php` | 0 | 2 |
-| `lib/JIT/CompileCacheEditScaffold.php` | 0 | 3 |
+| `lib/JIT/CompileCacheEditScaffold.php` | 0 | 2 |
+| `lib/JIT/CompileCacheEditScaffoldStrip.php` | 0 | 3 |
 | `lib/JIT/CompileCacheEditSession.php` | 0 | 2 |
 | `lib/JIT/CompileCacheHubState.php` | 0 | 1 |
 | `lib/JIT/CompileCacheKeyLayout.php` | 0 | 1 |
@@ -58809,9 +58810,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/CompileCacheEditScaffold.php`
 
 **Warnings** (review for bootstrap subset):
-- trait CompileCacheEditScaffold (line 16)
-- new Call\Native (line 510)
-- 10 class method(s)
+- trait CompileCacheEditScaffold (line 18)
+- 5 class method(s)
+
+### `lib/JIT/CompileCacheEditScaffoldStrip.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CompileCacheEditScaffoldStrip (line 17)
+- new Call\Native (line 202)
+- 5 class method(s)
 
 ### `lib/JIT/CompileCacheEditSession.php`
 

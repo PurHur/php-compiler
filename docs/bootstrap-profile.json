@@ -7254,6 +7254,7 @@
         "lib/JIT/CompileCacheArtifactFacade.php",
         "lib/JIT/CompileCacheArtifactPersist.php",
         "lib/JIT/CompileCacheBitcodePersist.php",
+        "lib/JIT/CompileCacheEditScaffoldStrip.php",
         "lib/JIT/CompileCacheEditScaffold.php",
         "lib/JIT/CompileCacheEditSession.php",
         "lib/JIT/CompileCacheHubState.php",
