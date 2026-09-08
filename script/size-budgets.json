@@ -179,9 +179,9 @@
             "note": "TYPE_CLASS_CONST_FETCH runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/Context.php": {
-            "budget": 4667,
+            "budget": 3544,
             "target": 4000,
-            "note": "DefineBuiltins + CompileToFile + EditScaffoldModuleRebind extracted (#36387/#36199); continue Context splits toward \u22644k"
+            "note": "VariableOperandBinding + CompileToFile + DefineBuiltins + EditScaffoldModuleRebind extracted (#36387/#36199); Context hub under 4k"
         },
         "lib/JIT/ContextEditScaffoldModuleRebind.php": {
             "budget": 315,
@@ -222,6 +222,11 @@
             "budget": 149,
             "target": 250,
             "note": "TYPE_NEW runFramesInner body extracted from VM.php (#36403)"
+        },
+        "lib/JIT/ContextVariableOperandBinding.php": {
+            "budget": 1155,
+            "target": 1200,
+            "note": "Operand\u2192Variable binding, freeDeadVariables, constantFetch extracted from Context (#36387)"
         }
     },
     "script_file_count": {

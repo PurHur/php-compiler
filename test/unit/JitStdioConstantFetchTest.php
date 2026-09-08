@@ -24,7 +24,10 @@ final class JitStdioConstantFetchTest extends TestCase
 
     public function testJitContextCoercesStdioObjectsBeforeLowering(): void
     {
-        $source = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Context.php');
+        // CONST_FETCH / stdio fd coerce lives on ContextVariableOperandBinding (#36387).
+        $source = (string) file_get_contents(
+            dirname(__DIR__, 2).'/lib/JIT/ContextVariableOperandBinding.php'
+        );
         $this->assertStringContainsString('vmStdioFdVariable', $source);
         $this->assertStringContainsString('TYPE_OBJECT === $phpVar->type', $source);
     }
