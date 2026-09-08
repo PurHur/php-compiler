@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8522 |
-| Phase A inventory files (M2 ratio SSOT) | 8522 |
+| PHP files on vm.php path | 8523 |
+| Phase A inventory files (M2 ratio SSOT) | 8523 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26649 |
+| Source constructs flagged (warnings) | 26651 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7315,7 +7315,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/ContextFunctionProxyAndNestedJitKernel.php` | 0 | 3 |
 | `lib/JIT/ContextFunctionProxyNestedJitKernelRegistry.php` | 0 | 3 |
 | `lib/JIT/ContextLlvmConstantsAndRegistry.php` | 0 | 4 |
-| `lib/JIT/ContextModuleCompileAndOptimize.php` | 0 | 5 |
+| `lib/JIT/ContextModuleCompileAndOptimize.php` | 0 | 4 |
+| `lib/JIT/ContextModuleOptimizationPasses.php` | 0 | 3 |
 | `lib/JIT/ContextScopeLifecycleAndInitEmit.php` | 0 | 3 |
 | `lib/JIT/ContextScriptGlobalsAndIncludeTracking.php` | 0 | 3 |
 | `lib/JIT/ContextStandaloneBodies.php` | 0 | 2 |
@@ -59881,16 +59882,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Context.php`
 
 **Warnings** (review for bootstrap subset):
-- new ExtensionLoweringHooks (line 865)
-- new Scope (line 866)
-- new Analyzer (line 895)
-- new Helper (line 896)
-- new Builtin\Refcount (line 897)
-- new Builtin\Output (line 899)
-- new Builtin\Type (line 900)
-- new Builtin\Internal (line 901)
-- new Builtin\VarArg (line 902)
-- new Builtin\ErrorHandler (line 903)
+- new ExtensionLoweringHooks (line 867)
+- new Scope (line 868)
+- new Analyzer (line 897)
+- new Helper (line 898)
+- new Builtin\Refcount (line 899)
+- new Builtin\Output (line 901)
+- new Builtin\Type (line 902)
+- new Builtin\Internal (line 903)
+- new Builtin\VarArg (line 904)
+- new Builtin\ErrorHandler (line 905)
 
 ### `lib/JIT/ContextCompileToFile.php`
 
@@ -60320,10 +60321,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ContextModuleCompileAndOptimize.php`
 
 **Warnings** (review for bootstrap subset):
-- trait ContextModuleCompileAndOptimize (line 24)
-- new Result (line 38)
-- new Result (line 59)
-- 18 class method(s)
+- trait ContextModuleCompileAndOptimize (line 25)
+- new Result (line 39)
+- new Result (line 60)
+- 14 class method(s)
+
+### `lib/JIT/ContextModuleOptimizationPasses.php`
+
+**Warnings** (review for bootstrap subset):
+- trait ContextModuleOptimizationPasses (line 25)
+- 4 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/ContextScopeLifecycleAndInitEmit.php`
