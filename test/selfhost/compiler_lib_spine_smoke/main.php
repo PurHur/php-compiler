@@ -6978,6 +6978,7 @@ require_once __DIR__.'/../../../lib/JIT/ContextStandaloneBodies.php';
 require_once __DIR__.'/../../../lib/JIT/ContextModuleCompileAndOptimize.php';
 require_once __DIR__.'/../../../lib/JIT/ContextScriptGlobalsAndIncludeTracking.php';
 require_once __DIR__.'/../../../lib/JIT/ContextLlvmConstantsAndRegistry.php';
+require_once __DIR__.'/../../../lib/JIT/ContextScopeLifecycleAndInitEmit.php';
 require_once __DIR__.'/../../../lib/JIT/Context.php';
 require_once __DIR__.'/../../../lib/JIT/DatePeriodForeachSnapshot.php';
 require_once __DIR__.'/../../../lib/JIT/SimpleXmlForeachSnapshot.php';
