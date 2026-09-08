@@ -14,7 +14,7 @@ Probed construct matrix: [`capabilities-syntax.md`](capabilities-syntax.md) (`ph
 
 ## Stdlib support
 
-Builtin matrix: [`capabilities.md`](capabilities.md) (`php script/capability-matrix.php`) — currently **4054** rows (**4021** VM / **1883** JIT / **1737** AOT yes). Extension manifests: [`extensions.md`](extensions.md).
+Builtin matrix: [`capabilities.md`](capabilities.md) (`php script/capability-matrix.php`) — currently **4054** rows (**4021** VM / **1472** JIT / **1326** AOT yes). Extension manifests: [`extensions.md`](extensions.md).
 
 ## Deploy
 
