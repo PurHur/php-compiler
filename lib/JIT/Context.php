@@ -626,7 +626,6 @@ class Context {
     /** False-arm literal for {@see $ternaryEchoLiteralConditionSlot} redirect (#18784). */
     public ?string $ternaryEchoLiteralElse = null;
 
-
     /** Guarded list destruct: assign-path dim fetches compile as unreachable stubs (#4308). */
     public bool $listUnpackSkipAssignPath = false;
 
