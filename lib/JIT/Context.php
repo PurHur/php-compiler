@@ -31,6 +31,7 @@ require_once __DIR__.'/ContextEditScaffoldModuleRebind.php';
 require_once __DIR__.'/ContextDefineBuiltinFunctionProxiesDateAndXml.php';
 require_once __DIR__.'/ContextDefineBuiltinFunctionProxiesFinfoPdoAndXml.php';
 require_once __DIR__.'/ContextDefineBuiltinFunctionProxiesReflectionAndException.php';
+require_once __DIR__.'/ContextDefineBuiltinFunctionProxiesReflectionMembers.php';
 require_once __DIR__.'/ContextDefineBuiltinFunctionProxiesExceptionAndError.php';
 require_once __DIR__.'/ContextDefineBuiltinFunctionProxiesFiberGeneratorAndClosure.php';
 require_once __DIR__.'/ContextDefineBuiltinFunctionProxiesDirectoryAndFile.php';
@@ -55,6 +56,7 @@ class Context {
     use ContextDefineBuiltinFunctionProxiesDateAndXml;
     use ContextDefineBuiltinFunctionProxiesFinfoPdoAndXml;
     use ContextDefineBuiltinFunctionProxiesReflectionAndException;
+    use ContextDefineBuiltinFunctionProxiesReflectionMembers;
     use ContextDefineBuiltinFunctionProxiesExceptionAndError;
     use ContextDefineBuiltinFunctionProxiesFiberGeneratorAndClosure;
     use ContextDefineBuiltinFunctionProxiesDirectoryAndFile;

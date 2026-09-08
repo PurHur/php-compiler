@@ -179,9 +179,9 @@
             "note": "TYPE_CLASS_CONST_FETCH runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/Context.php": {
-            "budget": 904,
+            "budget": 906,
             "target": 3500,
-            "note": "WeakAndPhpToken + FiberGeneratorAndClosure + ExceptionAndError + Spl* + DirectoryAndFile + Reflection + DateAndXml + FinfoPdoAndXml proxies wiring + ScopeLifecycle/LlvmConstants/FreeDead/ScriptGlobals peers (#36387/#36199); continue toward \u22643.5k"
+            "note": "ReflectionMembers + FiberGeneratorAndClosure + ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml proxies wiring + ScopeLifecycle peers (#36387/#36199); continue toward \u22643.5k"
         },
         "lib/JIT/ContextEditScaffoldModuleRebind.php": {
             "budget": 315,
@@ -274,9 +274,9 @@
             "note": "TYPE_ECHO/PRINT/EVAL runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/ContextDefineBuiltinFunctionProxies.php": {
-            "budget": 59,
+            "budget": 63,
             "target": 200,
-            "note": "is_null + peer dispatch hub; FiberGeneratorAndClosure + ExceptionAndError + WeakAndPhpToken + Spl* + DirectoryAndFile + Reflection + DateAndXml + FinfoPdoAndXml peers (#36387)"
+            "note": "is_null + peer dispatch hub; ReflectionMembers + FiberGeneratorAndClosure + ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml peers (#36387)"
         },
         "lib/JIT/ContextDefineBuiltinFunctionProxiesDirectoryAndFile.php": {
             "budget": 151,
@@ -299,9 +299,14 @@
             "note": "ArrayIterator/ArrayObject/LimitIterator/FilterIterator family thin-AOT proxies extracted from FunctionProxies (#36387)"
         },
         "lib/JIT/ContextDefineBuiltinFunctionProxiesReflectionAndException.php": {
-            "budget": 252,
-            "target": 260,
-            "note": "Reflection* thin-AOT proxies; Exception/Throwable/Error moved to ExceptionAndError (#36387)"
+            "budget": 131,
+            "target": 200,
+            "note": "ReflectionClass* thin-AOT proxies; member/extension/type catalogs moved to ReflectionMembers (#36387)"
+        },
+        "lib/JIT/ContextDefineBuiltinFunctionProxiesReflectionMembers.php": {
+            "budget": 153,
+            "target": 200,
+            "note": "ReflectionProperty/Method/Parameter/Function/Extension/Attribute/Enum/type thin-AOT proxies extracted from ReflectionAndException (#36387)"
         },
         "lib/JIT/ContextDefineBuiltinFunctionProxiesExceptionAndError.php": {
             "budget": 100,
