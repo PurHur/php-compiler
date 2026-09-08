@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8536 |
-| Phase A inventory files (M2 ratio SSOT) | 8536 |
+| PHP files on vm.php path | 8537 |
+| Phase A inventory files (M2 ratio SSOT) | 8537 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26677 |
+| Source constructs flagged (warnings) | 26679 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -8181,6 +8181,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/Concern/PropertyHookFrameAndStaticLink.php` | 0 | 2 |
 | `lib/VM/Concern/ReturnTypeEnforce.php` | 0 | 4 |
 | `lib/VM/Concern/ScalarCastCompareArithConcatDispatch.php` | 0 | 3 |
+| `lib/VM/Concern/ScalarCastDispatch.php` | 0 | 2 |
 | `lib/VM/Concern/StaticPropertyFetchDispatch.php` | 0 | 2 |
 | `lib/VM/Concern/TryCatchFinallyAndUncaughtDispatch.php` | 0 | 13 |
 | `lib/VM/Concern/TypedIntRecursiveAndCountedLoopFastPath.php` | 0 | 3 |
@@ -62624,25 +62625,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 311)
-- new ObjectEntry (line 435)
-- new Variable (line 444)
-- new Variable (line 473)
-- new VM\GeneratorUncaughtThrow (line 488)
-- new VM\FiberUncaughtThrow (line 502)
-- new VM\DestructorThrowCatchSignal (line 507)
-- new CompileError (line 967)
-- new Func\PHP (line 977)
-- new Variable (line 1065)
-- new Variable (line 1068)
-- new Variable (line 1359)
-- new Error (line 1804)
-- new ClassEntry (line 1840)
-- new Variable (line 1841)
-- new VM\ClassProperty (line 1842)
-- new ObjectEntry (line 1845)
-- new Variable (line 1848)
-- new Variable (line 1874)
+- new Variable (line 313)
+- new ObjectEntry (line 437)
+- new Variable (line 446)
+- new Variable (line 475)
+- new VM\GeneratorUncaughtThrow (line 490)
+- new VM\FiberUncaughtThrow (line 504)
+- new VM\DestructorThrowCatchSignal (line 509)
+- new CompileError (line 978)
+- new Func\PHP (line 988)
+- new Variable (line 1076)
+- new Variable (line 1079)
+- new Variable (line 1370)
+- new Error (line 1815)
+- new ClassEntry (line 1851)
+- new Variable (line 1852)
+- new VM\ClassProperty (line 1853)
+- new ObjectEntry (line 1856)
+- new Variable (line 1859)
+- new Variable (line 1885)
 - 27 class method(s)
 
 ### `lib/VM/AbstractPropertyHookCheck.php`
@@ -66664,8 +66665,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Concern/ScalarCastCompareArithConcatDispatch.php`
 
 **Warnings** (review for bootstrap subset):
-- trait ScalarCastCompareArithConcatDispatch (line 26)
-- new Variable (line 478)
+- trait ScalarCastCompareArithConcatDispatch (line 25)
+- new Variable (line 348)
+- 1 class method(s)
+
+### `lib/VM/Concern/ScalarCastDispatch.php`
+
+**Warnings** (review for bootstrap subset):
+- trait ScalarCastDispatch (line 21)
 - 1 class method(s)
 
 ### `lib/VM/Concern/StaticPropertyFetchDispatch.php`
