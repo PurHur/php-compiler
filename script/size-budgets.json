@@ -179,9 +179,9 @@
             "note": "TYPE_CLASS_CONST_FETCH runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/Context.php": {
-            "budget": 910,
+            "budget": 912,
             "target": 3500,
-            "note": "NestedJitKernelRegistry + ReflectionMembers + FiberGeneratorAndClosure + ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml proxies wiring + ScopeLifecycle peers (#36387/#36199); continue toward \u22643.5k + ModuleOptimizationPasses (#36387)"
+            "note": "ArrayIteratorAndObject + NestedJitKernelRegistry + ReflectionMembers + FiberGeneratorAndClosure + ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml proxies wiring + ScopeLifecycle peers (#36387/#36199); continue toward \u22643.5k + ModuleOptimizationPasses (#36387)"
         },
         "lib/JIT/ContextEditScaffoldModuleRebind.php": {
             "budget": 315,
@@ -279,9 +279,9 @@
             "note": "TYPE_ECHO/PRINT/EVAL runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/ContextDefineBuiltinFunctionProxies.php": {
-            "budget": 63,
+            "budget": 67,
             "target": 200,
-            "note": "is_null + peer dispatch hub; ReflectionMembers + FiberGeneratorAndClosure + ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml peers (#36387)"
+            "note": "is_null + peer dispatch hub; ArrayIteratorAndObject + ReflectionMembers + FiberGeneratorAndClosure + ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml peers (#36387)"
         },
         "lib/JIT/ContextDefineBuiltinFunctionProxiesDirectoryAndFile.php": {
             "budget": 151,
@@ -299,9 +299,14 @@
             "note": "SplObjectStorage/SplPriorityQueue/SplDllist/SplFixedArray thin-AOT proxies extracted from FunctionProxies (#36387)"
         },
         "lib/JIT/ContextDefineBuiltinFunctionProxiesSplIterators.php": {
-            "budget": 182,
-            "target": 250,
-            "note": "ArrayIterator/ArrayObject/LimitIterator/FilterIterator family thin-AOT proxies extracted from FunctionProxies (#36387)"
+            "budget": 110,
+            "target": 150,
+            "note": "LimitIterator/FilterIterator/EmptyIterator family; ArrayIterator/ArrayObject moved to ArrayIteratorAndObject (#36387)"
+        },
+        "lib/JIT/ContextDefineBuiltinFunctionProxiesArrayIteratorAndObject.php": {
+            "budget": 101,
+            "target": 150,
+            "note": "ArrayIterator/RecursiveArrayIterator/ArrayObject thin-AOT proxies extracted from SplIterators (#36387)"
         },
         "lib/JIT/ContextDefineBuiltinFunctionProxiesReflectionAndException.php": {
             "budget": 131,

@@ -358,6 +358,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/JIT/ContextDefineBuiltinFunctionProxiesReflectionAndException.php',
             'lib/JIT/ContextDefineBuiltinFunctionProxiesReflectionMembers.php',
             'lib/JIT/ContextDefineBuiltinFunctionProxiesSplContainers.php',
+            'lib/JIT/ContextDefineBuiltinFunctionProxiesArrayIteratorAndObject.php',
             'lib/JIT/ContextDefineBuiltinFunctionProxiesSplIterators.php',
             'lib/JIT/ContextDefineBuiltinFunctionProxiesWeakAndPhpToken.php',
             'lib/JIT/ContextDefineBuiltins.php',
