@@ -60,6 +60,7 @@ require_once __DIR__.'/VM/Concern/EchoPrintEvalDispatch.php';
 require_once __DIR__.'/VM/Concern/ForeachIterDispatch.php';
 require_once __DIR__.'/VM/Concern/CoalesceNullsafeSilenceExitDispatch.php';
 require_once __DIR__.'/VM/Concern/JumpCaseDispatch.php';
+require_once __DIR__.'/VM/Concern/ConstFetchStaticCallInstanceofDispatch.php';
 
 use PHPCompiler\BuiltinByRefParams;
 use PHPCompiler\Compiler\AttributeNames;
@@ -156,6 +157,7 @@ class VM {
     use ForeachIterDispatch;
     use CoalesceNullsafeSilenceExitDispatch;
     use JumpCaseDispatch;
+    use ConstFetchStaticCallInstanceofDispatch;
     const SUCCESS = 1;
     const FAILURE = 2;
 
@@ -965,103 +967,23 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_CONST_FETCH:
-                    $value = null;
-                    if (!is_null($op->arg3)) {
-                        // try NS constant fetch
-                        $value = $this->context->constantFetch($frame->scope[$op->arg3]->toString());
+                    $constFetchOutcome = $this->executeConstFetchDispatch($frame, $op);
+                    if ($constFetchOutcome instanceof Frame) {
+                        $frame = $constFetchOutcome;
+                        goto restart;
                     }
-                    if (is_null($value)) {
-                        $value = $this->context->constantFetch($frame->scope[$op->arg2]->toString());
+                    if (is_int($constFetchOutcome)) {
+                        return $constFetchOutcome;
                     }
-                    if (is_null($value)) {
-                        // arg3 is php-cfg's namespace-qualified name (N\NAME), not bare namespace (#10510).
-                        $constName = null !== $op->arg3
-                            ? $frame->scope[$op->arg3]->toString()
-                            : $frame->scope[$op->arg2]->toString();
-                        $catchFrame = $this->dispatchVmError(
-                            sprintf('Undefined constant "%s"', $constName),
-                            $frame
-                        );
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-
-                        return self::EXCEPTION;
-                    }
-                    $constName = null !== $op->arg3
-                        ? $frame->scope[$op->arg3]->toString()
-                        : $frame->scope[$op->arg2]->toString();
-                    $this->emitGlobalConstFetchDeprecation($constName, $frame);
-                    $frame->scope[$op->arg1]->copyFrom($value);
-                    $this->markScopeSlotInitialized($frame, (int) $op->arg1);
                     break;
                 case OpCode::TYPE_STATICCALL_INIT:
-                    $instanceScopeCall = false;
-                    $scopeClassName = null;
-                    $staticCallMethodName = '';
-                    $selfKeywordScope = false;
-                    try {
-                        $classOperand = $frame->scope[$op->arg1]->resolveIndirect();
-                        $staticCallMethodName = $frame->scope[$op->arg2]->toString();
-                        $parentKeywordScope = $op->staticCallParentScope;
-                        $enumScopeClass = VM\EnumCaseSupport::enumClassForCaseVariable($classOperand);
-                        if (null !== $enumScopeClass) {
-                            // (E::A)::staticMethod() — enum case scope resolves to enum type (#6408, zend_enum.c).
-                            $instanceScopeCall = true;
-                            $scopeClassName = $enumScopeClass->name;
-                            $callableName = $scopeClassName.'::'.$staticCallMethodName;
-                        } elseif (Variable::TYPE_OBJECT === $classOperand->type) {
-                            $instanceScopeCall = true;
-                            $scopeClassName = $classOperand->toObject()->class->name;
-                            $callableName = $scopeClassName.'::'.$staticCallMethodName;
-                        } else {
-                            // String (or Error) — do not stringify bool/int/null/array (#30059).
-                            $className = VM\InstanceOfClassName::resolveClassNamePreservingCase(
-                                $classOperand
-                            );
-                            if (!$parentKeywordScope) {
-                                $parentKeywordScope = 'parent' === strtolower($className);
-                            }
-                            // Lexical self:: (php-cfg may keep the keyword) — preserve LSB (#21983).
-                            $selfKeywordScope = 'self' === strtolower($className);
-                            $lcClass = $this->resolveClassScopeName($className, $frame);
-                            $resolvedClassName = isset($this->context->classes[$lcClass])
-                                ? $this->context->classes[$lcClass]->name
-                                : $className;
-                            $callableName = $resolvedClassName.'::'.$staticCallMethodName;
-                        }
-                        $this->initStaticCallable(
-                            $frame,
-                            $callableName,
-                            $parentKeywordScope,
-                            $selfKeywordScope
-                        );
-                    } catch (\Error $e) {
-                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                        return self::EXCEPTION;
-                    } catch (\LogicException $e) {
-                        if ($instanceScopeCall && str_starts_with($e->getMessage(), 'Call to undefined static method ')) {
-                            $catchFrame = $this->dispatchVmError(
-                                "Call to undefined method {$scopeClassName}::{$staticCallMethodName}()",
-                                $frame
-                            );
-                            if (null !== $catchFrame) {
-                                $frame = $catchFrame;
-                                goto restart;
-                            }
-                            return self::EXCEPTION;
-                        }
-                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                        return self::EXCEPTION;
+                    $staticCallInitOutcome = $this->executeStaticCallInitDispatch($frame, $op);
+                    if ($staticCallInitOutcome instanceof Frame) {
+                        $frame = $staticCallInitOutcome;
+                        goto restart;
+                    }
+                    if (is_int($staticCallInitOutcome)) {
+                        return $staticCallInitOutcome;
                     }
                     break;
                 case OpCode::TYPE_CLASS_CONST_FETCH:
@@ -1075,50 +997,23 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_INSTANCEOF:
-                    try {
-                        $value = $frame->scope[$op->arg2];
-                        $matches = false;
-                        $unionEncoded = $op->instanceofUnionTypes;
-                        if (null !== $unionEncoded && '' !== $unionEncoded) {
-                            foreach (explode('|', $unionEncoded) as $typeName) {
-                                if ('' === $typeName) {
-                                    continue;
-                                }
-                                if ($this->valueInstanceOfClassName($value, $typeName)) {
-                                    $matches = true;
-                                    break;
-                                }
-                            }
-                        } else {
-                            $keyword = $op->instanceofScopeKeyword;
-                            if (null !== $keyword && '' !== $keyword) {
-                                // Trait `instanceof self` → composing class (#31729, zend_inheritance.c).
-                                $className = $this->resolveClassScopeName($keyword, $frame);
-                            } else {
-                                $className = VM\InstanceOfClassName::resolveClassName($frame->scope[$op->arg3]);
-                            }
-                            $matches = $this->valueInstanceOfClassName($value, $className);
-                        }
-                        $frame->scope[$op->arg1]->bool($matches);
-                    } catch (\Error|\LogicException $e) {
-                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-
-                        return self::EXCEPTION;
+                    $instanceofOutcome = $this->executeInstanceofDispatch($frame, $op);
+                    if ($instanceofOutcome instanceof Frame) {
+                        $frame = $instanceofOutcome;
+                        goto restart;
+                    }
+                    if (is_int($instanceofOutcome)) {
+                        return $instanceofOutcome;
                     }
                     break;
                 case OpCode::TYPE_IN:
-                    try {
-                        $found = VM\InOperator::contains(
-                            $frame->scope[$op->arg2],
-                            $frame->scope[$op->arg3]
-                        );
-                        $frame->scope[$op->arg1]->bool($found);
-                    } catch (\TypeError $e) {
-                        return $this->raise($e->getMessage(), $frame);
+                    $inOutcome = $this->executeInDispatch($frame, $op);
+                    if ($inOutcome instanceof Frame) {
+                        $frame = $inOutcome;
+                        goto restart;
+                    }
+                    if (is_int($inOutcome)) {
+                        return $inOutcome;
                     }
                     break;
                 case OpCode::TYPE_STATIC_PROPERTY_FETCH:
