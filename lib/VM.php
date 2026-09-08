@@ -49,6 +49,7 @@ require_once __DIR__.'/VM/Concern/UnsetDispatch.php';
 require_once __DIR__.'/VM/Concern/AssignDispatch.php';
 require_once __DIR__.'/VM/Concern/FuncCallExecDispatch.php';
 require_once __DIR__.'/VM/Concern/ArgRecvDispatch.php';
+require_once __DIR__.'/VM/Concern/ScalarCastCompareArithConcatDispatch.php';
 
 use PHPCompiler\BuiltinByRefParams;
 use PHPCompiler\Compiler\AttributeNames;
@@ -137,6 +138,7 @@ class VM {
     use AssignDispatch;
     use FuncCallExecDispatch;
     use ArgRecvDispatch;
+    use ScalarCastCompareArithConcatDispatch;
     const SUCCESS = 1;
     const FAILURE = 2;
 
@@ -804,478 +806,50 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_CAST_BOOL:
-                    try {
-                        $frame->scope[$op->arg1]->castFrom(
-                            Variable::TYPE_BOOLEAN,
-                            $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2),
-                            $this
-                        );
-                    } catch (\TypeError $e) {
-                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                    }
-                    break;
                 case OpCode::TYPE_CAST_INT:
-                    try {
-                        $frame->scope[$op->arg1]->castFrom(
-                            Variable::TYPE_INTEGER,
-                            $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2),
-                            $this,
-                            $frame
-                        );
-                    } catch (\TypeError $e) {
-                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                    }
-                    break;
                 case OpCode::TYPE_CAST_FLOAT:
-                    try {
-                        $frame->scope[$op->arg1]->castFrom(
-                            Variable::TYPE_FLOAT,
-                            $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2),
-                            $this,
-                            $frame
-                        );
-                    } catch (\TypeError $e) {
-                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                    }
-                    break;
                 case OpCode::TYPE_CAST_STRING:
-                    $savedCallSiteLine = $frame->callSiteLine;
-                    if (null !== $op->arg3 && $op->arg3 > 0) {
-                        $frame->callSiteLine = $op->arg3;
-                    }
-                    // Encapsed "$this" / "{$this}" lowers to CAST_STRING on the this CV (#31728).
-                    $catchFrame = $this->guardUnboundThisRead($frame, (int) $op->arg2);
-                    if (null !== $catchFrame) {
-                        $frame->callSiteLine = $savedCallSiteLine;
-                        $frame = $catchFrame;
-                        goto restart;
-                    }
-                    $castStringSrc = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2);
-                    try {
-                        $frame->scope[$op->arg1]->castFrom(
-                            Variable::TYPE_STRING,
-                            $castStringSrc,
-                            $this,
-                            $frame
-                        );
-                    } catch (\Error $e) {
-                        $frame->callSiteLine = $savedCallSiteLine;
-                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                        break;
-                    } catch (\TypeError $e) {
-                        $frame->callSiteLine = $savedCallSiteLine;
-                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                        break;
-                    } catch (\BadMethodCallException $e) {
-                        // SPL CachingIterator::__toString without CALL_TOSTRING (#24907).
-                        $frame->callSiteLine = $savedCallSiteLine;
-                        $catchFrame = $this->dispatchVmBadMethodCallException($e, $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                        break;
-                    } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
-                        $frame->callSiteLine = $savedCallSiteLine;
-                        $frame = $this->resumeAfterBuiltinCallbackCatchRedirect($redirect);
-                        goto restart;
-                    } catch (VM\MagicMethodInvocationAborted) {
-                        $frame->callSiteLine = $savedCallSiteLine;
-                        $this->clearTryCatchUnwindState();
-                        ++$frame->pos;
-                        break;
-                    }
-                    $frame->callSiteLine = $savedCallSiteLine;
-                    break;
                 case OpCode::TYPE_CAST_ARRAY:
-                    $frame->scope[$op->arg1]->copyFrom(
-                        CastSupport::toArray(
-                            $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2),
-                            $this->context->classes
-                        )
-                    );
-                    break;
                 case OpCode::TYPE_CAST_OBJECT:
-                    $src = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2);
-                    $dst = $frame->scope[$op->arg1];
-                    $dst->copyFrom(VM\CastSupport::toObject($src, $this->context->classes));
-                    $this->markScopeSlotInitialized($frame, (int) $op->arg1);
-                    break;
                 case OpCode::TYPE_CAST_UNSET:
-                    $src = $frame->scope[$op->arg2];
-                    if ($this->slotIsReferenceBinding($src, $frame->scope)) {
-                        $src->reset();
-                        $src->type = Variable::TYPE_UNDEFINED;
-                    }
-                    $frame->scope[$op->arg1]->null();
-                    break;
                 case OpCode::TYPE_CAST_VOID:
-                    $frame->scope[$op->arg1]->null();
-                    break;
                 case OpCode::TYPE_IDENTICAL:
-                    // Match arms lower to IDENTICAL — warn on undefined CV reads (#26147, #10358).
-                    $arg1 = $frame->scope[$op->arg1];
-                    $arg2 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2);
-                    $arg3 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg3);
-                    $arg1->bool($arg2->identicalTo($arg3));
-                    break;
                 case OpCode::TYPE_NOT_IDENTICAL:
-                    $arg1 = $frame->scope[$op->arg1];
-                    $arg2 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2);
-                    $arg3 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg3);
-                    $arg1->bool(!$arg2->identicalTo($arg3));
-                    $this->releaseVmBinaryOpOperandTemp($frame, (int) $op->arg2, (int) $op->arg1, (int) $op->arg3);
-                    $this->releaseVmBinaryOpOperandTemp($frame, (int) $op->arg3, (int) $op->arg1, (int) $op->arg2);
-                    break;
                 case OpCode::TYPE_EQUAL:
-                    // Switch cases lower to EQUAL — same undefined-CV warning path (#26147).
-                    $arg1 = $frame->scope[$op->arg1];
-                    $arg2 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2);
-                    $arg3 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg3);
-                    try {
-                        $arg1->bool($arg2->equals($arg3, $this));
-                    } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
-                        $frame = $this->resumeAfterBuiltinCallbackCatchRedirect($redirect);
-                        goto restart;
-                    } catch (VM\MagicMethodInvocationAborted) {
-                        $this->clearTryCatchUnwindState();
-                        ++$frame->pos;
-                        break;
-                    }
-                    break;
                 case OpCode::TYPE_NOT_EQUAL:
-                    $arg1 = $frame->scope[$op->arg1];
-                    $arg2 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2);
-                    $arg3 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg3);
-                    try {
-                        $arg1->bool(!$arg2->equals($arg3, $this));
-                    } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
-                        $frame = $this->resumeAfterBuiltinCallbackCatchRedirect($redirect);
-                        goto restart;
-                    } catch (VM\MagicMethodInvocationAborted) {
-                        $this->clearTryCatchUnwindState();
-                        ++$frame->pos;
-                        break;
-                    }
-                    break;
                 case OpCode::TYPE_LOGICAL_XOR:
-                    $arg1 = $frame->scope[$op->arg1];
-                    $arg2 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2);
-                    $arg3 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg3);
-                    $arg1->bool($arg2->toBool($this) !== $arg3->toBool($this));
-                    break;
                 case OpCode::TYPE_SMALLER:
-                    if (1 === $frame->pos) {
-                        $jumpIfOp = $frame->block->opCodes[1] ?? null;
-                        if ($jumpIfOp instanceof OpCode && OpCode::TYPE_JUMPIF === $jumpIfOp->type) {
-                            $loopExit = $this->tryExecuteCountedIntForLoopAtJumpIf($frame, $jumpIfOp);
-                            if (null !== $loopExit) {
-                                $frame = $loopExit;
-                                continue 2;
-                            }
-                        }
-                    }
-                    // fall through
                 case OpCode::TYPE_GREATER:
                 case OpCode::TYPE_SMALLER_OR_EQUAL:
                 case OpCode::TYPE_GREATER_OR_EQUAL:
-                    if ($this->tryExecuteRelationalCompareFastPath($frame, $op)) {
-                        break;
-                    }
-                    $arg1 = $frame->scope[$op->arg1];
-                    $arg2 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2);
-                    $arg3 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg3);
-                    try {
-                        $arg1->compareOp($op->type, $arg2, $arg3, $this);
-                    } catch (\TypeError $e) {
-                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                        break;
-                    } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
-                        // __toString throw during relational compare (#29534).
-                        $frame = $this->resumeAfterBuiltinCallbackCatchRedirect($redirect);
-                        goto restart;
-                    }
-                    break;
                 case OpCode::TYPE_SPACESHIP:
-                    $arg1 = $frame->scope[$op->arg1];
-                    $arg2 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2);
-                    $arg3 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg3);
-                    try {
-                        $arg1->spaceshipOp($arg2, $arg3, $this);
-                    } catch (\TypeError $e) {
-                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                        break;
-                    } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
-                        // __toString throw during <=> (#29534).
-                        $frame = $this->resumeAfterBuiltinCallbackCatchRedirect($redirect);
-                        goto restart;
-                    }
-                    break;
                 case OpCode::TYPE_POST_INC:
-                    $catchFrame = $this->executeIncDec($frame, $op, true, false);
-                    if (null !== $catchFrame) {
-                        $frame = $catchFrame;
-                        goto restart;
-                    }
-                    break;
                 case OpCode::TYPE_PRE_INC:
-                    $catchFrame = $this->executeIncDec($frame, $op, true, true);
-                    if (null !== $catchFrame) {
-                        $frame = $catchFrame;
-                        goto restart;
-                    }
-                    break;
                 case OpCode::TYPE_POST_DEC:
-                    $catchFrame = $this->executeIncDec($frame, $op, false, false);
-                    if (null !== $catchFrame) {
-                        $frame = $catchFrame;
-                        goto restart;
-                    }
-                    break;
                 case OpCode::TYPE_PRE_DEC:
-                    $catchFrame = $this->executeIncDec($frame, $op, false, true);
-                    if (null !== $catchFrame) {
-                        $frame = $catchFrame;
-                        goto restart;
-                    }
-                    break;
                 case OpCode::TYPE_PLUS:
                 case OpCode::TYPE_MINUS:
                 case OpCode::TYPE_MUL:
                 case OpCode::TYPE_DIV:
                 case OpCode::TYPE_MODULO:
                 case OpCode::TYPE_POW:
-                    $arg1 = $frame->scope[$op->arg1];
-                    $arg2 = $frame->scope[$op->arg2];
-                    $arg3 = $frame->scope[$op->arg3];
-                    $readArg2 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2);
-                    $readArg3 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg3);
-                    $catchFrame = $this->enforceReadonlyForCompoundAssign($frame, $op, $arg2);
-                    if (null !== $catchFrame) {
-                        $frame = $catchFrame;
-                        goto restart;
-                    }
-                    if ($op->arg1 === $op->arg2) {
-                        $hookedRead = $this->fetchHookedPropertyValueForIncDec($arg2, $frame);
-                        if (null !== $hookedRead) {
-                            $catchFrame = $this->executeHookedPropertyInPlaceCompound($frame, $op, $hookedRead);
-                            if (null !== $catchFrame) {
-                                $frame = $catchFrame;
-                                goto restart;
-                            }
-                            break;
-                        }
-                    }
-                    try {
-                        $numericArg2 = $op->arg1 !== $op->arg2 ? $readArg2 : $arg2;
-                        $numericArg3 = $readArg3;
-                        if (
-                            $op->isIncDec
-                            && (OpCode::TYPE_PLUS === $op->type || OpCode::TYPE_MINUS === $op->type)
-                        ) {
-                            $arg1->incDecOp($op->type, $numericArg2, $numericArg3, $this, $frame);
-                        } else {
-                            $arg1->numericOp($op->type, $numericArg2, $numericArg3, $this, $frame);
-                        }
-                    } catch (\TypeError $e) {
-                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                        break;
-                    } catch (\DivisionByZeroError $e) {
-                        $catchFrame = $this->dispatchVmDivisionByZeroError($e, $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                        break;
-                    } catch (\ArithmeticError $e) {
-                        $catchFrame = $this->dispatchVmArithmeticError($e, $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                        break;
-                    } catch (\Error $e) {
-                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                        break;
-                    }
-                    $this->markScopeSlotInitializedIfNamedLocal($frame, (int) $op->arg1);
-                    break;
                 case OpCode::TYPE_BITWISE_AND:
                 case OpCode::TYPE_BITWISE_OR:
                 case OpCode::TYPE_BITWISE_XOR:
                 case OpCode::TYPE_SHIFT_LEFT:
                 case OpCode::TYPE_SHIFT_RIGHT:
-                    $arg1 = $frame->scope[$op->arg1];
-                    $readArg2 = $this->readRuntimeOperandForBitwise($frame, (int) $op->arg2);
-                    $readArg3 = $this->readRuntimeOperandForBitwise($frame, (int) $op->arg3);
-                    $arg2 = $op->arg1 !== $op->arg2 ? $readArg2 : $frame->scope[$op->arg2];
-                    $arg3 = $readArg3;
-                    $catchFrame = $this->enforceReadonlyForCompoundAssign($frame, $op, $arg2);
-                    if (null !== $catchFrame) {
-                        $frame = $catchFrame;
-                        goto restart;
-                    }
-                    if ($op->arg1 === $op->arg2) {
-                        $hookedRead = $this->fetchHookedPropertyValueForIncDec($arg2, $frame);
-                        if (null !== $hookedRead) {
-                            $catchFrame = $this->executeHookedPropertyInPlaceCompound($frame, $op, $hookedRead);
-                            if (null !== $catchFrame) {
-                                $frame = $catchFrame;
-                                goto restart;
-                            }
-                            break;
-                        }
-                    }
-                    try {
-                        $arg1->bitwiseOp($op->type, $arg2, $arg3, $this, $frame);
-                    } catch (\TypeError $e) {
-                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                        break;
-                    } catch (\ArithmeticError $e) {
-                        // Negative << / >> — Zend ArithmeticError must be user-catchable (#21912).
-                        $catchFrame = $this->dispatchVmArithmeticError($e, $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                        break;
-                    } catch (\Error $e) {
-                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                        break;
-                    }
-                    $this->markScopeSlotInitializedIfNamedLocal($frame, (int) $op->arg1);
-                    break;
-
                 case OpCode::TYPE_UNARY_MINUS:
                 case OpCode::TYPE_UNARY_PLUS:
                 case OpCode::TYPE_BITWISE_NOT:
-                    $arg1 = $frame->scope[$op->arg1];
-                    $arg2 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2);
-                    try {
-                        $arg1->unaryOp($op->type, $arg2, $this, $frame);
-                    } catch (\TypeError $e) {
-                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                        break;
-                    }
-                    break;
                 case OpCode::TYPE_CONCAT:
-                    $arg1 = $frame->scope[$op->arg1];
-                    $catchFrame = $this->enforceReadonlyForCompoundAssign($frame, $op, $arg1);
-                    if (null !== $catchFrame) {
-                        $frame = $catchFrame;
+                    $scalarOutcome = $this->executeScalarCastCompareArithConcatDispatch($frame, $op);
+                    if ($scalarOutcome instanceof Frame) {
+                        $frame = $scalarOutcome;
                         goto restart;
                     }
-                    // "$this" / concat with this CV — Error outside object context (#31728).
-                    $catchFrame = $this->guardUnboundThisRead($frame, (int) $op->arg2);
-                    if (null !== $catchFrame) {
-                        $frame = $catchFrame;
-                        goto restart;
+                    if (is_int($scalarOutcome)) {
+                        return $scalarOutcome;
                     }
-                    $catchFrame = $this->guardUnboundThisRead($frame, (int) $op->arg3);
-                    if (null !== $catchFrame) {
-                        $frame = $catchFrame;
-                        goto restart;
-                    }
-                    if ($op->arg1 === $op->arg2) {
-                        $hookedRead = $this->fetchHookedPropertyValueForIncDec($arg1, $frame);
-                        if (null !== $hookedRead) {
-                            $catchFrame = $this->executeHookedPropertyInPlaceCompound($frame, $op, $hookedRead);
-                            if (null !== $catchFrame) {
-                                $frame = $catchFrame;
-                                goto restart;
-                            }
-                            break;
-                        }
-                    }
-                    try {
-                        // Zend: assign-op on string offsets before concat (#22897).
-                        Variable::rejectAssignOpOnStringOffset(
-                            $arg1,
-                            $frame->scope[(int) $op->arg2]
-                        );
-                        $left = $op->arg1 === $op->arg2
-                            ? $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2)
-                            : $this->readRuntimeOperandForConcat($frame, (int) $op->arg2);
-                        $right = $this->readRuntimeOperandForConcat($frame, (int) $op->arg3);
-                        $result = new Variable();
-                        $result->string(
-                            $this->coerceVariableToString($left, $frame)
-                            . $this->coerceVariableToString($right, $frame)
-                        );
-                        $arg1->copyFrom($result);
-                    } catch (\Error $e) {
-                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                        break;
-                    } catch (\TypeError $e) {
-                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                        break;
-                    } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
-                        // __toString throw during concat — resume catch on outer stack (#29521).
-                        $frame = $this->resumeAfterBuiltinCallbackCatchRedirect($redirect);
-                        goto restart;
-                    } catch (VM\MagicMethodInvocationAborted) {
-                        $this->clearTryCatchUnwindState();
-                        ++$frame->pos;
-                        $frame->suppressNextEcho = true;
-                        break;
-                    }
-                    $this->markScopeSlotInitializedIfNamedLocal($frame, (int) $op->arg1);
                     break;
                 case OpCode::TYPE_ECHO:
                     if ($frame->suppressNextEcho) {
