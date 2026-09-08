@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT;
 
 require_once __DIR__.'/CompileCacheSemanticFileParts.php';
 require_once __DIR__.'/CompileCacheSemanticHash.php';
+require_once __DIR__.'/CompileCachePartialEmitLlvm.php';
 require_once __DIR__.'/CompileCachePartialEmitDemote.php';
 require_once __DIR__.'/CompileCacheArtifactPersist.php';
 require_once __DIR__.'/CompileCacheEditScaffold.php';
@@ -33,7 +34,8 @@ require_once __DIR__.'/CompileCacheKeyLayoutFacade.php';
  * Semantic hash / edit-strip planning lives in {@see CompileCacheSemanticHash}
  * (per-function parts in {@see CompileCacheSemanticFileParts};
  * public hub delegates in {@see CompileCacheSemanticHashFacade});
- * partial-emit demote lives in {@see CompileCachePartialEmitDemote};
+ * partial-emit demote orchestration lives in {@see CompileCachePartialEmitDemote}
+ * with LLVM surgery helpers in {@see CompileCachePartialEmitLlvm};
  * linked-binary / user-object mid-tier warm restore lives in {@see CompileCacheArtifactPersist};
  * edit-scaffold hub + plan + restore + LLVM strip live in {@see CompileCacheEditScaffold} / {@see CompileCacheEditScaffoldPlan} / {@see CompileCacheEditScaffoldRestore} / {@see CompileCacheEditScaffoldStrip};
  * multi-file project index / entry→members map lives in {@see CompileCacheProjectIndex}

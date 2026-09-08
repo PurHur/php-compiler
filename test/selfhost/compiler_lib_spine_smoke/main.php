@@ -6933,6 +6933,7 @@ require_once __DIR__.'/../../../lib/JIT/ClosureHelper.php';
 require_once __DIR__.'/../../../lib/JIT/CoalesceHelper.php';
 require_once __DIR__.'/../../../lib/JIT/CompileCacheSemanticFileParts.php';
 require_once __DIR__.'/../../../lib/JIT/CompileCacheSemanticHash.php';
+require_once __DIR__.'/../../../lib/JIT/CompileCachePartialEmitLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/CompileCachePartialEmitDemote.php';
 require_once __DIR__.'/../../../lib/JIT/CompileCacheArtifactPersist.php';
 require_once __DIR__.'/../../../lib/JIT/CompileCacheEditScaffoldPlan.php';

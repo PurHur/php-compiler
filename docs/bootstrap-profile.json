@@ -7264,6 +7264,7 @@
         "lib/JIT/CompileCacheKeyLayout.php",
         "lib/JIT/CompileCacheKeyLayoutFacade.php",
         "lib/JIT/CompileCachePartialEmitDemote.php",
+        "lib/JIT/CompileCachePartialEmitLlvm.php",
         "lib/JIT/CompileCacheProjectIndex.php",
         "lib/JIT/CompileCacheProjectIndexFacade.php",
         "lib/JIT/CompileCacheProjectMembers.php",
@@ -8695,9 +8696,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8461,
+        "inventory_files": 8462,
         "excluded": 0,
-        "eligible": 8461,
+        "eligible": 8462,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
