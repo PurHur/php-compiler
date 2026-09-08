@@ -50,6 +50,7 @@ require_once __DIR__.'/VM/Concern/AssignDispatch.php';
 require_once __DIR__.'/VM/Concern/FuncCallExecDispatch.php';
 require_once __DIR__.'/VM/Concern/ArgRecvDispatch.php';
 require_once __DIR__.'/VM/Concern/ScalarCastCompareArithConcatDispatch.php';
+require_once __DIR__.'/VM/Concern/ClassConstFetchDispatch.php';
 
 use PHPCompiler\BuiltinByRefParams;
 use PHPCompiler\Compiler\AttributeNames;
@@ -139,6 +140,7 @@ class VM {
     use FuncCallExecDispatch;
     use ArgRecvDispatch;
     use ScalarCastCompareArithConcatDispatch;
+    use ClassConstFetchDispatch;
     const SUCCESS = 1;
     const FAILURE = 2;
 
@@ -1219,227 +1221,13 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_CLASS_CONST_FETCH:
-                    $memberNameRaw = $frame->scope[$op->arg3]->toString();
-                    $classOperand = $frame->scope[$op->arg2]->resolveIndirect();
-                    if ($op->classConstFetchOnObject) {
-                        if ('class' === strtolower($memberNameRaw)) {
-                            $fqcn = $this->resolveClassPseudoConstFromOperand($classOperand);
-                            if (null !== $fqcn) {
-                                $frame->scope[$op->arg1]->string($fqcn);
-                                break;
-                            }
-                            $catchFrame = $this->dispatchVmTypeError(
-                                new \TypeError(
-                                    VM\EnumCaseSupport::classPseudoConstTypeErrorMessage($classOperand)
-                                ),
-                                $frame
-                            );
-                            if (null !== $catchFrame) {
-                                $frame = $catchFrame;
-                                goto restart;
-                            }
-                            break;
-                        }
-                        if (Variable::TYPE_OBJECT !== $classOperand->type) {
-                            $catchFrame = $this->dispatchVmTypeError(
-                                new \TypeError(
-                                    VM\EnumCaseSupport::classPseudoConstTypeErrorMessage($classOperand)
-                                ),
-                                $frame
-                            );
-                            if (null !== $catchFrame) {
-                                $frame = $catchFrame;
-                                goto restart;
-                            }
-                            break;
-                        }
-                        $frame->scope[$op->arg1]->string($classOperand->toObject()->class->name);
-                        break;
-                    }
-                    if (Variable::TYPE_OBJECT === $classOperand->type) {
-                        $classEntry = $classOperand->toObject()->class;
-                        $traitConstFrame = $this->enforceDirectTraitConstAccess($classEntry, $memberNameRaw, $frame);
-                        if (null !== $traitConstFrame) {
-                            $frame = $traitConstFrame;
-                            goto restart;
-                        }
-                        $constKey = ClassConstName::key($memberNameRaw);
-                        if (isset($classEntry->constants[$constKey])
-                            && ClassConstName::matchesDeclared(
-                                $memberNameRaw,
-                                $this->declaredClassConstName($classEntry, $constKey)
-                            )
-                        ) {
-                            $visFrame = $this->enforceClassConstVisibility($classEntry, $memberNameRaw, $frame);
-                            if (null !== $visFrame) {
-                                $frame = $visFrame;
-                                goto restart;
-                            }
-                        }
-                        $staticVisFrame = $this->enforceStaticPropertyReadVisibility(
-                            strtolower($classEntry->name),
-                            $memberNameRaw,
-                            $frame
-                        );
-                        if (null !== $staticVisFrame) {
-                            $frame = $staticVisFrame;
-                            goto restart;
-                        }
-                        try {
-                            if (!$this->copyClassConstOrStaticPropertyByName(
-                                $classEntry,
-                                $memberNameRaw,
-                                $frame->scope[$op->arg1],
-                                $frame
-                            )) {
-                                $catchFrame = $this->dispatchVmError(
-                                    "Undefined constant {$classEntry->name}::{$memberNameRaw}",
-                                    $frame
-                                );
-                                if (null !== $catchFrame) {
-                                    $frame = $catchFrame;
-                                    goto restart;
-                                }
-
-                                return self::EXCEPTION;
-                            }
-                        } catch (\Error $e) {
-                            $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
-                            if (null !== $catchFrame) {
-                                $frame = $catchFrame;
-                                goto restart;
-                            }
-
-                            return self::EXCEPTION;
-                        }
-                        break;
-                    }
-                    try {
-                        $classOperand = $frame->scope[$op->arg2]->resolveIndirect();
-                        $constName = strtolower($frame->scope[$op->arg3]->toString());
-                        if (Variable::TYPE_OBJECT === $classOperand->type && 'class' === $constName) {
-                            $frame->scope[$op->arg1]->string($classOperand->toObject()->class->name);
-                            break;
-                        }
-                        // String class name only — reject bool/int/null/array (#30059).
-                        $className = VM\InstanceOfClassName::resolveClassNamePreservingCase(
-                            $classOperand
-                        );
-                        $lcClass = $this->resolveClassScopeName($className, $frame);
-                    } catch (\Error $e) {
-                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                        return self::EXCEPTION;
-                    } catch (\LogicException $e) {
-                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                        return self::EXCEPTION;
-                    }
-                    if (!isset($this->context->classes[$lcClass])) {
-                        if ('self' !== strtolower($className) && 'static' !== strtolower($className)) {
-                            $this->context->autoloadClass($className);
-                        }
-                    }
-                    if (!isset($this->context->classes[$lcClass])) {
-                        // `ConstName::class` when ConstName is a user constant (Zend zend_compile.c; #5440).
-                        if ('class' === $constName && null !== $this->context->constantFetch($className)) {
-                            $frame->scope[$op->arg1]->string($className);
-                            break;
-                        }
-                        if ('class' === $constName) {
-                            $builtinName = BuiltinTypeClassConstant::classNameForTypeOperand($className);
-                            if (null !== $builtinName) {
-                                $frame->scope[$op->arg1]->string($builtinName);
-                                break;
-                            }
-                            $builtinFn = BuiltinFunctionClassConstant::functionNameForClassOperand($className);
-                            if (null !== $builtinFn) {
-                                $frame->scope[$op->arg1]->string($builtinFn);
-                                break;
-                            }
-                            if ('self' !== strtolower($className) && 'static' !== strtolower($className)) {
-                                // Foo::class is a pure name literal — Zend resolves it
-                                // without the class being declared (#16828).
-                                $frame->scope[$op->arg1]->string(ltrim($className, '\\'));
-                                break;
-                            }
-                        }
-
-                        // Missing class on Class::CONST / Enum::Case — catchable Error
-                        // (zend_execute.c), not LogicException via raise() (#28480).
-                        $catchFrame = $this->dispatchVmError(
-                            $this->classNotFoundMessage($className),
-                            $frame
-                        );
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-
-                        return self::EXCEPTION;
-                    }
-                    $classEntry = $this->context->classes[$lcClass];
-                    $traitConstFrame = $this->enforceDirectTraitConstAccess($classEntry, $memberNameRaw, $frame);
-                    if (null !== $traitConstFrame) {
-                        $frame = $traitConstFrame;
+                    $classConstFetchOutcome = $this->executeClassConstFetchDispatch($frame, $op);
+                    if ($classConstFetchOutcome instanceof Frame) {
+                        $frame = $classConstFetchOutcome;
                         goto restart;
                     }
-                    $constKey = ClassConstName::key($memberNameRaw);
-                    if (isset($classEntry->constants[$constKey])
-                        && ClassConstName::matchesDeclared(
-                            $memberNameRaw,
-                            $this->declaredClassConstName($classEntry, $constKey)
-                        )
-                    ) {
-                        $visFrame = $this->enforceClassConstVisibility($classEntry, $memberNameRaw, $frame);
-                        if (null !== $visFrame) {
-                            $frame = $visFrame;
-                            goto restart;
-                        }
-                    }
-                    $staticVisFrame = $this->enforceStaticPropertyReadVisibility($lcClass, $memberNameRaw, $frame);
-                    if (null !== $staticVisFrame) {
-                        $frame = $staticVisFrame;
-                        goto restart;
-                    }
-                    if ('class' === $constName) {
-                        $frame->scope[$op->arg1]->string(
-                            $this->resolveClassPseudoConstDisplayName($className, $frame)
-                        );
-                        break;
-                    }
-                    try {
-                        if (!$this->copyClassConstOrStaticPropertyByName(
-                            $classEntry,
-                            $memberNameRaw,
-                            $frame->scope[$op->arg1],
-                            $frame
-                        )) {
-                            $catchFrame = $this->dispatchVmError(
-                                "Undefined constant {$className}::{$memberNameRaw}",
-                                $frame
-                            );
-                            if (null !== $catchFrame) {
-                                $frame = $catchFrame;
-                                goto restart;
-                            }
-
-                            return self::EXCEPTION;
-                        }
-                    } catch (\Error $e) {
-                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-
-                        return self::EXCEPTION;
+                    if (is_int($classConstFetchOutcome)) {
+                        return $classConstFetchOutcome;
                     }
                     break;
                 case OpCode::TYPE_INSTANCEOF:
