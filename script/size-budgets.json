@@ -34,14 +34,19 @@
             "note": "helper-cache granularity; Fingerprint+Link+Bind extracts (#36387/#36403); sorted linkObjects (#36399); refusePrelinkGcMixReason (#36401)"
         },
         "lib/JIT/CompileCache.php": {
-            "budget": 672,
+            "budget": 534,
             "target": 2000,
-            "note": "MCJIT/AOT warm cache; SemanticHash + PartialEmitDemote + ArtifactPersist + EditScaffold + ProjectIndex + KeyLayout + BitcodePersist + Recording extracts (#36387/#36403)"
+            "note": "MCJIT/AOT warm cache; SemanticHash + PartialEmitDemote + ArtifactPersist + EditScaffold + ProjectIndex + KeyLayout + BitcodePersist + Recording + EditSession extracts (#36387/#36403)"
         },
         "lib/JIT/CompileCacheRecording.php": {
             "budget": 276,
             "target": 400,
             "note": "Cold-emit recording / symbol membership maps extracted from CompileCache (#36387)"
+        },
+        "lib/JIT/CompileCacheEditSession.php": {
+            "budget": 161,
+            "target": 300,
+            "note": "Edit-scaffold session arm/state accessors extracted from CompileCache (#36387)"
         }
     },
     "script_file_count": {
