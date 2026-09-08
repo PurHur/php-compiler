@@ -29,6 +29,7 @@ use PHPCompiler\Config;
 
 require_once __DIR__.'/ContextEditScaffoldModuleRebind.php';
 require_once __DIR__.'/ContextDefineBuiltinFunctionProxiesDateAndXml.php';
+require_once __DIR__.'/ContextDefineBuiltinFunctionProxiesExceptionAndError.php';
 require_once __DIR__.'/ContextDefineBuiltinFunctionProxiesReflectionAndException.php';
 require_once __DIR__.'/ContextDefineBuiltinFunctionProxiesDirectoryAndFile.php';
 require_once __DIR__.'/ContextDefineBuiltinFunctionProxiesSplIterators.php';
@@ -50,6 +51,7 @@ require_once __DIR__.'/ContextScopeLifecycleAndInitEmit.php';
 class Context {
     use ContextEditScaffoldModuleRebind;
     use ContextDefineBuiltinFunctionProxiesDateAndXml;
+    use ContextDefineBuiltinFunctionProxiesExceptionAndError;
     use ContextDefineBuiltinFunctionProxiesReflectionAndException;
     use ContextDefineBuiltinFunctionProxiesDirectoryAndFile;
     use ContextDefineBuiltinFunctionProxiesSplIterators;
