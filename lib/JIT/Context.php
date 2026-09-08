@@ -28,6 +28,7 @@ use PHPCompiler\Web\Superglobals;
 use PHPCompiler\Config;
 
 require_once __DIR__.'/ContextEditScaffoldModuleRebind.php';
+require_once __DIR__.'/ContextDefineBuiltinFunctionProxies.php';
 require_once __DIR__.'/ContextDefineBuiltins.php';
 require_once __DIR__.'/ContextCompileToFile.php';
 require_once __DIR__.'/ContextVariableOperandBinding.php';
@@ -42,6 +43,7 @@ require_once __DIR__.'/ContextScopeLifecycleAndInitEmit.php';
 
 class Context {
     use ContextEditScaffoldModuleRebind;
+    use ContextDefineBuiltinFunctionProxies;
     use ContextDefineBuiltins;
     use ContextCompileToFile;
     use ContextVariableOperandBinding;
