@@ -95,6 +95,7 @@ final class Issue36388StringCallResultFreeTest extends TestCase
         $this->assertStringContainsString("'str_pad' => true", $src);
         $this->assertStringContainsString("'md5' => true", $src);
         $this->assertStringContainsString("'hash' => true", $src);
+        $this->assertStringContainsString("'hash_hmac' => true", $src);
         $concat = (string) file_get_contents(
             dirname(__DIR__, 2).'/lib/JIT/Concern/CompileConcat.php'
         );
@@ -161,6 +162,12 @@ final class Issue36388StringCallResultFreeTest extends TestCase
         ));
         $this->assertStringContainsString('StringHash::invoke', (string) file_get_contents(
             dirname(__DIR__, 2).'/ext/standard/hash_.php'
+        ));
+        $this->assertStringContainsString('phpc_hash_hmac_r1', (string) file_get_contents(
+            dirname(__DIR__, 2).'/lib/JIT/Builtin/HashHmacRuntime.php'
+        ));
+        $this->assertStringContainsString('StringHashHmac::invoke', (string) file_get_contents(
+            dirname(__DIR__, 2).'/ext/standard/hash_hmac.php'
         ));
     }
 

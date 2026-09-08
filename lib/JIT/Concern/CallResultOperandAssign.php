@@ -206,6 +206,7 @@ trait CallResultOperandAssign
             'md5' => true,
             'sha1' => true,
             'hash' => true,
+            'hash_hmac' => true,
         ];
 
         return isset($owning[strtolower($name)]);

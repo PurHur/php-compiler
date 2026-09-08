@@ -6,14 +6,21 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringHashHmac;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\InternalStrictArg;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** hash_hmac() — sha256, sha1, md5 (VM + JIT/AOT via __compiler_hash_hmac). */
+/**
+ * hash_hmac() — sha256, sha1, md5 (VM + thin AOT via {@code phpc_hash_hmac_r1}, #36388).
+ * php-src: ext/hash/hash.c — PHP_FUNCTION(hash_hmac)
+ */
 final class hash_hmac extends Internal
 {
     public function execute(Frame $frame): void
@@ -67,13 +74,34 @@ final class hash_hmac extends Internal
             // Z_PARAM_BOOL: strict TypeError on null; else null→false + E_DEPRECATED (#31288).
             $raw = JitBoolArg::lowerCoerceZParamBool($context, $args[3], 'hash_hmac', 'binary', 4);
         }
-        return JitHash::hashHmac(
-            $context,
-            self::jitAlgoArg($context, $args[0]),
-            self::jitDataArg($context, $args[1]),
-            self::jitZparamStrArg($context, $args[2], 2, 'key'),
-            $raw
-        );
+
+        $algo = self::jitAlgoArg($context, $args[0]);
+        $data = self::jitDataArg($context, $args[1]);
+        $key = self::jitZparamStrArg($context, $args[2], 2, 'key');
+        // Native phpc_hash_hmac_r1 — no NestedJIT HashCryptoJitHelper (#36388). Peer hash/md5/sha1.
+        $rawI32 = $context->builder->zExt($raw, $context->getTypeFromString('int32'));
+        $digest = StringHashHmac::invoke($context, $algo, $data, $key, $rawI32);
+        $result = self::rejectNullHashHmacDigest($context, $digest);
+        JitStringBuiltinArg::releaseEphemeralArgAfterCopy($context, $args[0], $algo);
+        JitStringBuiltinArg::releaseEphemeralArgAfterCopy($context, $args[1], $data);
+        JitStringBuiltinArg::releaseEphemeralArgAfterCopy($context, $args[2], $key);
+
+        return $result;
+    }
+
+    /** ValueError on null digest; return owning {@code __string__*} (#36388). */
+    private static function rejectNullHashHmacDigest(Context $context, Value $digest): Value
+    {
+        $strPtr = $context->getTypeFromString('__string__*');
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $digest, $strPtr->constNull());
+        $fail = BasicBlockHelper::append($context, 'hash_hmac_r1_fail');
+        $ok = BasicBlockHelper::append($context, 'hash_hmac_r1_ok');
+        $context->builder->branchIf($isNull, $fail, $ok);
+        $context->builder->positionAtEnd($fail);
+        ExceptionBridge::emitValueErrorAndAbort($context, VmHash::unknownHmacAlgoMessage('hash_hmac'));
+        $context->builder->positionAtEnd($ok);
+
+        return $digest;
     }
 
     /**
