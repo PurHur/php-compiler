@@ -51,6 +51,7 @@ require_once __DIR__.'/VM/Concern/AssignDispatch.php';
 require_once __DIR__.'/VM/Concern/FuncCallExecDispatch.php';
 require_once __DIR__.'/VM/Concern/ArgRecvDispatch.php';
 require_once __DIR__.'/VM/Concern/ScalarCastDispatch.php';
+require_once __DIR__.'/VM/Concern/ScalarCompareDispatch.php';
 require_once __DIR__.'/VM/Concern/ScalarCastCompareArithConcatDispatch.php';
 require_once __DIR__.'/VM/Concern/ClassConstFetchDispatch.php';
 require_once __DIR__.'/VM/Concern/IssetDispatch.php';
@@ -150,6 +151,7 @@ class VM {
     use FuncCallExecDispatch;
     use ArgRecvDispatch;
     use ScalarCastDispatch;
+    use ScalarCompareDispatch;
     use ScalarCastCompareArithConcatDispatch;
     use ClassConstFetchDispatch;
     use IssetDispatch;
@@ -675,6 +677,15 @@ restart:
                 case OpCode::TYPE_SMALLER_OR_EQUAL:
                 case OpCode::TYPE_GREATER_OR_EQUAL:
                 case OpCode::TYPE_SPACESHIP:
+                    $compareOutcome = $this->executeScalarCompareDispatch($frame, $op);
+                    if ($compareOutcome instanceof Frame) {
+                        $frame = $compareOutcome;
+                        goto restart;
+                    }
+                    if (is_int($compareOutcome)) {
+                        return $compareOutcome;
+                    }
+                    break;
                 case OpCode::TYPE_POST_INC:
                 case OpCode::TYPE_PRE_INC:
                 case OpCode::TYPE_POST_DEC:

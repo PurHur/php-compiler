@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8538 |
-| Phase A inventory files (M2 ratio SSOT) | 8538 |
+| PHP files on vm.php path | 8540 |
+| Phase A inventory files (M2 ratio SSOT) | 8540 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26681 |
+| Source constructs flagged (warnings) | 26684 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5477,6 +5477,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/AOT/HelperRuntimeCache.php` | 0 | 1 |
 | `lib/AOT/HelperRuntimeCommon.php` | 0 | 1 |
 | `lib/AOT/HelperRuntimeFingerprint.php` | 0 | 2 |
+| `lib/AOT/HelperRuntimeIndex.php` | 0 | 1 |
 | `lib/AOT/HelperRuntimeLink.php` | 0 | 1 |
 | `lib/AOT/HelperUnitGlobalCtor.php` | 0 | 1 |
 | `lib/AOT/Linker.php` | 0 | 1 |
@@ -8183,6 +8184,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/Concern/ReturnTypeEnforce.php` | 0 | 4 |
 | `lib/VM/Concern/ScalarCastCompareArithConcatDispatch.php` | 0 | 3 |
 | `lib/VM/Concern/ScalarCastDispatch.php` | 0 | 2 |
+| `lib/VM/Concern/ScalarCompareDispatch.php` | 0 | 2 |
 | `lib/VM/Concern/StaticPropertyFetchDispatch.php` | 0 | 2 |
 | `lib/VM/Concern/TryCatchFinallyAndUncaughtDispatch.php` | 0 | 13 |
 | `lib/VM/Concern/TypedIntRecursiveAndCountedLoopFastPath.php` | 0 | 3 |
@@ -48890,6 +48892,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 23 class method(s)
 - 1 closure(s)
 
+### `lib/AOT/HelperRuntimeIndex.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
+
 ### `lib/AOT/HelperRuntimeLink.php`
 
 **Warnings** (review for bootstrap subset):
@@ -62632,25 +62639,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 313)
-- new ObjectEntry (line 437)
-- new Variable (line 446)
-- new Variable (line 475)
-- new VM\GeneratorUncaughtThrow (line 490)
-- new VM\FiberUncaughtThrow (line 504)
-- new VM\DestructorThrowCatchSignal (line 509)
-- new CompileError (line 978)
-- new Func\PHP (line 988)
-- new Variable (line 1076)
-- new Variable (line 1079)
-- new Variable (line 1370)
-- new Error (line 1815)
-- new ClassEntry (line 1851)
-- new Variable (line 1852)
-- new VM\ClassProperty (line 1853)
-- new ObjectEntry (line 1856)
-- new Variable (line 1859)
-- new Variable (line 1885)
+- new Variable (line 315)
+- new ObjectEntry (line 439)
+- new Variable (line 448)
+- new Variable (line 477)
+- new VM\GeneratorUncaughtThrow (line 492)
+- new VM\FiberUncaughtThrow (line 506)
+- new VM\DestructorThrowCatchSignal (line 511)
+- new CompileError (line 989)
+- new Func\PHP (line 999)
+- new Variable (line 1087)
+- new Variable (line 1090)
+- new Variable (line 1381)
+- new Error (line 1826)
+- new ClassEntry (line 1862)
+- new Variable (line 1863)
+- new VM\ClassProperty (line 1864)
+- new ObjectEntry (line 1867)
+- new Variable (line 1870)
+- new Variable (line 1896)
 - 27 class method(s)
 
 ### `lib/VM/AbstractPropertyHookCheck.php`
@@ -66672,14 +66679,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Concern/ScalarCastCompareArithConcatDispatch.php`
 
 **Warnings** (review for bootstrap subset):
-- trait ScalarCastCompareArithConcatDispatch (line 25)
-- new Variable (line 348)
+- trait ScalarCastCompareArithConcatDispatch (line 22)
+- new Variable (line 238)
 - 1 class method(s)
 
 ### `lib/VM/Concern/ScalarCastDispatch.php`
 
 **Warnings** (review for bootstrap subset):
 - trait ScalarCastDispatch (line 21)
+- 1 class method(s)
+
+### `lib/VM/Concern/ScalarCompareDispatch.php`
+
+**Warnings** (review for bootstrap subset):
+- trait ScalarCompareDispatch (line 24)
 - 1 class method(s)
 
 ### `lib/VM/Concern/StaticPropertyFetchDispatch.php`
