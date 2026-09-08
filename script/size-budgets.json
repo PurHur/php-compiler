@@ -179,9 +179,9 @@
             "note": "TYPE_CLASS_CONST_FETCH runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/Context.php": {
-            "budget": 916,
+            "budget": 918,
             "target": 3500,
-            "note": "FunctionProxyRegistration + ExternalMethodStubReport + ArrayIteratorAndObject + NestedJitKernelRegistry + ReflectionMembers + FiberGeneratorAndClosure + ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml proxies wiring + ScopeLifecycle peers (#36387/#36199); continue toward \u22643.5k + ModuleOptimizationPasses (#36387)"
+            "note": "FunctionProxyRegistration + ExternalMethodStubReport + ArrayIteratorAndObject + NestedJitKernelRegistry + ReflectionMembers + FiberGeneratorAndClosure + ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml proxies wiring + VariableOperandLookup + ScopeLifecycle peers (#36387/#36199); continue toward \u22643.5k + ModuleOptimizationPasses (#36387)"
         },
         "lib/JIT/ContextEditScaffoldModuleRebind.php": {
             "budget": 315,
@@ -224,9 +224,9 @@
             "note": "TYPE_NEW runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/ContextVariableOperandBinding.php": {
-            "budget": 768,
-            "target": 1200,
-            "note": "Operand\u2192Variable binding extracted from Context; freeDead/CONST_FETCH in ContextFreeDeadAndConstantFetch (#36387)"
+            "budget": 486,
+            "target": 500,
+            "note": "make/alias/bind helpers; getVariableFromOp cluster in ContextVariableOperandLookup; freeDead/CONST_FETCH in ContextFreeDeadAndConstantFetch (#36387)"
         },
         "lib/JIT/ContextFunctionProxyAndNestedJitKernel.php": {
             "budget": 230,
@@ -407,6 +407,16 @@
             "budget": 197,
             "target": 250,
             "note": "TYPE_YIELD/YIELD_FROM runFramesInner body extracted from VM.php (#36403); php-src zend_generators.c ZEND_YIELD/ZEND_YIELD_FROM"
+        },
+        "lib/VM/Concern/ArrayInitSpreadDispatch.php": {
+            "budget": 113,
+            "target": 200,
+            "note": "TYPE_INIT_ARRAY/ADD_ARRAY_ELEMENT/ARRAY_SPREAD runFramesInner body extracted from VM.php (#36403)"
+        },
+        "lib/JIT/ContextVariableOperandLookup.php": {
+            "budget": 309,
+            "target": 400,
+            "note": "getVariableFromOp / $this seed / scope-stack lookup extracted from ContextVariableOperandBinding (#36387)"
         }
     },
     "script_file_count": {
