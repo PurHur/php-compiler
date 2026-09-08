@@ -7894,6 +7894,7 @@ require_once __DIR__.'/../../../lib/VM/Concern/DeclareClassLikeDispatch.php';
 require_once __DIR__.'/../../../lib/VM/Concern/ArgSendDispatch.php';
 require_once __DIR__.'/../../../lib/VM/Concern/VarFetchGlobalAndFunctionStaticDispatch.php';
 require_once __DIR__.'/../../../lib/VM/Concern/ListUnpackAndSpreadAssignDispatch.php';
+require_once __DIR__.'/../../../lib/VM/Concern/FromCallableAndClosureDispatch.php';
 require_once __DIR__.'/../../../lib/VM/ObjectPropertyIterator.php';
 require_once __DIR__.'/../../../lib/VM/ObjectReadonlySupport.php';
 require_once __DIR__.'/../../../lib/VM/ObjectRegistry.php';

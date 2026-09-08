@@ -8244,6 +8244,7 @@
         "lib/VM/Concern/ForeachIterDispatch.php",
         "lib/VM/Concern/FrameActivationThisAndIncludeScope.php",
         "lib/VM/Concern/FrameObjectRefAndDeadTempRelease.php",
+        "lib/VM/Concern/FromCallableAndClosureDispatch.php",
         "lib/VM/Concern/FuncCallExecDispatch.php",
         "lib/VM/Concern/FuncCallInitDispatch.php",
         "lib/VM/Concern/GeneratorForeachAndYieldFrom.php",
@@ -8760,9 +8761,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8526,
+        "inventory_files": 8527,
         "excluded": 0,
-        "eligible": 8526,
+        "eligible": 8527,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
