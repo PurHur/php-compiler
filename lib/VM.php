@@ -58,6 +58,7 @@ require_once __DIR__.'/VM/Concern/NewDispatch.php';
 require_once __DIR__.'/VM/Concern/MethodCallInitDispatch.php';
 require_once __DIR__.'/VM/Concern/EchoPrintEvalDispatch.php';
 require_once __DIR__.'/VM/Concern/ForeachIterDispatch.php';
+require_once __DIR__.'/VM/Concern/CoalesceJumpSilenceExitDispatch.php';
 
 use PHPCompiler\BuiltinByRefParams;
 use PHPCompiler\Compiler\AttributeNames;
@@ -152,6 +153,7 @@ class VM {
     use MethodCallInitDispatch;
     use EchoPrintEvalDispatch;
     use ForeachIterDispatch;
+    use CoalesceJumpSilenceExitDispatch;
     const SUCCESS = 1;
     const FAILURE = 2;
 
@@ -895,146 +897,83 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_COALESCE:
-                    $check = $frame->scope[$op->arg2]->resolveIndirect();
-                    if (Variable::TYPE_BOOLEAN === $check->type) {
-                        $takeLeft = $check->toBool($this);
-                    } else {
-                        $takeLeft = VM\CoalesceJitHelper::takeLeftBranchFromTypeByte($check->type);
+                    $coalesceOutcome = $this->executeCoalesceDispatch($frame, $op);
+                    if ($coalesceOutcome instanceof Frame) {
+                        $frame = $coalesceOutcome;
+                        goto restart;
                     }
-                    $frame = ($takeLeft ? $op->block1 : $op->block2)->getFrame(
-                        $this->context,
-                        $frame
-                    );
-                    goto restart;
+                    if (is_int($coalesceOutcome)) {
+                        return $coalesceOutcome;
+                    }
+                    break;
                 case OpCode::TYPE_NULLSAFE:
-                    $receiver = $frame->scope[$op->arg2];
-                    $frame = (
-                        VM\TypedPropertyCheck::nullsafeShortCircuitReceiver(
-                            $receiver,
-                            $op->nullsafeMethodCall
-                        )
-                            ? $op->block1
-                            : $op->block2
-                    )->getFrame($this->context, $frame);
-                    goto restart;
+                    $nullsafeOutcome = $this->executeNullsafeDispatch($frame, $op);
+                    if ($nullsafeOutcome instanceof Frame) {
+                        $frame = $nullsafeOutcome;
+                        goto restart;
+                    }
+                    if (is_int($nullsafeOutcome)) {
+                        return $nullsafeOutcome;
+                    }
+                    break;
                 case OpCode::TYPE_BEGIN_SILENCE:
-                    $this->context->errors->beginSilence();
+                    $beginSilenceOutcome = $this->executeBeginSilenceDispatch($frame, $op);
+                    if ($beginSilenceOutcome instanceof Frame) {
+                        $frame = $beginSilenceOutcome;
+                        goto restart;
+                    }
+                    if (is_int($beginSilenceOutcome)) {
+                        return $beginSilenceOutcome;
+                    }
                     break;
                 case OpCode::TYPE_END_SILENCE:
-                    $this->context->errors->endSilence();
+                    $endSilenceOutcome = $this->executeEndSilenceDispatch($frame, $op);
+                    if ($endSilenceOutcome instanceof Frame) {
+                        $frame = $endSilenceOutcome;
+                        goto restart;
+                    }
+                    if (is_int($endSilenceOutcome)) {
+                        return $endSilenceOutcome;
+                    }
                     break;
                 case OpCode::TYPE_EXIT:
-                    $exitArg = null;
-                    if (null !== $op->arg2) {
-                        $exitArg = $frame->scope[$op->arg2];
+                    $exitOutcome = $this->executeExitDispatch($frame, $op);
+                    if ($exitOutcome instanceof Frame) {
+                        $frame = $exitOutcome;
+                        goto restart;
                     }
-                    $exitMessage = null;
-                    if (null !== $op->exitMessageSlot) {
-                        $exitMessage = $frame->scope[$op->exitMessageSlot];
+                    if (is_int($exitOutcome)) {
+                        return $exitOutcome;
                     }
-                    $savedCallSiteLine = $frame->callSiteLine;
-                    if (null !== $op->arg3 && $op->arg3 > 0) {
-                        $frame->callSiteLine = $op->arg3;
-                    }
-                    try {
-                        ext\standard\VmExit::terminate($exitArg, $frame, $exitMessage);
-                    } catch (\TypeError $e) {
-                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
-                        $frame->callSiteLine = $savedCallSiteLine;
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                    } catch (\Error $e) {
-                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
-                        $frame->callSiteLine = $savedCallSiteLine;
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                    }
-                    $frame->callSiteLine = $savedCallSiteLine;
                     break;
                 case OpCode::TYPE_JUMP:
-                    if ($this->completeActiveFinallyUnwind($frame)) {
+                    $jumpOutcome = $this->executeJumpDispatch($frame, $op);
+                    if ($jumpOutcome instanceof Frame) {
+                        $frame = $jumpOutcome;
                         goto restart;
                     }
-                    $finallyFrame = $this->beginCatchExitFinallyUnwind($frame, $op->block1);
-                    if (null !== $finallyFrame) {
-                        $frame = $finallyFrame;
-                        goto restart;
+                    if (is_int($jumpOutcome)) {
+                        return $jumpOutcome;
                     }
-                    $finallyFrame = $this->beginGotoFinallyUnwind($frame, $op->block1);
-                    if (null !== $finallyFrame) {
-                        $frame = $finallyFrame;
-                        goto restart;
-                    }
-                    if (
-                        null !== $frame->listUnpackAssignMergeBlock
-                        && $op->block1 === $frame->listUnpackAssignMergeBlock
-                    ) {
-                        $frame->listUnpackAssignMergeBlock = null;
-                    }
-                    $frame = $this->frameForBranch($frame, $op->block1);
-                    goto restart;
+                    break;
                 case OpCode::TYPE_JUMPIF:
-                    $condSlot = (int) $op->arg1;
-                    $arg1 = $frame->scope[$condSlot]->toBool();
-                    if (
-                        $arg1
-                        && [] === $this->context->activeTryHandlerFrames
-                        && null === $this->context->activeCatchHandlerFrame
-                        && !$this->frameIsInFinallyBody($frame)
-                    ) {
-                        $loopExit = $this->tryExecuteCountedIntForLoopAtJumpIf($frame, $op);
-                        if (null !== $loopExit) {
-                            $frame = $loopExit;
-                            goto restart;
-                        }
-                    }
-                    $this->releaseVmStatementDeadTemps($frame, $condSlot);
-                    $this->releaseVmJumpIfCondTemps($frame, $condSlot);
-                    $branchTarget = $arg1 ? $op->block1 : $op->block2;
-                    if (
-                        [] === $this->context->activeTryHandlerFrames
-                        && null === $this->context->activeCatchHandlerFrame
-                        && !$this->frameIsInFinallyBody($frame)
-                    ) {
-                        $frame = $this->frameForBranch($frame, $branchTarget);
+                    $jumpIfOutcome = $this->executeJumpIfDispatch($frame, $op);
+                    if ($jumpIfOutcome instanceof Frame) {
+                        $frame = $jumpIfOutcome;
                         goto restart;
                     }
-                    // break/continue lower to JumpIf edges that leave the try body; run finally
-                    // before the branch target (Zend ZEND_BRK/ZEND_CONT, #25240).
-                    if ($this->completeActiveFinallyUnwind($frame)) {
-                        goto restart;
+                    if (is_int($jumpIfOutcome)) {
+                        return $jumpIfOutcome;
                     }
-                    $finallyFrame = $this->beginCatchExitFinallyUnwind($frame, $branchTarget);
-                    if (null !== $finallyFrame) {
-                        $frame = $finallyFrame;
-                        goto restart;
-                    }
-                    $finallyFrame = $this->beginGotoFinallyUnwind($frame, $branchTarget);
-                    if (null !== $finallyFrame) {
-                        $frame = $finallyFrame;
-                        goto restart;
-                    }
-                    $frame = $this->frameForBranch($frame, $branchTarget);
-                    goto restart;
+                    break;
                 case OpCode::TYPE_CASE:
-                    $arg1 = $frame->scope[$op->arg1];
-                    $arg2 = $frame->scope[$op->arg2];
-                    try {
-                        if ($arg1->equals($arg2, $this)) {
-                            $frame = $op->block1->getFrame($this->context, $frame);
-                            goto restart;
-                        }
-                    } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
-                        $frame = $this->resumeAfterBuiltinCallbackCatchRedirect($redirect);
+                    $caseOutcome = $this->executeCaseDispatch($frame, $op);
+                    if ($caseOutcome instanceof Frame) {
+                        $frame = $caseOutcome;
                         goto restart;
-                    } catch (VM\MagicMethodInvocationAborted) {
-                        $this->clearTryCatchUnwindState();
-                        ++$frame->pos;
-                        break;
+                    }
+                    if (is_int($caseOutcome)) {
+                        return $caseOutcome;
                     }
                     break;
                 case OpCode::TYPE_CONST_FETCH:
