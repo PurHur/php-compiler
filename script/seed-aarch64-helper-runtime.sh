@@ -280,6 +280,22 @@ SEED_UNITS=(
   /ext/standard/ImageTypeToMimeTypeJitHelper.php
   /ext/standard/QuotPrintJitHelper.php
   /ext/standard/StrxfrmJitHelper.php
+  # Locale / network / info / assert / strptime / metatags / clone / weakref / list (#36391 after 232)
+  # Frexp/Ldexp/Modf/Nextafter/Shuffle still skipped (algorithm SSOT, no HELPER_PATH).
+  # Preg* still skipped: tip nested compile misses Compiler\Concern\OpCode.
+  # Sscanf still skipped: __init__ sealed during NestedJIT.
+  # Gethostbynamel skipped: NestedJIT missing __compiler_stream_resolve_include_path.
+  # Ini skipped: IniGetLeafJitHelper not compiled under helper-runtime-emit NestedJIT.
+  /ext/standard/AssertOptionsJitHelper.php
+  /ext/standard/NlLanginfoJitHelper.php
+  /ext/standard/NetInterfacesJitHelper.php
+  /ext/standard/StrptimeJitHelper.php
+  /ext/standard/MetaTagsJitHelper.php
+  /ext/standard/GlobalIntrospectionNameJitHelper.php
+  /ext/standard/InfoJitHelper.php
+  /ext/standard/CloneWithJitHelper.php
+  /ext/standard/WeakRefRegistryJitHelper.php
+  /ext/standard/ListSpreadTailJitHelper.php
 )
 
 MIN_SEED=${#SEED_UNITS[@]}
