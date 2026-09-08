@@ -5460,6 +5460,7 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/FinalizeArrayCombineColumnC
 require_once __DIR__.'/../../../lib/Compiler/Concern/PreferNamedLocalAndAdjacentAssignCallArgSlots.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/FunctionStaticAndCompileTimeLiterals.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/IssetEmptyCallArgAndMultiCompile.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/CoalesceIssetTargetAndMultiCompile.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CoalesceLeftAndEchoConcatPreludes.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/EchoConcatPreludes.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/InstanceOfInAndClassConstCompile.php';

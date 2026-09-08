@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8459 |
-| Phase A inventory files (M2 ratio SSOT) | 8459 |
+| PHP files on vm.php path | 8460 |
+| Phase A inventory files (M2 ratio SSOT) | 8460 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26536 |
+| Source constructs flagged (warnings) | 26538 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5598,6 +5598,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/CfgTypeShapeQueries.php` | 0 | 2 |
 | `lib/Compiler/Concern/ClassLikeAndStmtCompile.php` | 0 | 1 |
 | `lib/Compiler/Concern/CoalesceAndNullsafe.php` | 0 | 17 |
+| `lib/Compiler/Concern/CoalesceIssetTargetAndMultiCompile.php` | 0 | 25 |
 | `lib/Compiler/Concern/CoalesceLeftAndEchoConcatPreludes.php` | 0 | 2 |
 | `lib/Compiler/Concern/CompileAnonymousFunctionGeneratorAndNever.php` | 0 | 5 |
 | `lib/Compiler/Concern/CompileCallArgSends.php` | 0 | 3 |
@@ -5670,7 +5671,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/Concern/InlineNewCallArgProducers.php` | 0 | 2 |
 | `lib/Compiler/Concern/InstanceOfInAndClassConstCompile.php` | 0 | 12 |
 | `lib/Compiler/Concern/InvokableReceiverAndClosureDetect.php` | 0 | 2 |
-| `lib/Compiler/Concern/IssetEmptyCallArgAndMultiCompile.php` | 0 | 26 |
+| `lib/Compiler/Concern/IssetEmptyCallArgAndMultiCompile.php` | 0 | 3 |
 | `lib/Compiler/Concern/IssetEmptyUnsetAndDimFetchCompile.php` | 0 | 6 |
 | `lib/Compiler/Concern/ListDestructAndForeach.php` | 0 | 7 |
 | `lib/Compiler/Concern/MatchInlineCallArgProducerEmbeddedLiteralsResolve.php` | 0 | 2 |
@@ -49268,13 +49269,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 1105)
-- new CompileFatal (line 1139)
-- new CompileError (line 1142)
-- new ClassCompileRegistry (line 1183)
-- new AttributeClassRegistry (line 1184)
-- new ClassCompileRegistry (line 1292)
-- new AttributeClassRegistry (line 1293)
+- new CompileFatal (line 1108)
+- new CompileFatal (line 1142)
+- new CompileError (line 1145)
+- new ClassCompileRegistry (line 1186)
+- new AttributeClassRegistry (line 1187)
+- new ClassCompileRegistry (line 1295)
+- new AttributeClassRegistry (line 1296)
 - 26 class method(s)
 - 1 closure(s)
 
@@ -49693,6 +49694,35 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new OpCode (line 410)
 - new OpCode (line 421)
 - 7 class method(s)
+
+### `lib/Compiler/Concern/CoalesceIssetTargetAndMultiCompile.php`
+
+**Warnings** (review for bootstrap subset):
+- trait CoalesceIssetTargetAndMultiCompile (line 25)
+- new OpCode (line 152)
+- new Block (line 198)
+- new Block (line 201)
+- new OpCode (line 204)
+- new OpCode (line 210)
+- new OpCode (line 259)
+- new OpCode (line 284)
+- new Block (line 290)
+- new OpCode (line 293)
+- new OpCode (line 303)
+- new Block (line 320)
+- new Block (line 323)
+- new OpCode (line 326)
+- new OpCode (line 332)
+- new Temporary (line 341)
+- new Op\Expr\Isset_ (line 344)
+- new Block (line 352)
+- new OpCode (line 355)
+- new OpCode (line 363)
+- new OpCode (line 372)
+- new Temporary (line 382)
+- new Variable (line 392)
+- new Operand\Temporary (line 394)
+- 12 class method(s)
 
 ### `lib/Compiler/Concern/CoalesceLeftAndEchoConcatPreludes.php`
 
@@ -50433,31 +50463,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/IssetEmptyCallArgAndMultiCompile.php`
 
 **Warnings** (review for bootstrap subset):
-- trait IssetEmptyCallArgAndMultiCompile (line 28)
-- new OpCode (line 615)
-- new Block (line 661)
-- new Block (line 664)
-- new OpCode (line 667)
-- new OpCode (line 673)
-- new OpCode (line 722)
-- new OpCode (line 747)
-- new Block (line 753)
-- new OpCode (line 756)
-- new OpCode (line 766)
-- new Block (line 783)
-- new Block (line 786)
-- new OpCode (line 789)
-- new OpCode (line 795)
-- new Temporary (line 804)
-- new Op\Expr\Isset_ (line 807)
-- new Block (line 815)
-- new OpCode (line 818)
-- new OpCode (line 826)
-- new OpCode (line 835)
-- new Temporary (line 845)
-- new Variable (line 855)
-- new Operand\Temporary (line 857)
-- 29 class method(s)
+- trait IssetEmptyCallArgAndMultiCompile (line 26)
+- 17 class method(s)
 - 1 closure(s)
 
 ### `lib/Compiler/Concern/IssetEmptyUnsetAndDimFetchCompile.php`
@@ -53952,11 +53959,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ReflectionEnumJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 153)
-- new Variable (line 330)
-- new Variable (line 336)
-- new Variable (line 344)
-- new Variable (line 564)
+- new Variable (line 154)
+- new Variable (line 331)
+- new Variable (line 337)
+- new Variable (line 345)
+- new Variable (line 565)
 - 15 class method(s)
 - 12 closure(s)
 
@@ -56118,39 +56125,39 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/Type/Object_.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 872)
-- new Variable (line 1348)
-- new Variable (line 1395)
-- new Variable (line 1438)
-- new Variable (line 2632)
-- new Variable (line 3094)
-- new Variable (line 3159)
-- new Variable (line 3188)
-- new Variable (line 3200)
-- new Variable (line 3213)
-- new Variable (line 3496)
-- new VMVariable (line 4122)
-- new VMVariable (line 5497)
-- new VMVariable (line 5517)
-- new VMVariable (line 5527)
-- new VMVariable (line 5547)
-- new VMVariable (line 7191)
-- new ReflectionClassConstant (line 7933)
-- new Variable (line 8402)
-- new Variable (line 8438)
-- new Variable (line 8465)
-- new Variable (line 8473)
-- new Variable (line 8496)
-- new Variable (line 8522)
-- new Variable (line 8530)
-- new Variable (line 8604)
-- new Literal (line 8621)
-- new Literal (line 8626)
-- new Literal (line 8631)
-- new Variable (line 8642)
-- new Variable (line 8675)
-- new Variable (line 8698)
-- new Variable (line 9248)
+- new Variable (line 873)
+- new Variable (line 1349)
+- new Variable (line 1396)
+- new Variable (line 1439)
+- new Variable (line 2633)
+- new Variable (line 3095)
+- new Variable (line 3160)
+- new Variable (line 3189)
+- new Variable (line 3201)
+- new Variable (line 3214)
+- new Variable (line 3497)
+- new VMVariable (line 4123)
+- new VMVariable (line 5498)
+- new VMVariable (line 5518)
+- new VMVariable (line 5528)
+- new VMVariable (line 5548)
+- new VMVariable (line 7192)
+- new ReflectionClassConstant (line 7934)
+- new Variable (line 8403)
+- new Variable (line 8439)
+- new Variable (line 8466)
+- new Variable (line 8474)
+- new Variable (line 8497)
+- new Variable (line 8523)
+- new Variable (line 8531)
+- new Variable (line 8605)
+- new Literal (line 8622)
+- new Literal (line 8627)
+- new Literal (line 8632)
+- new Variable (line 8643)
+- new Variable (line 8676)
+- new Variable (line 8699)
+- new Variable (line 9249)
 - 354 class method(s)
 - 9 closure(s)
 
@@ -58718,9 +58725,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ClassConstFetchHelperTrait.php`
 
 **Warnings** (review for bootstrap subset):
-- trait ClassConstFetchHelperTrait (line 26)
-- new Variable (line 184)
-- new Operand\Literal (line 466)
+- trait ClassConstFetchHelperTrait (line 27)
+- new Variable (line 185)
+- new Operand\Literal (line 467)
 - 33 class method(s)
 
 ### `lib/JIT/ClassConstVisibilityJitGuard.php`
@@ -58939,15 +58946,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Concern/AssignOperandValueMetaAndGeneratorField.php`
 
 **Warnings** (review for bootstrap subset):
-- trait AssignOperandValueMetaAndGeneratorField (line 22)
-- new Variable (line 36)
-- new Variable (line 66)
-- new Variable (line 85)
-- new Variable (line 115)
-- new Variable (line 152)
-- new Variable (line 172)
-- new Variable (line 185)
-- new Variable (line 228)
+- trait AssignOperandValueMetaAndGeneratorField (line 23)
+- new Variable (line 37)
+- new Variable (line 67)
+- new Variable (line 86)
+- new Variable (line 116)
+- new Variable (line 153)
+- new Variable (line 173)
+- new Variable (line 186)
+- new Variable (line 229)
 - 12 class method(s)
 
 ### `lib/JIT/Concern/AssignRefSharedBoxAndClosureInvoke.php`
@@ -59041,7 +59048,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Concern/ClosureThisAndStaticScopeResolve.php`
 
 **Warnings** (review for bootstrap subset):
-- trait ClosureThisAndStaticScopeResolve (line 21)
+- trait ClosureThisAndStaticScopeResolve (line 22)
 - 9 class method(s)
 
 ### `lib/JIT/Concern/CoerceReturnPropertyDeclaringAndByRef.php`
@@ -60352,13 +60359,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/FiberHelperLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- new Native (line 263)
-- new Variable (line 315)
-- new Variable (line 343)
-- new Variable (line 384)
-- new Variable (line 417)
-- new Variable (line 515)
-- new Variable (line 557)
+- new Native (line 264)
+- new Variable (line 316)
+- new Variable (line 344)
+- new Variable (line 385)
+- new Variable (line 418)
+- new Variable (line 516)
+- new Variable (line 558)
 - 22 class method(s)
 
 ### `lib/JIT/FileinfoExtensionHooks.php`
@@ -62005,8 +62012,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Lint/UnsupportedFeature.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 54)
-- 2 class method(s)
+- new self (line 72)
+- 3 class method(s)
 
 ### `lib/Lint/UnsupportedRegistry.php`
 
@@ -67694,7 +67701,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/VmFiberValue.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 
 ### `lib/VM/VmFloatCompare.php`
 

@@ -5682,6 +5682,7 @@
         "lib/Compiler/Concern/CfgTypeShapeQueries.php",
         "lib/Compiler/Concern/ClassLikeAndStmtCompile.php",
         "lib/Compiler/Concern/CoalesceAndNullsafe.php",
+        "lib/Compiler/Concern/CoalesceIssetTargetAndMultiCompile.php",
         "lib/Compiler/Concern/CoalesceLeftAndEchoConcatPreludes.php",
         "lib/Compiler/Concern/CompileAnonymousFunctionGeneratorAndNever.php",
         "lib/Compiler/Concern/CompileCallArgSends.php",
@@ -8693,9 +8694,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8459,
+        "inventory_files": 8460,
         "excluded": 0,
-        "eligible": 8459,
+        "eligible": 8460,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

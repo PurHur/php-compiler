@@ -82,6 +82,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/Compiler/Concern/CfgTypeShapeQueries.php',
             'lib/Compiler/Concern/ClassLikeAndStmtCompile.php',
             'lib/Compiler/Concern/CoalesceAndNullsafe.php',
+            'lib/Compiler/Concern/CoalesceIssetTargetAndMultiCompile.php',
             'lib/Compiler/Concern/CoalesceLeftAndEchoConcatPreludes.php',
             'lib/Compiler/Concern/CompileAnonymousFunctionGeneratorAndNever.php',
             'lib/Compiler/Concern/CompileCallArgSends.php',

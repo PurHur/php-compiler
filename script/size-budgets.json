@@ -4,9 +4,9 @@
     "done_when_ceiling": 25000,
     "files": {
         "lib/Compiler.php": {
-            "budget": 1334,
+            "budget": 1337,
             "target": 20000,
-            "note": "Concern trait splits (#36230/#36387/#36403); PreferNamedLocalAndAdjacentAssignCallArgSlots + FinalizeArrayCombineColumnCallArgSlots + peers"
+            "note": "Concern trait splits (#36230/#36387/#36403); CoalesceIssetTargetAndMultiCompile + PreferNamedLocalAndAdjacentAssignCallArgSlots + peers"
         },
         "lib/JIT.php": {
             "budget": 278,
