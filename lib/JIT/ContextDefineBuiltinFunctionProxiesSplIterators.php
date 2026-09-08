@@ -12,13 +12,13 @@ namespace PHPCompiler\JIT;
  * proxies for {@see Context} (#36387).
  *
  * Extracted from {@see ContextDefineBuiltinFunctionProxies} so the SPL iterator
- * catalog stays a separate TU from SplObjectStorage / SplDllist / WeakMap /
- * DirectoryAndFile wiring (split-TU / size-budget ratchet toward
+ * catalog stays a separate TU from SplContainers / WeakMap / DirectoryAndFile
+ * wiring (split-TU / size-budget ratchet toward
  * ContextDefineBuiltinFunctionProxies ≤ 200 lines, #36199 / #36403).
  *
  * Used via {@code use ContextDefineBuiltinFunctionProxiesSplIterators;} on
  * {@see Context}. Invoked from {@see ContextDefineBuiltinFunctionProxies::defineBuiltinFunctionProxies}
- * after SplObjectStorage, before DirectoryAndFile.
+ * after SplContainers, before DirectoryAndFile.
  *
  * No new C ABI. php-src analogy: zim_ArrayIterator_* / zim_FilterIterator_* /
  * zim_LimitIterator_* method tables live in ext/spl/spl_array.c and
