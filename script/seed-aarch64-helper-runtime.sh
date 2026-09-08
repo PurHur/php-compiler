@@ -313,6 +313,23 @@ SEED_UNITS=(
   /ext/standard/ScopeBuiltinJitHelper.php
   /ext/standard/UploadTempJitHelper.php
   /ext/standard/NetworkServicesNameLookupThinAot.php
+  # First non-standard tier: ctype + calendar + posix getters (#36391 after 252)
+  # Frexp/Ldexp/Modf/Nextafter/Shuffle still skipped (algorithm SSOT, no HELPER_PATH).
+  # Preg* still skipped: tip nested compile misses Compiler\Concern\OpCode.
+  # Sscanf still skipped: __init__ sealed during NestedJIT.
+  # Gethostbynamel skipped: NestedJIT missing __compiler_stream_resolve_include_path.
+  # Ini skipped: IniGetLeafJitHelper not compiled under helper-runtime-emit NestedJIT.
+  # Progress skipped: NestedJIT ContextLlvmConstantsAndRegistry seal during helper emit.
+  /ext/ctype/CtypeJitHelper.php
+  /ext/calendar/CalDaysInMonthJitHelper.php
+  /ext/calendar/EasterDaysJitHelper.php
+  /ext/calendar/GregoriantojdJitHelper.php
+  /ext/calendar/JdtogregorianJitHelper.php
+  /ext/calendar/JdtounixJitHelper.php
+  /ext/calendar/UnixtojdJitHelper.php
+  /ext/posix/PosixGetpidJitHelper.php
+  /ext/posix/PosixGetuidJitHelper.php
+  /ext/posix/PosixStrerrorJitHelper.php
 )
 
 MIN_SEED=${#SEED_UNITS[@]}
