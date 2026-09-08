@@ -12,6 +12,7 @@ use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPCompiler\VM\ReflectionSupport;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -165,7 +166,7 @@ final class ReflectionEnumJitHelper
                 TryCatchHelper::emitCatchableClassError(
                     $context,
                     'ReflectionException',
-                    'ReflectionEnum refers to unknown enum in this compiler build'
+                    UnsupportedFeature::message('reflection-enum-unknown')
                 );
             }
         );
@@ -236,7 +237,7 @@ final class ReflectionEnumJitHelper
                 TryCatchHelper::emitCatchableClassError(
                     $context,
                     'ReflectionException',
-                    'ReflectionEnum refers to unknown enum in this compiler build'
+                    UnsupportedFeature::message('reflection-enum-unknown')
                 );
             }
         );
@@ -286,7 +287,7 @@ final class ReflectionEnumJitHelper
                 TryCatchHelper::emitCatchableClassError(
                     $context,
                     'ReflectionException',
-                    'ReflectionEnum refers to unknown enum in this compiler build'
+                    UnsupportedFeature::message('reflection-enum-unknown')
                 );
             }
         );
@@ -442,7 +443,7 @@ final class ReflectionEnumJitHelper
                 TryCatchHelper::emitCatchableClassError(
                     $context,
                     'ReflectionException',
-                    'ReflectionEnumUnitCase refers to unknown enum in this compiler build'
+                    UnsupportedFeature::message('reflection-enum-unit-case-unknown')
                 );
             }
         );

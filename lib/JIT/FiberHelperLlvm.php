@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT;
 use PHPCompiler\Block;
 use PHPCompiler\JIT\Builtin\JitThrow;
 use PHPCompiler\JIT\Call\Native;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPCompiler\OpCode;
 use PHPCompiler\VM\VmFiberValue;
 use PHPCfg\Operand;
@@ -460,7 +461,7 @@ final class FiberHelperLlvm
 
             return;
         }
-        throw new \LogicException(VmFiberValue::ERROR_UNSUPPORTED);
+        UnsupportedFeature::raise('fiber-value-type-jit');
     }
 
     public static function resolveResumeLc(Context $context, Variable $fiberVar): string

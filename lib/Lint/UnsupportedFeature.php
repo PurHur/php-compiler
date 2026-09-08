@@ -44,6 +44,24 @@ final class UnsupportedFeature extends \LogicException
     }
 
     /**
+     * Look up a catalogued feature id and return the stable message (no throw).
+     *
+     * Use for catchable runtime paths (e.g. ReflectionException) that still need
+     * the matrix-row + issue shape from the catalog.
+     */
+    public static function message(string $featureId, ?string $featureOverride = null): string
+    {
+        $row = UnsupportedRegistry::feature($featureId);
+
+        return self::format(
+            $featureOverride ?? $row['feature'],
+            $row['matrixRow'],
+            $row['issue'],
+            $row['alternative']
+        );
+    }
+
+    /**
      * Look up a catalogued feature id and throw.
      *
      * @return never

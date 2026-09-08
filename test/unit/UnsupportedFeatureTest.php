@@ -202,6 +202,37 @@ final class UnsupportedFeatureTest extends TestCase
         }
     }
 
+    public function testClassFiberReflectionEnumSitesUseCatalog(): void
+    {
+        foreach ([
+            'class-class-literal-jit' => 740,
+            'expr-class-operand-jit' => 4179,
+            'class-const-dynamic-type-jit' => 740,
+            'class-const-type-jit' => 740,
+            'generator-yield-value-type-jit' => 3074,
+            'fiber-value-type-jit' => 4019,
+            'reflection-enum-unknown' => 1214,
+            'reflection-enum-unit-case-unknown' => 1214,
+        ] as $id => $issue) {
+            try {
+                UnsupportedFeature::raise($id);
+                $this->fail('expected UnsupportedFeature for '.$id);
+            } catch (UnsupportedFeature $e) {
+                $this->assertSame($issue, $e->issue, $id);
+                $this->assertStringStartsWith('phpc: unsupported: ', $e->getMessage(), $id);
+                $row = UnsupportedRegistry::feature($id);
+                $this->assertStringContainsString($row['matrixRow'], $e->getMessage(), $id);
+            }
+        }
+
+        $msg = UnsupportedFeature::message('reflection-enum-unknown');
+        $this->assertStringStartsWith('phpc: unsupported: ', $msg);
+        $this->assertStringContainsString('#1214', $msg);
+        $fiberMsg = \PHPCompiler\VM\VmFiberValue::unsupportedMessage();
+        $this->assertStringContainsString('#4019', $fiberMsg);
+        $this->assertStringStartsWith('phpc: unsupported: ', $fiberMsg);
+    }
+
     /**
      * Sites routed in this slice must not keep the legacy bare LogicException wording.
      */
@@ -251,6 +282,12 @@ final class UnsupportedFeatureTest extends TestCase
             dirname(__DIR__, 2).'/lib/JIT/ArrayMapLlvm.php',
             dirname(__DIR__, 2).'/lib/JIT/Context.php',
             dirname(__DIR__, 2).'/lib/VM/ClassConstExpr.php',
+            dirname(__DIR__, 2).'/lib/JIT/Concern/ClosureThisAndStaticScopeResolve.php',
+            dirname(__DIR__, 2).'/lib/JIT/ClassConstFetchHelperTrait.php',
+            dirname(__DIR__, 2).'/lib/JIT/Concern/AssignOperandValueMetaAndGeneratorField.php',
+            dirname(__DIR__, 2).'/lib/JIT/Builtin/Type/Object_.php',
+            dirname(__DIR__, 2).'/lib/JIT/FiberHelperLlvm.php',
+            dirname(__DIR__, 2).'/lib/JIT/Builtin/ReflectionEnumJitHelper.php',
         ];
         $legacy = [
             'range() step must be an integer in this compiler build',
@@ -292,6 +329,14 @@ final class UnsupportedFeatureTest extends TestCase
             'array_map(null) multi-zip requires ≥2 source hashtables (#34978)',
             'Variable constant fetch not supported yet',
             '[] append is not supported in class constant expressions',
+            'Class::class requires a literal class name for JIT/AOT',
+            'Unsupported operand for expression ::class in JIT',
+            'Unsupported class constant type for dynamic JIT fetch',
+            'Unsupported class constant type for JIT',
+            'Unsupported generator yield value type in JIT (issue #3074)',
+            'Unsupported fiber value type in JIT (issue #4019)',
+            'ReflectionEnum refers to unknown enum in this compiler build',
+            'ReflectionEnumUnitCase refers to unknown enum in this compiler build',
         ];
         foreach ($roots as $path) {
             $this->assertFileExists($path);
@@ -308,11 +353,21 @@ final class UnsupportedFeatureTest extends TestCase
             dirname(__DIR__, 2).'/lib/JIT/BackedEnumFromJit.php' => 'backed-enum-backing-type-jit',
             dirname(__DIR__, 2).'/lib/JIT/CastObjectNativeJit.php' => 'object-cast-operand-type',
             dirname(__DIR__, 2).'/lib/JIT/ArrayMapLlvm.php' => 'array-map-mapped-value-type',
+            dirname(__DIR__, 2).'/lib/JIT/Concern/ClosureThisAndStaticScopeResolve.php' => 'class-class-literal-jit',
+            dirname(__DIR__, 2).'/lib/JIT/ClassConstFetchHelperTrait.php' => 'expr-class-operand-jit',
+            dirname(__DIR__, 2).'/lib/JIT/Concern/AssignOperandValueMetaAndGeneratorField.php' => 'generator-yield-value-type-jit',
+            dirname(__DIR__, 2).'/lib/JIT/Builtin/Type/Object_.php' => 'class-const-type-jit',
+            dirname(__DIR__, 2).'/lib/JIT/FiberHelperLlvm.php' => 'fiber-value-type-jit',
+            dirname(__DIR__, 2).'/lib/JIT/Builtin/ReflectionEnumJitHelper.php' => 'reflection-enum-unknown',
         ] as $path => $featureId) {
             $src = file_get_contents($path);
             $this->assertNotFalse($src);
             $this->assertStringContainsString("'".$featureId."'", $src, basename($path));
-            $this->assertStringContainsString('UnsupportedFeature::raise', $src, basename($path));
+            $this->assertTrue(
+                str_contains($src, 'UnsupportedFeature::raise')
+                    || str_contains($src, 'UnsupportedFeature::message'),
+                basename($path).' must call UnsupportedFeature::raise/message'
+            );
         }
     }
 }

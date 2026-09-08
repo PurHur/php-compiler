@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\Block;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPCompiler\PseudoClassScope;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ClassConstFetchRuntime;
@@ -60,7 +61,7 @@ trait ClassConstFetchHelperTrait
             return self::emitValueBoxExprClassPseudoConst($objectType, $classVar);
         }
 
-        throw new \LogicException('Unsupported operand for expression ::class in JIT');
+        UnsupportedFeature::raise('expr-class-operand-jit');
     }
 
     /**
@@ -831,7 +832,7 @@ trait ClassConstFetchHelperTrait
                 );
                 break;
             default:
-                throw new \LogicException('Unsupported class constant type for dynamic JIT fetch');
+                UnsupportedFeature::raise('class-const-dynamic-type-jit');
         }
     }
 

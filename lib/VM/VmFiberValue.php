@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 use PHPCompiler\JIT\Variable as JitVariable;
+use PHPCompiler\Lint\UnsupportedFeature;
 
 /**
  * Fiber suspend/resume value-box write guards for VM + JIT lowering (#10079).
@@ -13,7 +14,13 @@ use PHPCompiler\JIT\Variable as JitVariable;
  */
 final class VmFiberValue
 {
+    /** @deprecated use UnsupportedFeature catalog id fiber-value-type-jit (#36396) */
     public const ERROR_UNSUPPORTED = 'Unsupported fiber value type in JIT (issue #4019)';
+
+    public static function unsupportedMessage(): string
+    {
+        return UnsupportedFeature::message('fiber-value-type-jit');
+    }
 
     /** @return null|'__value__writeString'|'__value__writeLong'|'__value__writeDouble'|'__value__writeBool'|'__value__writeNull' */
     public static function writeFunctionForJitType(int $type): ?string

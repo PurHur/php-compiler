@@ -14,6 +14,7 @@ use PHPCfg\Operand\Literal;
 use PHPCompiler\Block;
 use PHPCompiler\ClassConstVisibility;
 use PHPCompiler\CompilerVersion;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPCompiler\ext\standard\ThrowableManifest;
 use PHPCompiler\VM\ExceptionSupport;
 use PHPCompiler\MethodVisibility;
@@ -8657,7 +8658,7 @@ class Object_ extends Type {
             case Variable::TYPE_OBJECT:
                 return $this->jitClassConstObjectFromGlobal($entry);
             default:
-                throw new \LogicException('Unsupported class constant type for JIT');
+                UnsupportedFeature::raise('class-const-type-jit');
         }
     }
 
