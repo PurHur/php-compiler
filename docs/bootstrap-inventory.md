@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8513 |
-| Phase A inventory files (M2 ratio SSOT) | 8513 |
+| PHP files on vm.php path | 8514 |
+| Phase A inventory files (M2 ratio SSOT) | 8514 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26631 |
+| Source constructs flagged (warnings) | 26633 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7298,10 +7298,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/VmSmokeAndRuntimeM3NativeStubs.php` | 0 | 10 |
 | `lib/JIT/Context.php` | 0 | 10 |
 | `lib/JIT/ContextCompileToFile.php` | 0 | 3 |
-| `lib/JIT/ContextDefineBuiltinFunctionProxies.php` | 0 | 70 |
+| `lib/JIT/ContextDefineBuiltinFunctionProxies.php` | 0 | 40 |
 | `lib/JIT/ContextDefineBuiltinFunctionProxiesDateAndXml.php` | 0 | 67 |
 | `lib/JIT/ContextDefineBuiltinFunctionProxiesDirectoryAndFile.php` | 0 | 10 |
 | `lib/JIT/ContextDefineBuiltinFunctionProxiesReflectionAndException.php` | 0 | 165 |
+| `lib/JIT/ContextDefineBuiltinFunctionProxiesSplIterators.php` | 0 | 32 |
 | `lib/JIT/ContextDefineBuiltins.php` | 0 | 2 |
 | `lib/JIT/ContextEditScaffoldModuleRebind.php` | 0 | 2 |
 | `lib/JIT/ContextFreeDeadAndConstantFetch.php` | 0 | 10 |
@@ -59872,16 +59873,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Context.php`
 
 **Warnings** (review for bootstrap subset):
-- new ExtensionLoweringHooks (line 849)
-- new Scope (line 850)
-- new Analyzer (line 879)
-- new Helper (line 880)
-- new Builtin\Refcount (line 881)
-- new Builtin\Output (line 883)
-- new Builtin\Type (line 884)
-- new Builtin\Internal (line 885)
-- new Builtin\VarArg (line 886)
-- new Builtin\ErrorHandler (line 887)
+- new ExtensionLoweringHooks (line 851)
+- new Scope (line 852)
+- new Analyzer (line 881)
+- new Helper (line 882)
+- new Builtin\Refcount (line 883)
+- new Builtin\Output (line 885)
+- new Builtin\Type (line 886)
+- new Builtin\Internal (line 887)
+- new Builtin\VarArg (line 888)
+- new Builtin\ErrorHandler (line 889)
 
 ### `lib/JIT/ContextCompileToFile.php`
 
@@ -59893,75 +59894,45 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ContextDefineBuiltinFunctionProxies.php`
 
 **Warnings** (review for bootstrap subset):
-- trait ContextDefineBuiltinFunctionProxies (line 26)
-- new Builtin\IsNullFn (line 30)
-- new Builtin\IsNullFn (line 31)
-- new Call\SplObjectStorageMethod (line 32)
-- new Call\SplObjectStorageMethod (line 33)
+- trait ContextDefineBuiltinFunctionProxies (line 28)
+- new Builtin\IsNullFn (line 32)
+- new Builtin\IsNullFn (line 33)
 - new Call\SplObjectStorageMethod (line 34)
 - new Call\SplObjectStorageMethod (line 35)
 - new Call\SplObjectStorageMethod (line 36)
 - new Call\SplObjectStorageMethod (line 37)
+- new Call\SplObjectStorageMethod (line 38)
 - new Call\SplObjectStorageMethod (line 39)
-- new Call\SplObjectStorageMethod (line 40)
+- new Call\SplObjectStorageMethod (line 41)
 - new Call\SplObjectStorageMethod (line 42)
-- new Call\SplObjectStorageMethod (line 43)
 - new Call\SplObjectStorageMethod (line 44)
+- new Call\SplObjectStorageMethod (line 45)
 - new Call\SplObjectStorageMethod (line 46)
-- new Call\SplObjectStorageMethod (line 47)
 - new Call\SplObjectStorageMethod (line 48)
 - new Call\SplObjectStorageMethod (line 49)
 - new Call\SplObjectStorageMethod (line 50)
 - new Call\SplObjectStorageMethod (line 51)
 - new Call\SplObjectStorageMethod (line 52)
+- new Call\SplObjectStorageMethod (line 53)
 - new Call\SplObjectStorageMethod (line 54)
 - new Call\SplObjectStorageMethod (line 56)
-- new Call\SplObjectStorageMethod (line 57)
-- new Call\ArrayIteratorConstruct (line 62)
-- new Call\ArrayIteratorConstruct (line 63)
-- new Call\ArrayIteratorMethod (line 89)
-- new Call\ArrayIteratorMethod (line 93)
-- new Call\ArrayIteratorConstruct (line 100)
-- new Call\ArrayObjectMethod (line 127)
-- new Call\RecursiveIteratorIteratorConstruct (line 130)
-- new Call\RecursiveIteratorIteratorArgcMethod (line 132)
-- new Call\RecursiveIteratorIteratorArgcMethod (line 133)
-- new Call\RecursiveIteratorIteratorArgcMethod (line 134)
-- new Call\LimitIteratorConstruct (line 140)
-- new Call\LimitIteratorMethod (line 141)
-- new Call\LimitIteratorMethod (line 142)
-- new Call\AppendIteratorMethod (line 143)
-- new Call\AppendIteratorMethod (line 144)
-- new Call\RegexIteratorConstruct (line 145)
-- new Call\CallbackFilterIteratorConstruct (line 146)
-- new Call\CachingIteratorConstruct (line 148)
-- new Call\CachingIteratorGetCache (line 149)
-- new Call\CachingIteratorMethod (line 151)
-- new Call\SplHtPosIteratorMethod (line 159)
-- new Call\SplHtPosIteratorMethod (line 165)
-- new Call\EmptyIteratorMethod (line 177)
-- new Call\FilterIteratorMethod (line 186)
-- new Call\ParentIteratorConstruct (line 194)
-- new Call\ParentIteratorArgcMethod (line 196)
-- new Call\ParentIteratorArgcMethod (line 200)
-- new Call\MultipleIteratorMethod (line 204)
-- new Call\MultipleIteratorMethod (line 205)
-- new Call\RecursiveTreeIteratorConstruct (line 206)
-- new Call\SplPriorityQueueMethod (line 219)
-- new Call\SplDllistMethod (line 245)
-- new Call\SplFixedArrayMethod (line 259)
-- new Call\WeakReferenceCreate (line 262)
-- new Call\WeakReferenceGet (line 263)
-- new Call\SensitiveParameterValueConstruct (line 264)
-- new Call\SensitiveParameterValueGetValue (line 265)
-- new Call\WeakMapMethod (line 266)
-- new Call\WeakMapMethod (line 267)
-- new Call\WeakMapMethod (line 268)
-- new Call\WeakMapMethod (line 269)
-- new Call\WeakMapMethod (line 270)
-- new Call\PhpTokenConstruct (line 273)
-- new Call\PhpTokenTokenize (line 274)
-- new Call\PhpTokenGetTokenName (line 275)
+- new Call\SplObjectStorageMethod (line 58)
+- new Call\SplObjectStorageMethod (line 59)
+- new Call\SplPriorityQueueMethod (line 74)
+- new Call\SplDllistMethod (line 100)
+- new Call\SplFixedArrayMethod (line 114)
+- new Call\WeakReferenceCreate (line 117)
+- new Call\WeakReferenceGet (line 118)
+- new Call\SensitiveParameterValueConstruct (line 119)
+- new Call\SensitiveParameterValueGetValue (line 120)
+- new Call\WeakMapMethod (line 121)
+- new Call\WeakMapMethod (line 122)
+- new Call\WeakMapMethod (line 123)
+- new Call\WeakMapMethod (line 124)
+- new Call\WeakMapMethod (line 125)
+- new Call\PhpTokenConstruct (line 128)
+- new Call\PhpTokenTokenize (line 129)
+- new Call\PhpTokenGetTokenName (line 130)
 - 1 class method(s)
 
 ### `lib/JIT/ContextDefineBuiltinFunctionProxiesDateAndXml.php`
@@ -60216,6 +60187,42 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\ExceptionGetFile (line 320)
 - new Call\ExceptionGetLine (line 321)
 - new Call\ExceptionGetPrevious (line 322)
+- 1 class method(s)
+
+### `lib/JIT/ContextDefineBuiltinFunctionProxiesSplIterators.php`
+
+**Warnings** (review for bootstrap subset):
+- trait ContextDefineBuiltinFunctionProxiesSplIterators (line 28)
+- new Call\ArrayIteratorConstruct (line 36)
+- new Call\ArrayIteratorConstruct (line 37)
+- new Call\ArrayIteratorMethod (line 63)
+- new Call\ArrayIteratorMethod (line 67)
+- new Call\ArrayIteratorConstruct (line 74)
+- new Call\ArrayObjectMethod (line 101)
+- new Call\RecursiveIteratorIteratorConstruct (line 104)
+- new Call\RecursiveIteratorIteratorArgcMethod (line 106)
+- new Call\RecursiveIteratorIteratorArgcMethod (line 107)
+- new Call\RecursiveIteratorIteratorArgcMethod (line 108)
+- new Call\LimitIteratorConstruct (line 114)
+- new Call\LimitIteratorMethod (line 115)
+- new Call\LimitIteratorMethod (line 116)
+- new Call\AppendIteratorMethod (line 117)
+- new Call\AppendIteratorMethod (line 118)
+- new Call\RegexIteratorConstruct (line 119)
+- new Call\CallbackFilterIteratorConstruct (line 120)
+- new Call\CachingIteratorConstruct (line 122)
+- new Call\CachingIteratorGetCache (line 123)
+- new Call\CachingIteratorMethod (line 125)
+- new Call\SplHtPosIteratorMethod (line 133)
+- new Call\SplHtPosIteratorMethod (line 139)
+- new Call\EmptyIteratorMethod (line 151)
+- new Call\FilterIteratorMethod (line 160)
+- new Call\ParentIteratorConstruct (line 168)
+- new Call\ParentIteratorArgcMethod (line 170)
+- new Call\ParentIteratorArgcMethod (line 174)
+- new Call\MultipleIteratorMethod (line 178)
+- new Call\MultipleIteratorMethod (line 179)
+- new Call\RecursiveTreeIteratorConstruct (line 180)
 - 1 class method(s)
 
 ### `lib/JIT/ContextDefineBuiltins.php`
