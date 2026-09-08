@@ -206,41 +206,4 @@ trait CompileCacheEditScaffoldPlan
 
         return $kept;
     }
-
-    /**
-     * @param array<string, mixed> $raw
-     *
-     * @return array<string, array<string, list<string>>>
-     */
-    private static function normalizeByFunctionMap(array $raw): array
-    {
-        $out = [];
-        foreach ($raw as $member => $scopedMap) {
-            if (!is_string($member) || !is_array($scopedMap)) {
-                continue;
-            }
-            $resolved = realpath($member);
-            $key = false !== $resolved ? $resolved : $member;
-            $funcs = [];
-            foreach ($scopedMap as $scoped => $syms) {
-                if (!is_string($scoped) || !is_array($syms)) {
-                    continue;
-                }
-                $list = [];
-                foreach ($syms as $sym) {
-                    if (is_string($sym) && '' !== $sym) {
-                        $list[] = $sym;
-                    }
-                }
-                if ([] !== $list) {
-                    $funcs[$scoped] = array_values(array_unique($list));
-                }
-            }
-            if ([] !== $funcs) {
-                $out[$key] = $funcs;
-            }
-        }
-
-        return $out;
-    }
 }

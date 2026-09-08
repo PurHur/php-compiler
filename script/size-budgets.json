@@ -36,7 +36,7 @@
         "lib/JIT/CompileCache.php": {
             "budget": 61,
             "target": 2000,
-            "note": "MCJIT/AOT warm cache; SemanticHashFacades + PartialEmitDemote + ArtifactPersist + EditScaffold(+Strip) + ProjectIndexFacade + KeyLayoutFacade + HubState + BitcodePersist + Recording + EditSession + ProjectMembers + ArtifactFacade extracts (#36387/#36403) + EditScaffoldPlan (#36387)"
+            "note": "MCJIT/AOT warm cache; SemanticHashFacades + PartialEmitDemote + ArtifactPersist + EditScaffold(+Plan+Strip+Restore) + ProjectIndexFacade + KeyLayoutFacade + HubState + BitcodePersist + Recording + EditSession + ProjectMembers + ArtifactFacade extracts (#36387/#36403) "
         },
         "lib/JIT/CompileCacheRecording.php": {
             "budget": 276,
@@ -79,17 +79,22 @@
             "note": "KeyLayout enable/path/freshness public delegates extracted from CompileCache (#36387)"
         },
         "lib/JIT/CompileCacheEditScaffold.php": {
-            "budget": 107,
-            "target": 200,
-            "note": "Edit-scaffold restore hub; Plan+Strip extracts (#36387)"
+            "budget": 30,
+            "target": 80,
+            "note": "Edit-scaffold composition hub (Plan+Strip+Restore) (#36387)"
         },
         "lib/JIT/CompileCacheEditScaffoldStrip.php": {
             "budget": 205,
             "target": 300,
             "note": "Edit-scaffold LLVM strip/rebind/rebase extracted from EditScaffold (#36387)"
         },
+        "lib/JIT/CompileCacheEditScaffoldRestore.php": {
+            "budget": 140,
+            "target": 250,
+            "note": "Edit-scaffold bitcode restore + by-function map normalize (#36387)"
+        },
         "lib/JIT/CompileCacheEditScaffoldPlan.php": {
-            "budget": 246,
+            "budget": 210,
             "target": 350,
             "note": "Changed-member / kept-symbol strip planning extracted from EditScaffold (#36387)"
         }
