@@ -380,6 +380,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/JIT/ContextStandaloneBodies.php',
             'lib/JIT/ContextStructFieldMap.php',
             'lib/JIT/ContextTypeAndStructMap.php',
+            'lib/JIT/ContextTypeFromString.php',
             'lib/JIT/ContextVariableOperandAlias.php',
             'lib/JIT/ContextVariableOperandBinding.php',
             'lib/JIT/ContextVariableOperandLookup.php',
