@@ -99,8 +99,9 @@ fi
 
 STREAM="$DEST/vendor/nyholm/psr7/src/Stream.php"
 if [[ -f "$STREAM" ]]; then
+  # Keep getContents / openZvalStream AOT patches; do NOT rewrite string bodies to
+  # AotStringStream36382 — thin AOT fopen('php://memory') + is_resource() works (#37259).
   php "$ROOT/script/composer/patch-nyholm-stream-36382.php" "$STREAM"
-  php "$ROOT/script/composer/patch-nyholm-stream-string-body-36382.php" "$STREAM"
 fi
 
 STREAM_TRAIT="$DEST/vendor/nyholm/psr7/src/StreamTrait.php"
