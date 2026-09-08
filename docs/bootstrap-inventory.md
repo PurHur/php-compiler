@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8504 |
-| Phase A inventory files (M2 ratio SSOT) | 8504 |
+| PHP files on vm.php path | 8505 |
+| Phase A inventory files (M2 ratio SSOT) | 8505 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26614 |
+| Source constructs flagged (warnings) | 26616 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -59859,16 +59859,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Context.php`
 
 **Warnings** (review for bootstrap subset):
-- new ExtensionLoweringHooks (line 846)
-- new Scope (line 847)
-- new Analyzer (line 877)
-- new Helper (line 878)
-- new Builtin\Refcount (line 879)
-- new Builtin\Output (line 881)
-- new Builtin\Type (line 882)
-- new Builtin\Internal (line 883)
-- new Builtin\VarArg (line 884)
-- new Builtin\ErrorHandler (line 885)
+- new ExtensionLoweringHooks (line 845)
+- new Scope (line 846)
+- new Analyzer (line 876)
+- new Helper (line 877)
+- new Builtin\Refcount (line 878)
+- new Builtin\Output (line 880)
+- new Builtin\Type (line 881)
+- new Builtin\Internal (line 882)
+- new Builtin\VarArg (line 883)
+- new Builtin\ErrorHandler (line 884)
 
 ### `lib/JIT/ContextCompileToFile.php`
 
