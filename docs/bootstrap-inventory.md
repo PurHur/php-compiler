@@ -7324,7 +7324,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/ContextScriptGlobalsAndIncludeTracking.php` | 0 | 3 |
 | `lib/JIT/ContextStandaloneBodies.php` | 0 | 2 |
 | `lib/JIT/ContextTypeAndStructMap.php` | 0 | 2 |
-| `lib/JIT/ContextVariableOperandBinding.php` | 0 | 5 |
+| `lib/JIT/ContextVariableOperandBinding.php` | 0 | 3 |
+| `lib/JIT/ContextVariableOperandLookup.php` | 0 | 4 |
 | `lib/JIT/DatePeriodForeachSnapshot.php` | 0 | 3 |
 | `lib/JIT/DeprecatedCallGuard.php` | 0 | 1 |
 | `lib/JIT/DiscardedPureCallElision.php` | 0 | 1 |
@@ -59890,16 +59891,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Context.php`
 
 **Warnings** (review for bootstrap subset):
-- new ExtensionLoweringHooks (line 873)
-- new Scope (line 874)
-- new Analyzer (line 903)
-- new Helper (line 904)
-- new Builtin\Refcount (line 905)
-- new Builtin\Output (line 907)
-- new Builtin\Type (line 908)
-- new Builtin\Internal (line 909)
-- new Builtin\VarArg (line 910)
-- new Builtin\ErrorHandler (line 911)
+- new ExtensionLoweringHooks (line 875)
+- new Scope (line 876)
+- new Analyzer (line 905)
+- new Helper (line 906)
+- new Builtin\Refcount (line 907)
+- new Builtin\Output (line 909)
+- new Builtin\Type (line 910)
+- new Builtin\Internal (line 911)
+- new Builtin\VarArg (line 912)
+- new Builtin\ErrorHandler (line 913)
 
 ### `lib/JIT/ContextCompileToFile.php`
 
@@ -60388,11 +60389,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ContextVariableOperandBinding.php`
 
 **Warnings** (review for bootstrap subset):
-- trait ContextVariableOperandBinding (line 29)
-- new Variable (line 287)
-- new Variable (line 580)
-- new Variable (line 707)
-- 19 class method(s)
+- trait ContextVariableOperandBinding (line 30)
+- new Variable (line 288)
+- 12 class method(s)
+
+### `lib/JIT/ContextVariableOperandLookup.php`
+
+**Warnings** (review for bootstrap subset):
+- trait ContextVariableOperandLookup (line 25)
+- new Variable (line 121)
+- new Variable (line 248)
+- 7 class method(s)
 
 ### `lib/JIT/DatePeriodForeachSnapshot.php`
 
