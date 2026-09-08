@@ -14,9 +14,9 @@
             "note": "Concern trait splits (#36387/#36403); DateTimeMutationAndUnserializeMeta + TernaryPhiReturnMerge + peers; CfgParamReturnTypeAndCalleeByRef + OpCodeArgSlotAndAssignRhs (#36387)"
         },
         "lib/VM.php": {
-            "budget": 2171,
+            "budget": 2110,
             "target": 15000,
-            "note": "FromCallableAndClosureDispatch + ListUnpackAndSpreadAssignDispatch + VarFetchGlobalAndFunctionStaticDispatch + ArgSendDispatch + DeclareClassLikeDispatch + ConstFetchStaticCallInstanceofDispatch + JumpCaseDispatch + CoalesceNullsafeSilenceExitDispatch + ForeachIterDispatch + EchoPrintEvalDispatch + MethodCallInitDispatch + NewDispatch + FuncCallInitDispatch + IncludeDispatch + IssetDispatch + ClassConstFetchDispatch + ScalarCastCompareArithConcatDispatch + ArgRecvDispatch + FuncCallExecDispatch + AssignDispatch + UnsetDispatch + StaticPropertyFetchDispatch + ArrayDimFetchDispatch + ObjectPropertyFetchDispatch + ConstructMarkAndPendingOutboundCall + PropertyHookFrameAndStaticLink + IteratorToArrayConvert + IncludePathAndClassPseudoConst + ClassScopeAndStaticPropertyResolve + ClosureBindAndFunctionStatic + InternalHandlerExecuteAndAssignCopy + OutgoingCallArgResolve + ClassConstAndPropertyDefaultMaterialize + InheritanceFinalVarianceAndConstFetch + MethodCallAndStaticCallableInit + VirtualPropertyHookEnforce + ReturnTypeEnforce + DeprecationNoticeEmit + FrameActivationThisAndIncludeScope + FiberStartResumeAndThrow + GeneratorForeachAndYieldFrom + FrameObjectRefAndDeadTempRelease + UserInvokeArrayAccessAndClosureCall + BuiltinHostExceptionDispatch + ClassInheritDefineAndConstDeclare + TryCatchFinallyAndUncaughtDispatch + ExecuteIncDecAndScopeOperandRead + TypedIntRecursiveAndCountedLoopFastPath + PropertyFetchDestAndHookedDimWrite + ObjectPropertyMagicAndClone + ClassTraitComposition + ObjectPropertyReadonlyAndVisibility + Hooks + CollectAndSerialize + IssetEmptyUnset Concern extracts (#36403); under 15k target"
+            "note": "ArrayInitSpreadDispatch + FromCallableAndClosureDispatch + ListUnpackAndSpreadAssignDispatch + VarFetchGlobalAndFunctionStaticDispatch + ArgSendDispatch + DeclareClassLikeDispatch + ConstFetchStaticCallInstanceofDispatch + JumpCaseDispatch + CoalesceNullsafeSilenceExitDispatch + ForeachIterDispatch + EchoPrintEvalDispatch + MethodCallInitDispatch + NewDispatch + FuncCallInitDispatch + IncludeDispatch + IssetDispatch + ClassConstFetchDispatch + ScalarCastCompareArithConcatDispatch + ArgRecvDispatch + FuncCallExecDispatch + AssignDispatch + UnsetDispatch + StaticPropertyFetchDispatch + ArrayDimFetchDispatch + ObjectPropertyFetchDispatch + ConstructMarkAndPendingOutboundCall + PropertyHookFrameAndStaticLink + IteratorToArrayConvert + IncludePathAndClassPseudoConst + ClassScopeAndStaticPropertyResolve + ClosureBindAndFunctionStatic + InternalHandlerExecuteAndAssignCopy + OutgoingCallArgResolve + ClassConstAndPropertyDefaultMaterialize + InheritanceFinalVarianceAndConstFetch + MethodCallAndStaticCallableInit + VirtualPropertyHookEnforce + ReturnTypeEnforce + DeprecationNoticeEmit + FrameActivationThisAndIncludeScope + FiberStartResumeAndThrow + GeneratorForeachAndYieldFrom + FrameObjectRefAndDeadTempRelease + UserInvokeArrayAccessAndClosureCall + BuiltinHostExceptionDispatch + ClassInheritDefineAndConstDeclare + TryCatchFinallyAndUncaughtDispatch + ExecuteIncDecAndScopeOperandRead + TypedIntRecursiveAndCountedLoopFastPath + PropertyFetchDestAndHookedDimWrite + ObjectPropertyMagicAndClone + ClassTraitComposition + ObjectPropertyReadonlyAndVisibility + Hooks + CollectAndSerialize + IssetEmptyUnset Concern extracts (#36403); under 15k target"
         },
         "script/apply-patches.sh": {
             "budget": 7637,
@@ -397,6 +397,16 @@
             "budget": 134,
             "target": 200,
             "note": "TYPE_FROM_CALLABLE/TYPE_CLOSURE runFramesInner body extracted from VM.php (#36403); php-src zend_closures.c"
+        },
+        "lib/VM/Concern/ArrayDimFetchDispatch.php": {
+            "budget": 386,
+            "target": 450,
+            "note": "TYPE_ARRAY_DIM_FETCH/WRITE runFramesInner body extracted from VM.php (#36403)"
+        },
+        "lib/VM/Concern/ArrayInitSpreadDispatch.php": {
+            "budget": 113,
+            "target": 200,
+            "note": "TYPE_INIT_ARRAY/ADD_ARRAY_ELEMENT/ARRAY_SPREAD runFramesInner body extracted from VM.php (#36403)"
         }
     },
     "script_file_count": {

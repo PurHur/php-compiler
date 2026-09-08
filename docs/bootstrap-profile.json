@@ -8226,6 +8226,7 @@
         "lib/VM/Concern/ArgRecvDispatch.php",
         "lib/VM/Concern/ArgSendDispatch.php",
         "lib/VM/Concern/ArrayDimFetchDispatch.php",
+        "lib/VM/Concern/ArrayInitSpreadDispatch.php",
         "lib/VM/Concern/AssignDispatch.php",
         "lib/VM/Concern/BuiltinHostExceptionDispatch.php",
         "lib/VM/Concern/ClassConstAndPropertyDefaultMaterialize.php",
@@ -8762,9 +8763,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8528,
+        "inventory_files": 8529,
         "excluded": 0,
-        "eligible": 8528,
+        "eligible": 8529,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

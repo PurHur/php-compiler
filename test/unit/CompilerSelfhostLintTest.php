@@ -432,6 +432,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/VM/Concern/ArgRecvDispatch.php',
             'lib/VM/Concern/ArgSendDispatch.php',
             'lib/VM/Concern/ArrayDimFetchDispatch.php',
+            'lib/VM/Concern/ArrayInitSpreadDispatch.php',
             'lib/VM/Concern/AssignDispatch.php',
             'lib/VM/Concern/BuiltinHostExceptionDispatch.php',
             'lib/VM/Concern/ClassConstAndPropertyDefaultMaterialize.php',
