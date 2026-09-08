@@ -166,8 +166,37 @@ done
 # Force the M2 assertSame line to the canonical spine count even when no
 # doc pair mentioned the old assert value (README N/N vs docs N/M drift).
 if ! grep -q "assertSame(${NEW_SPINE}, \$count" test/unit/BootstrapSelfhostBundleTest.php; then
-  sed -i -E "s/(assertSame\()[0-9]+(, \\\$count, 'M2 spine)/\1${NEW_SPINE}\2/" \
-    test/unit/BootstrapSelfhostBundleTest.php
+  # Temp PHP — bash/sed \$ previously wrote literal \$count into the test (#37409).
+  _spine_assert_rewrite="$(mktemp)"
+  cat > "${_spine_assert_rewrite}" <<'PHPEOF'
+<?php
+declare(strict_types=1);
+$f = 'test/unit/BootstrapSelfhostBundleTest.php';
+$n = getenv('NEW_SPINE');
+if ($n === false || $n === '' || !ctype_digit($n)) {
+    fwrite(STDERR, "spine-sync: bad NEW_SPINE\n");
+    exit(1);
+}
+$t = file_get_contents($f);
+if ($t === false) {
+    fwrite(STDERR, "spine-sync: cannot read {$f}\n");
+    exit(1);
+}
+$t2 = preg_replace(
+    '/assertSame\(\d+,\s*\\\\?\$count, \'M2 spine/',
+    'assertSame(' . $n . ', $count, \'M2 spine',
+    $t,
+    1,
+    $c
+);
+if ($c !== 1) {
+    fwrite(STDERR, "spine-sync: expected 1 assertSame rewrite, got {$c}\n");
+    exit(1);
+}
+file_put_contents($f, $t2);
+PHPEOF
+  NEW_SPINE="${NEW_SPINE}" "$PHP_BIN" "${_spine_assert_rewrite}"
+  rm -f "${_spine_assert_rewrite}"
   REWROTE=1
 fi
 if [[ "$REWROTE" == "0" ]]; then
