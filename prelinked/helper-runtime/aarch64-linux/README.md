@@ -13,7 +13,7 @@ non-native link.
 
 ## Seed corpus (VM_* + lib_VM_* + ext/standard tiers)
 
-**222** committed `unit.o` files:
+**232** committed `unit.o` files:
 
 - full `VM_*` (13) and `lib_VM_*` (9) sets from `x86_64-linux`
 - first `ext/standard` tier (10): ArrayChunk / ArrayIsList / ArraySlice / Bin2hex /
@@ -70,6 +70,10 @@ non-native link.
 - session leftovers / GC / spl_autoload / string (10): SessionGc /
   SessionStartOptionsAot / GcToggle / GcCollectCycles / GcCollectCyclesRegistry /
   SplAutoload / SplAutoloadDefault / StripWhitespace / StrIncdec / SuperglobalName
+- GC destruct companions + convert_cyr / chroot / image_type / quot_print / strxfrm (10):
+  GcDestructAllowDelref / GcDestructShutdown / GcDestructTryInvoke /
+  GcObjectReleaseStorage / ConvertCyrString / Chroot / ImageTypeToExtension /
+  ImageTypeToMimeType / QuotPrint / Strxfrm
 
 Refresh / expand via:
 

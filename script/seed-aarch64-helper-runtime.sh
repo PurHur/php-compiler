@@ -266,6 +266,20 @@ SEED_UNITS=(
   /ext/standard/StripWhitespaceJitHelper.php
   /ext/standard/StrIncdecJitHelper.php
   /ext/standard/SuperglobalNameJitHelper.php
+  # GC destruct companions + convert_cyr / chroot / image_type / quot_print / strxfrm (#36391 after #37352)
+  # Frexp/Ldexp/Modf/Nextafter/Shuffle still skipped (algorithm SSOT, no HELPER_PATH).
+  # Preg* still skipped: tip nested compile misses Compiler\Concern\OpCode.
+  # Sscanf still skipped: __init__ sealed during NestedJIT.
+  /ext/standard/GcDestructAllowDelrefJitHelper.php
+  /ext/standard/GcDestructShutdownJitHelper.php
+  /ext/standard/GcDestructTryInvokeJitHelper.php
+  /ext/standard/GcObjectReleaseStorageJitHelper.php
+  /ext/standard/ConvertCyrStringJitHelper.php
+  /ext/standard/ChrootJitHelper.php
+  /ext/standard/ImageTypeToExtensionJitHelper.php
+  /ext/standard/ImageTypeToMimeTypeJitHelper.php
+  /ext/standard/QuotPrintJitHelper.php
+  /ext/standard/StrxfrmJitHelper.php
 )
 
 MIN_SEED=${#SEED_UNITS[@]}
