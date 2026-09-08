@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8524 |
-| Phase A inventory files (M2 ratio SSOT) | 8524 |
+| PHP files on vm.php path | 8525 |
+| Phase A inventory files (M2 ratio SSOT) | 8525 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26653 |
+| Source constructs flagged (warnings) | 26655 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7299,6 +7299,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Context.php` | 0 | 10 |
 | `lib/JIT/ContextCompileToFile.php` | 0 | 3 |
 | `lib/JIT/ContextDefineBuiltinFunctionProxies.php` | 0 | 4 |
+| `lib/JIT/ContextDefineBuiltinFunctionProxiesArrayIteratorAndObject.php` | 0 | 8 |
 | `lib/JIT/ContextDefineBuiltinFunctionProxiesDateAndXml.php` | 0 | 60 |
 | `lib/JIT/ContextDefineBuiltinFunctionProxiesDirectoryAndFile.php` | 0 | 10 |
 | `lib/JIT/ContextDefineBuiltinFunctionProxiesExceptionAndError.php` | 0 | 25 |
@@ -7307,7 +7308,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/ContextDefineBuiltinFunctionProxiesReflectionAndException.php` | 0 | 61 |
 | `lib/JIT/ContextDefineBuiltinFunctionProxiesReflectionMembers.php` | 0 | 83 |
 | `lib/JIT/ContextDefineBuiltinFunctionProxiesSplContainers.php` | 0 | 26 |
-| `lib/JIT/ContextDefineBuiltinFunctionProxiesSplIterators.php` | 0 | 32 |
+| `lib/JIT/ContextDefineBuiltinFunctionProxiesSplIterators.php` | 0 | 26 |
 | `lib/JIT/ContextDefineBuiltinFunctionProxiesWeakAndPhpToken.php` | 0 | 14 |
 | `lib/JIT/ContextDefineBuiltins.php` | 0 | 2 |
 | `lib/JIT/ContextEditScaffoldModuleRebind.php` | 0 | 2 |
@@ -59883,16 +59884,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Context.php`
 
 **Warnings** (review for bootstrap subset):
-- new ExtensionLoweringHooks (line 867)
-- new Scope (line 868)
-- new Analyzer (line 897)
-- new Helper (line 898)
-- new Builtin\Refcount (line 899)
-- new Builtin\Output (line 901)
-- new Builtin\Type (line 902)
-- new Builtin\Internal (line 903)
-- new Builtin\VarArg (line 904)
-- new Builtin\ErrorHandler (line 905)
+- new ExtensionLoweringHooks (line 869)
+- new Scope (line 870)
+- new Analyzer (line 899)
+- new Helper (line 900)
+- new Builtin\Refcount (line 901)
+- new Builtin\Output (line 903)
+- new Builtin\Type (line 904)
+- new Builtin\Internal (line 905)
+- new Builtin\VarArg (line 906)
+- new Builtin\ErrorHandler (line 907)
 
 ### `lib/JIT/ContextCompileToFile.php`
 
@@ -59904,9 +59905,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ContextDefineBuiltinFunctionProxies.php`
 
 **Warnings** (review for bootstrap subset):
-- trait ContextDefineBuiltinFunctionProxies (line 30)
-- new Builtin\IsNullFn (line 34)
+- trait ContextDefineBuiltinFunctionProxies (line 31)
 - new Builtin\IsNullFn (line 35)
+- new Builtin\IsNullFn (line 36)
+- 1 class method(s)
+
+### `lib/JIT/ContextDefineBuiltinFunctionProxiesArrayIteratorAndObject.php`
+
+**Warnings** (review for bootstrap subset):
+- trait ContextDefineBuiltinFunctionProxiesArrayIteratorAndObject (line 25)
+- new Call\ArrayIteratorConstruct (line 33)
+- new Call\ArrayIteratorConstruct (line 34)
+- new Call\ArrayIteratorMethod (line 60)
+- new Call\ArrayIteratorMethod (line 64)
+- new Call\ArrayIteratorConstruct (line 71)
+- new Call\ArrayObjectMethod (line 98)
 - 1 class method(s)
 
 ### `lib/JIT/ContextDefineBuiltinFunctionProxiesDateAndXml.php`
@@ -60220,37 +60233,31 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ContextDefineBuiltinFunctionProxiesSplIterators.php`
 
 **Warnings** (review for bootstrap subset):
-- trait ContextDefineBuiltinFunctionProxiesSplIterators (line 28)
-- new Call\ArrayIteratorConstruct (line 36)
-- new Call\ArrayIteratorConstruct (line 37)
-- new Call\ArrayIteratorMethod (line 63)
-- new Call\ArrayIteratorMethod (line 67)
-- new Call\ArrayIteratorConstruct (line 74)
-- new Call\ArrayObjectMethod (line 101)
-- new Call\RecursiveIteratorIteratorConstruct (line 104)
-- new Call\RecursiveIteratorIteratorArgcMethod (line 106)
-- new Call\RecursiveIteratorIteratorArgcMethod (line 107)
-- new Call\RecursiveIteratorIteratorArgcMethod (line 108)
-- new Call\LimitIteratorConstruct (line 114)
-- new Call\LimitIteratorMethod (line 115)
-- new Call\LimitIteratorMethod (line 116)
-- new Call\AppendIteratorMethod (line 117)
-- new Call\AppendIteratorMethod (line 118)
-- new Call\RegexIteratorConstruct (line 119)
-- new Call\CallbackFilterIteratorConstruct (line 120)
-- new Call\CachingIteratorConstruct (line 122)
-- new Call\CachingIteratorGetCache (line 123)
-- new Call\CachingIteratorMethod (line 125)
-- new Call\SplHtPosIteratorMethod (line 133)
-- new Call\SplHtPosIteratorMethod (line 139)
-- new Call\EmptyIteratorMethod (line 151)
-- new Call\FilterIteratorMethod (line 160)
-- new Call\ParentIteratorConstruct (line 168)
-- new Call\ParentIteratorArgcMethod (line 170)
-- new Call\ParentIteratorArgcMethod (line 174)
-- new Call\MultipleIteratorMethod (line 178)
-- new Call\MultipleIteratorMethod (line 179)
-- new Call\RecursiveTreeIteratorConstruct (line 180)
+- trait ContextDefineBuiltinFunctionProxiesSplIterators (line 26)
+- new Call\RecursiveIteratorIteratorConstruct (line 32)
+- new Call\RecursiveIteratorIteratorArgcMethod (line 34)
+- new Call\RecursiveIteratorIteratorArgcMethod (line 35)
+- new Call\RecursiveIteratorIteratorArgcMethod (line 36)
+- new Call\LimitIteratorConstruct (line 42)
+- new Call\LimitIteratorMethod (line 43)
+- new Call\LimitIteratorMethod (line 44)
+- new Call\AppendIteratorMethod (line 45)
+- new Call\AppendIteratorMethod (line 46)
+- new Call\RegexIteratorConstruct (line 47)
+- new Call\CallbackFilterIteratorConstruct (line 48)
+- new Call\CachingIteratorConstruct (line 50)
+- new Call\CachingIteratorGetCache (line 51)
+- new Call\CachingIteratorMethod (line 53)
+- new Call\SplHtPosIteratorMethod (line 61)
+- new Call\SplHtPosIteratorMethod (line 67)
+- new Call\EmptyIteratorMethod (line 79)
+- new Call\FilterIteratorMethod (line 88)
+- new Call\ParentIteratorConstruct (line 96)
+- new Call\ParentIteratorArgcMethod (line 98)
+- new Call\ParentIteratorArgcMethod (line 102)
+- new Call\MultipleIteratorMethod (line 106)
+- new Call\MultipleIteratorMethod (line 107)
+- new Call\RecursiveTreeIteratorConstruct (line 108)
 - 1 class method(s)
 
 ### `lib/JIT/ContextDefineBuiltinFunctionProxiesWeakAndPhpToken.php`
