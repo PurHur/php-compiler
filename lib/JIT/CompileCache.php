@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT;
 require_once __DIR__.'/CompileCacheSemanticFunctionConsume.php';
 require_once __DIR__.'/CompileCacheSemanticFileParts.php';
 require_once __DIR__.'/CompileCacheSemanticHash.php';
+require_once __DIR__.'/CompileCachePartialEmitPruneGlobals.php';
 require_once __DIR__.'/CompileCachePartialEmitLlvm.php';
 require_once __DIR__.'/CompileCachePartialEmitDemote.php';
 require_once __DIR__.'/CompileCacheArtifactPersist.php';
@@ -38,7 +39,8 @@ require_once __DIR__.'/CompileCacheKeyLayoutFacade.php';
  *
  * Semantic hash / edit-strip: {@see CompileCacheSemanticHash} (+ FileParts /
  * FunctionConsume / HashFacade). Partial-emit: {@see CompileCachePartialEmitDemote}
- * + {@see CompileCachePartialEmitLlvm}. Artifact mid-tier: {@see CompileCacheArtifactPersist}
+ * + {@see CompileCachePartialEmitLlvm} + {@see CompileCachePartialEmitPruneGlobals}.
+ * Artifact mid-tier: {@see CompileCacheArtifactPersist}
  * / {@see CompileCacheObjectLinkPersist} / {@see CompileCacheArtifactFacade}. Edit-scaffold:
  * EditScaffold{,Plan,Restore,Strip} + EditSession. Project index + entry→members +
  * KeyLayout + BitcodeRestore/Persist + Recording (+ MemberPath) + HubState (#36387 / #36403).

@@ -4,14 +4,16 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+require_once __DIR__.'/CompileCachePartialEmitPruneGlobals.php';
 require_once __DIR__.'/CompileCachePartialEmitLlvm.php';
 
 /**
  * Partial-edit object demote for AOT edit-scaffold (#36387 / #36199).
  *
  * Orchestrates keep/strip candidate selection before TargetMachine emit on partial
- * keep. LLVM rename+declaration demote, unused const-global prune, and prior-object
- * symbol probes live in {@see CompileCachePartialEmitLlvm} (split-TU / size-budget).
+ * keep. LLVM rename+declaration demote and prior-object symbol probes live in
+ * {@see CompileCachePartialEmitLlvm}; unused const-global prune in
+ * {@see CompileCachePartialEmitPruneGlobals} (split-TU / size-budget).
  * CompileCache keeps a thin {@see CompileCache::demoteBodiesForPartialObjectEmit()}
  * delegate via {@see CompileCacheEditSession}.
  *
@@ -118,7 +120,7 @@ final class CompileCachePartialEmitDemote
         // Skip prune on small deltas — 4k×named-global probes dominate tiny scaffolds
         // (comment-only <30% gate). MiniWebApp-scale demotes benefit (#36387).
         if ($demoted >= 100) {
-            $pruned = CompileCachePartialEmitLlvm::pruneUnusedGlobalsAfterDemote($context);
+            $pruned = CompileCachePartialEmitPruneGlobals::pruneUnusedGlobalsAfterDemote($context);
             if ($pruned > 0) {
                 \PHPCompiler\AOT\BuildTiming::note('edit_scaffold_globals_pruned', (float) $pruned);
             }
