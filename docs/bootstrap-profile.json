@@ -5558,6 +5558,7 @@
         "lib/AOT/HelperRuntimeCache.php",
         "lib/AOT/HelperRuntimeCommon.php",
         "lib/AOT/HelperRuntimeFingerprint.php",
+        "lib/AOT/HelperRuntimeIndex.php",
         "lib/AOT/HelperRuntimeLink.php",
         "lib/AOT/HelperUnitGlobalCtor.php",
         "lib/AOT/Linker.php",
@@ -8280,6 +8281,7 @@
         "lib/VM/Concern/ReturnTypeEnforce.php",
         "lib/VM/Concern/ScalarCastCompareArithConcatDispatch.php",
         "lib/VM/Concern/ScalarCastDispatch.php",
+        "lib/VM/Concern/ScalarCompareDispatch.php",
         "lib/VM/Concern/StaticPropertyFetchDispatch.php",
         "lib/VM/Concern/TryCatchFinallyAndUncaughtDispatch.php",
         "lib/VM/Concern/TypedIntRecursiveAndCountedLoopFastPath.php",
@@ -8772,9 +8774,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8538,
+        "inventory_files": 8540,
         "excluded": 0,
-        "eligible": 8538,
+        "eligible": 8540,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

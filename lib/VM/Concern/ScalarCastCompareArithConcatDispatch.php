@@ -7,17 +7,14 @@ namespace PHPCompiler;
 use PHPCompiler\VM\Variable;
 
 /**
- * VM compare / arith / bitwise / unary / concat dispatch (#36403).
+ * VM inc/dec / arith / bitwise / unary / concat dispatch (#36403).
  *
- * CAST_* moved to {@see ScalarCastDispatch}. Remaining IDENTICAL through CONCAT
- * case bodies (php-src Zend/zend_vm_def.h ZEND_IS_* / ZEND_ADD..POW /
- * ZEND_BW_* / ZEND_BOOL_NOT adjacent unary / ZEND_CONCAT; zend_operators.c).
- * Concern trait — same namespace as parent so relative Frame / OpCode helpers
- * resolve. Move-only; no new C ABI.
- *
- * Counted-int for-loop fast path on TYPE_SMALLER previously used continue-2 on
- * the outer opcode while; that becomes return-$frame here so the caller
- * `goto restart` (same Frame-outcome convention as sibling Concern extracts).
+ * CAST_* in {@see ScalarCastDispatch}; IDENTICAL..SPACESHIP in
+ * {@see ScalarCompareDispatch}. Remaining POST_INC through CONCAT case bodies
+ * (php-src Zend/zend_vm_def.h ZEND_POST_INC..POW / ZEND_BW_* / ZEND_BOOL_NOT
+ * adjacent unary / ZEND_CONCAT; zend_operators.c). Concern trait — same
+ * namespace as parent so relative Frame / OpCode helpers resolve. Move-only;
+ * no new C ABI.
  *
  * @return Frame|int|null Frame → restart runFramesInner; int → return from
  *         runFramesInner (SUCCESS/EXCEPTION/FAILURE); null → opcode complete.
@@ -25,120 +22,13 @@ use PHPCompiler\VM\Variable;
 trait ScalarCastCompareArithConcatDispatch
 {
     /**
-     * Execute compare, inc/dec, arith, bitwise, unary, and CONCAT for the current opcode.
+     * Execute inc/dec, arith, bitwise, unary, and CONCAT for the current opcode.
      *
      * @return Frame|int|null
      */
     private function executeScalarCastCompareArithConcatDispatch(Frame $frame, OpCode $op): Frame|int|null
     {
         switch ($op->type) {
-        case OpCode::TYPE_IDENTICAL:
-            // Match arms lower to IDENTICAL — warn on undefined CV reads (#26147, #10358).
-            $arg1 = $frame->scope[$op->arg1];
-            $arg2 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2);
-            $arg3 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg3);
-            $arg1->bool($arg2->identicalTo($arg3));
-            break;
-        case OpCode::TYPE_NOT_IDENTICAL:
-            $arg1 = $frame->scope[$op->arg1];
-            $arg2 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2);
-            $arg3 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg3);
-            $arg1->bool(!$arg2->identicalTo($arg3));
-            $this->releaseVmBinaryOpOperandTemp($frame, (int) $op->arg2, (int) $op->arg1, (int) $op->arg3);
-            $this->releaseVmBinaryOpOperandTemp($frame, (int) $op->arg3, (int) $op->arg1, (int) $op->arg2);
-            break;
-        case OpCode::TYPE_EQUAL:
-            // Switch cases lower to EQUAL — same undefined-CV warning path (#26147).
-            $arg1 = $frame->scope[$op->arg1];
-            $arg2 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2);
-            $arg3 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg3);
-            try {
-                $arg1->bool($arg2->equals($arg3, $this));
-            } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
-                $frame = $this->resumeAfterBuiltinCallbackCatchRedirect($redirect);
-                return $frame;
-            } catch (VM\MagicMethodInvocationAborted) {
-                $this->clearTryCatchUnwindState();
-                ++$frame->pos;
-                break;
-            }
-            break;
-        case OpCode::TYPE_NOT_EQUAL:
-            $arg1 = $frame->scope[$op->arg1];
-            $arg2 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2);
-            $arg3 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg3);
-            try {
-                $arg1->bool(!$arg2->equals($arg3, $this));
-            } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
-                $frame = $this->resumeAfterBuiltinCallbackCatchRedirect($redirect);
-                return $frame;
-            } catch (VM\MagicMethodInvocationAborted) {
-                $this->clearTryCatchUnwindState();
-                ++$frame->pos;
-                break;
-            }
-            break;
-        case OpCode::TYPE_LOGICAL_XOR:
-            $arg1 = $frame->scope[$op->arg1];
-            $arg2 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2);
-            $arg3 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg3);
-            $arg1->bool($arg2->toBool($this) !== $arg3->toBool($this));
-            break;
-        case OpCode::TYPE_SMALLER:
-            if (1 === $frame->pos) {
-                $jumpIfOp = $frame->block->opCodes[1] ?? null;
-                if ($jumpIfOp instanceof OpCode && OpCode::TYPE_JUMPIF === $jumpIfOp->type) {
-                    $loopExit = $this->tryExecuteCountedIntForLoopAtJumpIf($frame, $jumpIfOp);
-                    if (null !== $loopExit) {
-                        $frame = $loopExit;
-                        return $frame;
-                    }
-                }
-            }
-            // fall through
-        case OpCode::TYPE_GREATER:
-        case OpCode::TYPE_SMALLER_OR_EQUAL:
-        case OpCode::TYPE_GREATER_OR_EQUAL:
-            if ($this->tryExecuteRelationalCompareFastPath($frame, $op)) {
-                break;
-            }
-            $arg1 = $frame->scope[$op->arg1];
-            $arg2 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2);
-            $arg3 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg3);
-            try {
-                $arg1->compareOp($op->type, $arg2, $arg3, $this);
-            } catch (\TypeError $e) {
-                $catchFrame = $this->dispatchVmTypeError($e, $frame);
-                if (null !== $catchFrame) {
-                    $frame = $catchFrame;
-                    return $frame;
-                }
-                break;
-            } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
-                // __toString throw during relational compare (#29534).
-                $frame = $this->resumeAfterBuiltinCallbackCatchRedirect($redirect);
-                return $frame;
-            }
-            break;
-        case OpCode::TYPE_SPACESHIP:
-            $arg1 = $frame->scope[$op->arg1];
-            $arg2 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2);
-            $arg3 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg3);
-            try {
-                $arg1->spaceshipOp($arg2, $arg3, $this);
-            } catch (\TypeError $e) {
-                $catchFrame = $this->dispatchVmTypeError($e, $frame);
-                if (null !== $catchFrame) {
-                    $frame = $catchFrame;
-                    return $frame;
-                }
-                break;
-            } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
-                // __toString throw during <=> (#29534).
-                $frame = $this->resumeAfterBuiltinCallbackCatchRedirect($redirect);
-                return $frame;
-            }
-            break;
         case OpCode::TYPE_POST_INC:
             $catchFrame = $this->executeIncDec($frame, $op, true, false);
             if (null !== $catchFrame) {
