@@ -164,7 +164,7 @@ trait GeneratorForeachAndYieldFrom
         $this->context->errors->triggerErrorWithHandlerFirst(
             'foreach() argument must be of type array|object, '
             .VM\EnumCaseSupport::typeNameForTypeErrorActual($resolved).' given',
-            ErrorReporter::E_WARNING,
+            VM\ErrorReporter::E_WARNING,
             '' !== $frame->scriptPath ? $frame->scriptPath : null,
             $this->context,
             $frame,

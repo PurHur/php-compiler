@@ -57,6 +57,7 @@ require_once __DIR__.'/VM/Concern/FuncCallInitDispatch.php';
 require_once __DIR__.'/VM/Concern/NewDispatch.php';
 require_once __DIR__.'/VM/Concern/MethodCallInitDispatch.php';
 require_once __DIR__.'/VM/Concern/EchoPrintEvalDispatch.php';
+require_once __DIR__.'/VM/Concern/ForeachIterDispatch.php';
 
 use PHPCompiler\BuiltinByRefParams;
 use PHPCompiler\Compiler\AttributeNames;
@@ -88,9 +89,6 @@ use PHPCompiler\VM\IterableCheck;
 use PHPCompiler\VM\NamedArgs;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\ObjectLifetime;
-use PHPCompiler\VM\ObjectPropertyIterator;
-use PHPCompiler\VM\WeakMapIterator;
-use PHPCompiler\VM\WeakRefSupport;
 use PHPCompiler\VM\ReferencableCheck;
 use PHPCompiler\VM\ReflectionPropertyHookSupport;
 use PHPCompiler\VM\ScriptExit;
@@ -153,6 +151,7 @@ class VM {
     use NewDispatch;
     use MethodCallInitDispatch;
     use EchoPrintEvalDispatch;
+    use ForeachIterDispatch;
     const SUCCESS = 1;
     const FAILURE = 2;
 
@@ -2288,299 +2287,43 @@ restart:
                     }
                     $this->throwYieldFromInvalidContainer($container);
                 case OpCode::TYPE_ITER_RESET:
-                    // Zend FE_RESET / CV fetch: Undefined variable E_WARNING before type check (#26148).
-                    $container = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg1)->resolveIndirect();
-                    unset($this->context->foreachInvalidSlots[$op->arg1]);
-                    if ($this->variableIsGenerator($container)) {
-                        unset($this->context->foreachObjectAdvance[$op->arg1]);
-                        unset($this->context->objectPropertyIterators[$op->arg1]);
-                        unset($this->context->weakMapIterators[$op->arg1]);
-                        $frame->iterators[$op->arg1] = $container;
-                        $this->context->foreachIterators[$op->arg1] = $container;
-                        try {
-                            $container->toObject()->generatorState->rewindForForeach();
-                        } catch (\Exception $e) {
-                            $catchFrame = $this->dispatchVmEngineException($e->getMessage(), $frame);
-                            if (null !== $catchFrame) {
-                                $frame = $catchFrame;
-                                goto restart;
-                            }
-                        }
-                        break;
+                    $iterResetOutcome = $this->executeIterResetDispatch($frame, $op);
+                    if ($iterResetOutcome instanceof Frame) {
+                        $frame = $iterResetOutcome;
+                        goto restart;
                     }
-                    if (Variable::TYPE_ARRAY === $container->type) {
-                        unset($this->context->foreachObjectAdvance[$op->arg1]);
-                        unset($this->context->objectPropertyIterators[$op->arg1]);
-                        unset($this->context->weakMapIterators[$op->arg1]);
-                        $this->bindArrayForeachIteratorContainer($frame, (int) $op->arg1, $container);
-                        break;
+                    if (is_int($iterResetOutcome)) {
+                        return $iterResetOutcome;
                     }
-                    if (Variable::TYPE_OBJECT === $container->type) {
-                        try {
-                            unset($this->context->objectPropertyIterators[$op->arg1]);
-                            unset($this->context->weakMapIterators[$op->arg1]);
-                            $iterable = VM\ForeachIterator::resolveTraversableObject($this, $frame, $container);
-                            $frame->iterators[$op->arg1] = $iterable;
-                            $this->context->foreachIterators[$op->arg1] = $iterable;
-                            if ($this->variableIsGenerator($iterable)) {
-                                unset($this->context->foreachObjectAdvance[$op->arg1]);
-                                try {
-                                    $iterable->toObject()->generatorState->rewindForForeach();
-                                } catch (\Exception $e) {
-                                    $catchFrame = $this->dispatchVmEngineException($e->getMessage(), $frame);
-                                    if (null !== $catchFrame) {
-                                        $frame = $catchFrame;
-                                        goto restart;
-                                    }
-                                }
-                                break;
-                            }
-                            $this->context->foreachObjectAdvance[$op->arg1] = false;
-                            $this->invokeForeachInstanceMethod($frame, $iterable, 'rewind');
-                            break;
-                        } catch (\TypeError $e) {
-                            // Property-foreach fallback only for "not iterable" (#3234).
-                            // Return-type / other TypeErrors from getIterator() must reach userland (#19729).
-                            if (!str_contains($e->getMessage(), 'is not iterable')) {
-                                $catchFrame = $this->dispatchVmTypeError($e, $frame);
-                                if (null !== $catchFrame) {
-                                    $frame = $catchFrame;
-                                    goto restart;
-                                }
-                                break;
-                            }
-                            unset($this->context->foreachObjectAdvance[$op->arg1]);
-                            if (WeakRefSupport::isWeakMap($container->toObject())) {
-                                unset($this->context->objectPropertyIterators[$op->arg1]);
-                                unset($this->context->weakMapIterators[$op->arg1]);
-                                $iter = new WeakMapIterator($container->toObject());
-                                $iter->reset();
-                                $this->context->weakMapIterators[$op->arg1] = $iter;
-                                break;
-                            }
-                            $iter = new ObjectPropertyIterator($container->toObject(), $this, $frame);
-                            $iter->reset();
-                            $this->context->objectPropertyIterators[$op->arg1] = $iter;
-                            break;
-                        } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
-                            // Iterator protocol throw (FilterIterator::accept, …) — do not re-wrap (#24286).
-                            $frame = $this->resumeAfterBuiltinCallbackCatchRedirect($redirect);
-                            goto restart;
-                        } catch (\Exception $e) {
-                            // zend_interfaces.c — bad getIterator() return is Exception, not TypeError (#19729).
-                            $catchFrame = $this->dispatchVmEngineException($e->getMessage(), $frame);
-                            if (null !== $catchFrame) {
-                                $frame = $catchFrame;
-                                goto restart;
-                            }
-                            break;
-                        }
-                    }
-                    $this->warnForeachNonTraversable($container, $frame, $op);
-                    unset($this->context->foreachObjectAdvance[$op->arg1]);
-                    unset($this->context->objectPropertyIterators[$op->arg1]);
-                    unset($this->context->weakMapIterators[$op->arg1]);
-                    unset($this->context->foreachIterators[$op->arg1]);
-                    unset($frame->iterators[$op->arg1]);
-                    $this->context->foreachInvalidSlots[$op->arg1] = true;
                     break;
                 case OpCode::TYPE_ITER_VALID:
-                    if ($this->isForeachInvalidSlot((int) $op->arg2)) {
-                        $frame->scope[$op->arg1]->bool(false);
-                        break;
+                    $iterValidOutcome = $this->executeIterValidDispatch($frame, $op);
+                    if ($iterValidOutcome instanceof Frame) {
+                        $frame = $iterValidOutcome;
+                        goto restart;
                     }
-                    $container = $this->resolveForeachContainer($frame, (int) $op->arg2);
-                    if ($this->isForeachObjectIteratorSlot((int) $op->arg2)) {
-                        if ($this->context->foreachObjectAdvance[$op->arg2]) {
-                            $this->invokeForeachInstanceMethod($frame, $container, 'next');
-                        }
-                        $valid = $this->invokeForeachInstanceMethod($frame, $container, 'valid');
-                        $frame->scope[$op->arg1]->bool($valid->toBool());
-                        break;
+                    if (is_int($iterValidOutcome)) {
+                        return $iterValidOutcome;
                     }
-                    if ($this->variableIsGenerator($container)) {
-                        $catchFrame = $this->foreachAdvanceGenerator(
-                            $frame,
-                            $container->toObject()->generatorState,
-                            (int) $op->arg1
-                        );
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                        break;
-                    }
-                    if (Variable::TYPE_OBJECT === $container->type) {
-                        if ($this->isWeakMapForeachSlot((int) $op->arg2)) {
-                            $frame->scope[$op->arg1]->bool(
-                                $this->weakMapForeachIterator($op->arg2)->valid()
-                            );
-                            break;
-                        }
-                        $frame->scope[$op->arg1]->bool(
-                            $this->objectForeachIterator($op->arg2)->valid()
-                        );
-                        break;
-                    }
-                    if (Variable::TYPE_ARRAY !== $container->type) {
-                        // Literal scalars re-embed per block (RESET slot ≠ VALID slot), so
-                        // foreachInvalidSlots from FE_RESET is missed — treat as empty (#23452).
-                        $frame->scope[$op->arg1]->bool(false);
-                        break;
-                    }
-                    $frame->scope[$op->arg1]->bool($container->toArray()->iterValid());
                     break;
                 case OpCode::TYPE_ITER_KEY:
-                    if ($this->isForeachInvalidSlot((int) $op->arg2)) {
-                        break;
+                    $iterKeyOutcome = $this->executeIterKeyDispatch($frame, $op);
+                    if ($iterKeyOutcome instanceof Frame) {
+                        $frame = $iterKeyOutcome;
+                        goto restart;
                     }
-                    $container = $this->resolveForeachContainer($frame, (int) $op->arg2);
-                    if ($this->isForeachObjectIteratorSlot((int) $op->arg2)) {
-                        $key = $this->invokeForeachInstanceMethod($frame, $container, 'key');
-                        $frame->scope[$op->arg1]->copyFrom($key);
-                        break;
+                    if (is_int($iterKeyOutcome)) {
+                        return $iterKeyOutcome;
                     }
-                    if ($this->variableIsGenerator($container)) {
-                        $frame->scope[$op->arg1]->copyFrom(
-                            $container->toObject()->generatorState->currentKey
-                        );
-                        break;
-                    }
-                    if (Variable::TYPE_OBJECT === $container->type) {
-                        if ($this->isWeakMapForeachSlot((int) $op->arg2)) {
-                            $frame->scope[$op->arg1]->copyFrom(
-                                $this->weakMapForeachIterator($op->arg2)->currentKey()
-                            );
-                            break;
-                        }
-                        $frame->scope[$op->arg1]->copyFrom(
-                            $this->objectForeachIterator($op->arg2)->currentKey()
-                        );
-                        break;
-                    }
-                    if (Variable::TYPE_ARRAY !== $container->type) {
-                        // Non-traversable: FE_RESET warned; no key fetch (#23452 / zend_vm_def.h).
-                        break;
-                    }
-                    $frame->scope[$op->arg1]->copyFrom($container->toArray()->iterCurrentKey());
                     break;
                 case OpCode::TYPE_ITER_VALUE:
-                    if ($this->isForeachInvalidSlot((int) $op->arg2)) {
-                        break;
+                    $iterValueOutcome = $this->executeIterValueDispatch($frame, $op);
+                    if ($iterValueOutcome instanceof Frame) {
+                        $frame = $iterValueOutcome;
+                        goto restart;
                     }
-                    $container = $this->resolveForeachContainer($frame, (int) $op->arg2);
-                    if ($this->isForeachObjectIteratorSlot((int) $op->arg2)) {
-                        if ((bool) $op->arg3) {
-                            // Zend FE_RESET_RW allow-list: array-backed SPL iterators (#19444).
-                            $iterObj = $container->toObject();
-                            if (VM\SplArraySupport::allowsForeachByRef($iterObj)) {
-                                $byRef = VM\SplArraySupport::foreachCurrentByRef($iterObj);
-                                if (null !== $byRef) {
-                                    $frame->scope[$op->arg1]->indirect($byRef);
-                                    $this->markScopeSlotInitialized($frame, (int) $op->arg1);
-                                    $this->context->foreachObjectAdvance[$op->arg2] = true;
-                                    break;
-                                }
-                            }
-                            if (VM\SplArraySupport::allowsRecursiveArrayIteratorForeachByRef($iterObj)) {
-                                $byRef = VM\SplArraySupport::recursiveArrayIteratorForeachCurrentByRef($iterObj);
-                                if (null !== $byRef) {
-                                    $frame->scope[$op->arg1]->indirect($byRef);
-                                    $this->markScopeSlotInitialized($frame, (int) $op->arg1);
-                                    $this->context->foreachObjectAdvance[$op->arg2] = true;
-                                    break;
-                                }
-                            }
-                            $catchFrame = $this->dispatchVmError(
-                                'An iterator cannot be used with foreach by reference',
-                                $frame
-                            );
-                            if (null !== $catchFrame) {
-                                $frame = $catchFrame;
-                                goto restart;
-                            }
-                            break;
-                        }
-                        $value = $this->invokeForeachInstanceMethod($frame, $container, 'current');
-                        $frame->scope[$op->arg1]->copyFrom($value);
-                        $this->context->foreachObjectAdvance[$op->arg2] = true;
-                        break;
-                    }
-                    if ($this->variableIsGenerator($container)) {
-                        if ((bool) $op->arg3) {
-                            $genState = $container->toObject()->generatorState;
-                            if (!$genState->yieldsByReference()) {
-                                $catchFrame = $this->dispatchVmEngineException(
-                                    \PHPCompiler\JIT\GeneratorHelper::FOREACH_GENERATOR_BYREF_ERROR,
-                                    $frame
-                                );
-                                if (null !== $catchFrame) {
-                                    $frame = $catchFrame;
-                                    goto restart;
-                                }
-                                break;
-                            }
-                            $frame->scope[$op->arg1]->indirectAsPhpReference(
-                                $genState->currentValue->byRefTarget()
-                            );
-                            $this->markScopeSlotInitialized($frame, (int) $op->arg1);
-                            break;
-                        }
-                        $frame->scope[$op->arg1]->copyFrom(
-                            $container->toObject()->generatorState->currentValue
-                        );
-                        break;
-                    }
-                    if (Variable::TYPE_OBJECT === $container->type) {
-                        $byRef = (bool) $op->arg3;
-                        if ($this->isWeakMapForeachSlot((int) $op->arg2)) {
-                            $iter = $this->weakMapForeachIterator($op->arg2);
-                            if ($byRef) {
-                                $frame->scope[$op->arg1]->indirectAsPhpReference($iter->currentValue(true));
-                                $this->markScopeSlotInitialized($frame, (int) $op->arg1);
-                            } else {
-                                $frame->scope[$op->arg1]->assignForeachByValue($iter->currentValue(false));
-                            }
-                            break;
-                        }
-                        if ($byRef) {
-                            try {
-                                $frame->scope[$op->arg1]->indirectAsPhpReference(
-                                    $this->objectForeachIterator($op->arg2)->currentValue(true)
-                                );
-                            } catch (VM\PropertyHookRefWriteSignal $signal) {
-                                $frame = $signal->catchFrame;
-                                goto restart;
-                            }
-                            $this->markScopeSlotInitialized($frame, (int) $op->arg1);
-                        } else {
-                            try {
-                                $frame->scope[$op->arg1]->assignForeachByValue(
-                                    $this->objectForeachIterator($op->arg2)->currentValue(false)
-                                );
-                            } catch (VM\PropertyHookRefWriteSignal $signal) {
-                                $frame = $signal->catchFrame;
-                                goto restart;
-                            }
-                        }
-                        break;
-                    }
-                    if (Variable::TYPE_ARRAY !== $container->type) {
-                        // Non-traversable: FE_RESET warned; no value fetch (#23452 / zend_vm_def.h).
-                        break;
-                    }
-                    $byRef = (bool) $op->arg3;
-                    if ($byRef) {
-                        $this->rebindArrayForeachToLiveContainer($frame, (int) $op->arg2);
-                        $container = $this->resolveForeachContainer($frame, (int) $op->arg2);
-                        $frame->scope[$op->arg1]->indirectAsPhpReference(
-                            $container->toArray()->iterCurrentValue(true)
-                        );
-                        $this->markScopeSlotInitialized($frame, (int) $op->arg1);
-                    } else {
-                        $frame->scope[$op->arg1]->assignForeachByValue(
-                            $container->toArray()->iterCurrentValue(false)
-                        );
+                    if (is_int($iterValueOutcome)) {
+                        return $iterValueOutcome;
                     }
                     break;
                 case OpCode::TYPE_TRY:
