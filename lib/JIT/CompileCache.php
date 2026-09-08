@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT;
 require_once __DIR__.'/CompileCacheSemanticHash.php';
 require_once __DIR__.'/CompileCachePartialEmitDemote.php';
 require_once __DIR__.'/CompileCacheArtifactPersist.php';
+require_once __DIR__.'/CompileCacheEditScaffoldPlan.php';
 require_once __DIR__.'/CompileCacheEditScaffold.php';
 require_once __DIR__.'/CompileCacheProjectIndex.php';
 require_once __DIR__.'/CompileCacheKeyLayout.php';
@@ -33,7 +34,8 @@ require_once __DIR__.'/CompileCacheKeyLayoutFacade.php';
  * (public hub delegates in {@see CompileCacheSemanticHashFacade});
  * partial-emit demote lives in {@see CompileCachePartialEmitDemote};
  * linked-binary / user-object mid-tier warm restore lives in {@see CompileCacheArtifactPersist};
- * edit-scaffold restore/plan + LLVM strip live in {@see CompileCacheEditScaffold} / {@see CompileCacheEditScaffoldStrip};
+ * edit-scaffold strip planning lives in {@see CompileCacheEditScaffoldPlan};
+ * edit-scaffold restore + LLVM strip live in {@see CompileCacheEditScaffold} / {@see CompileCacheEditScaffoldStrip};
  * multi-file project index / entry→members map lives in {@see CompileCacheProjectIndex}
  * (public hub delegates in {@see CompileCacheProjectIndexFacade});
  * cache-entry paths / freshness / fingerprint live in {@see CompileCacheKeyLayout};
@@ -49,6 +51,7 @@ final class CompileCache
 {
     use CompileCacheHubState;
     use CompileCacheKeyLayoutFacade;
+    use CompileCacheEditScaffoldPlan;
     use CompileCacheEditScaffold;
     use CompileCacheBitcodePersist;
     use CompileCacheRecording;
