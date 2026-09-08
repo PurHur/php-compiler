@@ -6354,6 +6354,8 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/Sha1Runtime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSha1.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/HashRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringHash.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/HashHmacRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringHashHmac.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrRepeat.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StrReplaceRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrReplace.php';
