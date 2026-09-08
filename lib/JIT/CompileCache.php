@@ -19,6 +19,7 @@ require_once __DIR__.'/CompileCacheEditSession.php';
 require_once __DIR__.'/CompileCacheProjectMembers.php';
 require_once __DIR__.'/CompileCacheArtifactFacade.php';
 require_once __DIR__.'/CompileCacheSemanticHashFacade.php';
+require_once __DIR__.'/CompileCacheProjectIndexFacade.php';
 
 /**
  * On-disk MCJIT bitcode cache (issue #153).
@@ -34,7 +35,8 @@ require_once __DIR__.'/CompileCacheSemanticHashFacade.php';
  * partial-emit demote lives in {@see CompileCachePartialEmitDemote};
  * linked-binary / user-object mid-tier warm restore lives in {@see CompileCacheArtifactPersist};
  * edit-scaffold restore/strip/rebind lives in {@see CompileCacheEditScaffold};
- * multi-file project index / entry→members map lives in {@see CompileCacheProjectIndex};
+ * multi-file project index / entry→members map lives in {@see CompileCacheProjectIndex}
+ * (public hub delegates in {@see CompileCacheProjectIndexFacade});
  * cache-entry paths / freshness / fingerprint live in {@see CompileCacheKeyLayout};
  * MCJIT bitcode restore/persist lives in {@see CompileCacheBitcodePersist};
  * cold-emit recording / symbol membership maps live in {@see CompileCacheRecording};
@@ -52,6 +54,7 @@ final class CompileCache
     use CompileCacheProjectMembers;
     use CompileCacheArtifactFacade;
     use CompileCacheSemanticHashFacade;
+    use CompileCacheProjectIndexFacade;
     /** @var list<array{llvm: string, signature: string, scoped: string}>|null */
     private static ?array $recordingExports = null;
 
@@ -238,89 +241,6 @@ final class CompileCache
     public static function hasDurableMarker(string $key): bool
     {
         return CompileCacheKeyLayout::hasDurableMarker($key);
-    }
-    /**
-     * Project identity = sorted member realpaths (content-independent) (#36387).
-     *
-     * @param list<string> $memberPaths
-     *
-     * @see CompileCacheProjectIndex::projectId()
-     */
-    public static function projectId(array $memberPaths): string
-    {
-        return CompileCacheProjectIndex::projectId($memberPaths);
-    }
-
-    /**
-     * @param list<string> $memberPaths
-     *
-     * @return array<string, string> path → sha256 of file bytes
-     *
-     * @see CompileCacheProjectIndex::memberHashes()
-     */
-    public static function memberHashes(array $memberPaths): array
-    {
-        return CompileCacheProjectIndex::memberHashes($memberPaths);
-    }
-
-    /** @see CompileCacheProjectIndex::projectIndexPath() */
-    public static function projectIndexPath(string $projectId): string
-    {
-        return CompileCacheProjectIndex::projectIndexPath($projectId);
-    }
-
-    /**
-     * Entry → member-path list so warm/edit boots skip Runtime include discovery (#36387).
-     *
-     * @see CompileCacheProjectIndex::entryMembersPath()
-     */
-    public static function entryMembersPath(string $entryPath): string
-    {
-        return CompileCacheProjectIndex::entryMembersPath($entryPath);
-    }
-
-    /**
-     * @param list<string> $memberPaths
-     *
-     * @see CompileCacheProjectIndex::rememberEntryMembers()
-     */
-    public static function rememberEntryMembers(string $entryPath, array $memberPaths): void
-    {
-        CompileCacheProjectIndex::rememberEntryMembers($entryPath, $memberPaths);
-    }
-
-    /**
-     * Prior member list for this entry when the entry bytes are unchanged (#36387).
-     *
-     * @return list<string>|null
-     *
-     * @see CompileCacheProjectIndex::lookupEntryMembers()
-     */
-    public static function lookupEntryMembers(string $entryPath): ?array
-    {
-        return CompileCacheProjectIndex::lookupEntryMembers($entryPath);
-    }
-
-    /**
-     * @param array<string, string> $memberHashes
-     *
-     * @see CompileCacheProjectIndex::rememberProject()
-     */
-    public static function rememberProject(string $projectId, string $key, array $memberHashes): void
-    {
-        CompileCacheProjectIndex::rememberProject($projectId, $key, $memberHashes);
-    }
-
-    /**
-     * Prior cache key for this project when at least one member changed (#36387).
-     *
-     * @param array<string, string> $memberHashes
-     *
-     * @see CompileCacheProjectIndex::findEditScaffoldKey()
-     */
-    public static function findEditScaffoldKey(string $projectId, array $memberHashes): ?string
-    {
-        return CompileCacheProjectIndex::findEditScaffoldKey($projectId, $memberHashes);
     }
 
 }
