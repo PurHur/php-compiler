@@ -53,6 +53,7 @@ require_once __DIR__.'/VM/Concern/ScalarCastCompareArithConcatDispatch.php';
 require_once __DIR__.'/VM/Concern/ClassConstFetchDispatch.php';
 require_once __DIR__.'/VM/Concern/IssetDispatch.php';
 require_once __DIR__.'/VM/Concern/IncludeDispatch.php';
+require_once __DIR__.'/VM/Concern/FuncCallInitDispatch.php';
 
 use PHPCompiler\BuiltinByRefParams;
 use PHPCompiler\Compiler\AttributeNames;
@@ -145,6 +146,7 @@ class VM {
     use ClassConstFetchDispatch;
     use IssetDispatch;
     use IncludeDispatch;
+    use FuncCallInitDispatch;
     const SUCCESS = 1;
     const FAILURE = 2;
 
@@ -1516,147 +1518,14 @@ restart:
                     $this->context->declareFunction($func);
                     break;
                 case OpCode::TYPE_FUNCCALL_INIT:
-                    $callee = $frame->scope[$op->arg1]->resolveIndirect();
-                    if (Variable::TYPE_NULL === $callee->type) {
-                        $catchFrame = $this->dispatchVmError(
-                            'Value of type null is not callable',
-                            $frame
-                        );
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-
-                        return self::EXCEPTION;
+                    $funcCallInitOutcome = $this->executeFuncCallInitDispatch($frame, $op);
+                    if ($funcCallInitOutcome instanceof Frame) {
+                        $frame = $funcCallInitOutcome;
+                        goto restart;
                     }
-                    if (Variable::TYPE_INTEGER === $callee->type
-                        || Variable::TYPE_FLOAT === $callee->type
-                        || Variable::TYPE_BOOLEAN === $callee->type) {
-                        $catchFrame = $this->dispatchVmError(
-                            VM\CallableCheck::scalarNotCallableMessage($callee),
-                            $frame
-                        );
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-
-                        return self::EXCEPTION;
+                    if (is_int($funcCallInitOutcome)) {
+                        return $funcCallInitOutcome;
                     }
-                    if (Variable::TYPE_OBJECT === $callee->type) {
-                        $closureState = $callee->toObject()->closureState;
-                        if (null !== $closureState) {
-                            $this->initClosureCall($frame, $closureState);
-                            $frame->closureCallableSlot = $op->arg1;
-                            break;
-                        }
-                        if (!$this->hasInstanceMethod($callee->toObject()->class, '__invoke')) {
-                            $catchFrame = $this->dispatchVmError(
-                                VM\CallableCheck::objectNotCallableMessage($callee),
-                                $frame
-                            );
-                            if (null !== $catchFrame) {
-                                $frame = $catchFrame;
-                                goto restart;
-                            }
-
-                            return self::EXCEPTION;
-                        }
-                        $catchFrame = $this->initMethodCall($frame, $callee, '__invoke', true);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                        break;
-                    }
-                    if (Variable::TYPE_ENUM_CASE === $callee->type) {
-                        $receiver = VM\EnumCaseSupport::receiverForInstanceMethod($callee);
-                        if (!$this->hasInstanceMethod($receiver->toObject()->class, '__invoke')) {
-                            $catchFrame = $this->dispatchVmError(
-                                VM\CallableCheck::objectNotCallableMessage($callee),
-                                $frame
-                            );
-                            if (null !== $catchFrame) {
-                                $frame = $catchFrame;
-                                goto restart;
-                            }
-
-                            return self::EXCEPTION;
-                        }
-                        $catchFrame = $this->initMethodCall($frame, $receiver, '__invoke', true);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                        break;
-                    }
-                    if (Variable::TYPE_ARRAY === $callee->type) {
-                        $catchFrame = $this->initArrayCallable($frame, $callee);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                        break;
-                    }
-                    $name = $callee->toString();
-                    if (str_contains($name, '::')) {
-                        try {
-                            // Dynamic "$c()" / array callables do not resolve parent/self/static
-                            // as scope keywords — Zend Errors with Class "parent" not found (#25625).
-                            $this->initStaticCallable($frame, $name, false, false, false, true);
-                        } catch (\Error $e) {
-                            $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
-                            if (null !== $catchFrame) {
-                                $frame = $catchFrame;
-                                goto restart;
-                            }
-                            return self::EXCEPTION;
-                        } catch (\LogicException $e) {
-                            $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
-                            if (null !== $catchFrame) {
-                                $frame = $catchFrame;
-                                goto restart;
-                            }
-                            return self::EXCEPTION;
-                        }
-                        break;
-                    }
-                    $lcname = $this->context->resolveFunctionCallLc($name);
-                    if (null === $lcname) {
-                        // Zend preserves source spelling (FCC / $fn(), zend_execute_API.c) (#26690).
-                        $catchFrame = $this->dispatchVmError(
-                            'Call to undefined function '.$name.'()',
-                            $frame
-                        );
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-
-                        return self::EXCEPTION;
-                    }
-                    // ZEND_ACC_FORBIDDEN_WHEN_DYNAMIC — variable/$fn() calls only (#23591).
-                    if (
-                        $op->funcCallDynamic
-                        && VM\VariableFunctionCall::isForbiddenWhenDynamic($lcname)
-                    ) {
-                        $catchFrame = $this->dispatchVmError(
-                            VM\VariableFunctionCall::forbiddenWhenDynamicMessage($lcname),
-                            $frame
-                        );
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-
-                        return self::EXCEPTION;
-                    }
-                    $this->savePendingOutboundCallForInlineNew($frame);
-                    $frame->call = $this->context->functions[$lcname];
-                    $frame->callArgs = [];
-                    $frame->callArgEntries = [];
-                    // Drop leftover Class::__construct from a prior `new` (#10009).
-                    $frame->builtinCalleeQualifiedMethod = null;
                     break;
                 case OpCode::TYPE_METHODCALL_INIT:
                     $catchFrame = $this->guardUnboundThisRead($frame, (int) $op->arg1);
