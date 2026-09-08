@@ -8208,6 +8208,7 @@
         "lib/VM/Concern/PropertyFetchDestAndHookedDimWrite.php",
         "lib/VM/Concern/PropertyHookFrameAndStaticLink.php",
         "lib/VM/Concern/ReturnTypeEnforce.php",
+        "lib/VM/Concern/StaticPropertyFetchDispatch.php",
         "lib/VM/Concern/TryCatchFinallyAndUncaughtDispatch.php",
         "lib/VM/Concern/TypedIntRecursiveAndCountedLoopFastPath.php",
         "lib/VM/Concern/UserInvokeArrayAccessAndClosureCall.php",
@@ -8696,9 +8697,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8462,
+        "inventory_files": 8463,
         "excluded": 0,
-        "eligible": 8462,
+        "eligible": 8463,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
