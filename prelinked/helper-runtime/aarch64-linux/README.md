@@ -11,9 +11,9 @@ non-native link.
 `script/check-helper-runtime-prelink.php --all-arches` asserts every committed `unit.o`
 (and `common.o` when present) has ELF `e_machine=183` (EM_AARCH64).
 
-## Seed corpus (VM_* + lib_VM_* + ext/standard tiers)
+## Seed corpus (VM_* + lib_VM_* + ext/standard + ctype/calendar/posix)
 
-**252** committed `unit.o` files:
+**262** committed `unit.o` files:
 
 - full `VM_*` (13) and `lib_VM_*` (9) sets from `x86_64-linux`
 - first `ext/standard` tier (10): ArrayChunk / ArrayIsList / ArraySlice / Bin2hex /
@@ -83,6 +83,9 @@ non-native link.
   RequestParseBody / RequestParseBodyNative / ScopeBuiltin / UploadTemp /
   NetworkServicesNameLookupThinAot
   (skipped this tier: Progress NestedJIT ContextLlvmConstantsAndRegistry seal)
+- first non-standard: ctype + calendar + posix getters (10):
+  Ctype / CalDaysInMonth / EasterDays / Gregoriantojd / Jdtogregorian /
+  Jdtounix / Unixtojd / PosixGetpid / PosixGetuid / PosixStrerror
 
 Refresh / expand via:
 
