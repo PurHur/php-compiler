@@ -139,8 +139,9 @@ final class JitPow
      * {@code 2} → {@code base * base}, {@code 3} → {@code base^3},
      * {@code 4} → {@code (base*base)^2}, {@code 5} → {@code base^3 * base^2},
      * {@code 6} → {@code (base^3)^2}, {@code 7} → {@code (base^3)^2 * base},
-     * {@code 8} → {@code ((base*base)^2)^2}, and {@code 9} →
-     * {@code ((base^3)^2)*(base^3)}
+     * {@code 8} → {@code ((base*base)^2)^2}, {@code 9} →
+     * {@code ((base^3)^2)*(base^3)}, {@code 10} → {@code (base^5)^2},
+     * {@code 11} → {@code (base^5)^2 * base}
      * with chained smul overflow→float omit {@code llvm.pow.f64}
      * (#36386; php-src {@code pow_function} / {@code zend_pow} /
      * {@code mul_function}).
@@ -862,6 +863,156 @@ final class JitPow
                 OpCode::TYPE_MUL,
                 $fifthLong,
                 $fifthLong,
+                $slotPtr
+            );
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($doneBlock);
+
+            return;
+        }
+        if ('eleventh' === $expFold) {
+            // n^11 = (((n*n*n)*(n*n))*((n*n*n)*(n*n)))*n: sq=n*n, cu=sq*n,
+            // fifth=cu*sq, tenth=fifth*fifth, then tenth*n. Overflow arms
+            // finish in float (sqF^5*nF, (cuF*sqF)^2*nF, fifthF^2*nF,
+            // tenthF*nF).
+            $baseL = JitLongArg::lower($context, $base, 'pow() base');
+            $i64 = $context->getTypeFromString('int64');
+            $f64 = $context->getTypeFromString('double');
+            $n = $context->builder->intCast($baseL, $i64);
+            $sqVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $n,
+                $n
+            );
+            $ov1 = $sqVar->longArithOverflowFlag;
+            if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **11 expected smul overflow metadata (sq)');
+            }
+            $sqLong = JITVariable::KIND_VARIABLE === $sqVar->kind
+                ? $context->builder->load($sqVar->value)
+                : $sqVar->value;
+            $ov1Block = BasicBlockHelper::append($context, 'pow_eleventh_sq_ov');
+            $ok1Block = BasicBlockHelper::append($context, 'pow_eleventh_sq_ok');
+            $doneBlock = BasicBlockHelper::append($context, 'pow_eleventh_done');
+            $context->builder->branchIf($ov1, $ov1Block, $ok1Block);
+
+            $context->builder->positionAtEnd($ov1Block);
+            $sqF = $context->builder->load($sqVar->longArithOverflowDoubleSlot);
+            $nF = $context->builder->siToFp($n, $f64);
+            $sq2F = $context->builder->fmul($sqF, $sqF);
+            $sq4F = $context->builder->fmul($sq2F, $sq2F);
+            $sq5F = $context->builder->fmul($sq4F, $sqF);
+            $eleventhF = $context->builder->fmul($sq5F, $nF);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eleventhF
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok1Block);
+            $cuVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $sqLong,
+                $n
+            );
+            $ov2 = $cuVar->longArithOverflowFlag;
+            if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **11 expected smul overflow metadata (cu)');
+            }
+            $cuLong = JITVariable::KIND_VARIABLE === $cuVar->kind
+                ? $context->builder->load($cuVar->value)
+                : $cuVar->value;
+            $ov2Block = BasicBlockHelper::append($context, 'pow_eleventh_cu_ov');
+            $ok2Block = BasicBlockHelper::append($context, 'pow_eleventh_cu_ok');
+            $context->builder->branchIf($ov2, $ov2Block, $ok2Block);
+
+            $context->builder->positionAtEnd($ov2Block);
+            $cuF = $context->builder->load($cuVar->longArithOverflowDoubleSlot);
+            $sqF2 = $context->builder->siToFp($sqLong, $f64);
+            $nF2 = $context->builder->siToFp($n, $f64);
+            $fifthF = $context->builder->fmul($cuF, $sqF2);
+            $tenthF = $context->builder->fmul($fifthF, $fifthF);
+            $eleventhF2 = $context->builder->fmul($tenthF, $nF2);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eleventhF2
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok2Block);
+            $fifthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $cuLong,
+                $sqLong
+            );
+            $ov3 = $fifthVar->longArithOverflowFlag;
+            if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **11 expected smul overflow metadata (fifth)');
+            }
+            $fifthLong = JITVariable::KIND_VARIABLE === $fifthVar->kind
+                ? $context->builder->load($fifthVar->value)
+                : $fifthVar->value;
+            $ov3Block = BasicBlockHelper::append($context, 'pow_eleventh_fifth_ov');
+            $ok3Block = BasicBlockHelper::append($context, 'pow_eleventh_fifth_ok');
+            $context->builder->branchIf($ov3, $ov3Block, $ok3Block);
+
+            $context->builder->positionAtEnd($ov3Block);
+            $fifthF2 = $context->builder->load($fifthVar->longArithOverflowDoubleSlot);
+            $nF3 = $context->builder->siToFp($n, $f64);
+            $tenthF2 = $context->builder->fmul($fifthF2, $fifthF2);
+            $eleventhF3 = $context->builder->fmul($tenthF2, $nF3);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eleventhF3
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok3Block);
+            $tenthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $fifthLong,
+                $fifthLong
+            );
+            $ov4 = $tenthVar->longArithOverflowFlag;
+            if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **11 expected smul overflow metadata (tenth)');
+            }
+            $tenthLong = JITVariable::KIND_VARIABLE === $tenthVar->kind
+                ? $context->builder->load($tenthVar->value)
+                : $tenthVar->value;
+            $ov4Block = BasicBlockHelper::append($context, 'pow_eleventh_tenth_ov');
+            $ok4Block = BasicBlockHelper::append($context, 'pow_eleventh_tenth_ok');
+            $context->builder->branchIf($ov4, $ov4Block, $ok4Block);
+
+            $context->builder->positionAtEnd($ov4Block);
+            $tenthF3 = $context->builder->load($tenthVar->longArithOverflowDoubleSlot);
+            $nF4 = $context->builder->siToFp($n, $f64);
+            $eleventhF4 = $context->builder->fmul($tenthF3, $nF4);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eleventhF4
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok4Block);
+            JitLongArithOverflow::writeBoxedBinary(
+                $context,
+                OpCode::TYPE_MUL,
+                $tenthLong,
+                $n,
                 $slotPtr
             );
             $context->builder->branch($doneBlock);
