@@ -179,9 +179,9 @@
             "note": "TYPE_CLASS_CONST_FETCH runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/Context.php": {
-            "budget": 912,
+            "budget": 914,
             "target": 3500,
-            "note": "ArrayIteratorAndObject + NestedJitKernelRegistry + ReflectionMembers + FiberGeneratorAndClosure + ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml proxies wiring + ScopeLifecycle peers (#36387/#36199); continue toward \u22643.5k + ModuleOptimizationPasses (#36387)"
+            "note": "ExternalMethodStubReport + ArrayIteratorAndObject + NestedJitKernelRegistry + ReflectionMembers + FiberGeneratorAndClosure + ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml proxies wiring + ScopeLifecycle peers (#36387/#36199); continue toward \u22643.5k + ModuleOptimizationPasses (#36387)"
         },
         "lib/JIT/ContextEditScaffoldModuleRebind.php": {
             "budget": 315,
@@ -229,9 +229,9 @@
             "note": "Operand\u2192Variable binding extracted from Context; freeDead/CONST_FETCH in ContextFreeDeadAndConstantFetch (#36387)"
         },
         "lib/JIT/ContextFunctionProxyAndNestedJitKernel.php": {
-            "budget": 433,
-            "target": 500,
-            "note": "Function-proxy resolve + external-stub registry; NestedJIT/SPINE_CHUNK whitelist in NestedJitKernelRegistry (#36387)"
+            "budget": 324,
+            "target": 350,
+            "note": "Function-proxy resolve + registerModule; NestedJIT whitelist in NestedJitKernelRegistry; stub report in ExternalMethodStubReport (#36387)"
         },
         "lib/JIT/ContextFunctionProxyNestedJitKernelRegistry.php": {
             "budget": 297,
@@ -382,6 +382,11 @@
             "budget": 122,
             "target": 200,
             "note": "TYPE_LIST_UNPACK_CHECK/LIST_SPREAD_ASSIGN runFramesInner body extracted from VM.php (#36403)"
+        },
+        "lib/JIT/ContextFunctionProxyExternalMethodStubReport.php": {
+            "budget": 137,
+            "target": 200,
+            "note": "recordExternalMethodStub/reportExternalMethodStubs/exportChunkMethodManifest extracted from NestedJitKernel (#36387)"
         }
     },
     "script_file_count": {

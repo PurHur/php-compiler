@@ -12,8 +12,8 @@ use PHPCompiler\Module;
  *
  * Extracted from {@see ContextFunctionProxyAndNestedJitKernel} so the pre-registerModule
  * NestedJIT kernel match-list and SPINE_CHUNK Runtime-internal whitelist stay a separate TU
- * from function-proxy resolve / external-stub reporting (split-TU / size-budget ratchet toward
- * ContextFunctionProxyAndNestedJitKernel ≤ 500 lines, #36199 / #36403).
+ * from function-proxy resolve (stub report: {@see ContextFunctionProxyExternalMethodStubReport}; split-TU / size-budget ratchet toward
+ * ContextFunctionProxyAndNestedJitKernel ≤ 350 lines, #36199 / #36403).
  *
  * Used via {@code use ContextFunctionProxyNestedJitKernelRegistry;} on {@see Context}.
  * Invoked as private static helpers from {@see ContextFunctionProxyAndNestedJitKernel}.

@@ -45,6 +45,7 @@ require_once __DIR__.'/ContextCompileToFile.php';
 require_once __DIR__.'/ContextVariableOperandBinding.php';
 require_once __DIR__.'/ContextFreeDeadAndConstantFetch.php';
 require_once __DIR__.'/ContextFunctionProxyNestedJitKernelRegistry.php';
+require_once __DIR__.'/ContextFunctionProxyExternalMethodStubReport.php';
 require_once __DIR__.'/ContextFunctionProxyAndNestedJitKernel.php';
 require_once __DIR__.'/ContextTypeAndStructMap.php';
 require_once __DIR__.'/ContextStandaloneBodies.php';
@@ -73,6 +74,7 @@ class Context {
     use ContextVariableOperandBinding;
     use ContextFreeDeadAndConstantFetch;
     use ContextFunctionProxyNestedJitKernelRegistry;
+    use ContextFunctionProxyExternalMethodStubReport;
     use ContextFunctionProxyAndNestedJitKernel;
     use ContextTypeAndStructMap;
     use ContextStandaloneBodies;
