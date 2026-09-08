@@ -72,4 +72,50 @@ final class PhpSrcPhptRunnerTest extends TestCase
         $this->assertStringContainsString('zero .phpt', (string) $stderr);
         $this->assertSame('', trim((string) $stdout));
     }
+
+    public function testBuildSummaryIncludesPassPct(): void
+    {
+        $summary = \php_src_phpt_build_summary([
+            'executed' => 4,
+            'pass' => 4,
+            'fail' => 0,
+            'skip' => 1,
+            'bork' => 0,
+            'backend' => 'vm',
+            'label' => 'corpus/sample',
+        ], []);
+        $this->assertSame(100.0, $summary['pass_pct']);
+        $this->assertSame(36381, $summary['issue']);
+        $this->assertSame([], $summary['top_failures']);
+    }
+
+    public function testJsonDiffEmitsMachineSummaryOnStdout(): void
+    {
+        $cmd = [
+            PHP_BINARY,
+            $this->repo . '/script/php-src/php-src-phpt.php',
+            '--corpus=sample',
+            '--backend=vm',
+            '--diff',
+            '--json',
+        ];
+        $descriptors = [1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+        $pipes = [];
+        $proc = proc_open($cmd, $descriptors, $pipes, $this->repo, [
+            'PHP_COMPILER_MEMORY_LIMIT' => '512M',
+        ]);
+        $this->assertIsResource($proc);
+        $stdout = (string) stream_get_contents($pipes[1]);
+        $stderr = (string) stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $rc = proc_close($proc);
+        $this->assertSame(0, $rc, $stderr);
+        $decoded = json_decode($stdout, true);
+        $this->assertIsArray($decoded, 'stdout must be JSON only; got: ' . substr($stdout, 0, 200));
+        $this->assertSame('ok', $decoded['diff'] ?? null);
+        $this->assertEqualsWithDelta(100.0, (float) ($decoded['pass_pct'] ?? 0), 0.01);
+        $this->assertSame(4, $decoded['pass'] ?? null);
+        $this->assertStringContainsString('DIFF OK', $stderr);
+    }
 }

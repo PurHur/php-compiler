@@ -120,7 +120,7 @@ test-docker-fast-jit-preflight: docker-build-22
 	JIT_PREFLIGHT_GATE=1 ./script/docker-ci-local.sh fast
 
 # VM smoke: examples/001-SimpleWeb with ?name=Test
-.PHONY: check web-smoke miniwebapp-gates miniwebapp-aot-bisect north-star1-verify north-star2-verify north-star3-verify north-star4-verify north-star5-verify north-star5-verify-fast dev-verify-fast aot-smoke-cross-emit seed-aarch64-helper-runtime runtime-assert-asan-smoke runtime-assert-valgrind-smoke runtime-assert-mutate-smoke runtime-assert-streak-status runtime-assert-streak-record runtime-assert-streak-check runtime-assert-differential-soak bootstrap-trust-preflight release-readiness bootstrap-gen0-staleness bootstrap-gen0-driver-functional-smoke bootstrap-gen0-refresh-argv-driver bootstrap-vendor-native-rebuild-audit spine-chunk-probe bootstrap-gen0-chunk-emit bootstrap-gen0-chunks apps-scoreboard php-src-phpt-sample fuzz-smoke fuzz-nightly
+.PHONY: check web-smoke miniwebapp-gates miniwebapp-aot-bisect north-star1-verify north-star2-verify north-star3-verify north-star4-verify north-star5-verify north-star5-verify-fast dev-verify-fast aot-smoke-cross-emit seed-aarch64-helper-runtime runtime-assert-asan-smoke runtime-assert-valgrind-smoke runtime-assert-mutate-smoke runtime-assert-streak-status runtime-assert-streak-record runtime-assert-streak-check runtime-assert-differential-soak bootstrap-trust-preflight release-readiness bootstrap-gen0-staleness bootstrap-gen0-driver-functional-smoke bootstrap-gen0-refresh-argv-driver bootstrap-vendor-native-rebuild-audit spine-chunk-probe bootstrap-gen0-chunk-emit bootstrap-gen0-chunks apps-scoreboard php-src-phpt-sample php-src-phpt-sample-aot fuzz-smoke fuzz-nightly
 web-smoke:
 	./script/web-smoke.sh
 
@@ -142,6 +142,9 @@ status-report:
 # php-src-shaped .phpt harness self-test (#36381) — sample corpus under VM + baseline diff
 php-src-phpt-sample:
 	./script/docker-exec.sh -- bash -lc 'source script/php-env.sh && script/php-src/php-src-phpt.sh --corpus=sample --backend=vm --diff --scoreboard'
+
+php-src-phpt-sample-aot:
+	./script/docker-exec.sh -- bash -lc 'source script/php-env.sh && script/php-src/php-src-phpt.sh --corpus=sample --backend=aot --diff'
 
 # MiniWebApp CI gate ladder status (issue #503; no full CI)
 miniwebapp-gates:

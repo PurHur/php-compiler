@@ -440,6 +440,7 @@ function php_src_phpt_parse_argv(array $argv): array
         'baseline_dir' => null,
         'limit' => 0,
         'scoreboard' => false,
+        'json' => false,
     ];
     foreach ($argv as $arg) {
         if (str_starts_with($arg, '--php-src=')) {
@@ -471,6 +472,8 @@ function php_src_phpt_parse_argv(array $argv): array
             $opts['mode'] = 'list';
         } elseif ('--scoreboard' === $arg) {
             $opts['scoreboard'] = true;
+        } elseif ('--json' === $arg) {
+            $opts['json'] = true;
         } elseif ('--help' === $arg || '-h' === $arg) {
             $opts['mode'] = 'help';
         }
@@ -494,11 +497,41 @@ Usage: script/php-src/php-src-phpt.sh [options]
   --diff                   compare current run to committed baselines
   --list                   print case names only
   --scoreboard             write docs/pages/php-src.html after a run
+  --json                   emit machine summary JSON on stdout (human log on stderr)
   --limit=N                stop after N cases (dev)
 
 Empty result sets fail hard (artifact honesty).
 
 USAGE);
+}
+
+/**
+ * Build the release-readiness / scoreboard summary payload (#36381).
+ *
+ * @param array<string, mixed> $base
+ * @param list<string>         $failAndBork
+ * @return array<string, mixed>
+ */
+function php_src_phpt_build_summary(array $base, array $failAndBork): array
+{
+    $executed = (int) ($base['executed'] ?? 0);
+    $pass = (int) ($base['pass'] ?? 0);
+    $base['pass_pct'] = $executed > 0 ? round(100.0 * $pass / $executed, 1) : 0.0;
+    $base['top_failures'] = array_slice($failAndBork, 0, 25);
+    $base['issue'] = 36381;
+
+    return $base;
+}
+
+/**
+ * @param array<string, mixed> $summary
+ */
+function php_src_phpt_emit_json(array $summary, bool $toStdout): void
+{
+    $json = json_encode($summary, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n";
+    if ($toStdout) {
+        echo $json;
+    }
 }
 
 /**
@@ -691,6 +724,9 @@ $baselineDir = $opts['baseline_dir'] ?: ($repoRoot . '/test/php-src/baselines');
 $baselineKey = preg_replace('/[^A-Za-z0-9._-]+/', '_', ($opts['corpus'] ?: $label) . '-' . $backend);
 
 $runner = new PhpSrcPhptRunner($repoRoot, $backend, (int) $opts['timeout']);
+$jsonOut = (bool) $opts['json'];
+// When --json, keep human progress on stderr so stdout is pure machine JSON (#36381).
+$humanOut = $jsonOut ? STDERR : STDOUT;
 
 $pass = [];
 $fail = [];
@@ -704,7 +740,7 @@ foreach ($selected as $name) {
         $phpt = $multiMap[$name] ?? null;
         if (null === $phpt || !is_file($phpt)) {
             $bork[] = $name;
-            fwrite(STDOUT, "BORK {$name} missing\n");
+            fwrite($humanOut, "BORK {$name} missing\n");
             continue;
         }
         $oneRoot = dirname($phpt);
@@ -720,19 +756,19 @@ foreach ($selected as $name) {
     $status = $result['status'];
     if ('skip' === $status) {
         $skip[] = $canon;
-        fwrite(STDOUT, "SKIP {$canon}\n");
+        fwrite($humanOut, "SKIP {$canon}\n");
         continue;
     }
     $executed[] = $canon;
     if ('pass' === $status) {
         $pass[] = $canon;
-        fwrite(STDOUT, "PASS {$canon}\n");
+        fwrite($humanOut, "PASS {$canon}\n");
     } elseif ('fail' === $status) {
         $fail[] = $canon;
-        fwrite(STDOUT, "FAIL {$canon}" . (null !== $result['detail'] ? ' — ' . $result['detail'] : '') . "\n");
+        fwrite($humanOut, "FAIL {$canon}" . (null !== $result['detail'] ? ' — ' . $result['detail'] : '') . "\n");
     } else {
         $bork[] = $canon;
-        fwrite(STDOUT, "BORK {$canon}" . (null !== $result['detail'] ? ' — ' . $result['detail'] : '') . "\n");
+        fwrite($humanOut, "BORK {$canon}" . (null !== $result['detail'] ? ' — ' . $result['detail'] : '') . "\n");
     }
 }
 
@@ -754,34 +790,37 @@ php_src_phpt_write_lines($outDir . '/failing', $failAndBork);
 php_src_phpt_write_lines($outDir . '/skipped', $skip);
 php_src_phpt_write_lines($outDir . '/passing', $pass);
 
-$summary = [
+$summary = php_src_phpt_build_summary([
     'generated_at' => gmdate('c'),
-    'issue' => 36381,
     'backend' => $backend,
     'label' => $label,
+    'corpus' => $opts['corpus'] ?: null,
     'executed' => count($executed),
     'pass' => count($pass),
     'fail' => count($fail),
     'skip' => count($skip),
     'bork' => count($bork),
-    'top_failures' => array_slice($failAndBork, 0, 25),
-];
+], $failAndBork);
 file_put_contents($outDir . '/summary.json', json_encode($summary, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
 
-echo sprintf(
-    "php-src-phpt: %s backend=%s executed=%d pass=%d fail=%d skip=%d bork=%d\n",
-    $label,
-    $backend,
-    count($executed),
-    count($pass),
-    count($fail),
-    count($skip),
-    count($bork)
+fwrite(
+    $humanOut,
+    sprintf(
+        "php-src-phpt: %s backend=%s executed=%d pass=%d (%.1f%%) fail=%d skip=%d bork=%d\n",
+        $label,
+        $backend,
+        count($executed),
+        count($pass),
+        (float) $summary['pass_pct'],
+        count($fail),
+        count($skip),
+        count($bork)
+    )
 );
 
 if ($opts['scoreboard']) {
     php_src_phpt_write_scoreboard($repoRoot, $summary);
-    echo "php-src-phpt: wrote docs/pages/php-src.html\n";
+    fwrite($humanOut, "php-src-phpt: wrote docs/pages/php-src.html\n");
 }
 
 if ('collect' === $opts['mode']) {
@@ -792,11 +831,15 @@ if ('collect' === $opts['mode']) {
     php_src_phpt_write_lines($baselineDir . '/' . $baselineKey . '.failing', $failAndBork);
     php_src_phpt_write_lines($baselineDir . '/' . $baselineKey . '.executed', $executed);
     php_src_phpt_write_lines($baselineDir . '/' . $baselineKey . '.skipped', $skip);
-    echo "php-src-phpt: collected baselines → {$baselineDir}/{$baselineKey}.*\n";
+    fwrite($humanOut, "php-src-phpt: collected baselines → {$baselineDir}/{$baselineKey}.*\n");
     // Collect with zero executed is still a failure (honesty).
     if (0 === count($executed) && 0 === count($skip)) {
         fwrite(STDERR, "php-src-phpt: collected empty executed+skipped — refusing\n");
         exit(2);
+    }
+    $summary['diff'] = 'collect';
+    if ($jsonOut) {
+        php_src_phpt_emit_json($summary, true);
     }
     exit(0);
 }
@@ -814,21 +857,34 @@ if ('diff' === $opts['mode']) {
     $oldFail = array_values(array_intersect($baseFail, $both));
     $regressed = array_values(array_diff($curFail, $oldFail));
     $fixed = array_values(array_diff($oldFail, $curFail));
-    echo 'REGRESSED (' . count($regressed) . "):\n";
+    fwrite($humanOut, 'REGRESSED (' . count($regressed) . "):\n");
     foreach ($regressed as $n) {
-        echo "  {$n}\n";
+        fwrite($humanOut, "  {$n}\n");
     }
-    echo 'FIXED (' . count($fixed) . "):\n";
+    fwrite($humanOut, 'FIXED (' . count($fixed) . "):\n");
     foreach ($fixed as $n) {
-        echo "  {$n}\n";
+        fwrite($humanOut, "  {$n}\n");
     }
+    $summary['diff'] = count($regressed) > 0 ? 'fail' : 'ok';
+    $summary['regressed'] = $regressed;
+    $summary['fixed'] = $fixed;
     if (count($regressed) > 0) {
         fwrite(STDERR, "php-src-phpt: DIFF FAIL — regressions present\n");
+        if ($jsonOut) {
+            php_src_phpt_emit_json($summary, true);
+        }
         exit(1);
     }
-    echo "php-src-phpt: DIFF OK — no regressions vs {$baselineKey}\n";
+    fwrite($humanOut, "php-src-phpt: DIFF OK — no regressions vs {$baselineKey}\n");
+    if ($jsonOut) {
+        php_src_phpt_emit_json($summary, true);
+    }
     exit(0);
 }
 
 // Plain run: exit non-zero on fail/bork (useful for tiny sample corpus).
+$summary['diff'] = 'n/a';
+if ($jsonOut) {
+    php_src_phpt_emit_json($summary, true);
+}
 exit((count($fail) + count($bork)) > 0 ? 1 : 0);

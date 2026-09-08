@@ -50,6 +50,15 @@ if (false !== $streakJson && '' !== $streakJson) {
     }
 }
 
+$phpSrcPhpt = null;
+$phpSrcJson = getenv('_RR_PHP_SRC_PHPT_JSON');
+if (false !== $phpSrcJson && '' !== $phpSrcJson) {
+    $decoded = json_decode($phpSrcJson, true);
+    if (is_array($decoded)) {
+        $phpSrcPhpt = $decoded;
+    }
+}
+
 $payload = [
     'user_release_ready' => getenv('_RR_READY') ?: 'no',
     'mode' => getenv('_RR_MODE') ?: 'quick',
@@ -62,6 +71,10 @@ if (null !== $honestCompile) {
 }
 if (null !== $gen0Provenance) {
     $payload['gen0_provenance'] = $gen0Provenance;
+}
+if (null !== $phpSrcPhpt) {
+    // Release criterion surface for #36381 — pass_pct from sample VM --diff.
+    $payload['php_src_phpt'] = $phpSrcPhpt;
 }
 
 echo json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT), "\n";
