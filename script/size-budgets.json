@@ -181,7 +181,7 @@
         "lib/JIT/Context.php": {
             "budget": 890,
             "target": 3500,
-            "note": "DateAndXml proxies wiring + ScopeLifecycle/LlvmConstants/FreeDead/ScriptGlobals peers (#36387/#36199); continue toward \u22643.5k"
+            "note": "ReflectionAndException + DateAndXml proxies wiring + ScopeLifecycle/LlvmConstants/FreeDead/ScriptGlobals peers (#36387/#36199); continue toward ≤3.5k"
         },
         "lib/JIT/ContextEditScaffoldModuleRebind.php": {
             "budget": 315,
@@ -274,9 +274,14 @@
             "note": "TYPE_ECHO/PRINT/EVAL runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/ContextDefineBuiltinFunctionProxies.php": {
-            "budget": 695,
-            "target": 700,
-            "note": "SPL/Reflection/Exception thin-AOT functionProxies; DateTime/PDO/XML in ContextDefineBuiltinFunctionProxiesDateAndXml (#36387)"
+            "budget": 403,
+            "target": 450,
+            "note": "SPL iterator/SplFile* thin-AOT functionProxies; Reflection/Exception in ContextDefineBuiltinFunctionProxiesReflectionAndException; DateTime/PDO/XML in DateAndXml (#36387)"
+        },
+        "lib/JIT/ContextDefineBuiltinFunctionProxiesReflectionAndException.php": {
+            "budget": 324,
+            "target": 400,
+            "note": "Reflection* / Exception / Throwable / Error thin-AOT proxies extracted from FunctionProxies (#36387)"
         },
         "lib/JIT/ContextDefineBuiltinFunctionProxiesDateAndXml.php": {
             "budget": 203,
