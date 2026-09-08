@@ -9,7 +9,7 @@ namespace PHPCompiler\JIT;
  *
  * Extracted from the hub so recording maps, edit-scaffold strip state, and partial-emit
  * base-object handoff stay a separate TU (split-TU / size-budget ratchet) while
- * {@see CompileCacheRecording}, {@see CompileCacheEditSession}, and {@see CompileCacheEditScaffold}
+ * {@see CompileCacheRecording}, {@see CompileCacheEditSession}, and {@see CompileCacheEditScaffold} / {@see CompileCacheEditScaffoldRestore}
  * keep their accessors. Distinct from KeyLayout / ProjectIndex public facades and from
  * ArtifactFacade / SemanticHashFacade.
  *
