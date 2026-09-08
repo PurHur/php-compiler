@@ -26,7 +26,7 @@ Bench history page: [`pages/bench.html`](pages/bench.html). Do not quote a ratio
 
 ## Internals
 
-[`architecture-review-2026-07.md`](architecture-review-2026-07.md) · [`self-host-target.md`](self-host-target.md) · [`bootstrap-m5-fast-path.md`](bootstrap-m5-fast-path.md) · ADRs under [`adr/`](adr/). Spine coverage **8476** / **8476**.
+[`architecture-review-2026-07.md`](architecture-review-2026-07.md) · [`self-host-target.md`](self-host-target.md) · [`bootstrap-m5-fast-path.md`](bootstrap-m5-fast-path.md) · ADRs under [`adr/`](adr/). Spine coverage **8478** / **8478**.
 
 ## Contributing for agents
 

@@ -14,9 +14,9 @@
             "note": "Concern trait splits (#36387/#36403); DateTimeMutationAndUnserializeMeta + TernaryPhiReturnMerge + peers; CfgParamReturnTypeAndCalleeByRef + OpCodeArgSlotAndAssignRhs (#36387)"
         },
         "lib/VM.php": {
-            "budget": 3887,
+            "budget": 3690,
             "target": 15000,
-            "note": "ClassConstFetchDispatch + ScalarCastCompareArithConcatDispatch + ArgRecvDispatch + FuncCallExecDispatch + AssignDispatch + UnsetDispatch + StaticPropertyFetchDispatch + ArrayDimFetchDispatch + ObjectPropertyFetchDispatch + ConstructMarkAndPendingOutboundCall + PropertyHookFrameAndStaticLink + IteratorToArrayConvert + IncludePathAndClassPseudoConst + ClassScopeAndStaticPropertyResolve + ClosureBindAndFunctionStatic + InternalHandlerExecuteAndAssignCopy + OutgoingCallArgResolve + ClassConstAndPropertyDefaultMaterialize + InheritanceFinalVarianceAndConstFetch + MethodCallAndStaticCallableInit + VirtualPropertyHookEnforce + ReturnTypeEnforce + DeprecationNoticeEmit + FrameActivationThisAndIncludeScope + FiberStartResumeAndThrow + GeneratorForeachAndYieldFrom + FrameObjectRefAndDeadTempRelease + UserInvokeArrayAccessAndClosureCall + BuiltinHostExceptionDispatch + ClassInheritDefineAndConstDeclare + TryCatchFinallyAndUncaughtDispatch + ExecuteIncDecAndScopeOperandRead + TypedIntRecursiveAndCountedLoopFastPath + PropertyFetchDestAndHookedDimWrite + ObjectPropertyMagicAndClone + ClassTraitComposition + ObjectPropertyReadonlyAndVisibility + Hooks + CollectAndSerialize + IssetEmptyUnset Concern extracts (#36403); under 15k target"
+            "note": "IssetDispatch + ClassConstFetchDispatch + ScalarCastCompareArithConcatDispatch + ArgRecvDispatch + FuncCallExecDispatch + AssignDispatch + UnsetDispatch + StaticPropertyFetchDispatch + ArrayDimFetchDispatch + ObjectPropertyFetchDispatch + ConstructMarkAndPendingOutboundCall + PropertyHookFrameAndStaticLink + IteratorToArrayConvert + IncludePathAndClassPseudoConst + ClassScopeAndStaticPropertyResolve + ClosureBindAndFunctionStatic + InternalHandlerExecuteAndAssignCopy + OutgoingCallArgResolve + ClassConstAndPropertyDefaultMaterialize + InheritanceFinalVarianceAndConstFetch + MethodCallAndStaticCallableInit + VirtualPropertyHookEnforce + ReturnTypeEnforce + DeprecationNoticeEmit + FrameActivationThisAndIncludeScope + FiberStartResumeAndThrow + GeneratorForeachAndYieldFrom + FrameObjectRefAndDeadTempRelease + UserInvokeArrayAccessAndClosureCall + BuiltinHostExceptionDispatch + ClassInheritDefineAndConstDeclare + TryCatchFinallyAndUncaughtDispatch + ExecuteIncDecAndScopeOperandRead + TypedIntRecursiveAndCountedLoopFastPath + PropertyFetchDestAndHookedDimWrite + ObjectPropertyMagicAndClone + ClassTraitComposition + ObjectPropertyReadonlyAndVisibility + Hooks + CollectAndSerialize + IssetEmptyUnset Concern extracts (#36403); under 15k target"
         },
         "script/apply-patches.sh": {
             "budget": 7637,
@@ -187,6 +187,11 @@
             "budget": 315,
             "target": 400,
             "note": "Thin-boot bind + core-type seed + init/shutdown/function-scope/intrinsic rebind after bitcode replace (#36387/#36199)"
+        },
+        "lib/VM/Concern/IssetDispatch.php": {
+            "budget": 227,
+            "target": 400,
+            "note": "TYPE_ISSET runFramesInner body extracted from VM.php (#36403)"
         }
     },
     "script_file_count": {
