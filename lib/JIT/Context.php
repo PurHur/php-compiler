@@ -52,6 +52,7 @@ require_once __DIR__.'/ContextFunctionProxyAndNestedJitKernel.php';
 require_once __DIR__.'/ContextTypeAndStructMap.php';
 require_once __DIR__.'/ContextStandaloneBodies.php';
 require_once __DIR__.'/ContextModuleCompileAndOptimize.php';
+require_once __DIR__.'/ContextModuleVerify.php';
 require_once __DIR__.'/ContextModuleOptimizationPasses.php';
 require_once __DIR__.'/ContextScriptGlobalsAndIncludeTracking.php';
 require_once __DIR__.'/ContextLlvmConstantsAndRegistry.php';
@@ -83,6 +84,7 @@ class Context {
     use ContextTypeAndStructMap;
     use ContextStandaloneBodies;
     use ContextModuleCompileAndOptimize;
+    use ContextModuleVerify;
     use ContextModuleOptimizationPasses;
     use ContextScriptGlobalsAndIncludeTracking;
     use ContextLlvmConstantsAndRegistry;

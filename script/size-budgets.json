@@ -179,9 +179,9 @@
             "note": "TYPE_CLASS_CONST_FETCH runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/Context.php": {
-            "budget": 918,
+            "budget": 920,
             "target": 3500,
-            "note": "FunctionProxyRegistration + ExternalMethodStubReport + ArrayIteratorAndObject + NestedJitKernelRegistry + ReflectionMembers + FiberGeneratorAndClosure + ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml proxies wiring + VariableOperandLookup + ScopeLifecycle peers (#36387/#36199); continue toward \u22643.5k + ModuleOptimizationPasses (#36387)"
+            "note": "FunctionProxyRegistration + ExternalMethodStubReport + ArrayIteratorAndObject + NestedJitKernelRegistry + ReflectionMembers + FiberGeneratorAndClosure + ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml proxies wiring + VariableOperandLookup + ScopeLifecycle peers (#36387/#36199); continue toward \u22643.5k + ModuleOptimizationPasses + ModuleVerify (#36387)"
         },
         "lib/JIT/ContextEditScaffoldModuleRebind.php": {
             "budget": 315,
@@ -254,9 +254,9 @@
             "note": "Thin/full standalone AOT body install (isThinStandaloneAotMain\u2026ensureFullStandaloneBodies) extracted from Context (#36387)"
         },
         "lib/JIT/ContextModuleCompileAndOptimize.php": {
-            "budget": 395,
-            "target": 400,
-            "note": "compileInPlace/compileCommon/verify; IR opt moved to ContextModuleOptimizationPasses (#36387)"
+            "budget": 237,
+            "target": 280,
+            "note": "compileInPlace/compileCommon; verify moved to ContextModuleVerify; IR opt in ContextModuleOptimizationPasses (#36387)"
         },
         "lib/JIT/ContextScriptGlobalsAndIncludeTracking.php": {
             "budget": 296,
@@ -403,20 +403,25 @@
             "target": 200,
             "note": "TYPE_BOOLEAN_NOT/EMPTY/EMPTY_* runFramesInner body extracted from VM.php (#36403); php-src ZEND_BOOL_NOT / ZEND_ISSET_ISEMPTY_*"
         },
-        "lib/VM/Concern/YieldAndYieldFromDispatch.php": {
-            "budget": 197,
-            "target": 250,
-            "note": "TYPE_YIELD/YIELD_FROM runFramesInner body extracted from VM.php (#36403); php-src zend_generators.c ZEND_YIELD/ZEND_YIELD_FROM"
-        },
         "lib/VM/Concern/ArrayInitSpreadDispatch.php": {
             "budget": 113,
             "target": 200,
             "note": "TYPE_INIT_ARRAY/ADD_ARRAY_ELEMENT/ARRAY_SPREAD runFramesInner body extracted from VM.php (#36403)"
         },
+        "lib/VM/Concern/YieldAndYieldFromDispatch.php": {
+            "budget": 197,
+            "target": 250,
+            "note": "TYPE_YIELD/YIELD_FROM runFramesInner body extracted from VM.php (#36403); php-src zend_generators.c ZEND_YIELD/ZEND_YIELD_FROM"
+        },
         "lib/JIT/ContextVariableOperandLookup.php": {
             "budget": 309,
             "target": 400,
             "note": "getVariableFromOp / $this seed / scope-stack lookup extracted from ContextVariableOperandBinding (#36387)"
+        },
+        "lib/JIT/ContextModuleVerify.php": {
+            "budget": 185,
+            "target": 220,
+            "note": "verifyModuleOrThrow + debugScanForPostTerminatorInstructions extracted from ModuleCompileAndOptimize (#36387); php-src Zend/Optimizer + LLVMVerifyModule"
         }
     },
     "script_file_count": {
