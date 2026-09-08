@@ -7315,7 +7315,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/ContextFunctionProxyAndNestedJitKernel.php` | 0 | 3 |
 | `lib/JIT/ContextFunctionProxyNestedJitKernelRegistry.php` | 0 | 3 |
 | `lib/JIT/ContextLlvmConstantsAndRegistry.php` | 0 | 4 |
-| `lib/JIT/ContextModuleCompileAndOptimize.php` | 0 | 5 |
+| `lib/JIT/ContextModuleCompileAndOptimize.php` | 0 | 4 |
+| `lib/JIT/ContextModuleOptimizationPasses.php` | 0 | 3 |
 | `lib/JIT/ContextScopeLifecycleAndInitEmit.php` | 0 | 3 |
 | `lib/JIT/ContextScriptGlobalsAndIncludeTracking.php` | 0 | 3 |
 | `lib/JIT/ContextStandaloneBodies.php` | 0 | 2 |
@@ -60320,10 +60321,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ContextModuleCompileAndOptimize.php`
 
 **Warnings** (review for bootstrap subset):
-- trait ContextModuleCompileAndOptimize (line 24)
-- new Result (line 38)
-- new Result (line 59)
-- 18 class method(s)
+- trait ContextModuleCompileAndOptimize (line 25)
+- new Result (line 39)
+- new Result (line 60)
+- 14 class method(s)
+
+### `lib/JIT/ContextModuleOptimizationPasses.php`
+
+**Warnings** (review for bootstrap subset):
+- trait ContextModuleOptimizationPasses (line 25)
+- 4 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/ContextScopeLifecycleAndInitEmit.php`

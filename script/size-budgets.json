@@ -179,9 +179,9 @@
             "note": "TYPE_CLASS_CONST_FETCH runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/Context.php": {
-            "budget": 908,
+            "budget": 910,
             "target": 3500,
-            "note": "NestedJitKernelRegistry + ReflectionMembers + FiberGeneratorAndClosure + ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml proxies wiring + ScopeLifecycle peers (#36387/#36199); continue toward \u22643.5k"
+            "note": "NestedJitKernelRegistry + ReflectionMembers + FiberGeneratorAndClosure + ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml proxies wiring + ScopeLifecycle peers (#36387/#36199); continue toward \u22643.5k + ModuleOptimizationPasses (#36387)"
         },
         "lib/JIT/ContextEditScaffoldModuleRebind.php": {
             "budget": 315,
@@ -249,9 +249,9 @@
             "note": "Thin/full standalone AOT body install (isThinStandaloneAotMain\u2026ensureFullStandaloneBodies) extracted from Context (#36387)"
         },
         "lib/JIT/ContextModuleCompileAndOptimize.php": {
-            "budget": 538,
-            "target": 600,
-            "note": "compileInPlace / compileCommon / verifyModuleOrThrow / opt passes extracted from Context (#36387)"
+            "budget": 395,
+            "target": 400,
+            "note": "compileInPlace/compileCommon/verify; IR opt moved to ContextModuleOptimizationPasses (#36387)"
         },
         "lib/JIT/ContextScriptGlobalsAndIncludeTracking.php": {
             "budget": 296,
@@ -367,6 +367,11 @@
             "budget": 34,
             "target": 80,
             "note": "Fiber/Generator/ClosureBind registerJitMethods wiring extracted from FunctionProxies hub (#36387)"
+        },
+        "lib/JIT/ContextModuleOptimizationPasses.php": {
+            "budget": 170,
+            "target": 250,
+            "note": "light/heavy LLVM IR PassManager pipeline extracted from ModuleCompileAndOptimize (#36387); php-src Zend/Optimizer"
         }
     },
     "script_file_count": {
