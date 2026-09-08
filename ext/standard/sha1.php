@@ -16,7 +16,11 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
-/** sha1() — hex digest via native __compiler_hash (issue #2160; #21181 null DEP+coerce on 8.4). */
+/**
+ * sha1() — thin AOT via native {@see \PHPCompiler\JIT\Builtin\StringSha1} /
+ * {@code phpc_sha1_r1} (#36388; NestedJIT __compiler_hash leaked under thin AOT).
+ * php-src: ext/standard/sha1.c — PHP_FUNCTION(sha1) (#2160; #21181 null DEP+coerce on 8.4).
+ */
 final class sha1 extends Internal
 {
     public function __construct()
@@ -82,11 +86,11 @@ final class sha1 extends Internal
             $raw = JitBoolArg::lowerCoerceZParamBool($context, $args[1], 'sha1', 'binary', 2);
         }
 
-        return JitSha1::digest(
-            $context,
-            self::jitStringArg($context, $args[0]),
-            $raw
-        );
+        $data = self::jitStringArg($context, $args[0]);
+        $result = JitSha1::digest($context, $data, $raw);
+        JitStringBuiltinArg::releaseEphemeralArgAfterCopy($context, $args[0], $data);
+
+        return $result;
     }
 
     /**

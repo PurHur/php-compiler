@@ -204,6 +204,7 @@ trait CallResultOperandAssign
             'str_replace' => true,
             'str_ireplace' => true,
             'md5' => true,
+            'sha1' => true,
         ];
 
         return isset($owning[strtolower($name)]);
