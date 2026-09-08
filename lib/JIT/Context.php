@@ -58,6 +58,7 @@ require_once __DIR__.'/ContextModuleVerify.php';
 require_once __DIR__.'/ContextModuleOptimizationPasses.php';
 require_once __DIR__.'/ContextScriptGlobalsAndIncludeTracking.php';
 require_once __DIR__.'/ContextLlvmConstantsAndRegistry.php';
+require_once __DIR__.'/ContextLlvmConstantEmit.php';
 require_once __DIR__.'/ContextScopeLifecycleAndInitEmit.php';
 
 class Context {
@@ -92,6 +93,7 @@ class Context {
     use ContextModuleOptimizationPasses;
     use ContextScriptGlobalsAndIncludeTracking;
     use ContextLlvmConstantsAndRegistry;
+    use ContextLlvmConstantEmit;
     use ContextScopeLifecycleAndInitEmit;
 
     public PHPLLVM\LLVM $llvm;

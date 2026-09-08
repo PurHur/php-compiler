@@ -7000,6 +7000,7 @@ require_once __DIR__.'/../../../lib/JIT/ContextModuleVerify.php';
 require_once __DIR__.'/../../../lib/JIT/ContextModuleOptimizationPasses.php';
 require_once __DIR__.'/../../../lib/JIT/ContextScriptGlobalsAndIncludeTracking.php';
 require_once __DIR__.'/../../../lib/JIT/ContextLlvmConstantsAndRegistry.php';
+require_once __DIR__.'/../../../lib/JIT/ContextLlvmConstantEmit.php';
 require_once __DIR__.'/../../../lib/JIT/ContextScopeLifecycleAndInitEmit.php';
 require_once __DIR__.'/../../../lib/JIT/Context.php';
 require_once __DIR__.'/../../../lib/JIT/DatePeriodForeachSnapshot.php';
