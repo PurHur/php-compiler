@@ -179,9 +179,9 @@
             "note": "TYPE_CLASS_CONST_FETCH runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/Context.php": {
-            "budget": 920,
+            "budget": 922,
             "target": 3500,
-            "note": "FunctionProxyRegistration + ExternalMethodStubReport + ArrayIteratorAndObject + NestedJitKernelRegistry + ReflectionMembers + FiberGeneratorAndClosure + ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml proxies wiring + VariableOperandLookup + ScopeLifecycle peers (#36387/#36199); continue toward \u22643.5k + ModuleOptimizationPasses + ModuleVerify (#36387)"
+            "note": "FunctionProxyRegistration + ExternalMethodStubReport + ArrayIteratorAndObject + NestedJitKernelRegistry + ReflectionMembers + FiberGeneratorAndClosure + ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml proxies wiring + VariableOperandLookup + VariableOperandAlias + ScopeLifecycle peers (#36387/#36199); continue toward \u22643.5k + ModuleOptimizationPasses + ModuleVerify (#36387)"
         },
         "lib/JIT/ContextEditScaffoldModuleRebind.php": {
             "budget": 315,
@@ -224,9 +224,14 @@
             "note": "TYPE_NEW runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/ContextVariableOperandBinding.php": {
-            "budget": 486,
+            "budget": 263,
             "target": 500,
-            "note": "make/alias/bind helpers; getVariableFromOp cluster in ContextVariableOperandLookup; freeDead/CONST_FETCH in ContextFreeDeadAndConstantFetch (#36387)"
+            "note": "makeVariableFromOp + constant-slot/object-mirror bind; alias cluster in ContextVariableOperandAlias; getVariableFromOp in Lookup; freeDead/CONST_FETCH in ContextFreeDeadAndConstantFetch (#36387)"
+        },
+        "lib/JIT/ContextVariableOperandAlias.php": {
+            "budget": 247,
+            "target": 300,
+            "note": "aliasVariableOp*/functionScopeBindingVariable/resolveRefAliasName/isForeachByRefLocalName extracted from ContextVariableOperandBinding (#36387); php-src Zend/zend_execute.c CV alias"
         },
         "lib/JIT/ContextFunctionProxyAndNestedJitKernel.php": {
             "budget": 230,

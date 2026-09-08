@@ -43,6 +43,7 @@ require_once __DIR__.'/ContextDefineBuiltinFunctionProxies.php';
 require_once __DIR__.'/ContextDefineBuiltins.php';
 require_once __DIR__.'/ContextCompileToFile.php';
 require_once __DIR__.'/ContextVariableOperandBinding.php';
+require_once __DIR__.'/ContextVariableOperandAlias.php';
 require_once __DIR__.'/ContextVariableOperandLookup.php';
 require_once __DIR__.'/ContextFreeDeadAndConstantFetch.php';
 require_once __DIR__.'/ContextFunctionProxyNestedJitKernelRegistry.php';
@@ -75,6 +76,7 @@ class Context {
     use ContextDefineBuiltins;
     use ContextCompileToFile;
     use ContextVariableOperandBinding;
+    use ContextVariableOperandAlias;
     use ContextVariableOperandLookup;
     use ContextFreeDeadAndConstantFetch;
     use ContextFunctionProxyNestedJitKernelRegistry;

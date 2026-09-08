@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8533 |
-| Phase A inventory files (M2 ratio SSOT) | 8533 |
+| PHP files on vm.php path | 8534 |
+| Phase A inventory files (M2 ratio SSOT) | 8534 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26671 |
+| Source constructs flagged (warnings) | 26673 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7325,7 +7325,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/ContextScriptGlobalsAndIncludeTracking.php` | 0 | 3 |
 | `lib/JIT/ContextStandaloneBodies.php` | 0 | 2 |
 | `lib/JIT/ContextTypeAndStructMap.php` | 0 | 2 |
-| `lib/JIT/ContextVariableOperandBinding.php` | 0 | 3 |
+| `lib/JIT/ContextVariableOperandAlias.php` | 0 | 3 |
+| `lib/JIT/ContextVariableOperandBinding.php` | 0 | 2 |
 | `lib/JIT/ContextVariableOperandLookup.php` | 0 | 4 |
 | `lib/JIT/DatePeriodForeachSnapshot.php` | 0 | 3 |
 | `lib/JIT/DeprecatedCallGuard.php` | 0 | 1 |
@@ -59892,16 +59893,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Context.php`
 
 **Warnings** (review for bootstrap subset):
-- new ExtensionLoweringHooks (line 877)
-- new Scope (line 878)
-- new Analyzer (line 907)
-- new Helper (line 908)
-- new Builtin\Refcount (line 909)
-- new Builtin\Output (line 911)
-- new Builtin\Type (line 912)
-- new Builtin\Internal (line 913)
-- new Builtin\VarArg (line 914)
-- new Builtin\ErrorHandler (line 915)
+- new ExtensionLoweringHooks (line 879)
+- new Scope (line 880)
+- new Analyzer (line 909)
+- new Helper (line 910)
+- new Builtin\Refcount (line 911)
+- new Builtin\Output (line 913)
+- new Builtin\Type (line 914)
+- new Builtin\Internal (line 915)
+- new Builtin\VarArg (line 916)
+- new Builtin\ErrorHandler (line 917)
 
 ### `lib/JIT/ContextCompileToFile.php`
 
@@ -60393,12 +60394,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - trait ContextTypeAndStructMap (line 23)
 - 13 class method(s)
 
+### `lib/JIT/ContextVariableOperandAlias.php`
+
+**Warnings** (review for bootstrap subset):
+- trait ContextVariableOperandAlias (line 25)
+- new Variable (line 49)
+- 7 class method(s)
+
 ### `lib/JIT/ContextVariableOperandBinding.php`
 
 **Warnings** (review for bootstrap subset):
-- trait ContextVariableOperandBinding (line 30)
-- new Variable (line 288)
-- 12 class method(s)
+- trait ContextVariableOperandBinding (line 28)
+- 5 class method(s)
 
 ### `lib/JIT/ContextVariableOperandLookup.php`
 
