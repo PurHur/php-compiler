@@ -47,6 +47,11 @@
             "budget": 161,
             "target": 300,
             "note": "Edit-scaffold session arm/state accessors extracted from CompileCache (#36387)"
+        },
+        "lib/JIT/CompileCacheProjectMembers.php": {
+            "budget": 58,
+            "target": 200,
+            "note": "Project member path list / compile entry extracted from CompileCache (#36387)"
         }
     },
     "script_file_count": {
