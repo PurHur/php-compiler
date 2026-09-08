@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8517 |
-| Phase A inventory files (M2 ratio SSOT) | 8517 |
+| PHP files on vm.php path | 8518 |
+| Phase A inventory files (M2 ratio SSOT) | 8518 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26639 |
+| Source constructs flagged (warnings) | 26641 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7299,8 +7299,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Context.php` | 0 | 10 |
 | `lib/JIT/ContextCompileToFile.php` | 0 | 3 |
 | `lib/JIT/ContextDefineBuiltinFunctionProxies.php` | 0 | 4 |
-| `lib/JIT/ContextDefineBuiltinFunctionProxiesDateAndXml.php` | 0 | 67 |
+| `lib/JIT/ContextDefineBuiltinFunctionProxiesDateAndXml.php` | 0 | 60 |
 | `lib/JIT/ContextDefineBuiltinFunctionProxiesDirectoryAndFile.php` | 0 | 10 |
+| `lib/JIT/ContextDefineBuiltinFunctionProxiesFinfoPdoAndXml.php` | 0 | 9 |
 | `lib/JIT/ContextDefineBuiltinFunctionProxiesReflectionAndException.php` | 0 | 165 |
 | `lib/JIT/ContextDefineBuiltinFunctionProxiesSplContainers.php` | 0 | 26 |
 | `lib/JIT/ContextDefineBuiltinFunctionProxiesSplIterators.php` | 0 | 32 |
@@ -59876,16 +59877,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Context.php`
 
 **Warnings** (review for bootstrap subset):
-- new ExtensionLoweringHooks (line 855)
-- new Scope (line 856)
-- new Analyzer (line 885)
-- new Helper (line 886)
-- new Builtin\Refcount (line 887)
-- new Builtin\Output (line 889)
-- new Builtin\Type (line 890)
-- new Builtin\Internal (line 891)
-- new Builtin\VarArg (line 892)
-- new Builtin\ErrorHandler (line 893)
+- new ExtensionLoweringHooks (line 857)
+- new Scope (line 858)
+- new Analyzer (line 887)
+- new Helper (line 888)
+- new Builtin\Refcount (line 889)
+- new Builtin\Output (line 891)
+- new Builtin\Type (line 892)
+- new Builtin\Internal (line 893)
+- new Builtin\VarArg (line 894)
+- new Builtin\ErrorHandler (line 895)
 
 ### `lib/JIT/ContextCompileToFile.php`
 
@@ -59897,80 +59898,73 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ContextDefineBuiltinFunctionProxies.php`
 
 **Warnings** (review for bootstrap subset):
-- trait ContextDefineBuiltinFunctionProxies (line 26)
-- new Builtin\IsNullFn (line 30)
+- trait ContextDefineBuiltinFunctionProxies (line 27)
 - new Builtin\IsNullFn (line 31)
+- new Builtin\IsNullFn (line 32)
 - 1 class method(s)
 
 ### `lib/JIT/ContextDefineBuiltinFunctionProxiesDateAndXml.php`
 
 **Warnings** (review for bootstrap subset):
-- trait ContextDefineBuiltinFunctionProxiesDateAndXml (line 27)
-- new Call\DateTimeConstruct (line 32)
-- new Call\DateTimeImmutableConstruct (line 33)
-- new Call\DateTimeZoneConstruct (line 36)
-- new Call\DateIntervalConstruct (line 37)
-- new Call\DateIntervalFormat (line 38)
-- new Call\DatePeriodConstruct (line 39)
-- new Call\DatePeriodCreateFromISO8601String (line 41)
-- new Call\DatePeriodIteratorMethod (line 43)
-- new Call\DatePeriodAccessorMethod (line 48)
+- trait ContextDefineBuiltinFunctionProxiesDateAndXml (line 26)
+- new Call\DateTimeConstruct (line 31)
+- new Call\DateTimeImmutableConstruct (line 32)
+- new Call\DateTimeZoneConstruct (line 35)
+- new Call\DateIntervalConstruct (line 36)
+- new Call\DateIntervalFormat (line 37)
+- new Call\DatePeriodConstruct (line 38)
+- new Call\DatePeriodCreateFromISO8601String (line 40)
+- new Call\DatePeriodIteratorMethod (line 42)
+- new Call\DatePeriodAccessorMethod (line 47)
+- new Call\DateTimeFormat (line 49)
 - new Call\DateTimeFormat (line 50)
-- new Call\DateTimeFormat (line 51)
+- new Call\DateTimeCreateFromFormat (line 52)
 - new Call\DateTimeCreateFromFormat (line 53)
-- new Call\DateTimeCreateFromFormat (line 54)
+- new Call\DateTimeCreateFromInterface (line 55)
 - new Call\DateTimeCreateFromInterface (line 56)
-- new Call\DateTimeCreateFromInterface (line 57)
-- new Call\DateTimeCreateFromImmutable (line 58)
-- new Call\DateTimeImmutableCreateFromMutable (line 59)
+- new Call\DateTimeCreateFromImmutable (line 57)
+- new Call\DateTimeImmutableCreateFromMutable (line 58)
+- new Call\DateTimeCreateFromTimestamp (line 61)
 - new Call\DateTimeCreateFromTimestamp (line 62)
-- new Call\DateTimeCreateFromTimestamp (line 63)
+- new Call\DateTimeGetMicrosecond (line 66)
 - new Call\DateTimeGetMicrosecond (line 67)
-- new Call\DateTimeGetMicrosecond (line 68)
+- new Call\DateTimeSetMicrosecond (line 68)
 - new Call\DateTimeSetMicrosecond (line 69)
-- new Call\DateTimeSetMicrosecond (line 70)
-- new Call\DateIntervalCreateFromDateString (line 73)
-- new Call\DateTimeSetTimezone (line 75)
+- new Call\DateIntervalCreateFromDateString (line 72)
+- new Call\DateTimeSetTimezone (line 74)
+- new Call\DateTimeGetTimezone (line 75)
 - new Call\DateTimeGetTimezone (line 76)
-- new Call\DateTimeGetTimezone (line 77)
+- new Call\DateTimeGetOffset (line 79)
 - new Call\DateTimeGetOffset (line 80)
-- new Call\DateTimeGetOffset (line 81)
-- new Call\DateTimeSetTimezone (line 87)
+- new Call\DateTimeSetTimezone (line 86)
+- new Call\DateTimeGetTimestamp (line 90)
 - new Call\DateTimeGetTimestamp (line 91)
-- new Call\DateTimeGetTimestamp (line 92)
-- new Call\DateTimeSetTimestamp (line 93)
-- new Call\DateTimeSetTimestamp (line 95)
+- new Call\DateTimeSetTimestamp (line 92)
+- new Call\DateTimeSetTimestamp (line 94)
+- new Call\DateTimeSetDate (line 97)
 - new Call\DateTimeSetDate (line 98)
-- new Call\DateTimeSetDate (line 99)
+- new Call\DateTimeSetTime (line 99)
 - new Call\DateTimeSetTime (line 100)
-- new Call\DateTimeSetTime (line 101)
+- new Call\DateTimeSetISODate (line 101)
 - new Call\DateTimeSetISODate (line 102)
-- new Call\DateTimeSetISODate (line 103)
+- new Call\DateTimeGetLastErrors (line 104)
 - new Call\DateTimeGetLastErrors (line 105)
-- new Call\DateTimeGetLastErrors (line 106)
+- new Call\DateTimeModify (line 108)
 - new Call\DateTimeModify (line 109)
-- new Call\DateTimeModify (line 110)
+- new Call\DateTimeAdd (line 112)
 - new Call\DateTimeAdd (line 113)
-- new Call\DateTimeAdd (line 114)
+- new Call\DateTimeSub (line 114)
 - new Call\DateTimeSub (line 115)
-- new Call\DateTimeSub (line 116)
-- new Call\ProceduralDateAdd (line 118)
-- new Call\ProceduralDateSub (line 119)
+- new Call\ProceduralDateAdd (line 117)
+- new Call\ProceduralDateSub (line 118)
+- new Call\DateTimeDiff (line 120)
 - new Call\DateTimeDiff (line 121)
-- new Call\DateTimeDiff (line 122)
-- new Call\DateTimeZoneGetTransitions (line 124)
-- new Call\DateTimeZoneGetName (line 126)
-- new Call\DateTimeZoneGetLocation (line 128)
-- new Call\DateTimeZoneGetOffset (line 130)
-- new Call\DateTimeZoneListIdentifiers (line 132)
-- new Call\DateTimeZoneListAbbreviations (line 134)
-- new Call\FinfoConstruct (line 139)
-- new Call\FinfoFile (line 140)
-- new Call\FinfoBuffer (line 141)
-- new Call\FinfoSetFlags (line 142)
-- new Call\PdoConstruct (line 144)
-- new Call\PdoGetAvailableDrivers (line 145)
-- new Call\PdoQuote (line 146)
+- new Call\DateTimeZoneGetTransitions (line 123)
+- new Call\DateTimeZoneGetName (line 125)
+- new Call\DateTimeZoneGetLocation (line 127)
+- new Call\DateTimeZoneGetOffset (line 129)
+- new Call\DateTimeZoneListIdentifiers (line 131)
+- new Call\DateTimeZoneListAbbreviations (line 133)
 - 1 class method(s)
 
 ### `lib/JIT/ContextDefineBuiltinFunctionProxiesDirectoryAndFile.php`
@@ -59985,6 +59979,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\SplFileObjectMethod (line 121)
 - new Call\DirectoryIteratorMethod (line 134)
 - new Call\GlobIteratorMethod (line 146)
+- 1 class method(s)
+
+### `lib/JIT/ContextDefineBuiltinFunctionProxiesFinfoPdoAndXml.php`
+
+**Warnings** (review for bootstrap subset):
+- trait ContextDefineBuiltinFunctionProxiesFinfoPdoAndXml (line 27)
+- new Call\FinfoConstruct (line 35)
+- new Call\FinfoFile (line 36)
+- new Call\FinfoBuffer (line 37)
+- new Call\FinfoSetFlags (line 38)
+- new Call\PdoConstruct (line 40)
+- new Call\PdoGetAvailableDrivers (line 41)
+- new Call\PdoQuote (line 42)
 - 1 class method(s)
 
 ### `lib/JIT/ContextDefineBuiltinFunctionProxiesReflectionAndException.php`

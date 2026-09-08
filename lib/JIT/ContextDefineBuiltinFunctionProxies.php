@@ -14,7 +14,8 @@ namespace PHPCompiler\JIT;
  * {@see ContextDefineBuiltinFunctionProxiesDirectoryAndFile},
  * {@see ContextDefineBuiltinFunctionProxiesWeakAndPhpToken},
  * {@see ContextDefineBuiltinFunctionProxiesReflectionAndException},
- * {@see ContextDefineBuiltinFunctionProxiesDateAndXml} (#36387 / #36199 / #36403).
+ * {@see ContextDefineBuiltinFunctionProxiesDateAndXml},
+ * {@see ContextDefineBuiltinFunctionProxiesFinfoPdoAndXml} (#36387 / #36199 / #36403).
  *
  * Used via {@code use ContextDefineBuiltinFunctionProxies;} on {@see Context}.
  * Invoked from {@see ContextDefineBuiltins::defineBuiltins} after implement.
@@ -48,5 +49,8 @@ trait ContextDefineBuiltinFunctionProxies
         GeneratorHelper::registerJitMethods($this);
         ClosureBindHelper::registerJitMethods($this);
         $this->defineBuiltinFunctionProxiesDateAndXml();
+        // finfo / PDO / XMLReader / XMLWriter / Dom\TokenList —
+        // ContextDefineBuiltinFunctionProxiesFinfoPdoAndXml (#36387).
+        $this->defineBuiltinFunctionProxiesFinfoPdoAndXml();
     }
 }
