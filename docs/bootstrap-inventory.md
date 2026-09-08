@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8521 |
-| Phase A inventory files (M2 ratio SSOT) | 8521 |
+| PHP files on vm.php path | 8522 |
+| Phase A inventory files (M2 ratio SSOT) | 8522 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26647 |
+| Source constructs flagged (warnings) | 26649 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7312,7 +7312,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/ContextDefineBuiltins.php` | 0 | 2 |
 | `lib/JIT/ContextEditScaffoldModuleRebind.php` | 0 | 2 |
 | `lib/JIT/ContextFreeDeadAndConstantFetch.php` | 0 | 10 |
-| `lib/JIT/ContextFunctionProxyAndNestedJitKernel.php` | 0 | 4 |
+| `lib/JIT/ContextFunctionProxyAndNestedJitKernel.php` | 0 | 3 |
+| `lib/JIT/ContextFunctionProxyNestedJitKernelRegistry.php` | 0 | 3 |
 | `lib/JIT/ContextLlvmConstantsAndRegistry.php` | 0 | 4 |
 | `lib/JIT/ContextModuleCompileAndOptimize.php` | 0 | 5 |
 | `lib/JIT/ContextScopeLifecycleAndInitEmit.php` | 0 | 3 |
@@ -59880,16 +59881,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Context.php`
 
 **Warnings** (review for bootstrap subset):
-- new ExtensionLoweringHooks (line 863)
-- new Scope (line 864)
-- new Analyzer (line 893)
-- new Helper (line 894)
-- new Builtin\Refcount (line 895)
-- new Builtin\Output (line 897)
-- new Builtin\Type (line 898)
-- new Builtin\Internal (line 899)
-- new Builtin\VarArg (line 900)
-- new Builtin\ErrorHandler (line 901)
+- new ExtensionLoweringHooks (line 865)
+- new Scope (line 866)
+- new Analyzer (line 895)
+- new Helper (line 896)
+- new Builtin\Refcount (line 897)
+- new Builtin\Output (line 899)
+- new Builtin\Type (line 900)
+- new Builtin\Internal (line 901)
+- new Builtin\VarArg (line 902)
+- new Builtin\ErrorHandler (line 903)
 
 ### `lib/JIT/ContextCompileToFile.php`
 
@@ -60297,10 +60298,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ContextFunctionProxyAndNestedJitKernel.php`
 
 **Warnings** (review for bootstrap subset):
-- trait ContextFunctionProxyAndNestedJitKernel (line 26)
-- new Call\ExternalMethod (line 80)
-- new ReflectionMethod (line 287)
-- 18 class method(s)
+- trait ContextFunctionProxyAndNestedJitKernel (line 23)
+- new Call\ExternalMethod (line 77)
+- 12 class method(s)
+
+### `lib/JIT/ContextFunctionProxyNestedJitKernelRegistry.php`
+
+**Warnings** (review for bootstrap subset):
+- trait ContextFunctionProxyNestedJitKernelRegistry (line 25)
+- new ReflectionMethod (line 80)
+- 6 class method(s)
 
 ### `lib/JIT/ContextLlvmConstantsAndRegistry.php`
 
