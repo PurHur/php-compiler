@@ -8129,7 +8129,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/Concern/ArgRecvDispatch.php` | 0 | 4 |
 | `lib/VM/Concern/ArgSendDispatch.php` | 0 | 4 |
 | `lib/VM/Concern/ArrayDimFetchDispatch.php` | 0 | 12 |
-| `lib/VM/Concern/ArrayInitSpreadDispatch.php` | 0 | 2 |
 | `lib/VM/Concern/AssignDispatch.php` | 0 | 8 |
 | `lib/VM/Concern/BuiltinHostExceptionDispatch.php` | 0 | 6 |
 | `lib/VM/Concern/ClassConstAndPropertyDefaultMaterialize.php` | 0 | 32 |
@@ -8144,6 +8143,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/Concern/DeclareClassLikeDispatch.php` | 0 | 8 |
 | `lib/VM/Concern/DeprecationNoticeEmit.php` | 0 | 3 |
 | `lib/VM/Concern/EchoPrintEvalDispatch.php` | 0 | 2 |
+| `lib/VM/Concern/EmptyAndBooleanNotDispatch.php` | 0 | 2 |
 | `lib/VM/Concern/ExecuteIncDecAndScopeOperandRead.php` | 0 | 14 |
 | `lib/VM/Concern/FiberStartResumeAndThrow.php` | 0 | 17 |
 | `lib/VM/Concern/ForeachIterDispatch.php` | 0 | 4 |
@@ -62598,14 +62598,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Func\PHP (line 973)
 - new Variable (line 1061)
 - new Variable (line 1064)
-- new Variable (line 1589)
-- new Error (line 2034)
-- new ClassEntry (line 2070)
-- new Variable (line 2071)
-- new VM\ClassProperty (line 2072)
-- new ObjectEntry (line 2075)
-- new Variable (line 2078)
-- new Variable (line 2104)
+- new Variable (line 1559)
+- new Error (line 2004)
+- new ClassEntry (line 2040)
+- new Variable (line 2041)
+- new VM\ClassProperty (line 2042)
+- new ObjectEntry (line 2045)
+- new Variable (line 2048)
+- new Variable (line 2074)
 - 27 class method(s)
 
 ### `lib/VM/AbstractPropertyHookCheck.php`
@@ -66090,12 +66090,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 310)
 - 1 class method(s)
 
-### `lib/VM/Concern/ArrayInitSpreadDispatch.php`
-
-**Warnings** (review for bootstrap subset):
-- trait ArrayInitSpreadDispatch (line 23)
-- 1 class method(s)
-
 ### `lib/VM/Concern/AssignDispatch.php`
 
 **Warnings** (review for bootstrap subset):
@@ -66250,6 +66244,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - trait EchoPrintEvalDispatch (line 23)
 - 3 class method(s)
+
+### `lib/VM/Concern/EmptyAndBooleanNotDispatch.php`
+
+**Warnings** (review for bootstrap subset):
+- trait EmptyAndBooleanNotDispatch (line 22)
+- 1 class method(s)
 
 ### `lib/VM/Concern/ExecuteIncDecAndScopeOperandRead.php`
 
