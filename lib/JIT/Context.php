@@ -29,6 +29,7 @@ use PHPCompiler\Config;
 
 require_once __DIR__.'/ContextEditScaffoldModuleRebind.php';
 require_once __DIR__.'/ContextDefineBuiltinFunctionProxiesDateAndXml.php';
+require_once __DIR__.'/ContextDefineBuiltinFunctionProxiesReflectionAndException.php';
 require_once __DIR__.'/ContextDefineBuiltinFunctionProxies.php';
 require_once __DIR__.'/ContextDefineBuiltins.php';
 require_once __DIR__.'/ContextCompileToFile.php';
@@ -45,6 +46,7 @@ require_once __DIR__.'/ContextScopeLifecycleAndInitEmit.php';
 class Context {
     use ContextEditScaffoldModuleRebind;
     use ContextDefineBuiltinFunctionProxiesDateAndXml;
+    use ContextDefineBuiltinFunctionProxiesReflectionAndException;
     use ContextDefineBuiltinFunctionProxies;
     use ContextDefineBuiltins;
     use ContextCompileToFile;
@@ -872,7 +874,6 @@ class Context {
         ];
         // Parse prior module.bc before namedStructType / Helper holds the live module (#36387).
         $this->tryBindEditScaffoldBitcodeBeforeBuiltins();
-
         $this->analyzer = new Analyzer;
         $this->helper = new Helper($this);
         $this->refcount = new Builtin\Refcount($this, $loadType);

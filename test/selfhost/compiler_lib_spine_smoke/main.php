@@ -6970,6 +6970,7 @@ require_once __DIR__.'/../../../lib/JIT/CompileCache.php';
 require_once __DIR__.'/../../../lib/JIT/CompilerOperandChainNative.php';
 require_once __DIR__.'/../../../lib/JIT/ContextEditScaffoldModuleRebind.php';
 require_once __DIR__.'/../../../lib/JIT/ContextDefineBuiltinFunctionProxiesDateAndXml.php';
+require_once __DIR__.'/../../../lib/JIT/ContextDefineBuiltinFunctionProxiesReflectionAndException.php';
 require_once __DIR__.'/../../../lib/JIT/ContextDefineBuiltinFunctionProxies.php';
 require_once __DIR__.'/../../../lib/JIT/ContextDefineBuiltins.php';
 require_once __DIR__.'/../../../lib/JIT/ContextCompileToFile.php';
