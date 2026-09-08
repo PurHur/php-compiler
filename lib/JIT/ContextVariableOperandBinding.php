@@ -16,8 +16,9 @@ use PHPLLVM;
  * a separate TU from the Context construction / compile hub.
  * Lookup (getVariableFromOp / $this seed) lives in {@see ContextVariableOperandLookup};
  * alias/scope-slot helpers live in {@see ContextVariableOperandAlias};
- * dead-temp free + CONST_FETCH live in {@see ContextFreeDeadAndConstantFetch}
- * (split-TU / size-budget ratchet toward ≤ 500 lines, #36199 / #36403).
+ * dead-temp free lives in {@see ContextFreeDeadAndConstantFetch}; CONST_FETCH in
+ * {@see ContextConstantFetch} (split-TU / size-budget ratchet toward ≤ 500 lines,
+ * #36199 / #36403).
  *
  * Used via {@code use ContextVariableOperandBinding;} on {@see Context}.
  *
