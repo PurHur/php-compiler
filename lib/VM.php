@@ -50,6 +50,7 @@ require_once __DIR__.'/VM/Concern/UnsetDispatch.php';
 require_once __DIR__.'/VM/Concern/AssignDispatch.php';
 require_once __DIR__.'/VM/Concern/FuncCallExecDispatch.php';
 require_once __DIR__.'/VM/Concern/ArgRecvDispatch.php';
+require_once __DIR__.'/VM/Concern/ScalarCastDispatch.php';
 require_once __DIR__.'/VM/Concern/ScalarCastCompareArithConcatDispatch.php';
 require_once __DIR__.'/VM/Concern/ClassConstFetchDispatch.php';
 require_once __DIR__.'/VM/Concern/IssetDispatch.php';
@@ -148,6 +149,7 @@ class VM {
     use AssignDispatch;
     use FuncCallExecDispatch;
     use ArgRecvDispatch;
+    use ScalarCastDispatch;
     use ScalarCastCompareArithConcatDispatch;
     use ClassConstFetchDispatch;
     use IssetDispatch;
@@ -654,6 +656,15 @@ restart:
                 case OpCode::TYPE_CAST_OBJECT:
                 case OpCode::TYPE_CAST_UNSET:
                 case OpCode::TYPE_CAST_VOID:
+                    $castOutcome = $this->executeScalarCastDispatch($frame, $op);
+                    if ($castOutcome instanceof Frame) {
+                        $frame = $castOutcome;
+                        goto restart;
+                    }
+                    if (is_int($castOutcome)) {
+                        return $castOutcome;
+                    }
+                    break;
                 case OpCode::TYPE_IDENTICAL:
                 case OpCode::TYPE_NOT_IDENTICAL:
                 case OpCode::TYPE_EQUAL:
