@@ -6,6 +6,7 @@ namespace PHPCompiler;
 
 use PHPCfg\Operand;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\Lint\UnsupportedFeature;
 use PHPLLVM;
 
 /**
@@ -644,6 +645,6 @@ trait AssignOperandValueMetaAndGeneratorField
                 return;
             }
         }
-        throw new \LogicException('Unsupported generator yield value type in JIT (issue #3074)');
+        UnsupportedFeature::raise('generator-yield-value-type-jit');
     }
 }

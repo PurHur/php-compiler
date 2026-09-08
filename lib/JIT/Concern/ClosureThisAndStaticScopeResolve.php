@@ -6,6 +6,7 @@ namespace PHPCompiler;
 
 use PHPCfg\Operand;
 use PHPCompiler\Block;
+use PHPCompiler\Lint\UnsupportedFeature;
 
 /**
  * Closure body compile, self/static/parent scope, and $this LLVM param offset (#36387).
@@ -26,7 +27,7 @@ trait ClosureThisAndStaticScopeResolve
     private function resolveClassNameForPseudoConst(Block $block, Operand $classOp): string
     {
         if (!$classOp instanceof Operand\Literal) {
-            throw new \LogicException('Class::class requires a literal class name for JIT/AOT');
+            UnsupportedFeature::raise('class-class-literal-jit');
         }
 
         return $this->resolveJitStaticScopeClass($block, $classOp);

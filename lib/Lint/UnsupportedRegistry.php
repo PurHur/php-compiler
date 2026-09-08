@@ -390,6 +390,54 @@ final class UnsupportedRegistry
             'issue' => 3592,
             'alternative' => 'build the array with explicit keys/values in the const initializer (php-src zend_ast_evaluate)',
         ],
+        'class-class-literal-jit' => [
+            'feature' => 'Class::class / ::class with a non-literal class operand under JIT/AOT',
+            'matrixRow' => 'docs/capabilities-syntax.md#class-constants',
+            'issue' => 740,
+            'alternative' => 'use a compile-time ClassName::class or string class name (php-src zend_compile.c ZEND_FETCH_CLASS_NAME)',
+        ],
+        'expr-class-operand-jit' => [
+            'feature' => '$expr::class operand type not lowerable for JIT/AOT',
+            'matrixRow' => 'docs/capabilities-syntax.md#class-constants',
+            'issue' => 4179,
+            'alternative' => 'use a string/object/boxed class operand or a compile-time ClassName::class (php-src zend_compile.c)',
+        ],
+        'class-const-dynamic-type-jit' => [
+            'feature' => 'class constant value type not storeable for dynamic JIT fetch',
+            'matrixRow' => 'docs/capabilities-syntax.md#class-constants',
+            'issue' => 740,
+            'alternative' => 'use int/float/string/bool/null/array/object class constants (php-src ZEND_FETCH_CLASS_CONSTANT)',
+        ],
+        'class-const-type-jit' => [
+            'feature' => 'class constant value type not lowerable for JIT/AOT',
+            'matrixRow' => 'docs/capabilities-syntax.md#class-constants',
+            'issue' => 740,
+            'alternative' => 'use int/float/string/bool/null/array/object class constants (php-src ZEND_FETCH_CLASS_CONSTANT)',
+        ],
+        'generator-yield-value-type-jit' => [
+            'feature' => 'generator yield value type not lowerable for JIT/AOT',
+            'matrixRow' => 'docs/capabilities-syntax.md#generators',
+            'issue' => 3074,
+            'alternative' => 'yield int/float/string/bool/null/array/hashtable/object/boxed values (php-src Zend/zend_generators.c)',
+        ],
+        'fiber-value-type-jit' => [
+            'feature' => 'Fiber suspend/resume value type not lowerable for JIT/AOT',
+            'matrixRow' => 'docs/capabilities-syntax.md#fibers',
+            'issue' => 4019,
+            'alternative' => 'suspend/resume with int/float/string/bool/null/boxed values (php-src Zend/zend_fibers.c)',
+        ],
+        'reflection-enum-unknown' => [
+            'feature' => 'ReflectionEnum refers to an enum not declared in this compile',
+            'matrixRow' => 'docs/capabilities.md#reflectionenum',
+            'issue' => 1214,
+            'alternative' => 'reflect a compile-time declared enum (php-src ext/reflection/php_reflection.c)',
+        ],
+        'reflection-enum-unit-case-unknown' => [
+            'feature' => 'ReflectionEnumUnitCase refers to an enum not declared in this compile',
+            'matrixRow' => 'docs/capabilities.md#reflectionenumunitcase',
+            'issue' => 1214,
+            'alternative' => 'reflect a compile-time declared enum case (php-src ext/reflection/php_reflection.c)',
+        ],
     ];
 
     /**
