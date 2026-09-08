@@ -62,6 +62,7 @@ require_once __DIR__.'/VM/Concern/CoalesceNullsafeSilenceExitDispatch.php';
 require_once __DIR__.'/VM/Concern/JumpCaseDispatch.php';
 require_once __DIR__.'/VM/Concern/ConstFetchStaticCallInstanceofDispatch.php';
 require_once __DIR__.'/VM/Concern/DeclareClassLikeDispatch.php';
+require_once __DIR__.'/VM/Concern/ArgSendDispatch.php';
 
 use PHPCompiler\BuiltinByRefParams;
 use PHPCompiler\Compiler\AttributeNames;
@@ -160,6 +161,7 @@ class VM {
     use JumpCaseDispatch;
     use ConstFetchStaticCallInstanceofDispatch;
     use DeclareClassLikeDispatch;
+    use ArgSendDispatch;
     const SUCCESS = 1;
     const FAILURE = 2;
 
@@ -1273,75 +1275,13 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_ARG_SEND:
-                    $catchFrame = $this->guardUnboundThisRead($frame, (int) $op->arg1);
-                    if (null !== $catchFrame) {
-                        $frame = $catchFrame;
+                    $argSendOutcome = $this->executeArgSendDispatch($frame, $op);
+                    if ($argSendOutcome instanceof Frame) {
+                        $frame = $argSendOutcome;
                         goto restart;
                     }
-                    $argSlot = (int) $op->arg1;
-                    // Implicit $this / new() prefix occupies low call-arg indices (#6739, #11844).
-                    $argIndex = \count($frame->callArgs) + \count($frame->callArgEntries);
-                    $value = $this->resolveOutgoingCallArgValue($frame, $argSlot);
-                    // Named sends use definition-order param index for ZEND_SEND_REF (count: $n skips limit, #19697).
-                    if (
-                        null !== $op->arg2
-                        && null === $op->arg3
-                        && isset($frame->block->constants[$op->arg2])
-                        && $frame->call instanceof Func\Internal
-                    ) {
-                        $namedParam = $frame->block->constants[$op->arg2]->toString();
-                        $calleeName = $frame->builtinCalleeQualifiedMethod ?? $frame->call->getName();
-                        $paramNames = BuiltinParamNames::paramNamesForInternalFunction($calleeName) ?? [];
-                        $namedIdx = BuiltinParamNames::lookupNamedParamIndex(
-                            $paramNames,
-                            $namedParam,
-                            $calleeName
-                        );
-                        if (false !== $namedIdx) {
-                            $argIndex = \count($frame->callArgs) + $namedIdx;
-                        }
-                    }
-                    $needsRef = $this->outgoingCallArgNeedsReference($frame, $argIndex, $value);
-                    if (!$needsRef) {
-                        $this->warnUndefinedVariableForScopeRead($frame, $argSlot);
-                    }
-                    if (
-                        !$needsRef
-                        && $this->isUnboundLocalScopeRead($frame, $argSlot)
-                    ) {
-                        $resolved = $value->resolveIndirect();
-                        if ($resolved->isUndefined()) {
-                            $sent = new Variable();
-                            $sent->null();
-                            $value = $sent;
-                        }
-                    } elseif ($needsRef && $this->isUnboundLocalScopeRead($frame, $argSlot)) {
-                        // Zend creates CV on ZEND_SEND_REF; no E_WARNING on later reads (#10403).
-                        $this->markScopeSlotInitialized($frame, $argSlot);
-                    }
-                    if (!$needsRef) {
-                        $snapshot = new Variable();
-                        if ($value->isIndirect()) {
-                            // CV/indirect send-by-value must not share cells with the snapshot (#16331).
-                            $snapshot->copyFrom($value->resolveIndirect());
-                        } else {
-                            $snapshot->duplicateFrom($value);
-                        }
-                        $value = $snapshot;
-                    }
-                    if (null !== $op->arg3) {
-                        $frame->callArgEntries[] = ['u', $value, $needsRef ? null : $argSlot];
-                        break;
-                    }
-                    if (null !== $op->arg2 && isset($frame->block->constants[$op->arg2])) {
-                        $frame->callArgEntries[] = [
-                            'n',
-                            $frame->block->constants[$op->arg2]->toString(),
-                            $value,
-                            $needsRef ? null : $argSlot,
-                        ];
-                    } else {
-                        $frame->callArgEntries[] = ['p', $value, $needsRef ? null : $argSlot];
+                    if (is_int($argSendOutcome)) {
+                        return $argSendOutcome;
                     }
                     break;
                 case OpCode::TYPE_FUNCCALL_EXEC_RETURN:

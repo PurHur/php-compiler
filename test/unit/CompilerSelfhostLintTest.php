@@ -417,6 +417,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/VM/ClassEntry.php',
             'lib/VM/ClassProperty.php',
             'lib/VM/Concern/ArgRecvDispatch.php',
+            'lib/VM/Concern/ArgSendDispatch.php',
             'lib/VM/Concern/ArrayDimFetchDispatch.php',
             'lib/VM/Concern/AssignDispatch.php',
             'lib/VM/Concern/BuiltinHostExceptionDispatch.php',
