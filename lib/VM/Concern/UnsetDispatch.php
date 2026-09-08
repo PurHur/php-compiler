@@ -132,11 +132,8 @@ trait UnsetDispatch
 
                 return null;
             }
-            if (
-                $op->unsetOnProperty
-                && ext\simplexml\VmSimpleXml::CLASS_LC === strtolower($object->class->name)
-                && ext\simplexml\SimpleXmlRegistry::has($object)
-            ) {
+            // unset($sxe->child) — ext/simplexml via SimpleXmlVmRuntimeSupport (#36204).
+            if ($op->unsetOnProperty && VM\SimpleXmlVmRuntimeSupport::isUnsetChildPropertySubject($object)) {
                 [$propName, $catchFrame] = $this->coerceRuntimeOperandToString($key, $frame);
                 if (null !== $catchFrame) {
                     return $catchFrame;
@@ -145,7 +142,7 @@ trait UnsetDispatch
                 if (null !== $catchFrame) {
                     return $catchFrame;
                 }
-                ext\simplexml\VmSimpleXml::unsetChildProperty($object, $propName);
+                VM\SimpleXmlVmRuntimeSupport::unsetChildProperty($object, $propName);
 
                 return null;
             }

@@ -26864,11 +26864,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new JitSimpleXmlExtensionHooksFacade (line 30)
-- new simplexml_load_string (line 182)
-- new simplexml_load_file (line 183)
-- new simplexml_import_dom (line 184)
+- new simplexml_load_string (line 194)
+- new simplexml_load_file (line 195)
+- new simplexml_import_dom (line 196)
 - 3 class method(s)
-- 33 closure(s)
+- 35 closure(s)
 
 ### `ext/simplexml/SimpleXmlElementAddAttribute.php`
 
@@ -62237,7 +62237,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/ReleaseUnsupportedExtensions.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 7 class method(s)
 
 ### `lib/Runtime.php`
 
@@ -66396,27 +66396,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 547)
 - new Variable (line 551)
 - new VM\BuiltinCallbackCatchRedirect (line 558)
-- new Variable (line 641)
-- new HashTable (line 666)
-- new Variable (line 672)
-- new Variable (line 687)
-- new Variable (line 696)
-- new Variable (line 716)
+- new Variable (line 644)
+- new HashTable (line 669)
+- new Variable (line 675)
+- new Variable (line 690)
+- new Variable (line 699)
 - new Variable (line 719)
-- new Variable (line 744)
-- new Variable (line 767)
-- new Variable (line 772)
-- new Variable (line 790)
+- new Variable (line 722)
+- new Variable (line 747)
+- new Variable (line 770)
+- new Variable (line 775)
 - new Variable (line 793)
-- new Variable (line 835)
-- new Variable (line 896)
-- new Error (line 902)
-- new Error (line 911)
-- new Error (line 934)
-- new Error (line 946)
+- new Variable (line 796)
+- new Variable (line 838)
+- new Variable (line 899)
+- new Error (line 905)
+- new Error (line 914)
+- new Error (line 937)
 - new Error (line 949)
-- new Frame (line 1009)
-- new Variable (line 1019)
+- new Error (line 952)
+- new Frame (line 1012)
+- new Variable (line 1022)
 - 46 class method(s)
 
 ### `lib/VM/Concern/VirtualPropertyHookEnforce.php`
@@ -67554,7 +67554,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/SimpleXmlVmRuntimeSupport.php`
 
 **Warnings** (review for bootstrap subset):
-- 17 class method(s)
+- 21 class method(s)
 
 ### `lib/VM/SplArrayCastJitHelper.php`
 

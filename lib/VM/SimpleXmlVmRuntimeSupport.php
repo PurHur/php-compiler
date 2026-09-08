@@ -37,6 +37,12 @@ final class SimpleXmlVmRuntimeSupport
     /** @var null|callable(ObjectEntry, Variable): bool */
     private static $dimensionIsEmpty = null;
 
+    /** @var null|callable(ObjectEntry): bool */
+    private static $isUnsetChildPropertySubject = null;
+
+    /** @var null|callable(ObjectEntry, string): void */
+    private static $unsetChildProperty = null;
+
     public static function clear(): void
     {
         self::$handles = null;
@@ -47,6 +53,8 @@ final class SimpleXmlVmRuntimeSupport
         self::$objectIsTruthy = null;
         self::$isDimensionSubject = null;
         self::$dimensionIsEmpty = null;
+        self::$isUnsetChildPropertySubject = null;
+        self::$unsetChildProperty = null;
     }
 
     /** @param callable(ObjectEntry): bool $hook */
@@ -95,6 +103,18 @@ final class SimpleXmlVmRuntimeSupport
     public static function setDimensionIsEmpty(callable $hook): void
     {
         self::$dimensionIsEmpty = $hook;
+    }
+
+    /** @param callable(ObjectEntry): bool $hook */
+    public static function setIsUnsetChildPropertySubject(callable $hook): void
+    {
+        self::$isUnsetChildPropertySubject = $hook;
+    }
+
+    /** @param callable(ObjectEntry, string): void $hook */
+    public static function setUnsetChildProperty(callable $hook): void
+    {
+        self::$unsetChildProperty = $hook;
     }
 
     public static function handles(ObjectEntry $object): bool
@@ -155,5 +175,26 @@ final class SimpleXmlVmRuntimeSupport
         }
 
         return (self::$dimensionIsEmpty)($object, $dim);
+    }
+
+    /**
+     * unset($sxe->child) subject — php-src ext/simplexml/sxe.c unset_property (#36204).
+     */
+    public static function isUnsetChildPropertySubject(ObjectEntry $object): bool
+    {
+        return null !== self::$isUnsetChildPropertySubject
+            && (self::$isUnsetChildPropertySubject)($object);
+    }
+
+    /**
+     * Remove a SimpleXMLElement child element by property name (no-op when unregistered).
+     */
+    public static function unsetChildProperty(ObjectEntry $object, string $propName): void
+    {
+        if (null === self::$unsetChildProperty) {
+            return;
+        }
+
+        (self::$unsetChildProperty)($object, $propName);
     }
 }

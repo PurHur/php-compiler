@@ -599,10 +599,13 @@ trait UserInvokeArrayAccessAndClosureCall
      * php-src zim_xmlreader_open / zim_xmlreader_XML inspect EX(This) even though the methods
      * are ZEND_ACC_STATIC — instance `$r->open()` / `$r->XML()` mutate $this and return bool
      * (#22630, re-#19330/#19308). Other static-via-instance calls omit the receiver (#22288).
+     *
+     * Class name is the php-src zend_class_entry name ({@code xmlreader}); lib must not import
+     * {@code ext\xmlreader} (#36204).
      */
     private function staticMethodKeepsInstanceThis(ClassEntry $declaring, string $methodLc): bool
     {
-        if (ext\xmlreader\VmXmlReader::CLASS_LC !== strtolower($declaring->name)) {
+        if ('xmlreader' !== strtolower($declaring->name)) {
             return false;
         }
 
