@@ -7834,6 +7834,7 @@ require_once __DIR__.'/../../../lib/VM/Concern/ObjectPropertyFetchDispatch.php';
 require_once __DIR__.'/../../../lib/VM/Concern/ArrayDimFetchDispatch.php';
 require_once __DIR__.'/../../../lib/VM/Concern/StaticPropertyFetchDispatch.php';
 require_once __DIR__.'/../../../lib/VM/Concern/UnsetDispatch.php';
+require_once __DIR__.'/../../../lib/VM/Concern/AssignDispatch.php';
 require_once __DIR__.'/../../../lib/VM/ObjectPropertyIterator.php';
 require_once __DIR__.'/../../../lib/VM/ObjectReadonlySupport.php';
 require_once __DIR__.'/../../../lib/VM/ObjectRegistry.php';

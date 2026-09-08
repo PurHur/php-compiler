@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8466 |
-| Phase A inventory files (M2 ratio SSOT) | 8466 |
+| PHP files on vm.php path | 8467 |
+| Phase A inventory files (M2 ratio SSOT) | 8467 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26546 |
+| Source constructs flagged (warnings) | 26549 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7580,7 +7580,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/TraitMethodFunctionStatic.php` | 0 | 4 |
 | `lib/TryCatchElseSyntaxRejector.php` | 0 | 2 |
 | `lib/TypedFunctionStaticSyntaxRejector.php` | 0 | 2 |
-| `lib/VM.php` | 0 | 49 |
+| `lib/VM.php` | 0 | 44 |
 | `lib/VM/AbstractPropertyHookCheck.php` | 0 | 1 |
 | `lib/VM/ArrayAccessDimension.php` | 0 | 3 |
 | `lib/VM/ArrayObjectJitHelper.php` | 0 | 23 |
@@ -8085,6 +8085,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/CompareStringableHelper.php` | 0 | 1 |
 | `lib/VM/CompareUnlikeHelper.php` | 0 | 1 |
 | `lib/VM/Concern/ArrayDimFetchDispatch.php` | 0 | 12 |
+| `lib/VM/Concern/AssignDispatch.php` | 0 | 8 |
 | `lib/VM/Concern/BuiltinHostExceptionDispatch.php` | 0 | 6 |
 | `lib/VM/Concern/ClassConstAndPropertyDefaultMaterialize.php` | 0 | 32 |
 | `lib/VM/Concern/ClassInheritDefineAndConstDeclare.php` | 0 | 18 |
@@ -62282,55 +62283,50 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 275)
-- new ObjectEntry (line 399)
-- new Variable (line 408)
-- new Variable (line 437)
-- new VM\GeneratorUncaughtThrow (line 452)
-- new VM\FiberUncaughtThrow (line 466)
-- new VM\DestructorThrowCatchSignal (line 471)
-- new Variable (line 594)
-- new Variable (line 614)
-- new Variable (line 688)
-- new Variable (line 942)
-- new Variable (line 1058)
-- new Variable (line 1113)
-- new Variable (line 1129)
-- new Error (line 1249)
-- new Variable (line 1734)
-- new Func\PHP (line 2474)
-- new ClosureState (line 2486)
-- new Variable (line 2521)
-- new CompileError (line 2614)
-- new Func\PHP (line 2624)
-- new Variable (line 2890)
-- new Variable (line 2899)
-- new GeneratorState (line 2974)
-- new Variable (line 3360)
-- new VM\ClassEntry (line 3516)
-- new ClassEntry (line 3552)
-- new Variable (line 3566)
-- new Variable (line 3569)
-- new ClassEntry (line 3607)
-- new CompileError (line 3652)
-- new ClassEntry (line 3679)
-- new CompileError (line 3744)
-- new ObjectEntry (line 3883)
-- new Variable (line 4173)
-- new Variable (line 4284)
-- new ParseError (line 4538)
-- new WeakMapIterator (line 4781)
-- new ObjectPropertyIterator (line 4786)
-- new Variable (line 5041)
-- new Error (line 5501)
-- new ClassEntry (line 5537)
-- new Variable (line 5538)
-- new VM\ClassProperty (line 5539)
-- new ObjectEntry (line 5542)
-- new Variable (line 5545)
-- new Variable (line 5571)
+- new Variable (line 277)
+- new ObjectEntry (line 401)
+- new Variable (line 410)
+- new Variable (line 439)
+- new VM\GeneratorUncaughtThrow (line 454)
+- new VM\FiberUncaughtThrow (line 468)
+- new VM\DestructorThrowCatchSignal (line 473)
+- new Variable (line 623)
+- new Variable (line 639)
+- new Error (line 759)
+- new Variable (line 1244)
+- new Func\PHP (line 1984)
+- new ClosureState (line 1996)
+- new Variable (line 2031)
+- new CompileError (line 2124)
+- new Func\PHP (line 2134)
+- new Variable (line 2400)
+- new Variable (line 2409)
+- new GeneratorState (line 2484)
+- new Variable (line 2870)
+- new VM\ClassEntry (line 3026)
+- new ClassEntry (line 3062)
+- new Variable (line 3076)
+- new Variable (line 3079)
+- new ClassEntry (line 3117)
+- new CompileError (line 3162)
+- new ClassEntry (line 3189)
+- new CompileError (line 3254)
+- new ObjectEntry (line 3393)
+- new Variable (line 3683)
+- new Variable (line 3794)
+- new ParseError (line 4048)
+- new WeakMapIterator (line 4291)
+- new ObjectPropertyIterator (line 4296)
+- new Variable (line 4551)
+- new Error (line 5011)
+- new ClassEntry (line 5047)
+- new Variable (line 5048)
+- new VM\ClassProperty (line 5049)
+- new ObjectEntry (line 5052)
+- new Variable (line 5055)
+- new Variable (line 5081)
 - 28 class method(s)
-- 3 closure(s)
+- 2 closure(s)
 
 ### `lib/VM/AbstractPropertyHookCheck.php`
 
@@ -65797,6 +65793,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new VM\ArrayAccessDimension (line 307)
 - new Variable (line 310)
 - 1 class method(s)
+
+### `lib/VM/Concern/AssignDispatch.php`
+
+**Warnings** (review for bootstrap subset):
+- trait AssignDispatch (line 23)
+- new Variable (line 63)
+- new Variable (line 83)
+- new Variable (line 150)
+- new Variable (line 394)
+- new Variable (line 506)
+- 2 class method(s)
+- 1 closure(s)
 
 ### `lib/VM/Concern/BuiltinHostExceptionDispatch.php`
 
