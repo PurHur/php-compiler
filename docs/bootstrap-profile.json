@@ -6412,6 +6412,7 @@
         "lib/JIT/Builtin/SessionUnset.php",
         "lib/JIT/Builtin/SessionWriteClose.php",
         "lib/JIT/Builtin/SettypeRuntime.php",
+        "lib/JIT/Builtin/Sha1Runtime.php",
         "lib/JIT/Builtin/ShmopRuntime.php",
         "lib/JIT/Builtin/ShuffleRuntime.php",
         "lib/JIT/Builtin/SilenceRuntime.php",
@@ -6635,6 +6636,7 @@
         "lib/JIT/Builtin/StringRmdir.php",
         "lib/JIT/Builtin/StringSem.php",
         "lib/JIT/Builtin/StringSerialize.php",
+        "lib/JIT/Builtin/StringSha1.php",
         "lib/JIT/Builtin/StringShmop.php",
         "lib/JIT/Builtin/StringSimilarText.php",
         "lib/JIT/Builtin/StringSimilarTextJit.php",
@@ -8721,9 +8723,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8487,
+        "inventory_files": 8489,
         "excluded": 0,
-        "eligible": 8487,
+        "eligible": 8489,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

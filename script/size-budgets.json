@@ -179,7 +179,7 @@
             "note": "TYPE_CLASS_CONST_FETCH runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/Context.php": {
-            "budget": 2869,
+            "budget": 2868,
             "target": 4000,
             "note": "FunctionProxyResolve + VariableOperandBinding + CompileToFile + DefineBuiltins + EditScaffoldModuleRebind extracted (#36387/#36199); Context hub under 4k"
         },
