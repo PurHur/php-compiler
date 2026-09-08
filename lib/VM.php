@@ -55,6 +55,7 @@ require_once __DIR__.'/VM/Concern/IssetDispatch.php';
 require_once __DIR__.'/VM/Concern/IncludeDispatch.php';
 require_once __DIR__.'/VM/Concern/FuncCallInitDispatch.php';
 require_once __DIR__.'/VM/Concern/NewDispatch.php';
+require_once __DIR__.'/VM/Concern/MethodCallInitDispatch.php';
 
 use PHPCompiler\BuiltinByRefParams;
 use PHPCompiler\Compiler\AttributeNames;
@@ -149,6 +150,7 @@ class VM {
     use IncludeDispatch;
     use FuncCallInitDispatch;
     use NewDispatch;
+    use MethodCallInitDispatch;
     const SUCCESS = 1;
     const FAILURE = 2;
 
@@ -1530,73 +1532,13 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_METHODCALL_INIT:
-                    $catchFrame = $this->guardUnboundThisRead($frame, (int) $op->arg1);
-                    if (null !== $catchFrame) {
-                        $frame = $catchFrame;
+                    $methodCallInitOutcome = $this->executeMethodCallInitDispatch($frame, $op);
+                    if ($methodCallInitOutcome instanceof Frame) {
+                        $frame = $methodCallInitOutcome;
                         goto restart;
                     }
-                    $receiver = $frame->scope[$op->arg1]->resolveIndirect();
-                    $methodName = $frame->scope[$op->arg2]->toString();
-                    if (Variable::TYPE_OBJECT !== $receiver->type
-                        && Variable::TYPE_ENUM_CASE !== $receiver->type) {
-                        if (Variable::TYPE_NULL === $receiver->type
-                            && '__invoke' === strtolower($methodName)) {
-                            $catchFrame = $this->dispatchVmError(
-                                'Value of type null is not callable',
-                                $frame
-                            );
-                            if (null !== $catchFrame) {
-                                $frame = $catchFrame;
-                                goto restart;
-                            }
-
-                            return self::EXCEPTION;
-                        }
-                        // zend_zval_value_name — bool prints true/false, not bool (#30054).
-                        $catchFrame = $this->dispatchVmError(
-                            sprintf(
-                                'Call to a member function %s() on %s',
-                                $methodName,
-                                $this->valueDebugTypeLabel($receiver)
-                            ),
-                            $frame
-                        );
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-
-                        return self::EXCEPTION;
-                    }
-                    if (Variable::TYPE_OBJECT === $receiver->type
-                        && VM\ResourceSupport::isResourceObject($receiver->toObject())) {
-                        $catchFrame = $this->dispatchVmError(
-                            sprintf('Call to a member function %s() on resource', $methodName),
-                            $frame
-                        );
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-
-                        return self::EXCEPTION;
-                    }
-                    $receiver = VM\EnumCaseSupport::receiverForInstanceMethod($receiver);
-                    $catchFrame = $this->initMethodCall(
-                        $frame,
-                        $receiver,
-                        $methodName,
-                        $op->objectCallInvoke
-                    );
-                    if (null !== $catchFrame) {
-                        $frame = $catchFrame;
-                        goto restart;
-                    }
-                    if (
-                        '__invoke' === strtolower($methodName)
-                        && null !== $receiver->toObject()->closureState
-                    ) {
-                        $frame->closureCallableSlot = $op->arg1;
+                    if (is_int($methodCallInitOutcome)) {
+                        return $methodCallInitOutcome;
                     }
                     break;
                 case OpCode::TYPE_ARG_SEND:
