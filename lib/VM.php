@@ -64,6 +64,7 @@ require_once __DIR__.'/VM/Concern/ConstFetchStaticCallInstanceofDispatch.php';
 require_once __DIR__.'/VM/Concern/DeclareClassLikeDispatch.php';
 require_once __DIR__.'/VM/Concern/ArgSendDispatch.php';
 require_once __DIR__.'/VM/Concern/VarFetchGlobalAndFunctionStaticDispatch.php';
+require_once __DIR__.'/VM/Concern/ListUnpackAndSpreadAssignDispatch.php';
 
 use PHPCompiler\BuiltinByRefParams;
 use PHPCompiler\Compiler\AttributeNames;
@@ -163,6 +164,7 @@ class VM {
     use DeclareClassLikeDispatch;
     use ArgSendDispatch;
     use VarFetchGlobalAndFunctionStaticDispatch;
+    use ListUnpackAndSpreadAssignDispatch;
     const SUCCESS = 1;
     const FAILURE = 2;
 
@@ -624,87 +626,15 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_LIST_UNPACK_CHECK:
-                    $unpackSlot = $frame->scope[$op->arg2];
-                    $unpack = $unpackSlot->resolveIndirect();
-                    if (null !== $op->block1) {
-                        if (!$this->variableIsListDestructUnpackable($unpack)) {
-                            // Plain / Traversable-only objects: Zend FETCH_LIST Error (#25096).
-                            if (Variable::TYPE_OBJECT === $unpack->type) {
-                                $className = $unpack->toObject()->class->name;
-                                $catchFrame = $this->dispatchVmError(
-                                    'Cannot use object of type ' . $className . ' as array',
-                                    $frame
-                                );
-                                if (null !== $catchFrame) {
-                                    $frame = $catchFrame;
-                                    goto restart;
-                                }
-                                break;
-                            }
-                            // By-ref list / `$r =& $s[$i]`: do not skip — FETCH_DIM_W + ASSIGN_REF
-                            // raise Zend string-offset or scalar-as-array Errors (#21910).
-                            if ($op->listUnpackHasByRef) {
-                                break;
-                            }
-                            foreach ($op->listUnpackNullInitSlots as $destSlot) {
-                                $dest = $frame->scope[(int) $destSlot];
-                                $dest->resolveIndirect()->null();
-                                $this->markScopeSlotInitialized($frame, (int) $destSlot);
-                            }
-                            if (null !== $op->block1) {
-                                foreach ($op->listUnpackNullInitSlots as $destSlot) {
-                                    unset($op->block1->constants[(int) $destSlot]);
-                                }
-                            }
-                            // String and other non-array RHS: skip slot binds, targets read as NULL (#4325, #10486).
-                            $frame = $this->frameForBranch($frame, $op->block1);
-                            goto restart;
-                        }
-                        $catchFrame = $this->materializeListDestructIterableRhs($unpackSlot, $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                        $frame->listUnpackAssignMergeBlock = $op->block1;
-                        break;
-                    }
-                    break;
                 case OpCode::TYPE_LIST_SPREAD_ASSIGN:
-                    if (!CompilerVersion::supportsListDestructuringSpreadAssign()) {
-                        throw new \Error('Spread operator is not supported in assignments');
+                    $listUnpackSpreadOutcome = $this->executeListUnpackAndSpreadAssignDispatch($frame, $op);
+                    if ($listUnpackSpreadOutcome instanceof Frame) {
+                        $frame = $listUnpackSpreadOutcome;
+                        goto restart;
                     }
-                    $dest = $frame->scope[$op->arg1];
-                    $src = $frame->scope[$op->arg2]->resolveIndirect();
-                    if (Variable::TYPE_ARRAY !== $src->type) {
-                        if (null !== $op->block1) {
-                            $frame = $this->frameForBranch($frame, $op->block1);
-                            goto restart;
-                        }
-                        break;
+                    if (is_int($listUnpackSpreadOutcome)) {
+                        return $listUnpackSpreadOutcome;
                     }
-                    if (!isset($frame->block->constants[$op->arg3])) {
-                        throw new \LogicException('list spread assign requires compile-time offset');
-                    }
-                    $offset = $frame->block->constants[$op->arg3]->toInt();
-                    $ht = $src->toArray();
-                    $excludedKeys = $op->listSpreadExcludedKeys;
-                    if ([] !== $excludedKeys) {
-                        $tail = $ht->copyListSpreadTail($offset, $excludedKeys);
-                    } else {
-                        if (!\PHPCompiler\ext\standard\VmArray::isList($ht)) {
-                            $catchFrame = $this->dispatchVmTypeError(
-                                new \TypeError('Cannot unpack array with string keys'),
-                                $frame
-                            );
-                            if (null !== $catchFrame) {
-                                $frame = $catchFrame;
-                                goto restart;
-                            }
-                            break;
-                        }
-                        $tail = $ht->sliceCopy($offset, null);
-                    }
-                    $dest->array($tail);
                     break;
                 case OpCode::TYPE_ARRAY_DIM_FETCH:
                 case OpCode::TYPE_ARRAY_DIM_FETCH_WRITE:

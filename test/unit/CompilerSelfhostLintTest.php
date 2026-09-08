@@ -458,6 +458,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/VM/Concern/IssetDispatch.php',
             'lib/VM/Concern/IteratorToArrayConvert.php',
             'lib/VM/Concern/JumpCaseDispatch.php',
+            'lib/VM/Concern/ListUnpackAndSpreadAssignDispatch.php',
             'lib/VM/Concern/MethodCallAndStaticCallableInit.php',
             'lib/VM/Concern/MethodCallInitDispatch.php',
             'lib/VM/Concern/NewDispatch.php',
