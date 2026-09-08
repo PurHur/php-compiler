@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8509 |
-| Phase A inventory files (M2 ratio SSOT) | 8509 |
+| PHP files on vm.php path | 8510 |
+| Phase A inventory files (M2 ratio SSOT) | 8510 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26624 |
+| Source constructs flagged (warnings) | 26626 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7608,7 +7608,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/TraitMethodFunctionStatic.php` | 0 | 4 |
 | `lib/TryCatchElseSyntaxRejector.php` | 0 | 2 |
 | `lib/TypedFunctionStaticSyntaxRejector.php` | 0 | 2 |
-| `lib/VM.php` | 0 | 34 |
+| `lib/VM.php` | 0 | 28 |
 | `lib/VM/AbstractPropertyHookCheck.php` | 0 | 1 |
 | `lib/VM/ArrayAccessDimension.php` | 0 | 3 |
 | `lib/VM/ArrayObjectJitHelper.php` | 0 | 23 |
@@ -8125,6 +8125,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/Concern/CoalesceNullsafeSilenceExitDispatch.php` | 0 | 2 |
 | `lib/VM/Concern/ConstFetchStaticCallInstanceofDispatch.php` | 0 | 2 |
 | `lib/VM/Concern/ConstructMarkAndPendingOutboundCall.php` | 0 | 2 |
+| `lib/VM/Concern/DeclareClassLikeDispatch.php` | 0 | 8 |
 | `lib/VM/Concern/DeprecationNoticeEmit.php` | 0 | 3 |
 | `lib/VM/Concern/EchoPrintEvalDispatch.php` | 0 | 2 |
 | `lib/VM/Concern/ExecuteIncDecAndScopeOperandRead.php` | 0 | 14 |
@@ -62484,39 +62485,33 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 302)
-- new ObjectEntry (line 426)
-- new Variable (line 435)
-- new Variable (line 464)
-- new VM\GeneratorUncaughtThrow (line 479)
-- new VM\FiberUncaughtThrow (line 493)
-- new VM\DestructorThrowCatchSignal (line 498)
-- new Variable (line 648)
-- new Variable (line 664)
-- new Error (line 784)
-- new Func\PHP (line 1089)
-- new ClosureState (line 1101)
-- new Variable (line 1136)
-- new CompileError (line 1229)
-- new Func\PHP (line 1239)
-- new Variable (line 1312)
-- new Variable (line 1321)
-- new VM\ClassEntry (line 1372)
-- new ClassEntry (line 1408)
-- new Variable (line 1422)
-- new Variable (line 1425)
-- new ClassEntry (line 1463)
-- new CompileError (line 1508)
-- new ClassEntry (line 1535)
-- new CompileError (line 1600)
-- new Variable (line 2181)
-- new Error (line 2641)
-- new ClassEntry (line 2677)
-- new Variable (line 2678)
-- new VM\ClassProperty (line 2679)
-- new ObjectEntry (line 2682)
-- new Variable (line 2685)
-- new Variable (line 2711)
+- new Variable (line 304)
+- new ObjectEntry (line 428)
+- new Variable (line 437)
+- new Variable (line 466)
+- new VM\GeneratorUncaughtThrow (line 481)
+- new VM\FiberUncaughtThrow (line 495)
+- new VM\DestructorThrowCatchSignal (line 500)
+- new Variable (line 650)
+- new Variable (line 666)
+- new Error (line 786)
+- new Func\PHP (line 1091)
+- new ClosureState (line 1103)
+- new Variable (line 1138)
+- new CompileError (line 1231)
+- new Func\PHP (line 1241)
+- new Variable (line 1314)
+- new Variable (line 1323)
+- new Variable (line 1391)
+- new Variable (line 1394)
+- new Variable (line 1982)
+- new Error (line 2442)
+- new ClassEntry (line 2478)
+- new Variable (line 2479)
+- new VM\ClassProperty (line 2480)
+- new ObjectEntry (line 2483)
+- new Variable (line 2486)
+- new Variable (line 2512)
 - 28 class method(s)
 
 ### `lib/VM/AbstractPropertyHookCheck.php`
@@ -66122,6 +66117,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - trait ConstructMarkAndPendingOutboundCall (line 18)
 - 5 class method(s)
+
+### `lib/VM/Concern/DeclareClassLikeDispatch.php`
+
+**Warnings** (review for bootstrap subset):
+- trait DeclareClassLikeDispatch (line 26)
+- new VM\ClassEntry (line 40)
+- new ClassEntry (line 84)
+- new ClassEntry (line 109)
+- new CompileError (line 153)
+- new ClassEntry (line 188)
+- new CompileError (line 252)
+- 4 class method(s)
 
 ### `lib/VM/Concern/DeprecationNoticeEmit.php`
 
