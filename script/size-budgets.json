@@ -179,9 +179,9 @@
             "note": "TYPE_CLASS_CONST_FETCH runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/Context.php": {
-            "budget": 2867,
+            "budget": 2486,
             "target": 3500,
-            "note": "DefineBuiltins + CompileToFile + EditScaffold + VariableOperandBinding + FunctionProxyAndNestedJitKernel extracted (#36387); continue toward \u22643.5k"
+            "note": "DefineBuiltins + CompileToFile + EditScaffold + VariableOperandBinding + FunctionProxyAndNestedJitKernel + TypeAndStructMap extracted (#36387); continue toward \u22643.5k"
         },
         "lib/JIT/ContextEditScaffoldModuleRebind.php": {
             "budget": 315,
@@ -232,6 +232,11 @@
             "budget": 707,
             "target": 800,
             "note": "Function-proxy resolve + NestedJIT kernel / external-stub registry extracted from Context (#36387)"
+        },
+        "lib/JIT/ContextTypeAndStructMap.php": {
+            "budget": 407,
+            "target": 500,
+            "note": "castToBool / type\u2194LLVM map / structField* extracted from Context (#36387)"
         }
     },
     "script_file_count": {
