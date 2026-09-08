@@ -56,6 +56,7 @@ require_once __DIR__.'/VM/Concern/IncludeDispatch.php';
 require_once __DIR__.'/VM/Concern/FuncCallInitDispatch.php';
 require_once __DIR__.'/VM/Concern/NewDispatch.php';
 require_once __DIR__.'/VM/Concern/MethodCallInitDispatch.php';
+require_once __DIR__.'/VM/Concern/EchoPrintEvalDispatch.php';
 
 use PHPCompiler\BuiltinByRefParams;
 use PHPCompiler\Compiler\AttributeNames;
@@ -151,6 +152,7 @@ class VM {
     use FuncCallInitDispatch;
     use NewDispatch;
     use MethodCallInitDispatch;
+    use EchoPrintEvalDispatch;
     const SUCCESS = 1;
     const FAILURE = 2;
 
@@ -864,128 +866,34 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_ECHO:
-                    if ($frame->suppressNextEcho) {
-                        $frame->suppressNextEcho = false;
-                        break;
-                    }
-                    // echo $this outside object context — Error (zend_execute.c ZEND_ECHO / FETCH_THIS, #31901).
-                    $catchFrame = $this->guardUnboundThisRead($frame, (int) $op->arg1);
-                    if (null !== $catchFrame) {
-                        $frame = $catchFrame;
+                    $echoOutcome = $this->executeEchoDispatch($frame, $op);
+                    if ($echoOutcome instanceof Frame) {
+                        $frame = $echoOutcome;
                         goto restart;
                     }
-                    try {
-                        if (!VM\SapiOutput::headersSent()) {
-                            VM\HeaderCallbackQueue::runBeforeOutput($this->context);
-                        }
-                        $printed = $this->valueToPrintString(
-                            $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg1),
-                            $frame
-                        );
-                    } catch (\Error $e) {
-                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                        break;
-                    } catch (\TypeError $e) {
-                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                        break;
-                    } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
-                        // __toString throw during echo — do not continue try body (#29521).
-                        $frame = $this->resumeAfterBuiltinCallbackCatchRedirect($redirect);
-                        goto restart;
-                    } catch (VM\MagicMethodInvocationAborted) {
-                        break;
+                    if (is_int($echoOutcome)) {
+                        return $echoOutcome;
                     }
-                    $this->releaseVmStatementDeadTemps($frame, (int) $op->arg1);
-                    $echoFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
-                    VM\OutputBuffer::append($printed, $echoFile, (int) ($op->arg2 ?? 0));
                     break;
                 case OpCode::TYPE_PRINT:
-                    // print $this outside object context — Error (zend_execute.c ZEND_PRINT / FETCH_THIS, #31901).
-                    $catchFrame = $this->guardUnboundThisRead($frame, (int) $op->arg2);
-                    if (null !== $catchFrame) {
-                        $frame = $catchFrame;
+                    $printOutcome = $this->executePrintDispatch($frame, $op);
+                    if ($printOutcome instanceof Frame) {
+                        $frame = $printOutcome;
                         goto restart;
                     }
-                    try {
-                        if (!VM\SapiOutput::headersSent()) {
-                            VM\HeaderCallbackQueue::runBeforeOutput($this->context);
-                        }
-                        $printFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
-                        VM\OutputBuffer::append(
-                            $this->valueToPrintString($frame->scope[$op->arg2], $frame),
-                            $printFile,
-                            (int) ($op->arg3 ?? 0)
-                        );
-                        $frame->scope[$op->arg1]->int(1);
-                    } catch (\Error $e) {
-                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                        break;
-                    } catch (\TypeError $e) {
-                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                        break;
-                    } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
-                        // __toString throw during print — do not continue try body (#29521).
-                        $frame = $this->resumeAfterBuiltinCallbackCatchRedirect($redirect);
-                        goto restart;
-                    } catch (VM\MagicMethodInvocationAborted) {
-                        break;
+                    if (is_int($printOutcome)) {
+                        return $printOutcome;
                     }
                     break;
                 case OpCode::TYPE_EVAL:
-                    $codeVar = $frame->scope[$op->arg2]->resolveIndirect();
-                    $dest = $frame->scope[$op->arg1];
-                    if (Variable::TYPE_STRING !== $codeVar->type) {
-                        return $this->raise('eval() expects a string argument', $frame);
-                    }
-                    try {
-                        $evalResult = VmEval::evalCodeInFrame(
-                            $this,
-                            $frame,
-                            $codeVar->toString()
-                        );
-                    } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
-                        // Outer try matched from nested eval runFrames — resume catch here (#25816).
-                        $frame = $this->resumeAfterBuiltinCallbackCatchRedirect($redirect);
+                    $evalOutcome = $this->executeEvalDispatch($frame, $op);
+                    if ($evalOutcome instanceof Frame) {
+                        $frame = $evalOutcome;
                         goto restart;
-                    } catch (\ParseError $e) {
-                        $catchFrame = $this->dispatchVmParseError($e, $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-
-                        return null;
-                    } catch (\CompileError $e) {
-                        // php-src: zend_throw_exception(CompileError) is catchable in eval (#25114);
-                        // zend_inheritance.c zend_error_noreturn(E_COMPILE_ERROR) is not (#22922, #22329).
-                        if (!VmEval::isCatchableCompileError($e)) {
-                            $this->raiseEvalCompileFatal($e, $frame);
-                        }
-                        $catchFrame = $this->dispatchVmEvalCompileError($e, $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-
-                        return null;
                     }
-                    $dest->copyFrom($evalResult);
+                    if (is_int($evalOutcome)) {
+                        return $evalOutcome;
+                    }
                     break;
                 case OpCode::TYPE_COALESCE:
                     $check = $frame->scope[$op->arg2]->resolveIndirect();
