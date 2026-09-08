@@ -18,7 +18,7 @@ final class ContextCompileToFileLazyHttpResponseRuntimeShrinkTest extends TestCa
 {
     public function testCompileToFileDropsEagerHttpResponseEnsure(): void
     {
-        $context = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $context = (string) file_get_contents(__DIR__.'/../../lib/JIT/ContextCompileToFile.php');
         $this->assertStringContainsString('#35803', $context);
         $pos = strpos($context, 'public function compileToFile');
         $this->assertNotFalse($pos);

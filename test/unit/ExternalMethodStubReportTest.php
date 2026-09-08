@@ -47,7 +47,7 @@ final class ExternalMethodStubReportTest extends TestCase
     /** compileToFile() is the finalisation point, so the report must fire before object emit. */
     public function testReportIsInvokedFromCompileToFile(): void
     {
-        $source = (string) file_get_contents(\dirname(__DIR__, 2).'/lib/JIT/Context.php');
+        $source = (string) file_get_contents(\dirname(__DIR__, 2).'/lib/JIT/ContextCompileToFile.php');
 
         $compileToFile = strpos($source, 'public function compileToFile(');
         $this->assertIsInt($compileToFile);

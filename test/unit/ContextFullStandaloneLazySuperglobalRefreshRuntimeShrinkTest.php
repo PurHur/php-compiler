@@ -21,7 +21,7 @@ final class ContextFullStandaloneLazySuperglobalRefreshRuntimeShrinkTest extends
         $this->assertStringContainsString('#35137', $context);
         $fullPos = strpos($context, 'private function ensureFullStandaloneBodies');
         $this->assertNotFalse($fullPos);
-        $fullEnd = strpos($context, 'public function compileToFile', $fullPos);
+        $fullEnd = strpos($context, 'public function jitResult', $fullPos);
         $this->assertNotFalse($fullEnd);
         $fullBody = substr($context, $fullPos, $fullEnd - $fullPos);
 
@@ -53,7 +53,7 @@ final class ContextFullStandaloneLazySuperglobalRefreshRuntimeShrinkTest extends
 
     public function testCompileToFileEnsuresSuperglobalRefreshForAllStandalone(): void
     {
-        $context = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $context = (string) file_get_contents(__DIR__.'/../../lib/JIT/ContextCompileToFile.php');
         $compilePos = strpos($context, 'public function compileToFile(string $file)');
         $this->assertNotFalse($compilePos);
         $compileSlice = substr($context, $compilePos, 3500);
