@@ -6939,6 +6939,7 @@ require_once __DIR__.'/../../../lib/JIT/CompileCacheKeyLayout.php';
 require_once __DIR__.'/../../../lib/JIT/CompileCacheBitcodePersist.php';
 require_once __DIR__.'/../../../lib/JIT/CompileCacheRecording.php';
 require_once __DIR__.'/../../../lib/JIT/CompileCacheEditSession.php';
+require_once __DIR__.'/../../../lib/JIT/CompileCacheProjectMembers.php';
 require_once __DIR__.'/../../../lib/JIT/CompileCache.php';
 require_once __DIR__.'/../../../lib/JIT/CompilerOperandChainNative.php';
 require_once __DIR__.'/../../../lib/JIT/Context.php';
