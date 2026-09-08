@@ -91,7 +91,7 @@
         "lib/JIT/CompileCacheProjectIndexFacade.php": {
             "budget": 105,
             "target": 200,
-            "note": "Project index + entry→members public delegates extracted from CompileCache (#36387)"
+            "note": "Project index + entry\u2192members public delegates extracted from CompileCache (#36387)"
         },
         "lib/JIT/CompileCacheHubState.php": {
             "budget": 106,
@@ -136,12 +136,12 @@
         "lib/JIT/CompileCacheProjectIndex.php": {
             "budget": 150,
             "target": 250,
-            "note": "Project identity / member hashes / edit-scaffold key; entry→members in CompileCacheProjectEntryMembers (#36387)"
+            "note": "Project identity / member hashes / edit-scaffold key; entry\u2192members in CompileCacheProjectEntryMembers (#36387)"
         },
         "lib/JIT/CompileCacheProjectEntryMembers.php": {
             "budget": 124,
             "target": 200,
-            "note": "Entry→member-path durability for warm/edit boots extracted from ProjectIndex (#36387/#36199)"
+            "note": "Entry\u2192member-path durability for warm/edit boots extracted from ProjectIndex (#36387/#36199)"
         },
         "lib/VM/Concern/FuncCallExecDispatch.php": {
             "budget": 336,
@@ -151,7 +151,7 @@
         "lib/JIT/CompileCacheRecordingMemberPath.php": {
             "budget": 100,
             "target": 200,
-            "note": "LLVM-symbol → project-member path attribution extracted from Recording (#36387/#36199)"
+            "note": "LLVM-symbol \u2192 project-member path attribution extracted from Recording (#36387/#36199)"
         },
         "lib/JIT/CompileCacheBitcodePersist.php": {
             "budget": 59,
@@ -179,9 +179,9 @@
             "note": "TYPE_CLASS_CONST_FETCH runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/Context.php": {
-            "budget": 1041,
+            "budget": 1043,
             "target": 3500,
-            "note": "ModuleCompileAndOptimize + ScriptGlobalsAndIncludeTracking + LlvmConstantsAndRegistry + StandaloneBodies + peers (#36387/#36199); continue toward ≤3.5k"
+            "note": "ModuleCompileAndOptimize + ScriptGlobalsAndIncludeTracking + LlvmConstantsAndRegistry + FreeDeadAndConstantFetch + StandaloneBodies + peers (#36387/#36199); continue toward \u22643.5k"
         },
         "lib/JIT/ContextEditScaffoldModuleRebind.php": {
             "budget": 315,
@@ -224,9 +224,9 @@
             "note": "TYPE_NEW runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/ContextVariableOperandBinding.php": {
-            "budget": 1155,
+            "budget": 768,
             "target": 1200,
-            "note": "Operand→Variable binding, freeDeadVariables, constantFetch extracted from Context (#36387)"
+            "note": "Operand\u2192Variable binding extracted from Context; freeDead/CONST_FETCH in ContextFreeDeadAndConstantFetch (#36387)"
         },
         "lib/JIT/ContextFunctionProxyAndNestedJitKernel.php": {
             "budget": 707,
@@ -236,12 +236,12 @@
         "lib/JIT/ContextTypeAndStructMap.php": {
             "budget": 407,
             "target": 500,
-            "note": "castToBool / type↔LLVM map / structField* extracted from Context (#36387)"
+            "note": "castToBool / type\u2194LLVM map / structField* extracted from Context (#36387)"
         },
         "lib/JIT/ContextStandaloneBodies.php": {
             "budget": 289,
             "target": 400,
-            "note": "Thin/full standalone AOT body install (isThinStandaloneAotMain…ensureFullStandaloneBodies) extracted from Context (#36387)"
+            "note": "Thin/full standalone AOT body install (isThinStandaloneAotMain\u2026ensureFullStandaloneBodies) extracted from Context (#36387)"
         },
         "lib/JIT/ContextModuleCompileAndOptimize.php": {
             "budget": 538,
@@ -257,6 +257,11 @@
             "budget": 433,
             "target": 500,
             "note": "lookupFunction / registerType / namedStructType / constantFrom* / constantArray|ObjectFromVm extracted from Context (#36387)"
+        },
+        "lib/JIT/ContextFreeDeadAndConstantFetch.php": {
+            "budget": 417,
+            "target": 500,
+            "note": "freeDeadVariables + constantFetch / stdio/zend/enum helpers extracted from ContextVariableOperandBinding (#36387)"
         }
     },
     "script_file_count": {
