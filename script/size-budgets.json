@@ -34,9 +34,19 @@
             "note": "helper-cache granularity; Fingerprint+Link+Bind extracts (#36387/#36403); sorted linkObjects (#36399); refusePrelinkGcMixReason (#36401)"
         },
         "lib/JIT/CompileCache.php": {
-            "budget": 63,
+            "budget": 65,
             "target": 2000,
-            "note": "MCJIT/AOT warm cache; SemanticFileParts + SemanticHashFacades + PartialEmitDemote + ArtifactPersist + EditScaffold(+Plan+Strip+Restore) + ProjectIndexFacade + KeyLayoutFacade + HubState + BitcodePersist + Recording + EditSession + ProjectMembers + ArtifactFacade extracts (#36387/#36403) "
+            "note": "MCJIT/AOT warm cache; SemanticFileParts + SemanticHashFacades + PartialEmitDemote(+Llvm) + ArtifactPersist + EditScaffold(+Plan+Strip+Restore) + ProjectIndexFacade + KeyLayoutFacade + HubState + BitcodePersist + Recording + EditSession + ProjectMembers + ArtifactFacade extracts (#36387/#36403) "
+        },
+        "lib/JIT/CompileCachePartialEmitDemote.php": {
+            "budget": 140,
+            "target": 250,
+            "note": "Partial-edit demote orchestration; LLVM surgery in CompileCachePartialEmitLlvm (#36387)"
+        },
+        "lib/JIT/CompileCachePartialEmitLlvm.php": {
+            "budget": 230,
+            "target": 350,
+            "note": "Partial-edit LLVM rename+declaration demote + const-global prune + nm symbol probe (#36387)"
         },
         "lib/JIT/CompileCacheRecording.php": {
             "budget": 276,
