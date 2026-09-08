@@ -487,7 +487,28 @@ function run(string $filename, string $code, array $options): void
     };
 
     // Fast warm path for single-file scripts: restore before include discovery / Runtime (#36387).
-    if ('' === $code && '-' !== $filename && is_file($filename) && [] === $includes && !$skipBundle) {
+    // Multi-file projects (prior entry→members map with >1 path) must not restore from entry
+    // bytes alone — a require()'d unit can change while the entry is unchanged (#36382 /
+    // IncludeHelper Composer graphs). Those hits go through project-index member hashes below.
+    $allowEarlyEntryArtifactRestore = true;
+    if (
+        \PHPCompiler\JIT\CompileCache::isEnabled()
+        && '-' !== $filename
+        && is_file($filename)
+    ) {
+        $priorMembers = \PHPCompiler\JIT\CompileCache::lookupEntryMembers($filename);
+        if (\is_array($priorMembers) && \count($priorMembers) > 1) {
+            $allowEarlyEntryArtifactRestore = false;
+        }
+    }
+    if (
+        $allowEarlyEntryArtifactRestore
+        && '' === $code
+        && '-' !== $filename
+        && is_file($filename)
+        && [] === $includes
+        && !$skipBundle
+    ) {
         $codeProbe = (string) file_get_contents($filename);
         if ($tryArtifactRestore($filename, $codeProbe, $options)) {
             $restoreUserScriptEnv();
@@ -649,7 +670,14 @@ function run(string $filename, string $code, array $options): void
     }
 
     // Bundled multi-file projects: restore after SourceBundler rewrote $code (#36387).
-    if ($tryArtifactRestore($filename, $code, $options)) {
+    // Unchanged multi-member projects already returned via project-index member hashes.
+    // Reaching here with >1 members means a unit changed (or scaffold armed) — do not
+    // restore from entry/incremental-require text alone (#36382 IncludeHelper graphs:
+    // require_once entry bytes stay fixed while vendor units change).
+    if (
+        \count(\PHPCompiler\JIT\CompileCache::projectMembers()) <= 1
+        && $tryArtifactRestore($filename, $code, $options)
+    ) {
         $restoreUserScriptEnv();
 
         return;

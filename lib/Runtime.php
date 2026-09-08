@@ -1023,10 +1023,22 @@ class Runtime {
 
         // Unchanged-source warm path: restore linked binary and skip loadJitContext + link (#36387).
         // Bitcode-only restore still pays ~5s of Context init / object emit for hello-world.
+        //
+        // Multi-file / edit-scaffold projects must NOT restore via entry-only computeKey here.
+        // Incremental Composer graphs (#36382) pass a synthetic require_once entry whose bytes
+        // stay fixed while a vendor unit (e.g. Nyholm Stream.php) changes — restoring aot.bin
+        // from that key ships a stale binary and skips edit-scaffold re-lower (artifact honesty).
+        // Full multi-member warm hits go through project-index member hashes in bin/compile.php.
         $artifactCacheKey = null;
         $skipDebugArtifact = JIT\AotDebugSymbols::isEnabled() || null !== $this->debugFile;
+        $projectMemberCount = \count(JIT\CompileCache::projectMembers());
+        $skipEntryOnlyArtifact = $projectMemberCount > 1
+            || JIT\CompileCache::isEditScaffoldActive()
+            || [] !== JIT\CompileCache::editChangedMembers()
+            || null !== JIT\CompileCache::pendingEditScaffoldKey();
         if (
             !$skipDebugArtifact
+            && !$skipEntryOnlyArtifact
             && null !== $block
             && is_string($sourceCode)
             && is_string($sourceFilename)
@@ -1050,6 +1062,14 @@ class Runtime {
 
                 return;
             }
+        } elseif (
+            !$skipDebugArtifact
+            && is_string($sourceCode)
+            && is_string($sourceFilename)
+            && JIT\CompileCache::isEnabled()
+        ) {
+            // Still bind the key for later persist after a real emit (#36387).
+            $artifactCacheKey = JIT\CompileCache::computeKey($sourceFilename, $sourceCode);
         }
 
         $needsPregPrelink = Block::containsPregPrelinkBuiltinCalls($block);
