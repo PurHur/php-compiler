@@ -179,9 +179,9 @@
             "note": "TYPE_CLASS_CONST_FETCH runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/Context.php": {
-            "budget": 902,
+            "budget": 904,
             "target": 3500,
-            "note": "ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml proxies wiring + ScopeLifecycle peers (#36387/#36199); continue toward \u22643.5k"
+            "note": "WeakAndPhpToken + FiberGeneratorAndClosure + ExceptionAndError + Spl* + DirectoryAndFile + Reflection + DateAndXml + FinfoPdoAndXml proxies wiring + ScopeLifecycle/LlvmConstants/FreeDead/ScriptGlobals peers (#36387/#36199); continue toward \u22643.5k"
         },
         "lib/JIT/ContextEditScaffoldModuleRebind.php": {
             "budget": 315,
@@ -276,7 +276,7 @@
         "lib/JIT/ContextDefineBuiltinFunctionProxies.php": {
             "budget": 59,
             "target": 200,
-            "note": "is_null + peer dispatch hub; ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml peers (#36387)"
+            "note": "is_null + peer dispatch hub; FiberGeneratorAndClosure + ExceptionAndError + WeakAndPhpToken + Spl* + DirectoryAndFile + Reflection + DateAndXml + FinfoPdoAndXml peers (#36387)"
         },
         "lib/JIT/ContextDefineBuiltinFunctionProxiesDirectoryAndFile.php": {
             "budget": 151,
@@ -352,6 +352,11 @@
             "budget": 99,
             "target": 150,
             "note": "finfo/PDO/XMLReader/XMLWriter/Dom TokenList proxies extracted from DateAndXml (#36387)"
+        },
+        "lib/JIT/ContextDefineBuiltinFunctionProxiesFiberGeneratorAndClosure.php": {
+            "budget": 34,
+            "target": 80,
+            "note": "Fiber/Generator/ClosureBind registerJitMethods wiring extracted from FunctionProxies hub (#36387)"
         }
     },
     "script_file_count": {
