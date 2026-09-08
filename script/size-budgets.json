@@ -34,9 +34,9 @@
             "note": "helper-cache granularity; Fingerprint+Link+Bind extracts (#36387/#36403); sorted linkObjects (#36399); refusePrelinkGcMixReason (#36401)"
         },
         "lib/JIT/CompileCache.php": {
-            "budget": 65,
+            "budget": 67,
             "target": 2000,
-            "note": "docblock compact + BitcodeAotStamp + PartialEmitPruneGlobals hub requires (#36387/#36403); MCJIT/AOT warm cache extracts"
+            "note": "docblock compact + BitcodeAotStamp + PartialEmitSymbolProbe hub requires (#36387/#36403); MCJIT/AOT warm cache extracts"
         },
         "lib/JIT/CompileCacheArtifactPersist.php": {
             "budget": 136,
@@ -49,14 +49,14 @@
             "note": "User .o + helper-slug link-manifest mid-tier warm restore extracted from ArtifactPersist (#36387/#36199)"
         },
         "lib/JIT/CompileCachePartialEmitDemote.php": {
-            "budget": 140,
+            "budget": 133,
             "target": 250,
-            "note": "Partial-edit demote orchestration; LLVM surgery in CompileCachePartialEmitLlvm (#36387)"
+            "note": "Partial-edit demote orchestration; LLVM demote in PartialEmitLlvm; probes in SymbolProbe (#36387)"
         },
         "lib/JIT/CompileCachePartialEmitLlvm.php": {
-            "budget": 152,
-            "target": 250,
-            "note": "Partial-edit LLVM rename+declaration demote + nm symbol probe; prune in PartialEmitPruneGlobals (#36387)"
+            "budget": 79,
+            "target": 150,
+            "note": "Partial-edit LLVM rename+declaration demote; probes in SymbolProbe; prune in PruneGlobals (#36387)"
         },
         "lib/JIT/CompileCachePartialEmitPruneGlobals.php": {
             "budget": 92,
@@ -192,6 +192,11 @@
             "budget": 227,
             "target": 400,
             "note": "TYPE_ISSET runFramesInner body extracted from VM.php (#36403)"
+        },
+        "lib/JIT/CompileCachePartialEmitSymbolProbe.php": {
+            "budget": 96,
+            "target": 150,
+            "note": "Shared-runtime demote candidacy + LLVM name + nm objectDefinedSymbols extracted from PartialEmitLlvm (#36387/#36199)"
         }
     },
     "script_file_count": {

@@ -5,17 +5,19 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 require_once __DIR__.'/CompileCachePartialEmitPruneGlobals.php';
+require_once __DIR__.'/CompileCachePartialEmitSymbolProbe.php';
 require_once __DIR__.'/CompileCachePartialEmitLlvm.php';
 
 /**
  * Partial-edit object demote for AOT edit-scaffold (#36387 / #36199).
  *
  * Orchestrates keep/strip candidate selection before TargetMachine emit on partial
- * keep. LLVM rename+declaration demote and prior-object symbol probes live in
- * {@see CompileCachePartialEmitLlvm}; unused const-global prune in
- * {@see CompileCachePartialEmitPruneGlobals} (split-TU / size-budget).
- * CompileCache keeps a thin {@see CompileCache::demoteBodiesForPartialObjectEmit()}
- * delegate via {@see CompileCacheEditSession}.
+ * keep. LLVM rename+declaration demote lives in {@see CompileCachePartialEmitLlvm};
+ * shared-runtime / nm symbol probes in {@see CompileCachePartialEmitSymbolProbe};
+ * unused const-global prune in {@see CompileCachePartialEmitPruneGlobals}
+ * (split-TU / size-budget). CompileCache keeps a thin
+ * {@see CompileCache::demoteBodiesForPartialObjectEmit()} delegate via
+ * {@see CompileCacheEditSession}.
  *
  * Before TargetMachine emit on partial keep: drop bodies that already exist in the
  * prior `aot.o`, leaving declarations. Rebuild set (stripped user symbols + main +
@@ -46,7 +48,7 @@ final class CompileCachePartialEmitDemote
         if (null === $baseObject || !$editScaffoldPartial) {
             return 0;
         }
-        $prevDefs = CompileCachePartialEmitLlvm::objectDefinedSymbols($baseObject);
+        $prevDefs = CompileCachePartialEmitSymbolProbe::objectDefinedSymbols($baseObject);
         if ([] === $prevDefs) {
             return 0;
         }
@@ -59,7 +61,7 @@ final class CompileCachePartialEmitDemote
         }
         foreach ([$context->initFunc, $context->shutdownFunc] as $lifecycle) {
             if ($lifecycle instanceof \PHPLLVM\Value\Function_) {
-                $n = CompileCachePartialEmitLlvm::llvmFunctionName($context, $lifecycle);
+                $n = CompileCachePartialEmitSymbolProbe::llvmFunctionName($context, $lifecycle);
                 if ('' !== $n) {
                     $mustKeepBody[$n] = true;
                 }
@@ -72,7 +74,7 @@ final class CompileCachePartialEmitDemote
             }
         }
         foreach (array_keys($prevDefs) as $name) {
-            if (is_string($name) && '' !== $name && CompileCachePartialEmitLlvm::isSharedRuntimeDemoteCandidate($name)) {
+            if (is_string($name) && '' !== $name && CompileCachePartialEmitSymbolProbe::isSharedRuntimeDemoteCandidate($name)) {
                 $candidates[$name] = true;
             }
         }
