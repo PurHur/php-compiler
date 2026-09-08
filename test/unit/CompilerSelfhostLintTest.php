@@ -470,6 +470,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/VM/Concern/TypedIntRecursiveAndCountedLoopFastPath.php',
             'lib/VM/Concern/UnsetDispatch.php',
             'lib/VM/Concern/UserInvokeArrayAccessAndClosureCall.php',
+            'lib/VM/Concern/VarFetchGlobalAndFunctionStaticDispatch.php',
             'lib/VM/Concern/VirtualPropertyHookEnforce.php',
             'lib/VM/Context.php',
             'lib/VM/ErrorReporter.php',
