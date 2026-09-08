@@ -20,6 +20,7 @@ require_once __DIR__.'/CompileCacheProjectMembers.php';
 require_once __DIR__.'/CompileCacheArtifactFacade.php';
 require_once __DIR__.'/CompileCacheSemanticHashFacade.php';
 require_once __DIR__.'/CompileCacheProjectIndexFacade.php';
+require_once __DIR__.'/CompileCacheHubState.php';
 
 /**
  * On-disk MCJIT bitcode cache (issue #153).
@@ -42,11 +43,13 @@ require_once __DIR__.'/CompileCacheProjectIndexFacade.php';
  * cold-emit recording / symbol membership maps live in {@see CompileCacheRecording};
  * edit-scaffold session arm / state live in {@see CompileCacheEditSession};
  * project member path list / compile entry live in {@see CompileCacheProjectMembers};
- * artifact / object mid-tier warm restore live in {@see CompileCacheArtifactFacade}
+ * artifact / object mid-tier warm restore live in {@see CompileCacheArtifactFacade};
+ * shared recording / edit-scaffold / partial-emit fields live in {@see CompileCacheHubState}
  * (#36387 one-file-edit Done-when / #36403 size-budget split-TU).
  */
 final class CompileCache
 {
+    use CompileCacheHubState;
     use CompileCacheEditScaffold;
     use CompileCacheBitcodePersist;
     use CompileCacheRecording;
@@ -55,90 +58,6 @@ final class CompileCache
     use CompileCacheArtifactFacade;
     use CompileCacheSemanticHashFacade;
     use CompileCacheProjectIndexFacade;
-    /** @var list<array{llvm: string, signature: string, scoped: string}>|null */
-    private static ?array $recordingExports = null;
-
-    /** @var list<string>|null LLVM names lowered outside NestedJIT (user TU) (#36387). */
-    private static ?array $recordingUserSymbols = null;
-
-    /** @var array<string, string>|null logical lc → LLVM name for NestedJIT helpers (#36387). */
-    private static ?array $recordingHelperSymbols = null;
-
-
-    private static ?string $recordingKey = null;
-
-    private static bool $skipModuleFuncCompile = false;
-
-    /** True after {@see tryRestoreEditScaffold()} — helpers kept, user symbols stripped. */
-    private static bool $editScaffoldActive = false;
-
-    /** True after Context parsed prior module.bc before namedStructType (#36387). */
-    private static bool $editScaffoldBitcodeBound = false;
-
-    /**
-     * Prior cache key armed before {@see Context} construct so defineBuiltins can skip
-     * implement() (Values would dangle after module replace) (#36387).
-     */
-    private static ?string $pendingEditScaffoldKey = null;
-
-    /** @var array<string, list<string>>|null member path → LLVM names (#36387) */
-    private static ?array $recordingUserSymbolsByMember = null;
-
-    /**
-     * member path → scoped name (Class::method or function) → LLVM names (#36387).
-     *
-     * @var array<string, array<string, list<string>>>|null
-     */
-    private static ?array $recordingUserSymbolsByFunction = null;
-
-    /**
-     * Loaded from prior AOT meta for keep-path planning (#36387).
-     *
-     * @var array<string, array<string, list<string>>>
-     */
-    private static array $editScaffoldByFunction = [];
-
-    private static ?string $bundledSource = null;
-
-    /**
-     * Absolute paths whose *semantic* content changed vs the scaffold project index
-     * (comments/whitespace-only edits do not strip that member's LLVM bodies) (#36387).
-     *
-     * @var list<string>
-     */
-    private static array $editChangedMembers = [];
-
-    /**
-     * Within a semantically-changed member: scoped names (lc) whose bodies changed.
-     * Absent path ⇒ full member strip; non-empty ⇒ keep sibling functions (#36387).
-     *
-     * @var array<string, array<string, true>>
-     */
-    private static array $editChangedFunctions = [];
-
-    /**
-     * LLVM names of user symbols left in the module after edit-scaffold partial strip (#36387).
-     *
-     * @var array<string, true>
-     */
-    private static array $keptUserSymbols = [];
-    /**
-     * User LLVM names renamed to `*.stale` during edit-scaffold strip (#36387).
-     *
-     * @var list<string>
-     */
-    private static array $strippedUserSymbols = [];
-
-    /** True when edit-scaffold kept at least one unchanged user body (#36387). */
-    private static bool $editScaffoldPartial = false;
-
-    /**
-     * Prior cold `aot.o` linked after a demoted delta emit on partial keep (#36387).
-     *
-     * Delta object is listed first; `-z muldefs` keeps rebuilt symbols from the delta
-     * and everything else (runtime + kept user bodies) from this base object.
-     */
-    private static ?string $partialEmitBaseObject = null;
 
     public static function isEnabled(): bool
     {

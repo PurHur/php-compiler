@@ -7256,9 +7256,11 @@
         "lib/JIT/CompileCacheBitcodePersist.php",
         "lib/JIT/CompileCacheEditScaffold.php",
         "lib/JIT/CompileCacheEditSession.php",
+        "lib/JIT/CompileCacheHubState.php",
         "lib/JIT/CompileCacheKeyLayout.php",
         "lib/JIT/CompileCachePartialEmitDemote.php",
         "lib/JIT/CompileCacheProjectIndex.php",
+        "lib/JIT/CompileCacheProjectIndexFacade.php",
         "lib/JIT/CompileCacheProjectMembers.php",
         "lib/JIT/CompileCacheRecording.php",
         "lib/JIT/CompileCacheSemanticHash.php",
@@ -8685,9 +8687,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8451,
+        "inventory_files": 8453,
         "excluded": 0,
-        "eligible": 8451,
+        "eligible": 8453,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
