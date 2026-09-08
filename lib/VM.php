@@ -63,6 +63,7 @@ require_once __DIR__.'/VM/Concern/JumpCaseDispatch.php';
 require_once __DIR__.'/VM/Concern/ConstFetchStaticCallInstanceofDispatch.php';
 require_once __DIR__.'/VM/Concern/DeclareClassLikeDispatch.php';
 require_once __DIR__.'/VM/Concern/ArgSendDispatch.php';
+require_once __DIR__.'/VM/Concern/VarFetchGlobalAndFunctionStaticDispatch.php';
 
 use PHPCompiler\BuiltinByRefParams;
 use PHPCompiler\Compiler\AttributeNames;
@@ -101,7 +102,6 @@ use PHPCompiler\VM\TypeCheck;
 use PHPCompiler\VM\TraitCompositionConflictMessage;
 use PHPCompiler\VM\TypedPropertyReadSignal;
 use PHPCompiler\VM\VmIncDec;
-use PHPCompiler\VM\VmVarFetch;
 use PHPCompiler\VM\VmIsset;
 use PHPCompiler\VM\WeakRefRegistry;
 use PHPCompiler\VM\Variable;
@@ -162,6 +162,7 @@ class VM {
     use ConstFetchStaticCallInstanceofDispatch;
     use DeclareClassLikeDispatch;
     use ArgSendDispatch;
+    use VarFetchGlobalAndFunctionStaticDispatch;
     const SUCCESS = 1;
     const FAILURE = 2;
 
@@ -609,133 +610,18 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_VAR_FETCH:
-                    $dest = $frame->scope[$op->arg1];
-                    $nameSlot = (int) $op->arg2;
-                    $nameHolder = $frame->scope[$nameSlot]->resolveIndirect();
-                    $nameOperand = $frame->block->operandForScopeSlot($nameSlot);
-                    $nameVarLabel = null !== $nameOperand ? Block::resolveVariableName($nameOperand) : null;
-                    if (
-                        null !== $nameVarLabel
-                        && (Variable::TYPE_NULL === $nameHolder->type || Variable::TYPE_UNDEFINED === $nameHolder->type)
-                    ) {
-                        $this->context->errors->undefinedVariable(
-                            $nameVarLabel,
-                            $this->context,
-                            $frame,
-                            '' !== $frame->scriptPath ? $frame->scriptPath : null
-                        );
-                    }
-                    [$name, $catchFrame] = $this->coerceRuntimeOperandToString($nameHolder, $frame);
-                    if (null !== $catchFrame) {
-                        $frame = $catchFrame;
-                        goto restart;
-                    }
-                    if ('this' === strtolower($name)) {
-                        if (null !== $frame->block->func && null !== $frame->block->func->class) {
-                            $isStatic = (($frame->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) !== 0;
-                            $thisIdx = $frame->block->slotIndexForVariableName('this');
-                            if ($isStatic || null === $thisIdx || !isset($frame->scope[$thisIdx])) {
-                                $catchFrame = $this->dispatchVmError(
-                                    'Using $this when not in object context',
-                                    $frame
-                                );
-                                if (null !== $catchFrame) {
-                                    $frame = $catchFrame;
-                                    goto restart;
-                                }
-                                break;
-                            }
-                        }
-                    }
-                    $forWrite = $this->varFetchDestUsedAsAssignLvalue($frame, $op);
-                    if ('' === $name) {
-                        $dest->indirect(new Variable());
-                        break;
-                    }
-                    if (VmVarFetch::isSuperglobalName($name)) {
-                        $target = $this->context->ensureSuperglobal($name);
-                    } elseif ($forWrite) {
-                        $target = $frame->block->ensureVariableByRuntimeName($name, $frame);
-                    } else {
-                        $target = $frame->block->findVariableByRuntimeName($name, $frame);
-                        if (null === $target) {
-                            $this->context->errors->undefinedVariable(
-                                $name,
-                                $this->context,
-                                $frame,
-                                '' !== $frame->scriptPath ? $frame->scriptPath : null
-                            );
-                            $target = new Variable();
-                        }
-                    }
-                    $dest->indirect($target);
-                    break;
                 case OpCode::TYPE_DECLARE_GLOBAL:
-                    if (!isset($frame->block->constants[$op->arg2])) {
-                        throw new \LogicException('Global name must be a compile-time constant');
-                    }
-                    $globalName = $frame->block->constants[$op->arg2]->toString();
-                    $frame->scope[$op->arg1]->indirect($this->context->ensureGlobal($globalName));
-                    // Zend: `global $x` installs $x in the active symbol table (compact /
-                    // get_defined_vars see it). Same as TYPE_DECLARE_FUNCTION_STATIC (#25898).
-                    $this->markScopeSlotInitialized($frame, (int) $op->arg1);
-                    break;
                 case OpCode::TYPE_DECLARE_FUNCTION_STATIC:
-                    if (!isset($frame->block->constants[$op->arg2])) {
-                        throw new \LogicException('Function static key must be a compile-time constant');
-                    }
-                    $storageKey = $frame->block->constants[$op->arg2]->toString();
-                    $storage = $this->ensureFunctionStaticForFrame($frame, $storageKey);
-                    if (!$this->isFunctionStaticInitializedForFrame($frame, $storageKey)) {
-                        if (null !== $op->arg3 && isset($frame->block->constants[$op->arg3])) {
-                            $storage->copyFrom($frame->block->constants[$op->arg3]);
-                            $catchFrame = $this->enforceFunctionStaticWrite(
-                                $storage,
-                                $frame,
-                                $op->functionStaticVarName
-                            );
-                            if (null !== $catchFrame) {
-                                $frame = $catchFrame;
-                                goto restart;
-                            }
-                            $this->markFunctionStaticInitializedForFrame($frame, $storageKey);
-                        }
-                    }
-                    $this->applyFunctionStaticTypeMetadata($storage, $frame, $op);
-                    $frame->scope[$op->arg1]->indirect($storage);
-                    $this->markScopeSlotInitialized($frame, (int) $op->arg1);
-                    break;
                 case OpCode::TYPE_JUMPIF_FUNCTION_STATIC_INITIALIZED:
-                    if (!isset($frame->block->constants[$op->arg2])) {
-                        throw new \LogicException('Function static key must be a compile-time constant');
-                    }
-                    $jumpKey = $frame->block->constants[$op->arg2]->toString();
-                    if ($this->isFunctionStaticInitializedForFrame($frame, $jumpKey)) {
-                        $frame = $this->frameForBranch($frame, $op->block1);
-                        goto restart;
-                    }
-                    break;
                 case OpCode::TYPE_FUNCTION_STATIC_INIT_STORE:
-                    if (!isset($frame->block->constants[$op->arg2])) {
-                        throw new \LogicException('Function static key must be a compile-time constant');
-                    }
-                    if (null === $op->arg3) {
-                        throw new \LogicException('Function static init store requires a value slot');
-                    }
-                    $storeKey = $frame->block->constants[$op->arg2]->toString();
-                    $store = $this->ensureFunctionStaticForFrame($frame, $storeKey);
-                    $this->applyFunctionStaticTypeMetadata($store, $frame, $op);
-                    $store->copyFrom($frame->scope[$op->arg3]->resolveIndirect());
-                    $catchFrame = $this->enforceFunctionStaticWrite(
-                        $store,
-                        $frame,
-                        $op->functionStaticVarName
-                    );
-                    if (null !== $catchFrame) {
-                        $frame = $catchFrame;
+                    $varFetchGlobalStaticOutcome = $this->executeVarFetchGlobalAndFunctionStaticDispatch($frame, $op);
+                    if ($varFetchGlobalStaticOutcome instanceof Frame) {
+                        $frame = $varFetchGlobalStaticOutcome;
                         goto restart;
                     }
-                    $this->markFunctionStaticInitializedForFrame($frame, $storeKey);
+                    if (is_int($varFetchGlobalStaticOutcome)) {
+                        return $varFetchGlobalStaticOutcome;
+                    }
                     break;
                 case OpCode::TYPE_LIST_UNPACK_CHECK:
                     $unpackSlot = $frame->scope[$op->arg2];
@@ -2252,21 +2138,6 @@ restart:
     {
         $where = '' !== $frame->scriptPath ? $frame->scriptPath : 'script';
         throw new \LogicException($message.' in '.$where);
-    }
-
-    /** True when the next opcode assigns through this VAR_FETCH destination slot (#3801, #5370). */
-    private function varFetchDestUsedAsAssignLvalue(Frame $frame, OpCode $op): bool
-    {
-        $nextIndex = $frame->pos;
-        if ($nextIndex >= $frame->block->nOpCodes) {
-            return false;
-        }
-        $next = $frame->block->opCodes[$nextIndex] ?? null;
-        if (null === $next) {
-            return false;
-        }
-
-        return OpCode::destSlotUsedAsAssignLvalue($next, (int) $op->arg1);
     }
 
     /**
