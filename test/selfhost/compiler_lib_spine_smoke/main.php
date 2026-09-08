@@ -6975,6 +6975,7 @@ require_once __DIR__.'/../../../lib/JIT/ContextDefineBuiltinFunctionProxiesRefle
 require_once __DIR__.'/../../../lib/JIT/ContextDefineBuiltinFunctionProxiesDirectoryAndFile.php';
 require_once __DIR__.'/../../../lib/JIT/ContextDefineBuiltinFunctionProxiesSplIterators.php';
 require_once __DIR__.'/../../../lib/JIT/ContextDefineBuiltinFunctionProxiesSplContainers.php';
+require_once __DIR__.'/../../../lib/JIT/ContextDefineBuiltinFunctionProxiesWeakAndPhpToken.php';
 require_once __DIR__.'/../../../lib/JIT/ContextDefineBuiltinFunctionProxies.php';
 require_once __DIR__.'/../../../lib/JIT/ContextDefineBuiltins.php';
 require_once __DIR__.'/../../../lib/JIT/ContextCompileToFile.php';

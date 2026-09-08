@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8516 |
-| Phase A inventory files (M2 ratio SSOT) | 8516 |
+| PHP files on vm.php path | 8517 |
+| Phase A inventory files (M2 ratio SSOT) | 8517 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26637 |
+| Source constructs flagged (warnings) | 26639 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7298,12 +7298,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/VmSmokeAndRuntimeM3NativeStubs.php` | 0 | 10 |
 | `lib/JIT/Context.php` | 0 | 10 |
 | `lib/JIT/ContextCompileToFile.php` | 0 | 3 |
-| `lib/JIT/ContextDefineBuiltinFunctionProxies.php` | 0 | 16 |
+| `lib/JIT/ContextDefineBuiltinFunctionProxies.php` | 0 | 4 |
 | `lib/JIT/ContextDefineBuiltinFunctionProxiesDateAndXml.php` | 0 | 67 |
 | `lib/JIT/ContextDefineBuiltinFunctionProxiesDirectoryAndFile.php` | 0 | 10 |
 | `lib/JIT/ContextDefineBuiltinFunctionProxiesReflectionAndException.php` | 0 | 165 |
 | `lib/JIT/ContextDefineBuiltinFunctionProxiesSplContainers.php` | 0 | 26 |
 | `lib/JIT/ContextDefineBuiltinFunctionProxiesSplIterators.php` | 0 | 32 |
+| `lib/JIT/ContextDefineBuiltinFunctionProxiesWeakAndPhpToken.php` | 0 | 14 |
 | `lib/JIT/ContextDefineBuiltins.php` | 0 | 2 |
 | `lib/JIT/ContextEditScaffoldModuleRebind.php` | 0 | 2 |
 | `lib/JIT/ContextFreeDeadAndConstantFetch.php` | 0 | 10 |
@@ -59875,16 +59876,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Context.php`
 
 **Warnings** (review for bootstrap subset):
-- new ExtensionLoweringHooks (line 853)
-- new Scope (line 854)
-- new Analyzer (line 883)
-- new Helper (line 884)
-- new Builtin\Refcount (line 885)
-- new Builtin\Output (line 887)
-- new Builtin\Type (line 888)
-- new Builtin\Internal (line 889)
-- new Builtin\VarArg (line 890)
-- new Builtin\ErrorHandler (line 891)
+- new ExtensionLoweringHooks (line 855)
+- new Scope (line 856)
+- new Analyzer (line 885)
+- new Helper (line 886)
+- new Builtin\Refcount (line 887)
+- new Builtin\Output (line 889)
+- new Builtin\Type (line 890)
+- new Builtin\Internal (line 891)
+- new Builtin\VarArg (line 892)
+- new Builtin\ErrorHandler (line 893)
 
 ### `lib/JIT/ContextCompileToFile.php`
 
@@ -59896,21 +59897,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ContextDefineBuiltinFunctionProxies.php`
 
 **Warnings** (review for bootstrap subset):
-- trait ContextDefineBuiltinFunctionProxies (line 25)
-- new Builtin\IsNullFn (line 29)
+- trait ContextDefineBuiltinFunctionProxies (line 26)
 - new Builtin\IsNullFn (line 30)
-- new Call\WeakReferenceCreate (line 38)
-- new Call\WeakReferenceGet (line 39)
-- new Call\SensitiveParameterValueConstruct (line 40)
-- new Call\SensitiveParameterValueGetValue (line 41)
-- new Call\WeakMapMethod (line 42)
-- new Call\WeakMapMethod (line 43)
-- new Call\WeakMapMethod (line 44)
-- new Call\WeakMapMethod (line 45)
-- new Call\WeakMapMethod (line 46)
-- new Call\PhpTokenConstruct (line 49)
-- new Call\PhpTokenTokenize (line 50)
-- new Call\PhpTokenGetTokenName (line 51)
+- new Builtin\IsNullFn (line 31)
 - 1 class method(s)
 
 ### `lib/JIT/ContextDefineBuiltinFunctionProxiesDateAndXml.php`
@@ -60231,6 +60220,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\MultipleIteratorMethod (line 178)
 - new Call\MultipleIteratorMethod (line 179)
 - new Call\RecursiveTreeIteratorConstruct (line 180)
+- 1 class method(s)
+
+### `lib/JIT/ContextDefineBuiltinFunctionProxiesWeakAndPhpToken.php`
+
+**Warnings** (review for bootstrap subset):
+- trait ContextDefineBuiltinFunctionProxiesWeakAndPhpToken (line 25)
+- new Call\WeakReferenceCreate (line 29)
+- new Call\WeakReferenceGet (line 30)
+- new Call\SensitiveParameterValueConstruct (line 31)
+- new Call\SensitiveParameterValueGetValue (line 32)
+- new Call\WeakMapMethod (line 33)
+- new Call\WeakMapMethod (line 34)
+- new Call\WeakMapMethod (line 35)
+- new Call\WeakMapMethod (line 36)
+- new Call\WeakMapMethod (line 37)
+- new Call\PhpTokenConstruct (line 40)
+- new Call\PhpTokenTokenize (line 41)
+- new Call\PhpTokenGetTokenName (line 42)
 - 1 class method(s)
 
 ### `lib/JIT/ContextDefineBuiltins.php`
