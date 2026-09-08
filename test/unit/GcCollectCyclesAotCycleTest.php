@@ -38,14 +38,19 @@ final class GcCollectCyclesAotCycleTest extends TestCase
 
     public function testUnsetDelrefsBeforeWriteNull(): void
     {
-        $jit = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT.php');
+        // Local release / unset lives in Concern TU (#36387), not hub lib/JIT.php.
+        $jit = (string) file_get_contents(
+            dirname(__DIR__, 2).'/lib/JIT/Concern/LocalReleaseUnsetAndVarFetchDest.php'
+        );
         $this->assertStringContainsString('valueDelref alone leaves extra GC roots (#36245)', $jit);
         $this->assertStringContainsString('refcount->delref($obj)', $jit);
     }
 
     public function testFunctionReturnDelrefsTypedObjectLocals(): void
     {
-        $jit = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT.php');
+        $root = dirname(__DIR__, 2);
+        $jit = (string) file_get_contents($root.'/lib/JIT/Concern/LocalReleaseUnsetAndVarFetchDest.php')
+            .(string) file_get_contents($root.'/lib/JIT/Concern/AssignOperand.php');
         $this->assertStringContainsString('releaseJitNamedLocalAtReturn', $jit);
         $this->assertStringContainsString('releaseJitCanonicalNamedLocalAtReturn', $jit);
         $this->assertStringContainsString('jitFunctionAssignTargets', $jit);
@@ -55,7 +60,9 @@ final class GcCollectCyclesAotCycleTest extends TestCase
 
     public function testUserScriptStandaloneRegistryResetWiredAtMain(): void
     {
-        $ctx = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Context.php');
+        $root = dirname(__DIR__, 2);
+        $ctx = (string) file_get_contents($root.'/lib/JIT/Context.php')
+            .(string) file_get_contents($root.'/lib/JIT/ContextCompileToFile.php');
         $this->assertStringContainsString(
             'emitUserScriptStandaloneRegistryReset',
             $ctx

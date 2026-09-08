@@ -544,7 +544,7 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         // #35160: StringStrReplace is lazy at invoke — ensureFull must not early-bind.
         $fullPos = strpos($ctx, 'private function ensureFullStandaloneBodies');
         $this->assertNotFalse($fullPos);
-        $fullEnd = strpos($ctx, 'public function compileToFile', $fullPos);
+        $fullEnd = strpos($ctx, 'public function jitResult', $fullPos);
         $this->assertNotFalse($fullEnd);
         $fullBody = substr($ctx, $fullPos, $fullEnd - $fullPos);
         $this->assertStringNotContainsString(

@@ -21,7 +21,7 @@ final class ContextFullStandaloneLazyExceptionErrorBridgeRuntimeShrinkTest exten
         $this->assertStringContainsString('#35099', $context);
         $fullPos = strpos($context, 'private function ensureFullStandaloneBodies');
         $this->assertNotFalse($fullPos);
-        $fullEnd = strpos($context, 'public function compileToFile', $fullPos);
+        $fullEnd = strpos($context, 'public function jitResult', $fullPos);
         $this->assertNotFalse($fullEnd);
         $fullBody = substr($context, $fullPos, $fullEnd - $fullPos);
 
@@ -78,7 +78,7 @@ final class ContextFullStandaloneLazyExceptionErrorBridgeRuntimeShrinkTest exten
 
     public function testStandaloneMainStillEnsuresBeforeClearAbort(): void
     {
-        $context = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $context = (string) file_get_contents(__DIR__.'/../../lib/JIT/ContextCompileToFile.php');
         $this->assertStringContainsString('#35443', $context);
         // compileToFile must not eagerly NestedJIT ErrorBridge around clear/abort (#35443).
         $compilePos = strpos($context, 'public function compileToFile');
@@ -138,7 +138,7 @@ final class ContextFullStandaloneLazyExceptionErrorBridgeRuntimeShrinkTest exten
             'ext/standard/wordwrap.php' => 'StringWordwrap::ensureLinked',
             'ext/standard/bin2hex.php' => 'StringBin2hex::ensureLinked',
             'ext/standard/base64_encode.php' => 'StringBase64Encode::ensureLinked',
-            'ext/standard/strrev.php' => 'StringStrrev::ensureLinked',
+            // strrev() inlines reverseBytesInPlace — no StringStrrev NestedJIT (#36388).
         ];
         foreach ($checks as $rel => $needle) {
             $path = __DIR__.'/../../'.$rel;

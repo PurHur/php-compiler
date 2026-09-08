@@ -179,9 +179,9 @@
             "note": "TYPE_CLASS_CONST_FETCH runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/Context.php": {
-            "budget": 4992,
+            "budget": 4667,
             "target": 4000,
-            "note": "DefineBuiltins + EditScaffoldModuleRebind extracted (#36387/#36199); continue Context splits toward \u22644k"
+            "note": "DefineBuiltins + CompileToFile + EditScaffoldModuleRebind extracted (#36387/#36199); continue Context splits toward \u22644k"
         },
         "lib/JIT/ContextEditScaffoldModuleRebind.php": {
             "budget": 315,
@@ -212,6 +212,11 @@
             "budget": 162,
             "target": 300,
             "note": "TYPE_FUNCCALL_INIT runFramesInner body extracted from VM.php (#36403)"
+        },
+        "lib/JIT/ContextCompileToFile.php": {
+            "budget": 354,
+            "target": 500,
+            "note": "AOT compileToFile + createAotTargetMachine extract from Context (#36387)"
         }
     },
     "script_file_count": {

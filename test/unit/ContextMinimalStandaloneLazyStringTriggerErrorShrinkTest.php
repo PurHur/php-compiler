@@ -60,7 +60,7 @@ final class ContextMinimalStandaloneLazyStringTriggerErrorShrinkTest extends Tes
         // Full standalone also drops StringTriggerError (#35073); AssertFail::ensureLinked covers #33234.
         $fullPos = strpos($context, 'private function ensureFullStandaloneBodies');
         $this->assertNotFalse($fullPos);
-        $fullEnd = strpos($context, 'public function compileToFile', $fullPos);
+        $fullEnd = strpos($context, 'public function jitResult', $fullPos);
         $this->assertNotFalse($fullEnd);
         $fullBody = substr($context, $fullPos, $fullEnd - $fullPos);
         $this->assertStringNotContainsString(

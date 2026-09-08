@@ -147,7 +147,7 @@ final class TypeDeadTriggerErrorAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#35073', $ctx);
         $fullPos = strpos($ctx, 'private function ensureFullStandaloneBodies');
         $this->assertNotFalse($fullPos);
-        $fullEnd = strpos($ctx, 'public function compileToFile', $fullPos);
+        $fullEnd = strpos($ctx, 'public function jitResult', $fullPos);
         $this->assertNotFalse($fullEnd);
         $fullBody = substr($ctx, $fullPos, $fullEnd - $fullPos);
         $this->assertStringNotContainsString(

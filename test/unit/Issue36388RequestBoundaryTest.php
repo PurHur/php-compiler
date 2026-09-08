@@ -14,7 +14,7 @@ final class Issue36388RequestBoundaryTest extends TestCase
 {
     public function testStandaloneMainEmitsRequestBoundaryCalls(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/ContextCompileToFile.php');
         $this->assertStringContainsString('MemoryRuntime::emitRequestBeginForStandaloneMain', $source);
         $this->assertStringContainsString('MemoryRuntime::emitRequestEndForStandaloneMain', $source);
         // request_end must follow shutdownFunc so arena release cannot UAF live zvals (#36388).

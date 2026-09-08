@@ -17,7 +17,7 @@ final class ContextCompileToFileLazyErrorBridgeRuntimeShrinkTest extends TestCas
 {
     public function testCompileToFileDropsEagerErrorBridgeEnsure(): void
     {
-        $context = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $context = (string) file_get_contents(__DIR__.'/../../lib/JIT/ContextCompileToFile.php');
         $this->assertStringContainsString('#35443', $context);
         $pos = strpos($context, 'public function compileToFile');
         $this->assertNotFalse($pos);

@@ -21,7 +21,7 @@ final class ContextFullStandaloneLazyCliArgvRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#35133', $context);
         $fullPos = strpos($context, 'private function ensureFullStandaloneBodies');
         $this->assertNotFalse($fullPos);
-        $fullEnd = strpos($context, 'public function compileToFile', $fullPos);
+        $fullEnd = strpos($context, 'public function jitResult', $fullPos);
         $this->assertNotFalse($fullEnd);
         $fullBody = substr($context, $fullPos, $fullEnd - $fullPos);
 
@@ -57,7 +57,7 @@ final class ContextFullStandaloneLazyCliArgvRuntimeShrinkTest extends TestCase
 
     public function testCompileToFileEnsuresCliArgvForAllStandalone(): void
     {
-        $context = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $context = (string) file_get_contents(__DIR__.'/../../lib/JIT/ContextCompileToFile.php');
         $compilePos = strpos($context, 'public function compileToFile(string $file)');
         $this->assertNotFalse($compilePos);
         $compileSlice = substr($context, $compilePos, 2500);
