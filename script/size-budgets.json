@@ -179,9 +179,9 @@
             "note": "TYPE_CLASS_CONST_FETCH runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/Context.php": {
-            "budget": 3544,
+            "budget": 2869,
             "target": 4000,
-            "note": "VariableOperandBinding + CompileToFile + DefineBuiltins + EditScaffoldModuleRebind extracted (#36387/#36199); Context hub under 4k"
+            "note": "FunctionProxyResolve + VariableOperandBinding + CompileToFile + DefineBuiltins + EditScaffoldModuleRebind extracted (#36387/#36199); Context hub under 4k"
         },
         "lib/JIT/ContextEditScaffoldModuleRebind.php": {
             "budget": 315,
@@ -227,6 +227,11 @@
             "budget": 1155,
             "target": 1200,
             "note": "Operand\u2192Variable binding, freeDeadVariables, constantFetch extracted from Context (#36387)"
+        },
+        "lib/JIT/ContextFunctionProxyResolve.php": {
+            "budget": 706,
+            "target": 800,
+            "note": "resolveFunctionProxy / NestedJIT kernel whitelist / external-stub report extracted from Context (#36387)"
         }
     },
     "script_file_count": {
