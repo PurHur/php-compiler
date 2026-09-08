@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8488 |
-| Phase A inventory files (M2 ratio SSOT) | 8488 |
+| PHP files on vm.php path | 8489 |
+| Phase A inventory files (M2 ratio SSOT) | 8489 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26587 |
+| Source constructs flagged (warnings) | 26589 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7290,10 +7290,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/ValueBoxCoalesceAndConcatHelpers.php` | 0 | 7 |
 | `lib/JIT/Concern/VarFetchDestLvalueContext.php` | 0 | 2 |
 | `lib/JIT/Concern/VmSmokeAndRuntimeM3NativeStubs.php` | 0 | 10 |
-| `lib/JIT/Context.php` | 0 | 19 |
+| `lib/JIT/Context.php` | 0 | 17 |
 | `lib/JIT/ContextCompileToFile.php` | 0 | 3 |
 | `lib/JIT/ContextDefineBuiltins.php` | 0 | 306 |
 | `lib/JIT/ContextEditScaffoldModuleRebind.php` | 0 | 2 |
+| `lib/JIT/ContextFunctionProxyAndNestedJitKernel.php` | 0 | 4 |
 | `lib/JIT/ContextVariableOperandBinding.php` | 0 | 13 |
 | `lib/JIT/DatePeriodForeachSnapshot.php` | 0 | 3 |
 | `lib/JIT/DeprecatedCallGuard.php` | 0 | 1 |
@@ -59817,24 +59818,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Context.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 996)
-- new ExtensionLoweringHooks (line 1093)
-- new Scope (line 1094)
-- new Analyzer (line 1125)
-- new Helper (line 1126)
-- new Builtin\Refcount (line 1128)
-- new Builtin\Output (line 1130)
-- new Builtin\Type (line 1131)
-- new Builtin\Internal (line 1132)
-- new Builtin\VarArg (line 1133)
-- new Builtin\ErrorHandler (line 1134)
-- new Scope (line 1162)
-- new Call\ExternalMethod (line 1245)
-- new ReflectionMethod (line 1452)
-- new Result (line 2160)
-- new Result (line 2181)
-- new Variable (line 3465)
-- 108 class method(s)
+- new Variable (line 998)
+- new ExtensionLoweringHooks (line 1095)
+- new Scope (line 1096)
+- new Analyzer (line 1127)
+- new Helper (line 1128)
+- new Builtin\Refcount (line 1130)
+- new Builtin\Output (line 1132)
+- new Builtin\Type (line 1133)
+- new Builtin\Internal (line 1134)
+- new Builtin\VarArg (line 1135)
+- new Builtin\ErrorHandler (line 1136)
+- new Scope (line 1164)
+- new Result (line 1483)
+- new Result (line 1504)
+- new Variable (line 2788)
+- 90 class method(s)
 - 2 closure(s)
 
 ### `lib/JIT/ContextCompileToFile.php`
@@ -60159,6 +60158,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - trait ContextEditScaffoldModuleRebind (line 22)
 - 8 class method(s)
+
+### `lib/JIT/ContextFunctionProxyAndNestedJitKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- trait ContextFunctionProxyAndNestedJitKernel (line 26)
+- new Call\ExternalMethod (line 80)
+- new ReflectionMethod (line 287)
+- 18 class method(s)
 
 ### `lib/JIT/ContextVariableOperandBinding.php`
 

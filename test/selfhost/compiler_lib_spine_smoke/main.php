@@ -6967,6 +6967,7 @@ require_once __DIR__.'/../../../lib/JIT/ContextEditScaffoldModuleRebind.php';
 require_once __DIR__.'/../../../lib/JIT/ContextDefineBuiltins.php';
 require_once __DIR__.'/../../../lib/JIT/ContextCompileToFile.php';
 require_once __DIR__.'/../../../lib/JIT/ContextVariableOperandBinding.php';
+require_once __DIR__.'/../../../lib/JIT/ContextFunctionProxyAndNestedJitKernel.php';
 require_once __DIR__.'/../../../lib/JIT/Context.php';
 require_once __DIR__.'/../../../lib/JIT/DatePeriodForeachSnapshot.php';
 require_once __DIR__.'/../../../lib/JIT/SimpleXmlForeachSnapshot.php';
