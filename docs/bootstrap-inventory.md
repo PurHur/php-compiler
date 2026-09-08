@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8512 |
-| Phase A inventory files (M2 ratio SSOT) | 8512 |
+| PHP files on vm.php path | 8513 |
+| Phase A inventory files (M2 ratio SSOT) | 8513 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26630 |
+| Source constructs flagged (warnings) | 26631 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -6027,6 +6027,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/Highlight.php` | 0 | 1 |
 | `lib/JIT/Builtin/HtmlEntitiesJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/HtmlEntityDecodeJit.php` | 0 | 1 |
+| `lib/JIT/Builtin/HtmlspecialcharsRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/HttpResponseCode.php` | 0 | 1 |
 | `lib/JIT/Builtin/HttpResponseCodeJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/HttpResponseRuntime.php` | 0 | 1 |
@@ -52766,6 +52767,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 7 class method(s)
 
+### `lib/JIT/Builtin/HtmlspecialcharsRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 16 class method(s)
+
 ### `lib/JIT/Builtin/HttpResponseCode.php`
 
 **Warnings** (review for bootstrap subset):
@@ -55250,7 +55256,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringHtmlspecialchars.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 6 class method(s)
 
 ### `lib/JIT/Builtin/StringHtmlspecialcharsDecode.php`
 
@@ -59149,21 +59155,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - trait CallResultOperandAssign (line 25)
-- new Variable (line 346)
-- new Variable (line 369)
-- new Variable (line 398)
-- new Variable (line 424)
-- new Variable (line 449)
-- new Variable (line 494)
-- new Type (line 502)
-- new Variable (line 522)
-- new Type (line 531)
-- new Variable (line 550)
-- new Type (line 558)
-- new Variable (line 584)
-- new Type (line 592)
-- new Variable (line 615)
-- new Variable (line 639)
+- new Variable (line 348)
+- new Variable (line 371)
+- new Variable (line 400)
+- new Variable (line 426)
+- new Variable (line 451)
+- new Variable (line 496)
+- new Type (line 504)
+- new Variable (line 524)
+- new Type (line 533)
+- new Variable (line 552)
+- new Type (line 560)
+- new Variable (line 586)
+- new Type (line 594)
+- new Variable (line 617)
+- new Variable (line 641)
 - 6 class method(s)
 
 ### `lib/JIT/Concern/CfgParamReturnTypeAndCalleeByRef.php`

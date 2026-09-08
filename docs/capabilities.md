@@ -1645,8 +1645,8 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `APCUIterator::rewind` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `APCUIterator::valid` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `AllowDynamicProperties::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `AppendIterator::__construct` | yes | yes | yes | standard |  |
-| `AppendIterator::append` | yes | yes | yes | standard |  |
+| `AppendIterator::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `AppendIterator::append` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `AppendIterator::current` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `AppendIterator::getArrayIterator` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `AppendIterator::getInnerIterator` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -1675,58 +1675,58 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `ArithmeticError::getPrevious` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ArithmeticError::getTrace` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ArithmeticError::getTraceAsString` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ArrayIterator::__construct` | yes | yes | yes | standard |  |
+| `ArrayIterator::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ArrayIterator::__debugInfo` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ArrayIterator::__serialize` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ArrayIterator::__unserialize` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ArrayIterator::append` | yes | yes | yes | standard |  |
-| `ArrayIterator::asort` | yes | yes | yes | standard |  |
-| `ArrayIterator::count` | yes | yes | yes | standard |  |
+| `ArrayIterator::append` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ArrayIterator::asort` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ArrayIterator::count` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ArrayIterator::current` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ArrayIterator::getarraycopy` | yes | yes | yes | standard |  |
-| `ArrayIterator::getflags` | yes | yes | yes | standard |  |
+| `ArrayIterator::getarraycopy` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ArrayIterator::getflags` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ArrayIterator::key` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ArrayIterator::ksort` | yes | yes | yes | standard |  |
-| `ArrayIterator::natcasesort` | yes | yes | yes | standard |  |
-| `ArrayIterator::natsort` | yes | yes | yes | standard |  |
+| `ArrayIterator::ksort` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ArrayIterator::natcasesort` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ArrayIterator::natsort` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ArrayIterator::next` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ArrayIterator::offsetExists` | yes | yes | yes | standard |  |
-| `ArrayIterator::offsetGet` | yes | yes | yes | standard |  |
-| `ArrayIterator::offsetSet` | yes | yes | yes | standard |  |
-| `ArrayIterator::offsetUnset` | yes | yes | yes | standard |  |
+| `ArrayIterator::offsetExists` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ArrayIterator::offsetGet` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ArrayIterator::offsetSet` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ArrayIterator::offsetUnset` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ArrayIterator::rewind` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ArrayIterator::seek` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ArrayIterator::serialize` | yes | yes | yes | standard |  |
-| `ArrayIterator::setflags` | yes | yes | yes | standard |  |
-| `ArrayIterator::uasort` | yes | yes | yes | standard |  |
-| `ArrayIterator::uksort` | yes | yes | yes | standard |  |
-| `ArrayIterator::unserialize` | yes | yes | yes | standard |  |
+| `ArrayIterator::serialize` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ArrayIterator::setflags` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ArrayIterator::uasort` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ArrayIterator::uksort` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ArrayIterator::unserialize` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ArrayIterator::valid` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ArrayObject::__construct` | yes | yes | yes | standard |  |
+| `ArrayObject::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ArrayObject::__debugInfo` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ArrayObject::__serialize` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ArrayObject::__unserialize` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ArrayObject::append` | yes | yes | yes | standard |  |
-| `ArrayObject::asort` | yes | yes | yes | standard |  |
-| `ArrayObject::count` | yes | yes | yes | standard |  |
-| `ArrayObject::exchangearray` | yes | yes | yes | standard |  |
-| `ArrayObject::getarraycopy` | yes | yes | yes | standard |  |
-| `ArrayObject::getflags` | yes | yes | yes | standard |  |
-| `ArrayObject::getiterator` | yes | yes | yes | standard |  |
-| `ArrayObject::getiteratorclass` | yes | yes | yes | standard |  |
-| `ArrayObject::ksort` | yes | yes | yes | standard |  |
-| `ArrayObject::natcasesort` | yes | yes | yes | standard |  |
-| `ArrayObject::natsort` | yes | yes | yes | standard |  |
-| `ArrayObject::offsetExists` | yes | yes | yes | standard |  |
-| `ArrayObject::offsetGet` | yes | yes | yes | standard |  |
-| `ArrayObject::offsetSet` | yes | yes | yes | standard |  |
-| `ArrayObject::offsetUnset` | yes | yes | yes | standard |  |
-| `ArrayObject::serialize` | yes | yes | yes | standard |  |
-| `ArrayObject::setflags` | yes | yes | yes | standard |  |
+| `ArrayObject::append` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ArrayObject::asort` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ArrayObject::count` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ArrayObject::exchangearray` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ArrayObject::getarraycopy` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ArrayObject::getflags` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ArrayObject::getiterator` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ArrayObject::getiteratorclass` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ArrayObject::ksort` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ArrayObject::natcasesort` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ArrayObject::natsort` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ArrayObject::offsetExists` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ArrayObject::offsetGet` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ArrayObject::offsetSet` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ArrayObject::offsetUnset` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ArrayObject::serialize` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ArrayObject::setflags` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ArrayObject::setiteratorclass` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ArrayObject::uasort` | yes | yes | yes | standard |  |
-| `ArrayObject::uksort` | yes | yes | yes | standard |  |
-| `ArrayObject::unserialize` | yes | yes | yes | standard |  |
+| `ArrayObject::uasort` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ArrayObject::uksort` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ArrayObject::unserialize` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `AssertionError::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `AssertionError::__toString` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `AssertionError::__wakeup` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -1782,12 +1782,12 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `CURLFile::setMimeType` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `CURLFile::setPostFilename` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `CURLStringFile::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `CachingIterator::__construct` | yes | yes | yes | standard |  |
+| `CachingIterator::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `CachingIterator::__toString` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `CachingIterator::count` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `CachingIterator::current` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `CachingIterator::getCache` | yes | yes | yes | standard |  |
-| `CachingIterator::getFlags` | yes | yes | yes | standard |  |
+| `CachingIterator::getCache` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `CachingIterator::getFlags` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `CachingIterator::getInnerIterator` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `CachingIterator::hasNext` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `CachingIterator::key` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -1797,9 +1797,9 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `CachingIterator::offsetSet` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `CachingIterator::offsetUnset` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `CachingIterator::rewind` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `CachingIterator::setFlags` | yes | yes | yes | standard |  |
+| `CachingIterator::setFlags` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `CachingIterator::valid` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `CallbackFilterIterator::__construct` | yes | yes | yes | standard |  |
+| `CallbackFilterIterator::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `CallbackFilterIterator::accept` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `CallbackFilterIterator::current` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `CallbackFilterIterator::getInnerIterator` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -2002,13 +2002,13 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `DateException::getPrevious` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DateException::getTrace` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DateException::getTraceAsString` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `DateInterval::__construct` | yes | yes | yes | standard |  |
+| `DateInterval::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DateInterval::__serialize` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DateInterval::__set_state` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DateInterval::__unserialize` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DateInterval::__wakeup` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `DateInterval::createfromdatestring` | yes | yes | yes | standard |  |
-| `DateInterval::format` | yes | yes | yes | standard |  |
+| `DateInterval::createfromdatestring` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateInterval::format` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DateInvalidOperationException::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DateInvalidOperationException::__toString` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DateInvalidOperationException::__wakeup` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -2069,12 +2069,12 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `DateObjectError::getPrevious` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DateObjectError::getTrace` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DateObjectError::getTraceAsString` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `DatePeriod::__construct` | yes | yes | yes | standard |  |
+| `DatePeriod::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DatePeriod::__serialize` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DatePeriod::__set_state` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DatePeriod::__unserialize` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DatePeriod::__wakeup` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `DatePeriod::createFromISO8601String` | yes | yes | yes | standard |  |
+| `DatePeriod::createFromISO8601String` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DatePeriod::getIterator` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DatePeriod::getdateinterval` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DatePeriod::getenddate` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -2090,72 +2090,72 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `DateRangeError::getPrevious` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DateRangeError::getTrace` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DateRangeError::getTraceAsString` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `DateTime::__construct` | yes | yes | yes | standard |  |
+| `DateTime::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DateTime::__serialize` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DateTime::__set_state` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DateTime::__unserialize` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DateTime::__wakeup` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `DateTime::add` | yes | yes | yes | standard |  |
-| `DateTime::createfromformat` | yes | yes | yes | standard |  |
-| `DateTime::createfromimmutable` | yes | yes | yes | standard |  |
-| `DateTime::createfrominterface` | yes | yes | yes | standard |  |
-| `DateTime::createfromtimestamp` | yes | yes | yes | standard |  |
-| `DateTime::diff` | yes | yes | yes | standard |  |
-| `DateTime::format` | yes | yes | yes | standard |  |
-| `DateTime::getlasterrors` | yes | yes | yes | standard |  |
-| `DateTime::getmicrosecond` | yes | yes | yes | standard |  |
-| `DateTime::getoffset` | yes | yes | yes | standard |  |
-| `DateTime::gettimestamp` | yes | yes | yes | standard |  |
-| `DateTime::gettimezone` | yes | yes | yes | standard |  |
-| `DateTime::modify` | yes | yes | yes | standard |  |
-| `DateTime::setdate` | yes | yes | yes | standard |  |
-| `DateTime::setisodate` | yes | yes | yes | standard |  |
-| `DateTime::setmicrosecond` | yes | yes | yes | standard |  |
-| `DateTime::settime` | yes | yes | yes | standard |  |
-| `DateTime::settimestamp` | yes | yes | yes | standard |  |
-| `DateTime::settimezone` | yes | yes | yes | standard |  |
-| `DateTime::sub` | yes | yes | yes | standard |  |
-| `DateTimeImmutable::__construct` | yes | yes | yes | standard |  |
+| `DateTime::add` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTime::createfromformat` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTime::createfromimmutable` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTime::createfrominterface` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTime::createfromtimestamp` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTime::diff` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTime::format` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTime::getlasterrors` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTime::getmicrosecond` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTime::getoffset` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTime::gettimestamp` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTime::gettimezone` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTime::modify` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTime::setdate` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTime::setisodate` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTime::setmicrosecond` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTime::settime` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTime::settimestamp` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTime::settimezone` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTime::sub` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTimeImmutable::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DateTimeImmutable::__serialize` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DateTimeImmutable::__set_state` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DateTimeImmutable::__unserialize` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DateTimeImmutable::__wakeup` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `DateTimeImmutable::add` | yes | yes | yes | standard |  |
-| `DateTimeImmutable::createfromformat` | yes | yes | yes | standard |  |
-| `DateTimeImmutable::createfrominterface` | yes | yes | yes | standard |  |
-| `DateTimeImmutable::createfrommutable` | yes | yes | yes | standard |  |
-| `DateTimeImmutable::createfromtimestamp` | yes | yes | yes | standard |  |
-| `DateTimeImmutable::diff` | yes | yes | yes | standard |  |
-| `DateTimeImmutable::format` | yes | yes | yes | standard |  |
-| `DateTimeImmutable::getlasterrors` | yes | yes | yes | standard |  |
-| `DateTimeImmutable::getmicrosecond` | yes | yes | yes | standard |  |
-| `DateTimeImmutable::getoffset` | yes | yes | yes | standard |  |
-| `DateTimeImmutable::gettimestamp` | yes | yes | yes | standard |  |
-| `DateTimeImmutable::gettimezone` | yes | yes | yes | standard |  |
-| `DateTimeImmutable::modify` | yes | yes | yes | standard |  |
-| `DateTimeImmutable::setdate` | yes | yes | yes | standard |  |
-| `DateTimeImmutable::setisodate` | yes | yes | yes | standard |  |
-| `DateTimeImmutable::setmicrosecond` | yes | yes | yes | standard |  |
-| `DateTimeImmutable::settime` | yes | yes | yes | standard |  |
-| `DateTimeImmutable::settimestamp` | yes | yes | yes | standard |  |
-| `DateTimeImmutable::settimezone` | yes | yes | yes | standard |  |
-| `DateTimeImmutable::sub` | yes | yes | yes | standard |  |
-| `DateTimeZone::__construct` | yes | yes | yes | standard |  |
+| `DateTimeImmutable::add` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTimeImmutable::createfromformat` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTimeImmutable::createfrominterface` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTimeImmutable::createfrommutable` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTimeImmutable::createfromtimestamp` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTimeImmutable::diff` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTimeImmutable::format` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTimeImmutable::getlasterrors` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTimeImmutable::getmicrosecond` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTimeImmutable::getoffset` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTimeImmutable::gettimestamp` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTimeImmutable::gettimezone` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTimeImmutable::modify` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTimeImmutable::setdate` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTimeImmutable::setisodate` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTimeImmutable::setmicrosecond` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTimeImmutable::settime` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTimeImmutable::settimestamp` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTimeImmutable::settimezone` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTimeImmutable::sub` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTimeZone::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DateTimeZone::__serialize` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DateTimeZone::__set_state` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DateTimeZone::__unserialize` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DateTimeZone::__wakeup` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `DateTimeZone::getlocation` | yes | yes | yes | standard |  |
-| `DateTimeZone::getname` | yes | yes | yes | standard |  |
-| `DateTimeZone::getoffset` | yes | yes | yes | standard |  |
-| `DateTimeZone::gettransitions` | yes | yes | yes | standard |  |
-| `DateTimeZone::listabbreviations` | yes | yes | yes | standard |  |
-| `DateTimeZone::listidentifiers` | yes | yes | yes | standard |  |
+| `DateTimeZone::getlocation` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTimeZone::getname` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTimeZone::getoffset` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTimeZone::gettransitions` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTimeZone::listabbreviations` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `DateTimeZone::listidentifiers` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `Deprecated::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `Directory::__construct` | yes | yes | yes | standard |  |
-| `Directory::close` | yes | yes | yes | standard |  |
-| `Directory::read` | yes | yes | yes | standard |  |
-| `Directory::rewind` | yes | yes | yes | standard |  |
+| `Directory::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `Directory::close` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `Directory::read` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `Directory::rewind` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DirectoryIterator::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DirectoryIterator::__tostring` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DirectoryIterator::current` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -2362,24 +2362,24 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `DomainException::getPrevious` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DomainException::getTrace` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `DomainException::getTraceAsString` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `EmptyIterator::__construct` | yes | yes | yes | standard |  |
-| `EmptyIterator::current` | yes | yes | yes | standard |  |
-| `EmptyIterator::key` | yes | yes | yes | standard |  |
-| `EmptyIterator::next` | yes | yes | yes | standard |  |
-| `EmptyIterator::rewind` | yes | yes | yes | standard |  |
-| `EmptyIterator::valid` | yes | yes | yes | standard |  |
+| `EmptyIterator::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `EmptyIterator::current` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `EmptyIterator::key` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `EmptyIterator::next` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `EmptyIterator::rewind` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `EmptyIterator::valid` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `EnumCases::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `Error::__clone` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `Error::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `Error::__toString` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `Error::__wakeup` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `Error::getCode` | yes | yes | yes | standard |  |
-| `Error::getFile` | yes | yes | yes | standard |  |
-| `Error::getLine` | yes | yes | yes | standard |  |
-| `Error::getMessage` | yes | yes | yes | standard |  |
-| `Error::getPrevious` | yes | yes | yes | standard |  |
-| `Error::getTrace` | yes | yes | yes | standard |  |
-| `Error::getTraceAsString` | yes | yes | yes | standard |  |
+| `Error::getCode` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `Error::getFile` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `Error::getLine` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `Error::getMessage` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `Error::getPrevious` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `Error::getTrace` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `Error::getTraceAsString` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ErrorException::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ErrorException::__toString` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ErrorException::__wakeup` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -2395,10 +2395,10 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `Exception::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `Exception::__toString` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `Exception::__wakeup` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `Exception::getCode` | yes | yes | yes | standard |  |
+| `Exception::getCode` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `Exception::getFile` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `Exception::getLine` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `Exception::getMessage` | yes | yes | yes | standard |  |
+| `Exception::getMessage` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `Exception::getPrevious` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `Exception::getTrace` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `Exception::getTraceAsString` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -2462,14 +2462,14 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `FilesystemIterator::getFlags` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `FilesystemIterator::key` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `FilesystemIterator::setFlags` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `FilterIterator::__construct` | yes | yes | yes | standard |  |
-| `FilterIterator::accept` | yes | yes | yes | standard |  |
-| `FilterIterator::current` | yes | yes | yes | standard |  |
-| `FilterIterator::getInnerIterator` | yes | yes | yes | standard |  |
-| `FilterIterator::key` | yes | yes | yes | standard |  |
-| `FilterIterator::next` | yes | yes | yes | standard |  |
-| `FilterIterator::rewind` | yes | yes | yes | standard |  |
-| `FilterIterator::valid` | yes | yes | yes | standard |  |
+| `FilterIterator::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `FilterIterator::accept` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `FilterIterator::current` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `FilterIterator::getInnerIterator` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `FilterIterator::key` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `FilterIterator::next` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `FilterIterator::rewind` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `FilterIterator::valid` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `Filter\FilterException::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `Filter\FilterException::__tostring` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `Filter\FilterException::__wakeup` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -2498,25 +2498,25 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `Generator::send` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `Generator::throw` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `Generator::valid` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `GlobIterator::__construct` | yes | yes | yes | standard |  |
-| `GlobIterator::count` | yes | yes | yes | standard |  |
-| `GlobIterator::current` | yes | yes | yes | standard |  |
-| `GlobIterator::getFlags` | yes | yes | yes | standard |  |
-| `GlobIterator::key` | yes | yes | yes | standard |  |
-| `GlobIterator::next` | yes | yes | yes | standard |  |
-| `GlobIterator::rewind` | yes | yes | yes | standard |  |
-| `GlobIterator::setFlags` | yes | yes | yes | standard |  |
-| `GlobIterator::valid` | yes | yes | yes | standard |  |
+| `GlobIterator::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `GlobIterator::count` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `GlobIterator::current` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `GlobIterator::getFlags` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `GlobIterator::key` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `GlobIterator::next` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `GlobIterator::rewind` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `GlobIterator::setFlags` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `GlobIterator::valid` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `HashContext::__debugInfo` | yes | no | no | hash | not implemented for JIT in this compiler build |
 | `HashContext::__serialize` | yes | no | no | hash | not implemented for JIT in this compiler build |
 | `HashContext::__unserialize` | yes | no | no | hash | not implemented for JIT in this compiler build |
-| `InfiniteIterator::__construct` | yes | yes | yes | standard |  |
-| `InfiniteIterator::current` | yes | yes | yes | standard |  |
+| `InfiniteIterator::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `InfiniteIterator::current` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `InfiniteIterator::getInnerIterator` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `InfiniteIterator::key` | yes | yes | yes | standard |  |
-| `InfiniteIterator::next` | yes | yes | yes | standard |  |
-| `InfiniteIterator::rewind` | yes | yes | yes | standard |  |
-| `InfiniteIterator::valid` | yes | yes | yes | standard |  |
+| `InfiniteIterator::key` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `InfiniteIterator::next` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `InfiniteIterator::rewind` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `InfiniteIterator::valid` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `InfoView::cases` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `InternalIterator::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `InternalIterator::current` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -2562,14 +2562,14 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `LengthException::getPrevious` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `LengthException::getTrace` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `LengthException::getTraceAsString` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `LimitIterator::__construct` | yes | yes | yes | standard |  |
+| `LimitIterator::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `LimitIterator::current` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `LimitIterator::getInnerIterator` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `LimitIterator::getPosition` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `LimitIterator::key` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `LimitIterator::next` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `LimitIterator::rewind` | yes | yes | yes | standard |  |
-| `LimitIterator::seek` | yes | yes | yes | standard |  |
+| `LimitIterator::rewind` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `LimitIterator::seek` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `LimitIterator::valid` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `LogicException::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `LogicException::__toString` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -2633,9 +2633,9 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `MongoDB\Driver\WriteConcern::getJournal` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `MongoDB\Driver\WriteConcern::getW` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `MongoDB\Driver\WriteConcern::getWtimeout` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `MultipleIterator::__construct` | yes | yes | yes | standard |  |
+| `MultipleIterator::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `MultipleIterator::__debugInfo` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `MultipleIterator::attachIterator` | yes | yes | yes | standard |  |
+| `MultipleIterator::attachIterator` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `MultipleIterator::containsIterator` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `MultipleIterator::countIterators` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `MultipleIterator::current` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -2647,13 +2647,13 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `MultipleIterator::setFlags` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `MultipleIterator::valid` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `NoDiscard::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `NoRewindIterator::__construct` | yes | yes | yes | standard |  |
-| `NoRewindIterator::current` | yes | yes | yes | standard |  |
+| `NoRewindIterator::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `NoRewindIterator::current` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `NoRewindIterator::getInnerIterator` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `NoRewindIterator::key` | yes | yes | yes | standard |  |
-| `NoRewindIterator::next` | yes | yes | yes | standard |  |
-| `NoRewindIterator::rewind` | yes | yes | yes | standard |  |
-| `NoRewindIterator::valid` | yes | yes | yes | standard |  |
+| `NoRewindIterator::key` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `NoRewindIterator::next` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `NoRewindIterator::rewind` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `NoRewindIterator::valid` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `OutOfBoundsException::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `OutOfBoundsException::__toString` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `OutOfBoundsException::__wakeup` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -2685,7 +2685,7 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `OverflowException::getTrace` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `OverflowException::getTraceAsString` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `Override::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `PDO::__construct` | yes | yes | yes | pdo |  |
+| `PDO::__construct` | yes | no | no | pdo | not implemented for JIT in this compiler build |
 | `PDO::beginTransaction` | yes | no | no | pdo | not implemented for JIT in this compiler build |
 | `PDO::commit` | yes | no | no | pdo | not implemented for JIT in this compiler build |
 | `PDO::connect` | yes | no | no | pdo | not implemented for JIT in this compiler build |
@@ -2693,12 +2693,12 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `PDO::errorInfo` | yes | no | no | pdo | not implemented for JIT in this compiler build |
 | `PDO::exec` | yes | no | no | pdo | not implemented for JIT in this compiler build |
 | `PDO::getAttribute` | yes | no | no | pdo | not implemented for JIT in this compiler build |
-| `PDO::getAvailableDrivers` | yes | yes | yes | pdo |  |
+| `PDO::getAvailableDrivers` | yes | no | no | pdo | not implemented for JIT in this compiler build |
 | `PDO::inTransaction` | yes | no | no | pdo | not implemented for JIT in this compiler build |
 | `PDO::lastInsertId` | yes | no | no | pdo | not implemented for JIT in this compiler build |
 | `PDO::prepare` | yes | no | no | pdo | not implemented for JIT in this compiler build |
 | `PDO::query` | yes | no | no | pdo | not implemented for JIT in this compiler build |
-| `PDO::quote` | yes | yes | yes | pdo |  |
+| `PDO::quote` | yes | no | no | pdo | not implemented for JIT in this compiler build |
 | `PDO::rollBack` | yes | no | no | pdo | not implemented for JIT in this compiler build |
 | `PDO::setAttribute` | yes | no | no | pdo | not implemented for JIT in this compiler build |
 | `PDOException::__construct` | yes | no | no | pdo | not implemented for JIT in this compiler build |
@@ -2737,12 +2737,12 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `PDOStatement::setAttribute` | yes | no | no | pdo | not implemented for JIT in this compiler build |
 | `PDOStatement::setFetchMode` | yes | no | no | pdo | not implemented for JIT in this compiler build |
 | `PDOStatement::valid` | yes | no | no | pdo | not implemented for JIT in this compiler build |
-| `ParentIterator::__construct` | yes | yes | yes | standard |  |
-| `ParentIterator::accept` | yes | yes | yes | standard |  |
+| `ParentIterator::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ParentIterator::accept` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ParentIterator::current` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ParentIterator::getChildren` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ParentIterator::getInnerIterator` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ParentIterator::hasChildren` | yes | yes | yes | standard |  |
+| `ParentIterator::hasChildren` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ParentIterator::key` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ParentIterator::next` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ParentIterator::rewind` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -2869,12 +2869,12 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `PharFileInfo::isCompressed` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `PharFileInfo::setMetadata` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `PhpInputFilter::cases` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `PhpToken::__construct` | yes | yes | yes | tokenizer |  |
+| `PhpToken::__construct` | yes | no | no | tokenizer | not implemented for JIT in this compiler build |
 | `PhpToken::__toString` | yes | no | no | tokenizer | not implemented for JIT in this compiler build |
-| `PhpToken::getTokenName` | yes | yes | yes | tokenizer |  |
+| `PhpToken::getTokenName` | yes | no | no | tokenizer | not implemented for JIT in this compiler build |
 | `PhpToken::is` | yes | no | no | tokenizer | not implemented for JIT in this compiler build |
 | `PhpToken::isIgnorable` | yes | no | no | tokenizer | not implemented for JIT in this compiler build |
-| `PhpToken::tokenize` | yes | yes | yes | tokenizer |  |
+| `PhpToken::tokenize` | yes | no | no | tokenizer | not implemented for JIT in this compiler build |
 | `PropertyHookType::cases` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `Random\Engine\Mt19937::__construct` | yes | yes | fold | standard | compile-time fold — non-literal inputs fail AOT build (#36203) |
 | `Random\Engine\Mt19937::__debuginfo` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -2948,7 +2948,7 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `RarException::getPrevious` | yes | no | no | rar | not implemented for JIT in this compiler build |
 | `RarException::getTrace` | yes | no | no | rar | not implemented for JIT in this compiler build |
 | `RarException::getTraceAsString` | yes | no | no | rar | not implemented for JIT in this compiler build |
-| `RecursiveArrayIterator::__construct` | yes | yes | yes | standard |  |
+| `RecursiveArrayIterator::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `RecursiveArrayIterator::getChildren` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `RecursiveArrayIterator::hasChildren` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `RecursiveCachingIterator::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -2972,7 +2972,7 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `RecursiveFilterIterator::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `RecursiveFilterIterator::getChildren` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `RecursiveFilterIterator::hasChildren` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `RecursiveIteratorIterator::__construct` | yes | yes | yes | standard |  |
+| `RecursiveIteratorIterator::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `RecursiveIteratorIterator::beginChildren` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `RecursiveIteratorIterator::beginIteration` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `RecursiveIteratorIterator::callGetChildren` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -2980,23 +2980,23 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `RecursiveIteratorIterator::current` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `RecursiveIteratorIterator::endChildren` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `RecursiveIteratorIterator::endIteration` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `RecursiveIteratorIterator::getDepth` | yes | yes | yes | standard |  |
+| `RecursiveIteratorIterator::getDepth` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `RecursiveIteratorIterator::getInnerIterator` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `RecursiveIteratorIterator::getMaxDepth` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `RecursiveIteratorIterator::getSubIterator` | yes | yes | yes | standard |  |
+| `RecursiveIteratorIterator::getSubIterator` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `RecursiveIteratorIterator::getSubPath` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `RecursiveIteratorIterator::getSubPathname` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `RecursiveIteratorIterator::key` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `RecursiveIteratorIterator::next` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `RecursiveIteratorIterator::nextElement` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `RecursiveIteratorIterator::rewind` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `RecursiveIteratorIterator::setMaxDepth` | yes | yes | yes | standard |  |
+| `RecursiveIteratorIterator::setMaxDepth` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `RecursiveIteratorIterator::valid` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `RecursiveRegexIterator::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `RecursiveRegexIterator::accept` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `RecursiveRegexIterator::getChildren` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `RecursiveRegexIterator::hasChildren` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `RecursiveTreeIterator::__construct` | yes | yes | yes | standard |  |
+| `RecursiveTreeIterator::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `RecursiveTreeIterator::current` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `RecursiveTreeIterator::getEntry` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `RecursiveTreeIterator::getPostfix` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -3116,84 +3116,84 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `Reflection::getmodifiernames` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionAttribute::__tostring` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionAttribute::getarguments` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionAttribute::getname` | yes | yes | yes | standard |  |
-| `ReflectionAttribute::gettarget` | yes | yes | yes | standard |  |
+| `ReflectionAttribute::getname` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionAttribute::gettarget` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionAttribute::isrepeated` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionAttribute::newinstance` | yes | yes | yes | standard |  |
-| `ReflectionClass::__construct` | yes | yes | yes | standard |  |
-| `ReflectionClass::__tostring` | yes | yes | yes | standard |  |
-| `ReflectionClass::getattributes` | yes | yes | yes | standard |  |
-| `ReflectionClass::getconstant` | yes | yes | yes | standard |  |
-| `ReflectionClass::getconstants` | yes | yes | yes | standard |  |
-| `ReflectionClass::getconstructor` | yes | yes | yes | standard |  |
-| `ReflectionClass::getdefaultproperties` | yes | yes | yes | standard |  |
+| `ReflectionAttribute::newinstance` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::__tostring` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::getattributes` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::getconstant` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::getconstants` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::getconstructor` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::getdefaultproperties` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionClass::getdeprecatedmessage` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionClass::getdeprecatedversion` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionClass::getdoccomment` | yes | yes | yes | standard |  |
-| `ReflectionClass::getendline` | yes | yes | yes | standard |  |
-| `ReflectionClass::getextension` | yes | yes | yes | standard |  |
-| `ReflectionClass::getextensionname` | yes | yes | yes | standard |  |
-| `ReflectionClass::getfilename` | yes | yes | yes | standard |  |
-| `ReflectionClass::getinterfacenames` | yes | yes | yes | standard |  |
-| `ReflectionClass::getinterfaces` | yes | yes | yes | standard |  |
+| `ReflectionClass::getdoccomment` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::getendline` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::getextension` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::getextensionname` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::getfilename` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::getinterfacenames` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::getinterfaces` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionClass::getlazyinitializer` | yes | yes | yes | standard |  |
-| `ReflectionClass::getmethod` | yes | yes | yes | standard |  |
-| `ReflectionClass::getmethods` | yes | yes | yes | standard |  |
+| `ReflectionClass::getmethod` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::getmethods` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionClass::getmodifiers` | yes | yes | yes | standard |  |
-| `ReflectionClass::getname` | yes | yes | yes | standard |  |
-| `ReflectionClass::getnamespacename` | yes | yes | yes | standard |  |
-| `ReflectionClass::getparentclass` | yes | yes | yes | standard |  |
-| `ReflectionClass::getproperties` | yes | yes | yes | standard |  |
-| `ReflectionClass::getproperty` | yes | yes | yes | standard |  |
-| `ReflectionClass::getreflectionconstant` | yes | yes | yes | standard |  |
-| `ReflectionClass::getreflectionconstants` | yes | yes | yes | standard |  |
-| `ReflectionClass::getshortname` | yes | yes | yes | standard |  |
-| `ReflectionClass::getstartline` | yes | yes | yes | standard |  |
-| `ReflectionClass::getstaticproperties` | yes | yes | yes | standard |  |
-| `ReflectionClass::getstaticpropertyvalue` | yes | yes | yes | standard |  |
-| `ReflectionClass::gettraitaliases` | yes | yes | yes | standard |  |
-| `ReflectionClass::gettraitnames` | yes | yes | yes | standard |  |
-| `ReflectionClass::gettraits` | yes | yes | yes | standard |  |
-| `ReflectionClass::hasconstant` | yes | yes | yes | standard |  |
-| `ReflectionClass::hasmethod` | yes | yes | yes | standard |  |
-| `ReflectionClass::hasproperty` | yes | yes | yes | standard |  |
-| `ReflectionClass::implementsinterface` | yes | yes | yes | standard |  |
+| `ReflectionClass::getname` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::getnamespacename` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::getparentclass` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::getproperties` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::getproperty` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::getreflectionconstant` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::getreflectionconstants` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::getshortname` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::getstartline` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::getstaticproperties` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::getstaticpropertyvalue` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::gettraitaliases` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::gettraitnames` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::gettraits` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::hasconstant` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::hasmethod` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::hasproperty` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::implementsinterface` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionClass::initializelazyobject` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionClass::innamespace` | yes | yes | yes | standard |  |
+| `ReflectionClass::innamespace` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionClass::isabstract` | yes | yes | yes | standard |  |
-| `ReflectionClass::isanonymous` | yes | yes | yes | standard |  |
-| `ReflectionClass::iscloneable` | yes | yes | yes | standard |  |
+| `ReflectionClass::isanonymous` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::iscloneable` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionClass::isenum` | yes | yes | yes | standard |  |
-| `ReflectionClass::isfinal` | yes | yes | yes | standard |  |
-| `ReflectionClass::isinstance` | yes | yes | yes | standard |  |
-| `ReflectionClass::isinstantiable` | yes | yes | yes | standard |  |
+| `ReflectionClass::isfinal` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::isinstance` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::isinstantiable` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionClass::isinterface` | yes | yes | yes | standard |  |
-| `ReflectionClass::isinternal` | yes | yes | yes | standard |  |
-| `ReflectionClass::isiterable` | yes | yes | yes | standard |  |
-| `ReflectionClass::isiterateable` | yes | yes | yes | standard |  |
+| `ReflectionClass::isinternal` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::isiterable` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::isiterateable` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionClass::isreadonly` | yes | yes | yes | standard |  |
-| `ReflectionClass::issubclassof` | yes | yes | yes | standard |  |
+| `ReflectionClass::issubclassof` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionClass::istrait` | yes | yes | yes | standard |  |
 | `ReflectionClass::isuninitializedlazyobject` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionClass::isuserdefined` | yes | yes | yes | standard |  |
+| `ReflectionClass::isuserdefined` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionClass::marklazyobjectasinitialized` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionClass::newinstance` | yes | yes | yes | standard |  |
-| `ReflectionClass::newinstanceargs` | yes | yes | yes | standard |  |
-| `ReflectionClass::newinstancewithoutconstructor` | yes | yes | yes | standard |  |
-| `ReflectionClass::newlazyghost` | yes | yes | yes | standard |  |
-| `ReflectionClass::newlazyproxy` | yes | yes | yes | standard |  |
+| `ReflectionClass::newinstance` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::newinstanceargs` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::newinstancewithoutconstructor` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::newlazyghost` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClass::newlazyproxy` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionClass::resetaslazyghost` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionClass::resetaslazyproxy` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionClass::setstaticpropertyvalue` | yes | yes | yes | standard |  |
-| `ReflectionClassConstant::__construct` | yes | yes | yes | standard |  |
+| `ReflectionClass::setstaticpropertyvalue` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionClassConstant::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionClassConstant::__tostring` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionClassConstant::getattributes` | yes | yes | yes | standard |  |
+| `ReflectionClassConstant::getattributes` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionClassConstant::getdeclaringclass` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionClassConstant::getdeprecatedmessage` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionClassConstant::getdeprecatedversion` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionClassConstant::getdoccomment` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionClassConstant::getmodifiers` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionClassConstant::getname` | yes | yes | yes | standard |  |
+| `ReflectionClassConstant::getname` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionClassConstant::gettype` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionClassConstant::getvalue` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionClassConstant::hastype` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -3203,29 +3203,29 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `ReflectionClassConstant::isprivate` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionClassConstant::isprotected` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionClassConstant::ispublic` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionConstant::__construct` | yes | yes | yes | standard |  |
+| `ReflectionConstant::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionConstant::__tostring` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionConstant::getattributes` | yes | yes | yes | standard |  |
+| `ReflectionConstant::getattributes` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionConstant::getextension` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionConstant::getextensionname` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionConstant::getfilename` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionConstant::getname` | yes | yes | yes | standard |  |
+| `ReflectionConstant::getname` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionConstant::getnamespacename` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionConstant::getshortname` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionConstant::getvalue` | yes | yes | yes | standard |  |
+| `ReflectionConstant::getvalue` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionConstant::isdeprecated` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionEnum::__construct` | yes | yes | yes | standard |  |
+| `ReflectionEnum::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionEnum::fromName` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionEnum::getbackingtype` | yes | yes | yes | standard |  |
-| `ReflectionEnum::getcase` | yes | yes | yes | standard |  |
-| `ReflectionEnum::getcases` | yes | yes | yes | standard |  |
+| `ReflectionEnum::getbackingtype` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionEnum::getcase` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionEnum::getcases` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionEnum::getinterfacenames` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionEnum::getinterfaces` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionEnum::getname` | yes | yes | yes | standard |  |
+| `ReflectionEnum::getname` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionEnum::gettraitnames` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionEnum::gettraits` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionEnum::hascase` | yes | yes | yes | standard |  |
-| `ReflectionEnum::isbacked` | yes | yes | yes | standard |  |
+| `ReflectionEnum::hascase` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionEnum::isbacked` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionEnumBackedCase::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionEnumBackedCase::getbackingvalue` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionEnumBackedCase::isbacked` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -3235,7 +3235,7 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `ReflectionEnumUnitCase::getdeclaringclass` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionEnumUnitCase::getdoccomment` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionEnumUnitCase::getenum` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionEnumUnitCase::getname` | yes | yes | yes | standard |  |
+| `ReflectionEnumUnitCase::getname` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionEnumUnitCase::getvalue` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionEnumUnitCase::isbacked` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionEnumUnitCase::isdeprecated` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -3249,26 +3249,26 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `ReflectionException::getPrevious` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionException::getTrace` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionException::getTraceAsString` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionExtension::__construct` | yes | yes | yes | standard |  |
-| `ReflectionExtension::__tostring` | yes | yes | yes | standard |  |
-| `ReflectionExtension::getclasses` | yes | yes | yes | standard |  |
-| `ReflectionExtension::getclassnames` | yes | yes | yes | standard |  |
-| `ReflectionExtension::getconstants` | yes | yes | yes | standard |  |
-| `ReflectionExtension::getdependencies` | yes | yes | yes | standard |  |
-| `ReflectionExtension::getfunctions` | yes | yes | yes | standard |  |
-| `ReflectionExtension::getinientries` | yes | yes | yes | standard |  |
-| `ReflectionExtension::getname` | yes | yes | yes | standard |  |
-| `ReflectionExtension::getversion` | yes | yes | yes | standard |  |
-| `ReflectionExtension::info` | yes | yes | yes | standard |  |
-| `ReflectionExtension::ispersistent` | yes | yes | yes | standard |  |
-| `ReflectionExtension::istemporary` | yes | yes | yes | standard |  |
+| `ReflectionExtension::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionExtension::__tostring` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionExtension::getclasses` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionExtension::getclassnames` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionExtension::getconstants` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionExtension::getdependencies` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionExtension::getfunctions` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionExtension::getinientries` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionExtension::getname` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionExtension::getversion` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionExtension::info` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionExtension::ispersistent` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionExtension::istemporary` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionFiber::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionFiber::getcallable` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionFiber::getexecutingfile` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionFiber::getexecutingline` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionFiber::getfiber` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionFiber::gettrace` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionFunction::__construct` | yes | yes | yes | standard |  |
+| `ReflectionFunction::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionFunction::__tostring` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionFunction::createfromcallable` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionFunction::createfromfunction` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -3282,18 +3282,18 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `ReflectionFunction::getextension` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionFunction::getextensionname` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionFunction::getfilename` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionFunction::getname` | yes | yes | yes | standard |  |
-| `ReflectionFunction::getnamedarguments` | yes | yes | yes | standard |  |
+| `ReflectionFunction::getname` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionFunction::getnamedarguments` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionFunction::getnamespacename` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionFunction::getnumberofparameters` | yes | yes | yes | standard |  |
-| `ReflectionFunction::getnumberofrequiredparameters` | yes | yes | yes | standard |  |
-| `ReflectionFunction::getparameters` | yes | yes | yes | standard |  |
-| `ReflectionFunction::getreturntype` | yes | yes | yes | standard |  |
+| `ReflectionFunction::getnumberofparameters` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionFunction::getnumberofrequiredparameters` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionFunction::getparameters` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionFunction::getreturntype` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionFunction::getshortname` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionFunction::getstartline` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionFunction::getstaticvariables` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionFunction::gettentativereturntype` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionFunction::hasreturntype` | yes | yes | yes | standard |  |
+| `ReflectionFunction::hasreturntype` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionFunction::hastentativereturntype` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionFunction::innamespace` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionFunction::invoke` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -3303,10 +3303,10 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `ReflectionFunction::isdeprecated` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionFunction::isdisabled` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionFunction::isgenerator` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionFunction::isinternal` | yes | yes | yes | standard |  |
+| `ReflectionFunction::isinternal` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionFunction::isstatic` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionFunction::isuserdefined` | yes | yes | yes | standard |  |
-| `ReflectionFunction::isvariadic` | yes | yes | yes | standard |  |
+| `ReflectionFunction::isuserdefined` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionFunction::isvariadic` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionFunction::returnsreference` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionFunctionAbstract::getattributes` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionGenerator::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -3318,17 +3318,17 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `ReflectionGenerator::gettrace` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionGenerator::isclosed` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionIntersectionType::gettypes` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionMethod::__construct` | yes | yes | yes | standard |  |
+| `ReflectionMethod::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionMethod::__tostring` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionMethod::createfromclosure` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionMethod::createfrommethodname` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionMethod::getattributes` | yes | yes | yes | standard |  |
+| `ReflectionMethod::getattributes` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionMethod::getclosure` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionMethod::getclosurecalledclass` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionMethod::getclosurescopeclass` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionMethod::getclosurethis` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionMethod::getclosureusedvariables` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionMethod::getdeclaringclass` | yes | yes | yes | standard |  |
+| `ReflectionMethod::getdeclaringclass` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionMethod::getdeprecatedmessage` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionMethod::getdeprecatedversion` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionMethod::getdoccomment` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -3337,11 +3337,11 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `ReflectionMethod::getextensionname` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionMethod::getfilename` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionMethod::getmodifiers` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionMethod::getname` | yes | yes | yes | standard |  |
-| `ReflectionMethod::getnamedarguments` | yes | yes | yes | standard |  |
+| `ReflectionMethod::getname` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionMethod::getnamedarguments` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionMethod::getnamespacename` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionMethod::getnumberofparameters` | yes | yes | yes | standard |  |
-| `ReflectionMethod::getnumberofrequiredparameters` | yes | yes | yes | standard |  |
+| `ReflectionMethod::getnumberofparameters` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionMethod::getnumberofrequiredparameters` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionMethod::getparameters` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionMethod::getprototype` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionMethod::getreturntype` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -3350,10 +3350,10 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `ReflectionMethod::getstaticvariables` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionMethod::gettentativereturntype` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionMethod::hasprototype` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionMethod::hasreturntype` | yes | yes | yes | standard |  |
+| `ReflectionMethod::hasreturntype` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionMethod::hastentativereturntype` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionMethod::innamespace` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionMethod::invoke` | yes | yes | yes | standard |  |
+| `ReflectionMethod::invoke` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionMethod::invokeargs` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionMethod::isabstract` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionMethod::isclosure` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -3365,53 +3365,53 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `ReflectionMethod::isinternal` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionMethod::isprivate` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionMethod::isprotected` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionMethod::ispublic` | yes | yes | yes | standard |  |
-| `ReflectionMethod::isstatic` | yes | yes | yes | standard |  |
+| `ReflectionMethod::ispublic` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionMethod::isstatic` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionMethod::isuserdefined` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionMethod::isvariadic` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionMethod::returnsreference` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionMethod::setaccessible` | yes | yes | yes | standard |  |
-| `ReflectionNamedType::getname` | yes | yes | yes | standard |  |
+| `ReflectionMethod::setaccessible` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionNamedType::getname` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionNamedType::isbuiltin` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionObject::__construct` | yes | yes | yes | standard |  |
-| `ReflectionParameter::__construct` | yes | yes | yes | standard |  |
+| `ReflectionObject::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionParameter::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionParameter::__tostring` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionParameter::allowsnull` | yes | yes | yes | standard |  |
+| `ReflectionParameter::allowsnull` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionParameter::canbepassedbyvalue` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionParameter::getattributes` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionParameter::getclass` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionParameter::getdeclaringclass` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionParameter::getdeclaringfunction` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionParameter::getdefaultvalue` | yes | yes | yes | standard |  |
+| `ReflectionParameter::getdefaultvalue` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionParameter::getdefaultvalueconstantname` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionParameter::getname` | yes | yes | yes | standard |  |
+| `ReflectionParameter::getname` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionParameter::getposition` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionParameter::gettype` | yes | yes | yes | standard |  |
-| `ReflectionParameter::hastype` | yes | yes | yes | standard |  |
+| `ReflectionParameter::gettype` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionParameter::hastype` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionParameter::isarray` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionParameter::iscallable` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionParameter::isdefaultvalueavailable` | yes | yes | yes | standard |  |
+| `ReflectionParameter::isdefaultvalueavailable` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionParameter::isdefaultvalueconstant` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionParameter::isoptional` | yes | yes | yes | standard |  |
+| `ReflectionParameter::isoptional` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionParameter::ispassedbyreference` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionParameter::ispromoted` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionParameter::isvariadic` | yes | yes | yes | standard |  |
-| `ReflectionProperty::__construct` | yes | yes | yes | standard |  |
+| `ReflectionParameter::isvariadic` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionProperty::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionProperty::__tostring` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionProperty::getasymmetricvisibility` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionProperty::getattributes` | yes | yes | yes | standard |  |
-| `ReflectionProperty::getdeclaringclass` | yes | yes | yes | standard |  |
+| `ReflectionProperty::getattributes` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionProperty::getdeclaringclass` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionProperty::getdefaultvalue` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionProperty::getdoccomment` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionProperty::gethook` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionProperty::gethooks` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionProperty::getmangledname` | yes | yes | yes | standard |  |
+| `ReflectionProperty::getmangledname` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionProperty::getmodifiers` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionProperty::getname` | yes | yes | yes | standard |  |
-| `ReflectionProperty::getrawvalue` | yes | yes | yes | standard |  |
+| `ReflectionProperty::getname` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionProperty::getrawvalue` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionProperty::getsettabletype` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionProperty::gettype` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionProperty::getvalue` | yes | yes | yes | standard |  |
+| `ReflectionProperty::getvalue` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionProperty::hasdefaultvalue` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionProperty::hashook` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionProperty::hashooks` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -3419,7 +3419,7 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `ReflectionProperty::isabstract` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionProperty::isdefault` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionProperty::isdynamic` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionProperty::isfinal` | yes | yes | yes | standard |  |
+| `ReflectionProperty::isfinal` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionProperty::isinitialized` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionProperty::islazy` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionProperty::isprivate` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -3434,12 +3434,12 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `ReflectionProperty::isreadable` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionProperty::isreadonly` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionProperty::isstatic` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionProperty::isvirtual` | yes | yes | yes | standard |  |
+| `ReflectionProperty::isvirtual` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionProperty::iswritable` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionProperty::setaccessible` | yes | yes | yes | standard |  |
-| `ReflectionProperty::setrawvalue` | yes | yes | yes | standard |  |
+| `ReflectionProperty::setaccessible` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `ReflectionProperty::setrawvalue` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionProperty::setrawvaluewithoutlazyinitialization` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `ReflectionProperty::setvalue` | yes | yes | yes | standard |  |
+| `ReflectionProperty::setvalue` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionProperty::skiplazyinitialization` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionReference::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionReference::fromArrayElement` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -3454,7 +3454,7 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `ReflectionZendExtension::getname` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionZendExtension::geturl` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ReflectionZendExtension::getversion` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `RegexIterator::__construct` | yes | yes | yes | standard |  |
+| `RegexIterator::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `RegexIterator::accept` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `RegexIterator::current` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `RegexIterator::getFlags` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -3553,9 +3553,9 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `SQLite3Stmt::reset` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
 | `SQLite3Stmt::setExplain` | yes | no | no | sqlite3 | not implemented for JIT in this compiler build |
 | `SensitiveParameter::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `SensitiveParameterValue::__construct` | yes | yes | yes | standard |  |
+| `SensitiveParameterValue::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `SensitiveParameterValue::__debuginfo` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `SensitiveParameterValue::getvalue` | yes | yes | yes | standard |  |
+| `SensitiveParameterValue::getvalue` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `SessionHandler::close` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `SessionHandler::create_sid` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `SessionHandler::destroy` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -3656,84 +3656,84 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `SplDoublyLinkedList::unserialize` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `SplDoublyLinkedList::unshift` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `SplDoublyLinkedList::valid` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `SplFileInfo::__construct` | yes | yes | yes | standard |  |
+| `SplFileInfo::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `SplFileInfo::__debugInfo` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `SplFileInfo::__tostring` | yes | yes | yes | standard |  |
+| `SplFileInfo::__tostring` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `SplFileInfo::_bad_state_ex` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `SplFileInfo::getATime` | yes | yes | yes | standard |  |
-| `SplFileInfo::getCTime` | yes | yes | yes | standard |  |
-| `SplFileInfo::getExtension` | yes | yes | yes | standard |  |
-| `SplFileInfo::getFileInfo` | yes | yes | yes | standard |  |
-| `SplFileInfo::getGroup` | yes | yes | yes | standard |  |
-| `SplFileInfo::getInode` | yes | yes | yes | standard |  |
-| `SplFileInfo::getLinkTarget` | yes | yes | yes | standard |  |
-| `SplFileInfo::getMTime` | yes | yes | yes | standard |  |
-| `SplFileInfo::getOwner` | yes | yes | yes | standard |  |
-| `SplFileInfo::getPathInfo` | yes | yes | yes | standard |  |
-| `SplFileInfo::getPerms` | yes | yes | yes | standard |  |
-| `SplFileInfo::getRealPath` | yes | yes | yes | standard |  |
-| `SplFileInfo::getSize` | yes | yes | yes | standard |  |
-| `SplFileInfo::getType` | yes | yes | yes | standard |  |
-| `SplFileInfo::getbasename` | yes | yes | yes | standard |  |
-| `SplFileInfo::getfilename` | yes | yes | yes | standard |  |
-| `SplFileInfo::getpath` | yes | yes | yes | standard |  |
-| `SplFileInfo::getpathname` | yes | yes | yes | standard |  |
-| `SplFileInfo::isDir` | yes | yes | yes | standard |  |
-| `SplFileInfo::isExecutable` | yes | yes | yes | standard |  |
-| `SplFileInfo::isFile` | yes | yes | yes | standard |  |
-| `SplFileInfo::isLink` | yes | yes | yes | standard |  |
-| `SplFileInfo::isReadable` | yes | yes | yes | standard |  |
-| `SplFileInfo::isWritable` | yes | yes | yes | standard |  |
-| `SplFileInfo::openFile` | yes | yes | yes | standard |  |
+| `SplFileInfo::getATime` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileInfo::getCTime` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileInfo::getExtension` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileInfo::getFileInfo` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileInfo::getGroup` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileInfo::getInode` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileInfo::getLinkTarget` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileInfo::getMTime` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileInfo::getOwner` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileInfo::getPathInfo` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileInfo::getPerms` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileInfo::getRealPath` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileInfo::getSize` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileInfo::getType` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileInfo::getbasename` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileInfo::getfilename` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileInfo::getpath` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileInfo::getpathname` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileInfo::isDir` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileInfo::isExecutable` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileInfo::isFile` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileInfo::isLink` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileInfo::isReadable` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileInfo::isWritable` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileInfo::openFile` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `SplFileInfo::setFileClass` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `SplFileInfo::setInfoClass` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `SplFileObject::__construct` | yes | yes | yes | standard |  |
-| `SplFileObject::__toString` | yes | yes | yes | standard |  |
-| `SplFileObject::current` | yes | yes | yes | standard |  |
-| `SplFileObject::eof` | yes | yes | yes | standard |  |
-| `SplFileObject::fflush` | yes | yes | yes | standard |  |
-| `SplFileObject::fgetc` | yes | yes | yes | standard |  |
-| `SplFileObject::fgetcsv` | yes | yes | yes | standard |  |
-| `SplFileObject::fgets` | yes | yes | yes | standard |  |
-| `SplFileObject::flock` | yes | yes | yes | standard |  |
-| `SplFileObject::fpassthru` | yes | yes | yes | standard |  |
-| `SplFileObject::fputcsv` | yes | yes | yes | standard |  |
-| `SplFileObject::fread` | yes | yes | yes | standard |  |
-| `SplFileObject::fscanf` | yes | yes | yes | standard |  |
-| `SplFileObject::fseek` | yes | yes | yes | standard |  |
-| `SplFileObject::fstat` | yes | yes | yes | standard |  |
-| `SplFileObject::ftell` | yes | yes | yes | standard |  |
-| `SplFileObject::ftruncate` | yes | yes | yes | standard |  |
-| `SplFileObject::fwrite` | yes | yes | yes | standard |  |
-| `SplFileObject::getChildren` | yes | yes | yes | standard |  |
-| `SplFileObject::getCsvControl` | yes | yes | yes | standard |  |
-| `SplFileObject::getCurrentLine` | yes | yes | yes | standard |  |
-| `SplFileObject::getFlags` | yes | yes | yes | standard |  |
-| `SplFileObject::getMaxLineLen` | yes | yes | yes | standard |  |
-| `SplFileObject::hasChildren` | yes | yes | yes | standard |  |
-| `SplFileObject::key` | yes | yes | yes | standard |  |
-| `SplFileObject::next` | yes | yes | yes | standard |  |
-| `SplFileObject::rewind` | yes | yes | yes | standard |  |
-| `SplFileObject::seek` | yes | yes | yes | standard |  |
-| `SplFileObject::setCsvControl` | yes | yes | yes | standard |  |
-| `SplFileObject::setFlags` | yes | yes | yes | standard |  |
-| `SplFileObject::setMaxLineLen` | yes | yes | yes | standard |  |
-| `SplFileObject::valid` | yes | yes | yes | standard |  |
-| `SplFixedArray::__construct` | yes | yes | yes | standard |  |
-| `SplFixedArray::__debugInfo` | yes | yes | yes | standard |  |
+| `SplFileObject::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileObject::__toString` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileObject::current` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileObject::eof` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileObject::fflush` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileObject::fgetc` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileObject::fgetcsv` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileObject::fgets` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileObject::flock` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileObject::fpassthru` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileObject::fputcsv` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileObject::fread` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileObject::fscanf` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileObject::fseek` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileObject::fstat` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileObject::ftell` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileObject::ftruncate` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileObject::fwrite` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileObject::getChildren` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileObject::getCsvControl` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileObject::getCurrentLine` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileObject::getFlags` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileObject::getMaxLineLen` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileObject::hasChildren` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileObject::key` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileObject::next` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileObject::rewind` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileObject::seek` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileObject::setCsvControl` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileObject::setFlags` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileObject::setMaxLineLen` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFileObject::valid` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFixedArray::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFixedArray::__debugInfo` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `SplFixedArray::__serialize` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `SplFixedArray::__unserialize` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `SplFixedArray::count` | yes | yes | yes | standard |  |
-| `SplFixedArray::fromArray` | yes | yes | yes | standard |  |
+| `SplFixedArray::count` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFixedArray::fromArray` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `SplFixedArray::getIterator` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `SplFixedArray::getSize` | yes | yes | yes | standard |  |
+| `SplFixedArray::getSize` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `SplFixedArray::jsonSerialize` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `SplFixedArray::offsetExists` | yes | yes | yes | standard |  |
-| `SplFixedArray::offsetGet` | yes | yes | yes | standard |  |
-| `SplFixedArray::offsetSet` | yes | yes | yes | standard |  |
-| `SplFixedArray::offsetUnset` | yes | yes | yes | standard |  |
-| `SplFixedArray::setSize` | yes | yes | yes | standard |  |
-| `SplFixedArray::toArray` | yes | yes | yes | standard |  |
+| `SplFixedArray::offsetExists` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFixedArray::offsetGet` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFixedArray::offsetSet` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFixedArray::offsetUnset` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFixedArray::setSize` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplFixedArray::toArray` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `SplHeap::__debugInfo` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `SplHeap::compare` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `SplHeap::count` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -3756,44 +3756,44 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `SplObjectStorage::__debugInfo` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `SplObjectStorage::__serialize` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `SplObjectStorage::__unserialize` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `SplObjectStorage::addAll` | yes | yes | yes | standard |  |
-| `SplObjectStorage::attach` | yes | yes | yes | standard |  |
-| `SplObjectStorage::contains` | yes | yes | yes | standard |  |
-| `SplObjectStorage::count` | yes | yes | yes | standard |  |
-| `SplObjectStorage::current` | yes | yes | yes | standard |  |
-| `SplObjectStorage::detach` | yes | yes | yes | standard |  |
-| `SplObjectStorage::getHash` | yes | yes | yes | standard |  |
-| `SplObjectStorage::getInfo` | yes | yes | yes | standard |  |
-| `SplObjectStorage::key` | yes | yes | yes | standard |  |
-| `SplObjectStorage::next` | yes | yes | yes | standard |  |
-| `SplObjectStorage::offsetExists` | yes | yes | yes | standard |  |
-| `SplObjectStorage::offsetGet` | yes | yes | yes | standard |  |
-| `SplObjectStorage::offsetSet` | yes | yes | yes | standard |  |
-| `SplObjectStorage::offsetUnset` | yes | yes | yes | standard |  |
-| `SplObjectStorage::removeAll` | yes | yes | yes | standard |  |
-| `SplObjectStorage::removeAllExcept` | yes | yes | yes | standard |  |
-| `SplObjectStorage::rewind` | yes | yes | yes | standard |  |
-| `SplObjectStorage::serialize` | yes | yes | yes | standard |  |
-| `SplObjectStorage::setInfo` | yes | yes | yes | standard |  |
-| `SplObjectStorage::unserialize` | yes | yes | yes | standard |  |
-| `SplObjectStorage::valid` | yes | yes | yes | standard |  |
-| `SplPriorityQueue::__construct` | yes | yes | yes | standard |  |
+| `SplObjectStorage::addAll` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplObjectStorage::attach` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplObjectStorage::contains` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplObjectStorage::count` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplObjectStorage::current` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplObjectStorage::detach` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplObjectStorage::getHash` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplObjectStorage::getInfo` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplObjectStorage::key` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplObjectStorage::next` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplObjectStorage::offsetExists` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplObjectStorage::offsetGet` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplObjectStorage::offsetSet` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplObjectStorage::offsetUnset` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplObjectStorage::removeAll` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplObjectStorage::removeAllExcept` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplObjectStorage::rewind` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplObjectStorage::serialize` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplObjectStorage::setInfo` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplObjectStorage::unserialize` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplObjectStorage::valid` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplPriorityQueue::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `SplPriorityQueue::__debugInfo` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `SplPriorityQueue::compare` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `SplPriorityQueue::count` | yes | yes | yes | standard |  |
-| `SplPriorityQueue::current` | yes | yes | yes | standard |  |
-| `SplPriorityQueue::extract` | yes | yes | yes | standard |  |
-| `SplPriorityQueue::getExtractFlags` | yes | yes | yes | standard |  |
-| `SplPriorityQueue::insert` | yes | yes | yes | standard |  |
+| `SplPriorityQueue::count` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplPriorityQueue::current` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplPriorityQueue::extract` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplPriorityQueue::getExtractFlags` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplPriorityQueue::insert` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `SplPriorityQueue::isCorrupted` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `SplPriorityQueue::isEmpty` | yes | yes | yes | standard |  |
-| `SplPriorityQueue::key` | yes | yes | yes | standard |  |
-| `SplPriorityQueue::next` | yes | yes | yes | standard |  |
+| `SplPriorityQueue::isEmpty` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplPriorityQueue::key` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplPriorityQueue::next` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `SplPriorityQueue::recoverFromCorruption` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `SplPriorityQueue::rewind` | yes | yes | yes | standard |  |
-| `SplPriorityQueue::setExtractFlags` | yes | yes | yes | standard |  |
-| `SplPriorityQueue::top` | yes | yes | yes | standard |  |
-| `SplPriorityQueue::valid` | yes | yes | yes | standard |  |
+| `SplPriorityQueue::rewind` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplPriorityQueue::setExtractFlags` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplPriorityQueue::top` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `SplPriorityQueue::valid` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `SplQueue::dequeue` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `SplQueue::enqueue` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `SplQueue::getIteratorMode` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -3801,7 +3801,7 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `SplStack::getIteratorMode` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `SplStack::setIteratorMode` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `SplStack::top` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `SplTempFileObject::__construct` | yes | yes | yes | standard |  |
+| `SplTempFileObject::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `TypeError::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `TypeError::__toString` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `TypeError::__wakeup` | yes | no | no | standard | not implemented for JIT in this compiler build |
@@ -3964,15 +3964,15 @@ Internal extension classes only. JIT/AOT from `lib/JIT/Context.php` proxy wiring
 | `ValueError::getTrace` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `ValueError::getTraceAsString` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `WeakMap::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `WeakMap::count` | yes | yes | yes | standard |  |
+| `WeakMap::count` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `WeakMap::getIterator` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `WeakMap::offsetexists` | yes | yes | yes | standard |  |
-| `WeakMap::offsetget` | yes | yes | yes | standard |  |
-| `WeakMap::offsetset` | yes | yes | yes | standard |  |
-| `WeakMap::offsetunset` | yes | yes | yes | standard |  |
+| `WeakMap::offsetexists` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `WeakMap::offsetget` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `WeakMap::offsetset` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `WeakMap::offsetunset` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `WeakReference::__construct` | yes | no | no | standard | not implemented for JIT in this compiler build |
-| `WeakReference::create` | yes | yes | yes | standard |  |
-| `WeakReference::get` | yes | yes | yes | standard |  |
+| `WeakReference::create` | yes | no | no | standard | not implemented for JIT in this compiler build |
+| `WeakReference::get` | yes | no | no | standard | not implemented for JIT in this compiler build |
 | `XMLReader::XML` | yes | yes | fold | xmlreader | compile-time fold — non-literal inputs fail AOT build (#36203) |
 | `XMLReader::close` | yes | yes | fold | xmlreader | compile-time fold — non-literal inputs fail AOT build (#36203) |
 | `XMLReader::expand` | yes | yes | fold | xmlreader | compile-time fold — non-literal inputs fail AOT build (#36203) |

@@ -29,6 +29,10 @@ use PHPLLVM\Value;
 /**
  * htmlspecialchars() for strings (subset of PHP; JIT UTF-8 + flags + double_encode — #27290).
  *
+ * VM: {@see VmString::htmlspecialchars()}; JIT/AOT: native {@see StringHtmlspecialchars} /
+ * {@see \PHPCompiler\JIT\Builtin\HtmlspecialcharsRuntime} {@code phpc_htmlspecialchars_r1}
+ * (#36388; NestedJIT HtmlspecialcharsJitHelper leaked under thin AOT — peer chunk_split_r1).
+ *
  * php-src: ext/standard/html.stub.php / html.c — PHP_FUNCTION(htmlspecialchars)
  */
 final class htmlspecialchars extends Internal
@@ -131,6 +135,7 @@ final class htmlspecialchars extends Internal
             return $context->getTypeFromString('__string__*')->constNull();
         }
 
+        // Native phpc_htmlspecialchars_r1 — no NestedJIT HtmlspecialcharsJitHelper (#36388).
         StringHtmlspecialchars::ensureLinked($context);
 
         $str = self::jitStringArg($context, $args[0], 0, 'string');
@@ -146,12 +151,17 @@ final class htmlspecialchars extends Internal
         }
 
         if (!$hasDoubleEncode) {
-            return JitHtmlspecialchars::escape($context, $str, $flags);
+            $result = JitHtmlspecialchars::escape($context, $str, $flags);
+            JitStringBuiltinArg::releaseEphemeralArgAfterCopy($context, $args[0], $str);
+
+            return $result;
         }
 
         $doubleEncode = self::jitDoubleEncodeArg($context, $args[3]);
+        $result = JitHtmlspecialchars::escapeEx($context, $str, $flags, $doubleEncode);
+        JitStringBuiltinArg::releaseEphemeralArgAfterCopy($context, $args[0], $str);
 
-        return JitHtmlspecialchars::escapeEx($context, $str, $flags, $doubleEncode);
+        return $result;
     }
 
     /** Zend 8.4 DEP+coerces null (not TypeError until 9.0); use soft-null path (#21405). */

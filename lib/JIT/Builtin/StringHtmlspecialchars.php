@@ -7,39 +7,27 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for __string__htmlspecialchars via HtmlspecialcharsJitHelper PHP (#9445, #18967, #20487).
+ * JIT/AOT link for phpc_htmlspecialchars_r1 / _ex_r1 (#9445, #20487, #27290, #36388).
  *
- * Embed + thin standalone AOT: {@see HtmlspecialcharsJitHelper} via {@see JitVmHelperLink}
- * (Bin2hex #20452 / HashEquals #20469 shape — no hand-written escape kernel).
- * SSOT: {@see \PHPCompiler\ext\standard\VmString::htmlspecialchars()}.
+ * Thin AOT uses native {@see HtmlspecialcharsRuntime} (no NestedJIT
+ * HtmlspecialcharsJitHelper) so FUNCCALL results free on unset — peer
+ * {@see StringChunkSplit} / chunk_split_r1.
+ * {@see Context::ensureFullStandaloneBodies} must not NestedJIT this during init.
+ * SSOT behaviour: {@see \PHPCompiler\ext\standard\VmString::htmlspecialchars()}.
  * php-src: ext/standard/html.c — PHP_FUNCTION(htmlspecialchars)
- *
- * `__string__htmlspecialchars_ex` adds double_encode for encoding/arity-4 calls (#27290).
  */
 final class StringHtmlspecialchars
 {
-    private const ABI = '__string__htmlspecialchars';
+    private const ABI = HtmlspecialcharsRuntime::ABI;
 
-    private const ABI_EX = '__string__htmlspecialchars_ex';
+    private const ABI_EX = HtmlspecialcharsRuntime::ABI_EX;
 
-    private const HELPER_PATH = '/ext/standard/HtmlspecialcharsJitHelper.php';
+    private const BRIDGE_ENTRY = HtmlspecialcharsRuntime::BRIDGE_ENTRY;
 
-    private const HTMLSPECIALCHARS_HELPER = 'PHPCompiler\\ext\\standard\\HtmlspecialcharsJitHelper::htmlspecialchars';
-
-    private const HTMLSPECIALCHARS_EX_HELPER = 'PHPCompiler\\ext\\standard\\HtmlspecialcharsJitHelper::htmlspecialcharsEx';
-
-    private const BRIDGE_ENTRY = 'htmlspecialchars_bridge_entry';
-
-    private const BRIDGE_ENTRY_EX = 'htmlspecialchars_ex_bridge_entry';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::HTMLSPECIALCHARS_HELPER,
-        self::HTMLSPECIALCHARS_EX_HELPER,
-    ];
+    private const BRIDGE_ENTRY_EX = HtmlspecialcharsRuntime::BRIDGE_ENTRY_EX;
 
     public static function ensureLinked(Context $context): void
     {
@@ -48,66 +36,83 @@ final class StringHtmlspecialchars
 
     public static function ensureStandaloneBodies(Context $context): void
     {
-        self::implement($context);
+        self::ensureLinked($context);
     }
 
+    public static function invoke(Context $context, Value $strPtr, Value $flags): Value
+    {
+        self::ensureLinked($context);
+
+        return $context->builder->call(
+            $context->lookupFunction(self::ABI),
+            $strPtr,
+            $flags
+        );
+    }
+
+    public static function invokeEx(
+        Context $context,
+        Value $strPtr,
+        Value $flags,
+        Value $doubleEncode
+    ): Value {
+        self::ensureLinked($context);
+
+        return $context->builder->call(
+            $context->lookupFunction(self::ABI_EX),
+            $strPtr,
+            $flags,
+            $doubleEncode
+        );
+    }
+
+    /** @deprecated use {@see invoke} — kept for Type/String_ decls of legacy ABI names */
     public static function implement(Context $context): void
     {
-        if (NestedJitCompileScope::isActive()) {
+        // Native emit does not NestedJIT HtmlspecialcharsJitHelper — safe under NestedJIT.
+        self::implementOne(
+            $context,
+            self::ABI,
+            self::BRIDGE_ENTRY,
+            false
+        );
+        self::implementOne(
+            $context,
+            self::ABI_EX,
+            self::BRIDGE_ENTRY_EX,
+            true
+        );
+    }
+
+    private static function implementOne(
+        Context $context,
+        string $abi,
+        string $bridgeEntry,
+        bool $withDoubleEncode
+    ): void {
+        $probe = $context->module->getNamedFunction($abi);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, $bridgeEntry)) {
+            $context->registerFunction($abi, $probe);
+
             return;
         }
-
-        $probe = $context->module->getNamedFunction(self::ABI);
-        $probeEx = $context->module->getNamedFunction(self::ABI_EX);
-        if (null !== $probe && $probe->countBasicBlocks() > 0
-            && null !== $probeEx && $probeEx->countBasicBlocks() > 0) {
-            $context->registerFunction(self::ABI, $probe);
-            $context->registerFunction(self::ABI_EX, $probeEx);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abi, $probe);
 
             return;
         }
 
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        self::implementBridge($context);
-        self::implementBridgeEx($context);
-        if (null !== $savedInsert) {
-            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
-    }
-
-    private static function implementBridge(Context $context): void
-    {
         $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI,
-            self::BRIDGE_ENTRY,
-            [$strPtr, $i64],
-            $strPtr,
-            self::HTMLSPECIALCHARS_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#20487'
-        );
-    }
-
-    private static function implementBridgeEx(Context $context): void
-    {
-        $strPtr = $context->getTypeFromString('__string__*');
-        $i64 = $context->getTypeFromString('int64');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_EX,
-            self::BRIDGE_ENTRY_EX,
-            [$strPtr, $i64, $i64],
-            $strPtr,
-            self::HTMLSPECIALCHARS_EX_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#27290'
-        );
+        $ft = $withDoubleEncode
+            ? $context->context->functionType($strPtr, false, $strPtr, $i64, $i64)
+            : $context->context->functionType($strPtr, false, $strPtr, $i64);
+        $fn = null !== $probe ? $probe : $context->module->addFunction($abi, $ft);
+        $entry = $fn->appendBasicBlock($bridgeEntry);
+        $context->builder->positionAtEnd($entry);
+        HtmlspecialcharsRuntime::emitBridgeBody($context, $fn, $withDoubleEncode);
+        $context->registerFunction($abi, $fn);
+        BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
     }
 }

@@ -97,6 +97,8 @@ final class Issue36388StringCallResultFreeTest extends TestCase
         $this->assertStringContainsString("'md5' => true", $src);
         $this->assertStringContainsString("'hash' => true", $src);
         $this->assertStringContainsString("'hash_hmac' => true", $src);
+        $this->assertStringContainsString("'htmlspecialchars' => true", $src);
+        $this->assertStringContainsString("'htmlentities' => true", $src);
         $concat = (string) file_get_contents(
             dirname(__DIR__, 2).'/lib/JIT/Concern/CompileConcat.php'
         );
@@ -175,6 +177,12 @@ final class Issue36388StringCallResultFreeTest extends TestCase
         ));
         $this->assertStringContainsString('StringHashHmac::invoke', (string) file_get_contents(
             dirname(__DIR__, 2).'/ext/standard/hash_hmac.php'
+        ));
+        $this->assertStringContainsString('phpc_htmlspecialchars_r1', (string) file_get_contents(
+            dirname(__DIR__, 2).'/lib/JIT/Builtin/HtmlspecialcharsRuntime.php'
+        ));
+        $this->assertStringContainsString('StringHtmlspecialchars::invoke', (string) file_get_contents(
+            dirname(__DIR__, 2).'/ext/standard/JitHtmlspecialchars.php'
         ));
     }
 
@@ -297,6 +305,8 @@ final class Issue36388StringCallResultFreeTest extends TestCase
             'chunk_split_local' => ['test/repro/issue_36388_chunk_split_local_free.php', 'chunk_local delta='],
             'chunk_split_lit' => ['test/repro/issue_36388_chunk_split_lit_free.php', 'chunk_lit delta='],
             'chunk_split_default_sep' => ['test/repro/issue_36388_chunk_split_default_sep_free.php', 'chunk_default_sep delta='],
+            'htmlspecialchars_local' => ['test/repro/issue_36388_htmlspecialchars_local_free.php', 'hs_local delta='],
+            'htmlspecialchars_lit' => ['test/repro/issue_36388_htmlspecialchars_lit_free.php', 'hs_lit delta='],
             'hash_local' => ['test/repro/issue_36388_hash_local_free.php', 'hash_local delta='],
             'hash_lit' => ['test/repro/issue_36388_hash_lit_free.php', 'hash_lit delta='],
             'hash_raw' => ['test/repro/issue_36388_hash_raw_free.php', 'hash_raw delta='],
