@@ -91,7 +91,7 @@
         "lib/JIT/CompileCacheProjectIndexFacade.php": {
             "budget": 105,
             "target": 200,
-            "note": "Project index + entry\u2192members public delegates extracted from CompileCache (#36387)"
+            "note": "Project index + entry→members public delegates extracted from CompileCache (#36387)"
         },
         "lib/JIT/CompileCacheHubState.php": {
             "budget": 106,
@@ -136,12 +136,12 @@
         "lib/JIT/CompileCacheProjectIndex.php": {
             "budget": 150,
             "target": 250,
-            "note": "Project identity / member hashes / edit-scaffold key; entry\u2192members in CompileCacheProjectEntryMembers (#36387)"
+            "note": "Project identity / member hashes / edit-scaffold key; entry→members in CompileCacheProjectEntryMembers (#36387)"
         },
         "lib/JIT/CompileCacheProjectEntryMembers.php": {
             "budget": 124,
             "target": 200,
-            "note": "Entry\u2192member-path durability for warm/edit boots extracted from ProjectIndex (#36387/#36199)"
+            "note": "Entry→member-path durability for warm/edit boots extracted from ProjectIndex (#36387/#36199)"
         },
         "lib/VM/Concern/FuncCallExecDispatch.php": {
             "budget": 336,
@@ -151,7 +151,7 @@
         "lib/JIT/CompileCacheRecordingMemberPath.php": {
             "budget": 100,
             "target": 200,
-            "note": "LLVM-symbol \u2192 project-member path attribution extracted from Recording (#36387/#36199)"
+            "note": "LLVM-symbol → project-member path attribution extracted from Recording (#36387/#36199)"
         },
         "lib/JIT/CompileCacheBitcodePersist.php": {
             "budget": 59,
@@ -179,9 +179,9 @@
             "note": "TYPE_CLASS_CONST_FETCH runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/Context.php": {
-            "budget": 1713,
-            "target": 4000,
-            "note": "ModuleCompileAndOptimize + StandaloneBodies + TypeAndStructMap + FunctionProxyAndNestedJitKernel + peers (#36387/#36199)"
+            "budget": 1445,
+            "target": 3500,
+            "note": "DefineBuiltins + CompileToFile + EditScaffold + VariableOperandBinding + FunctionProxyAndNestedJitKernel + TypeAndStructMap + StandaloneBodies + ModuleCompileAndOptimize + ScriptGlobalsAndIncludeTracking extracted (#36387); continue toward ≤3.5k"
         },
         "lib/JIT/ContextEditScaffoldModuleRebind.php": {
             "budget": 315,
@@ -226,7 +226,7 @@
         "lib/JIT/ContextVariableOperandBinding.php": {
             "budget": 1155,
             "target": 1200,
-            "note": "Operand\u2192Variable binding, freeDeadVariables, constantFetch extracted from Context (#36387)"
+            "note": "Operand→Variable binding, freeDeadVariables, constantFetch extracted from Context (#36387)"
         },
         "lib/JIT/ContextFunctionProxyAndNestedJitKernel.php": {
             "budget": 707,
@@ -236,17 +236,22 @@
         "lib/JIT/ContextTypeAndStructMap.php": {
             "budget": 407,
             "target": 500,
-            "note": "castToBool / type\u2194LLVM map / structField* extracted from Context (#36387)"
+            "note": "castToBool / type↔LLVM map / structField* extracted from Context (#36387)"
         },
         "lib/JIT/ContextStandaloneBodies.php": {
             "budget": 289,
             "target": 400,
-            "note": "Thin/full standalone AOT body install (isThinStandaloneAotMain\u2026ensureFullStandaloneBodies) extracted from Context (#36387)"
+            "note": "Thin/full standalone AOT body install (isThinStandaloneAotMain…ensureFullStandaloneBodies) extracted from Context (#36387)"
         },
         "lib/JIT/ContextModuleCompileAndOptimize.php": {
             "budget": 538,
             "target": 600,
             "note": "compileInPlace / compileCommon / verifyModuleOrThrow / opt passes extracted from Context (#36387)"
+        },
+        "lib/JIT/ContextScriptGlobalsAndIncludeTracking.php": {
+            "budget": 296,
+            "target": 400,
+            "note": "Script-global slots + JIT include/helper-TU compile tracking extracted from Context (#36387)"
         }
     },
     "script_file_count": {
