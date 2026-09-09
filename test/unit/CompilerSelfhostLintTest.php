@@ -465,6 +465,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/VM/Concern/FromCallableAndClosureDispatch.php',
             'lib/VM/Concern/FuncCallExecDispatch.php',
             'lib/VM/Concern/FuncCallInitDispatch.php',
+            'lib/VM/Concern/FuncDefAndGlobalConstDispatch.php',
             'lib/VM/Concern/GeneratorForeachAndYieldFrom.php',
             'lib/VM/Concern/IncludeDispatch.php',
             'lib/VM/Concern/IncludePathAndClassPseudoConst.php',
