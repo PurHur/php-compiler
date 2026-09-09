@@ -564,9 +564,9 @@
             "note": "instanceof / static-call eligibility helpers extracted from VM.php (#36403); php-src ZEND_INSTANCEOF / ZEND_INIT_STATIC_METHOD_CALL / zend_std_get_static_method / zend_inheritance.c"
         },
         "lib/JIT/DiscardedPureCallElision.php": {
-            "budget": 1646,
-            "target": 1606,
-            "note": "Discarded pure-call elision hub; string/array/date-cal/format-analyze/math-hash/runtime-info/native-long/introspect traits (#36387/#36403/#23483)"
+            "budget": 1345,
+            "target": 3500,
+            "note": "Discarded pure-call elision hub; StringOps/ArrayOps/DateCalOps/FormatAnalyzeOps/MathAndHashOps/RuntimeInfoOps/NativeLongFolds/IntrospectOps/TypeStringCoreOps (#36387/#36403/#23483)"
         },
         "lib/JIT/DiscardedPureCallElisionStringOps.php": {
             "budget": 641,
@@ -627,6 +627,11 @@
             "budget": 407,
             "target": 500,
             "note": "function_exists / extension_loaded / defined / method_exists / property_exists / array_key_exists / class_exists family / object introspect / is_a / class_hierarchy / get_object_vars discarded elision extracted from DiscardedPureCallElision (#36387); php-src Zend/zend_builtin_functions.c + ext/standard/{info,basic_functions,array,class,var}.c + ext/spl"
+        },
+        "lib/JIT/DiscardedPureCallElisionTypeStringCoreOps.php": {
+            "budget": 334,
+            "target": 450,
+            "note": "type/ctype/strlen/ord/chr/string-transform/str_incdec discarded elision extracted from DiscardedPureCallElision (#36387); php-src type.c/ctype.c/string.c/url.c/md5.c/crc32.c/base64.c"
         }
     },
     "script_file_count": {
