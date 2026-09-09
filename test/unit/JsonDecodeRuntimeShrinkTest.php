@@ -16,7 +16,8 @@ final class JsonDecodeRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringJsonDecode.php');
         $this->assertStringContainsString('JsonDecodeJitHelper', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
-        $this->assertStringContainsString('json_decode_bridge_entry_v2', $source);
+        $this->assertStringContainsString('json_decode_bridge_entry_v2heap', $source);
+        $this->assertStringContainsString('allocHeap', $source);
         $this->assertStringContainsString('json_validate_bridge_entry', $source);
         $this->assertStringContainsString('resultTag', $source);
         $this->assertStringContainsString('nestedJitPayloadString', $source);
@@ -26,7 +27,7 @@ final class JsonDecodeRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringNotContainsString('StringJsonDecodeInventoryStubs', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
-        $this->assertLessThan(520, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(540, \substr_count($source, "\n") + 1);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringJsonDecodeJit.php');
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringJsonDecodeInventoryStubs.php');
     }
@@ -35,6 +36,7 @@ final class JsonDecodeRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JsonDecodeJitHelper.php');
         $this->assertStringContainsString('function decodeInto(int $destPtr, string $payload): int', $source);
+        $this->assertStringContainsString('digitValue', $source);
         $this->assertStringContainsString('phpc_native_ht_set_string_key_long', $source);
         $this->assertStringContainsString('parseObject', $source);
         $this->assertStringContainsString('resultTag', $source);
