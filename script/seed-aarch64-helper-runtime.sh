@@ -490,6 +490,28 @@ SEED_UNITS=(
   /ext/stats/StatsJitHelper.php
   /ext/xmlrpc/XmlrpcEncodeJitHelper.php
   /ext/ftp/FtpCloseJitHelper.php
+  # First Dom create/query helpers (#36391 after 342)
+  # Frexp/Ldexp/Modf/Nextafter/Shuffle still skipped (algorithm SSOT, no HELPER_PATH).
+  # Preg* still skipped: tip nested compile misses Compiler\Concern\OpCode.
+  # Sscanf still skipped: __init__ sealed during NestedJIT.
+  # Gethostbynamel skipped: NestedJIT missing __compiler_stream_resolve_include_path.
+  # Ini skipped: IniGetLeafJitHelper not compiled under helper-runtime-emit NestedJIT.
+  # Progress skipped: NestedJIT ContextLlvmConstantsAndRegistry seal during helper emit.
+  # CalInfo still skipped (unknown unit under NestedJIT).
+  # PosixSet* / PosixSession / PosixTerminal deferred (mutators / tty).
+  # Curl* handle/transfer deferred (host libcurl); Strerror* are string-only.
+  # Ftp* connect/transfer deferred (host libftp); Close is handle-teardown only.
+  # Remaining Dom* (load/save/HTML/XML) + Intl* / Openssl* / Soap* / Sockets* deferred.
+  /ext/dom/DomAdoptNodeJitHelper.php
+  /ext/dom/DomC14NJitHelper.php
+  /ext/dom/DomCreateElementJitHelper.php
+  /ext/dom/DomCreateElementNSJitHelper.php
+  /ext/dom/DomElementTextContentJitHelper.php
+  /ext/dom/DomGetElementByIdJitHelper.php
+  /ext/dom/DomGetElementsByTagNameJitHelper.php
+  /ext/dom/DomHtmlDocumentCreateFromFileJitHelper.php
+  /ext/dom/DomHtmlDocumentCreateFromStringJitHelper.php
+  /ext/dom/DomImportNodeJitHelper.php
 )
 
 MIN_SEED=${#SEED_UNITS[@]}
