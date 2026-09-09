@@ -10,7 +10,7 @@ use PHPCompiler\JIT\Call\Vararg;
 
 require_once __DIR__.'/NoThrowCallElisionRuntimeInfoPredicates.php';
 require_once __DIR__.'/NoThrowCallElisionExistsConvertAndIntrospectOps.php';
-require_once __DIR__.'/NoThrowCallElisionStringOps.php';
+require_once __DIR__.'/NoThrowCallElisionTypeCtypeHtmlOps.php';
 require_once __DIR__.'/NoThrowCallElisionStringSlicePadReplaceOps.php';
 require_once __DIR__.'/NoThrowCallElisionMathAndFormatOps.php';
 require_once __DIR__.'/NoThrowCallElisionCalleeGraph.php';
@@ -72,7 +72,7 @@ require_once __DIR__.'/NoThrowCallElisionPureBuiltinArgOps.php';
  * Exists / convert / introspect / scalar-cast / version_compare proofs live in
  * {@see NoThrowCallElisionExistsConvertAndIntrospectOps} (#36403).
  * Type / ctype / string transform / html / slice / pad / replace proofs live in
- * {@see NoThrowCallElisionStringOps} (#36387).
+ * {@see NoThrowCallElisionTypeCtypeHtmlOps} (#36387).
  * Math / number_format / scalar-cast / base-inet-minmax / path-url
  * proofs live in {@see NoThrowCallElisionMathAndFormatOps} (#36387).
  * Callee-graph proofs live in {@see NoThrowCallElisionCalleeGraph} (#36387).
@@ -85,7 +85,7 @@ final class NoThrowCallElision
 
     use NoThrowCallElisionExistsConvertAndIntrospectOps;
 
-    use NoThrowCallElisionStringOps;
+    use NoThrowCallElisionTypeCtypeHtmlOps;
     use NoThrowCallElisionStringSlicePadReplaceOps;
     use NoThrowCallElisionMathAndFormatOps;
     use NoThrowCallElisionCalleeGraph;

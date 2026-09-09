@@ -644,9 +644,9 @@
             "note": "baseConvert/inet/minMax/checkdate/clamp/intdiv arg guards + scalarCast + count-on-typed-array + pure math/round + effect-free void Native constraints extracted from DiscardedPureCallElision (#36387); php-src ext/standard/math.c + basic_functions.c + Zend/zend_operators.c"
         },
         "lib/JIT/NoThrowCallElision.php": {
-            "budget": 237,
+            "budget": 235,
             "target": 350,
-            "note": "No-throw call elision hub; RuntimeInfo + ExistsConvert + StringOps + StringSlicePadReplace + MathAndFormat + CalleeGraph + PureBuiltinArgOps (#36387/#36403/#36386)"
+            "note": "No-throw call elision hub; RuntimeInfo + ExistsConvert + TypeCtypeHtml + StringSlicePadReplace + MathAndFormat + CalleeGraph + PureBuiltinArgOps (#36387/#36403/#36386)"
         },
         "lib/JIT/NoThrowCallElisionRuntimeInfoPredicates.php": {
             "budget": 648,
@@ -657,11 +657,6 @@
             "budget": 773,
             "target": 900,
             "note": "exists/convert/introspect/scalar-cast/version_compare no-throw proofs extracted from NoThrowCallElision (#36403); php-src Zend/zend_builtin_functions.c + ext/standard/{info,basic_functions,array,math,url,file,versioning,type}.c + ext/hash + ext/date + ext/spl"
-        },
-        "lib/JIT/NoThrowCallElisionStringOps.php": {
-            "budget": 392,
-            "target": 500,
-            "note": "type/ctype/string-transform/html no-throw proofs; slice/pad/replace extracted to StringSlicePadReplaceOps (#36387); php-src ext/standard/{type,string,html,url,md5,crc32,base64,quot_print,file,exec}.c + ext/ctype + ext/pcre"
         },
         "lib/JIT/NoThrowCallElisionMathAndFormatOps.php": {
             "budget": 269,
@@ -682,6 +677,11 @@
             "budget": 489,
             "target": 600,
             "note": "slice/compare + pad/split + replace/join no-throw proofs extracted from NoThrowCallElisionStringOps (#36387); php-src ext/standard/{string,levenshtein,file}.c"
+        },
+        "lib/JIT/NoThrowCallElisionTypeCtypeHtmlOps.php": {
+            "budget": 393,
+            "target": 500,
+            "note": "type/ctype/string-transform/html-escape no-throw proofs (renamed from StringOps after #37604 slice extract); php-src ext/standard/{type,string,html,url,md5,crc32,base64,quot_print,levenshtein,exec}.c + ext/ctype + ext/pcre (#36387)"
         }
     },
     "script_file_count": {
