@@ -468,7 +468,11 @@ final class Variable {
     public ?\PHPLLVM\Value $valueBoxAliasPtr = null;
 
     /**
-     * i1 SSA (not alloca): native long + / − / * / `/` / unary − took the overflow→double cold path (#36189 / #36386).
+     * i1* entry alloca (preferred) or legacy raw i1 SSA: native long + / − / * / `/` /
+     * unary − took the overflow→double cold path (#36189 / #36386 / #36385).
+     *
+     * Prefer the alloca form so {@see JitLongArithOverflow::materializeOverflowableNativeLong}
+     * can load from any basic block without dominance failures.
      *
      * @var \PHPLLVM\Value|null
      */

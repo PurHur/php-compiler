@@ -2213,6 +2213,50 @@ final class PregAotFastPath
     private static string $matchAllG3_7 = '';
 
     /**
+     * NestedJIT-safe preg_match_all count only — no matchAll* static stores (#36385).
+     *
+     * {@see matchAllStore} clears dozens of static string slots under NestedJIT and
+     * SIGSEGVs even for an empty subject; JitPregMatchAll only needs the int count.
+     *
+     * @return int match count, 0 if none, -1 unsupported/error
+     */
+    public static function matchAllCountOnly(string $pattern, string $subject, int $offset): int
+    {
+        self::$lastError = 0;
+        $subLen = \strlen($subject);
+        if ($offset < 0 || $offset > $subLen) {
+            return 0;
+        }
+        // First probe — also rejects unsupported patterns (kind=0 → -1).
+        $rc = self::matchCount($pattern, $subject, $offset);
+        if ($rc < 0) {
+            return -1;
+        }
+        if (0 === $rc) {
+            return 0;
+        }
+        $full = '' . self::lastCap(0);
+        $flen = \strlen($full);
+        if ($flen < 1) {
+            return 1;
+        }
+        // Non-overlapping literal scan from $offset — no further matchCount calls
+        // (re-entering matchCount after a multi-match loop SIGSEGVd under NestedJIT; #36385).
+        $n = 0;
+        $cursor = $offset;
+        while ($cursor + $flen <= $subLen) {
+            if (self::literalEqualsAt($subject, $cursor, $full, $flen)) {
+                ++$n;
+                $cursor += $flen;
+                continue;
+            }
+            ++$cursor;
+        }
+
+        return $n;
+    }
+
+    /**
      * NestedJIT-safe preg_match_all — int return + PREG_PATTERN_ORDER rows (#27195 / #34994).
      *
      * flags==0 only. Stores group rows in slots; LLVM builds `$matches[g] = [m0, …]`

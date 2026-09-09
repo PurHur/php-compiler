@@ -7,6 +7,7 @@ namespace PHPCompiler\VM;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitLongArithOverflow;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitValueNumeric;
 use PHPCompiler\JIT\Variable;
@@ -192,6 +193,8 @@ final class VmUnaryMinus
             $long,
             $i64->constInt(\PHP_INT_MIN, true)
         );
+        // Spill before split — materialize may load from a non-dominating BB (#36385).
+        $flagSlot = JitLongArithOverflow::spillOverflowFlagToEntryAlloca($context, $isMin);
         // f64 only — no entryAllocaValueBox / TYPE_NULL init on the hot path (#36386).
         $doubleSlot = BasicBlockHelper::entryAlloca($context, $f64);
 
@@ -217,7 +220,7 @@ final class VmUnaryMinus
         $mergedLong->addIncoming($i64->constInt(0, false), $minBlock);
 
         $okVar = new Variable($context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $mergedLong);
-        $okVar->longArithOverflowFlag = $isMin;
+        $okVar->longArithOverflowFlag = $flagSlot;
         $okVar->longArithOverflowDoubleSlot = $doubleSlot;
 
         return $okVar;

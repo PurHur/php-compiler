@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArithOverflow;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -94,6 +95,8 @@ final class MathAbs
             $long,
             $i64->constInt(\PHP_INT_MIN, true)
         );
+        // Spill before split — materialize may load from a non-dominating BB (#36385).
+        $flagSlot = JitLongArithOverflow::spillOverflowFlagToEntryAlloca($context, $isMin);
         $doubleSlot = BasicBlockHelper::entryAlloca($context, $f64);
 
         $minBlock = BasicBlockHelper::append($context, 'abs_long_int_min');
@@ -117,7 +120,7 @@ final class MathAbs
         $mergedLong->addIncoming($i64->constInt(0, false), $minBlock);
 
         $okVar = new Variable($context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $mergedLong);
-        $okVar->longArithOverflowFlag = $isMin;
+        $okVar->longArithOverflowFlag = $flagSlot;
         $okVar->longArithOverflowDoubleSlot = $doubleSlot;
 
         return $okVar;

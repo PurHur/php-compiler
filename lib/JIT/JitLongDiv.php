@@ -102,6 +102,8 @@ final class JitLongDiv
                 $isIntMinNegOne
             );
         }
+        // Spill before split — materialize may load from a non-dominating BB (#36385).
+        $flagSlot = JitLongArithOverflow::spillOverflowFlagToEntryAlloca($context, $promote);
 
         // f64 only — no entryAllocaValueBox / TYPE_NULL init on the hot path (#36386).
         $doubleSlot = BasicBlockHelper::entryAlloca($context, $f64);
@@ -130,7 +132,7 @@ final class JitLongDiv
         $mergedLong->addIncoming($i64->constInt(0, false), $floatBlock);
 
         $okVar = new Variable($context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $mergedLong);
-        $okVar->longArithOverflowFlag = $promote;
+        $okVar->longArithOverflowFlag = $flagSlot;
         $okVar->longArithOverflowDoubleSlot = $doubleSlot;
 
         return $okVar;
