@@ -136,17 +136,66 @@ final class CallUnpackCompileTime
     /**
      * True when $slot is the container for ARRAY_DIM_FETCH_WRITE or unset($slot[$dim]).
      *
+     * Scans the whole function CFG — not only {@see $block}. Loop-body `$a[]=` lives in a
+     * sibling of a predecessor of the `json_encode($a)` block; same-block-only scanning still
+     * folded the INIT `[]` constant and baked `"[]"` (#36385 / peer #33709).
+     *
      * php-src: Zend/zend_execute.c — ZEND_ASSIGN_DIM / ZEND_UNSET_DIM mutate the HT in place.
      */
     private static function slotHasDimMutation(Block $block, int $slot): bool
     {
-        foreach ($block->opCodes as $op) {
-            if (OpCode::destSlotUsedAsDimWriteContainer($op, $slot)) {
-                return true;
+        $root = self::cfgRoot($block);
+        $seen = [];
+        $stack = [$root];
+        while ([] !== $stack) {
+            $current = array_pop($stack);
+            if (!$current instanceof Block) {
+                continue;
+            }
+            $id = spl_object_id($current);
+            if (isset($seen[$id])) {
+                continue;
+            }
+            $seen[$id] = true;
+            foreach ($current->opCodes as $op) {
+                if (OpCode::destSlotUsedAsDimWriteContainer($op, $slot)) {
+                    return true;
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof Block) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+            foreach ($current->blocks as $child) {
+                if ($child instanceof Block) {
+                    $stack[] = $child;
+                }
             }
         }
 
         return false;
+    }
+
+    /** Climb {@see Block::$parents} to a CFG entry (no parents / cycle-safe). */
+    private static function cfgRoot(Block $block): Block
+    {
+        $seen = [];
+        $current = $block;
+        while ([] !== $current->parents) {
+            $id = spl_object_id($current);
+            if (isset($seen[$id])) {
+                break;
+            }
+            $seen[$id] = true;
+            $parent = $current->parents[0] ?? null;
+            if (!$parent instanceof Block) {
+                break;
+            }
+            $current = $parent;
+        }
+
+        return $current;
     }
 
     /**
