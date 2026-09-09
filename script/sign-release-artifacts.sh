@@ -7,8 +7,11 @@
 #   PHPC_RELEASE_SIGNING_KEY=/path/to/rsa.pem
 #   PHPC_RELEASE_SIGNING_PUB=/path/to/rsa.pub.pem   # optional; written next to sig
 #
-# Without PHPC_RELEASE_SIGNING_KEY, generates an ephemeral 2048-bit RSA keypair
-# under OUT_DIR (local smoke / CI that only checks the verify path).
+# When PHPC_RELEASE_SIGNING_KEY is unset, prefers the committed CI test key at
+# keys/ci-release-test/rsa.pem (#36399 durable distribution for local/CI smoke).
+# That key is NOT for production — override with PHPC_RELEASE_SIGNING_KEY.
+# Only if the CI test key is also missing does this script generate an ephemeral
+# 2048-bit RSA keypair under OUT_DIR.
 #
 # Usage:
 #   script/sign-release-artifacts.sh OUT_DIR
@@ -42,6 +45,16 @@ PUB_OUT="${SUMS}.sig.pub.pem"
 KEY="${PHPC_RELEASE_SIGNING_KEY:-}"
 PUB_IN="${PHPC_RELEASE_SIGNING_PUB:-}"
 EPHEMERAL=0
+CI_TEST_KEY="${REPO_ROOT}/keys/ci-release-test/rsa.pem"
+CI_TEST_PUB="${REPO_ROOT}/keys/ci-release-test/rsa.pub.pem"
+
+if [[ -z "$KEY" && -f "$CI_TEST_KEY" ]]; then
+  KEY="$CI_TEST_KEY"
+  if [[ -z "$PUB_IN" && -f "$CI_TEST_PUB" ]]; then
+    PUB_IN="$CI_TEST_PUB"
+  fi
+  echo "sign-release-artifacts: using committed CI test key (keys/ci-release-test/; set PHPC_RELEASE_SIGNING_KEY for production)" >&2
+fi
 
 if [[ -z "$KEY" ]]; then
   EPHEMERAL=1

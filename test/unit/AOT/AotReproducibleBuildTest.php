@@ -73,4 +73,22 @@ final class AotReproducibleBuildTest extends TestCase
         $this->assertArrayHasKey('SOURCE_DATE_EPOCH', $reg);
         $this->assertSame('#36399', $reg['SOURCE_DATE_EPOCH']['since']);
     }
+
+    public function testVerifyReproducibleScriptUsesDualIsolationAndBuildIdMatch(): void
+    {
+        $root = dirname(__DIR__, 3);
+        $body = (string) file_get_contents($root.'/script/verify-reproducible.sh');
+        $this->assertStringContainsString('HOME=', $body);
+        $this->assertStringContainsString('TMPDIR=', $body);
+        $this->assertStringContainsString('gnu_build_id', $body);
+        $this->assertStringContainsString('Build ID differs across isolations', $body);
+        $this->assertStringContainsString('--json', $body);
+
+        $dev = (string) file_get_contents($root.'/script/dev-verify-fast.sh');
+        $this->assertStringContainsString('VERIFY_REPRODUCIBLE_GATE', $dev);
+        $this->assertStringContainsString('verify-reproducible.sh', $dev);
+
+        $defaults = (string) file_get_contents($root.'/script/ci-defaults.env');
+        $this->assertStringContainsString('VERIFY_REPRODUCIBLE_GATE', $defaults);
+    }
 }
