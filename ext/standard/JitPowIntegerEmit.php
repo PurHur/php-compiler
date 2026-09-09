@@ -4,22 +4,18 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\MathFpow;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\DiscardedPureCallElision;
 use PHPCompiler\JIT\JitLongArg;
-use PHPCompiler\JIT\JitLongArithOverflow;
-use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\OpCode;
 use PHPLLVM\Value;
 
 /**
  * Integer {@code pow}/{@code **} chained-smul emit for compile-time exponents
  * (#36387 / #36386). Extracted from {@see JitPow} so gen-0 spine gets a
- * separate TU for the exponent table; Mid (30–49) and High (70–89) are
- * Low/Mid/High sibling TUs (#36387).
+ * separate TU for the exponent table; Low/Mid/Exponents50to69/Exponents70to79/High
+ * are sibling TUs (#36387).
  *
  * No new C ABI. php-src: Zend/zend_operators.c {@code pow_function} /
  * {@code zend_pow} / {@code mul_function}; ext/standard/math.c
@@ -27,8 +23,9 @@ use PHPLLVM\Value;
  */
 require_once __DIR__.'/JitPowIntegerEmitLow.php';
 require_once __DIR__.'/JitPowIntegerEmitMid.php';
-require_once __DIR__.'/JitPowIntegerEmitHigh.php';
 require_once __DIR__.'/JitPowIntegerEmitExponents50to69.php';
+require_once __DIR__.'/JitPowIntegerEmitExponents70to79.php';
+require_once __DIR__.'/JitPowIntegerEmitHigh.php';
 
 final class JitPowIntegerEmit
 {
@@ -66,11 +63,26 @@ final class JitPowIntegerEmit
             return;
         }
 
-        if (JitPowIntegerEmitExponents50to69::tryEmit($context, $slotPtr, $base, $exp, $expFold)) {
+        if (JitPowIntegerEmitExponents50to69::tryEmit(
+            $context,
+            $slotPtr,
+            $base,
+            $exp,
+            $expFold
+        )) {
             return;
         }
 
         if (JitPowIntegerEmitMid::tryEmitIntegerPowViaMathFpow(
+            $context,
+            $slotPtr,
+            $base,
+            $exp,
+            $expFold
+        )) {
+            return;
+        }
+        if (JitPowIntegerEmitExponents70to79::tryEmitIntegerPowViaMathFpow(
             $context,
             $slotPtr,
             $base,
