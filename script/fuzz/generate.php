@@ -21,6 +21,12 @@ function fuzz_known_shapes(): array
         'ternary_null_coalesce',
         'nested_array_isset',
         'ref_assign_swap',
+        // Slice 4 — shapes aimed at silent-wrong-output / CFG classes still under-covered (#36398).
+        'foreach_byref_mutate',
+        'string_offset_assign',
+        'switch_int_fallthrough',
+        'static_counter_fn',
+        'array_plus_vs_merge',
     ];
 }
 
@@ -47,6 +53,11 @@ function fuzz_generate_program(int $seed, string $shape = 'auto'): string
         'ternary_null_coalesce' => fuzz_shape_ternary_null_coalesce($rng),
         'nested_array_isset' => fuzz_shape_nested_array_isset($rng),
         'ref_assign_swap' => fuzz_shape_ref_assign_swap($rng),
+        'foreach_byref_mutate' => fuzz_shape_foreach_byref_mutate($rng),
+        'string_offset_assign' => fuzz_shape_string_offset_assign($rng),
+        'switch_int_fallthrough' => fuzz_shape_switch_int_fallthrough($rng),
+        'static_counter_fn' => fuzz_shape_static_counter_fn($rng),
+        'array_plus_vs_merge' => fuzz_shape_array_plus_vs_merge($rng),
         default => throw new InvalidArgumentException("unknown shape: {$shape}"),
     };
 
@@ -262,6 +273,113 @@ function fuzz_shape_ref_assign_swap(FuzzRng $rng): string
     $lines[] = '$a = $c - 1;';
     $lines[] = 'echo $a, "|", $b, "|", $c, "\n";';
     $lines[] = 'var_dump($a, $c);';
+
+    return implode("\n", $lines)."\n";
+}
+
+/** foreach-by-ref mutation — COW / ref-slot wrong values historically (#36397). */
+function fuzz_shape_foreach_byref_mutate(FuzzRng $rng): string
+{
+    $n = $rng->int(3, 8);
+    $lines = [];
+    $lines[] = '$a = [];';
+    $lines[] = "for (\$i = 0; \$i < {$n}; ++\$i) {";
+    $lines[] = '    $a[] = $i;';
+    $lines[] = '}';
+    $lines[] = 'foreach ($a as &$v) {';
+    $lines[] = '    $v = $v + 1;';
+    $lines[] = '}';
+    $lines[] = 'unset($v);';
+    $lines[] = '$sum = 0;';
+    $lines[] = 'foreach ($a as $x) {';
+    $lines[] = '    $sum += $x;';
+    $lines[] = '}';
+    $lines[] = 'echo count($a), "|", $a[0], "|", $sum, "\n";';
+    $lines[] = 'var_dump($sum);';
+
+    return implode("\n", $lines)."\n";
+}
+
+/** In-place string offset writes — historically wrong length / content (#36406 class). */
+function fuzz_shape_string_offset_assign(FuzzRng $rng): string
+{
+    $base = $rng->pick(['abcd', 'wxyz', 'AAAA', 'pqrs']);
+    $idx = $rng->int(0, 3);
+    $ch = $rng->pick(['Z', '0', 'q']);
+    $lines = [];
+    $lines[] = "\$s = '{$base}';";
+    $lines[] = "\$s[{$idx}] = '{$ch}';";
+    $lines[] = '$s .= "!";';
+    $lines[] = 'echo $s, "|", strlen($s), "|", $s[0], "\n";';
+    $lines[] = 'var_dump(strlen($s));';
+
+    return implode("\n", $lines)."\n";
+}
+
+/** Integer switch with intentional fallthrough — CFG / phi wrong results. */
+function fuzz_shape_switch_int_fallthrough(FuzzRng $rng): string
+{
+    $n = $rng->int(0, 5);
+    $lines = [];
+    $lines[] = "\$n = {$n};";
+    $lines[] = '$s = 0;';
+    $lines[] = 'switch ($n) {';
+    $lines[] = '    case 0:';
+    $lines[] = '        $s += 1;';
+    $lines[] = '        // fallthrough';
+    $lines[] = '    case 1:';
+    $lines[] = '        $s += 10;';
+    $lines[] = '        break;';
+    $lines[] = '    case 2:';
+    $lines[] = '        $s += 100;';
+    $lines[] = '        break;';
+    $lines[] = '    default:';
+    $lines[] = '        $s += 7;';
+    $lines[] = '}';
+    $lines[] = 'echo $n, "|", $s, "\n";';
+    $lines[] = 'var_dump($s);';
+
+    return implode("\n", $lines)."\n";
+}
+
+/** Function-static counter — wrong persistence / slot reuse. */
+function fuzz_shape_static_counter_fn(FuzzRng $rng): string
+{
+    $calls = $rng->int(2, 6);
+    $lines = [];
+    $lines[] = 'function tick(): int';
+    $lines[] = '{';
+    $lines[] = '    static $n = 0;';
+    $lines[] = '    $n = $n + 1;';
+    $lines[] = '    return $n;';
+    $lines[] = '}';
+    $lines[] = '';
+    $lines[] = '$last = 0;';
+    $lines[] = "for (\$i = 0; \$i < {$calls}; ++\$i) {";
+    $lines[] = '    $last = tick();';
+    $lines[] = '}';
+    $lines[] = 'echo $last, "|", tick(), "\n";';
+    $lines[] = 'var_dump($last);';
+
+    return implode("\n", $lines)."\n";
+}
+
+/** `$a + $b` vs array_merge — key collision / list append semantics. */
+function fuzz_shape_array_plus_vs_merge(FuzzRng $rng): string
+{
+    $n = $rng->int(2, 5);
+    $lines = [];
+    $lines[] = '$a = [];';
+    $lines[] = '$b = [];';
+    $lines[] = "for (\$i = 0; \$i < {$n}; ++\$i) {";
+    $lines[] = '    $a[$i] = $i;';
+    $lines[] = '    $b[$i] = $i + 10;';
+    $lines[] = '}';
+    $lines[] = '$b["x"] = 99;';
+    $lines[] = '$plus = $a + $b;';
+    $lines[] = '$merged = array_merge($a, $b);';
+    $lines[] = 'echo count($plus), "|", count($merged), "|", $plus[0], "|", $merged[0], "\n";';
+    $lines[] = 'var_dump(count($plus), count($merged));';
 
     return implode("\n", $lines)."\n";
 }

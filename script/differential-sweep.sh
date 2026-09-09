@@ -6,7 +6,7 @@
 # already thought to record. This asserts against Zend itself, which is what makes it useful for
 # finding silent wrong output — code that runs to completion and prints the wrong thing.
 #
-#   script/differential-sweep.sh                      # VM backend, bundled corpus
+#   script/differential-sweep.sh                      # VM backend, bundled corpus (+ fuzz seeds)
 #   script/differential-sweep.sh --aot                # AOT backend (slow; compiles each program)
 #   script/differential-sweep.sh --jit                # MCJIT via bin/jit.php (#36221)
 #   script/differential-sweep.sh --dir path/to/cases  # your own programs
@@ -14,6 +14,9 @@
 #   script/differential-sweep.sh --dir test/differential/cases/programs
 #   script/differential-sweep.sh --stderr --dir test/differential/cases/errors
 #       stdout + stderr + exit vs Zend (#36383)
+#
+# Default corpus is `test/differential/cases/*.php` plus `cases/fuzz/*.php` (#36398).
+# Other subdirs stay opt-in via --dir.
 #
 # On RunForge / hosts without image LLVM, this re-execs via docker-exec.sh (same gate as
 # phpunit.sh). Host glibc ≠ Ubuntu 22.04 image glibc: AOT binaries that match Zend in the
@@ -105,8 +108,25 @@ fi
 fail=0
 total=0
 skipped=0
+fuzz_total=0
+fuzz_skipped=0
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
+
+# Case list: flat `$DIR/*.php`. When sweeping the default corpus, also include the
+# differential fuzz seed corpus under `cases/fuzz/` (#36398 Done-when: fuzz is part
+# of the sweep). Other subdirs (programs/, errors/, stdlib/) stay opt-in via --dir.
+cases=()
+shopt -s nullglob
+for f in "$DIR"/*.php; do
+    cases+=("$f")
+done
+if [ "$DIR" = "$DEFAULT_DIR" ] && [ -d "$DIR/fuzz" ]; then
+    for f in "$DIR/fuzz"/*.php; do
+        cases+=("$f")
+    done
+fi
+shopt -u nullglob
 
 norm_text() {
     php "$ROOT/script/differential-stderr-normalize.php" "$ROOT"
@@ -135,9 +155,13 @@ run_got_streams() {
     echo $? >"$tmp/got.rc"
 }
 
-for f in "$DIR"/*.php; do
+for f in "${cases[@]}"; do
     [ -e "$f" ] || continue
     name="$(basename "$f")"
+    in_fuzz=0
+    case "$f" in
+        */fuzz/*) in_fuzz=1 ;;
+    esac
 
     # A case may declare a backend it cannot pass, e.g. it exercises a feature that mode does not
     # implement. Without this, such a case fails forever regardless of compiler state and the exit
@@ -149,10 +173,16 @@ for f in "$DIR"/*.php; do
         reason="$(sed -n "s|.*@differential-skip-$BACKEND: *||p" "$f" | head -1)"
         [ "$QUIET" -eq 1 ] || printf 'skip    %-34s %s\n' "$name" "$reason"
         skipped=$((skipped + 1))
+        if [ "$in_fuzz" -eq 1 ]; then
+            fuzz_skipped=$((fuzz_skipped + 1))
+        fi
         continue
     fi
 
     total=$((total + 1))
+    if [ "$in_fuzz" -eq 1 ]; then
+        fuzz_total=$((fuzz_total + 1))
+    fi
 
     # A case may ask for extra runs because its failure mode is intermittent. The per-case marker
     # wins only when it is larger, so `--repeat 20` still applies everywhere.
@@ -285,10 +315,29 @@ if [ -n "$count_file" ]; then
     fi
 fi
 
+# Default sweep must include the fuzz seed corpus (#36398). Empty/missing fuzz is not a pass.
+if [ "$DIR" = "$DEFAULT_DIR" ] && [ -f "$DIR/fuzz/COUNT" ]; then
+    fuzz_min="$(tr -d '[:space:]' <"$DIR/fuzz/COUNT")"
+    case "$fuzz_min" in
+        ''|*[!0-9]*)
+            echo "differential-sweep: invalid fuzz COUNT in $DIR/fuzz/COUNT" >&2
+            exit 2
+            ;;
+    esac
+    if [ "$((fuzz_total + fuzz_skipped))" -lt "$fuzz_min" ]; then
+        echo "differential-sweep: fuzz corpus included $fuzz_total run + $fuzz_skipped skipped but $DIR/fuzz/COUNT requires >= $fuzz_min (#36398)" >&2
+        exit 2
+    fi
+fi
+
 if [ "$skipped" -gt 0 ]; then
     printf '\n%d/%d match Zend (%s backend, %d skipped)\n' \
         "$((total - fail))" "$total" "$BACKEND" "$skipped"
 else
     printf '\n%d/%d match Zend (%s backend)\n' "$((total - fail))" "$total" "$BACKEND"
+fi
+if [ "$DIR" = "$DEFAULT_DIR" ] && [ "$((fuzz_total + fuzz_skipped))" -gt 0 ]; then
+    printf 'fuzz seed corpus: %d run + %d skipped (included in default sweep — #36398)\n' \
+        "$fuzz_total" "$fuzz_skipped"
 fi
 exit "$fail"
