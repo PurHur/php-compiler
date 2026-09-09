@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8573 |
-| Phase A inventory files (M2 ratio SSOT) | 8573 |
+| PHP files on vm.php path | 8574 |
+| Phase A inventory files (M2 ratio SSOT) | 8574 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26744 |
+| Source constructs flagged (warnings) | 26746 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7509,6 +7509,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/NoThrowCallElision.php` | 0 | 2 |
 | `lib/JIT/NoThrowCallElisionExistsConvertAndIntrospectOps.php` | 0 | 2 |
 | `lib/JIT/NoThrowCallElisionRuntimeInfoPredicates.php` | 0 | 2 |
+| `lib/JIT/NoThrowCallElisionStringOps.php` | 0 | 2 |
 | `lib/JIT/NonObjectPropertyFetchHelper.php` | 0 | 4 |
 | `lib/JIT/NullsafeHelper.php` | 0 | 1 |
 | `lib/JIT/ObjectPropertyForeachHelper.php` | 0 | 1 |
@@ -61766,8 +61767,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/NoThrowCallElision.php`
 
 **Warnings** (review for bootstrap subset):
-- new Operand\Literal (line 1842)
-- 42 class method(s)
+- new Operand\Literal (line 1015)
+- 30 class method(s)
 
 ### `lib/JIT/NoThrowCallElisionExistsConvertAndIntrospectOps.php`
 
@@ -61780,6 +61781,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - trait NoThrowCallElisionRuntimeInfoPredicates (line 25)
 - 23 class method(s)
+
+### `lib/JIT/NoThrowCallElisionStringOps.php`
+
+**Warnings** (review for bootstrap subset):
+- trait NoThrowCallElisionStringOps (line 21)
+- 12 class method(s)
 
 ### `lib/JIT/NonObjectPropertyFetchHelper.php`
 
