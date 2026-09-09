@@ -14,9 +14,9 @@
             "note": "Concern trait splits (#36387/#36403); DateTimeMutationAndUnserializeMeta + TernaryPhiReturnMerge + peers; CfgParamReturnTypeAndCalleeByRef + OpCodeArgSlotAndAssignRhs (#36387)"
         },
         "lib/VM.php": {
-            "budget": 1819,
+            "budget": 1770,
             "target": 15000,
-            "note": "TryCatchThrowDispatch + YieldAndYieldFromDispatch + EmptyAndBooleanNotDispatch + FromCallableAndClosureDispatch + ListUnpackAndSpreadAssignDispatch + VarFetchGlobalAndFunctionStaticDispatch + ArgSendDispatch + DeclareClassLikeDispatch + ConstFetchStaticCallInstanceofDispatch + JumpCaseDispatch + CoalesceNullsafeSilenceExitDispatch + ForeachIterDispatch + EchoPrintEvalDispatch + MethodCallInitDispatch + NewDispatch + FuncCallInitDispatch + IncludeDispatch + IssetDispatch + ClassConstFetchDispatch + ScalarArithBitwiseUnaryDispatch + ScalarCompareDispatch + ScalarCastDispatch + ScalarCastCompareArithConcatDispatch + ArgRecvDispatch + FuncCallExecDispatch + AssignDispatch + UnsetDispatch + StaticPropertyFetchDispatch + ArrayDimFetchDispatch + ObjectPropertyFetchDispatch + ConstructMarkAndPendingOutboundCall + PropertyHookFrameAndStaticLink + IteratorToArrayConvert + IncludePathAndClassPseudoConst + ClassScopeAndStaticPropertyResolve + ClosureBindAndFunctionStatic + InternalHandlerExecuteAndAssignCopy + OutgoingCallArgResolve + ClassConstAndPropertyDefaultMaterialize + InheritanceFinalVarianceAndConstFetch + MethodCallAndStaticCallableInit + VirtualPropertyHookEnforce + ReturnTypeEnforce + DeprecationNoticeEmit + FrameActivationThisAndIncludeScope + FiberStartResumeAndThrow + GeneratorForeachAndYieldFrom + FrameObjectRefAndDeadTempRelease + UserInvokeArrayAccessAndClosureCall + BuiltinHostExceptionDispatch + ClassInheritDefineAndConstDeclare + TryCatchFinallyAndUncaughtDispatch + ExecuteIncDecAndScopeOperandRead + TypedIntRecursiveAndCountedLoopFastPath + PropertyFetchDestAndHookedDimWrite + ObjectPropertyMagicAndClone + ClassTraitComposition + ObjectPropertyReadonlyAndVisibility + Hooks + CollectAndSerialize + IssetEmptyUnset Concern extracts (#36403); under 15k target"
+            "note": "CloneDispatch + TryCatchThrowDispatch + YieldAndYieldFromDispatch + EmptyAndBooleanNotDispatch + FromCallableAndClosureDispatch + ListUnpackAndSpreadAssignDispatch + VarFetchGlobalAndFunctionStaticDispatch + ArgSendDispatch + DeclareClassLikeDispatch + ConstFetchStaticCallInstanceofDispatch + JumpCaseDispatch + CoalesceNullsafeSilenceExitDispatch + ForeachIterDispatch + EchoPrintEvalDispatch + MethodCallInitDispatch + NewDispatch + FuncCallInitDispatch + IncludeDispatch + IssetDispatch + ClassConstFetchDispatch + ScalarArithBitwiseUnaryDispatch + ScalarCompareDispatch + ScalarCastDispatch + ScalarCastCompareArithConcatDispatch + ArgRecvDispatch + FuncCallExecDispatch + AssignDispatch + UnsetDispatch + StaticPropertyFetchDispatch + ArrayDimFetchDispatch + ObjectPropertyFetchDispatch + ConstructMarkAndPendingOutboundCall + PropertyHookFrameAndStaticLink + IteratorToArrayConvert + IncludePathAndClassPseudoConst + ClassScopeAndStaticPropertyResolve + ClosureBindAndFunctionStatic + InternalHandlerExecuteAndAssignCopy + OutgoingCallArgResolve + ClassConstAndPropertyDefaultMaterialize + InheritanceFinalVarianceAndConstFetch + MethodCallAndStaticCallableInit + VirtualPropertyHookEnforce + ReturnTypeEnforce + DeprecationNoticeEmit + FrameActivationThisAndIncludeScope + FiberStartResumeAndThrow + GeneratorForeachAndYieldFrom + FrameObjectRefAndDeadTempRelease + UserInvokeArrayAccessAndClosureCall + BuiltinHostExceptionDispatch + ClassInheritDefineAndConstDeclare + TryCatchFinallyAndUncaughtDispatch + ExecuteIncDecAndScopeOperandRead + TypedIntRecursiveAndCountedLoopFastPath + PropertyFetchDestAndHookedDimWrite + ObjectPropertyMagicAndClone + ClassTraitComposition + ObjectPropertyReadonlyAndVisibility + Hooks + CollectAndSerialize + IssetEmptyUnset Concern extracts (#36403); under 15k target"
         },
         "script/apply-patches.sh": {
             "budget": 7637,
@@ -472,6 +472,11 @@
             "budget": 149,
             "target": 250,
             "note": "TYPE_TRY/CATCH/FINALLY/THROW/RETHROW runFramesInner body extracted from VM.php (#36403); php-src ZEND_THROW/CATCH/HANDLE_EXCEPTION / zend_exceptions.c / zend_property_hooks.c"
+        },
+        "lib/VM/Concern/CloneDispatch.php": {
+            "budget": 88,
+            "target": 150,
+            "note": "TYPE_CLONE runFramesInner body extracted from VM.php (#36403); php-src ZEND_CLONE / zend_lazy_objects.c / zend_objects.c / zend_enum.c uncloneable"
         },
         "lib/JIT/ContextVariableOperandLookup.php": {
             "budget": 309,
