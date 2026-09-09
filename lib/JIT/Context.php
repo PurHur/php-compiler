@@ -51,6 +51,7 @@ require_once __DIR__.'/ContextFunctionProxyNestedJitKernelRegistry.php';
 require_once __DIR__.'/ContextFunctionProxyExternalMethodStubReport.php';
 require_once __DIR__.'/ContextFunctionProxyRegistration.php';
 require_once __DIR__.'/ContextFunctionProxyAndNestedJitKernel.php';
+require_once __DIR__.'/ContextTypeFromPhpType.php';
 require_once __DIR__.'/ContextTypeAndStructMap.php';
 require_once __DIR__.'/ContextCastToBool.php';
 require_once __DIR__.'/ContextTypeFromString.php';
@@ -89,6 +90,7 @@ class Context {
     use ContextFunctionProxyExternalMethodStubReport;
     use ContextFunctionProxyRegistration;
     use ContextFunctionProxyAndNestedJitKernel;
+    use ContextTypeFromPhpType;
     use ContextTypeAndStructMap;
     use ContextCastToBool;
     use ContextTypeFromString;

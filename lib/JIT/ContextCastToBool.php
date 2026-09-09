@@ -14,7 +14,8 @@ use PHPLLVM;
  * (split-TU / size-budget ratchet, #36199 / #36403).
  *
  * Used via {@code use ContextCastToBool;} on {@see Context}.
- * Type↔LLVM map: {@see ContextTypeAndStructMap}.
+ * PHPTypes→LLVM: {@see ContextTypeFromPhpType}.
+ * String→LLVM map: {@see ContextTypeAndStructMap}.
  * Struct field maps: {@see ContextStructFieldMap}.
  *
  * No new C ABI. php-src analogy: zend_is_true lives in Zend/zend_operators.c
