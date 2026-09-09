@@ -719,9 +719,9 @@
             "note": "pow()/ ** LLVM lowering hub; integer chained-smul emit in JitPowIntegerEmit + Low + Mid + High (#36387)"
         },
         "ext/standard/JitPowIntegerEmit.php": {
-            "budget": 16438,
-            "target": 25000,
-            "note": "integer pow()/ ** hub: Low/Mid/High dispatch; retains exponents 50..69 until Exponents50to69 extract (#36387/#36386)"
+            "budget": 107,
+            "target": 5000,
+            "note": "integer pow hub dispatching Low/Mid/Exponents50to69/High (#36387/#36386)"
         },
         "ext/standard/JitPowIntegerEmitHigh.php": {
             "budget": 46827,
@@ -737,6 +737,11 @@
             "budget": 5037,
             "target": 8000,
             "note": "integer pow()/ ** chained-smul emit for compile-time exponents 30..49 extracted from JitPowIntegerEmit (#36387/#36386)"
+        },
+        "ext/standard/JitPowIntegerEmitExponents50to69.php": {
+            "budget": 16374,
+            "target": 20000,
+            "note": "compile-time exponents 50-69 (#36387/#36386)"
         }
     },
     "script_file_count": {
