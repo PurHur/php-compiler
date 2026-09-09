@@ -6973,6 +6973,7 @@ require_once __DIR__.'/../../../lib/JIT/CompileCacheHubState.php';
 require_once __DIR__.'/../../../lib/JIT/CompileCacheKeyLayoutFacade.php';
 require_once __DIR__.'/../../../lib/JIT/CompileCache.php';
 require_once __DIR__.'/../../../lib/JIT/CompilerOperandChainNative.php';
+require_once __DIR__.'/../../../lib/JIT/ContextEditScaffoldCoreTypeSeed.php';
 require_once __DIR__.'/../../../lib/JIT/ContextEditScaffoldModuleRebind.php';
 require_once __DIR__.'/../../../lib/JIT/ContextDefineBuiltinFunctionProxiesDateAndXml.php';
 require_once __DIR__.'/../../../lib/JIT/ContextDefineBuiltinFunctionProxiesFinfoPdoAndXml.php';

@@ -219,14 +219,14 @@
             "note": "TYPE_CLASS_CONST_FETCH runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/Context.php": {
-            "budget": 940,
+            "budget": 942,
             "target": 3500,
-            "note": "FunctionProxyRegistration + ExternalMethodStubReport + ArrayIteratorAndObject + NestedJitKernelRegistry + ReflectionMembers + FiberGeneratorAndClosure + ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml proxies wiring + VariableOperandLookup + VariableOperandAlias + ModuleVerify + CompileToFileEmitAndLink + CompileToFileStandaloneMain + InitShutdownBlocks + ConstantFetch + CastToBool + TypeFromString + StructFieldMap + LlvmConstantEmit + ScopeLifecycle peers (#36387/#36199); continue toward \u22643.5k + ModuleOptimizationPasses (#36387)"
+            "note": "CoreTypeSeed + FunctionProxyRegistration + ExternalMethodStubReport + ArrayIteratorAndObject + NestedJitKernelRegistry + ReflectionMembers + FiberGeneratorAndClosure + ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml proxies wiring + VariableOperandLookup + VariableOperandAlias + ModuleVerify + CompileToFileEmitAndLink + CompileToFileStandaloneMain + InitShutdownBlocks + ConstantFetch + CastToBool + TypeFromString + StructFieldMap + LlvmConstantEmit + ScopeLifecycle peers (#36387/#36199); continue toward \u22643.5k + ModuleOptimizationPasses (#36387)"
         },
         "lib/JIT/ContextEditScaffoldModuleRebind.php": {
-            "budget": 315,
+            "budget": 213,
             "target": 400,
-            "note": "Thin-boot bind + core-type seed + init/shutdown/function-scope/intrinsic rebind after bitcode replace (#36387/#36199)"
+            "note": "Thin-boot bind + init/shutdown/function-scope/intrinsic rebind after bitcode replace; core-type seed in ContextEditScaffoldCoreTypeSeed (#36387/#36199)"
         },
         "lib/VM/Concern/IssetDispatch.php": {
             "budget": 227,
@@ -527,6 +527,11 @@
             "budget": 92,
             "target": 150,
             "note": "TYPE_SCRIPT_MAGIC/TICK_SCOPE_*/TICKS runFramesInner body extracted from VM.php (#36403); php-src zend_compile_const + zend_declare_ticks / ZEND_TICKS"
+        },
+        "lib/JIT/ContextEditScaffoldCoreTypeSeed.php": {
+            "budget": 126,
+            "target": 200,
+            "note": "seedCoreTypesFromModuleForEditScaffold typeMap/structFieldMap (+ CreateNamed aliases) extracted from ContextEditScaffoldModuleRebind (#36387/#36199); php-src Zend/zend_file_cache.c + Zend/zend_types.h"
         }
     },
     "script_file_count": {

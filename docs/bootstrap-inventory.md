@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8554 |
-| Phase A inventory files (M2 ratio SSOT) | 8554 |
+| PHP files on vm.php path | 8555 |
+| Phase A inventory files (M2 ratio SSOT) | 8555 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26708 |
+| Source constructs flagged (warnings) | 26710 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7319,6 +7319,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/ContextDefineBuiltinFunctionProxiesSplIterators.php` | 0 | 26 |
 | `lib/JIT/ContextDefineBuiltinFunctionProxiesWeakAndPhpToken.php` | 0 | 14 |
 | `lib/JIT/ContextDefineBuiltins.php` | 0 | 2 |
+| `lib/JIT/ContextEditScaffoldCoreTypeSeed.php` | 0 | 2 |
 | `lib/JIT/ContextEditScaffoldModuleRebind.php` | 0 | 2 |
 | `lib/JIT/ContextFreeDeadAndConstantFetch.php` | 0 | 2 |
 | `lib/JIT/ContextFunctionProxyAndNestedJitKernel.php` | 0 | 3 |
@@ -59933,16 +59934,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Context.php`
 
 **Warnings** (review for bootstrap subset):
-- new ExtensionLoweringHooks (line 897)
-- new Scope (line 898)
-- new Analyzer (line 927)
-- new Helper (line 928)
-- new Builtin\Refcount (line 929)
-- new Builtin\Output (line 931)
-- new Builtin\Type (line 932)
-- new Builtin\Internal (line 933)
-- new Builtin\VarArg (line 934)
-- new Builtin\ErrorHandler (line 935)
+- new ExtensionLoweringHooks (line 899)
+- new Scope (line 900)
+- new Analyzer (line 929)
+- new Helper (line 930)
+- new Builtin\Refcount (line 931)
+- new Builtin\Output (line 933)
+- new Builtin\Type (line 934)
+- new Builtin\Internal (line 935)
+- new Builtin\VarArg (line 936)
+- new Builtin\ErrorHandler (line 937)
 
 ### `lib/JIT/ContextCastToBool.php`
 
@@ -60365,11 +60366,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - trait ContextDefineBuiltins (line 22)
 - 1 class method(s)
 
+### `lib/JIT/ContextEditScaffoldCoreTypeSeed.php`
+
+**Warnings** (review for bootstrap subset):
+- trait ContextEditScaffoldCoreTypeSeed (line 22)
+- 1 class method(s)
+
 ### `lib/JIT/ContextEditScaffoldModuleRebind.php`
 
 **Warnings** (review for bootstrap subset):
-- trait ContextEditScaffoldModuleRebind (line 22)
-- 8 class method(s)
+- trait ContextEditScaffoldModuleRebind (line 23)
+- 7 class method(s)
 
 ### `lib/JIT/ContextFreeDeadAndConstantFetch.php`
 
