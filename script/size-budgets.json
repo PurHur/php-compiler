@@ -557,6 +557,16 @@
             "budget": 152,
             "target": 220,
             "note": "instanceof / static-call eligibility helpers extracted from VM.php (#36403); php-src ZEND_INSTANCEOF / ZEND_INIT_STATIC_METHOD_CALL / zend_std_get_static_method / zend_inheritance.c"
+        },
+        "lib/JIT/DiscardedPureCallElision.php": {
+            "budget": 5566,
+            "target": 3500,
+            "note": "Discarded pure-call elision hub; string html/slice/pad/replace/implode in DiscardedPureCallElisionStringOps (#36387/#23483); php-src string.c/html.c"
+        },
+        "lib/JIT/DiscardedPureCallElisionStringOps.php": {
+            "budget": 641,
+            "target": 800,
+            "note": "html-escape / slice-compare / pad-split / replace-join / implode discarded elision extracted from DiscardedPureCallElision (#36387); php-src html.c/string.c/php_pcre.c/exec.c"
         }
     },
     "script_file_count": {
