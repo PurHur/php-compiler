@@ -102,10 +102,10 @@ final class JsonDecodeJitHelper
         if (!self::isDigit($c)) {
             return 0;
         }
-        $val = \ord($c) - 48;
+        $val = self::digitValue($c);
         ++$pos;
         while ($pos < $len && self::isDigit($payload[$pos])) {
-            $digit = \ord($payload[$pos]) - 48;
+            $digit = self::digitValue($payload[$pos]);
             $val = $val * 10;
             $val = $val + $digit;
             ++$pos;
@@ -183,6 +183,43 @@ final class JsonDecodeJitHelper
     {
         return '0' === $c || '1' === $c || '2' === $c || '3' === $c || '4' === $c
             || '5' === $c || '6' === $c || '7' === $c || '8' === $c || '9' === $c;
+    }
+
+    /** NestedJIT: ord() on substr-indexed chars returns 0 — compare instead (#36385). */
+    private static function digitValue(string $c): int
+    {
+        if ('0' === $c) {
+            return 0;
+        }
+        if ('1' === $c) {
+            return 1;
+        }
+        if ('2' === $c) {
+            return 2;
+        }
+        if ('3' === $c) {
+            return 3;
+        }
+        if ('4' === $c) {
+            return 4;
+        }
+        if ('5' === $c) {
+            return 5;
+        }
+        if ('6' === $c) {
+            return 6;
+        }
+        if ('7' === $c) {
+            return 7;
+        }
+        if ('8' === $c) {
+            return 8;
+        }
+        if ('9' === $c) {
+            return 9;
+        }
+
+        return 0;
     }
 
     private static function skipWs(string $json, int $len, int $pos): int
@@ -285,7 +322,7 @@ final class JsonDecodeJitHelper
             if ($rlen < 2 || '[' !== $rest[0]) {
                 return -1;
             }
-            $child = phpc_native_ht_alloc();
+            $child = (int) phpc_native_ht_alloc();
             $i = 1;
             while ($i < $rlen && (' ' === $rest[$i] || "\t" === $rest[$i] || "\n" === $rest[$i] || "\r" === $rest[$i])) {
                 ++$i;
@@ -305,10 +342,10 @@ final class JsonDecodeJitHelper
                 if ($i >= $rlen || !self::isDigit($rest[$i])) {
                     return -1;
                 }
-                $val = \ord($rest[$i]) - 48;
+                $val = self::digitValue($rest[$i]);
                 ++$i;
                 while ($i < $rlen && self::isDigit($rest[$i])) {
-                    $digit = \ord($rest[$i]) - 48;
+                    $digit = self::digitValue($rest[$i]);
                     $val = $val * 10;
                     $val = $val + $digit;
                     ++$i;
@@ -353,10 +390,10 @@ final class JsonDecodeJitHelper
                     return -1;
                 }
             }
-            $val = \ord($c) - 48;
+            $val = self::digitValue($c);
             ++$pos;
             while ($pos < $len && self::isDigit($json[$pos])) {
-                $digit = \ord($json[$pos]) - 48;
+                $digit = self::digitValue($json[$pos]);
                 $val = $val * 10;
                 $val = $val + $digit;
                 ++$pos;

@@ -20,12 +20,13 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for json_decode runtime helpers via JsonDecodeJitHelper PHP (#9359, #13228, #20829, #24137).
+ * JIT/AOT link for json_decode runtime helpers via JsonDecodeJitHelper PHP (#9359, #13228, #20829, #24137, #36385).
  * Type always-on shells dropped (#32897).
  *
  * Embed + thin standalone AOT: single {@see __compiler_json_decode} bridge with tag dispatch
  * (Unserialize #20785 / Explode #14750 shape — no thin null stubs).
- * Validate/last_error live in {@see JsonValidateJitHelper} (separate NestedJIT TU).
+ * Bridge returns {@see JitValueBox::allocHeap} — stack {@see JitValueBox::alloc} UAF after
+ * return (#36382 / #36385). Validate/last_error live in {@see JsonValidateJitHelper}.
  * Call sites ensureLinked before lookup; ensureFullStandaloneBodies must not NestedJIT this
  * during init (#35065) — peer #35035 / #32122 `.1` mint class.
  * php-src: ext/json/php_json.c — php_json_decode_ex / php_json_validate
@@ -56,7 +57,8 @@ final class StringJsonDecode
 
     private const SET_LAST_ERROR_HELPER = 'PHPCompiler\\ext\\standard\\JsonValidateJitHelper::setLastError';
 
-    private const DECODE_BRIDGE_ENTRY = 'json_decode_bridge_entry_v2';
+    /** v2heap: return __value__* via allocHeap — stack alloca UAF (#36382 / #36385). */
+    private const DECODE_BRIDGE_ENTRY = 'json_decode_bridge_entry_v2heap';
 
     private const VALIDATE_BRIDGE_ENTRY = 'json_validate_bridge_entry';
 
@@ -325,14 +327,14 @@ final class StringJsonDecode
         }
 
         $context->builder->positionAtEnd($bbNull);
-        $slotNull = JitValueBox::alloc($context);
+        $slotNull = JitValueBox::allocHeap($context);
         $ptrNull = JitValueBox::pointer($context, $slotNull);
         $context->builder->call($context->lookupFunction('__value__writeNull'), $ptrNull);
         $castNull = $context->builder->pointerCast($ptrNull, $voidPtr);
         $context->builder->branch($bbMerge);
 
         $context->builder->positionAtEnd($bbBool);
-        $slotBool = JitValueBox::alloc($context);
+        $slotBool = JitValueBox::allocHeap($context);
         $ptrBool = JitValueBox::pointer($context, $slotBool);
         $boolHelper = self::helperFunction($context, self::BOOL_HELPER);
         $boolArg = JitNestedHelperCoerce::coerceArgForHelper(
@@ -353,7 +355,7 @@ final class StringJsonDecode
         $context->builder->branch($bbMerge);
 
         $context->builder->positionAtEnd($bbInt);
-        $slotInt = JitValueBox::alloc($context);
+        $slotInt = JitValueBox::allocHeap($context);
         $ptrInt = JitValueBox::pointer($context, $slotInt);
         $intHelper = self::helperFunction($context, self::INT_HELPER);
         $intArg = JitNestedHelperCoerce::coerceArgForHelper(
@@ -371,7 +373,7 @@ final class StringJsonDecode
         $context->builder->branch($bbMerge);
 
         $context->builder->positionAtEnd($bbFloat);
-        $slotFloat = JitValueBox::alloc($context);
+        $slotFloat = JitValueBox::allocHeap($context);
         $ptrFloat = JitValueBox::pointer($context, $slotFloat);
         $floatHelper = self::helperFunction($context, self::FLOAT_HELPER);
         $floatArg = JitNestedHelperCoerce::coerceArgForHelper(
@@ -389,7 +391,7 @@ final class StringJsonDecode
         $context->builder->branch($bbMerge);
 
         $context->builder->positionAtEnd($bbString);
-        $slotStr = JitValueBox::alloc($context);
+        $slotStr = JitValueBox::allocHeap($context);
         $ptrStr = JitValueBox::pointer($context, $slotStr);
         $stringHelper = self::helperFunction($context, self::STRING_HELPER);
         $stringArg = JitNestedHelperCoerce::coerceArgForHelper(
@@ -441,7 +443,7 @@ final class StringJsonDecode
         $context->builder->branchIf($failed, $bbArrayFail, $bbArrayOk);
 
         $context->builder->positionAtEnd($bbArrayFail);
-        $slotArrNull = JitValueBox::alloc($context);
+        $slotArrNull = JitValueBox::allocHeap($context);
         $ptrArrNull = JitValueBox::pointer($context, $slotArrNull);
         $context->builder->call($context->lookupFunction('__value__writeNull'), $ptrArrNull);
         $castArrNull = $context->builder->pointerCast($ptrArrNull, $voidPtr);
@@ -449,7 +451,7 @@ final class StringJsonDecode
 
         $context->builder->positionAtEnd($bbArrayOk);
         // Box HT into __value__* — raw HT* cast to value* is misread as int/NULL (#24137).
-        $slotHt = JitValueBox::alloc($context);
+        $slotHt = JitValueBox::allocHeap($context);
         $ptrHt = JitValueBox::pointer($context, $slotHt);
         $context->builder->call(
             $context->lookupFunction('__value__writeHashtable'),
