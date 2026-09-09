@@ -619,7 +619,7 @@
             "note": "zero-arg / defined-table / process / memory-ini / env-path / host-error / json-preg / date-ob-http-spl / clock / civil-date / randmax runtime-info discarded elision extracted from DiscardedPureCallElision (#36387); php-src basic_functions.c/info.c/microtime.c/hrtime.c/datetime.c/Zend/zend.c/ext/date/php_date.c/ext/random/random.c"
         },
         "lib/JIT/DiscardedPureCallElisionNativeLongFolds.php": {
-            "budget": 1074,
+            "budget": 1079,
             "target": 1200,
             "note": "native-long/intdiv/bitwise/pow/compare compile-time fold helpers extracted from DiscardedPureCallElision (#36403); php-src Zend/zend_operators.c ext/standard/math.c"
         },
