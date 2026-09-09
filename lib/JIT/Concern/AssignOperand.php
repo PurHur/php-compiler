@@ -226,10 +226,10 @@ trait AssignOperand
                 && null !== ($initName = \PHPCompiler\JIT\OperandName::resolve($resultOp))
                 && '' !== $initName
                 && null !== $this->context->jitEnclosingBlock?->func
-                && !$this->context->jitEnclosingBlock->isMainScript()
             ) {
-                // Named function locals must live in an i64 alloca so loop JUMPIF and
-                // post-increment share one slot — KIND_VALUE literals go stale (#36018).
+                // Named locals (function or {main}) must live in an i64 alloca so loop
+                // JUMPIF and post-increment share one slot — KIND_VALUE literals go
+                // stale (#36018; {main} for/++ with runtime bound #36385).
                 $i64 = $this->context->getTypeFromString('int64');
                 $slot = \PHPCompiler\JIT\BasicBlockHelper::entryAlloca($this->context, $i64);
                 $this->context->builder->store($this->context->helper->loadValue($value), $slot);
