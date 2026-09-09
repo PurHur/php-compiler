@@ -724,9 +724,9 @@
             "note": "integer pow()/ ** hub: Low/Mid/Exponents50to69/Exponents70to79/High dispatch only (#36387/#36386)"
         },
         "ext/standard/JitPowIntegerEmitHigh.php": {
-            "budget": 32883,
+            "budget": 35972,
             "target": 40000,
-            "note": "integer pow()/ ** chained-smul emit for compile-time exponents 80..92 extracted from JitPowIntegerEmit (#36387/#36386)"
+            "note": "integer pow()/ ** chained-smul emit for compile-time exponents 80..93 extracted from JitPowIntegerEmit (#36387/#36386)"
         },
         "ext/standard/JitPowIntegerEmitLow.php": {
             "budget": 3985,
