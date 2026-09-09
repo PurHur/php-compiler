@@ -82,7 +82,7 @@ Patch source of truth is moving toward forks (#36229); until then every patch ne
 
 ## Size ratchet
 
-After a Concern extract that shrinks a budgeted file, lower `budget` in `script/size-budgets.json` to the new line count (never raise it). Targets: Compiler/JIT ≤ 25k (then 20k), VM ≤ 15k, `apply-patches.sh` ≤ 4k (overlays under `script/lib/`), `script/` ≤ 150 top-level files (issue-specific helpers go under `script/composer/`, `script/fuzz/`, `script/lib/`, …), `ci-defaults.env` ≤ 60 exports.
+After a Concern extract that shrinks a budgeted file, lower `budget` in `script/size-budgets.json` to the new line count (never raise it). Targets: Compiler/JIT ≤ 25k (then 20k), VM ≤ 15k, `apply-patches.sh` ≤ 4k then ≤ 2k (overlays under `script/lib/`, including mid php-cfg), `script/` ≤ 150 top-level files (issue-specific helpers go under `script/composer/`, `script/fuzz/`, `script/lib/`, …), `ci-defaults.env` ≤ 60 exports.
 
 ## Related ADRs / docs
 

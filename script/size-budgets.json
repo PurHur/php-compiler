@@ -19,9 +19,9 @@
             "note": "RunFramesInner + ClassInstanceAndStaticCallSupport + ReturnDispatch + ScriptMagicAndTickDispatch + FuncDefAndGlobalConstDispatch + CloneDispatch + TryCatchThrowDispatch + YieldAndYieldFromDispatch + EmptyAndBooleanNotDispatch + FromCallableAndClosureDispatch + ListUnpackAndSpreadAssignDispatch + VarFetchGlobalAndFunctionStaticDispatch + ArgSendDispatch + DeclareClassLikeDispatch + ConstFetchStaticCallInstanceofDispatch + JumpCaseDispatch + CoalesceNullsafeSilenceExitDispatch + ForeachIterDispatch + EchoPrintEvalDispatch + MethodCallInitDispatch + NewDispatch + FuncCallInitDispatch + IncludeDispatch + IssetDispatch + ClassConstFetchDispatch + ScalarArithBitwiseUnaryDispatch + ScalarCompareDispatch + ScalarCastDispatch + ScalarCastCompareArithConcatDispatch + ArgRecvDispatch + FuncCallExecDispatch + AssignDispatch + UnsetDispatch + StaticPropertyFetchDispatch + ArrayDimFetchDispatch + ObjectPropertyFetchDispatch + ConstructMarkAndPendingOutboundCall + PropertyHookFrameAndStaticLink + IteratorToArrayConvert + IncludePathAndClassPseudoConst + ClassScopeAndStaticPropertyResolve + ClosureBindAndFunctionStatic + InternalHandlerExecuteAndAssignCopy + OutgoingCallArgResolve + ClassConstAndPropertyDefaultMaterialize + InheritanceFinalVarianceAndConstFetch + MethodCallAndStaticCallableInit + VirtualPropertyHookEnforce + ReturnTypeEnforce + DeprecationNoticeEmit + FrameActivationThisAndIncludeScope + FiberStartResumeAndThrow + GeneratorForeachAndYieldFrom + FrameObjectRefAndDeadTempRelease + UserInvokeArrayAccessAndClosureCall + BuiltinHostExceptionDispatch + ClassInheritDefineAndConstDeclare + TryCatchFinallyAndUncaughtDispatch + ExecuteIncDecAndScopeOperandRead + TypedIntRecursiveAndCountedLoopFastPath + PropertyFetchDestAndHookedDimWrite + ObjectPropertyMagicAndClone + ClassTraitComposition + ObjectPropertyReadonlyAndVisibility + Hooks + CollectAndSerialize + IssetEmptyUnset Concern extracts (#36403); under 15k target"
         },
         "script/apply-patches.sh": {
-            "budget": 3813,
+            "budget": 1772,
             "target": 4000,
-            "note": "overlays in script/lib/apply-php-cfg-overlays-early.inc.sh + apply-php-types-overlays.inc.sh + patch-already-applied.inc.sh (#36403); prefer patches/ + short idempotent guards"
+            "note": "overlays in script/lib/apply-php-cfg-overlays-{early,mid}.inc.sh + apply-php-types-overlays.inc.sh + patch-already-applied.inc.sh (#36403); prefer patches/ + short idempotent guards"
         },
         "lib/AOT/Linker.php": {
             "budget": 1008,
@@ -558,6 +558,7 @@
             "target": 220,
             "note": "instanceof / static-call eligibility helpers extracted from VM.php (#36403); php-src ZEND_INSTANCEOF / ZEND_INIT_STATIC_METHOD_CALL / zend_std_get_static_method / zend_inheritance.c"
         },
+<<<<<<< HEAD
         "lib/JIT/DiscardedPureCallElision.php": {
             "budget": 5566,
             "target": 3500,
@@ -567,11 +568,30 @@
             "budget": 641,
             "target": 800,
             "note": "html-escape / slice-compare / pad-split / replace-join / implode discarded elision extracted from DiscardedPureCallElision (#36387); php-src html.c/string.c/php_pcre.c/exec.c"
+<<<<<<< HEAD
         },
         "lib/VM/Concern/RunFramesInner.php": {
             "budget": 803,
             "target": 900,
             "note": "runFramesInner opcode loop extracted from VM.php (#36403); php-src Zend/zend_vm_execute.h execute_ex / ZEND_VM_CONTINUE; zend_execute.c; zend_generators.c / zend_fibers.c / zend_exceptions.c"
+=======
+=======
+        "script/lib/apply-php-cfg-overlays-mid.inc.sh": {
+            "budget": 2055,
+            "target": 2200,
+            "note": "mid php-cfg overlays extracted from apply-patches.sh (#36403)"
+        },
+        "script/lib/apply-php-cfg-overlays-early.inc.sh": {
+            "budget": 1736,
+            "target": 1800,
+            "note": "early php-cfg overlays extracted from apply-patches.sh (#36403)"
+        },
+        "script/lib/apply-php-types-overlays.inc.sh": {
+            "budget": 2104,
+            "target": 2200,
+            "note": "php-types overlays extracted from apply-patches.sh (#36403)"
+>>>>>>> ac59ccd529 (Size: extract mid php-cfg overlays from apply-patches (#36403))
+>>>>>>> 2af110ca68 (Size: extract mid php-cfg overlays from apply-patches (#36403))
         }
 
     },
