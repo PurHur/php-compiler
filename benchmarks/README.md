@@ -48,6 +48,7 @@ Environment: 8.2.32 · LLVM 9 available · 5 iterations averaged, wall time per 
 ```bash
 ./script/docker-exec.sh -- bash -lc 'source script/php-env.sh && PHP_8_2=$(command -v php) php script/bench.php --v2'
 ./script/bench-gate.sh --v2
+./script/bench-gate.sh --self-test-v2-2x   # Done-when: deliberate ~2× must fail (#36385)
 php script/bench-web-request.php --merge-results   # MiniWebApp req/s column
 php script/generate-bench-chart.php                # docs/pages/bench.html
 ./script/bench/nightly.sh --publish-only           # history/<sha>.json + chart + gate

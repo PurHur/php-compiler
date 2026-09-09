@@ -13,6 +13,7 @@
 #   script/bench-gate.sh --v2 --update
 #   script/bench-gate.sh --compile  # compile-time gate (#36387)
 #   script/bench-gate.sh --compile --update
+#   script/bench-gate.sh --self-test-v2-2x  # #36385 Done-when: deliberate 2× must fail
 #
 # On RunForge / hosts without image LLVM, re-execs via docker-exec.sh (same as aot-smoke.sh).
 set -uo pipefail

@@ -98,6 +98,7 @@ final class BenchGateTest extends TestCase
         $this->assertStringContainsString('PHP_COMPILER_BENCH_HISTORY', $nightly);
         $this->assertStringContainsString('--publish-only', $nightly);
         $this->assertStringContainsString('bench-gate.sh --v2', $nightly);
+        $this->assertStringContainsString('--self-test-v2-2x', (string) file_get_contents($root.'/script/bench-gate.php'));
         $this->assertStringContainsString('generate-bench-chart.php', $nightly);
         $bench = (string) file_get_contents($root.'/script/bench.php');
         $this->assertStringContainsString('bench-web-request.php', $bench);
@@ -161,4 +162,18 @@ final class BenchGateTest extends TestCase
         }
         $this->assertGreaterThanOrEqual(16, \count($baseline['cases']));
     }
+    public function testV2Deliberate2xSlowdownFailsGate(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $php = \PHP_BINARY;
+        $cmd = escapeshellcmd($php).' '
+            .escapeshellarg($root.'/script/bench-gate.php').' --self-test-v2-2x';
+        exec($cmd.' 2>&1', $lines, $rc);
+        $out = implode("\n", $lines);
+        $this->assertSame(0, $rc, $out);
+        $this->assertStringContainsString('deliberate 2× trips', $out);
+        $this->assertStringContainsString('__self_test_2x_probe__', $out);
+    }
+
+
 }
