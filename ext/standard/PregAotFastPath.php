@@ -386,8 +386,10 @@ final class PregAotFastPath
     }
 
     /**
-     * Closing delimiter index; allows a trailing `u` UTF modifier (#29024).
+     * Closing delimiter index; allows trailing PCRE modifiers (i/m/s/x/u/…).
      * NestedJIT-safe substitute for strrpos (#27119 / peer #26888).
+     * php-src: ext/pcre/php_pcre.c php_pcre_get_back_end / modifier scan.
+     * Without this, `/t{3,}/i` was kind=0 → replaceFindNext -1 → NestedJIT SIGSEGV (#36385).
      */
     private static function delimitedBodyCloseAllowUtf(string $pattern): int
     {
@@ -399,12 +401,18 @@ final class PregAotFastPath
         if ('/' !== $delim && '#' !== $delim) {
             return -1;
         }
-        $last = \substr($pattern, $plen - 1, 1);
-        if ($delim === $last) {
-            return $plen - 1;
-        }
-        if ('u' === $last && $plen >= 4 && $delim === \substr($pattern, $plen - 2, 1)) {
-            return $plen - 2;
+        $i = $plen - 1;
+        while ($i > 0) {
+            $c = \substr($pattern, $i, 1);
+            if ($delim === $c) {
+                return $i;
+            }
+            // Known modifiers — same set as VmPregPattern::isKnownModifier (no match()).
+            if ('i' !== $c && 'm' !== $c && 's' !== $c && 'x' !== $c
+                && 'A' !== $c && 'D' !== $c && 'U' !== $c && 'u' !== $c && 'J' !== $c) {
+                return -1;
+            }
+            --$i;
         }
 
         return -1;
@@ -412,17 +420,39 @@ final class PregAotFastPath
 
     private static function patternHasUtfFlag(string $pattern): bool
     {
-        $plen = \strlen($pattern);
-        if ($plen < 4) {
+        $close = self::delimitedBodyCloseAllowUtf($pattern);
+        if ($close < 1) {
             return false;
         }
-        $delim = \substr($pattern, 0, 1);
-        if ('/' !== $delim && '#' !== $delim) {
-            return false;
+        $plen = \strlen($pattern);
+        $j = $close + 1;
+        while ($j < $plen) {
+            if ('u' === \substr($pattern, $j, 1)) {
+                return true;
+            }
+            ++$j;
         }
 
-        return 'u' === \substr($pattern, $plen - 1, 1)
-            && $delim === \substr($pattern, $plen - 2, 1);
+        return false;
+    }
+
+    /** True when pattern carries the `i` (PCRE2_CASELESS) modifier after the closing delimiter. */
+    private static function patternHasIFlag(string $pattern): bool
+    {
+        $close = self::delimitedBodyCloseAllowUtf($pattern);
+        if ($close < 1) {
+            return false;
+        }
+        $plen = \strlen($pattern);
+        $j = $close + 1;
+        while ($j < $plen) {
+            if ('i' === \substr($pattern, $j, 1)) {
+                return true;
+            }
+            ++$j;
+        }
+
+        return false;
     }
 
     /** Next body index after {@see consumeHexEscapeAt} (NestedJIT cannot return pairs). */
@@ -764,31 +794,161 @@ final class PregAotFastPath
     }
 
     /**
+     * ASCII case-fold compare for `/i` — NestedJIT-safe (no strcasecmp).
+     */
+    private static function asciiCharEqualsInsensitive(string $a, string $b): bool
+    {
+        if ($a === $b) {
+            return true;
+        }
+        $oa = \ord($a);
+        $ob = \ord($b);
+        if ($oa >= 65 && $oa <= 90) {
+            $oa += 32;
+        }
+        if ($ob >= 65 && $ob <= 90) {
+            $ob += 32;
+        }
+
+        return $oa === $ob;
+    }
+
+    /**
      * @return int 1 matched, 0 no match
      */
     private static function findLiteralCharPlus(string $ch, string $subject, int $offset): int
     {
+        return self::findLiteralCharRun($ch, $subject, $offset, 1, -1, false);
+    }
+
+    /**
+     * Find next run of `$ch` with length in [min,max] (-1 max = unbounded).
+     *
+     * @return int 1 matched, 0 no match
+     */
+    private static function findLiteralCharRun(
+        string $ch,
+        string $subject,
+        int $offset,
+        int $min,
+        int $max,
+        bool $insensitive
+    ): int {
         $subLen = \strlen($subject);
         $i = $offset;
         if ($i < 0) {
             $i = 0;
         }
         while ($i < $subLen) {
-            if ($ch !== \substr($subject, $i, 1)) {
+            $c = \substr($subject, $i, 1);
+            $hit = $insensitive ? self::asciiCharEqualsInsensitive($ch, $c) : ($ch === $c);
+            if (!$hit) {
                 ++$i;
                 continue;
             }
             $j = $i + 1;
-            while ($j < $subLen && $ch === \substr($subject, $j, 1)) {
+            while ($j < $subLen) {
+                $n = \substr($subject, $j, 1);
+                $cont = $insensitive ? self::asciiCharEqualsInsensitive($ch, $n) : ($ch === $n);
+                if (!$cont) {
+                    break;
+                }
                 ++$j;
             }
-            self::$lastReplacePos = $i;
-            self::$lastReplaceBodyLen = $j - $i;
+            $run = $j - $i;
+            if ($run >= $min) {
+                $take = $run;
+                if ($max >= 0 && $take > $max) {
+                    $take = $max;
+                }
+                if ($take >= $min) {
+                    self::$lastReplacePos = $i;
+                    // Greedy up to max (php-src / PCRE brace quantifier).
+                    self::$lastReplaceBodyLen = $take;
 
-            return 1;
+                    return 1;
+                }
+            }
+            ++$i;
         }
 
         return 0;
+    }
+
+    /**
+     * `/X{n,}/i` `/X{n}/` `/X{n,m}/` — single literal byte + brace quant (#36385 regex-redux).
+     * php-src: ext/pcre brace quantifiers; case via PCRE2_CASELESS.
+     *
+     * @return int -2 not this shape, 0 no match, 1 matched
+     */
+    private static function tryFindLiteralCharBraceQuant(string $pattern, string $subject, int $offset): int
+    {
+        $close = self::delimitedBodyCloseAllowUtf($pattern);
+        if ($close < 1) {
+            return -2;
+        }
+        $rawBody = \substr($pattern, 1, $close - 1);
+        $blen = \strlen($rawBody);
+        // Minimum `X{0}` / `X{1,}` → 4 chars.
+        if ($blen < 4) {
+            return -2;
+        }
+        $ch = \substr($rawBody, 0, 1);
+        if ('[' === $ch || '(' === $ch || ')' === $ch || '|' === $ch
+            || '*' === $ch || '+' === $ch || '?' === $ch || '{' === $ch || '}' === $ch
+            || '^' === $ch || '$' === $ch || '.' === $ch || '\\' === $ch) {
+            return -2;
+        }
+        if ('{' !== \substr($rawBody, 1, 1)) {
+            return -2;
+        }
+        $p = 2;
+        $d0 = \substr($rawBody, $p, 1);
+        if ($d0 < '0' || $d0 > '9') {
+            return -2;
+        }
+        $min = 0;
+        while ($p < $blen) {
+            $d = \substr($rawBody, $p, 1);
+            if ($d < '0' || $d > '9') {
+                break;
+            }
+            $min = ($min * 10) + (\ord($d) - 48);
+            ++$p;
+        }
+        $max = $min;
+        if ($p < $blen && ',' === \substr($rawBody, $p, 1)) {
+            ++$p;
+            if ($p < $blen && '}' === \substr($rawBody, $p, 1)) {
+                $max = -1;
+            } else {
+                $d1 = $p < $blen ? \substr($rawBody, $p, 1) : '';
+                if ($d1 < '0' || $d1 > '9') {
+                    return -2;
+                }
+                $max = 0;
+                while ($p < $blen) {
+                    $d = \substr($rawBody, $p, 1);
+                    if ($d < '0' || $d > '9') {
+                        break;
+                    }
+                    $max = ($max * 10) + (\ord($d) - 48);
+                    ++$p;
+                }
+                if ($max < $min) {
+                    return -2;
+                }
+            }
+        }
+        if ($p >= $blen || '}' !== \substr($rawBody, $p, 1)) {
+            return -2;
+        }
+        if ($p + 1 !== $blen) {
+            return -2;
+        }
+        $insensitive = self::patternHasIFlag($pattern);
+
+        return self::findLiteralCharRun($ch, $subject, $offset, $min, $max, $insensitive);
     }
 
     /**
@@ -969,7 +1129,18 @@ final class PregAotFastPath
         self::$lastReplaceBodyLen = 0;
         $litPlus = self::literalCharPlusChar($pattern);
         if (null !== $litPlus) {
-            return self::findLiteralCharPlus($litPlus, $subject, $offset);
+            return self::findLiteralCharRun(
+                $litPlus,
+                $subject,
+                $offset,
+                1,
+                -1,
+                self::patternHasIFlag($pattern)
+            );
+        }
+        $braceRc = self::tryFindLiteralCharBraceQuant($pattern, $subject, $offset);
+        if (-2 !== $braceRc) {
+            return $braceRc;
         }
         // FastRoute Std::parse — `VARIABLE_REGEX(*SKIP)(*F) | \[` / `\]` (nikic/fast-route).
         // Thin AOT has no PCRE verbs; kind=0 → Internal error while Zend splits. (#36382)
@@ -1050,8 +1221,25 @@ final class PregAotFastPath
         if ($i < 0) {
             $i = 0;
         }
+        $insensitive = self::patternHasIFlag($pattern);
         while ($i + $bodyLen <= $subLen) {
-            if (self::literalEqualsAt($subject, $i, $body, $bodyLen)) {
+            $ok = true;
+            if ($insensitive) {
+                $k = 0;
+                while ($k < $bodyLen) {
+                    if (!self::asciiCharEqualsInsensitive(
+                        \substr($body, $k, 1),
+                        \substr($subject, $i + $k, 1)
+                    )) {
+                        $ok = false;
+                        break;
+                    }
+                    ++$k;
+                }
+            } else {
+                $ok = self::literalEqualsAt($subject, $i, $body, $bodyLen);
+            }
+            if ($ok) {
                 self::$lastReplacePos = $i;
 
                 return 1;
