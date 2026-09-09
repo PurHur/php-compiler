@@ -18,14 +18,12 @@ final class ContextCompileToFileLazyHttpResponseRuntimeShrinkTest extends TestCa
 {
     public function testCompileToFileDropsEagerHttpResponseEnsure(): void
     {
-        $context = (string) file_get_contents(__DIR__.'/../../lib/JIT/ContextCompileToFile.php');
+        $context = (string) file_get_contents(__DIR__.'/../../lib/JIT/ContextCompileToFile.php')
+            .(string) file_get_contents(__DIR__.'/../../lib/JIT/ContextCompileToFileStandaloneMain.php');
         $this->assertStringContainsString('#35803', $context);
-        $pos = strpos($context, 'public function compileToFile');
+        $pos = strpos($context, 'private function emitStandaloneMainFunction');
         $this->assertNotFalse($pos);
-        // emit/link half lives in ContextCompileToFileEmitAndLink (#36387).
-        $end = strpos($context, '$this->emitAndLinkCompiledModule($file)', $pos);
-        $this->assertNotFalse($end);
-        $body = substr($context, $pos, $end - $pos);
+        $body = substr($context, $pos);
 
         $this->assertStringNotContainsString(
             'HttpResponseRuntime::ensureStandaloneBodies($this)',
