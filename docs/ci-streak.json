@@ -1,7 +1,7 @@
 {
     "issue": 36401,
     "ci_green_streak_days": 6,
-    "last_green_master_sha": "2e7940d360bf801ecd3414ec0f15b4c68d22dc11",
+    "last_green_master_sha": "c689bf3c9824240ab4574978d3daeefbdf21f90f",
     "last_green_day": "2026-09-09",
     "gates": [
         "apply-patches",
@@ -9,5 +9,5 @@
         "aot-smoke",
         "north-star5-verify-fast"
     ],
-    "notes": "Local Docker gates; GHA billing-disabled \u2014 not a remote check streak (#36401). Verified apply-patches --verify-pristine php-llvm 27/27 (structgep OK, #36143 closed), bootstrap-inventory 8595/8595 (construct-flag sync after #37683 ExtPolicy fold), aot-smoke 9/9, north-star5-verify-fast OK on tip 2e7940d360. Closed conflicting IR-stock PR #37682. Streak records last fully verified SHA."
+    "notes": "Local Docker gates; GHA billing-disabled \u2014 not a remote check streak (#36401). Verified apply-patches --verify-pristine php-llvm 27/27 (structgep OK, #36143 closed), bootstrap-inventory 8596/8596 (construct-flag sync after #37690 ExtPolicy fold), aot-smoke 9/9, north-star5-verify-fast OK on tip c689bf3c98. No open worker PRs; #36143\u2013#36148/#36142 already closed. No IR stock. Streak records last fully verified SHA."
 }
