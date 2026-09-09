@@ -88,6 +88,16 @@
             "target": 250,
             "note": "User .o + helper-slug link-manifest mid-tier warm restore extracted from ArtifactPersist (#36387/#36199)"
         },
+        "lib/JIT/Builtin/Type/Object_.php": {
+            "budget": 8560,
+            "target": 7000,
+            "note": "Object LLVM type hub; external/zend builtin class registration in ObjectExternalClassRegister (#36387); php-src Zend/zend_API.c + zend_object_handlers.c"
+        },
+        "lib/JIT/Builtin/Type/ObjectExternalClassRegister.php": {
+            "budget": 1280,
+            "target": 1500,
+            "note": "registerExternalClass extracted from Object_ (#36387); php-src Zend/zend_API.c zend_register_internal_class* + ext/spl + ext/date + ext/reflection"
+        },
         "lib/JIT/CompileCachePartialEmitDemote.php": {
             "budget": 133,
             "target": 250,

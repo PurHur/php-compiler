@@ -6457,6 +6457,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/Type/ObjectExitStatusLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/Type/ObjectInstancePropertyLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/Type/ObjectStaticPropertyInitLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/Type/ObjectStaticPropertyLlvm.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/Type/ObjectExternalClassRegister.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/Type/Object_.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/Type/String_.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/Type/Value.php';
