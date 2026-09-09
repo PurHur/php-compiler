@@ -68,7 +68,8 @@ abstract class ModuleAbstract implements Module {
      * default_enabled from ext/<name>/ext.json (#36204).
      *
      * An extension that should be opt-in sets {@code "default_enabled": false} in its manifest.
-     * Nothing selects on it yet beyond {@see ExtensionRegistry} `--only` / `--without` generation.
+     * Runtime load filtering uses {@see Runtime::modulesToLoad()} + {@code PHP_COMPILER_EXTENSIONS}
+     * (generator `--only=` / `--without=` still shapes the committed registry).
      */
     public function isDefaultEnabled(): bool
     {

@@ -1,0 +1,9 @@
+{
+  "issue": 36204,
+  "subset": "standard,spl,types,ctype,hash,random",
+  "full_bytes": 4371936,
+  "subset_bytes": 4371936,
+  "full_compile_s": 4,
+  "subset_compile_s": 0,
+  "delta_bytes": 0
+}
