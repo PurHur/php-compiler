@@ -10,7 +10,9 @@
         "passthru()"
     ],
     "compiler_cfg_gaps": [],
-    "excluded_files": [],
+    "excluded_files": [
+        "lib/JIT/DiscardedPureCallElisionNativeLongFolds.php"
+    ],
     "eligible_files": [
         "bin/vm.php",
         "ext/apcu/ApcuConstants.php",
@@ -7446,7 +7448,7 @@
         "lib/JIT/DiscardedPureCallElisionMathGuardAndVoidNativeOps.php",
         "lib/JIT/DiscardedPureCallElisionNativeLongBitwiseFolds.php",
         "lib/JIT/DiscardedPureCallElisionNativeLongCompareMulFolds.php",
-        "lib/JIT/DiscardedPureCallElisionNativeLongFolds.php",
+        "lib/JIT/DiscardedPureCallElisionNativeLongPowFolds.php",
         "lib/JIT/DiscardedPureCallElisionRuntimeInfoOps.php",
         "lib/JIT/DiscardedPureCallElisionStringOps.php",
         "lib/JIT/DiscardedPureCallElisionTypeStringCoreOps.php",
@@ -8815,8 +8817,8 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8581,
-        "excluded": 0,
+        "inventory_files": 8582,
+        "excluded": 1,
         "eligible": 8581,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
