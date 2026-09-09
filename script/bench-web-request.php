@@ -148,7 +148,8 @@ if (is_executable($aotBin)) {
     $payload['notes'][] = 'phpc_serve_aot n/a: examples/003-MiniWebApp/.phpc/bin/app missing (build with phpc build --project first)';
 }
 
-// php-fpm: rare in the pinned image — report n/a with reason rather than inventing a column
+// php-fpm: when present, run a disposable pool + pure-PHP FastCGI client (#36385).
+// No HTTP front required — measures FastCGI wall time with the same route needles.
 $fpm = trim((string) shell_exec('command -v php-fpm 2>/dev/null'));
 if ('' === $fpm) {
     $fpm = trim((string) shell_exec('command -v php-fpm8.2 2>/dev/null'));
@@ -156,7 +157,8 @@ if ('' === $fpm) {
 if ('' === $fpm || !is_executable($fpm)) {
     $payload['notes'][] = 'php_fpm n/a: no php-fpm binary on PATH in this environment';
 } else {
-    $payload['notes'][] = 'php_fpm n/a: FastCGI pool wiring for MiniWebApp is not automated in this harness yet; use zend_builtin as the Zend reference';
+    $fpmMeasure = measurePhpFpm($fpm, $php, $docroot, $payload['routes'], $requests);
+    mergeMeasure($payload, 'php_fpm', $fpmMeasure);
 }
 
 emitAndExit($payload, $jsonOnly, $mergeResults, $root, 0);
@@ -422,4 +424,262 @@ function stopPid(int $pid): void
         usleep(50000);
     }
     exec('kill -KILL '.((int) $pid).' 2>/dev/null');
+}
+
+/**
+ * Disposable php-fpm pool + FastCGI client for the web-request column (#36385).
+ *
+ * @param list<array{path: string, needle: string}> $routes
+ * @return array{wall_s: ?float, req_per_s: ?float, p99_ms: ?float, note: ?string}
+ */
+function measurePhpFpm(string $fpmBin, string $php, string $docroot, array $routes, int $requests): array
+{
+    $port = findFreePort($php);
+    if (null === $port) {
+        return ['wall_s' => null, 'req_per_s' => null, 'p99_ms' => null, 'note' => 'php_fpm: no free port'];
+    }
+    $tmp = sys_get_temp_dir().'/phpc-fpm-'.getmypid().'-'.$port;
+    if (!mkdir($tmp, 0700, true) && !is_dir($tmp)) {
+        return ['wall_s' => null, 'req_per_s' => null, 'p99_ms' => null, 'note' => 'php_fpm: temp dir failed'];
+    }
+    $conf = $tmp.'/php-fpm.conf';
+    $errorLog = $tmp.'/error.log';
+    $poolLog = $tmp.'/pool.log';
+    $index = $docroot.'/index.php';
+    $confBody = <<<CONF
+[global]
+pid = {$tmp}/php-fpm.pid
+error_log = {$errorLog}
+daemonize = no
+
+[www]
+user = nobody
+group = nogroup
+listen = 127.0.0.1:{$port}
+listen.allowed_clients = 127.0.0.1
+pm = static
+pm.max_children = 2
+catch_workers_output = yes
+php_admin_value[error_log] = {$poolLog}
+php_admin_flag[log_errors] = on
+chdir = {$docroot}
+CONF;
+    // Prefer running as current user when nobody is unavailable (containers).
+    $uid = function_exists('posix_geteuid') ? (int) posix_geteuid() : 0;
+    if (0 !== $uid) {
+        $user = function_exists('posix_getpwuid') ? (posix_getpwuid($uid)['name'] ?? 'www-data') : 'www-data';
+        $gid = function_exists('posix_getegid') ? (int) posix_getegid() : $uid;
+        $group = function_exists('posix_getgrgid') ? (posix_getgrgid($gid)['name'] ?? $user) : $user;
+        $confBody = str_replace(
+            ["user = nobody", "group = nogroup"],
+            ["user = {$user}", "group = {$group}"],
+            $confBody
+        );
+    }
+    file_put_contents($conf, $confBody."\n");
+
+    $cmdLine = escapeshellarg($fpmBin).' -F -y '.escapeshellarg($conf)
+        .' >'.escapeshellarg($tmp.'/stdout.log').' 2>&1 & echo $!';
+    $pid = (int) trim((string) shell_exec($cmdLine));
+    if ($pid < 1) {
+        cleanupFpmTemp($tmp);
+
+        return ['wall_s' => null, 'req_per_s' => null, 'p99_ms' => null, 'note' => 'php_fpm: failed to spawn'];
+    }
+
+    try {
+        if (!waitForPort($port, (int) (getenv('PHP_COMPILER_SERVE_READY_TIMEOUT') ?: 30))) {
+            $err = is_file($errorLog) ? trim((string) file_get_contents($errorLog)) : '';
+
+            return [
+                'wall_s' => null,
+                'req_per_s' => null,
+                'p99_ms' => null,
+                'note' => 'php_fpm did not become ready'.('' !== $err ? ': '.$err : ''),
+            ];
+        }
+
+        foreach ($routes as $route) {
+            $body = fastcgiGet($port, $docroot, $index, $route['path'], $status);
+            if (200 !== $status || !str_contains($body, $route['needle'])) {
+                return [
+                    'wall_s' => null,
+                    'req_per_s' => null,
+                    'p99_ms' => null,
+                    'note' => 'php_fpm warmup failed status='.$status.' path='.$route['path'],
+                ];
+            }
+        }
+
+        $samplesMs = [];
+        $start = microtime(true);
+        for ($i = 0; $i < $requests; ++$i) {
+            foreach ($routes as $route) {
+                $t0 = microtime(true);
+                $body = fastcgiGet($port, $docroot, $index, $route['path'], $status);
+                $samplesMs[] = (microtime(true) - $t0) * 1000.0;
+                if (200 !== $status || !str_contains($body, $route['needle'])) {
+                    return [
+                        'wall_s' => null,
+                        'req_per_s' => null,
+                        'p99_ms' => null,
+                        'note' => 'php_fpm request '.$i.' failed status='.$status,
+                    ];
+                }
+            }
+        }
+        $wall = microtime(true) - $start;
+        $totalReqs = $requests * count($routes);
+        sort($samplesMs);
+        $idx = (int) max(0, (int) floor(0.99 * (count($samplesMs) - 1)));
+
+        return [
+            'wall_s' => $wall,
+            'req_per_s' => $wall > 0.0 ? $totalReqs / $wall : null,
+            'p99_ms' => $samplesMs[$idx] ?? null,
+            'note' => 'php_fpm via FastCGI (no HTTP front; compare to zend_builtin carefully)',
+        ];
+    } finally {
+        stopPid($pid);
+        cleanupFpmTemp($tmp);
+    }
+}
+
+function cleanupFpmTemp(string $tmp): void
+{
+    if (!is_dir($tmp)) {
+        return;
+    }
+    foreach (glob($tmp.'/*') ?: [] as $f) {
+        @unlink($f);
+    }
+    @rmdir($tmp);
+}
+
+/**
+ * Minimal FastCGI GET against php-fpm (FCGI_BEGIN_REQUEST + FCGI_PARAMS + empty STDIN).
+ */
+function fastcgiGet(int $port, string $docroot, string $scriptFilename, string $path, ?int &$status = null): string
+{
+    $status = 0;
+    $fp = @fsockopen('127.0.0.1', $port, $errno, $errstr, 5.0);
+    if (false === $fp) {
+        return '';
+    }
+    stream_set_timeout($fp, 15);
+
+    // PATH_INFO for MiniWebApp routes like /index.php/api/status
+    $scriptName = '/index.php';
+    $pathInfo = '';
+    if (str_starts_with($path, '/index.php')) {
+        $pathInfo = substr($path, strlen('/index.php'));
+    } else {
+        $scriptName = $path;
+    }
+
+    $params = [
+        'REQUEST_METHOD' => 'GET',
+        'SCRIPT_FILENAME' => $scriptFilename,
+        'SCRIPT_NAME' => $scriptName,
+        'REQUEST_URI' => $path,
+        'PATH_INFO' => $pathInfo,
+        'QUERY_STRING' => '',
+        'DOCUMENT_ROOT' => $docroot,
+        'SERVER_SOFTWARE' => 'phpc-bench-web-request',
+        'SERVER_NAME' => '127.0.0.1',
+        'SERVER_PORT' => '80',
+        'REMOTE_ADDR' => '127.0.0.1',
+        'SERVER_PROTOCOL' => 'HTTP/1.1',
+        'GATEWAY_INTERFACE' => 'CGI/1.1',
+        'CONTENT_LENGTH' => '0',
+    ];
+
+    $reqId = 1;
+    $packets = '';
+    $packets .= fcgiRecord(1, $reqId, "\x00\x01\x00\x00\x00\x00\x00\x00"); // BEGIN_REQUEST responder
+    $paramBody = '';
+    foreach ($params as $k => $v) {
+        $paramBody .= fcgiNameValue($k, $v);
+    }
+    $packets .= fcgiRecord(4, $reqId, $paramBody); // PARAMS
+    $packets .= fcgiRecord(4, $reqId, ''); // PARAMS end
+    $packets .= fcgiRecord(5, $reqId, ''); // STDIN end
+    fwrite($fp, $packets);
+
+    $stdout = '';
+    $deadline = microtime(true) + 15.0;
+    while (microtime(true) < $deadline) {
+        $header = '';
+        while (strlen($header) < 8) {
+            $chunk = fread($fp, 8 - strlen($header));
+            if (false === $chunk || '' === $chunk) {
+                break 2;
+            }
+            $header .= $chunk;
+        }
+        $fields = unpack('Cversion/Ctype/nrequestId/ncontentLength/CpaddingLength/Creserved', $header);
+        if (!is_array($fields)) {
+            break;
+        }
+        $len = (int) $fields['contentLength'];
+        $pad = (int) $fields['paddingLength'];
+        $content = '';
+        while (strlen($content) < $len) {
+            $chunk = fread($fp, $len - strlen($content));
+            if (false === $chunk || '' === $chunk) {
+                break 2;
+            }
+            $content .= $chunk;
+        }
+        if ($pad > 0) {
+            fread($fp, $pad);
+        }
+        $type = (int) $fields['type'];
+        if (6 === $type) { // STDOUT
+            $stdout .= $content;
+        } elseif (3 === $type) { // END_REQUEST
+            break;
+        }
+    }
+    fclose($fp);
+
+    $headerEnd = strpos($stdout, "\r\n\r\n");
+    if (false === $headerEnd) {
+        $headerEnd = strpos($stdout, "\n\n");
+    }
+    if (false === $headerEnd) {
+        return $stdout;
+    }
+    $rawHeaders = substr($stdout, 0, $headerEnd);
+    $body = substr($stdout, $headerEnd);
+    $body = ltrim($body, "\r\n");
+    if (preg_match('/Status:\s*(\d+)/i', $rawHeaders, $m)) {
+        $status = (int) $m[1];
+    } else {
+        $status = 200;
+    }
+
+    return $body;
+}
+
+function fcgiNameValue(string $name, string $value): string
+{
+    return fcgiLength(strlen($name)).fcgiLength(strlen($value)).$name.$value;
+}
+
+function fcgiLength(int $len): string
+{
+    if ($len < 128) {
+        return chr($len);
+    }
+
+    return pack('N', $len | 0x80000000);
+}
+
+function fcgiRecord(int $type, int $requestId, string $content): string
+{
+    $len = strlen($content);
+    $pad = (8 - ($len % 8)) % 8;
+
+    return pack('CCnnCx', 1, $type, $requestId, $len, $pad).$content.str_repeat("\0", $pad);
 }

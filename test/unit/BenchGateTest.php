@@ -175,5 +175,38 @@ final class BenchGateTest extends TestCase
         $this->assertStringContainsString('__self_test_2x_probe__', $out);
     }
 
+    public function testBenchReadmeSyncGate(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $script = $root.'/script/check-bench-readme-sync.php';
+        $this->assertFileExists($script);
+        $php = \PHP_BINARY;
+        $cmd = escapeshellcmd($php).' '.escapeshellarg($script);
+        exec($cmd.' 2>&1', $lines, $rc);
+        $out = implode("\n", $lines);
+        $this->assertSame(0, $rc, $out);
+        $this->assertStringContainsString('OK', $out);
+
+        exec($cmd.' --self-test 2>&1', $selfLines, $selfRc);
+        $selfOut = implode("\n", $selfLines);
+        $this->assertSame(0, $selfRc, $selfOut);
+        $this->assertStringContainsString('--self-test: OK', $selfOut);
+
+        $gen = (string) file_get_contents($root.'/script/check-generated-docs.sh');
+        $this->assertStringContainsString('check-bench-readme-sync', $gen);
+    }
+
+    public function testWebRequestAutomatesPhpFpmPool(): void
+    {
+        $src = (string) file_get_contents(dirname(__DIR__, 2).'/script/bench-web-request.php');
+        $this->assertStringContainsString('function measurePhpFpm', $src);
+        $this->assertStringContainsString('function fastcgiGet', $src);
+        $this->assertStringNotContainsString(
+            'FastCGI pool wiring for MiniWebApp is not automated',
+            $src
+        );
+        $this->assertStringContainsString('php_fpm n/a: no php-fpm binary on PATH', $src);
+    }
+
 
 }

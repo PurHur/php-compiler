@@ -6,10 +6,12 @@ benchmark-game kernels. The **web-request** column lives beside the CLI suite
 (`script/bench-web-request.php` → `WEB_REQUEST.json`) and times MiniWebApp `/` +
 `/api/status` under Zend `php -S` and `phpc serve` (AOT/`php-fpm` when available).
 
-**Do not hand-edit numbers.** Regenerate:
+**Do not hand-edit numbers.** Regenerate (or rewrite the table from committed JSON):
 
 ```bash
 ./script/docker-exec.sh -- bash -lc 'source script/php-env.sh && PHP_8_2=$(command -v php) php script/bench.php --v2'
+php script/check-bench-readme-sync.php --render   # table ← RESULTS.json without re-timing
+php script/check-bench-readme-sync.php            # gate (#36385)
 ```
 
 That also refreshes `docs/pages/bench.html` (ratio sparklines + web column). Set
