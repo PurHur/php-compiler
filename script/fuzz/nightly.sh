@@ -137,6 +137,30 @@ fi
 
 echo "fuzz-nightly: OK (${ELAPSED}s for ${COUNT} programs; unique=${UNIQUE}; le15=${REDUCED_LE15}/${REDUCED_OK})"
 
+# Optional soft AOT batch (does not own the 2k/60m wall — VM does). Failures are
+# reduced into the same keep-dir for signature filing (#36398 slice 5).
+AOT_COUNT="${FUZZ_NIGHTLY_AOT_COUNT:-0}"
+if [[ "$AOT_COUNT" -gt 0 ]]; then
+  AOT_SEED_BASE="${FUZZ_NIGHTLY_AOT_SEED_BASE:-$((SEED_BASE + COUNT))}"
+  AOT_OUT="$OUTDIR/aot-programs"
+  echo "fuzz-nightly: soft AOT batch count=${AOT_COUNT} seed-base=${AOT_SEED_BASE}"
+  set +e
+  php script/fuzz/run.php \
+    --count "$AOT_COUNT" \
+    --seed-base "$AOT_SEED_BASE" \
+    --backend aot \
+    --quiet \
+    --outdir "$AOT_OUT" \
+    --keep-failures "$KEEP"
+  AOT_RC=$?
+  set -e
+  if [[ "$AOT_RC" -gt 1 ]]; then
+    echo "fuzz-nightly: FAIL soft AOT runner exit ${AOT_RC}" >&2
+    exit "$AOT_RC"
+  fi
+  echo "fuzz-nightly: soft AOT batch done (runner_exit=${AOT_RC})"
+fi
+
 # Optional: draft / file GitHub issues for new signatures (#36398 slice 3).
 if [[ "${FUZZ_NIGHTLY_FILE_ISSUES:-0}" == "1" && "$UNIQUE" -gt 0 ]]; then
   FILE_ARGS=(

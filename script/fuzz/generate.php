@@ -27,7 +27,54 @@ function fuzz_known_shapes(): array
         'switch_int_fallthrough',
         'static_counter_fn',
         'array_plus_vs_merge',
+        // Slice 5 — New_ sibling side-effect args (#36398 / #37598 follow-up).
+        'new_static_counter_ctor_args',
     ];
+}
+
+/**
+ * Inverse-frequency weights from the committed fuzz seed corpus (#36398 slice 5).
+ * Shapes with fewer `@fuzz-shape:` hits get higher weight so nightly bias toward
+ * under-covered rows (Done-when: coverage feedback).
+ *
+ * @return array<string, int>
+ */
+function fuzz_shape_coverage_weights(): array
+{
+    static $weights = null;
+    if (\is_array($weights)) {
+        return $weights;
+    }
+    $shapes = fuzz_known_shapes();
+    $counts = array_fill_keys($shapes, 0);
+    $dir = fuzz_repo_root().'/test/differential/cases/fuzz';
+    foreach (glob($dir.'/seed_*.php') ?: [] as $path) {
+        $src = (string) file_get_contents($path);
+        if (preg_match('/@fuzz-shape:\s*(\S+)/', $src, $m) === 1 && isset($counts[$m[1]])) {
+            ++$counts[$m[1]];
+        }
+    }
+    $max = max($counts) ?: 0;
+    $weights = [];
+    foreach ($counts as $shape => $n) {
+        $weights[$shape] = 1 + ($max - $n);
+    }
+
+    return $weights;
+}
+
+/** @param array<string, int> $weights */
+function fuzz_pick_weighted_shape(FuzzRng $rng, array $weights): string
+{
+    $bag = [];
+    foreach ($weights as $shape => $w) {
+        $w = max(1, (int) $w);
+        for ($i = 0; $i < $w; ++$i) {
+            $bag[] = $shape;
+        }
+    }
+
+    return (string) $rng->pick($bag !== [] ? $bag : fuzz_known_shapes());
 }
 
 function fuzz_generate_program(int $seed, string $shape = 'auto'): string
@@ -35,7 +82,13 @@ function fuzz_generate_program(int $seed, string $shape = 'auto'): string
     $rng = new FuzzRng($seed);
     $shapes = fuzz_known_shapes();
     if ($shape === 'auto') {
-        $shape = $rng->pick($shapes);
+        // Default: coverage-biased pick (opt out with FUZZ_BIAS=uniform).
+        $bias = getenv('FUZZ_BIAS') ?: 'coverage';
+        $shape = $bias === 'uniform'
+            ? $rng->pick($shapes)
+            : fuzz_pick_weighted_shape($rng, fuzz_shape_coverage_weights());
+    } elseif ($shape === 'coverage') {
+        $shape = fuzz_pick_weighted_shape($rng, fuzz_shape_coverage_weights());
     } elseif (!in_array($shape, $shapes, true)) {
         throw new InvalidArgumentException("unknown shape: {$shape}");
     }
@@ -58,6 +111,7 @@ function fuzz_generate_program(int $seed, string $shape = 'auto'): string
         'switch_int_fallthrough' => fuzz_shape_switch_int_fallthrough($rng),
         'static_counter_fn' => fuzz_shape_static_counter_fn($rng),
         'array_plus_vs_merge' => fuzz_shape_array_plus_vs_merge($rng),
+        'new_static_counter_ctor_args' => fuzz_shape_new_static_counter_ctor_args($rng),
         default => throw new InvalidArgumentException("unknown shape: {$shape}"),
     };
 
@@ -380,6 +434,38 @@ function fuzz_shape_array_plus_vs_merge(FuzzRng $rng): string
     $lines[] = '$merged = array_merge($a, $b);';
     $lines[] = 'echo count($plus), "|", count($merged), "|", $plus[0], "|", $merged[0], "\n";';
     $lines[] = 'var_dump(count($plus), count($merged));';
+
+    return implode("\n", $lines)."\n";
+}
+
+/**
+ * `new C(f(), g())` with static counters — must evaluate each arg once (#36398).
+ * Zend left-to-right; double-emit of the second producer yields `1|3` instead of `1|2`.
+ */
+function fuzz_shape_new_static_counter_ctor_args(FuzzRng $rng): string
+{
+    $start = $rng->int(0, 3);
+    $lines = [];
+    $lines[] = 'function mk($n)';
+    $lines[] = '{';
+    $lines[] = '    static $c = 0;';
+    $lines[] = '    return ++$c + $n;';
+    $lines[] = '}';
+    $lines[] = '';
+    $lines[] = 'class Box';
+    $lines[] = '{';
+    $lines[] = '    public $a;';
+    $lines[] = '    public $b;';
+    $lines[] = '    public function __construct($a, $b)';
+    $lines[] = '    {';
+    $lines[] = '        $this->a = $a;';
+    $lines[] = '        $this->b = $b;';
+    $lines[] = '    }';
+    $lines[] = '}';
+    $lines[] = '';
+    $lines[] = "\$o = new Box(mk({$start}), mk({$start}));";
+    $lines[] = 'echo $o->a, "|", $o->b, "\n";';
+    $lines[] = 'var_dump($o->a, $o->b);';
 
     return implode("\n", $lines)."\n";
 }

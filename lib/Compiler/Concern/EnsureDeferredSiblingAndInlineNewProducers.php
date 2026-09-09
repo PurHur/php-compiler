@@ -664,6 +664,17 @@ trait EnsureDeferredSiblingAndInlineNewProducers
             if (!$isSib && !$isCreate) {
                 continue;
             }
+            // Already emitted while walking the CFG child list (empty-usage New_/call
+            // producers force EXEC_RETURN via firstSibling — #36385). Re-emitting here
+            // evaluates side-effecting args a third time: `new Box(mk(), mk())` → Zend
+            // `1|2`, VM/AOT `1|3` (#36398). Same guard as the lone-producer path above.
+            if (
+                property_exists($producer, 'result')
+                && null !== $producer->result
+                && null !== $block->slotForOperand($producer->result)
+            ) {
+                continue;
+            }
             $siblingOrdinal = $this->siblingInlineFuncCallProducerOrdinal(
                 $j,
                 $contiguousFirst,
