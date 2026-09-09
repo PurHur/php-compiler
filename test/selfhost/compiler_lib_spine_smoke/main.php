@@ -6995,6 +6995,7 @@ require_once __DIR__.'/../../../lib/JIT/ContextFunctionProxyExternalMethodStubRe
 require_once __DIR__.'/../../../lib/JIT/ContextFunctionProxyRegistration.php';
 require_once __DIR__.'/../../../lib/JIT/ContextFunctionProxyAndNestedJitKernel.php';
 require_once __DIR__.'/../../../lib/JIT/ContextTypeAndStructMap.php';
+require_once __DIR__.'/../../../lib/JIT/ContextCastToBool.php';
 require_once __DIR__.'/../../../lib/JIT/ContextStructFieldMap.php';
 require_once __DIR__.'/../../../lib/JIT/ContextStandaloneBodies.php';
 require_once __DIR__.'/../../../lib/JIT/ContextModuleCompileAndOptimize.php';

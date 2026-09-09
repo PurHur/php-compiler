@@ -348,6 +348,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/JIT/Concern/VarFetchDestLvalueContext.php',
             'lib/JIT/Concern/VmSmokeAndRuntimeM3NativeStubs.php',
             'lib/JIT/Context.php',
+            'lib/JIT/ContextCastToBool.php',
             'lib/JIT/ContextCompileToFile.php',
             'lib/JIT/ContextConstantFetch.php',
             'lib/JIT/ContextDefineBuiltinFunctionProxies.php',
