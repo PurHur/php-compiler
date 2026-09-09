@@ -30,10 +30,10 @@ permalink: /development-status.html
 | Area | PR / commit | Notes |
 |------|-------------|-------|
 | M4 full ladder | `make bootstrap-loop-probe` | Gen-1→gen-2 native + gen-2→gen-3 full spine + full-revision argv ✅ |
-| M5 spine runtime + bootstrap | `fix/spine-aot-jit-blockers` | Native bundle-OK probe; inventory argv spine-lint fallback; gen-0 sidecars refreshed ([#8558](https://github.com/PurHur/php-compiler/issues/8558)) |
+| M5 spine runtime + bootstrap | `fix/spine-aot-jit-blockers` | Native bundle-OK probe; inventory argv spine-lint fallback; gen-0 sidecars refreshed ([#8559](https://github.com/PurHur/php-compiler/issues/8559)) |
 | VM driver execute probe | [9493e806d](https://github.com/PurHur/php-compiler/commit/9493e806d) | **~20ms** feedback loop — no full relink on stale SHA; `BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_FULL_LINK=1` for rebuild ([#2201](https://github.com/PurHur/php-compiler/issues/2201)) |
 | M5 presenter | `make north-star5-verify-fast` | Daily PR gate (~1–2 min); `--strict` (~1h) pre-merge only ([#1492](https://github.com/PurHur/php-compiler/issues/1492)) |
-| Gen-0 refresh | [a8cffaa0e](https://github.com/PurHur/php-compiler/commit/a8cffaa0e) | Spine runtime probe + gen-0 sidecars (**7410/7412**); inventory argv spine-lint fallback ([#8558](https://github.com/PurHur/php-compiler/issues/8558)) |
+| Gen-0 refresh | [a8cffaa0e](https://github.com/PurHur/php-compiler/commit/a8cffaa0e) | Spine runtime probe + gen-0 sidecars (**7410/7412**); inventory argv spine-lint fallback ([#8559](https://github.com/PurHur/php-compiler/issues/8559)) |
 | Parallel compile jobs | [#10347](https://github.com/PurHur/php-compiler/pull/10347) | `PHP_COMPILER_COMPILE_JOBS` for vendor prelink + M3 sidecar warmup |
 | Spine coverage | [#10356](https://github.com/PurHur/php-compiler/pull/10356) | `GeneratorYieldSourceMarker.php` in spine; inventory **3276** Phase A files |
 | v1.1.0 docs sync | [#10369](https://github.com/PurHur/php-compiler/issues/10369) | README, development-status, examples README, capability matrix (**1555** builtins) |
