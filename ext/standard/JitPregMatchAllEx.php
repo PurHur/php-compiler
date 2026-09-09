@@ -27,6 +27,13 @@ final class JitPregMatchAllEx
             throw new \LogicException('preg_match_all() requires 2 to 5 arguments in this compiler build');
         }
 
+        if (2 === $argc) {
+            $folded = JitPregMatchAllCompileTime::tryFoldCount($context, $args[0], $args[1]);
+            if (null !== $folded) {
+                return $folded;
+            }
+        }
+
         StringPregMatch::ensureLinked($context);
 
         // Soft-null $pattern on 8.4 — Zend DEP+empty-pattern warn+false (#21479, reverts #20226 TypeError).

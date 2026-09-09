@@ -3103,6 +3103,7 @@ require_once __DIR__.'/../../../ext/standard/JitPregLastErrorMsg.php';
 require_once __DIR__.'/../../../ext/standard/JitPregMatch.php';
 require_once __DIR__.'/../../../ext/standard/JitPregMatchAll.php';
 require_once __DIR__.'/../../../ext/standard/JitPregMatchAllEx.php';
+require_once __DIR__.'/../../../ext/standard/JitPregMatchAllCompileTime.php';
 require_once __DIR__.'/../../../ext/standard/JitPregMatchEx.php';
 require_once __DIR__.'/../../../ext/standard/JitPregReplace.php';
 require_once __DIR__.'/../../../ext/standard/JitPregReplaceCompileTime.php';

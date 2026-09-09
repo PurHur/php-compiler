@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8582 |
-| Phase A inventory files (M2 ratio SSOT) | 8582 |
+| PHP files on vm.php path | 8581 |
+| Phase A inventory files (M2 ratio SSOT) | 8581 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26762 |
+| Source constructs flagged (warnings) | 26759 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3269,6 +3269,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitPregLastErrorMsg.php` | 0 | 1 |
 | `ext/standard/JitPregMatch.php` | 0 | 1 |
 | `ext/standard/JitPregMatchAll.php` | 0 | 1 |
+| `ext/standard/JitPregMatchAllCompileTime.php` | 0 | 1 |
 | `ext/standard/JitPregMatchAllEx.php` | 0 | 1 |
 | `ext/standard/JitPregMatchEx.php` | 0 | 1 |
 | `ext/standard/JitPregReplace.php` | 0 | 2 |
@@ -7355,9 +7356,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/DiscardedPureCallElisionMathAndHashOps.php` | 0 | 2 |
 | `lib/JIT/DiscardedPureCallElisionMathGuardAndVoidNativeOps.php` | 0 | 2 |
 | `lib/JIT/DiscardedPureCallElisionNativeLongBitwiseFolds.php` | 0 | 2 |
-| `lib/JIT/DiscardedPureCallElisionNativeLongCompareMulFolds.php` | 0 | 2 |
 | `lib/JIT/DiscardedPureCallElisionNativeLongFolds.php` | 0 | 2 |
-| `lib/JIT/DiscardedPureCallElisionNativeLongPowFolds.php` | 0 | 2 |
 | `lib/JIT/DiscardedPureCallElisionRuntimeInfoOps.php` | 0 | 2 |
 | `lib/JIT/DiscardedPureCallElisionStringOps.php` | 0 | 2 |
 | `lib/JIT/DiscardedPureCallElisionTypeStringCoreOps.php` | 0 | 2 |
@@ -33777,6 +33776,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/standard/JitPregMatchAllCompileTime.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/standard/JitPregMatchAllEx.php`
 
 **Warnings** (review for bootstrap subset):
@@ -36139,7 +36143,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/PregAotFastPath.php`
 
 **Warnings** (review for bootstrap subset):
-- 85 class method(s)
+- 89 class method(s)
 
 ### `ext/standard/PregCallbackInvokeJitHelper.php`
 
@@ -60617,23 +60621,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - trait DiscardedPureCallElisionNativeLongBitwiseFolds (line 23)
 - 5 class method(s)
 
-### `lib/JIT/DiscardedPureCallElisionNativeLongCompareMulFolds.php`
-
-**Warnings** (review for bootstrap subset):
-- trait DiscardedPureCallElisionNativeLongCompareMulFolds (line 25)
-- 8 class method(s)
-
 ### `lib/JIT/DiscardedPureCallElisionNativeLongFolds.php`
 
 **Warnings** (review for bootstrap subset):
-- trait DiscardedPureCallElisionNativeLongFolds (line 26)
-- 12 class method(s)
-
-### `lib/JIT/DiscardedPureCallElisionNativeLongPowFolds.php`
-
-**Warnings** (review for bootstrap subset):
-- trait DiscardedPureCallElisionNativeLongPowFolds (line 22)
-- 1 class method(s)
+- trait DiscardedPureCallElisionNativeLongFolds (line 22)
+- 21 class method(s)
 
 ### `lib/JIT/DiscardedPureCallElisionRuntimeInfoOps.php`
 
