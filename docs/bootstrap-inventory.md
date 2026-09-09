@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8585 |
-| Phase A inventory files (M2 ratio SSOT) | 8585 |
+| PHP files on vm.php path | 8586 |
+| Phase A inventory files (M2 ratio SSOT) | 8586 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26766 |
+| Source constructs flagged (warnings) | 26768 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -6687,10 +6687,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/Type/ObjectEnumCasePropertyLlvm.php` | 0 | 4 |
 | `lib/JIT/Builtin/Type/ObjectEnumStringCastLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/Type/ObjectExitStatusLlvm.php` | 0 | 2 |
+| `lib/JIT/Builtin/Type/ObjectExternalClassRegister.php` | 0 | 6 |
 | `lib/JIT/Builtin/Type/ObjectInstancePropertyLlvm.php` | 0 | 6 |
 | `lib/JIT/Builtin/Type/ObjectStaticPropertyInitLlvm.php` | 0 | 2 |
 | `lib/JIT/Builtin/Type/ObjectStaticPropertyLlvm.php` | 0 | 10 |
-| `lib/JIT/Builtin/Type/Object_.php` | 0 | 35 |
+| `lib/JIT/Builtin/Type/Object_.php` | 0 | 31 |
 | `lib/JIT/Builtin/Type/String_.php` | 0 | 1 |
 | `lib/JIT/Builtin/Type/Value.php` | 0 | 4 |
 | `lib/JIT/Builtin/TypeErrorRaise.php` | 0 | 3 |
@@ -56297,6 +56298,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JitVariable (line 97)
 - 4 class method(s)
 
+### `lib/JIT/Builtin/Type/ObjectExternalClassRegister.php`
+
+**Warnings** (review for bootstrap subset):
+- trait ObjectExternalClassRegister (line 27)
+- new VMVariable (line 1224)
+- new VMVariable (line 1244)
+- new VMVariable (line 1254)
+- new VMVariable (line 1274)
+- 1 class method(s)
+
 ### `lib/JIT/Builtin/Type/ObjectInstancePropertyLlvm.php`
 
 **Warnings** (review for bootstrap subset):
@@ -56330,40 +56341,36 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/Type/Object_.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 873)
-- new Variable (line 1349)
-- new Variable (line 1396)
-- new Variable (line 1439)
-- new Variable (line 2633)
-- new Variable (line 3095)
-- new Variable (line 3160)
-- new Variable (line 3189)
-- new Variable (line 3201)
-- new Variable (line 3214)
-- new Variable (line 3497)
-- new VMVariable (line 4123)
-- new VMVariable (line 5498)
-- new VMVariable (line 5518)
-- new VMVariable (line 5528)
-- new VMVariable (line 5548)
-- new VMVariable (line 7192)
-- new ReflectionClassConstant (line 7934)
-- new Variable (line 8403)
-- new Variable (line 8439)
-- new Variable (line 8466)
-- new Variable (line 8474)
-- new Variable (line 8497)
-- new Variable (line 8523)
-- new Variable (line 8531)
-- new Variable (line 8605)
-- new Literal (line 8622)
-- new Literal (line 8627)
-- new Literal (line 8632)
-- new Variable (line 8643)
-- new Variable (line 8676)
-- new Variable (line 8699)
-- new Variable (line 9249)
-- 354 class method(s)
+- new Variable (line 877)
+- new Variable (line 1353)
+- new Variable (line 1400)
+- new Variable (line 1443)
+- new Variable (line 2637)
+- new Variable (line 3099)
+- new Variable (line 3164)
+- new Variable (line 3193)
+- new Variable (line 3205)
+- new Variable (line 3218)
+- new Variable (line 3501)
+- new VMVariable (line 4127)
+- new VMVariable (line 5944)
+- new ReflectionClassConstant (line 6686)
+- new Variable (line 7155)
+- new Variable (line 7191)
+- new Variable (line 7218)
+- new Variable (line 7226)
+- new Variable (line 7249)
+- new Variable (line 7275)
+- new Variable (line 7283)
+- new Variable (line 7357)
+- new Literal (line 7374)
+- new Literal (line 7379)
+- new Literal (line 7384)
+- new Variable (line 7395)
+- new Variable (line 7428)
+- new Variable (line 7451)
+- new Variable (line 8001)
+- 353 class method(s)
 - 9 closure(s)
 
 ### `lib/JIT/Builtin/Type/String_.php`
