@@ -564,9 +564,9 @@
             "note": "instanceof / static-call eligibility helpers extracted from VM.php (#36403); php-src ZEND_INSTANCEOF / ZEND_INIT_STATIC_METHOD_CALL / zend_std_get_static_method / zend_inheritance.c"
         },
         "lib/JIT/DiscardedPureCallElision.php": {
-            "budget": 697,
+            "budget": 700,
             "target": 700,
-            "note": "Discarded pure-call elision hub; string/array/date-cal/format-analyze/math-hash/runtime-info/native-long/bitwise/math-guard/introspect/type-string traits (#36387/#36403/#23483)"
+            "note": "Discarded pure-call elision hub; string/array/date-cal/format-analyze/math-hash/runtime-info/native-long/bitwise/compare-pow/math-guard/introspect/type-string traits (#36387/#36403/#23483)"
         },
         "lib/JIT/DiscardedPureCallElisionStringOps.php": {
             "budget": 641,
@@ -619,14 +619,19 @@
             "note": "zero-arg / defined-table / process / memory-ini / env-path / host-error / json-preg / date-ob-http-spl / clock / civil-date / randmax runtime-info discarded elision extracted from DiscardedPureCallElision (#36387); php-src basic_functions.c/info.c/microtime.c/hrtime.c/datetime.c/Zend/zend.c/ext/date/php_date.c/ext/random/random.c"
         },
         "lib/JIT/DiscardedPureCallElisionNativeLongFolds.php": {
-            "budget": 967,
-            "target": 1000,
-            "note": "native-long/intdiv/pow/compare/mul compile-time fold helpers; bitwise extracted (#36403/#36387); php-src Zend/zend_operators.c ext/standard/math.c"
+            "budget": 384,
+            "target": 500,
+            "note": "native-long/intdiv/mul compile-time fold helpers; bitwise+compare/pow extracted (#36403/#36387); php-src Zend/zend_operators.c ext/standard/math.c"
         },
         "lib/JIT/DiscardedPureCallElisionNativeLongBitwiseFolds.php": {
             "budget": 185,
             "target": 300,
             "note": "bitShift* + bitwiseLogic* compile-time folds extracted from NativeLongFolds (#36387); php-src Zend/zend_operators.c shift_left/right + bitwise_and/or/xor"
+        },
+        "lib/JIT/DiscardedPureCallElisionNativeLongComparePowFolds.php": {
+            "budget": 610,
+            "target": 700,
+            "note": "pow + compare compile-time folds extracted from NativeLongFolds (#36387); php-src Zend/zend_operators.c pow_function/compare_function/is_identical_function + ext/standard/math.c pow"
         },
         "lib/JIT/DiscardedPureCallElisionIntrospectOps.php": {
             "budget": 407,
