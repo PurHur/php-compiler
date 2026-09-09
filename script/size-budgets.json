@@ -716,17 +716,17 @@
         "ext/standard/JitPow.php": {
             "budget": 443,
             "target": 600,
-            "note": "pow()/ ** LLVM lowering hub; integer chained-smul emit in JitPowIntegerEmit + Low/Mid/Exponents50to69/70to79/80to85/86to88/80to91/92to95/High (#36387)"
+            "note": "pow()/ ** LLVM lowering hub; integer chained-smul emit in JitPowIntegerEmit + Low/Mid/Exponents50to69/70to79/80to85/86to88/80to91/92to95/96to99/High (#36387)"
         },
         "ext/standard/JitPowIntegerEmit.php": {
-            "budget": 159,
+            "budget": 169,
             "target": 500,
-            "note": "integer pow()/ ** hub dispatch including Exponents92to95 (#36387/#36386)"
+            "note": "integer pow()/ ** hub: Low/Mid/Exponents50to69/70to79/80to85/86to88/80to91/92to95/96to99/High dispatch (#36387/#36386)"
         },
         "ext/standard/JitPowIntegerEmitHigh.php": {
-            "budget": 20300,
-            "target": 25000,
-            "note": "integer pow()/ ** chained-smul for ninetysixth+ including hundredfirst; 92..95 in Exponents92to95 (#36387/#36386)"
+            "budget": 6966,
+            "target": 20000,
+            "note": "integer pow()/ ** chained-smul emit for hundredth..hundredfirst; 96..99 in Exponents96to99; 92..95 in Exponents92to95 (#36387/#36386)"
         },
         "ext/standard/JitPowIntegerEmitLow.php": {
             "budget": 3985,
@@ -766,7 +766,12 @@
         "ext/standard/JitPowIntegerEmitExponents92to95.php": {
             "budget": 12524,
             "target": 20000,
-            "note": "integer pow()/ ** chained-smul for exponents 92..95 extracted from High (#36387/#36386)"
+            "note": "integer pow()/ ** chained-smul emit for compile-time exponents 92..95; 96..99 in Exponents96to99 (#36387/#36386)"
+        },
+        "ext/standard/JitPowIntegerEmitExponents96to99.php": {
+            "budget": 13386,
+            "target": 20000,
+            "note": "integer pow()/ ** chained-smul emit for compile-time exponents 96..99 extracted from High (#36387/#36386)"
         }
     },
     "script_file_count": {
