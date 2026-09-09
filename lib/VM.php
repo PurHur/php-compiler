@@ -73,6 +73,7 @@ require_once __DIR__.'/VM/Concern/FromCallableAndClosureDispatch.php';
 require_once __DIR__.'/VM/Concern/EmptyAndBooleanNotDispatch.php';
 require_once __DIR__.'/VM/Concern/YieldAndYieldFromDispatch.php';
 require_once __DIR__.'/VM/Concern/TryCatchThrowDispatch.php';
+require_once __DIR__.'/VM/Concern/CloneDispatch.php';
 
 use PHPCompiler\BuiltinByRefParams;
 use PHPCompiler\Compiler\AttributeNames;
@@ -175,6 +176,7 @@ class VM {
     use EmptyAndBooleanNotDispatch;
     use YieldAndYieldFromDispatch;
     use TryCatchThrowDispatch;
+    use CloneDispatch;
     const SUCCESS = 1;
     const FAILURE = 2;
 
@@ -1186,65 +1188,14 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_CLONE:
-                    $result = $frame->scope[$op->arg1];
-                    $src = $frame->scope[$op->arg2]->resolveIndirect();
-                    $uncloneableEnumClass = VM\EnumCaseSupport::uncloneableEnumClassForClone(
-                        $src,
-                        $this->context
-                    );
-                    if (null !== $uncloneableEnumClass) {
-                        $message = VM\CloneSupport::uncloneableObjectErrorMessage($uncloneableEnumClass);
-                        $catchFrame = $this->dispatchVmError($message, $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                        break;
-                    }
-                    if (Variable::TYPE_OBJECT !== $src->type) {
-                        $catchFrame = $this->dispatchVmError(
-                            VM\CloneSupport::NON_OBJECT_ERROR_MESSAGE,
-                            $frame
-                        );
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                        break;
-                    }
-                    $srcObject = $src->toObject();
-                    $deniedCloneClass = VM\CloneSupport::uncloneableDeniedClass($srcObject, $this->context);
-                    if (null !== $deniedCloneClass) {
-                        $catchFrame = $this->dispatchVmError(
-                            VM\CloneSupport::uncloneableObjectErrorMessage($deniedCloneClass),
-                            $frame
-                        );
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                        break;
-                    }
-                    $catchFrame = $this->enforceCloneVisibility($srcObject, $frame);
-                    if (null !== $catchFrame) {
-                        $frame = $catchFrame;
+                    $cloneOutcome = $this->executeCloneDispatch($frame, $op);
+                    if ($cloneOutcome instanceof Frame) {
+                        $frame = $cloneOutcome;
                         goto restart;
                     }
-                    // Zend/zend_lazy_objects.c zend_lazy_object_clone — init pending ghost/proxy
-                    // before clone so both original and clone are initialized (#29171).
-                    $catchFrame = $this->ensureLazyObjectInitialized($srcObject, $frame);
-                    if (null !== $catchFrame) {
-                        $frame = $catchFrame;
-                        goto restart;
+                    if (is_int($cloneOutcome)) {
+                        return $cloneOutcome;
                     }
-                    $cloned = $srcObject->cloneShallow();
-                    $this->invokeCloneObjectHandler($srcObject, $cloned);
-                    $catchFrame = $this->invokeCloneMagicMethod($cloned, $frame);
-                    if (null !== $catchFrame) {
-                        $frame = $catchFrame;
-                        goto restart;
-                    }
-                    $result->object($cloned);
                     break;
                 case OpCode::TYPE_BOOLEAN_NOT:
                 case OpCode::TYPE_EMPTY:
