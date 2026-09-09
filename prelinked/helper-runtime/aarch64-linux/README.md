@@ -13,7 +13,7 @@ non-native link.
 
 ## Seed corpus (VM_* + lib_VM_* + ext/standard + ctype/calendar/posix/filter/hash/tokenizer/mbstring)
 
-**302** committed `unit.o` files:
+**312** committed `unit.o` files:
 
 - full `VM_*` (13) and `lib_VM_*` (9) sets from `x86_64-linux`
 - first `ext/standard` tier (10): ArrayChunk / ArrayIsList / ArraySlice / Bin2hex /
@@ -100,7 +100,13 @@ non-native link.
 - more mbstring string/width/encoding helpers (10):
   MbStrwidth / MbStrcut / MbStrSplit / MbSubstrCount / MbTrim / MbScrub /
   MbCheckEncoding / MbChrOrd / MbPreferredMimeName / MbEncodingAliases
-  (deferred this tier: MbEreg / MbSplit / MbSearch / MbConvert*)
+  (deferred that tier: MbEreg / MbSplit / MbSearch / MbConvert*)
+- mbstring encoding/config/case helpers (10):
+  MbInternalEncoding / MbLanguage / MbDetectEncoding / MbDetectOrder /
+  MbSubstituteCharacter / MbHttpInput / MbHttpOutput / MbCase /
+  MbConvertCase / MbConvertEncoding
+  (deferred this tier: MbEreg / MbSplit / MbSearch / MbConvertKana /
+  MbConvertVariables / MbNumericEntity / MbOutputHandler / MbRegexEncoding)
 
 Refresh / expand via:
 
