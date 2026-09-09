@@ -564,9 +564,9 @@
             "note": "instanceof / static-call eligibility helpers extracted from VM.php (#36403); php-src ZEND_INSTANCEOF / ZEND_INIT_STATIC_METHOD_CALL / zend_std_get_static_method / zend_inheritance.c"
         },
         "lib/JIT/DiscardedPureCallElision.php": {
-            "budget": 5072,
+            "budget": 4440,
             "target": 3500,
-            "note": "Discarded pure-call elision hub; string ops in DiscardedPureCallElisionStringOps; array key/copy/transform/merge/lookup/construct/combine/range in DiscardedPureCallElisionArrayOps (#36387/#23483); php-src string.c/html.c/array.c"
+            "note": "Discarded pure-call elision hub; string ops in DiscardedPureCallElisionStringOps; array key/copy/transform/merge/lookup/construct/combine/range in DiscardedPureCallElisionArrayOps; date/mktime/strtotime/calendar/jd/easter in DiscardedPureCallElisionDateCalOps (#36387/#23483); php-src string.c/html.c/array.c/date/calendar"
         },
         "lib/JIT/DiscardedPureCallElisionStringOps.php": {
             "budget": 641,
@@ -597,6 +597,11 @@
             "budget": 530,
             "target": 700,
             "note": "array-key-edge / copy / transform / merge / lookup / construct / combine / range discarded elision extracted from DiscardedPureCallElision (#36387); php-src ext/standard/array.c"
+        },
+        "lib/JIT/DiscardedPureCallElisionDateCalOps.php": {
+            "budget": 667,
+            "target": 800,
+            "note": "date/mktime/strtotime/date_parse/sun_info/timezone/calendar↔jd/easter/jdtounix/unixtojd discarded elision extracted from DiscardedPureCallElision (#36387); php-src ext/date/php_date.c + ext/calendar/*"
         }
     },
     "script_file_count": {
