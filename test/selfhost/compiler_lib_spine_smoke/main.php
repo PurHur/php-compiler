@@ -7920,6 +7920,7 @@ require_once __DIR__.'/../../../lib/VM/Concern/YieldAndYieldFromDispatch.php';
 require_once __DIR__.'/../../../lib/VM/Concern/TryCatchThrowDispatch.php';
 require_once __DIR__.'/../../../lib/VM/Concern/CloneDispatch.php';
 require_once __DIR__.'/../../../lib/VM/Concern/FuncDefAndGlobalConstDispatch.php';
+require_once __DIR__.'/../../../lib/VM/Concern/ScriptMagicAndTickDispatch.php';
 require_once __DIR__.'/../../../lib/VM/ObjectPropertyIterator.php';
 require_once __DIR__.'/../../../lib/VM/ObjectReadonlySupport.php';
 require_once __DIR__.'/../../../lib/VM/ObjectRegistry.php';

@@ -8196,6 +8196,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/Concern/ScalarCastCompareArithConcatDispatch.php` | 0 | 3 |
 | `lib/VM/Concern/ScalarCastDispatch.php` | 0 | 2 |
 | `lib/VM/Concern/ScalarCompareDispatch.php` | 0 | 2 |
+| `lib/VM/Concern/ScriptMagicAndTickDispatch.php` | 0 | 2 |
 | `lib/VM/Concern/StaticPropertyFetchDispatch.php` | 0 | 2 |
 | `lib/VM/Concern/TryCatchFinallyAndUncaughtDispatch.php` | 0 | 13 |
 | `lib/VM/Concern/TryCatchThrowDispatch.php` | 0 | 3 |
@@ -62695,20 +62696,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 321)
-- new ObjectEntry (line 445)
-- new Variable (line 454)
-- new Variable (line 483)
-- new VM\GeneratorUncaughtThrow (line 498)
-- new VM\FiberUncaughtThrow (line 512)
-- new VM\DestructorThrowCatchSignal (line 517)
-- new Error (line 1623)
-- new ClassEntry (line 1659)
-- new Variable (line 1660)
-- new VM\ClassProperty (line 1661)
-- new ObjectEntry (line 1664)
-- new Variable (line 1667)
-- new Variable (line 1693)
+- new Variable (line 323)
+- new ObjectEntry (line 447)
+- new Variable (line 456)
+- new Variable (line 485)
+- new VM\GeneratorUncaughtThrow (line 500)
+- new VM\FiberUncaughtThrow (line 514)
+- new VM\DestructorThrowCatchSignal (line 519)
+- new Error (line 1592)
+- new ClassEntry (line 1628)
+- new Variable (line 1629)
+- new VM\ClassProperty (line 1630)
+- new ObjectEntry (line 1633)
+- new Variable (line 1636)
+- new Variable (line 1662)
 - 27 class method(s)
 
 ### `lib/VM/AbstractPropertyHookCheck.php`
@@ -66766,6 +66767,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - trait ScalarCompareDispatch (line 24)
+- 1 class method(s)
+
+### `lib/VM/Concern/ScriptMagicAndTickDispatch.php`
+
+**Warnings** (review for bootstrap subset):
+- trait ScriptMagicAndTickDispatch (line 20)
 - 1 class method(s)
 
 ### `lib/VM/Concern/StaticPropertyFetchDispatch.php`

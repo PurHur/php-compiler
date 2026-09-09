@@ -75,6 +75,7 @@ require_once __DIR__.'/VM/Concern/YieldAndYieldFromDispatch.php';
 require_once __DIR__.'/VM/Concern/TryCatchThrowDispatch.php';
 require_once __DIR__.'/VM/Concern/CloneDispatch.php';
 require_once __DIR__.'/VM/Concern/FuncDefAndGlobalConstDispatch.php';
+require_once __DIR__.'/VM/Concern/ScriptMagicAndTickDispatch.php';
 
 use PHPCompiler\BuiltinByRefParams;
 use PHPCompiler\Compiler\AttributeNames;
@@ -177,6 +178,7 @@ class VM {
     use TryCatchThrowDispatch;
     use CloneDispatch;
     use FuncDefAndGlobalConstDispatch;
+    use ScriptMagicAndTickDispatch;
     const SUCCESS = 1;
     const FAILURE = 2;
 
@@ -1151,33 +1153,13 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_SCRIPT_MAGIC:
-                    $dst = $frame->scope[$op->arg1];
-                    if (OpCode::SCRIPT_MAGIC_HALT_OFFSET === $op->arg3) {
-                        $offset = $this->context->runtime->compiler->getHaltCompilerOffset();
-                        if (null === $offset) {
-                            return $this->raise('Undefined constant "__COMPILER_HALT_OFFSET__"', $frame);
-                        }
-                        $dst->int($offset);
-                        break;
+                    $scriptMagicOutcome = $this->executeScriptMagicAndTickDispatch($frame, $op);
+                    if ($scriptMagicOutcome instanceof Frame) {
+                        $frame = $scriptMagicOutcome;
+                        goto restart;
                     }
-                    if (OpCode::SCRIPT_MAGIC_LINE === $op->arg3) {
-                        $line = null !== $op->arg2 ? (int) $op->arg2 : 0;
-                        if ($line < 1) {
-                            $line = 1;
-                        }
-                        $dst->int($line);
-                        break;
-                    }
-                    $script = '' !== $frame->scriptPath
-                        ? $frame->scriptPath
-                        : $this->context->scriptStack->current();
-                    if ('' === $script) {
-                        return $this->raise('__DIR__/__FILE__ used without script context', $frame);
-                    }
-                    if (OpCode::SCRIPT_MAGIC_DIR === $op->arg3) {
-                        $dst->string(dirname($script));
-                    } else {
-                        $dst->string($script);
+                    if (is_int($scriptMagicOutcome)) {
+                        return $scriptMagicOutcome;
                     }
                     break;
                 case OpCode::TYPE_INCLUDE:
@@ -1256,30 +1238,17 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_TICK_SCOPE_ENTER:
-                    $this->context->tickIntervalStack[] = $this->context->tickInterval;
-                    $this->context->tickInterval = max(0, (int) $op->arg1);
-                    $this->context->tickCounter = $this->context->tickInterval > 0
-                        ? $this->context->tickInterval
-                        : 0;
-                    break;
                 case OpCode::TYPE_TICK_SCOPE_SET:
-                    $this->context->tickInterval = max(0, (int) $op->arg1);
-                    $this->context->tickCounter = $this->context->tickInterval > 0
-                        ? $this->context->tickInterval
-                        : 0;
-                    break;
                 case OpCode::TYPE_TICK_SCOPE_LEAVE:
-                    if ([] !== $this->context->tickIntervalStack) {
-                        $this->context->tickInterval = array_pop($this->context->tickIntervalStack);
-                    } else {
-                        $this->context->tickInterval = 0;
-                    }
-                    $this->context->tickCounter = $this->context->tickInterval > 0
-                        ? $this->context->tickInterval
-                        : 0;
-                    break;
                 case OpCode::TYPE_TICKS:
-                    $this->maybeRunTick();
+                    $tickOutcome = $this->executeScriptMagicAndTickDispatch($frame, $op);
+                    if ($tickOutcome instanceof Frame) {
+                        $frame = $tickOutcome;
+                        goto restart;
+                    }
+                    if (is_int($tickOutcome)) {
+                        return $tickOutcome;
+                    }
                     break;
                 default:
                     throw new \LogicException("VM OpCode Not Implemented: " . opcode_type_name($op->type));
