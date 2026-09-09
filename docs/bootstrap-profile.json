@@ -5558,6 +5558,7 @@
         "lib/AOT/HelperRuntimeCache.php",
         "lib/AOT/HelperRuntimeCommon.php",
         "lib/AOT/HelperRuntimeFingerprint.php",
+        "lib/AOT/HelperRuntimeFingerprintUnit.php",
         "lib/AOT/HelperRuntimeIndex.php",
         "lib/AOT/HelperRuntimeLink.php",
         "lib/AOT/HelperRuntimePaths.php",
@@ -8784,9 +8785,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8550,
+        "inventory_files": 8551,
         "excluded": 0,
-        "eligible": 8550,
+        "eligible": 8551,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
