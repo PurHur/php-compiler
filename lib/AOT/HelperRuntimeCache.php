@@ -10,6 +10,7 @@ require_once __DIR__.'/HelperRuntimePaths.php';
 require_once __DIR__.'/HelperRuntimeFingerprintUnit.php';
 require_once __DIR__.'/HelperRuntimeFingerprint.php';
 require_once __DIR__.'/HelperRuntimeLink.php';
+require_once __DIR__.'/HelperRuntimeBindInlineOnly.php';
 require_once __DIR__.'/HelperRuntimeBind.php';
 require_once __DIR__.'/HelperRuntimeIndex.php';
 require_once __DIR__.'/HelperRuntimeWarm.php';
@@ -49,6 +50,7 @@ require_once __DIR__.'/HelperRuntimeWarm.php';
  * per-unit deps / manifest v2 hashing lives in {@see HelperRuntimeFingerprintUnit};
  * link selection + unit.o safety gates live in {@see HelperRuntimeLink};
  * bitcode bind / type localize / lifecycle live in {@see HelperRuntimeBind};
+ * NestedJIT-force logicals live in {@see HelperRuntimeBindInlineOnly};
  * unit manifest / helperIndex scan lives in {@see HelperRuntimeIndex};
  * user-AOT warm / committed-tier skip lives in {@see HelperRuntimeWarm}
  * (#36387 / #36403 size-budget ratchet).
