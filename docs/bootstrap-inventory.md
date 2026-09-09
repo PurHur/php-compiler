@@ -7320,6 +7320,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/ContextDefineBuiltinFunctionProxiesWeakAndPhpToken.php` | 0 | 14 |
 | `lib/JIT/ContextDefineBuiltins.php` | 0 | 2 |
 | `lib/JIT/ContextEditScaffoldCoreTypeSeed.php` | 0 | 2 |
+| `lib/JIT/ContextEditScaffoldFunctionScopeRebind.php` | 0 | 2 |
 | `lib/JIT/ContextEditScaffoldModuleRebind.php` | 0 | 2 |
 | `lib/JIT/ContextFreeDeadAndConstantFetch.php` | 0 | 2 |
 | `lib/JIT/ContextFunctionProxyAndNestedJitKernel.php` | 0 | 3 |
@@ -59935,16 +59936,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Context.php`
 
 **Warnings** (review for bootstrap subset):
-- new ExtensionLoweringHooks (line 899)
-- new Scope (line 900)
-- new Analyzer (line 929)
-- new Helper (line 930)
-- new Builtin\Refcount (line 931)
-- new Builtin\Output (line 933)
-- new Builtin\Type (line 934)
-- new Builtin\Internal (line 935)
-- new Builtin\VarArg (line 936)
-- new Builtin\ErrorHandler (line 937)
+- new ExtensionLoweringHooks (line 901)
+- new Scope (line 902)
+- new Analyzer (line 931)
+- new Helper (line 932)
+- new Builtin\Refcount (line 933)
+- new Builtin\Output (line 935)
+- new Builtin\Type (line 936)
+- new Builtin\Internal (line 937)
+- new Builtin\VarArg (line 938)
+- new Builtin\ErrorHandler (line 939)
 
 ### `lib/JIT/ContextCastToBool.php`
 
@@ -60373,11 +60374,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - trait ContextEditScaffoldCoreTypeSeed (line 22)
 - 1 class method(s)
 
+### `lib/JIT/ContextEditScaffoldFunctionScopeRebind.php`
+
+**Warnings** (review for bootstrap subset):
+- trait ContextEditScaffoldFunctionScopeRebind (line 22)
+- 1 class method(s)
+
 ### `lib/JIT/ContextEditScaffoldModuleRebind.php`
 
 **Warnings** (review for bootstrap subset):
-- trait ContextEditScaffoldModuleRebind (line 23)
-- 7 class method(s)
+- trait ContextEditScaffoldModuleRebind (line 24)
+- 6 class method(s)
 
 ### `lib/JIT/ContextFreeDeadAndConstantFetch.php`
 
