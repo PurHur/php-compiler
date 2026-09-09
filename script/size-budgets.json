@@ -627,6 +627,16 @@
             "budget": 407,
             "target": 500,
             "note": "function_exists / extension_loaded / defined / method_exists / property_exists / array_key_exists / class_exists family / object introspect / is_a / class_hierarchy / get_object_vars discarded elision extracted from DiscardedPureCallElision (#36387); php-src Zend/zend_builtin_functions.c + ext/standard/{info,basic_functions,array,class,var}.c + ext/spl"
+        },
+        "lib/JIT/NoThrowCallElision.php": {
+            "budget": 2622,
+            "target": 2200,
+            "note": "No-throw call elision hub; runtime-info predicates in NoThrowCallElisionRuntimeInfoPredicates (#36387/#36386)"
+        },
+        "lib/JIT/NoThrowCallElisionRuntimeInfoPredicates.php": {
+            "budget": 647,
+            "target": 800,
+            "note": "runtime-info isPure*/ArgsCannotThrow predicates extracted from NoThrowCallElision (#36387); php-src basic_functions/info/microtime/hrtime/datetime + Zend + ext/date + ext/random"
         }
     },
     "script_file_count": {
