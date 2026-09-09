@@ -644,9 +644,9 @@
             "note": "baseConvert/inet/minMax/checkdate/clamp/intdiv arg guards + scalarCast + count-on-typed-array + pure math/round + effect-free void Native constraints extracted from DiscardedPureCallElision (#36387); php-src ext/standard/math.c + basic_functions.c + Zend/zend_operators.c"
         },
         "lib/JIT/NoThrowCallElision.php": {
-            "budget": 235,
+            "budget": 239,
             "target": 350,
-            "note": "No-throw call elision hub; RuntimeInfo + ExistsConvert + TypeCtypeHtml + StringSlicePadReplace + MathAndFormat + CalleeGraph + PureBuiltinArgOps (#36387/#36403/#36386)"
+            "note": "No-throw call elision hub; RuntimeInfo + ExistsConvert + ConvertAndScalarCast + TypeCtypeHtml + StringSlicePadReplace + MathAndFormat + CalleeGraph + PureBuiltinArgOps (#36387/#36403/#36386)"
         },
         "lib/JIT/NoThrowCallElisionRuntimeInfoPredicates.php": {
             "budget": 648,
@@ -654,9 +654,14 @@
             "note": "runtime-info isPure*/ArgsCannotThrow predicates extracted from NoThrowCallElision (#36387); php-src basic_functions/info/microtime/hrtime/datetime + Zend + ext/date + ext/random"
         },
         "lib/JIT/NoThrowCallElisionExistsConvertAndIntrospectOps.php": {
-            "budget": 773,
-            "target": 900,
-            "note": "exists/convert/introspect/scalar-cast/version_compare no-throw proofs extracted from NoThrowCallElision (#36403); php-src Zend/zend_builtin_functions.c + ext/standard/{info,basic_functions,array,math,url,file,versioning,type}.c + ext/hash + ext/date + ext/spl"
+            "budget": 501,
+            "target": 600,
+            "note": "exists/introspect/version_compare no-throw proofs; convert/scalar-cast ArgsCannotThrow extracted to ConvertAndScalarCastOps (#36387/#36403); php-src Zend/zend_builtin_functions.c + ext/standard/{info,basic_functions,array,versioning}.c + ext/spl"
+        },
+        "lib/JIT/NoThrowCallElisionConvertAndScalarCastOps.php": {
+            "budget": 296,
+            "target": 400,
+            "note": "baseConvert/inet/minMax/checkdate/hashEquals/pathinfo/parseUrl + scalarCast ArgsCannotThrow extracted from ExistsConvertAndIntrospectOps (#36387); php-src ext/standard/{math,type,string,url,file}.c + ext/hash + ext/date"
         },
         "lib/JIT/NoThrowCallElisionMathAndFormatOps.php": {
             "budget": 269,
@@ -690,7 +695,7 @@
         "note": "script/ top-level *.sh/*.php; ASAN/valgrind under script/runtime-assert/; bench nightly under script/bench/ (#36403/#36385/#36397); do not add top-level scripts without removing another"
     },
     "ci_defaults_exports": {
-        "budget": 141,
+        "budget": 142,
         "target": 60
     }
 }

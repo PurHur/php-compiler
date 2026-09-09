@@ -15,7 +15,7 @@ namespace PHPCompiler\JIT;
  * {@code intParamBuiltinArgCannotThrow}, {@code typedArrayArgCannotThrow})
  * live in {@see NoThrowCallElisionPureBuiltinArgOps}. Matching ArgsCannotThrow
  * peers for base/inet/minmax/… live in
- * {@see NoThrowCallElisionExistsConvertAndIntrospectOps}.
+ * {@see NoThrowCallElisionConvertAndScalarCastOps}.
  *
  * Used via {@code use NoThrowCallElisionMathAndFormatOps;} on
  * {@see NoThrowCallElision}.
