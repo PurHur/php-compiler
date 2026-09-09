@@ -76,6 +76,7 @@ require_once __DIR__.'/VM/Concern/TryCatchThrowDispatch.php';
 require_once __DIR__.'/VM/Concern/CloneDispatch.php';
 require_once __DIR__.'/VM/Concern/FuncDefAndGlobalConstDispatch.php';
 require_once __DIR__.'/VM/Concern/ScriptMagicAndTickDispatch.php';
+require_once __DIR__.'/VM/Concern/ReturnDispatch.php';
 
 use PHPCompiler\BuiltinByRefParams;
 use PHPCompiler\Compiler\AttributeNames;
@@ -179,8 +180,11 @@ class VM {
     use CloneDispatch;
     use FuncDefAndGlobalConstDispatch;
     use ScriptMagicAndTickDispatch;
+    use ReturnDispatch;
     const SUCCESS = 1;
     const FAILURE = 2;
+    /** Sentinel from {@see ReturnDispatch}: caller must `goto nextframe`. */
+    const RETURN_NEXTFRAME = 5;
 
     private static ?self $running = null;
 
@@ -549,10 +553,18 @@ restart:
             $isVoid = $this->context->pendingReturnIsVoid;
             $returnValue = $this->context->pendingReturnValue;
             $this->clearPendingReturnState();
-            if ($isVoid) {
-                goto return_void_complete;
+            $pendingReturnOutcome = $isVoid
+                ? $this->completeReturnVoid($frame)
+                : $this->completeReturnValue($frame, $returnValue);
+            if ($pendingReturnOutcome instanceof Frame) {
+                $frame = $pendingReturnOutcome;
+                goto restart;
             }
-            goto return_value_complete;
+            if (self::RETURN_NEXTFRAME === $pendingReturnOutcome) {
+                goto nextframe;
+            }
+
+            return $pendingReturnOutcome;
         }
 
         $this->executingFrame = $frame;
@@ -919,61 +931,17 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_RETURN_VOID:
-                    $frame->returnSiteLine = (int) ($op->arg1 ?? 0);
-                    // Explicit `return;` in a distinct finally body overrides pending try return
-                    // and suppresses a pending exception (#25239). Fused empty-finally epilogues
-                    // share the merge block and must keep exception unwind (#24728).
-                    if ($this->frameIsInDistinctFinallyBody($frame) && null !== $op->arg1) {
-                        if ($this->applyReturnInsideFinally($frame, null, true)) {
-                            goto restart;
-                        }
-                        goto return_void_complete;
-                    }
-                    $finallyFrame = $this->beginReturnFinallyUnwind($frame, null, true);
-                    if (null !== $finallyFrame) {
-                        $frame = $finallyFrame;
-                        goto restart;
-                    }
-                    // Empty finally may fuse with merge and end in RETURN_VOID instead of JUMP (#15738).
-                    if ($this->completeActiveFinallyUnwind($frame)) {
-                        goto restart;
-                    }
-                    goto return_void_complete;
                 case OpCode::TYPE_RETURN:
-                    $frame->returnSiteLine = (int) ($op->arg2 ?? 0);
-                    if (null !== $op->arg1 && isset($frame->scope[$op->arg1])) {
-                        $catchFrame = $this->guardUnboundThisRead($frame, (int) $op->arg1);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                    }
-                    $returnValue = $this->resolveVmReturnValue($frame, $op);
-                    // Explicit return inside a real finally body (finally block != merge) overrides
-                    // pending try return / pending exception (#25239). Fused empty finally shares
-                    // the merge block and must keep exception unwind (#24728).
-                    if ($this->frameIsInDistinctFinallyBody($frame)) {
-                        if ($this->applyReturnInsideFinally($frame, $returnValue, false)) {
-                            goto restart;
-                        }
-                        goto return_value_complete;
-                    }
-                    // Empty finally may fuse with merge and end in TYPE_RETURN instead of JUMP (#24728).
-                    // Check exception-unwind completion BEFORE beginReturnFinallyUnwind so the
-                    // pending exception propagates to the outer catch instead of being swallowed
-                    // by a spurious return-finally chain.
-                    if (null !== $this->context->pendingException && $this->completeActiveFinallyUnwind($frame)) {
+                    $returnDispatchOutcome = $this->executeReturnDispatch($frame, $op);
+                    if ($returnDispatchOutcome instanceof Frame) {
+                        $frame = $returnDispatchOutcome;
                         goto restart;
                     }
-                    $finallyFrame = $this->beginReturnFinallyUnwind($frame, $returnValue, false);
-                    if (null !== $finallyFrame) {
-                        $frame = $finallyFrame;
-                        goto restart;
+                    if (self::RETURN_NEXTFRAME === $returnDispatchOutcome) {
+                        goto nextframe;
                     }
-                    if ($this->completeActiveFinallyUnwind($frame)) {
-                        goto restart;
-                    }
-                    goto return_value_complete;
+
+                    return $returnDispatchOutcome;
                 case OpCode::TYPE_FUNCDEF:
                     $funcDefOutcome = $this->executeFuncDefAndGlobalConstDispatch($frame, $op);
                     if ($funcDefOutcome instanceof Frame) {
@@ -1346,123 +1314,6 @@ restart:
 
                 return self::FAIL;
             }
-        }
-
-        return self::SUCCESS;
-
-        return_void_complete:
-        if ($frame->ephemeral) {
-            $this->context->scriptStack->pop();
-        }
-        try {
-            $this->enforceReturnType($frame, null);
-        } catch (\TypeError $e) {
-            $catchFrame = $this->dispatchVmTypeError($e, $frame);
-            if (null !== $catchFrame) {
-                $frame = $catchFrame;
-                goto restart;
-            }
-            return self::FAIL;
-        } catch (\Error $e) {
-            $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
-            if (null !== $catchFrame) {
-                $frame = $catchFrame;
-                goto restart;
-            }
-            return self::FAIL;
-        }
-        // Do not null returnVar: it may alias the caller result slot (#1885).
-        $this->markObjectConstructedIfLeavingConstruct($frame);
-        $gen = $this->findGeneratorState($frame);
-        if (null !== $gen) {
-            $gen->markReturned(null);
-            $this->releaseFrameObjectRefs($frame);
-            goto nextframe;
-        }
-        if ($frame->ephemeral && null !== $frame->parent) {
-            $frame = $this->resumeEphemeralCallerFrame($frame);
-            goto restart;
-        }
-        // Match return_value_complete: clear caller callSiteLine so later opcodes
-        // (readonly property writes, etc.) do not cite the prior call (#25556, #21953).
-        $callee = $frame;
-        $caller = $this->context->pop();
-        $this->releaseFrameObjectRefs($callee);
-        if (null !== $caller) {
-            $this->clearOutgoingCallState($caller);
-            $this->restorePendingOutboundCallAfterInlineNew($caller);
-            $frame = $caller;
-            goto restart;
-        }
-
-        return self::SUCCESS;
-
-        return_value_complete:
-        if ($frame->ephemeral) {
-            $this->context->scriptStack->pop();
-        }
-        try {
-            $this->enforceReturnType($frame, $returnValue);
-        } catch (\TypeError $e) {
-            $catchFrame = $this->dispatchVmTypeError($e, $frame);
-            if (null !== $catchFrame) {
-                $frame = $catchFrame;
-                goto restart;
-            }
-            return self::FAIL;
-        }
-        $gen = $this->findGeneratorState($frame);
-        if (null !== $gen) {
-            $gen->markReturned($returnValue);
-            $this->markObjectConstructedIfLeavingConstruct($frame);
-            goto nextframe;
-        }
-        if (!is_null($frame->returnVar)) {
-            if ($this->functionReturnsByRef($frame)) {
-                $frame->returnVar->indirect($returnValue);
-            } else {
-                $frame->returnVar->copyFrom($returnValue);
-            }
-        }
-        $this->markObjectConstructedIfLeavingConstruct($frame);
-        $callee = $frame;
-        $caller = $this->context->pop();
-        $this->releaseFrameObjectRefs($callee);
-        if (null !== $caller) {
-            $this->clearOutgoingCallState($caller);
-            $frame = $caller;
-            goto restart;
-        }
-        // Nested return <call>(): callee may finish with an empty run stack (#1885).
-        if (null !== $frame->parent && null !== $frame->returnVar) {
-            if ($this->isFunctionStaticInitContinueReturn($frame)) {
-                $entry = $frame->parent;
-                if (null !== $entry->returnVar) {
-                    $entry->returnVar->copyFrom($returnValue);
-                }
-                $this->releaseFrameObjectRefs($frame);
-                $caller = $this->context->pop();
-                if (null !== $caller) {
-                    $this->clearOutgoingCallState($caller);
-                    $frame = $caller;
-                    goto restart;
-                }
-
-                return self::SUCCESS;
-            }
-            // Property hooks run via swapRunStack(null); parent is only for static-init
-            // continue detection — must not resume the caller frame here (#7097, #7108).
-            if (null !== $frame->propertyHookRawProperty) {
-                return self::SUCCESS;
-            }
-            $child = $frame;
-            $frame = $frame->parent;
-            $this->releaseFrameObjectRefs($child);
-            goto restart;
-        }
-        if ($frame->ephemeral && null !== $frame->parent) {
-            $frame = $this->resumeEphemeralCallerFrame($frame);
-            goto restart;
         }
 
         return self::SUCCESS;
