@@ -18,6 +18,7 @@ declare(strict_types=1);
  *   PHP_8_2=$(command -v php) php script/bench-gate.php --v2 --update
  *   PHP_8_2=$(command -v php) php script/bench-gate.php --compile
  *   PHP_8_2=$(command -v php) php script/bench-gate.php --compile --update
+ *   php script/bench-gate.php --self-test-v2-2x   # #36385 Done-when: 2× must fail
  */
 
 const COMPILE_BASELINE_REL = 'benchmarks/COMPILE_BASELINE.json';
@@ -70,6 +71,14 @@ $argvList = $argv ?? [];
 $update = in_array('--update', $argvList, true);
 $compileMode = in_array('--compile', $argvList, true);
 $v2Mode = in_array('--v2', $argvList, true);
+$selfTestV2Twice = in_array('--self-test-v2-2x', $argvList, true);
+
+if ($selfTestV2Twice) {
+    // Done-when (#36385): deliberate ~2× AOT slowdown must turn the v2 gate red.
+    // No Zend/LLVM required — compares fabricated measurements to the committed baseline.
+    runV2Deliberate2xSelfTest($root);
+    exit(0);
+}
 
 if ($compileMode) {
     runCompileGate($root, $root.'/'.COMPILE_BASELINE_REL, $update);
@@ -411,6 +420,91 @@ function compareToBaseline(array $baseline, array $measured): array
     }
 
     return $errors;
+}
+
+/**
+ * Prove the v2 ratio band rejects a deliberate ~2× AOT slowdown (#36385 Done-when).
+ *
+ * Tiny micros can stay under {@see MIN_ABSOLUTE_AOT_REGRESSION_SECONDS} even at 2×,
+ * so the self-test also injects a synthetic case with a 1s baseline wall. Exit 0 only
+ * when compareToBaseline reports at least one ratio regression.
+ */
+function runV2Deliberate2xSelfTest(string $root): void
+{
+    $baselinePath = $root.'/'.V2_BASELINE_REL;
+    if (!is_readable($baselinePath)) {
+        fwrite(STDERR, "bench-gate --self-test-v2-2x: missing {$baselinePath}\n");
+        exit(1);
+    }
+    $baseline = json_decode((string) file_get_contents($baselinePath), true);
+    if (!is_array($baseline) || !isset($baseline['cases']) || !is_array($baseline['cases'])) {
+        fwrite(STDERR, "bench-gate --self-test-v2-2x: invalid baseline JSON\n");
+        exit(1);
+    }
+
+    $baseline['ratio_tolerance_percent'] = V2_RATIO_TOLERANCE_PERCENT;
+    $measured = [];
+    $eligible = 0;
+    foreach ($baseline['cases'] as $name => $base) {
+        if (!is_array($base)) {
+            continue;
+        }
+        $baseRatio = (float) ($base['ratio_aot_over_zend'] ?? 0.0);
+        $baseAot = (float) ($base['aot_wall'] ?? 0.0);
+        $baseIr = (int) ($base['ir_lines'] ?? 0);
+        if ($baseRatio <= 0.0 || $baseAot <= 0.0) {
+            continue;
+        }
+        $curAot = $baseAot * 2.0;
+        if (($curAot - $baseAot) > MIN_ABSOLUTE_AOT_REGRESSION_SECONDS) {
+            ++$eligible;
+        }
+        $measured[$name] = [
+            'ratio' => $baseRatio * 2.0,
+            'zend_wall' => (float) ($base['zend_wall'] ?? 0.0),
+            'aot_wall' => $curAot,
+            'ir_lines' => $baseIr,
+            'ir_defines' => (int) ($base['ir_defines'] ?? 0),
+            'output_ok' => true,
+        ];
+    }
+
+    // Guaranteed trip even when every committed micro is under the absolute floor.
+    $baseline['cases']['__self_test_2x_probe__'] = [
+        'ratio_aot_over_zend' => 1.0,
+        'zend_wall' => 1.0,
+        'aot_wall' => 1.0,
+        'ir_lines' => 1000,
+        'ir_defines' => 1,
+    ];
+    $measured['__self_test_2x_probe__'] = [
+        'ratio' => 2.0,
+        'zend_wall' => 1.0,
+        'aot_wall' => 2.0,
+        'ir_lines' => 1000,
+        'ir_defines' => 1,
+        'output_ok' => true,
+    ];
+
+    $errors = compareToBaseline($baseline, $measured);
+    $ratioErrors = array_values(array_filter(
+        $errors,
+        static fn (string $e): bool => str_contains($e, '.ratio:')
+    ));
+
+    if ([] === $ratioErrors) {
+        fwrite(STDERR, "bench-gate --self-test-v2-2x: FAIL — 2× slowdown produced no ratio regressions\n");
+        fwrite(STDERR, "  (eligible committed cases with |Δaot| > "
+            .MIN_ABSOLUTE_AOT_REGRESSION_SECONDS."s: {$eligible})\n");
+        exit(1);
+    }
+
+    echo "bench-gate --self-test-v2-2x: OK — deliberate 2× trips "
+        .count($ratioErrors)." ratio regression(s) "
+        ."(v2 tol +".V2_RATIO_TOLERANCE_PERCENT."%; eligible micros {$eligible})\n";
+    foreach (array_slice($ratioErrors, 0, 5) as $err) {
+        echo "  {$err}\n";
+    }
 }
 
 function runCompileGate(string $root, string $baselinePath, bool $update): void
