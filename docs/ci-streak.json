@@ -1,7 +1,7 @@
 {
     "issue": 36401,
     "ci_green_streak_days": 6,
-    "last_green_master_sha": "6388d2568b8d47d0468d669fb0ca2c3b2a4e2568",
+    "last_green_master_sha": "91c2766b17a7aa3143312c9dedf17b8d41d7fdeb",
     "last_green_day": "2026-09-09",
     "gates": [
         "apply-patches",
@@ -9,5 +9,5 @@
         "aot-smoke",
         "north-star5-verify-fast"
     ],
-    "notes": "Local Docker gates; GHA billing-disabled — not a remote check streak (#36401). Verified apply-patches --verify-pristine (php-llvm 27/27), inventory 8571/8571, aot-smoke 9/9, north-star5-verify-fast OK (spine 8571/8571) on tip after #37581. user_release_ready=yes on tip bb7abf6d9d; #36143 remains closed/green. BOOTSTRAP_M4_REQUIRE_NATIVE_EMIT=1 refused sidecar COPY at M4 gen-1 (#36146 honesty)."
+    "notes": "Local Docker gates; GHA billing-disabled \u2014 not a remote check streak (#36401). Verified apply-patches --verify-pristine (php-llvm 27/27 incl. structgep), inventory/spine 8573/8573, aot-smoke 9/9, north-star5-verify-fast OK (spine 8573/8573) on tip 91c2766b17 after #37588. #36143 remains closed/green. Streak records last fully verified SHA; master tip may be ahead."
 }
