@@ -637,6 +637,16 @@
             "budget": 677,
             "target": 800,
             "note": "baseConvert/inet/minMax/checkdate/clamp/intdiv arg guards + scalarCast + count-on-typed-array + pure math/round + effect-free void Native constraints extracted from DiscardedPureCallElision (#36387); php-src ext/standard/math.c + basic_functions.c + Zend/zend_operators.c"
+        },
+        "lib/JIT/NoThrowCallElision.php": {
+            "budget": 2622,
+            "target": 2200,
+            "note": "No-throw call elision hub; runtime-info predicates in NoThrowCallElisionRuntimeInfoPredicates (#36387/#36386)"
+        },
+        "lib/JIT/NoThrowCallElisionRuntimeInfoPredicates.php": {
+            "budget": 647,
+            "target": 800,
+            "note": "runtime-info isPure*/ArgsCannotThrow predicates extracted from NoThrowCallElision (#36387); php-src basic_functions/info/microtime/hrtime/datetime + Zend + ext/date + ext/random"
         }
     },
     "script_file_count": {
