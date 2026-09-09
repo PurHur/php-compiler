@@ -3097,6 +3097,7 @@ require_once __DIR__.'/../../../ext/standard/JitPhpinfoFlags.php';
 require_once __DIR__.'/../../../ext/standard/JitPopen.php';
 require_once __DIR__.'/../../../ext/standard/JitPow.php';
 require_once __DIR__.'/../../../ext/standard/JitPowIntegerEmit.php';
+require_once __DIR__.'/../../../ext/standard/JitPowIntegerEmitHigh.php';
 require_once __DIR__.'/../../../ext/standard/JitPregFilter.php';
 require_once __DIR__.'/../../../ext/standard/JitPregGrep.php';
 require_once __DIR__.'/../../../ext/standard/JitPregLastError.php';
