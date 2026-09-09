@@ -77,6 +77,7 @@ require_once __DIR__.'/VM/Concern/CloneDispatch.php';
 require_once __DIR__.'/VM/Concern/FuncDefAndGlobalConstDispatch.php';
 require_once __DIR__.'/VM/Concern/ScriptMagicAndTickDispatch.php';
 require_once __DIR__.'/VM/Concern/ReturnDispatch.php';
+require_once __DIR__.'/VM/Concern/ClassInstanceAndStaticCallSupport.php';
 
 use PHPCompiler\BuiltinByRefParams;
 use PHPCompiler\Compiler\AttributeNames;
@@ -88,7 +89,6 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\VM\ForeachIterator;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\CastSupport;
-use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\DnfCheck;
 use PHPCompiler\VM\CallableCheck;
 use PHPCompiler\VM\CycleCollector;
@@ -181,6 +181,7 @@ class VM {
     use FuncDefAndGlobalConstDispatch;
     use ScriptMagicAndTickDispatch;
     use ReturnDispatch;
+    use ClassInstanceAndStaticCallSupport;
     const SUCCESS = 1;
     const FAILURE = 2;
     /** Sentinel from {@see ReturnDispatch}: caller must `goto nextframe`. */
@@ -1355,96 +1356,6 @@ restart:
         return VM\VmTryCatch::encodedTypesMatchOpcode($op, $thrown, $this->context);
     }
 
-    private function valueInstanceOfClassName(Variable $value, string $className): bool
-    {
-        $resolved = $value->resolveIndirect();
-        $enumMatch = VM\EnumCaseSupport::valueMatchesInstanceOfClassName(
-            $value,
-            $className,
-            $this->context
-        );
-        if (null !== $enumMatch) {
-            return $enumMatch;
-        }
-        if (Variable::TYPE_OBJECT !== $resolved->type) {
-            return false;
-        }
-        $className = strtolower(ltrim($className, '\\'));
-        $entry = $resolved->toObject()->class;
-        $target = $this->context->classes[$className] ?? null;
-        if (null !== $target && $target->isInterface) {
-            return VM\InterfaceCheck::entryImplements($entry, $className, $this->context);
-        }
-
-        return VM\InterfaceCheck::entryIsInstanceOf($entry, $className, $this->context);
-    }
-
-    private function isDirectParentScopeInstanceCall(Frame $frame, string $resolvedLcClass): bool
-    {
-        if (null === $this->resolveCallerThis($frame)) {
-            return false;
-        }
-        $callerClassLc = $this->callerClassLc($frame);
-        if (null === $callerClassLc || !isset($this->context->classes[$callerClassLc])) {
-            return false;
-        }
-        $directParentLc = $this->context->classes[$callerClassLc]->parentLc;
-
-        return null !== $directParentLc && $directParentLc === strtolower($resolvedLcClass);
-    }
-
-    /**
-     * Zend zend_vm_def.h ZEND_INIT_STATIC_METHOD_CALL: bind non-static methods when
-     * EX(This) is set and instanceof the called class CE (#28050).
-     */
-    private function instanceThisAllowsNonStaticCall(Frame $frame, string $calledClassLc): bool
-    {
-        $thisVar = $this->resolveCallerThis($frame);
-        if (null === $thisVar || Variable::TYPE_OBJECT !== $thisVar->type) {
-            return false;
-        }
-        $objectClassLc = strtolower($thisVar->toObject()->class->name);
-
-        return $this->isClassSameOrSubclassOf($objectClassLc, strtolower($calledClassLc));
-    }
-
-    /**
-     * Zend zend_std_get_static_method: instance methods are not callable via Class::name() (#5339).
-     */
-    private function assertMethodCallableStatically(ClassEntry $declaringClass, string $methodLc): void
-    {
-        if ($declaringClass->isEnum && 'cases' === $methodLc) {
-            VM\EnumSupport::ensureBuiltinCasesMethod($declaringClass);
-
-            return;
-        }
-        if ($declaringClass->usesLazyGhostTrait && 'createlazyghost' === $methodLc) {
-            VM\LazyGhostTraitSupport::ensureBuiltinLazyGhostMethods($declaringClass);
-
-            return;
-        }
-        $vis = $declaringClass->methodVisibility[$methodLc] ?? 0;
-        if (($vis & \PHPCfg\Func::FLAG_STATIC) !== 0) {
-            return;
-        }
-        $func = $declaringClass->methods[$methodLc];
-        if ($this->methodIsStatic($func)) {
-            return;
-        }
-        $declaringName = $declaringClass->name;
-        $declaredName = $declaringClass->methodNames[$methodLc] ?? $methodLc;
-        if ($func instanceof Func\PHP && null !== $func->block->func && null !== $func->block->func->class) {
-            $declaringName = $func->block->func->class->value;
-            $declLc = strtolower($declaringName);
-            if (isset($this->context->classes[$declLc]->methodNames[$methodLc])) {
-                $declaredName = $this->context->classes[$declLc]->methodNames[$methodLc];
-            }
-        }
-        throw new \Error(
-            'Non-static method '.$declaringName.'::'.$declaredName.'() cannot be called statically'
-        );
-    }
-
     /**
      * unset($GLOBALS['name']) on the script $GLOBALS operand (#5868).
      */
@@ -1469,42 +1380,6 @@ restart:
     private function dispatchUnsetDimNonContainerError(Frame $frame, string $message): ?Frame
     {
         return $this->dispatchVmError($message, $frame);
-    }
-
-
-    private function logicExceptionVariable(string $message): Variable
-    {
-        $lc = 'logicexception';
-        if (!isset($this->context->classes[$lc])) {
-            $entry = new ClassEntry('LogicException');
-            $msgProto = new Variable(Variable::TYPE_STRING);
-            $entry->properties[] = new VM\ClassProperty('message', null, $msgProto);
-            $this->context->classes[$lc] = $entry;
-        }
-        $obj = new ObjectEntry($this->context->classes[$lc]);
-        $obj->constructed = true;
-        $obj->getProperty('message')->string($message);
-        $var = new Variable(Variable::TYPE_OBJECT);
-        $var->object($obj);
-
-        return $var;
-    }
-
-    private function isSubclassOf(string $childLc, string $parentLc): bool
-    {
-        $current = $childLc;
-        while (isset($this->context->classes[$current])) {
-            $parent = $this->context->classes[$current]->parentLc;
-            if (null === $parent) {
-                return false;
-            }
-            if ($parent === $parentLc) {
-                return true;
-            }
-            $current = $parent;
-        }
-
-        return false;
     }
 
     protected function scopeSlot(Frame $frame, int $slot): Variable
