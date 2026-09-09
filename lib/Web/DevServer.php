@@ -702,6 +702,12 @@ final class DevServer
     /**
      * Parse CGI-style stdout (Status/headers + body) from an AOT binary.
      *
+     * php-src CGI always emits at least a Content-Type header before the blank
+     * line (sapi/cgi/cgi_main.c). AOT binaries that only `echo` HTML without
+     * calling `header()` print body-only stdout — treat that as the body so
+     * `phpc serve --aot` does not advertise Content-Length: 0 while stuffing
+     * HTML into response headers (#36385 web-request AOT column).
+     *
      * @return array{0: int, 1: string, 2: string, 3: list<string>}
      */
     public static function parseCgiOutput(string $raw): array
@@ -712,8 +718,15 @@ final class DevServer
 
         // AOT binaries may emit a single CRLF after headers (no blank line).
         if ('' === $body && preg_match('/\A(.+?\r\n)(.+)\z/s', $raw, $m)) {
-            $headerBlock = rtrim($m[1], "\r\n");
-            $body = $m[2];
+            $maybeHeader = rtrim($m[1], "\r\n");
+            if (self::looksLikeCgiHeaderLine($maybeHeader)) {
+                $headerBlock = $maybeHeader;
+                $body = $m[2];
+            }
+        }
+
+        if (!self::cgiHeaderBlockLooksValid($headerBlock)) {
+            return [200, 'text/html; charset=UTF-8', $raw, []];
         }
 
         $status = 200;
@@ -737,5 +750,27 @@ final class DevServer
         }
 
         return [$status, $contentType, $body, $extraHeaders];
+    }
+
+    /**
+     * First non-empty line of a CGI header block must look like `Name: value`
+     * (or `Status:`). HTML / JSON body-only stdout fails this check.
+     */
+    public static function cgiHeaderBlockLooksValid(string $headerBlock): bool
+    {
+        foreach (preg_split("/\r\n|\n/", $headerBlock) as $line) {
+            if ('' === $line) {
+                continue;
+            }
+
+            return self::looksLikeCgiHeaderLine($line);
+        }
+
+        return false;
+    }
+
+    public static function looksLikeCgiHeaderLine(string $line): bool
+    {
+        return 1 === preg_match('/^(Status\s*:|[A-Za-z][A-Za-z0-9-]*\s*:)/', $line);
     }
 }

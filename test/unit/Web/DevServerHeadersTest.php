@@ -213,6 +213,29 @@ final class DevServerHeadersTest extends TestCase
         $this->assertSame([], $extraHeaders);
     }
 
+    public function testParseCgiOutputBodyOnlyHtmlWithoutHeaders(): void
+    {
+        // MiniWebApp home template never calls header(); AOT echo is body-only (#36385).
+        $raw = "<!DOCTYPE html>\n<html>\n<head>\n<title>Home — MiniWebApp</title>\n</head>\n\n<body>\n<h1>MiniWebApp</h1>\n</body>\n</html>\n";
+        [$status, $contentType, $body, $extraHeaders] = DevServer::parseCgiOutput($raw);
+
+        $this->assertSame(200, $status);
+        $this->assertSame('text/html; charset=UTF-8', $contentType);
+        $this->assertSame($raw, $body);
+        $this->assertStringContainsString('MiniWebApp', $body);
+        $this->assertSame([], $extraHeaders);
+    }
+
+    public function testParseCgiOutputBodyOnlyJsonWithoutHeaders(): void
+    {
+        $raw = '{"ok":true,"app":"MiniWebApp"}';
+        [$status, $contentType, $body, $extraHeaders] = DevServer::parseCgiOutput($raw);
+
+        $this->assertSame(200, $status);
+        $this->assertSame($raw, $body);
+        $this->assertSame([], $extraHeaders);
+    }
+
     public function testMaxRequestBodyHonorsEnvOverride(): void
     {
         $previous = getenv('PHP_COMPILER_MAX_BODY');

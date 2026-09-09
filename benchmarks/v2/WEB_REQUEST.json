@@ -1,7 +1,7 @@
 {
     "name": "web-request",
     "suite": "v2",
-    "generated_at": "2026-09-09T17:48:23Z",
+    "generated_at": "2026-09-09T18:09:13Z",
     "requests": 200,
     "routes": [
         {
@@ -13,24 +13,23 @@
             "needle": "\"ok\":true"
         }
     ],
-    "zend_builtin_s": 1.2860591411590576,
-    "phpc_serve_s": 76.8163628578186,
-    "phpc_serve_aot_s": null,
+    "zend_builtin_s": 2.678457021713257,
+    "phpc_serve_s": 57.35966897010803,
+    "phpc_serve_aot_s": 5.750227928161621,
     "php_fpm_s": null,
     "req_per_s": {
-        "zend_builtin": 311.02768698452,
-        "phpc_serve": 5.207223892393478,
-        "phpc_serve_aot": null,
+        "zend_builtin": 149.33971191523645,
+        "phpc_serve": 6.973540942303082,
+        "phpc_serve_aot": 69.562459957632,
         "php_fpm": null
     },
     "p99_ms": {
-        "zend_builtin": 5.486965179443359,
-        "phpc_serve": 1830.543041229248,
-        "phpc_serve_aot": null,
+        "zend_builtin": 39.94488716125488,
+        "phpc_serve": 1264.3530368804932,
+        "phpc_serve_aot": 81.5129280090332,
         "php_fpm": null
     },
     "notes": [
-        "phpc_serve_aot warmup failed status=200 path=/index.php",
         "php_fpm n/a: no php-fpm binary on PATH in this environment"
     ]
 }
