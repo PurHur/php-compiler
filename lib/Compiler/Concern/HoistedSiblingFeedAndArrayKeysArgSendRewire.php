@@ -296,8 +296,10 @@ trait HoistedSiblingFeedAndArrayKeysArgSendRewire
                 $gap instanceof Op\Expr\ArrayDimFetch
                 || $gap instanceof Op\Expr\ConstFetch
                 || $gap instanceof Op\Expr\ClassConstFetch
+                || $gap instanceof Op\Expr\BinaryOp
                 || $this->isUnaryInlineSiblingCallArgExpr($gap)
             ) {
+                // BinaryOp: new C(f(), $n+1) — Plus/Minus is a sibling arg prelude (#36385).
                 ++$consumerIndex;
                 continue;
             }
@@ -317,6 +319,18 @@ trait HoistedSiblingFeedAndArrayKeysArgSendRewire
                 || (
                     $consumerIndex > $producerIndex + 1
                     && $this->nestedFuncCallProducerSeparatedByDimFetchPreludesOnly(
+                        $producerIndex,
+                        $consumerIndex,
+                        $cfgChildren
+                    )
+                    && property_exists($consumer, 'args')
+                    && \is_array($consumer->args)
+                    && \count($consumer->args) >= 2
+                    && $this->deadInlineTemporaryArgCount($consumer) >= 1
+                )
+                || (
+                    $consumerIndex > $producerIndex + 1
+                    && $this->nestedFuncCallProducerSeparatedBySkippablePreludesOnly(
                         $producerIndex,
                         $consumerIndex,
                         $cfgChildren

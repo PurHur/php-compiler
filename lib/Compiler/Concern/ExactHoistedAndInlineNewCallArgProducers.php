@@ -32,13 +32,22 @@ trait ExactHoistedAndInlineNewCallArgProducers
             || $op instanceof Op\Expr\New_;
     }
 
-    /** php-cfg f(g(), h()) sibling producers feeding a multi-arg call (#9463, #14828). */
+    /**
+     * php-cfg f(g(), h()) sibling producers feeding a multi-arg call (#9463, #14828).
+     *
+     * Include {@see Op\Expr\New_}: `new C(f(), g())` / binary-trees
+     * `new TreeNode(bottomUpTree($d-1), bottomUpTree($d-1))` hoist FuncCall producers with
+     * dead arg temps the same way multi-arg FuncCall does. Without New_ here those producers
+     * become FUNCCALL_EXEC_NORETURN and ARG_SEND rematerializes the wrong callee (#36385).
+     * php-src: Zend/zend_compile.c zend_compile_new / zend_compile_func_call (ZEND_SEND_*).
+     */
     private function isSiblingMultiArgInlineCallConsumer(Op $consumer): bool
     {
         return $consumer instanceof Op\Expr\FuncCall
             || $consumer instanceof Op\Expr\NsFuncCall
             || $consumer instanceof Op\Expr\MethodCall
-            || $consumer instanceof Op\Expr\StaticCall;
+            || $consumer instanceof Op\Expr\StaticCall
+            || $consumer instanceof Op\Expr\New_;
     }
 
     /**
@@ -84,9 +93,13 @@ trait ExactHoistedAndInlineNewCallArgProducers
                 }
                 continue;
             } elseif ($this->isUnaryInlineSiblingCallArgExpr($child)) {
-                if (null !== $first) {
-                    break;
-                }
+                // new C(f(), -$n) — unary is a sibling arg prelude, not a chain barrier (#36385).
+                continue;
+            } elseif ($child instanceof Op\Expr\BinaryOp) {
+                // new C(f($n), g($n+1)) — Plus/Minus between producers (#36385 / #36353).
+                continue;
+            } elseif ($child instanceof Op\Expr\ArrayDimFetch) {
+                // new C(id($t), $t[0]) — dim sibling prelude (#36380).
                 continue;
             } elseif (null !== $first) {
                 break;
