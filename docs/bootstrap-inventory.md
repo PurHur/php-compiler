@@ -68918,7 +68918,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Web/DevServer.php`
 
 **Warnings** (review for bootstrap subset):
-- 24 class method(s)
+- 26 class method(s)
 
 ### `lib/Web/FastCgi/Environment.php`
 
