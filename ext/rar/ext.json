@@ -15,5 +15,9 @@
     },
     "policy_env": [
         "PHP_COMPILER_ENABLE_RAR"
-    ]
+    ],
+    "advertise": {
+        "compiler_version": "supportsRar",
+        "or_env": "PHP_COMPILER_ENABLE_RAR"
+    }
 }

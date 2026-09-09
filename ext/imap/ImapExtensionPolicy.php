@@ -4,26 +4,19 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\imap;
 
-use PHPCompiler\CompilerVersion;
+use PHPCompiler\ExtensionRegistry;
 
 /**
  * ext/imap surface advertisement — php-src ext/imap (#3663).
  *
- * Pure-PHP mbox engine stays in-tree but is withheld from
- * extension_loaded()/function_exists on the reference profile (Zend 8.2
- * harness typically lacks libc-client / php-imap). Enable via
- * {@see CompilerVersion::supportsImap()} (PROFILE≥8.4) or
- * {@code PHP_COMPILER_ENABLE_IMAP=1}.
+ * {@see advertisesExtension()} is folded to ext.json advertise → ExtensionRegistry (#36204).
+ * Compliance helpers for phantom / gated cases stay here.
  */
 final class ImapExtensionPolicy
 {
     public static function advertisesExtension(): bool
     {
-        if (CompilerVersion::supportsImap()) {
-            return true;
-        }
-
-        return self::explicitEnableRequested();
+        return ExtensionRegistry::advertisesExtensionFor('imap');
     }
 
     public static function advertisesBuiltins(): bool
@@ -51,16 +44,5 @@ final class ImapExtensionPolicy
 
         // Functional imap_* cases set PHP_COMPILER_ENABLE_IMAP / PROFILE via --ENV--.
         return true;
-    }
-
-    private static function explicitEnableRequested(): bool
-    {
-        $raw = getenv('PHP_COMPILER_ENABLE_IMAP');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-        $v = strtolower(trim($raw));
-
-        return !\in_array($v, ['0', 'false', 'off', 'no'], true);
     }
 }
