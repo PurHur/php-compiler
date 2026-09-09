@@ -15,5 +15,10 @@
     },
     "policy_env": [
         "PHP_COMPILER_ENABLE_REDIS"
-    ]
+    ],
+    "advertise": {
+        "compiler_version": "supportsRedis",
+        "or_host_extension": "redis",
+        "or_env": "PHP_COMPILER_ENABLE_REDIS"
+    }
 }

@@ -13,5 +13,6 @@
         "functions": [],
         "classes": []
     },
-    "policy_env": []
+    "policy_env": [],
+    "advertise": "always"
 }

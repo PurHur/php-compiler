@@ -42,7 +42,12 @@ foreach ($argv as $arg) {
 }
 
 /**
- * @return array{order: list<string>, deps: array<string, list<string>>, default_enabled: array<string, bool>}
+ * @return array{
+ *   order: list<string>,
+ *   deps: array<string, list<string>>,
+ *   default_enabled: array<string, bool>,
+ *   advertise: array<string, mixed>
+ * }
  */
 $loadManifests = static function () use ($root): array {
     $rows = [];
@@ -58,10 +63,11 @@ $loadManifests = static function () use ($root): array {
             'load_order' => isset($data['load_order']) ? (int) $data['load_order'] : PHP_INT_MAX,
             'depends' => array_values(array_map('strtolower', array_map('strval', $data['depends'] ?? []))),
             'default_enabled' => !array_key_exists('default_enabled', $data) || (bool) $data['default_enabled'],
+            'advertise' => $data['advertise'] ?? null,
         ];
     }
     if ([] === $rows) {
-        return ['order' => [], 'deps' => [], 'default_enabled' => []];
+        return ['order' => [], 'deps' => [], 'default_enabled' => [], 'advertise' => []];
     }
     usort($rows, static function (array $a, array $b): int {
         if ($a['load_order'] === $b['load_order']) {
@@ -73,13 +79,22 @@ $loadManifests = static function () use ($root): array {
     $order = [];
     $deps = [];
     $defaultEnabled = [];
+    $advertise = [];
     foreach ($rows as $row) {
         $order[] = $row['name'];
         $deps[$row['name']] = $row['depends'];
         $defaultEnabled[$row['name']] = $row['default_enabled'];
+        if (null !== $row['advertise']) {
+            $advertise[$row['name']] = $row['advertise'];
+        }
     }
 
-    return ['order' => $order, 'deps' => $deps, 'default_enabled' => $defaultEnabled];
+    return [
+        'order' => $order,
+        'deps' => $deps,
+        'default_enabled' => $defaultEnabled,
+        'advertise' => $advertise,
+    ];
 };
 
 $manifested = $loadManifests();
@@ -187,6 +202,97 @@ foreach ($manifested['order'] as $name) {
 $depsBody = [] === $allDepsLines ? '' : "\n".implode("\n", $allDepsLines)."\n        ";
 $defaultBody = "\n".implode("\n", $allDefaultLines)."\n        ";
 
+/**
+ * Emit advertisesExtensionFor() arms from ext.json "advertise" (#36204).
+ *
+ * @param array<string, mixed> $advertiseByDir
+ */
+$buildAdvertiseMatch = static function (array $advertiseByDir) use ($root): string {
+    if ([] === $advertiseByDir) {
+        return "        default => throw new \\InvalidArgumentException(\n"
+            ."            'ExtensionRegistry::advertisesExtensionFor: no advertise rule for '\n"
+            ."            .\$directory.' (#36204)'\n"
+            ."        ),";
+    }
+    $allowedCv = [];
+    $cvSrc = (string) file_get_contents($root.'/lib/CompilerVersion.php');
+    if (preg_match_all('/public static function (supports[A-Za-z0-9]+)\(\): bool/', $cvSrc, $cm)) {
+        $allowedCv = array_fill_keys($cm[1], true);
+    }
+    $arms = [];
+    ksort($advertiseByDir);
+    foreach ($advertiseByDir as $name => $rule) {
+        if (!is_string($name) || !preg_match('/^[a-z][a-z0-9_]*$/', $name)) {
+            fwrite(STDERR, "generate-extension-registry: invalid advertise key {$name}\n");
+            exit(2);
+        }
+        if ('always' === $rule || (is_array($rule) && ($rule['via'] ?? null) === 'always')) {
+            $arms[] = "            '{$name}' => true,";
+            continue;
+        }
+        if (!is_array($rule)) {
+            fwrite(STDERR, "generate-extension-registry: invalid advertise for {$name}\n");
+            exit(2);
+        }
+        $method = $rule['compiler_version'] ?? null;
+        if (!is_string($method) || !isset($allowedCv[$method])) {
+            fwrite(STDERR, "generate-extension-registry: advertise {$name} needs known compiler_version method\n");
+            exit(2);
+        }
+        $expr = 'CompilerVersion::'.$method.'()';
+        $host = $rule['or_host_extension'] ?? null;
+        if (is_string($host) && '' !== $host) {
+            if (!preg_match('/^[a-z][a-z0-9_]*$/', $host)) {
+                fwrite(STDERR, "generate-extension-registry: bad or_host_extension for {$name}\n");
+                exit(2);
+            }
+            $expr = "\\extension_loaded('{$host}') || {$expr}";
+        }
+        $env = $rule['or_env'] ?? null;
+        if (is_string($env) && '' !== $env) {
+            if (!preg_match('/^PHP_COMPILER_ENABLE_[A-Z0-9_]+$/', $env)) {
+                fwrite(STDERR, "generate-extension-registry: bad or_env for {$name}\n");
+                exit(2);
+            }
+            $expr = "({$expr}) || self::envFlagEnabled('{$env}')";
+        }
+        $arms[] = "            '{$name}' => {$expr},";
+    }
+    $arms[] = "            default => throw new \\InvalidArgumentException(\n"
+        ."                'ExtensionRegistry::advertisesExtensionFor: no advertise rule for '\n"
+        ."                .\$directory.' (#36204)'\n"
+        ."            ),";
+
+    return implode("\n", $arms);
+};
+
+$advertiseMatch = $buildAdvertiseMatch($manifested['advertise'] ?? []);
+$needsEnvHelper = false;
+foreach ($manifested['advertise'] ?? [] as $rule) {
+    if (is_array($rule) && isset($rule['or_env'])) {
+        $needsEnvHelper = true;
+        break;
+    }
+}
+$envHelperPhp = '';
+if ($needsEnvHelper) {
+    $envHelperPhp = <<<'PHP'
+
+
+    /** Explicit PHP_COMPILER_ENABLE_* opt-in (redis / similar) (#36204). */
+    private static function envFlagEnabled(string $name): bool
+    {
+        $raw = getenv($name);
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+        $v = strtolower(trim($raw));
+
+        return !\in_array($v, ['0', 'false', 'off', 'no'], true);
+    }
+PHP;
+}
+
 $out = <<<PHP
 <?php
 
@@ -211,6 +317,7 @@ declare(strict_types=1);
  * `--only=` / `--without=` on this script; runtime {@see \\PHPCompiler\\Module::isDefaultEnabled}
  * mirrors each manifest's default_enabled via {@see self::isDefaultEnabledFor()}.
  * Runtime load filtering: {@code PHP_COMPILER_EXTENSIONS} via {@see \\PHPCompiler\\Runtime::modulesToLoad()}.
+ * Manifest {@code advertise} drives {@see self::advertisesExtensionFor()} for folded policies.
  */
 
 namespace PHPCompiler;
@@ -261,6 +368,20 @@ final class ExtensionRegistry
     {
         return self::defaultEnabledByDirectory()[\$directory] ?? true;
     }
+
+    /**
+     * Surface advertisement from ext.json {@code advertise} (#36204).
+     *
+     * Folded *ExtensionPolicy::advertisesExtension() delegates here. Extensions without an
+     * advertise rule keep a hand-written policy class.
+     */
+    public static function advertisesExtensionFor(string \$directory): bool
+    {
+        return match (\$directory) {
+{$advertiseMatch}
+        };
+    }
+{$envHelperPhp}
 }
 
 PHP;

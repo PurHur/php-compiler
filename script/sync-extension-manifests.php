@@ -6,12 +6,13 @@ declare(strict_types=1);
  * Sync ext/<name>/ext.json + docs/extensions.md from the live extension tree (#36204 / #23480).
  *
  * Each manifest is the per-extension source of truth for name, load_order, depends, default_enabled,
- * policy_env, host_libs, and backends. script/generate-extension-registry.php reads these to emit
- * lib/ExtensionRegistry.php (including dependenciesByDirectory / defaultEnabledByDirectory for
- * ModuleAbstract). Policy advertisement classes stay for now — folding them is a follow-up once
- * every surface reads policy_env from the manifest.
+ * policy_env, host_libs, backends, and optional advertise (manifest-driven
+ * {@see \PHPCompiler\ExtensionRegistry::advertisesExtensionFor}). script/generate-extension-registry.php
+ * reads these to emit lib/ExtensionRegistry.php (including dependenciesByDirectory /
+ * defaultEnabledByDirectory for ModuleAbstract). Simple advertise-only *ExtensionPolicy classes
+ * delegate to the registry; complex policies (sodium AEGIS, intl host probes, …) stay per-ext.
  *
- * Sync preserves depends[] / default_enabled from an existing ext.json (manifests are SSOT).
+ * Sync preserves depends[] / default_enabled / advertise from an existing ext.json (manifests are SSOT).
  * Module.php getExtensionDependencies() overrides are only a migration fallback.
  *
  * Usage:
@@ -137,6 +138,16 @@ foreach ($fullOrder as $index => $name) {
         $defaultEnabled = (bool) $existing['default_enabled'];
     }
 
+    // Prefer committed policy_env (SSOT) so folding advertise.or_env out of *ExtensionPolicy.php
+    // does not wipe the env list (#36204). Fall back to scanning policy sources.
+    if (isset($existing['policy_env']) && is_array($existing['policy_env'])) {
+        $policyEnv = array_values(array_map('strval', $existing['policy_env']));
+    } else {
+        $policyEnv = ext_policy_env($extDir);
+    }
+    // Union any ENABLE_* still mentioned in policy PHP (mid-migration).
+    $policyEnv = array_values(array_unique(array_merge($policyEnv, ext_policy_env($extDir))));
+
     $manifest = [
         'name' => $name,
         'load_order' => $index,
@@ -152,8 +163,20 @@ foreach ($fullOrder as $index => $name) {
             'functions' => [],
             'classes' => [],
         ],
-        'policy_env' => ext_policy_env($extDir),
+        'policy_env' => $policyEnv,
     ];
+    // Preserve optional advertise rules — sync must not wipe fold progress (#36204).
+    if (array_key_exists('advertise', $existing)) {
+        $manifest['advertise'] = $existing['advertise'];
+        if (is_array($existing['advertise'])
+            && isset($existing['advertise']['or_env'])
+            && is_string($existing['advertise']['or_env'])
+            && '' !== $existing['advertise']['or_env']
+            && !in_array($existing['advertise']['or_env'], $manifest['policy_env'], true)
+        ) {
+            $manifest['policy_env'][] = $existing['advertise']['or_env'];
+        }
+    }
     $manifests[$name] = $manifest;
 
     $json = json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n";

@@ -4,18 +4,15 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\xmlrpc;
 
-use PHPCompiler\CompilerVersion;
+use PHPCompiler\ExtensionRegistry;
 
 /**
- * ext/xmlrpc surface advertisement — php-src ext/xmlrpc/xmlrpc.c removed in PHP 8.0 (#18503).
- *
- * Pure PHP {@see VmXmlrpc} stays compiled in-tree but is withheld from extension_loaded()
- * and function_exists() on the reference profile until {@see CompilerVersion::supportsXmlrpc()}.
+ * ext/xmlrpc surface advertisement — removed in PHP 8.0 (#18503). Folded to ext.json advertise (#36204).
  */
 final class XmlrpcExtensionPolicy
 {
     public static function advertisesExtension(): bool
     {
-        return CompilerVersion::supportsXmlrpc();
+        return ExtensionRegistry::advertisesExtensionFor('xmlrpc');
     }
 }
