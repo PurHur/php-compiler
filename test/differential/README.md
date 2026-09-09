@@ -8,12 +8,16 @@ itself**, which is what makes it useful for the failure mode that has no diagnos
 to completion and prints the wrong answer.
 
 ```
-script/differential-sweep.sh              # VM backend
+script/differential-sweep.sh              # VM backend (includes cases/fuzz seeds — #36398)
 script/differential-sweep.sh --aot        # AOT backend (compiles each program; slow)
 script/differential-sweep.sh --dir DIR    # your own programs
 ```
 
 Exit status is the number of mismatching programs.
+
+The default sweep runs every `cases/*.php` file **and** the differential fuzz seed corpus under
+`cases/fuzz/` (asserted via `cases/fuzz/COUNT`). Other subdirectories (`programs/`, `errors/`,
+`stdlib/`) remain opt-in via `--dir`.
 
 ## Origin
 

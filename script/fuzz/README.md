@@ -31,7 +31,13 @@ Aim for ≤ 15-line reproducers; attach fixed cases under `test/differential/cas
 
 ## Seed corpus (gate)
 
+The fuzz seed corpus is part of the **default** differential sweep (#36398 Done-when):
+
 ```bash
+./script/docker-exec.sh -- bash -lc 'script/differential-sweep.sh'
+# → also runs test/differential/cases/fuzz/*.php and asserts fuzz/COUNT
+
+# Or target the corpus alone:
 ./script/docker-exec.sh -- bash -lc \
   'script/differential-sweep.sh --dir test/differential/cases/fuzz'
 ./script/docker-exec.sh -- bash -lc \

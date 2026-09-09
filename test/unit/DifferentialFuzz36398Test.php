@@ -66,7 +66,7 @@ final class DifferentialFuzz36398Test extends TestCase
         $count = (int) trim((string) file_get_contents($dir.'/COUNT'));
         $cases = glob($dir.'/seed_*.php') ?: [];
         $this->assertSame($count, count($cases));
-        $this->assertGreaterThanOrEqual(7, $count);
+        $this->assertGreaterThanOrEqual(12, $count);
     }
 
     public function testReducerShrinksRedundantEcho(): void
@@ -182,6 +182,21 @@ PHP;
         $shapes = fuzz_known_shapes();
         $this->assertContains('strlen_after_concat_guard', $shapes);
         $this->assertContains('assoc_string_keys', $shapes);
-        $this->assertGreaterThanOrEqual(11, count($shapes));
+        $this->assertContains('foreach_byref_mutate', $shapes);
+        $this->assertContains('string_offset_assign', $shapes);
+        $this->assertContains('switch_int_fallthrough', $shapes);
+        $this->assertContains('static_counter_fn', $shapes);
+        $this->assertContains('array_plus_vs_merge', $shapes);
+        $this->assertGreaterThanOrEqual(16, count($shapes));
+    }
+
+    public function testDefaultSweepScriptIncludesFuzzCorpus(): void
+    {
+        $path = self::$root.'/script/differential-sweep.sh';
+        $this->assertFileExists($path);
+        $src = (string) file_get_contents($path);
+        $this->assertStringContainsString('cases/fuzz', $src);
+        $this->assertStringContainsString('fuzz/COUNT', $src);
+        $this->assertStringContainsString('#36398', $src);
     }
 }
