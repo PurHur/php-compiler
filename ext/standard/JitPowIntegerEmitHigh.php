@@ -18,8 +18,8 @@ use PHPLLVM\Value;
  * emit (ninetysecond … ninetyfifth) (#36387 / #36386).
  *
  * Extracted from {@see JitPowIntegerEmit} so gen-0 spine gets another TU
- * instead of one ~33k-line monolith; 80–91 live in
- * {@see JitPowIntegerEmitExponents80to91}.
+ * instead of one monolith; 80–85 in {@see JitPowIntegerEmitExponents80to85},
+ * 86–91 in {@see JitPowIntegerEmitExponents80to91}.
  *
  * No new C ABI. php-src: Zend/zend_operators.c {@code pow_function} /
  * {@code zend_pow} / {@code mul_function}; ext/standard/math.c
