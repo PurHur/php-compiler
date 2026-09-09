@@ -13,8 +13,9 @@ namespace PHPCompiler\JIT;
  * size-budget target. Shared arg helpers
  * ({@code stringParamBuiltinArgCannotThrow}, {@code numericParamBuiltinArgCannotThrow},
  * {@code intParamBuiltinArgCannotThrow}, {@code typedArrayArgCannotThrow})
- * stay on the hub. Matching ArgsCannotThrow peers for base/inet/minmax/…
- * live in {@see NoThrowCallElisionExistsConvertAndIntrospectOps}.
+ * live in {@see NoThrowCallElisionPureBuiltinArgOps}. Matching ArgsCannotThrow
+ * peers for base/inet/minmax/… live in
+ * {@see NoThrowCallElisionExistsConvertAndIntrospectOps}.
  *
  * Used via {@code use NoThrowCallElisionMathAndFormatOps;} on
  * {@see NoThrowCallElision}.

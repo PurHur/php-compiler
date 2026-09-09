@@ -639,12 +639,12 @@
             "note": "baseConvert/inet/minMax/checkdate/clamp/intdiv arg guards + scalarCast + count-on-typed-array + pure math/round + effect-free void Native constraints extracted from DiscardedPureCallElision (#36387); php-src ext/standard/math.c + basic_functions.c + Zend/zend_operators.c"
         },
         "lib/JIT/NoThrowCallElision.php": {
-            "budget": 591,
-            "target": 500,
-            "note": "No-throw call elision hub; RuntimeInfo + ExistsConvert + StringOps + MathAndFormat + CalleeGraph (#36387/#36403/#36386)"
+            "budget": 233,
+            "target": 350,
+            "note": "No-throw call elision hub; RuntimeInfo + ExistsConvert + StringOps + MathAndFormat + CalleeGraph + PureBuiltinArgOps (#36387/#36403/#36386)"
         },
         "lib/JIT/NoThrowCallElisionRuntimeInfoPredicates.php": {
-            "budget": 647,
+            "budget": 648,
             "target": 800,
             "note": "runtime-info isPure*/ArgsCannotThrow predicates extracted from NoThrowCallElision (#36387); php-src basic_functions/info/microtime/hrtime/datetime + Zend + ext/date + ext/random"
         },
@@ -659,7 +659,7 @@
             "note": "type/ctype/string transform/html/slice/pad/replace no-throw proofs extracted from NoThrowCallElision (#36387); php-src ext/standard/{type,string,html,url,md5,crc32,base64,quot_print,levenshtein,file,exec}.c + ext/ctype + ext/pcre"
         },
         "lib/JIT/NoThrowCallElisionMathAndFormatOps.php": {
-            "budget": 270,
+            "budget": 269,
             "target": 400,
             "note": "number_format / scalar-cast / base-inet-minmax-checkdate / hash_equals / pathinfo / parse_url / math isPure* extracted from NoThrowCallElision (#36387); php-src ext/standard/{math,string,type,basic_functions,url,file}.c + ext/hash + ext/date"
         },
@@ -667,6 +667,11 @@
             "budget": 271,
             "target": 350,
             "note": "bodyIsNoThrowCalleeGraph + method/static/literal helpers extracted from NoThrowCallElision (#36387); php-src Zend execute/exceptions frame model"
+        },
+        "lib/JIT/NoThrowCallElisionPureBuiltinArgOps.php": {
+            "budget": 382,
+            "target": 450,
+            "note": "pureBuiltinArgsAreNoThrow dispatch + string/numeric/int/typedArray ParamArgCannotThrow helpers extracted from NoThrowCallElision (#36387); php-src ext/standard/{type,string,math,basic_functions,url,file,info,html}.c + ext/ctype + Zend/zend_builtin_functions.c + ext/hash + ext/date + ext/spl"
         }
     },
     "script_file_count": {

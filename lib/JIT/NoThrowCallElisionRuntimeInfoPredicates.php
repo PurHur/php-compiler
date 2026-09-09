@@ -10,7 +10,8 @@ namespace PHPCompiler\JIT;
  * Extracted from {@see NoThrowCallElision} so the hub is not one monolith TU
  * on the gen-0 spine (split-TU / size-budget ratchet). Shared arg helpers
  * ({@code stringParamBuiltinArgCannotThrow}, {@code numericParamBuiltinArgCannotThrow},
- * {@code intParamBuiltinArgCannotThrow}) stay on the hub class.
+ * {@code intParamBuiltinArgCannotThrow}) live in
+ * {@see NoThrowCallElisionPureBuiltinArgOps}.
  *
  * Used via {@code use NoThrowCallElisionRuntimeInfoPredicates;} on
  * {@see NoThrowCallElision}.
