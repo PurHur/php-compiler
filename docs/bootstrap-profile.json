@@ -7445,6 +7445,7 @@
         "lib/JIT/DiscardedPureCallElisionMathAndHashOps.php",
         "lib/JIT/DiscardedPureCallElisionMathGuardAndVoidNativeOps.php",
         "lib/JIT/DiscardedPureCallElisionNativeLongBitwiseFolds.php",
+        "lib/JIT/DiscardedPureCallElisionNativeLongCompareMulFolds.php",
         "lib/JIT/DiscardedPureCallElisionNativeLongFolds.php",
         "lib/JIT/DiscardedPureCallElisionRuntimeInfoOps.php",
         "lib/JIT/DiscardedPureCallElisionStringOps.php",
@@ -7600,6 +7601,7 @@
         "lib/JIT/NoDiscardCallGuard.php",
         "lib/JIT/NoThrowCallElision.php",
         "lib/JIT/NoThrowCallElisionCalleeGraph.php",
+        "lib/JIT/NoThrowCallElisionConvertAndScalarCastOps.php",
         "lib/JIT/NoThrowCallElisionExistsConvertAndIntrospectOps.php",
         "lib/JIT/NoThrowCallElisionMathAndFormatOps.php",
         "lib/JIT/NoThrowCallElisionPureBuiltinArgOps.php",
@@ -8813,9 +8815,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8579,
+        "inventory_files": 8581,
         "excluded": 0,
-        "eligible": 8579,
+        "eligible": 8581,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
