@@ -11,9 +11,9 @@ non-native link.
 `script/check-helper-runtime-prelink.php --all-arches` asserts every committed `unit.o`
 (and `common.o` when present) has ELF `e_machine=183` (EM_AARCH64).
 
-## Seed corpus (VM_* + lib_VM_* + ext/standard + ctype/calendar/posix/filter/hash/tokenizer/mbstring)
+## Seed corpus (VM_* + lib_VM_* + ext/standard + ctype/calendar/posix/filter/hash/tokenizer/mbstring/iconv)
 
-**312** committed `unit.o` files:
+**322** committed `unit.o` files:
 
 - full `VM_*` (13) and `lib_VM_*` (9) sets from `x86_64-linux`
 - first `ext/standard` tier (10): ArrayChunk / ArrayIsList / ArraySlice / Bin2hex /
@@ -105,8 +105,11 @@ non-native link.
   MbInternalEncoding / MbLanguage / MbDetectEncoding / MbDetectOrder /
   MbSubstituteCharacter / MbHttpInput / MbHttpOutput / MbCase /
   MbConvertCase / MbConvertEncoding
-  (deferred this tier: MbEreg / MbSplit / MbSearch / MbConvertKana /
-  MbConvertVariables / MbNumericEntity / MbOutputHandler / MbRegexEncoding)
+- remaining mbstring + first iconv (10):
+  MbConvertKana / MbConvertVariables / MbEreg / MbNumericEntity /
+  MbOutputHandler / MbRegexEncoding / MbSearch / MbSplit /
+  Iconv / IconvString
+  (MbGetInfo / MbMimeheader not on x86_64-linux yet; IconvMime next wave)
 
 Refresh / expand via:
 
