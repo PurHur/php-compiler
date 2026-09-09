@@ -27,6 +27,7 @@ use PHPCompiler\JIT\SuperglobalInit;
 use PHPCompiler\Web\Superglobals;
 use PHPCompiler\Config;
 
+require_once __DIR__.'/ContextEditScaffoldCoreTypeSeed.php';
 require_once __DIR__.'/ContextEditScaffoldModuleRebind.php';
 require_once __DIR__.'/ContextDefineBuiltinFunctionProxiesDateAndXml.php';
 require_once __DIR__.'/ContextDefineBuiltinFunctionProxiesFinfoPdoAndXml.php';
@@ -69,6 +70,7 @@ require_once __DIR__.'/ContextLlvmConstantEmit.php';
 require_once __DIR__.'/ContextScopeLifecycleAndInitEmit.php';
 
 class Context {
+    use ContextEditScaffoldCoreTypeSeed;
     use ContextEditScaffoldModuleRebind;
     use ContextDefineBuiltinFunctionProxiesDateAndXml;
     use ContextDefineBuiltinFunctionProxiesFinfoPdoAndXml;
