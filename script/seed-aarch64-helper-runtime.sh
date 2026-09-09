@@ -468,6 +468,28 @@ SEED_UNITS=(
   /ext/curl/CurlStrerrorJitHelper.php
   /ext/curl/CurlShareStrerrorJitHelper.php
   /ext/lzf/LzfJitHelper.php
+  # Sodium / SPL snapshots / libxml / lz4 / stats / xmlrpc / ftp-close (#36391 after 332)
+  # Frexp/Ldexp/Modf/Nextafter/Shuffle still skipped (algorithm SSOT, no HELPER_PATH).
+  # Preg* still skipped: tip nested compile misses Compiler\Concern\OpCode.
+  # Sscanf still skipped: __init__ sealed during NestedJIT.
+  # Gethostbynamel skipped: NestedJIT missing __compiler_stream_resolve_include_path.
+  # Ini skipped: IniGetLeafJitHelper not compiled under helper-runtime-emit NestedJIT.
+  # Progress skipped: NestedJIT ContextLlvmConstantsAndRegistry seal during helper emit.
+  # CalInfo still skipped (unknown unit under NestedJIT).
+  # PosixSet* / PosixSession / PosixTerminal deferred (mutators / tty).
+  # Curl* handle/transfer deferred (host libcurl); Strerror* are string-only.
+  # Dom* / Intl* / Openssl* / Soap* / Sockets* deferred to later waves.
+  # Ftp* connect/transfer deferred (host libftp); Close is handle-teardown only.
+  /ext/sodium/SodiumBase64JitHelper.php
+  /ext/sodium/SodiumJitHelper.php
+  /ext/spl/DirectoryIteratorSnapshotJitHelper.php
+  /ext/spl/GlobIteratorSnapshotJitHelper.php
+  /ext/spl/SplFileObjectSnapshotJitHelper.php
+  /ext/libxml/LibxmlInternalErrorsJitHelper.php
+  /ext/lz4/Lz4JitHelper.php
+  /ext/stats/StatsJitHelper.php
+  /ext/xmlrpc/XmlrpcEncodeJitHelper.php
+  /ext/ftp/FtpCloseJitHelper.php
 )
 
 MIN_SEED=${#SEED_UNITS[@]}
