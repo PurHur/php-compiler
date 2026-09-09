@@ -18,7 +18,8 @@ use PHPLLVM\Value;
  * for eightieth … eightyfifth (#36387 / #36386).
  *
  * Extracted from {@see JitPowIntegerEmitExponents80to91} so gen-0 spine gets
- * another TU (80to91 retains eightysixth … ninetyfirst).
+ * another TU (86–88 in {@see JitPowIntegerEmitExponents86to88}; 80to91 retains
+ * eightyninth … ninetyfirst).
  *
  * No new C ABI. php-src: Zend/zend_operators.c {@code pow_function} /
  * {@code zend_pow} / {@code mul_function}; ext/standard/math.c

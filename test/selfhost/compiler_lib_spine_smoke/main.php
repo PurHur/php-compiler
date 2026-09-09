@@ -8725,5 +8725,6 @@ require_once __DIR__.'/../../../lib/Compiler/Concern/CompileAnonymousFunctionGen
 require_once __DIR__.'/../../../ext/standard/JitPowIntegerEmitLow.php';
 require_once __DIR__.'/../../../ext/standard/JitPowIntegerEmitExponents70to79.php';
 require_once __DIR__.'/../../../ext/standard/JitPowIntegerEmitExponents80to85.php';
+require_once __DIR__.'/../../../ext/standard/JitPowIntegerEmitExponents86to88.php';
 require_once __DIR__.'/../../../ext/standard/JitPowIntegerEmitExponents80to91.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
