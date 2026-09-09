@@ -121,11 +121,17 @@ $vm = measureServer(
 );
 mergeMeasure($payload, 'phpc_serve', $vm);
 
-// phpc serve --aot only when a prior project binary exists and still prints MiniWebApp
+// phpc serve --aot only when a prior project binary still serves home + api/status.
+// Home-only CLI probe is not enough: a stale Aug-2026 MiniWebApp binary printed
+// MiniWebApp on CLI home but returned `{}` for PATH_INFO=/api/status (#36385).
 $aotBin = $project.'/.phpc/bin/app';
 if (is_executable($aotBin)) {
-    $probe = trim((string) shell_exec(escapeshellarg($aotBin).' 2>/dev/null'));
-    if (str_contains($probe, 'MiniWebApp')) {
+    $probeHome = trim((string) shell_exec(escapeshellarg($aotBin).' 2>/dev/null'));
+    $probeApiCmd = 'env REQUEST_METHOD=GET SCRIPT_NAME=/index.php PATH_INFO=/api/status '
+        .'QUERY_STRING= SERVER_PROTOCOL=HTTP/1.1 '
+        .escapeshellarg($aotBin).' 2>/dev/null';
+    $probeApi = trim((string) shell_exec($probeApiCmd));
+    if (str_contains($probeHome, 'MiniWebApp') && str_contains($probeApi, '"ok":true')) {
         $aot = measureServer(
             $php,
             [$phpc, 'serve', '--aot', 'HOSTPORT', $project],
@@ -135,7 +141,8 @@ if (is_executable($aotBin)) {
         );
         mergeMeasure($payload, 'phpc_serve_aot', $aot);
     } else {
-        $payload['notes'][] = 'phpc_serve_aot n/a: .phpc/bin/app exists but CLI probe lacks MiniWebApp (rebuild with phpc build --project)';
+        $payload['notes'][] = 'phpc_serve_aot n/a: .phpc/bin/app stale or incomplete '
+            .'(need MiniWebApp on home + "ok":true on PATH_INFO=/api/status; rebuild with phpc build --project)';
     }
 } else {
     $payload['notes'][] = 'phpc_serve_aot n/a: examples/003-MiniWebApp/.phpc/bin/app missing (build with phpc build --project first)';
