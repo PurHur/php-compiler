@@ -68,10 +68,10 @@
       "slug": "nikic-php-parser",
       "composer": "nikic/php-parser",
       "repo": "https://github.com/nikic/PHP-Parser",
-      "sha": null,
+      "sha": "51bd93cc741b7fc3d63d20b6bdcd99fdaa359837",
       "difficulty": 8,
-      "status": "pending",
-      "notes": "Already vendored for self-host; must also *run*"
+      "status": "ready",
+      "notes": "Runner executes parser/pretty-printer smoke cases from vendored parser package"
     },
     {
       "slug": "twig-twig",

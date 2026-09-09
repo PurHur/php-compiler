@@ -1,5 +1,5 @@
 {
-    "generated_at": "2026-09-07T08:48:32Z",
+    "generated_at": "2026-09-09T16:09:27Z",
     "issue": 36380,
     "packages": [
         {
@@ -245,36 +245,38 @@
         {
             "slug": "nikic-php-parser",
             "composer": "nikic/php-parser",
-            "sha": null,
-            "status": "pending",
+            "sha": "51bd93cc741b7fc3d63d20b6bdcd99fdaa359837",
+            "status": "ready",
             "zend": {
-                "status": "pending",
-                "pass": 0,
+                "status": "ok",
+                "pass": 7,
                 "fail": 0,
                 "skip": 0,
-                "rc": null,
+                "rc": 0,
                 "reason": null
             },
             "vm": {
-                "status": "pending",
+                "status": "fail",
                 "pass": 0,
-                "fail": 0,
+                "fail": 7,
                 "skip": 0,
-                "rc": null,
+                "rc": 1,
                 "reason": null
             },
             "aot": {
-                "status": "pending",
+                "status": "block",
                 "pass": 0,
                 "fail": 0,
                 "skip": 0,
-                "rc": null,
-                "reason": null
+                "rc": 2,
+                "reason": "phpc_build:_helper-runtime_cache_hit_(5_helpers,_core=5ad0aaf1dce8f2636199)_(#15889)_phpc:_unsupported:_spl_autoload_register()_callback_form_not_lowerable_for_JIT/AOT_(docs/capabilities.md#spl_autolo"
             },
-            "aot_pass_rate": null,
+            "aot_pass_rate": 0,
             "blockers": [
-                "pending pin"
-            ]
+                "vm: 7 fixture failures",
+                "aot: phpc_build:_helper-runtime_cache_hit_(5_helpers,_core=5ad0aaf1dce8f2636199)_(#15889)_phpc:_unsupported:_spl_autoload_register()_callback_form_not_lowerable_for_JIT/AOT_(docs/capabilities.md#spl_autolo"
+            ],
+            "raw_rc": 0
         },
         {
             "slug": "twig-twig",
