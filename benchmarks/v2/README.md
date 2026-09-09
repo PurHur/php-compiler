@@ -23,8 +23,9 @@ Gate (AOT/Zend ratio + IR size vs committed baseline; subset that must match Zen
 ```
 
 `n/a` AOT columns mean build failed, timed out, or output mismatched Zend — intentional honesty
-in `script/bench.php`, not a silent pass. Gate cases: `call-heavy`, `assoc-heavy`, `str-builder`,
-`k-nucleotide`, `template-render`.
+in `script/bench.php`, not a silent pass. Gate cases (`script/bench-gate.php` `BENCH_GATE_V2_CASES`):
+all CLI v2 programs that currently FULL_MATCH under AOT, including `binary-trees` and
+`fannkuch-redux` (#36385).
 
 History JSON lands in `benchmarks/history/<sha>.json` when `PHP_COMPILER_BENCH_HISTORY=1`,
 or via the nightly publisher (`./script/bench/nightly.sh` / `make bench-nightly`).
@@ -36,21 +37,21 @@ Environment: 8.2.32 · LLVM 9 available · 5 iterations averaged, wall time per 
 
 | Test Name          | Zend       8.2 (s)| bin/vm.php (s) | bin/jit.php (s) | phpc build (s) | native run (s) |
 |--------------------|-------------------|----------------|-----------------|----------------|----------------|
-|        assoc-heavy |            0.0087 |         1.9957 |         2.1369 |         8.4864 |         0.0059 |
-|       binary-trees |            0.0198 |            n/a |            n/a |            n/a |            n/a |
-|         call-heavy |            0.0100 |        13.8233 |        13.9641 |         4.9835 |         0.0039 |
-|      closure-heavy |            0.0091 |         2.1651 |         2.2900 |         5.3873 |         0.0047 |
-|         exceptions |            0.0103 |         3.4846 |         3.6688 |         5.7109 |         0.0052 |
-|     fannkuch-redux |            0.0298 |            n/a |            n/a |            n/a |            n/a |
-|              fasta |            0.0093 |         1.2634 |         1.3142 |            n/a |            n/a |
-|     json-roundtrip |            0.0089 |         0.7887 |         0.8209 |            n/a |            n/a |
-|       k-nucleotide |            0.0109 |         6.0314 |         6.2036 |         6.4826 |         0.0054 |
-|              nbody |            0.0109 |         8.8066 |         8.8836 |            n/a |            n/a |
-|       object-graph |            0.0120 |        11.2522 |        11.2404 |         5.7253 |         0.0071 |
-|        regex-redux |            0.0102 |         0.3812 |         0.3900 |            n/a |            n/a |
-|         sort-mixed |            0.0107 |        12.2563 |        11.9755 |            n/a |            n/a |
-|      spectral-norm |            0.0137 |        13.4940 |        13.1483 |            n/a |            n/a |
-|        str-builder |            0.0092 |         1.2257 |         1.2948 |         6.1904 |         0.0265 |
-|    template-render |            0.0097 |         1.7663 |         1.8927 |         5.9370 |         0.3647 |
+|        assoc-heavy |            0.0126 |         2.3833 |         2.5549 |         0.8874 |         0.0060 |
+|       binary-trees |            0.0241 |            n/a |            n/a |         0.1714 |         0.0451 |
+|         call-heavy |            0.0136 |        15.0404 |        15.1099 |         0.1626 |         0.0043 |
+|      closure-heavy |            0.0126 |         2.4026 |         2.5199 |         0.1653 |         0.0039 |
+|         exceptions |            0.0103 |         3.9743 |         4.2101 |         0.1972 |         0.0065 |
+|     fannkuch-redux |            0.0301 |            n/a |            n/a |         0.1983 |         0.0840 |
+|              fasta |            0.0104 |         1.5001 |         1.5971 |         2.5357 |         0.0033 |
+|     json-roundtrip |            0.0117 |         0.9283 |         0.9592 |         0.5963 |         0.0475 |
+|       k-nucleotide |            0.0116 |         6.5502 |         6.9028 |         1.7240 |         0.0041 |
+|              nbody |            0.0127 |        14.9188 |        14.6774 |         0.2910 |         0.0061 |
+|       object-graph |            0.0146 |        14.0374 |        13.9162 |         0.1727 |         0.0061 |
+|        regex-redux |            0.0115 |         0.4090 |         0.4481 |         0.4191 |         0.0066 |
+|         sort-mixed |            0.0151 |        14.9361 |        14.9716 |         0.1824 |         1.2736 |
+|      spectral-norm |            0.0181 |        14.8421 |        14.6183 |         0.4206 |         0.0067 |
+|        str-builder |            0.0116 |         1.3313 |         1.4305 |         0.1695 |         0.0052 |
+|    template-render |            0.0123 |         1.9787 |         2.1282 |         0.7559 |         0.0078 |
 
 <!-- v2 benchmark table end -->
