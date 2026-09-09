@@ -11,9 +11,10 @@ use PHPLLVM;
  * Edit-scaffold / bitcode module rebind helpers for {@see Context} (#36387 / #36199).
  *
  * Extracted from {@see Context} so thin-boot bind, init/shutdown rebind,
- * function-scope refresh, and intrinsic rebuild stay a separate TU from the
- * Context construction / register hub (split-TU / one-file-edit path).
- * Core-type / structFieldMap seed lives in {@see ContextEditScaffoldCoreTypeSeed}.
+ * and intrinsic rebuild stay a separate TU from the Context construction /
+ * register hub (split-TU / one-file-edit path).
+ * Core-type / structFieldMap seed lives in {@see ContextEditScaffoldCoreTypeSeed};
+ * functionScope / $functions refresh lives in {@see ContextEditScaffoldFunctionScopeRebind}.
  *
  * Used via {@code use ContextEditScaffoldModuleRebind;} on {@see Context}.
  *
@@ -106,94 +107,6 @@ trait ContextEditScaffoldModuleRebind
         $this->objectConstantMap = [];
         $this->boolValues = [];
         $this->constants = [];
-    }
-
-    /**
-     * After edit-scaffold bitcode restore, re-point functionScope at live module Functions (#36387).
-     *
-     * register() stored decls from the throwaway empty module; replaceModule discards them.
-     * Thin boot skips register — import every defined function from the restored module.
-     */
-    public function rebindFunctionScopeFromModule(): void
-    {
-        $names = array_keys($this->functionScope);
-        $this->functionScope = [];
-        foreach ($names as $name) {
-            if (!is_string($name) || '' === $name) {
-                continue;
-            }
-            $fn = $this->module->getNamedFunction($name);
-            if ($fn instanceof PHPLLVM\Value\Function_) {
-                $this->functionScope[$name] = $fn;
-            }
-        }
-        // Thin boot: register() skipped — merge every named function from bitcode (#36387).
-        if (CompileCache::isEditScaffoldActive()) {
-            try {
-                $fn = $this->module->getFirstFunction();
-            } catch (\Throwable $e) {
-                $fn = null;
-            }
-            $guard = 0;
-            while ($fn instanceof PHPLLVM\Value\Function_ && $guard < 100000) {
-                ++$guard;
-                try {
-                    $name = (string) $fn->getName();
-                } catch (\Throwable $e) {
-                    break;
-                }
-                if ('' !== $name) {
-                    $this->functionScope[$name] = $fn;
-                }
-                try {
-                    $next = method_exists($fn, 'getNext') ? $fn->getNext() : null;
-                } catch (\Throwable $e) {
-                    $next = null;
-                }
-                if (!$next instanceof PHPLLVM\Value\Function_) {
-                    break;
-                }
-                $fn = $next;
-            }
-        }
-        // Standalone refresh / init symbols may exist only in bitcode (thin init skipped declare).
-        foreach ([
-            '__superglobals__refresh',
-            '__init__',
-            '__shutdown__',
-            '__header_pre_flush__',
-        ] as $extra) {
-            if (isset($this->functionScope[$extra])) {
-                continue;
-            }
-            $fn = $this->module->getNamedFunction($extra);
-            if ($fn instanceof PHPLLVM\Value\Function_) {
-                $this->functionScope[$extra] = $fn;
-            }
-        }
-        // Refresh $functions map entries that still name a live symbol.
-        foreach ($this->functions as $lc => $old) {
-            $llvm = $this->functionLlvmSymbols[$lc] ?? null;
-            if (!is_string($llvm) || '' === $llvm) {
-                if ($old instanceof PHPLLVM\Value\Function_) {
-                    try {
-                        $llvm = (string) $old->getName();
-                    } catch (\Throwable $e) {
-                        unset($this->functions[$lc]);
-                        continue;
-                    }
-                } else {
-                    unset($this->functions[$lc]);
-                    continue;
-                }
-            }
-            $fn = $this->module->getNamedFunction($llvm);
-            if ($fn instanceof PHPLLVM\Value\Function_) {
-                $this->functions[$lc] = $fn;
-            } else {
-                unset($this->functions[$lc]);
-            }
-        }
     }
 
     /** Intrinsic holds the old module — rebuild after replaceModuleFromBitcodeFile (#36387). */

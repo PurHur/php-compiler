@@ -219,14 +219,14 @@
             "note": "TYPE_CLASS_CONST_FETCH runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/Context.php": {
-            "budget": 942,
+            "budget": 944,
             "target": 3500,
-            "note": "CoreTypeSeed + FunctionProxyRegistration + ExternalMethodStubReport + ArrayIteratorAndObject + NestedJitKernelRegistry + ReflectionMembers + FiberGeneratorAndClosure + ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml proxies wiring + VariableOperandLookup + VariableOperandAlias + ModuleVerify + CompileToFileEmitAndLink + CompileToFileStandaloneMain + InitShutdownBlocks + ConstantFetch + CastToBool + TypeFromString + StructFieldMap + LlvmConstantEmit + ScopeLifecycle peers (#36387/#36199); continue toward \u22643.5k + ModuleOptimizationPasses (#36387)"
+            "note": "CoreTypeSeed + FunctionScopeRebind + FunctionProxyRegistration + ExternalMethodStubReport + ArrayIteratorAndObject + NestedJitKernelRegistry + ReflectionMembers + FiberGeneratorAndClosure + ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml proxies wiring + VariableOperandLookup + VariableOperandAlias + ModuleVerify + CompileToFileEmitAndLink + CompileToFileStandaloneMain + InitShutdownBlocks + ConstantFetch + CastToBool + TypeFromString + StructFieldMap + LlvmConstantEmit + ScopeLifecycle peers (#36387/#36199); continue toward \u22643.5k + ModuleOptimizationPasses (#36387)"
         },
         "lib/JIT/ContextEditScaffoldModuleRebind.php": {
-            "budget": 213,
+            "budget": 126,
             "target": 400,
-            "note": "Thin-boot bind + init/shutdown/function-scope/intrinsic rebind after bitcode replace; core-type seed in ContextEditScaffoldCoreTypeSeed (#36387/#36199)"
+            "note": "Thin-boot bind + init/shutdown/intrinsic rebind after bitcode replace; core-type seed in ContextEditScaffoldCoreTypeSeed; functionScope refresh in ContextEditScaffoldFunctionScopeRebind (#36387/#36199)"
         },
         "lib/VM/Concern/IssetDispatch.php": {
             "budget": 227,
@@ -537,6 +537,11 @@
             "budget": 230,
             "target": 300,
             "note": "TYPE_RETURN/RETURN_VOID + return_*_complete epilogues extracted from VM.php (#36403); php-src ZEND_RETURN / zend_generators.c / finally-return"
+        },
+        "lib/JIT/ContextEditScaffoldFunctionScopeRebind.php": {
+            "budget": 111,
+            "target": 200,
+            "note": "rebindFunctionScopeFromModule functionScope/$functions refresh extracted from ContextEditScaffoldModuleRebind (#36387/#36199); php-src Zend/zend_file_cache.c + Zend/zend_execute_API.c"
         }
     },
     "script_file_count": {
