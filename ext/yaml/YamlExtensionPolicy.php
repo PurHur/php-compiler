@@ -4,18 +4,15 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\yaml;
 
-use PHPCompiler\CompilerVersion;
+use PHPCompiler\ExtensionRegistry;
 
 /**
- * ext/yaml surface advertisement — PECL yaml / php-src-style yaml.c (#6275).
- *
- * Pure PHP {@see VmYaml} stays compiled in-tree but is withheld from extension_loaded()
- * and function_exists() on the reference profile until {@see CompilerVersion::supportsYaml()}.
+ * ext/yaml surface advertisement — PECL yaml (#6275). Folded to ext.json advertise (#36204).
  */
 final class YamlExtensionPolicy
 {
     public static function advertisesExtension(): bool
     {
-        return CompilerVersion::supportsYaml();
+        return ExtensionRegistry::advertisesExtensionFor('yaml');
     }
 }

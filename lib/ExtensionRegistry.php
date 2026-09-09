@@ -20,6 +20,8 @@ declare(strict_types=1);
  * 84 extensions from ext/<name>/ext.json (#36204). Subset builds use
  * `--only=` / `--without=` on this script; runtime {@see \PHPCompiler\Module::isDefaultEnabled}
  * mirrors each manifest's default_enabled via {@see self::isDefaultEnabledFor()}.
+ * Runtime load filtering: {@code PHP_COMPILER_EXTENSIONS} via {@see \PHPCompiler\Runtime::modulesToLoad()}.
+ * Manifest {@code advertise} drives {@see self::advertisesExtensionFor()} for folded policies.
  */
 
 namespace PHPCompiler;
@@ -244,5 +246,47 @@ final class ExtensionRegistry
     public static function isDefaultEnabledFor(string $directory): bool
     {
         return self::defaultEnabledByDirectory()[$directory] ?? true;
+    }
+
+    /**
+     * Surface advertisement from ext.json {@code advertise} (#36204).
+     *
+     * Folded *ExtensionPolicy::advertisesExtension() delegates here. Extensions without an
+     * advertise rule keep a hand-written policy class.
+     */
+    public static function advertisesExtensionFor(string $directory): bool
+    {
+        return match ($directory) {
+            'apcu' => \extension_loaded('apcu') || CompilerVersion::supportsApcu(),
+            'igbinary' => CompilerVersion::supportsIgbinary(),
+            'memcached' => CompilerVersion::supportsMemcached(),
+            'mongodb' => CompilerVersion::supportsMongodb(),
+            'msgpack' => CompilerVersion::supportsMsgpack(),
+            'phar' => true,
+            'redis' => (\extension_loaded('redis') || CompilerVersion::supportsRedis()) || self::envFlagEnabled('PHP_COMPILER_ENABLE_REDIS'),
+            'simdjson' => CompilerVersion::supportsSimdjson(),
+            'snmp' => CompilerVersion::supportsSnmp(),
+            'uri' => CompilerVersion::supportsUri(),
+            'wddx' => CompilerVersion::supportsWddx(),
+            'xmlrpc' => CompilerVersion::supportsXmlrpc(),
+            'yaml' => CompilerVersion::supportsYaml(),
+            default => throw new \InvalidArgumentException(
+                'ExtensionRegistry::advertisesExtensionFor: no advertise rule for '
+                .$directory.' (#36204)'
+            ),
+        };
+    }
+
+
+    /** Explicit PHP_COMPILER_ENABLE_* opt-in (redis / similar) (#36204). */
+    private static function envFlagEnabled(string $name): bool
+    {
+        $raw = getenv($name);
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+        $v = strtolower(trim($raw));
+
+        return !\in_array($v, ['0', 'false', 'off', 'no'], true);
     }
 }
