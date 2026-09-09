@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8596 |
-| Phase A inventory files (M2 ratio SSOT) | 8596 |
+| PHP files on vm.php path | 8597 |
+| Phase A inventory files (M2 ratio SSOT) | 8597 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26778 |
+| Source constructs flagged (warnings) | 26779 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3264,6 +3264,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitPopen.php` | 0 | 1 |
 | `ext/standard/JitPow.php` | 0 | 1 |
 | `ext/standard/JitPowIntegerEmit.php` | 0 | 1 |
+| `ext/standard/JitPowIntegerEmitExponents100to104.php` | 0 | 1 |
 | `ext/standard/JitPowIntegerEmitExponents50to69.php` | 0 | 1 |
 | `ext/standard/JitPowIntegerEmitExponents70to79.php` | 0 | 1 |
 | `ext/standard/JitPowIntegerEmitExponents80to85.php` | 0 | 1 |
@@ -33760,6 +33761,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 15 class method(s)
 
 ### `ext/standard/JitPowIntegerEmit.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/standard/JitPowIntegerEmitExponents100to104.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
