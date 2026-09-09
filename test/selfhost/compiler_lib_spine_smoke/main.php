@@ -7001,6 +7001,7 @@ require_once __DIR__.'/../../../lib/JIT/ContextCastToBool.php';
 require_once __DIR__.'/../../../lib/JIT/ContextTypeFromString.php';
 require_once __DIR__.'/../../../lib/JIT/ContextStructFieldMap.php';
 require_once __DIR__.'/../../../lib/JIT/ContextStandaloneBodies.php';
+require_once __DIR__.'/../../../lib/JIT/ContextModuleInitShutdownBlocks.php';
 require_once __DIR__.'/../../../lib/JIT/ContextModuleCompileAndOptimize.php';
 require_once __DIR__.'/../../../lib/JIT/ContextModuleVerify.php';
 require_once __DIR__.'/../../../lib/JIT/ContextModuleOptimizationPasses.php';
