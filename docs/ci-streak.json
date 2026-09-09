@@ -1,7 +1,7 @@
 {
     "issue": 36401,
     "ci_green_streak_days": 6,
-    "last_green_master_sha": "98ed4dc0824d939ab072628c19f913dec6677a82",
+    "last_green_master_sha": "e8935fb292752f9f0f6bb031931cd87b52fd77ab",
     "last_green_day": "2026-09-09",
     "gates": [
         "apply-patches",
@@ -9,5 +9,5 @@
         "aot-smoke",
         "north-star5-verify-fast"
     ],
-    "notes": "Local Docker gates; GHA billing-disabled — not a remote check streak (#36401). Verified apply-patches --verify-pristine php-llvm 27/27 (structgep OK, #36143), inventory/spine 8586/8586, aot-smoke 9/9, north-star5-verify-fast OK on tip 98ed4dc082 after #37635/#37636. Synced spine footnotes 8585→8586 (check-selfhost-spine-count-sync was red). #36143 remains closed/green. Streak records last fully verified SHA; master tip may be ahead."
+    "notes": "Local Docker gates; GHA billing-disabled \u2014 not a remote check streak (#36401). Verified apply-patches --verify-pristine php-llvm 27/27 (structgep OK, #36143), inventory/spine 8588/8588, aot-smoke 9/9, north-star5-verify-fast OK on tip e8935fb292 after #37637/#37638. #36143 remains closed/green. Streak records last fully verified SHA; master tip may be ahead."
 }

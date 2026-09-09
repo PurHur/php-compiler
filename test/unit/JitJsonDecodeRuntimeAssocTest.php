@@ -38,9 +38,6 @@ final class JitJsonDecodeRuntimeAssocTest extends TestCase
 
     public function testRuntimeAssocReproNoSegfaultUnderAot(): void
     {
-        $this->markTestSkipped(
-            'AOT NestedJIT json_encode→json_decode SIGSEGV on runtime strings — regression of #32645; tracked under #36385 / #24137 (j06_json_roundtrip prints encode then exit 139)'
-        );
         $root = dirname(__DIR__, 2);
         $source = $root.'/test/repro/issue_24137_json_decode_runtime_assoc.php';
         $out = $root.'/build/test-aot-json-decode-runtime-assoc-24137';
@@ -49,13 +46,14 @@ final class JitJsonDecodeRuntimeAssocTest extends TestCase
             [PHP_BINARY, $root.'/bin/compile.php', '-o', $out, $source],
             $root,
             expectExit: 0,
-            env: ['PHP_COMPILER_HELPER_RUNTIME_O' => '1']
+            env: ['PHP_COMPILER_HELPER_RUNTIME_O' => '1', 'PHP_COMPILER_CACHE' => '0']
         );
         $this->assertFileExists($out);
-        // Master SIGSEGV here; top-level $r['a'] must run under default helper cache (#24137).
+        // allocHeap return + digitValue (#36385); must not SIGSEGV (#24137).
         $runOut = $this->runCommand([$out], $root, expectExit: 0);
         $this->assertStringContainsString('{"a":1,"b":[2,3]}', $runOut);
         $this->assertStringContainsString(' 1 ', $runOut);
+        $this->assertStringContainsString(' 3', $runOut);
     }
 
     public function testRuntimeLiteralJsonVariablePassesUnderAot(): void

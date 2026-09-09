@@ -76,7 +76,9 @@ final class json_decode extends Internal
         $depth = self::resolveDepthJit($context, $args);
         $flags = self::resolveFlagsJit($context, $args);
         $assoc = self::resolveAssocFlag($context, $args, $flags);
-        $literal = JitStringArg::compileTimeLiteral($args[0]);
+        // Slot-backed locals may keep a stale compileTimeString after concat (#36406);
+        // only KIND_VALUE literals are safe to CT-fold (#36385 / j06 runtime path).
+        $literal = JitStringArg::compileTimeLiteralForFold($args[0]);
         if (
             null === $literal
             && (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))
