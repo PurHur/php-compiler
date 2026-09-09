@@ -5,20 +5,23 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 /**
- * Type / ctype / string transform / html-escape no-throw proofs for
+ * Type / ctype / string-transform / html-escape no-throw proofs for
  * {@see NoThrowCallElision} (#36387).
  *
- * Slice/compare / pad/split / replace/join live in
- * {@see NoThrowCallElisionStringSlicePadReplaceOps}. External call sites keep
- * using {@code NoThrowCallElision::…} (trait methods on the hub class).
+ * Renamed from {@see NoThrowCallElisionStringOps} after slice/pad/replace moved
+ * to {@see NoThrowCallElisionStringSlicePadReplaceOps} (#37604) so the remaining
+ * type/ctype/html TU has an honest name and gen-0 spine stays granular.
+ * External call sites keep using {@code NoThrowCallElision::…}
+ * (trait methods on the hub class).
  *
- * Used via {@code use NoThrowCallElisionStringOps;} on {@see NoThrowCallElision}.
+ * Used via {@code use NoThrowCallElisionTypeCtypeHtmlOps;} on
+ * {@see NoThrowCallElision}.
  *
  * No new C ABI. php-src: ext/standard/{type,string,html,url,md5,crc32,base64,
- * quot_print}.c; ext/ctype/ctype.c; ext/pcre/php_pcre.c;
- * ext/standard/file.c (basename / dirname); ext/standard/exec.c.
+ * quot_print,levenshtein}.c; ext/ctype/ctype.c; ext/pcre/php_pcre.c;
+ * ext/standard/exec.c.
  */
-trait NoThrowCallElisionStringOps
+trait NoThrowCallElisionTypeCtypeHtmlOps
 {
 
     /**

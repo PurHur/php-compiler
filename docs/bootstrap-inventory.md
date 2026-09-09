@@ -7513,8 +7513,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/NoThrowCallElisionMathAndFormatOps.php` | 0 | 2 |
 | `lib/JIT/NoThrowCallElisionPureBuiltinArgOps.php` | 0 | 2 |
 | `lib/JIT/NoThrowCallElisionRuntimeInfoPredicates.php` | 0 | 2 |
-| `lib/JIT/NoThrowCallElisionStringOps.php` | 0 | 2 |
 | `lib/JIT/NoThrowCallElisionStringSlicePadReplaceOps.php` | 0 | 2 |
+| `lib/JIT/NoThrowCallElisionTypeCtypeHtmlOps.php` | 0 | 2 |
 | `lib/JIT/NonObjectPropertyFetchHelper.php` | 0 | 4 |
 | `lib/JIT/NullsafeHelper.php` | 0 | 1 |
 | `lib/JIT/ObjectPropertyForeachHelper.php` | 0 | 1 |
@@ -61811,16 +61811,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - trait NoThrowCallElisionRuntimeInfoPredicates (line 26)
 - 23 class method(s)
 
-### `lib/JIT/NoThrowCallElisionStringOps.php`
-
-**Warnings** (review for bootstrap subset):
-- trait NoThrowCallElisionStringOps (line 21)
-- 6 class method(s)
-
 ### `lib/JIT/NoThrowCallElisionStringSlicePadReplaceOps.php`
 
 **Warnings** (review for bootstrap subset):
 - trait NoThrowCallElisionStringSlicePadReplaceOps (line 21)
+- 6 class method(s)
+
+### `lib/JIT/NoThrowCallElisionTypeCtypeHtmlOps.php`
+
+**Warnings** (review for bootstrap subset):
+- trait NoThrowCallElisionTypeCtypeHtmlOps (line 24)
 - 6 class method(s)
 
 ### `lib/JIT/NonObjectPropertyFetchHelper.php`
