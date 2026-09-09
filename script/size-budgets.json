@@ -564,9 +564,9 @@
             "note": "instanceof / static-call eligibility helpers extracted from VM.php (#36403); php-src ZEND_INSTANCEOF / ZEND_INIT_STATIC_METHOD_CALL / zend_std_get_static_method / zend_inheritance.c"
         },
         "lib/JIT/DiscardedPureCallElision.php": {
-            "budget": 3940,
+            "budget": 3578,
             "target": 3500,
-            "note": "Discarded pure-call elision hub; string/array/date-cal/format-analyze traits (#36387/#23483); php-src string.c/html.c/array.c/formatted_print.c/url.c/versioning.c/ext/date/php_date.c/ext/calendar"
+            "note": "Discarded pure-call elision hub; string/array/date-cal/format-analyze traits (#36387/#23483); php-src string.c/html.c/array.c/formatted_print.c/url.c/versioning.c/ext/date/php_date.c/ext/calendar; math/scalar/inet/hash in DiscardedPureCallElisionMathAndHashOps (#36387/#23483)"
         },
         "lib/JIT/DiscardedPureCallElisionStringOps.php": {
             "budget": 641,
@@ -607,6 +607,11 @@
             "budget": 545,
             "target": 700,
             "note": "sprintf/vsprintf / pathinfo / parse_url / count_chars / str_word_count / strip_tags / get_html_translation_table / version_compare discarded elision extracted from DiscardedPureCallElision (#36387); php-src formatted_print.c/string.c/html.c/url.c/versioning.c"
+        },
+        "lib/JIT/DiscardedPureCallElisionMathAndHashOps.php": {
+            "budget": 394,
+            "target": 500,
+            "note": "number_format / scalar-cast / base_convert / inet / min-max / checkdate / clamp / intdiv + hash_equals / hash / hash_hmac discarded elision extracted from DiscardedPureCallElision (#36387); php-src ext/standard/math.c + ext/hash/hash.c"
         }
     },
     "script_file_count": {
