@@ -739,7 +739,7 @@
             "note": "integer pow()/ ** chained-smul emit for compile-time exponents 30..49 extracted from JitPowIntegerEmit (#36387/#36386)"
         },
         "ext/standard/JitPowIntegerEmitExponents50to69.php": {
-            "budget": 16374,
+            "budget": 16382,
             "target": 20000,
             "note": "compile-time exponents 50-69 (#36387/#36386)"
         }

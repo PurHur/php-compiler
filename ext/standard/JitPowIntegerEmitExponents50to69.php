@@ -25,13 +25,21 @@ use PHPLLVM\Value;
  */
 final class JitPowIntegerEmitExponents50to69
 {
+    /**
+     * Null {@code $expFold} (runtime exponent) falls through — mirrors
+     * Low/Mid/High null-guard so hub dispatch does not TypeError.
+     */
     public static function tryEmit(
         Context $context,
         Value $slotPtr,
         JITVariable $base,
         JITVariable $exp,
-        string $expFold
+        ?string $expFold
     ): bool {
+        if (null === $expFold) {
+            return false;
+        }
+
         if ('fiftieth' === $expFold) {
             // n^50 = fortyeighth*sq = fortysixth*sq*sq: sq=n*n, cu=sq*n, fifth=cu*sq,
             // tenth=fifth*fifth, twentieth=tenth*tenth,
