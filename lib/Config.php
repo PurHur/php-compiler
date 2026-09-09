@@ -325,6 +325,12 @@ final class Config
             'PHP_COMPILER_AOT_USER_SCRIPT' => $str(self::SCOPE_COMPILE, 'User script path for AOT driver', null, null),
             'PHP_COMPILER_AOT_CODEGEN_OPT' => $str(self::SCOPE_COMPILE, 'AOT TargetMachine codegen opt: none|less|default|aggressive', null, '#36387'),
             'PHP_COMPILER_REPRODUCIBLE' => $bool(self::SCOPE_COMPILE, 'Force deterministic AOT link (build-id=sha1 + default SOURCE_DATE_EPOCH)', null, '#36399'),
+            'PHP_COMPILER_EXTENSIONS' => $str(
+                self::SCOPE_RUNTIME,
+                'Extension load filter: only:a,b / a,b / +a,-b (ext/ directory names; pulls depends[]) (#36204)',
+                null,
+                '#36204'
+            ),
             'SOURCE_DATE_EPOCH' => $str(self::SCOPE_COMPILE, 'Unix epoch for reproducible AOT link timestamps (Debian/repro builds)', null, '#36399'),
             'PHP_COMPILER_KEEP_OBJECT_FILE' => $str(self::SCOPE_DEBUG, 'Keep intermediate .o path', null, null),
             'PHP_COMPILER_EMIT_BITCODE' => $str(self::SCOPE_DEBUG, 'Emit LLVM bitcode path', null, null),

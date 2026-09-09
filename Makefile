@@ -335,7 +335,7 @@ test-18: test-legacy-18
 PHP_COMPILER_DEV_IMAGE ?= ghcr.io/purhur/php-compiler:dev
 LOCAL_DEV_IMAGE ?= php-compiler:22.04-dev
 
-.PHONY: docker-build-22 docker-publish-dev docker-build-phpc-release pack-phpc-sdk cold-build-check-image cold-build-check-sdk
+.PHONY: docker-build-22 docker-publish-dev docker-build-phpc-release pack-phpc-sdk cold-build-check-image cold-build-check-sdk subset-hello-build-gate
 docker-build-22:
 	docker build -f Docker/dev/ubuntu-22.04/Dockerfile -t $(LOCAL_DEV_IMAGE) -t $(PHP_COMPILER_DEV_IMAGE) .
 
@@ -354,6 +354,9 @@ cold-build-check-image:
 # Tarball / extracted-SDK cold path (#36390). Needs phpc:local (or PHPC_SDK_TARBALL=…).
 cold-build-check-sdk:
 	./script/cold-build-check.sh --sdk
+# #36204 Done-when: PHP_COMPILER_EXTENSIONS subset hello vs full registry
+subset-hello-build-gate:
+	./script/subset-hello-build-gate.sh
 
 # Run full local CI inside Docker (memory-capped; see script/ci-defaults.env)
 .PHONY: test-docker test-docker-safe

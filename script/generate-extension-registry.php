@@ -210,6 +210,7 @@ declare(strict_types=1);
  * {$count} extensions from ext/<name>/ext.json (#36204). Subset builds use
  * `--only=` / `--without=` on this script; runtime {@see \\PHPCompiler\\Module::isDefaultEnabled}
  * mirrors each manifest's default_enabled via {@see self::isDefaultEnabledFor()}.
+ * Runtime load filtering: {@code PHP_COMPILER_EXTENSIONS} via {@see \\PHPCompiler\\Runtime::modulesToLoad()}.
  */
 
 namespace PHPCompiler;

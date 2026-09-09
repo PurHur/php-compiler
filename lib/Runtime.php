@@ -268,14 +268,173 @@ class Runtime {
         }
     }
 
+    /** Done-when subset from #36204 — core + a few always-on stdlib companions. */
+    public const EXTENSIONS_HELLO_SUBSET = 'standard,spl,types,ctype,hash,random';
+
     private function loadCoreModules(): void {
         // Generated list — see script/generate-extension-registry.php and RELEASE-PLAN Phase 2.5.
         // Adding an extension used to mean editing this core file; it now means adding a directory
         // and regenerating. Order is unchanged from the 76 hardcoded loads this replaced, verified
         // identical at generation time and by test/unit/ExtensionRegistryOrderTest.php.
-        foreach (ExtensionRegistry::defaultModules() as $module) {
+        // Subset builds: PHP_COMPILER_EXTENSIONS (#36204).
+        foreach (self::modulesToLoad() as $module) {
             $this->load($module);
         }
+    }
+
+    /**
+     * Modules to load after applying {@code PHP_COMPILER_EXTENSIONS} (#36204).
+     *
+     * Env grammar (ext/ directory names): unset = full registry; {@code a,b} / {@code only:a,b};
+     * {@code +a,-b} add/remove from full set. Declared depends[] are pulled in; order preserved.
+     *
+     * @return list<Module>
+     */
+    public static function modulesToLoad(): array
+    {
+        $all = ExtensionRegistry::defaultModules();
+        $selected = self::selectedExtensionDirectories($all);
+        if (null === $selected) {
+            return $all;
+        }
+
+        $out = [];
+        foreach ($all as $module) {
+            $dir = self::extensionDirectoryOf($module);
+            if (isset($selected[$dir])) {
+                $out[] = $module;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<Module> $all
+     *
+     * @return array<string, true>|null null = load all
+     */
+    public static function selectedExtensionDirectories(array $all): ?array
+    {
+        $raw = Config::getenv('PHP_COMPILER_EXTENSIONS');
+        if (false === $raw || '' === trim((string) $raw)) {
+            return null;
+        }
+
+        $token = strtolower(trim((string) $raw));
+        $allNames = [];
+        foreach ($all as $module) {
+            $allNames[] = self::extensionDirectoryOf($module);
+        }
+        $allSet = array_fill_keys($allNames, true);
+
+        $only = null;
+        $add = [];
+        $remove = [];
+
+        if (str_starts_with($token, 'only:')) {
+            $only = self::splitExtensionNames(substr($token, 5));
+        } else {
+            $parts = preg_split('/\s*,\s*/', $token) ?: [];
+            $plain = [];
+            foreach ($parts as $part) {
+                $part = trim($part);
+                if ('' === $part) {
+                    continue;
+                }
+                if (str_starts_with($part, 'only:')) {
+                    foreach (self::splitExtensionNames(substr($part, 5)) as $n) {
+                        $plain[] = $n;
+                    }
+                    continue;
+                }
+                if (str_starts_with($part, '+')) {
+                    $add[] = strtolower(ltrim($part, '+'));
+                    continue;
+                }
+                if (str_starts_with($part, '-')) {
+                    $remove[] = strtolower(ltrim($part, '-'));
+                    continue;
+                }
+                $plain[] = strtolower($part);
+            }
+            if ([] !== $plain) {
+                if ([] !== $add || [] !== $remove) {
+                    throw new \InvalidArgumentException(
+                        'PHP_COMPILER_EXTENSIONS: do not mix plain names with +/- tokens '
+                        .'(use only:a,b or +a,-b) (#36204)'
+                    );
+                }
+                $only = $plain;
+            }
+        }
+
+        if (null !== $only) {
+            $selected = [];
+            foreach ($only as $name) {
+                if (!isset($allSet[$name])) {
+                    throw new \InvalidArgumentException(
+                        "PHP_COMPILER_EXTENSIONS: unknown extension directory {$name} (#36204)"
+                    );
+                }
+                $selected[$name] = true;
+            }
+        } else {
+            $selected = $allSet;
+            foreach ($add as $name) {
+                if (!isset($allSet[$name])) {
+                    throw new \InvalidArgumentException(
+                        "PHP_COMPILER_EXTENSIONS: unknown extension directory +{$name} (#36204)"
+                    );
+                }
+                $selected[$name] = true;
+            }
+            foreach ($remove as $name) {
+                unset($selected[$name]);
+            }
+        }
+
+        $changed = true;
+        while ($changed) {
+            $changed = false;
+            foreach (array_keys($selected) as $name) {
+                foreach (ExtensionRegistry::dependenciesFor($name) as $dep) {
+                    $dep = strtolower($dep);
+                    if (!isset($selected[$dep]) && isset($allSet[$dep])) {
+                        $selected[$dep] = true;
+                        $changed = true;
+                    }
+                }
+            }
+        }
+
+        return $selected;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function splitExtensionNames(string $csv): array
+    {
+        $out = [];
+        foreach (preg_split('/\s*,\s*/', $csv) ?: [] as $part) {
+            $part = strtolower(trim($part));
+            if ('' !== $part) {
+                $out[] = $part;
+            }
+        }
+
+        return $out;
+    }
+
+    private static function extensionDirectoryOf(Module $module): string
+    {
+        $class = \get_class($module);
+        if (preg_match('#\\\\ext\\\\([^\\\\]+)\\\\Module$#', $class, $matches)) {
+            return strtolower($matches[1]);
+        }
+
+        return strtolower(preg_replace('#.*\\\\([^\\\\]+)$#', '$1', $class) ?? $class);
     }
 
     public function loadJit(): JIT {
