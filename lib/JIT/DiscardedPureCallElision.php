@@ -17,6 +17,7 @@ require_once __DIR__.'/DiscardedPureCallElisionNativeLongBitwiseFolds.php';
 require_once __DIR__.'/DiscardedPureCallElisionNativeLongCompareMulFolds.php';
 require_once __DIR__.'/DiscardedPureCallElisionNativeLongPowFolds.php';
 require_once __DIR__.'/DiscardedPureCallElisionMathGuardAndVoidNativeOps.php';
+require_once __DIR__.'/DiscardedPureCallElisionPureMathAndVoidNativeOps.php';
 require_once __DIR__.'/DiscardedPureCallElisionIntrospectOps.php';
 require_once __DIR__.'/DiscardedPureCallElisionTypeStringCoreOps.php';
 
@@ -37,7 +38,10 @@ require_once __DIR__.'/DiscardedPureCallElisionTypeStringCoreOps.php';
  * Native-long bit-shift / bitwise-logic folds live in {@see DiscardedPureCallElisionNativeLongBitwiseFolds} (#36387).
  * Native-long compare / mul / identity folds live in {@see DiscardedPureCallElisionNativeLongCompareMulFolds} (#36387).
  * Native-long {@code **}/{@code pow()} exponent folds live in {@see DiscardedPureCallElisionNativeLongPowFolds} (#36387).
- * Math arg guards / pure math / void-Native constraint checks live in {@see DiscardedPureCallElisionMathGuardAndVoidNativeOps} (#36387).
+ * Math arg guards / count-on-typed-array / shared arg predicates live in
+ * {@see DiscardedPureCallElisionMathGuardAndVoidNativeOps} (#36387).
+ * Pure math/round + effect-free void Native checks live in
+ * {@see DiscardedPureCallElisionPureMathAndVoidNativeOps} (#36387).
  * Exists / class / object introspect eliders live in
  * {@see DiscardedPureCallElisionIntrospectOps} (#36387).
  * Type/ctype/strlen/ord/chr/string-transform/str_incdec eliders live in
@@ -443,6 +447,7 @@ final class DiscardedPureCallElision
     use DiscardedPureCallElisionNativeLongCompareMulFolds;
     use DiscardedPureCallElisionNativeLongPowFolds;
     use DiscardedPureCallElisionMathGuardAndVoidNativeOps;
+    use DiscardedPureCallElisionPureMathAndVoidNativeOps;
     use DiscardedPureCallElisionIntrospectOps;
     use DiscardedPureCallElisionTypeStringCoreOps;
 

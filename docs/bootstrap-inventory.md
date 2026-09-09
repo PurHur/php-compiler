@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8584 |
-| Phase A inventory files (M2 ratio SSOT) | 8584 |
+| PHP files on vm.php path | 8585 |
+| Phase A inventory files (M2 ratio SSOT) | 8585 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26764 |
+| Source constructs flagged (warnings) | 26766 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7360,6 +7360,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/DiscardedPureCallElisionNativeLongCompareMulFolds.php` | 0 | 2 |
 | `lib/JIT/DiscardedPureCallElisionNativeLongFolds.php` | 0 | 2 |
 | `lib/JIT/DiscardedPureCallElisionNativeLongPowFolds.php` | 0 | 2 |
+| `lib/JIT/DiscardedPureCallElisionPureMathAndVoidNativeOps.php` | 0 | 2 |
 | `lib/JIT/DiscardedPureCallElisionRuntimeInfoOps.php` | 0 | 2 |
 | `lib/JIT/DiscardedPureCallElisionStringOps.php` | 0 | 2 |
 | `lib/JIT/DiscardedPureCallElisionTypeStringCoreOps.php` | 0 | 2 |
@@ -60620,8 +60621,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/DiscardedPureCallElisionMathGuardAndVoidNativeOps.php`
 
 **Warnings** (review for bootstrap subset):
-- trait DiscardedPureCallElisionMathGuardAndVoidNativeOps (line 27)
-- 21 class method(s)
+- trait DiscardedPureCallElisionMathGuardAndVoidNativeOps (line 26)
+- 14 class method(s)
 
 ### `lib/JIT/DiscardedPureCallElisionNativeLongBitwiseFolds.php`
 
@@ -60646,6 +60647,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - trait DiscardedPureCallElisionNativeLongPowFolds (line 22)
 - 1 class method(s)
+
+### `lib/JIT/DiscardedPureCallElisionPureMathAndVoidNativeOps.php`
+
+**Warnings** (review for bootstrap subset):
+- trait DiscardedPureCallElisionPureMathAndVoidNativeOps (line 32)
+- 7 class method(s)
 
 ### `lib/JIT/DiscardedPureCallElisionRuntimeInfoOps.php`
 
