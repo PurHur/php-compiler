@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 /**
- * Compile-time native-long / intdiv / pow fold helpers used by typed arith
+ * Compile-time native-long / intdiv fold helpers used by typed arith
  * lowering (#36403 / #36386 / #23483).
  *
  * Extracted from {@see DiscardedPureCallElision} so the hub stays under the
@@ -13,7 +13,7 @@ namespace PHPCompiler\JIT;
  * {@see DiscardedPureCallElisionNativeLongBitwiseFolds} (#36387).
  * Compare / mul / identity folds live in
  * {@see DiscardedPureCallElisionNativeLongCompareMulFolds} (#36387).
- * Compile-time {@code **}{@code pow()} exponent folds live in
+ * Compile-time {@code **} / {@code pow()} exponent folds live in
  * {@see DiscardedPureCallElisionNativeLongPowFolds} (#36387).
  * External call sites keep using
  * {@code DiscardedPureCallElision::…} (trait methods on the hub class).
