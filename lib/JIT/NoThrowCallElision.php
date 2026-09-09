@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Call\Vararg;
 
 require_once __DIR__.'/NoThrowCallElisionRuntimeInfoPredicates.php';
 require_once __DIR__.'/NoThrowCallElisionExistsConvertAndIntrospectOps.php';
+require_once __DIR__.'/NoThrowCallElisionConvertAndScalarCastOps.php';
 require_once __DIR__.'/NoThrowCallElisionTypeCtypeHtmlOps.php';
 require_once __DIR__.'/NoThrowCallElisionStringSlicePadReplaceOps.php';
 require_once __DIR__.'/NoThrowCallElisionMathAndFormatOps.php';
@@ -69,8 +70,10 @@ require_once __DIR__.'/NoThrowCallElisionPureBuiltinArgOps.php';
  *
  * Runtime-info pure-builtin name/arg predicates live in
  * {@see NoThrowCallElisionRuntimeInfoPredicates} (#36387).
- * Exists / convert / introspect / scalar-cast / version_compare proofs live in
+ * Exists / introspect / version_compare proofs live in
  * {@see NoThrowCallElisionExistsConvertAndIntrospectOps} (#36403).
+ * Convert / path-url / hash_equals / scalar-cast ArgsCannotThrow live in
+ * {@see NoThrowCallElisionConvertAndScalarCastOps} (#36387).
  * Type / ctype / string transform / html / slice / pad / replace proofs live in
  * {@see NoThrowCallElisionTypeCtypeHtmlOps} (#36387).
  * Math / number_format / scalar-cast / base-inet-minmax / path-url
@@ -84,6 +87,7 @@ final class NoThrowCallElision
     use NoThrowCallElisionRuntimeInfoPredicates;
 
     use NoThrowCallElisionExistsConvertAndIntrospectOps;
+    use NoThrowCallElisionConvertAndScalarCastOps;
 
     use NoThrowCallElisionTypeCtypeHtmlOps;
     use NoThrowCallElisionStringSlicePadReplaceOps;
