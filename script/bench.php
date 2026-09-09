@@ -10,16 +10,34 @@ declare(strict_types=1);
  *           Also runs script/bench-web-request.php (MiniWebApp req/s) and refreshes
  *           docs/pages/bench.html unless PHP_COMPILER_BENCH_SKIP_WEB=1.
  *
+ * v2 wall budget (#36385 Done-when): regenerate in < 15 min. Defaults differ from
+ * the legacy suite — shorter per-run cap, fewer average iterations, skip JIT after
+ * a VM time-cap, and reuse a slow verify sample instead of re-running it N times.
+ *
  * Usage (pinned env):
  *   ./script/docker-exec.sh -- bash -lc 'PHP_8_2=$(command -v php) php script/bench.php'
  *   ./script/docker-exec.sh -- bash -lc 'PHP_8_2=$(command -v php) php script/bench.php --v2'
  */
 
-const ITERATIONS = 5;
+const ITERATIONS_LEGACY = 5;
+/** Fewer averages keep v2 under the 15 min regen budget (#36385). */
+const ITERATIONS_V2 = 3;
+/**
+ * Fail-fast per-run cap for v2 VM/JIT (seconds). Legacy default remains 300s.
+ * Override with PHP_COMPILER_BENCH_TIMEOUT. binary-trees / fannkuch-redux still
+ * time out under VM; a 300s cap burned ~20 min on those two alone.
+ */
+const V2_DEFAULT_TIMEOUT_SEC = 25;
+/**
+ * When a successful VM/JIT verify already took this long, reuse that sample as
+ * the column time instead of averaging more runs (#36385 wall budget).
+ */
+const V2_REUSE_VERIFY_SEC = 5.0;
 
 $root = dirname(__DIR__);
 $argvList = $argv ?? [];
 $v2 = in_array('--v2', $argvList, true);
+$iterations = $v2 ? ITERATIONS_V2 : ITERATIONS_LEGACY;
 
 $runtimes = [];
 foreach (getenv() as $key => $value) {
@@ -46,7 +64,12 @@ $suiteDir = $v2 ? $root.'/benchmarks/v2' : $root.'/benchmarks';
 $it = new GlobIterator($suiteDir.'/*.php');
 $testResults = [];
 
-echo 'Running '.ITERATIONS.' iterations of each '.($v2 ? 'v2 ' : '')."test, and averaging\n";
+echo 'Running '.$iterations.' iterations of each '.($v2 ? 'v2 ' : '')."test, and averaging\n";
+if ($v2) {
+    echo 'v2 caps: timeout='.benchTimeoutSeconds(true).'s'
+        .' · reuse-verify>='.V2_REUSE_VERIFY_SEC.'s'
+        ." · skip JIT after VM time-cap (#36385)\n";
+}
 $files = [];
 foreach ($it as $file) {
     $files[$file->getBasename('.php')] = $file->getPathname();
@@ -55,9 +78,10 @@ ksort($files, \SORT_STRING);
 if ([] === $files) {
     die("No benchmark PHP files under {$suiteDir}\n");
 }
+$suiteStarted = microtime(true);
 foreach ($files as $name => $path) {
     echo "Running {$name}:\n";
-    $testResults[$name] = bench($path, $runtimes, $harnessPhp, $llvmEnv, $root);
+    $testResults[$name] = bench($path, $runtimes, $harnessPhp, $llvmEnv, $root, $v2, $iterations);
 }
 
 $results = '| Test Name          ';
@@ -90,7 +114,7 @@ $stamp = sprintf(
     "Environment: %s · LLVM 9 %s · %d iterations averaged, wall time per run.\n\n",
     trim((string) shell_exec(escapeshellcmd($harnessPhp).' -r "echo PHP_VERSION;"')),
     '' !== $llvmEnv ? 'available' : 'unavailable (VM/JIT only)',
-    ITERATIONS
+    $iterations
 );
 
 if ($v2) {
@@ -111,7 +135,7 @@ if ($v2) {
         'suite' => 'v2',
         'generated_at' => gmdate('Y-m-d\TH:i:s\Z'),
         'php_version' => trim((string) shell_exec(escapeshellcmd($harnessPhp).' -r "echo PHP_VERSION;"')),
-        'iterations' => ITERATIONS,
+        'iterations' => $iterations,
         'cases' => $testResults,
     ];
     $resultsJson = $suiteDir.'/RESULTS.json';
@@ -152,6 +176,13 @@ if ($v2) {
     if (0 !== $chartRc) {
         fwrite(STDERR, "bench.php --v2: generate-bench-chart exited {$chartRc}\n");
     }
+
+    $suiteWall = microtime(true) - $suiteStarted;
+    printf("v2 suite wall: %.1fs (budget 900s / 15 min, #36385)\n", $suiteWall);
+    if ($suiteWall > 900.0) {
+        fwrite(STDERR, "bench.php --v2: exceeded 15 min wall (#36385 Done-when)\n");
+        exit(1);
+    }
 } else {
     $readme = file_get_contents($root.'/benchmarks/README.md');
     $readme = preg_replace(
@@ -165,12 +196,19 @@ if ($v2) {
 echo $results;
 
 /** @param array<string, string> $runtimes */
-function bench(string $file, array $runtimes, string $harnessPhp, string $llvmEnv, string $root): array
-{
+function bench(
+    string $file,
+    array $runtimes,
+    string $harnessPhp,
+    string $llvmEnv,
+    string $root,
+    bool $v2,
+    int $iterations
+): array {
     echo "Testing each method:\n";
-    $expected = trim(capture(escapeshellcmd($harnessPhp).' '.escapeshellarg($file)));
+    $expected = trim(capture(escapeshellcmd($harnessPhp).' '.escapeshellarg($file), $zendRc, null, $v2));
     foreach ($runtimes as $name => $binary) {
-        $got = trim(capture(escapeshellcmd($binary).' '.escapeshellarg($file)));
+        $got = trim(capture(escapeshellcmd($binary).' '.escapeshellarg($file), $rtRc, null, $v2));
         if ($expected !== $got) {
             die("Failure for Zend {$name}: \"{$got}\" != \"{$expected}\"\n");
         }
@@ -178,24 +216,35 @@ function bench(string $file, array $runtimes, string $harnessPhp, string $llvmEn
     $vmCmd = escapeshellcmd($harnessPhp)
         .' -d error_reporting=1 -d log_errors=1 -d display_errors=stderr'
         .' '.escapeshellarg($root.'/bin/vm.php').' '.escapeshellarg($file);
-    $vmOk = trim(capture($vmCmd, $vmRc)) === $expected;
+    $vmStarted = microtime(true);
+    $vmOut = trim(capture($vmCmd, $vmRc, null, $v2));
+    $vmVerifySec = microtime(true) - $vmStarted;
+    $vmOk = $vmOut === $expected;
+    $vmTimedOut = !$vmOk && capture_timed_out($vmRc);
     if (!$vmOk) {
-        echo capture_timed_out($vmRc)
+        echo $vmTimedOut
             ? "  vm.php exceeded the time cap — vm column n/a\n"
             : "  vm.php output mismatch — vm column n/a\n";
     }
 
     $jitCmd = $llvmEnv.' '.escapeshellcmd($harnessPhp).' '.escapeshellarg($root.'/bin/jit.php').' '.escapeshellarg($file);
     $jitOk = false;
-    if ('' !== $llvmEnv) {
-        $jitOk = trim(capture($jitCmd, $jitRc)) === $expected;
+    $jitVerifySec = 0.0;
+    $jitRc = null;
+    if ('' === $llvmEnv) {
+        echo "  no LLVM available — jit column n/a\n";
+    } elseif ($v2 && $vmTimedOut) {
+        // Same workload will hit the cap under JIT; do not burn another full timeout (#36385).
+        echo "  skip jit after vm time-cap — jit column n/a\n";
+    } else {
+        $jitStarted = microtime(true);
+        $jitOk = trim(capture($jitCmd, $jitRc, null, $v2)) === $expected;
+        $jitVerifySec = microtime(true) - $jitStarted;
         if (!$jitOk) {
             echo capture_timed_out($jitRc)
                 ? "  jit.php exceeded the time cap — jit column n/a\n"
                 : "  jit.php unavailable or mismatch — jit column n/a\n";
         }
-    } else {
-        echo "  no LLVM available — jit column n/a\n";
     }
 
     $binary = tempnam(sys_get_temp_dir(), 'phpcbench');
@@ -203,9 +252,9 @@ function bench(string $file, array $runtimes, string $harnessPhp, string $llvmEn
     $aotOk = false;
     $buildRc = null;
     if ('' !== $llvmEnv) {
-        capture($buildCmd.' 2>&1', $buildRc, buildCapSeconds());
+        capture($buildCmd.' 2>&1', $buildRc, buildCapSeconds(), $v2);
         $aotOk = 0 === $buildRc && is_executable($binary)
-            && trim(capture(escapeshellarg($binary))) === $expected;
+            && trim(capture(escapeshellarg($binary), $aotRunRc, null, $v2)) === $expected;
     }
     if (!$aotOk) {
         echo capture_timed_out($buildRc)
@@ -215,32 +264,46 @@ function bench(string $file, array $runtimes, string $harnessPhp, string $llvmEn
 
     $times = [];
     foreach ($runtimes as $name => $bin) {
-        $times[$name] = timeCmd(escapeshellcmd($bin).' '.escapeshellarg($file));
+        $times[$name] = timeCmd(escapeshellcmd($bin).' '.escapeshellarg($file), $iterations, $v2);
     }
-    $times['vm'] = $vmOk ? timeCmd($vmCmd) : null;
-    $times['jit'] = $jitOk ? timeCmd($jitCmd) : null;
-    $times['aotcompile'] = $aotOk ? timeCmd($buildCmd) : null;
-    $times['aot'] = $aotOk ? timeCmd(escapeshellarg($binary)) : null;
+    $times['vm'] = $vmOk
+        ? timeOrReuse($vmCmd, $vmVerifySec, $iterations, $v2)
+        : null;
+    $times['jit'] = $jitOk
+        ? timeOrReuse($jitCmd, $jitVerifySec, $iterations, $v2)
+        : null;
+    $times['aotcompile'] = $aotOk ? timeCmd($buildCmd, $iterations, $v2) : null;
+    $times['aot'] = $aotOk ? timeCmd(escapeshellarg($binary), $iterations, $v2) : null;
     @unlink($binary);
 
     return $times;
 }
 
-function timeCmd(string $cmd): float
+function timeOrReuse(string $cmd, float $verifySec, int $iterations, bool $v2): float
 {
-    $start = microtime(true);
-    for ($i = 0; $i < ITERATIONS; ++$i) {
-        capture($cmd);
+    if ($v2 && $verifySec >= V2_REUSE_VERIFY_SEC) {
+        echo sprintf("  reuse %.2fs verify sample (skip %d-iter average)\n", $verifySec, $iterations);
+
+        return $verifySec;
     }
 
-    return (microtime(true) - $start) / ITERATIONS;
+    return timeCmd($cmd, $iterations, $v2);
 }
 
-function capture(string $cmd, ?int &$rc = null, ?int $capSeconds = null): string
+function timeCmd(string $cmd, int $iterations, bool $v2): float
+{
+    $start = microtime(true);
+    for ($i = 0; $i < $iterations; ++$i) {
+        capture($cmd, $rc, null, $v2);
+    }
+
+    return (microtime(true) - $start) / $iterations;
+}
+
+function capture(string $cmd, ?int &$rc = null, ?int $capSeconds = null, bool $v2 = false): string
 {
     if (null === $capSeconds) {
-        $timeout = getenv('PHP_COMPILER_BENCH_TIMEOUT');
-        $timeout = is_string($timeout) && ctype_digit($timeout) ? (int) $timeout : 300;
+        $timeout = benchTimeoutSeconds($v2);
     } else {
         $timeout = $capSeconds;
     }
@@ -255,6 +318,16 @@ function capture(string $cmd, ?int &$rc = null, ?int $capSeconds = null): string
 function capture_timed_out(?int $rc): bool
 {
     return 124 === $rc || 137 === $rc;
+}
+
+function benchTimeoutSeconds(bool $v2): int
+{
+    $fromEnv = getenv('PHP_COMPILER_BENCH_TIMEOUT');
+    if (is_string($fromEnv) && ctype_digit($fromEnv)) {
+        return (int) $fromEnv;
+    }
+
+    return $v2 ? V2_DEFAULT_TIMEOUT_SEC : 300;
 }
 
 function buildCapSeconds(): int

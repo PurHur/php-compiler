@@ -102,6 +102,10 @@ final class BenchGateTest extends TestCase
         $bench = (string) file_get_contents($root.'/script/bench.php');
         $this->assertStringContainsString('bench-web-request.php', $bench);
         $this->assertStringContainsString('generate-bench-chart.php', $bench);
+        $this->assertStringContainsString('ITERATIONS_V2', $bench);
+        $this->assertStringContainsString('V2_DEFAULT_TIMEOUT_SEC', $bench);
+        $this->assertStringContainsString('skip jit after vm time-cap', $bench);
+        $this->assertStringContainsString('exceeded 15 min wall', $bench);
         $readme = (string) file_get_contents($root.'/benchmarks/README.md');
         $this->assertStringNotContainsString('9.1x faster', $readme);
         $this->assertStringNotContainsString('7.6x slower', $readme);
