@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8559 |
-| Phase A inventory files (M2 ratio SSOT) | 8559 |
+| PHP files on vm.php path | 8560 |
+| Phase A inventory files (M2 ratio SSOT) | 8560 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26717 |
+| Source constructs flagged (warnings) | 26719 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7347,6 +7347,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/DatePeriodForeachSnapshot.php` | 0 | 3 |
 | `lib/JIT/DeprecatedCallGuard.php` | 0 | 1 |
 | `lib/JIT/DiscardedPureCallElision.php` | 0 | 1 |
+| `lib/JIT/DiscardedPureCallElisionStringOps.php` | 0 | 2 |
 | `lib/JIT/DnfParamCheck.php` | 0 | 31 |
 | `lib/JIT/DomExtensionHooks.php` | 0 | 1 |
 | `lib/JIT/DomInstanceMethodJit.php` | 0 | 114 |
@@ -60545,7 +60546,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/DiscardedPureCallElision.php`
 
 **Warnings** (review for bootstrap subset):
-- 170 class method(s)
+- 161 class method(s)
+
+### `lib/JIT/DiscardedPureCallElisionStringOps.php`
+
+**Warnings** (review for bootstrap subset):
+- trait DiscardedPureCallElisionStringOps (line 25)
+- 9 class method(s)
 
 ### `lib/JIT/DnfParamCheck.php`
 
