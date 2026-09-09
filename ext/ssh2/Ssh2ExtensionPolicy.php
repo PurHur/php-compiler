@@ -4,24 +4,19 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\ssh2;
 
-use PHPCompiler\CompilerVersion;
+use PHPCompiler\ExtensionRegistry;
 
 /**
  * ext/ssh2 surface advertisement — PECL ssh2 / libssh2 (#6385).
  *
- * Withheld on the reference profile (Zend 8.2 harness typically lacks pecl-ssh2).
- * Enable via {@see CompilerVersion::supportsSsh2()} (PROFILE≥8.4) or
- * {@code PHP_COMPILER_ENABLE_SSH2=1}.
+ * {@see advertisesExtension()} is folded to ext.json advertise → ExtensionRegistry (#36204).
+ * Compliance helpers for phantom / gated cases stay here.
  */
 final class Ssh2ExtensionPolicy
 {
     public static function advertisesExtension(): bool
     {
-        if (CompilerVersion::supportsSsh2()) {
-            return true;
-        }
-
-        return self::explicitEnableRequested();
+        return ExtensionRegistry::advertisesExtensionFor('ssh2');
     }
 
     public static function advertisesBuiltins(): bool
@@ -48,16 +43,5 @@ final class Ssh2ExtensionPolicy
         }
 
         return true;
-    }
-
-    private static function explicitEnableRequested(): bool
-    {
-        $raw = getenv('PHP_COMPILER_ENABLE_SSH2');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-        $v = strtolower(trim($raw));
-
-        return !\in_array($v, ['0', 'false', 'off', 'no'], true);
     }
 }

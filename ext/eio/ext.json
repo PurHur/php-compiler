@@ -15,5 +15,9 @@
     },
     "policy_env": [
         "PHP_COMPILER_ENABLE_EIO"
-    ]
+    ],
+    "advertise": {
+        "compiler_version": "supportsEio",
+        "or_env": "PHP_COMPILER_ENABLE_EIO"
+    }
 }

@@ -15,5 +15,9 @@
     },
     "policy_env": [
         "PHP_COMPILER_ENABLE_IMAP"
-    ]
+    ],
+    "advertise": {
+        "compiler_version": "supportsImap",
+        "or_env": "PHP_COMPILER_ENABLE_IMAP"
+    }
 }
