@@ -7025,6 +7025,7 @@ require_once __DIR__.'/../../../lib/JIT/DnfParamCheck.php';
 require_once __DIR__.'/../../../lib/JIT/DiscardedPureCallElisionStringOps.php';
 require_once __DIR__.'/../../../lib/JIT/DiscardedPureCallElisionArrayOps.php';
 require_once __DIR__.'/../../../lib/JIT/DiscardedPureCallElisionDateCalOps.php';
+require_once __DIR__.'/../../../lib/JIT/DiscardedPureCallElisionFormatAnalyzeOps.php';
 require_once __DIR__.'/../../../lib/JIT/DiscardedPureCallElision.php';
 require_once __DIR__.'/../../../lib/JIT/DomInstanceMethodJit.php';
 require_once __DIR__.'/../../../lib/JIT/DynamicObjectReadonlyGuard.php';
