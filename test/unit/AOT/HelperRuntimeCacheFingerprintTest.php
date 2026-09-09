@@ -112,6 +112,8 @@ final class HelperRuntimeCacheFingerprintTest extends TestCase
             'coreFingerprint must not hash lib/JIT.php'
         );
         $hub = (string) file_get_contents($root.'/lib/AOT/HelperRuntimeCache.php');
+        $this->assertStringContainsString('HelperRuntimePaths::enabled', $hub);
+        $this->assertFileExists($root.'/lib/AOT/HelperRuntimePaths.php');
         $this->assertStringContainsString('HelperRuntimeFingerprint::coreFingerprint', $hub);
         $this->assertStringContainsString('HelperRuntimeLink::linkObjects', $hub);
         $this->assertFileExists($root.'/lib/AOT/HelperRuntimeLink.php');

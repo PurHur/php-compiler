@@ -29,9 +29,14 @@
             "note": "already under target; output helpers in LinkerOutputArtifacts (#36403); ASAN via clang/gcc (#36397)"
         },
         "lib/AOT/HelperRuntimeCache.php": {
-            "budget": 424,
+            "budget": 423,
             "target": 1200,
-            "note": "helper-cache granularity; Fingerprint+Link+Bind+Index+Warm extracts (#36387/#36403); sorted linkObjects (#36399); refusePrelinkGcMixReason (#36401)"
+            "note": "helper-cache granularity; Paths+Fingerprint+Link+Bind+Index+Warm extracts (#36387/#36403); sorted linkObjects (#36399); refusePrelinkGcMixReason (#36401)"
+        },
+        "lib/AOT/HelperRuntimePaths.php": {
+            "budget": 79,
+            "target": 200,
+            "note": "enabled/cacheDir/unitsDir/slugFor/archKey/prelinkedUnitsDir/markEmitting extracted from HelperRuntimeCache (#36387/#15889/#36391)"
         },
         "lib/AOT/HelperRuntimeIndex.php": {
             "budget": 124,
