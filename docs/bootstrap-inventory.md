@@ -58840,14 +58840,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/CallUnpackCompileTime.php`
 
 **Warnings** (review for bootstrap subset):
-- new VmVariable (line 228)
-- new VmVariable (line 333)
-- new VmVariable (line 368)
-- new VmVariable (line 395)
-- new VmVariable (line 401)
-- new VmVariable (line 410)
-- new VmVariable (line 421)
-- 12 class method(s)
+- new VmVariable (line 277)
+- new VmVariable (line 382)
+- new VmVariable (line 417)
+- new VmVariable (line 444)
+- new VmVariable (line 450)
+- new VmVariable (line 459)
+- new VmVariable (line 470)
+- 13 class method(s)
 
 ### `lib/JIT/CallUnpackExpand.php`
 
