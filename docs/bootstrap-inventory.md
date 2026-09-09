@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8551 |
-| Phase A inventory files (M2 ratio SSOT) | 8551 |
+| PHP files on vm.php path | 8552 |
+| Phase A inventory files (M2 ratio SSOT) | 8552 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26702 |
+| Source constructs flagged (warnings) | 26704 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7303,6 +7303,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Context.php` | 0 | 10 |
 | `lib/JIT/ContextCastToBool.php` | 0 | 2 |
 | `lib/JIT/ContextCompileToFile.php` | 0 | 3 |
+| `lib/JIT/ContextCompileToFileEmitAndLink.php` | 0 | 2 |
 | `lib/JIT/ContextConstantFetch.php` | 0 | 10 |
 | `lib/JIT/ContextDefineBuiltinFunctionProxies.php` | 0 | 4 |
 | `lib/JIT/ContextDefineBuiltinFunctionProxiesArrayIteratorAndObject.php` | 0 | 8 |
@@ -59930,16 +59931,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Context.php`
 
 **Warnings** (review for bootstrap subset):
-- new ExtensionLoweringHooks (line 893)
-- new Scope (line 894)
-- new Analyzer (line 923)
-- new Helper (line 924)
-- new Builtin\Refcount (line 925)
-- new Builtin\Output (line 927)
-- new Builtin\Type (line 928)
-- new Builtin\Internal (line 929)
-- new Builtin\VarArg (line 930)
-- new Builtin\ErrorHandler (line 931)
+- new ExtensionLoweringHooks (line 895)
+- new Scope (line 896)
+- new Analyzer (line 925)
+- new Helper (line 926)
+- new Builtin\Refcount (line 927)
+- new Builtin\Output (line 929)
+- new Builtin\Type (line 930)
+- new Builtin\Internal (line 931)
+- new Builtin\VarArg (line 932)
+- new Builtin\ErrorHandler (line 933)
 
 ### `lib/JIT/ContextCastToBool.php`
 
@@ -59950,9 +59951,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ContextCompileToFile.php`
 
 **Warnings** (review for bootstrap subset):
-- trait ContextCompileToFile (line 25)
-- 2 class method(s)
+- trait ContextCompileToFile (line 22)
+- 1 class method(s)
 - 35 closure(s)
+
+### `lib/JIT/ContextCompileToFileEmitAndLink.php`
+
+**Warnings** (review for bootstrap subset):
+- trait ContextCompileToFileEmitAndLink (line 26)
+- 2 class method(s)
 
 ### `lib/JIT/ContextConstantFetch.php`
 

@@ -6988,6 +6988,7 @@ require_once __DIR__.'/../../../lib/JIT/ContextDefineBuiltinFunctionProxiesWeakA
 require_once __DIR__.'/../../../lib/JIT/ContextDefineBuiltinFunctionProxies.php';
 require_once __DIR__.'/../../../lib/JIT/ContextDefineBuiltins.php';
 require_once __DIR__.'/../../../lib/JIT/ContextCompileToFile.php';
+require_once __DIR__.'/../../../lib/JIT/ContextCompileToFileEmitAndLink.php';
 require_once __DIR__.'/../../../lib/JIT/ContextVariableOperandBinding.php';
 require_once __DIR__.'/../../../lib/JIT/ContextVariableOperandAlias.php';
 require_once __DIR__.'/../../../lib/JIT/ContextVariableOperandLookup.php';

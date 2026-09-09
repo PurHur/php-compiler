@@ -21,7 +21,8 @@ final class ContextCompileToFileLazyErrorBridgeRuntimeShrinkTest extends TestCas
         $this->assertStringContainsString('#35443', $context);
         $pos = strpos($context, 'public function compileToFile');
         $this->assertNotFalse($pos);
-        $end = strpos($context, 'Progress::noteFunction(\'jit_context_compile_common_begin\')', $pos);
+        // emit/link half lives in ContextCompileToFileEmitAndLink (#36387).
+        $end = strpos($context, '$this->emitAndLinkCompiledModule($file)', $pos);
         $this->assertNotFalse($end);
         $body = substr($context, $pos, $end - $pos);
 

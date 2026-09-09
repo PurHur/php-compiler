@@ -67,8 +67,8 @@ final class BootstrapInventoryEmitTest extends TestCase
 
     public function testJitContextCompileToFileUsesLinkerOutputGuard(): void
     {
-        $context = (string) file_get_contents(self::$root.'/lib/JIT/Context.php');
-        $this->assertStringContainsString('Linker::assertNonEmptyOutputFile', $context);
+        $emit = (string) file_get_contents(self::$root.'/lib/JIT/ContextCompileToFileEmitAndLink.php');
+        $this->assertStringContainsString('Linker::assertNonEmptyOutputFile', $emit);
     }
 
     public function testBootstrapInventoryArgvEmitOutputOkDocuments8709(): void
