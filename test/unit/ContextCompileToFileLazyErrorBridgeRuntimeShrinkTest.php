@@ -17,14 +17,13 @@ final class ContextCompileToFileLazyErrorBridgeRuntimeShrinkTest extends TestCas
 {
     public function testCompileToFileDropsEagerErrorBridgeEnsure(): void
     {
-        $context = (string) file_get_contents(__DIR__.'/../../lib/JIT/ContextCompileToFile.php');
+        $context = (string) file_get_contents(__DIR__.'/../../lib/JIT/ContextCompileToFile.php')
+            .(string) file_get_contents(__DIR__.'/../../lib/JIT/ContextCompileToFileStandaloneMain.php');
         $this->assertStringContainsString('#35443', $context);
-        $pos = strpos($context, 'public function compileToFile');
+        $this->assertStringContainsString('emitStandaloneMainFunction', $context);
+        $pos = strpos($context, 'private function emitStandaloneMainFunction');
         $this->assertNotFalse($pos);
-        // emit/link half lives in ContextCompileToFileEmitAndLink (#36387).
-        $end = strpos($context, '$this->emitAndLinkCompiledModule($file)', $pos);
-        $this->assertNotFalse($end);
-        $body = substr($context, $pos, $end - $pos);
+        $body = substr($context, $pos);
 
         foreach ([
             'ErrorBridge::ensureLinked($this)',
@@ -34,7 +33,7 @@ final class ContextCompileToFileLazyErrorBridgeRuntimeShrinkTest extends TestCas
             $this->assertStringNotContainsString(
                 $forbidden,
                 $body,
-                'compileToFile must not eagerly '.$forbidden.' (#35443)'
+                'compileToFile standalone main must not eagerly '.$forbidden.' (#35443)'
             );
         }
 

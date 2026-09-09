@@ -7393,6 +7393,8 @@
         "lib/JIT/Context.php",
         "lib/JIT/ContextCastToBool.php",
         "lib/JIT/ContextCompileToFile.php",
+        "lib/JIT/ContextCompileToFileEmitAndLink.php",
+        "lib/JIT/ContextCompileToFileStandaloneMain.php",
         "lib/JIT/ContextConstantFetch.php",
         "lib/JIT/ContextDefineBuiltinFunctionProxies.php",
         "lib/JIT/ContextDefineBuiltinFunctionProxiesArrayIteratorAndObject.php",
@@ -8292,6 +8294,7 @@
         "lib/VM/Concern/ScalarCastCompareArithConcatDispatch.php",
         "lib/VM/Concern/ScalarCastDispatch.php",
         "lib/VM/Concern/ScalarCompareDispatch.php",
+        "lib/VM/Concern/ScriptMagicAndTickDispatch.php",
         "lib/VM/Concern/StaticPropertyFetchDispatch.php",
         "lib/VM/Concern/TryCatchFinallyAndUncaughtDispatch.php",
         "lib/VM/Concern/TryCatchThrowDispatch.php",
@@ -8785,9 +8788,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8551,
+        "inventory_files": 8554,
         "excluded": 0,
-        "eligible": 8551,
+        "eligible": 8554,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

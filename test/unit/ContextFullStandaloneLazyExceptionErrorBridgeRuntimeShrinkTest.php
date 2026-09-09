@@ -21,9 +21,8 @@ final class ContextFullStandaloneLazyExceptionErrorBridgeRuntimeShrinkTest exten
         $this->assertStringContainsString('#35099', $context);
         $fullPos = strpos($context, 'private function ensureFullStandaloneBodies');
         $this->assertNotFalse($fullPos);
-        // Trait ends after ensureFull — no jitResult on this TU (#36387 StandaloneBodies extract).
-        $fullEnd = strlen($context);
-        $fullBody = substr($context, $fullPos, $fullEnd - $fullPos);
+        // ensureFull is the last method in ContextStandaloneBodies (#36387 extract).
+        $fullBody = substr($context, $fullPos);
 
         foreach ([
             'ExceptionBridge::ensureStandaloneBodies($this)',
@@ -78,20 +77,21 @@ final class ContextFullStandaloneLazyExceptionErrorBridgeRuntimeShrinkTest exten
 
     public function testStandaloneMainStillEnsuresBeforeClearAbort(): void
     {
-        $context = (string) file_get_contents(__DIR__.'/../../lib/JIT/ContextCompileToFile.php');
+        $context = (string) file_get_contents(__DIR__.'/../../lib/JIT/ContextCompileToFile.php')
+            .(string) file_get_contents(__DIR__.'/../../lib/JIT/ContextCompileToFileStandaloneMain.php');
         $this->assertStringContainsString('#35443', $context);
         // compileToFile must not eagerly NestedJIT ErrorBridge around clear/abort (#35443).
         $compilePos = strpos($context, 'public function compileToFile');
         $this->assertNotFalse($compilePos);
-        $compileEnd = strpos($context, 'public function compileCommon', $compilePos);
-        if (false === $compileEnd) {
-            $compileEnd = strpos($context, '$this->emitAndLinkCompiledModule($file)', $compilePos);
-        }
+        $mainPos = strpos($context, 'private function emitStandaloneMainFunction');
+        $this->assertNotFalse($mainPos);
+        $compileEnd = strpos($context, '$this->emitAndLinkCompiledModule($file)', $compilePos);
         if (false === $compileEnd) {
             $compileEnd = strpos($context, 'Progress::noteFunction(\'jit_context_compile_common_begin\')', $compilePos);
         }
         $this->assertNotFalse($compileEnd);
-        $compileBody = substr($context, $compilePos, $compileEnd - $compilePos);
+        $compileBody = substr($context, $compilePos, $compileEnd - $compilePos)
+            .substr($context, $mainPos);
         $this->assertStringNotContainsString(
             'ErrorBridge::ensureLinked($this)',
             $compileBody,
