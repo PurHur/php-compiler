@@ -447,6 +447,27 @@ SEED_UNITS=(
   /ext/mbstring/MbSplitJitHelper.php
   /ext/iconv/IconvJitHelper.php
   /ext/iconv/IconvStringJitHelper.php
+  # Finish iconv + compress/encode/strerror tier (#36391 after 322)
+  # Frexp/Ldexp/Modf/Nextafter/Shuffle still skipped (algorithm SSOT, no HELPER_PATH).
+  # Preg* still skipped: tip nested compile misses Compiler\Concern\OpCode.
+  # Sscanf still skipped: __init__ sealed during NestedJIT.
+  # Gethostbynamel skipped: NestedJIT missing __compiler_stream_resolve_include_path.
+  # Ini skipped: IniGetLeafJitHelper not compiled under helper-runtime-emit NestedJIT.
+  # Progress skipped: NestedJIT ContextLlvmConstantsAndRegistry seal during helper emit.
+  # CalInfo still skipped (unknown unit under NestedJIT).
+  # PosixSet* / PosixSession / PosixTerminal deferred (mutators / tty).
+  # Curl* handle/transfer deferred (host libcurl); Strerror* are string-only.
+  # Dom* / Intl* / Openssl* / Soap* / Sockets* deferred to later waves.
+  /ext/iconv/IconvMimeJitHelper.php
+  /ext/bcmath/BcmathJitHelper.php
+  /ext/bz2/Bz2JitHelper.php
+  /ext/bz2/Bz2StreamJitHelper.php
+  /ext/gettext/GettextJitHelper.php
+  /ext/exif/ExifImagetypeJitHelper.php
+  /ext/fileinfo/FinfoFileJitHelper.php
+  /ext/curl/CurlStrerrorJitHelper.php
+  /ext/curl/CurlShareStrerrorJitHelper.php
+  /ext/lzf/LzfJitHelper.php
 )
 
 MIN_SEED=${#SEED_UNITS[@]}
