@@ -204,9 +204,9 @@
             "note": "TYPE_CLASS_CONST_FETCH runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/Context.php": {
-            "budget": 930,
+            "budget": 932,
             "target": 3500,
-            "note": "FunctionProxyRegistration + ExternalMethodStubReport + ArrayIteratorAndObject + NestedJitKernelRegistry + ReflectionMembers + FiberGeneratorAndClosure + ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml proxies wiring + VariableOperandLookup + VariableOperandAlias + ModuleVerify + ConstantFetch + CastToBool + StructFieldMap + LlvmConstantEmit + ScopeLifecycle peers (#36387/#36199); continue toward \u22643.5k + ModuleOptimizationPasses (#36387)"
+            "note": "FunctionProxyRegistration + ExternalMethodStubReport + ArrayIteratorAndObject + NestedJitKernelRegistry + ReflectionMembers + FiberGeneratorAndClosure + ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml proxies wiring + VariableOperandLookup + VariableOperandAlias + ModuleVerify + ConstantFetch + CastToBool + TypeFromString + StructFieldMap + LlvmConstantEmit + ScopeLifecycle peers (#36387/#36199); continue toward \u22643.5k + ModuleOptimizationPasses (#36387)"
         },
         "lib/JIT/ContextEditScaffoldModuleRebind.php": {
             "budget": 315,
@@ -274,14 +274,19 @@
             "note": "functionIsRegistered / builtin-name cache / registerModule|Builtin extracted from FunctionProxyAndNestedJitKernel (#36387)"
         },
         "lib/JIT/ContextTypeAndStructMap.php": {
-            "budget": 189,
-            "target": 300,
-            "note": "type\u2194LLVM map only; castToBool in ContextCastToBool; structField* in ContextStructFieldMap (#36387)"
+            "budget": 109,
+            "target": 200,
+            "note": "getTypeFromType / getStringFromType / unwrapNullable; castToBool in ContextCastToBool; getTypeFromString in ContextTypeFromString; structField* in ContextStructFieldMap (#36387)"
         },
         "lib/JIT/ContextCastToBool.php": {
             "budget": 106,
             "target": 200,
             "note": "castToBool / zend_is_true extracted from ContextTypeAndStructMap (#36387); php-src Zend/zend_operators.c"
+        },
+        "lib/JIT/ContextTypeFromString.php": {
+            "budget": 102,
+            "target": 200,
+            "note": "getTypeFromString / _getTypeFromString extracted from ContextTypeAndStructMap (#36387); php-src Zend/zend_API.c + Zend/zend_types.h"
         },
         "lib/JIT/ContextStructFieldMap.php": {
             "budget": 164,

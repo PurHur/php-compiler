@@ -7331,6 +7331,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/ContextStandaloneBodies.php` | 0 | 2 |
 | `lib/JIT/ContextStructFieldMap.php` | 0 | 2 |
 | `lib/JIT/ContextTypeAndStructMap.php` | 0 | 2 |
+| `lib/JIT/ContextTypeFromString.php` | 0 | 2 |
 | `lib/JIT/ContextVariableOperandAlias.php` | 0 | 3 |
 | `lib/JIT/ContextVariableOperandBinding.php` | 0 | 2 |
 | `lib/JIT/ContextVariableOperandLookup.php` | 0 | 4 |
@@ -59913,16 +59914,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Context.php`
 
 **Warnings** (review for bootstrap subset):
-- new ExtensionLoweringHooks (line 887)
-- new Scope (line 888)
-- new Analyzer (line 917)
-- new Helper (line 918)
-- new Builtin\Refcount (line 919)
-- new Builtin\Output (line 921)
-- new Builtin\Type (line 922)
-- new Builtin\Internal (line 923)
-- new Builtin\VarArg (line 924)
-- new Builtin\ErrorHandler (line 925)
+- new ExtensionLoweringHooks (line 889)
+- new Scope (line 890)
+- new Analyzer (line 919)
+- new Helper (line 920)
+- new Builtin\Refcount (line 921)
+- new Builtin\Output (line 923)
+- new Builtin\Type (line 924)
+- new Builtin\Internal (line 925)
+- new Builtin\VarArg (line 926)
+- new Builtin\ErrorHandler (line 927)
 
 ### `lib/JIT/ContextCastToBool.php`
 
@@ -60435,8 +60436,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ContextTypeAndStructMap.php`
 
 **Warnings** (review for bootstrap subset):
-- trait ContextTypeAndStructMap (line 25)
-- 5 class method(s)
+- trait ContextTypeAndStructMap (line 24)
+- 3 class method(s)
+
+### `lib/JIT/ContextTypeFromString.php`
+
+**Warnings** (review for bootstrap subset):
+- trait ContextTypeFromString (line 22)
+- 2 class method(s)
 
 ### `lib/JIT/ContextVariableOperandAlias.php`
 
