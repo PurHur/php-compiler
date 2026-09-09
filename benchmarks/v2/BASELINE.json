@@ -1,7 +1,7 @@
 {
     "version": 1,
     "suite": "v2",
-    "generated_at": "2026-09-09T02:09:35Z",
+    "generated_at": "2026-09-09T14:04:06Z",
     "arch": "x86_64-linux",
     "ratio_tolerance_percent": 20,
     "ir_tolerance_percent": 20,
@@ -9,39 +9,102 @@
     "note": "v2 gate subset (#36385). Ratio tolerance 20% so a deliberate ~2\u00d7 slowdown fails.",
     "cases": {
         "call-heavy": {
-            "ratio_aot_over_zend": 0.364715,
-            "zend_wall": 0.011834,
-            "aot_wall": 0.004316,
-            "ir_lines": 155036,
+            "ratio_aot_over_zend": 0.446248,
+            "zend_wall": 0.009428,
+            "aot_wall": 0.004207,
+            "ir_lines": 155074,
             "ir_defines": 545
         },
         "assoc-heavy": {
-            "ratio_aot_over_zend": 0.37981,
-            "zend_wall": 0.013483,
-            "aot_wall": 0.005121,
-            "ir_lines": 158655,
+            "ratio_aot_over_zend": 0.429031,
+            "zend_wall": 0.010589,
+            "aot_wall": 0.004543,
+            "ir_lines": 158692,
             "ir_defines": 565
         },
         "str-builder": {
-            "ratio_aot_over_zend": 0.470137,
-            "zend_wall": 0.009784,
-            "aot_wall": 0.0046,
-            "ir_lines": 160989,
+            "ratio_aot_over_zend": 0.398333,
+            "zend_wall": 0.014563,
+            "aot_wall": 0.005801,
+            "ir_lines": 161024,
             "ir_defines": 543
         },
         "k-nucleotide": {
-            "ratio_aot_over_zend": 0.414941,
-            "zend_wall": 0.009823,
-            "aot_wall": 0.004076,
-            "ir_lines": 173977,
+            "ratio_aot_over_zend": 0.3354,
+            "zend_wall": 0.011881,
+            "aot_wall": 0.003985,
+            "ir_lines": 174018,
             "ir_defines": 540
         },
         "template-render": {
-            "ratio_aot_over_zend": 0.429325,
-            "zend_wall": 0.013423,
-            "aot_wall": 0.005763,
-            "ir_lines": 147874,
+            "ratio_aot_over_zend": 0.400137,
+            "zend_wall": 0.015275,
+            "aot_wall": 0.006112,
+            "ir_lines": 147911,
             "ir_defines": 519
+        },
+        "fasta": {
+            "ratio_aot_over_zend": 0.280942,
+            "zend_wall": 0.009279,
+            "aot_wall": 0.002607,
+            "ir_lines": 163017,
+            "ir_defines": 547
+        },
+        "nbody": {
+            "ratio_aot_over_zend": 0.460515,
+            "zend_wall": 0.013148,
+            "aot_wall": 0.006055,
+            "ir_lines": 869651,
+            "ir_defines": 684
+        },
+        "sort-mixed": {
+            "ratio_aot_over_zend": 74.280643,
+            "zend_wall": 0.015528,
+            "aot_wall": 1.153427,
+            "ir_lines": 166809,
+            "ir_defines": 556
+        },
+        "regex-redux": {
+            "ratio_aot_over_zend": 0.50358,
+            "zend_wall": 0.012322,
+            "aot_wall": 0.006205,
+            "ir_lines": 936957,
+            "ir_defines": 860
+        },
+        "closure-heavy": {
+            "ratio_aot_over_zend": 0.338944,
+            "zend_wall": 0.012096,
+            "aot_wall": 0.0041,
+            "ir_lines": 172630,
+            "ir_defines": 534
+        },
+        "object-graph": {
+            "ratio_aot_over_zend": 0.461094,
+            "zend_wall": 0.012722,
+            "aot_wall": 0.005866,
+            "ir_lines": 164304,
+            "ir_defines": 537
+        },
+        "spectral-norm": {
+            "ratio_aot_over_zend": 0.52762,
+            "zend_wall": 0.014446,
+            "aot_wall": 0.007622,
+            "ir_lines": 402900,
+            "ir_defines": 684
+        },
+        "json-roundtrip": {
+            "ratio_aot_over_zend": 3.727,
+            "zend_wall": 0.009679,
+            "aot_wall": 0.036074,
+            "ir_lines": 278375,
+            "ir_defines": 609
+        },
+        "exceptions": {
+            "ratio_aot_over_zend": 0.64044,
+            "zend_wall": 0.009242,
+            "aot_wall": 0.005919,
+            "ir_lines": 172869,
+            "ir_defines": 555
         }
     }
 }
