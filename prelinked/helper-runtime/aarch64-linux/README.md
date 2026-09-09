@@ -13,7 +13,7 @@ non-native link.
 
 ## Seed corpus (VM_* + lib_VM_* + ext/standard + ctype/calendar/posix)
 
-**262** committed `unit.o` files:
+**272** committed `unit.o` files:
 
 - full `VM_*` (13) and `lib_VM_*` (9) sets from `x86_64-linux`
 - first `ext/standard` tier (10): ArrayChunk / ArrayIsList / ArraySlice / Bin2hex /
@@ -86,6 +86,10 @@ non-native link.
 - first non-standard: ctype + calendar + posix getters (10):
   Ctype / CalDaysInMonth / EasterDays / Gregoriantojd / Jdtogregorian /
   Jdtounix / Unixtojd / PosixGetpid / PosixGetuid / PosixStrerror
+- more calendar conversions + posix getters (10):
+  CalFromJd / CalToJd / EasterDate / Frenchtojd / Jdmonthname / Juliantojd /
+  PosixGetegid / PosixGeteuid / PosixGetgid / PosixGetppid
+  (deferred: CalInfo unknown-unit; PosixSet* / PosixSession / PosixTerminal)
 
 Refresh / expand via:
 
