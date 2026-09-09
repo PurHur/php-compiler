@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8588 |
-| Phase A inventory files (M2 ratio SSOT) | 8588 |
+| PHP files on vm.php path | 8589 |
+| Phase A inventory files (M2 ratio SSOT) | 8589 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26770 |
+| Source constructs flagged (warnings) | 26771 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -34961,7 +34961,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JsonDecodeJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
+- 13 class method(s)
 
 ### `ext/standard/JsonEncodeJitHelper.php`
 
