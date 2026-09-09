@@ -644,9 +644,9 @@
             "note": "nativeLongCompare* + nativeLongMul* + nativeLongArithIsCompileTimeIdentityOrZero extracted from NativeLongFolds (#36387); php-src Zend/zend_operators.c compare/mul/add/sub"
         },
         "lib/JIT/DiscardedPureCallElisionNativeLongPowFolds.php": {
-            "budget": 496,
+            "budget": 501,
             "target": 600,
-            "note": "nativeLongPowCompileTimeExponentFold extracted from NativeLongFolds (#36387/#36386); includes ninetythird fold; php-src Zend/zend_operators.c pow_function / zend_pow / mul_function; ext/standard/math.c PHP_FUNCTION(pow)"
+            "note": "nativeLongPowCompileTimeExponentFold extracted from NativeLongFolds (#36387/#36386); includes ninetyfourth fold; php-src Zend/zend_operators.c pow_function / zend_pow / mul_function; ext/standard/math.c PHP_FUNCTION(pow)"
         },
         "lib/JIT/DiscardedPureCallElisionIntrospectOps.php": {
             "budget": 407,
@@ -724,9 +724,9 @@
             "note": "integer pow()/ ** hub: Low/Mid/Exponents50to69/70to79/80to91/High dispatch (#36387/#36386)"
         },
         "ext/standard/JitPowIntegerEmitHigh.php": {
-            "budget": 6151,
-            "target": 8000,
-            "note": "integer pow()/ ** chained-smul emit for ninetysecond..ninetythird; 80..91 in Exponents80to91 (#36387/#36386)"
+            "budget": 9325,
+            "target": 12000,
+            "note": "integer pow()/ ** chained-smul emit for ninetysecond..ninetyfourth; 80..91 in Exponents80to91 (#36387/#36386)"
         },
         "ext/standard/JitPowIntegerEmitLow.php": {
             "budget": 3985,
