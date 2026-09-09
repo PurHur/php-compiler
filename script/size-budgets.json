@@ -633,6 +633,11 @@
             "target": 400,
             "note": "nativeLongCompare* + nativeLongMul* + nativeLongArithIsCompileTimeIdentityOrZero extracted from NativeLongFolds (#36387); php-src Zend/zend_operators.c compare/mul/add/sub"
         },
+        "lib/JIT/DiscardedPureCallElisionNativeLongPowFolds.php": {
+            "budget": 468,
+            "target": 600,
+            "note": "nativeLongPowCompileTimeExponentFold extracted from NativeLongFolds (#36387/#36386); php-src Zend/zend_operators.c pow_function / zend_pow / mul_function; ext/standard/math.c PHP_FUNCTION(pow)"
+        },
         "lib/JIT/DiscardedPureCallElisionIntrospectOps.php": {
             "budget": 407,
             "target": 500,
