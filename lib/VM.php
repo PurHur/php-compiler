@@ -52,6 +52,7 @@ require_once __DIR__.'/VM/Concern/FuncCallExecDispatch.php';
 require_once __DIR__.'/VM/Concern/ArgRecvDispatch.php';
 require_once __DIR__.'/VM/Concern/ScalarCastDispatch.php';
 require_once __DIR__.'/VM/Concern/ScalarCompareDispatch.php';
+require_once __DIR__.'/VM/Concern/ScalarArithBitwiseUnaryDispatch.php';
 require_once __DIR__.'/VM/Concern/ScalarCastCompareArithConcatDispatch.php';
 require_once __DIR__.'/VM/Concern/ClassConstFetchDispatch.php';
 require_once __DIR__.'/VM/Concern/IssetDispatch.php';
@@ -152,6 +153,7 @@ class VM {
     use ArgRecvDispatch;
     use ScalarCastDispatch;
     use ScalarCompareDispatch;
+    use ScalarArithBitwiseUnaryDispatch;
     use ScalarCastCompareArithConcatDispatch;
     use ClassConstFetchDispatch;
     use IssetDispatch;
@@ -704,6 +706,15 @@ restart:
                 case OpCode::TYPE_UNARY_MINUS:
                 case OpCode::TYPE_UNARY_PLUS:
                 case OpCode::TYPE_BITWISE_NOT:
+                    $arithOutcome = $this->executeScalarArithBitwiseUnaryDispatch($frame, $op);
+                    if ($arithOutcome instanceof Frame) {
+                        $frame = $arithOutcome;
+                        goto restart;
+                    }
+                    if (is_int($arithOutcome)) {
+                        return $arithOutcome;
+                    }
+                    break;
                 case OpCode::TYPE_CONCAT:
                     $scalarOutcome = $this->executeScalarCastCompareArithConcatDispatch($frame, $op);
                     if ($scalarOutcome instanceof Frame) {

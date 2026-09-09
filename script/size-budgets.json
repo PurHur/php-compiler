@@ -14,9 +14,9 @@
             "note": "Concern trait splits (#36387/#36403); DateTimeMutationAndUnserializeMeta + TernaryPhiReturnMerge + peers; CfgParamReturnTypeAndCalleeByRef + OpCodeArgSlotAndAssignRhs (#36387)"
         },
         "lib/VM.php": {
-            "budget": 1902,
+            "budget": 1913,
             "target": 15000,
-            "note": "YieldAndYieldFromDispatch + EmptyAndBooleanNotDispatch + FromCallableAndClosureDispatch + ListUnpackAndSpreadAssignDispatch + VarFetchGlobalAndFunctionStaticDispatch + ArgSendDispatch + DeclareClassLikeDispatch + ConstFetchStaticCallInstanceofDispatch + JumpCaseDispatch + CoalesceNullsafeSilenceExitDispatch + ForeachIterDispatch + EchoPrintEvalDispatch + MethodCallInitDispatch + NewDispatch + FuncCallInitDispatch + IncludeDispatch + IssetDispatch + ClassConstFetchDispatch + ScalarCompareDispatch + ScalarCastDispatch + ScalarCastCompareArithConcatDispatch + ArgRecvDispatch + FuncCallExecDispatch + AssignDispatch + UnsetDispatch + StaticPropertyFetchDispatch + ArrayDimFetchDispatch + ObjectPropertyFetchDispatch + ConstructMarkAndPendingOutboundCall + PropertyHookFrameAndStaticLink + IteratorToArrayConvert + IncludePathAndClassPseudoConst + ClassScopeAndStaticPropertyResolve + ClosureBindAndFunctionStatic + InternalHandlerExecuteAndAssignCopy + OutgoingCallArgResolve + ClassConstAndPropertyDefaultMaterialize + InheritanceFinalVarianceAndConstFetch + MethodCallAndStaticCallableInit + VirtualPropertyHookEnforce + ReturnTypeEnforce + DeprecationNoticeEmit + FrameActivationThisAndIncludeScope + FiberStartResumeAndThrow + GeneratorForeachAndYieldFrom + FrameObjectRefAndDeadTempRelease + UserInvokeArrayAccessAndClosureCall + BuiltinHostExceptionDispatch + ClassInheritDefineAndConstDeclare + TryCatchFinallyAndUncaughtDispatch + ExecuteIncDecAndScopeOperandRead + TypedIntRecursiveAndCountedLoopFastPath + PropertyFetchDestAndHookedDimWrite + ObjectPropertyMagicAndClone + ClassTraitComposition + ObjectPropertyReadonlyAndVisibility + Hooks + CollectAndSerialize + IssetEmptyUnset Concern extracts (#36403); under 15k target"
+            "note": "YieldAndYieldFromDispatch + EmptyAndBooleanNotDispatch + FromCallableAndClosureDispatch + ListUnpackAndSpreadAssignDispatch + VarFetchGlobalAndFunctionStaticDispatch + ArgSendDispatch + DeclareClassLikeDispatch + ConstFetchStaticCallInstanceofDispatch + JumpCaseDispatch + CoalesceNullsafeSilenceExitDispatch + ForeachIterDispatch + EchoPrintEvalDispatch + MethodCallInitDispatch + NewDispatch + FuncCallInitDispatch + IncludeDispatch + IssetDispatch + ClassConstFetchDispatch + ScalarArithBitwiseUnaryDispatch + ScalarCompareDispatch + ScalarCastDispatch + ScalarCastCompareArithConcatDispatch + ArgRecvDispatch + FuncCallExecDispatch + AssignDispatch + UnsetDispatch + StaticPropertyFetchDispatch + ArrayDimFetchDispatch + ObjectPropertyFetchDispatch + ConstructMarkAndPendingOutboundCall + PropertyHookFrameAndStaticLink + IteratorToArrayConvert + IncludePathAndClassPseudoConst + ClassScopeAndStaticPropertyResolve + ClosureBindAndFunctionStatic + InternalHandlerExecuteAndAssignCopy + OutgoingCallArgResolve + ClassConstAndPropertyDefaultMaterialize + InheritanceFinalVarianceAndConstFetch + MethodCallAndStaticCallableInit + VirtualPropertyHookEnforce + ReturnTypeEnforce + DeprecationNoticeEmit + FrameActivationThisAndIncludeScope + FiberStartResumeAndThrow + GeneratorForeachAndYieldFrom + FrameObjectRefAndDeadTempRelease + UserInvokeArrayAccessAndClosureCall + BuiltinHostExceptionDispatch + ClassInheritDefineAndConstDeclare + TryCatchFinallyAndUncaughtDispatch + ExecuteIncDecAndScopeOperandRead + TypedIntRecursiveAndCountedLoopFastPath + PropertyFetchDestAndHookedDimWrite + ObjectPropertyMagicAndClone + ClassTraitComposition + ObjectPropertyReadonlyAndVisibility + Hooks + CollectAndSerialize + IssetEmptyUnset Concern extracts (#36403); under 15k target"
         },
         "script/apply-patches.sh": {
             "budget": 7637,
@@ -174,9 +174,14 @@
             "note": "MCJIT bitcode warm tryRestore / export rebind extracted from BitcodePersist (#36387/#36199)"
         },
         "lib/VM/Concern/ScalarCastCompareArithConcatDispatch.php": {
-            "budget": 279,
-            "target": 350,
-            "note": "inc/dec/arith/bitwise/unary/CONCAT runFramesInner body; CAST_* in ScalarCastDispatch; IDENTICAL..SPACESHIP in ScalarCompareDispatch (#36403)"
+            "budget": 112,
+            "target": 150,
+            "note": "CONCAT runFramesInner body; CAST_* in ScalarCastDispatch; IDENTICAL..SPACESHIP in ScalarCompareDispatch; POST_INC..BITWISE_NOT in ScalarArithBitwiseUnaryDispatch (#36403)"
+        },
+        "lib/VM/Concern/ScalarArithBitwiseUnaryDispatch.php": {
+            "budget": 206,
+            "target": 280,
+            "note": "POST_INC..POW / bitwise / unary runFramesInner body extracted from ScalarCastCompareArithConcatDispatch (#36403); php-src ZEND_POST_INC..POW / ZEND_BW_* / unary; zend_operators.c"
         },
         "lib/VM/Concern/ScalarCompareDispatch.php": {
             "budget": 151,

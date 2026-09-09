@@ -7890,6 +7890,7 @@ require_once __DIR__.'/../../../lib/VM/Concern/FuncCallExecDispatch.php';
 require_once __DIR__.'/../../../lib/VM/Concern/ArgRecvDispatch.php';
 require_once __DIR__.'/../../../lib/VM/Concern/ScalarCastDispatch.php';
 require_once __DIR__.'/../../../lib/VM/Concern/ScalarCompareDispatch.php';
+require_once __DIR__.'/../../../lib/VM/Concern/ScalarArithBitwiseUnaryDispatch.php';
 require_once __DIR__.'/../../../lib/VM/Concern/ScalarCastCompareArithConcatDispatch.php';
 require_once __DIR__.'/../../../lib/VM/Concern/ClassConstFetchDispatch.php';
 require_once __DIR__.'/../../../lib/VM/Concern/IssetDispatch.php';
