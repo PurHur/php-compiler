@@ -29,9 +29,9 @@
             "note": "already under target; output helpers in LinkerOutputArtifacts (#36403); ASAN via clang/gcc (#36397)"
         },
         "lib/AOT/HelperRuntimeCache.php": {
-            "budget": 425,
+            "budget": 427,
             "target": 1200,
-            "note": "helper-cache granularity; Paths+Fingerprint+FingerprintUnit+Link+Bind+Index+Warm extracts (#36387/#36403); sorted linkObjects (#36399); refusePrelinkGcMixReason (#36401)"
+            "note": "helper-cache granularity; Paths+Fingerprint+FingerprintUnit+Link+Bind+InlineOnly+Index+Warm extracts (#36387/#36403); sorted linkObjects (#36399); refusePrelinkGcMixReason (#36401)"
         },
         "lib/AOT/HelperRuntimePaths.php": {
             "budget": 79,
@@ -47,6 +47,16 @@
             "budget": 129,
             "target": 300,
             "note": "warmForUserAotBuild/committedCacheHasUnits extracted from HelperRuntimeCache (#36387/#15889/#24302)"
+        },
+        "lib/AOT/HelperRuntimeBind.php": {
+            "budget": 288,
+            "target": 600,
+            "note": "tryProvide/declareExtern/localize/lifecycle; NestedJIT-force list in HelperRuntimeBindInlineOnly (#36387/#15889/#16075)"
+        },
+        "lib/AOT/HelperRuntimeBindInlineOnly.php": {
+            "budget": 287,
+            "target": 400,
+            "note": "USER_SCRIPT_INLINE_ONLY NestedJIT-force logicals extracted from HelperRuntimeBind (#36387/#15889/#17954)"
         },
         "lib/AOT/HelperRuntimeFingerprint.php": {
             "budget": 420,
