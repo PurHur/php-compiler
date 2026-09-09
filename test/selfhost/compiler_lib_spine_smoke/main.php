@@ -8723,4 +8723,5 @@ unset($__spineMimeEnc, $__spineMimeDec);
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompileErrorSuppressEndBlockAndSlotInherit.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompileAnonymousFunctionGeneratorAndNever.php';
 require_once __DIR__.'/../../../ext/standard/JitPowIntegerEmitLow.php';
+require_once __DIR__.'/../../../ext/standard/JitPowIntegerEmitExponents70to79.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
