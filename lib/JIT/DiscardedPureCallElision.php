@@ -13,6 +13,7 @@ require_once __DIR__.'/DiscardedPureCallElisionFormatAnalyzeOps.php';
 require_once __DIR__.'/DiscardedPureCallElisionMathAndHashOps.php';
 require_once __DIR__.'/DiscardedPureCallElisionRuntimeInfoOps.php';
 require_once __DIR__.'/DiscardedPureCallElisionNativeLongFolds.php';
+require_once __DIR__.'/DiscardedPureCallElisionNativeLongBitwiseFolds.php';
 require_once __DIR__.'/DiscardedPureCallElisionMathGuardAndVoidNativeOps.php';
 require_once __DIR__.'/DiscardedPureCallElisionIntrospectOps.php';
 require_once __DIR__.'/DiscardedPureCallElisionTypeStringCoreOps.php';
@@ -30,7 +31,8 @@ require_once __DIR__.'/DiscardedPureCallElisionTypeStringCoreOps.php';
  * {@see DiscardedPureCallElisionMathAndHashOps} (#36387).
  * Runtime-info / process / clock / civil-date / randmax eliders live in
  * {@see DiscardedPureCallElisionRuntimeInfoOps} (#36387).
- * Native-long/intdiv/bitwise/pow fold helpers live in {@see DiscardedPureCallElisionNativeLongFolds} (#36403).
+ * Native-long/intdiv/pow/compare/mul fold helpers live in {@see DiscardedPureCallElisionNativeLongFolds} (#36403).
+ * Native-long bit-shift / bitwise-logic folds live in {@see DiscardedPureCallElisionNativeLongBitwiseFolds} (#36387).
  * Math arg guards / pure math / void-Native constraint checks live in {@see DiscardedPureCallElisionMathGuardAndVoidNativeOps} (#36387).
  * Exists / class / object introspect eliders live in
  * {@see DiscardedPureCallElisionIntrospectOps} (#36387).
@@ -433,6 +435,7 @@ final class DiscardedPureCallElision
     use DiscardedPureCallElisionMathAndHashOps;
     use DiscardedPureCallElisionRuntimeInfoOps;
     use DiscardedPureCallElisionNativeLongFolds;
+    use DiscardedPureCallElisionNativeLongBitwiseFolds;
     use DiscardedPureCallElisionMathGuardAndVoidNativeOps;
     use DiscardedPureCallElisionIntrospectOps;
     use DiscardedPureCallElisionTypeStringCoreOps;

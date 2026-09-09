@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8578 |
-| Phase A inventory files (M2 ratio SSOT) | 8578 |
+| PHP files on vm.php path | 8579 |
+| Phase A inventory files (M2 ratio SSOT) | 8579 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26754 |
+| Source constructs flagged (warnings) | 26756 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7354,6 +7354,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/DiscardedPureCallElisionIntrospectOps.php` | 0 | 2 |
 | `lib/JIT/DiscardedPureCallElisionMathAndHashOps.php` | 0 | 2 |
 | `lib/JIT/DiscardedPureCallElisionMathGuardAndVoidNativeOps.php` | 0 | 2 |
+| `lib/JIT/DiscardedPureCallElisionNativeLongBitwiseFolds.php` | 0 | 2 |
 | `lib/JIT/DiscardedPureCallElisionNativeLongFolds.php` | 0 | 2 |
 | `lib/JIT/DiscardedPureCallElisionRuntimeInfoOps.php` | 0 | 2 |
 | `lib/JIT/DiscardedPureCallElisionStringOps.php` | 0 | 2 |
@@ -60607,11 +60608,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - trait DiscardedPureCallElisionMathGuardAndVoidNativeOps (line 27)
 - 21 class method(s)
 
+### `lib/JIT/DiscardedPureCallElisionNativeLongBitwiseFolds.php`
+
+**Warnings** (review for bootstrap subset):
+- trait DiscardedPureCallElisionNativeLongBitwiseFolds (line 23)
+- 5 class method(s)
+
 ### `lib/JIT/DiscardedPureCallElisionNativeLongFolds.php`
 
 **Warnings** (review for bootstrap subset):
-- trait DiscardedPureCallElisionNativeLongFolds (line 20)
-- 26 class method(s)
+- trait DiscardedPureCallElisionNativeLongFolds (line 22)
+- 21 class method(s)
 
 ### `lib/JIT/DiscardedPureCallElisionRuntimeInfoOps.php`
 
