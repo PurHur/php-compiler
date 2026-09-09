@@ -61,15 +61,18 @@ final class GcCollectCyclesAotCycleTest extends TestCase
     public function testUserScriptStandaloneRegistryResetWiredAtMain(): void
     {
         $root = dirname(__DIR__, 2);
-        $ctx = (string) file_get_contents($root.'/lib/JIT/Context.php')
-            .(string) file_get_contents($root.'/lib/JIT/ContextCompileToFile.php');
+        $main = (string) file_get_contents($root.'/lib/JIT/ContextCompileToFile.php')
+            .(string) file_get_contents($root.'/lib/JIT/ContextCompileToFileStandaloneMain.php');
         $this->assertStringContainsString(
             'emitUserScriptStandaloneRegistryReset',
-            $ctx
+            $main
         );
-        $this->assertStringContainsString('isUserScriptAot()', $ctx);
-        $this->assertStringContainsString('OpCode::TYPE_RETURN_VOID', $ctx);
-        $this->assertStringContainsString('scope_exit', $ctx);
-        $this->assertStringContainsString('objectMirrorSharesNamedCvAlloca', $ctx);
+        $this->assertStringContainsString('isUserScriptAot()', $main);
+        // Return-path / scope_exit GC roots live in FreeDead + VariableOperandBinding TUs (#36245 / #36387).
+        $freeDead = (string) file_get_contents($root.'/lib/JIT/ContextFreeDeadAndConstantFetch.php')
+            .(string) file_get_contents($root.'/lib/JIT/ContextVariableOperandBinding.php');
+        $this->assertStringContainsString('OpCode::TYPE_RETURN_VOID', $freeDead);
+        $this->assertStringContainsString('scope_exit', $freeDead);
+        $this->assertStringContainsString('objectMirrorSharesNamedCvAlloca', $freeDead);
     }
 }

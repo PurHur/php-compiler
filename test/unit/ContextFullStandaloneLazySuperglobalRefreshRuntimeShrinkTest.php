@@ -17,13 +17,12 @@ final class ContextFullStandaloneLazySuperglobalRefreshRuntimeShrinkTest extends
 {
     public function testEnsureFullDropsEagerSuperglobalRefreshNestedJit(): void
     {
-        $context = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $context = (string) file_get_contents(__DIR__.'/../../lib/JIT/ContextStandaloneBodies.php');
         $this->assertStringContainsString('#35137', $context);
         $fullPos = strpos($context, 'private function ensureFullStandaloneBodies');
         $this->assertNotFalse($fullPos);
-        $fullEnd = strpos($context, 'public function jitResult', $fullPos);
-        $this->assertNotFalse($fullEnd);
-        $fullBody = substr($context, $fullPos, $fullEnd - $fullPos);
+        // ensureFull is the last method in ContextStandaloneBodies (#36387 extract).
+        $fullBody = substr($context, $fullPos);
 
         foreach ([
             'SuperglobalRefreshRuntime::ensureStandaloneBodies($this)',
@@ -83,7 +82,7 @@ final class ContextFullStandaloneLazySuperglobalRefreshRuntimeShrinkTest extends
 
     public function testBootstrapAotStillEnsuresSuperglobalRefresh(): void
     {
-        $context = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $context = (string) file_get_contents(__DIR__.'/../../lib/JIT/ContextStandaloneBodies.php');
         $bootPos = strpos($context, 'private function ensureBootstrapAotStandaloneBodies');
         $this->assertNotFalse($bootPos);
         $bootEnd = strpos($context, 'private function ensureFullStandaloneBodies', $bootPos);

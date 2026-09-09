@@ -41,6 +41,7 @@ require_once __DIR__.'/ContextDefineBuiltinFunctionProxiesSplContainers.php';
 require_once __DIR__.'/ContextDefineBuiltinFunctionProxiesWeakAndPhpToken.php';
 require_once __DIR__.'/ContextDefineBuiltinFunctionProxies.php';
 require_once __DIR__.'/ContextDefineBuiltins.php';
+require_once __DIR__.'/ContextCompileToFileStandaloneMain.php';
 require_once __DIR__.'/ContextCompileToFile.php';
 require_once __DIR__.'/ContextCompileToFileEmitAndLink.php';
 require_once __DIR__.'/ContextVariableOperandBinding.php';
@@ -82,6 +83,7 @@ class Context {
     use ContextDefineBuiltinFunctionProxiesWeakAndPhpToken;
     use ContextDefineBuiltinFunctionProxies;
     use ContextDefineBuiltins;
+    use ContextCompileToFileStandaloneMain;
     use ContextCompileToFile;
     use ContextCompileToFileEmitAndLink;
     use ContextVariableOperandBinding;

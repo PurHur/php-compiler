@@ -219,9 +219,9 @@
             "note": "TYPE_CLASS_CONST_FETCH runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/Context.php": {
-            "budget": 938,
+            "budget": 940,
             "target": 3500,
-            "note": "FunctionProxyRegistration + ExternalMethodStubReport + ArrayIteratorAndObject + NestedJitKernelRegistry + ReflectionMembers + FiberGeneratorAndClosure + ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml proxies wiring + VariableOperandLookup + VariableOperandAlias + ModuleVerify + CompileToFileEmitAndLink + InitShutdownBlocks + ConstantFetch + CastToBool + TypeFromString + StructFieldMap + LlvmConstantEmit + ScopeLifecycle peers (#36387/#36199); continue toward \u22643.5k + ModuleOptimizationPasses (#36387)"
+            "note": "FunctionProxyRegistration + ExternalMethodStubReport + ArrayIteratorAndObject + NestedJitKernelRegistry + ReflectionMembers + FiberGeneratorAndClosure + ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml proxies wiring + VariableOperandLookup + VariableOperandAlias + ModuleVerify + CompileToFileEmitAndLink + CompileToFileStandaloneMain + InitShutdownBlocks + ConstantFetch + CastToBool + TypeFromString + StructFieldMap + LlvmConstantEmit + ScopeLifecycle peers (#36387/#36199); continue toward \u22643.5k + ModuleOptimizationPasses (#36387)"
         },
         "lib/JIT/ContextEditScaffoldModuleRebind.php": {
             "budget": 315,
@@ -254,9 +254,14 @@
             "note": "TYPE_FUNCCALL_INIT runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/ContextCompileToFile.php": {
-            "budget": 187,
+            "budget": 74,
+            "target": 200,
+            "note": "compileToFile orchestration hub; standalone main in ContextCompileToFileStandaloneMain; emit/link in ContextCompileToFileEmitAndLink (#36387/#36199)"
+        },
+        "lib/JIT/ContextCompileToFileStandaloneMain.php": {
+            "budget": 142,
             "target": 250,
-            "note": "standalone main scaffolding for compileToFile; emit/link in ContextCompileToFileEmitAndLink (#36387/#36199)"
+            "note": "standalone main IR prologue/epilogue extracted from ContextCompileToFile (#36387); php-src main/main.c + Zend/zend_execute_API.c"
         },
         "lib/JIT/ContextCompileToFileEmitAndLink.php": {
             "budget": 200,
