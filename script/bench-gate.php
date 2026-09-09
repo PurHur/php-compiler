@@ -49,6 +49,9 @@ const BENCH_GATE_V2_CASES = [
     'spectral-norm',
     'json-roundtrip',
     'exceptions',
+    // Classic benchmark-game kernels now AOT FULL_MATCH (#36385):
+    'binary-trees',
+    'fannkuch-redux',
 ];
 
 const RATIO_TOLERANCE_PERCENT = 30;

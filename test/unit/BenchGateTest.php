@@ -131,6 +131,8 @@ final class BenchGateTest extends TestCase
         $this->assertStringContainsString("'sort-mixed'", $php);
         $this->assertStringContainsString("'regex-redux'", $php);
         $this->assertStringContainsString("'json-roundtrip'", $php);
+        $this->assertStringContainsString("'binary-trees'", $php);
+        $this->assertStringContainsString("'fannkuch-redux'", $php);
         $baseline = json_decode(
             (string) file_get_contents(dirname(__DIR__, 2).'/benchmarks/v2/BASELINE.json'),
             true
@@ -147,10 +149,12 @@ final class BenchGateTest extends TestCase
             'spectral-norm',
             'json-roundtrip',
             'exceptions',
+            'binary-trees',
+            'fannkuch-redux',
         ] as $name) {
             $this->assertArrayHasKey($name, $baseline['cases'], $name);
             $this->assertArrayHasKey('ratio_aot_over_zend', $baseline['cases'][$name]);
         }
-        $this->assertGreaterThanOrEqual(14, \count($baseline['cases']));
+        $this->assertGreaterThanOrEqual(16, \count($baseline['cases']));
     }
 }
