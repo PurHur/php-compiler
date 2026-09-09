@@ -26475,7 +26475,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/redis/RedisExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 4 class method(s)
 
 ### `ext/redis/RedisGet.php`
 
@@ -51529,7 +51529,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/ExtensionRegistry.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 7 class method(s)
 
 ### `lib/FinalPromotedPropertySyntaxRejector.php`
 
