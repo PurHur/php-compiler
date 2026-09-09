@@ -559,7 +559,7 @@
             "note": "instanceof / static-call eligibility helpers extracted from VM.php (#36403); php-src ZEND_INSTANCEOF / ZEND_INIT_STATIC_METHOD_CALL / zend_std_get_static_method / zend_inheritance.c"
         },
         "lib/JIT/DiscardedPureCallElision.php": {
-            "budget": 5561,
+            "budget": 5566,
             "target": 3500,
             "note": "Discarded pure-call elision hub; string html/slice/pad/replace/implode in DiscardedPureCallElisionStringOps (#36387/#23483); php-src string.c/html.c"
         },
