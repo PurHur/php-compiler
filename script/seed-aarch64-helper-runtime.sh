@@ -406,6 +406,27 @@ SEED_UNITS=(
   /ext/mbstring/MbChrOrdJitHelper.php
   /ext/mbstring/MbPreferredMimeNameJitHelper.php
   /ext/mbstring/MbEncodingAliasesJitHelper.php
+  # mbstring encoding/config/case helpers (#36391 after 302)
+  # Frexp/Ldexp/Modf/Nextafter/Shuffle still skipped (algorithm SSOT, no HELPER_PATH).
+  # Preg* still skipped: tip nested compile misses Compiler\Concern\OpCode.
+  # Sscanf still skipped: __init__ sealed during NestedJIT.
+  # Gethostbynamel skipped: NestedJIT missing __compiler_stream_resolve_include_path.
+  # Ini skipped: IniGetLeafJitHelper not compiled under helper-runtime-emit NestedJIT.
+  # Progress skipped: NestedJIT ContextLlvmConstantsAndRegistry seal during helper emit.
+  # CalInfo still skipped (unknown unit under NestedJIT).
+  # PosixSet* / PosixSession / PosixTerminal deferred (mutators / tty).
+  # MbEreg/MbSplit/MbSearch/MbConvertKana/MbConvertVariables/MbNumericEntity/
+  # MbOutputHandler/MbRegexEncoding deferred to a later mbstring wave.
+  /ext/mbstring/MbInternalEncodingJitHelper.php
+  /ext/mbstring/MbLanguageJitHelper.php
+  /ext/mbstring/MbDetectEncodingJitHelper.php
+  /ext/mbstring/MbDetectOrderJitHelper.php
+  /ext/mbstring/MbSubstituteCharacterJitHelper.php
+  /ext/mbstring/MbHttpInputJitHelper.php
+  /ext/mbstring/MbHttpOutputJitHelper.php
+  /ext/mbstring/MbCaseJitHelper.php
+  /ext/mbstring/MbConvertCaseJitHelper.php
+  /ext/mbstring/MbConvertEncodingJitHelper.php
 )
 
 MIN_SEED=${#SEED_UNITS[@]}
