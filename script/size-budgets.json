@@ -564,9 +564,9 @@
             "note": "instanceof / static-call eligibility helpers extracted from VM.php (#36403); php-src ZEND_INSTANCEOF / ZEND_INIT_STATIC_METHOD_CALL / zend_std_get_static_method / zend_inheritance.c"
         },
         "lib/JIT/DiscardedPureCallElision.php": {
-            "budget": 703,
-            "target": 703,
-            "note": "Discarded pure-call elision hub; traits incl. native-long bitwise/compare-mul/pow (#36387/#36403/#23483)"
+            "budget": 708,
+            "target": 708,
+            "note": "Discarded pure-call elision hub; traits incl. native-long bitwise/compare-mul/pow + PureMathAndVoidNativeOps (#36387/#36403/#23483)"
         },
         "lib/JIT/DiscardedPureCallElisionStringOps.php": {
             "budget": 641,
@@ -649,9 +649,14 @@
             "note": "type/ctype/strlen/ord/chr/string-transform/str_incdec discarded elision extracted from DiscardedPureCallElision (#36387); php-src type.c/ctype.c/string.c/url.c/md5.c/crc32.c/base64.c"
         },
         "lib/JIT/DiscardedPureCallElisionMathGuardAndVoidNativeOps.php": {
-            "budget": 677,
-            "target": 800,
-            "note": "baseConvert/inet/minMax/checkdate/clamp/intdiv arg guards + scalarCast + count-on-typed-array + pure math/round + effect-free void Native constraints extracted from DiscardedPureCallElision (#36387); php-src ext/standard/math.c + basic_functions.c + Zend/zend_operators.c"
+            "budget": 419,
+            "target": 500,
+            "note": "baseConvert/inet/minMax/checkdate/clamp/intdiv arg guards + scalarCast + count-on-typed-array + shared string/math/array arg predicates (#36387); pure math/void Native extracted to PureMathAndVoidNativeOps; php-src ext/standard/math.c + basic_functions.c + Zend/zend_builtin_functions.c"
+        },
+        "lib/JIT/DiscardedPureCallElisionPureMathAndVoidNativeOps.php": {
+            "budget": 292,
+            "target": 400,
+            "note": "tryElidePureMathNoSideEffect + round mode guards + tryElideEffectFreeVoidNative extracted from MathGuardAndVoidNativeOps (#36387); php-src ext/standard/math.c + Zend/zend_operators.c"
         },
         "lib/JIT/NoThrowCallElision.php": {
             "budget": 239,

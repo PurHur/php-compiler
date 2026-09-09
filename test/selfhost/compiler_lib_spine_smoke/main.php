@@ -7035,6 +7035,7 @@ require_once __DIR__.'/../../../lib/JIT/DiscardedPureCallElisionNativeLongBitwis
 require_once __DIR__.'/../../../lib/JIT/DiscardedPureCallElisionNativeLongCompareMulFolds.php';
 require_once __DIR__.'/../../../lib/JIT/DiscardedPureCallElisionNativeLongPowFolds.php';
 require_once __DIR__.'/../../../lib/JIT/DiscardedPureCallElisionMathGuardAndVoidNativeOps.php';
+require_once __DIR__.'/../../../lib/JIT/DiscardedPureCallElisionPureMathAndVoidNativeOps.php';
 require_once __DIR__.'/../../../lib/JIT/DiscardedPureCallElisionIntrospectOps.php';
 require_once __DIR__.'/../../../lib/JIT/DiscardedPureCallElisionTypeStringCoreOps.php';
 require_once __DIR__.'/../../../lib/JIT/DiscardedPureCallElision.php';
