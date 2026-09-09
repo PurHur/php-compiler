@@ -77,19 +77,18 @@ final class HelperRuntimeCacheFingerprintTest extends TestCase
     public function testWarmupSkipsCorpusEmitWhenCommittedUnitsExistRegardlessOfCoreFingerprint(): void
     {
         $root = \dirname(__DIR__, 3);
-        $source = (string) file_get_contents($root.'/lib/AOT/HelperRuntimeCache.php');
-        $this->assertStringContainsString('committedCacheHasUnits', $source);
-        $this->assertStringContainsString('skip corpus warmup', $source);
+        $warm = (string) file_get_contents($root.'/lib/AOT/HelperRuntimeWarm.php');
+        $this->assertStringContainsString('committedCacheHasUnits', $warm);
+        $this->assertStringContainsString('skip corpus warmup', $warm);
         $this->assertDoesNotMatchRegularExpression(
             '/function committedCacheHasUnits\(\): bool\s*\{[^}]*coreFingerprintMatches/s',
-            $source,
+            $warm,
             'warmup skip must not require core_fingerprint match (#32122)'
         );
-        $ref = new \ReflectionClass(HelperRuntimeCache::class);
-        $m = $ref->getMethod('committedCacheHasUnits');
-        $m->setAccessible(true);
+        $hub = (string) file_get_contents($root.'/lib/AOT/HelperRuntimeCache.php');
+        $this->assertStringContainsString('HelperRuntimeWarm::warmForUserAotBuild', $hub);
         $this->assertTrue(
-            (bool) $m->invoke(null),
+            HelperRuntimeWarm::committedCacheHasUnits(),
             'committed helper-runtime units must skip hello-world corpus warmup'
         );
     }
@@ -120,6 +119,8 @@ final class HelperRuntimeCacheFingerprintTest extends TestCase
         $this->assertFileExists($root.'/lib/AOT/HelperRuntimeBind.php');
         $this->assertStringContainsString('HelperRuntimeIndex::helperIndex', $hub);
         $this->assertFileExists($root.'/lib/AOT/HelperRuntimeIndex.php');
+        $this->assertStringContainsString('HelperRuntimeWarm::warmForUserAotBuild', $hub);
+        $this->assertFileExists($root.'/lib/AOT/HelperRuntimeWarm.php');
         $this->assertNotSame(
             HelperRuntimeCache::coreFingerprint(),
             HelperRuntimeCache::legacyLoweringFingerprint(),

@@ -5250,6 +5250,7 @@ require_once __DIR__.'/../../../lib/AOT/HelperRuntimeFingerprint.php';
 require_once __DIR__.'/../../../lib/AOT/HelperRuntimeLink.php';
 require_once __DIR__.'/../../../lib/AOT/HelperRuntimeBind.php';
 require_once __DIR__.'/../../../lib/AOT/HelperRuntimeIndex.php';
+require_once __DIR__.'/../../../lib/AOT/HelperRuntimeWarm.php';
 require_once __DIR__.'/../../../lib/AOT/HelperRuntimeCache.php';
 require_once __DIR__.'/../../../lib/AOT/HelperUnitGlobalCtor.php';
 require_once __DIR__.'/../../../lib/AOT/LinkerOutputArtifacts.php';

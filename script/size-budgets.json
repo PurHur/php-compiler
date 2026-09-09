@@ -29,14 +29,19 @@
             "note": "already under target; output helpers in LinkerOutputArtifacts (#36403); ASAN via clang/gcc (#36397)"
         },
         "lib/AOT/HelperRuntimeCache.php": {
-            "budget": 519,
+            "budget": 424,
             "target": 1200,
-            "note": "helper-cache granularity; Fingerprint+Link+Bind+Index extracts (#36387/#36403); sorted linkObjects (#36399); refusePrelinkGcMixReason (#36401)"
+            "note": "helper-cache granularity; Fingerprint+Link+Bind+Index+Warm extracts (#36387/#36403); sorted linkObjects (#36399); refusePrelinkGcMixReason (#36401)"
         },
         "lib/AOT/HelperRuntimeIndex.php": {
             "budget": 124,
             "target": 300,
             "note": "unitManifest/helperIndex/resolveUnitSource extracted from HelperRuntimeCache (#36387/#15889)"
+        },
+        "lib/AOT/HelperRuntimeWarm.php": {
+            "budget": 129,
+            "target": 300,
+            "note": "warmForUserAotBuild/committedCacheHasUnits extracted from HelperRuntimeCache (#36387/#15889/#24302)"
         },
         "lib/JIT/CompileCache.php": {
             "budget": 67,
