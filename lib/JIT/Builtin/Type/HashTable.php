@@ -3314,6 +3314,10 @@ class HashTable extends Type
      *
      * String/int elements use readString/readLong; object/enum/mixed use {@see __value__spaceship}
      * (php-src zend_compare on zvals). `$caseInsensitive` → SORT_STRING|SORT_FLAG_CASE.
+     *
+     * Loop scratch (`needs_swap`, `__value__` tmp, walk index) must be allocated once in the
+     * work entry — alloca inside walk/swap grows the native stack O(n²) and SIGSEGVs around
+     * n≈1000 on an 8 MiB stack (benchmarks/v2/sort-mixed.php / #36385).
      */
     private function implementSortPacked(bool $reverse, bool $caseInsensitive = false): void
     {
@@ -3356,7 +3360,13 @@ class HashTable extends Type
         $this->context->builder->branchIf($tooSmall, $done, $work);
 
         $this->context->builder->positionAtEnd($work);
+        // Hoist loop scratch allocas to the work entry — alloca inside walk/swap
+        // grows the native stack O(n²) under thin AOT and SIGSEGVs around n≈1000
+        // (benchmarks/v2/sort-mixed.php, default 8 MiB stack) (#36385).
         $swappedSlot = $this->context->builder->alloca($i1, 1, $tag.'_swapped');
+        $iSlot = $this->context->builder->alloca($sizeT, 1, $tag.'_i');
+        $needsSwapSlot = $this->context->builder->alloca($i1, 1, $tag.'_needs_swap');
+        $tmp = $this->context->builder->alloca($valueType, 1, $tag.'_tmp');
         $this->context->builder->store($i1->constInt(1, false), $swappedSlot);
         $passHead = $fn->appendBasicBlock($tag.'_pass_head');
         $passBody = $fn->appendBasicBlock($tag.'_pass_body');
@@ -3368,7 +3378,6 @@ class HashTable extends Type
 
         $this->context->builder->positionAtEnd($passBody);
         $this->context->builder->store($i1->constInt(0, false), $swappedSlot);
-        $iSlot = $this->context->builder->alloca($sizeT, 1, $tag.'_i');
         $this->context->builder->store($zero, $iSlot);
         $limit = $this->context->builder->sub($n, $one);
         $walkHead = $fn->appendBasicBlock($tag.'_walk_head');
@@ -3394,7 +3403,6 @@ class HashTable extends Type
         $cmpObject = $fn->appendBasicBlock($tag.'_cmp_object');
         $typeDispatch = $fn->appendBasicBlock($tag.'_type_dispatch');
         $cmpDone = $fn->appendBasicBlock($tag.'_cmp_done');
-        $needsSwapSlot = $this->context->builder->alloca($i1, 1, $tag.'_needs_swap');
         $this->context->builder->branchIf($isString, $cmpStr, $typeDispatch);
 
         $this->context->builder->positionAtEnd($cmpStr);
@@ -3454,7 +3462,6 @@ class HashTable extends Type
         $this->context->builder->branchIf($needsSwap, $swapBlock, $advance);
 
         $this->context->builder->positionAtEnd($swapBlock);
-        $tmp = $this->context->builder->alloca($valueType, 1, $tag.'_tmp');
         $this->context->builder->store($this->context->builder->load($valCur), $tmp);
         $this->context->builder->store($this->context->builder->load($valNext), $valCur);
         $this->context->builder->store($this->context->builder->load($tmp), $valNext);
@@ -3512,7 +3519,10 @@ class HashTable extends Type
         $this->context->builder->branchIf($tooSmall, $done, $work);
 
         $this->context->builder->positionAtEnd($work);
+        // Hoist loop scratch allocas — see implementSortPacked (#36385).
         $swappedSlot = $this->context->builder->alloca($i1, 1, $tag.'_swapped');
+        $iSlot = $this->context->builder->alloca($sizeT, 1, $tag.'_i');
+        $tmp = $this->context->builder->alloca($valueType, 1, $tag.'_tmp');
         $this->context->builder->store($i1->constInt(1, false), $swappedSlot);
         $passHead = $fn->appendBasicBlock($tag.'_pass_head');
         $passBody = $fn->appendBasicBlock($tag.'_pass_body');
@@ -3524,7 +3534,6 @@ class HashTable extends Type
 
         $this->context->builder->positionAtEnd($passBody);
         $this->context->builder->store($i1->constInt(0, false), $swappedSlot);
-        $iSlot = $this->context->builder->alloca($sizeT, 1, $tag.'_i');
         $this->context->builder->store($zero, $iSlot);
         $limit = $this->context->builder->sub($n, $one);
         $walkHead = $fn->appendBasicBlock($tag.'_walk_head');
@@ -3557,7 +3566,6 @@ class HashTable extends Type
         $this->context->builder->branchIf($needsSwap, $swapBlock, $advance);
 
         $this->context->builder->positionAtEnd($swapBlock);
-        $tmp = $this->context->builder->alloca($valueType, 1, $tag.'_tmp');
         $this->context->builder->store($this->context->builder->load($valCur), $tmp);
         $this->context->builder->store($this->context->builder->load($valNext), $valCur);
         $this->context->builder->store($this->context->builder->load($tmp), $valNext);
@@ -3645,7 +3653,12 @@ class HashTable extends Type
             $i1->constInt(0, false)
         );
 
+        // Hoist loop scratch allocas — see implementSortPacked (#36385).
         $outerSlot = $this->context->builder->alloca($sizeT, 1, $tag.'_outer');
+        $innerSlot = $this->context->builder->alloca($sizeT, 1, $tag.'_inner');
+        $needsSwapSlot = $this->context->builder->alloca($i1, 1, $tag.'_needs_swap');
+        $tSlot = $this->context->builder->alloca($sizeT, 1, $tag.'_t');
+        $tmp = $this->context->builder->alloca($valueType, 1, $tag.'_tmp');
         $this->context->builder->store($zero, $outerSlot);
         $outerHead = $fn->appendBasicBlock($tag.'_outer_head');
         $outerBody = $fn->appendBasicBlock($tag.'_outer_body');
@@ -3658,7 +3671,6 @@ class HashTable extends Type
         $this->context->builder->branchIf($outerDone, $done, $outerBody);
 
         $this->context->builder->positionAtEnd($outerBody);
-        $innerSlot = $this->context->builder->alloca($sizeT, 1, $tag.'_inner');
         $this->context->builder->store($zero, $innerSlot);
         $innerLimit = $this->context->builder->sub($outerLimit, $outer);
         $innerHead = $fn->appendBasicBlock($tag.'_inner_head');
@@ -3678,7 +3690,6 @@ class HashTable extends Type
         $cmpStr = $fn->appendBasicBlock($tag.'_cmp_str');
         $cmpLong = $fn->appendBasicBlock($tag.'_cmp_long');
         $cmpDone = $fn->appendBasicBlock($tag.'_cmp_done');
-        $needsSwapSlot = $this->context->builder->alloca($i1, 1, $tag.'_needs_swap');
         $this->context->builder->branchIf($isString, $cmpStr, $cmpLong);
 
         $this->context->builder->positionAtEnd($cmpStr);
@@ -3707,7 +3718,6 @@ class HashTable extends Type
         $this->context->builder->branchIf($needsSwap, $swapAll, $innerAdvance);
 
         $this->context->builder->positionAtEnd($swapAll);
-        $tSlot = $this->context->builder->alloca($sizeT, 1, $tag.'_t');
         $this->context->builder->store($zero, $tSlot);
         $swapHead = $fn->appendBasicBlock($tag.'_swap_head');
         $swapBody = $fn->appendBasicBlock($tag.'_swap_body');
@@ -3726,7 +3736,6 @@ class HashTable extends Type
         );
         $a = $this->listEntryAt($table, $htMap, $inner);
         $b = $this->listEntryAt($table, $htMap, $innerNext);
-        $tmp = $this->context->builder->alloca($valueType, 1, $tag.'_tmp');
         $this->context->builder->store($this->context->builder->load($a), $tmp);
         $this->context->builder->store($this->context->builder->load($b), $a);
         $this->context->builder->store($this->context->builder->load($tmp), $b);
