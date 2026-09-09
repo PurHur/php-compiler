@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\soap;
 
+use PHPCompiler\ExtensionRegistry;
+
 /**
  * ext/soap advertisement — php-src ext/soap/soap.c (#20124 / #3724 / #20267 / #22859 / #25165).
  *
- * SoapClient / SoapServer / SoapFault stay in-tree (PHP-in-PHP) but are withheld from
- * extension_loaded() / class_exists() when host Zend has no php-soap — same shape as
- * yaml/brotli (#6275 / #17563). Enable via host ext/soap only; `PHP_COMPILER_PROFILE`
- * must not invent soap (#25165, re-#22859).
+ * {@see advertisesExtension()} is folded to ext.json advertise → ExtensionRegistry (#36204).
+ * Opaque URL/SDL types and soap_error_handler state stay here. Host php-soap only —
+ * language profile must not invent soap (#25165, re-#22859).
  *
  * Tracks SOAP_GLOBAL(use_soap_error_handler) for soap_error_handler (#20267).
  */
@@ -21,12 +22,10 @@ final class SoapExtensionPolicy
 
     /**
      * extension_loaded('soap') / CREDITS_MODULES — match Zend without phantom soap (#22859 / #25165).
-     *
-     * Host php-soap only; language profile alone must not advertise (#25165).
      */
     public static function advertisesExtension(): bool
     {
-        return \extension_loaded('soap');
+        return ExtensionRegistry::advertisesExtensionFor('soap');
     }
 
     public static function advertisesExceptionClass(): bool

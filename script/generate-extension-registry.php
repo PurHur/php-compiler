@@ -235,6 +235,16 @@ $buildAdvertiseMatch = static function (array $advertiseByDir) use ($root): stri
             exit(2);
         }
         $method = $rule['compiler_version'] ?? null;
+        $hostOnly = $rule['host_extension'] ?? null;
+        // Host-only gate (gd/soap): no CompilerVersion arm — match Zend without phantom modules.
+        if (!is_string($method) && is_string($hostOnly) && '' !== $hostOnly) {
+            if (!preg_match('/^[a-z][a-z0-9_]*$/', $hostOnly)) {
+                fwrite(STDERR, "generate-extension-registry: bad host_extension for {$name}\n");
+                exit(2);
+            }
+            $arms[] = "            '{$name}' => \\extension_loaded('{$hostOnly}'),";
+            continue;
+        }
         if (!is_string($method) || !isset($allowedCv[$method])) {
             fwrite(STDERR, "generate-extension-registry: advertise {$name} needs known compiler_version method\n");
             exit(2);

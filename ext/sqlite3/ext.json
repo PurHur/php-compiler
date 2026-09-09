@@ -13,5 +13,9 @@
         "functions": [],
         "classes": []
     },
-    "policy_env": []
+    "policy_env": [],
+    "advertise": {
+        "compiler_version": "supportsSqlite3",
+        "or_host_extension": "sqlite3"
+    }
 }

@@ -4,26 +4,22 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\gd;
 
+use PHPCompiler\ExtensionRegistry;
+
 /**
  * ext/gd surface advertisement — php-src ext/gd/gd.c (#11675, #6215, #22740).
  *
- * PHP-in-PHP decode/draw implementations stay in-tree, but Zend never registers
- * {@code gd_info} / {@code imagecreate} / {@code GdImage} unless ext/gd is linked.
- * Advertise the logical {@code gd} module only when host Zend has php-gd
- * ({@see advertisesExtension()}) — same host-extension gate as #22691 (intl) /
- * #11627 (curl). Do not phantom-advertise on images without php-gd (#22740).
+ * {@see advertisesExtension()} is folded to ext.json advertise → ExtensionRegistry (#36204).
+ * Compliance helpers stay here. Host php-gd only — do not phantom-advertise (#22740).
  */
 final class GdExtensionPolicy
 {
     /**
      * extension_loaded('gd') / CREDITS_MODULES — match host Zend php-gd (#22740, re-#11675).
-     *
-     * php-src-strict: Docker reference image ships without php-gd; withhold stubs
-     * so function_exists / get_extension_funcs agree with Zend.
      */
     public static function advertisesExtension(): bool
     {
-        return \extension_loaded('gd');
+        return ExtensionRegistry::advertisesExtensionFor('gd');
     }
 
     /**

@@ -5,18 +5,14 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\sqlite3;
 
 use PHPCompiler\CompilerVersion;
+use PHPCompiler\ExtensionRegistry;
 
 /**
  * ext/sqlite3 advertisement — php-src ext/sqlite3/php_sqlite3.c (#7269, #17106, #19047, #22791).
  *
- * Pure-PHP SQLite3 ({@see VmSQLite3}) stays in-tree but is withheld from
- * extension_loaded() / class_exists('SQLite3') on the reference harness when host
- * Zend has no ext/sqlite3 — same shape as gmp/soap (#22860 / #22859).
- * Enable via host ext/sqlite3 or `PHP_COMPILER_PROFILE=8.4`
- * ({@see CompilerVersion::supportsSqlite3()}).
- *
- * SQLite3Exception is PHP 8.3+ (php-src stub); withhold on 8.4.0-dev reference like
- * {@see CompilerVersion::advertisesDateExceptionHierarchy()}.
+ * {@see advertisesExtension()} / {@see advertisesExtensionLoaded()} are folded to
+ * ext.json advertise → ExtensionRegistry (#36204). Profile-gated exception / 8.5 APIs
+ * and compliance helpers stay here.
  */
 final class Sqlite3ExtensionPolicy
 {
@@ -25,21 +21,13 @@ final class Sqlite3ExtensionPolicy
      */
     public static function advertisesExtensionLoaded(): bool
     {
-        if (\extension_loaded('sqlite3')) {
-            return true;
-        }
-
-        return CompilerVersion::supportsSqlite3();
+        return ExtensionRegistry::advertisesExtensionFor('sqlite3');
     }
 
     /** SQLite3 class + procedural surface (#3434 / #22791). */
     public static function advertisesExtension(): bool
     {
-        if (\extension_loaded('sqlite3')) {
-            return true;
-        }
-
-        return CompilerVersion::supportsSqlite3();
+        return ExtensionRegistry::advertisesExtensionFor('sqlite3');
     }
 
     /**

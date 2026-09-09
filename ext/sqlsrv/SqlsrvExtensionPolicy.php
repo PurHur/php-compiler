@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\sqlsrv;
 
+use PHPCompiler\ExtensionRegistry;
+
 /**
  * ext/sqlsrv surface advertisement — Microsoft sqlsrv (#6577).
  *
+ * {@see advertisesExtension()} is folded to ext.json advertise → ExtensionRegistry (#36204).
  * sqlsrv_* symbols are always registered so {@code function_exists('sqlsrv_connect')}
  * matches enterprise apps that probe before connecting. Live SQL Server I/O requires the
  * Microsoft ODBC driver / host ext/sqlsrv; without it, connect returns false and
@@ -16,12 +19,12 @@ final class SqlsrvExtensionPolicy
 {
     public static function advertisesExtension(): bool
     {
-        return true;
+        return ExtensionRegistry::advertisesExtensionFor('sqlsrv');
     }
 
     public static function advertisesBuiltins(): bool
     {
-        return true;
+        return self::advertisesExtension();
     }
 
     public static function hasNativeDriver(): bool
