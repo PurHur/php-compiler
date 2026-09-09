@@ -17,8 +17,8 @@ use PHPLLVM\Value;
  * Compile-time exponent integer {@code pow}/{@code **} chained-smul emit
  * for eightyninth … ninetyfirst (#36387 / #36386).
  *
- * Sibling of {@see JitPowIntegerEmitExponents86to88}; High retains ninetysecond+.
- * 86–88 live in {@see JitPowIntegerEmitExponents86to88}.
+ * Sibling of {@see JitPowIntegerEmitExponents86to88}; 92–95 in
+ * {@see JitPowIntegerEmitExponents92to95}; High retains ninetysixth+.
  *
  * No new C ABI. php-src: Zend/zend_operators.c {@code pow_function} /
  * {@code zend_pow} / {@code mul_function}; ext/standard/math.c
