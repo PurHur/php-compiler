@@ -41,6 +41,7 @@ defaults — `doctor --env` exits non-zero when they drift.
 | `PHP_COMPILER_EMIT_BITCODE` | string | debug | — | Emit LLVM bitcode path | — |
 | `PHP_COMPILER_EMIT_HELPER_LINK` | bool | compile | — | Link helper runtime into emit | — |
 | `PHP_COMPILER_EMIT_JOBS` | int | compile | — | Parallel helper-unit emit jobs | — |
+| `PHP_COMPILER_EXTENSIONS` | string | runtime | — | Extension load filter: only:a,b / a,b / +a,-b (ext/ directory names; pulls depends[]) (#36204) | #36204 |
 | `PHP_COMPILER_EXTERNAL_METHOD_MANIFEST_EXPORT` | string | debug | — | Export external method manifest | — |
 | `PHP_COMPILER_EXTERNAL_STUBS_JSON` | string | debug | — | Write external stubs JSON report | — |
 | `PHP_COMPILER_EXT_DIR` | string | runtime | `/usr/lib/php/20220829` | Directory of PHP extension .so files | — |

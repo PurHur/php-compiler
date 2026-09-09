@@ -3322,12 +3322,14 @@
         "ext/standard/JitPopen.php",
         "ext/standard/JitPow.php",
         "ext/standard/JitPowIntegerEmit.php",
+        "ext/standard/JitPowIntegerEmitExponents100to103.php",
         "ext/standard/JitPowIntegerEmitExponents50to69.php",
         "ext/standard/JitPowIntegerEmitExponents70to79.php",
         "ext/standard/JitPowIntegerEmitExponents80to85.php",
         "ext/standard/JitPowIntegerEmitExponents80to91.php",
         "ext/standard/JitPowIntegerEmitExponents86to88.php",
         "ext/standard/JitPowIntegerEmitExponents92to95.php",
+        "ext/standard/JitPowIntegerEmitExponents96to99.php",
         "ext/standard/JitPowIntegerEmitHigh.php",
         "ext/standard/JitPowIntegerEmitLow.php",
         "ext/standard/JitPowIntegerEmitMid.php",
@@ -8829,9 +8831,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8596,
+        "inventory_files": 8597,
         "excluded": 0,
-        "eligible": 8596,
+        "eligible": 8597,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
