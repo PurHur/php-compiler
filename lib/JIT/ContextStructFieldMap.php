@@ -16,6 +16,7 @@ use PHPLLVM;
  *
  * Used via {@code use ContextStructFieldMap;} on {@see Context}.
  * Type↔LLVM map: {@see ContextTypeAndStructMap}.
+ * Bool cast: {@see ContextCastToBool}.
  *
  * No new C ABI. php-src analogy: zend_object_handlers / property offset maps
  * and struct layout live beside the executor (Zend/zend_object_handlers.c,

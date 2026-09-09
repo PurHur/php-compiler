@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8540 |
-| Phase A inventory files (M2 ratio SSOT) | 8540 |
+| PHP files on vm.php path | 8541 |
+| Phase A inventory files (M2 ratio SSOT) | 8541 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26684 |
+| Source constructs flagged (warnings) | 26686 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7298,6 +7298,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Concern/VarFetchDestLvalueContext.php` | 0 | 2 |
 | `lib/JIT/Concern/VmSmokeAndRuntimeM3NativeStubs.php` | 0 | 10 |
 | `lib/JIT/Context.php` | 0 | 10 |
+| `lib/JIT/ContextCastToBool.php` | 0 | 2 |
 | `lib/JIT/ContextCompileToFile.php` | 0 | 3 |
 | `lib/JIT/ContextConstantFetch.php` | 0 | 10 |
 | `lib/JIT/ContextDefineBuiltinFunctionProxies.php` | 0 | 4 |
@@ -59904,16 +59905,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Context.php`
 
 **Warnings** (review for bootstrap subset):
-- new ExtensionLoweringHooks (line 885)
-- new Scope (line 886)
-- new Analyzer (line 915)
-- new Helper (line 916)
-- new Builtin\Refcount (line 917)
-- new Builtin\Output (line 919)
-- new Builtin\Type (line 920)
-- new Builtin\Internal (line 921)
-- new Builtin\VarArg (line 922)
-- new Builtin\ErrorHandler (line 923)
+- new ExtensionLoweringHooks (line 887)
+- new Scope (line 888)
+- new Analyzer (line 917)
+- new Helper (line 918)
+- new Builtin\Refcount (line 919)
+- new Builtin\Output (line 921)
+- new Builtin\Type (line 922)
+- new Builtin\Internal (line 923)
+- new Builtin\VarArg (line 924)
+- new Builtin\ErrorHandler (line 925)
+
+### `lib/JIT/ContextCastToBool.php`
+
+**Warnings** (review for bootstrap subset):
+- trait ContextCastToBool (line 23)
+- 1 class method(s)
 
 ### `lib/JIT/ContextCompileToFile.php`
 
@@ -60414,14 +60421,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ContextStructFieldMap.php`
 
 **Warnings** (review for bootstrap subset):
-- trait ContextStructFieldMap (line 24)
+- trait ContextStructFieldMap (line 25)
 - 7 class method(s)
 
 ### `lib/JIT/ContextTypeAndStructMap.php`
 
 **Warnings** (review for bootstrap subset):
 - trait ContextTypeAndStructMap (line 25)
-- 6 class method(s)
+- 5 class method(s)
 
 ### `lib/JIT/ContextVariableOperandAlias.php`
 
