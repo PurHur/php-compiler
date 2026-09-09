@@ -367,6 +367,25 @@ SEED_UNITS=(
   /ext/filter/FilterFloatJitHelper.php
   /ext/filter/FilterBooleanJitHelper.php
   /ext/filter/FilterSanitizeJitHelper.php
+  # Remaining filter validators + hash + tokenizer + MbStrlen (#36391 after 282)
+  # Frexp/Ldexp/Modf/Nextafter/Shuffle still skipped (algorithm SSOT, no HELPER_PATH).
+  # Preg* still skipped: tip nested compile misses Compiler\Concern\OpCode.
+  # Sscanf still skipped: __init__ sealed during NestedJIT.
+  # Gethostbynamel skipped: NestedJIT missing __compiler_stream_resolve_include_path.
+  # Ini skipped: IniGetLeafJitHelper not compiled under helper-runtime-emit NestedJIT.
+  # Progress skipped: NestedJIT ContextLlvmConstantsAndRegistry seal during helper emit.
+  # CalInfo still skipped (unknown unit under NestedJIT).
+  # PosixSet* / PosixSession / PosixTerminal deferred (mutators / tty).
+  /ext/filter/FilterBatchJitHelper.php
+  /ext/filter/FilterDomainValidate.php
+  /ext/filter/FilterEmailValidate.php
+  /ext/filter/FilterIpValidate.php
+  /ext/filter/FilterMacValidate.php
+  /ext/filter/FilterUrlValidate.php
+  /ext/hash/HashAlgosJitHelper.php
+  /ext/hash/HashContextJitHelper.php
+  /ext/tokenizer/TokenGetAllJitHelper.php
+  /ext/mbstring/MbStrlenJitHelper.php
 )
 
 MIN_SEED=${#SEED_UNITS[@]}
