@@ -126,6 +126,8 @@ final class JitLongArithOverflow
         $lres = $context->builder->shl($a, $k);
         $restored = $context->builder->aShr($lres, $k);
         $overflow = $context->builder->icmp(\PHPLLVM\Builder::INT_NE, $restored, $a);
+        // Spill i1 before the split so materialize can load from any BB (#36385).
+        $flagSlot = self::spillOverflowFlagToEntryAlloca($context, $overflow);
 
         $doubleSlot = BasicBlockHelper::entryAlloca($context, $f64);
 
@@ -150,7 +152,7 @@ final class JitLongArithOverflow
         $mergedLong->addIncoming($i64->constInt(0, false), $ovBlock);
 
         $okVar = new Variable($context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $mergedLong);
-        $okVar->longArithOverflowFlag = $overflow;
+        $okVar->longArithOverflowFlag = $flagSlot;
         $okVar->longArithOverflowDoubleSlot = $doubleSlot;
 
         return $okVar;
@@ -199,6 +201,8 @@ final class JitLongArithOverflow
         }
 
         [$lres, $overflow] = self::emitWithOverflow($context, $opType, $a, $b);
+        // Spill i1 before the split so materialize can load from any BB (#36385).
+        $flagSlot = self::spillOverflowFlagToEntryAlloca($context, $overflow);
 
         // f64 only — no entryAllocaValueBox / TYPE_NULL init on the hot path (#36386).
         $doubleSlot = BasicBlockHelper::entryAlloca($context, $f64);
@@ -225,10 +229,32 @@ final class JitLongArithOverflow
         $mergedLong->addIncoming($i64->constInt(0, false), $ovBlock);
 
         $okVar = new Variable($context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $mergedLong);
-        $okVar->longArithOverflowFlag = $overflow;
+        $okVar->longArithOverflowFlag = $flagSlot;
         $okVar->longArithOverflowDoubleSlot = $doubleSlot;
 
         return $okVar;
+    }
+
+    /**
+     * Store an overflow/promote i1 into an entry alloca so later materialize loads
+     * are valid from any basic block (loop merges, NestedJIT helpers) (#36385).
+     *
+     * Raw i1 SSA flags attached to {@see Variable::$longArithOverflowFlag} and then
+     * branched on in {@see materializeOverflowableNativeLong} fail LLVM verify with
+     * "Instruction does not dominate all uses" (and SIGSEGV without assert) when the
+     * consumer is not dominated by the flag's defining block — e.g. thin-AOT
+     * {@code preg_match("/a/", …)} NestedJIT of {@see PregAotFastPath::matchLiteral}.
+     */
+    public static function spillOverflowFlagToEntryAlloca(Context $context, LlvmValue $flagI1): LlvmValue
+    {
+        if (\PHPLLVM\Type::KIND_POINTER === $flagI1->typeOf()->getKind()) {
+            return $flagI1;
+        }
+        $i1 = $context->getTypeFromString('int1');
+        $slot = BasicBlockHelper::entryAlloca($context, $i1);
+        $context->builder->store($flagI1, $slot);
+
+        return $slot;
     }
 
     /**
@@ -247,7 +273,7 @@ final class JitLongArithOverflow
             return $var;
         }
 
-        // Flag is the i1 SSA from llvm.*.with.overflow (or a legacy i1* alloca).
+        // Prefer i1* entry alloca (#36385); legacy raw i1 SSA still supported.
         $flag = $var->longArithOverflowFlag;
         $isOv = \PHPLLVM\Type::KIND_POINTER === $flag->typeOf()->getKind()
             ? $context->builder->load($flag)

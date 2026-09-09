@@ -45,8 +45,8 @@ final class PregJitHelper
 
     public static function matchAllArgv(string $pattern, string $subject): int
     {
-        PregAotFastPath::setLastError(0);
-        $n = PregAotFastPath::matchAllStore($pattern, $subject, 0, 0);
+        // Count-only — skip matchAllStore static-slot prologue (SIGSEGV; #36385).
+        $n = PregAotFastPath::matchAllCountOnly($pattern, $subject, 0);
         if ($n < 0) {
             PregAotFastPath::setLastError(1);
 
