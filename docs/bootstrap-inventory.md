@@ -8199,6 +8199,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/Concern/PropertyHookFrameAndStaticLink.php` | 0 | 2 |
 | `lib/VM/Concern/ReturnDispatch.php` | 0 | 2 |
 | `lib/VM/Concern/ReturnTypeEnforce.php` | 0 | 4 |
+| `lib/VM/Concern/RunFramesInner.php` | 0 | 2 |
 | `lib/VM/Concern/ScalarArithBitwiseUnaryDispatch.php` | 0 | 2 |
 | `lib/VM/Concern/ScalarCastCompareArithConcatDispatch.php` | 0 | 3 |
 | `lib/VM/Concern/ScalarCastDispatch.php` | 0 | 2 |
@@ -62732,15 +62733,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 328)
-- new ObjectEntry (line 452)
-- new Variable (line 461)
-- new Variable (line 490)
-- new VM\GeneratorUncaughtThrow (line 505)
-- new VM\FiberUncaughtThrow (line 519)
-- new VM\DestructorThrowCatchSignal (line 524)
-- new Variable (line 1388)
-- 21 class method(s)
+- new Variable (line 330)
+- new ObjectEntry (line 454)
+- new Variable (line 463)
+- new Variable (line 492)
+- new VM\GeneratorUncaughtThrow (line 507)
+- new VM\FiberUncaughtThrow (line 521)
+- new VM\DestructorThrowCatchSignal (line 526)
+- new Variable (line 609)
+- 20 class method(s)
 
 ### `lib/VM/AbstractPropertyHookCheck.php`
 
@@ -66791,6 +66792,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 58)
 - new Variable (line 76)
 - 8 class method(s)
+
+### `lib/VM/Concern/RunFramesInner.php`
+
+**Warnings** (review for bootstrap subset):
+- trait RunFramesInner (line 20)
+- 1 class method(s)
 
 ### `lib/VM/Concern/ScalarArithBitwiseUnaryDispatch.php`
 
