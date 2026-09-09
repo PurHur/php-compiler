@@ -56,7 +56,7 @@ Do **not** add modules to `Runtime::loadCoreModules()` — every binary already 
 | `script/aot-smoke.sh` | Toolchain liveness | itself (8–9/9) | Mass differential “regressions” from dead toolchain (#24194) |
 | `script/differential-sweep.sh` | Zend-vs-us output | itself | Silent wrong output missed by compliance (#23354) |
 | `script/north-star5-verify.sh` | M5 self-host presenter | `make north-star5-verify-fast` | Sidecar COPY reported as native (#21860/#36146) |
-| `script/apply-patches.sh` | Vendor patch apply | `--verify-pristine` in docs gate | structgep / simplifier guard drift (#36143/#36377) |
+| `script/apply-patches.sh` + `script/lib/apply-php-*-overlays*.inc.sh` + `patch-already-applied.inc.sh` | Vendor patch apply | `--verify-pristine` in docs gate | structgep / simplifier guard drift (#36143/#36377); size ratchet extracts (#36403) |
 | `script/bootstrap-inventory.php` | `bin/vm.php` require graph | `--check` | Inventory/spine desync blocks north-star5 |
 
 ## `prelinked/`
@@ -81,7 +81,7 @@ Patch source of truth is moving toward forks (#36229); until then every patch ne
 
 ## Size ratchet
 
-After a Concern extract that shrinks a budgeted file, lower `budget` in `script/size-budgets.json` to the new line count (never raise it). Targets: Compiler/JIT ≤ 25k (then 20k), VM ≤ 15k, `script/` ≤ 150 top-level files (issue-specific helpers go under `script/composer/`, `script/fuzz/`, `script/lib/`, …), `ci-defaults.env` ≤ 60 exports.
+After a Concern extract that shrinks a budgeted file, lower `budget` in `script/size-budgets.json` to the new line count (never raise it). Targets: Compiler/JIT ≤ 25k (then 20k), VM ≤ 15k, `apply-patches.sh` ≤ 4k (overlays under `script/lib/`), `script/` ≤ 150 top-level files (issue-specific helpers go under `script/composer/`, `script/fuzz/`, `script/lib/`, …), `ci-defaults.env` ≤ 60 exports.
 
 ## Related ADRs / docs
 
