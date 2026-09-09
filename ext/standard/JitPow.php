@@ -36500,6 +36500,1873 @@ if ('seventysixth' === $expFold) {
             return;
         }
 
+if ('seventyseventh' === $expFold) {
+            // n^77 = seventysixth*n; overflow arms +1 ×nF vs **76.
+            // tenth=fifth*fifth, twentieth=tenth*tenth,
+            // fortieth=twentieth*twentieth, fortysecond=fortieth*sq, fortyfourth=fortysecond*sq,
+            // fortysixth=fortyfourth*sq, then fortysixth*sq*sq*n… (sixtyseventh×n).
+            // Overflow arms finish in float with one extra ×nF vs **77.
+            $baseL = JitLongArg::lower($context, $base, 'pow() base');
+            $i64 = $context->getTypeFromString('int64');
+            $f64 = $context->getTypeFromString('double');
+            $n = $context->builder->intCast($baseL, $i64);
+            $sqVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $n,
+                $n
+            );
+            $ov1 = $sqVar->longArithOverflowFlag;
+            if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **77 expected smul overflow metadata (sq)');
+            }
+            $sqLong = JITVariable::KIND_VARIABLE === $sqVar->kind
+                ? $context->builder->load($sqVar->value)
+                : $sqVar->value;
+            $ov1Block = BasicBlockHelper::append($context, 'pow_seventyseventh_sq_ov');
+            $ok1Block = BasicBlockHelper::append($context, 'pow_seventyseventh_sq_ok');
+            $doneBlock = BasicBlockHelper::append($context, 'pow_seventyseventh_done');
+            $context->builder->branchIf($ov1, $ov1Block, $ok1Block);
+
+            $context->builder->positionAtEnd($ov1Block);
+            $sqF = $context->builder->load($sqVar->longArithOverflowDoubleSlot);
+            $sq2F = $context->builder->fmul($sqF, $sqF);
+            $sq4F = $context->builder->fmul($sq2F, $sq2F);
+            $sq8F = $context->builder->fmul($sq4F, $sq4F);
+            $twentiethF = $context->builder->fmul($sq8F, $sq2F);
+            $fortiethF = $context->builder->fmul($twentiethF, $twentiethF);
+            $fortysecondF = $context->builder->fmul($fortiethF, $sqF);
+            $fortyfourthF = $context->builder->fmul($fortysecondF, $sqF);
+            $seventyseventhFSq = $context->builder->fmul($fortyfourthF, $sqF);
+            $seventyseventhFEighth = $context->builder->fmul($seventyseventhFSq, $sqF);
+            $seventyseventhF = $context->builder->fmul($seventyseventhFEighth, $sqF);
+            $nF = $context->builder->siToFp($n, $f64);
+            $seventyseventhF = $context->builder->fmul($seventyseventhF, $nF);
+            $seventyseventhF = $context->builder->fmul($seventyseventhF, $nF);
+            $seventyseventhF = $context->builder->fmul($seventyseventhF, $nF);
+            $seventyseventhF = $context->builder->fmul($seventyseventhF, $nF);
+            $seventyseventhF = $context->builder->fmul($seventyseventhF, $nF);
+            $seventyseventhF = $context->builder->fmul($seventyseventhF, $nF);
+            $seventyseventhF = $context->builder->fmul($seventyseventhF, $nF);
+            $seventyseventhF = $context->builder->fmul($seventyseventhF, $nF);
+            $seventyseventhF = $context->builder->fmul($seventyseventhF, $nF);
+            $seventyseventhF = $context->builder->fmul($seventyseventhF, $nF);
+                $seventyseventhF = $context->builder->fmul($seventyseventhF, $nF);
+                    $seventyseventhF = $context->builder->fmul($seventyseventhF, $nF);
+                        $seventyseventhF = $context->builder->fmul($seventyseventhF, $nF);
+                        $seventyseventhF = $context->builder->fmul($seventyseventhF, $nF);
+                        $seventyseventhF = $context->builder->fmul($seventyseventhF, $nF);
+                        $seventyseventhF = $context->builder->fmul($seventyseventhF, $nF);
+                        $seventyseventhF = $context->builder->fmul($seventyseventhF, $nF);
+                        $seventyseventhF = $context->builder->fmul($seventyseventhF, $nF);
+                        $seventyseventhF = $context->builder->fmul($seventyseventhF, $nF);
+            $seventyseventhF = $context->builder->fmul($seventyseventhF, $nF);
+            $seventyseventhF = $context->builder->fmul($seventyseventhF, $nF);
+            $seventyseventhF = $context->builder->fmul($seventyseventhF, $nF);
+            $seventyseventhF = $context->builder->fmul($seventyseventhF, $nF);
+
+            $seventyseventhF = $context->builder->fmul($seventyseventhF, $nF);
+            $seventyseventhF = $context->builder->fmul($seventyseventhF, $nF);
+            $seventyseventhF = $context->builder->fmul($seventyseventhF, $nF);
+            $seventyseventhF = $context->builder->fmul($seventyseventhF, $nF);
+            $seventyseventhF = $context->builder->fmul($seventyseventhF, $nF);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $seventyseventhF
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok1Block);
+            $cuVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $sqLong,
+                $n
+            );
+            $ov2 = $cuVar->longArithOverflowFlag;
+            if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **77 expected smul overflow metadata (cu)');
+            }
+            $cuLong = JITVariable::KIND_VARIABLE === $cuVar->kind
+                ? $context->builder->load($cuVar->value)
+                : $cuVar->value;
+            $ov2Block = BasicBlockHelper::append($context, 'pow_seventyseventh_cu_ov');
+            $ok2Block = BasicBlockHelper::append($context, 'pow_seventyseventh_cu_ok');
+            $context->builder->branchIf($ov2, $ov2Block, $ok2Block);
+
+            $context->builder->positionAtEnd($ov2Block);
+            $cuF = $context->builder->load($cuVar->longArithOverflowDoubleSlot);
+            $sqF2 = $context->builder->siToFp($sqLong, $f64);
+            $fifthF = $context->builder->fmul($cuF, $sqF2);
+            $tenthF2 = $context->builder->fmul($fifthF, $fifthF);
+            $twentiethF2 = $context->builder->fmul($tenthF2, $tenthF2);
+            $fortiethF2 = $context->builder->fmul($twentiethF2, $twentiethF2);
+            $fortysecondF2 = $context->builder->fmul($fortiethF2, $sqF2);
+            $fortyfourthF2 = $context->builder->fmul($fortysecondF2, $sqF2);
+            $seventyseventhF2Sq = $context->builder->fmul($fortyfourthF2, $sqF2);
+            $seventyseventhF2Eighth = $context->builder->fmul($seventyseventhF2Sq, $sqF2);
+            $seventyseventhF2 = $context->builder->fmul($seventyseventhF2Eighth, $sqF2);
+            $nF2 = $context->builder->siToFp($n, $f64);
+            $seventyseventhF2 = $context->builder->fmul($seventyseventhF2, $nF2);
+            $seventyseventhF2 = $context->builder->fmul($seventyseventhF2, $nF2);
+            $seventyseventhF2 = $context->builder->fmul($seventyseventhF2, $nF2);
+            $seventyseventhF2 = $context->builder->fmul($seventyseventhF2, $nF2);
+            $seventyseventhF2 = $context->builder->fmul($seventyseventhF2, $nF2);
+            $seventyseventhF2 = $context->builder->fmul($seventyseventhF2, $nF2);
+            $seventyseventhF2 = $context->builder->fmul($seventyseventhF2, $nF2);
+            $seventyseventhF2 = $context->builder->fmul($seventyseventhF2, $nF2);
+            $seventyseventhF2 = $context->builder->fmul($seventyseventhF2, $nF2);
+            $seventyseventhF2 = $context->builder->fmul($seventyseventhF2, $nF2);
+                $seventyseventhF2 = $context->builder->fmul($seventyseventhF2, $nF2);
+                    $seventyseventhF2 = $context->builder->fmul($seventyseventhF2, $nF2);
+                        $seventyseventhF2 = $context->builder->fmul($seventyseventhF2, $nF2);
+                        $seventyseventhF2 = $context->builder->fmul($seventyseventhF2, $nF2);
+                        $seventyseventhF2 = $context->builder->fmul($seventyseventhF2, $nF2);
+                        $seventyseventhF2 = $context->builder->fmul($seventyseventhF2, $nF2);
+                        $seventyseventhF2 = $context->builder->fmul($seventyseventhF2, $nF2);
+                        $seventyseventhF2 = $context->builder->fmul($seventyseventhF2, $nF2);
+                        $seventyseventhF2 = $context->builder->fmul($seventyseventhF2, $nF2);
+            $seventyseventhF2 = $context->builder->fmul($seventyseventhF2, $nF2);
+            $seventyseventhF2 = $context->builder->fmul($seventyseventhF2, $nF2);
+            $seventyseventhF2 = $context->builder->fmul($seventyseventhF2, $nF2);
+            $seventyseventhF2 = $context->builder->fmul($seventyseventhF2, $nF2);
+
+            $seventyseventhF2 = $context->builder->fmul($seventyseventhF2, $nF2);
+            $seventyseventhF2 = $context->builder->fmul($seventyseventhF2, $nF2);
+            $seventyseventhF2 = $context->builder->fmul($seventyseventhF2, $nF2);
+            $seventyseventhF2 = $context->builder->fmul($seventyseventhF2, $nF2);
+            $seventyseventhF2 = $context->builder->fmul($seventyseventhF2, $nF2);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $seventyseventhF2
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok2Block);
+            $fifthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $cuLong,
+                $sqLong
+            );
+            $ov3 = $fifthVar->longArithOverflowFlag;
+            if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **77 expected smul overflow metadata (fifth)');
+            }
+            $fifthLong = JITVariable::KIND_VARIABLE === $fifthVar->kind
+                ? $context->builder->load($fifthVar->value)
+                : $fifthVar->value;
+            $ov3Block = BasicBlockHelper::append($context, 'pow_seventyseventh_fifth_ov');
+            $ok3Block = BasicBlockHelper::append($context, 'pow_seventyseventh_fifth_ok');
+            $context->builder->branchIf($ov3, $ov3Block, $ok3Block);
+
+            $context->builder->positionAtEnd($ov3Block);
+            $fifthF2 = $context->builder->load($fifthVar->longArithOverflowDoubleSlot);
+            $tenthF3 = $context->builder->fmul($fifthF2, $fifthF2);
+            $twentiethF3 = $context->builder->fmul($tenthF3, $tenthF3);
+            $fortiethF3 = $context->builder->fmul($twentiethF3, $twentiethF3);
+            $sqF3 = $context->builder->siToFp($sqLong, $f64);
+            $fortysecondF3 = $context->builder->fmul($fortiethF3, $sqF3);
+            $fortyfourthF3 = $context->builder->fmul($fortysecondF3, $sqF3);
+            $seventyseventhF3Sq = $context->builder->fmul($fortyfourthF3, $sqF3);
+            $seventyseventhF3Eighth = $context->builder->fmul($seventyseventhF3Sq, $sqF3);
+            $seventyseventhF3 = $context->builder->fmul($seventyseventhF3Eighth, $sqF3);
+            $nF3 = $context->builder->siToFp($n, $f64);
+            $seventyseventhF3 = $context->builder->fmul($seventyseventhF3, $nF3);
+            $seventyseventhF3 = $context->builder->fmul($seventyseventhF3, $nF3);
+            $seventyseventhF3 = $context->builder->fmul($seventyseventhF3, $nF3);
+            $seventyseventhF3 = $context->builder->fmul($seventyseventhF3, $nF3);
+            $seventyseventhF3 = $context->builder->fmul($seventyseventhF3, $nF3);
+            $seventyseventhF3 = $context->builder->fmul($seventyseventhF3, $nF3);
+            $seventyseventhF3 = $context->builder->fmul($seventyseventhF3, $nF3);
+            $seventyseventhF3 = $context->builder->fmul($seventyseventhF3, $nF3);
+            $seventyseventhF3 = $context->builder->fmul($seventyseventhF3, $nF3);
+            $seventyseventhF3 = $context->builder->fmul($seventyseventhF3, $nF3);
+                $seventyseventhF3 = $context->builder->fmul($seventyseventhF3, $nF3);
+                    $seventyseventhF3 = $context->builder->fmul($seventyseventhF3, $nF3);
+                        $seventyseventhF3 = $context->builder->fmul($seventyseventhF3, $nF3);
+                        $seventyseventhF3 = $context->builder->fmul($seventyseventhF3, $nF3);
+                        $seventyseventhF3 = $context->builder->fmul($seventyseventhF3, $nF3);
+                        $seventyseventhF3 = $context->builder->fmul($seventyseventhF3, $nF3);
+                        $seventyseventhF3 = $context->builder->fmul($seventyseventhF3, $nF3);
+                        $seventyseventhF3 = $context->builder->fmul($seventyseventhF3, $nF3);
+                        $seventyseventhF3 = $context->builder->fmul($seventyseventhF3, $nF3);
+            $seventyseventhF3 = $context->builder->fmul($seventyseventhF3, $nF3);
+            $seventyseventhF3 = $context->builder->fmul($seventyseventhF3, $nF3);
+            $seventyseventhF3 = $context->builder->fmul($seventyseventhF3, $nF3);
+            $seventyseventhF3 = $context->builder->fmul($seventyseventhF3, $nF3);
+
+            $seventyseventhF3 = $context->builder->fmul($seventyseventhF3, $nF3);
+            $seventyseventhF3 = $context->builder->fmul($seventyseventhF3, $nF3);
+            $seventyseventhF3 = $context->builder->fmul($seventyseventhF3, $nF3);
+            $seventyseventhF3 = $context->builder->fmul($seventyseventhF3, $nF3);
+            $seventyseventhF3 = $context->builder->fmul($seventyseventhF3, $nF3);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $seventyseventhF3
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok3Block);
+            $tenthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $fifthLong,
+                $fifthLong
+            );
+            $ov4 = $tenthVar->longArithOverflowFlag;
+            if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **77 expected smul overflow metadata (tenth)');
+            }
+            $tenthLong = JITVariable::KIND_VARIABLE === $tenthVar->kind
+                ? $context->builder->load($tenthVar->value)
+                : $tenthVar->value;
+            $ov4Block = BasicBlockHelper::append($context, 'pow_seventyseventh_tenth_ov');
+            $ok4Block = BasicBlockHelper::append($context, 'pow_seventyseventh_tenth_ok');
+            $context->builder->branchIf($ov4, $ov4Block, $ok4Block);
+
+            $context->builder->positionAtEnd($ov4Block);
+            $tenthF4 = $context->builder->load($tenthVar->longArithOverflowDoubleSlot);
+            $twentiethF4 = $context->builder->fmul($tenthF4, $tenthF4);
+            $fortiethF4 = $context->builder->fmul($twentiethF4, $twentiethF4);
+            $sqF4 = $context->builder->siToFp($sqLong, $f64);
+            $fortysecondF4 = $context->builder->fmul($fortiethF4, $sqF4);
+            $fortyfourthF4 = $context->builder->fmul($fortysecondF4, $sqF4);
+            $seventyseventhF4Sq = $context->builder->fmul($fortyfourthF4, $sqF4);
+            $seventyseventhF4Eighth = $context->builder->fmul($seventyseventhF4Sq, $sqF4);
+            $seventyseventhF4 = $context->builder->fmul($seventyseventhF4Eighth, $sqF4);
+            $nF4 = $context->builder->siToFp($n, $f64);
+            $seventyseventhF4 = $context->builder->fmul($seventyseventhF4, $nF4);
+            $seventyseventhF4 = $context->builder->fmul($seventyseventhF4, $nF4);
+            $seventyseventhF4 = $context->builder->fmul($seventyseventhF4, $nF4);
+            $seventyseventhF4 = $context->builder->fmul($seventyseventhF4, $nF4);
+            $seventyseventhF4 = $context->builder->fmul($seventyseventhF4, $nF4);
+            $seventyseventhF4 = $context->builder->fmul($seventyseventhF4, $nF4);
+            $seventyseventhF4 = $context->builder->fmul($seventyseventhF4, $nF4);
+            $seventyseventhF4 = $context->builder->fmul($seventyseventhF4, $nF4);
+            $seventyseventhF4 = $context->builder->fmul($seventyseventhF4, $nF4);
+            $seventyseventhF4 = $context->builder->fmul($seventyseventhF4, $nF4);
+                $seventyseventhF4 = $context->builder->fmul($seventyseventhF4, $nF4);
+                    $seventyseventhF4 = $context->builder->fmul($seventyseventhF4, $nF4);
+                        $seventyseventhF4 = $context->builder->fmul($seventyseventhF4, $nF4);
+                        $seventyseventhF4 = $context->builder->fmul($seventyseventhF4, $nF4);
+                        $seventyseventhF4 = $context->builder->fmul($seventyseventhF4, $nF4);
+                        $seventyseventhF4 = $context->builder->fmul($seventyseventhF4, $nF4);
+                        $seventyseventhF4 = $context->builder->fmul($seventyseventhF4, $nF4);
+                        $seventyseventhF4 = $context->builder->fmul($seventyseventhF4, $nF4);
+                        $seventyseventhF4 = $context->builder->fmul($seventyseventhF4, $nF4);
+            $seventyseventhF4 = $context->builder->fmul($seventyseventhF4, $nF4);
+            $seventyseventhF4 = $context->builder->fmul($seventyseventhF4, $nF4);
+            $seventyseventhF4 = $context->builder->fmul($seventyseventhF4, $nF4);
+            $seventyseventhF4 = $context->builder->fmul($seventyseventhF4, $nF4);
+
+            $seventyseventhF4 = $context->builder->fmul($seventyseventhF4, $nF4);
+            $seventyseventhF4 = $context->builder->fmul($seventyseventhF4, $nF4);
+            $seventyseventhF4 = $context->builder->fmul($seventyseventhF4, $nF4);
+            $seventyseventhF4 = $context->builder->fmul($seventyseventhF4, $nF4);
+            $seventyseventhF4 = $context->builder->fmul($seventyseventhF4, $nF4);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $seventyseventhF4
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok4Block);
+            $twentiethVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $tenthLong,
+                $tenthLong
+            );
+            $ov5 = $twentiethVar->longArithOverflowFlag;
+            if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **77 expected smul overflow metadata (twentieth)');
+            }
+            $twentiethLong = JITVariable::KIND_VARIABLE === $twentiethVar->kind
+                ? $context->builder->load($twentiethVar->value)
+                : $twentiethVar->value;
+            $ov5Block = BasicBlockHelper::append($context, 'pow_seventyseventh_twentieth_ov');
+            $ok5Block = BasicBlockHelper::append($context, 'pow_seventyseventh_twentieth_ok');
+            $context->builder->branchIf($ov5, $ov5Block, $ok5Block);
+
+            $context->builder->positionAtEnd($ov5Block);
+            $twentiethF5 = $context->builder->load($twentiethVar->longArithOverflowDoubleSlot);
+            $fortiethF5 = $context->builder->fmul($twentiethF5, $twentiethF5);
+            $sqF5 = $context->builder->siToFp($sqLong, $f64);
+            $fortysecondF5 = $context->builder->fmul($fortiethF5, $sqF5);
+            $fortyfourthF5 = $context->builder->fmul($fortysecondF5, $sqF5);
+            $seventyseventhF5Sq = $context->builder->fmul($fortyfourthF5, $sqF5);
+            $seventyseventhF5Eighth = $context->builder->fmul($seventyseventhF5Sq, $sqF5);
+            $seventyseventhF5 = $context->builder->fmul($seventyseventhF5Eighth, $sqF5);
+            $nF5 = $context->builder->siToFp($n, $f64);
+            $seventyseventhF5 = $context->builder->fmul($seventyseventhF5, $nF5);
+            $seventyseventhF5 = $context->builder->fmul($seventyseventhF5, $nF5);
+            $seventyseventhF5 = $context->builder->fmul($seventyseventhF5, $nF5);
+            $seventyseventhF5 = $context->builder->fmul($seventyseventhF5, $nF5);
+            $seventyseventhF5 = $context->builder->fmul($seventyseventhF5, $nF5);
+            $seventyseventhF5 = $context->builder->fmul($seventyseventhF5, $nF5);
+            $seventyseventhF5 = $context->builder->fmul($seventyseventhF5, $nF5);
+            $seventyseventhF5 = $context->builder->fmul($seventyseventhF5, $nF5);
+            $seventyseventhF5 = $context->builder->fmul($seventyseventhF5, $nF5);
+            $seventyseventhF5 = $context->builder->fmul($seventyseventhF5, $nF5);
+                $seventyseventhF5 = $context->builder->fmul($seventyseventhF5, $nF5);
+                    $seventyseventhF5 = $context->builder->fmul($seventyseventhF5, $nF5);
+                        $seventyseventhF5 = $context->builder->fmul($seventyseventhF5, $nF5);
+                        $seventyseventhF5 = $context->builder->fmul($seventyseventhF5, $nF5);
+                        $seventyseventhF5 = $context->builder->fmul($seventyseventhF5, $nF5);
+                        $seventyseventhF5 = $context->builder->fmul($seventyseventhF5, $nF5);
+                        $seventyseventhF5 = $context->builder->fmul($seventyseventhF5, $nF5);
+                        $seventyseventhF5 = $context->builder->fmul($seventyseventhF5, $nF5);
+                        $seventyseventhF5 = $context->builder->fmul($seventyseventhF5, $nF5);
+            $seventyseventhF5 = $context->builder->fmul($seventyseventhF5, $nF5);
+            $seventyseventhF5 = $context->builder->fmul($seventyseventhF5, $nF5);
+            $seventyseventhF5 = $context->builder->fmul($seventyseventhF5, $nF5);
+            $seventyseventhF5 = $context->builder->fmul($seventyseventhF5, $nF5);
+
+            $seventyseventhF5 = $context->builder->fmul($seventyseventhF5, $nF5);
+            $seventyseventhF5 = $context->builder->fmul($seventyseventhF5, $nF5);
+            $seventyseventhF5 = $context->builder->fmul($seventyseventhF5, $nF5);
+            $seventyseventhF5 = $context->builder->fmul($seventyseventhF5, $nF5);
+            $seventyseventhF5 = $context->builder->fmul($seventyseventhF5, $nF5);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $seventyseventhF5
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok5Block);
+            $fortiethVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $twentiethLong,
+                $twentiethLong
+            );
+            $ov6 = $fortiethVar->longArithOverflowFlag;
+            if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **77 expected smul overflow metadata (fortieth)');
+            }
+            $fortiethLong = JITVariable::KIND_VARIABLE === $fortiethVar->kind
+                ? $context->builder->load($fortiethVar->value)
+                : $fortiethVar->value;
+            $ov6Block = BasicBlockHelper::append($context, 'pow_seventyseventh_fortieth_ov');
+            $ok6Block = BasicBlockHelper::append($context, 'pow_seventyseventh_fortieth_ok');
+            $context->builder->branchIf($ov6, $ov6Block, $ok6Block);
+
+            $context->builder->positionAtEnd($ov6Block);
+            $fortiethF6 = $context->builder->load($fortiethVar->longArithOverflowDoubleSlot);
+            $sqF6 = $context->builder->siToFp($sqLong, $f64);
+            $fortysecondF6 = $context->builder->fmul($fortiethF6, $sqF6);
+            $fortyfourthF6 = $context->builder->fmul($fortysecondF6, $sqF6);
+            $seventyseventhF6Sq = $context->builder->fmul($fortyfourthF6, $sqF6);
+            $seventyseventhF6Eighth = $context->builder->fmul($seventyseventhF6Sq, $sqF6);
+            $seventyseventhF6 = $context->builder->fmul($seventyseventhF6Eighth, $sqF6);
+            $nF6 = $context->builder->siToFp($n, $f64);
+            $seventyseventhF6 = $context->builder->fmul($seventyseventhF6, $nF6);
+            $seventyseventhF6 = $context->builder->fmul($seventyseventhF6, $nF6);
+            $seventyseventhF6 = $context->builder->fmul($seventyseventhF6, $nF6);
+            $seventyseventhF6 = $context->builder->fmul($seventyseventhF6, $nF6);
+            $seventyseventhF6 = $context->builder->fmul($seventyseventhF6, $nF6);
+            $seventyseventhF6 = $context->builder->fmul($seventyseventhF6, $nF6);
+            $seventyseventhF6 = $context->builder->fmul($seventyseventhF6, $nF6);
+            $seventyseventhF6 = $context->builder->fmul($seventyseventhF6, $nF6);
+            $seventyseventhF6 = $context->builder->fmul($seventyseventhF6, $nF6);
+            $seventyseventhF6 = $context->builder->fmul($seventyseventhF6, $nF6);
+                $seventyseventhF6 = $context->builder->fmul($seventyseventhF6, $nF6);
+                    $seventyseventhF6 = $context->builder->fmul($seventyseventhF6, $nF6);
+                        $seventyseventhF6 = $context->builder->fmul($seventyseventhF6, $nF6);
+                        $seventyseventhF6 = $context->builder->fmul($seventyseventhF6, $nF6);
+                        $seventyseventhF6 = $context->builder->fmul($seventyseventhF6, $nF6);
+                        $seventyseventhF6 = $context->builder->fmul($seventyseventhF6, $nF6);
+                        $seventyseventhF6 = $context->builder->fmul($seventyseventhF6, $nF6);
+                        $seventyseventhF6 = $context->builder->fmul($seventyseventhF6, $nF6);
+                        $seventyseventhF6 = $context->builder->fmul($seventyseventhF6, $nF6);
+            $seventyseventhF6 = $context->builder->fmul($seventyseventhF6, $nF6);
+            $seventyseventhF6 = $context->builder->fmul($seventyseventhF6, $nF6);
+            $seventyseventhF6 = $context->builder->fmul($seventyseventhF6, $nF6);
+            $seventyseventhF6 = $context->builder->fmul($seventyseventhF6, $nF6);
+
+            $seventyseventhF6 = $context->builder->fmul($seventyseventhF6, $nF6);
+            $seventyseventhF6 = $context->builder->fmul($seventyseventhF6, $nF6);
+            $seventyseventhF6 = $context->builder->fmul($seventyseventhF6, $nF6);
+            $seventyseventhF6 = $context->builder->fmul($seventyseventhF6, $nF6);
+            $seventyseventhF6 = $context->builder->fmul($seventyseventhF6, $nF6);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $seventyseventhF6
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok6Block);
+            $fortysecondVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $fortiethLong,
+                $sqLong
+            );
+            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **77 expected smul overflow metadata (fortysecond)');
+            }
+            $fortysecondLong = JITVariable::KIND_VARIABLE === $fortysecondVar->kind
+                ? $context->builder->load($fortysecondVar->value)
+                : $fortysecondVar->value;
+            $ov7Block = BasicBlockHelper::append($context, 'pow_seventyseventh_fortysecond_ov');
+            $ok7Block = BasicBlockHelper::append($context, 'pow_seventyseventh_fortysecond_ok');
+            $context->builder->branchIf($ov7, $ov7Block, $ok7Block);
+
+            $context->builder->positionAtEnd($ov7Block);
+            $fortysecondF7 = $context->builder->load($fortysecondVar->longArithOverflowDoubleSlot);
+            $sqF7 = $context->builder->siToFp($sqLong, $f64);
+            $fortyfourthF7 = $context->builder->fmul($fortysecondF7, $sqF7);
+            $seventyseventhF7Sq = $context->builder->fmul($fortyfourthF7, $sqF7);
+            $seventyseventhF7Eighth = $context->builder->fmul($seventyseventhF7Sq, $sqF7);
+            $seventyseventhF7 = $context->builder->fmul($seventyseventhF7Eighth, $sqF7);
+            $nF7 = $context->builder->siToFp($n, $f64);
+            $seventyseventhF7 = $context->builder->fmul($seventyseventhF7, $nF7);
+            $seventyseventhF7 = $context->builder->fmul($seventyseventhF7, $nF7);
+            $seventyseventhF7 = $context->builder->fmul($seventyseventhF7, $nF7);
+            $seventyseventhF7 = $context->builder->fmul($seventyseventhF7, $nF7);
+            $seventyseventhF7 = $context->builder->fmul($seventyseventhF7, $nF7);
+            $seventyseventhF7 = $context->builder->fmul($seventyseventhF7, $nF7);
+            $seventyseventhF7 = $context->builder->fmul($seventyseventhF7, $nF7);
+            $seventyseventhF7 = $context->builder->fmul($seventyseventhF7, $nF7);
+            $seventyseventhF7 = $context->builder->fmul($seventyseventhF7, $nF7);
+            $seventyseventhF7 = $context->builder->fmul($seventyseventhF7, $nF7);
+                $seventyseventhF7 = $context->builder->fmul($seventyseventhF7, $nF7);
+                    $seventyseventhF7 = $context->builder->fmul($seventyseventhF7, $nF7);
+                        $seventyseventhF7 = $context->builder->fmul($seventyseventhF7, $nF7);
+                        $seventyseventhF7 = $context->builder->fmul($seventyseventhF7, $nF7);
+                        $seventyseventhF7 = $context->builder->fmul($seventyseventhF7, $nF7);
+                        $seventyseventhF7 = $context->builder->fmul($seventyseventhF7, $nF7);
+                        $seventyseventhF7 = $context->builder->fmul($seventyseventhF7, $nF7);
+                        $seventyseventhF7 = $context->builder->fmul($seventyseventhF7, $nF7);
+                        $seventyseventhF7 = $context->builder->fmul($seventyseventhF7, $nF7);
+            $seventyseventhF7 = $context->builder->fmul($seventyseventhF7, $nF7);
+            $seventyseventhF7 = $context->builder->fmul($seventyseventhF7, $nF7);
+            $seventyseventhF7 = $context->builder->fmul($seventyseventhF7, $nF7);
+            $seventyseventhF7 = $context->builder->fmul($seventyseventhF7, $nF7);
+
+            $seventyseventhF7 = $context->builder->fmul($seventyseventhF7, $nF7);
+            $seventyseventhF7 = $context->builder->fmul($seventyseventhF7, $nF7);
+            $seventyseventhF7 = $context->builder->fmul($seventyseventhF7, $nF7);
+            $seventyseventhF7 = $context->builder->fmul($seventyseventhF7, $nF7);
+            $seventyseventhF7 = $context->builder->fmul($seventyseventhF7, $nF7);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $seventyseventhF7
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok7Block);
+            $fortyfourthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $fortysecondLong,
+                $sqLong
+            );
+            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **77 expected smul overflow metadata (fortyfourth)');
+            }
+            $fortyfourthLong = JITVariable::KIND_VARIABLE === $fortyfourthVar->kind
+                ? $context->builder->load($fortyfourthVar->value)
+                : $fortyfourthVar->value;
+            $ov8Block = BasicBlockHelper::append($context, 'pow_seventyseventh_fortyfourth_ov');
+            $ok8Block = BasicBlockHelper::append($context, 'pow_seventyseventh_fortyfourth_ok');
+            $context->builder->branchIf($ov8, $ov8Block, $ok8Block);
+
+            $context->builder->positionAtEnd($ov8Block);
+            $fortyfourthF8 = $context->builder->load($fortyfourthVar->longArithOverflowDoubleSlot);
+            $sqF8 = $context->builder->siToFp($sqLong, $f64);
+            $seventyseventhF8Sq = $context->builder->fmul($fortyfourthF8, $sqF8);
+            $seventyseventhF8Eighth = $context->builder->fmul($seventyseventhF8Sq, $sqF8);
+            $seventyseventhF8 = $context->builder->fmul($seventyseventhF8Eighth, $sqF8);
+            $nF8 = $context->builder->siToFp($n, $f64);
+            $seventyseventhF8 = $context->builder->fmul($seventyseventhF8, $nF8);
+            $seventyseventhF8 = $context->builder->fmul($seventyseventhF8, $nF8);
+            $seventyseventhF8 = $context->builder->fmul($seventyseventhF8, $nF8);
+            $seventyseventhF8 = $context->builder->fmul($seventyseventhF8, $nF8);
+            $seventyseventhF8 = $context->builder->fmul($seventyseventhF8, $nF8);
+            $seventyseventhF8 = $context->builder->fmul($seventyseventhF8, $nF8);
+            $seventyseventhF8 = $context->builder->fmul($seventyseventhF8, $nF8);
+            $seventyseventhF8 = $context->builder->fmul($seventyseventhF8, $nF8);
+            $seventyseventhF8 = $context->builder->fmul($seventyseventhF8, $nF8);
+            $seventyseventhF8 = $context->builder->fmul($seventyseventhF8, $nF8);
+                $seventyseventhF8 = $context->builder->fmul($seventyseventhF8, $nF8);
+                    $seventyseventhF8 = $context->builder->fmul($seventyseventhF8, $nF8);
+                        $seventyseventhF8 = $context->builder->fmul($seventyseventhF8, $nF8);
+                        $seventyseventhF8 = $context->builder->fmul($seventyseventhF8, $nF8);
+                        $seventyseventhF8 = $context->builder->fmul($seventyseventhF8, $nF8);
+                        $seventyseventhF8 = $context->builder->fmul($seventyseventhF8, $nF8);
+                        $seventyseventhF8 = $context->builder->fmul($seventyseventhF8, $nF8);
+                        $seventyseventhF8 = $context->builder->fmul($seventyseventhF8, $nF8);
+                        $seventyseventhF8 = $context->builder->fmul($seventyseventhF8, $nF8);
+            $seventyseventhF8 = $context->builder->fmul($seventyseventhF8, $nF8);
+            $seventyseventhF8 = $context->builder->fmul($seventyseventhF8, $nF8);
+            $seventyseventhF8 = $context->builder->fmul($seventyseventhF8, $nF8);
+            $seventyseventhF8 = $context->builder->fmul($seventyseventhF8, $nF8);
+
+            $seventyseventhF8 = $context->builder->fmul($seventyseventhF8, $nF8);
+            $seventyseventhF8 = $context->builder->fmul($seventyseventhF8, $nF8);
+            $seventyseventhF8 = $context->builder->fmul($seventyseventhF8, $nF8);
+            $seventyseventhF8 = $context->builder->fmul($seventyseventhF8, $nF8);
+            $seventyseventhF8 = $context->builder->fmul($seventyseventhF8, $nF8);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $seventyseventhF8
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok8Block);
+            $fortysixthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $fortyfourthLong,
+                $sqLong
+            );
+            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **77 expected smul overflow metadata (fortysixth)');
+            }
+            $fortysixthLong = JITVariable::KIND_VARIABLE === $fortysixthVar->kind
+                ? $context->builder->load($fortysixthVar->value)
+                : $fortysixthVar->value;
+            $ov9Block = BasicBlockHelper::append($context, 'pow_seventyseventh_fortysixth_ov');
+            $ok9Block = BasicBlockHelper::append($context, 'pow_seventyseventh_fortysixth_ok');
+            $context->builder->branchIf($ov9, $ov9Block, $ok9Block);
+
+            $context->builder->positionAtEnd($ov9Block);
+            $fortysixthF9 = $context->builder->load($fortysixthVar->longArithOverflowDoubleSlot);
+            $sqF9 = $context->builder->siToFp($sqLong, $f64);
+            $fortyeighthF9 = $context->builder->fmul($fortysixthF9, $sqF9);
+            $seventyseventhF9 = $context->builder->fmul($fortyeighthF9, $sqF9);
+            $nF9 = $context->builder->siToFp($n, $f64);
+            $seventyseventhF9 = $context->builder->fmul($seventyseventhF9, $nF9);
+            $seventyseventhF9 = $context->builder->fmul($seventyseventhF9, $nF9);
+            $seventyseventhF9 = $context->builder->fmul($seventyseventhF9, $nF9);
+            $seventyseventhF9 = $context->builder->fmul($seventyseventhF9, $nF9);
+            $seventyseventhF9 = $context->builder->fmul($seventyseventhF9, $nF9);
+            $seventyseventhF9 = $context->builder->fmul($seventyseventhF9, $nF9);
+            $seventyseventhF9 = $context->builder->fmul($seventyseventhF9, $nF9);
+            $seventyseventhF9 = $context->builder->fmul($seventyseventhF9, $nF9);
+            $seventyseventhF9 = $context->builder->fmul($seventyseventhF9, $nF9);
+            $seventyseventhF9 = $context->builder->fmul($seventyseventhF9, $nF9);
+                $seventyseventhF9 = $context->builder->fmul($seventyseventhF9, $nF9);
+                    $seventyseventhF9 = $context->builder->fmul($seventyseventhF9, $nF9);
+                        $seventyseventhF9 = $context->builder->fmul($seventyseventhF9, $nF9);
+                        $seventyseventhF9 = $context->builder->fmul($seventyseventhF9, $nF9);
+                        $seventyseventhF9 = $context->builder->fmul($seventyseventhF9, $nF9);
+                        $seventyseventhF9 = $context->builder->fmul($seventyseventhF9, $nF9);
+                        $seventyseventhF9 = $context->builder->fmul($seventyseventhF9, $nF9);
+                        $seventyseventhF9 = $context->builder->fmul($seventyseventhF9, $nF9);
+                        $seventyseventhF9 = $context->builder->fmul($seventyseventhF9, $nF9);
+            $seventyseventhF9 = $context->builder->fmul($seventyseventhF9, $nF9);
+            $seventyseventhF9 = $context->builder->fmul($seventyseventhF9, $nF9);
+            $seventyseventhF9 = $context->builder->fmul($seventyseventhF9, $nF9);
+            $seventyseventhF9 = $context->builder->fmul($seventyseventhF9, $nF9);
+
+            $seventyseventhF9 = $context->builder->fmul($seventyseventhF9, $nF9);
+            $seventyseventhF9 = $context->builder->fmul($seventyseventhF9, $nF9);
+            $seventyseventhF9 = $context->builder->fmul($seventyseventhF9, $nF9);
+            $seventyseventhF9 = $context->builder->fmul($seventyseventhF9, $nF9);
+            $seventyseventhF9 = $context->builder->fmul($seventyseventhF9, $nF9);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $seventyseventhF9
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok9Block);
+            $fortyeighthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $fortysixthLong,
+                $sqLong
+            );
+            $ov10 = $fortyeighthVar->longArithOverflowFlag;
+            if (null === $ov10 || null === $fortyeighthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **77 expected smul overflow metadata (fortyeighth)');
+            }
+            $fortyeighthLong = JITVariable::KIND_VARIABLE === $fortyeighthVar->kind
+                ? $context->builder->load($fortyeighthVar->value)
+                : $fortyeighthVar->value;
+            $ov10Block = BasicBlockHelper::append($context, 'pow_seventyseventh_fortyeighth_ov');
+            $ok10Block = BasicBlockHelper::append($context, 'pow_seventyseventh_fortyeighth_ok');
+            $context->builder->branchIf($ov10, $ov10Block, $ok10Block);
+
+            $context->builder->positionAtEnd($ov10Block);
+            $fortyeighthF10 = $context->builder->load($fortyeighthVar->longArithOverflowDoubleSlot);
+            $sqF10 = $context->builder->siToFp($sqLong, $f64);
+            $seventyseventhF10 = $context->builder->fmul($fortyeighthF10, $sqF10);
+            $nF10 = $context->builder->siToFp($n, $f64);
+            $seventyseventhF10 = $context->builder->fmul($seventyseventhF10, $nF10);
+            $seventyseventhF10 = $context->builder->fmul($seventyseventhF10, $nF10);
+            $seventyseventhF10 = $context->builder->fmul($seventyseventhF10, $nF10);
+            $seventyseventhF10 = $context->builder->fmul($seventyseventhF10, $nF10);
+            $seventyseventhF10 = $context->builder->fmul($seventyseventhF10, $nF10);
+            $seventyseventhF10 = $context->builder->fmul($seventyseventhF10, $nF10);
+            $seventyseventhF10 = $context->builder->fmul($seventyseventhF10, $nF10);
+            $seventyseventhF10 = $context->builder->fmul($seventyseventhF10, $nF10);
+            $seventyseventhF10 = $context->builder->fmul($seventyseventhF10, $nF10);
+            $seventyseventhF10 = $context->builder->fmul($seventyseventhF10, $nF10);
+                $seventyseventhF10 = $context->builder->fmul($seventyseventhF10, $nF10);
+                    $seventyseventhF10 = $context->builder->fmul($seventyseventhF10, $nF10);
+                        $seventyseventhF10 = $context->builder->fmul($seventyseventhF10, $nF10);
+                        $seventyseventhF10 = $context->builder->fmul($seventyseventhF10, $nF10);
+                        $seventyseventhF10 = $context->builder->fmul($seventyseventhF10, $nF10);
+                        $seventyseventhF10 = $context->builder->fmul($seventyseventhF10, $nF10);
+                        $seventyseventhF10 = $context->builder->fmul($seventyseventhF10, $nF10);
+                        $seventyseventhF10 = $context->builder->fmul($seventyseventhF10, $nF10);
+                        $seventyseventhF10 = $context->builder->fmul($seventyseventhF10, $nF10);
+            $seventyseventhF10 = $context->builder->fmul($seventyseventhF10, $nF10);
+            $seventyseventhF10 = $context->builder->fmul($seventyseventhF10, $nF10);
+            $seventyseventhF10 = $context->builder->fmul($seventyseventhF10, $nF10);
+            $seventyseventhF10 = $context->builder->fmul($seventyseventhF10, $nF10);
+
+            $seventyseventhF10 = $context->builder->fmul($seventyseventhF10, $nF10);
+            $seventyseventhF10 = $context->builder->fmul($seventyseventhF10, $nF10);
+            $seventyseventhF10 = $context->builder->fmul($seventyseventhF10, $nF10);
+            $seventyseventhF10 = $context->builder->fmul($seventyseventhF10, $nF10);
+            $seventyseventhF10 = $context->builder->fmul($seventyseventhF10, $nF10);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $seventyseventhF10
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok10Block);
+            $fiftiethVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $fortyeighthLong,
+                $sqLong
+            );
+            $ov11 = $fiftiethVar->longArithOverflowFlag;
+            if (null === $ov11 || null === $fiftiethVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **77 expected smul overflow metadata (fiftieth)');
+            }
+            $fiftiethLong = JITVariable::KIND_VARIABLE === $fiftiethVar->kind
+                ? $context->builder->load($fiftiethVar->value)
+                : $fiftiethVar->value;
+            $ov11Block = BasicBlockHelper::append($context, 'pow_seventyseventh_fiftieth_ov');
+            $ok11Block = BasicBlockHelper::append($context, 'pow_seventyseventh_fiftieth_ok');
+            $context->builder->branchIf($ov11, $ov11Block, $ok11Block);
+
+            $context->builder->positionAtEnd($ov11Block);
+            $fiftiethF11 = $context->builder->load($fiftiethVar->longArithOverflowDoubleSlot);
+            $nF11 = $context->builder->siToFp($n, $f64);
+            $seventyseventhF11 = $context->builder->fmul($fiftiethF11, $nF11);
+            $seventyseventhF11 = $context->builder->fmul($seventyseventhF11, $nF11);
+            $seventyseventhF11 = $context->builder->fmul($seventyseventhF11, $nF11);
+            $seventyseventhF11 = $context->builder->fmul($seventyseventhF11, $nF11);
+            $seventyseventhF11 = $context->builder->fmul($seventyseventhF11, $nF11);
+            $seventyseventhF11 = $context->builder->fmul($seventyseventhF11, $nF11);
+            $seventyseventhF11 = $context->builder->fmul($seventyseventhF11, $nF11);
+            $seventyseventhF11 = $context->builder->fmul($seventyseventhF11, $nF11);
+            $seventyseventhF11 = $context->builder->fmul($seventyseventhF11, $nF11);
+            $seventyseventhF11 = $context->builder->fmul($seventyseventhF11, $nF11);
+                $seventyseventhF11 = $context->builder->fmul($seventyseventhF11, $nF11);
+                    $seventyseventhF11 = $context->builder->fmul($seventyseventhF11, $nF11);
+                        $seventyseventhF11 = $context->builder->fmul($seventyseventhF11, $nF11);
+                        $seventyseventhF11 = $context->builder->fmul($seventyseventhF11, $nF11);
+                        $seventyseventhF11 = $context->builder->fmul($seventyseventhF11, $nF11);
+                        $seventyseventhF11 = $context->builder->fmul($seventyseventhF11, $nF11);
+                        $seventyseventhF11 = $context->builder->fmul($seventyseventhF11, $nF11);
+                        $seventyseventhF11 = $context->builder->fmul($seventyseventhF11, $nF11);
+                        $seventyseventhF11 = $context->builder->fmul($seventyseventhF11, $nF11);
+            $seventyseventhF11 = $context->builder->fmul($seventyseventhF11, $nF11);
+            $seventyseventhF11 = $context->builder->fmul($seventyseventhF11, $nF11);
+            $seventyseventhF11 = $context->builder->fmul($seventyseventhF11, $nF11);
+            $seventyseventhF11 = $context->builder->fmul($seventyseventhF11, $nF11);
+
+            $seventyseventhF11 = $context->builder->fmul($seventyseventhF11, $nF11);
+            $seventyseventhF11 = $context->builder->fmul($seventyseventhF11, $nF11);
+            $seventyseventhF11 = $context->builder->fmul($seventyseventhF11, $nF11);
+            $seventyseventhF11 = $context->builder->fmul($seventyseventhF11, $nF11);
+            $seventyseventhF11 = $context->builder->fmul($seventyseventhF11, $nF11);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $seventyseventhF11
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok11Block);
+            $fiftyfirstVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $fiftiethLong,
+                $n
+            );
+            $ov12 = $fiftyfirstVar->longArithOverflowFlag;
+            if (null === $ov12 || null === $fiftyfirstVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **77 expected smul overflow metadata (fiftyfirst)');
+            }
+            $fiftyfirstLong = JITVariable::KIND_VARIABLE === $fiftyfirstVar->kind
+                ? $context->builder->load($fiftyfirstVar->value)
+                : $fiftyfirstVar->value;
+            $ov12Block = BasicBlockHelper::append($context, 'pow_seventyseventh_fiftyfirst_ov');
+            $ok12Block = BasicBlockHelper::append($context, 'pow_seventyseventh_fiftyfirst_ok');
+            $context->builder->branchIf($ov12, $ov12Block, $ok12Block);
+
+            $context->builder->positionAtEnd($ov12Block);
+            $fiftyfirstF12 = $context->builder->load($fiftyfirstVar->longArithOverflowDoubleSlot);
+            $nF12 = $context->builder->siToFp($n, $f64);
+            $seventyseventhF12 = $context->builder->fmul($fiftyfirstF12, $nF12);
+            $seventyseventhF12 = $context->builder->fmul($seventyseventhF12, $nF12);
+            $seventyseventhF12 = $context->builder->fmul($seventyseventhF12, $nF12);
+            $seventyseventhF12 = $context->builder->fmul($seventyseventhF12, $nF12);
+            $seventyseventhF12 = $context->builder->fmul($seventyseventhF12, $nF12);
+            $seventyseventhF12 = $context->builder->fmul($seventyseventhF12, $nF12);
+            $seventyseventhF12 = $context->builder->fmul($seventyseventhF12, $nF12);
+            $seventyseventhF12 = $context->builder->fmul($seventyseventhF12, $nF12);
+            $seventyseventhF12 = $context->builder->fmul($seventyseventhF12, $nF12);
+                $seventyseventhF12 = $context->builder->fmul($seventyseventhF12, $nF12);
+                    $seventyseventhF12 = $context->builder->fmul($seventyseventhF12, $nF12);
+                        $seventyseventhF12 = $context->builder->fmul($seventyseventhF12, $nF12);
+                        $seventyseventhF12 = $context->builder->fmul($seventyseventhF12, $nF12);
+                        $seventyseventhF12 = $context->builder->fmul($seventyseventhF12, $nF12);
+                        $seventyseventhF12 = $context->builder->fmul($seventyseventhF12, $nF12);
+                        $seventyseventhF12 = $context->builder->fmul($seventyseventhF12, $nF12);
+                        $seventyseventhF12 = $context->builder->fmul($seventyseventhF12, $nF12);
+                        $seventyseventhF12 = $context->builder->fmul($seventyseventhF12, $nF12);
+            $seventyseventhF12 = $context->builder->fmul($seventyseventhF12, $nF12);
+            $seventyseventhF12 = $context->builder->fmul($seventyseventhF12, $nF12);
+            $seventyseventhF12 = $context->builder->fmul($seventyseventhF12, $nF12);
+            $seventyseventhF12 = $context->builder->fmul($seventyseventhF12, $nF12);
+
+            $seventyseventhF12 = $context->builder->fmul($seventyseventhF12, $nF12);
+            $seventyseventhF12 = $context->builder->fmul($seventyseventhF12, $nF12);
+            $seventyseventhF12 = $context->builder->fmul($seventyseventhF12, $nF12);
+            $seventyseventhF12 = $context->builder->fmul($seventyseventhF12, $nF12);
+            $seventyseventhF12 = $context->builder->fmul($seventyseventhF12, $nF12);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $seventyseventhF12
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok12Block);
+            $fiftysecondVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $fiftyfirstLong,
+                $n
+            );
+            $ov13 = $fiftysecondVar->longArithOverflowFlag;
+            if (null === $ov13 || null === $fiftysecondVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **77 expected smul overflow metadata (fiftysecond)');
+            }
+            $fiftysecondLong = JITVariable::KIND_VARIABLE === $fiftysecondVar->kind
+                ? $context->builder->load($fiftysecondVar->value)
+                : $fiftysecondVar->value;
+            $ov13Block = BasicBlockHelper::append($context, 'pow_seventyseventh_fiftysecond_ov');
+            $ok13Block = BasicBlockHelper::append($context, 'pow_seventyseventh_fiftysecond_ok');
+            $context->builder->branchIf($ov13, $ov13Block, $ok13Block);
+
+            $context->builder->positionAtEnd($ov13Block);
+            $fiftysecondF13 = $context->builder->load($fiftysecondVar->longArithOverflowDoubleSlot);
+            $nF13 = $context->builder->siToFp($n, $f64);
+            $seventyseventhF13 = $context->builder->fmul($fiftysecondF13, $nF13);
+            $seventyseventhF13 = $context->builder->fmul($seventyseventhF13, $nF13);
+            $seventyseventhF13 = $context->builder->fmul($seventyseventhF13, $nF13);
+            $seventyseventhF13 = $context->builder->fmul($seventyseventhF13, $nF13);
+            $seventyseventhF13 = $context->builder->fmul($seventyseventhF13, $nF13);
+            $seventyseventhF13 = $context->builder->fmul($seventyseventhF13, $nF13);
+            $seventyseventhF13 = $context->builder->fmul($seventyseventhF13, $nF13);
+            $seventyseventhF13 = $context->builder->fmul($seventyseventhF13, $nF13);
+                $seventyseventhF13 = $context->builder->fmul($seventyseventhF13, $nF13);
+                    $seventyseventhF13 = $context->builder->fmul($seventyseventhF13, $nF13);
+                        $seventyseventhF13 = $context->builder->fmul($seventyseventhF13, $nF13);
+                        $seventyseventhF13 = $context->builder->fmul($seventyseventhF13, $nF13);
+                        $seventyseventhF13 = $context->builder->fmul($seventyseventhF13, $nF13);
+                        $seventyseventhF13 = $context->builder->fmul($seventyseventhF13, $nF13);
+                        $seventyseventhF13 = $context->builder->fmul($seventyseventhF13, $nF13);
+                        $seventyseventhF13 = $context->builder->fmul($seventyseventhF13, $nF13);
+                        $seventyseventhF13 = $context->builder->fmul($seventyseventhF13, $nF13);
+            $seventyseventhF13 = $context->builder->fmul($seventyseventhF13, $nF13);
+            $seventyseventhF13 = $context->builder->fmul($seventyseventhF13, $nF13);
+            $seventyseventhF13 = $context->builder->fmul($seventyseventhF13, $nF13);
+            $seventyseventhF13 = $context->builder->fmul($seventyseventhF13, $nF13);
+
+            $seventyseventhF13 = $context->builder->fmul($seventyseventhF13, $nF13);
+            $seventyseventhF13 = $context->builder->fmul($seventyseventhF13, $nF13);
+            $seventyseventhF13 = $context->builder->fmul($seventyseventhF13, $nF13);
+            $seventyseventhF13 = $context->builder->fmul($seventyseventhF13, $nF13);
+            $seventyseventhF13 = $context->builder->fmul($seventyseventhF13, $nF13);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $seventyseventhF13
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok13Block);
+            $fiftythirdVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $fiftysecondLong,
+                $n
+            );
+            $ov14 = $fiftythirdVar->longArithOverflowFlag;
+            if (null === $ov14 || null === $fiftythirdVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **77 expected smul overflow metadata (fiftythird)');
+            }
+            $fiftythirdLong = JITVariable::KIND_VARIABLE === $fiftythirdVar->kind
+                ? $context->builder->load($fiftythirdVar->value)
+                : $fiftythirdVar->value;
+            $ov14Block = BasicBlockHelper::append($context, 'pow_seventyseventh_fiftythird_ov');
+            $ok14Block = BasicBlockHelper::append($context, 'pow_seventyseventh_fiftythird_ok');
+            $context->builder->branchIf($ov14, $ov14Block, $ok14Block);
+
+            $context->builder->positionAtEnd($ov14Block);
+            $fiftythirdF14 = $context->builder->load($fiftythirdVar->longArithOverflowDoubleSlot);
+            $nF14 = $context->builder->siToFp($n, $f64);
+            $seventyseventhF14 = $context->builder->fmul($fiftythirdF14, $nF14);
+            $seventyseventhF14 = $context->builder->fmul($seventyseventhF14, $nF14);
+            $seventyseventhF14 = $context->builder->fmul($seventyseventhF14, $nF14);
+            $seventyseventhF14 = $context->builder->fmul($seventyseventhF14, $nF14);
+            $seventyseventhF14 = $context->builder->fmul($seventyseventhF14, $nF14);
+            $seventyseventhF14 = $context->builder->fmul($seventyseventhF14, $nF14);
+            $seventyseventhF14 = $context->builder->fmul($seventyseventhF14, $nF14);
+                $seventyseventhF14 = $context->builder->fmul($seventyseventhF14, $nF14);
+                    $seventyseventhF14 = $context->builder->fmul($seventyseventhF14, $nF14);
+                        $seventyseventhF14 = $context->builder->fmul($seventyseventhF14, $nF14);
+                        $seventyseventhF14 = $context->builder->fmul($seventyseventhF14, $nF14);
+                        $seventyseventhF14 = $context->builder->fmul($seventyseventhF14, $nF14);
+                        $seventyseventhF14 = $context->builder->fmul($seventyseventhF14, $nF14);
+                        $seventyseventhF14 = $context->builder->fmul($seventyseventhF14, $nF14);
+                        $seventyseventhF14 = $context->builder->fmul($seventyseventhF14, $nF14);
+                        $seventyseventhF14 = $context->builder->fmul($seventyseventhF14, $nF14);
+            $seventyseventhF14 = $context->builder->fmul($seventyseventhF14, $nF14);
+            $seventyseventhF14 = $context->builder->fmul($seventyseventhF14, $nF14);
+            $seventyseventhF14 = $context->builder->fmul($seventyseventhF14, $nF14);
+            $seventyseventhF14 = $context->builder->fmul($seventyseventhF14, $nF14);
+
+            $seventyseventhF14 = $context->builder->fmul($seventyseventhF14, $nF14);
+            $seventyseventhF14 = $context->builder->fmul($seventyseventhF14, $nF14);
+            $seventyseventhF14 = $context->builder->fmul($seventyseventhF14, $nF14);
+            $seventyseventhF14 = $context->builder->fmul($seventyseventhF14, $nF14);
+            $seventyseventhF14 = $context->builder->fmul($seventyseventhF14, $nF14);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $seventyseventhF14
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok14Block);
+            $fiftyfourthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $fiftythirdLong,
+                $n
+            );
+            $ov15 = $fiftyfourthVar->longArithOverflowFlag;
+            if (null === $ov15 || null === $fiftyfourthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **77 expected smul overflow metadata (fiftyfourth)');
+            }
+            $fiftyfourthLong = JITVariable::KIND_VARIABLE === $fiftyfourthVar->kind
+                ? $context->builder->load($fiftyfourthVar->value)
+                : $fiftyfourthVar->value;
+            $ov15Block = BasicBlockHelper::append($context, 'pow_seventyseventh_fiftyfourth_ov');
+            $ok15Block = BasicBlockHelper::append($context, 'pow_seventyseventh_fiftyfourth_ok');
+            $context->builder->branchIf($ov15, $ov15Block, $ok15Block);
+
+            $context->builder->positionAtEnd($ov15Block);
+            $fiftyfourthF15 = $context->builder->load($fiftyfourthVar->longArithOverflowDoubleSlot);
+            $nF15 = $context->builder->siToFp($n, $f64);
+            $seventyseventhF15 = $context->builder->fmul($fiftyfourthF15, $nF15);
+            $seventyseventhF15 = $context->builder->fmul($seventyseventhF15, $nF15);
+            $seventyseventhF15 = $context->builder->fmul($seventyseventhF15, $nF15);
+            $seventyseventhF15 = $context->builder->fmul($seventyseventhF15, $nF15);
+            $seventyseventhF15 = $context->builder->fmul($seventyseventhF15, $nF15);
+            $seventyseventhF15 = $context->builder->fmul($seventyseventhF15, $nF15);
+                $seventyseventhF15 = $context->builder->fmul($seventyseventhF15, $nF15);
+                    $seventyseventhF15 = $context->builder->fmul($seventyseventhF15, $nF15);
+                        $seventyseventhF15 = $context->builder->fmul($seventyseventhF15, $nF15);
+                        $seventyseventhF15 = $context->builder->fmul($seventyseventhF15, $nF15);
+                        $seventyseventhF15 = $context->builder->fmul($seventyseventhF15, $nF15);
+                        $seventyseventhF15 = $context->builder->fmul($seventyseventhF15, $nF15);
+                        $seventyseventhF15 = $context->builder->fmul($seventyseventhF15, $nF15);
+                        $seventyseventhF15 = $context->builder->fmul($seventyseventhF15, $nF15);
+                        $seventyseventhF15 = $context->builder->fmul($seventyseventhF15, $nF15);
+            $seventyseventhF15 = $context->builder->fmul($seventyseventhF15, $nF15);
+            $seventyseventhF15 = $context->builder->fmul($seventyseventhF15, $nF15);
+            $seventyseventhF15 = $context->builder->fmul($seventyseventhF15, $nF15);
+            $seventyseventhF15 = $context->builder->fmul($seventyseventhF15, $nF15);
+
+            $seventyseventhF15 = $context->builder->fmul($seventyseventhF15, $nF15);
+            $seventyseventhF15 = $context->builder->fmul($seventyseventhF15, $nF15);
+            $seventyseventhF15 = $context->builder->fmul($seventyseventhF15, $nF15);
+            $seventyseventhF15 = $context->builder->fmul($seventyseventhF15, $nF15);
+            $seventyseventhF15 = $context->builder->fmul($seventyseventhF15, $nF15);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $seventyseventhF15
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok15Block);
+            $fiftyfifthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $fiftyfourthLong,
+                $n
+            );
+            $ov16 = $fiftyfifthVar->longArithOverflowFlag;
+            if (null === $ov16 || null === $fiftyfifthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **77 expected smul overflow metadata (fiftyfifth)');
+            }
+            $fiftyfifthLong = JITVariable::KIND_VARIABLE === $fiftyfifthVar->kind
+                ? $context->builder->load($fiftyfifthVar->value)
+                : $fiftyfifthVar->value;
+            $ov16Block = BasicBlockHelper::append($context, 'pow_seventyseventh_fiftyfifth_ov');
+            $ok16Block = BasicBlockHelper::append($context, 'pow_seventyseventh_fiftyfifth_ok');
+            $context->builder->branchIf($ov16, $ov16Block, $ok16Block);
+
+            $context->builder->positionAtEnd($ov16Block);
+            $fiftyfifthF16 = $context->builder->load($fiftyfifthVar->longArithOverflowDoubleSlot);
+            $nF16 = $context->builder->siToFp($n, $f64);
+            $seventyseventhF16 = $context->builder->fmul($fiftyfifthF16, $nF16);
+            $seventyseventhF16 = $context->builder->fmul($seventyseventhF16, $nF16);
+            $seventyseventhF16 = $context->builder->fmul($seventyseventhF16, $nF16);
+            $seventyseventhF16 = $context->builder->fmul($seventyseventhF16, $nF16);
+            $seventyseventhF16 = $context->builder->fmul($seventyseventhF16, $nF16);
+                $seventyseventhF16 = $context->builder->fmul($seventyseventhF16, $nF16);
+                    $seventyseventhF16 = $context->builder->fmul($seventyseventhF16, $nF16);
+                        $seventyseventhF16 = $context->builder->fmul($seventyseventhF16, $nF16);
+                        $seventyseventhF16 = $context->builder->fmul($seventyseventhF16, $nF16);
+                        $seventyseventhF16 = $context->builder->fmul($seventyseventhF16, $nF16);
+                        $seventyseventhF16 = $context->builder->fmul($seventyseventhF16, $nF16);
+                        $seventyseventhF16 = $context->builder->fmul($seventyseventhF16, $nF16);
+                        $seventyseventhF16 = $context->builder->fmul($seventyseventhF16, $nF16);
+                        $seventyseventhF16 = $context->builder->fmul($seventyseventhF16, $nF16);
+            $seventyseventhF16 = $context->builder->fmul($seventyseventhF16, $nF16);
+            $seventyseventhF16 = $context->builder->fmul($seventyseventhF16, $nF16);
+            $seventyseventhF16 = $context->builder->fmul($seventyseventhF16, $nF16);
+            $seventyseventhF16 = $context->builder->fmul($seventyseventhF16, $nF16);
+
+            $seventyseventhF16 = $context->builder->fmul($seventyseventhF16, $nF16);
+            $seventyseventhF16 = $context->builder->fmul($seventyseventhF16, $nF16);
+            $seventyseventhF16 = $context->builder->fmul($seventyseventhF16, $nF16);
+            $seventyseventhF16 = $context->builder->fmul($seventyseventhF16, $nF16);
+            $seventyseventhF16 = $context->builder->fmul($seventyseventhF16, $nF16);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $seventyseventhF16
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok16Block);
+            $fiftysixthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $fiftyfifthLong,
+                $n
+            );
+            $ov17 = $fiftysixthVar->longArithOverflowFlag;
+            if (null === $ov17 || null === $fiftysixthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **77 expected smul overflow metadata (fiftysixth)');
+            }
+            $fiftysixthLong = JITVariable::KIND_VARIABLE === $fiftysixthVar->kind
+                ? $context->builder->load($fiftysixthVar->value)
+                : $fiftysixthVar->value;
+            $ov17Block = BasicBlockHelper::append($context, 'pow_seventyseventh_fiftysixth_ov');
+            $ok17Block = BasicBlockHelper::append($context, 'pow_seventyseventh_fiftysixth_ok');
+            $context->builder->branchIf($ov17, $ov17Block, $ok17Block);
+
+            $context->builder->positionAtEnd($ov17Block);
+            $fiftysixthF17 = $context->builder->load($fiftysixthVar->longArithOverflowDoubleSlot);
+            $nF17 = $context->builder->siToFp($n, $f64);
+            $seventyseventhF17 = $context->builder->fmul($fiftysixthF17, $nF17);
+            $seventyseventhF17 = $context->builder->fmul($seventyseventhF17, $nF17);
+            $seventyseventhF17 = $context->builder->fmul($seventyseventhF17, $nF17);
+            $seventyseventhF17 = $context->builder->fmul($seventyseventhF17, $nF17);
+                $seventyseventhF17 = $context->builder->fmul($seventyseventhF17, $nF17);
+                    $seventyseventhF17 = $context->builder->fmul($seventyseventhF17, $nF17);
+                        $seventyseventhF17 = $context->builder->fmul($seventyseventhF17, $nF17);
+                        $seventyseventhF17 = $context->builder->fmul($seventyseventhF17, $nF17);
+                        $seventyseventhF17 = $context->builder->fmul($seventyseventhF17, $nF17);
+                        $seventyseventhF17 = $context->builder->fmul($seventyseventhF17, $nF17);
+                        $seventyseventhF17 = $context->builder->fmul($seventyseventhF17, $nF17);
+                        $seventyseventhF17 = $context->builder->fmul($seventyseventhF17, $nF17);
+                        $seventyseventhF17 = $context->builder->fmul($seventyseventhF17, $nF17);
+            $seventyseventhF17 = $context->builder->fmul($seventyseventhF17, $nF17);
+            $seventyseventhF17 = $context->builder->fmul($seventyseventhF17, $nF17);
+            $seventyseventhF17 = $context->builder->fmul($seventyseventhF17, $nF17);
+            $seventyseventhF17 = $context->builder->fmul($seventyseventhF17, $nF17);
+
+            $seventyseventhF17 = $context->builder->fmul($seventyseventhF17, $nF17);
+            $seventyseventhF17 = $context->builder->fmul($seventyseventhF17, $nF17);
+            $seventyseventhF17 = $context->builder->fmul($seventyseventhF17, $nF17);
+            $seventyseventhF17 = $context->builder->fmul($seventyseventhF17, $nF17);
+            $seventyseventhF17 = $context->builder->fmul($seventyseventhF17, $nF17);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $seventyseventhF17
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok17Block);
+            $fiftyseventhVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $fiftysixthLong,
+                $n
+            );
+            $ov18 = $fiftyseventhVar->longArithOverflowFlag;
+            if (null === $ov18 || null === $fiftyseventhVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **77 expected smul overflow metadata (fiftyseventh)');
+            }
+            $fiftyseventhLong = JITVariable::KIND_VARIABLE === $fiftyseventhVar->kind
+                ? $context->builder->load($fiftyseventhVar->value)
+                : $fiftyseventhVar->value;
+            $ov18Block = BasicBlockHelper::append($context, 'pow_seventyseventh_fiftyseventh_ov');
+            $ok18Block = BasicBlockHelper::append($context, 'pow_seventyseventh_fiftyseventh_ok');
+            $context->builder->branchIf($ov18, $ov18Block, $ok18Block);
+
+            $context->builder->positionAtEnd($ov18Block);
+            $fiftyseventhF18 = $context->builder->load($fiftyseventhVar->longArithOverflowDoubleSlot);
+            $nF18 = $context->builder->siToFp($n, $f64);
+            $seventyseventhF18 = $context->builder->fmul($fiftyseventhF18, $nF18);
+            $seventyseventhF18 = $context->builder->fmul($seventyseventhF18, $nF18);
+            $seventyseventhF18 = $context->builder->fmul($seventyseventhF18, $nF18);
+                $seventyseventhF18 = $context->builder->fmul($seventyseventhF18, $nF18);
+                    $seventyseventhF18 = $context->builder->fmul($seventyseventhF18, $nF18);
+                        $seventyseventhF18 = $context->builder->fmul($seventyseventhF18, $nF18);
+                        $seventyseventhF18 = $context->builder->fmul($seventyseventhF18, $nF18);
+                        $seventyseventhF18 = $context->builder->fmul($seventyseventhF18, $nF18);
+                        $seventyseventhF18 = $context->builder->fmul($seventyseventhF18, $nF18);
+                        $seventyseventhF18 = $context->builder->fmul($seventyseventhF18, $nF18);
+                        $seventyseventhF18 = $context->builder->fmul($seventyseventhF18, $nF18);
+                        $seventyseventhF18 = $context->builder->fmul($seventyseventhF18, $nF18);
+            $seventyseventhF18 = $context->builder->fmul($seventyseventhF18, $nF18);
+            $seventyseventhF18 = $context->builder->fmul($seventyseventhF18, $nF18);
+            $seventyseventhF18 = $context->builder->fmul($seventyseventhF18, $nF18);
+            $seventyseventhF18 = $context->builder->fmul($seventyseventhF18, $nF18);
+
+            $seventyseventhF18 = $context->builder->fmul($seventyseventhF18, $nF18);
+            $seventyseventhF18 = $context->builder->fmul($seventyseventhF18, $nF18);
+            $seventyseventhF18 = $context->builder->fmul($seventyseventhF18, $nF18);
+            $seventyseventhF18 = $context->builder->fmul($seventyseventhF18, $nF18);
+            $seventyseventhF18 = $context->builder->fmul($seventyseventhF18, $nF18);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $seventyseventhF18
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok18Block);
+            $fiftyeighthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $fiftyseventhLong,
+                $n
+            );
+            $ov19 = $fiftyeighthVar->longArithOverflowFlag;
+            if (null === $ov19 || null === $fiftyeighthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **77 expected smul overflow metadata (fiftyeighth)');
+            }
+            $fiftyeighthLong = JITVariable::KIND_VARIABLE === $fiftyeighthVar->kind
+                ? $context->builder->load($fiftyeighthVar->value)
+                : $fiftyeighthVar->value;
+            $ov19Block = BasicBlockHelper::append($context, 'pow_seventyseventh_fiftyeighth_ov');
+            $ok19Block = BasicBlockHelper::append($context, 'pow_seventyseventh_fiftyeighth_ok');
+            $context->builder->branchIf($ov19, $ov19Block, $ok19Block);
+
+            $context->builder->positionAtEnd($ov19Block);
+            $fiftyeighthF19 = $context->builder->load($fiftyeighthVar->longArithOverflowDoubleSlot);
+            $nF19 = $context->builder->siToFp($n, $f64);
+            $seventyseventhF19 = $context->builder->fmul($fiftyeighthF19, $nF19);
+            $seventyseventhF19 = $context->builder->fmul($seventyseventhF19, $nF19);
+                $seventyseventhF19 = $context->builder->fmul($seventyseventhF19, $nF19);
+                    $seventyseventhF19 = $context->builder->fmul($seventyseventhF19, $nF19);
+                        $seventyseventhF19 = $context->builder->fmul($seventyseventhF19, $nF19);
+                        $seventyseventhF19 = $context->builder->fmul($seventyseventhF19, $nF19);
+                        $seventyseventhF19 = $context->builder->fmul($seventyseventhF19, $nF19);
+                        $seventyseventhF19 = $context->builder->fmul($seventyseventhF19, $nF19);
+                        $seventyseventhF19 = $context->builder->fmul($seventyseventhF19, $nF19);
+                        $seventyseventhF19 = $context->builder->fmul($seventyseventhF19, $nF19);
+                        $seventyseventhF19 = $context->builder->fmul($seventyseventhF19, $nF19);
+            $seventyseventhF19 = $context->builder->fmul($seventyseventhF19, $nF19);
+            $seventyseventhF19 = $context->builder->fmul($seventyseventhF19, $nF19);
+            $seventyseventhF19 = $context->builder->fmul($seventyseventhF19, $nF19);
+            $seventyseventhF19 = $context->builder->fmul($seventyseventhF19, $nF19);
+
+            $seventyseventhF19 = $context->builder->fmul($seventyseventhF19, $nF19);
+            $seventyseventhF19 = $context->builder->fmul($seventyseventhF19, $nF19);
+            $seventyseventhF19 = $context->builder->fmul($seventyseventhF19, $nF19);
+            $seventyseventhF19 = $context->builder->fmul($seventyseventhF19, $nF19);
+            $seventyseventhF19 = $context->builder->fmul($seventyseventhF19, $nF19);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $seventyseventhF19
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok19Block);
+            $fiftyninthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $fiftyeighthLong,
+                $n
+            );
+            $ov20 = $fiftyninthVar->longArithOverflowFlag;
+            if (null === $ov20 || null === $fiftyninthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **77 expected smul overflow metadata (fiftyninth)');
+            }
+            $fiftyninthLong = JITVariable::KIND_VARIABLE === $fiftyninthVar->kind
+                ? $context->builder->load($fiftyninthVar->value)
+                : $fiftyninthVar->value;
+            $ov20Block = BasicBlockHelper::append($context, 'pow_seventyseventh_fiftyninth_ov');
+            $ok20Block = BasicBlockHelper::append($context, 'pow_seventyseventh_fiftyninth_ok');
+            $context->builder->branchIf($ov20, $ov20Block, $ok20Block);
+
+            $context->builder->positionAtEnd($ov20Block);
+            $fiftyninthF20 = $context->builder->load($fiftyninthVar->longArithOverflowDoubleSlot);
+            $nF20 = $context->builder->siToFp($n, $f64);
+            $seventyseventhF20 = $context->builder->fmul($fiftyninthF20, $nF20);
+                $seventyseventhF20 = $context->builder->fmul($seventyseventhF20, $nF20);
+                    $seventyseventhF20 = $context->builder->fmul($seventyseventhF20, $nF20);
+                        $seventyseventhF20 = $context->builder->fmul($seventyseventhF20, $nF20);
+                        $seventyseventhF20 = $context->builder->fmul($seventyseventhF20, $nF20);
+                        $seventyseventhF20 = $context->builder->fmul($seventyseventhF20, $nF20);
+                        $seventyseventhF20 = $context->builder->fmul($seventyseventhF20, $nF20);
+                        $seventyseventhF20 = $context->builder->fmul($seventyseventhF20, $nF20);
+                        $seventyseventhF20 = $context->builder->fmul($seventyseventhF20, $nF20);
+                        $seventyseventhF20 = $context->builder->fmul($seventyseventhF20, $nF20);
+            $seventyseventhF20 = $context->builder->fmul($seventyseventhF20, $nF20);
+            $seventyseventhF20 = $context->builder->fmul($seventyseventhF20, $nF20);
+            $seventyseventhF20 = $context->builder->fmul($seventyseventhF20, $nF20);
+            $seventyseventhF20 = $context->builder->fmul($seventyseventhF20, $nF20);
+
+            $seventyseventhF20 = $context->builder->fmul($seventyseventhF20, $nF20);
+            $seventyseventhF20 = $context->builder->fmul($seventyseventhF20, $nF20);
+            $seventyseventhF20 = $context->builder->fmul($seventyseventhF20, $nF20);
+            $seventyseventhF20 = $context->builder->fmul($seventyseventhF20, $nF20);
+            $seventyseventhF20 = $context->builder->fmul($seventyseventhF20, $nF20);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $seventyseventhF20
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok20Block);
+            $sixtiethVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $fiftyninthLong,
+                $n
+            );
+            $ov21 = $sixtiethVar->longArithOverflowFlag;
+            if (null === $ov21 || null === $sixtiethVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **77 expected smul overflow metadata (sixtieth)');
+            }
+            $sixtiethLong = JITVariable::KIND_VARIABLE === $sixtiethVar->kind
+                ? $context->builder->load($sixtiethVar->value)
+                : $sixtiethVar->value;
+            $ov21Block = BasicBlockHelper::append($context, 'pow_seventyseventh_sixtieth_ov');
+            $ok21Block = BasicBlockHelper::append($context, 'pow_seventyseventh_sixtieth_ok');
+            $context->builder->branchIf($ov21, $ov21Block, $ok21Block);
+
+            $context->builder->positionAtEnd($ov21Block);
+            $sixtiethF21 = $context->builder->load($sixtiethVar->longArithOverflowDoubleSlot);
+            $nF21 = $context->builder->siToFp($n, $f64);
+            $seventyseventhF21 = $context->builder->fmul($sixtiethF21, $nF21);
+                $seventyseventhF21 = $context->builder->fmul($seventyseventhF21, $nF21);
+                    $seventyseventhF21 = $context->builder->fmul($seventyseventhF21, $nF21);
+                    $seventyseventhF21 = $context->builder->fmul($seventyseventhF21, $nF21);
+                    $seventyseventhF21 = $context->builder->fmul($seventyseventhF21, $nF21);
+                    $seventyseventhF21 = $context->builder->fmul($seventyseventhF21, $nF21);
+                    $seventyseventhF21 = $context->builder->fmul($seventyseventhF21, $nF21);
+                    $seventyseventhF21 = $context->builder->fmul($seventyseventhF21, $nF21);
+                    $seventyseventhF21 = $context->builder->fmul($seventyseventhF21, $nF21);
+            $seventyseventhF21 = $context->builder->fmul($seventyseventhF21, $nF21);
+            $seventyseventhF21 = $context->builder->fmul($seventyseventhF21, $nF21);
+            $seventyseventhF21 = $context->builder->fmul($seventyseventhF21, $nF21);
+            $seventyseventhF21 = $context->builder->fmul($seventyseventhF21, $nF21);
+
+            $seventyseventhF21 = $context->builder->fmul($seventyseventhF21, $nF21);
+            $seventyseventhF21 = $context->builder->fmul($seventyseventhF21, $nF21);
+            $seventyseventhF21 = $context->builder->fmul($seventyseventhF21, $nF21);
+            $seventyseventhF21 = $context->builder->fmul($seventyseventhF21, $nF21);
+            $seventyseventhF21 = $context->builder->fmul($seventyseventhF21, $nF21);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $seventyseventhF21
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok21Block);
+            $sixtyfirstVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $sixtiethLong,
+                $n
+            );
+            $ov22 = $sixtyfirstVar->longArithOverflowFlag;
+            if (null === $ov22 || null === $sixtyfirstVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **77 expected smul overflow metadata (sixtyfirst)');
+            }
+            $sixtyfirstLong = JITVariable::KIND_VARIABLE === $sixtyfirstVar->kind
+                ? $context->builder->load($sixtyfirstVar->value)
+                : $sixtyfirstVar->value;
+            $ov22Block = BasicBlockHelper::append($context, 'pow_seventyseventh_sixtyfirst_ov');
+            $ok22Block = BasicBlockHelper::append($context, 'pow_seventyseventh_sixtyfirst_ok');
+            $context->builder->branchIf($ov22, $ov22Block, $ok22Block);
+
+            $context->builder->positionAtEnd($ov22Block);
+            $sixtyfirstF22 = $context->builder->load($sixtyfirstVar->longArithOverflowDoubleSlot);
+            $nF22 = $context->builder->siToFp($n, $f64);
+            $seventyseventhF22 = $context->builder->fmul($sixtyfirstF22, $nF22);
+                $seventyseventhF22 = $context->builder->fmul($seventyseventhF22, $nF22);
+                $seventyseventhF22 = $context->builder->fmul($seventyseventhF22, $nF22);
+                $seventyseventhF22 = $context->builder->fmul($seventyseventhF22, $nF22);
+                $seventyseventhF22 = $context->builder->fmul($seventyseventhF22, $nF22);
+                $seventyseventhF22 = $context->builder->fmul($seventyseventhF22, $nF22);
+                $seventyseventhF22 = $context->builder->fmul($seventyseventhF22, $nF22);
+                $seventyseventhF22 = $context->builder->fmul($seventyseventhF22, $nF22);
+            $seventyseventhF22 = $context->builder->fmul($seventyseventhF22, $nF22);
+            $seventyseventhF22 = $context->builder->fmul($seventyseventhF22, $nF22);
+            $seventyseventhF22 = $context->builder->fmul($seventyseventhF22, $nF22);
+            $seventyseventhF22 = $context->builder->fmul($seventyseventhF22, $nF22);
+
+            $seventyseventhF22 = $context->builder->fmul($seventyseventhF22, $nF22);
+            $seventyseventhF22 = $context->builder->fmul($seventyseventhF22, $nF22);
+            $seventyseventhF22 = $context->builder->fmul($seventyseventhF22, $nF22);
+            $seventyseventhF22 = $context->builder->fmul($seventyseventhF22, $nF22);
+            $seventyseventhF22 = $context->builder->fmul($seventyseventhF22, $nF22);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $seventyseventhF22
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok22Block);
+            $sixtysecondVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $sixtyfirstLong,
+                $n
+            );
+            $ov23 = $sixtysecondVar->longArithOverflowFlag;
+            if (null === $ov23 || null === $sixtysecondVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **77 expected smul overflow metadata (sixtysecond)');
+            }
+            $sixtysecondLong = JITVariable::KIND_VARIABLE === $sixtysecondVar->kind
+                ? $context->builder->load($sixtysecondVar->value)
+                : $sixtysecondVar->value;
+            $ov23Block = BasicBlockHelper::append($context, 'pow_seventyseventh_sixtysecond_ov');
+            $ok23Block = BasicBlockHelper::append($context, 'pow_seventyseventh_sixtysecond_ok');
+            $context->builder->branchIf($ov23, $ov23Block, $ok23Block);
+
+            $context->builder->positionAtEnd($ov23Block);
+            $sixtysecondF23 = $context->builder->load($sixtysecondVar->longArithOverflowDoubleSlot);
+            $nF23 = $context->builder->siToFp($n, $f64);
+            $seventyseventhF23 = $context->builder->fmul($sixtysecondF23, $nF23);
+            $seventyseventhF23 = $context->builder->fmul($seventyseventhF23, $nF23);
+            $seventyseventhF23 = $context->builder->fmul($seventyseventhF23, $nF23);
+            $seventyseventhF23 = $context->builder->fmul($seventyseventhF23, $nF23);
+            $seventyseventhF23 = $context->builder->fmul($seventyseventhF23, $nF23);
+            $seventyseventhF23 = $context->builder->fmul($seventyseventhF23, $nF23);
+            $seventyseventhF23 = $context->builder->fmul($seventyseventhF23, $nF23);
+            $seventyseventhF23 = $context->builder->fmul($seventyseventhF23, $nF23);
+            $seventyseventhF23 = $context->builder->fmul($seventyseventhF23, $nF23);
+            $seventyseventhF23 = $context->builder->fmul($seventyseventhF23, $nF23);
+            $seventyseventhF23 = $context->builder->fmul($seventyseventhF23, $nF23);
+
+            $seventyseventhF23 = $context->builder->fmul($seventyseventhF23, $nF23);
+            $seventyseventhF23 = $context->builder->fmul($seventyseventhF23, $nF23);
+            $seventyseventhF23 = $context->builder->fmul($seventyseventhF23, $nF23);
+            $seventyseventhF23 = $context->builder->fmul($seventyseventhF23, $nF23);
+            $seventyseventhF23 = $context->builder->fmul($seventyseventhF23, $nF23);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $seventyseventhF23
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok23Block);
+            $sixtythirdVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $sixtysecondLong,
+                $n
+            );
+            $ov24 = $sixtythirdVar->longArithOverflowFlag;
+            if (null === $ov24 || null === $sixtythirdVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **77 expected smul overflow metadata (sixtythird)');
+            }
+            $sixtythirdLong = JITVariable::KIND_VARIABLE === $sixtythirdVar->kind
+                ? $context->builder->load($sixtythirdVar->value)
+                : $sixtythirdVar->value;
+            $ov24Block = BasicBlockHelper::append($context, 'pow_seventyseventh_sixtythird_ov');
+            $ok24Block = BasicBlockHelper::append($context, 'pow_seventyseventh_sixtythird_ok');
+            $context->builder->branchIf($ov24, $ov24Block, $ok24Block);
+
+            $context->builder->positionAtEnd($ov24Block);
+            $sixtythirdF24 = $context->builder->load($sixtythirdVar->longArithOverflowDoubleSlot);
+            $nF24 = $context->builder->siToFp($n, $f64);
+            $seventyseventhF24 = $context->builder->fmul($sixtythirdF24, $nF24);
+            $seventyseventhF24 = $context->builder->fmul($seventyseventhF24, $nF24);
+            $seventyseventhF24 = $context->builder->fmul($seventyseventhF24, $nF24);
+            $seventyseventhF24 = $context->builder->fmul($seventyseventhF24, $nF24);
+            $seventyseventhF24 = $context->builder->fmul($seventyseventhF24, $nF24);
+            $seventyseventhF24 = $context->builder->fmul($seventyseventhF24, $nF24);
+            $seventyseventhF24 = $context->builder->fmul($seventyseventhF24, $nF24);
+            $seventyseventhF24 = $context->builder->fmul($seventyseventhF24, $nF24);
+            $seventyseventhF24 = $context->builder->fmul($seventyseventhF24, $nF24);
+            $seventyseventhF24 = $context->builder->fmul($seventyseventhF24, $nF24);
+
+            $seventyseventhF24 = $context->builder->fmul($seventyseventhF24, $nF24);
+            $seventyseventhF24 = $context->builder->fmul($seventyseventhF24, $nF24);
+            $seventyseventhF24 = $context->builder->fmul($seventyseventhF24, $nF24);
+            $seventyseventhF24 = $context->builder->fmul($seventyseventhF24, $nF24);
+            $seventyseventhF24 = $context->builder->fmul($seventyseventhF24, $nF24);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $seventyseventhF24
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok24Block);
+            $sixtyfourthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $sixtythirdLong,
+                $n
+            );
+            $ov25 = $sixtyfourthVar->longArithOverflowFlag;
+            if (null === $ov25 || null === $sixtyfourthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **77 expected smul overflow metadata (sixtyfourth)');
+            }
+            $sixtyfourthLong = JITVariable::KIND_VARIABLE === $sixtyfourthVar->kind
+                ? $context->builder->load($sixtyfourthVar->value)
+                : $sixtyfourthVar->value;
+            $ov25Block = BasicBlockHelper::append($context, 'pow_seventyseventh_sixtyfourth_ov');
+            $ok25Block = BasicBlockHelper::append($context, 'pow_seventyseventh_sixtyfourth_ok');
+            $context->builder->branchIf($ov25, $ov25Block, $ok25Block);
+
+            $context->builder->positionAtEnd($ov25Block);
+            $sixtyfourthF25 = $context->builder->load($sixtyfourthVar->longArithOverflowDoubleSlot);
+            $nF25 = $context->builder->siToFp($n, $f64);
+            $seventyseventhF25 = $context->builder->fmul($sixtyfourthF25, $nF25);
+            $seventyseventhF25 = $context->builder->fmul($seventyseventhF25, $nF25);
+            $seventyseventhF25 = $context->builder->fmul($seventyseventhF25, $nF25);
+            $seventyseventhF25 = $context->builder->fmul($seventyseventhF25, $nF25);
+            $seventyseventhF25 = $context->builder->fmul($seventyseventhF25, $nF25);
+            $seventyseventhF25 = $context->builder->fmul($seventyseventhF25, $nF25);
+            $seventyseventhF25 = $context->builder->fmul($seventyseventhF25, $nF25);
+            $seventyseventhF25 = $context->builder->fmul($seventyseventhF25, $nF25);
+            $seventyseventhF25 = $context->builder->fmul($seventyseventhF25, $nF25);
+
+            $seventyseventhF25 = $context->builder->fmul($seventyseventhF25, $nF25);
+            $seventyseventhF25 = $context->builder->fmul($seventyseventhF25, $nF25);
+            $seventyseventhF25 = $context->builder->fmul($seventyseventhF25, $nF25);
+            $seventyseventhF25 = $context->builder->fmul($seventyseventhF25, $nF25);
+            $seventyseventhF25 = $context->builder->fmul($seventyseventhF25, $nF25);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $seventyseventhF25
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok25Block);
+            $sixtyfifthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $sixtyfourthLong,
+                $n
+            );
+            $ov26 = $sixtyfifthVar->longArithOverflowFlag;
+            if (null === $ov26 || null === $sixtyfifthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **77 expected smul overflow metadata (sixtyfifth)');
+            }
+            $sixtyfifthLong = JITVariable::KIND_VARIABLE === $sixtyfifthVar->kind
+                ? $context->builder->load($sixtyfifthVar->value)
+                : $sixtyfifthVar->value;
+            $ov26Block = BasicBlockHelper::append($context, 'pow_seventyseventh_sixtyfifth_ov');
+            $ok26Block = BasicBlockHelper::append($context, 'pow_seventyseventh_sixtyfifth_ok');
+            $context->builder->branchIf($ov26, $ov26Block, $ok26Block);
+
+            $context->builder->positionAtEnd($ov26Block);
+            $sixtyfifthF26 = $context->builder->load($sixtyfifthVar->longArithOverflowDoubleSlot);
+            $nF26 = $context->builder->siToFp($n, $f64);
+            $seventyseventhF26 = $context->builder->fmul($sixtyfifthF26, $nF26);
+            $seventyseventhF26 = $context->builder->fmul($seventyseventhF26, $nF26);
+            $seventyseventhF26 = $context->builder->fmul($seventyseventhF26, $nF26);
+            $seventyseventhF26 = $context->builder->fmul($seventyseventhF26, $nF26);
+            $seventyseventhF26 = $context->builder->fmul($seventyseventhF26, $nF26);
+            $seventyseventhF26 = $context->builder->fmul($seventyseventhF26, $nF26);
+            $seventyseventhF26 = $context->builder->fmul($seventyseventhF26, $nF26);
+            $seventyseventhF26 = $context->builder->fmul($seventyseventhF26, $nF26);
+
+            $seventyseventhF26 = $context->builder->fmul($seventyseventhF26, $nF26);
+            $seventyseventhF26 = $context->builder->fmul($seventyseventhF26, $nF26);
+            $seventyseventhF26 = $context->builder->fmul($seventyseventhF26, $nF26);
+            $seventyseventhF26 = $context->builder->fmul($seventyseventhF26, $nF26);
+            $seventyseventhF26 = $context->builder->fmul($seventyseventhF26, $nF26);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $seventyseventhF26
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok26Block);
+            $sixtysixthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $sixtyfifthLong,
+                $n
+            );
+            $ov27 = $sixtysixthVar->longArithOverflowFlag;
+            if (null === $ov27 || null === $sixtysixthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **77 expected smul overflow metadata (sixtysixth)');
+            }
+            $sixtysixthLong = JITVariable::KIND_VARIABLE === $sixtysixthVar->kind
+                ? $context->builder->load($sixtysixthVar->value)
+                : $sixtysixthVar->value;
+            $ov27Block = BasicBlockHelper::append($context, 'pow_seventyseventh_sixtysixth_ov');
+            $ok27Block = BasicBlockHelper::append($context, 'pow_seventyseventh_sixtysixth_ok');
+            $context->builder->branchIf($ov27, $ov27Block, $ok27Block);
+
+            $context->builder->positionAtEnd($ov27Block);
+            $sixtysixthF27 = $context->builder->load($sixtysixthVar->longArithOverflowDoubleSlot);
+            $nF27 = $context->builder->siToFp($n, $f64);
+            $seventyseventhF27 = $context->builder->fmul($sixtysixthF27, $nF27);
+            $seventyseventhF27 = $context->builder->fmul($seventyseventhF27, $nF27);
+            $seventyseventhF27 = $context->builder->fmul($seventyseventhF27, $nF27);
+            $seventyseventhF27 = $context->builder->fmul($seventyseventhF27, $nF27);
+            $seventyseventhF27 = $context->builder->fmul($seventyseventhF27, $nF27);
+            $seventyseventhF27 = $context->builder->fmul($seventyseventhF27, $nF27);
+            $seventyseventhF27 = $context->builder->fmul($seventyseventhF27, $nF27);
+
+            $seventyseventhF27 = $context->builder->fmul($seventyseventhF27, $nF27);
+            $seventyseventhF27 = $context->builder->fmul($seventyseventhF27, $nF27);
+            $seventyseventhF27 = $context->builder->fmul($seventyseventhF27, $nF27);
+            $seventyseventhF27 = $context->builder->fmul($seventyseventhF27, $nF27);
+            $seventyseventhF27 = $context->builder->fmul($seventyseventhF27, $nF27);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $seventyseventhF27
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok27Block);
+            $sixtyseventhVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $sixtysixthLong,
+                $n
+            );
+            $ov28 = $sixtyseventhVar->longArithOverflowFlag;
+            if (null === $ov28 || null === $sixtyseventhVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **77 expected smul overflow metadata (sixtyseventh)');
+            }
+            $sixtyseventhLong = JITVariable::KIND_VARIABLE === $sixtyseventhVar->kind
+                ? $context->builder->load($sixtyseventhVar->value)
+                : $sixtyseventhVar->value;
+            $ov28Block = BasicBlockHelper::append($context, 'pow_seventyseventh_sixtyseventh_ov');
+            $ok28Block = BasicBlockHelper::append($context, 'pow_seventyseventh_sixtyseventh_ok');
+            $context->builder->branchIf($ov28, $ov28Block, $ok28Block);
+
+            $context->builder->positionAtEnd($ov28Block);
+            $sixtyseventhF28 = $context->builder->load($sixtyseventhVar->longArithOverflowDoubleSlot);
+            $nF28 = $context->builder->siToFp($n, $f64);
+            $seventyseventhF28 = $context->builder->fmul($sixtyseventhF28, $nF28);
+            $seventyseventhF28 = $context->builder->fmul($seventyseventhF28, $nF28);
+            $seventyseventhF28 = $context->builder->fmul($seventyseventhF28, $nF28);
+            $seventyseventhF28 = $context->builder->fmul($seventyseventhF28, $nF28);
+            $seventyseventhF28 = $context->builder->fmul($seventyseventhF28, $nF28);
+            $seventyseventhF28 = $context->builder->fmul($seventyseventhF28, $nF28);
+            $seventyseventhF28 = $context->builder->fmul($seventyseventhF28, $nF28);
+
+            $seventyseventhF28 = $context->builder->fmul($seventyseventhF28, $nF28);
+            $seventyseventhF28 = $context->builder->fmul($seventyseventhF28, $nF28);
+            $seventyseventhF28 = $context->builder->fmul($seventyseventhF28, $nF28);
+            $seventyseventhF28 = $context->builder->fmul($seventyseventhF28, $nF28);
+            $seventyseventhF28 = $context->builder->fmul($seventyseventhF28, $nF28);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $seventyseventhF28
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok28Block);
+            $sixtyeighthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $sixtyseventhLong,
+                $n
+            );
+            $ov29 = $sixtyeighthVar->longArithOverflowFlag;
+            if (null === $ov29 || null === $sixtyeighthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **77 expected smul overflow metadata (sixtyeighth)');
+            }
+            $sixtyeighthLong = JITVariable::KIND_VARIABLE === $sixtyeighthVar->kind
+                ? $context->builder->load($sixtyeighthVar->value)
+                : $sixtyeighthVar->value;
+            $ov29Block = BasicBlockHelper::append($context, 'pow_seventyseventh_sixtyeighth_ov');
+            $ok29Block = BasicBlockHelper::append($context, 'pow_seventyseventh_sixtyeighth_ok');
+            $context->builder->branchIf($ov29, $ov29Block, $ok29Block);
+
+            $context->builder->positionAtEnd($ov29Block);
+            $sixtyeighthF29 = $context->builder->load($sixtyeighthVar->longArithOverflowDoubleSlot);
+            $nF29 = $context->builder->siToFp($n, $f64);
+            $seventyseventhF29 = $context->builder->fmul($sixtyeighthF29, $nF29);
+            $seventyseventhF29 = $context->builder->fmul($seventyseventhF29, $nF29);
+            $seventyseventhF29 = $context->builder->fmul($seventyseventhF29, $nF29);
+            $seventyseventhF29 = $context->builder->fmul($seventyseventhF29, $nF29);
+            $seventyseventhF29 = $context->builder->fmul($seventyseventhF29, $nF29);
+
+            $seventyseventhF29 = $context->builder->fmul($seventyseventhF29, $nF29);
+            $seventyseventhF29 = $context->builder->fmul($seventyseventhF29, $nF29);
+            $seventyseventhF29 = $context->builder->fmul($seventyseventhF29, $nF29);
+            $seventyseventhF29 = $context->builder->fmul($seventyseventhF29, $nF29);
+            $seventyseventhF29 = $context->builder->fmul($seventyseventhF29, $nF29);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $seventyseventhF29
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok29Block);
+            $sixtyninthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $sixtyeighthLong,
+                $n
+            );
+            $ov30 = $sixtyninthVar->longArithOverflowFlag;
+            if (null === $ov30 || null === $sixtyninthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **77 expected smul overflow metadata (sixtyninth)');
+            }
+            $sixtyninthLong = JITVariable::KIND_VARIABLE === $sixtyninthVar->kind
+                ? $context->builder->load($sixtyninthVar->value)
+                : $sixtyninthVar->value;
+            $ov30Block = BasicBlockHelper::append($context, 'pow_seventyseventh_sixtyninth_ov');
+            $ok30Block = BasicBlockHelper::append($context, 'pow_seventyseventh_sixtyninth_ok');
+            $context->builder->branchIf($ov30, $ov30Block, $ok30Block);
+
+            $context->builder->positionAtEnd($ov30Block);
+            $sixtyninthF30 = $context->builder->load($sixtyninthVar->longArithOverflowDoubleSlot);
+            $nF30 = $context->builder->siToFp($n, $f64);
+            $seventyseventhF30 = $context->builder->fmul($sixtyninthF30, $nF30);
+            $seventyseventhF30 = $context->builder->fmul($seventyseventhF30, $nF30);
+            $seventyseventhF30 = $context->builder->fmul($seventyseventhF30, $nF30);
+            $seventyseventhF30 = $context->builder->fmul($seventyseventhF30, $nF30);
+            $seventyseventhF30 = $context->builder->fmul($seventyseventhF30, $nF30);
+            $seventyseventhF30 = $context->builder->fmul($seventyseventhF30, $nF30);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $seventyseventhF30
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok30Block);
+            $seventiethVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $sixtyninthLong,
+                $n
+            );
+            $ov31 = $seventiethVar->longArithOverflowFlag;
+            if (null === $ov31 || null === $seventiethVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **77 expected smul overflow metadata (seventieth)');
+            }
+            $seventiethLong = JITVariable::KIND_VARIABLE === $seventiethVar->kind
+                ? $context->builder->load($seventiethVar->value)
+                : $seventiethVar->value;
+            $ov31Block = BasicBlockHelper::append($context, 'pow_seventyseventh_seventieth_ov');
+            $ok31Block = BasicBlockHelper::append($context, 'pow_seventyseventh_seventieth_ok');
+            $context->builder->branchIf($ov31, $ov31Block, $ok31Block);
+
+            $context->builder->positionAtEnd($ov31Block);
+            $seventiethF31 = $context->builder->load($seventiethVar->longArithOverflowDoubleSlot);
+            $nF31 = $context->builder->siToFp($n, $f64);
+            $seventyseventhF31 = $context->builder->fmul($seventiethF31, $nF31);
+            $seventyseventhF31 = $context->builder->fmul($seventyseventhF31, $nF31);
+            $seventyseventhF31 = $context->builder->fmul($seventyseventhF31, $nF31);
+            $seventyseventhF31 = $context->builder->fmul($seventyseventhF31, $nF31);
+            $seventyseventhF31 = $context->builder->fmul($seventyseventhF31, $nF31);
+            $seventyseventhF31 = $context->builder->fmul($seventyseventhF31, $nF31);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $seventyseventhF31
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok31Block);
+            $seventyfirstVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $seventiethLong,
+                $n
+            );
+            $ov32 = $seventyfirstVar->longArithOverflowFlag;
+            if (null === $ov32 || null === $seventyfirstVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **77 expected smul overflow metadata (seventyfirst)');
+            }
+            $seventyfirstLong = JITVariable::KIND_VARIABLE === $seventyfirstVar->kind
+                ? $context->builder->load($seventyfirstVar->value)
+                : $seventyfirstVar->value;
+            $ov32Block = BasicBlockHelper::append($context, 'pow_seventyseventh_seventyfirst_ov');
+            $ok32Block = BasicBlockHelper::append($context, 'pow_seventyseventh_seventyfirst_ok');
+            $context->builder->branchIf($ov32, $ov32Block, $ok32Block);
+
+            $context->builder->positionAtEnd($ov32Block);
+            $seventyfirstF32 = $context->builder->load($seventyfirstVar->longArithOverflowDoubleSlot);
+            $nF32 = $context->builder->siToFp($n, $f64);
+            $seventyseventhF32 = $context->builder->fmul($seventyfirstF32, $nF32);
+            $seventyseventhF32 = $context->builder->fmul($seventyseventhF32, $nF32);
+            $seventyseventhF32 = $context->builder->fmul($seventyseventhF32, $nF32);
+            $seventyseventhF32 = $context->builder->fmul($seventyseventhF32, $nF32);
+            $seventyseventhF32 = $context->builder->fmul($seventyseventhF32, $nF32);
+            $seventyseventhF32 = $context->builder->fmul($seventyseventhF32, $nF32);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $seventyseventhF32
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok32Block);
+            $seventysecondVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $seventyfirstLong,
+                $n
+            );
+            $ov33 = $seventysecondVar->longArithOverflowFlag;
+            if (null === $ov33 || null === $seventysecondVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **77 expected smul overflow metadata (seventysecond)');
+            }
+            $seventysecondLong = JITVariable::KIND_VARIABLE === $seventysecondVar->kind
+                ? $context->builder->load($seventysecondVar->value)
+                : $seventysecondVar->value;
+            $ov33Block = BasicBlockHelper::append($context, 'pow_seventyseventh_seventysecond_ov');
+            $ok33Block = BasicBlockHelper::append($context, 'pow_seventyseventh_seventysecond_ok');
+            $context->builder->branchIf($ov33, $ov33Block, $ok33Block);
+
+            $context->builder->positionAtEnd($ov33Block);
+            $seventysecondF33 = $context->builder->load($seventysecondVar->longArithOverflowDoubleSlot);
+            $nF33 = $context->builder->siToFp($n, $f64);
+            $seventyseventhF33 = $context->builder->fmul($seventysecondF33, $nF33);
+            $seventyseventhF33 = $context->builder->fmul($seventysecondF33, $nF33);
+            $seventyseventhF33 = $context->builder->fmul($seventyseventhF33, $nF33);
+            $seventyseventhF33 = $context->builder->fmul($seventyseventhF33, $nF33);
+            $seventyseventhF33 = $context->builder->fmul($seventyseventhF33, $nF33);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $seventyseventhF33
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok33Block);
+            $seventythirdVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $seventysecondLong,
+                $n
+            );
+            $ov34 = $seventythirdVar->longArithOverflowFlag;
+            if (null === $ov34 || null === $seventythirdVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **77 expected smul overflow metadata (seventythird)');
+            }
+            $seventythirdLong = JITVariable::KIND_VARIABLE === $seventythirdVar->kind
+                ? $context->builder->load($seventythirdVar->value)
+                : $seventythirdVar->value;
+            $ov34Block = BasicBlockHelper::append($context, 'pow_seventyseventh_seventythird_ov');
+            $ok34Block = BasicBlockHelper::append($context, 'pow_seventyseventh_seventythird_ok');
+            $context->builder->branchIf($ov34, $ov34Block, $ok34Block);
+
+            $context->builder->positionAtEnd($ov34Block);
+            $seventythirdF34 = $context->builder->load($seventythirdVar->longArithOverflowDoubleSlot);
+            $nF34 = $context->builder->siToFp($n, $f64);
+            $seventyseventhF34 = $context->builder->fmul($seventythirdF34, $nF34);
+            $seventyseventhF34 = $context->builder->fmul($seventyseventhF34, $nF34);
+            $seventyseventhF34 = $context->builder->fmul($seventyseventhF34, $nF34);
+            $seventyseventhF34 = $context->builder->fmul($seventyseventhF34, $nF34);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $seventyseventhF34
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok34Block);
+            $seventyfourthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $seventythirdLong,
+                $n
+            );
+            $ov35 = $seventyfourthVar->longArithOverflowFlag;
+            if (null === $ov35 || null === $seventyfourthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **77 expected smul overflow metadata (seventyfourth)');
+            }
+            $seventyfourthLong = JITVariable::KIND_VARIABLE === $seventyfourthVar->kind
+                ? $context->builder->load($seventyfourthVar->value)
+                : $seventyfourthVar->value;
+            $ov35Block = BasicBlockHelper::append($context, 'pow_seventyseventh_seventyfourth_ov');
+            $ok35Block = BasicBlockHelper::append($context, 'pow_seventyseventh_seventyfourth_ok');
+            $context->builder->branchIf($ov35, $ov35Block, $ok35Block);
+
+            $context->builder->positionAtEnd($ov35Block);
+            $seventyfourthF35 = $context->builder->load($seventyfourthVar->longArithOverflowDoubleSlot);
+            $nF35 = $context->builder->siToFp($n, $f64);
+            $seventyseventhF35 = $context->builder->fmul($seventyfourthF35, $nF35);
+            $seventyseventhF35 = $context->builder->fmul($seventyfourthF35, $nF35);
+            $seventyseventhF35 = $context->builder->fmul($seventyseventhF35, $nF35);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $seventyseventhF35
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok35Block);
+            $seventyfifthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $seventyfourthLong,
+                $n
+            );
+            $ov36 = $seventyfifthVar->longArithOverflowFlag;
+            if (null === $ov36 || null === $seventyfifthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **77 expected smul overflow metadata (seventyfifth)');
+            }
+            $seventyfifthLong = JITVariable::KIND_VARIABLE === $seventyfifthVar->kind
+                ? $context->builder->load($seventyfifthVar->value)
+                : $seventyfifthVar->value;
+            $ov36Block = BasicBlockHelper::append($context, 'pow_seventyseventh_seventyfifth_ov');
+            $ok36Block = BasicBlockHelper::append($context, 'pow_seventyseventh_seventyfifth_ok');
+            $context->builder->branchIf($ov36, $ov36Block, $ok36Block);
+
+            $context->builder->positionAtEnd($ov36Block);
+            $seventyfifthF36 = $context->builder->load($seventyfifthVar->longArithOverflowDoubleSlot);
+            $nF36 = $context->builder->siToFp($n, $f64);
+            $seventyseventhF36 = $context->builder->fmul($seventyfifthF36, $nF36);
+            $seventyseventhF36 = $context->builder->fmul($seventyseventhF36, $nF36);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $seventyseventhF36
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok36Block);
+            $seventysixthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $seventyfifthLong,
+                $n
+            );
+            $ov37 = $seventysixthVar->longArithOverflowFlag;
+            if (null === $ov37 || null === $seventysixthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **77 expected smul overflow metadata (seventysixth)');
+            }
+            $seventysixthLong = JITVariable::KIND_VARIABLE === $seventysixthVar->kind
+                ? $context->builder->load($seventysixthVar->value)
+                : $seventysixthVar->value;
+            $ov37Block = BasicBlockHelper::append($context, 'pow_seventyseventh_seventysixth_ov');
+            $ok37Block = BasicBlockHelper::append($context, 'pow_seventyseventh_seventysixth_ok');
+            $context->builder->branchIf($ov37, $ov37Block, $ok37Block);
+
+            $context->builder->positionAtEnd($ov37Block);
+            $seventysixthF37 = $context->builder->load($seventysixthVar->longArithOverflowDoubleSlot);
+            $nF37 = $context->builder->siToFp($n, $f64);
+            $seventyseventhF37 = $context->builder->fmul($seventysixthF37, $nF37);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $seventyseventhF37
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok37Block);
+            JitLongArithOverflow::writeBoxedBinary(
+                $context,
+                OpCode::TYPE_MUL,
+                $seventysixthLong,
+                $n,
+                $slotPtr
+            );
+            $context->builder->branch($doneBlock);
+
+
+            $context->builder->positionAtEnd($doneBlock);
+
+            return;
+        }
+
 
 
 
