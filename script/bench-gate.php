@@ -39,6 +39,16 @@ const BENCH_GATE_V2_CASES = [
     'str-builder',
     'k-nucleotide',
     'template-render',
+    // Expanded after AOT FULL_MATCH vs Zend on master tip (#36385):
+    'fasta',
+    'nbody',
+    'sort-mixed',
+    'regex-redux',
+    'closure-heavy',
+    'object-graph',
+    'spectral-norm',
+    'json-roundtrip',
+    'exceptions',
 ];
 
 const RATIO_TOLERANCE_PERCENT = 30;

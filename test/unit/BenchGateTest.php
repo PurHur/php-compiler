@@ -122,4 +122,35 @@ final class BenchGateTest extends TestCase
         $this->assertStringContainsString('web-request', $html);
         $this->assertStringContainsString('"history"', $html);
     }
+
+    public function testV2GateSubsetListsExpandedCases(): void
+    {
+        $php = (string) file_get_contents(dirname(__DIR__, 2).'/script/bench-gate.php');
+        $this->assertStringContainsString("'fasta'", $php);
+        $this->assertStringContainsString("'nbody'", $php);
+        $this->assertStringContainsString("'sort-mixed'", $php);
+        $this->assertStringContainsString("'regex-redux'", $php);
+        $this->assertStringContainsString("'json-roundtrip'", $php);
+        $baseline = json_decode(
+            (string) file_get_contents(dirname(__DIR__, 2).'/benchmarks/v2/BASELINE.json'),
+            true
+        );
+        $this->assertIsArray($baseline);
+        $this->assertArrayHasKey('cases', $baseline);
+        foreach ([
+            'fasta',
+            'nbody',
+            'sort-mixed',
+            'regex-redux',
+            'closure-heavy',
+            'object-graph',
+            'spectral-norm',
+            'json-roundtrip',
+            'exceptions',
+        ] as $name) {
+            $this->assertArrayHasKey($name, $baseline['cases'], $name);
+            $this->assertArrayHasKey('ratio_aot_over_zend', $baseline['cases'][$name]);
+        }
+        $this->assertGreaterThanOrEqual(14, \count($baseline['cases']));
+    }
 }
