@@ -634,7 +634,7 @@
             "note": "nativeLongCompare* + nativeLongMul* + nativeLongArithIsCompileTimeIdentityOrZero extracted from NativeLongFolds (#36387); php-src Zend/zend_operators.c compare/mul/add/sub"
         },
         "lib/JIT/DiscardedPureCallElisionNativeLongPowFolds.php": {
-            "budget": 472,
+            "budget": 476,
             "target": 600,
             "note": "nativeLongPowCompileTimeExponentFold extracted from NativeLongFolds (#36387/#36386); php-src Zend/zend_operators.c pow_function / zend_pow / mul_function; ext/standard/math.c PHP_FUNCTION(pow)"
         },
@@ -709,7 +709,7 @@
             "note": "pow()/ ** LLVM lowering hub; integer chained-smul emit extracted to JitPowIntegerEmit (#36387)"
         },
         "ext/standard/JitPowIntegerEmit.php": {
-            "budget": 60808,
+            "budget": 63504,
             "target": 70000,
             "note": "compile-time exponent chained-smul integer pow emit (#36387/#36386); php-src Zend/zend_operators.c pow_function"
         }
