@@ -18,8 +18,8 @@ use PHPLLVM\Value;
 /**
  * Integer {@code pow}/{@code **} chained-smul emit for compile-time exponents
  * (#36387 / #36386). Extracted from {@see JitPow} so gen-0 spine gets a
- * separate TU for the exponent table; Mid (30–49) and High (70–89) are
- * sibling TUs (#36387).
+ * separate TU for the exponent table; Mid (30–49), Exponents50to69, and High
+ * (70–91) are sibling TUs (#36387).
  *
  * No new C ABI. php-src: Zend/zend_operators.c {@code pow_function} /
  * {@code zend_pow} / {@code mul_function}; ext/standard/math.c
