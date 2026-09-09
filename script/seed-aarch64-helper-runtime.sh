@@ -386,6 +386,26 @@ SEED_UNITS=(
   /ext/hash/HashContextJitHelper.php
   /ext/tokenizer/TokenGetAllJitHelper.php
   /ext/mbstring/MbStrlenJitHelper.php
+  # More mbstring string/width/encoding helpers (#36391 after 292)
+  # Frexp/Ldexp/Modf/Nextafter/Shuffle still skipped (algorithm SSOT, no HELPER_PATH).
+  # Preg* still skipped: tip nested compile misses Compiler\Concern\OpCode.
+  # Sscanf still skipped: __init__ sealed during NestedJIT.
+  # Gethostbynamel skipped: NestedJIT missing __compiler_stream_resolve_include_path.
+  # Ini skipped: IniGetLeafJitHelper not compiled under helper-runtime-emit NestedJIT.
+  # Progress skipped: NestedJIT ContextLlvmConstantsAndRegistry seal during helper emit.
+  # CalInfo still skipped (unknown unit under NestedJIT).
+  # PosixSet* / PosixSession / PosixTerminal deferred (mutators / tty).
+  # MbEreg/MbSplit/MbSearch/MbConvert* deferred to a later mbstring wave.
+  /ext/mbstring/MbStrwidthJitHelper.php
+  /ext/mbstring/MbStrcutJitHelper.php
+  /ext/mbstring/MbStrSplitJitHelper.php
+  /ext/mbstring/MbSubstrCountJitHelper.php
+  /ext/mbstring/MbTrimJitHelper.php
+  /ext/mbstring/MbScrubJitHelper.php
+  /ext/mbstring/MbCheckEncodingJitHelper.php
+  /ext/mbstring/MbChrOrdJitHelper.php
+  /ext/mbstring/MbPreferredMimeNameJitHelper.php
+  /ext/mbstring/MbEncodingAliasesJitHelper.php
 )
 
 MIN_SEED=${#SEED_UNITS[@]}
