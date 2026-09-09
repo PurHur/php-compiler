@@ -6,6 +6,7 @@ namespace PHPCompiler\AOT;
 
 use PHPCompiler\JIT\Context;
 
+require_once __DIR__.'/HelperRuntimePaths.php';
 require_once __DIR__.'/HelperRuntimeFingerprint.php';
 require_once __DIR__.'/HelperRuntimeLink.php';
 require_once __DIR__.'/HelperRuntimeBind.php';
@@ -42,7 +43,8 @@ require_once __DIR__.'/HelperRuntimeWarm.php';
  *
  * Opt-in: PHP_COMPILER_HELPER_RUNTIME_O=1.
  *
- * Fingerprint / identity / unit-deps hashing lives in {@see HelperRuntimeFingerprint};
+ * Path / env / arch dirs live in {@see HelperRuntimePaths};
+ * fingerprint / identity / unit-deps hashing lives in {@see HelperRuntimeFingerprint};
  * link selection + unit.o safety gates live in {@see HelperRuntimeLink};
  * bitcode bind / type localize / lifecycle live in {@see HelperRuntimeBind};
  * unit manifest / helperIndex scan lives in {@see HelperRuntimeIndex};
@@ -51,31 +53,16 @@ require_once __DIR__.'/HelperRuntimeWarm.php';
  */
 final class HelperRuntimeCache
 {
-    private const ENV_FLAG = 'PHP_COMPILER_HELPER_RUNTIME_O';
-
-    private const ENV_DIR = 'PHP_COMPILER_HELPER_RUNTIME_CACHE_DIR';
-
-    /** Guard so the emitter itself never consumes the cache. */
-    private const ENV_EMITTING = 'PHP_COMPILER_HELPER_RUNTIME_EMITTING';
-
+    /** @see HelperRuntimePaths::enabled() */
     public static function enabled(): bool
     {
-        if ('1' === getenv(self::ENV_EMITTING)) {
-            return false;
-        }
-        $flag = getenv(self::ENV_FLAG);
-
-        return '1' === $flag || 'true' === strtolower((string) $flag);
+        return HelperRuntimePaths::enabled();
     }
 
+    /** @see HelperRuntimePaths::cacheDir() */
     public static function cacheDir(): string
     {
-        $dir = getenv(self::ENV_DIR);
-        if (is_string($dir) && '' !== $dir) {
-            return rtrim($dir, '/');
-        }
-
-        return \dirname(__DIR__, 2).'/build/helper-runtime-cache';
+        return HelperRuntimePaths::cacheDir();
     }
 
     /**
@@ -88,31 +75,42 @@ final class HelperRuntimeCache
         HelperRuntimeWarm::warmForUserAotBuild();
     }
 
+    /** @see HelperRuntimePaths::unitsDir() */
     public static function unitsDir(): string
     {
-        return self::cacheDir().'/units';
+        return HelperRuntimePaths::unitsDir();
     }
 
+    /** @see HelperRuntimePaths::unitDir() */
     public static function unitDir(string $slug): string
     {
-        return self::unitsDir().'/'.$slug;
+        return HelperRuntimePaths::unitDir($slug);
     }
 
+    /** @see HelperRuntimePaths::slugFor() */
     public static function slugFor(string $unitPath): string
     {
-        return (string) preg_replace('#[^A-Za-z0-9]+#', '_', trim($unitPath, '/'));
+        return HelperRuntimePaths::slugFor($unitPath);
     }
 
-    /** Architecture key for shareable prelinked unit objects, e.g. "x86_64-linux" (#36391). */
+    /**
+     * Architecture key for shareable prelinked unit objects, e.g. "x86_64-linux" (#36391).
+     *
+     * @see HelperRuntimePaths::archKey()
+     */
     public static function archKey(): string
     {
-        return CompileTarget::current()->id();
+        return HelperRuntimePaths::archKey();
     }
 
-    /** Committed per-arch unit cache: prelinked/helper-runtime/<arch>/units. */
+    /**
+     * Committed per-arch unit cache: prelinked/helper-runtime/<arch>/units.
+     *
+     * @see HelperRuntimePaths::prelinkedUnitsDir()
+     */
     public static function prelinkedUnitsDir(): string
     {
-        return CompileTarget::current()->helperRuntimeArchDir(\dirname(__DIR__, 2)).'/units';
+        return HelperRuntimePaths::prelinkedUnitsDir();
     }
 
     /**
@@ -363,9 +361,10 @@ final class HelperRuntimeCache
         return HelperRuntimeLink::resolveLinkableUnitDir($slug);
     }
 
+    /** @see HelperRuntimePaths::markEmitting() */
     public static function markEmitting(): void
     {
-        putenv(self::ENV_EMITTING.'=1');
+        HelperRuntimePaths::markEmitting();
     }
 
     /**
