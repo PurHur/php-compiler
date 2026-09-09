@@ -13393,7 +13393,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/eio/EioExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 5 class method(s)
 
 ### `ext/eio/Module.php`
 
@@ -16561,7 +16561,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/imap/ImapExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 5 class method(s)
 
 ### `ext/imap/ImapMboxEngine.php`
 
@@ -26239,7 +26239,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/rar/RarExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 4 class method(s)
 
 ### `ext/rar/RarProceduralFunction.php`
 
@@ -30600,7 +30600,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/ssh2/Ssh2ExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 5 class method(s)
 
 ### `ext/ssh2/VmSsh2Listener.php`
 
