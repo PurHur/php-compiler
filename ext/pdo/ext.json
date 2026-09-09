@@ -17,5 +17,6 @@
         "PHP_COMPILER_ENABLE_PDO_SQLITE",
         "PHP_COMPILER_ENABLE_PDO_PGSQL",
         "PHP_COMPILER_ENABLE_PDO_MYSQL"
-    ]
+    ],
+    "advertise": "always"
 }

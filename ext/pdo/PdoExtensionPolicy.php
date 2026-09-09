@@ -5,9 +5,13 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\pdo;
 
 use PHPCompiler\CompilerVersion;
+use PHPCompiler\ExtensionRegistry;
 
 /**
  * ext/pdo advertisement — php-src ext/pdo/pdo.c (#3367, #24523).
+ *
+ * {@see advertisesExtension()} is folded to ext.json advertise → ExtensionRegistry (#36204).
+ * Driver / subclass gates stay here.
  *
  * PDO + PDOException are always advertised (Zend ships ext/pdo). The sqlite driver
  * surface needs libsqlite3 FFI ({@see \PHPCompiler\ext\sqlite3\VmSqlite3Native}) and
@@ -40,7 +44,7 @@ final class PdoExtensionPolicy
 {
     public static function advertisesExtension(): bool
     {
-        return true;
+        return ExtensionRegistry::advertisesExtensionFor('pdo');
     }
 
     public static function advertisesExceptionClass(): bool

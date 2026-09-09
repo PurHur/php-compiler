@@ -8,10 +8,16 @@ use PHPCompiler\CompilerVersion;
 use PHPCompiler\ExtensionRegistry;
 use PHPCompiler\ext\apcu\ApcuExtensionPolicy;
 use PHPCompiler\ext\eio\EioExtensionPolicy;
+use PHPCompiler\ext\gd\GdExtensionPolicy;
 use PHPCompiler\ext\igbinary\IgbinaryExtensionPolicy;
+use PHPCompiler\ext\oci8\Oci8ExtensionPolicy;
+use PHPCompiler\ext\pdo\PdoExtensionPolicy;
 use PHPCompiler\ext\phar\PharExtensionPolicy;
 use PHPCompiler\ext\rar\RarExtensionPolicy;
 use PHPCompiler\ext\redis\RedisExtensionPolicy;
+use PHPCompiler\ext\soap\SoapExtensionPolicy;
+use PHPCompiler\ext\sqlite3\Sqlite3ExtensionPolicy;
+use PHPCompiler\ext\sqlsrv\SqlsrvExtensionPolicy;
 use PHPCompiler\ext\uuid\UuidExtensionPolicy;
 use PHPUnit\Framework\TestCase;
 
@@ -35,6 +41,38 @@ final class ExtensionPolicyAdvertiseTest extends TestCase
     {
         self::assertTrue(ExtensionRegistry::advertisesExtensionFor('phar'));
         self::assertTrue(PharExtensionPolicy::advertisesExtension());
+    }
+
+    public function testPdoOci8SqlsrvAlwaysAdvertise(): void
+    {
+        self::assertTrue(ExtensionRegistry::advertisesExtensionFor('pdo'));
+        self::assertTrue(PdoExtensionPolicy::advertisesExtension());
+        self::assertTrue(ExtensionRegistry::advertisesExtensionFor('oci8'));
+        self::assertTrue(Oci8ExtensionPolicy::advertisesExtension());
+        self::assertTrue(ExtensionRegistry::advertisesExtensionFor('sqlsrv'));
+        self::assertTrue(SqlsrvExtensionPolicy::advertisesExtension());
+    }
+
+    public function testSqlite3HostOrCompilerVersion(): void
+    {
+        $expected = \extension_loaded('sqlite3') || CompilerVersion::supportsSqlite3();
+        self::assertSame($expected, ExtensionRegistry::advertisesExtensionFor('sqlite3'));
+        self::assertSame($expected, Sqlite3ExtensionPolicy::advertisesExtension());
+        self::assertSame($expected, Sqlite3ExtensionPolicy::advertisesExtensionLoaded());
+    }
+
+    public function testGdAndSoapHostOnly(): void
+    {
+        self::assertSame(
+            \extension_loaded('gd'),
+            ExtensionRegistry::advertisesExtensionFor('gd')
+        );
+        self::assertSame(\extension_loaded('gd'), GdExtensionPolicy::advertisesExtension());
+        self::assertSame(
+            \extension_loaded('soap'),
+            ExtensionRegistry::advertisesExtensionFor('soap')
+        );
+        self::assertSame(\extension_loaded('soap'), SoapExtensionPolicy::advertisesExtension());
     }
 
     public function testIgbinaryMatchesCompilerVersion(): void
