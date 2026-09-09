@@ -7165,6 +7165,7 @@ require_once __DIR__.'/../../../lib/JIT/DeprecatedCallGuard.php';
 require_once __DIR__.'/../../../lib/JIT/NoThrowCallElisionRuntimeInfoPredicates.php';
 require_once __DIR__.'/../../../lib/JIT/NoThrowCallElisionExistsConvertAndIntrospectOps.php';
 require_once __DIR__.'/../../../lib/JIT/NoThrowCallElisionStringOps.php';
+require_once __DIR__.'/../../../lib/JIT/NoThrowCallElisionMathAndFormatOps.php';
 require_once __DIR__.'/../../../lib/JIT/NoThrowCallElision.php';
 require_once __DIR__.'/../../../lib/JIT/NonObjectPropertyFetchHelper.php';
 require_once __DIR__.'/../../../lib/JIT/NullsafeHelper.php';

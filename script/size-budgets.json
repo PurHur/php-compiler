@@ -639,9 +639,9 @@
             "note": "baseConvert/inet/minMax/checkdate/clamp/intdiv arg guards + scalarCast + count-on-typed-array + pure math/round + effect-free void Native constraints extracted from DiscardedPureCallElision (#36387); php-src ext/standard/math.c + basic_functions.c + Zend/zend_operators.c"
         },
         "lib/JIT/NoThrowCallElision.php": {
-            "budget": 1047,
+            "budget": 827,
             "target": 900,
-            "note": "No-throw call elision hub; RuntimeInfoPredicates + ExistsConvertAndIntrospectOps + StringOps (#36387/#36403/#36386)"
+            "note": "No-throw call elision hub; RuntimeInfoPredicates + ExistsConvertAndIntrospectOps + StringOps + MathAndFormatOps (#36387/#36403/#36386)"
         },
         "lib/JIT/NoThrowCallElisionRuntimeInfoPredicates.php": {
             "budget": 647,
@@ -657,6 +657,11 @@
             "budget": 855,
             "target": 1000,
             "note": "type/ctype/string transform/html/slice/pad/replace no-throw proofs extracted from NoThrowCallElision (#36387); php-src ext/standard/{type,string,html,url,md5,crc32,base64,quot_print,levenshtein,file,exec}.c + ext/ctype + ext/pcre"
+        },
+        "lib/JIT/NoThrowCallElisionMathAndFormatOps.php": {
+            "budget": 270,
+            "target": 400,
+            "note": "number_format / scalar-cast / base-inet-minmax-checkdate / hash_equals / pathinfo / parse_url / math isPure* extracted from NoThrowCallElision (#36387); php-src ext/standard/{math,string,type,basic_functions,url,file}.c + ext/hash + ext/date"
         }
     },
     "script_file_count": {
