@@ -5558,6 +5558,7 @@
         "lib/AOT/HelperRuntimeCache.php",
         "lib/AOT/HelperRuntimeCommon.php",
         "lib/AOT/HelperRuntimeFingerprint.php",
+        "lib/AOT/HelperRuntimeFingerprintUnit.php",
         "lib/AOT/HelperRuntimeIndex.php",
         "lib/AOT/HelperRuntimeLink.php",
         "lib/AOT/HelperRuntimePaths.php",

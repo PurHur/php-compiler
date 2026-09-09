@@ -171,7 +171,7 @@ final class HelperRuntimeCacheFingerprintTest extends TestCase
         if (!isset($raw['deps'])) {
             // Restore legacy fingerprint for the assertion when file is already v2.
             $legacyFp = (static function () use ($sourceAbs): string {
-                $ref = new \ReflectionClass(HelperRuntimeCache::class);
+                $ref = new \ReflectionClass(HelperRuntimeFingerprintUnit::class);
                 $m = $ref->getMethod('fingerprintV1Legacy');
                 $m->setAccessible(true);
 
@@ -221,7 +221,7 @@ final class HelperRuntimeCacheFingerprintTest extends TestCase
     {
         $root = \dirname(__DIR__, 3);
         $unit = $root.'/ext/standard/StrposJitHelper.php';
-        $ref = new \ReflectionClass(HelperRuntimeFingerprint::class);
+        $ref = new \ReflectionClass(HelperRuntimeFingerprintUnit::class);
         $m = $ref->getMethod('fingerprintV1Legacy');
         $m->setAccessible(true);
         $legacyFp = (string) $m->invoke(null, $unit);

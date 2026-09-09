@@ -7,6 +7,7 @@ namespace PHPCompiler\AOT;
 use PHPCompiler\JIT\Context;
 
 require_once __DIR__.'/HelperRuntimePaths.php';
+require_once __DIR__.'/HelperRuntimeFingerprintUnit.php';
 require_once __DIR__.'/HelperRuntimeFingerprint.php';
 require_once __DIR__.'/HelperRuntimeLink.php';
 require_once __DIR__.'/HelperRuntimeBind.php';
@@ -44,7 +45,8 @@ require_once __DIR__.'/HelperRuntimeWarm.php';
  * Opt-in: PHP_COMPILER_HELPER_RUNTIME_O=1.
  *
  * Path / env / arch dirs live in {@see HelperRuntimePaths};
- * fingerprint / identity / unit-deps hashing lives in {@see HelperRuntimeFingerprint};
+ * fingerprint / identity lives in {@see HelperRuntimeFingerprint};
+ * per-unit deps / manifest v2 hashing lives in {@see HelperRuntimeFingerprintUnit};
  * link selection + unit.o safety gates live in {@see HelperRuntimeLink};
  * bitcode bind / type localize / lifecycle live in {@see HelperRuntimeBind};
  * unit manifest / helperIndex scan lives in {@see HelperRuntimeIndex};

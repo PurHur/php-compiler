@@ -5476,7 +5476,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/AOT/HelperRuntimeBind.php` | 0 | 2 |
 | `lib/AOT/HelperRuntimeCache.php` | 0 | 1 |
 | `lib/AOT/HelperRuntimeCommon.php` | 0 | 1 |
-| `lib/AOT/HelperRuntimeFingerprint.php` | 0 | 2 |
+| `lib/AOT/HelperRuntimeFingerprint.php` | 0 | 1 |
+| `lib/AOT/HelperRuntimeFingerprintUnit.php` | 0 | 2 |
 | `lib/AOT/HelperRuntimeIndex.php` | 0 | 1 |
 | `lib/AOT/HelperRuntimeLink.php` | 0 | 1 |
 | `lib/AOT/HelperRuntimePaths.php` | 0 | 1 |
@@ -48899,7 +48900,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/AOT/HelperRuntimeFingerprint.php`
 
 **Warnings** (review for bootstrap subset):
-- 23 class method(s)
+- 19 class method(s)
+
+### `lib/AOT/HelperRuntimeFingerprintUnit.php`
+
+**Warnings** (review for bootstrap subset):
+- 12 class method(s)
 - 1 closure(s)
 
 ### `lib/AOT/HelperRuntimeIndex.php`
@@ -59679,7 +59685,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - trait JitConstructAssignedAndNativeLongLocal (line 24)
 - new JIT\Variable (line 396)
-- new JIT\Variable (line 459)
+- new JIT\Variable (line 462)
 - 12 class method(s)
 
 ### `lib/JIT/Concern/ListUnpackClassDeclareAndIncludeAssign.php`

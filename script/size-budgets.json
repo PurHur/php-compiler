@@ -29,9 +29,9 @@
             "note": "already under target; output helpers in LinkerOutputArtifacts (#36403); ASAN via clang/gcc (#36397)"
         },
         "lib/AOT/HelperRuntimeCache.php": {
-            "budget": 423,
+            "budget": 425,
             "target": 1200,
-            "note": "helper-cache granularity; Paths+Fingerprint+Link+Bind+Index+Warm extracts (#36387/#36403); sorted linkObjects (#36399); refusePrelinkGcMixReason (#36401)"
+            "note": "helper-cache granularity; Paths+Fingerprint+FingerprintUnit+Link+Bind+Index+Warm extracts (#36387/#36403); sorted linkObjects (#36399); refusePrelinkGcMixReason (#36401)"
         },
         "lib/AOT/HelperRuntimePaths.php": {
             "budget": 79,
@@ -47,6 +47,16 @@
             "budget": 129,
             "target": 300,
             "note": "warmForUserAotBuild/committedCacheHasUnits extracted from HelperRuntimeCache (#36387/#15889/#24302)"
+        },
+        "lib/AOT/HelperRuntimeFingerprint.php": {
+            "budget": 420,
+            "target": 500,
+            "note": "core/LLVM identity; unitFingerprint/deps/manifest v2 in HelperRuntimeFingerprintUnit (#36387/#23458/#24381)"
+        },
+        "lib/AOT/HelperRuntimeFingerprintUnit.php": {
+            "budget": 276,
+            "target": 350,
+            "note": "unitFingerprint/dependencyRelPathsForEmit/manifest v2 extracted from HelperRuntimeFingerprint (#36387/#15889/#23458)"
         },
         "lib/JIT/CompileCache.php": {
             "budget": 67,
