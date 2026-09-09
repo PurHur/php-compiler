@@ -8,7 +8,7 @@
     "builtins_vm_yes": 4021,
     "builtins_jit_yes": 1472,
     "builtins_aot_yes": 1326,
-    "differential_cases": 418,
+    "differential_cases": 419,
     "apps_packages": 12,
     "apps_ready": 1,
     "vm_driver_probe_ms_target": 20,
