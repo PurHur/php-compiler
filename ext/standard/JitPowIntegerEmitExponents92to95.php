@@ -18,7 +18,7 @@ use PHPLLVM\Value;
  * for ninetysecond … ninetyfifth (#36387 / #36386).
  *
  * Extracted from {@see JitPowIntegerEmitHigh} so gen-0 spine gets another TU
- * (High retains ninetysixth+).
+ * (96–99 in {@see JitPowIntegerEmitExponents96to99}; High retains hundredth+).
  *
  * No new C ABI. php-src: Zend/zend_operators.c {@code pow_function} /
  * {@code zend_pow} / {@code mul_function}; ext/standard/math.c

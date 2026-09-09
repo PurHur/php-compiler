@@ -8728,4 +8728,5 @@ require_once __DIR__.'/../../../ext/standard/JitPowIntegerEmitExponents80to85.ph
 require_once __DIR__.'/../../../ext/standard/JitPowIntegerEmitExponents86to88.php';
 require_once __DIR__.'/../../../ext/standard/JitPowIntegerEmitExponents80to91.php';
 require_once __DIR__.'/../../../ext/standard/JitPowIntegerEmitExponents92to95.php';
+require_once __DIR__.'/../../../ext/standard/JitPowIntegerEmitExponents96to99.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
