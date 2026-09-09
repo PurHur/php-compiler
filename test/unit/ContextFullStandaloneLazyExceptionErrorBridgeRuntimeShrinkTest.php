@@ -17,12 +17,12 @@ final class ContextFullStandaloneLazyExceptionErrorBridgeRuntimeShrinkTest exten
 {
     public function testEnsureFullDropsEagerExceptionAndErrorBridge(): void
     {
-        $context = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $context = (string) file_get_contents(__DIR__.'/../../lib/JIT/ContextStandaloneBodies.php');
         $this->assertStringContainsString('#35099', $context);
         $fullPos = strpos($context, 'private function ensureFullStandaloneBodies');
         $this->assertNotFalse($fullPos);
-        $fullEnd = strpos($context, 'public function jitResult', $fullPos);
-        $this->assertNotFalse($fullEnd);
+        // Trait ends after ensureFull — no jitResult on this TU (#36387 StandaloneBodies extract).
+        $fullEnd = strlen($context);
         $fullBody = substr($context, $fullPos, $fullEnd - $fullPos);
 
         foreach ([
@@ -84,6 +84,9 @@ final class ContextFullStandaloneLazyExceptionErrorBridgeRuntimeShrinkTest exten
         $compilePos = strpos($context, 'public function compileToFile');
         $this->assertNotFalse($compilePos);
         $compileEnd = strpos($context, 'public function compileCommon', $compilePos);
+        if (false === $compileEnd) {
+            $compileEnd = strpos($context, '$this->emitAndLinkCompiledModule($file)', $compilePos);
+        }
         if (false === $compileEnd) {
             $compileEnd = strpos($context, 'Progress::noteFunction(\'jit_context_compile_common_begin\')', $compilePos);
         }
