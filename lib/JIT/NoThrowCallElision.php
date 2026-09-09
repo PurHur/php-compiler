@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Call\Vararg;
 require_once __DIR__.'/NoThrowCallElisionRuntimeInfoPredicates.php';
 require_once __DIR__.'/NoThrowCallElisionExistsConvertAndIntrospectOps.php';
 require_once __DIR__.'/NoThrowCallElisionStringOps.php';
+require_once __DIR__.'/NoThrowCallElisionStringSlicePadReplaceOps.php';
 require_once __DIR__.'/NoThrowCallElisionMathAndFormatOps.php';
 require_once __DIR__.'/NoThrowCallElisionCalleeGraph.php';
 require_once __DIR__.'/NoThrowCallElisionPureBuiltinArgOps.php';
@@ -85,6 +86,7 @@ final class NoThrowCallElision
     use NoThrowCallElisionExistsConvertAndIntrospectOps;
 
     use NoThrowCallElisionStringOps;
+    use NoThrowCallElisionStringSlicePadReplaceOps;
     use NoThrowCallElisionMathAndFormatOps;
     use NoThrowCallElisionCalleeGraph;
     use NoThrowCallElisionPureBuiltinArgOps;
