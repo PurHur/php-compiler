@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8569 |
-| Phase A inventory files (M2 ratio SSOT) | 8569 |
+| PHP files on vm.php path | 8570 |
+| Phase A inventory files (M2 ratio SSOT) | 8570 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26736 |
+| Source constructs flagged (warnings) | 26738 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7351,6 +7351,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/DiscardedPureCallElisionArrayOps.php` | 0 | 2 |
 | `lib/JIT/DiscardedPureCallElisionDateCalOps.php` | 0 | 2 |
 | `lib/JIT/DiscardedPureCallElisionFormatAnalyzeOps.php` | 0 | 2 |
+| `lib/JIT/DiscardedPureCallElisionIntrospectOps.php` | 0 | 2 |
 | `lib/JIT/DiscardedPureCallElisionMathAndHashOps.php` | 0 | 2 |
 | `lib/JIT/DiscardedPureCallElisionNativeLongFolds.php` | 0 | 2 |
 | `lib/JIT/DiscardedPureCallElisionRuntimeInfoOps.php` | 0 | 2 |
@@ -60560,7 +60561,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/DiscardedPureCallElision.php`
 
 **Warnings** (review for bootstrap subset):
-- 44 class method(s)
+- 22 class method(s)
 
 ### `lib/JIT/DiscardedPureCallElisionArrayOps.php`
 
@@ -60579,6 +60580,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - trait DiscardedPureCallElisionFormatAnalyzeOps (line 25)
 - 16 class method(s)
+
+### `lib/JIT/DiscardedPureCallElisionIntrospectOps.php`
+
+**Warnings** (review for bootstrap subset):
+- trait DiscardedPureCallElisionIntrospectOps (line 25)
+- 22 class method(s)
 
 ### `lib/JIT/DiscardedPureCallElisionMathAndHashOps.php`
 
