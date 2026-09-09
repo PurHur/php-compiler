@@ -564,9 +564,9 @@
             "note": "instanceof / static-call eligibility helpers extracted from VM.php (#36403); php-src ZEND_INSTANCEOF / ZEND_INIT_STATIC_METHOD_CALL / zend_std_get_static_method / zend_inheritance.c"
         },
         "lib/JIT/DiscardedPureCallElision.php": {
-            "budget": 1646,
-            "target": 1606,
-            "note": "Discarded pure-call elision hub; string/array/date-cal/format-analyze/math-hash/runtime-info/native-long/introspect traits (#36387/#36403/#23483)"
+            "budget": 694,
+            "target": 700,
+            "note": "Discarded pure-call elision hub; string/array/date-cal/format-analyze/math-hash/runtime-info/native-long/math-guard/introspect/type-string traits (#36387/#36403/#23483)"
         },
         "lib/JIT/DiscardedPureCallElisionStringOps.php": {
             "budget": 641,
@@ -619,7 +619,7 @@
             "note": "zero-arg / defined-table / process / memory-ini / env-path / host-error / json-preg / date-ob-http-spl / clock / civil-date / randmax runtime-info discarded elision extracted from DiscardedPureCallElision (#36387); php-src basic_functions.c/info.c/microtime.c/hrtime.c/datetime.c/Zend/zend.c/ext/date/php_date.c/ext/random/random.c"
         },
         "lib/JIT/DiscardedPureCallElisionNativeLongFolds.php": {
-            "budget": 1065,
+            "budget": 1074,
             "target": 1200,
             "note": "native-long/intdiv/bitwise/pow/compare compile-time fold helpers extracted from DiscardedPureCallElision (#36403); php-src Zend/zend_operators.c ext/standard/math.c"
         },
@@ -627,6 +627,16 @@
             "budget": 407,
             "target": 500,
             "note": "function_exists / extension_loaded / defined / method_exists / property_exists / array_key_exists / class_exists family / object introspect / is_a / class_hierarchy / get_object_vars discarded elision extracted from DiscardedPureCallElision (#36387); php-src Zend/zend_builtin_functions.c + ext/standard/{info,basic_functions,array,class,var}.c + ext/spl"
+        },
+        "lib/JIT/DiscardedPureCallElisionTypeStringCoreOps.php": {
+            "budget": 334,
+            "target": 450,
+            "note": "type/ctype/strlen/ord/chr/string-transform/str_incdec discarded elision extracted from DiscardedPureCallElision (#36387); php-src type.c/ctype.c/string.c/url.c/md5.c/crc32.c/base64.c"
+        },
+        "lib/JIT/DiscardedPureCallElisionMathGuardAndVoidNativeOps.php": {
+            "budget": 677,
+            "target": 800,
+            "note": "baseConvert/inet/minMax/checkdate/clamp/intdiv arg guards + scalarCast + count-on-typed-array + pure math/round + effect-free void Native constraints extracted from DiscardedPureCallElision (#36387); php-src ext/standard/math.c + basic_functions.c + Zend/zend_operators.c"
         },
         "lib/JIT/NoThrowCallElision.php": {
             "budget": 2622,

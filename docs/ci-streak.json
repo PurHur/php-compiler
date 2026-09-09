@@ -1,7 +1,7 @@
 {
     "issue": 36401,
     "ci_green_streak_days": 6,
-    "last_green_master_sha": "233cf4e7687b4db501bbcd3e0ffe13f99fb2ecf3",
+    "last_green_master_sha": "6388d2568b8d47d0468d669fb0ca2c3b2a4e2568",
     "last_green_day": "2026-09-09",
     "gates": [
         "apply-patches",
@@ -9,5 +9,5 @@
         "aot-smoke",
         "north-star5-verify-fast"
     ],
-    "notes": "Local Docker gates; GHA billing-disabled \u2014 not a remote check streak (#36401). Verified apply-patches --verify-pristine (php-llvm 27/27), inventory 8566/8566, aot-smoke 9/9, north-star5-verify-fast OK on tip after #37570 MathAndHashOps merge. #36143 remains closed/green."
+    "notes": "Local Docker gates; GHA billing-disabled — not a remote check streak (#36401). Verified apply-patches --verify-pristine (php-llvm 27/27), inventory 8571/8571, aot-smoke 9/9, north-star5-verify-fast OK (spine 8571/8571) on tip after #37581. user_release_ready=yes on tip bb7abf6d9d; #36143 remains closed/green. BOOTSTRAP_M4_REQUIRE_NATIVE_EMIT=1 refused sidecar COPY at M4 gen-1 (#36146 honesty)."
 }

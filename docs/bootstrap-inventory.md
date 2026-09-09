@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8570 |
-| Phase A inventory files (M2 ratio SSOT) | 8570 |
+| PHP files on vm.php path | 8571 |
+| Phase A inventory files (M2 ratio SSOT) | 8571 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26738 |
+| Source constructs flagged (warnings) | 26740 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7353,9 +7353,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/DiscardedPureCallElisionFormatAnalyzeOps.php` | 0 | 2 |
 | `lib/JIT/DiscardedPureCallElisionIntrospectOps.php` | 0 | 2 |
 | `lib/JIT/DiscardedPureCallElisionMathAndHashOps.php` | 0 | 2 |
+| `lib/JIT/DiscardedPureCallElisionMathGuardAndVoidNativeOps.php` | 0 | 2 |
 | `lib/JIT/DiscardedPureCallElisionNativeLongFolds.php` | 0 | 2 |
 | `lib/JIT/DiscardedPureCallElisionRuntimeInfoOps.php` | 0 | 2 |
 | `lib/JIT/DiscardedPureCallElisionStringOps.php` | 0 | 2 |
+| `lib/JIT/DiscardedPureCallElisionTypeStringCoreOps.php` | 0 | 2 |
 | `lib/JIT/DnfParamCheck.php` | 0 | 31 |
 | `lib/JIT/DomExtensionHooks.php` | 0 | 1 |
 | `lib/JIT/DomInstanceMethodJit.php` | 0 | 114 |
@@ -7505,7 +7507,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/NestedVmVariableMethodLlvm.php` | 0 | 2 |
 | `lib/JIT/NoDiscardCallGuard.php` | 0 | 2 |
 | `lib/JIT/NoThrowCallElision.php` | 0 | 2 |
-| `lib/JIT/NoThrowCallElisionRuntimeInfoPredicates.php` | 0 | 2 |
 | `lib/JIT/NonObjectPropertyFetchHelper.php` | 0 | 4 |
 | `lib/JIT/NullsafeHelper.php` | 0 | 1 |
 | `lib/JIT/ObjectPropertyForeachHelper.php` | 0 | 1 |
@@ -60561,7 +60562,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/DiscardedPureCallElision.php`
 
 **Warnings** (review for bootstrap subset):
-- 33 class method(s)
+- 1 class method(s)
 
 ### `lib/JIT/DiscardedPureCallElisionArrayOps.php`
 
@@ -60593,6 +60594,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - trait DiscardedPureCallElisionMathAndHashOps (line 26)
 - 14 class method(s)
 
+### `lib/JIT/DiscardedPureCallElisionMathGuardAndVoidNativeOps.php`
+
+**Warnings** (review for bootstrap subset):
+- trait DiscardedPureCallElisionMathGuardAndVoidNativeOps (line 27)
+- 21 class method(s)
+
 ### `lib/JIT/DiscardedPureCallElisionNativeLongFolds.php`
 
 **Warnings** (review for bootstrap subset):
@@ -60610,6 +60617,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - trait DiscardedPureCallElisionStringOps (line 25)
 - 9 class method(s)
+
+### `lib/JIT/DiscardedPureCallElisionTypeStringCoreOps.php`
+
+**Warnings** (review for bootstrap subset):
+- trait DiscardedPureCallElisionTypeStringCoreOps (line 28)
+- 11 class method(s)
 
 ### `lib/JIT/DnfParamCheck.php`
 
@@ -61751,14 +61764,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/NoThrowCallElision.php`
 
 **Warnings** (review for bootstrap subset):
-- new Operand\Literal (line 2586)
-- 78 class method(s)
-
-### `lib/JIT/NoThrowCallElisionRuntimeInfoPredicates.php`
-
-**Warnings** (review for bootstrap subset):
-- trait NoThrowCallElisionRuntimeInfoPredicates (line 25)
-- 23 class method(s)
+- new Operand\Literal (line 3199)
+- 101 class method(s)
 
 ### `lib/JIT/NonObjectPropertyFetchHelper.php`
 
