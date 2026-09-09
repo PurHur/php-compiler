@@ -639,9 +639,9 @@
             "note": "baseConvert/inet/minMax/checkdate/clamp/intdiv arg guards + scalarCast + count-on-typed-array + pure math/round + effect-free void Native constraints extracted from DiscardedPureCallElision (#36387); php-src ext/standard/math.c + basic_functions.c + Zend/zend_operators.c"
         },
         "lib/JIT/NoThrowCallElision.php": {
-            "budget": 827,
-            "target": 900,
-            "note": "No-throw call elision hub; RuntimeInfoPredicates + ExistsConvertAndIntrospectOps + StringOps + MathAndFormatOps (#36387/#36403/#36386)"
+            "budget": 591,
+            "target": 500,
+            "note": "No-throw call elision hub; RuntimeInfo + ExistsConvert + StringOps + MathAndFormat + CalleeGraph (#36387/#36403/#36386)"
         },
         "lib/JIT/NoThrowCallElisionRuntimeInfoPredicates.php": {
             "budget": 647,
@@ -662,6 +662,11 @@
             "budget": 270,
             "target": 400,
             "note": "number_format / scalar-cast / base-inet-minmax-checkdate / hash_equals / pathinfo / parse_url / math isPure* extracted from NoThrowCallElision (#36387); php-src ext/standard/{math,string,type,basic_functions,url,file}.c + ext/hash + ext/date"
+        },
+        "lib/JIT/NoThrowCallElisionCalleeGraph.php": {
+            "budget": 271,
+            "target": 350,
+            "note": "bodyIsNoThrowCalleeGraph + method/static/literal helpers extracted from NoThrowCallElision (#36387); php-src Zend execute/exceptions frame model"
         }
     },
     "script_file_count": {
