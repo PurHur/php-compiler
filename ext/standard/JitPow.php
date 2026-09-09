@@ -203,7 +203,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **3 expected smul overflow metadata');
             }
@@ -253,7 +253,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **4 expected smul overflow metadata');
             }
@@ -303,7 +303,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **5 expected smul overflow metadata (sq)');
             }
@@ -335,7 +335,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **5 expected smul overflow metadata (cu)');
             }
@@ -385,7 +385,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **6 expected smul overflow metadata (sq)');
             }
@@ -416,7 +416,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **6 expected smul overflow metadata (cu)');
             }
@@ -466,7 +466,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **7 expected smul overflow metadata (sq)');
             }
@@ -499,7 +499,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **7 expected smul overflow metadata (cu)');
             }
@@ -530,7 +530,7 @@ final class JitPow
                 $cuLong,
                 $cuLong
             );
-            $ov3 = $sixthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $sixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **7 expected smul overflow metadata (sixth)');
             }
@@ -580,7 +580,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **8 expected smul overflow metadata (sq)');
             }
@@ -611,7 +611,7 @@ final class JitPow
                 $sqLong,
                 $sqLong
             );
-            $ov2 = $fourthVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $fourthVar->longArithOverflowFlag);
             if (null === $ov2 || null === $fourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **8 expected smul overflow metadata (fourth)');
             }
@@ -661,7 +661,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **9 expected smul overflow metadata (sq)');
             }
@@ -694,7 +694,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **9 expected smul overflow metadata (cu)');
             }
@@ -724,7 +724,7 @@ final class JitPow
                 $cuLong,
                 $cuLong
             );
-            $ov3 = $sixthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $sixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **9 expected smul overflow metadata (sixth)');
             }
@@ -775,7 +775,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **10 expected smul overflow metadata (sq)');
             }
@@ -807,7 +807,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **10 expected smul overflow metadata (cu)');
             }
@@ -838,7 +838,7 @@ final class JitPow
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **10 expected smul overflow metadata (fifth)');
             }
@@ -889,7 +889,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **11 expected smul overflow metadata (sq)');
             }
@@ -923,7 +923,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **11 expected smul overflow metadata (cu)');
             }
@@ -956,7 +956,7 @@ final class JitPow
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **11 expected smul overflow metadata (fifth)');
             }
@@ -987,7 +987,7 @@ final class JitPow
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **11 expected smul overflow metadata (tenth)');
             }
@@ -1037,7 +1037,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **12 expected smul overflow metadata (sq)');
             }
@@ -1069,7 +1069,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **12 expected smul overflow metadata (cu)');
             }
@@ -1099,7 +1099,7 @@ final class JitPow
                 $cuLong,
                 $cuLong
             );
-            $ov3 = $sixthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $sixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **12 expected smul overflow metadata (sixth)');
             }
@@ -1149,7 +1149,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **13 expected smul overflow metadata (sq)');
             }
@@ -1183,7 +1183,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **13 expected smul overflow metadata (cu)');
             }
@@ -1215,7 +1215,7 @@ final class JitPow
                 $cuLong,
                 $cuLong
             );
-            $ov3 = $sixthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $sixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **13 expected smul overflow metadata (sixth)');
             }
@@ -1246,7 +1246,7 @@ final class JitPow
                 $sixthLong,
                 $sixthLong
             );
-            $ov4 = $twelfthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $twelfthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $twelfthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **13 expected smul overflow metadata (twelfth)');
             }
@@ -1298,7 +1298,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **14 expected smul overflow metadata (sq)');
             }
@@ -1331,7 +1331,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **14 expected smul overflow metadata (cu)');
             }
@@ -1363,7 +1363,7 @@ final class JitPow
                 $cuLong,
                 $cuLong
             );
-            $ov3 = $sixthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $sixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **14 expected smul overflow metadata (sixth)');
             }
@@ -1394,7 +1394,7 @@ final class JitPow
                 $sixthLong,
                 $n
             );
-            $ov4 = $seventhVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventhVar->longArithOverflowFlag);
             if (null === $ov4 || null === $seventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **14 expected smul overflow metadata (seventh)');
             }
@@ -1445,7 +1445,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **15 expected smul overflow metadata (sq)');
             }
@@ -1480,7 +1480,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **15 expected smul overflow metadata (cu)');
             }
@@ -1513,7 +1513,7 @@ final class JitPow
                 $cuLong,
                 $cuLong
             );
-            $ov3 = $sixthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $sixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **15 expected smul overflow metadata (sixth)');
             }
@@ -1545,7 +1545,7 @@ final class JitPow
                 $sixthLong,
                 $n
             );
-            $ov4 = $seventhVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventhVar->longArithOverflowFlag);
             if (null === $ov4 || null === $seventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **15 expected smul overflow metadata (seventh)');
             }
@@ -1576,7 +1576,7 @@ final class JitPow
                 $seventhLong,
                 $seventhLong
             );
-            $ov5 = $fourteenthVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $fourteenthVar->longArithOverflowFlag);
             if (null === $ov5 || null === $fourteenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **15 expected smul overflow metadata (fourteenth)');
             }
@@ -1626,7 +1626,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **16 expected smul overflow metadata (sq)');
             }
@@ -1658,7 +1658,7 @@ final class JitPow
                 $sqLong,
                 $sqLong
             );
-            $ov2 = $fourthVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $fourthVar->longArithOverflowFlag);
             if (null === $ov2 || null === $fourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **16 expected smul overflow metadata (fourth)');
             }
@@ -1688,7 +1688,7 @@ final class JitPow
                 $fourthLong,
                 $fourthLong
             );
-            $ov3 = $eighthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $eighthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $eighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **16 expected smul overflow metadata (eighth)');
             }
@@ -1738,7 +1738,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **17 expected smul overflow metadata (sq)');
             }
@@ -1772,7 +1772,7 @@ final class JitPow
                 $sqLong,
                 $sqLong
             );
-            $ov2 = $fourthVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $fourthVar->longArithOverflowFlag);
             if (null === $ov2 || null === $fourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **17 expected smul overflow metadata (fourth)');
             }
@@ -1804,7 +1804,7 @@ final class JitPow
                 $fourthLong,
                 $fourthLong
             );
-            $ov3 = $eighthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $eighthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $eighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **17 expected smul overflow metadata (eighth)');
             }
@@ -1835,7 +1835,7 @@ final class JitPow
                 $eighthLong,
                 $eighthLong
             );
-            $ov4 = $sixteenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixteenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $sixteenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **17 expected smul overflow metadata (sixteenth)');
             }
@@ -1886,7 +1886,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **18 expected smul overflow metadata (sq)');
             }
@@ -1919,7 +1919,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **18 expected smul overflow metadata (cu)');
             }
@@ -1950,7 +1950,7 @@ final class JitPow
                 $cuLong,
                 $cuLong
             );
-            $ov3 = $sixthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $sixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **18 expected smul overflow metadata (sixth)');
             }
@@ -1981,7 +1981,7 @@ final class JitPow
                 $sixthLong,
                 $cuLong
             );
-            $ov4 = $ninthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $ninthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $ninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **18 expected smul overflow metadata (ninth)');
             }
@@ -2032,7 +2032,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **19 expected smul overflow metadata (sq)');
             }
@@ -2067,7 +2067,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **19 expected smul overflow metadata (cu)');
             }
@@ -2100,7 +2100,7 @@ final class JitPow
                 $cuLong,
                 $cuLong
             );
-            $ov3 = $sixthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $sixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **19 expected smul overflow metadata (sixth)');
             }
@@ -2133,7 +2133,7 @@ final class JitPow
                 $sixthLong,
                 $cuLong
             );
-            $ov4 = $ninthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $ninthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $ninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **19 expected smul overflow metadata (ninth)');
             }
@@ -2164,7 +2164,7 @@ final class JitPow
                 $ninthLong,
                 $ninthLong
             );
-            $ov5 = $eighteenthVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $eighteenthVar->longArithOverflowFlag);
             if (null === $ov5 || null === $eighteenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **19 expected smul overflow metadata (eighteenth)');
             }
@@ -2215,7 +2215,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **20 expected smul overflow metadata (sq)');
             }
@@ -2248,7 +2248,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **20 expected smul overflow metadata (cu)');
             }
@@ -2280,7 +2280,7 @@ final class JitPow
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **20 expected smul overflow metadata (fifth)');
             }
@@ -2310,7 +2310,7 @@ final class JitPow
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **20 expected smul overflow metadata (tenth)');
             }
@@ -2361,7 +2361,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **21 expected smul overflow metadata (sq)');
             }
@@ -2396,7 +2396,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **21 expected smul overflow metadata (cu)');
             }
@@ -2430,7 +2430,7 @@ final class JitPow
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **21 expected smul overflow metadata (fifth)');
             }
@@ -2462,7 +2462,7 @@ final class JitPow
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **21 expected smul overflow metadata (tenth)');
             }
@@ -2493,7 +2493,7 @@ final class JitPow
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **21 expected smul overflow metadata (twentieth)');
             }
@@ -2545,7 +2545,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **22 expected smul overflow metadata (sq)');
             }
@@ -2579,7 +2579,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **22 expected smul overflow metadata (cu)');
             }
@@ -2613,7 +2613,7 @@ final class JitPow
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **22 expected smul overflow metadata (fifth)');
             }
@@ -2645,7 +2645,7 @@ final class JitPow
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **22 expected smul overflow metadata (tenth)');
             }
@@ -2676,7 +2676,7 @@ final class JitPow
                 $tenthLong,
                 $n
             );
-            $ov5 = $eleventhVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $eleventhVar->longArithOverflowFlag);
             if (null === $ov5 || null === $eleventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **22 expected smul overflow metadata (eleventh)');
             }
@@ -2728,7 +2728,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **23 expected smul overflow metadata (sq)');
             }
@@ -2764,7 +2764,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **23 expected smul overflow metadata (cu)');
             }
@@ -2799,7 +2799,7 @@ final class JitPow
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **23 expected smul overflow metadata (fifth)');
             }
@@ -2832,7 +2832,7 @@ final class JitPow
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **23 expected smul overflow metadata (tenth)');
             }
@@ -2864,7 +2864,7 @@ final class JitPow
                 $tenthLong,
                 $n
             );
-            $ov5 = $eleventhVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $eleventhVar->longArithOverflowFlag);
             if (null === $ov5 || null === $eleventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **23 expected smul overflow metadata (eleventh)');
             }
@@ -2895,7 +2895,7 @@ final class JitPow
                 $eleventhLong,
                 $eleventhLong
             );
-            $ov6 = $twentysecondVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentysecondVar->longArithOverflowFlag);
             if (null === $ov6 || null === $twentysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **23 expected smul overflow metadata (twentysecond)');
             }
@@ -2945,7 +2945,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **24 expected smul overflow metadata (sq)');
             }
@@ -2978,7 +2978,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **24 expected smul overflow metadata (cu)');
             }
@@ -3009,7 +3009,7 @@ final class JitPow
                 $cuLong,
                 $cuLong
             );
-            $ov3 = $sixthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $sixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **24 expected smul overflow metadata (sixth)');
             }
@@ -3039,7 +3039,7 @@ final class JitPow
                 $sixthLong,
                 $sixthLong
             );
-            $ov4 = $twelfthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $twelfthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $twelfthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **24 expected smul overflow metadata (twelfth)');
             }
@@ -3090,7 +3090,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **25 expected smul overflow metadata (sq)');
             }
@@ -3125,7 +3125,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **25 expected smul overflow metadata (cu)');
             }
@@ -3158,7 +3158,7 @@ final class JitPow
                 $cuLong,
                 $cuLong
             );
-            $ov3 = $sixthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $sixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **25 expected smul overflow metadata (sixth)');
             }
@@ -3190,7 +3190,7 @@ final class JitPow
                 $sixthLong,
                 $sixthLong
             );
-            $ov4 = $twelfthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $twelfthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $twelfthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **25 expected smul overflow metadata (twelfth)');
             }
@@ -3221,7 +3221,7 @@ final class JitPow
                 $twelfthLong,
                 $twelfthLong
             );
-            $ov5 = $twentyfourthVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentyfourthVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **25 expected smul overflow metadata (twentyfourth)');
             }
@@ -3273,7 +3273,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **26 expected smul overflow metadata (sq)');
             }
@@ -3307,7 +3307,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **26 expected smul overflow metadata (cu)');
             }
@@ -3340,7 +3340,7 @@ final class JitPow
                 $cuLong,
                 $cuLong
             );
-            $ov3 = $sixthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $sixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **26 expected smul overflow metadata (sixth)');
             }
@@ -3372,7 +3372,7 @@ final class JitPow
                 $sixthLong,
                 $sixthLong
             );
-            $ov4 = $twelfthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $twelfthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $twelfthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **26 expected smul overflow metadata (twelfth)');
             }
@@ -3403,7 +3403,7 @@ final class JitPow
                 $twelfthLong,
                 $n
             );
-            $ov5 = $thirteenthVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $thirteenthVar->longArithOverflowFlag);
             if (null === $ov5 || null === $thirteenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **26 expected smul overflow metadata (thirteenth)');
             }
@@ -3456,7 +3456,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **27 expected smul overflow metadata (sq)');
             }
@@ -3492,7 +3492,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **27 expected smul overflow metadata (cu)');
             }
@@ -3526,7 +3526,7 @@ final class JitPow
                 $cuLong,
                 $cuLong
             );
-            $ov3 = $sixthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $sixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **27 expected smul overflow metadata (sixth)');
             }
@@ -3559,7 +3559,7 @@ final class JitPow
                 $sixthLong,
                 $sixthLong
             );
-            $ov4 = $twelfthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $twelfthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $twelfthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **27 expected smul overflow metadata (twelfth)');
             }
@@ -3591,7 +3591,7 @@ final class JitPow
                 $twelfthLong,
                 $n
             );
-            $ov5 = $thirteenthVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $thirteenthVar->longArithOverflowFlag);
             if (null === $ov5 || null === $thirteenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **27 expected smul overflow metadata (thirteenth)');
             }
@@ -3622,7 +3622,7 @@ final class JitPow
                 $thirteenthLong,
                 $thirteenthLong
             );
-            $ov6 = $twentysixthVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentysixthVar->longArithOverflowFlag);
             if (null === $ov6 || null === $twentysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **27 expected smul overflow metadata (twentysixth)');
             }
@@ -3674,7 +3674,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **28 expected smul overflow metadata (sq)');
             }
@@ -3708,7 +3708,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **28 expected smul overflow metadata (cu)');
             }
@@ -3741,7 +3741,7 @@ final class JitPow
                 $cuLong,
                 $cuLong
             );
-            $ov3 = $sixthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $sixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **28 expected smul overflow metadata (sixth)');
             }
@@ -3773,7 +3773,7 @@ final class JitPow
                 $sixthLong,
                 $n
             );
-            $ov4 = $seventhVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventhVar->longArithOverflowFlag);
             if (null === $ov4 || null === $seventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **28 expected smul overflow metadata (seventh)');
             }
@@ -3803,7 +3803,7 @@ final class JitPow
                 $seventhLong,
                 $seventhLong
             );
-            $ov5 = $fourteenthVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $fourteenthVar->longArithOverflowFlag);
             if (null === $ov5 || null === $fourteenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **28 expected smul overflow metadata (fourteenth)');
             }
@@ -3856,7 +3856,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **29 expected smul overflow metadata (sq)');
             }
@@ -3892,7 +3892,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **29 expected smul overflow metadata (cu)');
             }
@@ -3926,7 +3926,7 @@ final class JitPow
                 $cuLong,
                 $cuLong
             );
-            $ov3 = $sixthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $sixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **29 expected smul overflow metadata (sixth)');
             }
@@ -3959,7 +3959,7 @@ final class JitPow
                 $sixthLong,
                 $n
             );
-            $ov4 = $seventhVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventhVar->longArithOverflowFlag);
             if (null === $ov4 || null === $seventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **29 expected smul overflow metadata (seventh)');
             }
@@ -3991,7 +3991,7 @@ final class JitPow
                 $seventhLong,
                 $seventhLong
             );
-            $ov5 = $fourteenthVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $fourteenthVar->longArithOverflowFlag);
             if (null === $ov5 || null === $fourteenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **29 expected smul overflow metadata (fourteenth)');
             }
@@ -4022,7 +4022,7 @@ final class JitPow
                 $fourteenthLong,
                 $fourteenthLong
             );
-            $ov6 = $twentyeighthVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentyeighthVar->longArithOverflowFlag);
             if (null === $ov6 || null === $twentyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **29 expected smul overflow metadata (twentyeighth)');
             }
@@ -4076,7 +4076,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **30 expected smul overflow metadata (sq)');
             }
@@ -4112,7 +4112,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **30 expected smul overflow metadata (cu)');
             }
@@ -4146,7 +4146,7 @@ final class JitPow
                 $cuLong,
                 $cuLong
             );
-            $ov3 = $sixthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $sixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **30 expected smul overflow metadata (sixth)');
             }
@@ -4179,7 +4179,7 @@ final class JitPow
                 $sixthLong,
                 $n
             );
-            $ov4 = $seventhVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventhVar->longArithOverflowFlag);
             if (null === $ov4 || null === $seventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **30 expected smul overflow metadata (seventh)');
             }
@@ -4211,7 +4211,7 @@ final class JitPow
                 $seventhLong,
                 $seventhLong
             );
-            $ov5 = $fourteenthVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $fourteenthVar->longArithOverflowFlag);
             if (null === $ov5 || null === $fourteenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **30 expected smul overflow metadata (fourteenth)');
             }
@@ -4242,7 +4242,7 @@ final class JitPow
                 $fourteenthLong,
                 $n
             );
-            $ov6 = $fifteenthVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifteenthVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fifteenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **30 expected smul overflow metadata (fifteenth)');
             }
@@ -4297,7 +4297,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **31 expected smul overflow metadata (sq)');
             }
@@ -4334,7 +4334,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **31 expected smul overflow metadata (cu)');
             }
@@ -4369,7 +4369,7 @@ final class JitPow
                 $cuLong,
                 $cuLong
             );
-            $ov3 = $sixthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $sixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **31 expected smul overflow metadata (sixth)');
             }
@@ -4403,7 +4403,7 @@ final class JitPow
                 $sixthLong,
                 $n
             );
-            $ov4 = $seventhVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventhVar->longArithOverflowFlag);
             if (null === $ov4 || null === $seventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **31 expected smul overflow metadata (seventh)');
             }
@@ -4436,7 +4436,7 @@ final class JitPow
                 $seventhLong,
                 $seventhLong
             );
-            $ov5 = $fourteenthVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $fourteenthVar->longArithOverflowFlag);
             if (null === $ov5 || null === $fourteenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **31 expected smul overflow metadata (fourteenth)');
             }
@@ -4468,7 +4468,7 @@ final class JitPow
                 $fourteenthLong,
                 $n
             );
-            $ov6 = $fifteenthVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifteenthVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fifteenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **31 expected smul overflow metadata (fifteenth)');
             }
@@ -4499,7 +4499,7 @@ final class JitPow
                 $fifteenthLong,
                 $fifteenthLong
             );
-            $ov7 = $thirtiethVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $thirtiethVar->longArithOverflowFlag);
             if (null === $ov7 || null === $thirtiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **31 expected smul overflow metadata (thirtieth)');
             }
@@ -4551,7 +4551,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **32 expected smul overflow metadata (sq)');
             }
@@ -4584,7 +4584,7 @@ final class JitPow
                 $sqLong,
                 $sqLong
             );
-            $ov2 = $fourthVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $fourthVar->longArithOverflowFlag);
             if (null === $ov2 || null === $fourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **32 expected smul overflow metadata (fourth)');
             }
@@ -4615,7 +4615,7 @@ final class JitPow
                 $fourthLong,
                 $fourthLong
             );
-            $ov3 = $eighthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $eighthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $eighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **32 expected smul overflow metadata (eighth)');
             }
@@ -4645,7 +4645,7 @@ final class JitPow
                 $eighthLong,
                 $eighthLong
             );
-            $ov4 = $sixteenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixteenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $sixteenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **32 expected smul overflow metadata (sixteenth)');
             }
@@ -4698,7 +4698,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **33 expected smul overflow metadata (sq)');
             }
@@ -4733,7 +4733,7 @@ final class JitPow
                 $sqLong,
                 $sqLong
             );
-            $ov2 = $fourthVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $fourthVar->longArithOverflowFlag);
             if (null === $ov2 || null === $fourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **33 expected smul overflow metadata (fourth)');
             }
@@ -4766,7 +4766,7 @@ final class JitPow
                 $fourthLong,
                 $fourthLong
             );
-            $ov3 = $eighthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $eighthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $eighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **33 expected smul overflow metadata (eighth)');
             }
@@ -4798,7 +4798,7 @@ final class JitPow
                 $eighthLong,
                 $eighthLong
             );
-            $ov4 = $sixteenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixteenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $sixteenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **33 expected smul overflow metadata (sixteenth)');
             }
@@ -4829,7 +4829,7 @@ final class JitPow
                 $sixteenthLong,
                 $sixteenthLong
             );
-            $ov5 = $thirtysecondVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $thirtysecondVar->longArithOverflowFlag);
             if (null === $ov5 || null === $thirtysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **33 expected smul overflow metadata (thirtysecond)');
             }
@@ -4883,7 +4883,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **34 expected smul overflow metadata (sq)');
             }
@@ -4917,7 +4917,7 @@ final class JitPow
                 $sqLong,
                 $sqLong
             );
-            $ov2 = $fourthVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $fourthVar->longArithOverflowFlag);
             if (null === $ov2 || null === $fourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **34 expected smul overflow metadata (fourth)');
             }
@@ -4951,7 +4951,7 @@ final class JitPow
                 $fourthLong,
                 $fourthLong
             );
-            $ov3 = $eighthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $eighthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $eighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **34 expected smul overflow metadata (eighth)');
             }
@@ -4984,7 +4984,7 @@ final class JitPow
                 $eighthLong,
                 $eighthLong
             );
-            $ov4 = $sixteenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixteenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $sixteenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **34 expected smul overflow metadata (sixteenth)');
             }
@@ -5016,7 +5016,7 @@ final class JitPow
                 $sixteenthLong,
                 $n
             );
-            $ov5 = $seventeenthVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventeenthVar->longArithOverflowFlag);
             if (null === $ov5 || null === $seventeenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **34 expected smul overflow metadata (seventeenth)');
             }
@@ -5070,7 +5070,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **35 expected smul overflow metadata (sq)');
             }
@@ -5106,7 +5106,7 @@ final class JitPow
                 $sqLong,
                 $sqLong
             );
-            $ov2 = $fourthVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $fourthVar->longArithOverflowFlag);
             if (null === $ov2 || null === $fourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **35 expected smul overflow metadata (fourth)');
             }
@@ -5141,7 +5141,7 @@ final class JitPow
                 $fourthLong,
                 $fourthLong
             );
-            $ov3 = $eighthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $eighthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $eighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **35 expected smul overflow metadata (eighth)');
             }
@@ -5175,7 +5175,7 @@ final class JitPow
                 $eighthLong,
                 $eighthLong
             );
-            $ov4 = $sixteenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixteenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $sixteenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **35 expected smul overflow metadata (sixteenth)');
             }
@@ -5208,7 +5208,7 @@ final class JitPow
                 $sixteenthLong,
                 $n
             );
-            $ov5 = $seventeenthVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventeenthVar->longArithOverflowFlag);
             if (null === $ov5 || null === $seventeenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **35 expected smul overflow metadata (seventeenth)');
             }
@@ -5239,7 +5239,7 @@ final class JitPow
                 $seventeenthLong,
                 $seventeenthLong
             );
-            $ov6 = $thirtyfourthVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $thirtyfourthVar->longArithOverflowFlag);
             if (null === $ov6 || null === $thirtyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **35 expected smul overflow metadata (thirtyfourth)');
             }
@@ -5293,7 +5293,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **36 expected smul overflow metadata (sq)');
             }
@@ -5327,7 +5327,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **36 expected smul overflow metadata (cu)');
             }
@@ -5359,7 +5359,7 @@ final class JitPow
                 $cuLong,
                 $cuLong
             );
-            $ov3 = $sixthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $sixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **36 expected smul overflow metadata (sixth)');
             }
@@ -5391,7 +5391,7 @@ final class JitPow
                 $sixthLong,
                 $cuLong
             );
-            $ov4 = $ninthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $ninthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $ninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **36 expected smul overflow metadata (ninth)');
             }
@@ -5421,7 +5421,7 @@ final class JitPow
                 $ninthLong,
                 $ninthLong
             );
-            $ov5 = $eighteenthVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $eighteenthVar->longArithOverflowFlag);
             if (null === $ov5 || null === $eighteenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **36 expected smul overflow metadata (eighteenth)');
             }
@@ -5475,7 +5475,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **37 expected smul overflow metadata (sq)');
             }
@@ -5511,7 +5511,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **37 expected smul overflow metadata (cu)');
             }
@@ -5545,7 +5545,7 @@ final class JitPow
                 $cuLong,
                 $cuLong
             );
-            $ov3 = $sixthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $sixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **37 expected smul overflow metadata (sixth)');
             }
@@ -5579,7 +5579,7 @@ final class JitPow
                 $sixthLong,
                 $cuLong
             );
-            $ov4 = $ninthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $ninthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $ninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **37 expected smul overflow metadata (ninth)');
             }
@@ -5611,7 +5611,7 @@ final class JitPow
                 $ninthLong,
                 $ninthLong
             );
-            $ov5 = $eighteenthVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $eighteenthVar->longArithOverflowFlag);
             if (null === $ov5 || null === $eighteenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **37 expected smul overflow metadata (eighteenth)');
             }
@@ -5642,7 +5642,7 @@ final class JitPow
                 $eighteenthLong,
                 $eighteenthLong
             );
-            $ov6 = $thirtysixthVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $thirtysixthVar->longArithOverflowFlag);
             if (null === $ov6 || null === $thirtysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **37 expected smul overflow metadata (thirtysixth)');
             }
@@ -5697,7 +5697,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **38 expected smul overflow metadata (sq)');
             }
@@ -5734,7 +5734,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **38 expected smul overflow metadata (cu)');
             }
@@ -5769,7 +5769,7 @@ final class JitPow
                 $cuLong,
                 $cuLong
             );
-            $ov3 = $sixthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $sixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **38 expected smul overflow metadata (sixth)');
             }
@@ -5804,7 +5804,7 @@ final class JitPow
                 $sixthLong,
                 $cuLong
             );
-            $ov4 = $ninthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $ninthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $ninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **38 expected smul overflow metadata (ninth)');
             }
@@ -5837,7 +5837,7 @@ final class JitPow
                 $ninthLong,
                 $ninthLong
             );
-            $ov5 = $eighteenthVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $eighteenthVar->longArithOverflowFlag);
             if (null === $ov5 || null === $eighteenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **38 expected smul overflow metadata (eighteenth)');
             }
@@ -5869,7 +5869,7 @@ final class JitPow
                 $eighteenthLong,
                 $eighteenthLong
             );
-            $ov6 = $thirtysixthVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $thirtysixthVar->longArithOverflowFlag);
             if (null === $ov6 || null === $thirtysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **38 expected smul overflow metadata (thirtysixth)');
             }
@@ -5900,7 +5900,7 @@ final class JitPow
                 $thirtysixthLong,
                 $n
             );
-            $ov7 = $thirtyseventhVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $thirtyseventhVar->longArithOverflowFlag);
             if (null === $ov7 || null === $thirtyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **38 expected smul overflow metadata (thirtyseventh)');
             }
@@ -5957,7 +5957,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **39 expected smul overflow metadata (sq)');
             }
@@ -5995,7 +5995,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **39 expected smul overflow metadata (cu)');
             }
@@ -6031,7 +6031,7 @@ final class JitPow
                 $cuLong,
                 $cuLong
             );
-            $ov3 = $sixthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $sixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **39 expected smul overflow metadata (sixth)');
             }
@@ -6067,7 +6067,7 @@ final class JitPow
                 $sixthLong,
                 $cuLong
             );
-            $ov4 = $ninthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $ninthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $ninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **39 expected smul overflow metadata (ninth)');
             }
@@ -6101,7 +6101,7 @@ final class JitPow
                 $ninthLong,
                 $ninthLong
             );
-            $ov5 = $eighteenthVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $eighteenthVar->longArithOverflowFlag);
             if (null === $ov5 || null === $eighteenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **39 expected smul overflow metadata (eighteenth)');
             }
@@ -6134,7 +6134,7 @@ final class JitPow
                 $eighteenthLong,
                 $eighteenthLong
             );
-            $ov6 = $thirtysixthVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $thirtysixthVar->longArithOverflowFlag);
             if (null === $ov6 || null === $thirtysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **39 expected smul overflow metadata (thirtysixth)');
             }
@@ -6166,7 +6166,7 @@ final class JitPow
                 $thirtysixthLong,
                 $n
             );
-            $ov7 = $thirtyseventhVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $thirtyseventhVar->longArithOverflowFlag);
             if (null === $ov7 || null === $thirtyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **39 expected smul overflow metadata (thirtyseventh)');
             }
@@ -6197,7 +6197,7 @@ final class JitPow
                 $thirtyseventhLong,
                 $n
             );
-            $ov8 = $thirtyeighthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $thirtyeighthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $thirtyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **39 expected smul overflow metadata (thirtyeighth)');
             }
@@ -6251,7 +6251,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **40 expected smul overflow metadata (sq)');
             }
@@ -6285,7 +6285,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **40 expected smul overflow metadata (cu)');
             }
@@ -6318,7 +6318,7 @@ final class JitPow
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **40 expected smul overflow metadata (fifth)');
             }
@@ -6349,7 +6349,7 @@ final class JitPow
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **40 expected smul overflow metadata (tenth)');
             }
@@ -6379,7 +6379,7 @@ final class JitPow
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **40 expected smul overflow metadata (twentieth)');
             }
@@ -6433,7 +6433,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **41 expected smul overflow metadata (sq)');
             }
@@ -6469,7 +6469,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **41 expected smul overflow metadata (cu)');
             }
@@ -6504,7 +6504,7 @@ final class JitPow
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **41 expected smul overflow metadata (fifth)');
             }
@@ -6537,7 +6537,7 @@ final class JitPow
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **41 expected smul overflow metadata (tenth)');
             }
@@ -6569,7 +6569,7 @@ final class JitPow
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **41 expected smul overflow metadata (twentieth)');
             }
@@ -6600,7 +6600,7 @@ final class JitPow
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **41 expected smul overflow metadata (fortieth)');
             }
@@ -6654,7 +6654,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **42 expected smul overflow metadata (sq)');
             }
@@ -6689,7 +6689,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **42 expected smul overflow metadata (cu)');
             }
@@ -6723,7 +6723,7 @@ final class JitPow
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **42 expected smul overflow metadata (fifth)');
             }
@@ -6756,7 +6756,7 @@ final class JitPow
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **42 expected smul overflow metadata (tenth)');
             }
@@ -6788,7 +6788,7 @@ final class JitPow
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **42 expected smul overflow metadata (twentieth)');
             }
@@ -6819,7 +6819,7 @@ final class JitPow
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **42 expected smul overflow metadata (fortieth)');
             }
@@ -6874,7 +6874,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **43 expected smul overflow metadata (sq)');
             }
@@ -6911,7 +6911,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **43 expected smul overflow metadata (cu)');
             }
@@ -6947,7 +6947,7 @@ final class JitPow
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **43 expected smul overflow metadata (fifth)');
             }
@@ -6982,7 +6982,7 @@ final class JitPow
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **43 expected smul overflow metadata (tenth)');
             }
@@ -7016,7 +7016,7 @@ final class JitPow
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **43 expected smul overflow metadata (twentieth)');
             }
@@ -7049,7 +7049,7 @@ final class JitPow
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **43 expected smul overflow metadata (fortieth)');
             }
@@ -7081,7 +7081,7 @@ final class JitPow
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **43 expected smul overflow metadata (fortysecond)');
             }
@@ -7135,7 +7135,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **44 expected smul overflow metadata (sq)');
             }
@@ -7171,7 +7171,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **44 expected smul overflow metadata (cu)');
             }
@@ -7206,7 +7206,7 @@ final class JitPow
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **44 expected smul overflow metadata (fifth)');
             }
@@ -7240,7 +7240,7 @@ final class JitPow
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **44 expected smul overflow metadata (tenth)');
             }
@@ -7273,7 +7273,7 @@ final class JitPow
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **44 expected smul overflow metadata (twentieth)');
             }
@@ -7305,7 +7305,7 @@ final class JitPow
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **44 expected smul overflow metadata (fortieth)');
             }
@@ -7336,7 +7336,7 @@ final class JitPow
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **44 expected smul overflow metadata (fortysecond)');
             }
@@ -7393,7 +7393,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **45 expected smul overflow metadata (sq)');
             }
@@ -7431,7 +7431,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **45 expected smul overflow metadata (cu)');
             }
@@ -7468,7 +7468,7 @@ final class JitPow
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **45 expected smul overflow metadata (fifth)');
             }
@@ -7504,7 +7504,7 @@ final class JitPow
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **45 expected smul overflow metadata (tenth)');
             }
@@ -7539,7 +7539,7 @@ final class JitPow
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **45 expected smul overflow metadata (twentieth)');
             }
@@ -7573,7 +7573,7 @@ final class JitPow
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **45 expected smul overflow metadata (fortieth)');
             }
@@ -7606,7 +7606,7 @@ final class JitPow
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **45 expected smul overflow metadata (fortysecond)');
             }
@@ -7638,7 +7638,7 @@ final class JitPow
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **45 expected smul overflow metadata (fortyfourth)');
             }
@@ -7695,7 +7695,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **46 expected smul overflow metadata (sq)');
             }
@@ -7732,7 +7732,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **46 expected smul overflow metadata (cu)');
             }
@@ -7768,7 +7768,7 @@ final class JitPow
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **46 expected smul overflow metadata (fifth)');
             }
@@ -7803,7 +7803,7 @@ final class JitPow
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **46 expected smul overflow metadata (tenth)');
             }
@@ -7837,7 +7837,7 @@ final class JitPow
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **46 expected smul overflow metadata (twentieth)');
             }
@@ -7870,7 +7870,7 @@ final class JitPow
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **46 expected smul overflow metadata (fortieth)');
             }
@@ -7902,7 +7902,7 @@ final class JitPow
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **46 expected smul overflow metadata (fortysecond)');
             }
@@ -7933,7 +7933,7 @@ final class JitPow
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **46 expected smul overflow metadata (fortyfourth)');
             }
@@ -7989,7 +7989,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **47 expected smul overflow metadata (sq)');
             }
@@ -8028,7 +8028,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **47 expected smul overflow metadata (cu)');
             }
@@ -8066,7 +8066,7 @@ final class JitPow
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **47 expected smul overflow metadata (fifth)');
             }
@@ -8103,7 +8103,7 @@ final class JitPow
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **47 expected smul overflow metadata (tenth)');
             }
@@ -8139,7 +8139,7 @@ final class JitPow
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **47 expected smul overflow metadata (twentieth)');
             }
@@ -8174,7 +8174,7 @@ final class JitPow
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **47 expected smul overflow metadata (fortieth)');
             }
@@ -8208,7 +8208,7 @@ final class JitPow
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **47 expected smul overflow metadata (fortysecond)');
             }
@@ -8241,7 +8241,7 @@ final class JitPow
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **47 expected smul overflow metadata (fortyfourth)');
             }
@@ -8273,7 +8273,7 @@ final class JitPow
                 $fortyfourthLong,
                 $sqLong
             );
-            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
             if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **47 expected smul overflow metadata (fortysixth)');
             }
@@ -8329,7 +8329,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **48 expected smul overflow metadata (sq)');
             }
@@ -8367,7 +8367,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **48 expected smul overflow metadata (cu)');
             }
@@ -8404,7 +8404,7 @@ final class JitPow
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **48 expected smul overflow metadata (fifth)');
             }
@@ -8440,7 +8440,7 @@ final class JitPow
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **48 expected smul overflow metadata (tenth)');
             }
@@ -8475,7 +8475,7 @@ final class JitPow
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **48 expected smul overflow metadata (twentieth)');
             }
@@ -8509,7 +8509,7 @@ final class JitPow
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **48 expected smul overflow metadata (fortieth)');
             }
@@ -8542,7 +8542,7 @@ final class JitPow
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **48 expected smul overflow metadata (fortysecond)');
             }
@@ -8574,7 +8574,7 @@ final class JitPow
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **48 expected smul overflow metadata (fortyfourth)');
             }
@@ -8605,7 +8605,7 @@ final class JitPow
                 $fortyfourthLong,
                 $sqLong
             );
-            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
             if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **48 expected smul overflow metadata (fortysixth)');
             }
@@ -8662,7 +8662,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **49 expected smul overflow metadata (sq)');
             }
@@ -8702,7 +8702,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **49 expected smul overflow metadata (cu)');
             }
@@ -8741,7 +8741,7 @@ final class JitPow
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **49 expected smul overflow metadata (fifth)');
             }
@@ -8779,7 +8779,7 @@ final class JitPow
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **49 expected smul overflow metadata (tenth)');
             }
@@ -8816,7 +8816,7 @@ final class JitPow
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **49 expected smul overflow metadata (twentieth)');
             }
@@ -8852,7 +8852,7 @@ final class JitPow
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **49 expected smul overflow metadata (fortieth)');
             }
@@ -8887,7 +8887,7 @@ final class JitPow
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **49 expected smul overflow metadata (fortysecond)');
             }
@@ -8921,7 +8921,7 @@ final class JitPow
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **49 expected smul overflow metadata (fortyfourth)');
             }
@@ -8954,7 +8954,7 @@ final class JitPow
                 $fortyfourthLong,
                 $sqLong
             );
-            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
             if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **49 expected smul overflow metadata (fortysixth)');
             }
@@ -8986,7 +8986,7 @@ final class JitPow
                 $fortysixthLong,
                 $sqLong
             );
-            $ov10 = $fortyeighthVar->longArithOverflowFlag;
+            $ov10 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyeighthVar->longArithOverflowFlag);
             if (null === $ov10 || null === $fortyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **49 expected smul overflow metadata (fortyeighth)');
             }
@@ -9044,7 +9044,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **50 expected smul overflow metadata (sq)');
             }
@@ -9083,7 +9083,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **50 expected smul overflow metadata (cu)');
             }
@@ -9121,7 +9121,7 @@ final class JitPow
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **50 expected smul overflow metadata (fifth)');
             }
@@ -9158,7 +9158,7 @@ final class JitPow
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **50 expected smul overflow metadata (tenth)');
             }
@@ -9194,7 +9194,7 @@ final class JitPow
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **50 expected smul overflow metadata (twentieth)');
             }
@@ -9229,7 +9229,7 @@ final class JitPow
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **50 expected smul overflow metadata (fortieth)');
             }
@@ -9263,7 +9263,7 @@ final class JitPow
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **50 expected smul overflow metadata (fortysecond)');
             }
@@ -9296,7 +9296,7 @@ final class JitPow
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **50 expected smul overflow metadata (fortyfourth)');
             }
@@ -9328,7 +9328,7 @@ final class JitPow
                 $fortyfourthLong,
                 $sqLong
             );
-            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
             if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **50 expected smul overflow metadata (fortysixth)');
             }
@@ -9359,7 +9359,7 @@ final class JitPow
                 $fortysixthLong,
                 $sqLong
             );
-            $ov10 = $fortyeighthVar->longArithOverflowFlag;
+            $ov10 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyeighthVar->longArithOverflowFlag);
             if (null === $ov10 || null === $fortyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **50 expected smul overflow metadata (fortyeighth)');
             }
@@ -9416,7 +9416,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **51 expected smul overflow metadata (sq)');
             }
@@ -9457,7 +9457,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **51 expected smul overflow metadata (cu)');
             }
@@ -9497,7 +9497,7 @@ final class JitPow
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **51 expected smul overflow metadata (fifth)');
             }
@@ -9536,7 +9536,7 @@ final class JitPow
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **51 expected smul overflow metadata (tenth)');
             }
@@ -9574,7 +9574,7 @@ final class JitPow
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **51 expected smul overflow metadata (twentieth)');
             }
@@ -9611,7 +9611,7 @@ final class JitPow
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **51 expected smul overflow metadata (fortieth)');
             }
@@ -9647,7 +9647,7 @@ final class JitPow
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **51 expected smul overflow metadata (fortysecond)');
             }
@@ -9682,7 +9682,7 @@ final class JitPow
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **51 expected smul overflow metadata (fortyfourth)');
             }
@@ -9716,7 +9716,7 @@ final class JitPow
                 $fortyfourthLong,
                 $sqLong
             );
-            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
             if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **51 expected smul overflow metadata (fortysixth)');
             }
@@ -9749,7 +9749,7 @@ final class JitPow
                 $fortysixthLong,
                 $sqLong
             );
-            $ov10 = $fortyeighthVar->longArithOverflowFlag;
+            $ov10 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyeighthVar->longArithOverflowFlag);
             if (null === $ov10 || null === $fortyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **51 expected smul overflow metadata (fortyeighth)');
             }
@@ -9781,7 +9781,7 @@ final class JitPow
                 $fortyeighthLong,
                 $sqLong
             );
-            $ov11 = $fiftiethVar->longArithOverflowFlag;
+            $ov11 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftiethVar->longArithOverflowFlag);
             if (null === $ov11 || null === $fiftiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **51 expected smul overflow metadata (fiftieth)');
             }
@@ -9838,7 +9838,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **52 expected smul overflow metadata (sq)');
             }
@@ -9880,7 +9880,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **52 expected smul overflow metadata (cu)');
             }
@@ -9921,7 +9921,7 @@ final class JitPow
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **52 expected smul overflow metadata (fifth)');
             }
@@ -9961,7 +9961,7 @@ final class JitPow
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **52 expected smul overflow metadata (tenth)');
             }
@@ -10000,7 +10000,7 @@ final class JitPow
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **52 expected smul overflow metadata (twentieth)');
             }
@@ -10038,7 +10038,7 @@ final class JitPow
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **52 expected smul overflow metadata (fortieth)');
             }
@@ -10075,7 +10075,7 @@ final class JitPow
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **52 expected smul overflow metadata (fortysecond)');
             }
@@ -10111,7 +10111,7 @@ final class JitPow
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **52 expected smul overflow metadata (fortyfourth)');
             }
@@ -10146,7 +10146,7 @@ final class JitPow
                 $fortyfourthLong,
                 $sqLong
             );
-            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
             if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **52 expected smul overflow metadata (fortysixth)');
             }
@@ -10180,7 +10180,7 @@ final class JitPow
                 $fortysixthLong,
                 $sqLong
             );
-            $ov10 = $fortyeighthVar->longArithOverflowFlag;
+            $ov10 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyeighthVar->longArithOverflowFlag);
             if (null === $ov10 || null === $fortyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **52 expected smul overflow metadata (fortyeighth)');
             }
@@ -10213,7 +10213,7 @@ final class JitPow
                 $fortyeighthLong,
                 $sqLong
             );
-            $ov11 = $fiftiethVar->longArithOverflowFlag;
+            $ov11 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftiethVar->longArithOverflowFlag);
             if (null === $ov11 || null === $fiftiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **52 expected smul overflow metadata (fiftieth)');
             }
@@ -10244,7 +10244,7 @@ final class JitPow
                 $fiftiethLong,
                 $n
             );
-            $ov12 = $fiftyfirstVar->longArithOverflowFlag;
+            $ov12 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfirstVar->longArithOverflowFlag);
             if (null === $ov12 || null === $fiftyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **52 expected smul overflow metadata (fiftyfirst)');
             }
@@ -10301,7 +10301,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **53 expected smul overflow metadata (sq)');
             }
@@ -10344,7 +10344,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **53 expected smul overflow metadata (cu)');
             }
@@ -10386,7 +10386,7 @@ final class JitPow
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **53 expected smul overflow metadata (fifth)');
             }
@@ -10427,7 +10427,7 @@ final class JitPow
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **53 expected smul overflow metadata (tenth)');
             }
@@ -10467,7 +10467,7 @@ final class JitPow
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **53 expected smul overflow metadata (twentieth)');
             }
@@ -10506,7 +10506,7 @@ final class JitPow
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **53 expected smul overflow metadata (fortieth)');
             }
@@ -10544,7 +10544,7 @@ final class JitPow
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **53 expected smul overflow metadata (fortysecond)');
             }
@@ -10581,7 +10581,7 @@ final class JitPow
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **53 expected smul overflow metadata (fortyfourth)');
             }
@@ -10617,7 +10617,7 @@ final class JitPow
                 $fortyfourthLong,
                 $sqLong
             );
-            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
             if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **53 expected smul overflow metadata (fortysixth)');
             }
@@ -10652,7 +10652,7 @@ final class JitPow
                 $fortysixthLong,
                 $sqLong
             );
-            $ov10 = $fortyeighthVar->longArithOverflowFlag;
+            $ov10 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyeighthVar->longArithOverflowFlag);
             if (null === $ov10 || null === $fortyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **53 expected smul overflow metadata (fortyeighth)');
             }
@@ -10686,7 +10686,7 @@ final class JitPow
                 $fortyeighthLong,
                 $sqLong
             );
-            $ov11 = $fiftiethVar->longArithOverflowFlag;
+            $ov11 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftiethVar->longArithOverflowFlag);
             if (null === $ov11 || null === $fiftiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **53 expected smul overflow metadata (fiftieth)');
             }
@@ -10718,7 +10718,7 @@ final class JitPow
                 $fiftiethLong,
                 $n
             );
-            $ov12 = $fiftyfirstVar->longArithOverflowFlag;
+            $ov12 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfirstVar->longArithOverflowFlag);
             if (null === $ov12 || null === $fiftyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **53 expected smul overflow metadata (fiftyfirst)');
             }
@@ -10749,7 +10749,7 @@ final class JitPow
                 $fiftyfirstLong,
                 $n
             );
-            $ov13 = $fiftysecondVar->longArithOverflowFlag;
+            $ov13 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysecondVar->longArithOverflowFlag);
             if (null === $ov13 || null === $fiftysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **53 expected smul overflow metadata (fiftysecond)');
             }
@@ -10806,7 +10806,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **54 expected smul overflow metadata (sq)');
             }
@@ -10850,7 +10850,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **54 expected smul overflow metadata (cu)');
             }
@@ -10893,7 +10893,7 @@ final class JitPow
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **54 expected smul overflow metadata (fifth)');
             }
@@ -10935,7 +10935,7 @@ final class JitPow
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **54 expected smul overflow metadata (tenth)');
             }
@@ -10976,7 +10976,7 @@ final class JitPow
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **54 expected smul overflow metadata (twentieth)');
             }
@@ -11016,7 +11016,7 @@ final class JitPow
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **54 expected smul overflow metadata (fortieth)');
             }
@@ -11055,7 +11055,7 @@ final class JitPow
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **54 expected smul overflow metadata (fortysecond)');
             }
@@ -11093,7 +11093,7 @@ final class JitPow
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **54 expected smul overflow metadata (fortyfourth)');
             }
@@ -11130,7 +11130,7 @@ final class JitPow
                 $fortyfourthLong,
                 $sqLong
             );
-            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
             if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **54 expected smul overflow metadata (fortysixth)');
             }
@@ -11166,7 +11166,7 @@ final class JitPow
                 $fortysixthLong,
                 $sqLong
             );
-            $ov10 = $fortyeighthVar->longArithOverflowFlag;
+            $ov10 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyeighthVar->longArithOverflowFlag);
             if (null === $ov10 || null === $fortyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **54 expected smul overflow metadata (fortyeighth)');
             }
@@ -11201,7 +11201,7 @@ final class JitPow
                 $fortyeighthLong,
                 $sqLong
             );
-            $ov11 = $fiftiethVar->longArithOverflowFlag;
+            $ov11 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftiethVar->longArithOverflowFlag);
             if (null === $ov11 || null === $fiftiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **54 expected smul overflow metadata (fiftieth)');
             }
@@ -11234,7 +11234,7 @@ final class JitPow
                 $fiftiethLong,
                 $n
             );
-            $ov12 = $fiftyfirstVar->longArithOverflowFlag;
+            $ov12 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfirstVar->longArithOverflowFlag);
             if (null === $ov12 || null === $fiftyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **54 expected smul overflow metadata (fiftyfirst)');
             }
@@ -11266,7 +11266,7 @@ final class JitPow
                 $fiftyfirstLong,
                 $n
             );
-            $ov13 = $fiftysecondVar->longArithOverflowFlag;
+            $ov13 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysecondVar->longArithOverflowFlag);
             if (null === $ov13 || null === $fiftysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **54 expected smul overflow metadata (fiftysecond)');
             }
@@ -11297,7 +11297,7 @@ final class JitPow
                 $fiftysecondLong,
                 $n
             );
-            $ov14 = $fiftythirdVar->longArithOverflowFlag;
+            $ov14 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftythirdVar->longArithOverflowFlag);
             if (null === $ov14 || null === $fiftythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **54 expected smul overflow metadata (fiftythird)');
             }
@@ -11355,7 +11355,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **55 expected smul overflow metadata (sq)');
             }
@@ -11400,7 +11400,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **55 expected smul overflow metadata (cu)');
             }
@@ -11444,7 +11444,7 @@ final class JitPow
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **55 expected smul overflow metadata (fifth)');
             }
@@ -11487,7 +11487,7 @@ final class JitPow
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **55 expected smul overflow metadata (tenth)');
             }
@@ -11529,7 +11529,7 @@ final class JitPow
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **55 expected smul overflow metadata (twentieth)');
             }
@@ -11570,7 +11570,7 @@ final class JitPow
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **55 expected smul overflow metadata (fortieth)');
             }
@@ -11610,7 +11610,7 @@ final class JitPow
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **55 expected smul overflow metadata (fortysecond)');
             }
@@ -11649,7 +11649,7 @@ final class JitPow
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **55 expected smul overflow metadata (fortyfourth)');
             }
@@ -11687,7 +11687,7 @@ final class JitPow
                 $fortyfourthLong,
                 $sqLong
             );
-            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
             if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **55 expected smul overflow metadata (fortysixth)');
             }
@@ -11724,7 +11724,7 @@ final class JitPow
                 $fortysixthLong,
                 $sqLong
             );
-            $ov10 = $fortyeighthVar->longArithOverflowFlag;
+            $ov10 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyeighthVar->longArithOverflowFlag);
             if (null === $ov10 || null === $fortyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **55 expected smul overflow metadata (fortyeighth)');
             }
@@ -11760,7 +11760,7 @@ final class JitPow
                 $fortyeighthLong,
                 $sqLong
             );
-            $ov11 = $fiftiethVar->longArithOverflowFlag;
+            $ov11 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftiethVar->longArithOverflowFlag);
             if (null === $ov11 || null === $fiftiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **55 expected smul overflow metadata (fiftieth)');
             }
@@ -11794,7 +11794,7 @@ final class JitPow
                 $fiftiethLong,
                 $n
             );
-            $ov12 = $fiftyfirstVar->longArithOverflowFlag;
+            $ov12 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfirstVar->longArithOverflowFlag);
             if (null === $ov12 || null === $fiftyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **55 expected smul overflow metadata (fiftyfirst)');
             }
@@ -11827,7 +11827,7 @@ final class JitPow
                 $fiftyfirstLong,
                 $n
             );
-            $ov13 = $fiftysecondVar->longArithOverflowFlag;
+            $ov13 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysecondVar->longArithOverflowFlag);
             if (null === $ov13 || null === $fiftysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **55 expected smul overflow metadata (fiftysecond)');
             }
@@ -11859,7 +11859,7 @@ final class JitPow
                 $fiftysecondLong,
                 $n
             );
-            $ov14 = $fiftythirdVar->longArithOverflowFlag;
+            $ov14 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftythirdVar->longArithOverflowFlag);
             if (null === $ov14 || null === $fiftythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **55 expected smul overflow metadata (fiftythird)');
             }
@@ -11890,7 +11890,7 @@ final class JitPow
                 $fiftythirdLong,
                 $n
             );
-            $ov15 = $fiftyfourthVar->longArithOverflowFlag;
+            $ov15 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfourthVar->longArithOverflowFlag);
             if (null === $ov15 || null === $fiftyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **55 expected smul overflow metadata (fiftyfourth)');
             }
@@ -11947,7 +11947,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **56 expected smul overflow metadata (sq)');
             }
@@ -11993,7 +11993,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **56 expected smul overflow metadata (cu)');
             }
@@ -12038,7 +12038,7 @@ final class JitPow
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **56 expected smul overflow metadata (fifth)');
             }
@@ -12082,7 +12082,7 @@ final class JitPow
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **56 expected smul overflow metadata (tenth)');
             }
@@ -12125,7 +12125,7 @@ final class JitPow
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **56 expected smul overflow metadata (twentieth)');
             }
@@ -12167,7 +12167,7 @@ final class JitPow
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **56 expected smul overflow metadata (fortieth)');
             }
@@ -12208,7 +12208,7 @@ final class JitPow
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **56 expected smul overflow metadata (fortysecond)');
             }
@@ -12248,7 +12248,7 @@ final class JitPow
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **56 expected smul overflow metadata (fortyfourth)');
             }
@@ -12287,7 +12287,7 @@ final class JitPow
                 $fortyfourthLong,
                 $sqLong
             );
-            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
             if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **56 expected smul overflow metadata (fortysixth)');
             }
@@ -12325,7 +12325,7 @@ final class JitPow
                 $fortysixthLong,
                 $sqLong
             );
-            $ov10 = $fortyeighthVar->longArithOverflowFlag;
+            $ov10 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyeighthVar->longArithOverflowFlag);
             if (null === $ov10 || null === $fortyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **56 expected smul overflow metadata (fortyeighth)');
             }
@@ -12362,7 +12362,7 @@ final class JitPow
                 $fortyeighthLong,
                 $sqLong
             );
-            $ov11 = $fiftiethVar->longArithOverflowFlag;
+            $ov11 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftiethVar->longArithOverflowFlag);
             if (null === $ov11 || null === $fiftiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **56 expected smul overflow metadata (fiftieth)');
             }
@@ -12397,7 +12397,7 @@ final class JitPow
                 $fiftiethLong,
                 $n
             );
-            $ov12 = $fiftyfirstVar->longArithOverflowFlag;
+            $ov12 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfirstVar->longArithOverflowFlag);
             if (null === $ov12 || null === $fiftyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **56 expected smul overflow metadata (fiftyfirst)');
             }
@@ -12431,7 +12431,7 @@ final class JitPow
                 $fiftyfirstLong,
                 $n
             );
-            $ov13 = $fiftysecondVar->longArithOverflowFlag;
+            $ov13 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysecondVar->longArithOverflowFlag);
             if (null === $ov13 || null === $fiftysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **56 expected smul overflow metadata (fiftysecond)');
             }
@@ -12464,7 +12464,7 @@ final class JitPow
                 $fiftysecondLong,
                 $n
             );
-            $ov14 = $fiftythirdVar->longArithOverflowFlag;
+            $ov14 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftythirdVar->longArithOverflowFlag);
             if (null === $ov14 || null === $fiftythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **56 expected smul overflow metadata (fiftythird)');
             }
@@ -12496,7 +12496,7 @@ final class JitPow
                 $fiftythirdLong,
                 $n
             );
-            $ov15 = $fiftyfourthVar->longArithOverflowFlag;
+            $ov15 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfourthVar->longArithOverflowFlag);
             if (null === $ov15 || null === $fiftyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **56 expected smul overflow metadata (fiftyfourth)');
             }
@@ -12527,7 +12527,7 @@ final class JitPow
                 $fiftyfourthLong,
                 $n
             );
-            $ov16 = $fiftyfifthVar->longArithOverflowFlag;
+            $ov16 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfifthVar->longArithOverflowFlag);
             if (null === $ov16 || null === $fiftyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **56 expected smul overflow metadata (fiftyfifth)');
             }
@@ -12583,7 +12583,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **57 expected smul overflow metadata (sq)');
             }
@@ -12630,7 +12630,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **57 expected smul overflow metadata (cu)');
             }
@@ -12676,7 +12676,7 @@ final class JitPow
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **57 expected smul overflow metadata (fifth)');
             }
@@ -12721,7 +12721,7 @@ final class JitPow
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **57 expected smul overflow metadata (tenth)');
             }
@@ -12765,7 +12765,7 @@ final class JitPow
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **57 expected smul overflow metadata (twentieth)');
             }
@@ -12808,7 +12808,7 @@ final class JitPow
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **57 expected smul overflow metadata (fortieth)');
             }
@@ -12850,7 +12850,7 @@ final class JitPow
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **57 expected smul overflow metadata (fortysecond)');
             }
@@ -12891,7 +12891,7 @@ final class JitPow
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **57 expected smul overflow metadata (fortyfourth)');
             }
@@ -12931,7 +12931,7 @@ final class JitPow
                 $fortyfourthLong,
                 $sqLong
             );
-            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
             if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **57 expected smul overflow metadata (fortysixth)');
             }
@@ -12970,7 +12970,7 @@ final class JitPow
                 $fortysixthLong,
                 $sqLong
             );
-            $ov10 = $fortyeighthVar->longArithOverflowFlag;
+            $ov10 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyeighthVar->longArithOverflowFlag);
             if (null === $ov10 || null === $fortyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **57 expected smul overflow metadata (fortyeighth)');
             }
@@ -13008,7 +13008,7 @@ final class JitPow
                 $fortyeighthLong,
                 $sqLong
             );
-            $ov11 = $fiftiethVar->longArithOverflowFlag;
+            $ov11 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftiethVar->longArithOverflowFlag);
             if (null === $ov11 || null === $fiftiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **57 expected smul overflow metadata (fiftieth)');
             }
@@ -13044,7 +13044,7 @@ final class JitPow
                 $fiftiethLong,
                 $n
             );
-            $ov12 = $fiftyfirstVar->longArithOverflowFlag;
+            $ov12 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfirstVar->longArithOverflowFlag);
             if (null === $ov12 || null === $fiftyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **57 expected smul overflow metadata (fiftyfirst)');
             }
@@ -13079,7 +13079,7 @@ final class JitPow
                 $fiftyfirstLong,
                 $n
             );
-            $ov13 = $fiftysecondVar->longArithOverflowFlag;
+            $ov13 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysecondVar->longArithOverflowFlag);
             if (null === $ov13 || null === $fiftysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **57 expected smul overflow metadata (fiftysecond)');
             }
@@ -13113,7 +13113,7 @@ final class JitPow
                 $fiftysecondLong,
                 $n
             );
-            $ov14 = $fiftythirdVar->longArithOverflowFlag;
+            $ov14 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftythirdVar->longArithOverflowFlag);
             if (null === $ov14 || null === $fiftythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **57 expected smul overflow metadata (fiftythird)');
             }
@@ -13146,7 +13146,7 @@ final class JitPow
                 $fiftythirdLong,
                 $n
             );
-            $ov15 = $fiftyfourthVar->longArithOverflowFlag;
+            $ov15 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfourthVar->longArithOverflowFlag);
             if (null === $ov15 || null === $fiftyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **57 expected smul overflow metadata (fiftyfourth)');
             }
@@ -13178,7 +13178,7 @@ final class JitPow
                 $fiftyfourthLong,
                 $n
             );
-            $ov16 = $fiftyfifthVar->longArithOverflowFlag;
+            $ov16 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfifthVar->longArithOverflowFlag);
             if (null === $ov16 || null === $fiftyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **57 expected smul overflow metadata (fiftyfifth)');
             }
@@ -13209,7 +13209,7 @@ final class JitPow
                 $fiftyfifthLong,
                 $n
             );
-            $ov17 = $fiftysixthVar->longArithOverflowFlag;
+            $ov17 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysixthVar->longArithOverflowFlag);
             if (null === $ov17 || null === $fiftysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **57 expected smul overflow metadata (fiftysixth)');
             }
@@ -13265,7 +13265,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **58 expected smul overflow metadata (sq)');
             }
@@ -13313,7 +13313,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **58 expected smul overflow metadata (cu)');
             }
@@ -13360,7 +13360,7 @@ final class JitPow
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **58 expected smul overflow metadata (fifth)');
             }
@@ -13406,7 +13406,7 @@ final class JitPow
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **58 expected smul overflow metadata (tenth)');
             }
@@ -13451,7 +13451,7 @@ final class JitPow
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **58 expected smul overflow metadata (twentieth)');
             }
@@ -13495,7 +13495,7 @@ final class JitPow
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **58 expected smul overflow metadata (fortieth)');
             }
@@ -13538,7 +13538,7 @@ final class JitPow
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **58 expected smul overflow metadata (fortysecond)');
             }
@@ -13580,7 +13580,7 @@ final class JitPow
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **58 expected smul overflow metadata (fortyfourth)');
             }
@@ -13621,7 +13621,7 @@ final class JitPow
                 $fortyfourthLong,
                 $sqLong
             );
-            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
             if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **58 expected smul overflow metadata (fortysixth)');
             }
@@ -13661,7 +13661,7 @@ final class JitPow
                 $fortysixthLong,
                 $sqLong
             );
-            $ov10 = $fortyeighthVar->longArithOverflowFlag;
+            $ov10 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyeighthVar->longArithOverflowFlag);
             if (null === $ov10 || null === $fortyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **58 expected smul overflow metadata (fortyeighth)');
             }
@@ -13700,7 +13700,7 @@ final class JitPow
                 $fortyeighthLong,
                 $sqLong
             );
-            $ov11 = $fiftiethVar->longArithOverflowFlag;
+            $ov11 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftiethVar->longArithOverflowFlag);
             if (null === $ov11 || null === $fiftiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **58 expected smul overflow metadata (fiftieth)');
             }
@@ -13737,7 +13737,7 @@ final class JitPow
                 $fiftiethLong,
                 $n
             );
-            $ov12 = $fiftyfirstVar->longArithOverflowFlag;
+            $ov12 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfirstVar->longArithOverflowFlag);
             if (null === $ov12 || null === $fiftyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **58 expected smul overflow metadata (fiftyfirst)');
             }
@@ -13773,7 +13773,7 @@ final class JitPow
                 $fiftyfirstLong,
                 $n
             );
-            $ov13 = $fiftysecondVar->longArithOverflowFlag;
+            $ov13 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysecondVar->longArithOverflowFlag);
             if (null === $ov13 || null === $fiftysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **58 expected smul overflow metadata (fiftysecond)');
             }
@@ -13808,7 +13808,7 @@ final class JitPow
                 $fiftysecondLong,
                 $n
             );
-            $ov14 = $fiftythirdVar->longArithOverflowFlag;
+            $ov14 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftythirdVar->longArithOverflowFlag);
             if (null === $ov14 || null === $fiftythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **58 expected smul overflow metadata (fiftythird)');
             }
@@ -13842,7 +13842,7 @@ final class JitPow
                 $fiftythirdLong,
                 $n
             );
-            $ov15 = $fiftyfourthVar->longArithOverflowFlag;
+            $ov15 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfourthVar->longArithOverflowFlag);
             if (null === $ov15 || null === $fiftyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **58 expected smul overflow metadata (fiftyfourth)');
             }
@@ -13875,7 +13875,7 @@ final class JitPow
                 $fiftyfourthLong,
                 $n
             );
-            $ov16 = $fiftyfifthVar->longArithOverflowFlag;
+            $ov16 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfifthVar->longArithOverflowFlag);
             if (null === $ov16 || null === $fiftyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **58 expected smul overflow metadata (fiftyfifth)');
             }
@@ -13907,7 +13907,7 @@ final class JitPow
                 $fiftyfifthLong,
                 $n
             );
-            $ov17 = $fiftysixthVar->longArithOverflowFlag;
+            $ov17 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysixthVar->longArithOverflowFlag);
             if (null === $ov17 || null === $fiftysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **58 expected smul overflow metadata (fiftysixth)');
             }
@@ -13938,7 +13938,7 @@ final class JitPow
                 $fiftysixthLong,
                 $n
             );
-            $ov18 = $fiftyseventhVar->longArithOverflowFlag;
+            $ov18 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyseventhVar->longArithOverflowFlag);
             if (null === $ov18 || null === $fiftyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **58 expected smul overflow metadata (fiftyseventh)');
             }
@@ -13994,7 +13994,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **59 expected smul overflow metadata (sq)');
             }
@@ -14043,7 +14043,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **59 expected smul overflow metadata (cu)');
             }
@@ -14091,7 +14091,7 @@ final class JitPow
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **59 expected smul overflow metadata (fifth)');
             }
@@ -14138,7 +14138,7 @@ final class JitPow
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **59 expected smul overflow metadata (tenth)');
             }
@@ -14184,7 +14184,7 @@ final class JitPow
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **59 expected smul overflow metadata (twentieth)');
             }
@@ -14229,7 +14229,7 @@ final class JitPow
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **59 expected smul overflow metadata (fortieth)');
             }
@@ -14273,7 +14273,7 @@ final class JitPow
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **59 expected smul overflow metadata (fortysecond)');
             }
@@ -14316,7 +14316,7 @@ final class JitPow
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **59 expected smul overflow metadata (fortyfourth)');
             }
@@ -14358,7 +14358,7 @@ final class JitPow
                 $fortyfourthLong,
                 $sqLong
             );
-            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
             if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **59 expected smul overflow metadata (fortysixth)');
             }
@@ -14399,7 +14399,7 @@ final class JitPow
                 $fortysixthLong,
                 $sqLong
             );
-            $ov10 = $fortyeighthVar->longArithOverflowFlag;
+            $ov10 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyeighthVar->longArithOverflowFlag);
             if (null === $ov10 || null === $fortyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **59 expected smul overflow metadata (fortyeighth)');
             }
@@ -14439,7 +14439,7 @@ final class JitPow
                 $fortyeighthLong,
                 $sqLong
             );
-            $ov11 = $fiftiethVar->longArithOverflowFlag;
+            $ov11 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftiethVar->longArithOverflowFlag);
             if (null === $ov11 || null === $fiftiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **59 expected smul overflow metadata (fiftieth)');
             }
@@ -14477,7 +14477,7 @@ final class JitPow
                 $fiftiethLong,
                 $n
             );
-            $ov12 = $fiftyfirstVar->longArithOverflowFlag;
+            $ov12 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfirstVar->longArithOverflowFlag);
             if (null === $ov12 || null === $fiftyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **59 expected smul overflow metadata (fiftyfirst)');
             }
@@ -14514,7 +14514,7 @@ final class JitPow
                 $fiftyfirstLong,
                 $n
             );
-            $ov13 = $fiftysecondVar->longArithOverflowFlag;
+            $ov13 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysecondVar->longArithOverflowFlag);
             if (null === $ov13 || null === $fiftysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **59 expected smul overflow metadata (fiftysecond)');
             }
@@ -14550,7 +14550,7 @@ final class JitPow
                 $fiftysecondLong,
                 $n
             );
-            $ov14 = $fiftythirdVar->longArithOverflowFlag;
+            $ov14 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftythirdVar->longArithOverflowFlag);
             if (null === $ov14 || null === $fiftythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **59 expected smul overflow metadata (fiftythird)');
             }
@@ -14585,7 +14585,7 @@ final class JitPow
                 $fiftythirdLong,
                 $n
             );
-            $ov15 = $fiftyfourthVar->longArithOverflowFlag;
+            $ov15 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfourthVar->longArithOverflowFlag);
             if (null === $ov15 || null === $fiftyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **59 expected smul overflow metadata (fiftyfourth)');
             }
@@ -14619,7 +14619,7 @@ final class JitPow
                 $fiftyfourthLong,
                 $n
             );
-            $ov16 = $fiftyfifthVar->longArithOverflowFlag;
+            $ov16 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfifthVar->longArithOverflowFlag);
             if (null === $ov16 || null === $fiftyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **59 expected smul overflow metadata (fiftyfifth)');
             }
@@ -14652,7 +14652,7 @@ final class JitPow
                 $fiftyfifthLong,
                 $n
             );
-            $ov17 = $fiftysixthVar->longArithOverflowFlag;
+            $ov17 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysixthVar->longArithOverflowFlag);
             if (null === $ov17 || null === $fiftysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **59 expected smul overflow metadata (fiftysixth)');
             }
@@ -14684,7 +14684,7 @@ final class JitPow
                 $fiftysixthLong,
                 $n
             );
-            $ov18 = $fiftyseventhVar->longArithOverflowFlag;
+            $ov18 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyseventhVar->longArithOverflowFlag);
             if (null === $ov18 || null === $fiftyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **59 expected smul overflow metadata (fiftyseventh)');
             }
@@ -14715,7 +14715,7 @@ final class JitPow
                 $fiftyseventhLong,
                 $n
             );
-            $ov19 = $fiftyeighthVar->longArithOverflowFlag;
+            $ov19 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyeighthVar->longArithOverflowFlag);
             if (null === $ov19 || null === $fiftyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **59 expected smul overflow metadata (fiftyeighth)');
             }
@@ -14771,7 +14771,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **60 expected smul overflow metadata (sq)');
             }
@@ -14821,7 +14821,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **60 expected smul overflow metadata (cu)');
             }
@@ -14870,7 +14870,7 @@ final class JitPow
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **60 expected smul overflow metadata (fifth)');
             }
@@ -14918,7 +14918,7 @@ final class JitPow
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **60 expected smul overflow metadata (tenth)');
             }
@@ -14965,7 +14965,7 @@ final class JitPow
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **60 expected smul overflow metadata (twentieth)');
             }
@@ -15011,7 +15011,7 @@ final class JitPow
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **60 expected smul overflow metadata (fortieth)');
             }
@@ -15056,7 +15056,7 @@ final class JitPow
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **60 expected smul overflow metadata (fortysecond)');
             }
@@ -15100,7 +15100,7 @@ final class JitPow
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **60 expected smul overflow metadata (fortyfourth)');
             }
@@ -15143,7 +15143,7 @@ final class JitPow
                 $fortyfourthLong,
                 $sqLong
             );
-            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
             if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **60 expected smul overflow metadata (fortysixth)');
             }
@@ -15185,7 +15185,7 @@ final class JitPow
                 $fortysixthLong,
                 $sqLong
             );
-            $ov10 = $fortyeighthVar->longArithOverflowFlag;
+            $ov10 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyeighthVar->longArithOverflowFlag);
             if (null === $ov10 || null === $fortyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **60 expected smul overflow metadata (fortyeighth)');
             }
@@ -15226,7 +15226,7 @@ final class JitPow
                 $fortyeighthLong,
                 $sqLong
             );
-            $ov11 = $fiftiethVar->longArithOverflowFlag;
+            $ov11 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftiethVar->longArithOverflowFlag);
             if (null === $ov11 || null === $fiftiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **60 expected smul overflow metadata (fiftieth)');
             }
@@ -15265,7 +15265,7 @@ final class JitPow
                 $fiftiethLong,
                 $n
             );
-            $ov12 = $fiftyfirstVar->longArithOverflowFlag;
+            $ov12 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfirstVar->longArithOverflowFlag);
             if (null === $ov12 || null === $fiftyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **60 expected smul overflow metadata (fiftyfirst)');
             }
@@ -15303,7 +15303,7 @@ final class JitPow
                 $fiftyfirstLong,
                 $n
             );
-            $ov13 = $fiftysecondVar->longArithOverflowFlag;
+            $ov13 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysecondVar->longArithOverflowFlag);
             if (null === $ov13 || null === $fiftysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **60 expected smul overflow metadata (fiftysecond)');
             }
@@ -15340,7 +15340,7 @@ final class JitPow
                 $fiftysecondLong,
                 $n
             );
-            $ov14 = $fiftythirdVar->longArithOverflowFlag;
+            $ov14 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftythirdVar->longArithOverflowFlag);
             if (null === $ov14 || null === $fiftythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **60 expected smul overflow metadata (fiftythird)');
             }
@@ -15376,7 +15376,7 @@ final class JitPow
                 $fiftythirdLong,
                 $n
             );
-            $ov15 = $fiftyfourthVar->longArithOverflowFlag;
+            $ov15 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfourthVar->longArithOverflowFlag);
             if (null === $ov15 || null === $fiftyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **60 expected smul overflow metadata (fiftyfourth)');
             }
@@ -15411,7 +15411,7 @@ final class JitPow
                 $fiftyfourthLong,
                 $n
             );
-            $ov16 = $fiftyfifthVar->longArithOverflowFlag;
+            $ov16 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfifthVar->longArithOverflowFlag);
             if (null === $ov16 || null === $fiftyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **60 expected smul overflow metadata (fiftyfifth)');
             }
@@ -15445,7 +15445,7 @@ final class JitPow
                 $fiftyfifthLong,
                 $n
             );
-            $ov17 = $fiftysixthVar->longArithOverflowFlag;
+            $ov17 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysixthVar->longArithOverflowFlag);
             if (null === $ov17 || null === $fiftysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **60 expected smul overflow metadata (fiftysixth)');
             }
@@ -15478,7 +15478,7 @@ final class JitPow
                 $fiftysixthLong,
                 $n
             );
-            $ov18 = $fiftyseventhVar->longArithOverflowFlag;
+            $ov18 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyseventhVar->longArithOverflowFlag);
             if (null === $ov18 || null === $fiftyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **60 expected smul overflow metadata (fiftyseventh)');
             }
@@ -15510,7 +15510,7 @@ final class JitPow
                 $fiftyseventhLong,
                 $n
             );
-            $ov19 = $fiftyeighthVar->longArithOverflowFlag;
+            $ov19 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyeighthVar->longArithOverflowFlag);
             if (null === $ov19 || null === $fiftyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **60 expected smul overflow metadata (fiftyeighth)');
             }
@@ -15541,7 +15541,7 @@ final class JitPow
                 $fiftyeighthLong,
                 $n
             );
-            $ov20 = $fiftyninthVar->longArithOverflowFlag;
+            $ov20 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyninthVar->longArithOverflowFlag);
             if (null === $ov20 || null === $fiftyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **60 expected smul overflow metadata (fiftyninth)');
             }
@@ -15598,7 +15598,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **61 expected smul overflow metadata (sq)');
             }
@@ -15649,7 +15649,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **61 expected smul overflow metadata (cu)');
             }
@@ -15699,7 +15699,7 @@ final class JitPow
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **61 expected smul overflow metadata (fifth)');
             }
@@ -15748,7 +15748,7 @@ final class JitPow
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **61 expected smul overflow metadata (tenth)');
             }
@@ -15796,7 +15796,7 @@ final class JitPow
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **61 expected smul overflow metadata (twentieth)');
             }
@@ -15843,7 +15843,7 @@ final class JitPow
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **61 expected smul overflow metadata (fortieth)');
             }
@@ -15889,7 +15889,7 @@ final class JitPow
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **61 expected smul overflow metadata (fortysecond)');
             }
@@ -15934,7 +15934,7 @@ final class JitPow
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **61 expected smul overflow metadata (fortyfourth)');
             }
@@ -15978,7 +15978,7 @@ final class JitPow
                 $fortyfourthLong,
                 $sqLong
             );
-            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
             if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **61 expected smul overflow metadata (fortysixth)');
             }
@@ -16021,7 +16021,7 @@ final class JitPow
                 $fortysixthLong,
                 $sqLong
             );
-            $ov10 = $fortyeighthVar->longArithOverflowFlag;
+            $ov10 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyeighthVar->longArithOverflowFlag);
             if (null === $ov10 || null === $fortyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **61 expected smul overflow metadata (fortyeighth)');
             }
@@ -16063,7 +16063,7 @@ final class JitPow
                 $fortyeighthLong,
                 $sqLong
             );
-            $ov11 = $fiftiethVar->longArithOverflowFlag;
+            $ov11 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftiethVar->longArithOverflowFlag);
             if (null === $ov11 || null === $fiftiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **61 expected smul overflow metadata (fiftieth)');
             }
@@ -16103,7 +16103,7 @@ final class JitPow
                 $fiftiethLong,
                 $n
             );
-            $ov12 = $fiftyfirstVar->longArithOverflowFlag;
+            $ov12 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfirstVar->longArithOverflowFlag);
             if (null === $ov12 || null === $fiftyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **61 expected smul overflow metadata (fiftyfirst)');
             }
@@ -16142,7 +16142,7 @@ final class JitPow
                 $fiftyfirstLong,
                 $n
             );
-            $ov13 = $fiftysecondVar->longArithOverflowFlag;
+            $ov13 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysecondVar->longArithOverflowFlag);
             if (null === $ov13 || null === $fiftysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **61 expected smul overflow metadata (fiftysecond)');
             }
@@ -16180,7 +16180,7 @@ final class JitPow
                 $fiftysecondLong,
                 $n
             );
-            $ov14 = $fiftythirdVar->longArithOverflowFlag;
+            $ov14 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftythirdVar->longArithOverflowFlag);
             if (null === $ov14 || null === $fiftythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **61 expected smul overflow metadata (fiftythird)');
             }
@@ -16217,7 +16217,7 @@ final class JitPow
                 $fiftythirdLong,
                 $n
             );
-            $ov15 = $fiftyfourthVar->longArithOverflowFlag;
+            $ov15 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfourthVar->longArithOverflowFlag);
             if (null === $ov15 || null === $fiftyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **61 expected smul overflow metadata (fiftyfourth)');
             }
@@ -16253,7 +16253,7 @@ final class JitPow
                 $fiftyfourthLong,
                 $n
             );
-            $ov16 = $fiftyfifthVar->longArithOverflowFlag;
+            $ov16 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfifthVar->longArithOverflowFlag);
             if (null === $ov16 || null === $fiftyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **61 expected smul overflow metadata (fiftyfifth)');
             }
@@ -16288,7 +16288,7 @@ final class JitPow
                 $fiftyfifthLong,
                 $n
             );
-            $ov17 = $fiftysixthVar->longArithOverflowFlag;
+            $ov17 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysixthVar->longArithOverflowFlag);
             if (null === $ov17 || null === $fiftysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **61 expected smul overflow metadata (fiftysixth)');
             }
@@ -16322,7 +16322,7 @@ final class JitPow
                 $fiftysixthLong,
                 $n
             );
-            $ov18 = $fiftyseventhVar->longArithOverflowFlag;
+            $ov18 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyseventhVar->longArithOverflowFlag);
             if (null === $ov18 || null === $fiftyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **61 expected smul overflow metadata (fiftyseventh)');
             }
@@ -16355,7 +16355,7 @@ final class JitPow
                 $fiftyseventhLong,
                 $n
             );
-            $ov19 = $fiftyeighthVar->longArithOverflowFlag;
+            $ov19 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyeighthVar->longArithOverflowFlag);
             if (null === $ov19 || null === $fiftyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **61 expected smul overflow metadata (fiftyeighth)');
             }
@@ -16387,7 +16387,7 @@ final class JitPow
                 $fiftyeighthLong,
                 $n
             );
-            $ov20 = $fiftyninthVar->longArithOverflowFlag;
+            $ov20 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyninthVar->longArithOverflowFlag);
             if (null === $ov20 || null === $fiftyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **61 expected smul overflow metadata (fiftyninth)');
             }
@@ -16418,7 +16418,7 @@ final class JitPow
                 $fiftyninthLong,
                 $n
             );
-            $ov21 = $sixtiethVar->longArithOverflowFlag;
+            $ov21 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtiethVar->longArithOverflowFlag);
             if (null === $ov21 || null === $sixtiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **61 expected smul overflow metadata (sixtieth)');
             }
@@ -16475,7 +16475,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **62 expected smul overflow metadata (sq)');
             }
@@ -16527,7 +16527,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **62 expected smul overflow metadata (cu)');
             }
@@ -16578,7 +16578,7 @@ final class JitPow
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **62 expected smul overflow metadata (fifth)');
             }
@@ -16628,7 +16628,7 @@ final class JitPow
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **62 expected smul overflow metadata (tenth)');
             }
@@ -16677,7 +16677,7 @@ final class JitPow
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **62 expected smul overflow metadata (twentieth)');
             }
@@ -16725,7 +16725,7 @@ final class JitPow
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **62 expected smul overflow metadata (fortieth)');
             }
@@ -16772,7 +16772,7 @@ final class JitPow
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **62 expected smul overflow metadata (fortysecond)');
             }
@@ -16818,7 +16818,7 @@ final class JitPow
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **62 expected smul overflow metadata (fortyfourth)');
             }
@@ -16863,7 +16863,7 @@ final class JitPow
                 $fortyfourthLong,
                 $sqLong
             );
-            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
             if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **62 expected smul overflow metadata (fortysixth)');
             }
@@ -16907,7 +16907,7 @@ final class JitPow
                 $fortysixthLong,
                 $sqLong
             );
-            $ov10 = $fortyeighthVar->longArithOverflowFlag;
+            $ov10 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyeighthVar->longArithOverflowFlag);
             if (null === $ov10 || null === $fortyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **62 expected smul overflow metadata (fortyeighth)');
             }
@@ -16950,7 +16950,7 @@ final class JitPow
                 $fortyeighthLong,
                 $sqLong
             );
-            $ov11 = $fiftiethVar->longArithOverflowFlag;
+            $ov11 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftiethVar->longArithOverflowFlag);
             if (null === $ov11 || null === $fiftiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **62 expected smul overflow metadata (fiftieth)');
             }
@@ -16991,7 +16991,7 @@ final class JitPow
                 $fiftiethLong,
                 $n
             );
-            $ov12 = $fiftyfirstVar->longArithOverflowFlag;
+            $ov12 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfirstVar->longArithOverflowFlag);
             if (null === $ov12 || null === $fiftyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **62 expected smul overflow metadata (fiftyfirst)');
             }
@@ -17031,7 +17031,7 @@ final class JitPow
                 $fiftyfirstLong,
                 $n
             );
-            $ov13 = $fiftysecondVar->longArithOverflowFlag;
+            $ov13 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysecondVar->longArithOverflowFlag);
             if (null === $ov13 || null === $fiftysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **62 expected smul overflow metadata (fiftysecond)');
             }
@@ -17070,7 +17070,7 @@ final class JitPow
                 $fiftysecondLong,
                 $n
             );
-            $ov14 = $fiftythirdVar->longArithOverflowFlag;
+            $ov14 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftythirdVar->longArithOverflowFlag);
             if (null === $ov14 || null === $fiftythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **62 expected smul overflow metadata (fiftythird)');
             }
@@ -17108,7 +17108,7 @@ final class JitPow
                 $fiftythirdLong,
                 $n
             );
-            $ov15 = $fiftyfourthVar->longArithOverflowFlag;
+            $ov15 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfourthVar->longArithOverflowFlag);
             if (null === $ov15 || null === $fiftyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **62 expected smul overflow metadata (fiftyfourth)');
             }
@@ -17145,7 +17145,7 @@ final class JitPow
                 $fiftyfourthLong,
                 $n
             );
-            $ov16 = $fiftyfifthVar->longArithOverflowFlag;
+            $ov16 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfifthVar->longArithOverflowFlag);
             if (null === $ov16 || null === $fiftyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **62 expected smul overflow metadata (fiftyfifth)');
             }
@@ -17181,7 +17181,7 @@ final class JitPow
                 $fiftyfifthLong,
                 $n
             );
-            $ov17 = $fiftysixthVar->longArithOverflowFlag;
+            $ov17 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysixthVar->longArithOverflowFlag);
             if (null === $ov17 || null === $fiftysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **62 expected smul overflow metadata (fiftysixth)');
             }
@@ -17216,7 +17216,7 @@ final class JitPow
                 $fiftysixthLong,
                 $n
             );
-            $ov18 = $fiftyseventhVar->longArithOverflowFlag;
+            $ov18 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyseventhVar->longArithOverflowFlag);
             if (null === $ov18 || null === $fiftyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **62 expected smul overflow metadata (fiftyseventh)');
             }
@@ -17250,7 +17250,7 @@ final class JitPow
                 $fiftyseventhLong,
                 $n
             );
-            $ov19 = $fiftyeighthVar->longArithOverflowFlag;
+            $ov19 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyeighthVar->longArithOverflowFlag);
             if (null === $ov19 || null === $fiftyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **62 expected smul overflow metadata (fiftyeighth)');
             }
@@ -17283,7 +17283,7 @@ final class JitPow
                 $fiftyeighthLong,
                 $n
             );
-            $ov20 = $fiftyninthVar->longArithOverflowFlag;
+            $ov20 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyninthVar->longArithOverflowFlag);
             if (null === $ov20 || null === $fiftyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **62 expected smul overflow metadata (fiftyninth)');
             }
@@ -17315,7 +17315,7 @@ final class JitPow
                 $fiftyninthLong,
                 $n
             );
-            $ov21 = $sixtiethVar->longArithOverflowFlag;
+            $ov21 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtiethVar->longArithOverflowFlag);
             if (null === $ov21 || null === $sixtiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **62 expected smul overflow metadata (sixtieth)');
             }
@@ -17346,7 +17346,7 @@ final class JitPow
                 $sixtiethLong,
                 $n
             );
-            $ov22 = $sixtyfirstVar->longArithOverflowFlag;
+            $ov22 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfirstVar->longArithOverflowFlag);
             if (null === $ov22 || null === $sixtyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **62 expected smul overflow metadata (sixtyfirst)');
             }
@@ -17403,7 +17403,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **63 expected smul overflow metadata (sq)');
             }
@@ -17456,7 +17456,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **63 expected smul overflow metadata (cu)');
             }
@@ -17508,7 +17508,7 @@ final class JitPow
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **63 expected smul overflow metadata (fifth)');
             }
@@ -17559,7 +17559,7 @@ final class JitPow
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **63 expected smul overflow metadata (tenth)');
             }
@@ -17609,7 +17609,7 @@ final class JitPow
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **63 expected smul overflow metadata (twentieth)');
             }
@@ -17658,7 +17658,7 @@ final class JitPow
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **63 expected smul overflow metadata (fortieth)');
             }
@@ -17706,7 +17706,7 @@ final class JitPow
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **63 expected smul overflow metadata (fortysecond)');
             }
@@ -17753,7 +17753,7 @@ final class JitPow
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **63 expected smul overflow metadata (fortyfourth)');
             }
@@ -17799,7 +17799,7 @@ final class JitPow
                 $fortyfourthLong,
                 $sqLong
             );
-            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
             if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **63 expected smul overflow metadata (fortysixth)');
             }
@@ -17844,7 +17844,7 @@ final class JitPow
                 $fortysixthLong,
                 $sqLong
             );
-            $ov10 = $fortyeighthVar->longArithOverflowFlag;
+            $ov10 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyeighthVar->longArithOverflowFlag);
             if (null === $ov10 || null === $fortyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **63 expected smul overflow metadata (fortyeighth)');
             }
@@ -17888,7 +17888,7 @@ final class JitPow
                 $fortyeighthLong,
                 $sqLong
             );
-            $ov11 = $fiftiethVar->longArithOverflowFlag;
+            $ov11 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftiethVar->longArithOverflowFlag);
             if (null === $ov11 || null === $fiftiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **63 expected smul overflow metadata (fiftieth)');
             }
@@ -17930,7 +17930,7 @@ final class JitPow
                 $fiftiethLong,
                 $n
             );
-            $ov12 = $fiftyfirstVar->longArithOverflowFlag;
+            $ov12 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfirstVar->longArithOverflowFlag);
             if (null === $ov12 || null === $fiftyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **63 expected smul overflow metadata (fiftyfirst)');
             }
@@ -17971,7 +17971,7 @@ final class JitPow
                 $fiftyfirstLong,
                 $n
             );
-            $ov13 = $fiftysecondVar->longArithOverflowFlag;
+            $ov13 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysecondVar->longArithOverflowFlag);
             if (null === $ov13 || null === $fiftysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **63 expected smul overflow metadata (fiftysecond)');
             }
@@ -18011,7 +18011,7 @@ final class JitPow
                 $fiftysecondLong,
                 $n
             );
-            $ov14 = $fiftythirdVar->longArithOverflowFlag;
+            $ov14 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftythirdVar->longArithOverflowFlag);
             if (null === $ov14 || null === $fiftythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **63 expected smul overflow metadata (fiftythird)');
             }
@@ -18050,7 +18050,7 @@ final class JitPow
                 $fiftythirdLong,
                 $n
             );
-            $ov15 = $fiftyfourthVar->longArithOverflowFlag;
+            $ov15 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfourthVar->longArithOverflowFlag);
             if (null === $ov15 || null === $fiftyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **63 expected smul overflow metadata (fiftyfourth)');
             }
@@ -18088,7 +18088,7 @@ final class JitPow
                 $fiftyfourthLong,
                 $n
             );
-            $ov16 = $fiftyfifthVar->longArithOverflowFlag;
+            $ov16 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfifthVar->longArithOverflowFlag);
             if (null === $ov16 || null === $fiftyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **63 expected smul overflow metadata (fiftyfifth)');
             }
@@ -18125,7 +18125,7 @@ final class JitPow
                 $fiftyfifthLong,
                 $n
             );
-            $ov17 = $fiftysixthVar->longArithOverflowFlag;
+            $ov17 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysixthVar->longArithOverflowFlag);
             if (null === $ov17 || null === $fiftysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **63 expected smul overflow metadata (fiftysixth)');
             }
@@ -18161,7 +18161,7 @@ final class JitPow
                 $fiftysixthLong,
                 $n
             );
-            $ov18 = $fiftyseventhVar->longArithOverflowFlag;
+            $ov18 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyseventhVar->longArithOverflowFlag);
             if (null === $ov18 || null === $fiftyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **63 expected smul overflow metadata (fiftyseventh)');
             }
@@ -18196,7 +18196,7 @@ final class JitPow
                 $fiftyseventhLong,
                 $n
             );
-            $ov19 = $fiftyeighthVar->longArithOverflowFlag;
+            $ov19 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyeighthVar->longArithOverflowFlag);
             if (null === $ov19 || null === $fiftyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **63 expected smul overflow metadata (fiftyeighth)');
             }
@@ -18230,7 +18230,7 @@ final class JitPow
                 $fiftyeighthLong,
                 $n
             );
-            $ov20 = $fiftyninthVar->longArithOverflowFlag;
+            $ov20 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyninthVar->longArithOverflowFlag);
             if (null === $ov20 || null === $fiftyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **63 expected smul overflow metadata (fiftyninth)');
             }
@@ -18263,7 +18263,7 @@ final class JitPow
                 $fiftyninthLong,
                 $n
             );
-            $ov21 = $sixtiethVar->longArithOverflowFlag;
+            $ov21 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtiethVar->longArithOverflowFlag);
             if (null === $ov21 || null === $sixtiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **63 expected smul overflow metadata (sixtieth)');
             }
@@ -18295,7 +18295,7 @@ final class JitPow
                 $sixtiethLong,
                 $n
             );
-            $ov22 = $sixtyfirstVar->longArithOverflowFlag;
+            $ov22 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfirstVar->longArithOverflowFlag);
             if (null === $ov22 || null === $sixtyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **63 expected smul overflow metadata (sixtyfirst)');
             }
@@ -18326,7 +18326,7 @@ final class JitPow
                 $sixtyfirstLong,
                 $n
             );
-            $ov23 = $sixtysecondVar->longArithOverflowFlag;
+            $ov23 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysecondVar->longArithOverflowFlag);
             if (null === $ov23 || null === $sixtysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **63 expected smul overflow metadata (sixtysecond)');
             }
@@ -18383,7 +18383,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **64 expected smul overflow metadata (sq)');
             }
@@ -18437,7 +18437,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **64 expected smul overflow metadata (cu)');
             }
@@ -18490,7 +18490,7 @@ final class JitPow
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **64 expected smul overflow metadata (fifth)');
             }
@@ -18542,7 +18542,7 @@ final class JitPow
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **64 expected smul overflow metadata (tenth)');
             }
@@ -18593,7 +18593,7 @@ final class JitPow
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **64 expected smul overflow metadata (twentieth)');
             }
@@ -18643,7 +18643,7 @@ final class JitPow
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **64 expected smul overflow metadata (fortieth)');
             }
@@ -18692,7 +18692,7 @@ final class JitPow
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **64 expected smul overflow metadata (fortysecond)');
             }
@@ -18740,7 +18740,7 @@ final class JitPow
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **64 expected smul overflow metadata (fortyfourth)');
             }
@@ -18787,7 +18787,7 @@ final class JitPow
                 $fortyfourthLong,
                 $sqLong
             );
-            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
             if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **64 expected smul overflow metadata (fortysixth)');
             }
@@ -18833,7 +18833,7 @@ final class JitPow
                 $fortysixthLong,
                 $sqLong
             );
-            $ov10 = $fortyeighthVar->longArithOverflowFlag;
+            $ov10 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyeighthVar->longArithOverflowFlag);
             if (null === $ov10 || null === $fortyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **64 expected smul overflow metadata (fortyeighth)');
             }
@@ -18878,7 +18878,7 @@ final class JitPow
                 $fortyeighthLong,
                 $sqLong
             );
-            $ov11 = $fiftiethVar->longArithOverflowFlag;
+            $ov11 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftiethVar->longArithOverflowFlag);
             if (null === $ov11 || null === $fiftiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **64 expected smul overflow metadata (fiftieth)');
             }
@@ -18921,7 +18921,7 @@ final class JitPow
                 $fiftiethLong,
                 $n
             );
-            $ov12 = $fiftyfirstVar->longArithOverflowFlag;
+            $ov12 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfirstVar->longArithOverflowFlag);
             if (null === $ov12 || null === $fiftyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **64 expected smul overflow metadata (fiftyfirst)');
             }
@@ -18963,7 +18963,7 @@ final class JitPow
                 $fiftyfirstLong,
                 $n
             );
-            $ov13 = $fiftysecondVar->longArithOverflowFlag;
+            $ov13 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysecondVar->longArithOverflowFlag);
             if (null === $ov13 || null === $fiftysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **64 expected smul overflow metadata (fiftysecond)');
             }
@@ -19004,7 +19004,7 @@ final class JitPow
                 $fiftysecondLong,
                 $n
             );
-            $ov14 = $fiftythirdVar->longArithOverflowFlag;
+            $ov14 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftythirdVar->longArithOverflowFlag);
             if (null === $ov14 || null === $fiftythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **64 expected smul overflow metadata (fiftythird)');
             }
@@ -19044,7 +19044,7 @@ final class JitPow
                 $fiftythirdLong,
                 $n
             );
-            $ov15 = $fiftyfourthVar->longArithOverflowFlag;
+            $ov15 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfourthVar->longArithOverflowFlag);
             if (null === $ov15 || null === $fiftyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **64 expected smul overflow metadata (fiftyfourth)');
             }
@@ -19083,7 +19083,7 @@ final class JitPow
                 $fiftyfourthLong,
                 $n
             );
-            $ov16 = $fiftyfifthVar->longArithOverflowFlag;
+            $ov16 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfifthVar->longArithOverflowFlag);
             if (null === $ov16 || null === $fiftyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **64 expected smul overflow metadata (fiftyfifth)');
             }
@@ -19121,7 +19121,7 @@ final class JitPow
                 $fiftyfifthLong,
                 $n
             );
-            $ov17 = $fiftysixthVar->longArithOverflowFlag;
+            $ov17 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysixthVar->longArithOverflowFlag);
             if (null === $ov17 || null === $fiftysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **64 expected smul overflow metadata (fiftysixth)');
             }
@@ -19158,7 +19158,7 @@ final class JitPow
                 $fiftysixthLong,
                 $n
             );
-            $ov18 = $fiftyseventhVar->longArithOverflowFlag;
+            $ov18 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyseventhVar->longArithOverflowFlag);
             if (null === $ov18 || null === $fiftyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **64 expected smul overflow metadata (fiftyseventh)');
             }
@@ -19194,7 +19194,7 @@ final class JitPow
                 $fiftyseventhLong,
                 $n
             );
-            $ov19 = $fiftyeighthVar->longArithOverflowFlag;
+            $ov19 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyeighthVar->longArithOverflowFlag);
             if (null === $ov19 || null === $fiftyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **64 expected smul overflow metadata (fiftyeighth)');
             }
@@ -19229,7 +19229,7 @@ final class JitPow
                 $fiftyeighthLong,
                 $n
             );
-            $ov20 = $fiftyninthVar->longArithOverflowFlag;
+            $ov20 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyninthVar->longArithOverflowFlag);
             if (null === $ov20 || null === $fiftyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **64 expected smul overflow metadata (fiftyninth)');
             }
@@ -19263,7 +19263,7 @@ final class JitPow
                 $fiftyninthLong,
                 $n
             );
-            $ov21 = $sixtiethVar->longArithOverflowFlag;
+            $ov21 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtiethVar->longArithOverflowFlag);
             if (null === $ov21 || null === $sixtiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **64 expected smul overflow metadata (sixtieth)');
             }
@@ -19296,7 +19296,7 @@ final class JitPow
                 $sixtiethLong,
                 $n
             );
-            $ov22 = $sixtyfirstVar->longArithOverflowFlag;
+            $ov22 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfirstVar->longArithOverflowFlag);
             if (null === $ov22 || null === $sixtyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **64 expected smul overflow metadata (sixtyfirst)');
             }
@@ -19328,7 +19328,7 @@ final class JitPow
                 $sixtyfirstLong,
                 $n
             );
-            $ov23 = $sixtysecondVar->longArithOverflowFlag;
+            $ov23 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysecondVar->longArithOverflowFlag);
             if (null === $ov23 || null === $sixtysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **64 expected smul overflow metadata (sixtysecond)');
             }
@@ -19359,7 +19359,7 @@ final class JitPow
                 $sixtysecondLong,
                 $n
             );
-            $ov24 = $sixtythirdVar->longArithOverflowFlag;
+            $ov24 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtythirdVar->longArithOverflowFlag);
             if (null === $ov24 || null === $sixtythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **64 expected smul overflow metadata (sixtythird)');
             }
@@ -19417,7 +19417,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **65 expected smul overflow metadata (sq)');
             }
@@ -19472,7 +19472,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **65 expected smul overflow metadata (cu)');
             }
@@ -19526,7 +19526,7 @@ final class JitPow
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **65 expected smul overflow metadata (fifth)');
             }
@@ -19579,7 +19579,7 @@ final class JitPow
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **65 expected smul overflow metadata (tenth)');
             }
@@ -19631,7 +19631,7 @@ final class JitPow
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **65 expected smul overflow metadata (twentieth)');
             }
@@ -19682,7 +19682,7 @@ final class JitPow
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **65 expected smul overflow metadata (fortieth)');
             }
@@ -19732,7 +19732,7 @@ final class JitPow
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **65 expected smul overflow metadata (fortysecond)');
             }
@@ -19781,7 +19781,7 @@ final class JitPow
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **65 expected smul overflow metadata (fortyfourth)');
             }
@@ -19829,7 +19829,7 @@ final class JitPow
                 $fortyfourthLong,
                 $sqLong
             );
-            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
             if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **65 expected smul overflow metadata (fortysixth)');
             }
@@ -19876,7 +19876,7 @@ final class JitPow
                 $fortysixthLong,
                 $sqLong
             );
-            $ov10 = $fortyeighthVar->longArithOverflowFlag;
+            $ov10 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyeighthVar->longArithOverflowFlag);
             if (null === $ov10 || null === $fortyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **65 expected smul overflow metadata (fortyeighth)');
             }
@@ -19922,7 +19922,7 @@ final class JitPow
                 $fortyeighthLong,
                 $sqLong
             );
-            $ov11 = $fiftiethVar->longArithOverflowFlag;
+            $ov11 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftiethVar->longArithOverflowFlag);
             if (null === $ov11 || null === $fiftiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **65 expected smul overflow metadata (fiftieth)');
             }
@@ -19966,7 +19966,7 @@ final class JitPow
                 $fiftiethLong,
                 $n
             );
-            $ov12 = $fiftyfirstVar->longArithOverflowFlag;
+            $ov12 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfirstVar->longArithOverflowFlag);
             if (null === $ov12 || null === $fiftyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **65 expected smul overflow metadata (fiftyfirst)');
             }
@@ -20009,7 +20009,7 @@ final class JitPow
                 $fiftyfirstLong,
                 $n
             );
-            $ov13 = $fiftysecondVar->longArithOverflowFlag;
+            $ov13 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysecondVar->longArithOverflowFlag);
             if (null === $ov13 || null === $fiftysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **65 expected smul overflow metadata (fiftysecond)');
             }
@@ -20051,7 +20051,7 @@ final class JitPow
                 $fiftysecondLong,
                 $n
             );
-            $ov14 = $fiftythirdVar->longArithOverflowFlag;
+            $ov14 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftythirdVar->longArithOverflowFlag);
             if (null === $ov14 || null === $fiftythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **65 expected smul overflow metadata (fiftythird)');
             }
@@ -20092,7 +20092,7 @@ final class JitPow
                 $fiftythirdLong,
                 $n
             );
-            $ov15 = $fiftyfourthVar->longArithOverflowFlag;
+            $ov15 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfourthVar->longArithOverflowFlag);
             if (null === $ov15 || null === $fiftyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **65 expected smul overflow metadata (fiftyfourth)');
             }
@@ -20132,7 +20132,7 @@ final class JitPow
                 $fiftyfourthLong,
                 $n
             );
-            $ov16 = $fiftyfifthVar->longArithOverflowFlag;
+            $ov16 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfifthVar->longArithOverflowFlag);
             if (null === $ov16 || null === $fiftyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **65 expected smul overflow metadata (fiftyfifth)');
             }
@@ -20171,7 +20171,7 @@ final class JitPow
                 $fiftyfifthLong,
                 $n
             );
-            $ov17 = $fiftysixthVar->longArithOverflowFlag;
+            $ov17 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysixthVar->longArithOverflowFlag);
             if (null === $ov17 || null === $fiftysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **65 expected smul overflow metadata (fiftysixth)');
             }
@@ -20209,7 +20209,7 @@ final class JitPow
                 $fiftysixthLong,
                 $n
             );
-            $ov18 = $fiftyseventhVar->longArithOverflowFlag;
+            $ov18 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyseventhVar->longArithOverflowFlag);
             if (null === $ov18 || null === $fiftyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **65 expected smul overflow metadata (fiftyseventh)');
             }
@@ -20246,7 +20246,7 @@ final class JitPow
                 $fiftyseventhLong,
                 $n
             );
-            $ov19 = $fiftyeighthVar->longArithOverflowFlag;
+            $ov19 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyeighthVar->longArithOverflowFlag);
             if (null === $ov19 || null === $fiftyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **65 expected smul overflow metadata (fiftyeighth)');
             }
@@ -20282,7 +20282,7 @@ final class JitPow
                 $fiftyeighthLong,
                 $n
             );
-            $ov20 = $fiftyninthVar->longArithOverflowFlag;
+            $ov20 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyninthVar->longArithOverflowFlag);
             if (null === $ov20 || null === $fiftyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **65 expected smul overflow metadata (fiftyninth)');
             }
@@ -20317,7 +20317,7 @@ final class JitPow
                 $fiftyninthLong,
                 $n
             );
-            $ov21 = $sixtiethVar->longArithOverflowFlag;
+            $ov21 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtiethVar->longArithOverflowFlag);
             if (null === $ov21 || null === $sixtiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **65 expected smul overflow metadata (sixtieth)');
             }
@@ -20351,7 +20351,7 @@ final class JitPow
                 $sixtiethLong,
                 $n
             );
-            $ov22 = $sixtyfirstVar->longArithOverflowFlag;
+            $ov22 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfirstVar->longArithOverflowFlag);
             if (null === $ov22 || null === $sixtyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **65 expected smul overflow metadata (sixtyfirst)');
             }
@@ -20384,7 +20384,7 @@ final class JitPow
                 $sixtyfirstLong,
                 $n
             );
-            $ov23 = $sixtysecondVar->longArithOverflowFlag;
+            $ov23 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysecondVar->longArithOverflowFlag);
             if (null === $ov23 || null === $sixtysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **65 expected smul overflow metadata (sixtysecond)');
             }
@@ -20416,7 +20416,7 @@ final class JitPow
                 $sixtysecondLong,
                 $n
             );
-            $ov24 = $sixtythirdVar->longArithOverflowFlag;
+            $ov24 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtythirdVar->longArithOverflowFlag);
             if (null === $ov24 || null === $sixtythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **65 expected smul overflow metadata (sixtythird)');
             }
@@ -20447,7 +20447,7 @@ final class JitPow
                 $sixtythirdLong,
                 $n
             );
-            $ov25 = $sixtyfourthVar->longArithOverflowFlag;
+            $ov25 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfourthVar->longArithOverflowFlag);
             if (null === $ov25 || null === $sixtyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **65 expected smul overflow metadata (sixtyfourth)');
             }
@@ -20505,7 +20505,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **66 expected smul overflow metadata (sq)');
             }
@@ -20561,7 +20561,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **66 expected smul overflow metadata (cu)');
             }
@@ -20616,7 +20616,7 @@ final class JitPow
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **66 expected smul overflow metadata (fifth)');
             }
@@ -20670,7 +20670,7 @@ final class JitPow
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **66 expected smul overflow metadata (tenth)');
             }
@@ -20723,7 +20723,7 @@ final class JitPow
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **66 expected smul overflow metadata (twentieth)');
             }
@@ -20775,7 +20775,7 @@ final class JitPow
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **66 expected smul overflow metadata (fortieth)');
             }
@@ -20826,7 +20826,7 @@ final class JitPow
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **66 expected smul overflow metadata (fortysecond)');
             }
@@ -20876,7 +20876,7 @@ final class JitPow
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **66 expected smul overflow metadata (fortyfourth)');
             }
@@ -20925,7 +20925,7 @@ final class JitPow
                 $fortyfourthLong,
                 $sqLong
             );
-            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
             if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **66 expected smul overflow metadata (fortysixth)');
             }
@@ -20973,7 +20973,7 @@ final class JitPow
                 $fortysixthLong,
                 $sqLong
             );
-            $ov10 = $fortyeighthVar->longArithOverflowFlag;
+            $ov10 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyeighthVar->longArithOverflowFlag);
             if (null === $ov10 || null === $fortyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **66 expected smul overflow metadata (fortyeighth)');
             }
@@ -21020,7 +21020,7 @@ final class JitPow
                 $fortyeighthLong,
                 $sqLong
             );
-            $ov11 = $fiftiethVar->longArithOverflowFlag;
+            $ov11 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftiethVar->longArithOverflowFlag);
             if (null === $ov11 || null === $fiftiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **66 expected smul overflow metadata (fiftieth)');
             }
@@ -21065,7 +21065,7 @@ final class JitPow
                 $fiftiethLong,
                 $n
             );
-            $ov12 = $fiftyfirstVar->longArithOverflowFlag;
+            $ov12 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfirstVar->longArithOverflowFlag);
             if (null === $ov12 || null === $fiftyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **66 expected smul overflow metadata (fiftyfirst)');
             }
@@ -21109,7 +21109,7 @@ final class JitPow
                 $fiftyfirstLong,
                 $n
             );
-            $ov13 = $fiftysecondVar->longArithOverflowFlag;
+            $ov13 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysecondVar->longArithOverflowFlag);
             if (null === $ov13 || null === $fiftysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **66 expected smul overflow metadata (fiftysecond)');
             }
@@ -21152,7 +21152,7 @@ final class JitPow
                 $fiftysecondLong,
                 $n
             );
-            $ov14 = $fiftythirdVar->longArithOverflowFlag;
+            $ov14 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftythirdVar->longArithOverflowFlag);
             if (null === $ov14 || null === $fiftythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **66 expected smul overflow metadata (fiftythird)');
             }
@@ -21194,7 +21194,7 @@ final class JitPow
                 $fiftythirdLong,
                 $n
             );
-            $ov15 = $fiftyfourthVar->longArithOverflowFlag;
+            $ov15 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfourthVar->longArithOverflowFlag);
             if (null === $ov15 || null === $fiftyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **66 expected smul overflow metadata (fiftyfourth)');
             }
@@ -21235,7 +21235,7 @@ final class JitPow
                 $fiftyfourthLong,
                 $n
             );
-            $ov16 = $fiftyfifthVar->longArithOverflowFlag;
+            $ov16 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfifthVar->longArithOverflowFlag);
             if (null === $ov16 || null === $fiftyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **66 expected smul overflow metadata (fiftyfifth)');
             }
@@ -21275,7 +21275,7 @@ final class JitPow
                 $fiftyfifthLong,
                 $n
             );
-            $ov17 = $fiftysixthVar->longArithOverflowFlag;
+            $ov17 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysixthVar->longArithOverflowFlag);
             if (null === $ov17 || null === $fiftysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **66 expected smul overflow metadata (fiftysixth)');
             }
@@ -21314,7 +21314,7 @@ final class JitPow
                 $fiftysixthLong,
                 $n
             );
-            $ov18 = $fiftyseventhVar->longArithOverflowFlag;
+            $ov18 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyseventhVar->longArithOverflowFlag);
             if (null === $ov18 || null === $fiftyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **66 expected smul overflow metadata (fiftyseventh)');
             }
@@ -21352,7 +21352,7 @@ final class JitPow
                 $fiftyseventhLong,
                 $n
             );
-            $ov19 = $fiftyeighthVar->longArithOverflowFlag;
+            $ov19 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyeighthVar->longArithOverflowFlag);
             if (null === $ov19 || null === $fiftyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **66 expected smul overflow metadata (fiftyeighth)');
             }
@@ -21389,7 +21389,7 @@ final class JitPow
                 $fiftyeighthLong,
                 $n
             );
-            $ov20 = $fiftyninthVar->longArithOverflowFlag;
+            $ov20 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyninthVar->longArithOverflowFlag);
             if (null === $ov20 || null === $fiftyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **66 expected smul overflow metadata (fiftyninth)');
             }
@@ -21425,7 +21425,7 @@ final class JitPow
                 $fiftyninthLong,
                 $n
             );
-            $ov21 = $sixtiethVar->longArithOverflowFlag;
+            $ov21 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtiethVar->longArithOverflowFlag);
             if (null === $ov21 || null === $sixtiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **66 expected smul overflow metadata (sixtieth)');
             }
@@ -21460,7 +21460,7 @@ final class JitPow
                 $sixtiethLong,
                 $n
             );
-            $ov22 = $sixtyfirstVar->longArithOverflowFlag;
+            $ov22 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfirstVar->longArithOverflowFlag);
             if (null === $ov22 || null === $sixtyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **66 expected smul overflow metadata (sixtyfirst)');
             }
@@ -21494,7 +21494,7 @@ final class JitPow
                 $sixtyfirstLong,
                 $n
             );
-            $ov23 = $sixtysecondVar->longArithOverflowFlag;
+            $ov23 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysecondVar->longArithOverflowFlag);
             if (null === $ov23 || null === $sixtysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **66 expected smul overflow metadata (sixtysecond)');
             }
@@ -21527,7 +21527,7 @@ final class JitPow
                 $sixtysecondLong,
                 $n
             );
-            $ov24 = $sixtythirdVar->longArithOverflowFlag;
+            $ov24 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtythirdVar->longArithOverflowFlag);
             if (null === $ov24 || null === $sixtythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **66 expected smul overflow metadata (sixtythird)');
             }
@@ -21559,7 +21559,7 @@ final class JitPow
                 $sixtythirdLong,
                 $n
             );
-            $ov25 = $sixtyfourthVar->longArithOverflowFlag;
+            $ov25 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfourthVar->longArithOverflowFlag);
             if (null === $ov25 || null === $sixtyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **66 expected smul overflow metadata (sixtyfourth)');
             }
@@ -21590,7 +21590,7 @@ final class JitPow
                 $sixtyfourthLong,
                 $n
             );
-            $ov26 = $sixtyfifthVar->longArithOverflowFlag;
+            $ov26 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfifthVar->longArithOverflowFlag);
             if (null === $ov26 || null === $sixtyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **66 expected smul overflow metadata (sixtyfifth)');
             }
@@ -21647,7 +21647,7 @@ final class JitPow
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **67 expected smul overflow metadata (sq)');
             }
@@ -21704,7 +21704,7 @@ final class JitPow
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **67 expected smul overflow metadata (cu)');
             }
@@ -21760,7 +21760,7 @@ final class JitPow
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **67 expected smul overflow metadata (fifth)');
             }
@@ -21815,7 +21815,7 @@ final class JitPow
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **67 expected smul overflow metadata (tenth)');
             }
@@ -21869,7 +21869,7 @@ final class JitPow
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **67 expected smul overflow metadata (twentieth)');
             }
@@ -21922,7 +21922,7 @@ final class JitPow
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **67 expected smul overflow metadata (fortieth)');
             }
@@ -21974,7 +21974,7 @@ final class JitPow
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **67 expected smul overflow metadata (fortysecond)');
             }
@@ -22025,7 +22025,7 @@ final class JitPow
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **67 expected smul overflow metadata (fortyfourth)');
             }
@@ -22075,7 +22075,7 @@ final class JitPow
                 $fortyfourthLong,
                 $sqLong
             );
-            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
             if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **67 expected smul overflow metadata (fortysixth)');
             }
@@ -22124,7 +22124,7 @@ final class JitPow
                 $fortysixthLong,
                 $sqLong
             );
-            $ov10 = $fortyeighthVar->longArithOverflowFlag;
+            $ov10 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyeighthVar->longArithOverflowFlag);
             if (null === $ov10 || null === $fortyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **67 expected smul overflow metadata (fortyeighth)');
             }
@@ -22172,7 +22172,7 @@ final class JitPow
                 $fortyeighthLong,
                 $sqLong
             );
-            $ov11 = $fiftiethVar->longArithOverflowFlag;
+            $ov11 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftiethVar->longArithOverflowFlag);
             if (null === $ov11 || null === $fiftiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **67 expected smul overflow metadata (fiftieth)');
             }
@@ -22218,7 +22218,7 @@ final class JitPow
                 $fiftiethLong,
                 $n
             );
-            $ov12 = $fiftyfirstVar->longArithOverflowFlag;
+            $ov12 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfirstVar->longArithOverflowFlag);
             if (null === $ov12 || null === $fiftyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **67 expected smul overflow metadata (fiftyfirst)');
             }
@@ -22263,7 +22263,7 @@ final class JitPow
                 $fiftyfirstLong,
                 $n
             );
-            $ov13 = $fiftysecondVar->longArithOverflowFlag;
+            $ov13 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysecondVar->longArithOverflowFlag);
             if (null === $ov13 || null === $fiftysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **67 expected smul overflow metadata (fiftysecond)');
             }
@@ -22307,7 +22307,7 @@ final class JitPow
                 $fiftysecondLong,
                 $n
             );
-            $ov14 = $fiftythirdVar->longArithOverflowFlag;
+            $ov14 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftythirdVar->longArithOverflowFlag);
             if (null === $ov14 || null === $fiftythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **67 expected smul overflow metadata (fiftythird)');
             }
@@ -22350,7 +22350,7 @@ final class JitPow
                 $fiftythirdLong,
                 $n
             );
-            $ov15 = $fiftyfourthVar->longArithOverflowFlag;
+            $ov15 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfourthVar->longArithOverflowFlag);
             if (null === $ov15 || null === $fiftyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **67 expected smul overflow metadata (fiftyfourth)');
             }
@@ -22392,7 +22392,7 @@ final class JitPow
                 $fiftyfourthLong,
                 $n
             );
-            $ov16 = $fiftyfifthVar->longArithOverflowFlag;
+            $ov16 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfifthVar->longArithOverflowFlag);
             if (null === $ov16 || null === $fiftyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **67 expected smul overflow metadata (fiftyfifth)');
             }
@@ -22433,7 +22433,7 @@ final class JitPow
                 $fiftyfifthLong,
                 $n
             );
-            $ov17 = $fiftysixthVar->longArithOverflowFlag;
+            $ov17 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysixthVar->longArithOverflowFlag);
             if (null === $ov17 || null === $fiftysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **67 expected smul overflow metadata (fiftysixth)');
             }
@@ -22473,7 +22473,7 @@ final class JitPow
                 $fiftysixthLong,
                 $n
             );
-            $ov18 = $fiftyseventhVar->longArithOverflowFlag;
+            $ov18 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyseventhVar->longArithOverflowFlag);
             if (null === $ov18 || null === $fiftyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **67 expected smul overflow metadata (fiftyseventh)');
             }
@@ -22512,7 +22512,7 @@ final class JitPow
                 $fiftyseventhLong,
                 $n
             );
-            $ov19 = $fiftyeighthVar->longArithOverflowFlag;
+            $ov19 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyeighthVar->longArithOverflowFlag);
             if (null === $ov19 || null === $fiftyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **67 expected smul overflow metadata (fiftyeighth)');
             }
@@ -22550,7 +22550,7 @@ final class JitPow
                 $fiftyeighthLong,
                 $n
             );
-            $ov20 = $fiftyninthVar->longArithOverflowFlag;
+            $ov20 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyninthVar->longArithOverflowFlag);
             if (null === $ov20 || null === $fiftyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **67 expected smul overflow metadata (fiftyninth)');
             }
@@ -22587,7 +22587,7 @@ final class JitPow
                 $fiftyninthLong,
                 $n
             );
-            $ov21 = $sixtiethVar->longArithOverflowFlag;
+            $ov21 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtiethVar->longArithOverflowFlag);
             if (null === $ov21 || null === $sixtiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **67 expected smul overflow metadata (sixtieth)');
             }
@@ -22623,7 +22623,7 @@ final class JitPow
                 $sixtiethLong,
                 $n
             );
-            $ov22 = $sixtyfirstVar->longArithOverflowFlag;
+            $ov22 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfirstVar->longArithOverflowFlag);
             if (null === $ov22 || null === $sixtyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **67 expected smul overflow metadata (sixtyfirst)');
             }
@@ -22658,7 +22658,7 @@ final class JitPow
                 $sixtyfirstLong,
                 $n
             );
-            $ov23 = $sixtysecondVar->longArithOverflowFlag;
+            $ov23 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysecondVar->longArithOverflowFlag);
             if (null === $ov23 || null === $sixtysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **67 expected smul overflow metadata (sixtysecond)');
             }
@@ -22692,7 +22692,7 @@ final class JitPow
                 $sixtysecondLong,
                 $n
             );
-            $ov24 = $sixtythirdVar->longArithOverflowFlag;
+            $ov24 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtythirdVar->longArithOverflowFlag);
             if (null === $ov24 || null === $sixtythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **67 expected smul overflow metadata (sixtythird)');
             }
@@ -22725,7 +22725,7 @@ final class JitPow
                 $sixtythirdLong,
                 $n
             );
-            $ov25 = $sixtyfourthVar->longArithOverflowFlag;
+            $ov25 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfourthVar->longArithOverflowFlag);
             if (null === $ov25 || null === $sixtyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **67 expected smul overflow metadata (sixtyfourth)');
             }
@@ -22757,7 +22757,7 @@ final class JitPow
                 $sixtyfourthLong,
                 $n
             );
-            $ov26 = $sixtyfifthVar->longArithOverflowFlag;
+            $ov26 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfifthVar->longArithOverflowFlag);
             if (null === $ov26 || null === $sixtyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **67 expected smul overflow metadata (sixtyfifth)');
             }
@@ -22788,7 +22788,7 @@ final class JitPow
                 $sixtyfifthLong,
                 $n
             );
-            $ov27 = $sixtysixthVar->longArithOverflowFlag;
+            $ov27 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysixthVar->longArithOverflowFlag);
             if (null === $ov27 || null === $sixtysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **67 expected smul overflow metadata (sixtysixth)');
             }
@@ -22842,7 +22842,7 @@ if ('sixtyeighth' === $expFold) {
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **68 expected smul overflow metadata (sq)');
             }
@@ -22900,7 +22900,7 @@ if ('sixtyeighth' === $expFold) {
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **68 expected smul overflow metadata (cu)');
             }
@@ -22957,7 +22957,7 @@ if ('sixtyeighth' === $expFold) {
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **68 expected smul overflow metadata (fifth)');
             }
@@ -23013,7 +23013,7 @@ if ('sixtyeighth' === $expFold) {
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **68 expected smul overflow metadata (tenth)');
             }
@@ -23068,7 +23068,7 @@ if ('sixtyeighth' === $expFold) {
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **68 expected smul overflow metadata (twentieth)');
             }
@@ -23122,7 +23122,7 @@ if ('sixtyeighth' === $expFold) {
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **68 expected smul overflow metadata (fortieth)');
             }
@@ -23175,7 +23175,7 @@ if ('sixtyeighth' === $expFold) {
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **68 expected smul overflow metadata (fortysecond)');
             }
@@ -23227,7 +23227,7 @@ if ('sixtyeighth' === $expFold) {
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **68 expected smul overflow metadata (fortyfourth)');
             }
@@ -23278,7 +23278,7 @@ if ('sixtyeighth' === $expFold) {
                 $fortyfourthLong,
                 $sqLong
             );
-            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
             if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **68 expected smul overflow metadata (fortysixth)');
             }
@@ -23328,7 +23328,7 @@ if ('sixtyeighth' === $expFold) {
                 $fortysixthLong,
                 $sqLong
             );
-            $ov10 = $fortyeighthVar->longArithOverflowFlag;
+            $ov10 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyeighthVar->longArithOverflowFlag);
             if (null === $ov10 || null === $fortyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **68 expected smul overflow metadata (fortyeighth)');
             }
@@ -23377,7 +23377,7 @@ if ('sixtyeighth' === $expFold) {
                 $fortyeighthLong,
                 $sqLong
             );
-            $ov11 = $fiftiethVar->longArithOverflowFlag;
+            $ov11 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftiethVar->longArithOverflowFlag);
             if (null === $ov11 || null === $fiftiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **68 expected smul overflow metadata (fiftieth)');
             }
@@ -23424,7 +23424,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftiethLong,
                 $n
             );
-            $ov12 = $fiftyfirstVar->longArithOverflowFlag;
+            $ov12 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfirstVar->longArithOverflowFlag);
             if (null === $ov12 || null === $fiftyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **68 expected smul overflow metadata (fiftyfirst)');
             }
@@ -23470,7 +23470,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftyfirstLong,
                 $n
             );
-            $ov13 = $fiftysecondVar->longArithOverflowFlag;
+            $ov13 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysecondVar->longArithOverflowFlag);
             if (null === $ov13 || null === $fiftysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **68 expected smul overflow metadata (fiftysecond)');
             }
@@ -23515,7 +23515,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftysecondLong,
                 $n
             );
-            $ov14 = $fiftythirdVar->longArithOverflowFlag;
+            $ov14 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftythirdVar->longArithOverflowFlag);
             if (null === $ov14 || null === $fiftythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **68 expected smul overflow metadata (fiftythird)');
             }
@@ -23559,7 +23559,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftythirdLong,
                 $n
             );
-            $ov15 = $fiftyfourthVar->longArithOverflowFlag;
+            $ov15 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfourthVar->longArithOverflowFlag);
             if (null === $ov15 || null === $fiftyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **68 expected smul overflow metadata (fiftyfourth)');
             }
@@ -23602,7 +23602,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftyfourthLong,
                 $n
             );
-            $ov16 = $fiftyfifthVar->longArithOverflowFlag;
+            $ov16 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfifthVar->longArithOverflowFlag);
             if (null === $ov16 || null === $fiftyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **68 expected smul overflow metadata (fiftyfifth)');
             }
@@ -23644,7 +23644,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftyfifthLong,
                 $n
             );
-            $ov17 = $fiftysixthVar->longArithOverflowFlag;
+            $ov17 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysixthVar->longArithOverflowFlag);
             if (null === $ov17 || null === $fiftysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **68 expected smul overflow metadata (fiftysixth)');
             }
@@ -23685,7 +23685,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftysixthLong,
                 $n
             );
-            $ov18 = $fiftyseventhVar->longArithOverflowFlag;
+            $ov18 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyseventhVar->longArithOverflowFlag);
             if (null === $ov18 || null === $fiftyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **68 expected smul overflow metadata (fiftyseventh)');
             }
@@ -23725,7 +23725,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftyseventhLong,
                 $n
             );
-            $ov19 = $fiftyeighthVar->longArithOverflowFlag;
+            $ov19 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyeighthVar->longArithOverflowFlag);
             if (null === $ov19 || null === $fiftyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **68 expected smul overflow metadata (fiftyeighth)');
             }
@@ -23764,7 +23764,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftyeighthLong,
                 $n
             );
-            $ov20 = $fiftyninthVar->longArithOverflowFlag;
+            $ov20 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyninthVar->longArithOverflowFlag);
             if (null === $ov20 || null === $fiftyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **68 expected smul overflow metadata (fiftyninth)');
             }
@@ -23802,7 +23802,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftyninthLong,
                 $n
             );
-            $ov21 = $sixtiethVar->longArithOverflowFlag;
+            $ov21 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtiethVar->longArithOverflowFlag);
             if (null === $ov21 || null === $sixtiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **68 expected smul overflow metadata (sixtieth)');
             }
@@ -23839,7 +23839,7 @@ if ('sixtyeighth' === $expFold) {
                 $sixtiethLong,
                 $n
             );
-            $ov22 = $sixtyfirstVar->longArithOverflowFlag;
+            $ov22 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfirstVar->longArithOverflowFlag);
             if (null === $ov22 || null === $sixtyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **68 expected smul overflow metadata (sixtyfirst)');
             }
@@ -23875,7 +23875,7 @@ if ('sixtyeighth' === $expFold) {
                 $sixtyfirstLong,
                 $n
             );
-            $ov23 = $sixtysecondVar->longArithOverflowFlag;
+            $ov23 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysecondVar->longArithOverflowFlag);
             if (null === $ov23 || null === $sixtysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **68 expected smul overflow metadata (sixtysecond)');
             }
@@ -23910,7 +23910,7 @@ if ('sixtyeighth' === $expFold) {
                 $sixtysecondLong,
                 $n
             );
-            $ov24 = $sixtythirdVar->longArithOverflowFlag;
+            $ov24 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtythirdVar->longArithOverflowFlag);
             if (null === $ov24 || null === $sixtythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **68 expected smul overflow metadata (sixtythird)');
             }
@@ -23944,7 +23944,7 @@ if ('sixtyeighth' === $expFold) {
                 $sixtythirdLong,
                 $n
             );
-            $ov25 = $sixtyfourthVar->longArithOverflowFlag;
+            $ov25 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfourthVar->longArithOverflowFlag);
             if (null === $ov25 || null === $sixtyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **68 expected smul overflow metadata (sixtyfourth)');
             }
@@ -23977,7 +23977,7 @@ if ('sixtyeighth' === $expFold) {
                 $sixtyfourthLong,
                 $n
             );
-            $ov26 = $sixtyfifthVar->longArithOverflowFlag;
+            $ov26 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfifthVar->longArithOverflowFlag);
             if (null === $ov26 || null === $sixtyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **68 expected smul overflow metadata (sixtyfifth)');
             }
@@ -24009,7 +24009,7 @@ if ('sixtyeighth' === $expFold) {
                 $sixtyfifthLong,
                 $n
             );
-            $ov27 = $sixtysixthVar->longArithOverflowFlag;
+            $ov27 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysixthVar->longArithOverflowFlag);
             if (null === $ov27 || null === $sixtysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **68 expected smul overflow metadata (sixtysixth)');
             }
@@ -24040,7 +24040,7 @@ if ('sixtyeighth' === $expFold) {
                 $sixtysixthLong,
                 $n
             );
-            $ov28 = $sixtyseventhVar->longArithOverflowFlag;
+            $ov28 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyseventhVar->longArithOverflowFlag);
             if (null === $ov28 || null === $sixtyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **68 expected smul overflow metadata (sixtyseventh)');
             }
@@ -24094,7 +24094,7 @@ if ('sixtyeighth' === $expFold) {
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **69 expected smul overflow metadata (sq)');
             }
@@ -24152,7 +24152,7 @@ if ('sixtyeighth' === $expFold) {
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **69 expected smul overflow metadata (cu)');
             }
@@ -24209,7 +24209,7 @@ if ('sixtyeighth' === $expFold) {
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **69 expected smul overflow metadata (fifth)');
             }
@@ -24265,7 +24265,7 @@ if ('sixtyeighth' === $expFold) {
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **69 expected smul overflow metadata (tenth)');
             }
@@ -24320,7 +24320,7 @@ if ('sixtyeighth' === $expFold) {
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **69 expected smul overflow metadata (twentieth)');
             }
@@ -24374,7 +24374,7 @@ if ('sixtyeighth' === $expFold) {
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **69 expected smul overflow metadata (fortieth)');
             }
@@ -24427,7 +24427,7 @@ if ('sixtyeighth' === $expFold) {
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **69 expected smul overflow metadata (fortysecond)');
             }
@@ -24479,7 +24479,7 @@ if ('sixtyeighth' === $expFold) {
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **69 expected smul overflow metadata (fortyfourth)');
             }
@@ -24530,7 +24530,7 @@ if ('sixtyeighth' === $expFold) {
                 $fortyfourthLong,
                 $sqLong
             );
-            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
             if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **69 expected smul overflow metadata (fortysixth)');
             }
@@ -24580,7 +24580,7 @@ if ('sixtyeighth' === $expFold) {
                 $fortysixthLong,
                 $sqLong
             );
-            $ov10 = $fortyeighthVar->longArithOverflowFlag;
+            $ov10 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyeighthVar->longArithOverflowFlag);
             if (null === $ov10 || null === $fortyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **69 expected smul overflow metadata (fortyeighth)');
             }
@@ -24629,7 +24629,7 @@ if ('sixtyeighth' === $expFold) {
                 $fortyeighthLong,
                 $sqLong
             );
-            $ov11 = $fiftiethVar->longArithOverflowFlag;
+            $ov11 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftiethVar->longArithOverflowFlag);
             if (null === $ov11 || null === $fiftiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **69 expected smul overflow metadata (fiftieth)');
             }
@@ -24676,7 +24676,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftiethLong,
                 $n
             );
-            $ov12 = $fiftyfirstVar->longArithOverflowFlag;
+            $ov12 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfirstVar->longArithOverflowFlag);
             if (null === $ov12 || null === $fiftyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **69 expected smul overflow metadata (fiftyfirst)');
             }
@@ -24722,7 +24722,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftyfirstLong,
                 $n
             );
-            $ov13 = $fiftysecondVar->longArithOverflowFlag;
+            $ov13 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysecondVar->longArithOverflowFlag);
             if (null === $ov13 || null === $fiftysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **69 expected smul overflow metadata (fiftysecond)');
             }
@@ -24767,7 +24767,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftysecondLong,
                 $n
             );
-            $ov14 = $fiftythirdVar->longArithOverflowFlag;
+            $ov14 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftythirdVar->longArithOverflowFlag);
             if (null === $ov14 || null === $fiftythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **69 expected smul overflow metadata (fiftythird)');
             }
@@ -24811,7 +24811,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftythirdLong,
                 $n
             );
-            $ov15 = $fiftyfourthVar->longArithOverflowFlag;
+            $ov15 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfourthVar->longArithOverflowFlag);
             if (null === $ov15 || null === $fiftyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **69 expected smul overflow metadata (fiftyfourth)');
             }
@@ -24854,7 +24854,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftyfourthLong,
                 $n
             );
-            $ov16 = $fiftyfifthVar->longArithOverflowFlag;
+            $ov16 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfifthVar->longArithOverflowFlag);
             if (null === $ov16 || null === $fiftyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **69 expected smul overflow metadata (fiftyfifth)');
             }
@@ -24896,7 +24896,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftyfifthLong,
                 $n
             );
-            $ov17 = $fiftysixthVar->longArithOverflowFlag;
+            $ov17 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysixthVar->longArithOverflowFlag);
             if (null === $ov17 || null === $fiftysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **69 expected smul overflow metadata (fiftysixth)');
             }
@@ -24937,7 +24937,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftysixthLong,
                 $n
             );
-            $ov18 = $fiftyseventhVar->longArithOverflowFlag;
+            $ov18 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyseventhVar->longArithOverflowFlag);
             if (null === $ov18 || null === $fiftyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **69 expected smul overflow metadata (fiftyseventh)');
             }
@@ -24977,7 +24977,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftyseventhLong,
                 $n
             );
-            $ov19 = $fiftyeighthVar->longArithOverflowFlag;
+            $ov19 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyeighthVar->longArithOverflowFlag);
             if (null === $ov19 || null === $fiftyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **69 expected smul overflow metadata (fiftyeighth)');
             }
@@ -25016,7 +25016,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftyeighthLong,
                 $n
             );
-            $ov20 = $fiftyninthVar->longArithOverflowFlag;
+            $ov20 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyninthVar->longArithOverflowFlag);
             if (null === $ov20 || null === $fiftyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **69 expected smul overflow metadata (fiftyninth)');
             }
@@ -25054,7 +25054,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftyninthLong,
                 $n
             );
-            $ov21 = $sixtiethVar->longArithOverflowFlag;
+            $ov21 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtiethVar->longArithOverflowFlag);
             if (null === $ov21 || null === $sixtiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **69 expected smul overflow metadata (sixtieth)');
             }
@@ -25091,7 +25091,7 @@ if ('sixtyeighth' === $expFold) {
                 $sixtiethLong,
                 $n
             );
-            $ov22 = $sixtyfirstVar->longArithOverflowFlag;
+            $ov22 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfirstVar->longArithOverflowFlag);
             if (null === $ov22 || null === $sixtyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **69 expected smul overflow metadata (sixtyfirst)');
             }
@@ -25127,7 +25127,7 @@ if ('sixtyeighth' === $expFold) {
                 $sixtyfirstLong,
                 $n
             );
-            $ov23 = $sixtysecondVar->longArithOverflowFlag;
+            $ov23 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysecondVar->longArithOverflowFlag);
             if (null === $ov23 || null === $sixtysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **69 expected smul overflow metadata (sixtysecond)');
             }
@@ -25162,7 +25162,7 @@ if ('sixtyeighth' === $expFold) {
                 $sixtysecondLong,
                 $n
             );
-            $ov24 = $sixtythirdVar->longArithOverflowFlag;
+            $ov24 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtythirdVar->longArithOverflowFlag);
             if (null === $ov24 || null === $sixtythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **69 expected smul overflow metadata (sixtythird)');
             }
@@ -25196,7 +25196,7 @@ if ('sixtyeighth' === $expFold) {
                 $sixtythirdLong,
                 $n
             );
-            $ov25 = $sixtyfourthVar->longArithOverflowFlag;
+            $ov25 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfourthVar->longArithOverflowFlag);
             if (null === $ov25 || null === $sixtyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **69 expected smul overflow metadata (sixtyfourth)');
             }
@@ -25229,7 +25229,7 @@ if ('sixtyeighth' === $expFold) {
                 $sixtyfourthLong,
                 $n
             );
-            $ov26 = $sixtyfifthVar->longArithOverflowFlag;
+            $ov26 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfifthVar->longArithOverflowFlag);
             if (null === $ov26 || null === $sixtyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **69 expected smul overflow metadata (sixtyfifth)');
             }
@@ -25261,7 +25261,7 @@ if ('sixtyeighth' === $expFold) {
                 $sixtyfifthLong,
                 $n
             );
-            $ov27 = $sixtysixthVar->longArithOverflowFlag;
+            $ov27 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysixthVar->longArithOverflowFlag);
             if (null === $ov27 || null === $sixtysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **69 expected smul overflow metadata (sixtysixth)');
             }
@@ -25292,7 +25292,7 @@ if ('sixtyeighth' === $expFold) {
                 $sixtysixthLong,
                 $n
             );
-            $ov28 = $sixtyseventhVar->longArithOverflowFlag;
+            $ov28 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyseventhVar->longArithOverflowFlag);
             if (null === $ov28 || null === $sixtyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **69 expected smul overflow metadata (sixtyseventh)');
             }
@@ -25323,7 +25323,7 @@ if ('sixtyeighth' === $expFold) {
                 $sixtyseventhLong,
                 $n
             );
-            $ov29 = $sixtyeighthVar->longArithOverflowFlag;
+            $ov29 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyeighthVar->longArithOverflowFlag);
             if (null === $ov29 || null === $sixtyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **69 expected smul overflow metadata (sixtyeighth)');
             }
@@ -25377,7 +25377,7 @@ if ('sixtyeighth' === $expFold) {
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **70 expected smul overflow metadata (sq)');
             }
@@ -25436,7 +25436,7 @@ if ('sixtyeighth' === $expFold) {
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **70 expected smul overflow metadata (cu)');
             }
@@ -25494,7 +25494,7 @@ if ('sixtyeighth' === $expFold) {
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **70 expected smul overflow metadata (fifth)');
             }
@@ -25551,7 +25551,7 @@ if ('sixtyeighth' === $expFold) {
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **70 expected smul overflow metadata (tenth)');
             }
@@ -25607,7 +25607,7 @@ if ('sixtyeighth' === $expFold) {
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **70 expected smul overflow metadata (twentieth)');
             }
@@ -25662,7 +25662,7 @@ if ('sixtyeighth' === $expFold) {
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **70 expected smul overflow metadata (fortieth)');
             }
@@ -25716,7 +25716,7 @@ if ('sixtyeighth' === $expFold) {
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **70 expected smul overflow metadata (fortysecond)');
             }
@@ -25769,7 +25769,7 @@ if ('sixtyeighth' === $expFold) {
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **70 expected smul overflow metadata (fortyfourth)');
             }
@@ -25821,7 +25821,7 @@ if ('sixtyeighth' === $expFold) {
                 $fortyfourthLong,
                 $sqLong
             );
-            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
             if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **70 expected smul overflow metadata (fortysixth)');
             }
@@ -25872,7 +25872,7 @@ if ('sixtyeighth' === $expFold) {
                 $fortysixthLong,
                 $sqLong
             );
-            $ov10 = $fortyeighthVar->longArithOverflowFlag;
+            $ov10 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyeighthVar->longArithOverflowFlag);
             if (null === $ov10 || null === $fortyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **70 expected smul overflow metadata (fortyeighth)');
             }
@@ -25922,7 +25922,7 @@ if ('sixtyeighth' === $expFold) {
                 $fortyeighthLong,
                 $sqLong
             );
-            $ov11 = $fiftiethVar->longArithOverflowFlag;
+            $ov11 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftiethVar->longArithOverflowFlag);
             if (null === $ov11 || null === $fiftiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **70 expected smul overflow metadata (fiftieth)');
             }
@@ -25970,7 +25970,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftiethLong,
                 $n
             );
-            $ov12 = $fiftyfirstVar->longArithOverflowFlag;
+            $ov12 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfirstVar->longArithOverflowFlag);
             if (null === $ov12 || null === $fiftyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **70 expected smul overflow metadata (fiftyfirst)');
             }
@@ -26017,7 +26017,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftyfirstLong,
                 $n
             );
-            $ov13 = $fiftysecondVar->longArithOverflowFlag;
+            $ov13 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysecondVar->longArithOverflowFlag);
             if (null === $ov13 || null === $fiftysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **70 expected smul overflow metadata (fiftysecond)');
             }
@@ -26063,7 +26063,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftysecondLong,
                 $n
             );
-            $ov14 = $fiftythirdVar->longArithOverflowFlag;
+            $ov14 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftythirdVar->longArithOverflowFlag);
             if (null === $ov14 || null === $fiftythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **70 expected smul overflow metadata (fiftythird)');
             }
@@ -26108,7 +26108,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftythirdLong,
                 $n
             );
-            $ov15 = $fiftyfourthVar->longArithOverflowFlag;
+            $ov15 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfourthVar->longArithOverflowFlag);
             if (null === $ov15 || null === $fiftyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **70 expected smul overflow metadata (fiftyfourth)');
             }
@@ -26152,7 +26152,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftyfourthLong,
                 $n
             );
-            $ov16 = $fiftyfifthVar->longArithOverflowFlag;
+            $ov16 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfifthVar->longArithOverflowFlag);
             if (null === $ov16 || null === $fiftyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **70 expected smul overflow metadata (fiftyfifth)');
             }
@@ -26195,7 +26195,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftyfifthLong,
                 $n
             );
-            $ov17 = $fiftysixthVar->longArithOverflowFlag;
+            $ov17 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysixthVar->longArithOverflowFlag);
             if (null === $ov17 || null === $fiftysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **70 expected smul overflow metadata (fiftysixth)');
             }
@@ -26237,7 +26237,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftysixthLong,
                 $n
             );
-            $ov18 = $fiftyseventhVar->longArithOverflowFlag;
+            $ov18 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyseventhVar->longArithOverflowFlag);
             if (null === $ov18 || null === $fiftyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **70 expected smul overflow metadata (fiftyseventh)');
             }
@@ -26278,7 +26278,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftyseventhLong,
                 $n
             );
-            $ov19 = $fiftyeighthVar->longArithOverflowFlag;
+            $ov19 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyeighthVar->longArithOverflowFlag);
             if (null === $ov19 || null === $fiftyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **70 expected smul overflow metadata (fiftyeighth)');
             }
@@ -26318,7 +26318,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftyeighthLong,
                 $n
             );
-            $ov20 = $fiftyninthVar->longArithOverflowFlag;
+            $ov20 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyninthVar->longArithOverflowFlag);
             if (null === $ov20 || null === $fiftyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **70 expected smul overflow metadata (fiftyninth)');
             }
@@ -26357,7 +26357,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftyninthLong,
                 $n
             );
-            $ov21 = $sixtiethVar->longArithOverflowFlag;
+            $ov21 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtiethVar->longArithOverflowFlag);
             if (null === $ov21 || null === $sixtiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **70 expected smul overflow metadata (sixtieth)');
             }
@@ -26395,7 +26395,7 @@ if ('sixtyeighth' === $expFold) {
                 $sixtiethLong,
                 $n
             );
-            $ov22 = $sixtyfirstVar->longArithOverflowFlag;
+            $ov22 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfirstVar->longArithOverflowFlag);
             if (null === $ov22 || null === $sixtyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **70 expected smul overflow metadata (sixtyfirst)');
             }
@@ -26432,7 +26432,7 @@ if ('sixtyeighth' === $expFold) {
                 $sixtyfirstLong,
                 $n
             );
-            $ov23 = $sixtysecondVar->longArithOverflowFlag;
+            $ov23 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysecondVar->longArithOverflowFlag);
             if (null === $ov23 || null === $sixtysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **70 expected smul overflow metadata (sixtysecond)');
             }
@@ -26468,7 +26468,7 @@ if ('sixtyeighth' === $expFold) {
                 $sixtysecondLong,
                 $n
             );
-            $ov24 = $sixtythirdVar->longArithOverflowFlag;
+            $ov24 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtythirdVar->longArithOverflowFlag);
             if (null === $ov24 || null === $sixtythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **70 expected smul overflow metadata (sixtythird)');
             }
@@ -26503,7 +26503,7 @@ if ('sixtyeighth' === $expFold) {
                 $sixtythirdLong,
                 $n
             );
-            $ov25 = $sixtyfourthVar->longArithOverflowFlag;
+            $ov25 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfourthVar->longArithOverflowFlag);
             if (null === $ov25 || null === $sixtyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **70 expected smul overflow metadata (sixtyfourth)');
             }
@@ -26537,7 +26537,7 @@ if ('sixtyeighth' === $expFold) {
                 $sixtyfourthLong,
                 $n
             );
-            $ov26 = $sixtyfifthVar->longArithOverflowFlag;
+            $ov26 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfifthVar->longArithOverflowFlag);
             if (null === $ov26 || null === $sixtyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **70 expected smul overflow metadata (sixtyfifth)');
             }
@@ -26570,7 +26570,7 @@ if ('sixtyeighth' === $expFold) {
                 $sixtyfifthLong,
                 $n
             );
-            $ov27 = $sixtysixthVar->longArithOverflowFlag;
+            $ov27 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysixthVar->longArithOverflowFlag);
             if (null === $ov27 || null === $sixtysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **70 expected smul overflow metadata (sixtysixth)');
             }
@@ -26602,7 +26602,7 @@ if ('sixtyeighth' === $expFold) {
                 $sixtysixthLong,
                 $n
             );
-            $ov28 = $sixtyseventhVar->longArithOverflowFlag;
+            $ov28 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyseventhVar->longArithOverflowFlag);
             if (null === $ov28 || null === $sixtyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **70 expected smul overflow metadata (sixtyseventh)');
             }
@@ -26634,7 +26634,7 @@ if ('sixtyeighth' === $expFold) {
                 $sixtyseventhLong,
                 $n
             );
-            $ov29 = $sixtyeighthVar->longArithOverflowFlag;
+            $ov29 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyeighthVar->longArithOverflowFlag);
             if (null === $ov29 || null === $sixtyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **70 expected smul overflow metadata (sixtyeighth)');
             }
@@ -26665,7 +26665,7 @@ if ('sixtyeighth' === $expFold) {
                 $sixtyeighthLong,
                 $n
             );
-            $ov30 = $sixtyninthVar->longArithOverflowFlag;
+            $ov30 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyninthVar->longArithOverflowFlag);
             if (null === $ov30 || null === $sixtyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **70 expected smul overflow metadata (sixtyninth)');
             }
@@ -26720,7 +26720,7 @@ if ('sixtyeighth' === $expFold) {
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **71 expected smul overflow metadata (sq)');
             }
@@ -26781,7 +26781,7 @@ if ('sixtyeighth' === $expFold) {
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **71 expected smul overflow metadata (cu)');
             }
@@ -26841,7 +26841,7 @@ if ('sixtyeighth' === $expFold) {
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **71 expected smul overflow metadata (fifth)');
             }
@@ -26900,7 +26900,7 @@ if ('sixtyeighth' === $expFold) {
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **71 expected smul overflow metadata (tenth)');
             }
@@ -26958,7 +26958,7 @@ if ('sixtyeighth' === $expFold) {
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **71 expected smul overflow metadata (twentieth)');
             }
@@ -27015,7 +27015,7 @@ if ('sixtyeighth' === $expFold) {
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **71 expected smul overflow metadata (fortieth)');
             }
@@ -27071,7 +27071,7 @@ if ('sixtyeighth' === $expFold) {
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **71 expected smul overflow metadata (fortysecond)');
             }
@@ -27126,7 +27126,7 @@ if ('sixtyeighth' === $expFold) {
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **71 expected smul overflow metadata (fortyfourth)');
             }
@@ -27180,7 +27180,7 @@ if ('sixtyeighth' === $expFold) {
                 $fortyfourthLong,
                 $sqLong
             );
-            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
             if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **71 expected smul overflow metadata (fortysixth)');
             }
@@ -27233,7 +27233,7 @@ if ('sixtyeighth' === $expFold) {
                 $fortysixthLong,
                 $sqLong
             );
-            $ov10 = $fortyeighthVar->longArithOverflowFlag;
+            $ov10 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyeighthVar->longArithOverflowFlag);
             if (null === $ov10 || null === $fortyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **71 expected smul overflow metadata (fortyeighth)');
             }
@@ -27285,7 +27285,7 @@ if ('sixtyeighth' === $expFold) {
                 $fortyeighthLong,
                 $sqLong
             );
-            $ov11 = $fiftiethVar->longArithOverflowFlag;
+            $ov11 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftiethVar->longArithOverflowFlag);
             if (null === $ov11 || null === $fiftiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **71 expected smul overflow metadata (fiftieth)');
             }
@@ -27335,7 +27335,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftiethLong,
                 $n
             );
-            $ov12 = $fiftyfirstVar->longArithOverflowFlag;
+            $ov12 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfirstVar->longArithOverflowFlag);
             if (null === $ov12 || null === $fiftyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **71 expected smul overflow metadata (fiftyfirst)');
             }
@@ -27384,7 +27384,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftyfirstLong,
                 $n
             );
-            $ov13 = $fiftysecondVar->longArithOverflowFlag;
+            $ov13 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysecondVar->longArithOverflowFlag);
             if (null === $ov13 || null === $fiftysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **71 expected smul overflow metadata (fiftysecond)');
             }
@@ -27432,7 +27432,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftysecondLong,
                 $n
             );
-            $ov14 = $fiftythirdVar->longArithOverflowFlag;
+            $ov14 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftythirdVar->longArithOverflowFlag);
             if (null === $ov14 || null === $fiftythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **71 expected smul overflow metadata (fiftythird)');
             }
@@ -27479,7 +27479,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftythirdLong,
                 $n
             );
-            $ov15 = $fiftyfourthVar->longArithOverflowFlag;
+            $ov15 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfourthVar->longArithOverflowFlag);
             if (null === $ov15 || null === $fiftyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **71 expected smul overflow metadata (fiftyfourth)');
             }
@@ -27525,7 +27525,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftyfourthLong,
                 $n
             );
-            $ov16 = $fiftyfifthVar->longArithOverflowFlag;
+            $ov16 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfifthVar->longArithOverflowFlag);
             if (null === $ov16 || null === $fiftyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **71 expected smul overflow metadata (fiftyfifth)');
             }
@@ -27570,7 +27570,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftyfifthLong,
                 $n
             );
-            $ov17 = $fiftysixthVar->longArithOverflowFlag;
+            $ov17 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysixthVar->longArithOverflowFlag);
             if (null === $ov17 || null === $fiftysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **71 expected smul overflow metadata (fiftysixth)');
             }
@@ -27614,7 +27614,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftysixthLong,
                 $n
             );
-            $ov18 = $fiftyseventhVar->longArithOverflowFlag;
+            $ov18 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyseventhVar->longArithOverflowFlag);
             if (null === $ov18 || null === $fiftyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **71 expected smul overflow metadata (fiftyseventh)');
             }
@@ -27657,7 +27657,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftyseventhLong,
                 $n
             );
-            $ov19 = $fiftyeighthVar->longArithOverflowFlag;
+            $ov19 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyeighthVar->longArithOverflowFlag);
             if (null === $ov19 || null === $fiftyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **71 expected smul overflow metadata (fiftyeighth)');
             }
@@ -27699,7 +27699,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftyeighthLong,
                 $n
             );
-            $ov20 = $fiftyninthVar->longArithOverflowFlag;
+            $ov20 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyninthVar->longArithOverflowFlag);
             if (null === $ov20 || null === $fiftyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **71 expected smul overflow metadata (fiftyninth)');
             }
@@ -27740,7 +27740,7 @@ if ('sixtyeighth' === $expFold) {
                 $fiftyninthLong,
                 $n
             );
-            $ov21 = $sixtiethVar->longArithOverflowFlag;
+            $ov21 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtiethVar->longArithOverflowFlag);
             if (null === $ov21 || null === $sixtiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **71 expected smul overflow metadata (sixtieth)');
             }
@@ -27780,7 +27780,7 @@ if ('sixtyeighth' === $expFold) {
                 $sixtiethLong,
                 $n
             );
-            $ov22 = $sixtyfirstVar->longArithOverflowFlag;
+            $ov22 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfirstVar->longArithOverflowFlag);
             if (null === $ov22 || null === $sixtyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **71 expected smul overflow metadata (sixtyfirst)');
             }
@@ -27819,7 +27819,7 @@ if ('sixtyeighth' === $expFold) {
                 $sixtyfirstLong,
                 $n
             );
-            $ov23 = $sixtysecondVar->longArithOverflowFlag;
+            $ov23 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysecondVar->longArithOverflowFlag);
             if (null === $ov23 || null === $sixtysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **71 expected smul overflow metadata (sixtysecond)');
             }
@@ -27857,7 +27857,7 @@ if ('sixtyeighth' === $expFold) {
                 $sixtysecondLong,
                 $n
             );
-            $ov24 = $sixtythirdVar->longArithOverflowFlag;
+            $ov24 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtythirdVar->longArithOverflowFlag);
             if (null === $ov24 || null === $sixtythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **71 expected smul overflow metadata (sixtythird)');
             }
@@ -27894,7 +27894,7 @@ if ('sixtyeighth' === $expFold) {
                 $sixtythirdLong,
                 $n
             );
-            $ov25 = $sixtyfourthVar->longArithOverflowFlag;
+            $ov25 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfourthVar->longArithOverflowFlag);
             if (null === $ov25 || null === $sixtyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **71 expected smul overflow metadata (sixtyfourth)');
             }
@@ -27930,7 +27930,7 @@ if ('sixtyeighth' === $expFold) {
                 $sixtyfourthLong,
                 $n
             );
-            $ov26 = $sixtyfifthVar->longArithOverflowFlag;
+            $ov26 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfifthVar->longArithOverflowFlag);
             if (null === $ov26 || null === $sixtyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **71 expected smul overflow metadata (sixtyfifth)');
             }
@@ -27965,7 +27965,7 @@ if ('sixtyeighth' === $expFold) {
                 $sixtyfifthLong,
                 $n
             );
-            $ov27 = $sixtysixthVar->longArithOverflowFlag;
+            $ov27 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysixthVar->longArithOverflowFlag);
             if (null === $ov27 || null === $sixtysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **71 expected smul overflow metadata (sixtysixth)');
             }
@@ -27999,7 +27999,7 @@ if ('sixtyeighth' === $expFold) {
                 $sixtysixthLong,
                 $n
             );
-            $ov28 = $sixtyseventhVar->longArithOverflowFlag;
+            $ov28 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyseventhVar->longArithOverflowFlag);
             if (null === $ov28 || null === $sixtyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **71 expected smul overflow metadata (sixtyseventh)');
             }
@@ -28033,7 +28033,7 @@ if ('sixtyeighth' === $expFold) {
                 $sixtyseventhLong,
                 $n
             );
-            $ov29 = $sixtyeighthVar->longArithOverflowFlag;
+            $ov29 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyeighthVar->longArithOverflowFlag);
             if (null === $ov29 || null === $sixtyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **71 expected smul overflow metadata (sixtyeighth)');
             }
@@ -28066,7 +28066,7 @@ if ('sixtyeighth' === $expFold) {
                 $sixtyeighthLong,
                 $n
             );
-            $ov30 = $sixtyninthVar->longArithOverflowFlag;
+            $ov30 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyninthVar->longArithOverflowFlag);
             if (null === $ov30 || null === $sixtyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **71 expected smul overflow metadata (sixtyninth)');
             }
@@ -28096,7 +28096,7 @@ if ('sixtyeighth' === $expFold) {
                 $sixtyninthLong,
                 $n
             );
-            $ov31 = $seventiethVar->longArithOverflowFlag;
+            $ov31 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventiethVar->longArithOverflowFlag);
             if (null === $ov31 || null === $seventiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **71 expected smul overflow metadata (seventieth)');
             }
@@ -28151,7 +28151,7 @@ if ('seventysecond' === $expFold) {
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **72 expected smul overflow metadata (sq)');
             }
@@ -28215,7 +28215,7 @@ if ('seventysecond' === $expFold) {
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **72 expected smul overflow metadata (cu)');
             }
@@ -28278,7 +28278,7 @@ if ('seventysecond' === $expFold) {
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **72 expected smul overflow metadata (fifth)');
             }
@@ -28340,7 +28340,7 @@ if ('seventysecond' === $expFold) {
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **72 expected smul overflow metadata (tenth)');
             }
@@ -28401,7 +28401,7 @@ if ('seventysecond' === $expFold) {
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **72 expected smul overflow metadata (twentieth)');
             }
@@ -28461,7 +28461,7 @@ if ('seventysecond' === $expFold) {
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **72 expected smul overflow metadata (fortieth)');
             }
@@ -28520,7 +28520,7 @@ if ('seventysecond' === $expFold) {
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **72 expected smul overflow metadata (fortysecond)');
             }
@@ -28578,7 +28578,7 @@ if ('seventysecond' === $expFold) {
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **72 expected smul overflow metadata (fortyfourth)');
             }
@@ -28635,7 +28635,7 @@ if ('seventysecond' === $expFold) {
                 $fortyfourthLong,
                 $sqLong
             );
-            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
             if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **72 expected smul overflow metadata (fortysixth)');
             }
@@ -28691,7 +28691,7 @@ if ('seventysecond' === $expFold) {
                 $fortysixthLong,
                 $sqLong
             );
-            $ov10 = $fortyeighthVar->longArithOverflowFlag;
+            $ov10 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyeighthVar->longArithOverflowFlag);
             if (null === $ov10 || null === $fortyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **72 expected smul overflow metadata (fortyeighth)');
             }
@@ -28746,7 +28746,7 @@ if ('seventysecond' === $expFold) {
                 $fortyeighthLong,
                 $sqLong
             );
-            $ov11 = $fiftiethVar->longArithOverflowFlag;
+            $ov11 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftiethVar->longArithOverflowFlag);
             if (null === $ov11 || null === $fiftiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **72 expected smul overflow metadata (fiftieth)');
             }
@@ -28799,7 +28799,7 @@ if ('seventysecond' === $expFold) {
                 $fiftiethLong,
                 $n
             );
-            $ov12 = $fiftyfirstVar->longArithOverflowFlag;
+            $ov12 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfirstVar->longArithOverflowFlag);
             if (null === $ov12 || null === $fiftyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **72 expected smul overflow metadata (fiftyfirst)');
             }
@@ -28851,7 +28851,7 @@ if ('seventysecond' === $expFold) {
                 $fiftyfirstLong,
                 $n
             );
-            $ov13 = $fiftysecondVar->longArithOverflowFlag;
+            $ov13 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysecondVar->longArithOverflowFlag);
             if (null === $ov13 || null === $fiftysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **72 expected smul overflow metadata (fiftysecond)');
             }
@@ -28902,7 +28902,7 @@ if ('seventysecond' === $expFold) {
                 $fiftysecondLong,
                 $n
             );
-            $ov14 = $fiftythirdVar->longArithOverflowFlag;
+            $ov14 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftythirdVar->longArithOverflowFlag);
             if (null === $ov14 || null === $fiftythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **72 expected smul overflow metadata (fiftythird)');
             }
@@ -28952,7 +28952,7 @@ if ('seventysecond' === $expFold) {
                 $fiftythirdLong,
                 $n
             );
-            $ov15 = $fiftyfourthVar->longArithOverflowFlag;
+            $ov15 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfourthVar->longArithOverflowFlag);
             if (null === $ov15 || null === $fiftyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **72 expected smul overflow metadata (fiftyfourth)');
             }
@@ -29001,7 +29001,7 @@ if ('seventysecond' === $expFold) {
                 $fiftyfourthLong,
                 $n
             );
-            $ov16 = $fiftyfifthVar->longArithOverflowFlag;
+            $ov16 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfifthVar->longArithOverflowFlag);
             if (null === $ov16 || null === $fiftyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **72 expected smul overflow metadata (fiftyfifth)');
             }
@@ -29049,7 +29049,7 @@ if ('seventysecond' === $expFold) {
                 $fiftyfifthLong,
                 $n
             );
-            $ov17 = $fiftysixthVar->longArithOverflowFlag;
+            $ov17 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysixthVar->longArithOverflowFlag);
             if (null === $ov17 || null === $fiftysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **72 expected smul overflow metadata (fiftysixth)');
             }
@@ -29096,7 +29096,7 @@ if ('seventysecond' === $expFold) {
                 $fiftysixthLong,
                 $n
             );
-            $ov18 = $fiftyseventhVar->longArithOverflowFlag;
+            $ov18 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyseventhVar->longArithOverflowFlag);
             if (null === $ov18 || null === $fiftyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **72 expected smul overflow metadata (fiftyseventh)');
             }
@@ -29142,7 +29142,7 @@ if ('seventysecond' === $expFold) {
                 $fiftyseventhLong,
                 $n
             );
-            $ov19 = $fiftyeighthVar->longArithOverflowFlag;
+            $ov19 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyeighthVar->longArithOverflowFlag);
             if (null === $ov19 || null === $fiftyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **72 expected smul overflow metadata (fiftyeighth)');
             }
@@ -29187,7 +29187,7 @@ if ('seventysecond' === $expFold) {
                 $fiftyeighthLong,
                 $n
             );
-            $ov20 = $fiftyninthVar->longArithOverflowFlag;
+            $ov20 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyninthVar->longArithOverflowFlag);
             if (null === $ov20 || null === $fiftyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **72 expected smul overflow metadata (fiftyninth)');
             }
@@ -29231,7 +29231,7 @@ if ('seventysecond' === $expFold) {
                 $fiftyninthLong,
                 $n
             );
-            $ov21 = $sixtiethVar->longArithOverflowFlag;
+            $ov21 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtiethVar->longArithOverflowFlag);
             if (null === $ov21 || null === $sixtiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **72 expected smul overflow metadata (sixtieth)');
             }
@@ -29274,7 +29274,7 @@ if ('seventysecond' === $expFold) {
                 $sixtiethLong,
                 $n
             );
-            $ov22 = $sixtyfirstVar->longArithOverflowFlag;
+            $ov22 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfirstVar->longArithOverflowFlag);
             if (null === $ov22 || null === $sixtyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **72 expected smul overflow metadata (sixtyfirst)');
             }
@@ -29316,7 +29316,7 @@ if ('seventysecond' === $expFold) {
                 $sixtyfirstLong,
                 $n
             );
-            $ov23 = $sixtysecondVar->longArithOverflowFlag;
+            $ov23 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysecondVar->longArithOverflowFlag);
             if (null === $ov23 || null === $sixtysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **72 expected smul overflow metadata (sixtysecond)');
             }
@@ -29357,7 +29357,7 @@ if ('seventysecond' === $expFold) {
                 $sixtysecondLong,
                 $n
             );
-            $ov24 = $sixtythirdVar->longArithOverflowFlag;
+            $ov24 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtythirdVar->longArithOverflowFlag);
             if (null === $ov24 || null === $sixtythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **72 expected smul overflow metadata (sixtythird)');
             }
@@ -29397,7 +29397,7 @@ if ('seventysecond' === $expFold) {
                 $sixtythirdLong,
                 $n
             );
-            $ov25 = $sixtyfourthVar->longArithOverflowFlag;
+            $ov25 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfourthVar->longArithOverflowFlag);
             if (null === $ov25 || null === $sixtyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **72 expected smul overflow metadata (sixtyfourth)');
             }
@@ -29436,7 +29436,7 @@ if ('seventysecond' === $expFold) {
                 $sixtyfourthLong,
                 $n
             );
-            $ov26 = $sixtyfifthVar->longArithOverflowFlag;
+            $ov26 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfifthVar->longArithOverflowFlag);
             if (null === $ov26 || null === $sixtyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **72 expected smul overflow metadata (sixtyfifth)');
             }
@@ -29474,7 +29474,7 @@ if ('seventysecond' === $expFold) {
                 $sixtyfifthLong,
                 $n
             );
-            $ov27 = $sixtysixthVar->longArithOverflowFlag;
+            $ov27 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysixthVar->longArithOverflowFlag);
             if (null === $ov27 || null === $sixtysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **72 expected smul overflow metadata (sixtysixth)');
             }
@@ -29511,7 +29511,7 @@ if ('seventysecond' === $expFold) {
                 $sixtysixthLong,
                 $n
             );
-            $ov28 = $sixtyseventhVar->longArithOverflowFlag;
+            $ov28 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyseventhVar->longArithOverflowFlag);
             if (null === $ov28 || null === $sixtyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **72 expected smul overflow metadata (sixtyseventh)');
             }
@@ -29548,7 +29548,7 @@ if ('seventysecond' === $expFold) {
                 $sixtyseventhLong,
                 $n
             );
-            $ov29 = $sixtyeighthVar->longArithOverflowFlag;
+            $ov29 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyeighthVar->longArithOverflowFlag);
             if (null === $ov29 || null === $sixtyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **72 expected smul overflow metadata (sixtyeighth)');
             }
@@ -29583,7 +29583,7 @@ if ('seventysecond' === $expFold) {
                 $sixtyeighthLong,
                 $n
             );
-            $ov30 = $sixtyninthVar->longArithOverflowFlag;
+            $ov30 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyninthVar->longArithOverflowFlag);
             if (null === $ov30 || null === $sixtyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **72 expected smul overflow metadata (sixtyninth)');
             }
@@ -29613,7 +29613,7 @@ if ('seventysecond' === $expFold) {
                 $sixtyninthLong,
                 $n
             );
-            $ov31 = $seventiethVar->longArithOverflowFlag;
+            $ov31 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventiethVar->longArithOverflowFlag);
             if (null === $ov31 || null === $seventiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **72 expected smul overflow metadata (seventieth)');
             }
@@ -29643,7 +29643,7 @@ if ('seventysecond' === $expFold) {
                 $seventiethLong,
                 $n
             );
-            $ov32 = $seventyfirstVar->longArithOverflowFlag;
+            $ov32 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyfirstVar->longArithOverflowFlag);
             if (null === $ov32 || null === $seventyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **72 expected smul overflow metadata (seventyfirst)');
             }
@@ -29698,7 +29698,7 @@ if ('seventythird' === $expFold) {
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **73 expected smul overflow metadata (sq)');
             }
@@ -29763,7 +29763,7 @@ if ('seventythird' === $expFold) {
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **73 expected smul overflow metadata (cu)');
             }
@@ -29827,7 +29827,7 @@ if ('seventythird' === $expFold) {
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **73 expected smul overflow metadata (fifth)');
             }
@@ -29890,7 +29890,7 @@ if ('seventythird' === $expFold) {
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **73 expected smul overflow metadata (tenth)');
             }
@@ -29952,7 +29952,7 @@ if ('seventythird' === $expFold) {
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **73 expected smul overflow metadata (twentieth)');
             }
@@ -30013,7 +30013,7 @@ if ('seventythird' === $expFold) {
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **73 expected smul overflow metadata (fortieth)');
             }
@@ -30073,7 +30073,7 @@ if ('seventythird' === $expFold) {
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **73 expected smul overflow metadata (fortysecond)');
             }
@@ -30132,7 +30132,7 @@ if ('seventythird' === $expFold) {
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **73 expected smul overflow metadata (fortyfourth)');
             }
@@ -30190,7 +30190,7 @@ if ('seventythird' === $expFold) {
                 $fortyfourthLong,
                 $sqLong
             );
-            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
             if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **73 expected smul overflow metadata (fortysixth)');
             }
@@ -30247,7 +30247,7 @@ if ('seventythird' === $expFold) {
                 $fortysixthLong,
                 $sqLong
             );
-            $ov10 = $fortyeighthVar->longArithOverflowFlag;
+            $ov10 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyeighthVar->longArithOverflowFlag);
             if (null === $ov10 || null === $fortyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **73 expected smul overflow metadata (fortyeighth)');
             }
@@ -30303,7 +30303,7 @@ if ('seventythird' === $expFold) {
                 $fortyeighthLong,
                 $sqLong
             );
-            $ov11 = $fiftiethVar->longArithOverflowFlag;
+            $ov11 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftiethVar->longArithOverflowFlag);
             if (null === $ov11 || null === $fiftiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **73 expected smul overflow metadata (fiftieth)');
             }
@@ -30357,7 +30357,7 @@ if ('seventythird' === $expFold) {
                 $fiftiethLong,
                 $n
             );
-            $ov12 = $fiftyfirstVar->longArithOverflowFlag;
+            $ov12 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfirstVar->longArithOverflowFlag);
             if (null === $ov12 || null === $fiftyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **73 expected smul overflow metadata (fiftyfirst)');
             }
@@ -30410,7 +30410,7 @@ if ('seventythird' === $expFold) {
                 $fiftyfirstLong,
                 $n
             );
-            $ov13 = $fiftysecondVar->longArithOverflowFlag;
+            $ov13 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysecondVar->longArithOverflowFlag);
             if (null === $ov13 || null === $fiftysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **73 expected smul overflow metadata (fiftysecond)');
             }
@@ -30462,7 +30462,7 @@ if ('seventythird' === $expFold) {
                 $fiftysecondLong,
                 $n
             );
-            $ov14 = $fiftythirdVar->longArithOverflowFlag;
+            $ov14 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftythirdVar->longArithOverflowFlag);
             if (null === $ov14 || null === $fiftythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **73 expected smul overflow metadata (fiftythird)');
             }
@@ -30513,7 +30513,7 @@ if ('seventythird' === $expFold) {
                 $fiftythirdLong,
                 $n
             );
-            $ov15 = $fiftyfourthVar->longArithOverflowFlag;
+            $ov15 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfourthVar->longArithOverflowFlag);
             if (null === $ov15 || null === $fiftyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **73 expected smul overflow metadata (fiftyfourth)');
             }
@@ -30563,7 +30563,7 @@ if ('seventythird' === $expFold) {
                 $fiftyfourthLong,
                 $n
             );
-            $ov16 = $fiftyfifthVar->longArithOverflowFlag;
+            $ov16 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfifthVar->longArithOverflowFlag);
             if (null === $ov16 || null === $fiftyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **73 expected smul overflow metadata (fiftyfifth)');
             }
@@ -30612,7 +30612,7 @@ if ('seventythird' === $expFold) {
                 $fiftyfifthLong,
                 $n
             );
-            $ov17 = $fiftysixthVar->longArithOverflowFlag;
+            $ov17 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysixthVar->longArithOverflowFlag);
             if (null === $ov17 || null === $fiftysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **73 expected smul overflow metadata (fiftysixth)');
             }
@@ -30660,7 +30660,7 @@ if ('seventythird' === $expFold) {
                 $fiftysixthLong,
                 $n
             );
-            $ov18 = $fiftyseventhVar->longArithOverflowFlag;
+            $ov18 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyseventhVar->longArithOverflowFlag);
             if (null === $ov18 || null === $fiftyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **73 expected smul overflow metadata (fiftyseventh)');
             }
@@ -30707,7 +30707,7 @@ if ('seventythird' === $expFold) {
                 $fiftyseventhLong,
                 $n
             );
-            $ov19 = $fiftyeighthVar->longArithOverflowFlag;
+            $ov19 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyeighthVar->longArithOverflowFlag);
             if (null === $ov19 || null === $fiftyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **73 expected smul overflow metadata (fiftyeighth)');
             }
@@ -30753,7 +30753,7 @@ if ('seventythird' === $expFold) {
                 $fiftyeighthLong,
                 $n
             );
-            $ov20 = $fiftyninthVar->longArithOverflowFlag;
+            $ov20 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyninthVar->longArithOverflowFlag);
             if (null === $ov20 || null === $fiftyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **73 expected smul overflow metadata (fiftyninth)');
             }
@@ -30798,7 +30798,7 @@ if ('seventythird' === $expFold) {
                 $fiftyninthLong,
                 $n
             );
-            $ov21 = $sixtiethVar->longArithOverflowFlag;
+            $ov21 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtiethVar->longArithOverflowFlag);
             if (null === $ov21 || null === $sixtiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **73 expected smul overflow metadata (sixtieth)');
             }
@@ -30842,7 +30842,7 @@ if ('seventythird' === $expFold) {
                 $sixtiethLong,
                 $n
             );
-            $ov22 = $sixtyfirstVar->longArithOverflowFlag;
+            $ov22 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfirstVar->longArithOverflowFlag);
             if (null === $ov22 || null === $sixtyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **73 expected smul overflow metadata (sixtyfirst)');
             }
@@ -30885,7 +30885,7 @@ if ('seventythird' === $expFold) {
                 $sixtyfirstLong,
                 $n
             );
-            $ov23 = $sixtysecondVar->longArithOverflowFlag;
+            $ov23 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysecondVar->longArithOverflowFlag);
             if (null === $ov23 || null === $sixtysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **73 expected smul overflow metadata (sixtysecond)');
             }
@@ -30927,7 +30927,7 @@ if ('seventythird' === $expFold) {
                 $sixtysecondLong,
                 $n
             );
-            $ov24 = $sixtythirdVar->longArithOverflowFlag;
+            $ov24 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtythirdVar->longArithOverflowFlag);
             if (null === $ov24 || null === $sixtythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **73 expected smul overflow metadata (sixtythird)');
             }
@@ -30968,7 +30968,7 @@ if ('seventythird' === $expFold) {
                 $sixtythirdLong,
                 $n
             );
-            $ov25 = $sixtyfourthVar->longArithOverflowFlag;
+            $ov25 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfourthVar->longArithOverflowFlag);
             if (null === $ov25 || null === $sixtyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **73 expected smul overflow metadata (sixtyfourth)');
             }
@@ -31008,7 +31008,7 @@ if ('seventythird' === $expFold) {
                 $sixtyfourthLong,
                 $n
             );
-            $ov26 = $sixtyfifthVar->longArithOverflowFlag;
+            $ov26 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfifthVar->longArithOverflowFlag);
             if (null === $ov26 || null === $sixtyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **73 expected smul overflow metadata (sixtyfifth)');
             }
@@ -31047,7 +31047,7 @@ if ('seventythird' === $expFold) {
                 $sixtyfifthLong,
                 $n
             );
-            $ov27 = $sixtysixthVar->longArithOverflowFlag;
+            $ov27 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysixthVar->longArithOverflowFlag);
             if (null === $ov27 || null === $sixtysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **73 expected smul overflow metadata (sixtysixth)');
             }
@@ -31085,7 +31085,7 @@ if ('seventythird' === $expFold) {
                 $sixtysixthLong,
                 $n
             );
-            $ov28 = $sixtyseventhVar->longArithOverflowFlag;
+            $ov28 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyseventhVar->longArithOverflowFlag);
             if (null === $ov28 || null === $sixtyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **73 expected smul overflow metadata (sixtyseventh)');
             }
@@ -31123,7 +31123,7 @@ if ('seventythird' === $expFold) {
                 $sixtyseventhLong,
                 $n
             );
-            $ov29 = $sixtyeighthVar->longArithOverflowFlag;
+            $ov29 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyeighthVar->longArithOverflowFlag);
             if (null === $ov29 || null === $sixtyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **73 expected smul overflow metadata (sixtyeighth)');
             }
@@ -31159,7 +31159,7 @@ if ('seventythird' === $expFold) {
                 $sixtyeighthLong,
                 $n
             );
-            $ov30 = $sixtyninthVar->longArithOverflowFlag;
+            $ov30 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyninthVar->longArithOverflowFlag);
             if (null === $ov30 || null === $sixtyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **73 expected smul overflow metadata (sixtyninth)');
             }
@@ -31190,7 +31190,7 @@ if ('seventythird' === $expFold) {
                 $sixtyninthLong,
                 $n
             );
-            $ov31 = $seventiethVar->longArithOverflowFlag;
+            $ov31 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventiethVar->longArithOverflowFlag);
             if (null === $ov31 || null === $seventiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **73 expected smul overflow metadata (seventieth)');
             }
@@ -31221,7 +31221,7 @@ if ('seventythird' === $expFold) {
                 $seventiethLong,
                 $n
             );
-            $ov32 = $seventyfirstVar->longArithOverflowFlag;
+            $ov32 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyfirstVar->longArithOverflowFlag);
             if (null === $ov32 || null === $seventyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **73 expected smul overflow metadata (seventyfirst)');
             }
@@ -31252,7 +31252,7 @@ if ('seventythird' === $expFold) {
                 $seventyfirstLong,
                 $n
             );
-            $ov33 = $seventysecondVar->longArithOverflowFlag;
+            $ov33 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventysecondVar->longArithOverflowFlag);
             if (null === $ov33 || null === $seventysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **73 expected smul overflow metadata (seventysecond)');
             }
@@ -31307,7 +31307,7 @@ if ('seventyfourth' === $expFold) {
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **74 expected smul overflow metadata (sq)');
             }
@@ -31373,7 +31373,7 @@ if ('seventyfourth' === $expFold) {
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **74 expected smul overflow metadata (cu)');
             }
@@ -31438,7 +31438,7 @@ if ('seventyfourth' === $expFold) {
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **74 expected smul overflow metadata (fifth)');
             }
@@ -31502,7 +31502,7 @@ if ('seventyfourth' === $expFold) {
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **74 expected smul overflow metadata (tenth)');
             }
@@ -31565,7 +31565,7 @@ if ('seventyfourth' === $expFold) {
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **74 expected smul overflow metadata (twentieth)');
             }
@@ -31627,7 +31627,7 @@ if ('seventyfourth' === $expFold) {
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **74 expected smul overflow metadata (fortieth)');
             }
@@ -31688,7 +31688,7 @@ if ('seventyfourth' === $expFold) {
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **74 expected smul overflow metadata (fortysecond)');
             }
@@ -31748,7 +31748,7 @@ if ('seventyfourth' === $expFold) {
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **74 expected smul overflow metadata (fortyfourth)');
             }
@@ -31807,7 +31807,7 @@ if ('seventyfourth' === $expFold) {
                 $fortyfourthLong,
                 $sqLong
             );
-            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
             if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **74 expected smul overflow metadata (fortysixth)');
             }
@@ -31865,7 +31865,7 @@ if ('seventyfourth' === $expFold) {
                 $fortysixthLong,
                 $sqLong
             );
-            $ov10 = $fortyeighthVar->longArithOverflowFlag;
+            $ov10 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyeighthVar->longArithOverflowFlag);
             if (null === $ov10 || null === $fortyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **74 expected smul overflow metadata (fortyeighth)');
             }
@@ -31922,7 +31922,7 @@ if ('seventyfourth' === $expFold) {
                 $fortyeighthLong,
                 $sqLong
             );
-            $ov11 = $fiftiethVar->longArithOverflowFlag;
+            $ov11 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftiethVar->longArithOverflowFlag);
             if (null === $ov11 || null === $fiftiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **74 expected smul overflow metadata (fiftieth)');
             }
@@ -31977,7 +31977,7 @@ if ('seventyfourth' === $expFold) {
                 $fiftiethLong,
                 $n
             );
-            $ov12 = $fiftyfirstVar->longArithOverflowFlag;
+            $ov12 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfirstVar->longArithOverflowFlag);
             if (null === $ov12 || null === $fiftyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **74 expected smul overflow metadata (fiftyfirst)');
             }
@@ -32031,7 +32031,7 @@ if ('seventyfourth' === $expFold) {
                 $fiftyfirstLong,
                 $n
             );
-            $ov13 = $fiftysecondVar->longArithOverflowFlag;
+            $ov13 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysecondVar->longArithOverflowFlag);
             if (null === $ov13 || null === $fiftysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **74 expected smul overflow metadata (fiftysecond)');
             }
@@ -32084,7 +32084,7 @@ if ('seventyfourth' === $expFold) {
                 $fiftysecondLong,
                 $n
             );
-            $ov14 = $fiftythirdVar->longArithOverflowFlag;
+            $ov14 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftythirdVar->longArithOverflowFlag);
             if (null === $ov14 || null === $fiftythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **74 expected smul overflow metadata (fiftythird)');
             }
@@ -32136,7 +32136,7 @@ if ('seventyfourth' === $expFold) {
                 $fiftythirdLong,
                 $n
             );
-            $ov15 = $fiftyfourthVar->longArithOverflowFlag;
+            $ov15 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfourthVar->longArithOverflowFlag);
             if (null === $ov15 || null === $fiftyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **74 expected smul overflow metadata (fiftyfourth)');
             }
@@ -32187,7 +32187,7 @@ if ('seventyfourth' === $expFold) {
                 $fiftyfourthLong,
                 $n
             );
-            $ov16 = $fiftyfifthVar->longArithOverflowFlag;
+            $ov16 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfifthVar->longArithOverflowFlag);
             if (null === $ov16 || null === $fiftyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **74 expected smul overflow metadata (fiftyfifth)');
             }
@@ -32237,7 +32237,7 @@ if ('seventyfourth' === $expFold) {
                 $fiftyfifthLong,
                 $n
             );
-            $ov17 = $fiftysixthVar->longArithOverflowFlag;
+            $ov17 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysixthVar->longArithOverflowFlag);
             if (null === $ov17 || null === $fiftysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **74 expected smul overflow metadata (fiftysixth)');
             }
@@ -32286,7 +32286,7 @@ if ('seventyfourth' === $expFold) {
                 $fiftysixthLong,
                 $n
             );
-            $ov18 = $fiftyseventhVar->longArithOverflowFlag;
+            $ov18 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyseventhVar->longArithOverflowFlag);
             if (null === $ov18 || null === $fiftyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **74 expected smul overflow metadata (fiftyseventh)');
             }
@@ -32334,7 +32334,7 @@ if ('seventyfourth' === $expFold) {
                 $fiftyseventhLong,
                 $n
             );
-            $ov19 = $fiftyeighthVar->longArithOverflowFlag;
+            $ov19 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyeighthVar->longArithOverflowFlag);
             if (null === $ov19 || null === $fiftyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **74 expected smul overflow metadata (fiftyeighth)');
             }
@@ -32381,7 +32381,7 @@ if ('seventyfourth' === $expFold) {
                 $fiftyeighthLong,
                 $n
             );
-            $ov20 = $fiftyninthVar->longArithOverflowFlag;
+            $ov20 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyninthVar->longArithOverflowFlag);
             if (null === $ov20 || null === $fiftyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **74 expected smul overflow metadata (fiftyninth)');
             }
@@ -32427,7 +32427,7 @@ if ('seventyfourth' === $expFold) {
                 $fiftyninthLong,
                 $n
             );
-            $ov21 = $sixtiethVar->longArithOverflowFlag;
+            $ov21 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtiethVar->longArithOverflowFlag);
             if (null === $ov21 || null === $sixtiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **74 expected smul overflow metadata (sixtieth)');
             }
@@ -32472,7 +32472,7 @@ if ('seventyfourth' === $expFold) {
                 $sixtiethLong,
                 $n
             );
-            $ov22 = $sixtyfirstVar->longArithOverflowFlag;
+            $ov22 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfirstVar->longArithOverflowFlag);
             if (null === $ov22 || null === $sixtyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **74 expected smul overflow metadata (sixtyfirst)');
             }
@@ -32516,7 +32516,7 @@ if ('seventyfourth' === $expFold) {
                 $sixtyfirstLong,
                 $n
             );
-            $ov23 = $sixtysecondVar->longArithOverflowFlag;
+            $ov23 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysecondVar->longArithOverflowFlag);
             if (null === $ov23 || null === $sixtysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **74 expected smul overflow metadata (sixtysecond)');
             }
@@ -32559,7 +32559,7 @@ if ('seventyfourth' === $expFold) {
                 $sixtysecondLong,
                 $n
             );
-            $ov24 = $sixtythirdVar->longArithOverflowFlag;
+            $ov24 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtythirdVar->longArithOverflowFlag);
             if (null === $ov24 || null === $sixtythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **74 expected smul overflow metadata (sixtythird)');
             }
@@ -32601,7 +32601,7 @@ if ('seventyfourth' === $expFold) {
                 $sixtythirdLong,
                 $n
             );
-            $ov25 = $sixtyfourthVar->longArithOverflowFlag;
+            $ov25 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfourthVar->longArithOverflowFlag);
             if (null === $ov25 || null === $sixtyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **74 expected smul overflow metadata (sixtyfourth)');
             }
@@ -32642,7 +32642,7 @@ if ('seventyfourth' === $expFold) {
                 $sixtyfourthLong,
                 $n
             );
-            $ov26 = $sixtyfifthVar->longArithOverflowFlag;
+            $ov26 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfifthVar->longArithOverflowFlag);
             if (null === $ov26 || null === $sixtyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **74 expected smul overflow metadata (sixtyfifth)');
             }
@@ -32682,7 +32682,7 @@ if ('seventyfourth' === $expFold) {
                 $sixtyfifthLong,
                 $n
             );
-            $ov27 = $sixtysixthVar->longArithOverflowFlag;
+            $ov27 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysixthVar->longArithOverflowFlag);
             if (null === $ov27 || null === $sixtysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **74 expected smul overflow metadata (sixtysixth)');
             }
@@ -32721,7 +32721,7 @@ if ('seventyfourth' === $expFold) {
                 $sixtysixthLong,
                 $n
             );
-            $ov28 = $sixtyseventhVar->longArithOverflowFlag;
+            $ov28 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyseventhVar->longArithOverflowFlag);
             if (null === $ov28 || null === $sixtyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **74 expected smul overflow metadata (sixtyseventh)');
             }
@@ -32760,7 +32760,7 @@ if ('seventyfourth' === $expFold) {
                 $sixtyseventhLong,
                 $n
             );
-            $ov29 = $sixtyeighthVar->longArithOverflowFlag;
+            $ov29 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyeighthVar->longArithOverflowFlag);
             if (null === $ov29 || null === $sixtyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **74 expected smul overflow metadata (sixtyeighth)');
             }
@@ -32797,7 +32797,7 @@ if ('seventyfourth' === $expFold) {
                 $sixtyeighthLong,
                 $n
             );
-            $ov30 = $sixtyninthVar->longArithOverflowFlag;
+            $ov30 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyninthVar->longArithOverflowFlag);
             if (null === $ov30 || null === $sixtyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **74 expected smul overflow metadata (sixtyninth)');
             }
@@ -32829,7 +32829,7 @@ if ('seventyfourth' === $expFold) {
                 $sixtyninthLong,
                 $n
             );
-            $ov31 = $seventiethVar->longArithOverflowFlag;
+            $ov31 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventiethVar->longArithOverflowFlag);
             if (null === $ov31 || null === $seventiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **74 expected smul overflow metadata (seventieth)');
             }
@@ -32861,7 +32861,7 @@ if ('seventyfourth' === $expFold) {
                 $seventiethLong,
                 $n
             );
-            $ov32 = $seventyfirstVar->longArithOverflowFlag;
+            $ov32 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyfirstVar->longArithOverflowFlag);
             if (null === $ov32 || null === $seventyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **74 expected smul overflow metadata (seventyfirst)');
             }
@@ -32893,7 +32893,7 @@ if ('seventyfourth' === $expFold) {
                 $seventyfirstLong,
                 $n
             );
-            $ov33 = $seventysecondVar->longArithOverflowFlag;
+            $ov33 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventysecondVar->longArithOverflowFlag);
             if (null === $ov33 || null === $seventysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **74 expected smul overflow metadata (seventysecond)');
             }
@@ -32924,7 +32924,7 @@ if ('seventyfourth' === $expFold) {
                 $seventysecondLong,
                 $n
             );
-            $ov34 = $seventythirdVar->longArithOverflowFlag;
+            $ov34 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventythirdVar->longArithOverflowFlag);
             if (null === $ov34 || null === $seventythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **74 expected smul overflow metadata (seventythird)');
             }
@@ -32979,7 +32979,7 @@ if ('seventyfifth' === $expFold) {
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **75 expected smul overflow metadata (sq)');
             }
@@ -33046,7 +33046,7 @@ if ('seventyfifth' === $expFold) {
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **75 expected smul overflow metadata (cu)');
             }
@@ -33112,7 +33112,7 @@ if ('seventyfifth' === $expFold) {
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **75 expected smul overflow metadata (fifth)');
             }
@@ -33177,7 +33177,7 @@ if ('seventyfifth' === $expFold) {
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **75 expected smul overflow metadata (tenth)');
             }
@@ -33241,7 +33241,7 @@ if ('seventyfifth' === $expFold) {
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **75 expected smul overflow metadata (twentieth)');
             }
@@ -33304,7 +33304,7 @@ if ('seventyfifth' === $expFold) {
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **75 expected smul overflow metadata (fortieth)');
             }
@@ -33366,7 +33366,7 @@ if ('seventyfifth' === $expFold) {
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **75 expected smul overflow metadata (fortysecond)');
             }
@@ -33427,7 +33427,7 @@ if ('seventyfifth' === $expFold) {
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **75 expected smul overflow metadata (fortyfourth)');
             }
@@ -33487,7 +33487,7 @@ if ('seventyfifth' === $expFold) {
                 $fortyfourthLong,
                 $sqLong
             );
-            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
             if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **75 expected smul overflow metadata (fortysixth)');
             }
@@ -33546,7 +33546,7 @@ if ('seventyfifth' === $expFold) {
                 $fortysixthLong,
                 $sqLong
             );
-            $ov10 = $fortyeighthVar->longArithOverflowFlag;
+            $ov10 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyeighthVar->longArithOverflowFlag);
             if (null === $ov10 || null === $fortyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **75 expected smul overflow metadata (fortyeighth)');
             }
@@ -33604,7 +33604,7 @@ if ('seventyfifth' === $expFold) {
                 $fortyeighthLong,
                 $sqLong
             );
-            $ov11 = $fiftiethVar->longArithOverflowFlag;
+            $ov11 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftiethVar->longArithOverflowFlag);
             if (null === $ov11 || null === $fiftiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **75 expected smul overflow metadata (fiftieth)');
             }
@@ -33660,7 +33660,7 @@ if ('seventyfifth' === $expFold) {
                 $fiftiethLong,
                 $n
             );
-            $ov12 = $fiftyfirstVar->longArithOverflowFlag;
+            $ov12 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfirstVar->longArithOverflowFlag);
             if (null === $ov12 || null === $fiftyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **75 expected smul overflow metadata (fiftyfirst)');
             }
@@ -33715,7 +33715,7 @@ if ('seventyfifth' === $expFold) {
                 $fiftyfirstLong,
                 $n
             );
-            $ov13 = $fiftysecondVar->longArithOverflowFlag;
+            $ov13 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysecondVar->longArithOverflowFlag);
             if (null === $ov13 || null === $fiftysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **75 expected smul overflow metadata (fiftysecond)');
             }
@@ -33769,7 +33769,7 @@ if ('seventyfifth' === $expFold) {
                 $fiftysecondLong,
                 $n
             );
-            $ov14 = $fiftythirdVar->longArithOverflowFlag;
+            $ov14 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftythirdVar->longArithOverflowFlag);
             if (null === $ov14 || null === $fiftythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **75 expected smul overflow metadata (fiftythird)');
             }
@@ -33822,7 +33822,7 @@ if ('seventyfifth' === $expFold) {
                 $fiftythirdLong,
                 $n
             );
-            $ov15 = $fiftyfourthVar->longArithOverflowFlag;
+            $ov15 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfourthVar->longArithOverflowFlag);
             if (null === $ov15 || null === $fiftyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **75 expected smul overflow metadata (fiftyfourth)');
             }
@@ -33874,7 +33874,7 @@ if ('seventyfifth' === $expFold) {
                 $fiftyfourthLong,
                 $n
             );
-            $ov16 = $fiftyfifthVar->longArithOverflowFlag;
+            $ov16 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfifthVar->longArithOverflowFlag);
             if (null === $ov16 || null === $fiftyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **75 expected smul overflow metadata (fiftyfifth)');
             }
@@ -33925,7 +33925,7 @@ if ('seventyfifth' === $expFold) {
                 $fiftyfifthLong,
                 $n
             );
-            $ov17 = $fiftysixthVar->longArithOverflowFlag;
+            $ov17 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysixthVar->longArithOverflowFlag);
             if (null === $ov17 || null === $fiftysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **75 expected smul overflow metadata (fiftysixth)');
             }
@@ -33975,7 +33975,7 @@ if ('seventyfifth' === $expFold) {
                 $fiftysixthLong,
                 $n
             );
-            $ov18 = $fiftyseventhVar->longArithOverflowFlag;
+            $ov18 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyseventhVar->longArithOverflowFlag);
             if (null === $ov18 || null === $fiftyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **75 expected smul overflow metadata (fiftyseventh)');
             }
@@ -34024,7 +34024,7 @@ if ('seventyfifth' === $expFold) {
                 $fiftyseventhLong,
                 $n
             );
-            $ov19 = $fiftyeighthVar->longArithOverflowFlag;
+            $ov19 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyeighthVar->longArithOverflowFlag);
             if (null === $ov19 || null === $fiftyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **75 expected smul overflow metadata (fiftyeighth)');
             }
@@ -34072,7 +34072,7 @@ if ('seventyfifth' === $expFold) {
                 $fiftyeighthLong,
                 $n
             );
-            $ov20 = $fiftyninthVar->longArithOverflowFlag;
+            $ov20 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyninthVar->longArithOverflowFlag);
             if (null === $ov20 || null === $fiftyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **75 expected smul overflow metadata (fiftyninth)');
             }
@@ -34119,7 +34119,7 @@ if ('seventyfifth' === $expFold) {
                 $fiftyninthLong,
                 $n
             );
-            $ov21 = $sixtiethVar->longArithOverflowFlag;
+            $ov21 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtiethVar->longArithOverflowFlag);
             if (null === $ov21 || null === $sixtiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **75 expected smul overflow metadata (sixtieth)');
             }
@@ -34165,7 +34165,7 @@ if ('seventyfifth' === $expFold) {
                 $sixtiethLong,
                 $n
             );
-            $ov22 = $sixtyfirstVar->longArithOverflowFlag;
+            $ov22 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfirstVar->longArithOverflowFlag);
             if (null === $ov22 || null === $sixtyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **75 expected smul overflow metadata (sixtyfirst)');
             }
@@ -34210,7 +34210,7 @@ if ('seventyfifth' === $expFold) {
                 $sixtyfirstLong,
                 $n
             );
-            $ov23 = $sixtysecondVar->longArithOverflowFlag;
+            $ov23 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysecondVar->longArithOverflowFlag);
             if (null === $ov23 || null === $sixtysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **75 expected smul overflow metadata (sixtysecond)');
             }
@@ -34254,7 +34254,7 @@ if ('seventyfifth' === $expFold) {
                 $sixtysecondLong,
                 $n
             );
-            $ov24 = $sixtythirdVar->longArithOverflowFlag;
+            $ov24 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtythirdVar->longArithOverflowFlag);
             if (null === $ov24 || null === $sixtythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **75 expected smul overflow metadata (sixtythird)');
             }
@@ -34297,7 +34297,7 @@ if ('seventyfifth' === $expFold) {
                 $sixtythirdLong,
                 $n
             );
-            $ov25 = $sixtyfourthVar->longArithOverflowFlag;
+            $ov25 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfourthVar->longArithOverflowFlag);
             if (null === $ov25 || null === $sixtyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **75 expected smul overflow metadata (sixtyfourth)');
             }
@@ -34339,7 +34339,7 @@ if ('seventyfifth' === $expFold) {
                 $sixtyfourthLong,
                 $n
             );
-            $ov26 = $sixtyfifthVar->longArithOverflowFlag;
+            $ov26 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfifthVar->longArithOverflowFlag);
             if (null === $ov26 || null === $sixtyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **75 expected smul overflow metadata (sixtyfifth)');
             }
@@ -34380,7 +34380,7 @@ if ('seventyfifth' === $expFold) {
                 $sixtyfifthLong,
                 $n
             );
-            $ov27 = $sixtysixthVar->longArithOverflowFlag;
+            $ov27 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysixthVar->longArithOverflowFlag);
             if (null === $ov27 || null === $sixtysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **75 expected smul overflow metadata (sixtysixth)');
             }
@@ -34420,7 +34420,7 @@ if ('seventyfifth' === $expFold) {
                 $sixtysixthLong,
                 $n
             );
-            $ov28 = $sixtyseventhVar->longArithOverflowFlag;
+            $ov28 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyseventhVar->longArithOverflowFlag);
             if (null === $ov28 || null === $sixtyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **75 expected smul overflow metadata (sixtyseventh)');
             }
@@ -34460,7 +34460,7 @@ if ('seventyfifth' === $expFold) {
                 $sixtyseventhLong,
                 $n
             );
-            $ov29 = $sixtyeighthVar->longArithOverflowFlag;
+            $ov29 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyeighthVar->longArithOverflowFlag);
             if (null === $ov29 || null === $sixtyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **75 expected smul overflow metadata (sixtyeighth)');
             }
@@ -34498,7 +34498,7 @@ if ('seventyfifth' === $expFold) {
                 $sixtyeighthLong,
                 $n
             );
-            $ov30 = $sixtyninthVar->longArithOverflowFlag;
+            $ov30 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyninthVar->longArithOverflowFlag);
             if (null === $ov30 || null === $sixtyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **75 expected smul overflow metadata (sixtyninth)');
             }
@@ -34531,7 +34531,7 @@ if ('seventyfifth' === $expFold) {
                 $sixtyninthLong,
                 $n
             );
-            $ov31 = $seventiethVar->longArithOverflowFlag;
+            $ov31 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventiethVar->longArithOverflowFlag);
             if (null === $ov31 || null === $seventiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **75 expected smul overflow metadata (seventieth)');
             }
@@ -34564,7 +34564,7 @@ if ('seventyfifth' === $expFold) {
                 $seventiethLong,
                 $n
             );
-            $ov32 = $seventyfirstVar->longArithOverflowFlag;
+            $ov32 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyfirstVar->longArithOverflowFlag);
             if (null === $ov32 || null === $seventyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **75 expected smul overflow metadata (seventyfirst)');
             }
@@ -34597,7 +34597,7 @@ if ('seventyfifth' === $expFold) {
                 $seventyfirstLong,
                 $n
             );
-            $ov33 = $seventysecondVar->longArithOverflowFlag;
+            $ov33 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventysecondVar->longArithOverflowFlag);
             if (null === $ov33 || null === $seventysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **75 expected smul overflow metadata (seventysecond)');
             }
@@ -34629,7 +34629,7 @@ if ('seventyfifth' === $expFold) {
                 $seventysecondLong,
                 $n
             );
-            $ov34 = $seventythirdVar->longArithOverflowFlag;
+            $ov34 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventythirdVar->longArithOverflowFlag);
             if (null === $ov34 || null === $seventythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **75 expected smul overflow metadata (seventythird)');
             }
@@ -34660,7 +34660,7 @@ if ('seventyfifth' === $expFold) {
                 $seventythirdLong,
                 $n
             );
-            $ov35 = $seventyfourthVar->longArithOverflowFlag;
+            $ov35 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyfourthVar->longArithOverflowFlag);
             if (null === $ov35 || null === $seventyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **75 expected smul overflow metadata (seventyfourth)');
             }
@@ -34715,7 +34715,7 @@ if ('seventysixth' === $expFold) {
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **76 expected smul overflow metadata (sq)');
             }
@@ -34783,7 +34783,7 @@ if ('seventysixth' === $expFold) {
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **76 expected smul overflow metadata (cu)');
             }
@@ -34850,7 +34850,7 @@ if ('seventysixth' === $expFold) {
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **76 expected smul overflow metadata (fifth)');
             }
@@ -34916,7 +34916,7 @@ if ('seventysixth' === $expFold) {
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **76 expected smul overflow metadata (tenth)');
             }
@@ -34981,7 +34981,7 @@ if ('seventysixth' === $expFold) {
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **76 expected smul overflow metadata (twentieth)');
             }
@@ -35045,7 +35045,7 @@ if ('seventysixth' === $expFold) {
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **76 expected smul overflow metadata (fortieth)');
             }
@@ -35108,7 +35108,7 @@ if ('seventysixth' === $expFold) {
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **76 expected smul overflow metadata (fortysecond)');
             }
@@ -35170,7 +35170,7 @@ if ('seventysixth' === $expFold) {
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **76 expected smul overflow metadata (fortyfourth)');
             }
@@ -35231,7 +35231,7 @@ if ('seventysixth' === $expFold) {
                 $fortyfourthLong,
                 $sqLong
             );
-            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
             if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **76 expected smul overflow metadata (fortysixth)');
             }
@@ -35291,7 +35291,7 @@ if ('seventysixth' === $expFold) {
                 $fortysixthLong,
                 $sqLong
             );
-            $ov10 = $fortyeighthVar->longArithOverflowFlag;
+            $ov10 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyeighthVar->longArithOverflowFlag);
             if (null === $ov10 || null === $fortyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **76 expected smul overflow metadata (fortyeighth)');
             }
@@ -35350,7 +35350,7 @@ if ('seventysixth' === $expFold) {
                 $fortyeighthLong,
                 $sqLong
             );
-            $ov11 = $fiftiethVar->longArithOverflowFlag;
+            $ov11 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftiethVar->longArithOverflowFlag);
             if (null === $ov11 || null === $fiftiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **76 expected smul overflow metadata (fiftieth)');
             }
@@ -35407,7 +35407,7 @@ if ('seventysixth' === $expFold) {
                 $fiftiethLong,
                 $n
             );
-            $ov12 = $fiftyfirstVar->longArithOverflowFlag;
+            $ov12 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfirstVar->longArithOverflowFlag);
             if (null === $ov12 || null === $fiftyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **76 expected smul overflow metadata (fiftyfirst)');
             }
@@ -35463,7 +35463,7 @@ if ('seventysixth' === $expFold) {
                 $fiftyfirstLong,
                 $n
             );
-            $ov13 = $fiftysecondVar->longArithOverflowFlag;
+            $ov13 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysecondVar->longArithOverflowFlag);
             if (null === $ov13 || null === $fiftysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **76 expected smul overflow metadata (fiftysecond)');
             }
@@ -35518,7 +35518,7 @@ if ('seventysixth' === $expFold) {
                 $fiftysecondLong,
                 $n
             );
-            $ov14 = $fiftythirdVar->longArithOverflowFlag;
+            $ov14 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftythirdVar->longArithOverflowFlag);
             if (null === $ov14 || null === $fiftythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **76 expected smul overflow metadata (fiftythird)');
             }
@@ -35572,7 +35572,7 @@ if ('seventysixth' === $expFold) {
                 $fiftythirdLong,
                 $n
             );
-            $ov15 = $fiftyfourthVar->longArithOverflowFlag;
+            $ov15 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfourthVar->longArithOverflowFlag);
             if (null === $ov15 || null === $fiftyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **76 expected smul overflow metadata (fiftyfourth)');
             }
@@ -35625,7 +35625,7 @@ if ('seventysixth' === $expFold) {
                 $fiftyfourthLong,
                 $n
             );
-            $ov16 = $fiftyfifthVar->longArithOverflowFlag;
+            $ov16 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfifthVar->longArithOverflowFlag);
             if (null === $ov16 || null === $fiftyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **76 expected smul overflow metadata (fiftyfifth)');
             }
@@ -35677,7 +35677,7 @@ if ('seventysixth' === $expFold) {
                 $fiftyfifthLong,
                 $n
             );
-            $ov17 = $fiftysixthVar->longArithOverflowFlag;
+            $ov17 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysixthVar->longArithOverflowFlag);
             if (null === $ov17 || null === $fiftysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **76 expected smul overflow metadata (fiftysixth)');
             }
@@ -35728,7 +35728,7 @@ if ('seventysixth' === $expFold) {
                 $fiftysixthLong,
                 $n
             );
-            $ov18 = $fiftyseventhVar->longArithOverflowFlag;
+            $ov18 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyseventhVar->longArithOverflowFlag);
             if (null === $ov18 || null === $fiftyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **76 expected smul overflow metadata (fiftyseventh)');
             }
@@ -35778,7 +35778,7 @@ if ('seventysixth' === $expFold) {
                 $fiftyseventhLong,
                 $n
             );
-            $ov19 = $fiftyeighthVar->longArithOverflowFlag;
+            $ov19 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyeighthVar->longArithOverflowFlag);
             if (null === $ov19 || null === $fiftyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **76 expected smul overflow metadata (fiftyeighth)');
             }
@@ -35827,7 +35827,7 @@ if ('seventysixth' === $expFold) {
                 $fiftyeighthLong,
                 $n
             );
-            $ov20 = $fiftyninthVar->longArithOverflowFlag;
+            $ov20 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyninthVar->longArithOverflowFlag);
             if (null === $ov20 || null === $fiftyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **76 expected smul overflow metadata (fiftyninth)');
             }
@@ -35875,7 +35875,7 @@ if ('seventysixth' === $expFold) {
                 $fiftyninthLong,
                 $n
             );
-            $ov21 = $sixtiethVar->longArithOverflowFlag;
+            $ov21 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtiethVar->longArithOverflowFlag);
             if (null === $ov21 || null === $sixtiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **76 expected smul overflow metadata (sixtieth)');
             }
@@ -35922,7 +35922,7 @@ if ('seventysixth' === $expFold) {
                 $sixtiethLong,
                 $n
             );
-            $ov22 = $sixtyfirstVar->longArithOverflowFlag;
+            $ov22 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfirstVar->longArithOverflowFlag);
             if (null === $ov22 || null === $sixtyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **76 expected smul overflow metadata (sixtyfirst)');
             }
@@ -35968,7 +35968,7 @@ if ('seventysixth' === $expFold) {
                 $sixtyfirstLong,
                 $n
             );
-            $ov23 = $sixtysecondVar->longArithOverflowFlag;
+            $ov23 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysecondVar->longArithOverflowFlag);
             if (null === $ov23 || null === $sixtysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **76 expected smul overflow metadata (sixtysecond)');
             }
@@ -36013,7 +36013,7 @@ if ('seventysixth' === $expFold) {
                 $sixtysecondLong,
                 $n
             );
-            $ov24 = $sixtythirdVar->longArithOverflowFlag;
+            $ov24 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtythirdVar->longArithOverflowFlag);
             if (null === $ov24 || null === $sixtythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **76 expected smul overflow metadata (sixtythird)');
             }
@@ -36057,7 +36057,7 @@ if ('seventysixth' === $expFold) {
                 $sixtythirdLong,
                 $n
             );
-            $ov25 = $sixtyfourthVar->longArithOverflowFlag;
+            $ov25 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfourthVar->longArithOverflowFlag);
             if (null === $ov25 || null === $sixtyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **76 expected smul overflow metadata (sixtyfourth)');
             }
@@ -36100,7 +36100,7 @@ if ('seventysixth' === $expFold) {
                 $sixtyfourthLong,
                 $n
             );
-            $ov26 = $sixtyfifthVar->longArithOverflowFlag;
+            $ov26 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfifthVar->longArithOverflowFlag);
             if (null === $ov26 || null === $sixtyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **76 expected smul overflow metadata (sixtyfifth)');
             }
@@ -36142,7 +36142,7 @@ if ('seventysixth' === $expFold) {
                 $sixtyfifthLong,
                 $n
             );
-            $ov27 = $sixtysixthVar->longArithOverflowFlag;
+            $ov27 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysixthVar->longArithOverflowFlag);
             if (null === $ov27 || null === $sixtysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **76 expected smul overflow metadata (sixtysixth)');
             }
@@ -36183,7 +36183,7 @@ if ('seventysixth' === $expFold) {
                 $sixtysixthLong,
                 $n
             );
-            $ov28 = $sixtyseventhVar->longArithOverflowFlag;
+            $ov28 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyseventhVar->longArithOverflowFlag);
             if (null === $ov28 || null === $sixtyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **76 expected smul overflow metadata (sixtyseventh)');
             }
@@ -36224,7 +36224,7 @@ if ('seventysixth' === $expFold) {
                 $sixtyseventhLong,
                 $n
             );
-            $ov29 = $sixtyeighthVar->longArithOverflowFlag;
+            $ov29 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyeighthVar->longArithOverflowFlag);
             if (null === $ov29 || null === $sixtyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **76 expected smul overflow metadata (sixtyeighth)');
             }
@@ -36263,7 +36263,7 @@ if ('seventysixth' === $expFold) {
                 $sixtyeighthLong,
                 $n
             );
-            $ov30 = $sixtyninthVar->longArithOverflowFlag;
+            $ov30 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyninthVar->longArithOverflowFlag);
             if (null === $ov30 || null === $sixtyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **76 expected smul overflow metadata (sixtyninth)');
             }
@@ -36297,7 +36297,7 @@ if ('seventysixth' === $expFold) {
                 $sixtyninthLong,
                 $n
             );
-            $ov31 = $seventiethVar->longArithOverflowFlag;
+            $ov31 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventiethVar->longArithOverflowFlag);
             if (null === $ov31 || null === $seventiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **76 expected smul overflow metadata (seventieth)');
             }
@@ -36331,7 +36331,7 @@ if ('seventysixth' === $expFold) {
                 $seventiethLong,
                 $n
             );
-            $ov32 = $seventyfirstVar->longArithOverflowFlag;
+            $ov32 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyfirstVar->longArithOverflowFlag);
             if (null === $ov32 || null === $seventyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **76 expected smul overflow metadata (seventyfirst)');
             }
@@ -36365,7 +36365,7 @@ if ('seventysixth' === $expFold) {
                 $seventyfirstLong,
                 $n
             );
-            $ov33 = $seventysecondVar->longArithOverflowFlag;
+            $ov33 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventysecondVar->longArithOverflowFlag);
             if (null === $ov33 || null === $seventysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **76 expected smul overflow metadata (seventysecond)');
             }
@@ -36398,7 +36398,7 @@ if ('seventysixth' === $expFold) {
                 $seventysecondLong,
                 $n
             );
-            $ov34 = $seventythirdVar->longArithOverflowFlag;
+            $ov34 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventythirdVar->longArithOverflowFlag);
             if (null === $ov34 || null === $seventythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **76 expected smul overflow metadata (seventythird)');
             }
@@ -36430,7 +36430,7 @@ if ('seventysixth' === $expFold) {
                 $seventythirdLong,
                 $n
             );
-            $ov35 = $seventyfourthVar->longArithOverflowFlag;
+            $ov35 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyfourthVar->longArithOverflowFlag);
             if (null === $ov35 || null === $seventyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **76 expected smul overflow metadata (seventyfourth)');
             }
@@ -36461,7 +36461,7 @@ if ('seventysixth' === $expFold) {
                 $seventyfourthLong,
                 $n
             );
-            $ov36 = $seventyfifthVar->longArithOverflowFlag;
+            $ov36 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyfifthVar->longArithOverflowFlag);
             if (null === $ov36 || null === $seventyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **76 expected smul overflow metadata (seventyfifth)');
             }
@@ -36516,7 +36516,7 @@ if ('seventyseventh' === $expFold) {
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **77 expected smul overflow metadata (sq)');
             }
@@ -36585,7 +36585,7 @@ if ('seventyseventh' === $expFold) {
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **77 expected smul overflow metadata (cu)');
             }
@@ -36653,7 +36653,7 @@ if ('seventyseventh' === $expFold) {
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **77 expected smul overflow metadata (fifth)');
             }
@@ -36720,7 +36720,7 @@ if ('seventyseventh' === $expFold) {
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **77 expected smul overflow metadata (tenth)');
             }
@@ -36786,7 +36786,7 @@ if ('seventyseventh' === $expFold) {
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **77 expected smul overflow metadata (twentieth)');
             }
@@ -36851,7 +36851,7 @@ if ('seventyseventh' === $expFold) {
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **77 expected smul overflow metadata (fortieth)');
             }
@@ -36915,7 +36915,7 @@ if ('seventyseventh' === $expFold) {
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **77 expected smul overflow metadata (fortysecond)');
             }
@@ -36978,7 +36978,7 @@ if ('seventyseventh' === $expFold) {
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **77 expected smul overflow metadata (fortyfourth)');
             }
@@ -37040,7 +37040,7 @@ if ('seventyseventh' === $expFold) {
                 $fortyfourthLong,
                 $sqLong
             );
-            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
             if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **77 expected smul overflow metadata (fortysixth)');
             }
@@ -37101,7 +37101,7 @@ if ('seventyseventh' === $expFold) {
                 $fortysixthLong,
                 $sqLong
             );
-            $ov10 = $fortyeighthVar->longArithOverflowFlag;
+            $ov10 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyeighthVar->longArithOverflowFlag);
             if (null === $ov10 || null === $fortyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **77 expected smul overflow metadata (fortyeighth)');
             }
@@ -37161,7 +37161,7 @@ if ('seventyseventh' === $expFold) {
                 $fortyeighthLong,
                 $sqLong
             );
-            $ov11 = $fiftiethVar->longArithOverflowFlag;
+            $ov11 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftiethVar->longArithOverflowFlag);
             if (null === $ov11 || null === $fiftiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **77 expected smul overflow metadata (fiftieth)');
             }
@@ -37219,7 +37219,7 @@ if ('seventyseventh' === $expFold) {
                 $fiftiethLong,
                 $n
             );
-            $ov12 = $fiftyfirstVar->longArithOverflowFlag;
+            $ov12 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfirstVar->longArithOverflowFlag);
             if (null === $ov12 || null === $fiftyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **77 expected smul overflow metadata (fiftyfirst)');
             }
@@ -37276,7 +37276,7 @@ if ('seventyseventh' === $expFold) {
                 $fiftyfirstLong,
                 $n
             );
-            $ov13 = $fiftysecondVar->longArithOverflowFlag;
+            $ov13 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysecondVar->longArithOverflowFlag);
             if (null === $ov13 || null === $fiftysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **77 expected smul overflow metadata (fiftysecond)');
             }
@@ -37332,7 +37332,7 @@ if ('seventyseventh' === $expFold) {
                 $fiftysecondLong,
                 $n
             );
-            $ov14 = $fiftythirdVar->longArithOverflowFlag;
+            $ov14 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftythirdVar->longArithOverflowFlag);
             if (null === $ov14 || null === $fiftythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **77 expected smul overflow metadata (fiftythird)');
             }
@@ -37387,7 +37387,7 @@ if ('seventyseventh' === $expFold) {
                 $fiftythirdLong,
                 $n
             );
-            $ov15 = $fiftyfourthVar->longArithOverflowFlag;
+            $ov15 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfourthVar->longArithOverflowFlag);
             if (null === $ov15 || null === $fiftyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **77 expected smul overflow metadata (fiftyfourth)');
             }
@@ -37441,7 +37441,7 @@ if ('seventyseventh' === $expFold) {
                 $fiftyfourthLong,
                 $n
             );
-            $ov16 = $fiftyfifthVar->longArithOverflowFlag;
+            $ov16 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfifthVar->longArithOverflowFlag);
             if (null === $ov16 || null === $fiftyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **77 expected smul overflow metadata (fiftyfifth)');
             }
@@ -37494,7 +37494,7 @@ if ('seventyseventh' === $expFold) {
                 $fiftyfifthLong,
                 $n
             );
-            $ov17 = $fiftysixthVar->longArithOverflowFlag;
+            $ov17 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysixthVar->longArithOverflowFlag);
             if (null === $ov17 || null === $fiftysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **77 expected smul overflow metadata (fiftysixth)');
             }
@@ -37546,7 +37546,7 @@ if ('seventyseventh' === $expFold) {
                 $fiftysixthLong,
                 $n
             );
-            $ov18 = $fiftyseventhVar->longArithOverflowFlag;
+            $ov18 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyseventhVar->longArithOverflowFlag);
             if (null === $ov18 || null === $fiftyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **77 expected smul overflow metadata (fiftyseventh)');
             }
@@ -37597,7 +37597,7 @@ if ('seventyseventh' === $expFold) {
                 $fiftyseventhLong,
                 $n
             );
-            $ov19 = $fiftyeighthVar->longArithOverflowFlag;
+            $ov19 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyeighthVar->longArithOverflowFlag);
             if (null === $ov19 || null === $fiftyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **77 expected smul overflow metadata (fiftyeighth)');
             }
@@ -37647,7 +37647,7 @@ if ('seventyseventh' === $expFold) {
                 $fiftyeighthLong,
                 $n
             );
-            $ov20 = $fiftyninthVar->longArithOverflowFlag;
+            $ov20 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyninthVar->longArithOverflowFlag);
             if (null === $ov20 || null === $fiftyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **77 expected smul overflow metadata (fiftyninth)');
             }
@@ -37696,7 +37696,7 @@ if ('seventyseventh' === $expFold) {
                 $fiftyninthLong,
                 $n
             );
-            $ov21 = $sixtiethVar->longArithOverflowFlag;
+            $ov21 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtiethVar->longArithOverflowFlag);
             if (null === $ov21 || null === $sixtiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **77 expected smul overflow metadata (sixtieth)');
             }
@@ -37744,7 +37744,7 @@ if ('seventyseventh' === $expFold) {
                 $sixtiethLong,
                 $n
             );
-            $ov22 = $sixtyfirstVar->longArithOverflowFlag;
+            $ov22 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfirstVar->longArithOverflowFlag);
             if (null === $ov22 || null === $sixtyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **77 expected smul overflow metadata (sixtyfirst)');
             }
@@ -37791,7 +37791,7 @@ if ('seventyseventh' === $expFold) {
                 $sixtyfirstLong,
                 $n
             );
-            $ov23 = $sixtysecondVar->longArithOverflowFlag;
+            $ov23 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysecondVar->longArithOverflowFlag);
             if (null === $ov23 || null === $sixtysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **77 expected smul overflow metadata (sixtysecond)');
             }
@@ -37837,7 +37837,7 @@ if ('seventyseventh' === $expFold) {
                 $sixtysecondLong,
                 $n
             );
-            $ov24 = $sixtythirdVar->longArithOverflowFlag;
+            $ov24 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtythirdVar->longArithOverflowFlag);
             if (null === $ov24 || null === $sixtythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **77 expected smul overflow metadata (sixtythird)');
             }
@@ -37882,7 +37882,7 @@ if ('seventyseventh' === $expFold) {
                 $sixtythirdLong,
                 $n
             );
-            $ov25 = $sixtyfourthVar->longArithOverflowFlag;
+            $ov25 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfourthVar->longArithOverflowFlag);
             if (null === $ov25 || null === $sixtyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **77 expected smul overflow metadata (sixtyfourth)');
             }
@@ -37926,7 +37926,7 @@ if ('seventyseventh' === $expFold) {
                 $sixtyfourthLong,
                 $n
             );
-            $ov26 = $sixtyfifthVar->longArithOverflowFlag;
+            $ov26 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfifthVar->longArithOverflowFlag);
             if (null === $ov26 || null === $sixtyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **77 expected smul overflow metadata (sixtyfifth)');
             }
@@ -37969,7 +37969,7 @@ if ('seventyseventh' === $expFold) {
                 $sixtyfifthLong,
                 $n
             );
-            $ov27 = $sixtysixthVar->longArithOverflowFlag;
+            $ov27 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysixthVar->longArithOverflowFlag);
             if (null === $ov27 || null === $sixtysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **77 expected smul overflow metadata (sixtysixth)');
             }
@@ -38011,7 +38011,7 @@ if ('seventyseventh' === $expFold) {
                 $sixtysixthLong,
                 $n
             );
-            $ov28 = $sixtyseventhVar->longArithOverflowFlag;
+            $ov28 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyseventhVar->longArithOverflowFlag);
             if (null === $ov28 || null === $sixtyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **77 expected smul overflow metadata (sixtyseventh)');
             }
@@ -38053,7 +38053,7 @@ if ('seventyseventh' === $expFold) {
                 $sixtyseventhLong,
                 $n
             );
-            $ov29 = $sixtyeighthVar->longArithOverflowFlag;
+            $ov29 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyeighthVar->longArithOverflowFlag);
             if (null === $ov29 || null === $sixtyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **77 expected smul overflow metadata (sixtyeighth)');
             }
@@ -38093,7 +38093,7 @@ if ('seventyseventh' === $expFold) {
                 $sixtyeighthLong,
                 $n
             );
-            $ov30 = $sixtyninthVar->longArithOverflowFlag;
+            $ov30 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyninthVar->longArithOverflowFlag);
             if (null === $ov30 || null === $sixtyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **77 expected smul overflow metadata (sixtyninth)');
             }
@@ -38128,7 +38128,7 @@ if ('seventyseventh' === $expFold) {
                 $sixtyninthLong,
                 $n
             );
-            $ov31 = $seventiethVar->longArithOverflowFlag;
+            $ov31 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventiethVar->longArithOverflowFlag);
             if (null === $ov31 || null === $seventiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **77 expected smul overflow metadata (seventieth)');
             }
@@ -38163,7 +38163,7 @@ if ('seventyseventh' === $expFold) {
                 $seventiethLong,
                 $n
             );
-            $ov32 = $seventyfirstVar->longArithOverflowFlag;
+            $ov32 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyfirstVar->longArithOverflowFlag);
             if (null === $ov32 || null === $seventyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **77 expected smul overflow metadata (seventyfirst)');
             }
@@ -38198,7 +38198,7 @@ if ('seventyseventh' === $expFold) {
                 $seventyfirstLong,
                 $n
             );
-            $ov33 = $seventysecondVar->longArithOverflowFlag;
+            $ov33 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventysecondVar->longArithOverflowFlag);
             if (null === $ov33 || null === $seventysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **77 expected smul overflow metadata (seventysecond)');
             }
@@ -38232,7 +38232,7 @@ if ('seventyseventh' === $expFold) {
                 $seventysecondLong,
                 $n
             );
-            $ov34 = $seventythirdVar->longArithOverflowFlag;
+            $ov34 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventythirdVar->longArithOverflowFlag);
             if (null === $ov34 || null === $seventythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **77 expected smul overflow metadata (seventythird)');
             }
@@ -38265,7 +38265,7 @@ if ('seventyseventh' === $expFold) {
                 $seventythirdLong,
                 $n
             );
-            $ov35 = $seventyfourthVar->longArithOverflowFlag;
+            $ov35 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyfourthVar->longArithOverflowFlag);
             if (null === $ov35 || null === $seventyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **77 expected smul overflow metadata (seventyfourth)');
             }
@@ -38297,7 +38297,7 @@ if ('seventyseventh' === $expFold) {
                 $seventyfourthLong,
                 $n
             );
-            $ov36 = $seventyfifthVar->longArithOverflowFlag;
+            $ov36 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyfifthVar->longArithOverflowFlag);
             if (null === $ov36 || null === $seventyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **77 expected smul overflow metadata (seventyfifth)');
             }
@@ -38328,7 +38328,7 @@ if ('seventyseventh' === $expFold) {
                 $seventyfifthLong,
                 $n
             );
-            $ov37 = $seventysixthVar->longArithOverflowFlag;
+            $ov37 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventysixthVar->longArithOverflowFlag);
             if (null === $ov37 || null === $seventysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **77 expected smul overflow metadata (seventysixth)');
             }
@@ -38383,7 +38383,7 @@ if ('seventyeighth' === $expFold) {
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (sq)');
             }
@@ -38453,7 +38453,7 @@ if ('seventyeighth' === $expFold) {
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (cu)');
             }
@@ -38522,7 +38522,7 @@ if ('seventyeighth' === $expFold) {
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (fifth)');
             }
@@ -38590,7 +38590,7 @@ if ('seventyeighth' === $expFold) {
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (tenth)');
             }
@@ -38657,7 +38657,7 @@ if ('seventyeighth' === $expFold) {
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (twentieth)');
             }
@@ -38723,7 +38723,7 @@ if ('seventyeighth' === $expFold) {
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (fortieth)');
             }
@@ -38788,7 +38788,7 @@ if ('seventyeighth' === $expFold) {
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (fortysecond)');
             }
@@ -38852,7 +38852,7 @@ if ('seventyeighth' === $expFold) {
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (fortyfourth)');
             }
@@ -38915,7 +38915,7 @@ if ('seventyeighth' === $expFold) {
                 $fortyfourthLong,
                 $sqLong
             );
-            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
             if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (fortysixth)');
             }
@@ -38977,7 +38977,7 @@ if ('seventyeighth' === $expFold) {
                 $fortysixthLong,
                 $sqLong
             );
-            $ov10 = $fortyeighthVar->longArithOverflowFlag;
+            $ov10 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyeighthVar->longArithOverflowFlag);
             if (null === $ov10 || null === $fortyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (fortyeighth)');
             }
@@ -39038,7 +39038,7 @@ if ('seventyeighth' === $expFold) {
                 $fortyeighthLong,
                 $sqLong
             );
-            $ov11 = $fiftiethVar->longArithOverflowFlag;
+            $ov11 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftiethVar->longArithOverflowFlag);
             if (null === $ov11 || null === $fiftiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (fiftieth)');
             }
@@ -39097,7 +39097,7 @@ if ('seventyeighth' === $expFold) {
                 $fiftiethLong,
                 $n
             );
-            $ov12 = $fiftyfirstVar->longArithOverflowFlag;
+            $ov12 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfirstVar->longArithOverflowFlag);
             if (null === $ov12 || null === $fiftyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (fiftyfirst)');
             }
@@ -39155,7 +39155,7 @@ if ('seventyeighth' === $expFold) {
                 $fiftyfirstLong,
                 $n
             );
-            $ov13 = $fiftysecondVar->longArithOverflowFlag;
+            $ov13 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysecondVar->longArithOverflowFlag);
             if (null === $ov13 || null === $fiftysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (fiftysecond)');
             }
@@ -39212,7 +39212,7 @@ if ('seventyeighth' === $expFold) {
                 $fiftysecondLong,
                 $n
             );
-            $ov14 = $fiftythirdVar->longArithOverflowFlag;
+            $ov14 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftythirdVar->longArithOverflowFlag);
             if (null === $ov14 || null === $fiftythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (fiftythird)');
             }
@@ -39268,7 +39268,7 @@ if ('seventyeighth' === $expFold) {
                 $fiftythirdLong,
                 $n
             );
-            $ov15 = $fiftyfourthVar->longArithOverflowFlag;
+            $ov15 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfourthVar->longArithOverflowFlag);
             if (null === $ov15 || null === $fiftyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (fiftyfourth)');
             }
@@ -39323,7 +39323,7 @@ if ('seventyeighth' === $expFold) {
                 $fiftyfourthLong,
                 $n
             );
-            $ov16 = $fiftyfifthVar->longArithOverflowFlag;
+            $ov16 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfifthVar->longArithOverflowFlag);
             if (null === $ov16 || null === $fiftyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (fiftyfifth)');
             }
@@ -39377,7 +39377,7 @@ if ('seventyeighth' === $expFold) {
                 $fiftyfifthLong,
                 $n
             );
-            $ov17 = $fiftysixthVar->longArithOverflowFlag;
+            $ov17 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysixthVar->longArithOverflowFlag);
             if (null === $ov17 || null === $fiftysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (fiftysixth)');
             }
@@ -39430,7 +39430,7 @@ if ('seventyeighth' === $expFold) {
                 $fiftysixthLong,
                 $n
             );
-            $ov18 = $fiftyseventhVar->longArithOverflowFlag;
+            $ov18 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyseventhVar->longArithOverflowFlag);
             if (null === $ov18 || null === $fiftyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (fiftyseventh)');
             }
@@ -39482,7 +39482,7 @@ if ('seventyeighth' === $expFold) {
                 $fiftyseventhLong,
                 $n
             );
-            $ov19 = $fiftyeighthVar->longArithOverflowFlag;
+            $ov19 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyeighthVar->longArithOverflowFlag);
             if (null === $ov19 || null === $fiftyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (fiftyeighth)');
             }
@@ -39533,7 +39533,7 @@ if ('seventyeighth' === $expFold) {
                 $fiftyeighthLong,
                 $n
             );
-            $ov20 = $fiftyninthVar->longArithOverflowFlag;
+            $ov20 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyninthVar->longArithOverflowFlag);
             if (null === $ov20 || null === $fiftyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (fiftyninth)');
             }
@@ -39583,7 +39583,7 @@ if ('seventyeighth' === $expFold) {
                 $fiftyninthLong,
                 $n
             );
-            $ov21 = $sixtiethVar->longArithOverflowFlag;
+            $ov21 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtiethVar->longArithOverflowFlag);
             if (null === $ov21 || null === $sixtiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (sixtieth)');
             }
@@ -39632,7 +39632,7 @@ if ('seventyeighth' === $expFold) {
                 $sixtiethLong,
                 $n
             );
-            $ov22 = $sixtyfirstVar->longArithOverflowFlag;
+            $ov22 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfirstVar->longArithOverflowFlag);
             if (null === $ov22 || null === $sixtyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (sixtyfirst)');
             }
@@ -39680,7 +39680,7 @@ if ('seventyeighth' === $expFold) {
                 $sixtyfirstLong,
                 $n
             );
-            $ov23 = $sixtysecondVar->longArithOverflowFlag;
+            $ov23 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysecondVar->longArithOverflowFlag);
             if (null === $ov23 || null === $sixtysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (sixtysecond)');
             }
@@ -39727,7 +39727,7 @@ if ('seventyeighth' === $expFold) {
                 $sixtysecondLong,
                 $n
             );
-            $ov24 = $sixtythirdVar->longArithOverflowFlag;
+            $ov24 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtythirdVar->longArithOverflowFlag);
             if (null === $ov24 || null === $sixtythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (sixtythird)');
             }
@@ -39773,7 +39773,7 @@ if ('seventyeighth' === $expFold) {
                 $sixtythirdLong,
                 $n
             );
-            $ov25 = $sixtyfourthVar->longArithOverflowFlag;
+            $ov25 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfourthVar->longArithOverflowFlag);
             if (null === $ov25 || null === $sixtyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (sixtyfourth)');
             }
@@ -39818,7 +39818,7 @@ if ('seventyeighth' === $expFold) {
                 $sixtyfourthLong,
                 $n
             );
-            $ov26 = $sixtyfifthVar->longArithOverflowFlag;
+            $ov26 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfifthVar->longArithOverflowFlag);
             if (null === $ov26 || null === $sixtyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (sixtyfifth)');
             }
@@ -39862,7 +39862,7 @@ if ('seventyeighth' === $expFold) {
                 $sixtyfifthLong,
                 $n
             );
-            $ov27 = $sixtysixthVar->longArithOverflowFlag;
+            $ov27 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysixthVar->longArithOverflowFlag);
             if (null === $ov27 || null === $sixtysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (sixtysixth)');
             }
@@ -39905,7 +39905,7 @@ if ('seventyeighth' === $expFold) {
                 $sixtysixthLong,
                 $n
             );
-            $ov28 = $sixtyseventhVar->longArithOverflowFlag;
+            $ov28 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyseventhVar->longArithOverflowFlag);
             if (null === $ov28 || null === $sixtyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (sixtyseventh)');
             }
@@ -39948,7 +39948,7 @@ if ('seventyeighth' === $expFold) {
                 $sixtyseventhLong,
                 $n
             );
-            $ov29 = $sixtyeighthVar->longArithOverflowFlag;
+            $ov29 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyeighthVar->longArithOverflowFlag);
             if (null === $ov29 || null === $sixtyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (sixtyeighth)');
             }
@@ -39989,7 +39989,7 @@ if ('seventyeighth' === $expFold) {
                 $sixtyeighthLong,
                 $n
             );
-            $ov30 = $sixtyninthVar->longArithOverflowFlag;
+            $ov30 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyninthVar->longArithOverflowFlag);
             if (null === $ov30 || null === $sixtyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (sixtyninth)');
             }
@@ -40025,7 +40025,7 @@ if ('seventyeighth' === $expFold) {
                 $sixtyninthLong,
                 $n
             );
-            $ov31 = $seventiethVar->longArithOverflowFlag;
+            $ov31 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventiethVar->longArithOverflowFlag);
             if (null === $ov31 || null === $seventiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (seventieth)');
             }
@@ -40061,7 +40061,7 @@ if ('seventyeighth' === $expFold) {
                 $seventiethLong,
                 $n
             );
-            $ov32 = $seventyfirstVar->longArithOverflowFlag;
+            $ov32 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyfirstVar->longArithOverflowFlag);
             if (null === $ov32 || null === $seventyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (seventyfirst)');
             }
@@ -40097,7 +40097,7 @@ if ('seventyeighth' === $expFold) {
                 $seventyfirstLong,
                 $n
             );
-            $ov33 = $seventysecondVar->longArithOverflowFlag;
+            $ov33 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventysecondVar->longArithOverflowFlag);
             if (null === $ov33 || null === $seventysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (seventysecond)');
             }
@@ -40132,7 +40132,7 @@ if ('seventyeighth' === $expFold) {
                 $seventysecondLong,
                 $n
             );
-            $ov34 = $seventythirdVar->longArithOverflowFlag;
+            $ov34 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventythirdVar->longArithOverflowFlag);
             if (null === $ov34 || null === $seventythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (seventythird)');
             }
@@ -40166,7 +40166,7 @@ if ('seventyeighth' === $expFold) {
                 $seventythirdLong,
                 $n
             );
-            $ov35 = $seventyfourthVar->longArithOverflowFlag;
+            $ov35 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyfourthVar->longArithOverflowFlag);
             if (null === $ov35 || null === $seventyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (seventyfourth)');
             }
@@ -40199,7 +40199,7 @@ if ('seventyeighth' === $expFold) {
                 $seventyfourthLong,
                 $n
             );
-            $ov36 = $seventyfifthVar->longArithOverflowFlag;
+            $ov36 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyfifthVar->longArithOverflowFlag);
             if (null === $ov36 || null === $seventyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (seventyfifth)');
             }
@@ -40231,7 +40231,7 @@ if ('seventyeighth' === $expFold) {
                 $seventyfifthLong,
                 $n
             );
-            $ov37 = $seventysixthVar->longArithOverflowFlag;
+            $ov37 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventysixthVar->longArithOverflowFlag);
             if (null === $ov37 || null === $seventysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (seventysixth)');
             }
@@ -40262,7 +40262,7 @@ if ('seventyeighth' === $expFold) {
                 $seventysixthLong,
                 $n
             );
-            $ov38 = $seventyseventhVar->longArithOverflowFlag;
+            $ov38 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyseventhVar->longArithOverflowFlag);
             if (null === $ov38 || null === $seventyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **78 expected smul overflow metadata (seventyseventh)');
             }
@@ -40317,7 +40317,7 @@ if ('seventyninth' === $expFold) {
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (sq)');
             }
@@ -40388,7 +40388,7 @@ if ('seventyninth' === $expFold) {
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (cu)');
             }
@@ -40458,7 +40458,7 @@ if ('seventyninth' === $expFold) {
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (fifth)');
             }
@@ -40527,7 +40527,7 @@ if ('seventyninth' === $expFold) {
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (tenth)');
             }
@@ -40595,7 +40595,7 @@ if ('seventyninth' === $expFold) {
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (twentieth)');
             }
@@ -40662,7 +40662,7 @@ if ('seventyninth' === $expFold) {
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (fortieth)');
             }
@@ -40728,7 +40728,7 @@ if ('seventyninth' === $expFold) {
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (fortysecond)');
             }
@@ -40793,7 +40793,7 @@ if ('seventyninth' === $expFold) {
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (fortyfourth)');
             }
@@ -40857,7 +40857,7 @@ if ('seventyninth' === $expFold) {
                 $fortyfourthLong,
                 $sqLong
             );
-            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
             if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (fortysixth)');
             }
@@ -40920,7 +40920,7 @@ if ('seventyninth' === $expFold) {
                 $fortysixthLong,
                 $sqLong
             );
-            $ov10 = $fortyeighthVar->longArithOverflowFlag;
+            $ov10 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyeighthVar->longArithOverflowFlag);
             if (null === $ov10 || null === $fortyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (fortyeighth)');
             }
@@ -40982,7 +40982,7 @@ if ('seventyninth' === $expFold) {
                 $fortyeighthLong,
                 $sqLong
             );
-            $ov11 = $fiftiethVar->longArithOverflowFlag;
+            $ov11 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftiethVar->longArithOverflowFlag);
             if (null === $ov11 || null === $fiftiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (fiftieth)');
             }
@@ -41042,7 +41042,7 @@ if ('seventyninth' === $expFold) {
                 $fiftiethLong,
                 $n
             );
-            $ov12 = $fiftyfirstVar->longArithOverflowFlag;
+            $ov12 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfirstVar->longArithOverflowFlag);
             if (null === $ov12 || null === $fiftyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (fiftyfirst)');
             }
@@ -41101,7 +41101,7 @@ if ('seventyninth' === $expFold) {
                 $fiftyfirstLong,
                 $n
             );
-            $ov13 = $fiftysecondVar->longArithOverflowFlag;
+            $ov13 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysecondVar->longArithOverflowFlag);
             if (null === $ov13 || null === $fiftysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (fiftysecond)');
             }
@@ -41159,7 +41159,7 @@ if ('seventyninth' === $expFold) {
                 $fiftysecondLong,
                 $n
             );
-            $ov14 = $fiftythirdVar->longArithOverflowFlag;
+            $ov14 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftythirdVar->longArithOverflowFlag);
             if (null === $ov14 || null === $fiftythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (fiftythird)');
             }
@@ -41216,7 +41216,7 @@ if ('seventyninth' === $expFold) {
                 $fiftythirdLong,
                 $n
             );
-            $ov15 = $fiftyfourthVar->longArithOverflowFlag;
+            $ov15 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfourthVar->longArithOverflowFlag);
             if (null === $ov15 || null === $fiftyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (fiftyfourth)');
             }
@@ -41272,7 +41272,7 @@ if ('seventyninth' === $expFold) {
                 $fiftyfourthLong,
                 $n
             );
-            $ov16 = $fiftyfifthVar->longArithOverflowFlag;
+            $ov16 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfifthVar->longArithOverflowFlag);
             if (null === $ov16 || null === $fiftyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (fiftyfifth)');
             }
@@ -41327,7 +41327,7 @@ if ('seventyninth' === $expFold) {
                 $fiftyfifthLong,
                 $n
             );
-            $ov17 = $fiftysixthVar->longArithOverflowFlag;
+            $ov17 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysixthVar->longArithOverflowFlag);
             if (null === $ov17 || null === $fiftysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (fiftysixth)');
             }
@@ -41381,7 +41381,7 @@ if ('seventyninth' === $expFold) {
                 $fiftysixthLong,
                 $n
             );
-            $ov18 = $fiftyseventhVar->longArithOverflowFlag;
+            $ov18 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyseventhVar->longArithOverflowFlag);
             if (null === $ov18 || null === $fiftyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (fiftyseventh)');
             }
@@ -41434,7 +41434,7 @@ if ('seventyninth' === $expFold) {
                 $fiftyseventhLong,
                 $n
             );
-            $ov19 = $fiftyeighthVar->longArithOverflowFlag;
+            $ov19 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyeighthVar->longArithOverflowFlag);
             if (null === $ov19 || null === $fiftyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (fiftyeighth)');
             }
@@ -41486,7 +41486,7 @@ if ('seventyninth' === $expFold) {
                 $fiftyeighthLong,
                 $n
             );
-            $ov20 = $fiftyninthVar->longArithOverflowFlag;
+            $ov20 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyninthVar->longArithOverflowFlag);
             if (null === $ov20 || null === $fiftyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (fiftyninth)');
             }
@@ -41537,7 +41537,7 @@ if ('seventyninth' === $expFold) {
                 $fiftyninthLong,
                 $n
             );
-            $ov21 = $sixtiethVar->longArithOverflowFlag;
+            $ov21 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtiethVar->longArithOverflowFlag);
             if (null === $ov21 || null === $sixtiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (sixtieth)');
             }
@@ -41587,7 +41587,7 @@ if ('seventyninth' === $expFold) {
                 $sixtiethLong,
                 $n
             );
-            $ov22 = $sixtyfirstVar->longArithOverflowFlag;
+            $ov22 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfirstVar->longArithOverflowFlag);
             if (null === $ov22 || null === $sixtyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (sixtyfirst)');
             }
@@ -41636,7 +41636,7 @@ if ('seventyninth' === $expFold) {
                 $sixtyfirstLong,
                 $n
             );
-            $ov23 = $sixtysecondVar->longArithOverflowFlag;
+            $ov23 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysecondVar->longArithOverflowFlag);
             if (null === $ov23 || null === $sixtysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (sixtysecond)');
             }
@@ -41684,7 +41684,7 @@ if ('seventyninth' === $expFold) {
                 $sixtysecondLong,
                 $n
             );
-            $ov24 = $sixtythirdVar->longArithOverflowFlag;
+            $ov24 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtythirdVar->longArithOverflowFlag);
             if (null === $ov24 || null === $sixtythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (sixtythird)');
             }
@@ -41731,7 +41731,7 @@ if ('seventyninth' === $expFold) {
                 $sixtythirdLong,
                 $n
             );
-            $ov25 = $sixtyfourthVar->longArithOverflowFlag;
+            $ov25 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfourthVar->longArithOverflowFlag);
             if (null === $ov25 || null === $sixtyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (sixtyfourth)');
             }
@@ -41777,7 +41777,7 @@ if ('seventyninth' === $expFold) {
                 $sixtyfourthLong,
                 $n
             );
-            $ov26 = $sixtyfifthVar->longArithOverflowFlag;
+            $ov26 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfifthVar->longArithOverflowFlag);
             if (null === $ov26 || null === $sixtyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (sixtyfifth)');
             }
@@ -41822,7 +41822,7 @@ if ('seventyninth' === $expFold) {
                 $sixtyfifthLong,
                 $n
             );
-            $ov27 = $sixtysixthVar->longArithOverflowFlag;
+            $ov27 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysixthVar->longArithOverflowFlag);
             if (null === $ov27 || null === $sixtysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (sixtysixth)');
             }
@@ -41866,7 +41866,7 @@ if ('seventyninth' === $expFold) {
                 $sixtysixthLong,
                 $n
             );
-            $ov28 = $sixtyseventhVar->longArithOverflowFlag;
+            $ov28 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyseventhVar->longArithOverflowFlag);
             if (null === $ov28 || null === $sixtyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (sixtyseventh)');
             }
@@ -41910,7 +41910,7 @@ if ('seventyninth' === $expFold) {
                 $sixtyseventhLong,
                 $n
             );
-            $ov29 = $sixtyeighthVar->longArithOverflowFlag;
+            $ov29 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyeighthVar->longArithOverflowFlag);
             if (null === $ov29 || null === $sixtyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (sixtyeighth)');
             }
@@ -41952,7 +41952,7 @@ if ('seventyninth' === $expFold) {
                 $sixtyeighthLong,
                 $n
             );
-            $ov30 = $sixtyninthVar->longArithOverflowFlag;
+            $ov30 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyninthVar->longArithOverflowFlag);
             if (null === $ov30 || null === $sixtyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (sixtyninth)');
             }
@@ -41989,7 +41989,7 @@ if ('seventyninth' === $expFold) {
                 $sixtyninthLong,
                 $n
             );
-            $ov31 = $seventiethVar->longArithOverflowFlag;
+            $ov31 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventiethVar->longArithOverflowFlag);
             if (null === $ov31 || null === $seventiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (seventieth)');
             }
@@ -42026,7 +42026,7 @@ if ('seventyninth' === $expFold) {
                 $seventiethLong,
                 $n
             );
-            $ov32 = $seventyfirstVar->longArithOverflowFlag;
+            $ov32 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyfirstVar->longArithOverflowFlag);
             if (null === $ov32 || null === $seventyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (seventyfirst)');
             }
@@ -42063,7 +42063,7 @@ if ('seventyninth' === $expFold) {
                 $seventyfirstLong,
                 $n
             );
-            $ov33 = $seventysecondVar->longArithOverflowFlag;
+            $ov33 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventysecondVar->longArithOverflowFlag);
             if (null === $ov33 || null === $seventysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (seventysecond)');
             }
@@ -42099,7 +42099,7 @@ if ('seventyninth' === $expFold) {
                 $seventysecondLong,
                 $n
             );
-            $ov34 = $seventythirdVar->longArithOverflowFlag;
+            $ov34 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventythirdVar->longArithOverflowFlag);
             if (null === $ov34 || null === $seventythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (seventythird)');
             }
@@ -42134,7 +42134,7 @@ if ('seventyninth' === $expFold) {
                 $seventythirdLong,
                 $n
             );
-            $ov35 = $seventyfourthVar->longArithOverflowFlag;
+            $ov35 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyfourthVar->longArithOverflowFlag);
             if (null === $ov35 || null === $seventyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (seventyfourth)');
             }
@@ -42168,7 +42168,7 @@ if ('seventyninth' === $expFold) {
                 $seventyfourthLong,
                 $n
             );
-            $ov36 = $seventyfifthVar->longArithOverflowFlag;
+            $ov36 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyfifthVar->longArithOverflowFlag);
             if (null === $ov36 || null === $seventyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (seventyfifth)');
             }
@@ -42201,7 +42201,7 @@ if ('seventyninth' === $expFold) {
                 $seventyfifthLong,
                 $n
             );
-            $ov37 = $seventysixthVar->longArithOverflowFlag;
+            $ov37 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventysixthVar->longArithOverflowFlag);
             if (null === $ov37 || null === $seventysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (seventysixth)');
             }
@@ -42233,7 +42233,7 @@ if ('seventyninth' === $expFold) {
                 $seventysixthLong,
                 $n
             );
-            $ov38 = $seventyseventhVar->longArithOverflowFlag;
+            $ov38 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyseventhVar->longArithOverflowFlag);
             if (null === $ov38 || null === $seventyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (seventyseventh)');
             }
@@ -42264,7 +42264,7 @@ if ('seventyninth' === $expFold) {
                 $seventyseventhLong,
                 $n
             );
-            $ov39 = $seventyeighthVar->longArithOverflowFlag;
+            $ov39 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyeighthVar->longArithOverflowFlag);
             if (null === $ov39 || null === $seventyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **79 expected smul overflow metadata (seventyeighth)');
             }
@@ -42319,7 +42319,7 @@ if ('eightieth' === $expFold) {
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (sq)');
             }
@@ -42391,7 +42391,7 @@ if ('eightieth' === $expFold) {
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (cu)');
             }
@@ -42462,7 +42462,7 @@ if ('eightieth' === $expFold) {
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (fifth)');
             }
@@ -42532,7 +42532,7 @@ if ('eightieth' === $expFold) {
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (tenth)');
             }
@@ -42601,7 +42601,7 @@ if ('eightieth' === $expFold) {
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (twentieth)');
             }
@@ -42669,7 +42669,7 @@ if ('eightieth' === $expFold) {
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (fortieth)');
             }
@@ -42736,7 +42736,7 @@ if ('eightieth' === $expFold) {
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (fortysecond)');
             }
@@ -42802,7 +42802,7 @@ if ('eightieth' === $expFold) {
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (fortyfourth)');
             }
@@ -42867,7 +42867,7 @@ if ('eightieth' === $expFold) {
                 $fortyfourthLong,
                 $sqLong
             );
-            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
             if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (fortysixth)');
             }
@@ -42931,7 +42931,7 @@ if ('eightieth' === $expFold) {
                 $fortysixthLong,
                 $sqLong
             );
-            $ov10 = $fortyeighthVar->longArithOverflowFlag;
+            $ov10 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyeighthVar->longArithOverflowFlag);
             if (null === $ov10 || null === $fortyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (fortyeighth)');
             }
@@ -42994,7 +42994,7 @@ if ('eightieth' === $expFold) {
                 $fortyeighthLong,
                 $sqLong
             );
-            $ov11 = $fiftiethVar->longArithOverflowFlag;
+            $ov11 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftiethVar->longArithOverflowFlag);
             if (null === $ov11 || null === $fiftiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (fiftieth)');
             }
@@ -43055,7 +43055,7 @@ if ('eightieth' === $expFold) {
                 $fiftiethLong,
                 $n
             );
-            $ov12 = $fiftyfirstVar->longArithOverflowFlag;
+            $ov12 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfirstVar->longArithOverflowFlag);
             if (null === $ov12 || null === $fiftyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (fiftyfirst)');
             }
@@ -43115,7 +43115,7 @@ if ('eightieth' === $expFold) {
                 $fiftyfirstLong,
                 $n
             );
-            $ov13 = $fiftysecondVar->longArithOverflowFlag;
+            $ov13 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysecondVar->longArithOverflowFlag);
             if (null === $ov13 || null === $fiftysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (fiftysecond)');
             }
@@ -43174,7 +43174,7 @@ if ('eightieth' === $expFold) {
                 $fiftysecondLong,
                 $n
             );
-            $ov14 = $fiftythirdVar->longArithOverflowFlag;
+            $ov14 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftythirdVar->longArithOverflowFlag);
             if (null === $ov14 || null === $fiftythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (fiftythird)');
             }
@@ -43232,7 +43232,7 @@ if ('eightieth' === $expFold) {
                 $fiftythirdLong,
                 $n
             );
-            $ov15 = $fiftyfourthVar->longArithOverflowFlag;
+            $ov15 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfourthVar->longArithOverflowFlag);
             if (null === $ov15 || null === $fiftyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (fiftyfourth)');
             }
@@ -43289,7 +43289,7 @@ if ('eightieth' === $expFold) {
                 $fiftyfourthLong,
                 $n
             );
-            $ov16 = $fiftyfifthVar->longArithOverflowFlag;
+            $ov16 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfifthVar->longArithOverflowFlag);
             if (null === $ov16 || null === $fiftyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (fiftyfifth)');
             }
@@ -43345,7 +43345,7 @@ if ('eightieth' === $expFold) {
                 $fiftyfifthLong,
                 $n
             );
-            $ov17 = $fiftysixthVar->longArithOverflowFlag;
+            $ov17 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysixthVar->longArithOverflowFlag);
             if (null === $ov17 || null === $fiftysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (fiftysixth)');
             }
@@ -43400,7 +43400,7 @@ if ('eightieth' === $expFold) {
                 $fiftysixthLong,
                 $n
             );
-            $ov18 = $fiftyseventhVar->longArithOverflowFlag;
+            $ov18 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyseventhVar->longArithOverflowFlag);
             if (null === $ov18 || null === $fiftyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (fiftyseventh)');
             }
@@ -43454,7 +43454,7 @@ if ('eightieth' === $expFold) {
                 $fiftyseventhLong,
                 $n
             );
-            $ov19 = $fiftyeighthVar->longArithOverflowFlag;
+            $ov19 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyeighthVar->longArithOverflowFlag);
             if (null === $ov19 || null === $fiftyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (fiftyeighth)');
             }
@@ -43507,7 +43507,7 @@ if ('eightieth' === $expFold) {
                 $fiftyeighthLong,
                 $n
             );
-            $ov20 = $fiftyninthVar->longArithOverflowFlag;
+            $ov20 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyninthVar->longArithOverflowFlag);
             if (null === $ov20 || null === $fiftyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (fiftyninth)');
             }
@@ -43559,7 +43559,7 @@ if ('eightieth' === $expFold) {
                 $fiftyninthLong,
                 $n
             );
-            $ov21 = $sixtiethVar->longArithOverflowFlag;
+            $ov21 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtiethVar->longArithOverflowFlag);
             if (null === $ov21 || null === $sixtiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (sixtieth)');
             }
@@ -43610,7 +43610,7 @@ if ('eightieth' === $expFold) {
                 $sixtiethLong,
                 $n
             );
-            $ov22 = $sixtyfirstVar->longArithOverflowFlag;
+            $ov22 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfirstVar->longArithOverflowFlag);
             if (null === $ov22 || null === $sixtyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (sixtyfirst)');
             }
@@ -43660,7 +43660,7 @@ if ('eightieth' === $expFold) {
                 $sixtyfirstLong,
                 $n
             );
-            $ov23 = $sixtysecondVar->longArithOverflowFlag;
+            $ov23 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysecondVar->longArithOverflowFlag);
             if (null === $ov23 || null === $sixtysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (sixtysecond)');
             }
@@ -43709,7 +43709,7 @@ if ('eightieth' === $expFold) {
                 $sixtysecondLong,
                 $n
             );
-            $ov24 = $sixtythirdVar->longArithOverflowFlag;
+            $ov24 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtythirdVar->longArithOverflowFlag);
             if (null === $ov24 || null === $sixtythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (sixtythird)');
             }
@@ -43757,7 +43757,7 @@ if ('eightieth' === $expFold) {
                 $sixtythirdLong,
                 $n
             );
-            $ov25 = $sixtyfourthVar->longArithOverflowFlag;
+            $ov25 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfourthVar->longArithOverflowFlag);
             if (null === $ov25 || null === $sixtyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (sixtyfourth)');
             }
@@ -43804,7 +43804,7 @@ if ('eightieth' === $expFold) {
                 $sixtyfourthLong,
                 $n
             );
-            $ov26 = $sixtyfifthVar->longArithOverflowFlag;
+            $ov26 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfifthVar->longArithOverflowFlag);
             if (null === $ov26 || null === $sixtyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (sixtyfifth)');
             }
@@ -43850,7 +43850,7 @@ if ('eightieth' === $expFold) {
                 $sixtyfifthLong,
                 $n
             );
-            $ov27 = $sixtysixthVar->longArithOverflowFlag;
+            $ov27 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysixthVar->longArithOverflowFlag);
             if (null === $ov27 || null === $sixtysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (sixtysixth)');
             }
@@ -43895,7 +43895,7 @@ if ('eightieth' === $expFold) {
                 $sixtysixthLong,
                 $n
             );
-            $ov28 = $sixtyseventhVar->longArithOverflowFlag;
+            $ov28 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyseventhVar->longArithOverflowFlag);
             if (null === $ov28 || null === $sixtyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (sixtyseventh)');
             }
@@ -43940,7 +43940,7 @@ if ('eightieth' === $expFold) {
                 $sixtyseventhLong,
                 $n
             );
-            $ov29 = $sixtyeighthVar->longArithOverflowFlag;
+            $ov29 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyeighthVar->longArithOverflowFlag);
             if (null === $ov29 || null === $sixtyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (sixtyeighth)');
             }
@@ -43983,7 +43983,7 @@ if ('eightieth' === $expFold) {
                 $sixtyeighthLong,
                 $n
             );
-            $ov30 = $sixtyninthVar->longArithOverflowFlag;
+            $ov30 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyninthVar->longArithOverflowFlag);
             if (null === $ov30 || null === $sixtyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (sixtyninth)');
             }
@@ -44021,7 +44021,7 @@ if ('eightieth' === $expFold) {
                 $sixtyninthLong,
                 $n
             );
-            $ov31 = $seventiethVar->longArithOverflowFlag;
+            $ov31 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventiethVar->longArithOverflowFlag);
             if (null === $ov31 || null === $seventiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (seventieth)');
             }
@@ -44059,7 +44059,7 @@ if ('eightieth' === $expFold) {
                 $seventiethLong,
                 $n
             );
-            $ov32 = $seventyfirstVar->longArithOverflowFlag;
+            $ov32 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyfirstVar->longArithOverflowFlag);
             if (null === $ov32 || null === $seventyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (seventyfirst)');
             }
@@ -44097,7 +44097,7 @@ if ('eightieth' === $expFold) {
                 $seventyfirstLong,
                 $n
             );
-            $ov33 = $seventysecondVar->longArithOverflowFlag;
+            $ov33 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventysecondVar->longArithOverflowFlag);
             if (null === $ov33 || null === $seventysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (seventysecond)');
             }
@@ -44134,7 +44134,7 @@ if ('eightieth' === $expFold) {
                 $seventysecondLong,
                 $n
             );
-            $ov34 = $seventythirdVar->longArithOverflowFlag;
+            $ov34 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventythirdVar->longArithOverflowFlag);
             if (null === $ov34 || null === $seventythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (seventythird)');
             }
@@ -44170,7 +44170,7 @@ if ('eightieth' === $expFold) {
                 $seventythirdLong,
                 $n
             );
-            $ov35 = $seventyfourthVar->longArithOverflowFlag;
+            $ov35 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyfourthVar->longArithOverflowFlag);
             if (null === $ov35 || null === $seventyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (seventyfourth)');
             }
@@ -44205,7 +44205,7 @@ if ('eightieth' === $expFold) {
                 $seventyfourthLong,
                 $n
             );
-            $ov36 = $seventyfifthVar->longArithOverflowFlag;
+            $ov36 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyfifthVar->longArithOverflowFlag);
             if (null === $ov36 || null === $seventyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (seventyfifth)');
             }
@@ -44239,7 +44239,7 @@ if ('eightieth' === $expFold) {
                 $seventyfifthLong,
                 $n
             );
-            $ov37 = $seventysixthVar->longArithOverflowFlag;
+            $ov37 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventysixthVar->longArithOverflowFlag);
             if (null === $ov37 || null === $seventysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (seventysixth)');
             }
@@ -44272,7 +44272,7 @@ if ('eightieth' === $expFold) {
                 $seventysixthLong,
                 $n
             );
-            $ov38 = $seventyseventhVar->longArithOverflowFlag;
+            $ov38 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyseventhVar->longArithOverflowFlag);
             if (null === $ov38 || null === $seventyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (seventyseventh)');
             }
@@ -44304,7 +44304,7 @@ if ('eightieth' === $expFold) {
                 $seventyseventhLong,
                 $n
             );
-            $ov39 = $seventyeighthVar->longArithOverflowFlag;
+            $ov39 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyeighthVar->longArithOverflowFlag);
             if (null === $ov39 || null === $seventyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (seventyeighth)');
             }
@@ -44335,7 +44335,7 @@ if ('eightieth' === $expFold) {
                 $seventyeighthLong,
                 $n
             );
-            $ov40 = $seventyninthVar->longArithOverflowFlag;
+            $ov40 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyninthVar->longArithOverflowFlag);
             if (null === $ov40 || null === $seventyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **80 expected smul overflow metadata (seventyninth)');
             }
@@ -44390,7 +44390,7 @@ if ('eightyfirst' === $expFold) {
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (sq)');
             }
@@ -44463,7 +44463,7 @@ if ('eightyfirst' === $expFold) {
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (cu)');
             }
@@ -44535,7 +44535,7 @@ if ('eightyfirst' === $expFold) {
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (fifth)');
             }
@@ -44606,7 +44606,7 @@ if ('eightyfirst' === $expFold) {
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (tenth)');
             }
@@ -44676,7 +44676,7 @@ if ('eightyfirst' === $expFold) {
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (twentieth)');
             }
@@ -44745,7 +44745,7 @@ if ('eightyfirst' === $expFold) {
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (fortieth)');
             }
@@ -44813,7 +44813,7 @@ if ('eightyfirst' === $expFold) {
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (fortysecond)');
             }
@@ -44880,7 +44880,7 @@ if ('eightyfirst' === $expFold) {
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (fortyfourth)');
             }
@@ -44946,7 +44946,7 @@ if ('eightyfirst' === $expFold) {
                 $fortyfourthLong,
                 $sqLong
             );
-            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
             if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (fortysixth)');
             }
@@ -45011,7 +45011,7 @@ if ('eightyfirst' === $expFold) {
                 $fortysixthLong,
                 $sqLong
             );
-            $ov10 = $fortyeighthVar->longArithOverflowFlag;
+            $ov10 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyeighthVar->longArithOverflowFlag);
             if (null === $ov10 || null === $fortyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (fortyeighth)');
             }
@@ -45075,7 +45075,7 @@ if ('eightyfirst' === $expFold) {
                 $fortyeighthLong,
                 $sqLong
             );
-            $ov11 = $fiftiethVar->longArithOverflowFlag;
+            $ov11 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftiethVar->longArithOverflowFlag);
             if (null === $ov11 || null === $fiftiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (fiftieth)');
             }
@@ -45137,7 +45137,7 @@ if ('eightyfirst' === $expFold) {
                 $fiftiethLong,
                 $n
             );
-            $ov12 = $fiftyfirstVar->longArithOverflowFlag;
+            $ov12 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfirstVar->longArithOverflowFlag);
             if (null === $ov12 || null === $fiftyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (fiftyfirst)');
             }
@@ -45198,7 +45198,7 @@ if ('eightyfirst' === $expFold) {
                 $fiftyfirstLong,
                 $n
             );
-            $ov13 = $fiftysecondVar->longArithOverflowFlag;
+            $ov13 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysecondVar->longArithOverflowFlag);
             if (null === $ov13 || null === $fiftysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (fiftysecond)');
             }
@@ -45258,7 +45258,7 @@ if ('eightyfirst' === $expFold) {
                 $fiftysecondLong,
                 $n
             );
-            $ov14 = $fiftythirdVar->longArithOverflowFlag;
+            $ov14 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftythirdVar->longArithOverflowFlag);
             if (null === $ov14 || null === $fiftythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (fiftythird)');
             }
@@ -45317,7 +45317,7 @@ if ('eightyfirst' === $expFold) {
                 $fiftythirdLong,
                 $n
             );
-            $ov15 = $fiftyfourthVar->longArithOverflowFlag;
+            $ov15 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfourthVar->longArithOverflowFlag);
             if (null === $ov15 || null === $fiftyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (fiftyfourth)');
             }
@@ -45375,7 +45375,7 @@ if ('eightyfirst' === $expFold) {
                 $fiftyfourthLong,
                 $n
             );
-            $ov16 = $fiftyfifthVar->longArithOverflowFlag;
+            $ov16 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfifthVar->longArithOverflowFlag);
             if (null === $ov16 || null === $fiftyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (fiftyfifth)');
             }
@@ -45432,7 +45432,7 @@ if ('eightyfirst' === $expFold) {
                 $fiftyfifthLong,
                 $n
             );
-            $ov17 = $fiftysixthVar->longArithOverflowFlag;
+            $ov17 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysixthVar->longArithOverflowFlag);
             if (null === $ov17 || null === $fiftysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (fiftysixth)');
             }
@@ -45488,7 +45488,7 @@ if ('eightyfirst' === $expFold) {
                 $fiftysixthLong,
                 $n
             );
-            $ov18 = $fiftyseventhVar->longArithOverflowFlag;
+            $ov18 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyseventhVar->longArithOverflowFlag);
             if (null === $ov18 || null === $fiftyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (fiftyseventh)');
             }
@@ -45543,7 +45543,7 @@ if ('eightyfirst' === $expFold) {
                 $fiftyseventhLong,
                 $n
             );
-            $ov19 = $fiftyeighthVar->longArithOverflowFlag;
+            $ov19 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyeighthVar->longArithOverflowFlag);
             if (null === $ov19 || null === $fiftyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (fiftyeighth)');
             }
@@ -45597,7 +45597,7 @@ if ('eightyfirst' === $expFold) {
                 $fiftyeighthLong,
                 $n
             );
-            $ov20 = $fiftyninthVar->longArithOverflowFlag;
+            $ov20 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyninthVar->longArithOverflowFlag);
             if (null === $ov20 || null === $fiftyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (fiftyninth)');
             }
@@ -45650,7 +45650,7 @@ if ('eightyfirst' === $expFold) {
                 $fiftyninthLong,
                 $n
             );
-            $ov21 = $sixtiethVar->longArithOverflowFlag;
+            $ov21 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtiethVar->longArithOverflowFlag);
             if (null === $ov21 || null === $sixtiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (sixtieth)');
             }
@@ -45702,7 +45702,7 @@ if ('eightyfirst' === $expFold) {
                 $sixtiethLong,
                 $n
             );
-            $ov22 = $sixtyfirstVar->longArithOverflowFlag;
+            $ov22 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfirstVar->longArithOverflowFlag);
             if (null === $ov22 || null === $sixtyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (sixtyfirst)');
             }
@@ -45753,7 +45753,7 @@ if ('eightyfirst' === $expFold) {
                 $sixtyfirstLong,
                 $n
             );
-            $ov23 = $sixtysecondVar->longArithOverflowFlag;
+            $ov23 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysecondVar->longArithOverflowFlag);
             if (null === $ov23 || null === $sixtysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (sixtysecond)');
             }
@@ -45803,7 +45803,7 @@ if ('eightyfirst' === $expFold) {
                 $sixtysecondLong,
                 $n
             );
-            $ov24 = $sixtythirdVar->longArithOverflowFlag;
+            $ov24 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtythirdVar->longArithOverflowFlag);
             if (null === $ov24 || null === $sixtythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (sixtythird)');
             }
@@ -45852,7 +45852,7 @@ if ('eightyfirst' === $expFold) {
                 $sixtythirdLong,
                 $n
             );
-            $ov25 = $sixtyfourthVar->longArithOverflowFlag;
+            $ov25 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfourthVar->longArithOverflowFlag);
             if (null === $ov25 || null === $sixtyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (sixtyfourth)');
             }
@@ -45900,7 +45900,7 @@ if ('eightyfirst' === $expFold) {
                 $sixtyfourthLong,
                 $n
             );
-            $ov26 = $sixtyfifthVar->longArithOverflowFlag;
+            $ov26 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfifthVar->longArithOverflowFlag);
             if (null === $ov26 || null === $sixtyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (sixtyfifth)');
             }
@@ -45947,7 +45947,7 @@ if ('eightyfirst' === $expFold) {
                 $sixtyfifthLong,
                 $n
             );
-            $ov27 = $sixtysixthVar->longArithOverflowFlag;
+            $ov27 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysixthVar->longArithOverflowFlag);
             if (null === $ov27 || null === $sixtysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (sixtysixth)');
             }
@@ -45993,7 +45993,7 @@ if ('eightyfirst' === $expFold) {
                 $sixtysixthLong,
                 $n
             );
-            $ov28 = $sixtyseventhVar->longArithOverflowFlag;
+            $ov28 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyseventhVar->longArithOverflowFlag);
             if (null === $ov28 || null === $sixtyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (sixtyseventh)');
             }
@@ -46039,7 +46039,7 @@ if ('eightyfirst' === $expFold) {
                 $sixtyseventhLong,
                 $n
             );
-            $ov29 = $sixtyeighthVar->longArithOverflowFlag;
+            $ov29 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyeighthVar->longArithOverflowFlag);
             if (null === $ov29 || null === $sixtyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (sixtyeighth)');
             }
@@ -46083,7 +46083,7 @@ if ('eightyfirst' === $expFold) {
                 $sixtyeighthLong,
                 $n
             );
-            $ov30 = $sixtyninthVar->longArithOverflowFlag;
+            $ov30 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyninthVar->longArithOverflowFlag);
             if (null === $ov30 || null === $sixtyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (sixtyninth)');
             }
@@ -46122,7 +46122,7 @@ if ('eightyfirst' === $expFold) {
                 $sixtyninthLong,
                 $n
             );
-            $ov31 = $seventiethVar->longArithOverflowFlag;
+            $ov31 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventiethVar->longArithOverflowFlag);
             if (null === $ov31 || null === $seventiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (seventieth)');
             }
@@ -46161,7 +46161,7 @@ if ('eightyfirst' === $expFold) {
                 $seventiethLong,
                 $n
             );
-            $ov32 = $seventyfirstVar->longArithOverflowFlag;
+            $ov32 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyfirstVar->longArithOverflowFlag);
             if (null === $ov32 || null === $seventyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (seventyfirst)');
             }
@@ -46200,7 +46200,7 @@ if ('eightyfirst' === $expFold) {
                 $seventyfirstLong,
                 $n
             );
-            $ov33 = $seventysecondVar->longArithOverflowFlag;
+            $ov33 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventysecondVar->longArithOverflowFlag);
             if (null === $ov33 || null === $seventysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (seventysecond)');
             }
@@ -46238,7 +46238,7 @@ if ('eightyfirst' === $expFold) {
                 $seventysecondLong,
                 $n
             );
-            $ov34 = $seventythirdVar->longArithOverflowFlag;
+            $ov34 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventythirdVar->longArithOverflowFlag);
             if (null === $ov34 || null === $seventythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (seventythird)');
             }
@@ -46275,7 +46275,7 @@ if ('eightyfirst' === $expFold) {
                 $seventythirdLong,
                 $n
             );
-            $ov35 = $seventyfourthVar->longArithOverflowFlag;
+            $ov35 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyfourthVar->longArithOverflowFlag);
             if (null === $ov35 || null === $seventyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (seventyfourth)');
             }
@@ -46311,7 +46311,7 @@ if ('eightyfirst' === $expFold) {
                 $seventyfourthLong,
                 $n
             );
-            $ov36 = $seventyfifthVar->longArithOverflowFlag;
+            $ov36 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyfifthVar->longArithOverflowFlag);
             if (null === $ov36 || null === $seventyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (seventyfifth)');
             }
@@ -46346,7 +46346,7 @@ if ('eightyfirst' === $expFold) {
                 $seventyfifthLong,
                 $n
             );
-            $ov37 = $seventysixthVar->longArithOverflowFlag;
+            $ov37 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventysixthVar->longArithOverflowFlag);
             if (null === $ov37 || null === $seventysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (seventysixth)');
             }
@@ -46380,7 +46380,7 @@ if ('eightyfirst' === $expFold) {
                 $seventysixthLong,
                 $n
             );
-            $ov38 = $seventyseventhVar->longArithOverflowFlag;
+            $ov38 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyseventhVar->longArithOverflowFlag);
             if (null === $ov38 || null === $seventyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (seventyseventh)');
             }
@@ -46413,7 +46413,7 @@ if ('eightyfirst' === $expFold) {
                 $seventyseventhLong,
                 $n
             );
-            $ov39 = $seventyeighthVar->longArithOverflowFlag;
+            $ov39 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyeighthVar->longArithOverflowFlag);
             if (null === $ov39 || null === $seventyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (seventyeighth)');
             }
@@ -46445,7 +46445,7 @@ if ('eightyfirst' === $expFold) {
                 $seventyeighthLong,
                 $n
             );
-            $ov40 = $seventyninthVar->longArithOverflowFlag;
+            $ov40 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyninthVar->longArithOverflowFlag);
             if (null === $ov40 || null === $seventyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (seventyninth)');
             }
@@ -46476,7 +46476,7 @@ if ('eightyfirst' === $expFold) {
                 $seventyninthLong,
                 $n
             );
-            $ov41 = $eightiethVar->longArithOverflowFlag;
+            $ov41 = JitLongArithOverflow::loadOverflowFlagI1($context, $eightiethVar->longArithOverflowFlag);
             if (null === $ov41 || null === $eightiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **81 expected smul overflow metadata (eightieth)');
             }
@@ -46531,7 +46531,7 @@ if ('eightysecond' === $expFold) {
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (sq)');
             }
@@ -46605,7 +46605,7 @@ if ('eightysecond' === $expFold) {
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (cu)');
             }
@@ -46678,7 +46678,7 @@ if ('eightysecond' === $expFold) {
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (fifth)');
             }
@@ -46750,7 +46750,7 @@ if ('eightysecond' === $expFold) {
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (tenth)');
             }
@@ -46821,7 +46821,7 @@ if ('eightysecond' === $expFold) {
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (twentieth)');
             }
@@ -46891,7 +46891,7 @@ if ('eightysecond' === $expFold) {
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (fortieth)');
             }
@@ -46960,7 +46960,7 @@ if ('eightysecond' === $expFold) {
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (fortysecond)');
             }
@@ -47028,7 +47028,7 @@ if ('eightysecond' === $expFold) {
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (fortyfourth)');
             }
@@ -47095,7 +47095,7 @@ if ('eightysecond' === $expFold) {
                 $fortyfourthLong,
                 $sqLong
             );
-            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
             if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (fortysixth)');
             }
@@ -47161,7 +47161,7 @@ if ('eightysecond' === $expFold) {
                 $fortysixthLong,
                 $sqLong
             );
-            $ov10 = $fortyeighthVar->longArithOverflowFlag;
+            $ov10 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyeighthVar->longArithOverflowFlag);
             if (null === $ov10 || null === $fortyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (fortyeighth)');
             }
@@ -47226,7 +47226,7 @@ if ('eightysecond' === $expFold) {
                 $fortyeighthLong,
                 $sqLong
             );
-            $ov11 = $fiftiethVar->longArithOverflowFlag;
+            $ov11 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftiethVar->longArithOverflowFlag);
             if (null === $ov11 || null === $fiftiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (fiftieth)');
             }
@@ -47289,7 +47289,7 @@ if ('eightysecond' === $expFold) {
                 $fiftiethLong,
                 $n
             );
-            $ov12 = $fiftyfirstVar->longArithOverflowFlag;
+            $ov12 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfirstVar->longArithOverflowFlag);
             if (null === $ov12 || null === $fiftyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (fiftyfirst)');
             }
@@ -47351,7 +47351,7 @@ if ('eightysecond' === $expFold) {
                 $fiftyfirstLong,
                 $n
             );
-            $ov13 = $fiftysecondVar->longArithOverflowFlag;
+            $ov13 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysecondVar->longArithOverflowFlag);
             if (null === $ov13 || null === $fiftysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (fiftysecond)');
             }
@@ -47412,7 +47412,7 @@ if ('eightysecond' === $expFold) {
                 $fiftysecondLong,
                 $n
             );
-            $ov14 = $fiftythirdVar->longArithOverflowFlag;
+            $ov14 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftythirdVar->longArithOverflowFlag);
             if (null === $ov14 || null === $fiftythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (fiftythird)');
             }
@@ -47472,7 +47472,7 @@ if ('eightysecond' === $expFold) {
                 $fiftythirdLong,
                 $n
             );
-            $ov15 = $fiftyfourthVar->longArithOverflowFlag;
+            $ov15 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfourthVar->longArithOverflowFlag);
             if (null === $ov15 || null === $fiftyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (fiftyfourth)');
             }
@@ -47531,7 +47531,7 @@ if ('eightysecond' === $expFold) {
                 $fiftyfourthLong,
                 $n
             );
-            $ov16 = $fiftyfifthVar->longArithOverflowFlag;
+            $ov16 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfifthVar->longArithOverflowFlag);
             if (null === $ov16 || null === $fiftyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (fiftyfifth)');
             }
@@ -47589,7 +47589,7 @@ if ('eightysecond' === $expFold) {
                 $fiftyfifthLong,
                 $n
             );
-            $ov17 = $fiftysixthVar->longArithOverflowFlag;
+            $ov17 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysixthVar->longArithOverflowFlag);
             if (null === $ov17 || null === $fiftysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (fiftysixth)');
             }
@@ -47646,7 +47646,7 @@ if ('eightysecond' === $expFold) {
                 $fiftysixthLong,
                 $n
             );
-            $ov18 = $fiftyseventhVar->longArithOverflowFlag;
+            $ov18 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyseventhVar->longArithOverflowFlag);
             if (null === $ov18 || null === $fiftyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (fiftyseventh)');
             }
@@ -47702,7 +47702,7 @@ if ('eightysecond' === $expFold) {
                 $fiftyseventhLong,
                 $n
             );
-            $ov19 = $fiftyeighthVar->longArithOverflowFlag;
+            $ov19 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyeighthVar->longArithOverflowFlag);
             if (null === $ov19 || null === $fiftyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (fiftyeighth)');
             }
@@ -47757,7 +47757,7 @@ if ('eightysecond' === $expFold) {
                 $fiftyeighthLong,
                 $n
             );
-            $ov20 = $fiftyninthVar->longArithOverflowFlag;
+            $ov20 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyninthVar->longArithOverflowFlag);
             if (null === $ov20 || null === $fiftyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (fiftyninth)');
             }
@@ -47811,7 +47811,7 @@ if ('eightysecond' === $expFold) {
                 $fiftyninthLong,
                 $n
             );
-            $ov21 = $sixtiethVar->longArithOverflowFlag;
+            $ov21 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtiethVar->longArithOverflowFlag);
             if (null === $ov21 || null === $sixtiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (sixtieth)');
             }
@@ -47864,7 +47864,7 @@ if ('eightysecond' === $expFold) {
                 $sixtiethLong,
                 $n
             );
-            $ov22 = $sixtyfirstVar->longArithOverflowFlag;
+            $ov22 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfirstVar->longArithOverflowFlag);
             if (null === $ov22 || null === $sixtyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (sixtyfirst)');
             }
@@ -47916,7 +47916,7 @@ if ('eightysecond' === $expFold) {
                 $sixtyfirstLong,
                 $n
             );
-            $ov23 = $sixtysecondVar->longArithOverflowFlag;
+            $ov23 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysecondVar->longArithOverflowFlag);
             if (null === $ov23 || null === $sixtysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (sixtysecond)');
             }
@@ -47967,7 +47967,7 @@ if ('eightysecond' === $expFold) {
                 $sixtysecondLong,
                 $n
             );
-            $ov24 = $sixtythirdVar->longArithOverflowFlag;
+            $ov24 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtythirdVar->longArithOverflowFlag);
             if (null === $ov24 || null === $sixtythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (sixtythird)');
             }
@@ -48017,7 +48017,7 @@ if ('eightysecond' === $expFold) {
                 $sixtythirdLong,
                 $n
             );
-            $ov25 = $sixtyfourthVar->longArithOverflowFlag;
+            $ov25 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfourthVar->longArithOverflowFlag);
             if (null === $ov25 || null === $sixtyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (sixtyfourth)');
             }
@@ -48066,7 +48066,7 @@ if ('eightysecond' === $expFold) {
                 $sixtyfourthLong,
                 $n
             );
-            $ov26 = $sixtyfifthVar->longArithOverflowFlag;
+            $ov26 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfifthVar->longArithOverflowFlag);
             if (null === $ov26 || null === $sixtyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (sixtyfifth)');
             }
@@ -48114,7 +48114,7 @@ if ('eightysecond' === $expFold) {
                 $sixtyfifthLong,
                 $n
             );
-            $ov27 = $sixtysixthVar->longArithOverflowFlag;
+            $ov27 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysixthVar->longArithOverflowFlag);
             if (null === $ov27 || null === $sixtysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (sixtysixth)');
             }
@@ -48161,7 +48161,7 @@ if ('eightysecond' === $expFold) {
                 $sixtysixthLong,
                 $n
             );
-            $ov28 = $sixtyseventhVar->longArithOverflowFlag;
+            $ov28 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyseventhVar->longArithOverflowFlag);
             if (null === $ov28 || null === $sixtyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (sixtyseventh)');
             }
@@ -48208,7 +48208,7 @@ if ('eightysecond' === $expFold) {
                 $sixtyseventhLong,
                 $n
             );
-            $ov29 = $sixtyeighthVar->longArithOverflowFlag;
+            $ov29 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyeighthVar->longArithOverflowFlag);
             if (null === $ov29 || null === $sixtyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (sixtyeighth)');
             }
@@ -48253,7 +48253,7 @@ if ('eightysecond' === $expFold) {
                 $sixtyeighthLong,
                 $n
             );
-            $ov30 = $sixtyninthVar->longArithOverflowFlag;
+            $ov30 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyninthVar->longArithOverflowFlag);
             if (null === $ov30 || null === $sixtyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (sixtyninth)');
             }
@@ -48293,7 +48293,7 @@ if ('eightysecond' === $expFold) {
                 $sixtyninthLong,
                 $n
             );
-            $ov31 = $seventiethVar->longArithOverflowFlag;
+            $ov31 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventiethVar->longArithOverflowFlag);
             if (null === $ov31 || null === $seventiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (seventieth)');
             }
@@ -48333,7 +48333,7 @@ if ('eightysecond' === $expFold) {
                 $seventiethLong,
                 $n
             );
-            $ov32 = $seventyfirstVar->longArithOverflowFlag;
+            $ov32 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyfirstVar->longArithOverflowFlag);
             if (null === $ov32 || null === $seventyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (seventyfirst)');
             }
@@ -48373,7 +48373,7 @@ if ('eightysecond' === $expFold) {
                 $seventyfirstLong,
                 $n
             );
-            $ov33 = $seventysecondVar->longArithOverflowFlag;
+            $ov33 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventysecondVar->longArithOverflowFlag);
             if (null === $ov33 || null === $seventysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (seventysecond)');
             }
@@ -48412,7 +48412,7 @@ if ('eightysecond' === $expFold) {
                 $seventysecondLong,
                 $n
             );
-            $ov34 = $seventythirdVar->longArithOverflowFlag;
+            $ov34 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventythirdVar->longArithOverflowFlag);
             if (null === $ov34 || null === $seventythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (seventythird)');
             }
@@ -48450,7 +48450,7 @@ if ('eightysecond' === $expFold) {
                 $seventythirdLong,
                 $n
             );
-            $ov35 = $seventyfourthVar->longArithOverflowFlag;
+            $ov35 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyfourthVar->longArithOverflowFlag);
             if (null === $ov35 || null === $seventyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (seventyfourth)');
             }
@@ -48487,7 +48487,7 @@ if ('eightysecond' === $expFold) {
                 $seventyfourthLong,
                 $n
             );
-            $ov36 = $seventyfifthVar->longArithOverflowFlag;
+            $ov36 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyfifthVar->longArithOverflowFlag);
             if (null === $ov36 || null === $seventyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (seventyfifth)');
             }
@@ -48523,7 +48523,7 @@ if ('eightysecond' === $expFold) {
                 $seventyfifthLong,
                 $n
             );
-            $ov37 = $seventysixthVar->longArithOverflowFlag;
+            $ov37 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventysixthVar->longArithOverflowFlag);
             if (null === $ov37 || null === $seventysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (seventysixth)');
             }
@@ -48558,7 +48558,7 @@ if ('eightysecond' === $expFold) {
                 $seventysixthLong,
                 $n
             );
-            $ov38 = $seventyseventhVar->longArithOverflowFlag;
+            $ov38 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyseventhVar->longArithOverflowFlag);
             if (null === $ov38 || null === $seventyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (seventyseventh)');
             }
@@ -48592,7 +48592,7 @@ if ('eightysecond' === $expFold) {
                 $seventyseventhLong,
                 $n
             );
-            $ov39 = $seventyeighthVar->longArithOverflowFlag;
+            $ov39 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyeighthVar->longArithOverflowFlag);
             if (null === $ov39 || null === $seventyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (seventyeighth)');
             }
@@ -48625,7 +48625,7 @@ if ('eightysecond' === $expFold) {
                 $seventyeighthLong,
                 $n
             );
-            $ov40 = $seventyninthVar->longArithOverflowFlag;
+            $ov40 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyninthVar->longArithOverflowFlag);
             if (null === $ov40 || null === $seventyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (seventyninth)');
             }
@@ -48657,7 +48657,7 @@ if ('eightysecond' === $expFold) {
                 $seventyninthLong,
                 $n
             );
-            $ov41 = $eightiethVar->longArithOverflowFlag;
+            $ov41 = JitLongArithOverflow::loadOverflowFlagI1($context, $eightiethVar->longArithOverflowFlag);
             if (null === $ov41 || null === $eightiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (eightieth)');
             }
@@ -48688,7 +48688,7 @@ if ('eightysecond' === $expFold) {
                 $eightiethLong,
                 $n
             );
-            $ov42 = $eightyfirstVar->longArithOverflowFlag;
+            $ov42 = JitLongArithOverflow::loadOverflowFlagI1($context, $eightyfirstVar->longArithOverflowFlag);
             if (null === $ov42 || null === $eightyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **82 expected smul overflow metadata (eightyfirst)');
             }
@@ -48743,7 +48743,7 @@ if ('eightythird' === $expFold) {
                 $n,
                 $n
             );
-            $ov1 = $sqVar->longArithOverflowFlag;
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
             if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (sq)');
             }
@@ -48818,7 +48818,7 @@ if ('eightythird' === $expFold) {
                 $sqLong,
                 $n
             );
-            $ov2 = $cuVar->longArithOverflowFlag;
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
             if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (cu)');
             }
@@ -48892,7 +48892,7 @@ if ('eightythird' === $expFold) {
                 $cuLong,
                 $sqLong
             );
-            $ov3 = $fifthVar->longArithOverflowFlag;
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
             if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (fifth)');
             }
@@ -48965,7 +48965,7 @@ if ('eightythird' === $expFold) {
                 $fifthLong,
                 $fifthLong
             );
-            $ov4 = $tenthVar->longArithOverflowFlag;
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
             if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (tenth)');
             }
@@ -49037,7 +49037,7 @@ if ('eightythird' === $expFold) {
                 $tenthLong,
                 $tenthLong
             );
-            $ov5 = $twentiethVar->longArithOverflowFlag;
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
             if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (twentieth)');
             }
@@ -49108,7 +49108,7 @@ if ('eightythird' === $expFold) {
                 $twentiethLong,
                 $twentiethLong
             );
-            $ov6 = $fortiethVar->longArithOverflowFlag;
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
             if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (fortieth)');
             }
@@ -49178,7 +49178,7 @@ if ('eightythird' === $expFold) {
                 $fortiethLong,
                 $sqLong
             );
-            $ov7 = $fortysecondVar->longArithOverflowFlag;
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
             if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (fortysecond)');
             }
@@ -49247,7 +49247,7 @@ if ('eightythird' === $expFold) {
                 $fortysecondLong,
                 $sqLong
             );
-            $ov8 = $fortyfourthVar->longArithOverflowFlag;
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
             if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (fortyfourth)');
             }
@@ -49315,7 +49315,7 @@ if ('eightythird' === $expFold) {
                 $fortyfourthLong,
                 $sqLong
             );
-            $ov9 = $fortysixthVar->longArithOverflowFlag;
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
             if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (fortysixth)');
             }
@@ -49382,7 +49382,7 @@ if ('eightythird' === $expFold) {
                 $fortysixthLong,
                 $sqLong
             );
-            $ov10 = $fortyeighthVar->longArithOverflowFlag;
+            $ov10 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyeighthVar->longArithOverflowFlag);
             if (null === $ov10 || null === $fortyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (fortyeighth)');
             }
@@ -49448,7 +49448,7 @@ if ('eightythird' === $expFold) {
                 $fortyeighthLong,
                 $sqLong
             );
-            $ov11 = $fiftiethVar->longArithOverflowFlag;
+            $ov11 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftiethVar->longArithOverflowFlag);
             if (null === $ov11 || null === $fiftiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (fiftieth)');
             }
@@ -49512,7 +49512,7 @@ if ('eightythird' === $expFold) {
                 $fiftiethLong,
                 $n
             );
-            $ov12 = $fiftyfirstVar->longArithOverflowFlag;
+            $ov12 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfirstVar->longArithOverflowFlag);
             if (null === $ov12 || null === $fiftyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (fiftyfirst)');
             }
@@ -49575,7 +49575,7 @@ if ('eightythird' === $expFold) {
                 $fiftyfirstLong,
                 $n
             );
-            $ov13 = $fiftysecondVar->longArithOverflowFlag;
+            $ov13 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysecondVar->longArithOverflowFlag);
             if (null === $ov13 || null === $fiftysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (fiftysecond)');
             }
@@ -49637,7 +49637,7 @@ if ('eightythird' === $expFold) {
                 $fiftysecondLong,
                 $n
             );
-            $ov14 = $fiftythirdVar->longArithOverflowFlag;
+            $ov14 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftythirdVar->longArithOverflowFlag);
             if (null === $ov14 || null === $fiftythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (fiftythird)');
             }
@@ -49698,7 +49698,7 @@ if ('eightythird' === $expFold) {
                 $fiftythirdLong,
                 $n
             );
-            $ov15 = $fiftyfourthVar->longArithOverflowFlag;
+            $ov15 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfourthVar->longArithOverflowFlag);
             if (null === $ov15 || null === $fiftyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (fiftyfourth)');
             }
@@ -49758,7 +49758,7 @@ if ('eightythird' === $expFold) {
                 $fiftyfourthLong,
                 $n
             );
-            $ov16 = $fiftyfifthVar->longArithOverflowFlag;
+            $ov16 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfifthVar->longArithOverflowFlag);
             if (null === $ov16 || null === $fiftyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (fiftyfifth)');
             }
@@ -49817,7 +49817,7 @@ if ('eightythird' === $expFold) {
                 $fiftyfifthLong,
                 $n
             );
-            $ov17 = $fiftysixthVar->longArithOverflowFlag;
+            $ov17 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysixthVar->longArithOverflowFlag);
             if (null === $ov17 || null === $fiftysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (fiftysixth)');
             }
@@ -49875,7 +49875,7 @@ if ('eightythird' === $expFold) {
                 $fiftysixthLong,
                 $n
             );
-            $ov18 = $fiftyseventhVar->longArithOverflowFlag;
+            $ov18 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyseventhVar->longArithOverflowFlag);
             if (null === $ov18 || null === $fiftyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (fiftyseventh)');
             }
@@ -49932,7 +49932,7 @@ if ('eightythird' === $expFold) {
                 $fiftyseventhLong,
                 $n
             );
-            $ov19 = $fiftyeighthVar->longArithOverflowFlag;
+            $ov19 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyeighthVar->longArithOverflowFlag);
             if (null === $ov19 || null === $fiftyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (fiftyeighth)');
             }
@@ -49988,7 +49988,7 @@ if ('eightythird' === $expFold) {
                 $fiftyeighthLong,
                 $n
             );
-            $ov20 = $fiftyninthVar->longArithOverflowFlag;
+            $ov20 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyninthVar->longArithOverflowFlag);
             if (null === $ov20 || null === $fiftyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (fiftyninth)');
             }
@@ -50043,7 +50043,7 @@ if ('eightythird' === $expFold) {
                 $fiftyninthLong,
                 $n
             );
-            $ov21 = $sixtiethVar->longArithOverflowFlag;
+            $ov21 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtiethVar->longArithOverflowFlag);
             if (null === $ov21 || null === $sixtiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (sixtieth)');
             }
@@ -50097,7 +50097,7 @@ if ('eightythird' === $expFold) {
                 $sixtiethLong,
                 $n
             );
-            $ov22 = $sixtyfirstVar->longArithOverflowFlag;
+            $ov22 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfirstVar->longArithOverflowFlag);
             if (null === $ov22 || null === $sixtyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (sixtyfirst)');
             }
@@ -50150,7 +50150,7 @@ if ('eightythird' === $expFold) {
                 $sixtyfirstLong,
                 $n
             );
-            $ov23 = $sixtysecondVar->longArithOverflowFlag;
+            $ov23 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysecondVar->longArithOverflowFlag);
             if (null === $ov23 || null === $sixtysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (sixtysecond)');
             }
@@ -50202,7 +50202,7 @@ if ('eightythird' === $expFold) {
                 $sixtysecondLong,
                 $n
             );
-            $ov24 = $sixtythirdVar->longArithOverflowFlag;
+            $ov24 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtythirdVar->longArithOverflowFlag);
             if (null === $ov24 || null === $sixtythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (sixtythird)');
             }
@@ -50253,7 +50253,7 @@ if ('eightythird' === $expFold) {
                 $sixtythirdLong,
                 $n
             );
-            $ov25 = $sixtyfourthVar->longArithOverflowFlag;
+            $ov25 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfourthVar->longArithOverflowFlag);
             if (null === $ov25 || null === $sixtyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (sixtyfourth)');
             }
@@ -50303,7 +50303,7 @@ if ('eightythird' === $expFold) {
                 $sixtyfourthLong,
                 $n
             );
-            $ov26 = $sixtyfifthVar->longArithOverflowFlag;
+            $ov26 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfifthVar->longArithOverflowFlag);
             if (null === $ov26 || null === $sixtyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (sixtyfifth)');
             }
@@ -50352,7 +50352,7 @@ if ('eightythird' === $expFold) {
                 $sixtyfifthLong,
                 $n
             );
-            $ov27 = $sixtysixthVar->longArithOverflowFlag;
+            $ov27 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysixthVar->longArithOverflowFlag);
             if (null === $ov27 || null === $sixtysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (sixtysixth)');
             }
@@ -50400,7 +50400,7 @@ if ('eightythird' === $expFold) {
                 $sixtysixthLong,
                 $n
             );
-            $ov28 = $sixtyseventhVar->longArithOverflowFlag;
+            $ov28 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyseventhVar->longArithOverflowFlag);
             if (null === $ov28 || null === $sixtyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (sixtyseventh)');
             }
@@ -50448,7 +50448,7 @@ if ('eightythird' === $expFold) {
                 $sixtyseventhLong,
                 $n
             );
-            $ov29 = $sixtyeighthVar->longArithOverflowFlag;
+            $ov29 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyeighthVar->longArithOverflowFlag);
             if (null === $ov29 || null === $sixtyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (sixtyeighth)');
             }
@@ -50494,7 +50494,7 @@ if ('eightythird' === $expFold) {
                 $sixtyeighthLong,
                 $n
             );
-            $ov30 = $sixtyninthVar->longArithOverflowFlag;
+            $ov30 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyninthVar->longArithOverflowFlag);
             if (null === $ov30 || null === $sixtyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (sixtyninth)');
             }
@@ -50535,7 +50535,7 @@ if ('eightythird' === $expFold) {
                 $sixtyninthLong,
                 $n
             );
-            $ov31 = $seventiethVar->longArithOverflowFlag;
+            $ov31 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventiethVar->longArithOverflowFlag);
             if (null === $ov31 || null === $seventiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (seventieth)');
             }
@@ -50576,7 +50576,7 @@ if ('eightythird' === $expFold) {
                 $seventiethLong,
                 $n
             );
-            $ov32 = $seventyfirstVar->longArithOverflowFlag;
+            $ov32 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyfirstVar->longArithOverflowFlag);
             if (null === $ov32 || null === $seventyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (seventyfirst)');
             }
@@ -50617,7 +50617,7 @@ if ('eightythird' === $expFold) {
                 $seventyfirstLong,
                 $n
             );
-            $ov33 = $seventysecondVar->longArithOverflowFlag;
+            $ov33 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventysecondVar->longArithOverflowFlag);
             if (null === $ov33 || null === $seventysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (seventysecond)');
             }
@@ -50657,7 +50657,7 @@ if ('eightythird' === $expFold) {
                 $seventysecondLong,
                 $n
             );
-            $ov34 = $seventythirdVar->longArithOverflowFlag;
+            $ov34 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventythirdVar->longArithOverflowFlag);
             if (null === $ov34 || null === $seventythirdVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (seventythird)');
             }
@@ -50696,7 +50696,7 @@ if ('eightythird' === $expFold) {
                 $seventythirdLong,
                 $n
             );
-            $ov35 = $seventyfourthVar->longArithOverflowFlag;
+            $ov35 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyfourthVar->longArithOverflowFlag);
             if (null === $ov35 || null === $seventyfourthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (seventyfourth)');
             }
@@ -50734,7 +50734,7 @@ if ('eightythird' === $expFold) {
                 $seventyfourthLong,
                 $n
             );
-            $ov36 = $seventyfifthVar->longArithOverflowFlag;
+            $ov36 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyfifthVar->longArithOverflowFlag);
             if (null === $ov36 || null === $seventyfifthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (seventyfifth)');
             }
@@ -50771,7 +50771,7 @@ if ('eightythird' === $expFold) {
                 $seventyfifthLong,
                 $n
             );
-            $ov37 = $seventysixthVar->longArithOverflowFlag;
+            $ov37 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventysixthVar->longArithOverflowFlag);
             if (null === $ov37 || null === $seventysixthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (seventysixth)');
             }
@@ -50807,7 +50807,7 @@ if ('eightythird' === $expFold) {
                 $seventysixthLong,
                 $n
             );
-            $ov38 = $seventyseventhVar->longArithOverflowFlag;
+            $ov38 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyseventhVar->longArithOverflowFlag);
             if (null === $ov38 || null === $seventyseventhVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (seventyseventh)');
             }
@@ -50842,7 +50842,7 @@ if ('eightythird' === $expFold) {
                 $seventyseventhLong,
                 $n
             );
-            $ov39 = $seventyeighthVar->longArithOverflowFlag;
+            $ov39 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyeighthVar->longArithOverflowFlag);
             if (null === $ov39 || null === $seventyeighthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (seventyeighth)');
             }
@@ -50876,7 +50876,7 @@ if ('eightythird' === $expFold) {
                 $seventyeighthLong,
                 $n
             );
-            $ov40 = $seventyninthVar->longArithOverflowFlag;
+            $ov40 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyninthVar->longArithOverflowFlag);
             if (null === $ov40 || null === $seventyninthVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (seventyninth)');
             }
@@ -50909,7 +50909,7 @@ if ('eightythird' === $expFold) {
                 $seventyninthLong,
                 $n
             );
-            $ov41 = $eightiethVar->longArithOverflowFlag;
+            $ov41 = JitLongArithOverflow::loadOverflowFlagI1($context, $eightiethVar->longArithOverflowFlag);
             if (null === $ov41 || null === $eightiethVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (eightieth)');
             }
@@ -50941,7 +50941,7 @@ if ('eightythird' === $expFold) {
                 $eightiethLong,
                 $n
             );
-            $ov42 = $eightyfirstVar->longArithOverflowFlag;
+            $ov42 = JitLongArithOverflow::loadOverflowFlagI1($context, $eightyfirstVar->longArithOverflowFlag);
             if (null === $ov42 || null === $eightyfirstVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (eightyfirst)');
             }
@@ -50972,7 +50972,7 @@ if ('eightythird' === $expFold) {
                 $eightyfirstLong,
                 $n
             );
-            $ov43 = $eightysecondVar->longArithOverflowFlag;
+            $ov43 = JitLongArithOverflow::loadOverflowFlagI1($context, $eightysecondVar->longArithOverflowFlag);
             if (null === $ov43 || null === $eightysecondVar->longArithOverflowDoubleSlot) {
                 throw new \LogicException('pow() **83 expected smul overflow metadata (eightysecond)');
             }
@@ -51000,6 +51000,2363 @@ if ('eightythird' === $expFold) {
                 $context,
                 OpCode::TYPE_MUL,
                 $eightysecondLong,
+                $n,
+                $slotPtr
+            );
+            $context->builder->branch($doneBlock);
+
+
+            $context->builder->positionAtEnd($doneBlock);
+
+            return;
+        }
+
+if ('eightyfourth' === $expFold) {
+            // n^84 = eightythird*n; overflow arms +1 ×nF vs **83.
+            // tenth=fifth*fifth, twentieth=tenth*tenth,
+            // fortieth=twentieth*twentieth, fortysecond=fortieth*sq, fortyfourth=fortysecond*sq,
+            // fortysixth=fortyfourth*sq, then fortysixth*sq*sq*n… (sixtyseventh×n).
+            // Overflow arms finish in float with one extra ×nF vs **84.
+            $baseL = JitLongArg::lower($context, $base, 'pow() base');
+            $i64 = $context->getTypeFromString('int64');
+            $f64 = $context->getTypeFromString('double');
+            $n = $context->builder->intCast($baseL, $i64);
+            $sqVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $n,
+                $n
+            );
+            $ov1 = JitLongArithOverflow::loadOverflowFlagI1($context, $sqVar->longArithOverflowFlag);
+            if (null === $ov1 || null === $sqVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (sq)');
+            }
+            $sqLong = JITVariable::KIND_VARIABLE === $sqVar->kind
+                ? $context->builder->load($sqVar->value)
+                : $sqVar->value;
+            $ov1Block = BasicBlockHelper::append($context, 'pow_eightyfourth_sq_ov');
+            $ok1Block = BasicBlockHelper::append($context, 'pow_eightyfourth_sq_ok');
+            $doneBlock = BasicBlockHelper::append($context, 'pow_eightyfourth_done');
+            $context->builder->branchIf($ov1, $ov1Block, $ok1Block);
+
+            $context->builder->positionAtEnd($ov1Block);
+            $sqF = $context->builder->load($sqVar->longArithOverflowDoubleSlot);
+            $sq2F = $context->builder->fmul($sqF, $sqF);
+            $sq4F = $context->builder->fmul($sq2F, $sq2F);
+            $sq8F = $context->builder->fmul($sq4F, $sq4F);
+            $twentiethF = $context->builder->fmul($sq8F, $sq2F);
+            $fortiethF = $context->builder->fmul($twentiethF, $twentiethF);
+            $fortysecondF = $context->builder->fmul($fortiethF, $sqF);
+            $fortyfourthF = $context->builder->fmul($fortysecondF, $sqF);
+            $eightyfourthFSq = $context->builder->fmul($fortyfourthF, $sqF);
+            $eightyfourthFEighth = $context->builder->fmul($eightyfourthFSq, $sqF);
+            $eightyfourthF = $context->builder->fmul($eightyfourthFEighth, $sqF);
+            $nF = $context->builder->siToFp($n, $f64);
+            $eightyfourthF = $context->builder->fmul($eightyfourthF, $nF);
+            $eightyfourthF = $context->builder->fmul($eightyfourthF, $nF);
+            $eightyfourthF = $context->builder->fmul($eightyfourthF, $nF);
+            $eightyfourthF = $context->builder->fmul($eightyfourthF, $nF);
+            $eightyfourthF = $context->builder->fmul($eightyfourthF, $nF);
+            $eightyfourthF = $context->builder->fmul($eightyfourthF, $nF);
+            $eightyfourthF = $context->builder->fmul($eightyfourthF, $nF);
+            $eightyfourthF = $context->builder->fmul($eightyfourthF, $nF);
+            $eightyfourthF = $context->builder->fmul($eightyfourthF, $nF);
+            $eightyfourthF = $context->builder->fmul($eightyfourthF, $nF);
+                $eightyfourthF = $context->builder->fmul($eightyfourthF, $nF);
+                    $eightyfourthF = $context->builder->fmul($eightyfourthF, $nF);
+                        $eightyfourthF = $context->builder->fmul($eightyfourthF, $nF);
+                        $eightyfourthF = $context->builder->fmul($eightyfourthF, $nF);
+                        $eightyfourthF = $context->builder->fmul($eightyfourthF, $nF);
+                        $eightyfourthF = $context->builder->fmul($eightyfourthF, $nF);
+                        $eightyfourthF = $context->builder->fmul($eightyfourthF, $nF);
+                        $eightyfourthF = $context->builder->fmul($eightyfourthF, $nF);
+                        $eightyfourthF = $context->builder->fmul($eightyfourthF, $nF);
+            $eightyfourthF = $context->builder->fmul($eightyfourthF, $nF);
+            $eightyfourthF = $context->builder->fmul($eightyfourthF, $nF);
+            $eightyfourthF = $context->builder->fmul($eightyfourthF, $nF);
+            $eightyfourthF = $context->builder->fmul($eightyfourthF, $nF);
+
+            $eightyfourthF = $context->builder->fmul($eightyfourthF, $nF);
+            $eightyfourthF = $context->builder->fmul($eightyfourthF, $nF);
+            $eightyfourthF = $context->builder->fmul($eightyfourthF, $nF);
+            $eightyfourthF = $context->builder->fmul($eightyfourthF, $nF);
+            $eightyfourthF = $context->builder->fmul($eightyfourthF, $nF);
+            $eightyfourthF = $context->builder->fmul($eightyfourthF, $nF);
+            $eightyfourthF = $context->builder->fmul($eightyfourthF, $nF);
+            $eightyfourthF = $context->builder->fmul($eightyfourthF, $nF);
+            $eightyfourthF = $context->builder->fmul($eightyfourthF, $nF);
+            $eightyfourthF = $context->builder->fmul($eightyfourthF, $nF);
+            $eightyfourthF = $context->builder->fmul($eightyfourthF, $nF);
+            $eightyfourthF = $context->builder->fmul($eightyfourthF, $nF);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok1Block);
+            $cuVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $sqLong,
+                $n
+            );
+            $ov2 = JitLongArithOverflow::loadOverflowFlagI1($context, $cuVar->longArithOverflowFlag);
+            if (null === $ov2 || null === $cuVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (cu)');
+            }
+            $cuLong = JITVariable::KIND_VARIABLE === $cuVar->kind
+                ? $context->builder->load($cuVar->value)
+                : $cuVar->value;
+            $ov2Block = BasicBlockHelper::append($context, 'pow_eightyfourth_cu_ov');
+            $ok2Block = BasicBlockHelper::append($context, 'pow_eightyfourth_cu_ok');
+            $context->builder->branchIf($ov2, $ov2Block, $ok2Block);
+
+            $context->builder->positionAtEnd($ov2Block);
+            $cuF = $context->builder->load($cuVar->longArithOverflowDoubleSlot);
+            $sqF2 = $context->builder->siToFp($sqLong, $f64);
+            $fifthF = $context->builder->fmul($cuF, $sqF2);
+            $tenthF2 = $context->builder->fmul($fifthF, $fifthF);
+            $twentiethF2 = $context->builder->fmul($tenthF2, $tenthF2);
+            $fortiethF2 = $context->builder->fmul($twentiethF2, $twentiethF2);
+            $fortysecondF2 = $context->builder->fmul($fortiethF2, $sqF2);
+            $fortyfourthF2 = $context->builder->fmul($fortysecondF2, $sqF2);
+            $eightyfourthF2Sq = $context->builder->fmul($fortyfourthF2, $sqF2);
+            $eightyfourthF2Eighth = $context->builder->fmul($eightyfourthF2Sq, $sqF2);
+            $eightyfourthF2 = $context->builder->fmul($eightyfourthF2Eighth, $sqF2);
+            $nF2 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF2 = $context->builder->fmul($eightyfourthF2, $nF2);
+            $eightyfourthF2 = $context->builder->fmul($eightyfourthF2, $nF2);
+            $eightyfourthF2 = $context->builder->fmul($eightyfourthF2, $nF2);
+            $eightyfourthF2 = $context->builder->fmul($eightyfourthF2, $nF2);
+            $eightyfourthF2 = $context->builder->fmul($eightyfourthF2, $nF2);
+            $eightyfourthF2 = $context->builder->fmul($eightyfourthF2, $nF2);
+            $eightyfourthF2 = $context->builder->fmul($eightyfourthF2, $nF2);
+            $eightyfourthF2 = $context->builder->fmul($eightyfourthF2, $nF2);
+            $eightyfourthF2 = $context->builder->fmul($eightyfourthF2, $nF2);
+            $eightyfourthF2 = $context->builder->fmul($eightyfourthF2, $nF2);
+                $eightyfourthF2 = $context->builder->fmul($eightyfourthF2, $nF2);
+                    $eightyfourthF2 = $context->builder->fmul($eightyfourthF2, $nF2);
+                        $eightyfourthF2 = $context->builder->fmul($eightyfourthF2, $nF2);
+                        $eightyfourthF2 = $context->builder->fmul($eightyfourthF2, $nF2);
+                        $eightyfourthF2 = $context->builder->fmul($eightyfourthF2, $nF2);
+                        $eightyfourthF2 = $context->builder->fmul($eightyfourthF2, $nF2);
+                        $eightyfourthF2 = $context->builder->fmul($eightyfourthF2, $nF2);
+                        $eightyfourthF2 = $context->builder->fmul($eightyfourthF2, $nF2);
+                        $eightyfourthF2 = $context->builder->fmul($eightyfourthF2, $nF2);
+            $eightyfourthF2 = $context->builder->fmul($eightyfourthF2, $nF2);
+            $eightyfourthF2 = $context->builder->fmul($eightyfourthF2, $nF2);
+            $eightyfourthF2 = $context->builder->fmul($eightyfourthF2, $nF2);
+            $eightyfourthF2 = $context->builder->fmul($eightyfourthF2, $nF2);
+
+            $eightyfourthF2 = $context->builder->fmul($eightyfourthF2, $nF2);
+            $eightyfourthF2 = $context->builder->fmul($eightyfourthF2, $nF2);
+            $eightyfourthF2 = $context->builder->fmul($eightyfourthF2, $nF2);
+            $eightyfourthF2 = $context->builder->fmul($eightyfourthF2, $nF2);
+            $eightyfourthF2 = $context->builder->fmul($eightyfourthF2, $nF2);
+            $eightyfourthF2 = $context->builder->fmul($eightyfourthF2, $nF2);
+            $eightyfourthF2 = $context->builder->fmul($eightyfourthF2, $nF2);
+            $eightyfourthF2 = $context->builder->fmul($eightyfourthF2, $nF2);
+            $eightyfourthF2 = $context->builder->fmul($eightyfourthF2, $nF2);
+            $eightyfourthF2 = $context->builder->fmul($eightyfourthF2, $nF2);
+            $eightyfourthF2 = $context->builder->fmul($eightyfourthF2, $nF2);
+            $eightyfourthF2 = $context->builder->fmul($eightyfourthF2, $nF2);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF2
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok2Block);
+            $fifthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $cuLong,
+                $sqLong
+            );
+            $ov3 = JitLongArithOverflow::loadOverflowFlagI1($context, $fifthVar->longArithOverflowFlag);
+            if (null === $ov3 || null === $fifthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (fifth)');
+            }
+            $fifthLong = JITVariable::KIND_VARIABLE === $fifthVar->kind
+                ? $context->builder->load($fifthVar->value)
+                : $fifthVar->value;
+            $ov3Block = BasicBlockHelper::append($context, 'pow_eightyfourth_fifth_ov');
+            $ok3Block = BasicBlockHelper::append($context, 'pow_eightyfourth_fifth_ok');
+            $context->builder->branchIf($ov3, $ov3Block, $ok3Block);
+
+            $context->builder->positionAtEnd($ov3Block);
+            $fifthF2 = $context->builder->load($fifthVar->longArithOverflowDoubleSlot);
+            $tenthF3 = $context->builder->fmul($fifthF2, $fifthF2);
+            $twentiethF3 = $context->builder->fmul($tenthF3, $tenthF3);
+            $fortiethF3 = $context->builder->fmul($twentiethF3, $twentiethF3);
+            $sqF3 = $context->builder->siToFp($sqLong, $f64);
+            $fortysecondF3 = $context->builder->fmul($fortiethF3, $sqF3);
+            $fortyfourthF3 = $context->builder->fmul($fortysecondF3, $sqF3);
+            $eightyfourthF3Sq = $context->builder->fmul($fortyfourthF3, $sqF3);
+            $eightyfourthF3Eighth = $context->builder->fmul($eightyfourthF3Sq, $sqF3);
+            $eightyfourthF3 = $context->builder->fmul($eightyfourthF3Eighth, $sqF3);
+            $nF3 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF3 = $context->builder->fmul($eightyfourthF3, $nF3);
+            $eightyfourthF3 = $context->builder->fmul($eightyfourthF3, $nF3);
+            $eightyfourthF3 = $context->builder->fmul($eightyfourthF3, $nF3);
+            $eightyfourthF3 = $context->builder->fmul($eightyfourthF3, $nF3);
+            $eightyfourthF3 = $context->builder->fmul($eightyfourthF3, $nF3);
+            $eightyfourthF3 = $context->builder->fmul($eightyfourthF3, $nF3);
+            $eightyfourthF3 = $context->builder->fmul($eightyfourthF3, $nF3);
+            $eightyfourthF3 = $context->builder->fmul($eightyfourthF3, $nF3);
+            $eightyfourthF3 = $context->builder->fmul($eightyfourthF3, $nF3);
+            $eightyfourthF3 = $context->builder->fmul($eightyfourthF3, $nF3);
+                $eightyfourthF3 = $context->builder->fmul($eightyfourthF3, $nF3);
+                    $eightyfourthF3 = $context->builder->fmul($eightyfourthF3, $nF3);
+                        $eightyfourthF3 = $context->builder->fmul($eightyfourthF3, $nF3);
+                        $eightyfourthF3 = $context->builder->fmul($eightyfourthF3, $nF3);
+                        $eightyfourthF3 = $context->builder->fmul($eightyfourthF3, $nF3);
+                        $eightyfourthF3 = $context->builder->fmul($eightyfourthF3, $nF3);
+                        $eightyfourthF3 = $context->builder->fmul($eightyfourthF3, $nF3);
+                        $eightyfourthF3 = $context->builder->fmul($eightyfourthF3, $nF3);
+                        $eightyfourthF3 = $context->builder->fmul($eightyfourthF3, $nF3);
+            $eightyfourthF3 = $context->builder->fmul($eightyfourthF3, $nF3);
+            $eightyfourthF3 = $context->builder->fmul($eightyfourthF3, $nF3);
+            $eightyfourthF3 = $context->builder->fmul($eightyfourthF3, $nF3);
+            $eightyfourthF3 = $context->builder->fmul($eightyfourthF3, $nF3);
+
+            $eightyfourthF3 = $context->builder->fmul($eightyfourthF3, $nF3);
+            $eightyfourthF3 = $context->builder->fmul($eightyfourthF3, $nF3);
+            $eightyfourthF3 = $context->builder->fmul($eightyfourthF3, $nF3);
+            $eightyfourthF3 = $context->builder->fmul($eightyfourthF3, $nF3);
+            $eightyfourthF3 = $context->builder->fmul($eightyfourthF3, $nF3);
+            $eightyfourthF3 = $context->builder->fmul($eightyfourthF3, $nF3);
+            $eightyfourthF3 = $context->builder->fmul($eightyfourthF3, $nF3);
+            $eightyfourthF3 = $context->builder->fmul($eightyfourthF3, $nF3);
+            $eightyfourthF3 = $context->builder->fmul($eightyfourthF3, $nF3);
+            $eightyfourthF3 = $context->builder->fmul($eightyfourthF3, $nF3);
+            $eightyfourthF3 = $context->builder->fmul($eightyfourthF3, $nF3);
+            $eightyfourthF3 = $context->builder->fmul($eightyfourthF3, $nF3);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF3
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok3Block);
+            $tenthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $fifthLong,
+                $fifthLong
+            );
+            $ov4 = JitLongArithOverflow::loadOverflowFlagI1($context, $tenthVar->longArithOverflowFlag);
+            if (null === $ov4 || null === $tenthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (tenth)');
+            }
+            $tenthLong = JITVariable::KIND_VARIABLE === $tenthVar->kind
+                ? $context->builder->load($tenthVar->value)
+                : $tenthVar->value;
+            $ov4Block = BasicBlockHelper::append($context, 'pow_eightyfourth_tenth_ov');
+            $ok4Block = BasicBlockHelper::append($context, 'pow_eightyfourth_tenth_ok');
+            $context->builder->branchIf($ov4, $ov4Block, $ok4Block);
+
+            $context->builder->positionAtEnd($ov4Block);
+            $tenthF4 = $context->builder->load($tenthVar->longArithOverflowDoubleSlot);
+            $twentiethF4 = $context->builder->fmul($tenthF4, $tenthF4);
+            $fortiethF4 = $context->builder->fmul($twentiethF4, $twentiethF4);
+            $sqF4 = $context->builder->siToFp($sqLong, $f64);
+            $fortysecondF4 = $context->builder->fmul($fortiethF4, $sqF4);
+            $fortyfourthF4 = $context->builder->fmul($fortysecondF4, $sqF4);
+            $eightyfourthF4Sq = $context->builder->fmul($fortyfourthF4, $sqF4);
+            $eightyfourthF4Eighth = $context->builder->fmul($eightyfourthF4Sq, $sqF4);
+            $eightyfourthF4 = $context->builder->fmul($eightyfourthF4Eighth, $sqF4);
+            $nF4 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF4 = $context->builder->fmul($eightyfourthF4, $nF4);
+            $eightyfourthF4 = $context->builder->fmul($eightyfourthF4, $nF4);
+            $eightyfourthF4 = $context->builder->fmul($eightyfourthF4, $nF4);
+            $eightyfourthF4 = $context->builder->fmul($eightyfourthF4, $nF4);
+            $eightyfourthF4 = $context->builder->fmul($eightyfourthF4, $nF4);
+            $eightyfourthF4 = $context->builder->fmul($eightyfourthF4, $nF4);
+            $eightyfourthF4 = $context->builder->fmul($eightyfourthF4, $nF4);
+            $eightyfourthF4 = $context->builder->fmul($eightyfourthF4, $nF4);
+            $eightyfourthF4 = $context->builder->fmul($eightyfourthF4, $nF4);
+            $eightyfourthF4 = $context->builder->fmul($eightyfourthF4, $nF4);
+                $eightyfourthF4 = $context->builder->fmul($eightyfourthF4, $nF4);
+                    $eightyfourthF4 = $context->builder->fmul($eightyfourthF4, $nF4);
+                        $eightyfourthF4 = $context->builder->fmul($eightyfourthF4, $nF4);
+                        $eightyfourthF4 = $context->builder->fmul($eightyfourthF4, $nF4);
+                        $eightyfourthF4 = $context->builder->fmul($eightyfourthF4, $nF4);
+                        $eightyfourthF4 = $context->builder->fmul($eightyfourthF4, $nF4);
+                        $eightyfourthF4 = $context->builder->fmul($eightyfourthF4, $nF4);
+                        $eightyfourthF4 = $context->builder->fmul($eightyfourthF4, $nF4);
+                        $eightyfourthF4 = $context->builder->fmul($eightyfourthF4, $nF4);
+            $eightyfourthF4 = $context->builder->fmul($eightyfourthF4, $nF4);
+            $eightyfourthF4 = $context->builder->fmul($eightyfourthF4, $nF4);
+            $eightyfourthF4 = $context->builder->fmul($eightyfourthF4, $nF4);
+            $eightyfourthF4 = $context->builder->fmul($eightyfourthF4, $nF4);
+
+            $eightyfourthF4 = $context->builder->fmul($eightyfourthF4, $nF4);
+            $eightyfourthF4 = $context->builder->fmul($eightyfourthF4, $nF4);
+            $eightyfourthF4 = $context->builder->fmul($eightyfourthF4, $nF4);
+            $eightyfourthF4 = $context->builder->fmul($eightyfourthF4, $nF4);
+            $eightyfourthF4 = $context->builder->fmul($eightyfourthF4, $nF4);
+            $eightyfourthF4 = $context->builder->fmul($eightyfourthF4, $nF4);
+            $eightyfourthF4 = $context->builder->fmul($eightyfourthF4, $nF4);
+            $eightyfourthF4 = $context->builder->fmul($eightyfourthF4, $nF4);
+            $eightyfourthF4 = $context->builder->fmul($eightyfourthF4, $nF4);
+            $eightyfourthF4 = $context->builder->fmul($eightyfourthF4, $nF4);
+            $eightyfourthF4 = $context->builder->fmul($eightyfourthF4, $nF4);
+            $eightyfourthF4 = $context->builder->fmul($eightyfourthF4, $nF4);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF4
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok4Block);
+            $twentiethVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $tenthLong,
+                $tenthLong
+            );
+            $ov5 = JitLongArithOverflow::loadOverflowFlagI1($context, $twentiethVar->longArithOverflowFlag);
+            if (null === $ov5 || null === $twentiethVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (twentieth)');
+            }
+            $twentiethLong = JITVariable::KIND_VARIABLE === $twentiethVar->kind
+                ? $context->builder->load($twentiethVar->value)
+                : $twentiethVar->value;
+            $ov5Block = BasicBlockHelper::append($context, 'pow_eightyfourth_twentieth_ov');
+            $ok5Block = BasicBlockHelper::append($context, 'pow_eightyfourth_twentieth_ok');
+            $context->builder->branchIf($ov5, $ov5Block, $ok5Block);
+
+            $context->builder->positionAtEnd($ov5Block);
+            $twentiethF5 = $context->builder->load($twentiethVar->longArithOverflowDoubleSlot);
+            $fortiethF5 = $context->builder->fmul($twentiethF5, $twentiethF5);
+            $sqF5 = $context->builder->siToFp($sqLong, $f64);
+            $fortysecondF5 = $context->builder->fmul($fortiethF5, $sqF5);
+            $fortyfourthF5 = $context->builder->fmul($fortysecondF5, $sqF5);
+            $eightyfourthF5Sq = $context->builder->fmul($fortyfourthF5, $sqF5);
+            $eightyfourthF5Eighth = $context->builder->fmul($eightyfourthF5Sq, $sqF5);
+            $eightyfourthF5 = $context->builder->fmul($eightyfourthF5Eighth, $sqF5);
+            $nF5 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF5 = $context->builder->fmul($eightyfourthF5, $nF5);
+            $eightyfourthF5 = $context->builder->fmul($eightyfourthF5, $nF5);
+            $eightyfourthF5 = $context->builder->fmul($eightyfourthF5, $nF5);
+            $eightyfourthF5 = $context->builder->fmul($eightyfourthF5, $nF5);
+            $eightyfourthF5 = $context->builder->fmul($eightyfourthF5, $nF5);
+            $eightyfourthF5 = $context->builder->fmul($eightyfourthF5, $nF5);
+            $eightyfourthF5 = $context->builder->fmul($eightyfourthF5, $nF5);
+            $eightyfourthF5 = $context->builder->fmul($eightyfourthF5, $nF5);
+            $eightyfourthF5 = $context->builder->fmul($eightyfourthF5, $nF5);
+            $eightyfourthF5 = $context->builder->fmul($eightyfourthF5, $nF5);
+                $eightyfourthF5 = $context->builder->fmul($eightyfourthF5, $nF5);
+                    $eightyfourthF5 = $context->builder->fmul($eightyfourthF5, $nF5);
+                        $eightyfourthF5 = $context->builder->fmul($eightyfourthF5, $nF5);
+                        $eightyfourthF5 = $context->builder->fmul($eightyfourthF5, $nF5);
+                        $eightyfourthF5 = $context->builder->fmul($eightyfourthF5, $nF5);
+                        $eightyfourthF5 = $context->builder->fmul($eightyfourthF5, $nF5);
+                        $eightyfourthF5 = $context->builder->fmul($eightyfourthF5, $nF5);
+                        $eightyfourthF5 = $context->builder->fmul($eightyfourthF5, $nF5);
+                        $eightyfourthF5 = $context->builder->fmul($eightyfourthF5, $nF5);
+            $eightyfourthF5 = $context->builder->fmul($eightyfourthF5, $nF5);
+            $eightyfourthF5 = $context->builder->fmul($eightyfourthF5, $nF5);
+            $eightyfourthF5 = $context->builder->fmul($eightyfourthF5, $nF5);
+            $eightyfourthF5 = $context->builder->fmul($eightyfourthF5, $nF5);
+
+            $eightyfourthF5 = $context->builder->fmul($eightyfourthF5, $nF5);
+            $eightyfourthF5 = $context->builder->fmul($eightyfourthF5, $nF5);
+            $eightyfourthF5 = $context->builder->fmul($eightyfourthF5, $nF5);
+            $eightyfourthF5 = $context->builder->fmul($eightyfourthF5, $nF5);
+            $eightyfourthF5 = $context->builder->fmul($eightyfourthF5, $nF5);
+            $eightyfourthF5 = $context->builder->fmul($eightyfourthF5, $nF5);
+            $eightyfourthF5 = $context->builder->fmul($eightyfourthF5, $nF5);
+            $eightyfourthF5 = $context->builder->fmul($eightyfourthF5, $nF5);
+            $eightyfourthF5 = $context->builder->fmul($eightyfourthF5, $nF5);
+            $eightyfourthF5 = $context->builder->fmul($eightyfourthF5, $nF5);
+            $eightyfourthF5 = $context->builder->fmul($eightyfourthF5, $nF5);
+            $eightyfourthF5 = $context->builder->fmul($eightyfourthF5, $nF5);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF5
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok5Block);
+            $fortiethVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $twentiethLong,
+                $twentiethLong
+            );
+            $ov6 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortiethVar->longArithOverflowFlag);
+            if (null === $ov6 || null === $fortiethVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (fortieth)');
+            }
+            $fortiethLong = JITVariable::KIND_VARIABLE === $fortiethVar->kind
+                ? $context->builder->load($fortiethVar->value)
+                : $fortiethVar->value;
+            $ov6Block = BasicBlockHelper::append($context, 'pow_eightyfourth_fortieth_ov');
+            $ok6Block = BasicBlockHelper::append($context, 'pow_eightyfourth_fortieth_ok');
+            $context->builder->branchIf($ov6, $ov6Block, $ok6Block);
+
+            $context->builder->positionAtEnd($ov6Block);
+            $fortiethF6 = $context->builder->load($fortiethVar->longArithOverflowDoubleSlot);
+            $sqF6 = $context->builder->siToFp($sqLong, $f64);
+            $fortysecondF6 = $context->builder->fmul($fortiethF6, $sqF6);
+            $fortyfourthF6 = $context->builder->fmul($fortysecondF6, $sqF6);
+            $eightyfourthF6Sq = $context->builder->fmul($fortyfourthF6, $sqF6);
+            $eightyfourthF6Eighth = $context->builder->fmul($eightyfourthF6Sq, $sqF6);
+            $eightyfourthF6 = $context->builder->fmul($eightyfourthF6Eighth, $sqF6);
+            $nF6 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF6 = $context->builder->fmul($eightyfourthF6, $nF6);
+            $eightyfourthF6 = $context->builder->fmul($eightyfourthF6, $nF6);
+            $eightyfourthF6 = $context->builder->fmul($eightyfourthF6, $nF6);
+            $eightyfourthF6 = $context->builder->fmul($eightyfourthF6, $nF6);
+            $eightyfourthF6 = $context->builder->fmul($eightyfourthF6, $nF6);
+            $eightyfourthF6 = $context->builder->fmul($eightyfourthF6, $nF6);
+            $eightyfourthF6 = $context->builder->fmul($eightyfourthF6, $nF6);
+            $eightyfourthF6 = $context->builder->fmul($eightyfourthF6, $nF6);
+            $eightyfourthF6 = $context->builder->fmul($eightyfourthF6, $nF6);
+            $eightyfourthF6 = $context->builder->fmul($eightyfourthF6, $nF6);
+                $eightyfourthF6 = $context->builder->fmul($eightyfourthF6, $nF6);
+                    $eightyfourthF6 = $context->builder->fmul($eightyfourthF6, $nF6);
+                        $eightyfourthF6 = $context->builder->fmul($eightyfourthF6, $nF6);
+                        $eightyfourthF6 = $context->builder->fmul($eightyfourthF6, $nF6);
+                        $eightyfourthF6 = $context->builder->fmul($eightyfourthF6, $nF6);
+                        $eightyfourthF6 = $context->builder->fmul($eightyfourthF6, $nF6);
+                        $eightyfourthF6 = $context->builder->fmul($eightyfourthF6, $nF6);
+                        $eightyfourthF6 = $context->builder->fmul($eightyfourthF6, $nF6);
+                        $eightyfourthF6 = $context->builder->fmul($eightyfourthF6, $nF6);
+            $eightyfourthF6 = $context->builder->fmul($eightyfourthF6, $nF6);
+            $eightyfourthF6 = $context->builder->fmul($eightyfourthF6, $nF6);
+            $eightyfourthF6 = $context->builder->fmul($eightyfourthF6, $nF6);
+            $eightyfourthF6 = $context->builder->fmul($eightyfourthF6, $nF6);
+
+            $eightyfourthF6 = $context->builder->fmul($eightyfourthF6, $nF6);
+            $eightyfourthF6 = $context->builder->fmul($eightyfourthF6, $nF6);
+            $eightyfourthF6 = $context->builder->fmul($eightyfourthF6, $nF6);
+            $eightyfourthF6 = $context->builder->fmul($eightyfourthF6, $nF6);
+            $eightyfourthF6 = $context->builder->fmul($eightyfourthF6, $nF6);
+            $eightyfourthF6 = $context->builder->fmul($eightyfourthF6, $nF6);
+            $eightyfourthF6 = $context->builder->fmul($eightyfourthF6, $nF6);
+            $eightyfourthF6 = $context->builder->fmul($eightyfourthF6, $nF6);
+            $eightyfourthF6 = $context->builder->fmul($eightyfourthF6, $nF6);
+            $eightyfourthF6 = $context->builder->fmul($eightyfourthF6, $nF6);
+            $eightyfourthF6 = $context->builder->fmul($eightyfourthF6, $nF6);
+            $eightyfourthF6 = $context->builder->fmul($eightyfourthF6, $nF6);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF6
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok6Block);
+            $fortysecondVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $fortiethLong,
+                $sqLong
+            );
+            $ov7 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysecondVar->longArithOverflowFlag);
+            if (null === $ov7 || null === $fortysecondVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (fortysecond)');
+            }
+            $fortysecondLong = JITVariable::KIND_VARIABLE === $fortysecondVar->kind
+                ? $context->builder->load($fortysecondVar->value)
+                : $fortysecondVar->value;
+            $ov7Block = BasicBlockHelper::append($context, 'pow_eightyfourth_fortysecond_ov');
+            $ok7Block = BasicBlockHelper::append($context, 'pow_eightyfourth_fortysecond_ok');
+            $context->builder->branchIf($ov7, $ov7Block, $ok7Block);
+
+            $context->builder->positionAtEnd($ov7Block);
+            $fortysecondF7 = $context->builder->load($fortysecondVar->longArithOverflowDoubleSlot);
+            $sqF7 = $context->builder->siToFp($sqLong, $f64);
+            $fortyfourthF7 = $context->builder->fmul($fortysecondF7, $sqF7);
+            $eightyfourthF7Sq = $context->builder->fmul($fortyfourthF7, $sqF7);
+            $eightyfourthF7Eighth = $context->builder->fmul($eightyfourthF7Sq, $sqF7);
+            $eightyfourthF7 = $context->builder->fmul($eightyfourthF7Eighth, $sqF7);
+            $nF7 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF7 = $context->builder->fmul($eightyfourthF7, $nF7);
+            $eightyfourthF7 = $context->builder->fmul($eightyfourthF7, $nF7);
+            $eightyfourthF7 = $context->builder->fmul($eightyfourthF7, $nF7);
+            $eightyfourthF7 = $context->builder->fmul($eightyfourthF7, $nF7);
+            $eightyfourthF7 = $context->builder->fmul($eightyfourthF7, $nF7);
+            $eightyfourthF7 = $context->builder->fmul($eightyfourthF7, $nF7);
+            $eightyfourthF7 = $context->builder->fmul($eightyfourthF7, $nF7);
+            $eightyfourthF7 = $context->builder->fmul($eightyfourthF7, $nF7);
+            $eightyfourthF7 = $context->builder->fmul($eightyfourthF7, $nF7);
+            $eightyfourthF7 = $context->builder->fmul($eightyfourthF7, $nF7);
+                $eightyfourthF7 = $context->builder->fmul($eightyfourthF7, $nF7);
+                    $eightyfourthF7 = $context->builder->fmul($eightyfourthF7, $nF7);
+                        $eightyfourthF7 = $context->builder->fmul($eightyfourthF7, $nF7);
+                        $eightyfourthF7 = $context->builder->fmul($eightyfourthF7, $nF7);
+                        $eightyfourthF7 = $context->builder->fmul($eightyfourthF7, $nF7);
+                        $eightyfourthF7 = $context->builder->fmul($eightyfourthF7, $nF7);
+                        $eightyfourthF7 = $context->builder->fmul($eightyfourthF7, $nF7);
+                        $eightyfourthF7 = $context->builder->fmul($eightyfourthF7, $nF7);
+                        $eightyfourthF7 = $context->builder->fmul($eightyfourthF7, $nF7);
+            $eightyfourthF7 = $context->builder->fmul($eightyfourthF7, $nF7);
+            $eightyfourthF7 = $context->builder->fmul($eightyfourthF7, $nF7);
+            $eightyfourthF7 = $context->builder->fmul($eightyfourthF7, $nF7);
+            $eightyfourthF7 = $context->builder->fmul($eightyfourthF7, $nF7);
+
+            $eightyfourthF7 = $context->builder->fmul($eightyfourthF7, $nF7);
+            $eightyfourthF7 = $context->builder->fmul($eightyfourthF7, $nF7);
+            $eightyfourthF7 = $context->builder->fmul($eightyfourthF7, $nF7);
+            $eightyfourthF7 = $context->builder->fmul($eightyfourthF7, $nF7);
+            $eightyfourthF7 = $context->builder->fmul($eightyfourthF7, $nF7);
+            $eightyfourthF7 = $context->builder->fmul($eightyfourthF7, $nF7);
+            $eightyfourthF7 = $context->builder->fmul($eightyfourthF7, $nF7);
+            $eightyfourthF7 = $context->builder->fmul($eightyfourthF7, $nF7);
+            $eightyfourthF7 = $context->builder->fmul($eightyfourthF7, $nF7);
+            $eightyfourthF7 = $context->builder->fmul($eightyfourthF7, $nF7);
+            $eightyfourthF7 = $context->builder->fmul($eightyfourthF7, $nF7);
+            $eightyfourthF7 = $context->builder->fmul($eightyfourthF7, $nF7);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF7
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok7Block);
+            $fortyfourthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $fortysecondLong,
+                $sqLong
+            );
+            $ov8 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyfourthVar->longArithOverflowFlag);
+            if (null === $ov8 || null === $fortyfourthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (fortyfourth)');
+            }
+            $fortyfourthLong = JITVariable::KIND_VARIABLE === $fortyfourthVar->kind
+                ? $context->builder->load($fortyfourthVar->value)
+                : $fortyfourthVar->value;
+            $ov8Block = BasicBlockHelper::append($context, 'pow_eightyfourth_fortyfourth_ov');
+            $ok8Block = BasicBlockHelper::append($context, 'pow_eightyfourth_fortyfourth_ok');
+            $context->builder->branchIf($ov8, $ov8Block, $ok8Block);
+
+            $context->builder->positionAtEnd($ov8Block);
+            $fortyfourthF8 = $context->builder->load($fortyfourthVar->longArithOverflowDoubleSlot);
+            $sqF8 = $context->builder->siToFp($sqLong, $f64);
+            $eightyfourthF8Sq = $context->builder->fmul($fortyfourthF8, $sqF8);
+            $eightyfourthF8Eighth = $context->builder->fmul($eightyfourthF8Sq, $sqF8);
+            $eightyfourthF8 = $context->builder->fmul($eightyfourthF8Eighth, $sqF8);
+            $nF8 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF8 = $context->builder->fmul($eightyfourthF8, $nF8);
+            $eightyfourthF8 = $context->builder->fmul($eightyfourthF8, $nF8);
+            $eightyfourthF8 = $context->builder->fmul($eightyfourthF8, $nF8);
+            $eightyfourthF8 = $context->builder->fmul($eightyfourthF8, $nF8);
+            $eightyfourthF8 = $context->builder->fmul($eightyfourthF8, $nF8);
+            $eightyfourthF8 = $context->builder->fmul($eightyfourthF8, $nF8);
+            $eightyfourthF8 = $context->builder->fmul($eightyfourthF8, $nF8);
+            $eightyfourthF8 = $context->builder->fmul($eightyfourthF8, $nF8);
+            $eightyfourthF8 = $context->builder->fmul($eightyfourthF8, $nF8);
+            $eightyfourthF8 = $context->builder->fmul($eightyfourthF8, $nF8);
+                $eightyfourthF8 = $context->builder->fmul($eightyfourthF8, $nF8);
+                    $eightyfourthF8 = $context->builder->fmul($eightyfourthF8, $nF8);
+                        $eightyfourthF8 = $context->builder->fmul($eightyfourthF8, $nF8);
+                        $eightyfourthF8 = $context->builder->fmul($eightyfourthF8, $nF8);
+                        $eightyfourthF8 = $context->builder->fmul($eightyfourthF8, $nF8);
+                        $eightyfourthF8 = $context->builder->fmul($eightyfourthF8, $nF8);
+                        $eightyfourthF8 = $context->builder->fmul($eightyfourthF8, $nF8);
+                        $eightyfourthF8 = $context->builder->fmul($eightyfourthF8, $nF8);
+                        $eightyfourthF8 = $context->builder->fmul($eightyfourthF8, $nF8);
+            $eightyfourthF8 = $context->builder->fmul($eightyfourthF8, $nF8);
+            $eightyfourthF8 = $context->builder->fmul($eightyfourthF8, $nF8);
+            $eightyfourthF8 = $context->builder->fmul($eightyfourthF8, $nF8);
+            $eightyfourthF8 = $context->builder->fmul($eightyfourthF8, $nF8);
+
+            $eightyfourthF8 = $context->builder->fmul($eightyfourthF8, $nF8);
+            $eightyfourthF8 = $context->builder->fmul($eightyfourthF8, $nF8);
+            $eightyfourthF8 = $context->builder->fmul($eightyfourthF8, $nF8);
+            $eightyfourthF8 = $context->builder->fmul($eightyfourthF8, $nF8);
+            $eightyfourthF8 = $context->builder->fmul($eightyfourthF8, $nF8);
+            $eightyfourthF8 = $context->builder->fmul($eightyfourthF8, $nF8);
+            $eightyfourthF8 = $context->builder->fmul($eightyfourthF8, $nF8);
+            $eightyfourthF8 = $context->builder->fmul($eightyfourthF8, $nF8);
+            $eightyfourthF8 = $context->builder->fmul($eightyfourthF8, $nF8);
+            $eightyfourthF8 = $context->builder->fmul($eightyfourthF8, $nF8);
+            $eightyfourthF8 = $context->builder->fmul($eightyfourthF8, $nF8);
+            $eightyfourthF8 = $context->builder->fmul($eightyfourthF8, $nF8);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF8
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok8Block);
+            $fortysixthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $fortyfourthLong,
+                $sqLong
+            );
+            $ov9 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortysixthVar->longArithOverflowFlag);
+            if (null === $ov9 || null === $fortysixthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (fortysixth)');
+            }
+            $fortysixthLong = JITVariable::KIND_VARIABLE === $fortysixthVar->kind
+                ? $context->builder->load($fortysixthVar->value)
+                : $fortysixthVar->value;
+            $ov9Block = BasicBlockHelper::append($context, 'pow_eightyfourth_fortysixth_ov');
+            $ok9Block = BasicBlockHelper::append($context, 'pow_eightyfourth_fortysixth_ok');
+            $context->builder->branchIf($ov9, $ov9Block, $ok9Block);
+
+            $context->builder->positionAtEnd($ov9Block);
+            $fortysixthF9 = $context->builder->load($fortysixthVar->longArithOverflowDoubleSlot);
+            $sqF9 = $context->builder->siToFp($sqLong, $f64);
+            $fortyeighthF9 = $context->builder->fmul($fortysixthF9, $sqF9);
+            $eightyfourthF9 = $context->builder->fmul($fortyeighthF9, $sqF9);
+            $nF9 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF9 = $context->builder->fmul($eightyfourthF9, $nF9);
+            $eightyfourthF9 = $context->builder->fmul($eightyfourthF9, $nF9);
+            $eightyfourthF9 = $context->builder->fmul($eightyfourthF9, $nF9);
+            $eightyfourthF9 = $context->builder->fmul($eightyfourthF9, $nF9);
+            $eightyfourthF9 = $context->builder->fmul($eightyfourthF9, $nF9);
+            $eightyfourthF9 = $context->builder->fmul($eightyfourthF9, $nF9);
+            $eightyfourthF9 = $context->builder->fmul($eightyfourthF9, $nF9);
+            $eightyfourthF9 = $context->builder->fmul($eightyfourthF9, $nF9);
+            $eightyfourthF9 = $context->builder->fmul($eightyfourthF9, $nF9);
+            $eightyfourthF9 = $context->builder->fmul($eightyfourthF9, $nF9);
+                $eightyfourthF9 = $context->builder->fmul($eightyfourthF9, $nF9);
+                    $eightyfourthF9 = $context->builder->fmul($eightyfourthF9, $nF9);
+                        $eightyfourthF9 = $context->builder->fmul($eightyfourthF9, $nF9);
+                        $eightyfourthF9 = $context->builder->fmul($eightyfourthF9, $nF9);
+                        $eightyfourthF9 = $context->builder->fmul($eightyfourthF9, $nF9);
+                        $eightyfourthF9 = $context->builder->fmul($eightyfourthF9, $nF9);
+                        $eightyfourthF9 = $context->builder->fmul($eightyfourthF9, $nF9);
+                        $eightyfourthF9 = $context->builder->fmul($eightyfourthF9, $nF9);
+                        $eightyfourthF9 = $context->builder->fmul($eightyfourthF9, $nF9);
+            $eightyfourthF9 = $context->builder->fmul($eightyfourthF9, $nF9);
+            $eightyfourthF9 = $context->builder->fmul($eightyfourthF9, $nF9);
+            $eightyfourthF9 = $context->builder->fmul($eightyfourthF9, $nF9);
+            $eightyfourthF9 = $context->builder->fmul($eightyfourthF9, $nF9);
+
+            $eightyfourthF9 = $context->builder->fmul($eightyfourthF9, $nF9);
+            $eightyfourthF9 = $context->builder->fmul($eightyfourthF9, $nF9);
+            $eightyfourthF9 = $context->builder->fmul($eightyfourthF9, $nF9);
+            $eightyfourthF9 = $context->builder->fmul($eightyfourthF9, $nF9);
+            $eightyfourthF9 = $context->builder->fmul($eightyfourthF9, $nF9);
+            $eightyfourthF9 = $context->builder->fmul($eightyfourthF9, $nF9);
+            $eightyfourthF9 = $context->builder->fmul($eightyfourthF9, $nF9);
+            $eightyfourthF9 = $context->builder->fmul($eightyfourthF9, $nF9);
+            $eightyfourthF9 = $context->builder->fmul($eightyfourthF9, $nF9);
+            $eightyfourthF9 = $context->builder->fmul($eightyfourthF9, $nF9);
+            $eightyfourthF9 = $context->builder->fmul($eightyfourthF9, $nF9);
+            $eightyfourthF9 = $context->builder->fmul($eightyfourthF9, $nF9);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF9
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok9Block);
+            $fortyeighthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $fortysixthLong,
+                $sqLong
+            );
+            $ov10 = JitLongArithOverflow::loadOverflowFlagI1($context, $fortyeighthVar->longArithOverflowFlag);
+            if (null === $ov10 || null === $fortyeighthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (fortyeighth)');
+            }
+            $fortyeighthLong = JITVariable::KIND_VARIABLE === $fortyeighthVar->kind
+                ? $context->builder->load($fortyeighthVar->value)
+                : $fortyeighthVar->value;
+            $ov10Block = BasicBlockHelper::append($context, 'pow_eightyfourth_fortyeighth_ov');
+            $ok10Block = BasicBlockHelper::append($context, 'pow_eightyfourth_fortyeighth_ok');
+            $context->builder->branchIf($ov10, $ov10Block, $ok10Block);
+
+            $context->builder->positionAtEnd($ov10Block);
+            $fortyeighthF10 = $context->builder->load($fortyeighthVar->longArithOverflowDoubleSlot);
+            $sqF10 = $context->builder->siToFp($sqLong, $f64);
+            $eightyfourthF10 = $context->builder->fmul($fortyeighthF10, $sqF10);
+            $nF10 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF10 = $context->builder->fmul($eightyfourthF10, $nF10);
+            $eightyfourthF10 = $context->builder->fmul($eightyfourthF10, $nF10);
+            $eightyfourthF10 = $context->builder->fmul($eightyfourthF10, $nF10);
+            $eightyfourthF10 = $context->builder->fmul($eightyfourthF10, $nF10);
+            $eightyfourthF10 = $context->builder->fmul($eightyfourthF10, $nF10);
+            $eightyfourthF10 = $context->builder->fmul($eightyfourthF10, $nF10);
+            $eightyfourthF10 = $context->builder->fmul($eightyfourthF10, $nF10);
+            $eightyfourthF10 = $context->builder->fmul($eightyfourthF10, $nF10);
+            $eightyfourthF10 = $context->builder->fmul($eightyfourthF10, $nF10);
+            $eightyfourthF10 = $context->builder->fmul($eightyfourthF10, $nF10);
+                $eightyfourthF10 = $context->builder->fmul($eightyfourthF10, $nF10);
+                    $eightyfourthF10 = $context->builder->fmul($eightyfourthF10, $nF10);
+                        $eightyfourthF10 = $context->builder->fmul($eightyfourthF10, $nF10);
+                        $eightyfourthF10 = $context->builder->fmul($eightyfourthF10, $nF10);
+                        $eightyfourthF10 = $context->builder->fmul($eightyfourthF10, $nF10);
+                        $eightyfourthF10 = $context->builder->fmul($eightyfourthF10, $nF10);
+                        $eightyfourthF10 = $context->builder->fmul($eightyfourthF10, $nF10);
+                        $eightyfourthF10 = $context->builder->fmul($eightyfourthF10, $nF10);
+                        $eightyfourthF10 = $context->builder->fmul($eightyfourthF10, $nF10);
+            $eightyfourthF10 = $context->builder->fmul($eightyfourthF10, $nF10);
+            $eightyfourthF10 = $context->builder->fmul($eightyfourthF10, $nF10);
+            $eightyfourthF10 = $context->builder->fmul($eightyfourthF10, $nF10);
+            $eightyfourthF10 = $context->builder->fmul($eightyfourthF10, $nF10);
+
+            $eightyfourthF10 = $context->builder->fmul($eightyfourthF10, $nF10);
+            $eightyfourthF10 = $context->builder->fmul($eightyfourthF10, $nF10);
+            $eightyfourthF10 = $context->builder->fmul($eightyfourthF10, $nF10);
+            $eightyfourthF10 = $context->builder->fmul($eightyfourthF10, $nF10);
+            $eightyfourthF10 = $context->builder->fmul($eightyfourthF10, $nF10);
+            $eightyfourthF10 = $context->builder->fmul($eightyfourthF10, $nF10);
+            $eightyfourthF10 = $context->builder->fmul($eightyfourthF10, $nF10);
+            $eightyfourthF10 = $context->builder->fmul($eightyfourthF10, $nF10);
+            $eightyfourthF10 = $context->builder->fmul($eightyfourthF10, $nF10);
+            $eightyfourthF10 = $context->builder->fmul($eightyfourthF10, $nF10);
+            $eightyfourthF10 = $context->builder->fmul($eightyfourthF10, $nF10);
+            $eightyfourthF10 = $context->builder->fmul($eightyfourthF10, $nF10);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF10
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok10Block);
+            $fiftiethVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $fortyeighthLong,
+                $sqLong
+            );
+            $ov11 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftiethVar->longArithOverflowFlag);
+            if (null === $ov11 || null === $fiftiethVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (fiftieth)');
+            }
+            $fiftiethLong = JITVariable::KIND_VARIABLE === $fiftiethVar->kind
+                ? $context->builder->load($fiftiethVar->value)
+                : $fiftiethVar->value;
+            $ov11Block = BasicBlockHelper::append($context, 'pow_eightyfourth_fiftieth_ov');
+            $ok11Block = BasicBlockHelper::append($context, 'pow_eightyfourth_fiftieth_ok');
+            $context->builder->branchIf($ov11, $ov11Block, $ok11Block);
+
+            $context->builder->positionAtEnd($ov11Block);
+            $fiftiethF11 = $context->builder->load($fiftiethVar->longArithOverflowDoubleSlot);
+            $nF11 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF11 = $context->builder->fmul($fiftiethF11, $nF11);
+            $eightyfourthF11 = $context->builder->fmul($eightyfourthF11, $nF11);
+            $eightyfourthF11 = $context->builder->fmul($eightyfourthF11, $nF11);
+            $eightyfourthF11 = $context->builder->fmul($eightyfourthF11, $nF11);
+            $eightyfourthF11 = $context->builder->fmul($eightyfourthF11, $nF11);
+            $eightyfourthF11 = $context->builder->fmul($eightyfourthF11, $nF11);
+            $eightyfourthF11 = $context->builder->fmul($eightyfourthF11, $nF11);
+            $eightyfourthF11 = $context->builder->fmul($eightyfourthF11, $nF11);
+            $eightyfourthF11 = $context->builder->fmul($eightyfourthF11, $nF11);
+            $eightyfourthF11 = $context->builder->fmul($eightyfourthF11, $nF11);
+                $eightyfourthF11 = $context->builder->fmul($eightyfourthF11, $nF11);
+                    $eightyfourthF11 = $context->builder->fmul($eightyfourthF11, $nF11);
+                        $eightyfourthF11 = $context->builder->fmul($eightyfourthF11, $nF11);
+                        $eightyfourthF11 = $context->builder->fmul($eightyfourthF11, $nF11);
+                        $eightyfourthF11 = $context->builder->fmul($eightyfourthF11, $nF11);
+                        $eightyfourthF11 = $context->builder->fmul($eightyfourthF11, $nF11);
+                        $eightyfourthF11 = $context->builder->fmul($eightyfourthF11, $nF11);
+                        $eightyfourthF11 = $context->builder->fmul($eightyfourthF11, $nF11);
+                        $eightyfourthF11 = $context->builder->fmul($eightyfourthF11, $nF11);
+            $eightyfourthF11 = $context->builder->fmul($eightyfourthF11, $nF11);
+            $eightyfourthF11 = $context->builder->fmul($eightyfourthF11, $nF11);
+            $eightyfourthF11 = $context->builder->fmul($eightyfourthF11, $nF11);
+            $eightyfourthF11 = $context->builder->fmul($eightyfourthF11, $nF11);
+
+            $eightyfourthF11 = $context->builder->fmul($eightyfourthF11, $nF11);
+            $eightyfourthF11 = $context->builder->fmul($eightyfourthF11, $nF11);
+            $eightyfourthF11 = $context->builder->fmul($eightyfourthF11, $nF11);
+            $eightyfourthF11 = $context->builder->fmul($eightyfourthF11, $nF11);
+            $eightyfourthF11 = $context->builder->fmul($eightyfourthF11, $nF11);
+            $eightyfourthF11 = $context->builder->fmul($eightyfourthF11, $nF11);
+            $eightyfourthF11 = $context->builder->fmul($eightyfourthF11, $nF11);
+            $eightyfourthF11 = $context->builder->fmul($eightyfourthF11, $nF11);
+            $eightyfourthF11 = $context->builder->fmul($eightyfourthF11, $nF11);
+            $eightyfourthF11 = $context->builder->fmul($eightyfourthF11, $nF11);
+            $eightyfourthF11 = $context->builder->fmul($eightyfourthF11, $nF11);
+            $eightyfourthF11 = $context->builder->fmul($eightyfourthF11, $nF11);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF11
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok11Block);
+            $fiftyfirstVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $fiftiethLong,
+                $n
+            );
+            $ov12 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfirstVar->longArithOverflowFlag);
+            if (null === $ov12 || null === $fiftyfirstVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (fiftyfirst)');
+            }
+            $fiftyfirstLong = JITVariable::KIND_VARIABLE === $fiftyfirstVar->kind
+                ? $context->builder->load($fiftyfirstVar->value)
+                : $fiftyfirstVar->value;
+            $ov12Block = BasicBlockHelper::append($context, 'pow_eightyfourth_fiftyfirst_ov');
+            $ok12Block = BasicBlockHelper::append($context, 'pow_eightyfourth_fiftyfirst_ok');
+            $context->builder->branchIf($ov12, $ov12Block, $ok12Block);
+
+            $context->builder->positionAtEnd($ov12Block);
+            $fiftyfirstF12 = $context->builder->load($fiftyfirstVar->longArithOverflowDoubleSlot);
+            $nF12 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF12 = $context->builder->fmul($fiftyfirstF12, $nF12);
+            $eightyfourthF12 = $context->builder->fmul($eightyfourthF12, $nF12);
+            $eightyfourthF12 = $context->builder->fmul($eightyfourthF12, $nF12);
+            $eightyfourthF12 = $context->builder->fmul($eightyfourthF12, $nF12);
+            $eightyfourthF12 = $context->builder->fmul($eightyfourthF12, $nF12);
+            $eightyfourthF12 = $context->builder->fmul($eightyfourthF12, $nF12);
+            $eightyfourthF12 = $context->builder->fmul($eightyfourthF12, $nF12);
+            $eightyfourthF12 = $context->builder->fmul($eightyfourthF12, $nF12);
+            $eightyfourthF12 = $context->builder->fmul($eightyfourthF12, $nF12);
+                $eightyfourthF12 = $context->builder->fmul($eightyfourthF12, $nF12);
+                    $eightyfourthF12 = $context->builder->fmul($eightyfourthF12, $nF12);
+                        $eightyfourthF12 = $context->builder->fmul($eightyfourthF12, $nF12);
+                        $eightyfourthF12 = $context->builder->fmul($eightyfourthF12, $nF12);
+                        $eightyfourthF12 = $context->builder->fmul($eightyfourthF12, $nF12);
+                        $eightyfourthF12 = $context->builder->fmul($eightyfourthF12, $nF12);
+                        $eightyfourthF12 = $context->builder->fmul($eightyfourthF12, $nF12);
+                        $eightyfourthF12 = $context->builder->fmul($eightyfourthF12, $nF12);
+                        $eightyfourthF12 = $context->builder->fmul($eightyfourthF12, $nF12);
+            $eightyfourthF12 = $context->builder->fmul($eightyfourthF12, $nF12);
+            $eightyfourthF12 = $context->builder->fmul($eightyfourthF12, $nF12);
+            $eightyfourthF12 = $context->builder->fmul($eightyfourthF12, $nF12);
+            $eightyfourthF12 = $context->builder->fmul($eightyfourthF12, $nF12);
+
+            $eightyfourthF12 = $context->builder->fmul($eightyfourthF12, $nF12);
+            $eightyfourthF12 = $context->builder->fmul($eightyfourthF12, $nF12);
+            $eightyfourthF12 = $context->builder->fmul($eightyfourthF12, $nF12);
+            $eightyfourthF12 = $context->builder->fmul($eightyfourthF12, $nF12);
+            $eightyfourthF12 = $context->builder->fmul($eightyfourthF12, $nF12);
+            $eightyfourthF12 = $context->builder->fmul($eightyfourthF12, $nF12);
+            $eightyfourthF12 = $context->builder->fmul($eightyfourthF12, $nF12);
+            $eightyfourthF12 = $context->builder->fmul($eightyfourthF12, $nF12);
+            $eightyfourthF12 = $context->builder->fmul($eightyfourthF12, $nF12);
+            $eightyfourthF12 = $context->builder->fmul($eightyfourthF12, $nF12);
+            $eightyfourthF12 = $context->builder->fmul($eightyfourthF12, $nF12);
+            $eightyfourthF12 = $context->builder->fmul($eightyfourthF12, $nF12);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF12
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok12Block);
+            $fiftysecondVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $fiftyfirstLong,
+                $n
+            );
+            $ov13 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysecondVar->longArithOverflowFlag);
+            if (null === $ov13 || null === $fiftysecondVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (fiftysecond)');
+            }
+            $fiftysecondLong = JITVariable::KIND_VARIABLE === $fiftysecondVar->kind
+                ? $context->builder->load($fiftysecondVar->value)
+                : $fiftysecondVar->value;
+            $ov13Block = BasicBlockHelper::append($context, 'pow_eightyfourth_fiftysecond_ov');
+            $ok13Block = BasicBlockHelper::append($context, 'pow_eightyfourth_fiftysecond_ok');
+            $context->builder->branchIf($ov13, $ov13Block, $ok13Block);
+
+            $context->builder->positionAtEnd($ov13Block);
+            $fiftysecondF13 = $context->builder->load($fiftysecondVar->longArithOverflowDoubleSlot);
+            $nF13 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF13 = $context->builder->fmul($fiftysecondF13, $nF13);
+            $eightyfourthF13 = $context->builder->fmul($eightyfourthF13, $nF13);
+            $eightyfourthF13 = $context->builder->fmul($eightyfourthF13, $nF13);
+            $eightyfourthF13 = $context->builder->fmul($eightyfourthF13, $nF13);
+            $eightyfourthF13 = $context->builder->fmul($eightyfourthF13, $nF13);
+            $eightyfourthF13 = $context->builder->fmul($eightyfourthF13, $nF13);
+            $eightyfourthF13 = $context->builder->fmul($eightyfourthF13, $nF13);
+            $eightyfourthF13 = $context->builder->fmul($eightyfourthF13, $nF13);
+                $eightyfourthF13 = $context->builder->fmul($eightyfourthF13, $nF13);
+                    $eightyfourthF13 = $context->builder->fmul($eightyfourthF13, $nF13);
+                        $eightyfourthF13 = $context->builder->fmul($eightyfourthF13, $nF13);
+                        $eightyfourthF13 = $context->builder->fmul($eightyfourthF13, $nF13);
+                        $eightyfourthF13 = $context->builder->fmul($eightyfourthF13, $nF13);
+                        $eightyfourthF13 = $context->builder->fmul($eightyfourthF13, $nF13);
+                        $eightyfourthF13 = $context->builder->fmul($eightyfourthF13, $nF13);
+                        $eightyfourthF13 = $context->builder->fmul($eightyfourthF13, $nF13);
+                        $eightyfourthF13 = $context->builder->fmul($eightyfourthF13, $nF13);
+            $eightyfourthF13 = $context->builder->fmul($eightyfourthF13, $nF13);
+            $eightyfourthF13 = $context->builder->fmul($eightyfourthF13, $nF13);
+            $eightyfourthF13 = $context->builder->fmul($eightyfourthF13, $nF13);
+            $eightyfourthF13 = $context->builder->fmul($eightyfourthF13, $nF13);
+
+            $eightyfourthF13 = $context->builder->fmul($eightyfourthF13, $nF13);
+            $eightyfourthF13 = $context->builder->fmul($eightyfourthF13, $nF13);
+            $eightyfourthF13 = $context->builder->fmul($eightyfourthF13, $nF13);
+            $eightyfourthF13 = $context->builder->fmul($eightyfourthF13, $nF13);
+            $eightyfourthF13 = $context->builder->fmul($eightyfourthF13, $nF13);
+            $eightyfourthF13 = $context->builder->fmul($eightyfourthF13, $nF13);
+            $eightyfourthF13 = $context->builder->fmul($eightyfourthF13, $nF13);
+            $eightyfourthF13 = $context->builder->fmul($eightyfourthF13, $nF13);
+            $eightyfourthF13 = $context->builder->fmul($eightyfourthF13, $nF13);
+            $eightyfourthF13 = $context->builder->fmul($eightyfourthF13, $nF13);
+            $eightyfourthF13 = $context->builder->fmul($eightyfourthF13, $nF13);
+            $eightyfourthF13 = $context->builder->fmul($eightyfourthF13, $nF13);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF13
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok13Block);
+            $fiftythirdVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $fiftysecondLong,
+                $n
+            );
+            $ov14 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftythirdVar->longArithOverflowFlag);
+            if (null === $ov14 || null === $fiftythirdVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (fiftythird)');
+            }
+            $fiftythirdLong = JITVariable::KIND_VARIABLE === $fiftythirdVar->kind
+                ? $context->builder->load($fiftythirdVar->value)
+                : $fiftythirdVar->value;
+            $ov14Block = BasicBlockHelper::append($context, 'pow_eightyfourth_fiftythird_ov');
+            $ok14Block = BasicBlockHelper::append($context, 'pow_eightyfourth_fiftythird_ok');
+            $context->builder->branchIf($ov14, $ov14Block, $ok14Block);
+
+            $context->builder->positionAtEnd($ov14Block);
+            $fiftythirdF14 = $context->builder->load($fiftythirdVar->longArithOverflowDoubleSlot);
+            $nF14 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF14 = $context->builder->fmul($fiftythirdF14, $nF14);
+            $eightyfourthF14 = $context->builder->fmul($eightyfourthF14, $nF14);
+            $eightyfourthF14 = $context->builder->fmul($eightyfourthF14, $nF14);
+            $eightyfourthF14 = $context->builder->fmul($eightyfourthF14, $nF14);
+            $eightyfourthF14 = $context->builder->fmul($eightyfourthF14, $nF14);
+            $eightyfourthF14 = $context->builder->fmul($eightyfourthF14, $nF14);
+            $eightyfourthF14 = $context->builder->fmul($eightyfourthF14, $nF14);
+                $eightyfourthF14 = $context->builder->fmul($eightyfourthF14, $nF14);
+                    $eightyfourthF14 = $context->builder->fmul($eightyfourthF14, $nF14);
+                        $eightyfourthF14 = $context->builder->fmul($eightyfourthF14, $nF14);
+                        $eightyfourthF14 = $context->builder->fmul($eightyfourthF14, $nF14);
+                        $eightyfourthF14 = $context->builder->fmul($eightyfourthF14, $nF14);
+                        $eightyfourthF14 = $context->builder->fmul($eightyfourthF14, $nF14);
+                        $eightyfourthF14 = $context->builder->fmul($eightyfourthF14, $nF14);
+                        $eightyfourthF14 = $context->builder->fmul($eightyfourthF14, $nF14);
+                        $eightyfourthF14 = $context->builder->fmul($eightyfourthF14, $nF14);
+            $eightyfourthF14 = $context->builder->fmul($eightyfourthF14, $nF14);
+            $eightyfourthF14 = $context->builder->fmul($eightyfourthF14, $nF14);
+            $eightyfourthF14 = $context->builder->fmul($eightyfourthF14, $nF14);
+            $eightyfourthF14 = $context->builder->fmul($eightyfourthF14, $nF14);
+
+            $eightyfourthF14 = $context->builder->fmul($eightyfourthF14, $nF14);
+            $eightyfourthF14 = $context->builder->fmul($eightyfourthF14, $nF14);
+            $eightyfourthF14 = $context->builder->fmul($eightyfourthF14, $nF14);
+            $eightyfourthF14 = $context->builder->fmul($eightyfourthF14, $nF14);
+            $eightyfourthF14 = $context->builder->fmul($eightyfourthF14, $nF14);
+            $eightyfourthF14 = $context->builder->fmul($eightyfourthF14, $nF14);
+            $eightyfourthF14 = $context->builder->fmul($eightyfourthF14, $nF14);
+            $eightyfourthF14 = $context->builder->fmul($eightyfourthF14, $nF14);
+            $eightyfourthF14 = $context->builder->fmul($eightyfourthF14, $nF14);
+            $eightyfourthF14 = $context->builder->fmul($eightyfourthF14, $nF14);
+            $eightyfourthF14 = $context->builder->fmul($eightyfourthF14, $nF14);
+            $eightyfourthF14 = $context->builder->fmul($eightyfourthF14, $nF14);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF14
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok14Block);
+            $fiftyfourthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $fiftythirdLong,
+                $n
+            );
+            $ov15 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfourthVar->longArithOverflowFlag);
+            if (null === $ov15 || null === $fiftyfourthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (fiftyfourth)');
+            }
+            $fiftyfourthLong = JITVariable::KIND_VARIABLE === $fiftyfourthVar->kind
+                ? $context->builder->load($fiftyfourthVar->value)
+                : $fiftyfourthVar->value;
+            $ov15Block = BasicBlockHelper::append($context, 'pow_eightyfourth_fiftyfourth_ov');
+            $ok15Block = BasicBlockHelper::append($context, 'pow_eightyfourth_fiftyfourth_ok');
+            $context->builder->branchIf($ov15, $ov15Block, $ok15Block);
+
+            $context->builder->positionAtEnd($ov15Block);
+            $fiftyfourthF15 = $context->builder->load($fiftyfourthVar->longArithOverflowDoubleSlot);
+            $nF15 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF15 = $context->builder->fmul($fiftyfourthF15, $nF15);
+            $eightyfourthF15 = $context->builder->fmul($eightyfourthF15, $nF15);
+            $eightyfourthF15 = $context->builder->fmul($eightyfourthF15, $nF15);
+            $eightyfourthF15 = $context->builder->fmul($eightyfourthF15, $nF15);
+            $eightyfourthF15 = $context->builder->fmul($eightyfourthF15, $nF15);
+            $eightyfourthF15 = $context->builder->fmul($eightyfourthF15, $nF15);
+                $eightyfourthF15 = $context->builder->fmul($eightyfourthF15, $nF15);
+                    $eightyfourthF15 = $context->builder->fmul($eightyfourthF15, $nF15);
+                        $eightyfourthF15 = $context->builder->fmul($eightyfourthF15, $nF15);
+                        $eightyfourthF15 = $context->builder->fmul($eightyfourthF15, $nF15);
+                        $eightyfourthF15 = $context->builder->fmul($eightyfourthF15, $nF15);
+                        $eightyfourthF15 = $context->builder->fmul($eightyfourthF15, $nF15);
+                        $eightyfourthF15 = $context->builder->fmul($eightyfourthF15, $nF15);
+                        $eightyfourthF15 = $context->builder->fmul($eightyfourthF15, $nF15);
+                        $eightyfourthF15 = $context->builder->fmul($eightyfourthF15, $nF15);
+            $eightyfourthF15 = $context->builder->fmul($eightyfourthF15, $nF15);
+            $eightyfourthF15 = $context->builder->fmul($eightyfourthF15, $nF15);
+            $eightyfourthF15 = $context->builder->fmul($eightyfourthF15, $nF15);
+            $eightyfourthF15 = $context->builder->fmul($eightyfourthF15, $nF15);
+
+            $eightyfourthF15 = $context->builder->fmul($eightyfourthF15, $nF15);
+            $eightyfourthF15 = $context->builder->fmul($eightyfourthF15, $nF15);
+            $eightyfourthF15 = $context->builder->fmul($eightyfourthF15, $nF15);
+            $eightyfourthF15 = $context->builder->fmul($eightyfourthF15, $nF15);
+            $eightyfourthF15 = $context->builder->fmul($eightyfourthF15, $nF15);
+            $eightyfourthF15 = $context->builder->fmul($eightyfourthF15, $nF15);
+            $eightyfourthF15 = $context->builder->fmul($eightyfourthF15, $nF15);
+            $eightyfourthF15 = $context->builder->fmul($eightyfourthF15, $nF15);
+            $eightyfourthF15 = $context->builder->fmul($eightyfourthF15, $nF15);
+            $eightyfourthF15 = $context->builder->fmul($eightyfourthF15, $nF15);
+            $eightyfourthF15 = $context->builder->fmul($eightyfourthF15, $nF15);
+            $eightyfourthF15 = $context->builder->fmul($eightyfourthF15, $nF15);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF15
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok15Block);
+            $fiftyfifthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $fiftyfourthLong,
+                $n
+            );
+            $ov16 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyfifthVar->longArithOverflowFlag);
+            if (null === $ov16 || null === $fiftyfifthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (fiftyfifth)');
+            }
+            $fiftyfifthLong = JITVariable::KIND_VARIABLE === $fiftyfifthVar->kind
+                ? $context->builder->load($fiftyfifthVar->value)
+                : $fiftyfifthVar->value;
+            $ov16Block = BasicBlockHelper::append($context, 'pow_eightyfourth_fiftyfifth_ov');
+            $ok16Block = BasicBlockHelper::append($context, 'pow_eightyfourth_fiftyfifth_ok');
+            $context->builder->branchIf($ov16, $ov16Block, $ok16Block);
+
+            $context->builder->positionAtEnd($ov16Block);
+            $fiftyfifthF16 = $context->builder->load($fiftyfifthVar->longArithOverflowDoubleSlot);
+            $nF16 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF16 = $context->builder->fmul($fiftyfifthF16, $nF16);
+            $eightyfourthF16 = $context->builder->fmul($eightyfourthF16, $nF16);
+            $eightyfourthF16 = $context->builder->fmul($eightyfourthF16, $nF16);
+            $eightyfourthF16 = $context->builder->fmul($eightyfourthF16, $nF16);
+            $eightyfourthF16 = $context->builder->fmul($eightyfourthF16, $nF16);
+                $eightyfourthF16 = $context->builder->fmul($eightyfourthF16, $nF16);
+                    $eightyfourthF16 = $context->builder->fmul($eightyfourthF16, $nF16);
+                        $eightyfourthF16 = $context->builder->fmul($eightyfourthF16, $nF16);
+                        $eightyfourthF16 = $context->builder->fmul($eightyfourthF16, $nF16);
+                        $eightyfourthF16 = $context->builder->fmul($eightyfourthF16, $nF16);
+                        $eightyfourthF16 = $context->builder->fmul($eightyfourthF16, $nF16);
+                        $eightyfourthF16 = $context->builder->fmul($eightyfourthF16, $nF16);
+                        $eightyfourthF16 = $context->builder->fmul($eightyfourthF16, $nF16);
+                        $eightyfourthF16 = $context->builder->fmul($eightyfourthF16, $nF16);
+            $eightyfourthF16 = $context->builder->fmul($eightyfourthF16, $nF16);
+            $eightyfourthF16 = $context->builder->fmul($eightyfourthF16, $nF16);
+            $eightyfourthF16 = $context->builder->fmul($eightyfourthF16, $nF16);
+            $eightyfourthF16 = $context->builder->fmul($eightyfourthF16, $nF16);
+
+            $eightyfourthF16 = $context->builder->fmul($eightyfourthF16, $nF16);
+            $eightyfourthF16 = $context->builder->fmul($eightyfourthF16, $nF16);
+            $eightyfourthF16 = $context->builder->fmul($eightyfourthF16, $nF16);
+            $eightyfourthF16 = $context->builder->fmul($eightyfourthF16, $nF16);
+            $eightyfourthF16 = $context->builder->fmul($eightyfourthF16, $nF16);
+            $eightyfourthF16 = $context->builder->fmul($eightyfourthF16, $nF16);
+            $eightyfourthF16 = $context->builder->fmul($eightyfourthF16, $nF16);
+            $eightyfourthF16 = $context->builder->fmul($eightyfourthF16, $nF16);
+            $eightyfourthF16 = $context->builder->fmul($eightyfourthF16, $nF16);
+            $eightyfourthF16 = $context->builder->fmul($eightyfourthF16, $nF16);
+            $eightyfourthF16 = $context->builder->fmul($eightyfourthF16, $nF16);
+            $eightyfourthF16 = $context->builder->fmul($eightyfourthF16, $nF16);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF16
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok16Block);
+            $fiftysixthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $fiftyfifthLong,
+                $n
+            );
+            $ov17 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftysixthVar->longArithOverflowFlag);
+            if (null === $ov17 || null === $fiftysixthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (fiftysixth)');
+            }
+            $fiftysixthLong = JITVariable::KIND_VARIABLE === $fiftysixthVar->kind
+                ? $context->builder->load($fiftysixthVar->value)
+                : $fiftysixthVar->value;
+            $ov17Block = BasicBlockHelper::append($context, 'pow_eightyfourth_fiftysixth_ov');
+            $ok17Block = BasicBlockHelper::append($context, 'pow_eightyfourth_fiftysixth_ok');
+            $context->builder->branchIf($ov17, $ov17Block, $ok17Block);
+
+            $context->builder->positionAtEnd($ov17Block);
+            $fiftysixthF17 = $context->builder->load($fiftysixthVar->longArithOverflowDoubleSlot);
+            $nF17 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF17 = $context->builder->fmul($fiftysixthF17, $nF17);
+            $eightyfourthF17 = $context->builder->fmul($eightyfourthF17, $nF17);
+            $eightyfourthF17 = $context->builder->fmul($eightyfourthF17, $nF17);
+            $eightyfourthF17 = $context->builder->fmul($eightyfourthF17, $nF17);
+                $eightyfourthF17 = $context->builder->fmul($eightyfourthF17, $nF17);
+                    $eightyfourthF17 = $context->builder->fmul($eightyfourthF17, $nF17);
+                        $eightyfourthF17 = $context->builder->fmul($eightyfourthF17, $nF17);
+                        $eightyfourthF17 = $context->builder->fmul($eightyfourthF17, $nF17);
+                        $eightyfourthF17 = $context->builder->fmul($eightyfourthF17, $nF17);
+                        $eightyfourthF17 = $context->builder->fmul($eightyfourthF17, $nF17);
+                        $eightyfourthF17 = $context->builder->fmul($eightyfourthF17, $nF17);
+                        $eightyfourthF17 = $context->builder->fmul($eightyfourthF17, $nF17);
+                        $eightyfourthF17 = $context->builder->fmul($eightyfourthF17, $nF17);
+            $eightyfourthF17 = $context->builder->fmul($eightyfourthF17, $nF17);
+            $eightyfourthF17 = $context->builder->fmul($eightyfourthF17, $nF17);
+            $eightyfourthF17 = $context->builder->fmul($eightyfourthF17, $nF17);
+            $eightyfourthF17 = $context->builder->fmul($eightyfourthF17, $nF17);
+
+            $eightyfourthF17 = $context->builder->fmul($eightyfourthF17, $nF17);
+            $eightyfourthF17 = $context->builder->fmul($eightyfourthF17, $nF17);
+            $eightyfourthF17 = $context->builder->fmul($eightyfourthF17, $nF17);
+            $eightyfourthF17 = $context->builder->fmul($eightyfourthF17, $nF17);
+            $eightyfourthF17 = $context->builder->fmul($eightyfourthF17, $nF17);
+            $eightyfourthF17 = $context->builder->fmul($eightyfourthF17, $nF17);
+            $eightyfourthF17 = $context->builder->fmul($eightyfourthF17, $nF17);
+            $eightyfourthF17 = $context->builder->fmul($eightyfourthF17, $nF17);
+            $eightyfourthF17 = $context->builder->fmul($eightyfourthF17, $nF17);
+            $eightyfourthF17 = $context->builder->fmul($eightyfourthF17, $nF17);
+            $eightyfourthF17 = $context->builder->fmul($eightyfourthF17, $nF17);
+            $eightyfourthF17 = $context->builder->fmul($eightyfourthF17, $nF17);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF17
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok17Block);
+            $fiftyseventhVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $fiftysixthLong,
+                $n
+            );
+            $ov18 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyseventhVar->longArithOverflowFlag);
+            if (null === $ov18 || null === $fiftyseventhVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (fiftyseventh)');
+            }
+            $fiftyseventhLong = JITVariable::KIND_VARIABLE === $fiftyseventhVar->kind
+                ? $context->builder->load($fiftyseventhVar->value)
+                : $fiftyseventhVar->value;
+            $ov18Block = BasicBlockHelper::append($context, 'pow_eightyfourth_fiftyseventh_ov');
+            $ok18Block = BasicBlockHelper::append($context, 'pow_eightyfourth_fiftyseventh_ok');
+            $context->builder->branchIf($ov18, $ov18Block, $ok18Block);
+
+            $context->builder->positionAtEnd($ov18Block);
+            $fiftyseventhF18 = $context->builder->load($fiftyseventhVar->longArithOverflowDoubleSlot);
+            $nF18 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF18 = $context->builder->fmul($fiftyseventhF18, $nF18);
+            $eightyfourthF18 = $context->builder->fmul($eightyfourthF18, $nF18);
+            $eightyfourthF18 = $context->builder->fmul($eightyfourthF18, $nF18);
+                $eightyfourthF18 = $context->builder->fmul($eightyfourthF18, $nF18);
+                    $eightyfourthF18 = $context->builder->fmul($eightyfourthF18, $nF18);
+                        $eightyfourthF18 = $context->builder->fmul($eightyfourthF18, $nF18);
+                        $eightyfourthF18 = $context->builder->fmul($eightyfourthF18, $nF18);
+                        $eightyfourthF18 = $context->builder->fmul($eightyfourthF18, $nF18);
+                        $eightyfourthF18 = $context->builder->fmul($eightyfourthF18, $nF18);
+                        $eightyfourthF18 = $context->builder->fmul($eightyfourthF18, $nF18);
+                        $eightyfourthF18 = $context->builder->fmul($eightyfourthF18, $nF18);
+                        $eightyfourthF18 = $context->builder->fmul($eightyfourthF18, $nF18);
+            $eightyfourthF18 = $context->builder->fmul($eightyfourthF18, $nF18);
+            $eightyfourthF18 = $context->builder->fmul($eightyfourthF18, $nF18);
+            $eightyfourthF18 = $context->builder->fmul($eightyfourthF18, $nF18);
+            $eightyfourthF18 = $context->builder->fmul($eightyfourthF18, $nF18);
+
+            $eightyfourthF18 = $context->builder->fmul($eightyfourthF18, $nF18);
+            $eightyfourthF18 = $context->builder->fmul($eightyfourthF18, $nF18);
+            $eightyfourthF18 = $context->builder->fmul($eightyfourthF18, $nF18);
+            $eightyfourthF18 = $context->builder->fmul($eightyfourthF18, $nF18);
+            $eightyfourthF18 = $context->builder->fmul($eightyfourthF18, $nF18);
+            $eightyfourthF18 = $context->builder->fmul($eightyfourthF18, $nF18);
+            $eightyfourthF18 = $context->builder->fmul($eightyfourthF18, $nF18);
+            $eightyfourthF18 = $context->builder->fmul($eightyfourthF18, $nF18);
+            $eightyfourthF18 = $context->builder->fmul($eightyfourthF18, $nF18);
+            $eightyfourthF18 = $context->builder->fmul($eightyfourthF18, $nF18);
+            $eightyfourthF18 = $context->builder->fmul($eightyfourthF18, $nF18);
+            $eightyfourthF18 = $context->builder->fmul($eightyfourthF18, $nF18);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF18
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok18Block);
+            $fiftyeighthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $fiftyseventhLong,
+                $n
+            );
+            $ov19 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyeighthVar->longArithOverflowFlag);
+            if (null === $ov19 || null === $fiftyeighthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (fiftyeighth)');
+            }
+            $fiftyeighthLong = JITVariable::KIND_VARIABLE === $fiftyeighthVar->kind
+                ? $context->builder->load($fiftyeighthVar->value)
+                : $fiftyeighthVar->value;
+            $ov19Block = BasicBlockHelper::append($context, 'pow_eightyfourth_fiftyeighth_ov');
+            $ok19Block = BasicBlockHelper::append($context, 'pow_eightyfourth_fiftyeighth_ok');
+            $context->builder->branchIf($ov19, $ov19Block, $ok19Block);
+
+            $context->builder->positionAtEnd($ov19Block);
+            $fiftyeighthF19 = $context->builder->load($fiftyeighthVar->longArithOverflowDoubleSlot);
+            $nF19 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF19 = $context->builder->fmul($fiftyeighthF19, $nF19);
+            $eightyfourthF19 = $context->builder->fmul($eightyfourthF19, $nF19);
+                $eightyfourthF19 = $context->builder->fmul($eightyfourthF19, $nF19);
+                    $eightyfourthF19 = $context->builder->fmul($eightyfourthF19, $nF19);
+                        $eightyfourthF19 = $context->builder->fmul($eightyfourthF19, $nF19);
+                        $eightyfourthF19 = $context->builder->fmul($eightyfourthF19, $nF19);
+                        $eightyfourthF19 = $context->builder->fmul($eightyfourthF19, $nF19);
+                        $eightyfourthF19 = $context->builder->fmul($eightyfourthF19, $nF19);
+                        $eightyfourthF19 = $context->builder->fmul($eightyfourthF19, $nF19);
+                        $eightyfourthF19 = $context->builder->fmul($eightyfourthF19, $nF19);
+                        $eightyfourthF19 = $context->builder->fmul($eightyfourthF19, $nF19);
+            $eightyfourthF19 = $context->builder->fmul($eightyfourthF19, $nF19);
+            $eightyfourthF19 = $context->builder->fmul($eightyfourthF19, $nF19);
+            $eightyfourthF19 = $context->builder->fmul($eightyfourthF19, $nF19);
+            $eightyfourthF19 = $context->builder->fmul($eightyfourthF19, $nF19);
+
+            $eightyfourthF19 = $context->builder->fmul($eightyfourthF19, $nF19);
+            $eightyfourthF19 = $context->builder->fmul($eightyfourthF19, $nF19);
+            $eightyfourthF19 = $context->builder->fmul($eightyfourthF19, $nF19);
+            $eightyfourthF19 = $context->builder->fmul($eightyfourthF19, $nF19);
+            $eightyfourthF19 = $context->builder->fmul($eightyfourthF19, $nF19);
+            $eightyfourthF19 = $context->builder->fmul($eightyfourthF19, $nF19);
+            $eightyfourthF19 = $context->builder->fmul($eightyfourthF19, $nF19);
+            $eightyfourthF19 = $context->builder->fmul($eightyfourthF19, $nF19);
+            $eightyfourthF19 = $context->builder->fmul($eightyfourthF19, $nF19);
+            $eightyfourthF19 = $context->builder->fmul($eightyfourthF19, $nF19);
+            $eightyfourthF19 = $context->builder->fmul($eightyfourthF19, $nF19);
+            $eightyfourthF19 = $context->builder->fmul($eightyfourthF19, $nF19);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF19
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok19Block);
+            $fiftyninthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $fiftyeighthLong,
+                $n
+            );
+            $ov20 = JitLongArithOverflow::loadOverflowFlagI1($context, $fiftyninthVar->longArithOverflowFlag);
+            if (null === $ov20 || null === $fiftyninthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (fiftyninth)');
+            }
+            $fiftyninthLong = JITVariable::KIND_VARIABLE === $fiftyninthVar->kind
+                ? $context->builder->load($fiftyninthVar->value)
+                : $fiftyninthVar->value;
+            $ov20Block = BasicBlockHelper::append($context, 'pow_eightyfourth_fiftyninth_ov');
+            $ok20Block = BasicBlockHelper::append($context, 'pow_eightyfourth_fiftyninth_ok');
+            $context->builder->branchIf($ov20, $ov20Block, $ok20Block);
+
+            $context->builder->positionAtEnd($ov20Block);
+            $fiftyninthF20 = $context->builder->load($fiftyninthVar->longArithOverflowDoubleSlot);
+            $nF20 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF20 = $context->builder->fmul($fiftyninthF20, $nF20);
+                $eightyfourthF20 = $context->builder->fmul($eightyfourthF20, $nF20);
+                    $eightyfourthF20 = $context->builder->fmul($eightyfourthF20, $nF20);
+                        $eightyfourthF20 = $context->builder->fmul($eightyfourthF20, $nF20);
+                        $eightyfourthF20 = $context->builder->fmul($eightyfourthF20, $nF20);
+                        $eightyfourthF20 = $context->builder->fmul($eightyfourthF20, $nF20);
+                        $eightyfourthF20 = $context->builder->fmul($eightyfourthF20, $nF20);
+                        $eightyfourthF20 = $context->builder->fmul($eightyfourthF20, $nF20);
+                        $eightyfourthF20 = $context->builder->fmul($eightyfourthF20, $nF20);
+                        $eightyfourthF20 = $context->builder->fmul($eightyfourthF20, $nF20);
+            $eightyfourthF20 = $context->builder->fmul($eightyfourthF20, $nF20);
+            $eightyfourthF20 = $context->builder->fmul($eightyfourthF20, $nF20);
+            $eightyfourthF20 = $context->builder->fmul($eightyfourthF20, $nF20);
+            $eightyfourthF20 = $context->builder->fmul($eightyfourthF20, $nF20);
+
+            $eightyfourthF20 = $context->builder->fmul($eightyfourthF20, $nF20);
+            $eightyfourthF20 = $context->builder->fmul($eightyfourthF20, $nF20);
+            $eightyfourthF20 = $context->builder->fmul($eightyfourthF20, $nF20);
+            $eightyfourthF20 = $context->builder->fmul($eightyfourthF20, $nF20);
+            $eightyfourthF20 = $context->builder->fmul($eightyfourthF20, $nF20);
+            $eightyfourthF20 = $context->builder->fmul($eightyfourthF20, $nF20);
+            $eightyfourthF20 = $context->builder->fmul($eightyfourthF20, $nF20);
+            $eightyfourthF20 = $context->builder->fmul($eightyfourthF20, $nF20);
+            $eightyfourthF20 = $context->builder->fmul($eightyfourthF20, $nF20);
+            $eightyfourthF20 = $context->builder->fmul($eightyfourthF20, $nF20);
+            $eightyfourthF20 = $context->builder->fmul($eightyfourthF20, $nF20);
+            $eightyfourthF20 = $context->builder->fmul($eightyfourthF20, $nF20);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF20
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok20Block);
+            $sixtiethVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $fiftyninthLong,
+                $n
+            );
+            $ov21 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtiethVar->longArithOverflowFlag);
+            if (null === $ov21 || null === $sixtiethVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (sixtieth)');
+            }
+            $sixtiethLong = JITVariable::KIND_VARIABLE === $sixtiethVar->kind
+                ? $context->builder->load($sixtiethVar->value)
+                : $sixtiethVar->value;
+            $ov21Block = BasicBlockHelper::append($context, 'pow_eightyfourth_sixtieth_ov');
+            $ok21Block = BasicBlockHelper::append($context, 'pow_eightyfourth_sixtieth_ok');
+            $context->builder->branchIf($ov21, $ov21Block, $ok21Block);
+
+            $context->builder->positionAtEnd($ov21Block);
+            $sixtiethF21 = $context->builder->load($sixtiethVar->longArithOverflowDoubleSlot);
+            $nF21 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF21 = $context->builder->fmul($sixtiethF21, $nF21);
+                $eightyfourthF21 = $context->builder->fmul($eightyfourthF21, $nF21);
+                    $eightyfourthF21 = $context->builder->fmul($eightyfourthF21, $nF21);
+                    $eightyfourthF21 = $context->builder->fmul($eightyfourthF21, $nF21);
+                    $eightyfourthF21 = $context->builder->fmul($eightyfourthF21, $nF21);
+                    $eightyfourthF21 = $context->builder->fmul($eightyfourthF21, $nF21);
+                    $eightyfourthF21 = $context->builder->fmul($eightyfourthF21, $nF21);
+                    $eightyfourthF21 = $context->builder->fmul($eightyfourthF21, $nF21);
+                    $eightyfourthF21 = $context->builder->fmul($eightyfourthF21, $nF21);
+            $eightyfourthF21 = $context->builder->fmul($eightyfourthF21, $nF21);
+            $eightyfourthF21 = $context->builder->fmul($eightyfourthF21, $nF21);
+            $eightyfourthF21 = $context->builder->fmul($eightyfourthF21, $nF21);
+            $eightyfourthF21 = $context->builder->fmul($eightyfourthF21, $nF21);
+
+            $eightyfourthF21 = $context->builder->fmul($eightyfourthF21, $nF21);
+            $eightyfourthF21 = $context->builder->fmul($eightyfourthF21, $nF21);
+            $eightyfourthF21 = $context->builder->fmul($eightyfourthF21, $nF21);
+            $eightyfourthF21 = $context->builder->fmul($eightyfourthF21, $nF21);
+            $eightyfourthF21 = $context->builder->fmul($eightyfourthF21, $nF21);
+            $eightyfourthF21 = $context->builder->fmul($eightyfourthF21, $nF21);
+            $eightyfourthF21 = $context->builder->fmul($eightyfourthF21, $nF21);
+            $eightyfourthF21 = $context->builder->fmul($eightyfourthF21, $nF21);
+            $eightyfourthF21 = $context->builder->fmul($eightyfourthF21, $nF21);
+            $eightyfourthF21 = $context->builder->fmul($eightyfourthF21, $nF21);
+            $eightyfourthF21 = $context->builder->fmul($eightyfourthF21, $nF21);
+            $eightyfourthF21 = $context->builder->fmul($eightyfourthF21, $nF21);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF21
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok21Block);
+            $sixtyfirstVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $sixtiethLong,
+                $n
+            );
+            $ov22 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfirstVar->longArithOverflowFlag);
+            if (null === $ov22 || null === $sixtyfirstVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (sixtyfirst)');
+            }
+            $sixtyfirstLong = JITVariable::KIND_VARIABLE === $sixtyfirstVar->kind
+                ? $context->builder->load($sixtyfirstVar->value)
+                : $sixtyfirstVar->value;
+            $ov22Block = BasicBlockHelper::append($context, 'pow_eightyfourth_sixtyfirst_ov');
+            $ok22Block = BasicBlockHelper::append($context, 'pow_eightyfourth_sixtyfirst_ok');
+            $context->builder->branchIf($ov22, $ov22Block, $ok22Block);
+
+            $context->builder->positionAtEnd($ov22Block);
+            $sixtyfirstF22 = $context->builder->load($sixtyfirstVar->longArithOverflowDoubleSlot);
+            $nF22 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF22 = $context->builder->fmul($sixtyfirstF22, $nF22);
+                $eightyfourthF22 = $context->builder->fmul($eightyfourthF22, $nF22);
+                $eightyfourthF22 = $context->builder->fmul($eightyfourthF22, $nF22);
+                $eightyfourthF22 = $context->builder->fmul($eightyfourthF22, $nF22);
+                $eightyfourthF22 = $context->builder->fmul($eightyfourthF22, $nF22);
+                $eightyfourthF22 = $context->builder->fmul($eightyfourthF22, $nF22);
+                $eightyfourthF22 = $context->builder->fmul($eightyfourthF22, $nF22);
+                $eightyfourthF22 = $context->builder->fmul($eightyfourthF22, $nF22);
+            $eightyfourthF22 = $context->builder->fmul($eightyfourthF22, $nF22);
+            $eightyfourthF22 = $context->builder->fmul($eightyfourthF22, $nF22);
+            $eightyfourthF22 = $context->builder->fmul($eightyfourthF22, $nF22);
+            $eightyfourthF22 = $context->builder->fmul($eightyfourthF22, $nF22);
+
+            $eightyfourthF22 = $context->builder->fmul($eightyfourthF22, $nF22);
+            $eightyfourthF22 = $context->builder->fmul($eightyfourthF22, $nF22);
+            $eightyfourthF22 = $context->builder->fmul($eightyfourthF22, $nF22);
+            $eightyfourthF22 = $context->builder->fmul($eightyfourthF22, $nF22);
+            $eightyfourthF22 = $context->builder->fmul($eightyfourthF22, $nF22);
+            $eightyfourthF22 = $context->builder->fmul($eightyfourthF22, $nF22);
+            $eightyfourthF22 = $context->builder->fmul($eightyfourthF22, $nF22);
+            $eightyfourthF22 = $context->builder->fmul($eightyfourthF22, $nF22);
+            $eightyfourthF22 = $context->builder->fmul($eightyfourthF22, $nF22);
+            $eightyfourthF22 = $context->builder->fmul($eightyfourthF22, $nF22);
+            $eightyfourthF22 = $context->builder->fmul($eightyfourthF22, $nF22);
+            $eightyfourthF22 = $context->builder->fmul($eightyfourthF22, $nF22);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF22
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok22Block);
+            $sixtysecondVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $sixtyfirstLong,
+                $n
+            );
+            $ov23 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysecondVar->longArithOverflowFlag);
+            if (null === $ov23 || null === $sixtysecondVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (sixtysecond)');
+            }
+            $sixtysecondLong = JITVariable::KIND_VARIABLE === $sixtysecondVar->kind
+                ? $context->builder->load($sixtysecondVar->value)
+                : $sixtysecondVar->value;
+            $ov23Block = BasicBlockHelper::append($context, 'pow_eightyfourth_sixtysecond_ov');
+            $ok23Block = BasicBlockHelper::append($context, 'pow_eightyfourth_sixtysecond_ok');
+            $context->builder->branchIf($ov23, $ov23Block, $ok23Block);
+
+            $context->builder->positionAtEnd($ov23Block);
+            $sixtysecondF23 = $context->builder->load($sixtysecondVar->longArithOverflowDoubleSlot);
+            $nF23 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF23 = $context->builder->fmul($sixtysecondF23, $nF23);
+            $eightyfourthF23 = $context->builder->fmul($eightyfourthF23, $nF23);
+            $eightyfourthF23 = $context->builder->fmul($eightyfourthF23, $nF23);
+            $eightyfourthF23 = $context->builder->fmul($eightyfourthF23, $nF23);
+            $eightyfourthF23 = $context->builder->fmul($eightyfourthF23, $nF23);
+            $eightyfourthF23 = $context->builder->fmul($eightyfourthF23, $nF23);
+            $eightyfourthF23 = $context->builder->fmul($eightyfourthF23, $nF23);
+            $eightyfourthF23 = $context->builder->fmul($eightyfourthF23, $nF23);
+            $eightyfourthF23 = $context->builder->fmul($eightyfourthF23, $nF23);
+            $eightyfourthF23 = $context->builder->fmul($eightyfourthF23, $nF23);
+            $eightyfourthF23 = $context->builder->fmul($eightyfourthF23, $nF23);
+
+            $eightyfourthF23 = $context->builder->fmul($eightyfourthF23, $nF23);
+            $eightyfourthF23 = $context->builder->fmul($eightyfourthF23, $nF23);
+            $eightyfourthF23 = $context->builder->fmul($eightyfourthF23, $nF23);
+            $eightyfourthF23 = $context->builder->fmul($eightyfourthF23, $nF23);
+            $eightyfourthF23 = $context->builder->fmul($eightyfourthF23, $nF23);
+            $eightyfourthF23 = $context->builder->fmul($eightyfourthF23, $nF23);
+            $eightyfourthF23 = $context->builder->fmul($eightyfourthF23, $nF23);
+            $eightyfourthF23 = $context->builder->fmul($eightyfourthF23, $nF23);
+            $eightyfourthF23 = $context->builder->fmul($eightyfourthF23, $nF23);
+            $eightyfourthF23 = $context->builder->fmul($eightyfourthF23, $nF23);
+            $eightyfourthF23 = $context->builder->fmul($eightyfourthF23, $nF23);
+            $eightyfourthF23 = $context->builder->fmul($eightyfourthF23, $nF23);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF23
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok23Block);
+            $sixtythirdVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $sixtysecondLong,
+                $n
+            );
+            $ov24 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtythirdVar->longArithOverflowFlag);
+            if (null === $ov24 || null === $sixtythirdVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (sixtythird)');
+            }
+            $sixtythirdLong = JITVariable::KIND_VARIABLE === $sixtythirdVar->kind
+                ? $context->builder->load($sixtythirdVar->value)
+                : $sixtythirdVar->value;
+            $ov24Block = BasicBlockHelper::append($context, 'pow_eightyfourth_sixtythird_ov');
+            $ok24Block = BasicBlockHelper::append($context, 'pow_eightyfourth_sixtythird_ok');
+            $context->builder->branchIf($ov24, $ov24Block, $ok24Block);
+
+            $context->builder->positionAtEnd($ov24Block);
+            $sixtythirdF24 = $context->builder->load($sixtythirdVar->longArithOverflowDoubleSlot);
+            $nF24 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF24 = $context->builder->fmul($sixtythirdF24, $nF24);
+            $eightyfourthF24 = $context->builder->fmul($eightyfourthF24, $nF24);
+            $eightyfourthF24 = $context->builder->fmul($eightyfourthF24, $nF24);
+            $eightyfourthF24 = $context->builder->fmul($eightyfourthF24, $nF24);
+            $eightyfourthF24 = $context->builder->fmul($eightyfourthF24, $nF24);
+            $eightyfourthF24 = $context->builder->fmul($eightyfourthF24, $nF24);
+            $eightyfourthF24 = $context->builder->fmul($eightyfourthF24, $nF24);
+            $eightyfourthF24 = $context->builder->fmul($eightyfourthF24, $nF24);
+            $eightyfourthF24 = $context->builder->fmul($eightyfourthF24, $nF24);
+            $eightyfourthF24 = $context->builder->fmul($eightyfourthF24, $nF24);
+
+            $eightyfourthF24 = $context->builder->fmul($eightyfourthF24, $nF24);
+            $eightyfourthF24 = $context->builder->fmul($eightyfourthF24, $nF24);
+            $eightyfourthF24 = $context->builder->fmul($eightyfourthF24, $nF24);
+            $eightyfourthF24 = $context->builder->fmul($eightyfourthF24, $nF24);
+            $eightyfourthF24 = $context->builder->fmul($eightyfourthF24, $nF24);
+            $eightyfourthF24 = $context->builder->fmul($eightyfourthF24, $nF24);
+            $eightyfourthF24 = $context->builder->fmul($eightyfourthF24, $nF24);
+            $eightyfourthF24 = $context->builder->fmul($eightyfourthF24, $nF24);
+            $eightyfourthF24 = $context->builder->fmul($eightyfourthF24, $nF24);
+            $eightyfourthF24 = $context->builder->fmul($eightyfourthF24, $nF24);
+            $eightyfourthF24 = $context->builder->fmul($eightyfourthF24, $nF24);
+            $eightyfourthF24 = $context->builder->fmul($eightyfourthF24, $nF24);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF24
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok24Block);
+            $sixtyfourthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $sixtythirdLong,
+                $n
+            );
+            $ov25 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfourthVar->longArithOverflowFlag);
+            if (null === $ov25 || null === $sixtyfourthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (sixtyfourth)');
+            }
+            $sixtyfourthLong = JITVariable::KIND_VARIABLE === $sixtyfourthVar->kind
+                ? $context->builder->load($sixtyfourthVar->value)
+                : $sixtyfourthVar->value;
+            $ov25Block = BasicBlockHelper::append($context, 'pow_eightyfourth_sixtyfourth_ov');
+            $ok25Block = BasicBlockHelper::append($context, 'pow_eightyfourth_sixtyfourth_ok');
+            $context->builder->branchIf($ov25, $ov25Block, $ok25Block);
+
+            $context->builder->positionAtEnd($ov25Block);
+            $sixtyfourthF25 = $context->builder->load($sixtyfourthVar->longArithOverflowDoubleSlot);
+            $nF25 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF25 = $context->builder->fmul($sixtyfourthF25, $nF25);
+            $eightyfourthF25 = $context->builder->fmul($eightyfourthF25, $nF25);
+            $eightyfourthF25 = $context->builder->fmul($eightyfourthF25, $nF25);
+            $eightyfourthF25 = $context->builder->fmul($eightyfourthF25, $nF25);
+            $eightyfourthF25 = $context->builder->fmul($eightyfourthF25, $nF25);
+            $eightyfourthF25 = $context->builder->fmul($eightyfourthF25, $nF25);
+            $eightyfourthF25 = $context->builder->fmul($eightyfourthF25, $nF25);
+            $eightyfourthF25 = $context->builder->fmul($eightyfourthF25, $nF25);
+            $eightyfourthF25 = $context->builder->fmul($eightyfourthF25, $nF25);
+
+            $eightyfourthF25 = $context->builder->fmul($eightyfourthF25, $nF25);
+            $eightyfourthF25 = $context->builder->fmul($eightyfourthF25, $nF25);
+            $eightyfourthF25 = $context->builder->fmul($eightyfourthF25, $nF25);
+            $eightyfourthF25 = $context->builder->fmul($eightyfourthF25, $nF25);
+            $eightyfourthF25 = $context->builder->fmul($eightyfourthF25, $nF25);
+            $eightyfourthF25 = $context->builder->fmul($eightyfourthF25, $nF25);
+            $eightyfourthF25 = $context->builder->fmul($eightyfourthF25, $nF25);
+            $eightyfourthF25 = $context->builder->fmul($eightyfourthF25, $nF25);
+            $eightyfourthF25 = $context->builder->fmul($eightyfourthF25, $nF25);
+            $eightyfourthF25 = $context->builder->fmul($eightyfourthF25, $nF25);
+            $eightyfourthF25 = $context->builder->fmul($eightyfourthF25, $nF25);
+            $eightyfourthF25 = $context->builder->fmul($eightyfourthF25, $nF25);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF25
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok25Block);
+            $sixtyfifthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $sixtyfourthLong,
+                $n
+            );
+            $ov26 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyfifthVar->longArithOverflowFlag);
+            if (null === $ov26 || null === $sixtyfifthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (sixtyfifth)');
+            }
+            $sixtyfifthLong = JITVariable::KIND_VARIABLE === $sixtyfifthVar->kind
+                ? $context->builder->load($sixtyfifthVar->value)
+                : $sixtyfifthVar->value;
+            $ov26Block = BasicBlockHelper::append($context, 'pow_eightyfourth_sixtyfifth_ov');
+            $ok26Block = BasicBlockHelper::append($context, 'pow_eightyfourth_sixtyfifth_ok');
+            $context->builder->branchIf($ov26, $ov26Block, $ok26Block);
+
+            $context->builder->positionAtEnd($ov26Block);
+            $sixtyfifthF26 = $context->builder->load($sixtyfifthVar->longArithOverflowDoubleSlot);
+            $nF26 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF26 = $context->builder->fmul($sixtyfifthF26, $nF26);
+            $eightyfourthF26 = $context->builder->fmul($eightyfourthF26, $nF26);
+            $eightyfourthF26 = $context->builder->fmul($eightyfourthF26, $nF26);
+            $eightyfourthF26 = $context->builder->fmul($eightyfourthF26, $nF26);
+            $eightyfourthF26 = $context->builder->fmul($eightyfourthF26, $nF26);
+            $eightyfourthF26 = $context->builder->fmul($eightyfourthF26, $nF26);
+            $eightyfourthF26 = $context->builder->fmul($eightyfourthF26, $nF26);
+            $eightyfourthF26 = $context->builder->fmul($eightyfourthF26, $nF26);
+
+            $eightyfourthF26 = $context->builder->fmul($eightyfourthF26, $nF26);
+            $eightyfourthF26 = $context->builder->fmul($eightyfourthF26, $nF26);
+            $eightyfourthF26 = $context->builder->fmul($eightyfourthF26, $nF26);
+            $eightyfourthF26 = $context->builder->fmul($eightyfourthF26, $nF26);
+            $eightyfourthF26 = $context->builder->fmul($eightyfourthF26, $nF26);
+            $eightyfourthF26 = $context->builder->fmul($eightyfourthF26, $nF26);
+            $eightyfourthF26 = $context->builder->fmul($eightyfourthF26, $nF26);
+            $eightyfourthF26 = $context->builder->fmul($eightyfourthF26, $nF26);
+            $eightyfourthF26 = $context->builder->fmul($eightyfourthF26, $nF26);
+            $eightyfourthF26 = $context->builder->fmul($eightyfourthF26, $nF26);
+            $eightyfourthF26 = $context->builder->fmul($eightyfourthF26, $nF26);
+            $eightyfourthF26 = $context->builder->fmul($eightyfourthF26, $nF26);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF26
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok26Block);
+            $sixtysixthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $sixtyfifthLong,
+                $n
+            );
+            $ov27 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtysixthVar->longArithOverflowFlag);
+            if (null === $ov27 || null === $sixtysixthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (sixtysixth)');
+            }
+            $sixtysixthLong = JITVariable::KIND_VARIABLE === $sixtysixthVar->kind
+                ? $context->builder->load($sixtysixthVar->value)
+                : $sixtysixthVar->value;
+            $ov27Block = BasicBlockHelper::append($context, 'pow_eightyfourth_sixtysixth_ov');
+            $ok27Block = BasicBlockHelper::append($context, 'pow_eightyfourth_sixtysixth_ok');
+            $context->builder->branchIf($ov27, $ov27Block, $ok27Block);
+
+            $context->builder->positionAtEnd($ov27Block);
+            $sixtysixthF27 = $context->builder->load($sixtysixthVar->longArithOverflowDoubleSlot);
+            $nF27 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF27 = $context->builder->fmul($sixtysixthF27, $nF27);
+            $eightyfourthF27 = $context->builder->fmul($eightyfourthF27, $nF27);
+            $eightyfourthF27 = $context->builder->fmul($eightyfourthF27, $nF27);
+            $eightyfourthF27 = $context->builder->fmul($eightyfourthF27, $nF27);
+            $eightyfourthF27 = $context->builder->fmul($eightyfourthF27, $nF27);
+            $eightyfourthF27 = $context->builder->fmul($eightyfourthF27, $nF27);
+            $eightyfourthF27 = $context->builder->fmul($eightyfourthF27, $nF27);
+
+            $eightyfourthF27 = $context->builder->fmul($eightyfourthF27, $nF27);
+            $eightyfourthF27 = $context->builder->fmul($eightyfourthF27, $nF27);
+            $eightyfourthF27 = $context->builder->fmul($eightyfourthF27, $nF27);
+            $eightyfourthF27 = $context->builder->fmul($eightyfourthF27, $nF27);
+            $eightyfourthF27 = $context->builder->fmul($eightyfourthF27, $nF27);
+            $eightyfourthF27 = $context->builder->fmul($eightyfourthF27, $nF27);
+            $eightyfourthF27 = $context->builder->fmul($eightyfourthF27, $nF27);
+            $eightyfourthF27 = $context->builder->fmul($eightyfourthF27, $nF27);
+            $eightyfourthF27 = $context->builder->fmul($eightyfourthF27, $nF27);
+            $eightyfourthF27 = $context->builder->fmul($eightyfourthF27, $nF27);
+            $eightyfourthF27 = $context->builder->fmul($eightyfourthF27, $nF27);
+            $eightyfourthF27 = $context->builder->fmul($eightyfourthF27, $nF27);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF27
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok27Block);
+            $sixtyseventhVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $sixtysixthLong,
+                $n
+            );
+            $ov28 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyseventhVar->longArithOverflowFlag);
+            if (null === $ov28 || null === $sixtyseventhVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (sixtyseventh)');
+            }
+            $sixtyseventhLong = JITVariable::KIND_VARIABLE === $sixtyseventhVar->kind
+                ? $context->builder->load($sixtyseventhVar->value)
+                : $sixtyseventhVar->value;
+            $ov28Block = BasicBlockHelper::append($context, 'pow_eightyfourth_sixtyseventh_ov');
+            $ok28Block = BasicBlockHelper::append($context, 'pow_eightyfourth_sixtyseventh_ok');
+            $context->builder->branchIf($ov28, $ov28Block, $ok28Block);
+
+            $context->builder->positionAtEnd($ov28Block);
+            $sixtyseventhF28 = $context->builder->load($sixtyseventhVar->longArithOverflowDoubleSlot);
+            $nF28 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF28 = $context->builder->fmul($sixtyseventhF28, $nF28);
+            $eightyfourthF28 = $context->builder->fmul($eightyfourthF28, $nF28);
+            $eightyfourthF28 = $context->builder->fmul($eightyfourthF28, $nF28);
+            $eightyfourthF28 = $context->builder->fmul($eightyfourthF28, $nF28);
+            $eightyfourthF28 = $context->builder->fmul($eightyfourthF28, $nF28);
+            $eightyfourthF28 = $context->builder->fmul($eightyfourthF28, $nF28);
+            $eightyfourthF28 = $context->builder->fmul($eightyfourthF28, $nF28);
+
+            $eightyfourthF28 = $context->builder->fmul($eightyfourthF28, $nF28);
+            $eightyfourthF28 = $context->builder->fmul($eightyfourthF28, $nF28);
+            $eightyfourthF28 = $context->builder->fmul($eightyfourthF28, $nF28);
+            $eightyfourthF28 = $context->builder->fmul($eightyfourthF28, $nF28);
+            $eightyfourthF28 = $context->builder->fmul($eightyfourthF28, $nF28);
+            $eightyfourthF28 = $context->builder->fmul($eightyfourthF28, $nF28);
+            $eightyfourthF28 = $context->builder->fmul($eightyfourthF28, $nF28);
+            $eightyfourthF28 = $context->builder->fmul($eightyfourthF28, $nF28);
+            $eightyfourthF28 = $context->builder->fmul($eightyfourthF28, $nF28);
+            $eightyfourthF28 = $context->builder->fmul($eightyfourthF28, $nF28);
+            $eightyfourthF28 = $context->builder->fmul($eightyfourthF28, $nF28);
+            $eightyfourthF28 = $context->builder->fmul($eightyfourthF28, $nF28);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF28
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok28Block);
+            $sixtyeighthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $sixtyseventhLong,
+                $n
+            );
+            $ov29 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyeighthVar->longArithOverflowFlag);
+            if (null === $ov29 || null === $sixtyeighthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (sixtyeighth)');
+            }
+            $sixtyeighthLong = JITVariable::KIND_VARIABLE === $sixtyeighthVar->kind
+                ? $context->builder->load($sixtyeighthVar->value)
+                : $sixtyeighthVar->value;
+            $ov29Block = BasicBlockHelper::append($context, 'pow_eightyfourth_sixtyeighth_ov');
+            $ok29Block = BasicBlockHelper::append($context, 'pow_eightyfourth_sixtyeighth_ok');
+            $context->builder->branchIf($ov29, $ov29Block, $ok29Block);
+
+            $context->builder->positionAtEnd($ov29Block);
+            $sixtyeighthF29 = $context->builder->load($sixtyeighthVar->longArithOverflowDoubleSlot);
+            $nF29 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF29 = $context->builder->fmul($sixtyeighthF29, $nF29);
+            $eightyfourthF29 = $context->builder->fmul($eightyfourthF29, $nF29);
+            $eightyfourthF29 = $context->builder->fmul($eightyfourthF29, $nF29);
+            $eightyfourthF29 = $context->builder->fmul($eightyfourthF29, $nF29);
+            $eightyfourthF29 = $context->builder->fmul($eightyfourthF29, $nF29);
+
+            $eightyfourthF29 = $context->builder->fmul($eightyfourthF29, $nF29);
+            $eightyfourthF29 = $context->builder->fmul($eightyfourthF29, $nF29);
+            $eightyfourthF29 = $context->builder->fmul($eightyfourthF29, $nF29);
+            $eightyfourthF29 = $context->builder->fmul($eightyfourthF29, $nF29);
+            $eightyfourthF29 = $context->builder->fmul($eightyfourthF29, $nF29);
+            $eightyfourthF29 = $context->builder->fmul($eightyfourthF29, $nF29);
+            $eightyfourthF29 = $context->builder->fmul($eightyfourthF29, $nF29);
+            $eightyfourthF29 = $context->builder->fmul($eightyfourthF29, $nF29);
+            $eightyfourthF29 = $context->builder->fmul($eightyfourthF29, $nF29);
+            $eightyfourthF29 = $context->builder->fmul($eightyfourthF29, $nF29);
+            $eightyfourthF29 = $context->builder->fmul($eightyfourthF29, $nF29);
+            $eightyfourthF29 = $context->builder->fmul($eightyfourthF29, $nF29);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF29
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok29Block);
+            $sixtyninthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $sixtyeighthLong,
+                $n
+            );
+            $ov30 = JitLongArithOverflow::loadOverflowFlagI1($context, $sixtyninthVar->longArithOverflowFlag);
+            if (null === $ov30 || null === $sixtyninthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (sixtyninth)');
+            }
+            $sixtyninthLong = JITVariable::KIND_VARIABLE === $sixtyninthVar->kind
+                ? $context->builder->load($sixtyninthVar->value)
+                : $sixtyninthVar->value;
+            $ov30Block = BasicBlockHelper::append($context, 'pow_eightyfourth_sixtyninth_ov');
+            $ok30Block = BasicBlockHelper::append($context, 'pow_eightyfourth_sixtyninth_ok');
+            $context->builder->branchIf($ov30, $ov30Block, $ok30Block);
+
+            $context->builder->positionAtEnd($ov30Block);
+            $sixtyninthF30 = $context->builder->load($sixtyninthVar->longArithOverflowDoubleSlot);
+            $nF30 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF30 = $context->builder->fmul($sixtyninthF30, $nF30);
+            $eightyfourthF30 = $context->builder->fmul($eightyfourthF30, $nF30);
+            $eightyfourthF30 = $context->builder->fmul($eightyfourthF30, $nF30);
+            $eightyfourthF30 = $context->builder->fmul($eightyfourthF30, $nF30);
+            $eightyfourthF30 = $context->builder->fmul($eightyfourthF30, $nF30);
+            $eightyfourthF30 = $context->builder->fmul($eightyfourthF30, $nF30);
+            $eightyfourthF30 = $context->builder->fmul($eightyfourthF30, $nF30);
+            $eightyfourthF30 = $context->builder->fmul($eightyfourthF30, $nF30);
+            $eightyfourthF30 = $context->builder->fmul($eightyfourthF30, $nF30);
+            $eightyfourthF30 = $context->builder->fmul($eightyfourthF30, $nF30);
+            $eightyfourthF30 = $context->builder->fmul($eightyfourthF30, $nF30);
+            $eightyfourthF30 = $context->builder->fmul($eightyfourthF30, $nF30);
+            $eightyfourthF30 = $context->builder->fmul($eightyfourthF30, $nF30);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF30
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok30Block);
+            $seventiethVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $sixtyninthLong,
+                $n
+            );
+            $ov31 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventiethVar->longArithOverflowFlag);
+            if (null === $ov31 || null === $seventiethVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (seventieth)');
+            }
+            $seventiethLong = JITVariable::KIND_VARIABLE === $seventiethVar->kind
+                ? $context->builder->load($seventiethVar->value)
+                : $seventiethVar->value;
+            $ov31Block = BasicBlockHelper::append($context, 'pow_eightyfourth_seventieth_ov');
+            $ok31Block = BasicBlockHelper::append($context, 'pow_eightyfourth_seventieth_ok');
+            $context->builder->branchIf($ov31, $ov31Block, $ok31Block);
+
+            $context->builder->positionAtEnd($ov31Block);
+            $seventiethF31 = $context->builder->load($seventiethVar->longArithOverflowDoubleSlot);
+            $nF31 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF31 = $context->builder->fmul($seventiethF31, $nF31);
+            $eightyfourthF31 = $context->builder->fmul($eightyfourthF31, $nF31);
+            $eightyfourthF31 = $context->builder->fmul($eightyfourthF31, $nF31);
+            $eightyfourthF31 = $context->builder->fmul($eightyfourthF31, $nF31);
+            $eightyfourthF31 = $context->builder->fmul($eightyfourthF31, $nF31);
+            $eightyfourthF31 = $context->builder->fmul($eightyfourthF31, $nF31);
+            $eightyfourthF31 = $context->builder->fmul($eightyfourthF31, $nF31);
+            $eightyfourthF31 = $context->builder->fmul($eightyfourthF31, $nF31);
+            $eightyfourthF31 = $context->builder->fmul($eightyfourthF31, $nF31);
+            $eightyfourthF31 = $context->builder->fmul($eightyfourthF31, $nF31);
+            $eightyfourthF31 = $context->builder->fmul($eightyfourthF31, $nF31);
+            $eightyfourthF31 = $context->builder->fmul($eightyfourthF31, $nF31);
+            $eightyfourthF31 = $context->builder->fmul($eightyfourthF31, $nF31);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF31
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok31Block);
+            $seventyfirstVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $seventiethLong,
+                $n
+            );
+            $ov32 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyfirstVar->longArithOverflowFlag);
+            if (null === $ov32 || null === $seventyfirstVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (seventyfirst)');
+            }
+            $seventyfirstLong = JITVariable::KIND_VARIABLE === $seventyfirstVar->kind
+                ? $context->builder->load($seventyfirstVar->value)
+                : $seventyfirstVar->value;
+            $ov32Block = BasicBlockHelper::append($context, 'pow_eightyfourth_seventyfirst_ov');
+            $ok32Block = BasicBlockHelper::append($context, 'pow_eightyfourth_seventyfirst_ok');
+            $context->builder->branchIf($ov32, $ov32Block, $ok32Block);
+
+            $context->builder->positionAtEnd($ov32Block);
+            $seventyfirstF32 = $context->builder->load($seventyfirstVar->longArithOverflowDoubleSlot);
+            $nF32 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF32 = $context->builder->fmul($seventyfirstF32, $nF32);
+            $eightyfourthF32 = $context->builder->fmul($eightyfourthF32, $nF32);
+            $eightyfourthF32 = $context->builder->fmul($eightyfourthF32, $nF32);
+            $eightyfourthF32 = $context->builder->fmul($eightyfourthF32, $nF32);
+            $eightyfourthF32 = $context->builder->fmul($eightyfourthF32, $nF32);
+            $eightyfourthF32 = $context->builder->fmul($eightyfourthF32, $nF32);
+            $eightyfourthF32 = $context->builder->fmul($eightyfourthF32, $nF32);
+            $eightyfourthF32 = $context->builder->fmul($eightyfourthF32, $nF32);
+            $eightyfourthF32 = $context->builder->fmul($eightyfourthF32, $nF32);
+            $eightyfourthF32 = $context->builder->fmul($eightyfourthF32, $nF32);
+            $eightyfourthF32 = $context->builder->fmul($eightyfourthF32, $nF32);
+            $eightyfourthF32 = $context->builder->fmul($eightyfourthF32, $nF32);
+            $eightyfourthF32 = $context->builder->fmul($eightyfourthF32, $nF32);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF32
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok32Block);
+            $seventysecondVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $seventyfirstLong,
+                $n
+            );
+            $ov33 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventysecondVar->longArithOverflowFlag);
+            if (null === $ov33 || null === $seventysecondVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (seventysecond)');
+            }
+            $seventysecondLong = JITVariable::KIND_VARIABLE === $seventysecondVar->kind
+                ? $context->builder->load($seventysecondVar->value)
+                : $seventysecondVar->value;
+            $ov33Block = BasicBlockHelper::append($context, 'pow_eightyfourth_seventysecond_ov');
+            $ok33Block = BasicBlockHelper::append($context, 'pow_eightyfourth_seventysecond_ok');
+            $context->builder->branchIf($ov33, $ov33Block, $ok33Block);
+
+            $context->builder->positionAtEnd($ov33Block);
+            $seventysecondF33 = $context->builder->load($seventysecondVar->longArithOverflowDoubleSlot);
+            $nF33 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF33 = $context->builder->fmul($seventysecondF33, $nF33);
+            $eightyfourthF33 = $context->builder->fmul($seventysecondF33, $nF33);
+            $eightyfourthF33 = $context->builder->fmul($eightyfourthF33, $nF33);
+            $eightyfourthF33 = $context->builder->fmul($eightyfourthF33, $nF33);
+            $eightyfourthF33 = $context->builder->fmul($eightyfourthF33, $nF33);
+            $eightyfourthF33 = $context->builder->fmul($eightyfourthF33, $nF33);
+            $eightyfourthF33 = $context->builder->fmul($eightyfourthF33, $nF33);
+            $eightyfourthF33 = $context->builder->fmul($eightyfourthF33, $nF33);
+            $eightyfourthF33 = $context->builder->fmul($eightyfourthF33, $nF33);
+            $eightyfourthF33 = $context->builder->fmul($eightyfourthF33, $nF33);
+            $eightyfourthF33 = $context->builder->fmul($eightyfourthF33, $nF33);
+            $eightyfourthF33 = $context->builder->fmul($eightyfourthF33, $nF33);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF33
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok33Block);
+            $seventythirdVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $seventysecondLong,
+                $n
+            );
+            $ov34 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventythirdVar->longArithOverflowFlag);
+            if (null === $ov34 || null === $seventythirdVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (seventythird)');
+            }
+            $seventythirdLong = JITVariable::KIND_VARIABLE === $seventythirdVar->kind
+                ? $context->builder->load($seventythirdVar->value)
+                : $seventythirdVar->value;
+            $ov34Block = BasicBlockHelper::append($context, 'pow_eightyfourth_seventythird_ov');
+            $ok34Block = BasicBlockHelper::append($context, 'pow_eightyfourth_seventythird_ok');
+            $context->builder->branchIf($ov34, $ov34Block, $ok34Block);
+
+            $context->builder->positionAtEnd($ov34Block);
+            $seventythirdF34 = $context->builder->load($seventythirdVar->longArithOverflowDoubleSlot);
+            $nF34 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF34 = $context->builder->fmul($seventythirdF34, $nF34);
+            $eightyfourthF34 = $context->builder->fmul($eightyfourthF34, $nF34);
+            $eightyfourthF34 = $context->builder->fmul($eightyfourthF34, $nF34);
+            $eightyfourthF34 = $context->builder->fmul($eightyfourthF34, $nF34);
+            $eightyfourthF34 = $context->builder->fmul($eightyfourthF34, $nF34);
+            $eightyfourthF34 = $context->builder->fmul($eightyfourthF34, $nF34);
+            $eightyfourthF34 = $context->builder->fmul($eightyfourthF34, $nF34);
+            $eightyfourthF34 = $context->builder->fmul($eightyfourthF34, $nF34);
+            $eightyfourthF34 = $context->builder->fmul($eightyfourthF34, $nF34);
+            $eightyfourthF34 = $context->builder->fmul($eightyfourthF34, $nF34);
+            $eightyfourthF34 = $context->builder->fmul($eightyfourthF34, $nF34);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF34
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok34Block);
+            $seventyfourthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $seventythirdLong,
+                $n
+            );
+            $ov35 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyfourthVar->longArithOverflowFlag);
+            if (null === $ov35 || null === $seventyfourthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (seventyfourth)');
+            }
+            $seventyfourthLong = JITVariable::KIND_VARIABLE === $seventyfourthVar->kind
+                ? $context->builder->load($seventyfourthVar->value)
+                : $seventyfourthVar->value;
+            $ov35Block = BasicBlockHelper::append($context, 'pow_eightyfourth_seventyfourth_ov');
+            $ok35Block = BasicBlockHelper::append($context, 'pow_eightyfourth_seventyfourth_ok');
+            $context->builder->branchIf($ov35, $ov35Block, $ok35Block);
+
+            $context->builder->positionAtEnd($ov35Block);
+            $seventyfourthF35 = $context->builder->load($seventyfourthVar->longArithOverflowDoubleSlot);
+            $nF35 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF35 = $context->builder->fmul($seventyfourthF35, $nF35);
+            $eightyfourthF35 = $context->builder->fmul($seventyfourthF35, $nF35);
+            $eightyfourthF35 = $context->builder->fmul($eightyfourthF35, $nF35);
+            $eightyfourthF35 = $context->builder->fmul($eightyfourthF35, $nF35);
+            $eightyfourthF35 = $context->builder->fmul($eightyfourthF35, $nF35);
+            $eightyfourthF35 = $context->builder->fmul($eightyfourthF35, $nF35);
+            $eightyfourthF35 = $context->builder->fmul($eightyfourthF35, $nF35);
+            $eightyfourthF35 = $context->builder->fmul($eightyfourthF35, $nF35);
+            $eightyfourthF35 = $context->builder->fmul($eightyfourthF35, $nF35);
+            $eightyfourthF35 = $context->builder->fmul($eightyfourthF35, $nF35);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF35
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok35Block);
+            $seventyfifthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $seventyfourthLong,
+                $n
+            );
+            $ov36 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyfifthVar->longArithOverflowFlag);
+            if (null === $ov36 || null === $seventyfifthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (seventyfifth)');
+            }
+            $seventyfifthLong = JITVariable::KIND_VARIABLE === $seventyfifthVar->kind
+                ? $context->builder->load($seventyfifthVar->value)
+                : $seventyfifthVar->value;
+            $ov36Block = BasicBlockHelper::append($context, 'pow_eightyfourth_seventyfifth_ov');
+            $ok36Block = BasicBlockHelper::append($context, 'pow_eightyfourth_seventyfifth_ok');
+            $context->builder->branchIf($ov36, $ov36Block, $ok36Block);
+
+            $context->builder->positionAtEnd($ov36Block);
+            $seventyfifthF36 = $context->builder->load($seventyfifthVar->longArithOverflowDoubleSlot);
+            $nF36 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF36 = $context->builder->fmul($seventyfifthF36, $nF36);
+            $eightyfourthF36 = $context->builder->fmul($eightyfourthF36, $nF36);
+            $eightyfourthF36 = $context->builder->fmul($eightyfourthF36, $nF36);
+            $eightyfourthF36 = $context->builder->fmul($eightyfourthF36, $nF36);
+            $eightyfourthF36 = $context->builder->fmul($eightyfourthF36, $nF36);
+            $eightyfourthF36 = $context->builder->fmul($eightyfourthF36, $nF36);
+            $eightyfourthF36 = $context->builder->fmul($eightyfourthF36, $nF36);
+            $eightyfourthF36 = $context->builder->fmul($eightyfourthF36, $nF36);
+            $eightyfourthF36 = $context->builder->fmul($eightyfourthF36, $nF36);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF36
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok36Block);
+            $seventysixthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $seventyfifthLong,
+                $n
+            );
+            $ov37 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventysixthVar->longArithOverflowFlag);
+            if (null === $ov37 || null === $seventysixthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (seventysixth)');
+            }
+            $seventysixthLong = JITVariable::KIND_VARIABLE === $seventysixthVar->kind
+                ? $context->builder->load($seventysixthVar->value)
+                : $seventysixthVar->value;
+            $ov37Block = BasicBlockHelper::append($context, 'pow_eightyfourth_seventysixth_ov');
+            $ok37Block = BasicBlockHelper::append($context, 'pow_eightyfourth_seventysixth_ok');
+            $context->builder->branchIf($ov37, $ov37Block, $ok37Block);
+
+            $context->builder->positionAtEnd($ov37Block);
+            $seventysixthF37 = $context->builder->load($seventysixthVar->longArithOverflowDoubleSlot);
+            $nF37 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF37 = $context->builder->fmul($seventysixthF37, $nF37);
+            $eightyfourthF37 = $context->builder->fmul($eightyfourthF37, $nF37);
+            $eightyfourthF37 = $context->builder->fmul($eightyfourthF37, $nF37);
+            $eightyfourthF37 = $context->builder->fmul($eightyfourthF37, $nF37);
+            $eightyfourthF37 = $context->builder->fmul($eightyfourthF37, $nF37);
+            $eightyfourthF37 = $context->builder->fmul($eightyfourthF37, $nF37);
+            $eightyfourthF37 = $context->builder->fmul($eightyfourthF37, $nF37);
+            $eightyfourthF37 = $context->builder->fmul($eightyfourthF37, $nF37);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF37
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok37Block);
+            $seventyseventhVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $seventysixthLong,
+                $n
+            );
+            $ov38 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyseventhVar->longArithOverflowFlag);
+            if (null === $ov38 || null === $seventyseventhVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (seventyseventh)');
+            }
+            $seventyseventhLong = JITVariable::KIND_VARIABLE === $seventyseventhVar->kind
+                ? $context->builder->load($seventyseventhVar->value)
+                : $seventyseventhVar->value;
+            $ov38Block = BasicBlockHelper::append($context, 'pow_eightyfourth_seventyseventh_ov');
+            $ok38Block = BasicBlockHelper::append($context, 'pow_eightyfourth_seventyseventh_ok');
+            $context->builder->branchIf($ov38, $ov38Block, $ok38Block);
+
+            $context->builder->positionAtEnd($ov38Block);
+            $seventyseventhF38 = $context->builder->load($seventyseventhVar->longArithOverflowDoubleSlot);
+            $nF38 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF38 = $context->builder->fmul($seventyseventhF38, $nF38);
+            $eightyfourthF38 = $context->builder->fmul($seventyseventhF38, $nF38);
+            $eightyfourthF38 = $context->builder->fmul($eightyfourthF38, $nF38);
+            $eightyfourthF38 = $context->builder->fmul($eightyfourthF38, $nF38);
+            $eightyfourthF38 = $context->builder->fmul($eightyfourthF38, $nF38);
+            $eightyfourthF38 = $context->builder->fmul($eightyfourthF38, $nF38);
+            $eightyfourthF38 = $context->builder->fmul($eightyfourthF38, $nF38);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF38
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok38Block);
+            $seventyeighthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $seventyseventhLong,
+                $n
+            );
+            $ov39 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyeighthVar->longArithOverflowFlag);
+            if (null === $ov39 || null === $seventyeighthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (seventyeighth)');
+            }
+            $seventyeighthLong = JITVariable::KIND_VARIABLE === $seventyeighthVar->kind
+                ? $context->builder->load($seventyeighthVar->value)
+                : $seventyeighthVar->value;
+            $ov39Block = BasicBlockHelper::append($context, 'pow_eightyfourth_seventyeighth_ov');
+            $ok39Block = BasicBlockHelper::append($context, 'pow_eightyfourth_seventyeighth_ok');
+            $context->builder->branchIf($ov39, $ov39Block, $ok39Block);
+
+            $context->builder->positionAtEnd($ov39Block);
+            $seventyeighthF39 = $context->builder->load($seventyeighthVar->longArithOverflowDoubleSlot);
+            $nF39 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF39 = $context->builder->fmul($seventyeighthF39, $nF39);
+            $eightyfourthF39 = $context->builder->fmul($eightyfourthF39, $nF39);
+            $eightyfourthF39 = $context->builder->fmul($eightyfourthF39, $nF39);
+            $eightyfourthF39 = $context->builder->fmul($eightyfourthF39, $nF39);
+            $eightyfourthF39 = $context->builder->fmul($eightyfourthF39, $nF39);
+            $eightyfourthF39 = $context->builder->fmul($eightyfourthF39, $nF39);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF39
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok39Block);
+            $seventyninthVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $seventyeighthLong,
+                $n
+            );
+            $ov40 = JitLongArithOverflow::loadOverflowFlagI1($context, $seventyninthVar->longArithOverflowFlag);
+            if (null === $ov40 || null === $seventyninthVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (seventyninth)');
+            }
+            $seventyninthLong = JITVariable::KIND_VARIABLE === $seventyninthVar->kind
+                ? $context->builder->load($seventyninthVar->value)
+                : $seventyninthVar->value;
+            $ov40Block = BasicBlockHelper::append($context, 'pow_eightyfourth_seventyninth_ov');
+            $ok40Block = BasicBlockHelper::append($context, 'pow_eightyfourth_seventyninth_ok');
+            $context->builder->branchIf($ov40, $ov40Block, $ok40Block);
+
+            $context->builder->positionAtEnd($ov40Block);
+            $seventyninthF40 = $context->builder->load($seventyninthVar->longArithOverflowDoubleSlot);
+            $nF40 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF40 = $context->builder->fmul($seventyninthF40, $nF40);
+            $eightyfourthF40 = $context->builder->fmul($eightyfourthF40, $nF40);
+            $eightyfourthF40 = $context->builder->fmul($eightyfourthF40, $nF40);
+            $eightyfourthF40 = $context->builder->fmul($eightyfourthF40, $nF40);
+            $eightyfourthF40 = $context->builder->fmul($eightyfourthF40, $nF40);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF40
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok40Block);
+            $eightiethVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $seventyninthLong,
+                $n
+            );
+            $ov41 = JitLongArithOverflow::loadOverflowFlagI1($context, $eightiethVar->longArithOverflowFlag);
+            if (null === $ov41 || null === $eightiethVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (eightieth)');
+            }
+            $eightiethLong = JITVariable::KIND_VARIABLE === $eightiethVar->kind
+                ? $context->builder->load($eightiethVar->value)
+                : $eightiethVar->value;
+            $ov41Block = BasicBlockHelper::append($context, 'pow_eightyfourth_eightieth_ov');
+            $ok41Block = BasicBlockHelper::append($context, 'pow_eightyfourth_eightieth_ok');
+            $context->builder->branchIf($ov41, $ov41Block, $ok41Block);
+
+            $context->builder->positionAtEnd($ov41Block);
+            $eightiethF41 = $context->builder->load($eightiethVar->longArithOverflowDoubleSlot);
+            $nF41 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF41 = $context->builder->fmul($eightiethF41, $nF41);
+            $eightyfourthF41 = $context->builder->fmul($eightyfourthF41, $nF41);
+            $eightyfourthF41 = $context->builder->fmul($eightyfourthF41, $nF41);
+            $eightyfourthF41 = $context->builder->fmul($eightyfourthF41, $nF41);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF41
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok41Block);
+            $eightyfirstVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $eightiethLong,
+                $n
+            );
+            $ov42 = JitLongArithOverflow::loadOverflowFlagI1($context, $eightyfirstVar->longArithOverflowFlag);
+            if (null === $ov42 || null === $eightyfirstVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (eightyfirst)');
+            }
+            $eightyfirstLong = JITVariable::KIND_VARIABLE === $eightyfirstVar->kind
+                ? $context->builder->load($eightyfirstVar->value)
+                : $eightyfirstVar->value;
+            $ov42Block = BasicBlockHelper::append($context, 'pow_eightyfourth_eightyfirst_ov');
+            $ok42Block = BasicBlockHelper::append($context, 'pow_eightyfourth_eightyfirst_ok');
+            $context->builder->branchIf($ov42, $ov42Block, $ok42Block);
+
+            $context->builder->positionAtEnd($ov42Block);
+            $eightyfirstF42 = $context->builder->load($eightyfirstVar->longArithOverflowDoubleSlot);
+            $nF42 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF42 = $context->builder->fmul($eightyfirstF42, $nF42);
+            $eightyfourthF42 = $context->builder->fmul($eightyfourthF42, $nF42);
+            $eightyfourthF42 = $context->builder->fmul($eightyfourthF42, $nF42);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF42
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok42Block);
+            $eightysecondVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $eightyfirstLong,
+                $n
+            );
+            $ov43 = JitLongArithOverflow::loadOverflowFlagI1($context, $eightysecondVar->longArithOverflowFlag);
+            if (null === $ov43 || null === $eightysecondVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (eightysecond)');
+            }
+            $eightysecondLong = JITVariable::KIND_VARIABLE === $eightysecondVar->kind
+                ? $context->builder->load($eightysecondVar->value)
+                : $eightysecondVar->value;
+            $ov43Block = BasicBlockHelper::append($context, 'pow_eightyfourth_eightysecond_ov');
+            $ok43Block = BasicBlockHelper::append($context, 'pow_eightyfourth_eightysecond_ok');
+            $context->builder->branchIf($ov43, $ov43Block, $ok43Block);
+
+            $context->builder->positionAtEnd($ov43Block);
+            $eightysecondF43 = $context->builder->load($eightysecondVar->longArithOverflowDoubleSlot);
+            $nF43 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF43 = $context->builder->fmul($eightysecondF43, $nF43);
+            $eightyfourthF43 = $context->builder->fmul($eightysecondF43, $nF43);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF43
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok43Block);
+            $eightythirdVar = JitLongArithOverflow::binaryNativeLong(
+                $context,
+                OpCode::TYPE_MUL,
+                $eightysecondLong,
+                $n
+            );
+            $ov44 = JitLongArithOverflow::loadOverflowFlagI1($context, $eightythirdVar->longArithOverflowFlag);
+            if (null === $ov44 || null === $eightythirdVar->longArithOverflowDoubleSlot) {
+                throw new \LogicException('pow() **84 expected smul overflow metadata (eightythird)');
+            }
+            $eightythirdLong = JITVariable::KIND_VARIABLE === $eightythirdVar->kind
+                ? $context->builder->load($eightythirdVar->value)
+                : $eightythirdVar->value;
+            $ov44Block = BasicBlockHelper::append($context, 'pow_eightyfourth_eightythird_ov');
+            $ok44Block = BasicBlockHelper::append($context, 'pow_eightyfourth_eightythird_ok');
+            $context->builder->branchIf($ov44, $ov44Block, $ok44Block);
+
+            $context->builder->positionAtEnd($ov44Block);
+            $eightythirdF44 = $context->builder->load($eightythirdVar->longArithOverflowDoubleSlot);
+            $nF44 = $context->builder->siToFp($n, $f64);
+            $eightyfourthF44 = $context->builder->fmul($eightythirdF44, $nF44);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $eightyfourthF44
+            );
+            JitValueBox::publishAfterWrite($context, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($ok44Block);
+            JitLongArithOverflow::writeBoxedBinary(
+                $context,
+                OpCode::TYPE_MUL,
+                $eightythirdLong,
                 $n,
                 $slotPtr
             );

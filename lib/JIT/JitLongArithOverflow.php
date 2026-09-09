@@ -258,6 +258,26 @@ final class JitLongArithOverflow
     }
 
     /**
+     * Resolve {@see Variable::$longArithOverflowFlag} to a branchable i1.
+     *
+     * After #36385 / #37614 the flag is an entry {@code i1*} alloca; callers that
+     * {@code branchIf} on the raw field (notably {@see \PHPCompiler\ext\standard\JitPow}
+     * chained smul folds) must load first — branching on the pointer is always-true
+     * and forces the float overflow arm (typed int returns then type-error to 0).
+     */
+    public static function loadOverflowFlagI1(Context $context, ?LlvmValue $flag): ?LlvmValue
+    {
+        if (null === $flag) {
+            return null;
+        }
+        if (\PHPLLVM\Type::KIND_POINTER === $flag->typeOf()->getKind()) {
+            return $context->builder->load($flag);
+        }
+
+        return $flag;
+    }
+
+    /**
      * When a native-long arith result may have overflowed to double, lower to a
      * single {@see Variable::TYPE_VALUE} for consumers that cannot stay native.
      */
