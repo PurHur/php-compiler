@@ -17,7 +17,7 @@ use PHPLLVM\Value;
  * Integer {@code pow}/{@code **} chained-smul emit for compile-time
  * exponents 50–69 (#36387 / #36386). Extracted from {@see JitPowIntegerEmit}
  * so gen-0 spine gets a separate TU between the low hub and
- * {@see JitPowIntegerEmitHigh} (70–90).
+ * {@see JitPowIntegerEmitHigh} (70–91); Mid covers 30–49.
  *
  * No new C ABI. php-src: Zend/zend_operators.c {@code pow_function} /
  * {@code zend_pow} / {@code mul_function}; ext/standard/math.c
@@ -27,7 +27,7 @@ final class JitPowIntegerEmitExponents50to69
 {
     /**
      * Handle compile-time exponent folds fiftieth..sixtyninth.
-     * Null {@code $expFold} (runtime exponent) falls through like High.
+     * Null {@code $expFold} (runtime exponent) falls through like High/Mid.
      *
      * @return bool true when {@code $expFold} was handled (caller must return)
      */

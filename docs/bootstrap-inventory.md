@@ -3266,6 +3266,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitPowIntegerEmit.php` | 0 | 1 |
 | `ext/standard/JitPowIntegerEmitExponents50to69.php` | 0 | 1 |
 | `ext/standard/JitPowIntegerEmitHigh.php` | 0 | 1 |
+| `ext/standard/JitPowIntegerEmitMid.php` | 0 | 1 |
 | `ext/standard/JitPregFilter.php` | 0 | 2 |
 | `ext/standard/JitPregGrep.php` | 0 | 2 |
 | `ext/standard/JitPregLastError.php` | 0 | 1 |
@@ -33762,6 +33763,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/standard/JitPowIntegerEmitHigh.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/standard/JitPowIntegerEmitMid.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)

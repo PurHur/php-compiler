@@ -644,7 +644,7 @@
             "note": "nativeLongCompare* + nativeLongMul* + nativeLongArithIsCompileTimeIdentityOrZero extracted from NativeLongFolds (#36387); php-src Zend/zend_operators.c compare/mul/add/sub"
         },
         "lib/JIT/DiscardedPureCallElisionNativeLongPowFolds.php": {
-            "budget": 484,
+            "budget": 488,
             "target": 600,
             "note": "nativeLongPowCompileTimeExponentFold extracted from NativeLongFolds (#36387/#36386); php-src Zend/zend_operators.c pow_function / zend_pow / mul_function; ext/standard/math.c PHP_FUNCTION(pow)"
         },
@@ -719,14 +719,19 @@
             "note": "pow()/ ** LLVM lowering hub; integer chained-smul emit in JitPowIntegerEmit + High (#36387)"
         },
         "ext/standard/JitPowIntegerEmit.php": {
-            "budget": 8953,
+            "budget": 3999,
             "target": 30000,
-            "note": "compile-time exponent chained-smul hub (0-49); 50-69 in Exponents50to69; 70-90 in High (#36387/#36386); php-src Zend/zend_operators.c pow_function"
+            "note": "compile-time exponent chained-smul hub (0-29); Mid 30-49; Exponents50to69 50-69; High 70-91 (#36387/#36386); php-src Zend/zend_operators.c pow_function"
         },
         "ext/standard/JitPowIntegerEmitHigh.php": {
-            "budget": 43900,
+            "budget": 46827,
             "target": 55000,
-            "note": "integer pow()/ ** chained-smul emit for compile-time exponents 70..90 extracted from JitPowIntegerEmit (#36387/#36386)"
+            "note": "integer pow()/ ** chained-smul emit for compile-time exponents 70..91 extracted from JitPowIntegerEmit (#36387/#36386)"
+        },
+        "ext/standard/JitPowIntegerEmitMid.php": {
+            "budget": 5037,
+            "target": 8000,
+            "note": "compile-time exponents 30-49 chained-smul from JitPowIntegerEmit (#36387/#36386)"
         },
         "ext/standard/JitPowIntegerEmitExponents50to69.php": {
             "budget": 16384,
