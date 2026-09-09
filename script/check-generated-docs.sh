@@ -65,7 +65,10 @@ step "apps-scoreboard --check" "$PHP_BIN" script/apps/scoreboard.php --check
 # 13. Honest README / docs status snapshot (#36395) — numbers must come from status JSON
 step "status-snapshot --check" "$PHP_BIN" script/status/snapshot.php --check
 
-# 14. ADR index completeness (#36402) — every docs/adr/*.md listed; required set present
+# 14. Benchmark README tables match RESULTS.json; no hand-typed timings outside markers (#36385)
+step "check-bench-readme-sync" "$PHP_BIN" script/check-bench-readme-sync.php
+
+# 15. ADR index completeness (#36402) — every docs/adr/*.md listed; required set present
 step "check-adr-index" ./script/lib/check-adr-index.sh
 
 if [[ "$fail" -ne 0 ]]; then
