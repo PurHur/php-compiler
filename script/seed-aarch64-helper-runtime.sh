@@ -348,6 +348,25 @@ SEED_UNITS=(
   /ext/posix/PosixGeteuidJitHelper.php
   /ext/posix/PosixGetgidJitHelper.php
   /ext/posix/PosixGetppidJitHelper.php
+  # Remaining calendar JD + safe posix reads + filter scalar/sanitize (#36391 after 272)
+  # Frexp/Ldexp/Modf/Nextafter/Shuffle still skipped (algorithm SSOT, no HELPER_PATH).
+  # Preg* still skipped: tip nested compile misses Compiler\Concern\OpCode.
+  # Sscanf still skipped: __init__ sealed during NestedJIT.
+  # Gethostbynamel skipped: NestedJIT missing __compiler_stream_resolve_include_path.
+  # Ini skipped: IniGetLeafJitHelper not compiled under helper-runtime-emit NestedJIT.
+  # Progress skipped: NestedJIT ContextLlvmConstantsAndRegistry seal during helper emit.
+  # CalInfo still skipped (unknown unit under NestedJIT).
+  # PosixSet* / PosixSession / PosixTerminal deferred (mutators / tty).
+  /ext/calendar/JdtofrenchJitHelper.php
+  /ext/calendar/JdtojewishJitHelper.php
+  /ext/calendar/JdtojulianJitHelper.php
+  /ext/calendar/JewishtojdJitHelper.php
+  /ext/posix/PosixCtermidJitHelper.php
+  /ext/posix/PosixTimesJitHelper.php
+  /ext/filter/FilterIntJitHelper.php
+  /ext/filter/FilterFloatJitHelper.php
+  /ext/filter/FilterBooleanJitHelper.php
+  /ext/filter/FilterSanitizeJitHelper.php
 )
 
 MIN_SEED=${#SEED_UNITS[@]}
