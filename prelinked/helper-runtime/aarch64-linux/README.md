@@ -11,9 +11,9 @@ non-native link.
 `script/check-helper-runtime-prelink.php --all-arches` asserts every committed `unit.o`
 (and `common.o` when present) has ELF `e_machine=183` (EM_AARCH64).
 
-## Seed corpus (VM_* + lib_VM_* + ext/standard + ctype/calendar/posix)
+## Seed corpus (VM_* + lib_VM_* + ext/standard + ctype/calendar/posix/filter)
 
-**272** committed `unit.o` files:
+**282** committed `unit.o` files:
 
 - full `VM_*` (13) and `lib_VM_*` (9) sets from `x86_64-linux`
 - first `ext/standard` tier (10): ArrayChunk / ArrayIsList / ArraySlice / Bin2hex /
@@ -89,6 +89,9 @@ non-native link.
 - more calendar conversions + posix getters (10):
   CalFromJd / CalToJd / EasterDate / Frenchtojd / Jdmonthname / Juliantojd /
   PosixGetegid / PosixGeteuid / PosixGetgid / PosixGetppid
+- remaining calendar JD + safe posix reads + filter scalar/sanitize (10):
+  Jdtofrench / Jdtojewish / Jdtojulian / Jewishtojd / PosixCtermid / PosixTimes /
+  FilterInt / FilterFloat / FilterBoolean / FilterSanitize
   (deferred: CalInfo unknown-unit; PosixSet* / PosixSession / PosixTerminal)
 
 Refresh / expand via:
