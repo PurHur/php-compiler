@@ -331,6 +331,15 @@ trait NestedIifeAndDeferredSiblingCallArgProducers
             if ($this->isUnaryInlineSiblingCallArgExpr($mid)) {
                 continue;
             }
+            if ($mid instanceof Op\Expr\BinaryOp) {
+                // new C(f(), $n+1) / new TreeNode(f($d-1), …) — arithmetic is a sibling
+                // arg prelude, not a barrier (#36385; peer #36353 Div before consumer).
+                continue;
+            }
+            if ($mid instanceof Op\Expr\ArrayDimFetch) {
+                // new C(id($t), $t[0]) — dim sibling prelude (#36380).
+                continue;
+            }
 
             return false;
         }

@@ -632,6 +632,10 @@ trait AdjacentNestedCallArgSlots
             if ($this->isUnaryInlineSiblingCallArgExpr($mid)) {
                 continue;
             }
+            if ($mid instanceof Op\Expr\BinaryOp) {
+                // new C(f(), $n+1) — arithmetic sibling arg prelude (#36385).
+                continue;
+            }
             if ($mid instanceof Op\Expr\FuncCall || $mid instanceof Op\Expr\NsFuncCall) {
                 return false;
             }

@@ -180,6 +180,11 @@ trait FirstSiblingInlineFuncCallProducerIndex
      * Empty-usage FuncCall separated from a multi-arg consumer only by BinaryOp and/or
      * other sibling producers (and scalar preludes) — the #36353 sprintf/count/Div shape.
      *
+     * Also {@see Op\Expr\New_}: `new C(f(), g($n+1))` / binary-trees
+     * `new TreeNode(bottomUpTree($d-1), bottomUpTree($d-1))` — php-cfg leaves both
+     * FuncCall results with empty usages; without New_ here firstSibling stops on the
+     * nearest producer and the leading call becomes EXEC_NORETURN (#36385).
+     *
      * @param list<Op> $cfgChildren
      */
     private function emptyUsageFuncCallIsHoistedSiblingBeforeBinaryOp(
@@ -189,7 +194,13 @@ trait FirstSiblingInlineFuncCallProducerIndex
         Op $consumer
     ): bool {
         if (
-            !($consumer instanceof Op\Expr\FuncCall || $consumer instanceof Op\Expr\NsFuncCall)
+            !(
+                $consumer instanceof Op\Expr\FuncCall
+                || $consumer instanceof Op\Expr\NsFuncCall
+                || $consumer instanceof Op\Expr\MethodCall
+                || $consumer instanceof Op\Expr\StaticCall
+                || $consumer instanceof Op\Expr\New_
+            )
             || !property_exists($consumer, 'args')
             || !\is_array($consumer->args)
             || \count($consumer->args) < 2
@@ -236,6 +247,13 @@ trait FirstSiblingInlineFuncCallProducerIndex
             }
 
             return false;
+        }
+
+        // FuncCall consumers: require a BinaryOp in the gap (#36353 sprintf/count/Div).
+        // New_ consumers: empty gap (adjacent) or sibling-producer/BinaryOp gaps are enough —
+        // `new C(f(), g($n+1))` leaves both f/g with empty usages (#36385).
+        if ($consumer instanceof Op\Expr\New_) {
+            return true;
         }
 
         return $sawBinaryOp;
@@ -477,6 +495,11 @@ trait FirstSiblingInlineFuncCallProducerIndex
                 continue;
             }
             if ($this->isUnaryInlineSiblingCallArgExpr($skip)) {
+                ++$first;
+                continue;
+            }
+            // new TreeNode(f($d-1), g($d-1)) — Minus/Plus prelude before first producer (#36385 / #36353).
+            if ($skip instanceof Op\Expr\BinaryOp) {
                 ++$first;
                 continue;
             }
