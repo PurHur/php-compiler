@@ -719,9 +719,14 @@
             "note": "pow()/ ** LLVM lowering hub; integer chained-smul emit extracted to JitPowIntegerEmit (#36387)"
         },
         "ext/standard/JitPowIntegerEmit.php": {
-            "budget": 66271,
+            "budget": 42222,
             "target": 70000,
-            "note": "compile-time exponent chained-smul integer pow emit (#36387/#36386); php-src Zend/zend_operators.c pow_function"
+            "note": "compile-time exponent chained-smul integer pow emit; 80-89 in JitPowIntegerEmitExponents80to89 (#36387/#36386); php-src Zend/zend_operators.c pow_function"
+        },
+        "ext/standard/JitPowIntegerEmitExponents80to89.php": {
+            "budget": 24080,
+            "target": 30000,
+            "note": "compile-time exponents 80-89 chained-smul slice from JitPowIntegerEmit (#36387/#36386); php-src Zend/zend_operators.c pow_function"
         }
     },
     "script_file_count": {
