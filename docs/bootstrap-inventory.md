@@ -7351,11 +7351,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/DiscardedPureCallElisionArrayOps.php` | 0 | 2 |
 | `lib/JIT/DiscardedPureCallElisionDateCalOps.php` | 0 | 2 |
 | `lib/JIT/DiscardedPureCallElisionFormatAnalyzeOps.php` | 0 | 2 |
-| `lib/JIT/DiscardedPureCallElisionIntrospectOps.php` | 0 | 2 |
 | `lib/JIT/DiscardedPureCallElisionMathAndHashOps.php` | 0 | 2 |
 | `lib/JIT/DiscardedPureCallElisionNativeLongFolds.php` | 0 | 2 |
 | `lib/JIT/DiscardedPureCallElisionRuntimeInfoOps.php` | 0 | 2 |
 | `lib/JIT/DiscardedPureCallElisionStringOps.php` | 0 | 2 |
+| `lib/JIT/DiscardedPureCallElisionTypeStringCoreOps.php` | 0 | 2 |
 | `lib/JIT/DnfParamCheck.php` | 0 | 31 |
 | `lib/JIT/DomExtensionHooks.php` | 0 | 1 |
 | `lib/JIT/DomInstanceMethodJit.php` | 0 | 114 |
@@ -60560,7 +60560,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/DiscardedPureCallElision.php`
 
 **Warnings** (review for bootstrap subset):
-- 33 class method(s)
+- 44 class method(s)
 
 ### `lib/JIT/DiscardedPureCallElisionArrayOps.php`
 
@@ -60579,12 +60579,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - trait DiscardedPureCallElisionFormatAnalyzeOps (line 25)
 - 16 class method(s)
-
-### `lib/JIT/DiscardedPureCallElisionIntrospectOps.php`
-
-**Warnings** (review for bootstrap subset):
-- trait DiscardedPureCallElisionIntrospectOps (line 25)
-- 22 class method(s)
 
 ### `lib/JIT/DiscardedPureCallElisionMathAndHashOps.php`
 
@@ -60609,6 +60603,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - trait DiscardedPureCallElisionStringOps (line 25)
 - 9 class method(s)
+
+### `lib/JIT/DiscardedPureCallElisionTypeStringCoreOps.php`
+
+**Warnings** (review for bootstrap subset):
+- trait DiscardedPureCallElisionTypeStringCoreOps (line 28)
+- 11 class method(s)
 
 ### `lib/JIT/DnfParamCheck.php`
 
