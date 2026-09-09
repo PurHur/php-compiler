@@ -72,6 +72,7 @@ require_once __DIR__.'/VM/Concern/ListUnpackAndSpreadAssignDispatch.php';
 require_once __DIR__.'/VM/Concern/FromCallableAndClosureDispatch.php';
 require_once __DIR__.'/VM/Concern/EmptyAndBooleanNotDispatch.php';
 require_once __DIR__.'/VM/Concern/YieldAndYieldFromDispatch.php';
+require_once __DIR__.'/VM/Concern/TryCatchThrowDispatch.php';
 
 use PHPCompiler\BuiltinByRefParams;
 use PHPCompiler\Compiler\AttributeNames;
@@ -173,6 +174,7 @@ class VM {
     use FromCallableAndClosureDispatch;
     use EmptyAndBooleanNotDispatch;
     use YieldAndYieldFromDispatch;
+    use TryCatchThrowDispatch;
     const SUCCESS = 1;
     const FAILURE = 2;
 
@@ -1360,113 +1362,17 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_TRY:
-                    $this->context->activeTryHandlerFrames[] = $frame;
-                    // Loop re-entry reuses the handler frame object; clear stale "finally done"
-                    // so break/continue unwind can run finally again (#25240).
-                    unset($this->context->completedFinallyHandlers[spl_object_id($frame)]);
-                    if (null !== $op->block2) {
-                        $this->context->tryMergeBlockIds[spl_object_id($op->block2)] = true;
-                    }
-                    // php-cfg may fuse try body with merge when try is only `goto` to a later label (#4491).
-                    if (
-                        null !== $op->block2
-                        && $op->block1 === $op->block2
-                        && $this->hasPendingFinally($frame)
-                    ) {
-                        $this->context->pendingGotoAfterFinally = $op->block1;
-                        $finallyFrame = $this->enterFinallyHandlerForUnwind($frame, false);
-                        if (null !== $finallyFrame) {
-                            $frame = $finallyFrame;
-                            goto restart;
-                        }
-                    }
-                    $frame = $op->block1->getFrame($this->context, $frame);
-                    goto restart;
                 case OpCode::TYPE_CATCH:
-                    if (null !== $this->context->pendingException) {
-                        if ($this->catchTypesMatch($op, $this->context->pendingException)) {
-                            $caught = $this->context->pendingException;
-                            $this->context->pendingException = null;
-                            if (null !== $op->arg3) {
-                                if (!isset($frame->scope[$op->arg3])) {
-                                    $frame->scope[$op->arg3] = new Variable();
-                                }
-                                $frame->scope[$op->arg3]->copyFrom($caught);
-                            }
-                            $frame = $op->block1->getFrame($this->context, $frame);
-                            $this->bindCatchVariableToFrame($frame, $op->arg3, $caught);
-                            goto restart;
-                        }
-                        break;
-                    }
-                    if (null !== $op->block2) {
-                        $frame = $op->block2->getFrame($this->context, $frame);
-                        goto restart;
-                    }
-                    break;
                 case OpCode::TYPE_FINALLY:
-                    if (null !== $this->context->pendingException) {
-                        break;
-                    }
-                    if (null !== $op->block1) {
-                        $frame = $op->block1->getFrame($this->context, $frame);
-                        goto restart;
-                    }
-                    break;
                 case OpCode::TYPE_THROW:
-                    $thrown = $frame->scope[$op->arg1]->resolveIndirect();
-                    if (null !== $op->arg2) {
-                        VM\ExceptionSupport::stampThrowLine($thrown, (int) $op->arg2);
-                    }
-                    // External catch during __clone throws CloneMagicCatchRedirect from
-                    // findCatchFrameForThrow (#23527 / #12068). Local try/catch inside __clone
-                    // falls through to the normal dispatchEngineThrow path below.
-                    if ($this->frameIsPropertyGetHook($frame)) {
-                        $catchFrame = $this->dispatchEngineThrow($frame, $thrown);
-                        if (null !== $catchFrame) {
-                            // Bubble to caller stack — do not finish property read (#9503, zend_property_hooks.c).
-                            $this->context->propertyHookExternalCatchFrame = $catchFrame;
-
-                            return self::FAILURE;
-                        }
-                        break;
-                    }
-                    if ($this->frameIsPropertyUnsetHook($frame)) {
-                        $catchFrame = $this->dispatchEngineThrow($frame, $thrown);
-                        if (null !== $catchFrame) {
-                            // Bubble to caller stack — do not finish unset (#9666, zend_property_hooks.c).
-                            $this->context->propertyHookExternalCatchFrame = $catchFrame;
-
-                            return self::FAILURE;
-                        }
-                        break;
-                    }
-                    if ($this->frameIsPropertySetHook($frame)) {
-                        $catchFrame = $this->dispatchEngineThrow($frame, $thrown);
-                        if (null !== $catchFrame) {
-                            // Bubble to caller stack — do not finish assignment (#9670, zend_property_hooks.c).
-                            $this->context->propertyHookExternalCatchFrame = $catchFrame;
-                            $this->context->propertyHookSetAborted = true;
-
-                            return self::FAILURE;
-                        }
-                        break;
-                    }
-                    $catchFrame = $this->dispatchEngineThrow($frame, $thrown);
-                    if (null !== $catchFrame) {
-                        $frame = $catchFrame;
-                        goto restart;
-                    }
-                    break;
                 case OpCode::TYPE_RETHROW:
-                    $thrown = $this->resolveActiveCatchException($frame);
-                    if (null === $thrown) {
-                        throw new \LogicException('Cannot use "throw;" outside of a catch block');
-                    }
-                    $catchFrame = $this->dispatchEngineThrow($frame, $thrown);
-                    if (null !== $catchFrame) {
-                        $frame = $catchFrame;
+                    $tryCatchThrowOutcome = $this->executeTryCatchThrowDispatch($frame, $op);
+                    if ($tryCatchThrowOutcome instanceof Frame) {
+                        $frame = $tryCatchThrowOutcome;
                         goto restart;
+                    }
+                    if (is_int($tryCatchThrowOutcome)) {
+                        return $tryCatchThrowOutcome;
                     }
                     break;
                 case OpCode::TYPE_TICK_SCOPE_ENTER:

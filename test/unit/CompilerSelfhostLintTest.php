@@ -491,6 +491,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/VM/Concern/ScalarCompareDispatch.php',
             'lib/VM/Concern/StaticPropertyFetchDispatch.php',
             'lib/VM/Concern/TryCatchFinallyAndUncaughtDispatch.php',
+            'lib/VM/Concern/TryCatchThrowDispatch.php',
             'lib/VM/Concern/TypedIntRecursiveAndCountedLoopFastPath.php',
             'lib/VM/Concern/UnsetDispatch.php',
             'lib/VM/Concern/UserInvokeArrayAccessAndClosureCall.php',
