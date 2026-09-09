@@ -28,7 +28,7 @@ make cold-build-check-image    # ≤ 300 s; script/cold-build-check.sh --image
 make cold-build-check-sdk      # ≤ 300 s; relocatable SDK tree + bundled LLVM (#36390)
 ```
 
-**Tarball SDK** (host PHP 8.2+ only — no Docker at run time): `make pack-phpc-sdk` → `build/phpc-<tag>-x86_64-linux.tar.zst` plus `build/SHA256SUMS` and `SHA256SUMS.sig` (#36399). Extract, then `./phpc-host doctor` / `./phpc-host build -o hello hello.php`. Verify with `./script/verify-release-artifacts.sh build` (or `sha256sum -c SHA256SUMS` from `build/`). Gate the same path with `make cold-build-check-sdk` (or `PHPC_SDK_TARBALL=build/phpc-….tar.gz ./script/cold-build-check.sh --sdk`).
+**Tarball SDK** (host PHP 8.2+ only — no Docker at run time): `make pack-phpc-sdk` → `build/phpc-<tag>-x86_64-linux.tar.zst` plus `build/SHA256SUMS` and `SHA256SUMS.sig` (#36399). Extract, then `./phpc-host doctor` / `./phpc-host build -o hello hello.php`. Verify with `./script/verify-release-artifacts.sh build` (or `sha256sum -c SHA256SUMS` from `build/`). Gate the same path with `make cold-build-check-sdk` (or `PHPC_SDK_TARBALL=build/phpc-….tar.gz ./script/cold-build-check.sh --sdk`). Local/CI packs sign with `keys/ci-release-test/` unless `PHPC_RELEASE_SIGNING_KEY` points at a production key. Bit-identical AOT hello gate: `make verify-reproducible`.
 
 The **clone + composer + patches + LLVM** path below is for **contributors** working on the compiler itself.
 

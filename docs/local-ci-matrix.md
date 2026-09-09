@@ -492,6 +492,10 @@ Harness hosts and contributors without host PHP/LLVM should use the **22.04 dev 
 
 `AOT_BUILD_SMOKE_GATE=1` (default) runs `script/check-aot-build-smoke.sh` after the LLVM status report in `ci-fast`/`ci-local`: builds a variable-using script with `./phpc build`, executes the binary, and diffs its output against `bin/vm.php` (tier 1, enforced ~3 s). Tier 2 reports known-broken builtins (#15642) without failing. Would have caught all three of the 2026-07 week's master AOT breakages at merge time. `AOT_BUILD_SMOKE_GATE=0` opts out.
 
+## Reproducible AOT hello (`VERIFY_REPRODUCIBLE_GATE`, #36399)
+
+`VERIFY_REPRODUCIBLE_GATE=1` (default) runs `script/verify-reproducible.sh` from `dev-verify-fast` (tier 1b, ~6 s): builds hello twice under distinct `HOME`+`TMPDIR` isolations (two-runner approximation on one host), requires byte-identical binaries, identical GNU `Build ID` notes, and matching stdout. `make verify-reproducible` / `--json` for a machine-readable summary. Opt out with `VERIFY_REPRODUCIBLE_GATE=0`. Release artifact signing prefers the committed CI test key at `keys/ci-release-test/` when `PHPC_RELEASE_SIGNING_KEY` is unset (production must override).
+
 ## Gen-0 manifest sync (`BOOTSTRAP_GEN0_MANIFEST_SYNC_GATE`, #8713)
 
 `BOOTSTRAP_GEN0_MANIFEST_SYNC_GATE=1` (default) runs `script/check-bootstrap-gen0-manifest-sync.php` in `ci-fast`: verifies `prelinked/bootstrap-gen0/manifest.json` matches the committed gen-0 argv driver and compiler_lib sidecar byte sizes, so a sidecar refresh cannot land half-synced. `BOOTSTRAP_GEN0_MANIFEST_SYNC_GATE=0` opts out.

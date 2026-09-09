@@ -23,6 +23,12 @@ fi
 echo "dev-verify-fast: tier 1 — aot-smoke (8 programs)..."
 ./script/aot-smoke.sh
 
+# Dual-isolation bit-identical AOT hello (#36399). Default on; ~6s. Opt out: VERIFY_REPRODUCIBLE_GATE=0.
+if [[ "${VERIFY_REPRODUCIBLE_GATE:-1}" == "1" ]]; then
+  echo "dev-verify-fast: tier 1b — verify-reproducible (dual isolation + build-id match)..."
+  ./script/verify-reproducible.sh
+fi
+
 echo "dev-verify-fast: tier 2 — VM differential tier-0 ($(find test/differential/tier0-fast -name '*.php' | wc -l) programs)..."
 ./script/differential-sweep.sh --dir test/differential/tier0-fast
 
