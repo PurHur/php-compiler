@@ -639,9 +639,9 @@
             "note": "baseConvert/inet/minMax/checkdate/clamp/intdiv arg guards + scalarCast + count-on-typed-array + pure math/round + effect-free void Native constraints extracted from DiscardedPureCallElision (#36387); php-src ext/standard/math.c + basic_functions.c + Zend/zend_operators.c"
         },
         "lib/JIT/NoThrowCallElision.php": {
-            "budget": 233,
+            "budget": 237,
             "target": 350,
-            "note": "No-throw call elision hub; RuntimeInfo + ExistsConvert + StringOps + MathAndFormat + CalleeGraph + PureBuiltinArgOps (#36387/#36403/#36386)"
+            "note": "No-throw call elision hub; RuntimeInfo + ExistsConvert + StringOps + StringSlicePadReplace + MathAndFormat + CalleeGraph + PureBuiltinArgOps (#36387/#36403/#36386)"
         },
         "lib/JIT/NoThrowCallElisionRuntimeInfoPredicates.php": {
             "budget": 648,
@@ -654,9 +654,9 @@
             "note": "exists/convert/introspect/scalar-cast/version_compare no-throw proofs extracted from NoThrowCallElision (#36403); php-src Zend/zend_builtin_functions.c + ext/standard/{info,basic_functions,array,math,url,file,versioning,type}.c + ext/hash + ext/date + ext/spl"
         },
         "lib/JIT/NoThrowCallElisionStringOps.php": {
-            "budget": 855,
-            "target": 1000,
-            "note": "type/ctype/string transform/html/slice/pad/replace no-throw proofs extracted from NoThrowCallElision (#36387); php-src ext/standard/{type,string,html,url,md5,crc32,base64,quot_print,levenshtein,file,exec}.c + ext/ctype + ext/pcre"
+            "budget": 392,
+            "target": 500,
+            "note": "type/ctype/string-transform/html no-throw proofs; slice/pad/replace extracted to StringSlicePadReplaceOps (#36387); php-src ext/standard/{type,string,html,url,md5,crc32,base64,quot_print,file,exec}.c + ext/ctype + ext/pcre"
         },
         "lib/JIT/NoThrowCallElisionMathAndFormatOps.php": {
             "budget": 269,
@@ -672,6 +672,11 @@
             "budget": 382,
             "target": 450,
             "note": "pureBuiltinArgsAreNoThrow dispatch + string/numeric/int/typedArray ParamArgCannotThrow helpers extracted from NoThrowCallElision (#36387); php-src ext/standard/{type,string,math,basic_functions,url,file,info,html}.c + ext/ctype + Zend/zend_builtin_functions.c + ext/hash + ext/date + ext/spl"
+        },
+        "lib/JIT/NoThrowCallElisionStringSlicePadReplaceOps.php": {
+            "budget": 489,
+            "target": 600,
+            "note": "slice/compare + pad/split + replace/join no-throw proofs extracted from NoThrowCallElisionStringOps (#36387); php-src ext/standard/{string,levenshtein,file}.c"
         }
     },
     "script_file_count": {
