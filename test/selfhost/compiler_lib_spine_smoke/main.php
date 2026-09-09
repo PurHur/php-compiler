@@ -7928,6 +7928,7 @@ require_once __DIR__.'/../../../lib/VM/Concern/FuncDefAndGlobalConstDispatch.php
 require_once __DIR__.'/../../../lib/VM/Concern/ScriptMagicAndTickDispatch.php';
 require_once __DIR__.'/../../../lib/VM/Concern/ReturnDispatch.php';
 require_once __DIR__.'/../../../lib/VM/Concern/ClassInstanceAndStaticCallSupport.php';
+require_once __DIR__.'/../../../lib/VM/Concern/RunFramesInner.php';
 require_once __DIR__.'/../../../lib/VM/ObjectPropertyIterator.php';
 require_once __DIR__.'/../../../lib/VM/ObjectReadonlySupport.php';
 require_once __DIR__.'/../../../lib/VM/ObjectRegistry.php';
