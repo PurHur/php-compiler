@@ -697,6 +697,16 @@
             "budget": 393,
             "target": 500,
             "note": "type/ctype/string-transform/html-escape no-throw proofs (renamed from StringOps after #37604 slice extract); php-src ext/standard/{type,string,html,url,md5,crc32,base64,quot_print,levenshtein,exec}.c + ext/ctype + ext/pcre (#36387)"
+        },
+        "ext/standard/JitPow.php": {
+            "budget": 443,
+            "target": 600,
+            "note": "pow()/ ** LLVM lowering hub; integer chained-smul emit extracted to JitPowIntegerEmit (#36387)"
+        },
+        "ext/standard/JitPowIntegerEmit.php": {
+            "budget": 58226,
+            "target": 70000,
+            "note": "compile-time exponent chained-smul integer pow emit (#36387/#36386); php-src Zend/zend_operators.c pow_function"
         }
     },
     "script_file_count": {
