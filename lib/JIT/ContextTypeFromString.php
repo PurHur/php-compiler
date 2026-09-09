@@ -10,8 +10,8 @@ use PHPLLVM;
  * LLVM string→type materialization for {@see Context} (#36387).
  *
  * Extracted from {@see ContextTypeAndStructMap} so getTypeFromString /
- * _getTypeFromString stay a separate TU from castToBool / getTypeFromType /
- * getStringFromType (split-TU / size-budget ratchet).
+ * _getTypeFromString stay a separate TU from castToBool / PHPTypes→LLVM ({@see ContextTypeFromPhpType}) /
+ * getTypeFromType / getStringFromType (split-TU / size-budget ratchet).
  *
  * Used via {@code use ContextTypeFromString;} on {@see Context}.
  *

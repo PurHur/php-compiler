@@ -15,7 +15,8 @@ use PHPLLVM;
  * ratchet, #36199 / #36403).
  *
  * Used via {@code use ContextStructFieldMap;} on {@see Context}.
- * Type↔LLVM map: {@see ContextTypeAndStructMap}.
+ * PHPTypes→LLVM: {@see ContextTypeFromPhpType}.
+ * String→LLVM map: {@see ContextTypeAndStructMap}.
  * Bool cast: {@see ContextCastToBool}.
  *
  * No new C ABI. php-src analogy: zend_object_handlers / property offset maps
