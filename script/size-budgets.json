@@ -204,9 +204,9 @@
             "note": "TYPE_CLASS_CONST_FETCH runFramesInner body extracted from VM.php (#36403)"
         },
         "lib/JIT/Context.php": {
-            "budget": 934,
+            "budget": 936,
             "target": 3500,
-            "note": "FunctionProxyRegistration + ExternalMethodStubReport + ArrayIteratorAndObject + NestedJitKernelRegistry + ReflectionMembers + FiberGeneratorAndClosure + ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml proxies wiring + VariableOperandLookup + VariableOperandAlias + ModuleVerify + ConstantFetch + TypeFromPhpType + CastToBool + TypeFromString + StructFieldMap + LlvmConstantEmit + ScopeLifecycle peers (#36387/#36199); continue toward \u22643.5k + ModuleOptimizationPasses (#36387)"
+            "note": "FunctionProxyRegistration + ExternalMethodStubReport + ArrayIteratorAndObject + NestedJitKernelRegistry + ReflectionMembers + FiberGeneratorAndClosure + ExceptionAndError + FinfoPdoAndXml + WeakAndPhpToken + SplContainers + SplIterators + DirectoryAndFile + ReflectionAndException + DateAndXml proxies wiring + VariableOperandLookup + VariableOperandAlias + ModuleVerify + InitShutdownBlocks + ConstantFetch + CastToBool + TypeFromString + StructFieldMap + LlvmConstantEmit + ScopeLifecycle peers (#36387/#36199); continue toward \u22643.5k + ModuleOptimizationPasses (#36387)"
         },
         "lib/JIT/ContextEditScaffoldModuleRebind.php": {
             "budget": 315,
@@ -274,9 +274,9 @@
             "note": "functionIsRegistered / builtin-name cache / registerModule|Builtin extracted from FunctionProxyAndNestedJitKernel (#36387)"
         },
         "lib/JIT/ContextTypeAndStructMap.php": {
-            "budget": 24,
-            "target": 50,
-            "note": "empty composition hub after ContextTypeFromPhpType + ContextTypeFromString extracts (#36387); methods live in peer traits"
+            "budget": 109,
+            "target": 200,
+            "note": "getTypeFromType / getStringFromType / unwrapNullable; castToBool in ContextCastToBool; getTypeFromString in ContextTypeFromString; structField* in ContextStructFieldMap (#36387)"
         },
         "lib/JIT/ContextCastToBool.php": {
             "budget": 107,
@@ -299,9 +299,14 @@
             "note": "Thin/full standalone AOT body install (isThinStandaloneAotMain\u2026ensureFullStandaloneBodies) extracted from Context (#36387)"
         },
         "lib/JIT/ContextModuleCompileAndOptimize.php": {
-            "budget": 237,
-            "target": 280,
-            "note": "compileInPlace/compileCommon; verify moved to ContextModuleVerify; IR opt in ContextModuleOptimizationPasses (#36387)"
+            "budget": 150,
+            "target": 200,
+            "note": "compileInPlace/compileCommon/replaceModuleFromBitcodeFile; verify in ContextModuleVerify; IR opt in ContextModuleOptimizationPasses; init/shutdown blocks in ContextModuleInitShutdownBlocks (#36387)"
+        },
+        "lib/JIT/ContextModuleInitShutdownBlocks.php": {
+            "budget": 115,
+            "target": 200,
+            "note": "ensureInitShutdownBlocks/positionBuilderAtInitEmission/sealInit* / linear init helpers extracted from ContextModuleCompileAndOptimize (#36387); php-src main/main.c + Zend/zend_execute_API.c"
         },
         "lib/JIT/ContextScriptGlobalsAndIncludeTracking.php": {
             "budget": 296,
@@ -492,11 +497,6 @@
             "budget": 134,
             "target": 250,
             "note": "TYPE_FUNCDEF/DECLARE_GLOBAL_CONST runFramesInner body extracted from VM.php (#36403); php-src zend_compile_func_decl / zend_constants.c"
-        },
-        "lib/JIT/ContextTypeFromPhpType.php": {
-            "budget": 111,
-            "target": 200,
-            "note": "unwrapNullableUnionType/getTypeFromType/getStringFromType extracted from ContextTypeAndStructMap (#36387); php-src Zend/zend_types.h + Zend/zend_operators.c"
         }
     },
     "script_file_count": {

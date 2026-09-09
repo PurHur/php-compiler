@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8548 |
-| Phase A inventory files (M2 ratio SSOT) | 8548 |
+| PHP files on vm.php path | 8549 |
+| Phase A inventory files (M2 ratio SSOT) | 8549 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26698 |
+| Source constructs flagged (warnings) | 26700 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7324,6 +7324,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/ContextLlvmConstantEmit.php` | 0 | 4 |
 | `lib/JIT/ContextLlvmConstantsAndRegistry.php` | 0 | 2 |
 | `lib/JIT/ContextModuleCompileAndOptimize.php` | 0 | 4 |
+| `lib/JIT/ContextModuleInitShutdownBlocks.php` | 0 | 2 |
 | `lib/JIT/ContextModuleOptimizationPasses.php` | 0 | 3 |
 | `lib/JIT/ContextModuleVerify.php` | 0 | 2 |
 | `lib/JIT/ContextScopeLifecycleAndInitEmit.php` | 0 | 3 |
@@ -59917,16 +59918,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Context.php`
 
 **Warnings** (review for bootstrap subset):
-- new ExtensionLoweringHooks (line 891)
-- new Scope (line 892)
-- new Analyzer (line 921)
-- new Helper (line 922)
-- new Builtin\Refcount (line 923)
-- new Builtin\Output (line 925)
-- new Builtin\Type (line 926)
-- new Builtin\Internal (line 927)
-- new Builtin\VarArg (line 928)
-- new Builtin\ErrorHandler (line 929)
+- new ExtensionLoweringHooks (line 893)
+- new Scope (line 894)
+- new Analyzer (line 923)
+- new Helper (line 924)
+- new Builtin\Refcount (line 925)
+- new Builtin\Output (line 927)
+- new Builtin\Type (line 928)
+- new Builtin\Internal (line 929)
+- new Builtin\VarArg (line 930)
+- new Builtin\ErrorHandler (line 931)
 
 ### `lib/JIT/ContextCastToBool.php`
 
@@ -60392,10 +60393,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ContextModuleCompileAndOptimize.php`
 
 **Warnings** (review for bootstrap subset):
-- trait ContextModuleCompileAndOptimize (line 26)
-- new Result (line 40)
-- new Result (line 61)
-- 12 class method(s)
+- trait ContextModuleCompileAndOptimize (line 29)
+- new Result (line 43)
+- new Result (line 64)
+- 4 class method(s)
+
+### `lib/JIT/ContextModuleInitShutdownBlocks.php`
+
+**Warnings** (review for bootstrap subset):
+- trait ContextModuleInitShutdownBlocks (line 24)
+- 8 class method(s)
 
 ### `lib/JIT/ContextModuleOptimizationPasses.php`
 

@@ -57,6 +57,7 @@ require_once __DIR__.'/ContextCastToBool.php';
 require_once __DIR__.'/ContextTypeFromString.php';
 require_once __DIR__.'/ContextStructFieldMap.php';
 require_once __DIR__.'/ContextStandaloneBodies.php';
+require_once __DIR__.'/ContextModuleInitShutdownBlocks.php';
 require_once __DIR__.'/ContextModuleCompileAndOptimize.php';
 require_once __DIR__.'/ContextModuleVerify.php';
 require_once __DIR__.'/ContextModuleOptimizationPasses.php';
@@ -96,6 +97,7 @@ class Context {
     use ContextTypeFromString;
     use ContextStructFieldMap;
     use ContextStandaloneBodies;
+    use ContextModuleInitShutdownBlocks;
     use ContextModuleCompileAndOptimize;
     use ContextModuleVerify;
     use ContextModuleOptimizationPasses;
