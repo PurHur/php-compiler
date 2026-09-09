@@ -358,7 +358,7 @@ trait JitConstructAssignedAndNativeLongLocal
     }
 
     /**
-     * Promote named function locals from stale KIND_VALUE i64 literals to an alloca (#36018).
+     * Promote named locals from stale KIND_VALUE i64 literals to an alloca (#36018 / #36385).
      */
     private function ensureNamedNativeLongLocalAlloca(Operand $resultOp, JIT\Variable $result): JIT\Variable
     {
@@ -387,7 +387,7 @@ trait JitConstructAssignedAndNativeLongLocal
             return $result;
         }
         $block = $this->context->jitEnclosingBlock;
-        if (null === $block || null === $block->func || $block->isMainScript()) {
+        if (null === $block || null === $block->func) {
             return $result;
         }
         $i64 = $this->context->getTypeFromString('int64');
@@ -410,6 +410,9 @@ trait JitConstructAssignedAndNativeLongLocal
     /**
      * Named locals ($i++) must not constant-fold on a stale LLVM i64 literal — loop
      * JUMPIF still reads the original slot (#36018 / peer #32605 / #32831).
+     *
+     * Also applies to {main}: top-level `for ($i = 0; $i < strlen(...); ++$i)` hung
+     * because the main-script guard skipped alloca materialization (#36385 k-nucleotide).
      */
     private function isNamedLocalIncDec(Operand $readOp, Operand $writeOp): bool
     {
@@ -418,7 +421,7 @@ trait JitConstructAssignedAndNativeLongLocal
             return false;
         }
         $block = $this->context->jitEnclosingBlock;
-        if (null === $block || null === $block->func || $block->isMainScript()) {
+        if (null === $block || null === $block->func) {
             return false;
         }
 

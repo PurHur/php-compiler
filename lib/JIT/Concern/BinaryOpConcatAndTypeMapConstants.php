@@ -256,15 +256,15 @@ trait BinaryOpConcatAndTypeMapConstants
     }
 
     /**
-     * User-function `$i < $len` must not use orderedNativeLongToValue on boxed
-     * property temps — snapshot to i64 like `(int)$len` (#36018).
+     * `$i < $len` must not use orderedNativeLongToValue on boxed temps — snapshot
+     * to i64 like `(int)$len` (#36018). Applies to {main} too (#36385 k-nucleotide).
      *
      * @return array{0: Variable, 1: Variable}
      */
     private function materializeOrderedCompareNativeLongOperands(Variable $left, Variable $right): array
     {
         $block = $this->context->jitEnclosingBlock;
-        if (null === $block || null === $block->func || $block->isMainScript()) {
+        if (null === $block || null === $block->func) {
             return [$left, $right];
         }
         if (Variable::TYPE_NATIVE_LONG === $left->type

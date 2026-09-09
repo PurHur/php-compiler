@@ -1,7 +1,7 @@
 {
     "version": 1,
     "suite": "v2",
-    "generated_at": "2026-09-03T06:24:05Z",
+    "generated_at": "2026-09-09T02:09:35Z",
     "arch": "x86_64-linux",
     "ratio_tolerance_percent": 20,
     "ir_tolerance_percent": 20,
@@ -9,39 +9,39 @@
     "note": "v2 gate subset (#36385). Ratio tolerance 20% so a deliberate ~2\u00d7 slowdown fails.",
     "cases": {
         "call-heavy": {
-            "ratio_aot_over_zend": 0.355224,
-            "zend_wall": 0.00851,
-            "aot_wall": 0.003023,
-            "ir_lines": 101144,
-            "ir_defines": 426
+            "ratio_aot_over_zend": 0.364715,
+            "zend_wall": 0.011834,
+            "aot_wall": 0.004316,
+            "ir_lines": 155036,
+            "ir_defines": 545
         },
         "assoc-heavy": {
-            "ratio_aot_over_zend": 0.647696,
-            "zend_wall": 0.007687,
-            "aot_wall": 0.004979,
-            "ir_lines": 132782,
-            "ir_defines": 455
+            "ratio_aot_over_zend": 0.37981,
+            "zend_wall": 0.013483,
+            "aot_wall": 0.005121,
+            "ir_lines": 158655,
+            "ir_defines": 565
         },
         "str-builder": {
-            "ratio_aot_over_zend": 2.780569,
-            "zend_wall": 0.008562,
-            "aot_wall": 0.023807,
-            "ir_lines": 129358,
-            "ir_defines": 425
+            "ratio_aot_over_zend": 0.470137,
+            "zend_wall": 0.009784,
+            "aot_wall": 0.0046,
+            "ir_lines": 160989,
+            "ir_defines": 543
         },
         "k-nucleotide": {
-            "ratio_aot_over_zend": 0.551674,
-            "zend_wall": 0.008088,
-            "aot_wall": 0.004462,
-            "ir_lines": 139162,
-            "ir_defines": 454
+            "ratio_aot_over_zend": 0.414941,
+            "zend_wall": 0.009823,
+            "aot_wall": 0.004076,
+            "ir_lines": 173977,
+            "ir_defines": 540
         },
         "template-render": {
-            "ratio_aot_over_zend": 41.843912,
-            "zend_wall": 0.008444,
-            "aot_wall": 0.353323,
-            "ir_lines": 120824,
-            "ir_defines": 425
+            "ratio_aot_over_zend": 0.429325,
+            "zend_wall": 0.013423,
+            "aot_wall": 0.005763,
+            "ir_lines": 147874,
+            "ir_defines": 519
         }
     }
 }
