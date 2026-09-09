@@ -14,8 +14,8 @@ use PHPLLVM\Value;
 /**
  * Integer {@code pow}/{@code **} chained-smul emit for compile-time exponents
  * (#36387 / #36386). Extracted from {@see JitPow} so gen-0 spine gets a
- * separate TU for the exponent table; Low/Mid/Exponents50to69/Exponents70to79/High
- * are sibling TUs (#36387).
+ * separate TU for the exponent table; Low/Mid/Exponents50to69/Exponents70to79/
+ * Exponents80to91/High are sibling TUs (#36387).
  *
  * No new C ABI. php-src: Zend/zend_operators.c {@code pow_function} /
  * {@code zend_pow} / {@code mul_function}; ext/standard/math.c
@@ -25,6 +25,7 @@ require_once __DIR__.'/JitPowIntegerEmitLow.php';
 require_once __DIR__.'/JitPowIntegerEmitMid.php';
 require_once __DIR__.'/JitPowIntegerEmitExponents50to69.php';
 require_once __DIR__.'/JitPowIntegerEmitExponents70to79.php';
+require_once __DIR__.'/JitPowIntegerEmitExponents80to91.php';
 require_once __DIR__.'/JitPowIntegerEmitHigh.php';
 
 final class JitPowIntegerEmit
@@ -83,6 +84,15 @@ final class JitPowIntegerEmit
             return;
         }
         if (JitPowIntegerEmitExponents70to79::tryEmitIntegerPowViaMathFpow(
+            $context,
+            $slotPtr,
+            $base,
+            $exp,
+            $expFold
+        )) {
+            return;
+        }
+        if (JitPowIntegerEmitExponents80to91::tryEmitIntegerPowViaMathFpow(
             $context,
             $slotPtr,
             $base,
