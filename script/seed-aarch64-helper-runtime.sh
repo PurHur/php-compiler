@@ -427,6 +427,26 @@ SEED_UNITS=(
   /ext/mbstring/MbCaseJitHelper.php
   /ext/mbstring/MbConvertCaseJitHelper.php
   /ext/mbstring/MbConvertEncodingJitHelper.php
+  # Remaining mbstring (ereg/search/split/kana/entity/output) + first iconv (#36391 after 312)
+  # Frexp/Ldexp/Modf/Nextafter/Shuffle still skipped (algorithm SSOT, no HELPER_PATH).
+  # Preg* still skipped: tip nested compile misses Compiler\Concern\OpCode.
+  # Sscanf still skipped: __init__ sealed during NestedJIT.
+  # Gethostbynamel skipped: NestedJIT missing __compiler_stream_resolve_include_path.
+  # Ini skipped: IniGetLeafJitHelper not compiled under helper-runtime-emit NestedJIT.
+  # Progress skipped: NestedJIT ContextLlvmConstantsAndRegistry seal during helper emit.
+  # CalInfo still skipped (unknown unit under NestedJIT).
+  # PosixSet* / PosixSession / PosixTerminal deferred (mutators / tty).
+  # MbGetInfo / MbMimeheader not published on x86_64-linux yet — skip.
+  /ext/mbstring/MbConvertKanaJitHelper.php
+  /ext/mbstring/MbConvertVariablesJitHelper.php
+  /ext/mbstring/MbEregJitHelper.php
+  /ext/mbstring/MbNumericEntityJitHelper.php
+  /ext/mbstring/MbOutputHandlerJitHelper.php
+  /ext/mbstring/MbRegexEncodingJitHelper.php
+  /ext/mbstring/MbSearchJitHelper.php
+  /ext/mbstring/MbSplitJitHelper.php
+  /ext/iconv/IconvJitHelper.php
+  /ext/iconv/IconvStringJitHelper.php
 )
 
 MIN_SEED=${#SEED_UNITS[@]}
