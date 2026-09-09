@@ -1,7 +1,7 @@
 {
     "issue": 36401,
     "ci_green_streak_days": 6,
-    "last_green_master_sha": "1cd9658f6465320fea9ca41c2efa8e0b4fda28b5",
+    "last_green_master_sha": "233cf4e7687b4db501bbcd3e0ffe13f99fb2ecf3",
     "last_green_day": "2026-09-09",
     "gates": [
         "apply-patches",
@@ -9,5 +9,5 @@
         "aot-smoke",
         "north-star5-verify-fast"
     ],
-    "notes": "Local Docker gates; GHA billing-disabled \u2014 not a remote check streak (#36401). Verified apply-patches --verify-pristine (php-llvm 27/27), aot-smoke 9/9, north-star5-verify-fast OK (spine 8559/8559) on mid-overlay branch; rebased onto tip."
+    "notes": "Local Docker gates; GHA billing-disabled \u2014 not a remote check streak (#36401). Verified apply-patches --verify-pristine (php-llvm 27/27), inventory 8566/8566, aot-smoke 9/9, north-star5-verify-fast OK on tip after #37570 MathAndHashOps merge. #36143 remains closed/green."
 }
