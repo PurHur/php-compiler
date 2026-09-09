@@ -66,7 +66,7 @@ final class DifferentialFuzz36398Test extends TestCase
         $count = (int) trim((string) file_get_contents($dir.'/COUNT'));
         $cases = glob($dir.'/seed_*.php') ?: [];
         $this->assertSame($count, count($cases));
-        $this->assertGreaterThanOrEqual(12, $count);
+        $this->assertGreaterThanOrEqual(13, $count);
     }
 
     public function testReducerShrinksRedundantEcho(): void
@@ -187,7 +187,30 @@ PHP;
         $this->assertContains('switch_int_fallthrough', $shapes);
         $this->assertContains('static_counter_fn', $shapes);
         $this->assertContains('array_plus_vs_merge', $shapes);
-        $this->assertGreaterThanOrEqual(16, count($shapes));
+        $this->assertContains('new_static_counter_ctor_args', $shapes);
+        $this->assertGreaterThanOrEqual(17, count($shapes));
+    }
+
+    public function testCoverageBiasWeightsUndercoveredShapesHigher(): void
+    {
+        $weights = fuzz_shape_coverage_weights();
+        $this->assertArrayHasKey('new_static_counter_ctor_args', $weights);
+        $this->assertArrayHasKey('arith_main', $weights);
+        // Seed corpus tags @fuzz-shape on committed seeds — under-covered shapes
+        // (including brand-new ones) must outrank heavily seeded shapes.
+        $this->assertGreaterThanOrEqual(
+            $weights['arith_main'],
+            $weights['new_static_counter_ctor_args']
+        );
+        $picked = [];
+        for ($seed = 1; $seed <= 200; ++$seed) {
+            $src = fuzz_generate_program($seed, 'coverage');
+            if (preg_match('/@fuzz-shape:\s*(\S+)/', $src, $m) === 1) {
+                $picked[$m[1]] = ($picked[$m[1]] ?? 0) + 1;
+            }
+        }
+        $this->assertNotEmpty($picked);
+        $this->assertArrayHasKey('new_static_counter_ctor_args', $picked);
     }
 
     public function testDefaultSweepScriptIncludesFuzzCorpus(): void

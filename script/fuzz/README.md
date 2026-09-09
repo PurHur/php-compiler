@@ -81,4 +81,6 @@ FUZZ_NIGHTLY_FILE_ISSUES=1 make fuzz-nightly
 FUZZ_NIGHTLY_FILE_ISSUES=1 FUZZ_NIGHTLY_CREATE_ISSUES=1 make fuzz-nightly
 ```
 
-ASan / coverage-biased generation remain follow-up slices of #36398.
+ASan / soft AOT nightly remain optional follow-ups of #36398.
+Coverage-biased `auto` shape pick is on by default (`FUZZ_BIAS=coverage`);
+set `FUZZ_BIAS=uniform` for the old equal-weight behaviour.
