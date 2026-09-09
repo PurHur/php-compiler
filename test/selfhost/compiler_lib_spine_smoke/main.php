@@ -7030,6 +7030,7 @@ require_once __DIR__.'/../../../lib/JIT/DiscardedPureCallElisionMathAndHashOps.p
 require_once __DIR__.'/../../../lib/JIT/DiscardedPureCallElisionRuntimeInfoOps.php';
 require_once __DIR__.'/../../../lib/JIT/DiscardedPureCallElisionNativeLongFolds.php';
 require_once __DIR__.'/../../../lib/JIT/DiscardedPureCallElisionIntrospectOps.php';
+require_once __DIR__.'/../../../lib/JIT/DiscardedPureCallElisionTypeStringCoreOps.php';
 require_once __DIR__.'/../../../lib/JIT/DiscardedPureCallElision.php';
 require_once __DIR__.'/../../../lib/JIT/DomInstanceMethodJit.php';
 require_once __DIR__.'/../../../lib/JIT/DynamicObjectReadonlyGuard.php';
