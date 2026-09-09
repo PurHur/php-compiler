@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8576 |
-| Phase A inventory files (M2 ratio SSOT) | 8576 |
+| PHP files on vm.php path | 8577 |
+| Phase A inventory files (M2 ratio SSOT) | 8577 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26748 |
+| Source constructs flagged (warnings) | 26752 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7506,10 +7506,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/NestedVmObjectMethodLlvm.php` | 0 | 1 |
 | `lib/JIT/NestedVmVariableMethodLlvm.php` | 0 | 2 |
 | `lib/JIT/NoDiscardCallGuard.php` | 0 | 2 |
-| `lib/JIT/NoThrowCallElision.php` | 0 | 2 |
+| `lib/JIT/NoThrowCallElision.php` | 0 | 1 |
+| `lib/JIT/NoThrowCallElisionCalleeGraph.php` | 0 | 3 |
 | `lib/JIT/NoThrowCallElisionExistsConvertAndIntrospectOps.php` | 0 | 2 |
 | `lib/JIT/NoThrowCallElisionMathAndFormatOps.php` | 0 | 2 |
-| `lib/JIT/NoThrowCallElisionCalleeGraph.php` | 0 | 2 |
+| `lib/JIT/NoThrowCallElisionPureBuiltinArgOps.php` | 0 | 2 |
 | `lib/JIT/NoThrowCallElisionRuntimeInfoPredicates.php` | 0 | 2 |
 | `lib/JIT/NoThrowCallElisionStringOps.php` | 0 | 2 |
 | `lib/JIT/NonObjectPropertyFetchHelper.php` | 0 | 4 |
@@ -61769,8 +61770,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/NoThrowCallElision.php`
 
 **Warnings** (review for bootstrap subset):
-- new Operand\Literal (line 791)
-- 19 class method(s)
+- 5 class method(s)
+
+### `lib/JIT/NoThrowCallElisionCalleeGraph.php`
+
+**Warnings** (review for bootstrap subset):
+- trait NoThrowCallElisionCalleeGraph (line 26)
+- new Operand\Literal (line 234)
+- 9 class method(s)
 
 ### `lib/JIT/NoThrowCallElisionExistsConvertAndIntrospectOps.php`
 
@@ -61778,22 +61785,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - trait NoThrowCallElisionExistsConvertAndIntrospectOps (line 22)
 - 36 class method(s)
 
-### `lib/JIT/NoThrowCallElisionCalleeGraph.php`
-
-**Warnings** (review for bootstrap subset):
-- trait NoThrowCallElisionCalleeGraph (line 28)
-- 9 class method(s)
-
 ### `lib/JIT/NoThrowCallElisionMathAndFormatOps.php`
 
 **Warnings** (review for bootstrap subset):
-- trait NoThrowCallElisionMathAndFormatOps (line 28)
+- trait NoThrowCallElisionMathAndFormatOps (line 29)
 - 11 class method(s)
+
+### `lib/JIT/NoThrowCallElisionPureBuiltinArgOps.php`
+
+**Warnings** (review for bootstrap subset):
+- trait NoThrowCallElisionPureBuiltinArgOps (line 24)
+- 5 class method(s)
 
 ### `lib/JIT/NoThrowCallElisionRuntimeInfoPredicates.php`
 
 **Warnings** (review for bootstrap subset):
-- trait NoThrowCallElisionRuntimeInfoPredicates (line 25)
+- trait NoThrowCallElisionRuntimeInfoPredicates (line 26)
 - 23 class method(s)
 
 ### `lib/JIT/NoThrowCallElisionStringOps.php`
