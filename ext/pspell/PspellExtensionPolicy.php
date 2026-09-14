@@ -4,29 +4,25 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\pspell;
 
+use PHPCompiler\ExtensionRegistry;
+
 /**
  * ext/pspell advertisement — php-src ext/pspell/pspell.c (#6294, #23968).
+ *
+ * {@see advertisesExtension()} is folded to ext.json advertise → ExtensionRegistry (#36204).
  *
  * Pure PHP {@see VmPspellNative} stays compiled in-tree but must not flip
  * {@code extension_loaded('pspell')} / {@code function_exists('pspell_new')} when host
  * Zend has no ext/pspell — same host-module gate as bz2/gmp (#25011 / #22860).
  *
  * Enable via host {@code extension_loaded('pspell')}, or explicit {@code PHP_COMPILER_ENABLE_PSPELL=1}
- * when {@see VmPspellNative::available()} (functional PHPT / local runs).
+ * (functional PHPT / local runs).
  */
 final class PspellExtensionPolicy
 {
     public static function advertisesExtension(): bool
     {
-        if (\extension_loaded('pspell')) {
-            return true;
-        }
-
-        if (!self::explicitEnableRequested()) {
-            return false;
-        }
-
-        return VmPspellNative::available();
+        return ExtensionRegistry::advertisesExtensionFor('pspell');
     }
 
     public static function advertisesBuiltins(): bool
@@ -64,18 +60,5 @@ final class PspellExtensionPolicy
         }
 
         return true;
-    }
-
-    /** Explicit side-load / functional-test opt-in when host Zend lacks ext/pspell (#23968). */
-    private static function explicitEnableRequested(): bool
-    {
-        $raw = getenv('PHP_COMPILER_ENABLE_PSPELL');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        $v = strtolower(trim($raw));
-
-        return !\in_array($v, ['0', 'false', 'off', 'no'], true);
     }
 }

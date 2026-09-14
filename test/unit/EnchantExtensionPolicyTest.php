@@ -53,7 +53,7 @@ final class EnchantExtensionPolicyTest extends TestCase
         }
     }
 
-    public function testExplicitEnableAdvertisesWhenNativeAvailable(): void
+    public function testExplicitEnableAdvertisesEnchant(): void
     {
         if (\extension_loaded('enchant')) {
             self::markTestSkipped('host ext/enchant loaded');
@@ -62,8 +62,7 @@ final class EnchantExtensionPolicyTest extends TestCase
         $prevEnable = getenv('PHP_COMPILER_ENABLE_ENCHANT');
         putenv('PHP_COMPILER_ENABLE_ENCHANT=1');
         try {
-            $available = \PHPCompiler\ext\enchant\VmEnchantNative::available();
-            self::assertSame($available, EnchantExtensionPolicy::advertisesExtension());
+            self::assertTrue(EnchantExtensionPolicy::advertisesExtension());
         } finally {
             if (false === $prevEnable) {
                 putenv('PHP_COMPILER_ENABLE_ENCHANT');

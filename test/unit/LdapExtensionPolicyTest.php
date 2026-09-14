@@ -74,11 +74,8 @@ final class LdapExtensionPolicyTest extends TestCase
         self::assertFalse(LdapExtensionPolicy::advertisesExtension());
     }
 
-    public function testExplicitEnableAdvertisesWhenLibldapFfiAvailable(): void
+    public function testExplicitEnableAdvertisesLdap(): void
     {
-        if (!VmLdapNative::available()) {
-            self::markTestSkipped('libldap FFI unavailable');
-        }
         if (\extension_loaded('ldap')) {
             self::markTestSkipped('host php-ldap already advertises');
         }

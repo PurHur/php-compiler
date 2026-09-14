@@ -7,15 +7,21 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\ExtensionRegistry;
 use PHPCompiler\ext\apcu\ApcuExtensionPolicy;
+use PHPCompiler\ext\bz2\Bz2ExtensionPolicy;
 use PHPCompiler\ext\curl\CurlExtensionPolicy;
 use PHPCompiler\ext\dba\DbaExtensionPolicy;
 use PHPCompiler\ext\ds\DsExtensionPolicy;
 use PHPCompiler\ext\eio\EioExtensionPolicy;
+use PHPCompiler\ext\enchant\EnchantExtensionPolicy;
 use PHPCompiler\ext\gd\GdExtensionPolicy;
 use PHPCompiler\ext\igbinary\IgbinaryExtensionPolicy;
+use PHPCompiler\ext\imagick\ImagickExtensionPolicy;
+use PHPCompiler\ext\ldap\LdapExtensionPolicy;
 use PHPCompiler\ext\oci8\Oci8ExtensionPolicy;
 use PHPCompiler\ext\pdo\PdoExtensionPolicy;
+use PHPCompiler\ext\pgsql\PgsqlExtensionPolicy;
 use PHPCompiler\ext\phar\PharExtensionPolicy;
+use PHPCompiler\ext\pspell\PspellExtensionPolicy;
 use PHPCompiler\ext\rar\RarExtensionPolicy;
 use PHPCompiler\ext\redis\RedisExtensionPolicy;
 use PHPCompiler\ext\soap\SoapExtensionPolicy;
@@ -47,6 +53,18 @@ final class ExtensionPolicyAdvertiseTest extends TestCase
         unset($_ENV['PHP_COMPILER_ENABLE_ZIP'], $_SERVER['PHP_COMPILER_ENABLE_ZIP']);
         putenv('PHP_COMPILER_ENABLE_ZSTD');
         unset($_ENV['PHP_COMPILER_ENABLE_ZSTD'], $_SERVER['PHP_COMPILER_ENABLE_ZSTD']);
+        putenv('PHP_COMPILER_ENABLE_BZ2');
+        unset($_ENV['PHP_COMPILER_ENABLE_BZ2'], $_SERVER['PHP_COMPILER_ENABLE_BZ2']);
+        putenv('PHP_COMPILER_ENABLE_ENCHANT');
+        unset($_ENV['PHP_COMPILER_ENABLE_ENCHANT'], $_SERVER['PHP_COMPILER_ENABLE_ENCHANT']);
+        putenv('PHP_COMPILER_ENABLE_IMAGICK');
+        unset($_ENV['PHP_COMPILER_ENABLE_IMAGICK'], $_SERVER['PHP_COMPILER_ENABLE_IMAGICK']);
+        putenv('PHP_COMPILER_ENABLE_LDAP');
+        unset($_ENV['PHP_COMPILER_ENABLE_LDAP'], $_SERVER['PHP_COMPILER_ENABLE_LDAP']);
+        putenv('PHP_COMPILER_ENABLE_PGSQL');
+        unset($_ENV['PHP_COMPILER_ENABLE_PGSQL'], $_SERVER['PHP_COMPILER_ENABLE_PGSQL']);
+        putenv('PHP_COMPILER_ENABLE_PSPELL');
+        unset($_ENV['PHP_COMPILER_ENABLE_PSPELL'], $_SERVER['PHP_COMPILER_ENABLE_PSPELL']);
         parent::tearDown();
     }
 
@@ -177,6 +195,35 @@ final class ExtensionPolicyAdvertiseTest extends TestCase
         $_ENV['PHP_COMPILER_ENABLE_ZSTD'] = '1';
         self::assertTrue(ExtensionRegistry::advertisesExtensionFor('zstd'));
         self::assertTrue(ZstdExtensionPolicy::advertisesExtension());
+    }
+
+    public function testBz2LdapPgsqlHostOrEnv(): void
+    {
+        foreach ([
+            'bz2' => Bz2ExtensionPolicy::class,
+            'enchant' => EnchantExtensionPolicy::class,
+            'imagick' => ImagickExtensionPolicy::class,
+            'ldap' => LdapExtensionPolicy::class,
+            'pgsql' => PgsqlExtensionPolicy::class,
+            'pspell' => PspellExtensionPolicy::class,
+        ] as $ext => $policy) {
+            $host = \extension_loaded($ext);
+            self::assertSame($host, ExtensionRegistry::advertisesExtensionFor($ext));
+            self::assertSame($host, $policy::advertisesExtension());
+        }
+
+        putenv('PHP_COMPILER_ENABLE_BZ2=1');
+        $_ENV['PHP_COMPILER_ENABLE_BZ2'] = '1';
+        self::assertTrue(ExtensionRegistry::advertisesExtensionFor('bz2'));
+        self::assertTrue(Bz2ExtensionPolicy::advertisesExtension());
+        putenv('PHP_COMPILER_ENABLE_LDAP=1');
+        $_ENV['PHP_COMPILER_ENABLE_LDAP'] = '1';
+        self::assertTrue(ExtensionRegistry::advertisesExtensionFor('ldap'));
+        self::assertTrue(LdapExtensionPolicy::advertisesExtension());
+        putenv('PHP_COMPILER_ENABLE_PGSQL=1');
+        $_ENV['PHP_COMPILER_ENABLE_PGSQL'] = '1';
+        self::assertTrue(ExtensionRegistry::advertisesExtensionFor('pgsql'));
+        self::assertTrue(PgsqlExtensionPolicy::advertisesExtension());
     }
 
     public function testUnknownAdvertiseThrows(): void
