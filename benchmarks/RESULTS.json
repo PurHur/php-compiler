@@ -1,0 +1,58 @@
+{
+    "version": 1,
+    "suite": "legacy",
+    "generated_at": "2026-09-09T00:00:00Z",
+    "php_version": "8.2.32",
+    "iterations": 5,
+    "cases": {
+        "Ack(3,10)": {
+            "8.2": 1.5937,
+            "vm": null,
+            "jit": null,
+            "aotcompile": 8.442,
+            "aot": 4.1176
+        },
+        "Ack(3,8)": {
+            "8.2": 0.0986,
+            "vm": null,
+            "jit": null,
+            "aotcompile": 8.3854,
+            "aot": 0.2618
+        },
+        "Ack(3,9)": {
+            "8.2": 0.3258,
+            "vm": null,
+            "jit": null,
+            "aotcompile": 8.4376,
+            "aot": 1.0177
+        },
+        "fibo(30)": {
+            "8.2": 0.1008,
+            "vm": null,
+            "jit": null,
+            "aotcompile": 8.4598,
+            "aot": 0.017
+        },
+        "fibo(32)": {
+            "8.2": 0.2276,
+            "vm": null,
+            "jit": null,
+            "aotcompile": 8.3694,
+            "aot": 0.0251
+        },
+        "mandelbrot": {
+            "8.2": 0.1518,
+            "vm": null,
+            "jit": null,
+            "aotcompile": 8.4498,
+            "aot": 0.1699
+        },
+        "simple": {
+            "8.2": 0.0668,
+            "vm": null,
+            "jit": null,
+            "aotcompile": 8.2235,
+            "aot": 0.5087
+        }
+    }
+}
