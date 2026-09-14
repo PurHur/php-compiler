@@ -366,3 +366,4 @@ test/differential/cases/str_pad_r1_36388.php	bde308ce399205a7b4201ae42cfe2458
 test/differential/cases/tan_libm_36386.php	7c0590a7dec6f9b134d5096b1e09db3b
 test/differential/cases/unset_nested_dim_36380.php	b456de624bce757623e041bc85f095f9
 test/differential/cases/z26367_call_falsy_array_literal.php	0be7a8a0c8b5f55309b58fed97d25014
+test/differential/cases/pow_hundredseventh_smul_36386.php	9197bed57c553af7d73c920fb83e9127
