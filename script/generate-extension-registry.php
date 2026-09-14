@@ -230,27 +230,50 @@ $buildAdvertiseMatch = static function (array $advertiseByDir) use ($root): stri
             $arms[] = "            '{$name}' => true,";
             continue;
         }
+        if ('never' === $rule || false === $rule || (is_array($rule) && ($rule['via'] ?? null) === 'never')) {
+            $arms[] = "            '{$name}' => false,";
+            continue;
+        }
         if (!is_array($rule)) {
             fwrite(STDERR, "generate-extension-registry: invalid advertise for {$name}\n");
             exit(2);
         }
         $method = $rule['compiler_version'] ?? null;
         $hostOnly = $rule['host_extension'] ?? null;
-        // Host-only / host|env gate (gd/soap; curl/dba/…): no CompilerVersion arm —
-        // match Zend without phantom modules; optional PHP_COMPILER_ENABLE_* opt-in (#36204).
+        $envOnlyKey = $rule['or_env'] ?? null;
+        $requireEnv = $rule['require_env'] ?? null;
+        // Env-only opt-in (gmp release-unsupported): PHP_COMPILER_ENABLE_* with no host/CV (#36204).
+        if (!is_string($method) && !is_string($hostOnly) && is_string($envOnlyKey) && '' !== $envOnlyKey) {
+            if (!preg_match('/^PHP_COMPILER_ENABLE_[A-Z0-9_]+$/', $envOnlyKey)) {
+                fwrite(STDERR, "generate-extension-registry: bad or_env for {$name}\n");
+                exit(2);
+            }
+            $arms[] = "            '{$name}' => self::envFlagEnabled('{$envOnlyKey}'),";
+            continue;
+        }
+        // Host-only / host|env / require_env∧host (gd/soap; curl/dba/…; intl) (#36204).
         if (!is_string($method) && is_string($hostOnly) && '' !== $hostOnly) {
             if (!preg_match('/^[a-z][a-z0-9_]*$/', $hostOnly)) {
                 fwrite(STDERR, "generate-extension-registry: bad host_extension for {$name}\n");
                 exit(2);
             }
             $expr = "\\extension_loaded('{$hostOnly}')";
-            $envOnly = $rule['or_env'] ?? null;
-            if (is_string($envOnly) && '' !== $envOnly) {
-                if (!preg_match('/^PHP_COMPILER_ENABLE_[A-Z0-9_]+$/', $envOnly)) {
+            if (is_string($requireEnv) && '' !== $requireEnv) {
+                if (!preg_match('/^PHP_COMPILER_ENABLE_[A-Z0-9_]+$/', $requireEnv)) {
+                    fwrite(STDERR, "generate-extension-registry: bad require_env for {$name}\n");
+                    exit(2);
+                }
+                if (is_string($envOnlyKey) && '' !== $envOnlyKey) {
+                    fwrite(STDERR, "generate-extension-registry: {$name} cannot mix require_env and or_env\n");
+                    exit(2);
+                }
+                $expr = "self::envFlagEnabled('{$requireEnv}') && {$expr}";
+            } elseif (is_string($envOnlyKey) && '' !== $envOnlyKey) {
+                if (!preg_match('/^PHP_COMPILER_ENABLE_[A-Z0-9_]+$/', $envOnlyKey)) {
                     fwrite(STDERR, "generate-extension-registry: bad or_env for {$name}\n");
                     exit(2);
                 }
-                $expr = "{$expr} || self::envFlagEnabled('{$envOnly}')";
+                $expr = "{$expr} || self::envFlagEnabled('{$envOnlyKey}')";
             }
             $arms[] = "            '{$name}' => {$expr},";
             continue;
@@ -289,7 +312,7 @@ $buildAdvertiseMatch = static function (array $advertiseByDir) use ($root): stri
 $advertiseMatch = $buildAdvertiseMatch($manifested['advertise'] ?? []);
 $needsEnvHelper = false;
 foreach ($manifested['advertise'] ?? [] as $rule) {
-    if (is_array($rule) && isset($rule['or_env'])) {
+    if (is_array($rule) && (isset($rule['or_env']) || isset($rule['require_env']))) {
         $needsEnvHelper = true;
         break;
     }

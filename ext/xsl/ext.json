@@ -16,5 +16,8 @@
         "functions": [],
         "classes": []
     },
-    "policy_env": []
+    "policy_env": [],
+    "advertise": {
+        "host_extension": "xsl"
+    }
 }

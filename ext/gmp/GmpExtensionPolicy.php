@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\gmp;
 
+use PHPCompiler\ExtensionRegistry;
 use PHPCompiler\ReleaseUnsupportedExtensions;
 
 /**
  * ext/gmp advertisement — php-src ext/gmp/gmp.c (#3341 / #22860 / #24697).
+ *
+ * {@see advertisesExtension()} is folded to ext.json advertise → ExtensionRegistry (#36204).
  *
  * GMP APIs stay in-tree (PHP-in-PHP) but are **release-unsupported** for v1.1.0 (#24697):
  * every executed compliance case failed, so advertising a half-implemented surface yields
@@ -26,7 +29,7 @@ final class GmpExtensionPolicy
      */
     public static function advertisesExtension(): bool
     {
-        return ReleaseUnsupportedExtensions::explicitEnableRequested(ReleaseUnsupportedExtensions::EXT_GMP);
+        return ExtensionRegistry::advertisesExtensionFor('gmp');
     }
 
     /** Compliance filenames that exercise gmp_* / GMP. */

@@ -15,5 +15,8 @@
     },
     "policy_env": [
         "PHP_COMPILER_ENABLE_GMP"
-    ]
+    ],
+    "advertise": {
+        "or_env": "PHP_COMPILER_ENABLE_GMP"
+    }
 }

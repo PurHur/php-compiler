@@ -7,17 +7,24 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\ExtensionRegistry;
 use PHPCompiler\ext\apcu\ApcuExtensionPolicy;
+use PHPCompiler\ext\brotli\BrotliExtensionPolicy;
 use PHPCompiler\ext\bz2\Bz2ExtensionPolicy;
 use PHPCompiler\ext\curl\CurlExtensionPolicy;
 use PHPCompiler\ext\dba\DbaExtensionPolicy;
 use PHPCompiler\ext\ds\DsExtensionPolicy;
 use PHPCompiler\ext\eio\EioExtensionPolicy;
 use PHPCompiler\ext\enchant\EnchantExtensionPolicy;
+use PHPCompiler\ext\ffi\FfiExtensionPolicy;
+use PHPCompiler\ext\ftp\FtpExtensionPolicy;
 use PHPCompiler\ext\gd\GdExtensionPolicy;
+use PHPCompiler\ext\gmp\GmpExtensionPolicy;
 use PHPCompiler\ext\igbinary\IgbinaryExtensionPolicy;
 use PHPCompiler\ext\imagick\ImagickExtensionPolicy;
+use PHPCompiler\ext\inotify\InotifyExtensionPolicy;
+use PHPCompiler\ext\intl\IntlExtensionPolicy;
 use PHPCompiler\ext\ldap\LdapExtensionPolicy;
 use PHPCompiler\ext\oci8\Oci8ExtensionPolicy;
+use PHPCompiler\ext\openssl\OpensslExtensionPolicy;
 use PHPCompiler\ext\pdo\PdoExtensionPolicy;
 use PHPCompiler\ext\pgsql\PgsqlExtensionPolicy;
 use PHPCompiler\ext\phar\PharExtensionPolicy;
@@ -27,7 +34,9 @@ use PHPCompiler\ext\redis\RedisExtensionPolicy;
 use PHPCompiler\ext\soap\SoapExtensionPolicy;
 use PHPCompiler\ext\sqlite3\Sqlite3ExtensionPolicy;
 use PHPCompiler\ext\sqlsrv\SqlsrvExtensionPolicy;
+use PHPCompiler\ext\tidy\TidyExtensionPolicy;
 use PHPCompiler\ext\uuid\UuidExtensionPolicy;
+use PHPCompiler\ext\xsl\XslExtensionPolicy;
 use PHPCompiler\ext\zip\ZipExtensionPolicy;
 use PHPCompiler\ext\zstd\ZstdExtensionPolicy;
 use PHPUnit\Framework\TestCase;
@@ -65,6 +74,10 @@ final class ExtensionPolicyAdvertiseTest extends TestCase
         unset($_ENV['PHP_COMPILER_ENABLE_PGSQL'], $_SERVER['PHP_COMPILER_ENABLE_PGSQL']);
         putenv('PHP_COMPILER_ENABLE_PSPELL');
         unset($_ENV['PHP_COMPILER_ENABLE_PSPELL'], $_SERVER['PHP_COMPILER_ENABLE_PSPELL']);
+        putenv('PHP_COMPILER_ENABLE_GMP');
+        unset($_ENV['PHP_COMPILER_ENABLE_GMP'], $_SERVER['PHP_COMPILER_ENABLE_GMP']);
+        putenv('PHP_COMPILER_ENABLE_INTL');
+        unset($_ENV['PHP_COMPILER_ENABLE_INTL'], $_SERVER['PHP_COMPILER_ENABLE_INTL']);
         parent::tearDown();
     }
 
@@ -224,6 +237,66 @@ final class ExtensionPolicyAdvertiseTest extends TestCase
         $_ENV['PHP_COMPILER_ENABLE_PGSQL'] = '1';
         self::assertTrue(ExtensionRegistry::advertisesExtensionFor('pgsql'));
         self::assertTrue(PgsqlExtensionPolicy::advertisesExtension());
+    }
+
+    public function testBrotliFtpCompilerVersion(): void
+    {
+        self::assertSame(
+            CompilerVersion::supportsBrotli(),
+            ExtensionRegistry::advertisesExtensionFor('brotli')
+        );
+        self::assertSame(
+            CompilerVersion::supportsBrotli(),
+            BrotliExtensionPolicy::advertisesExtension()
+        );
+        self::assertSame(
+            CompilerVersion::supportsFtpConnection(),
+            ExtensionRegistry::advertisesExtensionFor('ftp')
+        );
+        self::assertSame(
+            CompilerVersion::supportsFtpConnection(),
+            FtpExtensionPolicy::advertisesExtension()
+        );
+    }
+
+    public function testFfiTidyXslHostOnly(): void
+    {
+        self::assertSame(\extension_loaded('ffi'), ExtensionRegistry::advertisesExtensionFor('ffi'));
+        self::assertSame(\extension_loaded('ffi'), FfiExtensionPolicy::advertisesExtension());
+        self::assertSame(\extension_loaded('tidy'), ExtensionRegistry::advertisesExtensionFor('tidy'));
+        self::assertSame(\extension_loaded('tidy'), TidyExtensionPolicy::advertisesExtension());
+        self::assertSame(\extension_loaded('xsl'), ExtensionRegistry::advertisesExtensionFor('xsl'));
+        self::assertSame(\extension_loaded('xsl'), XslExtensionPolicy::advertisesExtension());
+    }
+
+    public function testOpensslAlwaysAndInotifyNever(): void
+    {
+        self::assertTrue(ExtensionRegistry::advertisesExtensionFor('openssl'));
+        self::assertTrue(OpensslExtensionPolicy::advertisesExtension());
+        self::assertFalse(ExtensionRegistry::advertisesExtensionFor('inotify'));
+        self::assertFalse(InotifyExtensionPolicy::advertisesExtension());
+    }
+
+    public function testGmpEnvOnlyAndIntlRequireEnvAndHost(): void
+    {
+        putenv('PHP_COMPILER_ENABLE_GMP');
+        unset($_ENV['PHP_COMPILER_ENABLE_GMP']);
+        self::assertFalse(ExtensionRegistry::advertisesExtensionFor('gmp'));
+        self::assertFalse(GmpExtensionPolicy::advertisesExtension());
+        putenv('PHP_COMPILER_ENABLE_GMP=1');
+        $_ENV['PHP_COMPILER_ENABLE_GMP'] = '1';
+        self::assertTrue(ExtensionRegistry::advertisesExtensionFor('gmp'));
+        self::assertTrue(GmpExtensionPolicy::advertisesExtension());
+
+        putenv('PHP_COMPILER_ENABLE_INTL');
+        unset($_ENV['PHP_COMPILER_ENABLE_INTL']);
+        self::assertFalse(ExtensionRegistry::advertisesExtensionFor('intl'));
+        self::assertFalse(IntlExtensionPolicy::advertisesExtension());
+        putenv('PHP_COMPILER_ENABLE_INTL=1');
+        $_ENV['PHP_COMPILER_ENABLE_INTL'] = '1';
+        $expected = \extension_loaded('intl');
+        self::assertSame($expected, ExtensionRegistry::advertisesExtensionFor('intl'));
+        self::assertSame($expected, IntlExtensionPolicy::advertisesExtension());
     }
 
     public function testUnknownAdvertiseThrows(): void

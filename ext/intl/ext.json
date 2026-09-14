@@ -15,5 +15,9 @@
     },
     "policy_env": [
         "PHP_COMPILER_ENABLE_INTL"
-    ]
+    ],
+    "advertise": {
+        "host_extension": "intl",
+        "require_env": "PHP_COMPILER_ENABLE_INTL"
+    }
 }
