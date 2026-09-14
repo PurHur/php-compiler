@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\zip;
 
+use PHPCompiler\ExtensionRegistry;
+
 /**
  * ext/zip surface advertisement — php-src ext/zip/php_zip.c (#11676, #18137, #3337, #25010).
+ *
+ * {@see advertisesExtension()} is folded to ext.json advertise → ExtensionRegistry (#36204).
  *
  * Pure-PHP ZipArchive ({@see VmZipArchive}) and zip_* procedural API stay compiled in-tree but
  * must not flip {@code extension_loaded('zip')} / {@code class_exists('ZipArchive')} when host
@@ -19,11 +23,7 @@ final class ZipExtensionPolicy
 {
     public static function advertisesExtension(): bool
     {
-        if (\extension_loaded('zip')) {
-            return true;
-        }
-
-        return self::explicitEnableRequested();
+        return ExtensionRegistry::advertisesExtensionFor('zip');
     }
 
     /** Compliance filenames that exercise ZipArchive / zip_* / extension_loaded('zip'). */
@@ -66,16 +66,4 @@ final class ZipExtensionPolicy
         return true;
     }
 
-    /** Explicit side-load / functional-test opt-in when host Zend lacks ext/zip (#25010). */
-    private static function explicitEnableRequested(): bool
-    {
-        $raw = getenv('PHP_COMPILER_ENABLE_ZIP');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        $v = strtolower(trim($raw));
-
-        return !\in_array($v, ['0', 'false', 'off', 'no'], true);
-    }
 }

@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\lz4;
 
+use PHPCompiler\ExtensionRegistry;
+
 /**
  * ext/lz4 advertisement — PECL kjdev/php-ext-lz4 (#22529, #25087).
+ *
+ * {@see advertisesExtension()} is folded to ext.json advertise → ExtensionRegistry (#36204).
  *
  * Pure-PHP {@see VmLz4Native} stays compiled in-tree but must not flip
  * {@code extension_loaded('lz4')} / {@code function_exists('lz4_compress')} when host
@@ -18,11 +22,7 @@ final class Lz4ExtensionPolicy
 {
     public static function advertisesExtension(): bool
     {
-        if (\extension_loaded('lz4')) {
-            return true;
-        }
-
-        return self::explicitEnableRequested();
+        return ExtensionRegistry::advertisesExtensionFor('lz4');
     }
 
     public static function advertisesBuiltins(): bool
@@ -58,16 +58,4 @@ final class Lz4ExtensionPolicy
         return true;
     }
 
-    /** Explicit side-load / functional-test opt-in when host Zend lacks pecl-lz4 (#25087). */
-    private static function explicitEnableRequested(): bool
-    {
-        $raw = getenv('PHP_COMPILER_ENABLE_LZ4');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        $v = strtolower(trim($raw));
-
-        return !\in_array($v, ['0', 'false', 'off', 'no'], true);
-    }
 }

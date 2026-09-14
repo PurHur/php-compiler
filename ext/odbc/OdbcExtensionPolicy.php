@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\odbc;
 
+use PHPCompiler\ExtensionRegistry;
+
 /**
  * ext/odbc advertisement (php-src ext/odbc/php_odbc.c; #6293, #23969).
+ *
+ * {@see advertisesExtension()} is folded to ext.json advertise → ExtensionRegistry (#36204).
  *
  * In-tree ODBC PHP + optional unixODBC FFI stay compiled but must not flip
  * {@code extension_loaded('odbc')} / {@code function_exists('odbc_connect')} when
@@ -18,11 +22,7 @@ final class OdbcExtensionPolicy
 {
     public static function advertisesExtension(): bool
     {
-        if (\extension_loaded('odbc')) {
-            return true;
-        }
-
-        return self::explicitEnableRequested();
+        return ExtensionRegistry::advertisesExtensionFor('odbc');
     }
 
     public static function advertisesBuiltins(): bool
@@ -64,16 +64,4 @@ final class OdbcExtensionPolicy
         return true;
     }
 
-    /** Explicit side-load / functional-test opt-in when host Zend lacks ext/odbc (#23969). */
-    private static function explicitEnableRequested(): bool
-    {
-        $raw = getenv('PHP_COMPILER_ENABLE_ODBC');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        $v = strtolower(trim($raw));
-
-        return !\in_array($v, ['0', 'false', 'off', 'no'], true);
-    }
 }

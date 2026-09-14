@@ -15,5 +15,9 @@
     },
     "policy_env": [
         "PHP_COMPILER_ENABLE_LZF"
-    ]
+    ],
+    "advertise": {
+        "host_extension": "lzf",
+        "or_env": "PHP_COMPILER_ENABLE_LZF"
+    }
 }

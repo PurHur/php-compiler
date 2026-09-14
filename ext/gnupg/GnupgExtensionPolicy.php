@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\gnupg;
 
+use PHPCompiler\ExtensionRegistry;
+
 /**
  * ext/gnupg advertisement — PECL gnupg / libgpgme via FFI (#6668, #25360).
+ *
+ * {@see advertisesExtension()} is folded to ext.json advertise → ExtensionRegistry (#36204).
  *
  * In-tree FFI bridge stays compiled but must not flip
  * {@code extension_loaded('gnupg')} / {@code function_exists('gnupg_init')} /
@@ -19,11 +23,7 @@ final class GnupgExtensionPolicy
 {
     public static function advertisesExtension(): bool
     {
-        if (\extension_loaded('gnupg')) {
-            return true;
-        }
-
-        return self::explicitEnableRequested();
+        return ExtensionRegistry::advertisesExtensionFor('gnupg');
     }
 
     public static function advertisesBuiltins(): bool
@@ -64,16 +64,4 @@ final class GnupgExtensionPolicy
         return true;
     }
 
-    /** Explicit side-load / functional-test opt-in when host Zend lacks pecl-gnupg (#25360). */
-    private static function explicitEnableRequested(): bool
-    {
-        $raw = getenv('PHP_COMPILER_ENABLE_GNUPG');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        $v = strtolower(trim($raw));
-
-        return !\in_array($v, ['0', 'false', 'off', 'no'], true);
-    }
 }

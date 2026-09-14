@@ -15,5 +15,9 @@
     },
     "policy_env": [
         "PHP_COMPILER_ENABLE_STATS"
-    ]
+    ],
+    "advertise": {
+        "host_extension": "stats",
+        "or_env": "PHP_COMPILER_ENABLE_STATS"
+    }
 }

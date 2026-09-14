@@ -7,6 +7,9 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\ExtensionRegistry;
 use PHPCompiler\ext\apcu\ApcuExtensionPolicy;
+use PHPCompiler\ext\curl\CurlExtensionPolicy;
+use PHPCompiler\ext\dba\DbaExtensionPolicy;
+use PHPCompiler\ext\ds\DsExtensionPolicy;
 use PHPCompiler\ext\eio\EioExtensionPolicy;
 use PHPCompiler\ext\gd\GdExtensionPolicy;
 use PHPCompiler\ext\igbinary\IgbinaryExtensionPolicy;
@@ -19,6 +22,8 @@ use PHPCompiler\ext\soap\SoapExtensionPolicy;
 use PHPCompiler\ext\sqlite3\Sqlite3ExtensionPolicy;
 use PHPCompiler\ext\sqlsrv\SqlsrvExtensionPolicy;
 use PHPCompiler\ext\uuid\UuidExtensionPolicy;
+use PHPCompiler\ext\zip\ZipExtensionPolicy;
+use PHPCompiler\ext\zstd\ZstdExtensionPolicy;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -34,6 +39,14 @@ final class ExtensionPolicyAdvertiseTest extends TestCase
         unset($_ENV['PHP_COMPILER_ENABLE_RAR'], $_SERVER['PHP_COMPILER_ENABLE_RAR']);
         putenv('PHP_COMPILER_ENABLE_EIO');
         unset($_ENV['PHP_COMPILER_ENABLE_EIO'], $_SERVER['PHP_COMPILER_ENABLE_EIO']);
+        putenv('PHP_COMPILER_ENABLE_CURL');
+        unset($_ENV['PHP_COMPILER_ENABLE_CURL'], $_SERVER['PHP_COMPILER_ENABLE_CURL']);
+        putenv('PHP_COMPILER_ENABLE_DBA');
+        unset($_ENV['PHP_COMPILER_ENABLE_DBA'], $_SERVER['PHP_COMPILER_ENABLE_DBA']);
+        putenv('PHP_COMPILER_ENABLE_ZIP');
+        unset($_ENV['PHP_COMPILER_ENABLE_ZIP'], $_SERVER['PHP_COMPILER_ENABLE_ZIP']);
+        putenv('PHP_COMPILER_ENABLE_ZSTD');
+        unset($_ENV['PHP_COMPILER_ENABLE_ZSTD'], $_SERVER['PHP_COMPILER_ENABLE_ZSTD']);
         parent::tearDown();
     }
 
@@ -123,6 +136,47 @@ final class ExtensionPolicyAdvertiseTest extends TestCase
         $_ENV['PHP_COMPILER_ENABLE_EIO'] = '1';
         self::assertTrue(ExtensionRegistry::advertisesExtensionFor('eio'));
         self::assertTrue(EioExtensionPolicy::advertisesExtension());
+    }
+
+    public function testCurlDbaHostOrEnv(): void
+    {
+        $curlHost = \extension_loaded('curl');
+        self::assertSame($curlHost, ExtensionRegistry::advertisesExtensionFor('curl'));
+        self::assertSame($curlHost, CurlExtensionPolicy::advertisesExtension());
+        $dbaHost = \extension_loaded('dba');
+        self::assertSame($dbaHost, ExtensionRegistry::advertisesExtensionFor('dba'));
+        self::assertSame($dbaHost, DbaExtensionPolicy::advertisesExtension());
+        $dsHost = \extension_loaded('ds');
+        self::assertSame($dsHost, ExtensionRegistry::advertisesExtensionFor('ds'));
+        self::assertSame($dsHost, DsExtensionPolicy::advertisesExtension());
+
+        putenv('PHP_COMPILER_ENABLE_CURL=1');
+        $_ENV['PHP_COMPILER_ENABLE_CURL'] = '1';
+        self::assertTrue(ExtensionRegistry::advertisesExtensionFor('curl'));
+        self::assertTrue(CurlExtensionPolicy::advertisesExtension());
+        putenv('PHP_COMPILER_ENABLE_DBA=1');
+        $_ENV['PHP_COMPILER_ENABLE_DBA'] = '1';
+        self::assertTrue(ExtensionRegistry::advertisesExtensionFor('dba'));
+        self::assertTrue(DbaExtensionPolicy::advertisesExtension());
+    }
+
+    public function testZipZstdHostOrEnv(): void
+    {
+        $zipHost = \extension_loaded('zip');
+        self::assertSame($zipHost, ExtensionRegistry::advertisesExtensionFor('zip'));
+        self::assertSame($zipHost, ZipExtensionPolicy::advertisesExtension());
+        $zstdHost = \extension_loaded('zstd');
+        self::assertSame($zstdHost, ExtensionRegistry::advertisesExtensionFor('zstd'));
+        self::assertSame($zstdHost, ZstdExtensionPolicy::advertisesExtension());
+
+        putenv('PHP_COMPILER_ENABLE_ZIP=1');
+        $_ENV['PHP_COMPILER_ENABLE_ZIP'] = '1';
+        self::assertTrue(ExtensionRegistry::advertisesExtensionFor('zip'));
+        self::assertTrue(ZipExtensionPolicy::advertisesExtension());
+        putenv('PHP_COMPILER_ENABLE_ZSTD=1');
+        $_ENV['PHP_COMPILER_ENABLE_ZSTD'] = '1';
+        self::assertTrue(ExtensionRegistry::advertisesExtensionFor('zstd'));
+        self::assertTrue(ZstdExtensionPolicy::advertisesExtension());
     }
 
     public function testUnknownAdvertiseThrows(): void

@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\ds;
 
+use PHPCompiler\ExtensionRegistry;
+
 /**
  * ext/ds advertisement — PECL php-ds/ext-ds (#22549, #25086).
+ *
+ * {@see advertisesExtension()} is folded to ext.json advertise → ExtensionRegistry (#36204).
  *
  * Pure-PHP {@see BuiltinClasses} / {@see VmDsStorage} stay compiled in-tree but must not flip
  * {@code extension_loaded('ds')} / {@code class_exists('Ds\\Vector')} when host Zend has no
@@ -18,11 +22,7 @@ final class DsExtensionPolicy
 {
     public static function advertisesExtension(): bool
     {
-        if (\extension_loaded('ds')) {
-            return true;
-        }
-
-        return self::explicitEnableRequested();
+        return ExtensionRegistry::advertisesExtensionFor('ds');
     }
 
     public static function advertisesClasses(): bool
@@ -65,16 +65,4 @@ final class DsExtensionPolicy
         return true;
     }
 
-    /** Explicit side-load / functional-test opt-in when host Zend lacks pecl-ds (#25086). */
-    private static function explicitEnableRequested(): bool
-    {
-        $raw = getenv('PHP_COMPILER_ENABLE_DS');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        $v = strtolower(trim($raw));
-
-        return !\in_array($v, ['0', 'false', 'off', 'no'], true);
-    }
 }

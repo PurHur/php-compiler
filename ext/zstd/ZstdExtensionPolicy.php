@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\zstd;
 
+use PHPCompiler\ExtensionRegistry;
+
 /**
  * ext/zstd advertisement — PECL php-ext-zstd (#6387, #25287).
+ *
+ * {@see advertisesExtension()} is folded to ext.json advertise → ExtensionRegistry (#36204).
  *
  * Pure-PHP {@see VmZstdCore} stays compiled in-tree but must not flip
  * {@code extension_loaded('zstd')} / {@code function_exists('zstd_compress')} when host
@@ -18,11 +22,7 @@ final class ZstdExtensionPolicy
 {
     public static function advertisesExtension(): bool
     {
-        if (\extension_loaded('zstd')) {
-            return true;
-        }
-
-        return self::explicitEnableRequested();
+        return ExtensionRegistry::advertisesExtensionFor('zstd');
     }
 
     public static function advertisesBuiltins(): bool
@@ -59,16 +59,4 @@ final class ZstdExtensionPolicy
         return true;
     }
 
-    /** Explicit side-load / functional-test opt-in when host Zend lacks pecl-zstd (#25287). */
-    private static function explicitEnableRequested(): bool
-    {
-        $raw = getenv('PHP_COMPILER_ENABLE_ZSTD');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        $v = strtolower(trim($raw));
-
-        return !\in_array($v, ['0', 'false', 'off', 'no'], true);
-    }
 }

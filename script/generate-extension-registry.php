@@ -236,13 +236,23 @@ $buildAdvertiseMatch = static function (array $advertiseByDir) use ($root): stri
         }
         $method = $rule['compiler_version'] ?? null;
         $hostOnly = $rule['host_extension'] ?? null;
-        // Host-only gate (gd/soap): no CompilerVersion arm — match Zend without phantom modules.
+        // Host-only / host|env gate (gd/soap; curl/dba/…): no CompilerVersion arm —
+        // match Zend without phantom modules; optional PHP_COMPILER_ENABLE_* opt-in (#36204).
         if (!is_string($method) && is_string($hostOnly) && '' !== $hostOnly) {
             if (!preg_match('/^[a-z][a-z0-9_]*$/', $hostOnly)) {
                 fwrite(STDERR, "generate-extension-registry: bad host_extension for {$name}\n");
                 exit(2);
             }
-            $arms[] = "            '{$name}' => \\extension_loaded('{$hostOnly}'),";
+            $expr = "\\extension_loaded('{$hostOnly}')";
+            $envOnly = $rule['or_env'] ?? null;
+            if (is_string($envOnly) && '' !== $envOnly) {
+                if (!preg_match('/^PHP_COMPILER_ENABLE_[A-Z0-9_]+$/', $envOnly)) {
+                    fwrite(STDERR, "generate-extension-registry: bad or_env for {$name}\n");
+                    exit(2);
+                }
+                $expr = "{$expr} || self::envFlagEnabled('{$envOnly}')";
+            }
+            $arms[] = "            '{$name}' => {$expr},";
             continue;
         }
         if (!is_string($method) || !isset($allowedCv[$method])) {

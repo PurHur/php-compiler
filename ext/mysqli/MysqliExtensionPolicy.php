@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\mysqli;
 
+use PHPCompiler\ExtensionRegistry;
+
 /**
  * ext/mysqli advertisement — php-src ext/mysqli/mysqli.c (#3435, #23954).
+ *
+ * {@see advertisesExtension()} is folded to ext.json advertise → ExtensionRegistry (#36204).
  *
  * In-tree mysqli PHP stays compiled but must not flip
  * {@code extension_loaded('mysqli')} / {@code function_exists('mysqli_connect')} /
@@ -20,11 +24,7 @@ final class MysqliExtensionPolicy
 {
     public static function advertisesExtension(): bool
     {
-        if (\extension_loaded('mysqli')) {
-            return true;
-        }
-
-        return self::explicitEnableRequested();
+        return ExtensionRegistry::advertisesExtensionFor('mysqli');
     }
 
     public static function hasNativeDriver(): bool
@@ -71,16 +71,4 @@ final class MysqliExtensionPolicy
         return true;
     }
 
-    /** Explicit side-load / functional-test opt-in when host Zend lacks ext/mysqli (#23954). */
-    private static function explicitEnableRequested(): bool
-    {
-        $raw = getenv('PHP_COMPILER_ENABLE_MYSQLI');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        $v = strtolower(trim($raw));
-
-        return !\in_array($v, ['0', 'false', 'off', 'no'], true);
-    }
 }

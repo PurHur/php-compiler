@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\lzf;
 
+use PHPCompiler\ExtensionRegistry;
+
 /**
  * ext/lzf advertisement — PECL lzf (#6384, #25287).
+ *
+ * {@see advertisesExtension()} is folded to ext.json advertise → ExtensionRegistry (#36204).
  *
  * Pure-PHP {@see VmLzfCore} stays compiled in-tree but must not flip
  * {@code extension_loaded('lzf')} / {@code function_exists('lzf_compress')} when host
@@ -18,11 +22,7 @@ final class LzfExtensionPolicy
 {
     public static function advertisesExtension(): bool
     {
-        if (\extension_loaded('lzf')) {
-            return true;
-        }
-
-        return self::explicitEnableRequested();
+        return ExtensionRegistry::advertisesExtensionFor('lzf');
     }
 
     public static function advertisesBuiltins(): bool
@@ -59,16 +59,4 @@ final class LzfExtensionPolicy
         return true;
     }
 
-    /** Explicit side-load / functional-test opt-in when host Zend lacks pecl-lzf (#25287). */
-    private static function explicitEnableRequested(): bool
-    {
-        $raw = getenv('PHP_COMPILER_ENABLE_LZF');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        $v = strtolower(trim($raw));
-
-        return !\in_array($v, ['0', 'false', 'off', 'no'], true);
-    }
 }

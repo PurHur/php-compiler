@@ -15,5 +15,9 @@
     },
     "policy_env": [
         "PHP_COMPILER_ENABLE_ZIP"
-    ]
+    ],
+    "advertise": {
+        "host_extension": "zip",
+        "or_env": "PHP_COMPILER_ENABLE_ZIP"
+    }
 }

@@ -15,5 +15,9 @@
     },
     "policy_env": [
         "PHP_COMPILER_ENABLE_ZMQ"
-    ]
+    ],
+    "advertise": {
+        "host_extension": "zmq",
+        "or_env": "PHP_COMPILER_ENABLE_ZMQ"
+    }
 }

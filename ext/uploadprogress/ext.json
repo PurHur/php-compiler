@@ -15,5 +15,9 @@
     },
     "policy_env": [
         "PHP_COMPILER_ENABLE_UPLOADPROGRESS"
-    ]
+    ],
+    "advertise": {
+        "host_extension": "uploadprogress",
+        "or_env": "PHP_COMPILER_ENABLE_UPLOADPROGRESS"
+    }
 }

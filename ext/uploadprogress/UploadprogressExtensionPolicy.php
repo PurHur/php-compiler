@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\uploadprogress;
 
+use PHPCompiler\ExtensionRegistry;
+
 /**
  * ext/uploadprogress advertisement — PECL uploadprogress (#6386, #26744).
+ *
+ * {@see advertisesExtension()} is folded to ext.json advertise → ExtensionRegistry (#36204).
  *
  * Pure-PHP builtins stay compiled in-tree but must not flip
  * {@code extension_loaded('uploadprogress')} /
@@ -20,11 +24,7 @@ final class UploadprogressExtensionPolicy
 {
     public static function advertisesExtension(): bool
     {
-        if (\extension_loaded('uploadprogress')) {
-            return true;
-        }
-
-        return self::explicitEnableRequested();
+        return ExtensionRegistry::advertisesExtensionFor('uploadprogress');
     }
 
     public static function advertisesBuiltins(): bool
@@ -60,16 +60,4 @@ final class UploadprogressExtensionPolicy
         return true;
     }
 
-    /** Explicit side-load / functional-test opt-in when host Zend lacks pecl-uploadprogress (#26744). */
-    private static function explicitEnableRequested(): bool
-    {
-        $raw = getenv('PHP_COMPILER_ENABLE_UPLOADPROGRESS');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        $v = strtolower(trim($raw));
-
-        return !\in_array($v, ['0', 'false', 'off', 'no'], true);
-    }
 }
