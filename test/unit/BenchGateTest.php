@@ -217,14 +217,42 @@ final class BenchGateTest extends TestCase
 
     public function testWebRequestAutomatesPhpFpmPool(): void
     {
-        $src = (string) file_get_contents(dirname(__DIR__, 2).'/script/bench-web-request.php');
+        $root = dirname(__DIR__, 2);
+        $src = (string) file_get_contents($root.'/script/bench-web-request.php');
         $this->assertStringContainsString('function measurePhpFpm', $src);
+        $this->assertStringContainsString('function findPhpFpmBinary', $src);
         $this->assertStringContainsString('function fastcgiGet', $src);
         $this->assertStringNotContainsString(
             'FastCGI pool wiring for MiniWebApp is not automated',
             $src
         );
         $this->assertStringContainsString('php_fpm n/a: no php-fpm binary on PATH', $src);
+
+        // Done-when (#36385): pinned CI image must ship php-fpm so the web column
+        // is measurable, not permanently n/a for missing binary.
+        $dockerfile = (string) file_get_contents($root.'/Docker/dev/ubuntu-22.04/Dockerfile');
+        $this->assertMatchesRegularExpression(
+            '/php\$\{PHP_VERSION\}-fpm|php8\.2-fpm/',
+            $dockerfile,
+            'php-compiler:22.04-dev must install php-fpm for bench-web-request'
+        );
+
+        $web = json_decode((string) file_get_contents($root.'/benchmarks/v2/WEB_REQUEST.json'), true);
+        $this->assertIsArray($web);
+        $this->assertSame('web-request', $web['name'] ?? null);
+        $this->assertArrayHasKey('php_fpm_s', $web);
+        $this->assertArrayHasKey('req_per_s', $web);
+        $this->assertArrayHasKey('php_fpm', $web['req_per_s'] ?? []);
+        // When the committed JSON still has null php_fpm, notes must say why (honesty).
+        if (null === ($web['php_fpm_s'] ?? null)) {
+            $notes = $web['notes'] ?? [];
+            $this->assertIsArray($notes);
+            $joined = implode("\n", array_map('strval', $notes));
+            $this->assertMatchesRegularExpression('/php_fpm n\/a|php_fpm:/', $joined);
+        } else {
+            $this->assertIsFloat((float) $web['php_fpm_s']);
+            $this->assertGreaterThan(0.0, (float) $web['req_per_s']['php_fpm']);
+        }
     }
 
 

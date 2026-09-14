@@ -150,11 +150,10 @@ if (is_executable($aotBin)) {
 
 // php-fpm: when present, run a disposable pool + pure-PHP FastCGI client (#36385).
 // No HTTP front required — measures FastCGI wall time with the same route needles.
-$fpm = trim((string) shell_exec('command -v php-fpm 2>/dev/null'));
-if ('' === $fpm) {
-    $fpm = trim((string) shell_exec('command -v php-fpm8.2 2>/dev/null'));
-}
-if ('' === $fpm || !is_executable($fpm)) {
+// The php-compiler:22.04-dev image installs php${PHP_VERSION}-fpm so this is not
+// permanently n/a in pinned CI (#36385 Done-when).
+$fpm = findPhpFpmBinary();
+if (null === $fpm) {
     $payload['notes'][] = 'php_fpm n/a: no php-fpm binary on PATH in this environment';
 } else {
     $fpmMeasure = measurePhpFpm($fpm, $php, $docroot, $payload['routes'], $requests);
@@ -427,6 +426,32 @@ function stopPid(int $pid): void
 }
 
 /**
+ * Locate php-fpm (unversioned, versioned on PATH, or /usr/sbin).
+ */
+function findPhpFpmBinary(): ?string
+{
+    foreach (['php-fpm', 'php-fpm8.2', 'php-fpm8.3', 'php-fpm8.4', 'php-fpm8.1'] as $name) {
+        $which = trim((string) shell_exec('command -v '.escapeshellarg($name).' 2>/dev/null'));
+        if ('' !== $which && is_executable($which)) {
+            return $which;
+        }
+    }
+    foreach (glob('/usr/sbin/php-fpm*') ?: [] as $path) {
+        if (!is_executable($path)) {
+            continue;
+        }
+        // Skip package defaults / backups.
+        if (str_contains($path, '.default') || str_contains($path, '.dpkg-')) {
+            continue;
+        }
+
+        return $path;
+    }
+
+    return null;
+}
+
+/**
  * Disposable php-fpm pool + FastCGI client for the web-request column (#36385).
  *
  * @param list<array{path: string, needle: string}> $routes
@@ -464,7 +489,7 @@ php_admin_value[error_log] = {$poolLog}
 php_admin_flag[log_errors] = on
 chdir = {$docroot}
 CONF;
-    // Prefer running as current user when nobody is unavailable (containers).
+    // Prefer a real pool user: non-root → current uid; root in CI → www-data when present.
     $uid = function_exists('posix_geteuid') ? (int) posix_geteuid() : 0;
     if (0 !== $uid) {
         $user = function_exists('posix_getpwuid') ? (posix_getpwuid($uid)['name'] ?? 'www-data') : 'www-data';
@@ -473,6 +498,12 @@ CONF;
         $confBody = str_replace(
             ["user = nobody", "group = nogroup"],
             ["user = {$user}", "group = {$group}"],
+            $confBody
+        );
+    } elseif (function_exists('posix_getpwnam') && false !== posix_getpwnam('www-data')) {
+        $confBody = str_replace(
+            ["user = nobody", "group = nogroup"],
+            ["user = www-data", "group = www-data"],
             $confBody
         );
     }

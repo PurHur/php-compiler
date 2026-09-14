@@ -4,7 +4,9 @@ Programs under `benchmarks/v2/` exercise shapes the 2015 micro-suite does not co
 strings, associative arrays, objects, JSON, regex, exceptions, closures, and classic
 benchmark-game kernels. The **web-request** column lives beside the CLI suite
 (`script/bench-web-request.php` → `WEB_REQUEST.json`) and times MiniWebApp `/` +
-`/api/status` under Zend `php -S` and `phpc serve` (AOT/`php-fpm` when available).
+`/api/status` under Zend `php -S`, `phpc serve` (VM + AOT when `.phpc/bin/app` exists),
+and `php-fpm` (the `php-compiler:22.04-dev` image installs `php${PHP_VERSION}-fpm` for
+this column; without it the cell is `n/a` with a reason — never a silent pass).
 
 **Do not hand-edit numbers.** Regenerate (or rewrite the table from committed JSON):
 

@@ -1,7 +1,7 @@
 {
     "name": "web-request",
     "suite": "v2",
-    "generated_at": "2026-09-09T18:09:13Z",
+    "generated_at": "2026-09-14T16:09:27Z",
     "requests": 200,
     "routes": [
         {
@@ -13,23 +13,23 @@
             "needle": "\"ok\":true"
         }
     ],
-    "zend_builtin_s": 2.678457021713257,
-    "phpc_serve_s": 57.35966897010803,
-    "phpc_serve_aot_s": 5.750227928161621,
-    "php_fpm_s": null,
+    "zend_builtin_s": 2.109714984893799,
+    "phpc_serve_s": 28.82159399986267,
+    "phpc_serve_aot_s": 4.381744861602783,
+    "php_fpm_s": 0.02485799789428711,
     "req_per_s": {
-        "zend_builtin": 149.33971191523645,
-        "phpc_serve": 6.973540942303082,
-        "phpc_serve_aot": 69.562459957632,
-        "php_fpm": null
+        "zend_builtin": 189.59907042615788,
+        "phpc_serve": 13.878482918117086,
+        "phpc_serve_aot": 91.28783455768928,
+        "php_fpm": 16091.400510253017
     },
     "p99_ms": {
-        "zend_builtin": 39.94488716125488,
-        "phpc_serve": 1264.3530368804932,
-        "phpc_serve_aot": 81.5129280090332,
-        "php_fpm": null
+        "zend_builtin": 8.569955825805664,
+        "phpc_serve": 581.0890197753906,
+        "phpc_serve_aot": 19.75393295288086,
+        "php_fpm": 0.15401840209960938
     },
     "notes": [
-        "php_fpm n/a: no php-fpm binary on PATH in this environment"
+        "php_fpm via FastCGI (no HTTP front; compare to zend_builtin carefully)"
     ]
 }
