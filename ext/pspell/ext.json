@@ -15,5 +15,9 @@
     },
     "policy_env": [
         "PHP_COMPILER_ENABLE_PSPELL"
-    ]
+    ],
+    "advertise": {
+        "host_extension": "pspell",
+        "or_env": "PHP_COMPILER_ENABLE_PSPELL"
+    }
 }

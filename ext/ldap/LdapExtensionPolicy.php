@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\ldap;
 
+use PHPCompiler\ExtensionRegistry;
+
 /**
  * ext/ldap advertisement — php-src ext/ldap/php_ldap.c (#6352, #18211, #3369, #23857, #24536).
+ *
+ * {@see advertisesExtension()} is folded to ext.json advertise → ExtensionRegistry (#36204).
  *
  * OpenLDAP FFI stays in-tree ({@see VmLdapNative}) but introspection must match Zend
  * module registration on the reference harness (host without php-ldap), not FFI
@@ -14,8 +18,7 @@ namespace PHPCompiler\ext\ldap;
  * lacks it (#24536).
  *
  * Enable via host {@code extension_loaded('ldap')}, or explicit
- * {@code PHP_COMPILER_ENABLE_LDAP=1} plus libldap FFI (functional compliance sets
- * ENABLE via {@code --ENV--}; keep PROFILE for version-gated helpers).
+ * {@code PHP_COMPILER_ENABLE_LDAP=1} (functional compliance sets ENABLE via {@code --ENV--}).
  */
 final class LdapExtensionPolicy
 {
@@ -29,15 +32,7 @@ final class LdapExtensionPolicy
      */
     public static function advertisesExtension(): bool
     {
-        if (\extension_loaded('ldap')) {
-            return true;
-        }
-
-        if (!VmLdapNative::available()) {
-            return false;
-        }
-
-        return self::explicitEnableRequested();
+        return ExtensionRegistry::advertisesExtensionFor('ldap');
     }
 
     public static function advertisesClasses(): bool
@@ -116,18 +111,5 @@ final class LdapExtensionPolicy
         }
 
         return true;
-    }
-
-    /** Explicit side-load / functional-test opt-in when host Zend lacks php-ldap (#24536). */
-    private static function explicitEnableRequested(): bool
-    {
-        $raw = getenv('PHP_COMPILER_ENABLE_LDAP');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        $v = strtolower(trim($raw));
-
-        return !\in_array($v, ['0', 'false', 'off', 'no'], true);
     }
 }

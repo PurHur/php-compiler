@@ -15,5 +15,9 @@
     },
     "policy_env": [
         "PHP_COMPILER_ENABLE_IMAGICK"
-    ]
+    ],
+    "advertise": {
+        "host_extension": "imagick",
+        "or_env": "PHP_COMPILER_ENABLE_IMAGICK"
+    }
 }

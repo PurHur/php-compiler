@@ -15,5 +15,9 @@
     },
     "policy_env": [
         "PHP_COMPILER_ENABLE_LDAP"
-    ]
+    ],
+    "advertise": {
+        "host_extension": "ldap",
+        "or_env": "PHP_COMPILER_ENABLE_LDAP"
+    }
 }

@@ -15,5 +15,9 @@
     },
     "policy_env": [
         "PHP_COMPILER_ENABLE_ENCHANT"
-    ]
+    ],
+    "advertise": {
+        "host_extension": "enchant",
+        "or_env": "PHP_COMPILER_ENABLE_ENCHANT"
+    }
 }

@@ -60,10 +60,6 @@ final class PgsqlExtensionPolicyTest extends TestCase
         putenv('PHP_COMPILER_ENABLE_PGSQL=1');
         try {
             putenv('PHP_COMPILER_PROFILE=8.4');
-            $available = \PHPCompiler\ext\pgsql\VmPgsqlNative::available();
-            if (!$available) {
-                self::markTestSkipped('libpq FFI unavailable');
-            }
             self::assertTrue(PgsqlExtensionPolicy::advertisesPhp84Helpers());
             self::assertFalse(PgsqlExtensionPolicy::advertisesPhp85Helpers());
 
@@ -83,7 +79,7 @@ final class PgsqlExtensionPolicyTest extends TestCase
         }
     }
 
-    public function testExplicitEnableAdvertisesWhenLibpqAvailable(): void
+    public function testExplicitEnableAdvertisesPgsql(): void
     {
         if (\extension_loaded('pgsql')) {
             self::markTestSkipped('host ext/pgsql loaded');
@@ -92,8 +88,7 @@ final class PgsqlExtensionPolicyTest extends TestCase
         $prevEnable = getenv('PHP_COMPILER_ENABLE_PGSQL');
         putenv('PHP_COMPILER_ENABLE_PGSQL=1');
         try {
-            $available = \PHPCompiler\ext\pgsql\VmPgsqlNative::available();
-            self::assertSame($available, PgsqlExtensionPolicy::advertisesExtension());
+            self::assertTrue(PgsqlExtensionPolicy::advertisesExtension());
         } finally {
             if (false === $prevEnable) {
                 putenv('PHP_COMPILER_ENABLE_PGSQL');

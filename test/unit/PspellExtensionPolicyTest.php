@@ -53,7 +53,7 @@ final class PspellExtensionPolicyTest extends TestCase
         }
     }
 
-    public function testExplicitEnableAdvertisesWhenNativeAvailable(): void
+    public function testExplicitEnableAdvertisesPspell(): void
     {
         if (\extension_loaded('pspell')) {
             self::markTestSkipped('host ext/pspell loaded');
@@ -62,8 +62,7 @@ final class PspellExtensionPolicyTest extends TestCase
         $prevEnable = getenv('PHP_COMPILER_ENABLE_PSPELL');
         putenv('PHP_COMPILER_ENABLE_PSPELL=1');
         try {
-            $available = \PHPCompiler\ext\pspell\VmPspellNative::available();
-            self::assertSame($available, PspellExtensionPolicy::advertisesExtension());
+            self::assertTrue(PspellExtensionPolicy::advertisesExtension());
         } finally {
             if (false === $prevEnable) {
                 putenv('PHP_COMPILER_ENABLE_PSPELL');

@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\pgsql;
 
+use PHPCompiler\ExtensionRegistry;
+
 /**
  * ext/pgsql advertisement — php-src ext/pgsql/pgsql.c (#3741, #24994, #24627).
+ *
+ * {@see advertisesExtension()} is folded to ext.json advertise → ExtensionRegistry (#36204).
  *
  * In-tree libpq FFI ({@see VmPgsqlNative}) must not flip {@code extension_loaded('pgsql')} /
  * {@code function_exists('pg_*')} when host Zend has no ext/pgsql — same host-module gate as
@@ -13,21 +17,13 @@ namespace PHPCompiler\ext\pgsql;
  * optional module (#24627).
  *
  * Enable via host {@code extension_loaded('pgsql')}, or explicit
- * {@code PHP_COMPILER_ENABLE_PGSQL=1} when libpq FFI is available (functional PHPT / local runs).
+ * {@code PHP_COMPILER_ENABLE_PGSQL=1} (functional PHPT / local runs).
  */
 final class PgsqlExtensionPolicy
 {
     public static function advertisesExtension(): bool
     {
-        if (\extension_loaded('pgsql')) {
-            return true;
-        }
-
-        if (!self::explicitEnableRequested()) {
-            return false;
-        }
-
-        return VmPgsqlNative::available();
+        return ExtensionRegistry::advertisesExtensionFor('pgsql');
     }
 
     public static function advertisesBuiltins(): bool
@@ -135,20 +131,5 @@ final class PgsqlExtensionPolicy
         }
 
         return true;
-    }
-
-    /**
-     * Explicit side-load / functional-test opt-in when host Zend lacks ext/pgsql (#24994).
-     */
-    private static function explicitEnableRequested(): bool
-    {
-        $raw = getenv('PHP_COMPILER_ENABLE_PGSQL');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        $v = strtolower(trim($raw));
-
-        return !\in_array($v, ['0', 'false', 'off', 'no'], true);
     }
 }

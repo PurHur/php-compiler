@@ -45,7 +45,7 @@ final class Bz2ExtensionPolicyTest extends TestCase
         }
     }
 
-    public function testExplicitEnableAdvertisesWhenNativeAvailable(): void
+    public function testExplicitEnableAdvertisesBz2(): void
     {
         if (\extension_loaded('bz2')) {
             self::markTestSkipped('host ext/bz2 loaded');
@@ -54,8 +54,7 @@ final class Bz2ExtensionPolicyTest extends TestCase
         $prevEnable = getenv('PHP_COMPILER_ENABLE_BZ2');
         putenv('PHP_COMPILER_ENABLE_BZ2=1');
         try {
-            $available = \PHPCompiler\ext\bz2\VmBz2Native::available();
-            self::assertSame($available, Bz2ExtensionPolicy::advertisesExtension());
+            self::assertTrue(Bz2ExtensionPolicy::advertisesExtension());
         } finally {
             if (false === $prevEnable) {
                 putenv('PHP_COMPILER_ENABLE_BZ2');
