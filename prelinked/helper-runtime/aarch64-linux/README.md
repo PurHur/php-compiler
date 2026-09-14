@@ -11,9 +11,9 @@ non-native link.
 `script/check-helper-runtime-prelink.php --all-arches` asserts every committed `unit.o`
 (and `common.o` when present) has ELF `e_machine=183` (EM_AARCH64).
 
-## Seed corpus (VM_* + lib_VM_* + ext/standard + ctype/calendar/posix/filter/hash/tokenizer/mbstring/iconv + compress/encode + sodium/spl/libxml/lz4/stats/xmlrpc/ftp + Dom create/query)
+## Seed corpus (VM_* + lib_VM_* + ext/standard + ctype/calendar/posix/filter/hash/tokenizer/mbstring/iconv + compress/encode + sodium/spl/libxml/lz4/stats/xmlrpc/ftp + Dom create/query + Dom load/save/XML)
 
-**352** committed `unit.o` files:
+**362** committed `unit.o` files:
 
 - full `VM_*` (13) and `lib_VM_*` (9) sets from `x86_64-linux`
 - first `ext/standard` tier (10): ArrayChunk / ArrayIsList / ArraySlice / Bin2hex /
@@ -124,7 +124,13 @@ non-native link.
   DomElementTextContent / DomGetElementById / DomGetElementsByTagName /
   DomHtmlDocumentCreateFromFile / DomHtmlDocumentCreateFromString /
   DomImportNode
-  (deferred: remaining Dom* load/save; Intl* / Openssl* / Soap* / Sockets*)
+- Dom load/save + XML document create + normalize (10):
+  DomLoad / DomLoadHTML / DomLoadHTMLFile / DomLoadXML /
+  DomSaveHTML / DomSaveHTMLFile / DomSaveXML /
+  DomXmlDocumentCreateFromFile / DomXmlDocumentCreateFromString /
+  DomNormalize
+  (deferred: DomInsertAdjacent / DomIsConnected / DomSetIdAttribute /
+  DomStandaloneAotInit; Intl* / Openssl* / Soap* / Sockets*)
 
 Refresh / expand via:
 

@@ -501,7 +501,7 @@ SEED_UNITS=(
   # PosixSet* / PosixSession / PosixTerminal deferred (mutators / tty).
   # Curl* handle/transfer deferred (host libcurl); Strerror* are string-only.
   # Ftp* connect/transfer deferred (host libftp); Close is handle-teardown only.
-  # Remaining Dom* (load/save/HTML/XML) + Intl* / Openssl* / Soap* / Sockets* deferred.
+  # Remaining Dom* (insert/connected/set-id/standalone) + Intl* / Openssl* / Soap* / Sockets* deferred.
   /ext/dom/DomAdoptNodeJitHelper.php
   /ext/dom/DomC14NJitHelper.php
   /ext/dom/DomCreateElementJitHelper.php
@@ -512,6 +512,29 @@ SEED_UNITS=(
   /ext/dom/DomHtmlDocumentCreateFromFileJitHelper.php
   /ext/dom/DomHtmlDocumentCreateFromStringJitHelper.php
   /ext/dom/DomImportNodeJitHelper.php
+  # Dom load/save + XML document create + normalize (#36391 after 352)
+  # Frexp/Ldexp/Modf/Nextafter/Shuffle still skipped (algorithm SSOT, no HELPER_PATH).
+  # Preg* still skipped: tip nested compile misses Compiler\Concern\OpCode.
+  # Sscanf still skipped: __init__ sealed during NestedJIT.
+  # Gethostbynamel skipped: NestedJIT missing __compiler_stream_resolve_include_path.
+  # Ini skipped: IniGetLeafJitHelper not compiled under helper-runtime-emit NestedJIT.
+  # Progress skipped: NestedJIT ContextLlvmConstantsAndRegistry seal during helper emit.
+  # CalInfo still skipped (unknown unit under NestedJIT).
+  # PosixSet* / PosixSession / PosixTerminal deferred (mutators / tty).
+  # Curl* handle/transfer deferred (host libcurl); Strerror* are string-only.
+  # Ftp* connect/transfer deferred (host libftp); Close is handle-teardown only.
+  # DomInsertAdjacent / DomIsConnected / DomSetIdAttribute / DomStandaloneAotInit
+  # + Intl* / Openssl* / Soap* / Sockets* deferred.
+  /ext/dom/DomLoadJitHelper.php
+  /ext/dom/DomLoadHTMLJitHelper.php
+  /ext/dom/DomLoadHTMLFileJitHelper.php
+  /ext/dom/DomLoadXMLJitHelper.php
+  /ext/dom/DomSaveHTMLJitHelper.php
+  /ext/dom/DomSaveHTMLFileJitHelper.php
+  /ext/dom/DomSaveXMLJitHelper.php
+  /ext/dom/DomXmlDocumentCreateFromFileJitHelper.php
+  /ext/dom/DomXmlDocumentCreateFromStringJitHelper.php
+  /ext/dom/DomNormalizeJitHelper.php
 )
 
 MIN_SEED=${#SEED_UNITS[@]}
