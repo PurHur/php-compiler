@@ -99,6 +99,8 @@ final class BenchGateTest extends TestCase
         $this->assertStringContainsString('--publish-only', $nightly);
         $this->assertStringContainsString('bench-gate.sh --v2', $nightly);
         $this->assertStringContainsString('--self-test-v2-2x', (string) file_get_contents($root.'/script/bench-gate.php'));
+        $this->assertStringContainsString('--self-test-v2-geomean', (string) file_get_contents($root.'/script/bench-gate.php'));
+        $this->assertStringContainsString('V2_GEOMEAN_TOLERANCE_PERCENT', (string) file_get_contents($root.'/script/bench-gate.php'));
         $this->assertStringContainsString('generate-bench-chart.php', $nightly);
         $bench = (string) file_get_contents($root.'/script/bench.php');
         $this->assertStringContainsString('bench-web-request.php', $bench);
@@ -161,6 +163,9 @@ final class BenchGateTest extends TestCase
             $this->assertArrayHasKey('ratio_aot_over_zend', $baseline['cases'][$name]);
         }
         $this->assertGreaterThanOrEqual(16, \count($baseline['cases']));
+        $this->assertSame(10, $baseline['geomean_tolerance_percent'] ?? null);
+        $this->assertArrayHasKey('geomean_ratio_aot_over_zend', $baseline);
+        $this->assertGreaterThan(0.0, (float) $baseline['geomean_ratio_aot_over_zend']);
     }
     public function testV2Deliberate2xSlowdownFailsGate(): void
     {
@@ -173,6 +178,19 @@ final class BenchGateTest extends TestCase
         $this->assertSame(0, $rc, $out);
         $this->assertStringContainsString('deliberate 2× trips', $out);
         $this->assertStringContainsString('__self_test_2x_probe__', $out);
+    }
+
+    public function testV2DiffuseGeomeanSlowdownFailsGate(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $php = \PHP_BINARY;
+        $cmd = escapeshellcmd($php).' '
+            .escapeshellarg($root.'/script/bench-gate.php').' --self-test-v2-geomean';
+        exec($cmd.' 2>&1', $lines, $rc);
+        $out = implode("\n", $lines);
+        $this->assertSame(0, $rc, $out);
+        $this->assertStringContainsString('diffuse +15% trips geomean', $out);
+        $this->assertStringContainsString('geomean.ratio:', $out);
     }
 
     public function testBenchReadmeSyncGate(): void

@@ -4,9 +4,11 @@
     "generated_at": "2026-09-09T16:31:20Z",
     "arch": "x86_64-linux",
     "ratio_tolerance_percent": 20,
+    "geomean_tolerance_percent": 10,
+    "geomean_ratio_aot_over_zend": 0.869234,
     "ir_tolerance_percent": 20,
     "regeneration": "PHP_8_2=$(command -v php) ./script/bench-gate.sh --v2 --update",
-    "note": "v2 gate subset (#36385). Ratio tolerance 20% so a deliberate ~2\u00d7 slowdown fails.",
+    "note": "v2 gate subset (#36385). Per-case ratio +20%; suite geomean +10% so diffuse regressions fail.",
     "cases": {
         "call-heavy": {
             "ratio_aot_over_zend": 0.461441,

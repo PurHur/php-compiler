@@ -29,12 +29,16 @@ Gate (AOT/Zend ratio + IR size vs committed baseline; subset that must match Zen
 ```bash
 ./script/bench-gate.sh --v2
 ./script/bench-gate.sh --v2 --update   # bless after verifying output
+php script/bench-gate.php --self-test-v2-2x      # deliberate 2× must fail
+php script/bench-gate.php --self-test-v2-geomean # diffuse +15% must fail geomean (+10%)
 ```
 
 `n/a` AOT columns mean build failed, timed out, or output mismatched Zend — intentional honesty
 in `script/bench.php`, not a silent pass. Gate cases (`script/bench-gate.php` `BENCH_GATE_V2_CASES`):
 all CLI v2 programs that currently FULL_MATCH under AOT, including `binary-trees` and
-`fannkuch-redux` (#36385).
+`fannkuch-redux` (#36385). Per-case ratio band is **+20%**; suite **geometric mean** of
+AOT/Zend ratios is **+10%** so a diffuse regression that stays under the per-case band still
+fails.
 
 History JSON lands in `benchmarks/history/<sha>.json` when `PHP_COMPILER_BENCH_HISTORY=1`,
 or via the nightly publisher (`./script/bench/nightly.sh` / `make bench-nightly`).
