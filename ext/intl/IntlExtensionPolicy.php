@@ -5,11 +5,15 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\intl;
 
 use PHPCompiler\CompilerVersion;
+use PHPCompiler\ExtensionRegistry;
 use PHPCompiler\ReleaseUnsupportedExtensions;
 
 /**
  * ext/intl builtin advertisement — php-src ext/intl/php_intl.c module registration
  * (#11768, #11825, #20630, #22691, #24697).
+ *
+ * {@see advertisesExtension()} is folded to ext.json advertise → ExtensionRegistry (#36204)
+ * ({@code require_env} ∧ host {@code extension_loaded('intl')}).
  *
  * Grapheme helpers, IDN converters, Normalizer / normalizer_*, Locale / locale_*, IntlDateFormatter,
  * IntlCalendar / IntlTimeZone, NumberFormatter, and intl_* error functions stay in-tree but are
@@ -38,12 +42,9 @@ final class IntlExtensionPolicy
      */
     public static function advertisesExtension(): bool
     {
-        if (!ReleaseUnsupportedExtensions::explicitEnableRequested(ReleaseUnsupportedExtensions::EXT_INTL)) {
-            return false;
-        }
-
-        return \extension_loaded('intl');
+        return ExtensionRegistry::advertisesExtensionFor('intl');
     }
+
 
     /**
      * ICU major version from the loaded libicuuc soname (php-src U_ICU_VERSION_MAJOR_NUM).

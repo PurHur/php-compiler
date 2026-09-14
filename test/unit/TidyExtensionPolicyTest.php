@@ -13,7 +13,11 @@ final class TidyExtensionPolicyTest extends TestCase
 {
     public function testAdvertisesExtensionMatchesHostTidy(): void
     {
-        self::assertSame(VmTidy::hostAvailable(), TidyExtensionPolicy::advertisesExtension());
+        self::assertSame(\extension_loaded('tidy'), TidyExtensionPolicy::advertisesExtension());
+        self::assertSame(
+            \extension_loaded('tidy'),
+            \PHPCompiler\ExtensionRegistry::advertisesExtensionFor('tidy')
+        );
     }
 
     public function testRunsTidyComplianceSkipsPhantomWhenHostHasTidy(): void

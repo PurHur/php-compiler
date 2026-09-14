@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\tidy;
 
+use PHPCompiler\ExtensionRegistry;
+
 /**
  * ext/tidy surface advertisement (php-src ext/tidy/tidy.c; #21464, #23955).
+ *
+ * {@see advertisesExtension()} is folded to ext.json advertise → ExtensionRegistry (#36204).
  *
  * Withhold extension_loaded() / function_exists() / class_exists() on the reference
  * harness when host Zend has no ext/tidy — same shape as soap/yaml (#22859).
@@ -15,7 +19,7 @@ final class TidyExtensionPolicy
 {
     public static function advertisesExtension(): bool
     {
-        return VmTidy::hostAvailable();
+        return ExtensionRegistry::advertisesExtensionFor('tidy');
     }
 
     /** Compliance filenames that exercise tidy builtins / classes. */

@@ -168,13 +168,16 @@ foreach ($fullOrder as $index => $name) {
     // Preserve optional advertise rules — sync must not wipe fold progress (#36204).
     if (array_key_exists('advertise', $existing)) {
         $manifest['advertise'] = $existing['advertise'];
-        if (is_array($existing['advertise'])
-            && isset($existing['advertise']['or_env'])
-            && is_string($existing['advertise']['or_env'])
-            && '' !== $existing['advertise']['or_env']
-            && !in_array($existing['advertise']['or_env'], $manifest['policy_env'], true)
-        ) {
-            $manifest['policy_env'][] = $existing['advertise']['or_env'];
+        if (is_array($existing['advertise'])) {
+            foreach (['or_env', 'require_env'] as $envKey) {
+                if (isset($existing['advertise'][$envKey])
+                    && is_string($existing['advertise'][$envKey])
+                    && '' !== $existing['advertise'][$envKey]
+                    && !in_array($existing['advertise'][$envKey], $manifest['policy_env'], true)
+                ) {
+                    $manifest['policy_env'][] = $existing['advertise'][$envKey];
+                }
+            }
         }
     }
     $manifests[$name] = $manifest;
