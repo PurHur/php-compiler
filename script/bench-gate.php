@@ -18,7 +18,8 @@ declare(strict_types=1);
  *   PHP_8_2=$(command -v php) php script/bench-gate.php --v2 --update
  *   PHP_8_2=$(command -v php) php script/bench-gate.php --compile
  *   PHP_8_2=$(command -v php) php script/bench-gate.php --compile --update
- *   php script/bench-gate.php --self-test-v2-2x   # #36385 Done-when: 2× must fail
+ *   php script/bench-gate.php --self-test-v2-2x       # #36385 Done-when: 2× must fail
+ *   php script/bench-gate.php --self-test-v2-geomean  # #36385: +15% diffuse trip under per-case band
  */
 
 const COMPILE_BASELINE_REL = 'benchmarks/COMPILE_BASELINE.json';
@@ -64,6 +65,11 @@ const IR_TOLERANCE_PERCENT = 20;
 const MIN_ABSOLUTE_AOT_REGRESSION_SECONDS = 0.015;
 /** Tighter ratio band for v2 so a deliberate 2× slowdown fails the gate (#36385). */
 const V2_RATIO_TOLERANCE_PERCENT = 20;
+/**
+ * Geometric-mean band for v2 (#36385 deliverable): catches diffuse regressions that
+ * stay under the per-program 20% band but still move the suite mean.
+ */
+const V2_GEOMEAN_TOLERANCE_PERCENT = 10;
 const TIMING_RUNS = 3;
 
 $root = dirname(__DIR__);
@@ -72,11 +78,18 @@ $update = in_array('--update', $argvList, true);
 $compileMode = in_array('--compile', $argvList, true);
 $v2Mode = in_array('--v2', $argvList, true);
 $selfTestV2Twice = in_array('--self-test-v2-2x', $argvList, true);
+$selfTestV2Geomean = in_array('--self-test-v2-geomean', $argvList, true);
 
 if ($selfTestV2Twice) {
     // Done-when (#36385): deliberate ~2× AOT slowdown must turn the v2 gate red.
     // No Zend/LLVM required — compares fabricated measurements to the committed baseline.
     runV2Deliberate2xSelfTest($root);
+    exit(0);
+}
+
+if ($selfTestV2Geomean) {
+    // Done-when (#36385): +15% on every ratio stays under per-case 20% but must trip geomean 10%.
+    runV2GeomeanSelfTest($root);
     exit(0);
 }
 
@@ -146,7 +159,12 @@ if ([] !== $errors) {
 
 $ratioTol = (int) ($baseline['ratio_tolerance_percent'] ?? ($v2Mode ? V2_RATIO_TOLERANCE_PERCENT : RATIO_TOLERANCE_PERCENT));
 $irTol = (int) ($baseline['ir_tolerance_percent'] ?? IR_TOLERANCE_PERCENT);
-echo 'bench-gate'.($v2Mode ? ' --v2' : '').": OK (ratio <= +{$ratioTol}%, ir_lines <= +{$irTol}% vs baseline)\n";
+$geoTol = (int) ($baseline['geomean_tolerance_percent'] ?? ($v2Mode ? V2_GEOMEAN_TOLERANCE_PERCENT : 0));
+$okMsg = 'bench-gate'.($v2Mode ? ' --v2' : '').": OK (ratio <= +{$ratioTol}%, ir_lines <= +{$irTol}%";
+if ($geoTol > 0) {
+    $okMsg .= ", geomean <= +{$geoTol}%";
+}
+echo $okMsg." vs baseline)\n";
 exit(0);
 
 /** @return array{ratio: float, zend_wall: float, aot_wall: float, ir_lines: int, ir_defines: int, output_ok: bool} */
@@ -339,14 +357,53 @@ function writeBaseline(string $path, array $measured, bool $v2 = false): void
             ? 'PHP_8_2=$(command -v php) ./script/bench-gate.sh --v2 --update'
             : 'PHP_8_2=$(command -v php) ./script/bench-gate.sh --update',
         'note' => $v2
-            ? 'v2 gate subset (#36385). Ratio tolerance 20% so a deliberate ~2× slowdown fails.'
+            ? 'v2 gate subset (#36385). Per-case ratio +20%; suite geomean +10% so diffuse regressions fail.'
             : 'Blessed after #36386 typed/libm hot paths: wall times beat #36407 absolute targets; IR grew with specialised runtime defines — re-measure, do not restamp by hand (#36401).',
         'cases' => $cases,
     ];
+    if ($v2) {
+        $doc['geomean_tolerance_percent'] = V2_GEOMEAN_TOLERANCE_PERCENT;
+        $geo = geometricMeanRatiosFromCases($cases);
+        if (null !== $geo) {
+            $doc['geomean_ratio_aot_over_zend'] = round($geo, 6);
+        }
+    }
     if (null === $doc['note']) {
         unset($doc['note']);
     }
     file_put_contents($path, json_encode($doc, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES)."\n");
+}
+
+/**
+ * Geometric mean of positive AOT/Zend ratios (excludes synthetic __self_test_* keys).
+ *
+ * @param array<string, mixed> $cases
+ */
+function geometricMeanRatiosFromCases(array $cases): ?float
+{
+    $ratios = [];
+    foreach ($cases as $name => $row) {
+        if (!is_string($name) || str_starts_with($name, '__')) {
+            continue;
+        }
+        if (!is_array($row)) {
+            continue;
+        }
+        $ratio = (float) ($row['ratio_aot_over_zend'] ?? $row['ratio'] ?? 0.0);
+        if ($ratio > 0.0 && is_finite($ratio)) {
+            $ratios[] = $ratio;
+        }
+    }
+    if ([] === $ratios) {
+        return null;
+    }
+
+    $sumLog = 0.0;
+    foreach ($ratios as $r) {
+        $sumLog += log($r);
+    }
+
+    return exp($sumLog / count($ratios));
 }
 
 /**
@@ -414,6 +471,33 @@ function compareToBaseline(array $baseline, array $measured): array
                     $baseIr,
                     $irGrowth,
                     $irTol
+                );
+            }
+        }
+    }
+
+    $geoTol = (int) ($baseline['geomean_tolerance_percent']
+        ?? (('v2' === ($baseline['suite'] ?? '')) ? V2_GEOMEAN_TOLERANCE_PERCENT : 0));
+    if ($geoTol > 0) {
+        $baseGeo = isset($baseline['geomean_ratio_aot_over_zend'])
+            ? (float) $baseline['geomean_ratio_aot_over_zend']
+            : geometricMeanRatiosFromCases($baseCases);
+        $measuredAsCases = [];
+        foreach ($measured as $name => $row) {
+            $measuredAsCases[$name] = [
+                'ratio_aot_over_zend' => (float) $row['ratio'],
+            ];
+        }
+        $curGeo = geometricMeanRatiosFromCases($measuredAsCases);
+        if (null !== $baseGeo && null !== $curGeo && $baseGeo > 0.0) {
+            $geoGrowth = ($curGeo - $baseGeo) * 100.0 / $baseGeo;
+            if ($geoGrowth > $geoTol) {
+                $errors[] = sprintf(
+                    'geomean.ratio: %.6f exceeds baseline %.6f by %.1f%% (limit +%d%%)',
+                    $curGeo,
+                    $baseGeo,
+                    $geoGrowth,
+                    $geoTol
                 );
             }
         }
@@ -505,6 +589,88 @@ function runV2Deliberate2xSelfTest(string $root): void
     foreach (array_slice($ratioErrors, 0, 5) as $err) {
         echo "  {$err}\n";
     }
+}
+
+/**
+ * Prove the v2 geomean band rejects a diffuse +15% slowdown that stays under
+ * the per-case 20% ratio band (#36385 deliverable).
+ */
+function runV2GeomeanSelfTest(string $root): void
+{
+    $baselinePath = $root.'/'.V2_BASELINE_REL;
+    if (!is_readable($baselinePath)) {
+        fwrite(STDERR, "bench-gate --self-test-v2-geomean: missing {$baselinePath}\n");
+        exit(1);
+    }
+    $baseline = json_decode((string) file_get_contents($baselinePath), true);
+    if (!is_array($baseline) || !isset($baseline['cases']) || !is_array($baseline['cases'])) {
+        fwrite(STDERR, "bench-gate --self-test-v2-geomean: invalid baseline JSON\n");
+        exit(1);
+    }
+
+    $baseline['suite'] = 'v2';
+    $baseline['ratio_tolerance_percent'] = V2_RATIO_TOLERANCE_PERCENT;
+    $baseline['geomean_tolerance_percent'] = V2_GEOMEAN_TOLERANCE_PERCENT;
+    $baseGeo = geometricMeanRatiosFromCases($baseline['cases']);
+    if (null === $baseGeo || $baseGeo <= 0.0) {
+        fwrite(STDERR, "bench-gate --self-test-v2-geomean: cannot compute baseline geomean\n");
+        exit(1);
+    }
+    $baseline['geomean_ratio_aot_over_zend'] = $baseGeo;
+
+    $factor = 1.15; // under per-case +20%, over geomean +10%
+    $measured = [];
+    $n = 0;
+    foreach ($baseline['cases'] as $name => $base) {
+        if (!is_string($name) || str_starts_with($name, '__') || !is_array($base)) {
+            continue;
+        }
+        $baseRatio = (float) ($base['ratio_aot_over_zend'] ?? 0.0);
+        $baseAot = (float) ($base['aot_wall'] ?? 0.0);
+        $baseIr = (int) ($base['ir_lines'] ?? 0);
+        if ($baseRatio <= 0.0 || $baseAot <= 0.0) {
+            continue;
+        }
+        ++$n;
+        $measured[$name] = [
+            'ratio' => $baseRatio * $factor,
+            'zend_wall' => (float) ($base['zend_wall'] ?? 0.0),
+            'aot_wall' => $baseAot * $factor,
+            'ir_lines' => $baseIr,
+            'ir_defines' => (int) ($base['ir_defines'] ?? 0),
+            'output_ok' => true,
+        ];
+    }
+    if ($n < 2) {
+        fwrite(STDERR, "bench-gate --self-test-v2-geomean: need >=2 baseline cases\n");
+        exit(1);
+    }
+
+    $errors = compareToBaseline($baseline, $measured);
+    $perCaseRatio = array_values(array_filter(
+        $errors,
+        static fn (string $e): bool => str_contains($e, '.ratio:') && !str_starts_with($e, 'geomean.')
+    ));
+    $geoErrors = array_values(array_filter(
+        $errors,
+        static fn (string $e): bool => str_starts_with($e, 'geomean.ratio:')
+    ));
+
+    if ([] !== $perCaseRatio) {
+        fwrite(STDERR, "bench-gate --self-test-v2-geomean: FAIL — +15% must stay under per-case +20%\n");
+        foreach (array_slice($perCaseRatio, 0, 5) as $err) {
+            fwrite(STDERR, "  {$err}\n");
+        }
+        exit(1);
+    }
+    if ([] === $geoErrors) {
+        fwrite(STDERR, "bench-gate --self-test-v2-geomean: FAIL — +15% diffuse slowdown produced no geomean regression\n");
+        exit(1);
+    }
+
+    echo "bench-gate --self-test-v2-geomean: OK — diffuse +15% trips geomean "
+        ."(tol +".V2_GEOMEAN_TOLERANCE_PERCENT."%; per-case clean; n={$n})\n";
+    echo '  '.$geoErrors[0]."\n";
 }
 
 function runCompileGate(string $root, string $baselinePath, bool $update): void
