@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dba;
 
+use PHPCompiler\ExtensionRegistry;
+
 /**
  * ext/dba advertisement — php-src ext/dba/dba.c (#4422, #24134).
+ *
+ * {@see advertisesExtension()} is folded to ext.json advertise → ExtensionRegistry (#36204).
  *
  * Pure-PHP flatfile/inifile handlers stay compiled in-tree but must not flip
  * {@code extension_loaded('dba')} / {@code function_exists('dba_open')} /
@@ -19,11 +23,7 @@ final class DbaExtensionPolicy
 {
     public static function advertisesExtension(): bool
     {
-        if (\extension_loaded('dba')) {
-            return true;
-        }
-
-        return self::explicitEnableRequested();
+        return ExtensionRegistry::advertisesExtensionFor('dba');
     }
 
     public static function advertisesBuiltins(): bool
@@ -66,16 +66,4 @@ final class DbaExtensionPolicy
         return true;
     }
 
-    /** Explicit side-load / functional-test opt-in when host Zend lacks ext/dba (#24134). */
-    private static function explicitEnableRequested(): bool
-    {
-        $raw = getenv('PHP_COMPILER_ENABLE_DBA');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        $v = strtolower(trim($raw));
-
-        return !\in_array($v, ['0', 'false', 'off', 'no'], true);
-    }
 }

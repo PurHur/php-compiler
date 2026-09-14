@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\zmq;
 
+use PHPCompiler\ExtensionRegistry;
+
 /**
  * ext/zmq advertisement — pecl-networking-zmq (#6443, #23964).
+ *
+ * {@see advertisesExtension()} is folded to ext.json advertise → ExtensionRegistry (#36204).
  *
  * Pure-PHP inproc zmq_* / ZMQ* classes stay compiled in-tree but must not flip
  * {@code extension_loaded('zmq')} / {@code class_exists('ZMQContext')} when host
@@ -18,11 +22,7 @@ final class ZmqExtensionPolicy
 {
     public static function advertisesExtension(): bool
     {
-        if (\extension_loaded('zmq')) {
-            return true;
-        }
-
-        return self::explicitEnableRequested();
+        return ExtensionRegistry::advertisesExtensionFor('zmq');
     }
 
     public static function advertisesBuiltins(): bool
@@ -63,16 +63,4 @@ final class ZmqExtensionPolicy
         return true;
     }
 
-    /** Explicit side-load / functional-test opt-in when host Zend lacks pecl-zmq (#23964). */
-    private static function explicitEnableRequested(): bool
-    {
-        $raw = getenv('PHP_COMPILER_ENABLE_ZMQ');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        $v = strtolower(trim($raw));
-
-        return !\in_array($v, ['0', 'false', 'off', 'no'], true);
-    }
 }

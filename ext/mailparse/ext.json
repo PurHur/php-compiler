@@ -15,5 +15,9 @@
     },
     "policy_env": [
         "PHP_COMPILER_ENABLE_MAILPARSE"
-    ]
+    ],
+    "advertise": {
+        "host_extension": "mailparse",
+        "or_env": "PHP_COMPILER_ENABLE_MAILPARSE"
+    }
 }

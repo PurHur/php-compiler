@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\mailparse;
 
+use PHPCompiler\ExtensionRegistry;
+
 /**
  * ext/mailparse advertisement — PECL mailparse (#6383, #24908).
+ *
+ * {@see advertisesExtension()} is folded to ext.json advertise → ExtensionRegistry (#36204).
  *
  * Pure-PHP MIME parser stays compiled in-tree but must not flip
  * {@code extension_loaded('mailparse')} / {@code function_exists('mailparse_msg_create')}
@@ -18,11 +22,7 @@ final class MailparseExtensionPolicy
 {
     public static function advertisesExtension(): bool
     {
-        if (\extension_loaded('mailparse')) {
-            return true;
-        }
-
-        return self::explicitEnableRequested();
+        return ExtensionRegistry::advertisesExtensionFor('mailparse');
     }
 
     public static function advertisesBuiltins(): bool
@@ -58,16 +58,4 @@ final class MailparseExtensionPolicy
         return true;
     }
 
-    /** Explicit side-load / functional-test opt-in when host Zend lacks pecl-mailparse (#24908). */
-    private static function explicitEnableRequested(): bool
-    {
-        $raw = getenv('PHP_COMPILER_ENABLE_MAILPARSE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        $v = strtolower(trim($raw));
-
-        return !\in_array($v, ['0', 'false', 'off', 'no'], true);
-    }
 }

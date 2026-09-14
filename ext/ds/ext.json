@@ -15,5 +15,9 @@
     },
     "policy_env": [
         "PHP_COMPILER_ENABLE_DS"
-    ]
+    ],
+    "advertise": {
+        "host_extension": "ds",
+        "or_env": "PHP_COMPILER_ENABLE_DS"
+    }
 }

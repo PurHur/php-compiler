@@ -15,5 +15,9 @@
     },
     "policy_env": [
         "PHP_COMPILER_ENABLE_CURL"
-    ]
+    ],
+    "advertise": {
+        "host_extension": "curl",
+        "or_env": "PHP_COMPILER_ENABLE_CURL"
+    }
 }

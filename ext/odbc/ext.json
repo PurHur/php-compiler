@@ -15,5 +15,9 @@
     },
     "policy_env": [
         "PHP_COMPILER_ENABLE_ODBC"
-    ]
+    ],
+    "advertise": {
+        "host_extension": "odbc",
+        "or_env": "PHP_COMPILER_ENABLE_ODBC"
+    }
 }

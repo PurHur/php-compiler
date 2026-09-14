@@ -15,5 +15,9 @@
     },
     "policy_env": [
         "PHP_COMPILER_ENABLE_MYSQLI"
-    ]
+    ],
+    "advertise": {
+        "host_extension": "mysqli",
+        "or_env": "PHP_COMPILER_ENABLE_MYSQLI"
+    }
 }

@@ -15,5 +15,9 @@
     },
     "policy_env": [
         "PHP_COMPILER_ENABLE_DBA"
-    ]
+    ],
+    "advertise": {
+        "host_extension": "dba",
+        "or_env": "PHP_COMPILER_ENABLE_DBA"
+    }
 }

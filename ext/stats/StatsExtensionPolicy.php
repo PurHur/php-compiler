@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\stats;
 
+use PHPCompiler\ExtensionRegistry;
+
 /**
  * ext/stats advertisement — PECL stats (#5748, #26743).
+ *
+ * {@see advertisesExtension()} is folded to ext.json advertise → ExtensionRegistry (#36204).
  *
  * Pure-PHP {@see VmStats} stays compiled in-tree but must not flip
  * {@code extension_loaded('stats')} / {@code function_exists('stats_*')} when host
@@ -18,11 +22,7 @@ final class StatsExtensionPolicy
 {
     public static function advertisesExtension(): bool
     {
-        if (\extension_loaded('stats')) {
-            return true;
-        }
-
-        return self::explicitEnableRequested();
+        return ExtensionRegistry::advertisesExtensionFor('stats');
     }
 
     public static function advertisesBuiltins(): bool
@@ -72,16 +72,4 @@ final class StatsExtensionPolicy
         return true;
     }
 
-    /** Explicit side-load / functional-test opt-in when host Zend lacks pecl-stats (#26743). */
-    private static function explicitEnableRequested(): bool
-    {
-        $raw = getenv('PHP_COMPILER_ENABLE_STATS');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        $v = strtolower(trim($raw));
-
-        return !\in_array($v, ['0', 'false', 'off', 'no'], true);
-    }
 }

@@ -15,5 +15,9 @@
     },
     "policy_env": [
         "PHP_COMPILER_ENABLE_ZSTD"
-    ]
+    ],
+    "advertise": {
+        "host_extension": "zstd",
+        "or_env": "PHP_COMPILER_ENABLE_ZSTD"
+    }
 }
