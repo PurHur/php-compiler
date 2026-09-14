@@ -180,6 +180,13 @@ final class BenchGateTest extends TestCase
         $root = dirname(__DIR__, 2);
         $script = $root.'/script/check-bench-readme-sync.php';
         $this->assertFileExists($script);
+        $this->assertFileExists($root.'/benchmarks/RESULTS.json');
+        $legacy = json_decode((string) file_get_contents($root.'/benchmarks/RESULTS.json'), true);
+        $this->assertIsArray($legacy);
+        $this->assertSame('legacy', $legacy['suite'] ?? null);
+        foreach (['Ack(3,10)', 'fibo(30)', 'mandelbrot', 'simple'] as $name) {
+            $this->assertArrayHasKey($name, $legacy['cases'] ?? [], $name);
+        }
         $php = \PHP_BINARY;
         $cmd = escapeshellcmd($php).' '.escapeshellarg($script);
         exec($cmd.' 2>&1', $lines, $rc);
@@ -194,6 +201,18 @@ final class BenchGateTest extends TestCase
 
         $gen = (string) file_get_contents($root.'/script/check-generated-docs.sh');
         $this->assertStringContainsString('check-bench-readme-sync', $gen);
+
+        $chart = escapeshellcmd($php).' '
+            .escapeshellarg($root.'/script/generate-bench-chart.php').' --check';
+        exec($chart.' 2>&1', $chartLines, $chartRc);
+        $this->assertSame(0, $chartRc, implode("\n", $chartLines));
+
+        $history = glob($root.'/benchmarks/history/*.json') ?: [];
+        $this->assertGreaterThanOrEqual(1, \count($history), 'bench history must be non-empty');
+
+        $bench = (string) file_get_contents($root.'/script/bench.php');
+        $this->assertStringContainsString("suite' => 'legacy'", $bench);
+        $this->assertStringContainsString('benchmarks/RESULTS.json', $bench);
     }
 
     public function testWebRequestAutomatesPhpFpmPool(): void

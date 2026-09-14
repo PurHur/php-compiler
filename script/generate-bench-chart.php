@@ -10,10 +10,13 @@ declare(strict_types=1);
  *
  * Usage:
  *   php script/generate-bench-chart.php
+ *   php script/generate-bench-chart.php --check   # fail if committed HTML drifts
  *   ./script/docker-exec.sh -- bash -lc 'php script/generate-bench-chart.php'
  */
 
 $root = dirname(__DIR__);
+$argvList = array_slice($argv ?? [], 1);
+$checkOnly = in_array('--check', $argvList, true);
 $historyDir = $root.'/benchmarks/history';
 $resultsPath = $root.'/benchmarks/v2/RESULTS.json';
 $webPath = $root.'/benchmarks/v2/WEB_REQUEST.json';
@@ -40,13 +43,21 @@ if (is_dir($historyDir)) {
     }
 }
 
+if (\count($points) < 1) {
+    fwrite(STDERR, "generate-bench-chart: benchmarks/history/ has no usable JSON (#36385)\n");
+    exit(1);
+}
+
 $latest = null;
+$resultsGeneratedAt = null;
 if (is_file($resultsPath)) {
     $doc = json_decode((string) file_get_contents($resultsPath), true);
     if (is_array($doc) && isset($doc['cases']) && is_array($doc['cases'])) {
+        $resultsGeneratedAt = isset($doc['generated_at']) && is_string($doc['generated_at'])
+            ? $doc['generated_at'] : null;
         $latest = [
             'sha' => 'RESULTS',
-            'generated_at' => $doc['generated_at'] ?? null,
+            'generated_at' => $resultsGeneratedAt,
             'cases' => summarizeCases($doc['cases']),
             'web_request' => summarizeWeb($doc['web_request'] ?? null),
         ];
@@ -86,7 +97,11 @@ if (is_file($soakPath)) {
 }
 
 $payload = [
-    'generated_at' => gmdate('Y-m-d\TH:i:s\Z'),
+    // Stable stamp from RESULTS (not wall-clock) so --check is regenerable (#36385).
+    'generated_at' => $resultsGeneratedAt
+        ?? (isset($points[\count($points) - 1]['generated_at']) && is_string($points[\count($points) - 1]['generated_at'])
+            ? $points[\count($points) - 1]['generated_at']
+            : 'unknown'),
     'history' => $points,
     'latest' => $latest,
     'web_request' => $webStandalone ?? ($latest['web_request'] ?? null),
@@ -326,6 +341,22 @@ $html = <<<HTML
 </body>
 </html>
 HTML;
+
+if ($checkOnly) {
+    if (!is_file($outPath)) {
+        fwrite(STDERR, "generate-bench-chart --check: missing {$outPath}\n");
+        exit(1);
+    }
+    $committed = (string) file_get_contents($outPath);
+    if ($committed !== $html) {
+        fwrite(STDERR, "generate-bench-chart --check: docs/pages/bench.html drifts from history+RESULTS\n");
+        fwrite(STDERR, "  fix: php script/generate-bench-chart.php\n");
+        fwrite(STDERR, "  or:  ./script/bench/nightly.sh --publish-only\n");
+        exit(1);
+    }
+    fwrite(STDOUT, 'generate-bench-chart --check: OK (history points: '.\count($points).")\n");
+    exit(0);
+}
 
 if (false === file_put_contents($outPath, $html)) {
     fwrite(STDERR, "generate-bench-chart: failed to write {$outPath}\n");

@@ -5,7 +5,7 @@ declare(strict_types=1);
 /**
  * Benchmark harness: Zend php-src vs php-compiler VM / JIT / AOT.
  *
- * Default: benchmarks/*.php (legacy micro-suite).
+ * Default: benchmarks/*.php (legacy micro-suite) + benchmarks/RESULTS.json.
  * --v2:     benchmarks/v2/*.php (#36385) + RESULTS.json + optional history.
  *           Also runs script/bench-web-request.php (MiniWebApp req/s) and refreshes
  *           docs/pages/bench.html unless PHP_COMPILER_BENCH_SKIP_WEB=1.
@@ -191,6 +191,20 @@ if ($v2) {
         $readme
     );
     file_put_contents($root.'/benchmarks/README.md', $readme);
+
+    // Same honesty as v2: committed RESULTS.json is the source of truth for the
+    // README table (#36385 Done-when — no hand-typed legacy timings).
+    $payload = [
+        'version' => 1,
+        'suite' => 'legacy',
+        'generated_at' => gmdate('Y-m-d\TH:i:s\Z'),
+        'php_version' => trim((string) shell_exec(escapeshellcmd($harnessPhp).' -r "echo PHP_VERSION;"')),
+        'iterations' => $iterations,
+        'cases' => $testResults,
+    ];
+    $resultsJson = $root.'/benchmarks/RESULTS.json';
+    file_put_contents($resultsJson, json_encode($payload, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES)."\n");
+    echo "Wrote {$resultsJson}\n";
 }
 
 echo $results;
