@@ -18,6 +18,7 @@ use PHPCfg\Operand;
  *
  * Covers {@see rewireInlineArithmeticBranchCallArgSendSlots},
  * {@see rewireSubstrNestedSprintfArgSendSlots},
+ * {@see rewireSubstrNamedHaystackBeforeStrlenPlusArgSendSlots},
  * {@see rewireNestedFuncCallEnumPrefixCallArgSendSlots}, and
  * {@see rewireNestedMethodCallHoistedClassConstOuterCallArgSendSlots}.
  * Sibling multi-arg + hoisted ConstFetch prelude guards live in
@@ -154,6 +155,101 @@ trait RewireArithmeticBranchSubstrEnumAndSiblingMultiArgCallArgSendSlots
                         $block
                     );
                 }
+            }
+            ++$argSendIndex;
+        }
+    }
+
+    /**
+     * substr($haystack, $offset + strlen(...)) — haystack is a named CV/param.
+     *
+     * Nested strlen's EXEC_RETURN can reuse the same scope slot that was bound for the
+     * haystack ARG_SEND (php-cfg gives the read a distinct Operand<$text>), so SEND #0
+     * ships the strlen length instead of the string. Parsedown::pregReplaceElements then
+     * drops the post-break remainder (#36380).
+     *
+     * php-src: Zend/zend_compile.c ZEND_SEND_VAL / CV operands stay distinct from
+     * temporary call results (zend_compile_func_call result ISA).
+     *
+     * @param list<OpCode> $outerArgSends
+     */
+    private function rewireSubstrNamedHaystackBeforeStrlenPlusArgSendSlots(
+        array &$outerArgSends,
+        Block $block,
+        ?Op $cfgCallOp,
+        ?string $calleeName = null
+    ): void {
+        if (null === $cfgCallOp || null === $block->orig) {
+            return;
+        }
+        if (!\is_array($cfgCallOp->args ?? null) || \count($cfgCallOp->args) < 2) {
+            return;
+        }
+        if ('substr' !== strtolower($this->resolveInlineCallArgFuncName($cfgCallOp, $calleeName) ?? '')) {
+            return;
+        }
+        $haystackArg = $cfgCallOp->args[0] ?? null;
+        if (!$haystackArg instanceof Operand || $this->callArgIsDeadInlineTemporary($haystackArg)) {
+            return;
+        }
+        $callIndex = $this->cfgCallOpIndex($block, $cfgCallOp);
+        if (!\is_int($callIndex) || $callIndex < 1) {
+            return;
+        }
+        $plusOp = $block->orig->children[$callIndex - 1] ?? null;
+        if (!$plusOp instanceof Op\Expr\BinaryOp\Plus) {
+            return;
+        }
+        $strlenSide = null;
+        foreach ([$plusOp->left ?? null, $plusOp->right ?? null] as $side) {
+            if (
+                ($side instanceof Op\Expr\FuncCall || $side instanceof Op\Expr\NsFuncCall)
+                && 'strlen' === strtolower($this->resolveCfgFuncCallName($side) ?? '')
+            ) {
+                $strlenSide = $side;
+                break;
+            }
+            // strlen may be a Temporary result of a preceding FuncCall child.
+            if ($side instanceof Operand) {
+                for ($i = $callIndex - 2; $i >= 0; --$i) {
+                    $cand = $block->orig->children[$i] ?? null;
+                    if (
+                        ($cand instanceof Op\Expr\FuncCall || $cand instanceof Op\Expr\NsFuncCall)
+                        && isset($cand->result)
+                        && $this->operandsReferToSameVariable($cand->result, $side)
+                        && 'strlen' === strtolower($this->resolveCfgFuncCallName($cand) ?? '')
+                    ) {
+                        $strlenSide = $cand;
+                        break 2;
+                    }
+                    if ($cand instanceof Op\Expr\BinaryOp\Plus || $cand instanceof Op\Expr\FuncCall) {
+                        break;
+                    }
+                }
+            }
+        }
+        if (null === $strlenSide) {
+            return;
+        }
+        $namedSlot = $this->namedLocalCallArgSlotIfBound($haystackArg, $block, $cfgCallOp, 0)
+            ?? $this->slotForNamedLocalFromAssignVarOperand($haystackArg, $block);
+        if (null === $namedSlot) {
+            $operandSlot = $block->slotForOperand($haystackArg);
+            if (null === $operandSlot || !$block->isNamedVariableSlot((int) $operandSlot)) {
+                return;
+            }
+            $namedSlot = (int) $operandSlot;
+        }
+        $wired = (string) $this->finalizeOperandSlotForAccess($block, (int) $namedSlot, true);
+        $argSendIndex = 0;
+        foreach ($outerArgSends as $send) {
+            if (OpCode::TYPE_ARG_SEND !== $send->type) {
+                continue;
+            }
+            if (0 === $argSendIndex) {
+                $send->arg1 = $wired;
+
+                return;
             }
             ++$argSendIndex;
         }

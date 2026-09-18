@@ -67,8 +67,11 @@ trait AssignDispatch
             }
             $arg2 = $fresh;
         }
-        // Boolean/null sources are never dim write-backs: always break stale
-        // indirection before copyFrom write-through (#36398 isset result).
+        // Boolean/null sources are never *stale* dim write-backs: break recycled
+        // FETCH_DIM (read) indirection before copyFrom (#36398 isset result).
+        // Real FETCH_DIM_W / ASSIGN_REF lvalues must keep write-through — otherwise
+        // `$arr['continuable'] = true` stores into a discarded temp and the HT cell
+        // stays null (Parsedown block continuation, #36380).
         if (null !== $op->arg3) {
             $srcPeek = isset($frame->block->constants[$op->arg3])
                 ? $frame->block->constants[$op->arg3]
@@ -79,6 +82,7 @@ trait AssignDispatch
                 && $arg2->isIndirect()
                 && !$arg2->phpReference
                 && !$arg2->propertyAssignLvalue
+                && !$keepWriteThrough
             ) {
                 $fresh = new Variable();
                 $frame->scope[$assignDestSlot] = $fresh;

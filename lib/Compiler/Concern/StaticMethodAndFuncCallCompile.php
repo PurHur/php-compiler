@@ -89,6 +89,7 @@ trait StaticMethodAndFuncCallCompile
             $nestedProducerOps
         );
         $this->rewireSubstrNestedSprintfArgSendSlots($outerArgSends, $block, $cfgCallOp, $calleeName);
+        $this->rewireSubstrNamedHaystackBeforeStrlenPlusArgSendSlots($outerArgSends, $block, $cfgCallOp, $calleeName);
         $this->rewireArrayKeysInlineInitArrayArgSendSlots(
             $outerArgSends,
             $block,
@@ -396,6 +397,7 @@ trait StaticMethodAndFuncCallCompile
             $nestedProducerOps
         );
         $this->rewireSubstrNestedSprintfArgSendSlots($outerArgSends, $block, $cfgCallOp, $calleeName);
+        $this->rewireSubstrNamedHaystackBeforeStrlenPlusArgSendSlots($outerArgSends, $block, $cfgCallOp, $calleeName);
         $this->rewireArrayKeysInlineInitArrayArgSendSlots(
             $outerArgSends,
             $block,
