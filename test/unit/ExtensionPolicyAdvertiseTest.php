@@ -32,6 +32,8 @@ use PHPCompiler\ext\pspell\PspellExtensionPolicy;
 use PHPCompiler\ext\rar\RarExtensionPolicy;
 use PHPCompiler\ext\redis\RedisExtensionPolicy;
 use PHPCompiler\ext\soap\SoapExtensionPolicy;
+use PHPCompiler\ext\sodium\SodiumExtensionPolicy;
+use PHPCompiler\ext\sodium\VmSodium;
 use PHPCompiler\ext\sqlite3\Sqlite3ExtensionPolicy;
 use PHPCompiler\ext\sqlsrv\SqlsrvExtensionPolicy;
 use PHPCompiler\ext\tidy\TidyExtensionPolicy;
@@ -275,6 +277,13 @@ final class ExtensionPolicyAdvertiseTest extends TestCase
         self::assertTrue(OpensslExtensionPolicy::advertisesExtension());
         self::assertFalse(ExtensionRegistry::advertisesExtensionFor('inotify'));
         self::assertFalse(InotifyExtensionPolicy::advertisesExtension());
+    }
+
+    public function testSodiumProbeMatchesVmSodiumAvailable(): void
+    {
+        $expected = VmSodium::available();
+        self::assertSame($expected, ExtensionRegistry::advertisesExtensionFor('sodium'));
+        self::assertSame($expected, SodiumExtensionPolicy::advertisesExtension());
     }
 
     public function testGmpEnvOnlyAndIntlRequireEnvAndHost(): void

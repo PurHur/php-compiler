@@ -251,8 +251,8 @@ final class ExtensionRegistry
     /**
      * Surface advertisement from ext.json {@code advertise} (#36204).
      *
-     * Folded *ExtensionPolicy::advertisesExtension() delegates here. Extensions without an
-     * advertise rule keep a hand-written policy class.
+     * Folded *ExtensionPolicy::advertisesExtension() delegates here. Feature gates beyond
+     * advertise (e.g. sodium AEGIS) stay on the per-ext policy class.
      */
     public static function advertisesExtensionFor(string $directory): bool
     {
@@ -295,6 +295,7 @@ final class ExtensionRegistry
             'simdjson' => CompilerVersion::supportsSimdjson(),
             'snmp' => CompilerVersion::supportsSnmp(),
             'soap' => \extension_loaded('soap'),
+            'sodium' => \PHPCompiler\ext\sodium\VmSodium::available(),
             'sqlite3' => \extension_loaded('sqlite3') || CompilerVersion::supportsSqlite3(),
             'sqlsrv' => true,
             'ssh2' => (CompilerVersion::supportsSsh2()) || self::envFlagEnabled('PHP_COMPILER_ENABLE_SSH2'),
