@@ -5,9 +5,9 @@ ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 APP_DIR="$(cd "$(dirname "$0")" && pwd)"
 SLUG="$(basename "$APP_DIR")"
 PHP_BIN="${PHP_BIN:-php}"
-VM_TIMEOUT="${APPS_VM_TIMEOUT:-90}"
+VM_TIMEOUT="${APPS_VM_TIMEOUT:-180}"
 # Parsedown-sized libraries need minutes under IncludeHelper; 120s left rc=124 with a
-# misleading "helper-runtime cache hit" reason (#36380).
+# misleading "helper-runtime cache hit" reason (#36380). Full fixture suite is ~110s VM.
 AOT_TIMEOUT="${APPS_AOT_TIMEOUT:-600}"
 # Cap PHP heap so LLVM native RSS still fits under the 8–10g harness cgroup (#36380).
 # Override with APPS_AOT_MEMORY=8192M on larger hosts.
