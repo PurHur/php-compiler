@@ -107,8 +107,21 @@ final class BenchGateTest extends TestCase
         $this->assertStringContainsString('generate-bench-chart.php', $bench);
         $this->assertStringContainsString('ITERATIONS_V2', $bench);
         $this->assertStringContainsString('V2_DEFAULT_TIMEOUT_SEC', $bench);
+        $this->assertStringContainsString('V2_WALL_BUDGET_SEC', $bench);
+        $this->assertStringContainsString('benchSkipVmReason', $bench);
+        $this->assertStringContainsString('@bench-skip-vm', $bench);
         $this->assertStringContainsString('skip jit after vm time-cap', $bench);
         $this->assertStringContainsString('exceeded 15 min wall', $bench);
+        $sync = (string) file_get_contents($root.'/script/check-bench-readme-sync.php');
+        $this->assertStringContainsString('V2_WALL_BUDGET_SEC', $sync);
+        $this->assertStringContainsString('checkV2WallBudget', $sync);
+        $this->assertStringContainsString('--check-wall', $sync);
+        $bt = (string) file_get_contents($root.'/benchmarks/v2/binary-trees.php');
+        $this->assertStringContainsString('$maxDepth = 7;', $bt);
+        $this->assertStringNotContainsString('$maxDepth = 10;', $bt);
+        $fk = (string) file_get_contents($root.'/benchmarks/v2/fannkuch-redux.php');
+        $this->assertStringContainsString('fannkuch(6)', $fk);
+        $this->assertStringNotContainsString('fannkuch(8)', $fk);
         $readme = (string) file_get_contents($root.'/benchmarks/README.md');
         $this->assertStringNotContainsString('9.1x faster', $readme);
         $this->assertStringNotContainsString('7.6x slower', $readme);
@@ -191,6 +204,19 @@ final class BenchGateTest extends TestCase
         $this->assertSame(0, $rc, $out);
         $this->assertStringContainsString('diffuse +15% trips geomean', $out);
         $this->assertStringContainsString('geomean.ratio:', $out);
+    }
+
+    public function testV2WallBudgetProjectionGate(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $php = \PHP_BINARY;
+        $script = $root.'/script/check-bench-readme-sync.php';
+        $this->assertFileExists($script);
+        exec(escapeshellcmd($php).' '.escapeshellarg($script).' --check-wall 2>&1', $lines, $rc);
+        $out = implode("\n", $lines);
+        $this->assertSame(0, $rc, $out);
+        $this->assertStringContainsString('projected v2 wall', $out);
+        $this->assertStringContainsString('budget 900', $out);
     }
 
     public function testBenchReadmeSyncGate(): void

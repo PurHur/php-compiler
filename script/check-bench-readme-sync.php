@@ -3,26 +3,40 @@
 declare(strict_types=1);
 
 /**
- * Benchmark README honesty gate (#36385 Done-when).
+ * Benchmark README honesty + v2 wall-budget gate (#36385 Done-when).
  *
  * Timing figures in benchmarks/README.md and benchmarks/v2/README.md may appear
  * only inside the generated table markers. Both tables must match their
  * RESULTS.json (sprintf %.4f), not hand-typed drift. Chart HTML must match
- * generate-bench-chart.php (history + RESULTS ratchet).
+ * generate-bench-chart.php (history + RESULTS ratchet). Also projects CLI wall
+ * from RESULTS.json (same caps as script/bench.php) so a 300s timeout restamp
+ * cannot silently exceed the 15 min Done-when budget.
  *
  * Usage:
  *   php script/check-bench-readme-sync.php
  *   php script/check-bench-readme-sync.php --render   # rewrite both tables from RESULTS.json
  *   php script/check-bench-readme-sync.php --self-test
+ *   php script/check-bench-readme-sync.php --check-wall   # wall projection only
  */
 
 $root = dirname(__DIR__);
 $argvList = array_slice($argv ?? [], 1);
 $render = in_array('--render', $argvList, true);
 $selfTest = in_array('--self-test', $argvList, true);
+$checkWallOnly = in_array('--check-wall', $argvList, true);
+
+const V2_WALL_TIMEOUT_SEC = 25;
+const V2_WALL_REUSE_SEC = 5.0;
+const V2_WALL_BUDGET_SEC = 900.0;
+const V2_WALL_ITERATIONS = 3;
+const V2_WALL_OVERHEAD_SEC = 120.0;
 
 if ($selfTest) {
     exit(runSelfTest($root));
+}
+
+if ($checkWallOnly) {
+    exit(checkV2WallBudget($root));
 }
 
 if ($render) {
@@ -42,6 +56,7 @@ function checkAll(string $root): int
     $fail |= checkLegacyReadme($root);
     $fail |= checkV2Readme($root);
     $fail |= checkBenchChartSync($root);
+    $fail |= checkV2WallBudget($root);
     if (0 === $fail) {
         fwrite(STDOUT, "check-bench-readme-sync: OK (#36385)\n");
     }
@@ -556,4 +571,115 @@ function runSelfTest(string $root): int
         }
         @rmdir($tmp);
     }
+}
+
+function checkV2WallBudget(string $root): int
+{
+    $resultsPath = $root.'/benchmarks/v2/RESULTS.json';
+    if (!is_file($resultsPath)) {
+        fwrite(STDERR, "check-bench-readme-sync: missing {$resultsPath} (wall budget)\n");
+
+        return 1;
+    }
+    $doc = json_decode((string) file_get_contents($resultsPath), true);
+    if (!is_array($doc) || !isset($doc['cases']) || !is_array($doc['cases']) || [] === $doc['cases']) {
+        fwrite(STDERR, "check-bench-readme-sync: invalid/empty v2 RESULTS.json (wall budget)\n");
+
+        return 1;
+    }
+    $cli = estimateV2CliWallSeconds($doc['cases'], $root.'/benchmarks/v2');
+    $total = $cli + V2_WALL_OVERHEAD_SEC;
+    printf(
+        "check-bench-readme-sync: projected v2 wall CLI %.1fs + overhead %.0fs = %.1fs (budget %.0fs)\n",
+        $cli,
+        V2_WALL_OVERHEAD_SEC,
+        $total,
+        V2_WALL_BUDGET_SEC
+    );
+    if ($total > V2_WALL_BUDGET_SEC) {
+        fwrite(STDERR, "check-bench-readme-sync: projected wall exceeds 15 min (#36385 Done-when)\n");
+
+        return 1;
+    }
+
+    return 0;
+}
+
+/**
+ * @param array<string, mixed> $cases
+ */
+function estimateV2CliWallSeconds(array $cases, string $suiteDir): float
+{
+    $total = 0.0;
+    foreach ($cases as $name => $row) {
+        if (!is_array($row) || !is_string($name)) {
+            continue;
+        }
+        $path = $suiteDir.'/'.$name.'.php';
+        $skipVm = is_file($path) && null !== benchSkipVmReasonFromFile($path);
+        $zend = firstZendSecondsFromRow($row);
+        $vm = isset($row['vm']) && is_float($row['vm']) ? (float) $row['vm'] : null;
+        $jit = isset($row['jit']) && is_float($row['jit']) ? (float) $row['jit'] : null;
+        $aotCompile = isset($row['aotcompile']) && is_float($row['aotcompile'])
+            ? (float) $row['aotcompile'] : null;
+        $aot = isset($row['aot']) && is_float($row['aot']) ? (float) $row['aot'] : null;
+
+        $total += $zend + (V2_WALL_ITERATIONS * $zend);
+        if ($skipVm) {
+            // Annotated skip — no VM/JIT timeout burn.
+        } elseif (null === $vm) {
+            $total += V2_WALL_TIMEOUT_SEC;
+        } else {
+            $total += $vm;
+            if ($vm < V2_WALL_REUSE_SEC) {
+                $total += V2_WALL_ITERATIONS * $vm;
+            }
+            if (null === $jit) {
+                $total += V2_WALL_TIMEOUT_SEC;
+            } else {
+                $total += $jit;
+                if ($jit < V2_WALL_REUSE_SEC) {
+                    $total += V2_WALL_ITERATIONS * $jit;
+                }
+            }
+        }
+        if (null !== $aotCompile) {
+            $total += $aotCompile + (V2_WALL_ITERATIONS * $aotCompile);
+        } else {
+            $total += 5.0;
+        }
+        if (null !== $aot) {
+            $total += $aot + (V2_WALL_ITERATIONS * $aot);
+        }
+    }
+
+    return $total;
+}
+
+/** @param array<string, mixed> $row */
+function firstZendSecondsFromRow(array $row): float
+{
+    foreach ($row as $key => $val) {
+        if (is_string($key) && is_float($val) && 1 === preg_match('/^\d+\.\d+$/', $key)) {
+            return $val;
+        }
+    }
+
+    return 0.02;
+}
+
+function benchSkipVmReasonFromFile(string $file): ?string
+{
+    $src = @file_get_contents($file);
+    if (!is_string($src) || '' === $src) {
+        return null;
+    }
+    $head = substr($src, 0, 4096);
+    if (1 === preg_match('/@bench-skip-vm:\s*(.+)$/m', $head, $m)) {
+        $reason = trim($m[1]);
+
+        return '' !== $reason ? $reason : 'annotated';
+    }
+
+    return null;
 }

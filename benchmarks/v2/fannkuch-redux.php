@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 /**
  * Fannkuch-redux (scaled) — permutation / flip (#36385).
+ *
+ * n stays ≤ 6 so default `bench.php --v2` VM verify finishes under the 25 s
+ * per-run cap (n=8 timed out → burned the full cap with vm/jit n/a).
  */
 
 function fannkuch(int $n): int
@@ -66,4 +69,4 @@ function fannkuch(int $n): int
     }
 }
 
-echo fannkuch(8), "\n";
+echo fannkuch(6), "\n";

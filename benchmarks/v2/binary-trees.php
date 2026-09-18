@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 /**
  * Binary-trees (scaled) — object allocation / recursion (#36385).
+ *
+ * maxDepth stays ≤ 7 so default `bench.php --v2` VM verify finishes under the
+ * 25 s per-run cap (depth 10 timed out → burned the full cap with vm/jit n/a).
  */
 
 final class TreeNode
@@ -34,7 +37,7 @@ function itemCheck(TreeNode $node): int
 }
 
 $minDepth = 4;
-$maxDepth = 10;
+$maxDepth = 7;
 $stretchDepth = $maxDepth + 1;
 
 $stretch = bottomUpTree($stretchDepth);
