@@ -501,7 +501,7 @@ SEED_UNITS=(
   # PosixSet* / PosixSession / PosixTerminal deferred (mutators / tty).
   # Curl* handle/transfer deferred (host libcurl); Strerror* are string-only.
   # Ftp* connect/transfer deferred (host libftp); Close is handle-teardown only.
-  # Remaining Dom* (load/save/HTML/XML) + Intl* / Openssl* / Soap* / Sockets* deferred.
+  # Remaining Dom* + Intl* / Openssl* / Soap* / Sockets* deferred after load/save tier.
   /ext/dom/DomAdoptNodeJitHelper.php
   /ext/dom/DomC14NJitHelper.php
   /ext/dom/DomCreateElementJitHelper.php
@@ -512,6 +512,17 @@ SEED_UNITS=(
   /ext/dom/DomHtmlDocumentCreateFromFileJitHelper.php
   /ext/dom/DomHtmlDocumentCreateFromStringJitHelper.php
   /ext/dom/DomImportNodeJitHelper.php
+  # Dom load/save/HTML/XML helpers (#36391 after 352)
+  /ext/dom/DomInsertAdjacentJitHelper.php
+  /ext/dom/DomIsConnectedJitHelper.php
+  /ext/dom/DomLoadHTMLFileJitHelper.php
+  /ext/dom/DomLoadHTMLJitHelper.php
+  /ext/dom/DomLoadJitHelper.php
+  /ext/dom/DomLoadXMLJitHelper.php
+  /ext/dom/DomNodeChildPropertyJitHelper.php
+  /ext/dom/DomNormalizeJitHelper.php
+  /ext/dom/DomSaveHTMLFileJitHelper.php
+  /ext/dom/DomSaveHTMLJitHelper.php
 )
 
 MIN_SEED=${#SEED_UNITS[@]}
