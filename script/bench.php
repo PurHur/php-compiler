@@ -24,8 +24,9 @@ const ITERATIONS_LEGACY = 5;
 const ITERATIONS_V2 = 3;
 /**
  * Fail-fast per-run cap for v2 VM/JIT (seconds). Legacy default remains 300s.
- * Override with PHP_COMPILER_BENCH_TIMEOUT. binary-trees / fannkuch-redux still
- * time out under VM; a 300s cap burned ~20 min on those two alone.
+ * Override with PHP_COMPILER_BENCH_TIMEOUT. Workloads that still exceed this
+ * under VM should shrink (see binary-trees / fannkuch-redux) or declare
+ * `@bench-skip-vm: <reason>` so the harness does not burn the full cap (#36385).
  */
 const V2_DEFAULT_TIMEOUT_SEC = 25;
 /**
@@ -33,6 +34,8 @@ const V2_DEFAULT_TIMEOUT_SEC = 25;
  * the column time instead of averaging more runs (#36385 wall budget).
  */
 const V2_REUSE_VERIFY_SEC = 5.0;
+/** Done-when wall budget for a full `bench.php --v2` regen (#36385). */
+const V2_WALL_BUDGET_SEC = 900.0;
 
 $root = dirname(__DIR__);
 $argvList = $argv ?? [];
@@ -178,8 +181,8 @@ if ($v2) {
     }
 
     $suiteWall = microtime(true) - $suiteStarted;
-    printf("v2 suite wall: %.1fs (budget 900s / 15 min, #36385)\n", $suiteWall);
-    if ($suiteWall > 900.0) {
+    printf("v2 suite wall: %.1fs (budget %.0fs / 15 min, #36385)\n", $suiteWall, V2_WALL_BUDGET_SEC);
+    if ($suiteWall > V2_WALL_BUDGET_SEC) {
         fwrite(STDERR, "bench.php --v2: exceeded 15 min wall (#36385 Done-when)\n");
         exit(1);
     }
@@ -227,18 +230,29 @@ function bench(
             die("Failure for Zend {$name}: \"{$got}\" != \"{$expected}\"\n");
         }
     }
+
+    $skipVmReason = $v2 ? benchSkipVmReason($file) : null;
     $vmCmd = escapeshellcmd($harnessPhp)
         .' -d error_reporting=1 -d log_errors=1 -d display_errors=stderr'
         .' '.escapeshellarg($root.'/bin/vm.php').' '.escapeshellarg($file);
-    $vmStarted = microtime(true);
-    $vmOut = trim(capture($vmCmd, $vmRc, null, $v2));
-    $vmVerifySec = microtime(true) - $vmStarted;
-    $vmOk = $vmOut === $expected;
-    $vmTimedOut = !$vmOk && capture_timed_out($vmRc);
-    if (!$vmOk) {
-        echo $vmTimedOut
-            ? "  vm.php exceeded the time cap — vm column n/a\n"
-            : "  vm.php output mismatch — vm column n/a\n";
+    $vmOk = false;
+    $vmTimedOut = false;
+    $vmVerifySec = 0.0;
+    $vmRc = null;
+    if (null !== $skipVmReason) {
+        echo "  skip vm ({$skipVmReason}) — vm column n/a\n";
+        $vmTimedOut = true; // also skip JIT (same workload)
+    } else {
+        $vmStarted = microtime(true);
+        $vmOut = trim(capture($vmCmd, $vmRc, null, $v2));
+        $vmVerifySec = microtime(true) - $vmStarted;
+        $vmOk = $vmOut === $expected;
+        $vmTimedOut = !$vmOk && capture_timed_out($vmRc);
+        if (!$vmOk) {
+            echo $vmTimedOut
+                ? "  vm.php exceeded the time cap — vm column n/a\n"
+                : "  vm.php output mismatch — vm column n/a\n";
+        }
     }
 
     $jitCmd = $llvmEnv.' '.escapeshellcmd($harnessPhp).' '.escapeshellarg($root.'/bin/jit.php').' '.escapeshellarg($file);
@@ -249,7 +263,9 @@ function bench(
         echo "  no LLVM available — jit column n/a\n";
     } elseif ($v2 && $vmTimedOut) {
         // Same workload will hit the cap under JIT; do not burn another full timeout (#36385).
-        echo "  skip jit after vm time-cap — jit column n/a\n";
+        echo null !== $skipVmReason
+            ? "  skip jit after @bench-skip-vm — jit column n/a\n"
+            : "  skip jit after vm time-cap — jit column n/a\n";
     } else {
         $jitStarted = microtime(true);
         $jitOk = trim(capture($jitCmd, $jitRc, null, $v2)) === $expected;
@@ -349,4 +365,26 @@ function buildCapSeconds(): int
     $v = getenv('PHP_COMPILER_BENCH_BUILD_TIMEOUT');
 
     return is_string($v) && ctype_digit($v) ? (int) $v : 1800;
+}
+
+/**
+ * Optional file annotation: `// @bench-skip-vm: <reason>` (#36385).
+ * Skips VM+JIT verify immediately so a known time-cap case cannot burn the
+ * full per-run timeout (AOT columns still measured).
+ */
+function benchSkipVmReason(string $file): ?string
+{
+    $src = @file_get_contents($file);
+    if (!is_string($src) || '' === $src) {
+        return null;
+    }
+    // Only the leading docblock / first ~4 KiB — keep annotation cheap to scan.
+    $head = substr($src, 0, 4096);
+    if (1 === preg_match('/@bench-skip-vm:\s*(.+)$/m', $head, $m)) {
+        $reason = trim($m[1]);
+
+        return '' !== $reason ? $reason : 'annotated';
+    }
+
+    return null;
 }

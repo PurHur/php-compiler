@@ -1,14 +1,14 @@
 {
     "version": 1,
     "suite": "v2",
-    "generated_at": "2026-09-09T16:31:20Z",
+    "generated_at": "2026-09-18T17:00:45Z",
     "arch": "x86_64-linux",
     "ratio_tolerance_percent": 20,
     "geomean_tolerance_percent": 10,
-    "geomean_ratio_aot_over_zend": 0.869234,
+    "geomean_ratio_aot_over_zend": 0.711107,
     "ir_tolerance_percent": 20,
     "regeneration": "PHP_8_2=$(command -v php) ./script/bench-gate.sh --v2 --update",
-    "note": "v2 gate subset (#36385). Per-case ratio +20%; suite geomean +10% so diffuse regressions fail.",
+    "note": "v2 gate subset (#36385). Per-case ratio +20%; suite geomean +10%. binary-trees maxDepth=7 / fannkuch n=6 so VM finishes under 25s wall cap.",
     "cases": {
         "call-heavy": {
             "ratio_aot_over_zend": 0.461441,
@@ -109,16 +109,16 @@
             "ir_defines": 555
         },
         "binary-trees": {
-            "ratio_aot_over_zend": 1.684036,
-            "zend_wall": 0.027164,
-            "aot_wall": 0.045745,
+            "ratio_aot_over_zend": 0.536744,
+            "zend_wall": 0.015482,
+            "aot_wall": 0.00831,
             "ir_lines": 280636,
             "ir_defines": 546
         },
         "fannkuch-redux": {
-            "ratio_aot_over_zend": 2.502303,
-            "zend_wall": 0.034162,
-            "aot_wall": 0.085484,
+            "ratio_aot_over_zend": 0.31601,
+            "zend_wall": 0.015905,
+            "aot_wall": 0.005026,
             "ir_lines": 199262,
             "ir_defines": 565
         }
