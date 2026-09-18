@@ -523,7 +523,8 @@ SEED_UNITS=(
   # PosixSet* / PosixSession / PosixTerminal deferred (mutators / tty).
   # Curl* handle/transfer deferred (host libcurl); Strerror* are string-only.
   # Ftp* connect/transfer deferred (host libftp); Close is handle-teardown only.
-  # Remaining Dom* (XML create / SetId / Standalone / VmDomInstance) + Intl* / Openssl* / Soap* / Sockets* deferred.
+  # Ftp* connect/transfer still deferred (host libftp).
+  # Remaining Openssl* / Soap* / Sockets* / PosixSet* deferred.
   /ext/dom/DomInsertAdjacentJitHelper.php
   /ext/dom/DomIsConnectedJitHelper.php
   /ext/dom/DomLoadHTMLFileJitHelper.php
@@ -534,6 +535,17 @@ SEED_UNITS=(
   /ext/dom/DomNormalizeJitHelper.php
   /ext/dom/DomSaveHTMLFileJitHelper.php
   /ext/dom/DomSaveHTMLJitHelper.php
+  # Finish Dom* + first Intl grapheme/locale (#36391 after 362)
+  /ext/dom/DomSaveXMLJitHelper.php
+  /ext/dom/DomSetIdAttributeJitHelper.php
+  /ext/dom/DomStandaloneAotInitJitHelper.php
+  /ext/dom/DomXmlDocumentCreateFromFileJitHelper.php
+  /ext/dom/DomXmlDocumentCreateFromStringJitHelper.php
+  /ext/dom/VmDomInstanceInvoke.php
+  /ext/intl/GraphemeStrSplitJitHelper.php
+  /ext/intl/LocaleFilterMatchesJitHelper.php
+  /ext/intl/LocaleGetDisplayNameJitHelper.php
+  /ext/intl/LocaleLookupJitHelper.php
 )
 
 MIN_SEED=${#SEED_UNITS[@]}
