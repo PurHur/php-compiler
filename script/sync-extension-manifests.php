@@ -10,7 +10,7 @@ declare(strict_types=1);
  * {@see \PHPCompiler\ExtensionRegistry::advertisesExtensionFor}). script/generate-extension-registry.php
  * reads these to emit lib/ExtensionRegistry.php (including dependenciesByDirectory /
  * defaultEnabledByDirectory for ModuleAbstract). Simple advertise-only *ExtensionPolicy classes
- * delegate to the registry; complex policies (sodium AEGIS, intl host probes, …) stay per-ext.
+ * delegate to the registry; feature gates beyond advertise (sodium AEGIS, …) stay per-ext.
  *
  * Sync preserves depends[] / default_enabled / advertise from an existing ext.json (manifests are SSOT).
  * Module.php getExtensionDependencies() overrides are only a migration fallback.

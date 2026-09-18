@@ -242,6 +242,29 @@ $buildAdvertiseMatch = static function (array $advertiseByDir) use ($root): stri
         $hostOnly = $rule['host_extension'] ?? null;
         $envOnlyKey = $rule['or_env'] ?? null;
         $requireEnv = $rule['require_env'] ?? null;
+        $probe = $rule['probe'] ?? null;
+        // Same-ext static probe (sodium: host function_exists OR libsodium FFI; #36204).
+        if (!is_string($method) && !is_string($hostOnly) && is_string($probe) && '' !== $probe) {
+            if (!preg_match(
+                '/^PHPCompiler\\\\ext\\\\([a-z][a-z0-9_]*)\\\\([A-Za-z][A-Za-z0-9_]*)::([a-z][A-Za-z0-9_]*)$/',
+                $probe,
+                $pm
+            )) {
+                fwrite(STDERR, "generate-extension-registry: bad probe for {$name}\n");
+                exit(2);
+            }
+            if ($pm[1] !== $name) {
+                fwrite(STDERR, "generate-extension-registry: probe for {$name} must live under ext/{$name}\n");
+                exit(2);
+            }
+            $probeFile = $root.'/ext/'.$pm[1].'/'.$pm[2].'.php';
+            if (!is_file($probeFile)) {
+                fwrite(STDERR, "generate-extension-registry: probe class file missing for {$name}: {$probeFile}\n");
+                exit(2);
+            }
+            $arms[] = "            '{$name}' => \\{$probe}(),";
+            continue;
+        }
         // Env-only opt-in (gmp release-unsupported): PHP_COMPILER_ENABLE_* with no host/CV (#36204).
         if (!is_string($method) && !is_string($hostOnly) && is_string($envOnlyKey) && '' !== $envOnlyKey) {
             if (!preg_match('/^PHP_COMPILER_ENABLE_[A-Z0-9_]+$/', $envOnlyKey)) {
@@ -415,8 +438,8 @@ final class ExtensionRegistry
     /**
      * Surface advertisement from ext.json {@code advertise} (#36204).
      *
-     * Folded *ExtensionPolicy::advertisesExtension() delegates here. Extensions without an
-     * advertise rule keep a hand-written policy class.
+     * Folded *ExtensionPolicy::advertisesExtension() delegates here. Feature gates beyond
+     * advertise (e.g. sodium AEGIS) stay on the per-ext policy class.
      */
     public static function advertisesExtensionFor(string \$directory): bool
     {
