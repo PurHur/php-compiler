@@ -50886,9 +50886,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/Concern/RewireArithmeticBranchSubstrEnumAndSiblingMultiArgCallArgSendSlots.php`
 
 **Warnings** (review for bootstrap subset):
-- trait RewireArithmeticBranchSubstrEnumAndSiblingMultiArgCallArgSendSlots (line 32)
-- new Operand\Literal (line 153)
-- 5 class method(s)
+- trait RewireArithmeticBranchSubstrEnumAndSiblingMultiArgCallArgSendSlots (line 33)
+- new Operand\Literal (line 154)
+- 6 class method(s)
 
 ### `lib/Compiler/Concern/RewireHoistedPreludePregCombineAndVarExportCallArgSendSlots.php`
 
@@ -50974,17 +50974,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - trait StaticMethodAndFuncCallCompile (line 30)
-- new OpCode (line 152)
-- new OpCode (line 189)
-- new OpCode (line 215)
-- new OpCode (line 234)
-- new OpCode (line 241)
-- new OpCode (line 282)
-- new Literal (line 456)
-- new OpCode (line 561)
-- new Variable (line 572)
-- new Temporary (line 574)
-- new OpCode (line 577)
+- new OpCode (line 153)
+- new OpCode (line 190)
+- new OpCode (line 216)
+- new OpCode (line 235)
+- new OpCode (line 242)
+- new OpCode (line 283)
+- new Literal (line 458)
+- new OpCode (line 563)
+- new Variable (line 574)
+- new Temporary (line 576)
+- new OpCode (line 579)
 - 9 class method(s)
 
 ### `lib/Compiler/Concern/StmtCoalesceFuncCallArgSyncCompile.php`
@@ -66474,10 +66474,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - trait AssignDispatch (line 23)
 - new Variable (line 63)
-- new Variable (line 83)
-- new Variable (line 150)
-- new Variable (line 394)
-- new Variable (line 506)
+- new Variable (line 87)
+- new Variable (line 154)
+- new Variable (line 398)
+- new Variable (line 510)
 - 2 class method(s)
 - 1 closure(s)
 

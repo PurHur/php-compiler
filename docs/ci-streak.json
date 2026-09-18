@@ -1,7 +1,7 @@
 {
     "issue": 36401,
     "ci_green_streak_days": 1,
-    "last_green_master_sha": "b84c8fcadd5ff72df8359cccf259849177939370",
+    "last_green_master_sha": "59ef50766c98e4477f32d65372c558cbd0a2885a",
     "last_green_day": "2026-09-18",
     "gates": [
         "apply-patches",
@@ -9,5 +9,5 @@
         "aot-smoke",
         "north-star5-verify-fast"
     ],
-    "notes": "Local Docker gates; GHA billing-disabled \u2014 not a remote check streak (#36401). Verified apply-patches --verify-pristine php-llvm 27/27 (structgep OK, #36143 closed), bootstrap-inventory 8597/8597 (regenerated construct-flag drift after ext.json advertise folds), aot-smoke 9/9, north-star5-verify-fast OK on tip b84c8fcadd. No open worker PRs at tip-ratchet time. #36143\u2013#36148/#36142 already closed. No IR stock. Streak records last fully verified SHA (gap since 2026-09-09 resets days to 1)."
+    "notes": "Local Docker gates; GHA billing-disabled \u2014 not a remote check streak (#36401). Verified apply-patches --verify-pristine php-llvm 27/27 (structgep OK, #36143 closed), bootstrap-inventory 8597/8597 (regenerated construct-flag drift on RewireArithmetic\u2026), aot-smoke 9/9, north-star5-verify-fast OK (spine 8597/8597; gen-0 functional smoke OK; trust preflight warns stale/unverified-restamp \u2014 non-blocking on fast). Tip 59ef50766c. No open worker PRs at tip-ratchet time. #36143\u2013#36148/#36142 already closed. No IR stock. Same-day tip advance keeps streak at 1."
 }
