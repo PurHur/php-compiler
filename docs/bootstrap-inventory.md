@@ -9106,7 +9106,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/bz2/Bz2ExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 4 class method(s)
 
 ### `ext/bz2/Bz2JitHelper.php`
 
@@ -9701,7 +9701,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/curl/CurlExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 20 class method(s)
+- 19 class method(s)
 
 ### `ext/curl/CurlFileBuiltin.php`
 
@@ -10088,7 +10088,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dba/DbaExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 6 class method(s)
 
 ### `ext/dba/DbaFunction.php`
 
@@ -13300,7 +13300,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/ds/DsExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 5 class method(s)
 
 ### `ext/ds/DsFactories.php`
 
@@ -13474,7 +13474,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/enchant/EnchantExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 6 class method(s)
 
 ### `ext/enchant/EnchantSerializeDeny.php`
 
@@ -15878,7 +15878,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/gnupg/GnupgExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 6 class method(s)
 
 ### `ext/gnupg/GnupgFunction.php`
 
@@ -16501,7 +16501,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/imagick/ImagickExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 5 class method(s)
 
 ### `ext/imagick/ImagickGetImageHeight.php`
 
@@ -17378,9 +17378,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/IntlExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- new locale_get_primary_language (line 422)
-- new locale_get_region (line 423)
-- new locale_get_script (line 424)
+- new locale_get_primary_language (line 423)
+- new locale_get_region (line 424)
+- new locale_get_script (line 425)
 - 36 class method(s)
 
 ### `ext/intl/IntlSerializeDeny.php`
@@ -20227,7 +20227,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/ldap/LdapExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 8 class method(s)
 
 ### `ext/ldap/LdapLinkJitHelper.php`
 
@@ -20601,7 +20601,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/lz4/Lz4ExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 5 class method(s)
 
 ### `ext/lz4/Lz4JitHelper.php`
 
@@ -20654,7 +20654,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/lzf/LzfExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 5 class method(s)
 
 ### `ext/lzf/LzfJitHelper.php`
 
@@ -20703,7 +20703,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mailparse/MailparseExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 5 class method(s)
 
 ### `ext/mailparse/MailparseExtract.php`
 
@@ -22270,7 +22270,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mysqli/MysqliExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 7 class method(s)
 
 ### `ext/mysqli/MysqliProceduralLink.php`
 
@@ -22926,7 +22926,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/odbc/OdbcExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 6 class method(s)
 
 ### `ext/odbc/VmOdbcConnection.php`
 
@@ -23410,7 +23410,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/openssl/OpensslExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 1 class method(s)
 
 ### `ext/openssl/OpensslFunction.php`
 
@@ -24687,7 +24687,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/pgsql/PgsqlExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 10 class method(s)
+- 9 class method(s)
 
 ### `ext/pgsql/PgsqlSerializeDeny.php`
 
@@ -25885,7 +25885,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/pspell/PspellExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 6 class method(s)
 
 ### `ext/pspell/VmPspellArg.php`
 
@@ -45054,7 +45054,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/stats/StatsExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 5 class method(s)
 
 ### `ext/stats/StatsFunction.php`
 
@@ -46275,7 +46275,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/uploadprogress/UploadprogressExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 5 class method(s)
 
 ### `ext/uploadprogress/VmUploadprogress.php`
 
@@ -48630,7 +48630,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/zip/ZipExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 4 class method(s)
 
 ### `ext/zip/ZipProceduralFunction.php`
 
@@ -48730,7 +48730,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/zmq/ZmqExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 6 class method(s)
 
 ### `ext/zmq/ZmqFunction.php`
 
@@ -48851,7 +48851,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/zstd/ZstdExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 5 class method(s)
 
 ### `ext/zstd/ZstdJitHelper.php`
 
