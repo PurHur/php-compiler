@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8592 |
-| Phase A inventory files (M2 ratio SSOT) | 8592 |
+| PHP files on vm.php path | 8593 |
+| Phase A inventory files (M2 ratio SSOT) | 8593 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26785 |
+| Source constructs flagged (warnings) | 26789 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7602,10 +7602,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/UnserializeObjectDecodeLlvm.php` | 0 | 1 |
 | `lib/JIT/UnsetHelper.php` | 0 | 1 |
 | `lib/JIT/UnsetHelperLlvm.php` | 0 | 4 |
+| `lib/JIT/UserCallableResolver.php` | 0 | 1 |
 | `lib/JIT/UserScriptAotEnv.php` | 0 | 1 |
 | `lib/JIT/UsortCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/UsortKeyedLlvm.php` | 0 | 1 |
-| `lib/JIT/UsortPackedLlvm.php` | 0 | 2 |
+| `lib/JIT/UsortPackedLlvm.php` | 0 | 5 |
 | `lib/JIT/ValueBoxDimWrite.php` | 0 | 1 |
 | `lib/JIT/ValueEchoHelper.php` | 0 | 2 |
 | `lib/JIT/ValueSortKeyedLlvm.php` | 0 | 2 |
@@ -51908,7 +51909,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ArrayMapRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 405)
+- new JITVariable (line 409)
 - 26 class method(s)
 
 ### `lib/JIT/Builtin/ArrayMergeRecursiveRuntime.php`
@@ -62415,6 +62416,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 13 class method(s)
 - 2 closure(s)
 
+### `lib/JIT/UserCallableResolver.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/UserScriptAotEnv.php`
 
 **Warnings** (review for bootstrap subset):
@@ -62433,8 +62439,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/UsortPackedLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- new NestedClosureInvoke (line 126)
-- 4 class method(s)
+- new Variable (line 43)
+- new NestedClosureInvoke (line 46)
+- new Variable (line 105)
+- 9 class method(s)
+- 5 closure(s)
 
 ### `lib/JIT/ValueBoxDimWrite.php`
 
@@ -62629,9 +62638,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ZendSortLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 57)
+- new self (line 64)
 - 17 class method(s)
-- 3 closure(s)
+- 4 closure(s)
 
 ### `lib/JIT/ZipExtensionHooks.php`
 

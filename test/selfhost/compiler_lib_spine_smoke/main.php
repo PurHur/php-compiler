@@ -8697,6 +8697,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/ZendCompareLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/IntRadixSortLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/MergeSortLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/ZendSortLlvm.php';
+require_once __DIR__.'/../../../lib/JIT/UserCallableResolver.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 

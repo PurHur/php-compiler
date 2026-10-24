@@ -35,7 +35,9 @@ final class ZendSortLlvm
     private $i64;
     private Value $perm;
     private Value $values;
-    private Value\Function_ $cmpFn;
+    private ?Value\Function_ $cmpFn = null;
+    /** @var callable|null inline comparator (compare emitted at each comparison site) */
+    private $inlineCompare = null;
     private Value $extra;
 
     /**
@@ -45,6 +47,10 @@ final class ZendSortLlvm
      *        function, the three-way compare of element pointers a, b (with the caller's
      *        $extra pointer as i8*) as an integer whose sign matters
      * @param Value|null $extra  any pointer the comparator needs from the caller's frame
+     * @param bool $inline  emit the comparator at every comparison site in the caller's
+     *        function instead of a separate function — required when it references the
+     *        caller's frame (closures with captured variables); scratch slots it needs must
+     *        be entry allocas
      */
     public static function emit(
         Context $context,
@@ -52,9 +58,10 @@ final class ZendSortLlvm
         Value $count,
         callable $compare,
         string $tag,
-        ?Value $extra = null
+        ?Value $extra = null,
+        bool $inline = false
     ): void {
-        (new self($context, $tag))->emitSort($values, $count, $compare, $extra);
+        (new self($context, $tag))->emitSort($values, $count, $compare, $extra, $inline);
     }
 
     private function __construct(Context $context, string $tag)
@@ -86,13 +93,17 @@ final class ZendSortLlvm
         return $s;
     }
 
-    private function emitSort(Value $values, Value $countIn, callable $compare, ?Value $extra): void
+    private function emitSort(Value $values, Value $countIn, callable $compare, ?Value $extra, bool $inline): void
     {
         $b = $this->b;
         $i8p = $this->context->getTypeFromString('int8*');
         $this->values = $values;
         $this->extra = null === $extra ? $i8p->constNull() : $b->pointerCast($extra, $i8p);
-        $this->cmpFn = $this->emitComparator($values->typeOf(), $compare);
+        if ($inline) {
+            $this->inlineCompare = $compare;
+        } else {
+            $this->cmpFn = $this->emitComparator($values->typeOf(), $compare);
+        }
         $i64 = $this->i64;
         $count = $b->intCast($countIn, $i64);
         $done = $this->block('done');
@@ -262,7 +273,9 @@ final class ZendSortLlvm
         $b = $this->b;
         $ix = $b->load($b->gep($this->perm, $x));
         $iy = $b->load($b->gep($this->perm, $y));
-        $res = $b->call($this->cmpFn, $b->gep($this->values, $ix), $b->gep($this->values, $iy), $this->extra);
+        $res = null !== $this->cmpFn
+            ? $b->call($this->cmpFn, $b->gep($this->values, $ix), $b->gep($this->values, $iy), $this->extra)
+            : $b->intCast(($this->inlineCompare)($b->gep($this->values, $ix), $b->gep($this->values, $iy), $this->extra), $this->i64);
 
         return $b->bitwiseOr(
             $b->icmp(Builder::INT_SGT, $res, $this->c(0)),
@@ -284,9 +297,13 @@ final class ZendSortLlvm
         ));
         $this->context->llvm->lib->LLVMSetLinkage($fn->value, \llvm\llvm::LLVMInternalLinkage);
         $saved = BasicBlockHelper::tryGetInsertBlock($this->context);
-        $this->b->positionAtEnd($fn->appendBasicBlock('entry'));
-        $res = $compare($fn->getParam(0), $fn->getParam(1), $fn->getParam(2));
-        $this->b->returnValue($this->b->intCast($res, $this->i64));
+        // Scope lowering to the comparator: lazily materialized helpers (first use of
+        // __value__copy etc.) restore the insert point relative to loweringLlvmFunction.
+        BasicBlockHelper::scopeLoweringToFunction($this->context, $fn, $name, function () use ($fn, $compare): void {
+            $this->b->positionAtEnd($fn->appendBasicBlock('entry'));
+            $res = $compare($fn->getParam(0), $fn->getParam(1), $fn->getParam(2));
+            $this->b->returnValue($this->b->intCast($res, $this->i64));
+        });
         if (null !== $saved) {
             $this->b->positionAtEnd($saved);
         }
