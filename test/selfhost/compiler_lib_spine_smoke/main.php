@@ -102,6 +102,7 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
+
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
@@ -3097,9 +3098,6 @@ require_once __DIR__.'/../../../ext/standard/JitPhpinfoFlags.php';
 require_once __DIR__.'/../../../ext/standard/JitPopen.php';
 require_once __DIR__.'/../../../ext/standard/JitPow.php';
 require_once __DIR__.'/../../../ext/standard/JitPowIntegerEmit.php';
-require_once __DIR__.'/../../../ext/standard/JitPowIntegerEmitExponents50to69.php';
-require_once __DIR__.'/../../../ext/standard/JitPowIntegerEmitMid.php';
-require_once __DIR__.'/../../../ext/standard/JitPowIntegerEmitHigh.php';
 require_once __DIR__.'/../../../ext/standard/JitPregFilter.php';
 require_once __DIR__.'/../../../ext/standard/JitPregGrep.php';
 require_once __DIR__.'/../../../ext/standard/JitPregLastError.php';
@@ -7037,7 +7035,6 @@ require_once __DIR__.'/../../../lib/JIT/DiscardedPureCallElisionRuntimeInfoOps.p
 require_once __DIR__.'/../../../lib/JIT/DiscardedPureCallElisionNativeLongFolds.php';
 require_once __DIR__.'/../../../lib/JIT/DiscardedPureCallElisionNativeLongBitwiseFolds.php';
 require_once __DIR__.'/../../../lib/JIT/DiscardedPureCallElisionNativeLongCompareMulFolds.php';
-require_once __DIR__.'/../../../lib/JIT/DiscardedPureCallElisionNativeLongPowFolds.php';
 require_once __DIR__.'/../../../lib/JIT/DiscardedPureCallElisionMathGuardAndVoidNativeOps.php';
 require_once __DIR__.'/../../../lib/JIT/DiscardedPureCallElisionPureMathAndVoidNativeOps.php';
 require_once __DIR__.'/../../../lib/JIT/DiscardedPureCallElisionIntrospectOps.php';
@@ -8690,6 +8687,11 @@ require_once __DIR__.'/../../../lib/JIT/PdoExtensionHooks.php';
 require_once __DIR__.'/../../../lib/JIT/TokenizerExtensionHooks.php';
 require_once __DIR__.'/../../../ext/dom/JitDomExtensionHooksFacade.php';
 require_once __DIR__.'/../../../lib/JIT/DomExtensionHooks.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/NumericStringLlvm.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/PowLongLlvm.php';
+require_once __DIR__.'/../../../lib/JIT/ClassNameTable.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/CompileErrorSuppressEndBlockAndSlotInherit.php';
+require_once __DIR__.'/../../../lib/Compiler/Concern/CompileAnonymousFunctionGeneratorAndNever.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 
@@ -8720,14 +8722,4 @@ unset($__spineMimeEnc, $__spineMimeDec);
 // M2 spine unit: setcookie options array parser Vm inventory (#8698).
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
-require_once __DIR__.'/../../../lib/Compiler/Concern/CompileErrorSuppressEndBlockAndSlotInherit.php';
-require_once __DIR__.'/../../../lib/Compiler/Concern/CompileAnonymousFunctionGeneratorAndNever.php';
-require_once __DIR__.'/../../../ext/standard/JitPowIntegerEmitLow.php';
-require_once __DIR__.'/../../../ext/standard/JitPowIntegerEmitExponents70to79.php';
-require_once __DIR__.'/../../../ext/standard/JitPowIntegerEmitExponents80to85.php';
-require_once __DIR__.'/../../../ext/standard/JitPowIntegerEmitExponents86to88.php';
-require_once __DIR__.'/../../../ext/standard/JitPowIntegerEmitExponents80to91.php';
-require_once __DIR__.'/../../../ext/standard/JitPowIntegerEmitExponents92to95.php';
-require_once __DIR__.'/../../../ext/standard/JitPowIntegerEmitExponents96to99.php';
-require_once __DIR__.'/../../../ext/standard/JitPowIntegerEmitExponents100to104.php';
 echo "compiler_lib_spine_smoke bundle OK\n";

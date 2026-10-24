@@ -138,16 +138,22 @@ final class ClassNameTable
         return $out;
     }
 
+    public const OTHER_OPERAND_MARKER = "\0phpc-other\0";
+
     /**
      * Raise the TypeError produced by `$messageForClass($className)` for the runtime class
      * `$classId` ("object" when the id has no name), through one raise sequence.
+     * {@see OTHER_OPERAND_MARKER} in the message is replaced by `$otherName` (runtime).
      *
      * @param callable(string):string $messageForClass
      */
-    public static function emitTypeErrorForClassId(Context $context, Value $classId, callable $messageForClass): void
-    {
+    public static function emitTypeErrorForClassId(
+        Context $context,
+        Value $classId,
+        callable $messageForClass,
+        ?Value $otherName = null
+    ): void {
         $marker = "\0phpc-class\0";
-        [$prefix, $suffix] = explode($marker, $messageForClass($marker), 2) + [1 => ''];
         $b = $context->builder;
         $name = self::emitNameFromId($context, $classId);
         $nameLen = $b->load($b->structGep($name, $context->structFieldMap['__string__']['length']));
@@ -156,9 +162,99 @@ final class ClassNameTable
             $b->load($context->constantStringFromString('object')),
             $name
         );
-        ExceptionBridge::emitTypeErrorAndAbortWithStringValue(
-            $context,
-            self::emitConcat($context, $prefix, $name, $suffix)
-        );
+        $parts = [];
+        foreach (explode($marker, $messageForClass($marker)) as $i => $piece) {
+            if ($i > 0) {
+                $parts[] = $name;
+            }
+            foreach (explode(self::OTHER_OPERAND_MARKER, $piece) as $j => $sub) {
+                if ($j > 0) {
+                    $parts[] = $otherName ?? $b->load($context->constantStringFromString('mixed'));
+                }
+                $parts[] = $sub;
+            }
+        }
+        ExceptionBridge::emitTypeErrorAndAbortWithStringValue($context, self::emitConcatParts($context, $parts));
+    }
+
+    /**
+     * Concatenate literal and runtime {@see __string__*} parts into a fresh string.
+     *
+     * @param list<string|Value> $parts
+     */
+    public static function emitConcatParts(Context $context, array $parts): Value
+    {
+        $b = $context->builder;
+        $map = $context->structFieldMap['__string__'];
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $total = $i64->constInt(0, false);
+        $resolved = [];
+        foreach ($parts as $part) {
+            if (\is_string($part)) {
+                if ('' === $part) {
+                    continue;
+                }
+                $lit = $b->load($context->constantStringFromString($part));
+                $resolved[] = [$lit, $i64->constInt(\strlen($part), false)];
+            } else {
+                $resolved[] = [$part, $b->load($b->structGep($part, $map['length']))];
+            }
+            $total = $b->add($total, end($resolved)[1]);
+        }
+        $out = $b->call($context->lookupFunction('__string__alloc'), $total);
+        $dst = $b->pointerCast($b->structGep($out, $map['value']), $i8p);
+        LibcExtern::ensureMemcpyDecl($context);
+        $memcpy = $context->lookupFunction('memcpy');
+        $offset = $i64->constInt(0, false);
+        foreach ($resolved as [$str, $len]) {
+            $b->call($memcpy, $b->gep($dst, $offset), $b->pointerCast($b->structGep($str, $map['value']), $i8p), $len);
+            $offset = $b->add($offset, $len);
+        }
+
+        return $out;
+    }
+
+    /**
+     * zend_zval_type_name() of a value box at runtime; objects give their class name.
+     *
+     * @return Value {@see __string__*}
+     */
+    public static function emitBoxTypeName(Context $context, Value $valuePtr): Value
+    {
+        $b = $context->builder;
+        $i8 = $context->getTypeFromString('int8');
+        $vmap = $context->structFieldMap['__value__'];
+        $kind = $b->bitwiseAnd($b->load($b->structGep($valuePtr, $vmap['type'])), $i8->constInt(0x7f, false));
+        $name = static fn (string $n): Value => $b->load($context->constantStringFromString($n));
+        $result = $name('mixed');
+        foreach ([
+            Variable::TYPE_NULL => 'null',
+            Variable::TYPE_NATIVE_LONG => 'int',
+            Variable::TYPE_NATIVE_BOOL => 'bool',
+            Variable::TYPE_NATIVE_DOUBLE => 'float',
+            Variable::TYPE_STRING & 0x7f => 'string',
+            Variable::TYPE_HASHTABLE & 0x7f => 'array',
+        ] as $tag => $label) {
+            $result = $b->select($b->icmp(Builder::INT_EQ, $kind, $i8->constInt($tag, false)), $name($label), $result);
+        }
+        $isObject = $b->icmp(Builder::INT_EQ, $kind, $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false));
+        $fn = BasicBlockHelper::parentFunction($context);
+        $objBlock = $fn->appendBasicBlock('box_type_name_object');
+        $join = $fn->appendBasicBlock('box_type_name_join');
+        $from = $b->getInsertBlock();
+        $b->branchIf($isObject, $objBlock, $join);
+        $b->positionAtEnd($objBlock);
+        $obj = $b->call($context->lookupFunction('__value__readObject'), $valuePtr);
+        $classId = $b->load($b->structGep($obj, $context->structFieldMap['__object__']['class_id']));
+        $className = self::emitNameFromId($context, $classId);
+        $objEnd = $b->getInsertBlock();
+        $b->branch($join);
+        $b->positionAtEnd($join);
+        $phi = $b->phi($result->typeOf());
+        $phi->addIncoming($result, $from);
+        $phi->addIncoming($className, $objEnd);
+
+        return $phi;
     }
 }

@@ -90,6 +90,7 @@ final class VmObjectNumericOperandGuard
             return true;
         }
         if (Variable::TYPE_VALUE === $left->type && JitValueBox::isValueOperand($left)) {
+            $rightLabel = self::labelOrRuntimeMarker($context, $right);
             self::emitBoxedObjectTypeError(
                 $context,
                 $left,
@@ -97,20 +98,23 @@ final class VmObjectNumericOperandGuard
                     'Unsupported operand types: %s %s %s',
                     $class,
                     self::operatorSymbol($opCode),
-                    JitOperandTypeLabel::givenLabel($context, $right)
-                )
+                    $rightLabel
+                ),
+                $right
             );
         }
         if (Variable::TYPE_VALUE === $right->type && JitValueBox::isValueOperand($right)) {
+            $leftLabel = self::labelOrRuntimeMarker($context, $left);
             self::emitBoxedObjectTypeError(
                 $context,
                 $right,
                 static fn (string $class): string => sprintf(
                     'Unsupported operand types: %s %s %s',
-                    JitOperandTypeLabel::givenLabel($context, $left),
+                    $leftLabel,
                     self::operatorSymbol($opCode),
                     $class
-                )
+                ),
+                $left
             );
         }
 
@@ -183,10 +187,21 @@ final class VmObjectNumericOperandGuard
      *
      * @param callable(string):string $messageForClass
      */
+    /** Compile-time type label, or the runtime-name marker for an untyped value box. */
+    private static function labelOrRuntimeMarker(Context $context, Variable $other): string
+    {
+        $label = JitOperandTypeLabel::givenLabel($context, $other);
+
+        return 'mixed' === $label && JitValueBox::isValueOperand($other)
+            ? ClassNameTable::OTHER_OPERAND_MARKER
+            : $label;
+    }
+
     private static function emitBoxedObjectTypeError(
         Context $context,
         Variable $var,
-        callable $messageForClass
+        callable $messageForClass,
+        ?Variable $other = null
     ): void {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'obj_num_vbox_cont');
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $var);
@@ -210,7 +225,10 @@ final class VmObjectNumericOperandGuard
             $context->lookupFunction('__value__readObject'),
             $valuePtr
         );
-        self::emitClassIdTypeErrorSwitch($context, $objPtr, $messageForClass);
+        $otherName = null !== $other && JitValueBox::isValueOperand($other)
+            ? ClassNameTable::emitBoxTypeName($context, JitValueBox::valuePtrFromVariable($context, $other))
+            : null;
+        self::emitClassIdTypeErrorSwitch($context, $objPtr, $messageForClass, $otherName);
         $context->builder->positionAtEnd($continueBlock);
     }
 
@@ -220,11 +238,12 @@ final class VmObjectNumericOperandGuard
     private static function emitClassIdTypeErrorSwitch(
         Context $context,
         \PHPLLVM\Value $objPtr,
-        callable $messageForClass
+        callable $messageForClass,
+        ?\PHPLLVM\Value $otherName = null
     ): void {
         $jitObject = $context->type->object;
         if (!$jitObject instanceof JitObjectType) {
-            ExceptionBridge::emitTypeErrorAndAbort($context, $messageForClass('object'));
+            ExceptionBridge::emitTypeErrorAndAbort($context, str_replace(ClassNameTable::OTHER_OPERAND_MARKER, 'mixed', $messageForClass('object')));
 
             return;
         }
@@ -243,7 +262,7 @@ final class VmObjectNumericOperandGuard
             $entries[(int) $id] = (string) $name;
         }
         if ([] === $overloadedIds && [] === $entries) {
-            ExceptionBridge::emitTypeErrorAndAbort($context, $messageForClass('object'));
+            ExceptionBridge::emitTypeErrorAndAbort($context, str_replace(ClassNameTable::OTHER_OPERAND_MARKER, 'mixed', $messageForClass('object')));
             $context->builder->positionAtEnd(BasicBlockHelper::append($context, 'obj_num_class_ok'));
 
             return;
@@ -264,7 +283,7 @@ final class VmObjectNumericOperandGuard
 
         // One raise sequence; the class name is looked up at runtime (#36386 compile-size).
         $context->builder->positionAtEnd($raiseBlock);
-        ClassNameTable::emitTypeErrorForClassId($context, $classId, $messageForClass);
+        ClassNameTable::emitTypeErrorForClassId($context, $classId, $messageForClass, $otherName);
         $context->builder->positionAtEnd($okBlock);
     }
 

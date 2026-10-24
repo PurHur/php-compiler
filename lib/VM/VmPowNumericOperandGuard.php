@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin\TypeErrorRaise;
+use PHPCompiler\JIT\Builtin\NumericStringLlvm;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -87,6 +88,9 @@ final class VmPowNumericOperandGuard
             $valuePtr
         );
         self::emitRuntimeStringPtrGuard($context, $strPtr, $operand, $other);
+        // Numeric string: continue (the continue block used to fall off unterminated and was
+        // sealed `unreachable`, so every string operand of ** was undefined behaviour).
+        $context->builder->branch($okBlock);
         $context->builder->positionAtEnd($okBlock);
     }
 
@@ -96,9 +100,14 @@ final class VmPowNumericOperandGuard
         Variable $operand,
         Variable $other
     ): void {
-        $isNumeric = VmValueCompare::stringIsNumeric($context, $strPtr);
-        $noLeadingPrefix = VmValueCompare::stringHasNoLeadingIntegerPrefix($context, $strPtr);
-        $needsTypeError = $context->builder->and($noLeadingPrefix, $context->builder->not($isNumeric));
+        // php-src _is_numeric_string_ex: only a string with no numeric prefix at all throws.
+        $scratch = JitValueBox::pointer($context, JitValueBox::alloc($context));
+        $status = NumericStringLlvm::call($context, $strPtr, $scratch);
+        $needsTypeError = $context->builder->icmp(
+            Builder::INT_EQ,
+            $status,
+            $context->getTypeFromString('int32')->constInt(NumericStringLlvm::NON_NUMERIC, false)
+        );
 
         $typeErrorBlock = BasicBlockHelper::append($context, 'pow_str_type_error');
         $continueBlock = BasicBlockHelper::append($context, 'pow_str_cont');
@@ -134,9 +143,7 @@ final class VmPowNumericOperandGuard
 
     private static function emitTypeErrorAndAbort(Context $context, string $message): void
     {
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitRaise($context, $message);
-        $context->builder->call($context->lookupFunction('abort'));
+        // Catchable like every other operand TypeError (was raise + abort()).
+        ExceptionBridge::emitTypeErrorAndAbort($context, $message);
     }
 }

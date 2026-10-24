@@ -59,6 +59,9 @@ trait NoThrowCallElisionCalleeGraph
                 ) {
                     return false;
                 }
+                if (self::opMayRaiseEngineError($block, $op)) {
+                    return false;
+                }
                 if (OpCode::TYPE_FUNCCALL_INIT === $type) {
                     if (!empty($op->funcCallDynamic)) {
                         return false;
@@ -264,4 +267,185 @@ trait NoThrowCallElisionCalleeGraph
         return substr($scopedLc, 0, $pos);
     }
 
+
+    /**
+     * Engine errors (TypeError, DivisionByZeroError, ArithmeticError, Error) raised by the
+     * op itself, not by a call. The old analysis only looked for `throw`/`new`/calls, so
+     * `function f($a, $b) { return $a + $b; }` was "no-throw" and f(new Foo, 1) / f("x", 1)
+     * left its TypeError pending past the caller's next statement.
+     *
+     * Allow-list: ops listed here are safe (with operand-type conditions); anything else
+     * is assumed to possibly raise.
+     */
+    private static function opMayRaiseEngineError(Block $block, OpCode $op): bool
+    {
+        switch ($op->type) {
+            case OpCode::TYPE_ASSIGN:
+            case OpCode::TYPE_JUMP:
+            case OpCode::TYPE_JUMPIF:
+            case OpCode::TYPE_RETURN:
+            case OpCode::TYPE_RETURN_VOID:
+            case OpCode::TYPE_ARG_RECV:
+            case OpCode::TYPE_ARG_SEND:
+            case OpCode::TYPE_FUNCCALL_INIT:
+            case OpCode::TYPE_METHODCALL_INIT:
+            case OpCode::TYPE_STATICCALL_INIT:
+            case OpCode::TYPE_FUNCCALL_EXEC_RETURN:
+            case OpCode::TYPE_FUNCCALL_EXEC_NORETURN:
+            case OpCode::TYPE_FUNCDEF:
+            case OpCode::TYPE_CLOSURE:
+            case OpCode::TYPE_TYPE_ASSERT:
+            case OpCode::TYPE_SMALLER:
+            case OpCode::TYPE_SMALLER_OR_EQUAL:
+            case OpCode::TYPE_GREATER:
+            case OpCode::TYPE_GREATER_OR_EQUAL:
+            case OpCode::TYPE_EQUAL:
+            case OpCode::TYPE_NOT_EQUAL:
+            case OpCode::TYPE_IDENTICAL:
+            case OpCode::TYPE_NOT_IDENTICAL:
+            case OpCode::TYPE_SPACESHIP:
+            case OpCode::TYPE_BOOLEAN_NOT:
+            case OpCode::TYPE_LOGICAL_XOR:
+            case OpCode::TYPE_ISSET:
+            case OpCode::TYPE_EMPTY:
+            case OpCode::TYPE_COALESCE:
+            case OpCode::TYPE_CAST_BOOL:
+            case OpCode::TYPE_INSTANCEOF:
+            case OpCode::TYPE_INIT_ARRAY:
+            case OpCode::TYPE_TICK_SCOPE_ENTER:
+            case OpCode::TYPE_TICK_SCOPE_SET:
+            case OpCode::TYPE_TICK_SCOPE_LEAVE:
+                return false;
+
+            case OpCode::TYPE_PLUS:
+            case OpCode::TYPE_MINUS:
+            case OpCode::TYPE_MUL:
+            case OpCode::TYPE_POW:
+            case OpCode::TYPE_BITWISE_AND:
+            case OpCode::TYPE_BITWISE_OR:
+            case OpCode::TYPE_BITWISE_XOR:
+                return !self::operandIsNumeric($block, $op->arg1) || !self::operandIsNumeric($block, $op->arg2);
+
+            case OpCode::TYPE_UNARY_MINUS:
+            case OpCode::TYPE_UNARY_PLUS:
+            case OpCode::TYPE_BITWISE_NOT:
+            case OpCode::TYPE_PRE_INC:
+            case OpCode::TYPE_PRE_DEC:
+            case OpCode::TYPE_POST_INC:
+            case OpCode::TYPE_POST_DEC:
+            case OpCode::TYPE_CAST_INT:
+            case OpCode::TYPE_CAST_FLOAT:
+                return !self::operandIsNumeric($block, $op->arg1);
+
+            case OpCode::TYPE_CONCAT:
+            case OpCode::TYPE_ECHO:
+            case OpCode::TYPE_PRINT:
+            case OpCode::TYPE_CAST_STRING:
+                foreach ([$op->arg1, $op->arg2] as $slot) {
+                    if (null !== $slot && !self::operandIsScalar($block, $slot)) {
+                        return true;
+                    }
+                }
+
+                return false;
+
+            case OpCode::TYPE_DIV:
+            case OpCode::TYPE_MODULO:
+                // DivisionByZeroError for any zero divisor; only a non-zero literal is safe.
+                $divisor = self::literalOperandValue($block, $op->arg2);
+
+                return !self::operandIsNumeric($block, $op->arg1)
+                    || !(\is_int($divisor) || \is_float($divisor)) || 0 == $divisor;
+
+            case OpCode::TYPE_SHIFT_LEFT:
+            case OpCode::TYPE_SHIFT_RIGHT:
+                // ArithmeticError for a negative shift count.
+                $count = self::literalOperandValue($block, $op->arg2);
+
+                return !self::operandIsNumeric($block, $op->arg1) || !\is_int($count) || $count < 0;
+
+            case OpCode::TYPE_ARRAY_DIM_FETCH:
+                return !self::operandHasType($block, $op->arg1, [\PHPTypes\Type::TYPE_ARRAY]);
+        }
+
+        return true;
+    }
+
+    private static function operandIsNumeric(Block $block, ?int $slot): bool
+    {
+        return self::operandHasType($block, $slot, [
+            \PHPTypes\Type::TYPE_LONG,
+            \PHPTypes\Type::TYPE_DOUBLE,
+            \PHPTypes\Type::TYPE_BOOLEAN,
+            \PHPTypes\Type::TYPE_NULL,
+        ]);
+    }
+
+    private static function operandIsScalar(Block $block, ?int $slot): bool
+    {
+        return self::operandHasType($block, $slot, [
+            \PHPTypes\Type::TYPE_LONG,
+            \PHPTypes\Type::TYPE_DOUBLE,
+            \PHPTypes\Type::TYPE_BOOLEAN,
+            \PHPTypes\Type::TYPE_NULL,
+            \PHPTypes\Type::TYPE_STRING,
+        ]);
+    }
+
+    /**
+     * True when the operand's inferred type is one of $kinds (a union must consist only of
+     * them). Unknown/mixed operands are false.
+     *
+     * @param list<int> $kinds
+     */
+    private static function operandHasType(Block $block, ?int $slot, array $kinds): bool
+    {
+        if (null === $slot) {
+            return false;
+        }
+        $operand = $block->getOperand($slot);
+        if (null === $operand) {
+            return false;
+        }
+        if ($operand instanceof Operand\Literal) {
+            $v = $operand->value;
+
+            return match (true) {
+                \is_int($v) => \in_array(\PHPTypes\Type::TYPE_LONG, $kinds, true),
+                \is_float($v) => \in_array(\PHPTypes\Type::TYPE_DOUBLE, $kinds, true),
+                \is_bool($v) => \in_array(\PHPTypes\Type::TYPE_BOOLEAN, $kinds, true),
+                null === $v => \in_array(\PHPTypes\Type::TYPE_NULL, $kinds, true),
+                \is_string($v) => \in_array(\PHPTypes\Type::TYPE_STRING, $kinds, true),
+                default => false,
+            };
+        }
+        $type = $operand->type ?? null;
+        if (!$type instanceof \PHPTypes\Type) {
+            return false;
+        }
+        if (\PHPTypes\Type::TYPE_UNION === $type->type) {
+            if ([] === $type->subTypes) {
+                return false;
+            }
+            foreach ($type->subTypes as $sub) {
+                if (!\in_array($sub->type, $kinds, true)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        return \in_array($type->type, $kinds, true);
+    }
+
+    private static function literalOperandValue(Block $block, ?int $slot): mixed
+    {
+        if (null === $slot) {
+            return null;
+        }
+        $operand = $block->getOperand($slot);
+
+        return $operand instanceof Operand\Literal ? $operand->value : null;
+    }
 }

@@ -643,11 +643,6 @@
             "target": 400,
             "note": "nativeLongCompare* + nativeLongMul* + nativeLongArithIsCompileTimeIdentityOrZero extracted from NativeLongFolds (#36387); php-src Zend/zend_operators.c compare/mul/add/sub"
         },
-        "lib/JIT/DiscardedPureCallElisionNativeLongPowFolds.php": {
-            "budget": 555,
-            "target": 600,
-            "note": "nativeLongPowCompileTimeExponentFold extracted from NativeLongFolds (#36387/#36386); includes ninetyninth/hundredth/hundredfirst/hundredsecond/hundredthird/hundredfourth/hundredfifth/hundredsixth/hundredseventh/hundredeighth/hundredninth/hundredtenth/hundredeleventh fold; php-src Zend/zend_operators.c pow_function / zend_pow / mul_function; ext/standard/math.c PHP_FUNCTION(pow)"
-        },
         "lib/JIT/DiscardedPureCallElisionIntrospectOps.php": {
             "budget": 407,
             "target": 500,
@@ -716,67 +711,12 @@
         "ext/standard/JitPow.php": {
             "budget": 443,
             "target": 600,
-            "note": "pow()/ ** LLVM lowering hub; integer chained-smul emit in JitPowIntegerEmit + Low/Mid/Exponents50to69/70to79/80to85/86to88/80to91/92to95/96to99/100to104/High (#36387)"
+            "note": "pow()/ ** LLVM lowering hub; integer pow via JitPowIntegerEmit -> PowLongLlvm (#36386)"
         },
         "ext/standard/JitPowIntegerEmit.php": {
-            "budget": 179,
+            "budget": 60,
             "target": 500,
-            "note": "integer pow()/ ** hub: Low/Mid/Exponents50to69/70to79/80to85/86to88/80to91/92to95/96to99/100to104/High dispatch (#36387/#36386)"
-        },
-        "ext/standard/JitPowIntegerEmitHigh.php": {
-            "budget": 29349,
-            "target": 34349,
-            "note": "integer pow()/ ** chained-smul emit for hundredfifth..hundredeleventh; 100..104 in Exponents100to104 (#36387/#36386)"
-        },
-        "ext/standard/JitPowIntegerEmitLow.php": {
-            "budget": 3985,
-            "target": 6000,
-            "note": "integer pow()/ ** chained-smul emit for one..twentyninth extracted from JitPowIntegerEmit (#36387/#36386)"
-        },
-        "ext/standard/JitPowIntegerEmitMid.php": {
-            "budget": 5037,
-            "target": 8000,
-            "note": "integer pow()/ ** chained-smul emit for compile-time exponents 30..49 extracted from JitPowIntegerEmit (#36387/#36386)"
-        },
-        "ext/standard/JitPowIntegerEmitExponents50to69.php": {
-            "budget": 16382,
-            "target": 20000,
-            "note": "compile-time exponents 50-69 (#36387/#36386)"
-        },
-        "ext/standard/JitPowIntegerEmitExponents70to79.php": {
-            "budget": 17004,
-            "target": 20000,
-            "note": "integer pow()/ ** chained-smul emit for compile-time exponents 70..79 extracted from High (#36387/#36386)"
-        },
-        "ext/standard/JitPowIntegerEmitExponents80to91.php": {
-            "budget": 8593,
-            "target": 20000,
-            "note": "integer pow()/ ** chained-smul emit for compile-time exponents 89..91; 86..88 in Exponents86to88 (#36387/#36386)"
-        },
-        "ext/standard/JitPowIntegerEmitExponents80to85.php": {
-            "budget": 13554,
-            "target": 20000,
-            "note": "integer pow()/ ** chained-smul emit for compile-time exponents 80..85; 86..88 in Exponents86to88 (#36387/#36386)"
-        },
-        "ext/standard/JitPowIntegerEmitExponents86to88.php": {
-            "budget": 7830,
-            "target": 20000,
-            "note": "integer pow()/ ** chained-smul emit for compile-time exponents 86..88 extracted from Exponents80to91 (#36387/#36386)"
-        },
-        "ext/standard/JitPowIntegerEmitExponents92to95.php": {
-            "budget": 12525,
-            "target": 20000,
-            "note": "integer pow()/ ** chained-smul emit for compile-time exponents 92..95; 96..99 in Exponents96to99; 100..104 in Exponents100to104 (#36387/#36386)"
-        },
-        "ext/standard/JitPowIntegerEmitExponents96to99.php": {
-            "budget": 13386,
-            "target": 20000,
-            "note": "integer pow()/ ** chained-smul emit for compile-time exponents 96..99 extracted from High; 100..104 in Exponents100to104 (#36387/#36386)"
-        },
-        "ext/standard/JitPowIntegerEmitExponents100to104.php": {
-            "budget": 18016,
-            "target": 20000,
-            "note": "integer pow()/ ** chained-smul emit for compile-time exponents 100..104 extracted from High (#36387/#36386)"
+            "note": "integer pow()/ ** -> PowLongLlvm (php-src pow_function_base) (#36386)"
         }
     },
     "script_file_count": {
