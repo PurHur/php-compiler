@@ -58,69 +58,26 @@ final class ValueSortKeyedLlvm
         $pairCount = $context->builder->load(
             $context->builder->structGep($pairs, $map['nextFreeElement'])
         );
-        $maxPasses = $context->builder->mul($pairCount, $pairCount);
-        $passCountSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
-        $context->builder->store($zero, $passCountSlot);
-
-        $swappedSlot = BasicBlockHelper::entryAlloca($context, $i1);
-        $context->builder->store($i1->constInt(1, false), $swappedSlot);
-        $passHead = BasicBlockHelper::append($context, $prefix.'_pass_head');
-        $passBody = BasicBlockHelper::append($context, $prefix.'_pass_body');
+        // php-src zend_sort + php_array_data_compare (zend_compare, stable tiebreak); was a
+        // bubble sort that compared every non-string value with readLong (floats truncated).
         $writeback = BasicBlockHelper::append($context, $prefix.'_writeback');
-        $context->builder->branch($passHead);
+        $pairValues = $context->builder->load($context->builder->structGep($pairs, $map['values']));
+        ZendSortLlvm::emit(
+            $context,
+            $pairValues,
+            $pairCount,
+            static function (Value $pa, Value $pb) use ($context, $reverse, $caseInsensitive): Value {
+                $va = self::pairValuePtr($context, $pa);
+                $vb = self::pairValuePtr($context, $pb);
+                $cmp = $caseInsensitive
+                    ? self::compareCaseInsensitive($context, $va, $vb)
+                    : Builtin\ZendCompareLlvm::call($context, $va, $vb);
 
-        $context->builder->positionAtEnd($passHead);
-        $didSwap = $context->builder->load($swappedSlot);
-        $passCount = $context->builder->load($passCountSlot);
-        $overCap = $context->builder->icmp(Builder::INT_UGE, $passCount, $maxPasses);
-        $cont = $context->builder->and(
-            $didSwap,
-            $context->builder->icmp(Builder::INT_EQ, $overCap, $i1->constInt(0, false))
+                return $reverse ? $context->builder->sub($context->getTypeFromString('int64')->constInt(0, false), $cmp) : $cmp;
+            },
+            $prefix
         );
-        $context->builder->branchIf($cont, $passBody, $writeback);
-
-        $context->builder->positionAtEnd($passBody);
-        $context->builder->store(
-            $context->builder->addNoSignedWrap($passCount, $one),
-            $passCountSlot
-        );
-        $context->builder->store($i1->constInt(0, false), $swappedSlot);
-        $limit = $context->builder->sub($pairCount, $one);
-        $iSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
-        $context->builder->store($zero, $iSlot);
-        $walkHead = BasicBlockHelper::append($context, $prefix.'_walk_head');
-        $walkBody = BasicBlockHelper::append($context, $prefix.'_walk_body');
-        $passExit = BasicBlockHelper::append($context, $prefix.'_pass_exit');
-        $context->builder->branch($walkHead);
-
-        $context->builder->positionAtEnd($walkHead);
-        $i = $context->builder->load($iSlot);
-        $atEnd = $context->builder->icmp(Builder::INT_UGE, $i, $limit);
-        $context->builder->branchIf($atEnd, $passExit, $walkBody);
-
-        $context->builder->positionAtEnd($walkBody);
-        $j = $context->builder->addNoSignedWrap($i, $one);
-        $leftBox = self::pairCompareOperand($context, $pairs, $i, $valueIndex);
-        $rightBox = self::pairCompareOperand($context, $pairs, $j, $valueIndex);
-        $cmpLong = self::compareValueBoxes($context, $leftBox, $rightBox, $caseInsensitive);
-        $needsSwap = $reverse
-            ? $context->builder->icmp(Builder::INT_SLT, $cmpLong, $i64->constInt(0, false))
-            : $context->builder->icmp(Builder::INT_SGT, $cmpLong, $i64->constInt(0, false));
-        $swapBlock = BasicBlockHelper::append($context, $prefix.'_swap');
-        $advance = BasicBlockHelper::append($context, $prefix.'_advance');
-        $context->builder->branchIf($needsSwap, $swapBlock, $advance);
-
-        $context->builder->positionAtEnd($swapBlock);
-        self::swapPackedEntriesAt($context, $pairs, $i, $j, $valueType);
-        $context->builder->store($i1->constInt(1, false), $swappedSlot);
-        $context->builder->branch($advance);
-
-        $context->builder->positionAtEnd($advance);
-        $context->builder->store($context->builder->addNoSignedWrap($i, $one), $iSlot);
-        $context->builder->branch($walkHead);
-
-        $context->builder->positionAtEnd($passExit);
-        $context->builder->branch($passHead);
+        $context->builder->branch($writeback);
 
         $context->builder->positionAtEnd($writeback);
         // Packed AOT HTs store int keys in values[index] — foreach is always ascending
@@ -304,5 +261,44 @@ final class ValueSortKeyedLlvm
         $context->builder->store($context->builder->load($entryA), $tmp);
         $context->builder->store($context->builder->load($entryB), $entryA);
         $context->builder->store($context->builder->load($tmp), $entryB);
+    }
+
+    /** `__value__*` of the value slot (index 1) of an exported [key, value] pair element. */
+    private static function pairValuePtr(Context $context, Value $pairElem): Value
+    {
+        $pairHt = $context->builder->call($context->lookupFunction('__value__readHashtable'), $pairElem);
+
+        return HashTableReadLlvm::listEntryPointer($context, $pairHt, $context->getTypeFromString('size_t')->constInt(1, false));
+    }
+
+    /** SORT_FLAG_CASE: strings by ASCII strcasecmp, everything else zend_compare. */
+    private static function compareCaseInsensitive(Context $context, Value $a, Value $b): Value
+    {
+        $bd = $context->builder;
+        $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
+        $fn = BasicBlockHelper::parentFunction($context);
+        $map = $context->structFieldMap['__value__'];
+        $kind = static fn (Value $v): Value => $bd->and($bd->load($bd->structGep($v, $map['type'])), $i8->constInt(0x7f, false));
+        $strKind = $i8->constInt(Variable::TYPE_STRING & 0x7f, false);
+        $out = BasicBlockHelper::entryAlloca($context, $i64);
+        $strs = $fn->appendBasicBlock('vsort_case_strs');
+        $other = $fn->appendBasicBlock('vsort_case_other');
+        $join = $fn->appendBasicBlock('vsort_case_join');
+        $bd->branchIf($bd->and($bd->icmp(Builder::INT_EQ, $kind($a), $strKind), $bd->icmp(Builder::INT_EQ, $kind($b), $strKind)), $strs, $other);
+        $bd->positionAtEnd($strs);
+        $c = JitStringCompare::strcasecmp(
+            $context,
+            $bd->call($context->lookupFunction('__value__readString'), $a),
+            $bd->call($context->lookupFunction('__value__readString'), $b)
+        );
+        $bd->store($bd->intCast($c, $i64), $out);
+        $bd->branch($join);
+        $bd->positionAtEnd($other);
+        $bd->store(Builtin\ZendCompareLlvm::call($context, $a, $b), $out);
+        $bd->branch($join);
+        $bd->positionAtEnd($join);
+
+        return $bd->load($out);
     }
 }
