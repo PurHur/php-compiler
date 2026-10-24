@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8588 |
-| Phase A inventory files (M2 ratio SSOT) | 8588 |
+| PHP files on vm.php path | 8592 |
+| Phase A inventory files (M2 ratio SSOT) | 8592 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 26775 |
+| Source constructs flagged (warnings) | 26785 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -6722,6 +6722,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/WeakRefRegistryRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/WeakRefRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/WeakRefSetup.php` | 0 | 1 |
+| `lib/JIT/Builtin/ZendCompareLlvm.php` | 0 | 4 |
 | `lib/JIT/Builtin/ZendDoubleStringRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ZipArchiveEmbedBridge.php` | 0 | 1 |
 | `lib/JIT/Builtin/ZlibRuntime.php` | 0 | 1 |
@@ -7437,6 +7438,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/InstanceOfHelper.php` | 0 | 6 |
 | `lib/JIT/InstancePropertyVisibilityJitGuard.php` | 0 | 2 |
 | `lib/JIT/InstantiableClassJitGuard.php` | 0 | 1 |
+| `lib/JIT/IntRadixSortLlvm.php` | 0 | 2 |
 | `lib/JIT/InternalStrictArg.php` | 0 | 1 |
 | `lib/JIT/IntersectionParamCheck.php` | 0 | 3 |
 | `lib/JIT/IntlExtensionHooks.php` | 0 | 1 |
@@ -7504,6 +7506,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/MbConvertVariablesLlvm.php` | 0 | 2 |
 | `lib/JIT/McjitEmbedHostEcho.php` | 0 | 2 |
 | `lib/JIT/McjitEmbedRuntime.php` | 0 | 1 |
+| `lib/JIT/MergeSortLlvm.php` | 0 | 1 |
 | `lib/JIT/MultipleIteratorZipLlvm.php` | 0 | 4 |
 | `lib/JIT/NamedArgs.php` | 0 | 11 |
 | `lib/JIT/NamedOptionalCallArgs.php` | 0 | 2 |
@@ -7628,6 +7631,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/XmlWriterInstanceMethodJit.php` | 0 | 5 |
 | `lib/JIT/XslExtensionHooks.php` | 0 | 1 |
 | `lib/JIT/XsltInstanceMethodJit.php` | 0 | 2 |
+| `lib/JIT/ZendSortLlvm.php` | 0 | 3 |
 | `lib/JIT/ZipExtensionHooks.php` | 0 | 1 |
 | `lib/JitMcjitEmbed.php` | 0 | 1 |
 | `lib/JitVmLoweringPolicy.php` | 0 | 1 |
@@ -56263,8 +56267,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/Type/HashTable.php`
 
 **Warnings** (review for bootstrap subset):
-- 77 class method(s)
-- 2 closure(s)
+- 81 class method(s)
+- 14 closure(s)
 
 ### `lib/JIT/Builtin/Type/HashTableDtorLlvm.php`
 
@@ -56540,6 +56544,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
+
+### `lib/JIT/Builtin/ZendCompareLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- new self (line 65)
+- new self (line 84)
+- 26 class method(s)
+- 17 closure(s)
 
 ### `lib/JIT/Builtin/ZendDoubleStringRuntime.php`
 
@@ -60526,8 +60538,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - trait ContextModuleOptimizationPasses (line 25)
-- 7 class method(s)
-- 1 closure(s)
+- 9 class method(s)
+- 3 closure(s)
 
 ### `lib/JIT/ContextModuleVerify.php`
 
@@ -61314,6 +61326,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
+### `lib/JIT/IntRadixSortLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+- 8 closure(s)
+
 ### `lib/JIT/InternalStrictArg.php`
 
 **Warnings** (review for bootstrap subset):
@@ -61756,6 +61774,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
+
+### `lib/JIT/MergeSortLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
 
 ### `lib/JIT/MultipleIteratorZipLlvm.php`
 
@@ -62602,6 +62625,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Call\XsltMethod (line 45)
 - 3 class method(s)
+
+### `lib/JIT/ZendSortLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- new self (line 57)
+- 17 class method(s)
+- 3 closure(s)
 
 ### `lib/JIT/ZipExtensionHooks.php`
 
