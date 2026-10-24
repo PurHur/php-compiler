@@ -514,8 +514,8 @@ final class Linker
      */
     /**
      * Symbols the objects linked beside the script object (helper-runtime units, prelinked
-     * vendor objects) expect someone else to define. The script module must keep these
-     * external; everything else it defines can be internalized before optimization.
+     * vendor objects) reference or define. The script module must keep these external;
+     * everything else it defines can be internalized before optimization.
      *
      * @return list<string>|null null when nm is unavailable (caller must not internalize)
      */
@@ -534,7 +534,27 @@ final class Linker
             }
         }
 
-        return self::collectUndefinedSymbols($objects);
+        $symbols = self::collectUndefinedSymbols($objects);
+        // Also every global symbol the peers define: with -z muldefs the first definition
+        // (the script object) wins for *all* references, including a helper unit's calls to
+        // its own copy. Internalizing such a function silently rebinds those calls to the
+        // unit's copy, which need not match the script's runtime.
+        foreach ($objects as $object) {
+            $captured = self::runCaptured(
+                escapeshellarg((string) self::resolveNmBinary()).' -g --defined-only '.escapeshellarg($object),
+                null
+            );
+            if (0 !== $captured['code']) {
+                return null;
+            }
+            foreach (explode("\n", $captured['stdout']) as $line) {
+                if (preg_match('/^\S*\s+[A-Za-z]\s+(\S+)$/', trim($line), $m)) {
+                    $symbols[] = $m[1];
+                }
+            }
+        }
+
+        return array_values(array_unique($symbols));
     }
 
     private static function collectUndefinedSymbols(array $objectFiles): array

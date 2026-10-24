@@ -86,13 +86,136 @@ trait ContextModuleOptimizationPasses
             $function = $function->getNext();
         }
         $this->aotInternalized = true;
-        if (0 === $internalized) {
+        $this->zeroInitPointerAllocas();
+        if (0 !== $internalized) {
+            $pm = $this->llvm->createPassManager();
+            $lib->LLVMAddGlobalDCEPass($pm->passManager);
+            $pm->run($this->module);
+            $pm->dispose();
+        }
+        $this->markPeerOnlyFunctionsOptNone();
+    }
+
+    /**
+     * Store null into every pointer-typed stack slot at function entry.
+     *
+     * Several lowerings release a pointer local (`__ref__delref(load %slot)`) on paths where
+     * it was never assigned. At O0 that read stack garbage and only "worked" while the slot
+     * happened to hold 0 or a live pointer; under O2 the read is undef and the optimizer
+     * turned the release into a trap (j06_json_roundtrip). Zend initializes every CV to
+     * IS_UNDEF for the same reason. mem2reg drops the store wherever an assignment dominates.
+     */
+    private function zeroInitPointerAllocas(): void
+    {
+        $lib = $this->llvm->lib;
+        $builder = $this->builder->builder;
+        $pointerKind = \llvm\llvm::LLVMPointerTypeKind;
+        for ($fn = $lib->LLVMGetFirstFunction($this->module->module); null !== $fn; $fn = $lib->LLVMGetNextFunction($fn)) {
+            $entry = $lib->LLVMGetFirstBasicBlock($fn);
+            if (null === $entry) {
+                continue;
+            }
+            $slots = [];
+            $firstNonAlloca = null;
+            for ($inst = $lib->LLVMGetFirstInstruction($entry); null !== $inst; $inst = $lib->LLVMGetNextInstruction($inst)) {
+                if (null === $lib->LLVMIsAAllocaInst($inst)) {
+                    $firstNonAlloca = $inst;
+                    break;
+                }
+                $allocated = $lib->LLVMGetElementType($lib->LLVMTypeOf($inst));
+                if ($pointerKind === $lib->LLVMGetTypeKind($allocated)) {
+                    $slots[] = [$inst, $allocated];
+                }
+            }
+            if ([] === $slots || null === $firstNonAlloca) {
+                continue;
+            }
+            $lib->LLVMPositionBuilderBefore($builder, $firstNonAlloca);
+            foreach ($slots as [$slot, $allocated]) {
+                $lib->LLVMBuildStore($builder, $lib->LLVMConstNull($allocated), $slot);
+            }
+        }
+        $lib->LLVMClearInsertionPosition($builder);
+    }
+
+    /**
+     * Functions kept external only because peer objects need the script's copy (see
+     * {@see internalizeForStandaloneLink}) and that `main` cannot reach: compile them at O0
+     * (`optnone`, as every function was before the optimizer ran by default) so the O2
+     * pipeline and optimized codegen are spent on the user program and the runtime it uses.
+     */
+    private function markPeerOnlyFunctionsOptNone(): void
+    {
+        $lib = $this->llvm->lib;
+        $main = $lib->LLVMGetNamedFunction($this->module->module, 'main');
+        if (null === $main) {
             return;
         }
-        $pm = $this->llvm->createPassManager();
-        $lib->LLVMAddGlobalDCEPass($pm->passManager);
-        $pm->run($this->module);
-        $pm->dispose();
+        $key = static fn ($ref): int => (int) \FFI::cast('uintptr_t', $ref->getData())->cdata;
+        $reached = [$key($main) => true];
+        $seenGlobals = [];
+        $work = [$main];
+        // Collect functions referenced by a value (instruction operand, constant expression,
+        // global initializer such as a method table), recursively through constants.
+        $scanValue = function ($value, int $depth) use (&$scanValue, &$reached, &$work, &$seenGlobals, $lib, $key): void {
+            if (null !== $lib->LLVMIsAFunction($value)) {
+                $k = $key($value);
+                if (!isset($reached[$k])) {
+                    $reached[$k] = true;
+                    $work[] = $value;
+                }
+
+                return;
+            }
+            if (null !== $lib->LLVMIsAGlobalVariable($value)) {
+                $k = $key($value);
+                if (isset($seenGlobals[$k])) {
+                    return;
+                }
+                $seenGlobals[$k] = true;
+                $init = $lib->LLVMGetInitializer($value);
+                if (null !== $init) {
+                    $scanValue($init, 0);
+                }
+
+                return;
+            }
+            if ($depth > 8 || null === $lib->LLVMIsAConstant($value)) {
+                return;
+            }
+            $n = $lib->LLVMGetNumOperands($value);
+            for ($i = 0; $i < $n; ++$i) {
+                $scanValue($lib->LLVMGetOperand($value, $i), $depth + 1);
+            }
+        };
+        while ([] !== $work) {
+            $fn = array_pop($work);
+            for ($bb = $lib->LLVMGetFirstBasicBlock($fn); null !== $bb; $bb = $lib->LLVMGetNextBasicBlock($bb)) {
+                for ($inst = $lib->LLVMGetFirstInstruction($bb); null !== $inst; $inst = $lib->LLVMGetNextInstruction($inst)) {
+                    $n = $lib->LLVMGetNumOperands($inst);
+                    for ($i = 0; $i < $n; ++$i) {
+                        $op = $lib->LLVMGetOperand($inst, $i);
+                        if (null !== $op && null !== $lib->LLVMIsAConstant($op)) {
+                            $scanValue($op, 0);
+                        }
+                    }
+                }
+            }
+        }
+
+        $fnIndex = PHPLLVM\Attribute::INDEX_FUNCTION;
+        $llvmCtx = $this->context->context;
+        $optNone = $lib->LLVMCreateEnumAttribute($llvmCtx, $lib->LLVMGetEnumAttributeKindForName('optnone', 7), 0);
+        $noInline = $lib->LLVMCreateEnumAttribute($llvmCtx, $lib->LLVMGetEnumAttributeKindForName('noinline', 8), 0);
+        $alwaysInline = $lib->LLVMGetEnumAttributeKindForName('alwaysinline', 12);
+        for ($fn = $lib->LLVMGetFirstFunction($this->module->module); null !== $fn; $fn = $lib->LLVMGetNextFunction($fn)) {
+            if (0 === $lib->LLVMCountBasicBlocks($fn) || isset($reached[$key($fn)])) {
+                continue;
+            }
+            $lib->LLVMRemoveEnumAttributeAtIndex($fn, $fnIndex, $alwaysInline);
+            $lib->LLVMAddAttributeAtIndex($fn, $fnIndex, $optNone);
+            $lib->LLVMAddAttributeAtIndex($fn, $fnIndex, $noInline);
+        }
     }
 
     /**
@@ -268,9 +391,12 @@ trait ContextModuleOptimizationPasses
         $optSize = $lib->LLVMGetEnumAttributeKindForName('optsize', 7);
         $fnIndex = PHPLLVM\Attribute::INDEX_FUNCTION;
         $llvmCtx = $this->context->context;
+        $optNoneKind = $lib->LLVMGetEnumAttributeKindForName('optnone', 7);
         $function = $lib->LLVMGetFirstFunction($this->module->module);
         while (null !== $function) {
-            if ($lib->LLVMCountBasicBlocks($function) > 0) {
+            // optnone (peer-only) functions must not also get minsize/optsize (verifier).
+            if ($lib->LLVMCountBasicBlocks($function) > 0
+                && null === $lib->LLVMGetEnumAttributeAtIndex($function, $fnIndex, $optNoneKind)) {
                 $raw = $lib->LLVMGetValueName($function);
                 $name = null === $raw ? '' : $raw->toString();
                 if ('__init__' === $name || str_starts_with($name, '__init__') || str_starts_with($name, '__shutdown__')
