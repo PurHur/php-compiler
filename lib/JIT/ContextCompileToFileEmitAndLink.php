@@ -36,10 +36,6 @@ trait ContextCompileToFileEmitAndLink
         \PHPCompiler\AOT\BuildTiming::end('compile_common');
         Progress::noteFunction('jit_context_compile_common_done');
 
-        \PHPCompiler\AOT\BuildTiming::mark('ir_opt');
-        $this->runModuleOptimizationPasses();
-        \PHPCompiler\AOT\BuildTiming::end('ir_opt');
-
         // AOT CompileCache: stamp + meta + round-trippable module.bc (void*→i8*, #36387).
         // Warm paths still prefer aot.bin / aot.o; bitcode enables tryRestore fallback.
         // Persist FULL module before partial demote so the next edit can thin-boot (#36387).
@@ -52,6 +48,20 @@ trait ContextCompileToFileEmitAndLink
             \PHPCompiler\AOT\BuildTiming::mark('partial_demote');
             CompileCache::demoteBodiesForPartialObjectEmit($this);
             \PHPCompiler\AOT\BuildTiming::end('partial_demote');
+        }
+
+        // After the cache stamp: the persisted module.bc must stay the full, unstripped module
+        // so a later thin restore still finds every runtime function (#36386).
+        \PHPCompiler\AOT\BuildTiming::mark('internalize');
+        $this->internalizeForStandaloneLink();
+        \PHPCompiler\AOT\BuildTiming::end('internalize');
+
+        \PHPCompiler\AOT\BuildTiming::mark('ir_opt');
+        $this->runModuleOptimizationPasses();
+        \PHPCompiler\AOT\BuildTiming::end('ir_opt');
+        $dumpOptIr = Config::getenv('PHP_COMPILER_DUMP_OPT_IR');
+        if (is_string($dumpOptIr) && '' !== $dumpOptIr) {
+            $this->module->printToFile($dumpOptIr);
         }
 
         $bitcodePath = Config::getenv('PHP_COMPILER_EMIT_BITCODE');
@@ -173,6 +183,13 @@ trait ContextCompileToFileEmitAndLink
             $llvmTarget = $this->llvm->getTargetFromName($target->llvmTargetName());
             // Explicit AOT_CODEGEN_OPT wins; else OPT_LEVEL 0–3; else OptNone (#36399 / #36387).
             $optLevel = CompileTarget::targetMachineOptLevel();
+            // Optimized-by-default standalone builds (#36386) also get optimized codegen.
+            if ($this->aotInternalized
+                && PHPLLVM\Target::OPT_LEVEL_NONE === $optLevel
+                && '' === trim((string) Config::getenv('PHP_COMPILER_AOT_CODEGEN_OPT'))
+                && '' === trim((string) Config::getenv('PHP_COMPILER_OPT_LEVEL'))) {
+                $optLevel = PHPLLVM\Target::OPT_LEVEL_DEFAULT;
+            }
 
             return $llvmTarget->createTargetMachine(
                 $target->llvmTriple(),

@@ -409,9 +409,9 @@ final class ZendDoubleStringRuntime
         $okBb = $fn->appendBasicBlock('zds_ok_'.$s);
         $doneBb = $fn->appendBasicBlock('zds_done_'.$s);
 
-        $nanLit = $context->builder->load($context->constantStringFromString('nan'));
-        // Use JitStringCompare SSOT — bare __string__compare was never implemented (#21948 AOT link).
-        $isNan = JitStringCompare::identical($context, $raw, $nanLit);
+        // fcmp uno: glibc prints a negative NaN as "-nan", which a compare against "nan" missed
+        // (var_dump(pow(-8, 1/3)) printed float(-nan)); php-src prints NAN for every NaN.
+        $isNan = $context->builder->fcmp(Builder::REAL_UNO, $val, $val);
         $afterNan = $fn->appendBasicBlock('zds_after_nan_'.$s);
         $context->builder->branchIf($isNan, $nanBb, $afterNan);
 

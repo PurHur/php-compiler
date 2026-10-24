@@ -205,7 +205,13 @@ final class CompileCacheKeyLayout
         $parts[] = LazyBuiltins::fingerprintSegment();
         $parts[] = HelperRuntimeCache::coreFingerprint();
         $parts[] = HelperRuntimeCache::cacheKeySegment();
-        foreach (['PHP_COMPILER_AOT_USER_SCRIPT', 'PHP_COMPILER_HELPER_RUNTIME_O'] as $envKey) {
+        // Every compiler source, not a hand-picked subset: any lowering/runtime change alters
+        // the emitted binary, and the old list (Context.php, JIT.php, Concern/*, a few Type
+        // files) let edits elsewhere restore stale binaries. stat() only — cheap.
+        $parts[] = self::compilerSourceTreeStamp();
+        // Codegen knobs that change the artifact (#36386).
+        foreach (['PHP_COMPILER_AOT_USER_SCRIPT', 'PHP_COMPILER_HELPER_RUNTIME_O', 'PHP_COMPILER_OPT_LEVEL',
+            'PHP_COMPILER_AOT_CODEGEN_OPT', 'PHP_COMPILER_OPT_SIZE_LEVEL', 'PHP_COMPILER_AOT_INTERNALIZE'] as $envKey) {
             $flag = getenv($envKey);
             $parts[] = $envKey.'='.(false === $flag ? '' : $flag);
         }
@@ -213,5 +219,32 @@ final class CompileCacheKeyLayout
         $cached = hash('sha256', implode("\0", $parts));
 
         return $cached;
+    }
+
+    /** sha256 over (path, size, mtime) of every PHP file under lib/ and ext/. */
+    private static function compilerSourceTreeStamp(): string
+    {
+        $root = dirname(__DIR__, 2);
+        $ctx = hash_init('sha256');
+        foreach (['lib', 'ext'] as $dir) {
+            if (!is_dir($root.'/'.$dir)) {
+                continue;
+            }
+            $files = [];
+            $it = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($root.'/'.$dir, \FilesystemIterator::SKIP_DOTS)
+            );
+            foreach ($it as $file) {
+                if ($file->isFile() && 'php' === $file->getExtension()) {
+                    $files[$file->getPathname()] = $file->getSize().':'.$file->getMTime();
+                }
+            }
+            ksort($files);
+            foreach ($files as $path => $stamp) {
+                hash_update($ctx, $path."\0".$stamp."\n");
+            }
+        }
+
+        return hash_final($ctx);
     }
 }

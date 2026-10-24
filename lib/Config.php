@@ -307,6 +307,8 @@ final class Config
             'PHP_COMPILER_RUNTIME_ASSERT_INJECT_SHARED_WRITE' => $bool(self::SCOPE_DEBUG, 'Call shared-rc assert_exclusive probe at standalone main (unit test M5)', null, '#36397'),
             'PHP_COMPILER_ASAN' => $bool(self::SCOPE_COMPILE, 'Link AOT binaries with -fsanitize=address,undefined', null, '#36397'),
             'PHP_COMPILER_DUMP_IR' => $str(self::SCOPE_DEBUG, 'Dump LLVM IR path/flag', null, null),
+            'PHP_COMPILER_DUMP_OPT_IR' => $str(self::SCOPE_DEBUG, 'Write the module after IR optimization (pre-codegen) to this path', null, null),
+            'PHP_COMPILER_AOT_INTERNALIZE' => $str(self::SCOPE_COMPILE, 'Internalize + dead-strip script functions before optimization (default on; 0 disables)', null, '#36386'),
             'PHP_COMPILER_EMIT_JOBS' => $int(self::SCOPE_COMPILE, 'Parallel helper-unit emit jobs', null, null),
             'PHP_COMPILER_MEMORY_LIMIT' => $str(self::SCOPE_RUNTIME, 'PHP memory_limit for compiler processes', '1536M', '#497'),
             'PHP_COMPILER_LLVM_MEMORY_LIMIT' => $str(self::SCOPE_COMPILE, 'PHP memory_limit for LLVM-heavy compiles', '8192M', '#24738'),

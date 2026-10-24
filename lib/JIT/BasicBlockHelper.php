@@ -580,6 +580,13 @@ final class BasicBlockHelper
             return;
         }
         $context->builder->positionAtEnd($block);
+        // abort() before `unreachable`: a dangling block is a lowering gap, not a proof. A bare
+        // `unreachable` lets the optimizer delete every path into it (and the conditions that
+        // guard it), so a gap that is actually reachable became silent misbehaviour at O2.
+        try {
+            $context->builder->call($context->lookupFunction('abort'));
+        } catch (\LogicException) {
+        }
         $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
     }
 

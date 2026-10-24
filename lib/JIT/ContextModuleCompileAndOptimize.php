@@ -123,6 +123,7 @@ trait ContextModuleCompileAndOptimize
         }
         $this->registerAotDebugSourceGlobal();
         Progress::noteFunction('jit_context_compile_common_phase_seal_functions');
+        ClassNameTable::materialize($this);
         Call\RuntimeIndirectClosureCall::materializePending($this);
         TryCatchHelper::materializeAllPendingGotoResumeHandlers($this);
         $function = $this->module->getFirstFunction();

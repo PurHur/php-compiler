@@ -15,7 +15,6 @@ require_once __DIR__.'/DiscardedPureCallElisionRuntimeInfoOps.php';
 require_once __DIR__.'/DiscardedPureCallElisionNativeLongFolds.php';
 require_once __DIR__.'/DiscardedPureCallElisionNativeLongBitwiseFolds.php';
 require_once __DIR__.'/DiscardedPureCallElisionNativeLongCompareMulFolds.php';
-require_once __DIR__.'/DiscardedPureCallElisionNativeLongPowFolds.php';
 require_once __DIR__.'/DiscardedPureCallElisionMathGuardAndVoidNativeOps.php';
 require_once __DIR__.'/DiscardedPureCallElisionPureMathAndVoidNativeOps.php';
 require_once __DIR__.'/DiscardedPureCallElisionIntrospectOps.php';
@@ -37,7 +36,6 @@ require_once __DIR__.'/DiscardedPureCallElisionTypeStringCoreOps.php';
  * Native-long/intdiv fold helpers live in {@see DiscardedPureCallElisionNativeLongFolds} (#36403).
  * Native-long bit-shift / bitwise-logic folds live in {@see DiscardedPureCallElisionNativeLongBitwiseFolds} (#36387).
  * Native-long compare / mul / identity folds live in {@see DiscardedPureCallElisionNativeLongCompareMulFolds} (#36387).
- * Native-long {@code **}/{@code pow()} exponent folds live in {@see DiscardedPureCallElisionNativeLongPowFolds} (#36387).
  * Math arg guards / count-on-typed-array / shared arg predicates live in
  * {@see DiscardedPureCallElisionMathGuardAndVoidNativeOps} (#36387).
  * Pure math/round + effect-free void Native checks live in
@@ -301,39 +299,8 @@ require_once __DIR__.'/DiscardedPureCallElisionTypeStringCoreOps.php';
  * identity at the builtin call site; {@code intdiv($n, $n)} folds to {@code 1}
  * (omit {@code sdiv} / {@code INT_MIN}/{-1} {@code ArithmeticError}; keep
  * {@code DivisionByZeroError} when {@code n == 0}; peer typed {@code $n / $n};
- * {@see intdivSameOperandFoldsToOne}). Typed {@code $n ** 0} / {@code pow($n, 0)}
- * folds to {@code 1}, {@code $n ** 1} / {@code pow($n, 1)} is identity, and
- * {@code $n ** 2} / {@code pow($n, 2)} lowers to {@code $n * $n} with smul
- * overflow→float, {@code $n ** 3} / {@code pow($n, 3)} to
- * {@code $n * $n * $n} with chained smul, {@code $n ** 4} /
- * {@code pow($n, 4)} to {@code ($n*$n)*($n*$n)} (square-of-square),
- * {@code $n ** 5} / {@code pow($n, 5)} to {@code ($n*$n*$n)*($n*$n)} with
- * chained smul, {@code $n ** 6} / {@code pow($n, 6)} to
- * {@code ($n*$n*$n)*($n*$n*$n)} (cube-of-cube) with chained smul,
- * {@code $n ** 7} / {@code pow($n, 7)} to
- * {@code (($n*$n*$n)*($n*$n*$n))*$n} with chained smul,
- * {@code $n ** 8} / {@code pow($n, 8)} to
- * {@code (($n*$n)*($n*$n))*(($n*$n)*($n*$n))} with chained smul,
- * {@code $n ** 9} / {@code pow($n, 9)} to
- * {@code (($n*$n*$n)*($n*$n*$n))*($n*$n*$n)} with chained smul,
- * {@code $n ** 10} / {@code pow($n, 10)} to
- * {@code (($n*$n*$n)*($n*$n))*(($n*$n*$n)*($n*$n))} with chained smul,
- * {@code $n ** 11} / {@code pow($n, 11)} to
- * {@code ((($n*$n*$n)*($n*$n))*(($n*$n*$n)*($n*$n)))*$n} with chained smul, and
- * {@code $n ** 12} / {@code pow($n, 12)} to
- * {@code (($n*$n*$n)*($n*$n*$n))*(($n*$n*$n)*($n*$n*$n))} with chained smul, and
- * {@code $n ** 13} / {@code pow($n, 13)} to
- * {@code ((($n*$n*$n)*($n*$n*$n))*(($n*$n*$n)*($n*$n*$n)))*$n} with chained smul, and
- * {@code $n ** 14} / {@code pow($n, 14)} to
- * {@code (((($n*$n*$n)*($n*$n*$n))*$n)*((($n*$n*$n)*($n*$n*$n))*$n))} with chained smul, and
- * {@code $n ** 15} / {@code pow($n, 15)} to
- * {@code ((((($n*$n*$n)*($n*$n*$n))*$n)*((($n*$n*$n)*($n*$n*$n))*$n))*$n)} with chained smul, and
- * {@code $n ** 16} / {@code pow($n, 16)} to
- * {@code (((($n*$n)*($n*$n))*(($n*$n)*($n*$n)))*((($n*$n)*($n*$n))*(($n*$n)*($n*$n))))} with chained smul, and
- * {@code $n ** 17} / {@code pow($n, 17)} to
- * {@code ((((($n*$n)*($n*$n))*(($n*$n)*($n*$n)))*((($n*$n)*($n*$n))*(($n*$n)*($n*$n))))*$n} with chained smul (omit
- * {@code llvm.pow.f64} / float round-trip;
- * {@see nativeLongPowCompileTimeExponentFold}). {@code intdiv($n, -1)} and typed
+ * {@see intdivSameOperandFoldsToOne}). Integer {@code **} / {@code pow()} lowers through
+ * {@see Builtin\PowLongLlvm}. {@code intdiv($n, -1)} and typed
  * {@code / -1} lower to {@code negate} with the {@code INT_MIN} guard /
  * float promote only when needed ({@see nativeLongDivisorIsCompileTimeNegOne}).
  * Typed {@code % 1} folds to {@code 0} (peer {@code % -1};
@@ -445,7 +412,6 @@ final class DiscardedPureCallElision
     use DiscardedPureCallElisionNativeLongFolds;
     use DiscardedPureCallElisionNativeLongBitwiseFolds;
     use DiscardedPureCallElisionNativeLongCompareMulFolds;
-    use DiscardedPureCallElisionNativeLongPowFolds;
     use DiscardedPureCallElisionMathGuardAndVoidNativeOps;
     use DiscardedPureCallElisionPureMathAndVoidNativeOps;
     use DiscardedPureCallElisionIntrospectOps;

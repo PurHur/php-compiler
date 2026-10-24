@@ -1,0 +1,22 @@
+--- vendor/ircmaxell/php-llvm/lib/LLVMAbstract/PassManagerBuilder.php
++++ vendor/ircmaxell/php-llvm/lib/LLVMAbstract/PassManagerBuilder.php
+@@ -55,15 +55,15 @@
+         $this->llvm->lib->LLVMPassManagerBuilderUseInlinerWithThreshold($this->passManagerBuilder, $threshold);
+     }
+ 
+-    public function populateFunctionPassManager(PassManager $passManager): void {
++    public function populateFunctionPassManager(CorePassManager $passManager): void {
+         $this->llvm->lib->LLVMPassManagerBuilderPopulateFunctionPassManager($this->passManagerBuilder, $passManager->passManager);
+     }
+ 
+-    public function populateModulePassManager(PassManager $passManager): void {
++    public function populateModulePassManager(CorePassManager $passManager): void {
+         $this->llvm->lib->LLVMPassManagerBuilderPopulateModulePassManager($this->passManagerBuilder, $passManager->passManager);
+     }
+ 
+-    public function populateLTOPassManager(PassManager $passManager, bool $internalize, bool $runInliner): void {
++    public function populateLTOPassManager(CorePassManager $passManager, bool $internalize, bool $runInliner): void {
+         $this->llvm->lib->LLVMPassManagerBuilderPopulateLTOPassManager($this->passManagerBuilder, $passManager->passManager, $this->llvm->toBool($internalize), $this->llvm->toBool($runInliner));
+     }
+ }
+\ No newline at end of file

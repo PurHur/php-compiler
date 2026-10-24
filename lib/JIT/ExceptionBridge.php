@@ -112,6 +112,40 @@ final class ExceptionBridge
     }
 
     /**
+     * {@see emitTypeErrorAndAbort} with a runtime {@see __string__*} message — one raise
+     * sequence where the message depends on runtime data (e.g. a class name).
+     */
+    public static function emitTypeErrorAndAbortWithStringValue(Context $context, \PHPLLVM\Value $msgStr): void
+    {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+
+        if (null !== TryCatchHelper::resolveThrowHandler($context)) {
+            TryCatchHelper::emitCatchableClassErrorWithStringValue($context, 'TypeError', $msgStr);
+
+            return;
+        }
+
+        TypeErrorRaise::emitRaiseWithStringValue($context, $msgStr);
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            if (self::shouldPendTypeErrorForCaller($context)) {
+                TypeErrorRaise::ensureStandaloneBodies($context);
+                TryCatchHelper::emitPendTypeErrorForCallerWithStringValue($context, $msgStr);
+                $fn = $context->builder->getInsertBlock()?->getParent();
+                if ($fn instanceof \PHPLLVM\Value\Function_) {
+                    TryCatchHelper::emitPropagateReturnAfterPendingThrow($context, $fn);
+
+                    return;
+                }
+            }
+            $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_type_error'));
+        } else {
+            $context->builder->call($context->lookupFunction('abort'));
+            $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+        }
+    }
+
+    /**
      * Non-{main} user/closure bodies: cross-function TypeError must propagate (#26486 shape).
      *
      * NestedJIT helper compiles and {main} keep in-place abort — thin AOT may skip the

@@ -787,6 +787,15 @@ final class TryCatchHelper
      */
     public static function emitPendTypeErrorForCaller(Context $context, string $message): void
     {
+        self::emitPendTypeErrorForCallerWithStringValue(
+            $context,
+            $context->builder->load($context->constantStringFromString($message))
+        );
+    }
+
+    /** {@see emitPendTypeErrorForCaller} with a runtime {@see __string__*} message. */
+    public static function emitPendTypeErrorForCallerWithStringValue(Context $context, Value $msgStr): void
+    {
         JitThrow::registerDeclarations($context);
         JitThrow::ensureLinked($context);
         if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
@@ -797,7 +806,6 @@ final class TryCatchHelper
         $classId = $object->lookup('TypeError');
         $obj = $object->allocate($classId);
         $object->markObjectConstructed($obj);
-        $msgStr = $context->builder->load($context->constantStringFromString($message));
         $msgVar = new Variable(
             $context,
             Variable::TYPE_STRING,

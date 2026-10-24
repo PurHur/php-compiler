@@ -13,8 +13,7 @@ namespace PHPCompiler\JIT;
  * {@see DiscardedPureCallElisionNativeLongBitwiseFolds} (#36387).
  * Compare / mul / identity folds live in
  * {@see DiscardedPureCallElisionNativeLongCompareMulFolds} (#36387).
- * Compile-time {@code **} / {@code pow()} exponent folds live in
- * {@see DiscardedPureCallElisionNativeLongPowFolds} (#36387).
+ * Integer {@code **} / {@code pow()} lowers through {@see Builtin\PowLongLlvm}.
  * External call sites keep using
  * {@code DiscardedPureCallElision::…} (trait methods on the hub class).
  *

@@ -1003,43 +1003,14 @@ final class JitStringBuiltinArg
 
             return;
         }
-        $ids = [];
-        foreach ($jitObject->allDeclaredClassLowerNames() as $lc) {
-            $declaredId = $jitObject->lookup($lc);
-            $ids[] = [$declaredId, $jitObject->classNameForId($declaredId)];
-        }
-        if ([] === $ids) {
-            self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'object', $expectedType);
-
-            return;
-        }
-        $i64 = $context->getTypeFromString('int64');
-        $fn = BasicBlockHelper::parentFunction($context);
-        $checkBlock = $context->builder->getInsertBlock();
-        $okBlock = BasicBlockHelper::append($context, 'str_class_id_reject_ok');
-        $lastIdx = \count($ids) - 1;
-        foreach ($ids as $idx => [$declaredId, $className]) {
-            $context->builder->positionAtEnd($checkBlock);
-            $match = $context->builder->icmp(
-                Builder::INT_EQ,
-                $classId,
-                $i64->constInt($declaredId, false)
-            );
-            $rejectBlock = $fn->appendBasicBlock('str_class_id_reject_'.$declaredId);
-            $nextBlock = $idx === $lastIdx
-                ? $okBlock
-                : $fn->appendBasicBlock('str_class_id_try_'.($idx + 1));
-            $context->builder->branchIf($match, $rejectBlock, $nextBlock);
-            $context->builder->positionAtEnd($rejectBlock);
-            self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, $className, $expectedType);
-            $checkBlock = $nextBlock;
-        }
-        if ($checkBlock !== $okBlock) {
-            $context->builder->positionAtEnd($checkBlock);
-            self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'object', $expectedType);
-            $context->builder->branch($okBlock);
-        }
-        $context->builder->positionAtEnd($okBlock);
+        // One raise with the runtime class name (#36386 compile-size): the per-class arms
+        // made this check tens of thousands of IR lines per call site.
+        ClassNameTable::emitTypeErrorForClassId(
+            $context,
+            $classId,
+            static fn (string $class): string => self::typeErrorMessage($function, $argIndex, $paramName, $class, $expectedType)
+        );
+        $context->builder->positionAtEnd(BasicBlockHelper::append($context, 'str_class_id_reject_ok'));
     }
 
     private static function typeErrorMessage(
