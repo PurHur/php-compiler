@@ -78,6 +78,24 @@ final class TypeErrorRaise
         self::emitPendingMessage($context, $message, '__compiler_jit_raise_type_error');
     }
 
+    /** {@see emitRaise} with a runtime {@see __string__*} message. */
+    public static function emitRaiseWithStringValue(Context $context, Value $msgStr): void
+    {
+        self::ensureLinked($context);
+        $strMap = $context->structFieldMap['__string__'];
+        $context->builder->call(
+            $context->lookupFunction('__compiler_jit_raise_type_error'),
+            $context->builder->pointerCast(
+                $context->builder->structGep($msgStr, $strMap['value']),
+                $context->getTypeFromString('int8*')
+            ),
+            $context->builder->intCast(
+                $context->builder->load($context->builder->structGep($msgStr, $strMap['length'])),
+                $context->getTypeFromString('size_t')
+            )
+        );
+    }
+
     public static function emitArgumentCountError(Context $context, string $message): void
     {
         self::ensureLinked($context);

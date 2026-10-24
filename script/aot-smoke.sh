@@ -177,7 +177,10 @@ for size_name in echo class; do
     fi
     ir_arg=()
     if [ "$size_name" = "echo" ]; then
-        PHP_COMPILER_DUMP_IR=1 "$PHP_BIN" bin/compile.php -o "$WORK/echo-ir.bin" "$WORK/echo.php" \
+        # A cache hit emits no dump; a leftover /tmp/phpc-last.ll from any earlier build would
+        # then be measured instead. Remove it and bypass the cache.
+        rm -f /tmp/phpc-last.ll
+        PHP_COMPILER_CACHE=0 PHP_COMPILER_DUMP_IR=1 "$PHP_BIN" bin/compile.php -o "$WORK/echo-ir.bin" "$WORK/echo.php" \
             > "$WORK/echo-ir.compile.log" 2>&1 || true
         if [ -f /tmp/phpc-last.ll ]; then
             ir_arg=(--ir /tmp/phpc-last.ll)

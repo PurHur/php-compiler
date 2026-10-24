@@ -24,6 +24,77 @@ use PHPLLVM;
  */
 trait ContextModuleOptimizationPasses
 {
+    /** True once {@see internalizeForStandaloneLink()} stripped the module for a standalone link. */
+    private bool $aotInternalized = false;
+
+    /**
+     * Give internal linkage to every function the final link cannot need from outside this
+     * module, then drop the unreachable ones.
+     *
+     * The script module carries the whole runtime library (hashtable, string, object, error
+     * helpers …) with external linkage, so neither the optimizer nor the code generator can
+     * discard any of it — roughly 80% of the IR of a small script is unreachable from `main`,
+     * and every pipeline stage paid for it. Peer objects (helper-runtime units, prelinked
+     * vendor objects) define their own copies of the runtime ABI (`-z muldefs`); the only
+     * script functions they need are their undefined symbols, which stay external, as do all
+     * globals (single-copy runtime state).
+     *
+     * Only for a plain standalone link: chunked/partial/object-only emits link this module
+     * against other script objects that may reference anything in it.
+     */
+    private function internalizeForStandaloneLink(): void
+    {
+        $flag = Config::getenv('PHP_COMPILER_AOT_INTERNALIZE');
+        if ('0' === $flag || 'false' === strtolower((string) $flag)) {
+            return;
+        }
+        foreach (['PHP_COMPILER_KEEP_OBJECT_FILE', 'PHP_COMPILER_VENDOR_PRELINK', 'PHP_COMPILER_SELFHOST_AOT'] as $objectOnlyEnv) {
+            $v = Config::getenv($objectOnlyEnv);
+            if ('1' === $v || 'true' === strtolower((string) $v)) {
+                return;
+            }
+        }
+        if (null !== $this->debugFile) {
+            return;
+        }
+        $bitcodePath = Config::getenv('PHP_COMPILER_EMIT_BITCODE');
+        if (is_string($bitcodePath) && '' !== $bitcodePath) {
+            return;
+        }
+        if (CompileCache::isEditScaffoldPartial() || [] !== \PHPCompiler\AOT\Linker::resolveExtraScriptObjects()) {
+            return;
+        }
+        $peerUndefined = \PHPCompiler\AOT\Linker::undefinedSymbolsOfPeerObjects();
+        if (null === $peerUndefined) {
+            return;
+        }
+        $keep = array_fill_keys($peerUndefined, true);
+        $keep['main'] = true;
+
+        $lib = $this->llvm->lib;
+        $internalized = 0;
+        $function = $this->module->getFirstFunction();
+        while (null !== $function) {
+            if ($function instanceof PHPLLVM\Value\Function_ && $function->countBasicBlocks() > 0) {
+                $raw = $lib->LLVMGetValueName($function->value);
+                $name = null === $raw ? '' : $raw->toString();
+                if ('' !== $name && !isset($keep[$name]) && !str_starts_with($name, 'llvm.')) {
+                    $lib->LLVMSetLinkage($function->value, \llvm\llvm::LLVMInternalLinkage);
+                    ++$internalized;
+                }
+            }
+            $function = $function->getNext();
+        }
+        $this->aotInternalized = true;
+        if (0 === $internalized) {
+            return;
+        }
+        $pm = $this->llvm->createPassManager();
+        $lib->LLVMAddGlobalDCEPass($pm->passManager);
+        $pm->run($this->module);
+        $pm->dispose();
+    }
+
     /**
      * Run the LLVM IR optimization pipeline before codegen (#23483).
      *
@@ -62,6 +133,13 @@ trait ContextModuleOptimizationPasses
         if (!is_string($raw) || '' === trim($raw)) {
             $userAot = Config::getenv('PHP_COMPILER_AOT_USER_SCRIPT');
             if ('1' === $userAot || 'true' === strtolower((string) $userAot)) {
+                // Stripped standalone module: the full O2 pipeline is cheap enough to be the
+                // default (#36386) — it is what turns the boxed-value IR into machine
+                // arithmetic. Unstripped modules keep the old skip (compile-time budget).
+                if ($this->aotInternalized) {
+                    $this->runHeavyModuleOptimizationPasses(2);
+                }
+
                 return;
             }
         }
@@ -149,6 +227,8 @@ trait ContextModuleOptimizationPasses
         $sizeLevel = is_string($sizeLevel) && ctype_digit($sizeLevel) ? min((int) $sizeLevel, 2) : 0;
 
         Progress::noteFunction('jit_context_opt_passes_begin');
+        $this->outlineDelrefSlowPath();
+        $this->prepareInliningForHeavyPipeline();
         $builder = $this->llvm->createPassManagerBuilder();
         $builder->setOptLevel($level);
         $builder->setSizeLevel($sizeLevel);
@@ -166,5 +246,158 @@ trait ContextModuleOptimizationPasses
         $modulePasses->dispose();
         $builder->dispose();
         Progress::noteFunction('jit_context_opt_passes_done');
+    }
+
+    /**
+     * Inliner hygiene before the PassManagerBuilder pipeline.
+     *
+     * Runtime helpers are stamped `alwaysinline` wholesale — harmless while no inliner ran,
+     * but under O2 it force-expands multi-hundred-instruction hashtable/string helpers into
+     * every caller: `__init__` grew from ~1.2k to ~280k IR lines on nbody and compile time
+     * followed. Keep the attribute only on small accessors (where folding the tag switch is
+     * the point) and let the cost model decide the rest. One-shot setup functions get
+     * `minsize` so nothing is inlined into them for speed; huge functions get `optsize`.
+     */
+    private function prepareInliningForHeavyPipeline(): void
+    {
+        $lib = $this->llvm->lib;
+        $maxAlwaysInline = 80;
+        $hugeFunction = 4000;
+        $alwaysInline = $lib->LLVMGetEnumAttributeKindForName('alwaysinline', 12);
+        $minSize = $lib->LLVMGetEnumAttributeKindForName('minsize', 7);
+        $optSize = $lib->LLVMGetEnumAttributeKindForName('optsize', 7);
+        $fnIndex = PHPLLVM\Attribute::INDEX_FUNCTION;
+        $llvmCtx = $this->context->context;
+        $function = $lib->LLVMGetFirstFunction($this->module->module);
+        while (null !== $function) {
+            if ($lib->LLVMCountBasicBlocks($function) > 0) {
+                $raw = $lib->LLVMGetValueName($function);
+                $name = null === $raw ? '' : $raw->toString();
+                if ('__init__' === $name || str_starts_with($name, '__init__') || str_starts_with($name, '__shutdown__')
+                    || str_starts_with($name, '__superglobals__')) {
+                    $lib->LLVMRemoveEnumAttributeAtIndex($function, $fnIndex, $alwaysInline);
+                    $lib->LLVMAddAttributeAtIndex($function, $fnIndex, $lib->LLVMCreateEnumAttribute($llvmCtx, $minSize, 0));
+                    $lib->LLVMAddAttributeAtIndex($function, $fnIndex, $lib->LLVMCreateEnumAttribute($llvmCtx, $optSize, 0));
+                } else {
+                    $count = 0;
+                    $bb = $lib->LLVMGetFirstBasicBlock($function);
+                    while (null !== $bb && $count <= $hugeFunction) {
+                        $inst = $lib->LLVMGetFirstInstruction($bb);
+                        while (null !== $inst && $count <= $hugeFunction) {
+                            ++$count;
+                            $inst = $lib->LLVMGetNextInstruction($inst);
+                        }
+                        $bb = $lib->LLVMGetNextBasicBlock($bb);
+                    }
+                    if ($count > $maxAlwaysInline
+                        && null !== $lib->LLVMGetEnumAttributeAtIndex($function, $fnIndex, $alwaysInline)) {
+                        $lib->LLVMRemoveEnumAttributeAtIndex($function, $fnIndex, $alwaysInline);
+                    }
+                    // Lowering emits whole coercion/error ladders inline, so some functions are
+                    // tens of thousands of instructions of mostly cold code; inlining and
+                    // unrolling into those grew them ~5x and dominated compile time.
+                    if ($count > $hugeFunction) {
+                        $lib->LLVMAddAttributeAtIndex($function, $fnIndex, $lib->LLVMCreateEnumAttribute($llvmCtx, $optSize, 0));
+                    }
+                }
+            }
+            $function = $lib->LLVMGetNextFunction($function);
+        }
+    }
+
+    /**
+     * Split `__ref__delref` into an inlinable fast path and an out-of-line slow path.
+     *
+     * The generated delref carries the whole destroy sequence (destructor, weakref clear, GC
+     * unregister, hashtable/object dtor, free) and the GC possible-root buffering. Inlined at
+     * every decrement under O2 that was ~100 instructions per site. Like Zend's
+     * zval_ptr_dtor (GC_DELREF + rc==0 check inline, rc_dtor_func out of line), the fast
+     * path only handles "still referenced and not a GC root candidate"; everything else
+     * calls the original body, which re-reads the refcount and does the full work.
+     */
+    private function outlineDelrefSlowPath(): void
+    {
+        $assert = Config::getenv('PHP_COMPILER_RUNTIME_ASSERT') ?: Config::getenv('PHPC_RUNTIME_ASSERT');
+        if ('1' === $assert || 'true' === strtolower((string) $assert)) {
+            return;
+        }
+        $slow = $this->module->getNamedFunction('__ref__delref');
+        if (!$slow instanceof PHPLLVM\Value\Function_ || 0 === $slow->countBasicBlocks()) {
+            return;
+        }
+        $lib = $this->llvm->lib;
+        $lib->LLVMSetValueName2($slow->value, '__ref__delref_slow', \strlen('__ref__delref_slow'));
+        $fnIndex = PHPLLVM\Attribute::INDEX_FUNCTION;
+        $llvmCtx = $this->context->context;
+        $lib->LLVMRemoveEnumAttributeAtIndex(
+            $slow->value,
+            $fnIndex,
+            $lib->LLVMGetEnumAttributeKindForName('alwaysinline', 12)
+        );
+        foreach (['noinline' => 8, 'cold' => 4] as $attr => $len) {
+            $lib->LLVMAddAttributeAtIndex($slow->value, $fnIndex, $lib->LLVMCreateEnumAttribute(
+                $llvmCtx,
+                $lib->LLVMGetEnumAttributeKindForName($attr, $len),
+                0
+            ));
+        }
+        $refPtrTy = $this->getTypeFromString('__ref__virtual*');
+        $fast = $this->module->addFunction(
+            '__ref__delref',
+            $this->context->functionType($this->getTypeFromString('void'), false, $refPtrTy)
+        );
+        $lib->LLVMSetLinkage($fast->value, $lib->LLVMGetLinkage($slow->value));
+        $lib->LLVMReplaceAllUsesWith($slow->value, $fast->value);
+
+        // Runs after BasicBlockHelper::sealFunction: do not restore the prior insert block
+        // (restoreInsertBlock appends a continuation block nothing would terminate).
+        $b = $this->builder;
+        $i32 = $this->getTypeFromString('int32');
+        $entry = $fast->appendBasicBlock('entry');
+        $check = $fast->appendBasicBlock('counted_check');
+        $dec = $fast->appendBasicBlock('dec');
+        $store = $fast->appendBasicBlock('fast');
+        $callSlow = $fast->appendBasicBlock('slow');
+        $done = $fast->appendBasicBlock('done');
+        $b->positionAtEnd($entry);
+        $p = $fast->getParam(0);
+        $b->branchIf($b->icmp(PHPLLVM\Builder::INT_EQ, $p, $refPtrTy->constNull()), $done, $check);
+        $b->positionAtEnd($check);
+        $ref = $b->structGep($p, 0);
+        $rcPtr = $b->structGep($ref, 0);
+        $rc = $b->load($rcPtr);
+        $typeinfo = $b->load($b->structGep($ref, 1));
+        $counted = $b->icmp(
+            PHPLLVM\Builder::INT_NE,
+            $b->bitwiseAnd($typeinfo, $i32->constInt(Builtin\Refcount::TYPE_INFO_REFCOUNTED, false)),
+            $i32->constInt(0, false)
+        );
+        $b->branchIf($counted, $dec, $done);
+        $b->positionAtEnd($dec);
+        $newRc = $b->sub($rc, $i32->constInt(1, false));
+        $gcContainer = $b->icmp(
+            PHPLLVM\Builder::INT_NE,
+            $b->bitwiseAnd($typeinfo, $i32->constInt(Builtin\Refcount::TYPE_INFO_TYPE_OBJECT, false)),
+            $i32->constInt(0, false)
+        );
+        $needsSlow = $b->bitwiseOr(
+            $b->icmp(PHPLLVM\Builder::INT_SLE, $newRc, $i32->constInt(0, false)),
+            $b->bitwiseAnd($gcContainer, $b->icmp(PHPLLVM\Builder::INT_EQ, $newRc, $i32->constInt(1, false)))
+        );
+        $b->branchIf($needsSlow, $callSlow, $store);
+        $b->positionAtEnd($store);
+        $b->store($newRc, $rcPtr);
+        $b->branch($done);
+        $b->positionAtEnd($callSlow);
+        $b->call($slow, $p);
+        $b->branch($done);
+        $b->positionAtEnd($done);
+        $b->returnVoid();
+        $b->clearInsertionPosition();
+        $lib->LLVMAddAttributeAtIndex($fast->value, $fnIndex, $lib->LLVMCreateEnumAttribute(
+            $llvmCtx,
+            $lib->LLVMGetEnumAttributeKindForName('alwaysinline', 12),
+            0
+        ));
     }
 }

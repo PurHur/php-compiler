@@ -6,6 +6,7 @@ namespace PHPCompiler\VM;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\Type\Object_ as JitObjectType;
+use PHPCompiler\JIT\ClassNameTable;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitOperandTypeLabel;
@@ -241,48 +242,29 @@ final class VmObjectNumericOperandGuard
             }
             $entries[(int) $id] = (string) $name;
         }
-        $okBlock = BasicBlockHelper::append($context, 'obj_num_class_ok');
-        $fallbackBlock = BasicBlockHelper::append($context, 'obj_num_class_fallback');
-        $i64 = $context->getTypeFromString('int64');
-        $dispatch = [];
-        foreach ($overloadedIds as $id) {
-            $dispatch[$id] = 'ok';
-        }
-        foreach ($entries as $id => $name) {
-            $dispatch[$id] = $name;
-        }
-        if ([] === $dispatch) {
+        if ([] === $overloadedIds && [] === $entries) {
             ExceptionBridge::emitTypeErrorAndAbort($context, $messageForClass('object'));
-            $context->builder->positionAtEnd($okBlock);
+            $context->builder->positionAtEnd(BasicBlockHelper::append($context, 'obj_num_class_ok'));
 
             return;
         }
-        $ids = array_keys($dispatch);
-        $lastIdx = \count($ids) - 1;
-        foreach ($ids as $idx => $id) {
-            $matchBlock = BasicBlockHelper::append($context, 'obj_num_class_match_'.$id);
-            $nextBlock = $idx === $lastIdx
-                ? $fallbackBlock
-                : BasicBlockHelper::append($context, 'obj_num_class_next_'.$id);
-            $context->builder->branchIf(
-                $context->builder->icmp(
-                    Builder::INT_EQ,
-                    $classId,
-                    $i64->constInt($id, false)
-                ),
-                $matchBlock,
-                $nextBlock
-            );
-            $context->builder->positionAtEnd($matchBlock);
-            if ('ok' === $dispatch[$id]) {
-                $context->builder->branch($okBlock);
-            } else {
-                ExceptionBridge::emitTypeErrorAndAbort($context, $messageForClass($dispatch[$id]));
-            }
-            $context->builder->positionAtEnd($nextBlock);
+        $okBlock = BasicBlockHelper::append($context, 'obj_num_class_ok');
+        $raiseBlock = BasicBlockHelper::append($context, 'obj_num_class_raise');
+        $i64 = $context->getTypeFromString('int64');
+        $isOverloaded = null;
+        foreach ($overloadedIds as $id) {
+            $eq = $context->builder->icmp(Builder::INT_EQ, $classId, $i64->constInt($id, false));
+            $isOverloaded = null === $isOverloaded ? $eq : $context->builder->or($isOverloaded, $eq);
         }
-        $context->builder->positionAtEnd($fallbackBlock);
-        ExceptionBridge::emitTypeErrorAndAbort($context, $messageForClass('object'));
+        if (null === $isOverloaded) {
+            $context->builder->branch($raiseBlock);
+        } else {
+            $context->builder->branchIf($isOverloaded, $okBlock, $raiseBlock);
+        }
+
+        // One raise sequence; the class name is looked up at runtime (#36386 compile-size).
+        $context->builder->positionAtEnd($raiseBlock);
+        ClassNameTable::emitTypeErrorForClassId($context, $classId, $messageForClass);
         $context->builder->positionAtEnd($okBlock);
     }
 

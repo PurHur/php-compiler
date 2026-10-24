@@ -512,6 +512,31 @@ final class Linker
      *
      * @return list<string>
      */
+    /**
+     * Symbols the objects linked beside the script object (helper-runtime units, prelinked
+     * vendor objects) expect someone else to define. The script module must keep these
+     * external; everything else it defines can be internalized before optimization.
+     *
+     * @return list<string>|null null when nm is unavailable (caller must not internalize)
+     */
+    public static function undefinedSymbolsOfPeerObjects(): ?array
+    {
+        if (null === self::resolveNmBinary()) {
+            return null;
+        }
+        $objects = self::resolvePrelinkedVendorObjects();
+        foreach (HelperRuntimeCache::linkObjects() as $helperObject) {
+            $objects[] = $helperObject;
+        }
+        foreach ($objects as $object) {
+            if (!is_file($object)) {
+                return null;
+            }
+        }
+
+        return self::collectUndefinedSymbols($objects);
+    }
+
     private static function collectUndefinedSymbols(array $objectFiles): array
     {
         $nm = self::resolveNmBinary();
