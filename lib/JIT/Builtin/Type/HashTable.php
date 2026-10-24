@@ -22,6 +22,8 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM;
 use PHPLLVM\Builder;
+use PHPCompiler\JIT\ZendSortLlvm;
+use PHPCompiler\JIT\MergeSortLlvm;
 
 class HashTable extends Type
 {
@@ -3360,123 +3362,322 @@ class HashTable extends Type
         $this->context->builder->branchIf($tooSmall, $done, $work);
 
         $this->context->builder->positionAtEnd($work);
-        // Hoist loop scratch allocas to the work entry — alloca inside walk/swap
-        // grows the native stack O(n²) under thin AOT and SIGSEGVs around n≈1000
-        // (benchmarks/v2/sort-mixed.php, default 8 MiB stack) (#36385).
-        $swappedSlot = $this->context->builder->alloca($i1, 1, $tag.'_swapped');
-        $iSlot = $this->context->builder->alloca($sizeT, 1, $tag.'_i');
-        $needsSwapSlot = $this->context->builder->alloca($i1, 1, $tag.'_needs_swap');
-        $tmp = $this->context->builder->alloca($valueType, 1, $tag.'_tmp');
-        $this->context->builder->store($i1->constInt(1, false), $swappedSlot);
-        $passHead = $fn->appendBasicBlock($tag.'_pass_head');
-        $passBody = $fn->appendBasicBlock($tag.'_pass_body');
-        $this->context->builder->branch($passHead);
-
-        $this->context->builder->positionAtEnd($passHead);
-        $didSwap = $this->context->builder->load($swappedSlot);
-        $this->context->builder->branchIf($didSwap, $passBody, $done);
-
-        $this->context->builder->positionAtEnd($passBody);
-        $this->context->builder->store($i1->constInt(0, false), $swappedSlot);
-        $this->context->builder->store($zero, $iSlot);
-        $limit = $this->context->builder->sub($n, $one);
-        $walkHead = $fn->appendBasicBlock($tag.'_walk_head');
-        $walkBody = $fn->appendBasicBlock($tag.'_walk_body');
-        $passExit = $fn->appendBasicBlock($tag.'_pass_exit');
-        $this->context->builder->branch($walkHead);
-
-        $this->context->builder->positionAtEnd($walkHead);
-        $i = $this->context->builder->load($iSlot);
-        $atEnd = $this->context->builder->icmp(Builder::INT_UGE, $i, $limit);
-        $this->context->builder->branchIf($atEnd, $passExit, $walkBody);
-
-        $this->context->builder->positionAtEnd($walkBody);
-        $j = $this->context->builder->addNoSignedWrap($i, $one);
-        $valCur = $this->listEntryAt($ht, $htMap, $i);
-        $valNext = $this->listEntryAt($ht, $htMap, $j);
-        $typeCur = $this->context->builder->load($this->context->builder->structGep($valCur, $valueMap['type']));
-        $typeKind = $this->context->builder->and($typeCur, $i8->constInt(0x7f, false));
-        $isString = $this->context->builder->icmp(Builder::INT_EQ, $typeKind, $i8->constInt(Variable::TYPE_STRING & 0x7f, false));
-        $cmpStr = $fn->appendBasicBlock($tag.'_cmp_str');
-        $cmpLong = $fn->appendBasicBlock($tag.'_cmp_long');
-        $cmpValue = $fn->appendBasicBlock($tag.'_cmp_value');
-        $cmpObject = $fn->appendBasicBlock($tag.'_cmp_object');
-        $typeDispatch = $fn->appendBasicBlock($tag.'_type_dispatch');
-        $cmpDone = $fn->appendBasicBlock($tag.'_cmp_done');
-        $this->context->builder->branchIf($isString, $cmpStr, $typeDispatch);
-
-        $this->context->builder->positionAtEnd($cmpStr);
-        $strCur = $this->context->builder->call($this->context->lookupFunction('__value__readString'), $valCur);
-        $strNext = $this->context->builder->call($this->context->lookupFunction('__value__readString'), $valNext);
-        $cmp = $caseInsensitive
-            ? JitStringCompare::strcasecmp($this->context, $strCur, $strNext)
-            : JitStringCompare::strcmp($this->context, $strCur, $strNext);
-        $i64 = $this->context->getTypeFromString('int64');
-        $zeroI64 = $i64->constInt(0, false);
-        $strOutOfOrder = $reverse
-            ? $this->context->builder->icmp(Builder::INT_SLT, $cmp, $zeroI64)
-            : $this->context->builder->icmp(Builder::INT_SGT, $cmp, $zeroI64);
-        $this->context->builder->store($strOutOfOrder, $needsSwapSlot);
-        $this->context->builder->branch($cmpDone);
-
-        $this->context->builder->positionAtEnd($typeDispatch);
-        $isInteger = $this->context->builder->icmp(Builder::INT_EQ, $typeKind, $integerTag);
-        $checkObject = $fn->appendBasicBlock($tag.'_check_object');
-        $this->context->builder->branchIf($isInteger, $cmpLong, $checkObject);
-
-        $this->context->builder->positionAtEnd($checkObject);
-        $isObject = $this->context->builder->icmp(Builder::INT_EQ, $typeKind, $objectTag);
-        $this->context->builder->branchIf($isObject, $cmpObject, $cmpValue);
-
-        $this->context->builder->positionAtEnd($cmpLong);
-        $longCur = $this->context->builder->call($this->context->lookupFunction('__value__readLong'), $valCur);
-        $longNext = $this->context->builder->call($this->context->lookupFunction('__value__readLong'), $valNext);
-        $longOutOfOrder = $reverse
-            ? $this->context->builder->icmp(Builder::INT_SLT, $longCur, $longNext)
-            : $this->context->builder->icmp(Builder::INT_SGT, $longCur, $longNext);
-        $this->context->builder->store($longOutOfOrder, $needsSwapSlot);
-        $this->context->builder->branch($cmpDone);
-
-        $this->context->builder->positionAtEnd($cmpObject);
-        $objCur = $this->context->builder->call($this->context->lookupFunction('__value__readObject'), $valCur);
-        $objNext = $this->context->builder->call($this->context->lookupFunction('__value__readObject'), $valNext);
-        $objectCmp = SpaceshipRuntime::callObjectCompareSpaceship($this->context, $objCur, $objNext);
-        $objectOutOfOrder = $reverse
-            ? $this->context->builder->icmp(Builder::INT_SLT, $objectCmp, $zeroI64)
-            : $this->context->builder->icmp(Builder::INT_SGT, $objectCmp, $zeroI64);
-        $this->context->builder->store($objectOutOfOrder, $needsSwapSlot);
-        $this->context->builder->branch($cmpDone);
-
-        $this->context->builder->positionAtEnd($cmpValue);
-        $valueCmp = SpaceshipRuntime::callValueSpaceship($this->context, $valCur, $valNext);
-        $valueOutOfOrder = $reverse
-            ? $this->context->builder->icmp(Builder::INT_SLT, $valueCmp, $zeroI64)
-            : $this->context->builder->icmp(Builder::INT_SGT, $valueCmp, $zeroI64);
-        $this->context->builder->store($valueOutOfOrder, $needsSwapSlot);
-        $this->context->builder->branch($cmpDone);
-
-        $this->context->builder->positionAtEnd($cmpDone);
-        $needsSwap = $this->context->builder->load($needsSwapSlot);
-        $swapBlock = $fn->appendBasicBlock($tag.'_swap');
-        $advance = $fn->appendBasicBlock($tag.'_advance');
-        $this->context->builder->branchIf($needsSwap, $swapBlock, $advance);
-
-        $this->context->builder->positionAtEnd($swapBlock);
-        $this->context->builder->store($this->context->builder->load($valCur), $tmp);
-        $this->context->builder->store($this->context->builder->load($valNext), $valCur);
-        $this->context->builder->store($this->context->builder->load($tmp), $valNext);
-        $this->context->builder->store($i1->constInt(1, false), $swappedSlot);
-        $this->context->builder->branch($advance);
-
-        $this->context->builder->positionAtEnd($advance);
-        $this->context->builder->store($this->context->builder->addNoSignedWrap($i, $one), $iSlot);
-        $this->context->builder->branch($walkHead);
-
-        $this->context->builder->positionAtEnd($passExit);
-        $this->context->builder->branch($passHead);
+        // php-src zend_sort + stable tiebreak (was a bubble sort, O(n²): 1.5M ints never
+        // finished). Same algorithm => same order even for non-transitive mixed compares.
+        $values = $this->context->builder->load($this->context->builder->structGep($ht, $htMap['values']));
+        if (!$caseInsensitive) {
+            $this->emitSortPackedHomogeneousFastPaths($fn, $tag, $values, $n, $valueMap, $reverse, $done);
+        }
+        ZendSortLlvm::emit(
+            $this->context,
+            $values,
+            $n,
+            fn (PHPLLVM\Value $a, PHPLLVM\Value $b): PHPLLVM\Value => $this->emitSortPackedCompare(
+                $tag,
+                $valueMap,
+                $i8,
+                $integerTag,
+                $reverse,
+                $caseInsensitive,
+                $a,
+                $b
+            ),
+            $tag
+        );
+        $this->context->builder->branch($done);
 
         $this->context->builder->positionAtEnd($done);
         $this->context->builder->returnVoid();
+    }
+
+    /**
+     * sort()/rsort() SORT_REGULAR on arrays where zend_compare is a consistent total order,
+     * so any correct stable sort reproduces php-src's zend_sort result exactly:
+     * - all ints: O(n) radix sort on the payloads, no comparator calls at all;
+     * - all non-numeric strings: zend_compare is zend_binary_strcmp, so a stable merge sort
+     *   on memcmp skips php-src's per-comparison numeric-string checks.
+     * Branches to $done when it sorted; otherwise falls through to the generic zend_sort.
+     *
+     * @param array<string, int> $valueMap
+     */
+    private function emitSortPackedHomogeneousFastPaths(
+        PHPLLVM\Value\Function_ $fn,
+        string $tag,
+        PHPLLVM\Value $values,
+        PHPLLVM\Value $n,
+        array $valueMap,
+        bool $reverse,
+        PHPLLVM\BasicBlock $done
+    ): void {
+        $b = $this->context->builder;
+        $i64 = $this->context->getTypeFromString('int64');
+        $i8 = $this->context->getTypeFromString('int8');
+        $i1 = $this->context->getTypeFromString('int1');
+        $count = $b->intCast($n, $i64);
+        $c = static fn (int $v): PHPLLVM\Value => $i64->constInt($v, false);
+        $kindAt = fn (PHPLLVM\Value $i): PHPLLVM\Value => $b->and(
+            $b->load($b->structGep($b->inBoundsGep($values, $i), $valueMap['type'])),
+            $i8->constInt(0x7f, false)
+        );
+        $allLong = $b->alloca($i1);
+        $allStr = $b->alloca($i1);
+        $b->store($i1->constInt(1, false), $allLong);
+        $b->store($i1->constInt(1, false), $allStr);
+        $idx = $b->alloca($i64);
+        $b->store($c(0), $idx);
+        $head = $fn->appendBasicBlock($tag.'_homog_head');
+        $body = $fn->appendBasicBlock($tag.'_homog_body');
+        $decide = $fn->appendBasicBlock($tag.'_homog_decide');
+        $b->branch($head);
+        $b->positionAtEnd($head);
+        $b->branchIf($b->icmp(Builder::INT_SLT, $b->load($idx), $count), $body, $decide);
+        $b->positionAtEnd($body);
+        $i = $b->load($idx);
+        $k = $kindAt($i);
+        $b->store($b->and($b->load($allLong), $b->icmp(Builder::INT_EQ, $k, $i8->constInt(Variable::TYPE_NATIVE_LONG, false))), $allLong);
+        $b->store($b->and($b->load($allStr), $b->icmp(Builder::INT_EQ, $k, $i8->constInt(Variable::TYPE_STRING & 0x7f, false))), $allStr);
+        $b->store($b->add($i, $c(1)), $idx);
+        $b->branch($head);
+
+        $b->positionAtEnd($decide);
+        $radix = $fn->appendBasicBlock($tag.'_radix');
+        $notLong = $fn->appendBasicBlock($tag.'_not_all_long');
+        $generic = $fn->appendBasicBlock($tag.'_generic');
+        $b->branchIf($b->load($allLong), $radix, $notLong);
+
+        // all ints: radix sort the payloads in place (type bytes are all IS_LONG already)
+        $b->positionAtEnd($radix);
+        $keys = $b->pointerCast(
+            $b->call($this->context->lookupFunction('__mm__malloc'), $b->mul($count, $c(8))),
+            $this->context->getTypeFromString('int64*')
+        );
+        $payload = fn (PHPLLVM\Value $i): PHPLLVM\Value => $b->pointerCast(
+            $b->structGep($b->inBoundsGep($values, $i), $valueMap['value']),
+            $this->context->getTypeFromString('int64*')
+        );
+        $this->emitCountedLoop($fn, $tag.'_radix_in', $count, fn (PHPLLVM\Value $i) => $b->store($b->load($payload($i)), $b->gep($keys, $i)));
+        \PHPCompiler\JIT\IntRadixSortLlvm::emit($this->context, $keys, $count, $reverse, $tag);
+        $this->emitCountedLoop($fn, $tag.'_radix_out', $count, fn (PHPLLVM\Value $i) => $b->store($b->load($b->gep($keys, $i)), $payload($i)));
+        $b->call($this->context->lookupFunction('__mm__free'), $b->pointerCast($keys, $this->context->getTypeFromString('int8*')));
+        $b->branch($done);
+
+        // all strings: usable only when none is numeric (else zend_compare goes numeric)
+        $b->positionAtEnd($notLong);
+        $strCheck = $fn->appendBasicBlock($tag.'_str_check');
+        $b->branchIf($b->load($allStr), $strCheck, $generic);
+        $b->positionAtEnd($strCheck);
+        $anyNumeric = $b->alloca($i1);
+        $b->store($i1->constInt(0, false), $anyNumeric);
+        $scratch = $b->alloca($this->context->getTypeFromString('__value__'));
+        // IS_NULL first: __value__write* (inside the numeric parser) releases old contents.
+        $b->store($i8->constInt(Variable::TYPE_NULL, false), $b->structGep($scratch, $valueMap['type']));
+        $i32 = $this->context->getTypeFromString('int32');
+        $this->emitCountedLoop($fn, $tag.'_numchk', $count, function (PHPLLVM\Value $i) use ($b, $values, $scratch, $anyNumeric, $i32): void {
+            $st = \PHPCompiler\JIT\Builtin\NumericStringLlvm::call(
+                $this->context,
+                $b->call($this->context->lookupFunction('__value__readString'), $b->inBoundsGep($values, $i)),
+                $scratch
+            );
+            $numeric = $b->or(
+                $b->icmp(Builder::INT_EQ, $st, $i32->constInt(\PHPCompiler\JIT\Builtin\NumericStringLlvm::NUMERIC, false)),
+                $b->icmp(Builder::INT_UGE, $st, $i32->constInt(\PHPCompiler\JIT\Builtin\NumericStringLlvm::NUMERIC_OFLOW_POS, false))
+            );
+            $b->store($b->or($b->load($anyNumeric), $numeric), $anyNumeric);
+        });
+        $strSort = $fn->appendBasicBlock($tag.'_str_msort');
+        $b->branchIf($b->load($anyNumeric), $generic, $strSort);
+        $b->positionAtEnd($strSort);
+        $this->emitSortStringsByPrefix($fn, $tag, $values, $count, $reverse);
+        $b->branch($done);
+
+        $b->positionAtEnd($generic);
+    }
+
+    /**
+     * Stable sort of an all-string value array by zend_binary_strcmp: sorts contiguous
+     * {big-endian 8-byte prefix, original index} keys and compares string bytes only when
+     * prefixes tie, so the hot loop never chases a string pointer.
+     */
+    private function emitSortStringsByPrefix(
+        PHPLLVM\Value\Function_ $fn,
+        string $tag,
+        PHPLLVM\Value $values,
+        PHPLLVM\Value $count,
+        bool $reverse
+    ): void {
+        $b = $this->context->builder;
+        $i64 = $this->context->getTypeFromString('int64');
+        $i8p = $this->context->getTypeFromString('int8*');
+        $c = static fn (int $v): PHPLLVM\Value => $i64->constInt($v, false);
+        $strMap = $this->context->structFieldMap['__string__'];
+        $keyTy = $this->context->context->structType(false, $i64, $i64);
+        $keyPtrTy = $keyTy->pointerType(0);
+        $malloc = $this->context->lookupFunction('__mm__malloc');
+        $free = $this->context->lookupFunction('__mm__free');
+        $readString = $this->context->lookupFunction('__value__readString');
+        $keys = $b->pointerCast($b->call($malloc, $b->mul($count, $c(16))), $keyPtrTy);
+
+        $prefixSlot = $b->alloca($i64);
+        $byteIdx = $b->alloca($i64);
+        $this->emitCountedLoop($fn, $tag.'_pfx', $count, function (PHPLLVM\Value $i) use ($b, $values, $keys, $readString, $strMap, $i64, $i8p, $c, $prefixSlot, $byteIdx, $fn, $tag): void {
+            $s = $b->call($readString, $b->inBoundsGep($values, $i));
+            $len = $b->load($b->structGep($s, $strMap['length']));
+            $data = $b->pointerCast($b->structGep($s, $strMap['value']), $i8p);
+            $lim = $b->select($b->icmp(Builder::INT_ULT, $len, $c(8)), $len, $c(8));
+            $b->store($c(0), $prefixSlot);
+            $b->store($c(0), $byteIdx);
+            $h = $fn->appendBasicBlock($tag.'_pfx_byte_head');
+            $bd = $fn->appendBasicBlock($tag.'_pfx_byte_body');
+            $o = $fn->appendBasicBlock($tag.'_pfx_byte_out');
+            $b->branch($h);
+            $b->positionAtEnd($h);
+            $k = $b->load($byteIdx);
+            $b->branchIf($b->icmp(Builder::INT_ULT, $k, $lim), $bd, $o);
+            $b->positionAtEnd($bd);
+            $byte = $b->zExt($b->load($b->gep($data, $k)), $i64);
+            $shift = $b->mul($b->sub($c(7), $k), $c(8));
+            $b->store($b->bitwiseOr($b->load($prefixSlot), $b->shl($byte, $shift)), $prefixSlot);
+            $b->store($b->add($k, $c(1)), $byteIdx);
+            $b->branch($h);
+            $b->positionAtEnd($o);
+            $entry = $b->gep($keys, $i);
+            $b->store($b->load($prefixSlot), $b->structGep($entry, 0));
+            $b->store($i, $b->structGep($entry, 1));
+        });
+
+        // Hoisted: the comparator body is emitted inside the merge loop.
+        $res = $b->alloca($this->context->getTypeFromString('int1'));
+        MergeSortLlvm::emit(
+            $this->context,
+            $keys,
+            $count,
+            function (PHPLLVM\Value $x, PHPLLVM\Value $y) use ($b, $values, $readString, $reverse, $c, $fn, $tag, $res): PHPLLVM\Value {
+                $px = $b->load($b->structGep($x, 0));
+                $py = $b->load($b->structGep($y, 0));
+                $differ = $fn->appendBasicBlock($tag.'_pfx_differ');
+                $tie = $fn->appendBasicBlock($tag.'_pfx_tie');
+                $join = $fn->appendBasicBlock($tag.'_pfx_join');
+                $b->branchIf($b->icmp(Builder::INT_NE, $px, $py), $differ, $tie);
+                $b->positionAtEnd($differ);
+                $b->store($reverse ? $b->icmp(Builder::INT_ULT, $px, $py) : $b->icmp(Builder::INT_UGT, $px, $py), $res);
+                $b->branch($join);
+                $b->positionAtEnd($tie);
+                $r = \PHPCompiler\JIT\Builtin\ZendCompareLlvm::emitBinaryStrcmp(
+                    $this->context,
+                    $b->call($readString, $b->inBoundsGep($values, $b->load($b->structGep($x, 1)))),
+                    $b->call($readString, $b->inBoundsGep($values, $b->load($b->structGep($y, 1))))
+                );
+                $b->store($reverse ? $b->icmp(Builder::INT_SLT, $r, $c(0)) : $b->icmp(Builder::INT_SGT, $r, $c(0)), $res);
+                $b->branch($join);
+                $b->positionAtEnd($join);
+
+                return $b->load($res);
+            },
+            $tag.'_strpfx'
+        );
+
+        // Apply the permutation.
+        $elemSize = $b->ptrToInt($b->gep($values->typeOf()->constNull(), $c(1)), $i64);
+        $bytes = $b->mul($count, $elemSize);
+        $sorted = $b->pointerCast($b->call($malloc, $bytes), $values->typeOf());
+        LibcExtern::ensureMemcpyDecl($this->context);
+        $memcpy = $this->context->lookupFunction('memcpy');
+        $this->emitCountedLoop($fn, $tag.'_pfx_gather', $count, function (PHPLLVM\Value $j) use ($b, $keys, $values, $sorted, $memcpy, $elemSize, $i8p): void {
+            $src = $b->inBoundsGep($values, $b->load($b->structGep($b->gep($keys, $j), 1)));
+            $b->call($memcpy, $b->pointerCast($b->inBoundsGep($sorted, $j), $i8p), $b->pointerCast($src, $i8p), $elemSize);
+        });
+        $b->call($memcpy, $b->pointerCast($values, $i8p), $b->pointerCast($sorted, $i8p), $bytes);
+        $b->call($free, $b->pointerCast($sorted, $i8p));
+        $b->call($free, $b->pointerCast($keys, $i8p));
+    }
+
+    /** for (i = 0; i < $count; i++) $body(i) */
+    private function emitCountedLoop(PHPLLVM\Value\Function_ $fn, string $tag, PHPLLVM\Value $count, callable $body): void
+    {
+        $b = $this->context->builder;
+        $i64 = $this->context->getTypeFromString('int64');
+        $x = $b->alloca($i64);
+        $b->store($i64->constInt(0, false), $x);
+        $head = $fn->appendBasicBlock($tag.'_head');
+        $bodyB = $fn->appendBasicBlock($tag.'_body');
+        $out = $fn->appendBasicBlock($tag.'_out');
+        $b->branch($head);
+        $b->positionAtEnd($head);
+        $b->branchIf($b->icmp(Builder::INT_SLT, $b->load($x), $count), $bodyB, $out);
+        $b->positionAtEnd($bodyB);
+        $xv = $b->load($x);
+        $body($xv);
+        $b->store($b->add($xv, $i64->constInt(1, false)), $x);
+        $b->branch($head);
+        $b->positionAtEnd($out);
+    }
+
+    /**
+     * Three-way compare for sort()/rsort(): php_array_data_compare_unstable_i (zend_compare)
+     * for SORT_REGULAR, strcasecmp on strings for SORT_STRING|SORT_FLAG_CASE; negated for
+     * the reverse variants (php_array_reverse_*: result * -1).
+     *
+     * @param array<string, int> $valueMap
+     */
+    private function emitSortPackedCompare(
+        string $tag,
+        array $valueMap,
+        PHPLLVM\Type $i8,
+        PHPLLVM\Value $integerTag,
+        bool $reverse,
+        bool $caseInsensitive,
+        PHPLLVM\Value $a,
+        PHPLLVM\Value $b
+    ): PHPLLVM\Value {
+        $bd = $this->context->builder;
+        $i64 = $this->context->getTypeFromString('int64');
+        $fn = BasicBlockHelper::parentFunction($this->context);
+        $cmpSlot = $bd->alloca($i64);
+        $kind = fn (PHPLLVM\Value $v): PHPLLVM\Value => $bd->and(
+            $bd->load($bd->structGep($v, $valueMap['type'])),
+            $i8->constInt(0x7f, false)
+        );
+        $ka = $kind($a);
+        $kb = $kind($b);
+        $longs = $fn->appendBasicBlock($tag.'_cmp_longs');
+        $generic = $fn->appendBasicBlock($tag.'_cmp_generic');
+        $joined = $fn->appendBasicBlock($tag.'_cmp_join');
+        $bothLong = $bd->and($bd->icmp(Builder::INT_EQ, $ka, $integerTag), $bd->icmp(Builder::INT_EQ, $kb, $integerTag));
+        $bd->branchIf($bothLong, $longs, $generic);
+
+        $bd->positionAtEnd($longs);
+        $la = $bd->call($this->context->lookupFunction('__value__readLong'), $a);
+        $lb = $bd->call($this->context->lookupFunction('__value__readLong'), $b);
+        $bd->store(
+            $bd->sub(
+                $bd->zExt($bd->icmp(Builder::INT_SGT, $la, $lb), $i64),
+                $bd->zExt($bd->icmp(Builder::INT_SLT, $la, $lb), $i64)
+            ),
+            $cmpSlot
+        );
+        $bd->branch($joined);
+
+        $bd->positionAtEnd($generic);
+        if ($caseInsensitive) {
+            $strs = $fn->appendBasicBlock($tag.'_cmp_strcase');
+            $other = $fn->appendBasicBlock($tag.'_cmp_other');
+            $stringKind = $i8->constInt(Variable::TYPE_STRING & 0x7f, false);
+            $bothStr = $bd->and($bd->icmp(Builder::INT_EQ, $ka, $stringKind), $bd->icmp(Builder::INT_EQ, $kb, $stringKind));
+            $bd->branchIf($bothStr, $strs, $other);
+            $bd->positionAtEnd($strs);
+            $sa = $bd->call($this->context->lookupFunction('__value__readString'), $a);
+            $sb = $bd->call($this->context->lookupFunction('__value__readString'), $b);
+            $bd->store($bd->intCast(JitStringCompare::strcasecmp($this->context, $sa, $sb), $i64), $cmpSlot);
+            $bd->branch($joined);
+            $bd->positionAtEnd($other);
+        }
+        $bd->store(\PHPCompiler\JIT\Builtin\ZendCompareLlvm::call($this->context, $a, $b), $cmpSlot);
+        $bd->branch($joined);
+
+        $bd->positionAtEnd($joined);
+        $r = $bd->load($cmpSlot);
+
+        return $reverse ? $bd->sub($i64->constInt(0, false), $r) : $r;
     }
 
     /**

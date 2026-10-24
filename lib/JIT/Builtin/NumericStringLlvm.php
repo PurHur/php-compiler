@@ -19,8 +19,10 @@ use PHPLLVM\Value;
  * IS_LONG, everything else numeric IS_DOUBLE (zend_strtod — libc strtod here, same
  * result for the decimal forms this accepts).
  *
- * Returns {@see self::NUMERIC} (whole string numeric), {@see self::LEADING} (numeric
- * prefix followed by garbage — callers emit "A non-numeric value encountered") or
+ * Returns {@see self::NUMERIC} (whole string numeric), {@see self::NUMERIC_OFLOW_POS} /
+ * {@see self::NUMERIC_OFLOW_NEG} (whole string numeric, integer-shaped, overflowed
+ * zend_long — php-src's `oflow` out-param), {@see self::LEADING} (numeric prefix followed
+ * by garbage — callers emit "A non-numeric value encountered") or
  * {@see self::NON_NUMERIC} (out untouched — callers throw the operator's TypeError).
  */
 final class NumericStringLlvm
@@ -32,6 +34,12 @@ final class NumericStringLlvm
     public const LEADING = 1;
 
     public const NON_NUMERIC = 2;
+
+    /** Whole string numeric, integer-shaped but beyond ZEND_LONG_MAX (out is IS_DOUBLE). */
+    public const NUMERIC_OFLOW_POS = 3;
+
+    /** Whole string numeric, integer-shaped but below ZEND_LONG_MIN (out is IS_DOUBLE). */
+    public const NUMERIC_OFLOW_NEG = 4;
 
     /** @return Value i32 status */
     public static function call(Context $context, Value $str, Value $out): Value
@@ -80,6 +88,21 @@ final class NumericStringLlvm
         $len = $b->load($b->structGep($str, $map['length']));
         $pos = $b->alloca($i64);
         $b->store($zero, $pos);
+        // php-src's fast reject: every byte that can start a numeric string (whitespace,
+        // sign, '.', digit) is <= '9'.
+        $scan = $fn->appendBasicBlock('scan');
+        $reject = $fn->appendBasicBlock('fast_reject');
+        $b->branchIf(
+            $b->bitwiseAnd(
+                $b->icmp(Builder::INT_UGT, $len, $zero),
+                $b->icmp(Builder::INT_UGT, $b->load($data), $ch('9'))
+            ),
+            $reject,
+            $scan
+        );
+        $b->positionAtEnd($reject);
+        $b->returnValue($i32->constInt(self::NON_NUMERIC, false));
+        $b->positionAtEnd($scan);
 
         // byte at index (caller guarantees idx < len)
         $at = static fn (Value $idx): Value => $b->load($b->gep($data, $idx));
@@ -220,6 +243,12 @@ final class NumericStringLlvm
 
         // Accumulate negatively so ZEND_LONG_MIN parses; overflow → double (zend_strtod).
         $b->positionAtEnd($longPath);
+        $negative = $b->icmp(
+            Builder::INT_EQ,
+            $b->select($b->icmp(Builder::INT_UGT, $digitsStart, $start), $at($start), $ch('+')),
+            $ch('-')
+        );
+        $oflowPath = $fn->appendBasicBlock('oflow_path');
         $accSlot = $b->alloca($i64);
         $idxSlot = $b->alloca($i64);
         $b->store($zero, $accSlot);
@@ -236,10 +265,10 @@ final class NumericStringLlvm
         $b->positionAtEnd($accBody);
         $digit = $b->zExt($b->sub($at($idx), $ch('0')), $i64);
         $mul = $b->call($smul, $b->load($accSlot), $i64->constInt(10, false));
-        $b->branchIf($b->extractValue($mul, 1), $doublePath, $accMulOk);
+        $b->branchIf($b->extractValue($mul, 1), $oflowPath, $accMulOk);
         $b->positionAtEnd($accMulOk);
         $sub = $b->call($ssub, $b->extractValue($mul, 0), $digit);
-        $b->branchIf($b->extractValue($sub, 1), $doublePath, $accStep);
+        $b->branchIf($b->extractValue($sub, 1), $oflowPath, $accStep);
         $b->positionAtEnd($accStep);
         $b->store($b->extractValue($sub, 0), $accSlot);
         $b->store($b->add($idx, $one), $idxSlot);
@@ -247,11 +276,6 @@ final class NumericStringLlvm
 
         $b->positionAtEnd($accDone);
         $acc = $b->load($accSlot);
-        $negative = $b->icmp(
-            Builder::INT_EQ,
-            $b->select($b->icmp(Builder::INT_UGT, $digitsStart, $start), $at($start), $ch('+')),
-            $ch('-')
-        );
         $negWrite = $fn->appendBasicBlock('neg_write');
         $posCheck = $fn->appendBasicBlock('pos_check');
         $posWrite = $fn->appendBasicBlock('pos_write');
@@ -261,10 +285,20 @@ final class NumericStringLlvm
         $b->returnValue($status);
         $b->positionAtEnd($posCheck);
         $minLong = $i64->constInt(\PHP_INT_MIN, true);
-        $b->branchIf($b->icmp(Builder::INT_EQ, $acc, $minLong), $doublePath, $posWrite);
+        $b->branchIf($b->icmp(Builder::INT_EQ, $acc, $minLong), $oflowPath, $posWrite);
         $b->positionAtEnd($posWrite);
         $b->call($writeLong, $out, $b->sub($zero, $acc));
         $b->returnValue($status);
+
+        // Integer-shaped but out of zend_long range: double value + php-src's oflow sign.
+        $b->positionAtEnd($oflowPath);
+        $od = $b->call($strtod, $b->gep($data, $start), $context->getTypeFromString('int8**')->constNull());
+        $b->call($writeDouble, $out, $od);
+        $b->returnValue($b->select(
+            $b->icmp(Builder::INT_EQ, $status, $i32->constInt(self::NUMERIC, false)),
+            $b->select($negative, $i32->constInt(self::NUMERIC_OFLOW_NEG, false), $i32->constInt(self::NUMERIC_OFLOW_POS, false)),
+            $status
+        ));
 
         // strtod stops at the first byte it cannot use, which is at or before numEnd for
         // every form accepted above (no hex/inf/nan can reach here).

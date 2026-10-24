@@ -103,6 +103,7 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
+
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
@@ -8692,6 +8693,10 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/PowLongLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/ClassNameTable.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompileErrorSuppressEndBlockAndSlotInherit.php';
 require_once __DIR__.'/../../../lib/Compiler/Concern/CompileAnonymousFunctionGeneratorAndNever.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ZendCompareLlvm.php';
+require_once __DIR__.'/../../../lib/JIT/IntRadixSortLlvm.php';
+require_once __DIR__.'/../../../lib/JIT/MergeSortLlvm.php';
+require_once __DIR__.'/../../../lib/JIT/ZendSortLlvm.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 
