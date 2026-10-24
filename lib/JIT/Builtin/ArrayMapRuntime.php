@@ -111,6 +111,10 @@ final class ArrayMapRuntime
             $callback->compileTimeString
         )) {
             $name = $callback->compileTimeString;
+            $userFn = \PHPCompiler\JIT\UserCallableResolver::userFunctionCall($context, $callback);
+            if (null !== $userFn) {
+                return ArrayMapLlvm::mapStaticMethod($context, $ht, $userFn);
+            }
             if (null !== $name) {
                 return ArrayMapLlvm::mapBuiltin($context, $ht, $name);
             }

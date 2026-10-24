@@ -47,6 +47,13 @@ final class UsortRuntime
 
     public static function usortPacked(Context $context, JITVariable $array, JITVariable $callback): Value
     {
+        $userFn = \PHPCompiler\JIT\UserCallableResolver::userFunctionCall($context, $callback);
+        if (null !== $userFn && !ArrayBuiltinHelper::isNativeArray($array->type)) {
+            $ht = HashTableHelper::separateContainerForWrite($context, $array);
+            \PHPCompiler\JIT\UsortPackedLlvm::sortPackedWithFunction($context, $ht, $userFn);
+
+            return $context->getTypeFromString('int1')->constInt(1, false);
+        }
         UsortCallbackPolicy::assertJitLowerable($context, $callback);
         if (UsortCallbackPolicy::isClosureJitLowerable($callback)) {
             self::sortPackedWithClosure($context, $array, $callback);
